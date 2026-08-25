@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../application/notification_providers.dart';
 import '../../auth/application/auth_providers.dart';
+import '../../onboarding/application/onboarding_providers.dart';
 import '../../profile/application/user_providers.dart';
 
 /// App-session flag tracking whether the gate has already requested permission.
@@ -42,8 +43,12 @@ class _PermissionGateState extends ConsumerState<PermissionGate> {
     final profile = ref.watch(userProfileProvider).valueOrNull;
     final setupDone = profile?.displayName != null;
     final attempted = ref.watch(permissionGateAttemptedProvider);
+    // #627: both this gate and the onboarding card mount on /home and both fire
+    // post-frame on its first render. Without the wait, the OS alert lands on
+    // top of the card — green in every widget test, broken on a device.
+    final onboardingPending = ref.watch(onboardingBlocksProvider);
 
-    if (setupDone && !attempted) {
+    if (setupDone && !attempted && !onboardingPending) {
       // Defer provider mutation + side-effect to after frame: Riverpod
       // forbids modifying providers from within a build.
       WidgetsBinding.instance.addPostFrameCallback((_) {

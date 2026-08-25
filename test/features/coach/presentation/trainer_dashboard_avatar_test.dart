@@ -17,6 +17,8 @@ import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
 import 'package:treino/l10n/app_l10n.dart';
 
+import '../../../helpers/onboarding_test_helpers.dart';
+
 // The dashboard header avatar was a bare decoration — no tap handler at all
 // (unlike the bell right next to it, which was already wired to the
 // pending-requests modal and only looked inert at badgeCount == 0). It now
@@ -27,6 +29,7 @@ import 'package:treino/l10n/app_l10n.dart';
 const _kTrainer = 'trainer-1';
 
 UserProfile _trainerProfile() => UserProfile(
+      onboardingSeen: allSurfacesSeen(),
       uid: _kTrainer,
       email: 'mateo@test.com',
       displayName: 'Mateo Presset',

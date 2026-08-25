@@ -15,6 +15,6 @@
     "seed:emulator:clear": "FIREBASE_AUTH_EMULATOR_HOST=localhost:9099 FIRESTORE_EMULATOR_HOST=localhost:8080 node seed_emulator_full.js --clear"
   },
   "dependencies": {
-    "firebase-admin": "^12.0.0"
+    "firebase-admin": "^13.5.0"
   }
 }

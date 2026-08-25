@@ -36,6 +36,22 @@ Lectura obligatoria antes de tu primer PR:
 3. `flutter test` → verde si hay tests para lo que tocaste (Strict TDD habilitado — ver §Workflow SDD).
 4. Si tocaste un freezed → `dart run build_runner build --delete-conflicting-outputs`.
 
+### Gate de regresión visual del Coach Hub
+
+Los cambios de UI en `lib/features/coach_hub/` pasan además por un gate de
+goldens que corre **sólo en CI** (job *Visual Gate (Coach Hub)*). Localmente se
+saltea a propósito: los PNGs están rasterizados por el runner ubuntu y en macOS
+darían rojo por antialiasing, no por un defecto real.
+
+Si tu cambio visual es deliberado, **no edites los PNGs a mano ni los regeneres
+en tu máquina** — se regeneran en el runner con un commit marcado:
+
+```bash
+git commit --allow-empty -m "chore(gate): regenerar goldens [regen-goldens]"
+```
+
+→ Cómo funciona, qué pantallas cubre y cómo agregar una: [docs/visual-gate.md](./visual-gate.md).
+
 ## Commits
 
 Convención **Conventional Commits**: `<tipo>(<scope>): <mensaje imperativo>` con cuerpo opcional.

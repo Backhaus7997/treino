@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
-import '../../../profile/domain/experience_level.dart';
 import '../../domain/routine.dart';
-import '../../domain/routine_day_duration.dart';
+import 'routine_meta.dart';
 
 /// Visual variant of [RoutineCard]. Used to alternate between mint (accent)
 /// and magenta (highlight) glow per the design mockup.
@@ -51,30 +51,6 @@ class RoutineCard extends StatelessWidget {
   /// them and how long a session runs; the exact per-day exercise and set
   /// counts already live one tap away, on the detail screen's stat row.
   ///
-  /// Duration is omitted entirely when nothing is measurable — never "0 min"
-  /// or a dash. Trainer- and community-published routines carry no guaranteed
-  /// duration data, so a placeholder there would be noise on exactly the part
-  /// of the catalogue that is growing.
-  List<String> _metaSegments(AppL10n l10n) {
-    final segments = <String>[routine.level.displayNameEs];
-    // A routine with no days is a valid but degenerate document (spec
-    // SCENARIO-052; the detail screen has its own empty state for it).
-    // "0 días/sem" would be noise, so the segment is dropped — same rule the
-    // duration below follows.
-    if (routine.days.isNotEmpty) {
-      segments.add(l10n.routineCardDaysPerWeek(routine.days.length));
-    }
-    final duration = estimateRoutineSessionMinutes(routine);
-    final minutes = duration.minutes;
-    if (minutes != null) {
-      // "~" marks a computed estimate, same convention the detail screen's
-      // MINUTOS tile uses (see RoutineDayDuration).
-      segments.add(
-        l10n.routineCardMinutes(duration.authored ? '$minutes' : '~$minutes'),
-      );
-    }
-    return segments;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -133,7 +109,7 @@ class RoutineCard extends StatelessWidget {
       );
     }
     Widget meta = Text(
-      _metaSegments(AppL10n.of(context)).join(' · '),
+      routineMetaSegments(routine, AppL10n.of(context)).join(' · '),
       style: metaStyle,
       strutStyle: metaStrut,
       maxLines: useAccessibleLayout ? null : 2,
@@ -158,7 +134,7 @@ class RoutineCard extends StatelessWidget {
       height: 40,
       decoration: BoxDecoration(
         color: tint.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
         border: Border.all(
           color: tint.withValues(alpha: 0.3),
           width: 1,
@@ -173,7 +149,7 @@ class RoutineCard extends StatelessWidget {
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
           color: palette.bgCard,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
           border: Border.all(color: tint.withValues(alpha: 0.35), width: 1),
           boxShadow: [
             BoxShadow(

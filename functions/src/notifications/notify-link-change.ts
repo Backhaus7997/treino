@@ -23,6 +23,9 @@ import * as admin from "firebase-admin";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 import { sendFcm } from "./send-fcm";
+import { enqueueMail } from "../mail/enqueue-mail";
+import { resolveAthleteName, resolveTrainerName } from "../mail/format";
+import { COACH_HUB_URL } from "../mail/templates";
 
 function getApp(): admin.app.App {
   try {
@@ -35,15 +38,75 @@ function getApp(): admin.app.App {
 type LinkData = Record<string, unknown>;
 
 /**
+ * Queues the email counterpart of a link push, when the branch has one.
+ *
+ * Only the two branches where somebody stands to LOSE something get a mail:
+ *   - `pending` → the trainer. An unseen request is a lost athlete.
+ *   - `pending` → `active` → the athlete. Their request was granted.
+ *
+ * `paused` → `active` is a resume, not an acceptance, and gets no mail. Neither
+ * do `paused` and `terminated`: nothing is waiting on the recipient.
+ *
+ * Scope is the link id, so a pair that terminates and links again later still
+ * receives a fresh mail rather than colliding with the first one.
+ *
+ * @param app          - Admin SDK app.
+ * @param linkId       - trainer_links document ID; the dedupe scope.
+ * @param after        - Snapshot data after the write.
+ * @param afterStatus  - Resolved status branch.
+ * @param beforeStatus - Previous status, to tell accept apart from resume.
+ */
+async function enqueueLinkMail(
+  app: admin.app.App,
+  linkId: string,
+  after: LinkData,
+  afterStatus: string,
+  beforeStatus: string | undefined,
+): Promise<void> {
+  const trainerId = after.trainerId as string;
+  const athleteId = after.athleteId as string;
+
+  if (afterStatus === "pending") {
+    const athleteName = await resolveAthleteName(app, athleteId);
+    await enqueueMail(app, {
+      toUid: trainerId,
+      kind: "link-requested",
+      scope: linkId,
+      // El destinatario es el PF, asi que el CTA va al Coach Hub. El default
+      // (la landing) es para los mails que reciben ATLETAS.
+      params: { athleteName, ctaUrl: COACH_HUB_URL },
+      // The recipient is always the trainer, who HAS a settings screen for
+      // this row (kNotifTypes `nueva_solicitud`). Honour their toggle.
+      prefKey: "nueva_solicitud",
+    });
+    return;
+  }
+
+  // Acceptance only — a resume (paused → active) is not news worth a mail.
+  if (afterStatus === "active" && beforeStatus !== "paused") {
+    const trainerName = await resolveTrainerName(app, trainerId);
+    await enqueueMail(app, {
+      toUid: athleteId,
+      kind: "link-accepted",
+      scope: linkId,
+      params: { trainerName },
+    });
+  }
+}
+
+/**
  * Pure handler extracted for jest testability.
  *
  * @param app       - Admin SDK app.
+ * @param linkId    - trainer_links document ID (event.params.linkId). Used as
+ *                    the email dedupe scope.
  * @param before    - Snapshot data before the write (undefined for creates).
  * @param after     - Snapshot data after the write (undefined for deletes).
  * @param messaging - Optional messaging instance for test injection.
  */
 export async function notifyOnLinkChangeHandler(
   app: admin.app.App,
+  linkId: string,
   before: LinkData | undefined,
   after: LinkData | undefined,
   messaging?: admin.messaging.Messaging,
@@ -136,6 +199,12 @@ export async function notifyOnLinkChangeHandler(
     },
     messaging,
   );
+
+  // Best-effort: a queue failure must never take the push down with it.
+  await enqueueLinkMail(app, linkId, after, afterStatus, beforeStatus)
+    .catch((error: unknown) => {
+      logger.warn("notifyOnLinkChange: mail enqueue failed", { linkId, error });
+    });
 }
 
 /**
@@ -147,6 +216,6 @@ export const notifyOnLinkChange = onDocumentWritten(
   async (event) => {
     const before = event.data?.before?.data() as LinkData | undefined;
     const after = event.data?.after?.data() as LinkData | undefined;
-    await notifyOnLinkChangeHandler(getApp(), before, after);
+    await notifyOnLinkChangeHandler(getApp(), event.params.linkId, before, after);
   },
 );

@@ -16,6 +16,8 @@ import 'package:treino/features/profile/domain/user_session_stats.dart';
 import 'package:treino/features/profile/profile_screen.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
+import '../../helpers/onboarding_test_helpers.dart';
+
 class MockUser extends Mock implements User {}
 
 class _TestAuthNotifier extends AuthNotifier {
@@ -33,6 +35,7 @@ class _TestAuthNotifier extends AuthNotifier {
 }
 
 UserProfile _testProfile() => UserProfile(
+      onboardingSeen: allSurfacesSeen(),
       uid: 'uid-test',
       email: 'test@test.com',
       displayName: 'Test User',

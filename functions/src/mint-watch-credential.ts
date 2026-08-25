@@ -93,28 +93,52 @@ export async function runMintWatchCredential(
 export const mintWatchCredential = functions.onCall(
   // App Check DESACTIVADO temporalmente (2026-08-18), decision del dueno.
   //
-  // POR QUE: App Attest no emite token valido ni en un build de TestFlight
-  // firmado para distribucion. Medido: la funcion devuelve 401 con
-  // "Decoding App Check token failed" tanto con firma de desarrollo como con
-  // firma de distribucion, asi que el reloj nunca recibe credencial y se queda
-  // en "vinculando" para siempre. `deliverCredential` traga el error en su
-  // catch (_), asi que el sintoma no se parece en nada a la causa.
+  // POR QUE: el cliente mandaba un token que el server no podia decodificar.
+  // Medido en su momento: 401 con "Decoding App Check token failed" tanto con
+  // firma de desarrollo como con firma de distribucion, asi que el reloj nunca
+  // recibia credencial y se quedaba en "vinculando" para siempre.
+  // `deliverCredential` traga el error en su catch (_), asi que el sintoma no
+  // se parece en nada a la causa.
   //
-  // POR QUE ES ACEPTABLE HOY: el enforcement de App Check esta UNENFORCED en
-  // TODO el proyecto — verificado contra la API el 2026-08-18:
+  // CORRECCION (2026-08-25, #783): la frase original decia que App Attest "no
+  // emite token valido ni en un build de TestFlight firmado para
+  // distribucion". Generaliza de mas. Contando los logs de ESTA funcion —
+  // jsonPayload.verifications.app, que firebase-functions v2 escribe sola en
+  // cada llamada — cruzados con el user-agent:
+  //
+  //   iPhone fisico (hw=iPhone17_1, iOS 26.5.2/26.6):  8 VALID / 2 INVALID
+  //   Android (okhttp/3.12.13):                        1 VALID / 8 INVALID
+  //
+  // O sea que App Attest en iOS ya funciona casi siempre y el que esta roto es
+  // Play Integrity en Android, con el ultimo rechazo el 2026-08-24. Ver
+  // docs/security.md §4.8.2.
+  //
+  // POR QUE ES ACEPTABLE HOY: el enforcement POR API esta UNENFORCED en todo
+  // el proyecto — verificado contra la API el 2026-08-18 y re-verificado el
+  // 2026-08-25:
   //   firestore.googleapis.com        -> UNENFORCED
   //   identitytoolkit.googleapis.com  -> UNENFORCED
-  // Esta funcion era lo UNICO que lo exigia. La data de los atletas ya se lee
-  // y escribe sin atestacion, asi que el gate aca no cerraba una puerta que
-  // estuviera cerrada en otro lado.
+  // La data de los atletas ya se lee y escribe sin atestacion, asi que el gate
+  // aca no cerraba una puerta que estuviera cerrada en otro lado.
+  //
+  // CORRECCION (2026-08-25, #783): decia "esta funcion era lo UNICO que lo
+  // exigia". No es asi — `deleteAccount` y `addAlias` tienen
+  // `enforceAppCheck: true` y lo aplican HOY, porque el flag del callable lo
+  // aplica la propia funcion y no depende del enforcement por API de la
+  // consola. Medido: `deleteAccount` nunca devolvio 200, y sus unicos tres
+  // intentos autenticados (2026-08-11) fueron rechazados con app=INVALID.
   //
   // LO QUE SIGUE PROTEGIENDO: `request.auth` es obligatorio y el uid sale
   // unicamente del token verificado (ver abajo). No se puede pedir credencial
   // para otro atleta.
   //
-  // PARA RESTAURARLO: volver a `enforceAppCheck: true` cuando App Attest emita
-  // token. El arreglo de fondo pide instrumentar el cliente y subir un build
-  // nuevo; hasta entonces esto queda como deuda, no como decision de diseno.
+  // PARA RESTAURARLO: volver a `enforceAppCheck: true` cuando el cliente emita
+  // atestacion valida en las DOS plataformas. No hace falta instrumentar nada
+  // para saberlo — firebase-functions v2 ya loguea la verificacion de cada
+  // llamada; contar sobre `jsonPayload.verifications.app` filtrando por
+  // `jsonPayload.message:"Callable request verification"` y pedir cero INVALID
+  // por plataforma. Al 2026-08-25 falta Android (1 VALID / 8 INVALID). Hasta
+  // entonces esto queda como deuda, no como decision de diseno.
   { region: "southamerica-east1", enforceAppCheck: false },
   async (request): Promise<{ customToken: string }> => {
     if (!request.auth) {

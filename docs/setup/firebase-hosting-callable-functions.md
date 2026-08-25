@@ -159,10 +159,30 @@ Disabling the invoker IAM check does **not** make the function unprotected. It
 moves authentication from the front door into the handler, where it already
 lives:
 
-- `enforceAppCheck: true` on the `onCall` declaration
-- Firebase Auth validation inside the handler
+- Firebase Auth validation inside the handler (`request.auth` is mandatory)
+- Per-callable authorization — e.g. `deleteAccount` also enforces
+  `callerUid === data.uid`, so a caller can only delete their **own** account
 
-This is the same posture `deleteAccount` has had since it shipped.
+> **`enforceAppCheck` is NOT part of this posture — corrected 2026-08-25.**
+>
+> This section used to list `enforceAppCheck: true` as a pillar and claimed it
+> was *"the same posture `deleteAccount` has had since it shipped"*. Both parts
+> were wrong:
+>
+> - `deleteAccount` only carried the flag between 2026-07-20 (`2bb8d1c7`) and
+>   2026-08-25, and during that month **account deletion never once returned
+>   200** — every authenticated attempt was rejected because the client could
+>   not produce a valid attestation. It was removed for that reason
+>   ([#811](https://github.com/Backhaus7997/treino/pull/811)).
+> - Of the five deployed callables, only `addAlias` still sets the flag, and it
+>   is called exclusively from the Coach Hub web, which never activates App
+>   Check — so it fails every time, with the error swallowed in a `debugPrint`.
+>
+> Treat App Check as defense-in-depth that is **currently not load-bearing on
+> any callable**, not as a pillar of this posture. The live inventory of which
+> callable enforces what — and the written reason for each exemption — is
+> `functions/src/__tests__/appcheck-enforcement.test.ts`, derived from the AST
+> of `index.ts` so it cannot go stale. Background: `docs/security.md` §4.8.
 
 ---
 

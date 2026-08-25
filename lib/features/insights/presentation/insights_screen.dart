@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
@@ -373,7 +374,7 @@ class _WeekStripCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
       ),
       padding: const EdgeInsets.all(18),
       child: Column(
@@ -522,7 +523,7 @@ class _DayChip extends StatelessWidget {
         alignment: Alignment.center,
         child: Icon(
           TreinoIcon.checkCircleFill,
-          color: palette.bg,
+          color: TreinoButtonTokens.foreground(context),
           size: 18,
         ),
       );
@@ -622,7 +623,7 @@ class _DailyMusclesCard extends ConsumerWidget {
     return Container(
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
       ),
       padding: const EdgeInsets.all(18),
       child: Column(
@@ -827,6 +828,16 @@ class _StatsHubTileList extends StatelessWidget {
           subtitle: l10n.insightsTileMeasurementsSubtitle,
           onTap: () => context.push('/home/insights/measurements'),
         ),
+        const SizedBox(height: 12),
+        // Séptima entrada del hub, y la única que no mide kilos ni volumen.
+        // Va al final a propósito: suma una dimensión al hub, no reordena la
+        // jerarquía de lo que ya estaba (#643).
+        _StatTile(
+          icon: TreinoIcon.wellbeing,
+          title: l10n.insightsTileWellbeingTitle,
+          subtitle: l10n.insightsTileWellbeingSubtitle,
+          onTap: () => context.push('/home/insights/wellbeing'),
+        ),
       ],
     );
   }
@@ -858,7 +869,7 @@ class _StatTile extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: palette.bgCard,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
         ),
         padding: const EdgeInsets.all(18),
         child: Row(
@@ -912,7 +923,7 @@ class _VolverButton extends StatelessWidget {
           side: BorderSide(color: palette.border, width: 1),
           minimumSize: const Size.fromHeight(56),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(9999),
+            borderRadius: BorderRadius.circular(AppRadius.full),
           ),
         ),
         child: Text(

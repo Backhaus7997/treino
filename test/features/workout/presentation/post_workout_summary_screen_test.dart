@@ -108,7 +108,7 @@ Widget _buildWithRouter({
   SessionHighlights highlights = emptySessionHighlights,
   bool reduceMotion = false,
   double? textScale,
-  CheckIn? existingCheckIn,
+  List<CheckIn> dayCheckIns = const [],
 }) {
   final router = GoRouter(
     initialLocation: '/workout/session-summary/s1',
@@ -153,10 +153,10 @@ Widget _buildWithRouter({
     sessionHighlightsProvider.overrideWith(
       (ref, key) => Future.value(highlights),
     ),
-    // Always overridden: el paso de check-in (#643) lee el registro del día y
-    // el provider real iría a Firestore desde un widget test.
-    checkInByDateProvider.overrideWith(
-      (ref, key) => Future.value(existingCheckIn),
+    // Always overridden: el paso de check-in (#643) lee los registros del día
+    // y el provider real iría a Firestore desde un widget test.
+    checkInsForDateProvider.overrideWith(
+      (ref, key) => Future.value(dayCheckIns),
     ),
     currentUidProvider.overrideWithValue('u1'),
     if (notifierOverride != null)
@@ -612,24 +612,55 @@ void main() {
   });
 
   testWidgets(
-      'check-in: con registro del día muestra REGISTRADO en vez de la escala',
-      (tester) async {
+      'check-in: con registro de ESTA sesión muestra REGISTRADO en vez de la '
+      'escala', (tester) async {
     await tester.pumpWidget(_buildWithRouter(
       summaryOverride: () => (session: _makeSession(), setLogs: []),
-      existingCheckIn: CheckIn(
-        date: checkInDateKey(DateTime.now()),
-        feeling: CheckInFeeling.bien,
-        recordedAt: DateTime.now().toUtc(),
-      ),
+      dayCheckIns: [
+        CheckIn(
+          id: '2026-05-18_1779000000000',
+          date: checkInDateKey(DateTime.now()),
+          feeling: CheckInFeeling.bien,
+          recordedAt: DateTime.now().toUtc(),
+          sessionId: 's1',
+        ),
+      ],
     ));
     await tester.pumpAndSettle();
 
     expect(find.text('REGISTRADO'), findsOneWidget);
     expect(find.text('Editar'), findsOneWidget);
-    // El id del doc es la fecha: un segundo registro pisa al primero. Mostrar
-    // el que ya existe es lo que evita que eso sea una pérdida silenciosa.
+    // Editar reabre el sheet sobre el MISMO documento, así que la escala no
+    // vuelve a ofrecerse como si el registro no existiera.
     expect(find.text('😞'), findsNothing);
     expect(find.text('🙂'), findsOneWidget);
+  });
+
+  testWidgets(
+      'check-in: el registro de OTRA sesión del mismo día no cuenta como '
+      'propio', (tester) async {
+    // El bug que #643 vino a cerrar: con la fecha como id del documento, el
+    // segundo entreno del día veía el registro del primero como suyo y, al
+    // guardar, lo borraba. Ahora se le ofrece su propio paso.
+    await tester.pumpWidget(_buildWithRouter(
+      summaryOverride: () => (session: _makeSession(), setLogs: []),
+      dayCheckIns: [
+        CheckIn(
+          id: '2026-05-18_1779000000000',
+          date: checkInDateKey(DateTime.now()),
+          feeling: CheckInFeeling.muyMal,
+          recordedAt: DateTime.now().toUtc(),
+          sessionId: 's-otra-sesion',
+        ),
+      ],
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('REGISTRADO'), findsNothing);
+    // La escala completa vuelve a ofrecerse, con los 5 niveles.
+    for (final feeling in CheckInFeeling.displayOrder) {
+      expect(find.text(feeling.emoji), findsOneWidget);
+    }
   });
 
   // ── #456 regression: mood row must never overflow ────────────────────────

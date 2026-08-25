@@ -7,6 +7,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../../app/theme/app_motion.dart';
 import '../../../../../app/theme/app_palette.dart';
@@ -20,6 +21,7 @@ import '../../../../../core/widgets/treino_icon.dart';
 import '../../../../coach/application/agenda_providers.dart';
 import '../../../../coach/domain/agenda_exceptions.dart';
 import '../../../../coach/domain/appointment.dart';
+import '../../../../coach/domain/wall_clock.dart';
 import '../../../../coach/presentation/agenda_formatters.dart';
 import '../../../../payments/application/billing_providers.dart'
     show athleteBillingProvider;
@@ -360,15 +362,15 @@ class _AppointmentDetailDialogState
           filled: true,
           fillColor: palette.bg,
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
             borderSide: BorderSide(color: palette.border),
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
             borderSide: BorderSide(color: palette.border),
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
             borderSide: BorderSide(color: palette.accent, width: 1.5),
           ),
         );
@@ -429,7 +431,7 @@ class _AppointmentDetailDialogState
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             decoration: BoxDecoration(
               color: palette.bg,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
               border: Border.all(color: palette.border),
             ),
             child: Row(
@@ -512,7 +514,7 @@ class _AppointmentDetailDialogState
                   onPressed: _billing ? null : _confirmCobrar,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: palette.accent,
-                    foregroundColor: palette.bg,
+                    foregroundColor: TreinoButtonTokens.foreground(context),
                     minimumSize: const Size.fromHeight(44),
                     shape: const StadiumBorder(),
                     disabledBackgroundColor:
@@ -524,7 +526,7 @@ class _AppointmentDetailDialogState
                           height: 18,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: palette.bg,
+                            color: TreinoButtonTokens.foreground(context),
                           ),
                         )
                       : Text(
@@ -569,14 +571,17 @@ class _AppointmentDetailDialogState
         : rawName; // i18n
 
     final canCancel = !widget.isPast &&
-        appt.startsAt.difference(DateTime.now().toUtc()) >
-            const Duration(hours: 24);
+        // Wall-clock: contra el instante UTC real la ventana de 24h se
+        // volvia de 27h, y la web negaba cancelaciones que mobile permitia
+        // (#671).
+        appt.startsAt.difference(nowWall()) > const Duration(hours: 24);
     final isWithin24h = !widget.isPast && !canCancel;
     final isRecurring = appt.recurringId != null;
 
     return AlertDialog(
       backgroundColor: palette.bgCard,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg)),
       titlePadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
       contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
       actionsPadding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
@@ -599,7 +604,7 @@ class _AppointmentDetailDialogState
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: palette.highlight.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(9999),
+                borderRadius: BorderRadius.circular(AppRadius.full),
                 border: Border.all(color: palette.highlight),
               ),
               child: Text(
@@ -733,7 +738,7 @@ class _AppointmentDetailDialogState
                   onPressed: _saving ? null : _saveNotes,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: palette.accent,
-                    foregroundColor: palette.bg,
+                    foregroundColor: TreinoButtonTokens.foreground(context),
                     minimumSize: const Size.fromHeight(48),
                     shape: const StadiumBorder(),
                     disabledBackgroundColor:
@@ -745,7 +750,7 @@ class _AppointmentDetailDialogState
                           height: 18,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: palette.bg,
+                            color: TreinoButtonTokens.foreground(context),
                           ),
                         )
                       : Text(
@@ -908,7 +913,8 @@ Future<bool> confirmActionDialog(
     context: context,
     builder: (ctx) => AlertDialog(
       backgroundColor: palette.bgCard,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg)),
       title: Text(
         title,
         style: GoogleFonts.barlowCondensed(

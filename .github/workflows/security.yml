@@ -1,0 +1,176 @@
+name: Security
+
+# Gates de seguridad — slice B de #680.
+#
+# Va SEPARADO de ci.yml a propósito. `Analyze & Test` tarda ~13 minutos (5800+
+# tests) y estos jobs tardan segundos: metidos en el mismo archivo comparten
+# `concurrency` group y el feedback de seguridad queda enterrado detrás de la
+# suite. Además CodeQL necesita `security-events: write`, un permiso que ci.yml
+# no tiene y que no queremos darle a los jobs que corren código de tests.
+#
+# QUÉ BLOQUEA Y QUÉ NO (decisión explícita, ver #680 slice B):
+#
+#   secret-scan  → BLOQUEA. Un secreto commiteado es irreversible en un repo
+#                  público: se rota o no se rota, y el PR no puede entrar. Hoy
+#                  el árbol y los 1545 commits de historia dan cero hallazgos
+#                  con .gitleaks.toml, así que el gate arranca en verde.
+#
+#   npm-audit    → NO BLOQUEA (reporta). functions/ tiene HOY 17
+#                  vulnerabilidades heredadas (1 critical, 3 high) que vienen
+#                  de firebase-admin y firebase-functions-test y necesitan
+#                  bumps semver-major. Un gate bloqueante acá dejaría rojo
+#                  TODOS los PRs desde el minuto cero y a la semana lo apagan.
+#                  Dependabot (.github/dependabot.yml) es el que baja ese
+#                  número; cuando llegue a cero se cambia a bloqueante.
+#
+#   codeql       → NO BLOQUEA por hallazgo. Publica alertas en la pestaña
+#                  Security del repo. El job sólo falla si CodeQL en sí revienta.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Secret scanning con gitleaks.
+  #
+  # ¿No alcanza con el secret scanning nativo de GitHub? No del todo. El nativo
+  # YA está activo en este repo (es público, viene por default) junto con push
+  # protection, y cubre el caso "commiteo y pusheo un token de un proveedor
+  # conocido". Lo que NO cubre: los patrones non-provider (están deshabilitados
+  # en la config del repo) y los secretos genéricos de alta entropía. gitleaks
+  # cubre eso y además deja el resultado ATADO AL PR, en vez de en una pestaña
+  # que nadie mira. Los dos juntos, no uno en lugar del otro.
+  #
+  # Se escanea el árbol de trabajo, no la historia: un secreto agregado y
+  # borrado dentro de la misma rama lo frena el push protection nativo antes de
+  # que el commit llegue a GitHub.
+  secret-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # Binario pineado + checksum verificado en vez de una action de terceros:
+      # una action sin pinear puede cambiar bajo nuestros pies, y este job es
+      # justamente el que tiene que ser confiable. Versión = la misma que se
+      # verificó en local al escribir .gitleaks.toml.
+      - name: Install gitleaks
+        env:
+          GITLEAKS_VERSION: 8.30.1
+          GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+        run: |
+          set -euo pipefail
+          curl -sSfL -o gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf gitleaks.tar.gz gitleaks
+          sudo install -m 0755 gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+
+      # --exit-code 1: cualquier hallazgo rompe el job.
+      # --redact: que el secreto NO quede escrito en los logs públicos del run.
+      - name: Scan working tree
+        run: gitleaks dir . --config .gitleaks.toml --redact --exit-code 1 --verbose
+
+  # ---------------------------------------------------------------------------
+  # npm audit sobre los tres package.json del repo.
+  #
+  # REPORTA, NO BLOQUEA (ver cabecera). El resultado va al Job Summary para que
+  # se lea de un vistazo desde el PR sin abrir los logs.
+  #
+  # `--audit-level=high` filtra el ruido de low/moderate: lo que queremos ver es
+  # high y critical.
+  #
+  # El "no bloquea" NO se hace con `continue-on-error` (eso marca el job con un
+  # tilde amarillo y se lee como "algo falló y lo ignoramos"). Se hace con
+  # `|| true` sobre cada npm audit y SIN `set -e`: el step termina 0 de verdad,
+  # el job sale verde limpio, y la información vive en el Job Summary.
+  # Para volverlo bloqueante alcanza con sacar los `|| true` y poner `set -e`.
+  npm-audit:
+    name: npm audit (reporta, no bloquea)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '20'
+
+      # functions/ es el único que corre en producción (Cloud Functions).
+      # scripts/ y scripts/rules_test/ son tooling local, pero comparten
+      # firebase-admin, así que un CVE ahí también importa para el dev.
+      - name: Audit
+        run: |
+          set -uo pipefail
+          {
+            echo "## npm audit — high y critical"
+            echo
+            echo "_Informativo: este job NO bloquea el merge. Ver cabecera de \`.github/workflows/security.yml\`._"
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          for dir in functions scripts scripts/rules_test; do
+            echo "::group::npm audit — $dir"
+            summary=$(npm audit --prefix "$dir" --audit-level=high 2>&1 || true)
+            echo "$summary"
+            echo "::endgroup::"
+
+            counts=$(npm audit --prefix "$dir" --json 2>/dev/null \
+              | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const m=JSON.parse(s).metadata.vulnerabilities;console.log(`${m.critical} critical, ${m.high} high, ${m.moderate} moderate, ${m.low} low`)}catch(e){console.log("no se pudo leer el reporte")}})' \
+              || echo "no se pudo leer el reporte")
+
+            {
+              echo "### \`$dir\`"
+              echo
+              echo "$counts"
+              echo
+            } >> "$GITHUB_STEP_SUMMARY"
+          done
+
+  # ---------------------------------------------------------------------------
+  # SAST con CodeQL.
+  #
+  # LIMITACIÓN IMPORTANTE, no la maquillemos: CodeQL NO soporta Dart. Todo
+  # lib/ — que es la mayor parte del código de TREINO — queda SIN cobertura de
+  # SAST. Lo que este job cubre es functions/ (TypeScript), que es el código con
+  # privilegios de Admin SDK, o sea el de mayor blast radius. Es cobertura
+  # parcial y hay que leerla así.
+  #
+  # Swift SÍ lo soporta CodeQL, pero exige runner macOS + build del target
+  # watchOS: diez veces más caro que los jobs de ubuntu que ya validan ese
+  # código en ci.yml. Queda fuera a propósito.
+  codeql:
+    name: CodeQL (JS/TS)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+
+      # Sin build step: el extractor de JS/TS de CodeQL analiza el fuente
+      # directamente, no necesita compilar. Ojo con agregar `autobuild` acá —
+      # dispararía `npm ci` y triplicaría la duración sin cambiar el resultado.
+      - name: Analyze
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:javascript-typescript

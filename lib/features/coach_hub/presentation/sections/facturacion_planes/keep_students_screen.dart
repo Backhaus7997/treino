@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../../app/theme/app_palette.dart';
 import '../../../../../core/widgets/motion/treino_tappable.dart';
@@ -165,7 +166,7 @@ class _StudentRow extends StatelessWidget {
               color: selected ? palette.accent : palette.border,
               width: selected ? 1.5 : 1,
             ),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
           ),
           child: Row(
             children: [
@@ -236,12 +237,12 @@ class _ConfirmButton extends StatelessWidget {
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: palette.accent,
-            borderRadius: BorderRadius.circular(9999),
+            borderRadius: BorderRadius.circular(AppRadius.full),
           ),
           child: Text(
             'CONFIRMAR SELECCIÓN', // i18n: Fase W3
             style: GoogleFonts.barlowCondensed(
-              color: palette.bg,
+              color: TreinoButtonTokens.foreground(context),
               fontSize: 14,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.6,

@@ -7,8 +7,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/core/utils/app_clock.dart';
 import 'package:treino/core/utils/date_labels.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/motion/treino_success_check.dart';
@@ -19,6 +21,7 @@ import 'package:treino/features/coach/application/athlete_file_providers.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/application/athlete_note_providers.dart';
 import 'package:treino/features/coach/domain/appointment.dart';
+import 'package:treino/features/coach/domain/wall_clock.dart';
 import 'package:treino/features/coach/application/follow_up_entry_providers.dart';
 import 'package:treino/features/coach/application/nutrition_plan_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
@@ -55,6 +58,8 @@ import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_status.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
+import 'package:treino/features/workout/application/exercise_feedback_providers.dart';
+import 'package:treino/features/workout/domain/exercise_feedback.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/presentation/widgets/exercise_progression_chart.dart'
     show ExerciseProgressionChartLabels;
@@ -62,6 +67,7 @@ import 'package:treino/features/workout/presentation/widgets/exercise_progressio
 import 'package:treino/features/workout/presentation/widgets/most_frequent_exercises_list.dart';
 import 'package:treino/features/workout/presentation/widgets/personal_records_list.dart';
 import 'package:treino/features/workout/presentation/widgets/session_exercise_block.dart';
+import 'package:treino/features/workout/presentation/widgets/feedback_load_error_note.dart';
 import 'package:treino/features/profile/application/user_providers.dart'
     show userProfileProvider;
 import 'package:treino/features/payments/domain/payment.dart';
@@ -74,6 +80,7 @@ import '../pagos/widgets/pagos_table.dart';
 import '../pagos/widgets/payment_format.dart';
 import 'alumnos_screen.dart' show AlumnoEstado, AlumnoEstadoX, estadoForLink;
 import 'resumen_metrics.dart';
+import 'package:treino/core/widgets/treino_segmented_pill.dart';
 
 /// Detalle del alumno (`/alumnos/:id`, Fase W2 PR2).
 ///
@@ -162,7 +169,7 @@ class AlumnoDetailScreen extends ConsumerWidget {
                   palette: palette,
                 ),
                 const SizedBox(height: 14),
-                _Tabs(palette: palette, labels: _tabs),
+                const TreinoSegmentedPill(labels: _tabs, scrollable: true),
               ],
             ),
           ),
@@ -261,7 +268,9 @@ class _Header extends StatelessWidget {
     // .toUtc() para compartir reloj con el pipeline de billing (monthKey/weekKey
     // de pagosPorCobrarProvider y las escrituras usan UTC); evita un desfase de
     // 1 día en el borde del período en AR (UTC-3).
-    final proxCobro = b == null ? null : nextDueDate(b, DateTime.now().toUtc());
+    // Bucket de MES en ART (#671): con UTC, "Prox. cobro" mostraba el mes
+    // siguiente al correcto.
+    final proxCobro = b == null ? null : nextDueDate(b, argentinaNow());
     // Mismo criterio determinístico que el chat (avatar_color.dart) y el
     // roster (alumnos_screen.dart): sin foto de red, círculo de color estable
     // seedeado por uid + inicial en blanco — evita que todos los alumnos sin
@@ -434,40 +443,6 @@ class _MetricChip extends StatelessWidget {
                   fontSize: 18,
                   fontWeight: FontWeight.w700)),
         ],
-      ),
-    );
-  }
-}
-
-class _Tabs extends StatelessWidget {
-  const _Tabs({required this.palette, required this.labels});
-  final AppPalette palette;
-  final List<String> labels;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: palette.border),
-      ),
-      child: TabBar(
-        isScrollable: true,
-        tabAlignment: TabAlignment.start,
-        dividerColor: Colors.transparent,
-        indicatorSize: TabBarIndicatorSize.tab,
-        indicator: BoxDecoration(
-          color: palette.accent,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        splashBorderRadius: BorderRadius.circular(20),
-        labelColor: palette.bg,
-        unselectedLabelColor: palette.textMuted,
-        labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-        unselectedLabelStyle: const TextStyle(fontSize: 13),
-        tabs: [for (final l in labels) Tab(text: l, height: 38)],
       ),
     );
   }
@@ -754,7 +729,7 @@ class _ResumenTab extends ConsumerWidget {
       sessions: sessions,
       measurements: measAsync.requireValue,
       weeklyTarget: active?.days.length ?? 0,
-      now: DateTime.now(),
+      now: AppClock.now(),
     );
 
     final adh = m.adherencia30dPct;
@@ -926,7 +901,7 @@ class _MetricCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: palette.bgCard,
           border: Border.all(color: palette.border),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1023,7 +998,7 @@ class _NoteCard extends ConsumerWidget {
   final String athleteId;
 
   String _haceDias(DateTime updatedAt) {
-    final diff = DateTime.now().difference(updatedAt.toLocal());
+    final diff = AppClock.now().difference(updatedAt.toLocal());
     final days = diff.inDays;
     if (days == 0) return 'hoy';
     if (days == 1) return 'hace 1 día';
@@ -1068,7 +1043,7 @@ class _NoteCard extends ConsumerWidget {
               decoration: BoxDecoration(
                 color: palette.bgCard,
                 border: Border.all(color: palette.border),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
               ),
               child: note == null || note.note.trim().isEmpty
                   ? Text(
@@ -1141,7 +1116,9 @@ class _ProxSesionCard extends ConsumerWidget {
     // day-truncada ESTABLE y filtramos el alumno en memoria: sin permission-denied
     // y sin índice nuevo.
     final trainerId = ref.watch(currentUidProvider) ?? '';
-    final now = DateTime.now().toUtc();
+    // Wall-clock ADR-7 (#671): con el instante UTC real, "Proxima sesion"
+    // descartaba los turnos de las proximas 3h.
+    final now = nowWall();
     final todayStart = DateTime.utc(now.year, now.month, now.day);
     final async = ref.watch(trainerAppointmentsStreamProvider(
       TrainerAppointmentsKey(
@@ -1189,7 +1166,7 @@ class _ProxSesionCard extends ConsumerWidget {
               decoration: BoxDecoration(
                 color: palette.bgCard,
                 border: Border.all(color: palette.border),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
               ),
               child: next == null
                   ? Text(
@@ -1274,7 +1251,7 @@ class _UltimaSessionCard extends ConsumerWidget {
               decoration: BoxDecoration(
                 color: palette.bgCard,
                 border: Border.all(color: palette.border),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
               ),
               child: child,
             ),
@@ -1491,7 +1468,7 @@ class _AdherenciaHeatmap extends StatelessWidget {
       decoration: BoxDecoration(
         color: palette.bgCard,
         border: Border.all(color: palette.border),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2054,7 +2031,7 @@ class _RutinaCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: palette.bgCard,
         border: Border.all(color: palette.border),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2149,7 +2126,7 @@ class _HistorialTable extends StatelessWidget {
       decoration: BoxDecoration(
         color: palette.bgCard,
         border: Border.all(color: palette.border),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Column(
         children: [
@@ -2307,6 +2284,15 @@ class _SetLogsExpansion extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(coachSessionSetLogsProvider(
         (athleteUid: athleteId, sessionId: sessionId)));
+    // #628 — ver la nota en athlete_detail_screen: mismo provider, mismo
+    // criterio de degradación y el MISMO aviso independiente cuando la lectura
+    // falla. Que el PF esté en la web y no en el teléfono no cambia el modo de
+    // falla: sin el aviso, "no pudimos leer" se ve igual que "no reportó nada".
+    final feedbackAsync = ref.watch(coachSessionExerciseFeedbackProvider(
+        (athleteUid: athleteId, sessionId: sessionId)));
+    final feedback = feedbackAsync.valueOrNull ?? const <ExerciseFeedback>[];
+    final feedbackFailed = feedbackAsync.hasError;
+    final l10n = AppL10n.of(context);
     final muted = TextStyle(color: palette.textMuted, fontSize: 12);
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
@@ -2337,23 +2323,37 @@ class _SetLogsExpansion extends ConsumerWidget {
             );
           },
           data: (logs) {
-            if (logs.isEmpty) {
-              return Text(
-                  'Sin series registradas en esta sesión.', // i18n: Fase W2
-                  style: muted);
-            }
-            final groups = <String, List<SetLog>>{};
-            for (final log in logs) {
-              groups.putIfAbsent(log.exerciseId, () => <SetLog>[]).add(log);
-            }
+            final groups =
+                buildSessionExerciseGroups(sets: logs, feedback: feedback);
+            // Mismo criterio que el athlete-detail mobile (#628): el
+            // placeholder es de la sesión sin series Y sin reportes. Con
+            // `logs.isEmpty` el PF veía "sin series" y perdía la molestia que
+            // el alumno reportó sobre una serie que nunca registró.
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                for (final entry in groups.entries)
-                  SessionExerciseBlock(
-                    exerciseName: entry.value.first.exerciseName,
-                    sets: entry.value,
-                  ),
+                // Arriba y siempre que haya fallado, aun con la sesión vacía:
+                // "no hay series" y "no pudimos leer los reportes" son dos
+                // hechos distintos. Este SÍ sale por AppL10n aunque el resto
+                // del widget siga en `// i18n: Fase W2` — la clave ya existe
+                // (la creó este mismo change) y no había ningún motivo para
+                // estrenar deuda de i18n nueva.
+                if (feedbackFailed) ...[
+                  FeedbackLoadErrorNote(
+                      message: l10n.coachSessionFeedbackLoadError),
+                  const SizedBox(height: AppSpacing.s8),
+                ],
+                if (groups.isEmpty)
+                  Text(
+                      'Sin series registradas en esta sesión.', // i18n: Fase W2
+                      style: muted)
+                else
+                  for (final group in groups)
+                    SessionExerciseBlock(
+                      exerciseName: group.exerciseName,
+                      sets: group.sets,
+                      feedback: group.feedback,
+                    ),
               ],
             );
           },
@@ -2569,7 +2569,7 @@ class _NotasPrivadasTabState extends ConsumerState<_NotasPrivadasTab> {
                   // the ClipRRect ancestor.
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
                       border: Border.all(color: palette.border),
                     ),
                     child: ClipRRect(
@@ -2621,7 +2621,7 @@ class _NotasPrivadasTabState extends ConsumerState<_NotasPrivadasTab> {
                         : () => _save(trainerUid),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: palette.accent,
-                      foregroundColor: palette.bg,
+                      foregroundColor: TreinoButtonTokens.foreground(context),
                       disabledBackgroundColor:
                           palette.accent.withValues(alpha: 0.3),
                       padding: const EdgeInsets.symmetric(
@@ -2634,7 +2634,7 @@ class _NotasPrivadasTabState extends ConsumerState<_NotasPrivadasTab> {
                             height: 16,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: palette.bg,
+                              color: TreinoButtonTokens.foreground(context),
                             ),
                           )
                         : Text(
@@ -2768,7 +2768,7 @@ class _SessionStatusPill extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(9999),
+        borderRadius: BorderRadius.circular(AppRadius.full),
         border: Border.all(color: color.withValues(alpha: 0.5), width: 1),
       ),
       child: Text(
@@ -2969,7 +2969,7 @@ class _ArchivosTabState extends ConsumerState<_ArchivosTab> {
                 label: Text(l10n.coachHubAlumnoDetailArchivosUploadButton),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: palette.accent,
-                  foregroundColor: palette.bg,
+                  foregroundColor: TreinoButtonTokens.foreground(context),
                   disabledBackgroundColor:
                       palette.accent.withValues(alpha: 0.3),
                   padding:
@@ -3338,7 +3338,7 @@ class _MedicionesTabState extends ConsumerState<_MedicionesTab> {
                     : 'NUEVA PRUEBA'), // i18n: Fase W2
                 style: ElevatedButton.styleFrom(
                   backgroundColor: palette.accent,
-                  foregroundColor: palette.bg,
+                  foregroundColor: TreinoButtonTokens.foreground(context),
                   padding:
                       const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                   shape: const StadiumBorder(),
@@ -4224,7 +4224,7 @@ class _NuevaMedicionDialogState extends ConsumerState<_NuevaMedicionDialog> {
                     onPressed: _saving ? null : _save,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: palette.accent,
-                      foregroundColor: palette.bg,
+                      foregroundColor: TreinoButtonTokens.foreground(context),
                       padding: const EdgeInsets.symmetric(
                           horizontal: 20, vertical: 12),
                       shape: const StadiumBorder(),
@@ -4235,7 +4235,7 @@ class _NuevaMedicionDialogState extends ConsumerState<_NuevaMedicionDialog> {
                             height: 14,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: palette.bg,
+                              color: TreinoButtonTokens.foreground(context),
                             ),
                           )
                         : const Text('GUARDAR'), // i18n: Fase W2
@@ -5010,7 +5010,7 @@ class _NuevoRendimientoDialogState
                     onPressed: _saving ? null : _save,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: palette.accent,
-                      foregroundColor: palette.bg,
+                      foregroundColor: TreinoButtonTokens.foreground(context),
                       padding: const EdgeInsets.symmetric(
                           horizontal: 20, vertical: 12),
                       shape: const StadiumBorder(),
@@ -5021,7 +5021,7 @@ class _NuevoRendimientoDialogState
                             height: 14,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: palette.bg,
+                              color: TreinoButtonTokens.foreground(context),
                             ),
                           )
                         : const Text('GUARDAR'), // i18n: Fase W2
@@ -5149,7 +5149,7 @@ class _SeguimientoTabState extends ConsumerState<_SeguimientoTab> {
                 label: const Text('NUEVA ENTRADA'), // i18n: Fase W2
                 style: ElevatedButton.styleFrom(
                   backgroundColor: palette.accent,
-                  foregroundColor: palette.bg,
+                  foregroundColor: TreinoButtonTokens.foreground(context),
                   padding:
                       const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                   shape: const StadiumBorder(),
@@ -5311,7 +5311,7 @@ class _TagChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(9999),
+        borderRadius: BorderRadius.circular(AppRadius.full),
         border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
       child: Text(
@@ -5509,7 +5509,7 @@ class _NuevaEntradaSeguimientoDialogState
                       onPressed: _saving ? null : _save,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: palette.accent,
-                        foregroundColor: palette.bg,
+                        foregroundColor: TreinoButtonTokens.foreground(context),
                         padding: const EdgeInsets.symmetric(
                             horizontal: 20, vertical: 12),
                         shape: const StadiumBorder(),
@@ -5520,7 +5520,7 @@ class _NuevaEntradaSeguimientoDialogState
                               height: 14,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: palette.bg,
+                                color: TreinoButtonTokens.foreground(context),
                               ),
                             )
                           : const Text('GUARDAR'), // i18n: Fase W2
@@ -5744,7 +5744,7 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
                   onPressed: _saving ? null : _save,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: palette.accent,
-                    foregroundColor: palette.bg,
+                    foregroundColor: TreinoButtonTokens.foreground(context),
                     padding: const EdgeInsets.symmetric(
                         horizontal: 20, vertical: 12),
                     shape: const StadiumBorder(),
@@ -5755,7 +5755,7 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
                           height: 14,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: palette.bg,
+                            color: TreinoButtonTokens.foreground(context),
                           ),
                         )
                       : const Text('GUARDAR PLAN'), // i18n: Fase W2
@@ -6124,7 +6124,7 @@ class _SelectionModeSelector extends StatelessWidget {
           color: active
               ? palette.accent.withValues(alpha: 0.18)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(9999),
+          borderRadius: BorderRadius.circular(AppRadius.full),
           border: Border.all(
             color: active ? palette.accent : palette.border,
           ),

@@ -230,4 +230,14 @@ class TreinoIcon {
   static const IconData viewCards = PhosphorIconsRegular.squaresFour;
   // Coach Hub Web — acción archivar rutina (Fase 5, WU-04).
   static const IconData archive = PhosphorIconsRegular.archive;
+
+  // Check-in de bienestar (#643) — la entrada del hub de Insights a la serie
+  // subjetiva del atleta.
+  //
+  // Va aparte de `heartRate` y de las reacciones del feed aunque los tres sean
+  // del mismo barrio semántico: heartRate es el esfuerzo que mide el reloj y
+  // las reacciones son del feed. Reusar cualquiera de los dos ataría el
+  // bienestar a algo que no tiene nada que ver, que es justo lo que el
+  // comentario de heartRate ya pidió no hacer.
+  static const IconData wellbeing = PhosphorIconsRegular.smiley;
 }

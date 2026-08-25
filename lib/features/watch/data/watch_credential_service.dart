@@ -108,7 +108,23 @@ class WatchCredentialService {
       // (`enforceAppCheck: true`) y un APK sideloadeado con debug keys no puede
       // atestar con Play Integrity. Ese caso llega como `unauthenticated` y sin
       // el código a la vista es indistinguible de "no hay sesión".
-      debugPrint('[watch-cred] $callableName falló — ${e.code}: ${e.message}');
+      //
+      // Tragarse este error SIN DEJAR RASTRO costó caro: la función devolvía
+      // 401 "Decoding App Check token failed", acá se comía entero, y el único
+      // síntoma visible era el reloj clavado en "vinculando" para siempre. La
+      // causa y el síntoma no se parecían en nada.
+      //
+      // Matiz medido el 2026-08-25: para saber QUIÉN falla ya no hace falta
+      // instrumentar nada — `firebase-functions` v2 loguea la verificación de
+      // cada callable en `jsonPayload.verifications.app`, y cruzándola con el
+      // user-agent sale que el roto es Android (1 VALID / 8 INVALID) y no iOS
+      // (8 VALID / 2 INVALID). Ver docs/security.md §4.8.2. Lo que este log
+      // sigue aportando, y el server no puede, es el POR QUÉ del lado del
+      // dispositivo: por eso van también los `details`.
+      debugPrint(
+        '[watch-cred] $callableName falló — code=${e.code} '
+        'message=${e.message} details=${e.details}',
+      );
       return _rastro(WatchCredentialOutcome.mintFailed);
     } catch (e) {
       // Quedarse sin credencial de reloj no debe tumbar nada del teléfono.

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/motion/treino_tappable.dart';
@@ -247,7 +248,8 @@ Future<bool> _confirmDialog(
     context: context,
     builder: (ctx) => AlertDialog(
       backgroundColor: palette.bgCard,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg)),
       title: Text(
         title,
         style: GoogleFonts.barlowCondensed(
@@ -276,7 +278,7 @@ Future<bool> _confirmDialog(
           onPressed: () => Navigator.of(ctx).pop(true),
           style: ElevatedButton.styleFrom(
             backgroundColor: palette.accent,
-            foregroundColor: palette.bg,
+            foregroundColor: TreinoButtonTokens.foreground(context),
           ),
           child: Text(
             confirmLabel,

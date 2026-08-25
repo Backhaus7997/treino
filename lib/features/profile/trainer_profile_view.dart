@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../app/theme/app_palette.dart';
 import '../../core/widgets/treino_icon.dart';
@@ -198,7 +199,7 @@ class _IdentityCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: palette.border, width: 1),
       ),
       child: Row(
@@ -348,7 +349,7 @@ class _PerfilPublicoCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: palette.border, width: 1),
       ),
       child: Column(
@@ -376,7 +377,7 @@ class _PerfilPublicoCard extends StatelessWidget {
                   color: isVisible
                       ? palette.accent.withAlpha(40)
                       : palette.textMuted.withAlpha(40),
-                  borderRadius: BorderRadius.circular(9999),
+                  borderRadius: BorderRadius.circular(AppRadius.full),
                   border: Border.all(
                     color: isVisible ? palette.accent : palette.border,
                     width: 1,
@@ -417,7 +418,7 @@ class _PerfilPublicoCard extends StatelessWidget {
                     foregroundColor: palette.textPrimary,
                     minimumSize: const Size.fromHeight(44),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(9999),
+                      borderRadius: BorderRadius.circular(AppRadius.full),
                     ),
                   ),
                   child: Text(
@@ -442,10 +443,10 @@ class _PerfilPublicoCard extends StatelessWidget {
                   onPressed: () => context.push('/profile/edit-trainer'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: palette.accent,
-                    foregroundColor: palette.bg,
+                    foregroundColor: TreinoButtonTokens.foreground(context),
                     minimumSize: const Size.fromHeight(44),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(9999),
+                      borderRadius: BorderRadius.circular(AppRadius.full),
                     ),
                   ),
                   child: Text(
@@ -533,14 +534,14 @@ class _MenuRow extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     color: palette.accent,
-                    borderRadius: BorderRadius.circular(9999),
+                    borderRadius: BorderRadius.circular(AppRadius.full),
                   ),
                   child: Text(
                     badge!,
                     style: GoogleFonts.barlowCondensed(
                       fontWeight: FontWeight.w700,
                       fontSize: 11,
-                      color: palette.bg,
+                      color: TreinoButtonTokens.foreground(context),
                     ),
                   ),
                 ),

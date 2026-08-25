@@ -43,7 +43,9 @@ import '../../workout/application/session_providers.dart'
 import '../../workout/domain/routine.dart';
 import '../../workout/domain/session.dart';
 import '../../workout/domain/session_status.dart';
-import '../../workout/domain/set_log.dart';
+import '../../workout/application/exercise_feedback_providers.dart';
+import '../../workout/domain/exercise_feedback.dart';
+import '../../workout/presentation/widgets/feedback_load_error_note.dart';
 import '../../workout/presentation/widgets/exercise_progression_chart.dart'
     show ExerciseProgressionChartLabels;
 import '../../workout/presentation/widgets/exercise_progression_section.dart';
@@ -51,6 +53,7 @@ import '../../workout/presentation/widgets/most_frequent_exercises_list.dart';
 import '../../workout/presentation/widgets/personal_records_list.dart';
 import '../../workout/presentation/widgets/session_exercise_block.dart';
 import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseException;
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 /// Trainer's drill-down view for a specific athlete.
 ///
@@ -232,7 +235,7 @@ class _AthleteDetailBody extends ConsumerWidget {
                         foregroundColor: palette.accent,
                         minimumSize: const Size.fromHeight(48),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(9999),
+                          borderRadius: BorderRadius.circular(AppRadius.full),
                         ),
                       ),
                       icon: Icon(TreinoIcon.chat,
@@ -275,10 +278,10 @@ class _AthleteDetailBody extends ConsumerWidget {
                       context.push('/workout/routine-editor/$athleteId'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: palette.accent,
-                    foregroundColor: palette.bg,
+                    foregroundColor: TreinoButtonTokens.foreground(context),
                     minimumSize: const Size.fromHeight(48),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(9999),
+                      borderRadius: BorderRadius.circular(AppRadius.full),
                     ),
                   ),
                   child: Text(
@@ -437,7 +440,7 @@ class _PlanesSection extends ConsumerWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: palette.border),
       ),
       child: child,
@@ -791,7 +794,7 @@ class _AntropometriaSection extends ConsumerWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: palette.border),
       ),
       child: child,
@@ -1057,7 +1060,7 @@ class _RendimientoSection extends ConsumerWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: palette.border),
       ),
       child: child,
@@ -1188,7 +1191,7 @@ class _CobroSection extends ConsumerWidget {
       isScrollControlled: true,
       backgroundColor: AppPalette.of(context).bgCard,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
       ),
       builder: (_) => _CobroConfigSheet(
         athleteId: athleteId,
@@ -1204,7 +1207,7 @@ class _CobroSection extends ConsumerWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: palette.border),
       ),
       child: child,
@@ -1398,7 +1401,7 @@ class _CobroConfigSheetState extends ConsumerState<_CobroConfigSheet> {
             onPressed: _saving ? null : _save,
             style: ElevatedButton.styleFrom(
               backgroundColor: palette.accent,
-              foregroundColor: palette.bg,
+              foregroundColor: TreinoButtonTokens.foreground(context),
               minimumSize: const Size.fromHeight(48),
               shape: const StadiumBorder(),
               disabledBackgroundColor: palette.accent.withValues(alpha: 0.3),
@@ -1409,7 +1412,7 @@ class _CobroConfigSheetState extends ConsumerState<_CobroConfigSheet> {
                     height: 18,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: palette.bg,
+                      color: TreinoButtonTokens.foreground(context),
                     ),
                   )
                 : Text(
@@ -1479,7 +1482,7 @@ class _SeguimientoSection extends ConsumerWidget {
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: palette.bgCard,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppRadius.md),
             border: Border.all(color: palette.border),
           ),
           child: child,
@@ -1574,7 +1577,7 @@ class _SeguimientoRow extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 border: Border.all(color: color),
-                borderRadius: BorderRadius.circular(9999),
+                borderRadius: BorderRadius.circular(AppRadius.full),
               ),
               child: Text(
                 label,
@@ -1740,7 +1743,7 @@ class _NotaSectionState extends ConsumerState<_NotaSection> {
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: palette.bgCard,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppRadius.md),
             border: Border.all(
               color: _editing ? palette.accent : palette.border,
             ),
@@ -1899,7 +1902,7 @@ class _NotaEditor extends StatelessWidget {
               onPressed: saving ? null : onSave,
               style: FilledButton.styleFrom(
                 backgroundColor: palette.accent,
-                foregroundColor: palette.bg,
+                foregroundColor: TreinoButtonTokens.foreground(context),
                 minimumSize: const Size(0, 40),
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 shape: const StadiumBorder(),
@@ -1909,7 +1912,8 @@ class _NotaEditor extends StatelessWidget {
                       width: 16,
                       height: 16,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: palette.bg),
+                          strokeWidth: 2,
+                          color: TreinoButtonTokens.foreground(context)),
                     )
                   : Text(
                       'Guardar',
@@ -2027,7 +2031,7 @@ class _EntrenamientosSection extends ConsumerWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: palette.border),
       ),
       child: child,
@@ -2312,6 +2316,19 @@ class _SessionSetLogsExpansion extends ConsumerWidget {
       coachSessionSetLogsProvider(
           (athleteUid: athleteId, sessionId: sessionId)),
     );
+    // #628 — se watchea aparte de los setLogs a propósito: si el alumno no
+    // reportó nada (el caso normal) esto resuelve en una lista vacía y no
+    // cambia nada de lo que ya se veía.
+    final feedbackAsync = ref.watch(
+      coachSessionExerciseFeedbackProvider(
+          (athleteUid: athleteId, sessionId: sessionId)),
+    );
+    final feedback = feedbackAsync.valueOrNull ?? const <ExerciseFeedback>[];
+    // …pero degradar a lista vacía SIN decirlo deja el fallo de lectura
+    // indistinguible de "no reportó nada": el PF ve el historial de siempre y
+    // concluye que no hubo molestias. El error se renderiza aparte, arriba de
+    // las series, sin reemplazarlas.
+    final feedbackFailed = feedbackAsync.hasError;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(0, 0, 0, 8),
@@ -2339,31 +2356,45 @@ class _SessionSetLogsExpansion extends ConsumerWidget {
           ),
         ),
         data: (logs) {
-          if (logs.isEmpty) {
-            return Padding(
-              padding: const EdgeInsets.only(top: 4, bottom: 4),
-              child: Text(
-                l10n.coachSessionSetLogsEmpty,
-                style:
-                    GoogleFonts.barlow(fontSize: 12, color: palette.textMuted),
-              ),
-            );
-          }
-          // Group by exerciseId preserving insertion order (same as web).
-          final groups = <String, List<SetLog>>{};
-          for (final log in logs) {
-            groups.putIfAbsent(log.exerciseId, () => <SetLog>[]).add(log);
-          }
+          // Group by exerciseId preserving insertion order (same as web), más
+          // la pasada por los ejercicios que SÓLO tienen reportes (#628).
+          final groups =
+              buildSessionExerciseGroups(sets: logs, feedback: feedback);
+          // El placeholder es sólo para la sesión GENUINAMENTE vacía: sin
+          // series Y sin reportes. Cortar acá por `logs.isEmpty` era tragarse
+          // todo lo que el alumno dijo — el caso MÁS ruidoso del bug #628, no
+          // un borde.
           return Padding(
-            padding: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.only(top: AppSpacing.s8),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                for (final entry in groups.entries)
-                  SessionExerciseBlock(
-                    exerciseName: entry.value.first.exerciseName,
-                    sets: entry.value,
-                  ),
+                // El aviso va ARRIBA y siempre que haya fallado, incluso con la
+                // sesión vacía: "no hay series" + "no pudimos leer los
+                // reportes" son dos cosas distintas y el PF tiene que ver las
+                // dos.
+                if (feedbackFailed) ...[
+                  FeedbackLoadErrorNote(
+                      message: l10n.coachSessionFeedbackLoadError),
+                  const SizedBox(height: AppSpacing.s8),
+                ],
+                if (groups.isEmpty)
+                  Text(
+                    l10n.coachSessionSetLogsEmpty,
+                    style: GoogleFonts.barlow(
+                        fontSize: 12, color: palette.textMuted),
+                  )
+                else
+                  for (final group in groups)
+                    SessionExerciseBlock(
+                      exerciseName: group.exerciseName,
+                      sets: group.sets,
+                      // #628 — los reportes del alumno, pegados a la serie que
+                      // los originó. Un fallo al leerlos NO tumba las series:
+                      // degrada a "sin reportes" y lo dice con el aviso de
+                      // arriba, en vez de mentir por omisión.
+                      feedback: group.feedback,
+                    ),
               ],
             ),
           );
@@ -2388,11 +2419,11 @@ class _PlanCard extends StatelessWidget {
     final l10n = AppL10n.of(context);
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppRadius.sm),
       child: Container(
         decoration: BoxDecoration(
           color: palette.bgCard,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           border: Border.all(color: palette.border, width: 1),
         ),
         padding: const EdgeInsets.all(14),

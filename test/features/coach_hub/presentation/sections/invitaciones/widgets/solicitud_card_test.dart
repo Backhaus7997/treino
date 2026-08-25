@@ -30,6 +30,33 @@ Widget _wrap(Widget widget, {ThemeData? theme}) => MaterialApp(
 void main() {
   group('SolicitudCard —', () {
     testWidgets(
+        'una solicitud de las 22:30 ART muestra la fecha ARGENTINA (#671)',
+        (tester) async {
+      // 2020-06-17 01:30 UTC == 2020-06-16 22:30 ART. Entre las 21:00 y la
+      // medianoche argentina el día UTC ya rotó, y leer los campos crudos del
+      // instante mostraba la fecha del día siguiente.
+      //
+      // La fecha es vieja a propósito: el formato relativo sólo cae al dd/mm
+      // después de 7 días, que es la rama donde vivía el bug. Y al ser un
+      // instante FIJO el test no depende del reloj ni del huso de la máquina —
+      // falla con el código viejo en cualquier CI, incluido TZ=UTC.
+      await tester.pumpWidget(_wrap(
+        SolicitudCard(
+          id: 'r9',
+          displayName: 'Ana García',
+          requestedAt: DateTime.utc(2020, 6, 17, 1, 30),
+          status: TrainerLinkStatus.pending,
+          onAccept: () {},
+          onDecline: () {},
+        ),
+      ));
+      await tester.pump();
+
+      expect(find.text('16/06'), findsOneWidget);
+      expect(find.text('17/06'), findsNothing);
+    });
+
+    testWidgets(
         'pending && !busy → Aceptar/Rechazar visibles, keys y callbacks '
         '[SCENARIO-SC-01]', (tester) async {
       var accepted = 0;

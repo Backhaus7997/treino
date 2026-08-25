@@ -3,8 +3,9 @@
   "notFoundBody": "",
   "notFoundCta": "",
   "homeAthleteFirstRunTitle": "Start training",
-  "homeAthleteFirstRunBody": "Create your first routine or find a trainer to get started.",
+  "homeAthleteFirstRunBody": "Create your own routine, explore ready-made plans, or find a trainer to guide you.",
   "homeAthleteFirstRunCreateCta": "CREATE ROUTINE",
+  "homeAthleteFirstRunExplorePlansCta": "Explore plans",
   "homeAthleteFirstRunFindTrainerCta": "Find a trainer",
   "homeEstaSemanaTitle": "THIS WEEK",
   "homeEstaSemanaLoadError": "We couldn't load your insights.",
@@ -86,6 +87,10 @@
   "authForgotCta": "",
   "authForgotSuccess": "",
   "authForgotBackToLogin": "",
+  "authForgotSpamHint": "",
+  "authForgotResendCta": "",
+  "authForgotResendIn": "",
+  "authForgotEditEmail": "",
   "authTrainerInquiryDialogTitle": "",
   "authTrainerInquiryDialogBody": "",
   "authTrainerInquiryDialogClose": "",
@@ -117,6 +122,12 @@
   "coachProfileBioEmpty": "",
   "coachProfileRateLabel": "",
   "coachCtaLabel": "",
+  "coachInquiryCtaLabel": "ASK A QUESTION",
+  "@coachInquiryCtaLabel": {},
+  "coachInquiryCtaHelp": "Ask about price, format and availability without committing to anyone.",
+  "@coachInquiryCtaHelp": {},
+  "coachInquiryCtaError": "We couldn't open the chat. Please try again.",
+  "@coachInquiryCtaError": {},
   "coachCtaProximamente": "",
   "coachLocationSheetTitle": "",
   "coachLocationSheetBody": "",
@@ -258,6 +269,31 @@
   "workoutSnackShareSuccess": "",
   "workoutSnackShareError": "",
   "workoutPostAutoCompleteText": "",
+  "wellbeingTrendScreenTitle": "HOW I FELT",
+  "wellbeingTrendEmptyState": "You haven't logged how you feel yet. Once you do, your own series shows up here.",
+  "wellbeingTrendNeedsMoreData": "One entry isn't a trend yet.",
+  "wellbeingTrendLoadError": "We couldn't load your log. Try again.",
+  "wellbeingTrendPainHeading": "PAIN OR DISCOMFORT",
+  "wellbeingTrendPainCount": "{painCount} of {total} entries with pain",
+  "@wellbeingTrendPainCount": {
+    "placeholders": {
+      "painCount": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "wellbeingTrendPainCountPrevious": "Previous period: {painCount} of {total}",
+  "@wellbeingTrendPainCountPrevious": {
+    "placeholders": {
+      "painCount": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "wellbeingTrendAreasHeading": "LOGGED AREAS",
+  "wellbeingTrendPainMark": "with pain",
+  "insightsTileWellbeingTitle": "How I felt",
+  "insightsTileWellbeingSubtitle": "Your feeling and pain log over time",
+  "wellbeingDailyTitle": "HOW ARE YOU FEELING TODAY?",
+  "wellbeingDailyPrompt": "Log how you woke up, workout or not.",
   "wellbeingCheckInTitle": "HOW DID YOU FEEL?",
   "wellbeingCheckInOptional": "Optional. You can skip it.",
   "wellbeingFeelingVeryBad": "Very bad",
@@ -315,6 +351,20 @@
   "workoutSelfEditorPermissionDenied": "",
   "workoutEditStubToast": "",
   "workoutSelfEditorCapReached": "",
+  "workoutRoutineUseAsBase": "Use as a base",
+  "@workoutRoutineUseAsBase": {},
+  "workoutRoutineCustomizeTitle": "Customise routine",
+  "@workoutRoutineCustomizeTitle": {},
+  "workoutRoutineCustomizeSubmitLabel": "SAVE AS MINE",
+  "@workoutRoutineCustomizeSubmitLabel": {},
+  "workoutRoutineCopyName": "{name} (my version)",
+  "@workoutRoutineCopyName": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "workoutTabYours": "YOUR WORKOUT",
   "workoutTabExplore": "EXPLORE",
   "workoutExploreEmptyAll": "No routines yet.",
@@ -628,6 +678,12 @@
   "@routineEditorNotesLabel": {},
   "routineEditorNotesHint": "Technique, tempo, RIR…",
   "@routineEditorNotesHint": {},
+  "routineEditorSummaryLabel": "SUMMARY",
+  "@routineEditorSummaryLabel": {},
+  "routineEditorSummaryHelp": "One sentence explaining what the routine is, for someone who has never set foot in a gym.",
+  "@routineEditorSummaryHelp": {},
+  "routineEditorSummaryHint": "E.g. Push, pull and legs: each day trains a different kind of movement.",
+  "@routineEditorSummaryHint": {},
   "exerciseNoteFromCoachTag": "FROM COACH",
   "@exerciseNoteFromCoachTag": {},
   "routineEditorIncompleteSetsFeedback": "",
@@ -1261,71 +1317,298 @@
     }
   },
   "notificationHistoryTitle": "NOTIFICATIONS",
-  "@notificationHistoryTitle": {"description": "Title of the notification history screen."},
+  "@notificationHistoryTitle": {
+    "description": "Title of the notification history screen."
+  },
   "notificationHistoryEmpty": "You don't have any notifications yet",
-  "@notificationHistoryEmpty": {"description": "Empty state for notification history."},
+  "@notificationHistoryEmpty": {
+    "description": "Empty state for notification history."
+  },
   "notificationHistoryError": "We couldn't load your notifications.",
-  "@notificationHistoryError": {"description": "Error state for notification history."},
+  "@notificationHistoryError": {
+    "description": "Error state for notification history."
+  },
   "notificationPendingRequests": "{count, plural, =1{1 pending follower request} other{{count} pending follower requests}}",
-  "@notificationPendingRequests": {"description": "Compact link to pending friend requests.", "placeholders": {"count": {"type": "int"}}},
+  "@notificationPendingRequests": {
+    "description": "Compact link to pending friend requests.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "notificationBellA11y": "Open notifications",
-  "@notificationBellA11y": {"description": "Accessibility label for the feed notification bell."},
+  "@notificationBellA11y": {
+    "description": "Accessibility label for the feed notification bell."
+  },
   "notificationBellWithCountA11y": "Open notifications, {count} pending",
-  "@notificationBellWithCountA11y": {"description": "Accessibility label for the feed notification bell with its combined badge count.", "placeholders": {"count": {"type": "int"}}},
+  "@notificationBellWithCountA11y": {
+    "description": "Accessibility label for the feed notification bell with its combined badge count.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "postDetailTitle": "POST",
-  "@postDetailTitle": {"description": "Title of the individual feed post screen."},
+  "@postDetailTitle": {
+    "description": "Title of the individual feed post screen."
+  },
   "postDetailUnavailable": "This post is no longer available.",
-  "@postDetailUnavailable": {"description": "Privacy-safe state shown when a post is missing, deleted, or cannot be read."},
+  "@postDetailUnavailable": {
+    "description": "Privacy-safe state shown when a post is missing, deleted, or cannot be read."
+  },
   "feedUnfollowConfirmTitle": "Unfollow {name}?",
-  "@feedUnfollowConfirmTitle": {"description": "Título del sheet de confirmación para dejar de seguir.", "placeholders": {"name": {"type": "String"}}},
+  "@feedUnfollowConfirmTitle": {
+    "description": "Título del sheet de confirmación para dejar de seguir.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "feedUnfollowConfirmAction": "UNFOLLOW",
-  "@feedUnfollowConfirmAction": {"description": "Botón que confirma dejar de seguir."},
+  "@feedUnfollowConfirmAction": {
+    "description": "Botón que confirma dejar de seguir."
+  },
   "feedUnfollowDismiss": "CANCEL",
-  "@feedUnfollowDismiss": {"description": "Botón que descarta el sheet de dejar de seguir."},
+  "@feedUnfollowDismiss": {
+    "description": "Botón que descarta el sheet de dejar de seguir."
+  },
   "feedCancelRequestConfirmTitle": "Cancel your request to {name}?",
-  "@feedCancelRequestConfirmTitle": {"description": "Título del sheet para cancelar una solicitud enviada.", "placeholders": {"name": {"type": "String"}}},
+  "@feedCancelRequestConfirmTitle": {
+    "description": "Título del sheet para cancelar una solicitud enviada.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "feedCancelRequestConfirmAction": "CANCEL REQUEST",
-  "@feedCancelRequestConfirmAction": {"description": "Botón que confirma cancelar la solicitud enviada."},
+  "@feedCancelRequestConfirmAction": {
+    "description": "Botón que confirma cancelar la solicitud enviada."
+  },
   "feedCancelRequestDismiss": "BACK",
-  "@feedCancelRequestDismiss": {"description": "Botón que descarta el sheet de cancelar solicitud. Dice VOLVER y no CANCELAR para no chocar con el botón que SÍ cancela la solicitud."},
+  "@feedCancelRequestDismiss": {
+    "description": "Botón que descarta el sheet de cancelar solicitud. Dice VOLVER y no CANCELAR para no chocar con el botón que SÍ cancela la solicitud."
+  },
   "feedFollowButtonFollowA11y": "Follow this person",
-  "@feedFollowButtonFollowA11y": {"description": "Semantics del pill en estado SEGUIR."},
+  "@feedFollowButtonFollowA11y": {
+    "description": "Semantics del pill en estado SEGUIR."
+  },
   "feedFollowButtonFollowingA11y": "Following. Tap to unfollow",
-  "@feedFollowButtonFollowingA11y": {"description": "Semantics del pill en estado SIGUIENDO."},
+  "@feedFollowButtonFollowingA11y": {
+    "description": "Semantics del pill en estado SIGUIENDO."
+  },
   "feedFollowButtonRequestedA11y": "Request sent. Tap to cancel it",
-  "@feedFollowButtonRequestedA11y": {"description": "Semantics del pill en estado SOLICITUD ENVIADA."},
+  "@feedFollowButtonRequestedA11y": {
+    "description": "Semantics del pill en estado SOLICITUD ENVIADA."
+  },
   "feedFollowButtonAcceptA11y": "Accept follower request",
-  "@feedFollowButtonAcceptA11y": {"description": "Semantics del pill en estado ACEPTAR."},
+  "@feedFollowButtonAcceptA11y": {
+    "description": "Semantics del pill en estado ACEPTAR."
+  },
   "feedFollowStartedSuccess": "You're now following this person.",
-  "@feedFollowStartedSuccess": {"description": "Confirmación al seguir a una cuenta pública (auto-aceptada)."},
+  "@feedFollowStartedSuccess": {
+    "description": "Confirmación al seguir a una cuenta pública (auto-aceptada)."
+  },
   "feedSegmentFollowing": "FOLLOWERS",
-  "@feedSegmentFollowing": {"description": "Pill del segmento del feed que muestra posts de a quienes seguís."},
+  "@feedSegmentFollowing": {
+    "description": "Pill del segmento del feed que muestra posts de a quienes seguís."
+  },
   "feedEmptyFollowing": "No posts yet from people you follow",
-  "@feedEmptyFollowing": {"description": "Estado vacío del feed SEGUIDORES."},
+  "@feedEmptyFollowing": {
+    "description": "Estado vacío del feed SEGUIDORES."
+  },
   "chatBlockedComposerNotice": "To message them, this person needs to follow you.",
-  "@chatBlockedComposerNotice": {"description": "Aviso persistente sobre el composer cuando el destinatario no sigue al usuario y por lo tanto el servidor deniega el envío (REQ-FOLLOW-021)."},
+  "@chatBlockedComposerNotice": {
+    "description": "Aviso persistente sobre el composer cuando el destinatario no sigue al usuario y por lo tanto el servidor deniega el envío (REQ-FOLLOW-021)."
+  },
   "chatBlockedComposerHintA11y": "You can't write in this chat",
-  "@chatBlockedComposerHintA11y": {"description": "Semantics del composer deshabilitado por falta de permiso."},
+  "@chatBlockedComposerHintA11y": {
+    "description": "Semantics del composer deshabilitado por falta de permiso."
+  },
   "followListTabFollowers": "FOLLOWERS",
-  "@followListTabFollowers": {"description": "Pill for the followers list on the followers/following screen."},
+  "@followListTabFollowers": {
+    "description": "Pill for the followers list on the followers/following screen."
+  },
   "followListTabFollowing": "FOLLOWING",
-  "@followListTabFollowing": {"description": "Pill for the following list on the followers/following screen."},
+  "@followListTabFollowing": {
+    "description": "Pill for the following list on the followers/following screen."
+  },
   "followListEmptyFollowers": "No followers yet",
-  "@followListEmptyFollowers": {"description": "Empty state for someone else's followers list."},
+  "@followListEmptyFollowers": {
+    "description": "Empty state for someone else's followers list."
+  },
   "followListEmptyFollowersSelf": "You have no followers yet",
-  "@followListEmptyFollowersSelf": {"description": "Empty state for your own followers list."},
+  "@followListEmptyFollowersSelf": {
+    "description": "Empty state for your own followers list."
+  },
   "followListEmptyFollowing": "Not following anyone yet",
-  "@followListEmptyFollowing": {"description": "Empty state for someone else's following list."},
+  "@followListEmptyFollowing": {
+    "description": "Empty state for someone else's following list."
+  },
   "followListEmptyFollowingSelf": "You're not following anyone yet",
-  "@followListEmptyFollowingSelf": {"description": "Empty state for your own following list."},
+  "@followListEmptyFollowingSelf": {
+    "description": "Empty state for your own following list."
+  },
   "followListLoadError": "We couldn't load the list. Try again.",
-  "@followListLoadError": {"description": "Error while loading the followers or following list."},
+  "@followListLoadError": {
+    "description": "Error while loading the followers or following list."
+  },
   "followListOpenFollowersA11y": "View followers",
-  "@followListOpenFollowersA11y": {"description": "Semantics for the profile FOLLOWERS counter, which opens the list."},
+  "@followListOpenFollowersA11y": {
+    "description": "Semantics for the profile FOLLOWERS counter, which opens the list."
+  },
   "followListOpenFollowingA11y": "View following",
   "@followListOpenFollowingA11y": {"description": "Semantics for the profile FOLLOWING counter, which opens the list."},
   "routineCardDaysPerWeek": "{days, plural, =1{1 day/week} other{{days} days/week}}",
   "@routineCardDaysPerWeek": {"placeholders": {"days": {"type": "int"}}},
   "routineCardMinutes": "{value} min",
-  "@routineCardMinutes": {"placeholders": {"value": {"type": "String"}}}
+  "@routineCardMinutes": {"placeholders": {"value": {"type": "String"}}},
+  "sessionTrimAdjustedTo": "Trimmed to {value} min",
+  "@sessionTrimAdjustedTo": {"description": "Title of the trimmed-session notice in the player (#645). The value already carries the ~ prefix when computed.", "placeholders": {"value": {"type": "String"}}},
+  "sessionTrimDroppedList": "Out for today: {names}",
+  "@sessionTrimDroppedList": {"description": "Exercises the athlete left out of today's session so it would fit their time (#645). The routine itself is untouched.", "placeholders": {"names": {"type": "String"}}},
+  "sessionTrimUndo": "UNDO",
+  "@sessionTrimUndo": {"description": "Action that puts everything trimmed back into the session (#645)."},
+  "sessionTimeFitPromptTitle": "HOW MUCH TIME DO YOU HAVE TODAY?",
+  "@sessionTimeFitPromptTitle": {"description": "Entry point to the time adjustment in the player, and the title of its sheet (#645)."},
+  "sessionTimeFitCurrent": "This session runs {value} min",
+  "@sessionTimeFitCurrent": {"description": "Estimated length of today's session before trimming (#645). The value already carries the ~ prefix because it is always computed.", "placeholders": {"value": {"type": "String"}}},
+  "sessionTimeFitAlreadyFits": "{value} min is enough. Nothing needs to come out.",
+  "@sessionTimeFitAlreadyFits": {"description": "Shown when the full session already fits the declared time (#645).", "placeholders": {"value": {"type": "String"}}},
+  "sessionTimeFitTrimHeadline": "Drop these and the session runs {value} min:",
+  "@sessionTimeFitTrimHeadline": {"description": "Header of the trim proposal, followed by the exercise names (#645). The app suggests; the athlete decides.", "placeholders": {"value": {"type": "String"}}},
+  "sessionTimeFitCannotFit": "We can't get there. The shortest possible is {value} min:",
+  "@sessionTimeFitCannotFit": {"description": "Shown when even the deepest trim does not fit the declared time (#645).", "placeholders": {"value": {"type": "String"}}},
+  "sessionTimeFitNothingToTrim": "There's nothing to drop without emptying the session.",
+  "@sessionTimeFitNothingToTrim": {"description": "Shown when no exercise can be trimmed (#645)."},
+  "sessionTimeFitApply": "TRIM TODAY",
+  "@sessionTimeFitApply": {"description": "Confirms the proposed trim. Affects today's session only; the routine is untouched (#645)."},
+  "onboardingCardDismiss": "GOT IT",
+  "onboardingCardAthleteHomeTitle": "YOUR DAY AT A GLANCE",
+  "onboardingCardAthleteHomeBody": "See what you're training today, how your week is going and your streak. If you left a session half-done, it offers to pick it back up.",
+  "onboardingCardAthleteWorkoutTitle": "YOUR TRAINING STARTS HERE",
+  "onboardingCardAthleteWorkoutBody": "There are three ways to get a routine:",
+  "onboardingCardAthleteWorkoutBullet1": "Your coach's plan, already built and assigned to you",
+  "onboardingCardAthleteWorkoutBullet2": "A TREINO template, ready to use",
+  "onboardingCardAthleteWorkoutBullet3": "Your own routine, built exercise by exercise",
+  "onboardingCardAthleteFeedTitle": "THE SOCIAL SIDE",
+  "onboardingCardAthleteFeedBody": "Post your workouts and follow your friends. Rankings sits right next to it:",
+  "onboardingCardAthleteFeedBullet1": "It compares you with people at your gym",
+  "onboardingCardAthleteFeedBullet2": "It's optional: leave it off and you neither appear nor see anyone",
+  "onboardingCardAthleteCoachTitle": "YOUR COACH",
+  "onboardingCardAthleteCoachBody": "Find and hire a coach near you. You control what they see:",
+  "onboardingCardAthleteCoachBullet1": "They see your workouts as soon as you accept the link",
+  "onboardingCardAthleteCoachBullet2": "Your personal data and measurements only if you turn it on in Profile › Privacy",
+  "onboardingCardAthleteProfileTitle": "YOUR ACCOUNT",
+  "onboardingCardAthleteProfileBody": "Your data, your measurements and your privacy. This is where you decide what your public profile shares and what your coach can see.",
+  "onboardingCardTrainerHomeTitle": "YOUR DAY",
+  "onboardingCardTrainerHomeBody": "Your upcoming sessions, who trained today, your athletes' recent activity and what you have left to collect.",
+  "onboardingCardTrainerWorkoutTitle": "YOUR TEMPLATES",
+  "onboardingCardTrainerWorkoutBody": "Your own template library and the shortcut to assign a plan to an athlete. The full editor lives in Coach Hub, on your computer.",
+  "onboardingCardTrainerFeedTitle": "THE COMMUNITY",
+  "onboardingCardTrainerFeedBody": "TREINO's social feed. Follow what your athletes post, and post yourself.",
+  "onboardingCardTrainerCoachTitle": "ATHLETES AND SCHEDULE",
+  "onboardingCardTrainerCoachBody": "This is where you work with your athletes. First things worth knowing:",
+  "onboardingCardTrainerCoachBullet1": "The athlete sends you the request from their app, not the other way round",
+  "onboardingCardTrainerCoachBullet2": "Open an athlete to see their plan, sets, progress and chat",
+  "onboardingCardTrainerCoachBullet3": "Under SCHEDULE you create one-off sessions or recurring series",
+  "onboardingCardTrainerProfileTitle": "YOUR PROFESSIONAL PROFILE",
+  "onboardingCardTrainerProfileBody": "This is how athletes searching for a coach see you. From here you also:",
+  "onboardingCardTrainerProfileBullet1": "Accept incoming requests from new athletes",
+  "onboardingCardTrainerProfileBullet2": "Set your weekly availability",
+  "onboardingTourSkip": "SKIP",
+  "onboardingTourNext": "NEXT",
+  "onboardingTourFinish": "START",
+  "onboardingTourProgress": "Step {current} of {total}",
+  "onboardingCustomExerciseCta": "CREATE MY EXERCISE",
+  "@onboardingTourProgress": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "templatesOnboardingStep1Title": "How many days can you train?",
+  "templatesOnboardingStep1Body": "Pick what you can keep up. We save your answer to personalise what we recommend.",
+  "templatesOnboardingStep1Label": "Days per week",
+  "templatesOnboardingStep1Hint": "No answer filters the catalog: you will keep seeing every template.",
+  "templatesOnboardingStep2Title": "How long is your session?",
+  "templatesOnboardingStep2Body": "45 real minutes beat an ideal hour. Pick the time you actually have.",
+  "templatesOnboardingStep2Label": "Minutes per session",
+  "templatesOnboardingStep3Title": "What are you training for?",
+  "templatesOnboardingStep3Body": "Nobody picks by split, they pick by what for. It is the answer that tells us most about what you are after.",
+  "templatesOnboardingStep3Label": "Goal",
+  "templatesOnboardingStep4Title": "This is not an exam",
+  "templatesOnboardingStep4Body": "We save your answers to your profile. This one is optional: leave it empty if you have no preference.",
+  "templatesOnboardingStep4Label": "Zones to prioritise · optional",
+  "templatesOnboardingCta": "SEE MY TEMPLATES",
+  "templatesOnboardingMinutes30": "30 MIN",
+  "templatesOnboardingMinutes30Hint": "In and out",
+  "templatesOnboardingMinutes45": "45 MIN",
+  "templatesOnboardingMinutes45Hint": "The usual",
+  "templatesOnboardingMinutes60": "60 MIN",
+  "templatesOnboardingMinutes60Hint": "A full hour",
+  "templatesOnboardingMinutes75": "75 MIN OR MORE",
+  "templatesOnboardingMinutes75Hint": "Strength",
+  "templatesGoalHealth": "HEALTH",
+  "templatesGoalInjuryPrevention": "PREVENTION",
+  "templatesGoalAesthetics": "AESTHETICS",
+  "templatesGoalSport": "SPORT",
+  "templatesGoalWellbeing": "WELLBEING",
+  "templatesZoneBack": "BACK",
+  "templatesZoneChest": "CHEST",
+  "templatesZoneShoulders": "SHOULDERS",
+  "templatesZoneGlutes": "GLUTES",
+  "templatesZoneQuads": "QUADS",
+  "templatesZoneCore": "CORE",
+  "templatesOnboardingDaysOption": "{days} DAYS",
+  "templatesOnboardingBack": "BACK",
+  "exerciseFeedbackAction": "COMMENT / REPORT",
+  "@exerciseFeedbackAction": {},
+  "exerciseFeedbackActionA11y": "Comment or report discomfort on {exerciseName}",
+  "@exerciseFeedbackActionA11y": {"placeholders": {"exerciseName": {"type": "String"}}},
+  "exerciseFeedbackSheetTitle": "TELL YOUR COACH",
+  "@exerciseFeedbackSheetTitle": {},
+  "exerciseFeedbackSheetAnchorSet": "{exerciseName} · set {setNumber}",
+  "@exerciseFeedbackSheetAnchorSet": {"placeholders": {"exerciseName": {"type": "String"}, "setNumber": {"type": "int"}}},
+  "exerciseFeedbackKindComment": "Comment",
+  "@exerciseFeedbackKindComment": {},
+  "exerciseFeedbackKindDiscomfort": "Discomfort / pain",
+  "@exerciseFeedbackKindDiscomfort": {},
+  "exerciseFeedbackDiscomfortNotice": "Your coach gets notified right away.",
+  "@exerciseFeedbackDiscomfortNotice": {},
+  "exerciseFeedbackTextHint": "What do you want to tell them? E.g. my right shoulder pulled on set 3.",
+  "@exerciseFeedbackTextHint": {},
+  "exerciseFeedbackPhotoCamera": "Camera",
+  "@exerciseFeedbackPhotoCamera": {},
+  "exerciseFeedbackPhotoGallery": "Gallery",
+  "@exerciseFeedbackPhotoGallery": {},
+  "exerciseFeedbackPhotoRemove": "Remove photo",
+  "@exerciseFeedbackPhotoRemove": {},
+  "exerciseFeedbackPhotoError": "We could not open the photo. Try again.",
+  "@exerciseFeedbackPhotoError": {},
+  "exerciseFeedbackCancel": "CANCEL",
+  "@exerciseFeedbackCancel": {},
+  "exerciseFeedbackSubmit": "SEND",
+  "@exerciseFeedbackSubmit": {},
+  "exerciseFeedbackSuccess": "Done. Your coach will see it next to the set.",
+  "@exerciseFeedbackSuccess": {},
+  "exerciseFeedbackError": "We could not save your report. Try again.",
+  "@exerciseFeedbackError": {},
+  "exerciseFeedbackNoteTagComment": "FROM ATHLETE",
+  "@exerciseFeedbackNoteTagComment": {},
+  "exerciseFeedbackNoteTagDiscomfort": "DISCOMFORT",
+  "@exerciseFeedbackNoteTagDiscomfort": {},
+  "exerciseFeedbackNoteSetTag": "SET {setNumber}",
+  "@exerciseFeedbackNoteSetTag": {"placeholders": {"setNumber": {"type": "int"}}},
+  "coachSessionFeedbackLoadError": "We could not load the athlete's reports.",
+  "@coachSessionFeedbackLoadError": {},
+  "sessionFeedbackLoadError": "We could not load your reports.",
+  "@sessionFeedbackLoadError": {}
 }

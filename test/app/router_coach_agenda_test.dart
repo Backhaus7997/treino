@@ -29,6 +29,8 @@ import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
+import '../helpers/onboarding_test_helpers.dart';
+
 class _MockUser extends Mock implements User {}
 
 class _StubAuthNotifier extends AuthNotifier {
@@ -61,6 +63,8 @@ UserProfile _trainerProfile() => UserProfile(
       trainerSpecialty: 'Fuerza',
       trainerMonthlyRate: 50000,
       trainerOffersOnline: true,
+      // Not an onboarding test (#627) — keep the COACH card out of the layout.
+      onboardingSeen: allSurfacesSeen(),
     );
 
 UserProfile _athleteProfile() => UserProfile(
@@ -70,6 +74,7 @@ UserProfile _athleteProfile() => UserProfile(
       role: UserRole.athlete,
       createdAt: _kDate,
       updatedAt: _kDate,
+      onboardingSeen: allSurfacesSeen(),
     );
 
 Future<ProviderContainer> _pumpCoachAgenda(

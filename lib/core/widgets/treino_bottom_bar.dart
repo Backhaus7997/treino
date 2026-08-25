@@ -3,6 +3,7 @@ import 'dart:ui' show lerpDouble;
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../app/theme/app_motion.dart';
 import '../../app/theme/app_palette.dart';
@@ -76,7 +77,7 @@ TreinoBarMetrics resolveBarMetrics({
 }) {
   final tabWidth = availableWidth / itemCount;
   // Los dos insets con los que el pill se separa del borde del tab. Sale de
-  // la constante y NO de un 16 escrito a mano: el `AnimatedPositioned` del
+  // la constante y NO de un 16 escrito a mano: el `Positioned` del pill en el
   // build usa la misma, así que lo que se mide acá es lo que se pinta allá.
   final pillWidth = tabWidth - 2 * _kPillInset;
   final desiredHeight = 22 + 8 + maxLabelHeight + 20;
@@ -283,6 +284,13 @@ class TreinoBottomBar extends StatelessWidget {
   /// se queda en el caso expandido (el peor caso) y punto.
   static const double collapsedHeight = 52;
 
+  /// Key del pill de gradient activo.
+  ///
+  /// Es pública a propósito: es el ancla con la que los tests lo miden contra
+  /// su tab. Buscarlo por el tipo del widget que lo posiciona ataba el finder
+  /// justo a la pieza que cambia cuando se toca la animación.
+  static const Key pillKey = ValueKey('treino-bottom-bar-pill');
+
   static const List<_TabSpec> _items = [
     _TabSpec(
       label: 'ENTRENAR',
@@ -425,18 +433,53 @@ class TreinoBottomBar extends StatelessWidget {
                                 innerConstraints.maxWidth / _items.length;
                             return Stack(
                               children: [
-                                AnimatedPositioned(
+                                // Lo que se anima es el ÍNDICE, no los
+                                // píxeles.
+                                //
+                                // Acá había un `AnimatedPositioned` que
+                                // interpolaba `left` y `width`, y eso mete en
+                                // la misma animación dos cosas de naturaleza
+                                // distinta: cambiar de tab —que SÍ tiene que
+                                // deslizarse— y cambiar de ancho la barra
+                                // —que NO, porque los tabs son un `Row` de
+                                // `Expanded` y se reacomodan en un frame—.
+                                // Ante una rotación o un fold el pill viajaba
+                                // los 320ms de `AppMotion.slow` hacia una
+                                // posición que sus tabs ya ocupaban desde el
+                                // primer frame: hasta 34pt de desvío (#734).
+                                //
+                                // Animando el índice, `left` y `width` se
+                                // derivan del `tabWidth` VIGENTE en cada
+                                // frame. Cambiar de tab sigue deslizando;
+                                // cambiar de ancho reacomoda pill y tabs
+                                // juntos, en el mismo frame. La regla general:
+                                // animar la magnitud LÓGICA que cambia por
+                                // decisión del usuario, nunca la geometría
+                                // que el layout puede redefinir sola.
+                                TweenAnimationBuilder<double>(
+                                  tween: Tween<double>(
+                                    end: currentIndex.toDouble(),
+                                  ),
                                   duration: AppMotion.slow,
                                   curve: AppMotion.standard,
-                                  // Mismo inset que usa `resolveBarMetrics`
-                                  // para decidir si el label entra. Si acá
-                                  // hubiera un número suelto, medir y pintar
-                                  // podrían separarse sin que nadie lo note.
-                                  left: tabWidth * currentIndex + _kPillInset,
-                                  top: _kPillInset,
-                                  bottom: _kPillInset,
-                                  width: tabWidth - 2 * _kPillInset,
-                                  child: _PillHighlight(palette: palette),
+                                  builder: (context, position, child) {
+                                    return Positioned(
+                                      // Mismo inset que usa
+                                      // `resolveBarMetrics` para decidir si el
+                                      // label entra. Si acá hubiera un número
+                                      // suelto, medir y pintar podrían
+                                      // separarse sin que nadie lo note.
+                                      left: tabWidth * position + _kPillInset,
+                                      top: _kPillInset,
+                                      bottom: _kPillInset,
+                                      width: tabWidth - 2 * _kPillInset,
+                                      child: child!,
+                                    );
+                                  },
+                                  child: _PillHighlight(
+                                    key: TreinoBottomBar.pillKey,
+                                    palette: palette,
+                                  ),
                                 ),
                                 Row(
                                   children: List.generate(_items.length, (i) {
@@ -499,7 +542,7 @@ class _TabSpec {
 }
 
 class _PillHighlight extends StatelessWidget {
-  const _PillHighlight({required this.palette});
+  const _PillHighlight({super.key, required this.palette});
 
   final AppPalette palette;
 
@@ -563,7 +606,8 @@ class _TabContent extends StatelessWidget {
         letterSpacing: 0.8,
       ),
       // El padding horizontal es EXACTAMENTE el inset del pill, y sale de la
-      // misma constante que usan el `AnimatedPositioned` y `resolveBarMetrics`.
+      // misma constante que usan el `Positioned` del pill y
+      // `resolveBarMetrics`.
       // Sin esto la caja del label mide `tabWidth` y el pill `tabWidth - 2*
       // inset`: en el tab activo, las letras que se pasan del pill se pintan en
       // `palette.bg` (casi negro) sobre el fondo oscuro de la barra y se leen
@@ -609,7 +653,7 @@ class _TabContent extends StatelessWidget {
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
                           height: 1.2,
-                          color: palette.bg,
+                          color: TreinoButtonTokens.foreground(context),
                         ),
                       ),
                     ),

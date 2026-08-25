@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
@@ -747,27 +748,27 @@ class _ProfileEditPersonalScreenState
       fillColor: palette.bgCard,
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
         borderSide: BorderSide(
           color: palette.textMuted.withValues(alpha: 0.2),
         ),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
         borderSide: BorderSide(
           color: palette.textMuted.withValues(alpha: 0.2),
         ),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
         borderSide: BorderSide(color: palette.accent),
       ),
       errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
         borderSide: BorderSide(color: palette.danger),
       ),
       focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
         borderSide: BorderSide(color: palette.danger),
       ),
       errorStyle: GoogleFonts.barlow(
@@ -843,7 +844,7 @@ class _AvatarEditor extends StatelessWidget {
                   ),
                   child: Icon(
                     TreinoIcon.edit,
-                    color: palette.bg,
+                    color: TreinoButtonTokens.foreground(context),
                     size: 12,
                   ),
                 ),
@@ -907,7 +908,7 @@ class _GenderSelector extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
             decoration: BoxDecoration(
               color: isSelected ? palette.accent : Colors.transparent,
-              borderRadius: BorderRadius.circular(9999),
+              borderRadius: BorderRadius.circular(AppRadius.full),
               border: Border.all(
                 color: isSelected ? palette.accent : palette.border,
               ),
@@ -915,7 +916,9 @@ class _GenderSelector extends StatelessWidget {
             child: Text(
               choice.label,
               style: GoogleFonts.barlowCondensed(
-                color: isSelected ? palette.bg : palette.textMuted,
+                color: isSelected
+                    ? TreinoButtonTokens.foreground(context)
+                    : palette.textMuted,
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 1.0,
@@ -976,7 +979,7 @@ class _ExperienceLevelSelector extends StatelessWidget {
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: palette.bgCard,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadius.sm),
                 border: Border.all(
                   color: isSelected ? palette.accent : palette.border,
                   width: isSelected ? 1.5 : 1,
@@ -1043,13 +1046,13 @@ class _FilledPill extends StatelessWidget {
         height: 44,
         decoration: BoxDecoration(
           color: onTap != null ? palette.accent : palette.border,
-          borderRadius: BorderRadius.circular(9999),
+          borderRadius: BorderRadius.circular(AppRadius.full),
         ),
         alignment: Alignment.center,
         child: Text(
           label,
           style: GoogleFonts.barlowCondensed(
-            color: palette.bg,
+            color: TreinoButtonTokens.foreground(context),
             fontSize: 13,
             fontWeight: FontWeight.w700,
             letterSpacing: 1.0,
@@ -1082,7 +1085,7 @@ class _OutlinedPill extends StatelessWidget {
         height: 44,
         decoration: BoxDecoration(
           color: Colors.transparent,
-          borderRadius: BorderRadius.circular(9999),
+          borderRadius: BorderRadius.circular(AppRadius.full),
           border: Border.all(color: palette.border),
         ),
         alignment: Alignment.center,
@@ -1156,7 +1159,7 @@ class _DateField extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
           color: palette.bgCard,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           border: Border.all(color: palette.textMuted.withValues(alpha: 0.2)),
         ),
         alignment: Alignment.centerLeft,
@@ -1217,13 +1220,13 @@ class _ProfileLoadError extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 28),
                 decoration: BoxDecoration(
                   color: palette.accent,
-                  borderRadius: BorderRadius.circular(9999),
+                  borderRadius: BorderRadius.circular(AppRadius.full),
                 ),
                 alignment: Alignment.center,
                 child: Text(
                   retryLabel,
                   style: GoogleFonts.barlowCondensed(
-                    color: palette.bg,
+                    color: TreinoButtonTokens.foreground(context),
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 1.0,

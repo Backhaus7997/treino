@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../../app/theme/app_palette.dart';
 import '../../../../../core/widgets/motion/treino_tappable.dart';
@@ -124,7 +125,7 @@ class _PlanLimitPaywallDialog extends StatelessWidget {
     return Dialog(
       backgroundColor: palette.bgCard,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         side: BorderSide(color: palette.accent, width: 1.5),
       ),
       child: ConstrainedBox(
@@ -548,7 +549,7 @@ class _PrimaryCta extends StatelessWidget {
           child: Text(
             'REGULARIZAR', // i18n: Fase W3
             style: GoogleFonts.barlowCondensed(
-              color: palette.bg,
+              color: TreinoButtonTokens.foreground(context),
               fontSize: 14,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.6,
@@ -579,12 +580,12 @@ class _PrimaryCta extends StatelessWidget {
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: palette.accent,
-          borderRadius: BorderRadius.circular(9999),
+          borderRadius: BorderRadius.circular(AppRadius.full),
         ),
         child: Text(
           hasNext ? 'VER PLANES' : 'CONTACTANOS', // i18n: Fase W3
           style: GoogleFonts.barlowCondensed(
-            color: palette.bg,
+            color: TreinoButtonTokens.foreground(context),
             fontSize: 14,
             fontWeight: FontWeight.w700,
             letterSpacing: 0.6,

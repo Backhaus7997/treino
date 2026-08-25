@@ -2,17 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../core/widgets/treino_segmented_pill.dart';
 import '../../gyms/application/gym_providers.dart';
 import '../../gyms/domain/gym.dart';
 import '../application/trainer_discovery_providers.dart';
 import '../domain/trainer_location.dart';
 import '../domain/trainer_specialty.dart';
 import '../../../l10n/app_l10n.dart';
+import '../../onboarding/application/onboarding_providers.dart';
 import 'widgets/location_permission_rationale_sheet.dart';
 import 'widgets/trainer_advanced_filter_chips.dart';
 import 'widgets/trainer_compact_filter_row.dart';
@@ -50,6 +53,14 @@ class _TrainersListScreenState extends ConsumerState<TrainersListScreen> {
 
   Future<void> _maybeShowRationale() async {
     if (_rationaleShown) return;
+    // Esperar al tour (#627): ambos disparan post-frame y se apilarían.
+    //
+    // Salir por acá NO descarta el intento: `build` escucha
+    // `onboardingBlocksProvider` y vuelve a llamar cuando el tour se cierra.
+    // Sin ese listener, un alumno nuevo que entra por deep-link a /coach con
+    // el tour pendiente se quedaba sin el pedido de ubicación hasta remontar
+    // la ruta — `athleteLocationProvider` quieto en `initial` para siempre.
+    if (ref.read(onboardingBlocksProvider)) return;
     final notifier = ref.read(athleteLocationProvider.notifier);
     if (!notifier.isInitial) return;
     _rationaleShown = true;
@@ -64,6 +75,16 @@ class _TrainersListScreenState extends ConsumerState<TrainersListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Reintento del rationale cuando el tour (#627) deja de bloquear.
+    // `ref.listen` y no `watch`: presentar una hoja modal es un efecto, no
+    // parte del árbol, y un `watch` acá rebuildearía la pantalla entera cada
+    // vez que el flag cambia.
+    ref.listen<bool>(onboardingBlocksProvider, (previous, next) {
+      if (previous == true && next == false) {
+        _maybeShowRationale();
+      }
+    });
+
     final palette = AppPalette.of(context);
     final selected = ref.watch(selectedSpecialtyProvider);
     // Estado del toggle MAPA/LISTA vive en `mapModeProvider` (top-level del
@@ -255,7 +276,7 @@ class _ListMapToggle extends StatelessWidget {
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(9999),
+        borderRadius: BorderRadius.circular(AppRadius.full),
         border: Border.all(color: palette.border, width: 1),
       ),
       child: Row(
@@ -328,7 +349,7 @@ class _TogglePill extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
               color: bg,
-              borderRadius: BorderRadius.circular(9999),
+              borderRadius: BorderRadius.circular(AppRadius.full),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -499,41 +520,10 @@ class _ModeTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    final theme = Theme.of(context);
-
-    return Container(
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(9999),
-        border: Border.all(color: palette.border),
-      ),
-      padding: const EdgeInsets.all(4),
-      child: TabBar(
-        dividerColor: Colors.transparent,
-        indicatorSize: TabBarIndicatorSize.tab,
-        indicator: BoxDecoration(
-          color: palette.accent,
-          borderRadius: BorderRadius.circular(9999),
-        ),
-        splashBorderRadius: BorderRadius.circular(9999),
-        labelColor: palette.bg,
-        unselectedLabelColor: palette.textMuted,
-        labelStyle: GoogleFonts.barlowCondensed(
-          fontWeight: FontWeight.w700,
-          fontSize: 13,
-          letterSpacing: 1.2,
-        ),
-        unselectedLabelStyle: theme.textTheme.labelLarge?.copyWith(
-          fontWeight: FontWeight.w700,
-          fontSize: 13,
-          letterSpacing: 1.2,
-        ),
-        tabs: [
-          for (final l in _labels) Tab(text: l, height: 38),
-        ],
-      ),
-    );
+    // El wrapper sobrevive sólo para anclar [_labels] y el comentario de
+    // diseño de arriba. [_ModeTabScope] NO depende de él: se cuelga del
+    // DefaultTabController ancestro, así que inlinearlo también sería válido.
+    return const TreinoSegmentedPill(labels: _labels);
   }
 }
 

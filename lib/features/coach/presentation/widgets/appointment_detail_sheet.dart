@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/utils/argentina_time.dart'
@@ -183,7 +184,7 @@ class _AppointmentDetailSheetState
                 ),
                 decoration: BoxDecoration(
                   color: palette.bgCard,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(AppRadius.md),
                   border: Border.all(color: palette.border),
                 ),
                 child: Column(
@@ -223,9 +224,9 @@ class _AppointmentDetailSheetState
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: palette.accent,
-                    foregroundColor: palette.bg,
+                    foregroundColor: TreinoButtonTokens.foreground(context),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(9999),
+                      borderRadius: BorderRadius.circular(AppRadius.full),
                     ),
                   ),
                   child: Text(
@@ -251,7 +252,7 @@ class _AppointmentDetailSheetState
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           decoration: BoxDecoration(
                             color: palette.accent.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(9999),
+                            borderRadius: BorderRadius.circular(AppRadius.full),
                             border: Border.all(color: palette.accent),
                           ),
                           child: Row(
@@ -281,7 +282,8 @@ class _AppointmentDetailSheetState
                                   side: BorderSide(color: palette.accent),
                                   foregroundColor: palette.accent,
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(9999),
+                                    borderRadius:
+                                        BorderRadius.circular(AppRadius.full),
                                   ),
                                 ),
                                 child: Text(
@@ -312,7 +314,7 @@ class _AppointmentDetailSheetState
                         canCancel ? palette.highlight : palette.textMuted,
                     disabledForegroundColor: palette.textMuted,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(9999),
+                      borderRadius: BorderRadius.circular(AppRadius.full),
                     ),
                   ),
                   child: Text(
@@ -497,15 +499,15 @@ class _AppointmentDetailSheetState
           filled: true,
           fillColor: palette.bgCard,
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
             borderSide: BorderSide(color: palette.border),
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
             borderSide: BorderSide(color: palette.border),
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
             borderSide: BorderSide(color: palette.accent, width: 1.5),
           ),
         );
@@ -528,7 +530,7 @@ class _AppointmentDetailSheetState
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: palette.bg,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: palette.border),
       ),
       child: Column(
@@ -567,7 +569,7 @@ class _AppointmentDetailSheetState
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             decoration: BoxDecoration(
               color: palette.bg,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
               border: Border.all(color: palette.border),
             ),
             child: Row(
@@ -631,7 +633,7 @@ class _AppointmentDetailSheetState
                     foregroundColor: palette.textPrimary,
                     minimumSize: const Size.fromHeight(44),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(9999),
+                      borderRadius: BorderRadius.circular(AppRadius.full),
                     ),
                   ),
                   child: Text(l10n.agendaBookingCancel),
@@ -644,10 +646,10 @@ class _AppointmentDetailSheetState
                       _billing ? null : () => _confirmCobrar(context, ref),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: palette.accent,
-                    foregroundColor: palette.bg,
+                    foregroundColor: TreinoButtonTokens.foreground(context),
                     minimumSize: const Size.fromHeight(44),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(9999),
+                      borderRadius: BorderRadius.circular(AppRadius.full),
                     ),
                   ),
                   child: _billing
@@ -656,7 +658,7 @@ class _AppointmentDetailSheetState
                           height: 18,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: palette.bg,
+                            color: TreinoButtonTokens.foreground(context),
                           ),
                         )
                       : Text(
@@ -752,7 +754,7 @@ class _StatusRow extends StatelessWidget {
             decoration: BoxDecoration(
               color: color.withAlpha(30),
               border: Border.all(color: color),
-              borderRadius: BorderRadius.circular(9999),
+              borderRadius: BorderRadius.circular(AppRadius.full),
             ),
             child: Text(
               label,
@@ -824,7 +826,8 @@ Future<bool> _confirmDialog(
     context: context,
     builder: (ctx) => AlertDialog(
       backgroundColor: palette.bgCard,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg)),
       title: Text(
         title,
         style: GoogleFonts.barlowCondensed(

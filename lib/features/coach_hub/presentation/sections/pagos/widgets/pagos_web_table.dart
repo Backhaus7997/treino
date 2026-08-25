@@ -31,6 +31,7 @@ import '../../../widgets/coach_hub_widgets.dart'
     show CoachHubColumn, CoachHubDataTable, CoachHubRow;
 import 'pagos_estado.dart';
 import 'payment_format.dart';
+import 'package:treino/core/utils/argentina_time.dart';
 
 // ── PagosWebTable ─────────────────────────────────────────────────────────────
 
@@ -106,7 +107,9 @@ class PagosWebTable extends StatelessWidget {
 
   CoachHubRow _rowFor(AppPalette palette, Payment p) {
     final name = _displayName(p.athleteId);
-    final (:estado, :label) = pagoEstadoOf(p, DateTime.now().toUtc());
+    // Bucket de DIA en ART (#671): con UTC la columna VENCIMIENTO mostraba
+    // siempre un dia de mas.
+    final (:estado, :label) = pagoEstadoOf(p, argentinaNow());
     final vencimiento = fmtDayMonth(p.dueAt ?? p.createdAt);
 
     return CoachHubRow(

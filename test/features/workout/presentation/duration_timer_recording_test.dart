@@ -103,13 +103,13 @@ void main() {
             ),
           ),
         ],
-        child: TestAppWrapper(
+        child: const TestAppWrapper(
           child: DurationSetRow(
             exerciseId: 'plancha',
             setNumber: 2,
             targetSeconds: 60,
             isDone: false,
-            onDone: () {},
+            enabled: true,
           ),
         ),
       ),

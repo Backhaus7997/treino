@@ -6,15 +6,44 @@
  * leer, escribir y transaccionar; aca solo vive la decision, que es la parte
  * que tiene reglas de negocio y bordes.
  *
- * QUE SIGNIFICA BLOQUEADO: el vinculo deja de contar para el limite del PF y
- * el PF pierde la capacidad de operar sobre ese alumno. **El alumno NO pierde
- * nada** — conserva rutinas, historial y chat. La presion va sobre quien paga,
- * no sobre quien no decide. Este modulo solo elige; el enforcement vive en
- * firestore.rules y llega despues.
+ * QUE SIGNIFICA BLOQUEADO HOY: el vinculo deja de contar para el limite del
+ * PF. Nada mas — ninguna clausula de firestore.rules AUTORIZA nada en funcion
+ * de `entitlement`. Ojo con la precision, porque el campo SI figura en el
+ * archivo: firestore.rules ~:633 lo pinnea como CF-write-only (`get('entitlement',
+ * null) == resource.data.get('entitlement', null)`), que es una restriccion de
+ * ESCRITURA sobre el propio campo, no un gate sobre datos del alumno.
+ * `blockedAthleteIds` figura desde el slice 5 y es exactamente lo mismo: un pin
+ * de escritura en `users/{uid}`, no una lectura. Igual que `acceptedAt`, que se
+ * pineo en el mismo slice porque es la clave de orden de este archivo y sin pin
+ * cualquier member la reescribia para empujar a OTRO alumno fuera del cupo. Los
+ * dos estan pinneados en create Y en update: media escritura cerrada no cierra
+ * nada. El enforcement del lado
+ * del PF llega en un slice posterior. **El alumno NO pierde nada en ningun caso**:
+ * conserva rutinas, historial y chat. La presion va sobre quien paga, no sobre
+ * quien no decide.
  *
- * CRITERIO: se conservan los mas RECIENTES por `acceptedAt`. Es el mismo
- * default que ya muestra la pantalla keep-2, y el PF puede sobrescribirlo
- * eligiendo a mano. Un vinculo sin `acceptedAt` se trata como el mas viejo.
+ * LA UNIDAD DE DECISION ES EL ATLETA, NO EL VINCULO. El limite se mide sobre
+ * personas deduplicadas (`weighted-load.ts`) y `blockedAthleteIds` publica
+ * personas, asi que decidir por vinculo dejaba las tres cifras peleadas entre
+ * si. Ver `reconcileEntitlements`.
+ *
+ * CRITERIO: la PRIORIDAD para conservar es la antiguedad — primero los mas
+ * ANTIGUOS por `acceptedAt`. La antiguedad es la unica senal de vinculo que el
+ * sistema tiene sin preguntarle a nadie, y romper la relacion mas vieja es la
+ * que mas duele y la que peor se explica. Ojo con el matiz de la cola: el
+ * recorrido NO corta en el primer desborde, ver `reconcileEntitlements`.
+ * Este es el DEFAULT: la pantalla de eleccion (slice siguiente) deja que el PF
+ * lo sobrescriba a mano.
+ *
+ * PENDIENTE PARA EL SLICE DE LA PANTALLA: hasta 2026-08 el criterio era el
+ * INVERSO (conservar los mas recientes) y el lado Dart todavia lo documenta
+ * asi — `keep_students_screen.dart` ("los mas recientemente activos —
+ * resuelto server-side") y `paywall_preview_screen.dart`
+ * (`initialSelection` con el comentario "default: 2 mas recientes"). Esos dos
+ * comentarios son FALSOS desde el flip. No se tocan aca porque viven fuera de
+ * `functions/`, pero el que cablee `initialSelection` contra el server tiene
+ * que darlos vuelta o la pantalla va a pre-seleccionar exactamente el
+ * complemento de lo que el backend eligio.
  */
 
 export interface BlockableLink {
@@ -22,15 +51,8 @@ export interface BlockableLink {
   athleteId: string;
   status: "pending" | "active" | "paused" | "terminated";
   entitlement?: "entitled" | "blocked";
-  /** ms epoch. null/undefined ⇒ tratado como el mas viejo. */
+  /** ms epoch. null/undefined ⇒ defecto de datos: cae PRIMERO, ver el sort. */
   acceptedAtMs?: number | null;
-}
-
-export interface BlockSelection {
-  /** ids de vinculos que pasan a `entitlement: 'blocked'`. */
-  block: string[];
-  /** carga ponderada que queda despues de bloquear. */
-  keptLoad: number;
 }
 
 /** Mismos pesos que `weighted-load.ts` — si divergen, el gate y el downgrade
@@ -46,61 +68,6 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-/**
- * Elige a quien conservar (los mas recientes) hasta llenar `limit`, y devuelve
- * el resto para bloquear.
- *
- * Los ya `blocked` se ignoran por completo: no pesan y no se re-reportan, o
- * cada barrido generaria escrituras identicas para siempre.
- */
-export function selectLinksToBlock(
-  links: BlockableLink[],
-  limit: number | null,
-): BlockSelection {
-  // 1. Solo los que pesan: activos y pausados, aun entitled.
-  const candidates = links.filter(
-    (l) =>
-      l.entitlement !== "blocked" &&
-      (l.status === "active" || l.status === "paused"),
-  );
-
-  // 2. Dedupe por atleta, quedandose con el vinculo mas pesado (mismo criterio
-  //    que computeWeightedLoad). Sin esto, un alumno con un vinculo duplicado
-  //    consumiria doble cupo y bloquearia a otra persona sin motivo.
-  const byAthlete = new Map<string, BlockableLink>();
-  for (const l of candidates) {
-    const prev = byAthlete.get(l.athleteId);
-    if (!prev || STATUS_WEIGHT[l.status] > STATUS_WEIGHT[prev.status]) {
-      byAthlete.set(l.athleteId, l);
-    }
-  }
-
-  // 3. Mas reciente primero. Desempate por id para que dos barridos con los
-  //    mismos datos elijan siempre a las mismas personas — sin esto, quien se
-  //    queda afuera dependeria del orden en que Firestore devolvio los docs.
-  const ordered = [...byAthlete.values()].sort((a, b) => {
-    const at = a.acceptedAtMs ?? Number.NEGATIVE_INFINITY;
-    const bt = b.acceptedAtMs ?? Number.NEGATIVE_INFINITY;
-    if (at !== bt) return bt - at;
-    return a.id.localeCompare(b.id);
-  });
-
-  // 4. Greedy: se conserva mientras entre en el limite.
-  const block: string[] = [];
-  let keptLoad = 0;
-  for (const l of ordered) {
-    const w = STATUS_WEIGHT[l.status];
-    // limit === null ⇒ plan3, sin tope: entra todo y no se bloquea a nadie.
-    if (limit === null || round2(keptLoad + w) <= limit) {
-      keptLoad = round2(keptLoad + w);
-    } else {
-      block.push(l.id);
-    }
-  }
-
-  return { block, keptLoad: round2(keptLoad) };
-}
-
 export interface EntitlementReconciliation {
   /** ids que pasan a `blocked`. */
   block: string[];
@@ -108,6 +75,31 @@ export interface EntitlementReconciliation {
   unblock: string[];
   /** carga ponderada resultante. */
   keptLoad: number;
+  /**
+   * athleteIds que quedan bloqueados DESPUES de aplicar `block` y `unblock`.
+   * Estado resultante, no delta: es la lista denormalizada que va a
+   * `users/{trainerId}.blockedAthleteIds`. Deduplicada y ordenada.
+   *
+   * INVARIANTE: un atleta esta aca si y solo si TODOS sus vinculos vivos
+   * (active|paused) quedan en `blocked` despues de aplicar los dos diffs. No
+   * hay estado intermedio "medio bloqueado" — ver el agrupado por atleta.
+   */
+  blockedAthleteIds: string[];
+}
+
+/** Un atleta y todos sus vinculos vivos, colapsados en un solo candidato. */
+interface AthleteSlot {
+  athleteId: string;
+  /** TODOS sus vinculos active|paused, por id ascendente. */
+  linkIds: string[];
+  /** Subconjunto de `linkIds` que hoy ya dice `blocked`. */
+  blockedNow: string[];
+  /** Lo que aporta al limite si se lo conserva: su vinculo mas pesado. */
+  weight: number;
+  /** Antiguedad de la RELACION: el `acceptedAt` mas viejo con dato. */
+  seniority: number;
+  /** Menor id de vinculo — desempate total y estable entre atletas. */
+  tieId: string;
 }
 
 /**
@@ -117,56 +109,166 @@ export interface EntitlementReconciliation {
  * devolucion queda roto para siempre — con alumnos bloqueados que ya no
  * tendrian por que estarlo.
  *
- * A diferencia de [selectLinksToBlock], los ya bloqueados SI son candidatos:
- * compiten por el cupo con todos los demas segun el mismo criterio (mas
- * reciente primero). Si el estado ya es correcto no devuelve nada, asi el
- * barrido diario no escribe todos los dias lo mismo.
+ * Los ya bloqueados SI son candidatos: compiten por el cupo con todos los
+ * demas segun el mismo criterio (mas antiguo primero). Si el estado ya es
+ * correcto no devuelve nada, asi el barrido diario no escribe todos los dias
+ * lo mismo.
+ *
+ * ## Por que se decide por ATLETA y se escriben TODOS sus vinculos
+ *
+ * Un mismo alumno puede tener mas de un vinculo vivo con el mismo PF
+ * (`trainer_link_repository.dart` crea con id autogenerado y no impide el
+ * duplicado). Colapsar el atleta a un vinculo "representante" y escribir solo
+ * ese dejaba un punto fijo ROTO: con un representante `active+blocked` y un
+ * hermano `paused+entitled`, el diff salia vacio en cada corrida (el
+ * representante ya estaba bloqueado) mientras el hermano seguia contando
+ * 0.5 en `computeWeightedLoad`. El PF quedaba por encima de su limite PARA
+ * SIEMPRE y ningun barrido lo podia arreglar, porque no habia nada que
+ * escribir. Peor: `blockedAthleteIds` nombraba al alumno mientras su unico
+ * vinculo vivo decia `entitled` — o sea, el enforcement futuro le iba a
+ * cobrar la friccion al ALUMNO por un estado que su vinculo nunca declaro.
+ *
+ * Decidiendo por atleta y aplicando la decision a TODOS sus vinculos vivos,
+ * las tres cifras dejan de poder contradecirse:
+ *   `keptLoad` === `computeWeightedLoad(estado resultante)`, y
+ *   `blockedAthleteIds` === exactamente los atletas sin ningun vinculo vivo
+ *   entitled.
+ * Hay un test que pinea esa igualdad contra la funcion real de carga.
  */
 export function reconcileEntitlements(
   links: BlockableLink[],
   limit: number | null,
 ): EntitlementReconciliation {
-  const candidates = links.filter(
-    (l) => l.status === "active" || l.status === "paused",
-  );
+  // Agrupado por atleta. Los tres agregados (max de peso, min de antiguedad,
+  // min de id) son CONMUTATIVOS a proposito: el resultado no puede depender
+  // del orden en que Firestore devolvio los docs. La version anterior se
+  // quedaba con "el primero de peso maximo", que con pesos empatados dejaba la
+  // decision atada al orden de la query — sin `orderBy`, o sea al azar del
+  // backend.
+  const slots = new Map<string, AthleteSlot>();
+  for (const l of links) {
+    if (l.status !== "active" && l.status !== "paused") continue;
 
-  const byAthlete = new Map<string, BlockableLink>();
-  for (const l of candidates) {
-    const prev = byAthlete.get(l.athleteId);
-    if (!prev || STATUS_WEIGHT[l.status] > STATUS_WEIGHT[prev.status]) {
-      byAthlete.set(l.athleteId, l);
+    let slot = slots.get(l.athleteId);
+    if (!slot) {
+      slot = {
+        athleteId: l.athleteId,
+        linkIds: [],
+        blockedNow: [],
+        weight: 0,
+        seniority: Number.POSITIVE_INFINITY,
+        tieId: l.id,
+      };
+      slots.set(l.athleteId, slot);
     }
+
+    slot.linkIds.push(l.id);
+    if (l.entitlement === "blocked") slot.blockedNow.push(l.id);
+
+    // Peso: el mas pesado de sus vinculos vivos, sin mirar `entitlement`.
+    // Es lo que el atleta va a pesar SI SE LO CONSERVA — y conservarlo
+    // devuelve a `entitled` todos sus vinculos, asi que ninguno queda
+    // filtrado por `computeWeightedLoad`.
+    if (STATUS_WEIGHT[l.status] > slot.weight) slot.weight = STATUS_WEIGHT[l.status];
+
+    // Antiguedad: la mas VIEJA de sus vinculos. La relacion empezo cuando
+    // empezo; un vinculo duplicado creado despues no rejuvenece al alumno.
+    // El faltante entra como +Infinity, asi que solo decide cuando NINGUN
+    // vinculo del atleta tiene fecha — un defecto de datos parcial no le
+    // borra la antiguedad que si esta documentada en otro vinculo.
+    const t = l.acceptedAtMs ?? Number.POSITIVE_INFINITY;
+    if (t < slot.seniority) slot.seniority = t;
+
+    if (l.id.localeCompare(slot.tieId) < 0) slot.tieId = l.id;
   }
 
-  const ordered = [...byAthlete.values()].sort((a, b) => {
-    const at = a.acceptedAtMs ?? Number.NEGATIVE_INFINITY;
-    const bt = b.acceptedAtMs ?? Number.NEGATIVE_INFINITY;
-    if (at !== bt) return bt - at;
-    return a.id.localeCompare(b.id);
+  for (const slot of slots.values()) {
+    slot.linkIds.sort((a, b) => a.localeCompare(b));
+    slot.blockedNow.sort((a, b) => a.localeCompare(b));
+  }
+
+  // Mas ANTIGUO primero: el primero que entro es el ultimo en caer.
+  //
+  // El faltante NO se trata como "muy antiguo". Un atleta sin ningun
+  // `acceptedAt` es un DEFECTO DE DATOS, no evidencia de lealtad: darle el
+  // puesto mas protegido convertiria un bug de escritura en un cupo
+  // garantizado. Por eso +Infinity — en orden ascendente queda ULTIMO, o sea
+  // que es el PRIMERO en bloquearse. (Es una clave de comparacion local,
+  // nunca se serializa: el `null` de "sin limite" sigue siendo `null`.)
+  //
+  // Desempate por id para que dos barridos con los mismos datos elijan siempre
+  // a las mismas personas. `tieId` es el menor id de vinculo del atleta, o sea
+  // UNICO entre atletas: el orden es total, no parcial, y por eso no queda
+  // ningun resquicio donde el orden de entrada decida.
+  //
+  // La guarda `!==` antes de restar evita el `Infinity - Infinity = NaN` que
+  // dejaria el sort en manos del motor.
+  const ordered = [...slots.values()].sort((a, b) => {
+    if (a.seniority !== b.seniority) return a.seniority - b.seniority;
+    return a.tieId.localeCompare(b.tieId);
   });
 
+  // Recorrido codicioso que NO CORTA en el primer desborde: si un atleta no
+  // entra se lo saltea y se sigue, asi un `paused` posterior (0.5) puede
+  // ocupar el medio cupo que quedo libre.
+  //
+  // CONSECUENCIA, y hay que decirla porque contradice la lectura literal de
+  // "se conservan los mas antiguos": en la cola puede sobrevivir un vinculo
+  // MAS NUEVO que uno bloqueado. Con limite 2 y P(paused,t100) A(t200)
+  // A(t300) P(paused,t400), el tercero cae y el cuarto se queda.
+  //
+  // Se elige a proposito sobre cortar en el primer desborde: cortar bloquearia
+  // a MAS gente para respetar la prolijidad del enunciado, y la politica es
+  // que la friccion la coma el entrenador, no el alumno. Entre "explicacion
+  // mas simple" y "menos alumnos afectados" gana lo segundo. La pantalla de
+  // eleccion tiene que explicarlo asi: prioridad por antiguedad, y despues se
+  // termina de llenar el cupo con quien todavia entre.
   const kept = new Set<string>();
   let keptLoad = 0;
-  for (const l of ordered) {
-    const w = STATUS_WEIGHT[l.status];
+  for (const slot of ordered) {
     // limit === null ⇒ plan3, sin tope: todos quedan, y los que estaban
     // bloqueados de un plan anterior se devuelven.
-    if (limit === null || round2(keptLoad + w) <= limit) {
-      keptLoad = round2(keptLoad + w);
-      kept.add(l.id);
+    if (limit === null || round2(keptLoad + slot.weight) <= limit) {
+      keptLoad = round2(keptLoad + slot.weight);
+      kept.add(slot.athleteId);
     }
   }
 
   // Solo se reportan CAMBIOS: lo que ya esta en su estado correcto no genera
   // escritura. Sin esto, el barrido diario reescribiria los mismos campos
   // indefinidamente.
+  //
+  // La decision del atleta se aplica a TODOS sus vinculos vivos, no al
+  // representante: es lo unico que hace que `blockedAthleteIds` no mienta y
+  // que la carga resultante cierre. Ver el bloque de arriba.
   const block: string[] = [];
   const unblock: string[] = [];
-  for (const l of ordered) {
-    const isBlocked = l.entitlement === "blocked";
-    if (kept.has(l.id) && isBlocked) unblock.push(l.id);
-    if (!kept.has(l.id) && !isBlocked) block.push(l.id);
+  for (const slot of ordered) {
+    if (kept.has(slot.athleteId)) {
+      unblock.push(...slot.blockedNow);
+    } else {
+      const yaBloqueados = new Set(slot.blockedNow);
+      block.push(...slot.linkIds.filter((id) => !yaBloqueados.has(id)));
+    }
   }
 
-  return { block, unblock, keptLoad: round2(keptLoad) };
+  // `blockedAthleteIds` sale de `ordered`/`kept`, NO de filtrar los links por
+  // `entitlement === "blocked"`.
+  //
+  // POR QUE IMPORTA: `ordered` ya esta filtrado a active|paused y agrupado por
+  // atleta — el universo exacto que compite por el cupo. La forma ingenua
+  // arrastraria los `terminated` con su `entitlement` viejo, y un
+  // terminated+blocked nunca vuelve a ser candidato (lo filtra el agrupado de
+  // arriba), asi que su valor queda PETRIFICADO. Con esa formula un alumno
+  // que se re-vincula quedaria en la lista para siempre y ningun barrido lo
+  // sacaria, porque el valor seria "correcto" segun la formula.
+  //
+  // Ordenado por athleteId: es un SET, y una forma canonica hace que el
+  // documento no cambie cuando lo unico que cambio fue el orden de llegada.
+  const blockedAthleteIds = ordered
+    .filter((s) => !kept.has(s.athleteId))
+    .map((s) => s.athleteId)
+    .sort();
+
+  return { block, unblock, keptLoad: round2(keptLoad), blockedAthleteIds };
 }

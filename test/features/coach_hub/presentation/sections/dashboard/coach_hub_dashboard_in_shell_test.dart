@@ -31,6 +31,8 @@ import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pa
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
+
+import '../../../../../helpers/onboarding_test_helpers.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
 
@@ -48,6 +50,7 @@ class _StubAuthNotifier extends AuthNotifier {
 }
 
 UserProfile _trainerProfile() => UserProfile(
+      onboardingSeen: allSurfacesSeen(),
       uid: 'test-uid',
       email: 'trainer@example.com',
       displayName: 'Mateo',

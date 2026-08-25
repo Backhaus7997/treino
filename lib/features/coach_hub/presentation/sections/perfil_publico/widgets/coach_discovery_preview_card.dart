@@ -18,7 +18,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/app/theme/app_palette.dart';
-import 'package:treino/app/theme/tokens/primitives.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/widgets/motion/treino_shimmer.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
@@ -245,7 +245,8 @@ class CoachDiscoveryPreviewCard extends ConsumerWidget {
                             backgroundColor: palette.accent,
                             disabledBackgroundColor:
                                 palette.accent.withValues(alpha: 0.4),
-                            foregroundColor: palette.bg,
+                            foregroundColor:
+                                TreinoButtonTokens.foreground(context),
                             // WARNING-1 (verify fase-11): palette.bg casi
                             // invisible sobre el disabledBackgroundColor
                             // (accent tintado) — ratio ≈1.13:1 en light.

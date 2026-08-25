@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
@@ -222,7 +223,7 @@ class _AthleteAgendaScreenState extends ConsumerState<AthleteAgendaScreen> {
       isScrollControlled: true,
       backgroundColor: AppPalette.of(context).bgCard,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
       ),
       builder: (_) => _DaySessionsSheet(
         day: day,
@@ -305,8 +306,9 @@ class _AgendaCalendar extends StatelessWidget {
         outsideTextStyle: GoogleFonts.barlow(color: palette.textMuted),
         todayTextStyle: GoogleFonts.barlow(
             color: palette.textPrimary, fontWeight: FontWeight.w600),
-        selectedTextStyle:
-            GoogleFonts.barlow(color: palette.bg, fontWeight: FontWeight.w700),
+        selectedTextStyle: GoogleFonts.barlow(
+            color: TreinoButtonTokens.foreground(context),
+            fontWeight: FontWeight.w700),
       ),
       headerStyle: HeaderStyle(
         formatButtonVisible: false,
@@ -439,7 +441,7 @@ class _SessionRow extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: palette.bg,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
         border: Border.all(color: palette.border),
       ),
       child: Row(

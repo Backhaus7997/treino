@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/features/payments/application/payment_providers.dart'
     show trainerPaymentsProvider;
 import 'package:treino/features/payments/domain/payment.dart';
+import 'package:treino/core/utils/argentina_time.dart';
 
 // ── Result type ───────────────────────────────────────────────────────────────
 
@@ -57,7 +58,9 @@ final pagosBucketsProvider =
   final paymentsAsync = ref.watch(trainerPaymentsProvider);
 
   return paymentsAsync.whenData((payments) {
-    final now = DateTime.now().toUtc();
+    // Bucket de DIA en ART (#671): con UTC los pagos saltaban a "Vencidos"
+    // 3h antes y volvian solos a medianoche.
+    final now = argentinaNow();
     final periodStart = DateTime.utc(now.year, now.month, 1);
 
     List<Payment> desc(List<Payment> list) =>

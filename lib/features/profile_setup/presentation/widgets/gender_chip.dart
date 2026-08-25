@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_motion.dart';
 import '../../../../app/theme/app_palette.dart';
@@ -27,14 +28,14 @@ class GenderChip extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(9999),
+        borderRadius: BorderRadius.circular(AppRadius.full),
         child: AnimatedContainer(
           duration: AppMotion.fast,
           curve: AppMotion.standard,
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
           decoration: BoxDecoration(
             color: selected ? palette.accent : Colors.transparent,
-            borderRadius: BorderRadius.circular(9999),
+            borderRadius: BorderRadius.circular(AppRadius.full),
             border: Border.all(
               color: selected ? palette.accent : palette.border,
               width: 1,
@@ -43,7 +44,9 @@ class GenderChip extends StatelessWidget {
           child: Text(
             label,
             style: GoogleFonts.barlowCondensed(
-              color: selected ? palette.bg : palette.textMuted,
+              color: selected
+                  ? TreinoButtonTokens.foreground(context)
+                  : palette.textMuted,
               fontSize: 13,
               fontWeight: FontWeight.w700,
               letterSpacing: 1.0,

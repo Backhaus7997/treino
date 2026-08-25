@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../../app/theme/app_motion.dart';
 import '../../../../../app/theme/app_palette.dart';
@@ -263,7 +264,8 @@ class _NewSessionDialogState extends ConsumerState<NewSessionDialog> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: palette.bgCard,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.lg)),
         title: Text(
           'Día bloqueado', // i18n
           style: GoogleFonts.barlowCondensed(
@@ -293,7 +295,7 @@ class _NewSessionDialogState extends ConsumerState<NewSessionDialog> {
             onPressed: () => Navigator.of(ctx).pop(true),
             style: ElevatedButton.styleFrom(
               backgroundColor: palette.accent,
-              foregroundColor: palette.bg,
+              foregroundColor: TreinoButtonTokens.foreground(context),
             ),
             child: Text(
               'Cargar igual', // i18n
@@ -324,7 +326,8 @@ class _NewSessionDialogState extends ConsumerState<NewSessionDialog> {
 
     return AlertDialog(
       backgroundColor: palette.bgCard,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.lg)),
       titlePadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
       contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
       actionsPadding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
@@ -424,11 +427,11 @@ class _NewSessionDialogState extends ConsumerState<NewSessionDialog> {
                     filled: true,
                     fillColor: palette.bg,
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
                       borderSide: BorderSide(color: palette.border),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
                       borderSide: BorderSide(color: palette.accent, width: 1.5),
                     ),
                   ),
@@ -468,7 +471,7 @@ class _NewSessionDialogState extends ConsumerState<NewSessionDialog> {
           onPressed: (_saving || !hasActiveLinks) ? null : _submit,
           style: ElevatedButton.styleFrom(
             backgroundColor: palette.accent,
-            foregroundColor: palette.bg,
+            foregroundColor: TreinoButtonTokens.foreground(context),
             shape: const StadiumBorder(),
             disabledBackgroundColor: palette.accent.withValues(alpha: 0.3),
           ),
@@ -478,7 +481,7 @@ class _NewSessionDialogState extends ConsumerState<NewSessionDialog> {
                   height: 16,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: palette.bg,
+                    color: TreinoButtonTokens.foreground(context),
                   ),
                 )
               : Text(
@@ -527,11 +530,11 @@ class _AthleteDropdown extends ConsumerWidget {
         filled: true,
         fillColor: palette.bg,
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           borderSide: BorderSide(color: palette.border),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           borderSide: BorderSide(color: palette.accent, width: 1.5),
         ),
       ),
@@ -615,11 +618,11 @@ class _DurationSectionState extends State<_DurationSection> {
             filled: true,
             fillColor: palette.bg,
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
               borderSide: BorderSide(color: palette.border),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
               borderSide: BorderSide(color: palette.accent, width: 1.5),
             ),
             suffixText: 'min',
@@ -688,7 +691,7 @@ class _TappableField extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
           decoration: BoxDecoration(
             color: palette.bg,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
             border: Border.all(color: palette.border),
           ),
           child: Row(

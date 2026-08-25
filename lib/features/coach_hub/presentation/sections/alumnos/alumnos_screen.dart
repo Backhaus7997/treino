@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_palette.dart';
-import 'package:treino/app/theme/tokens/primitives.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
@@ -493,7 +493,9 @@ class _RosterTable extends ConsumerWidget {
     // Ventana de 30 días, día-truncada (UTC) — se computa UNA vez acá (no por
     // fila) para que la family key de finishedInWindowByUidProvider quede
     // estable entre rebuilds (mismo criterio que inactivosProvider).
-    final now = DateTime.now().toUtc();
+    // Ventana de dias en ART (#671): con UTC, "Ultimo entreno" de alguien
+    // que entreno hoy a la tarde se leia "Ayer" pasadas las 21:00.
+    final now = argentinaNow();
     final todayStart = DateTime.utc(now.year, now.month, now.day);
     final windowFrom = todayStart.subtract(const Duration(days: 30));
     final windowTo = todayStart.add(const Duration(days: 1));
@@ -841,7 +843,9 @@ class _VencimientoCell extends ConsumerWidget {
     final payments =
         ref.watch(pagosBucketsProvider).valueOrNull?.todos ?? const [];
     final info =
-        vencimientoInfoFor(payments, athleteId, DateTime.now().toUtc());
+        // Bucket de DIA en ART (#671): un vencimiento 31/07 se leia
+        // "1 agosto".
+        vencimientoInfoFor(payments, athleteId, argentinaNow());
 
     if (info.vencido) {
       return _DotLabel(color: palette.danger, label: 'Vencido'); // i18n
@@ -1218,12 +1222,17 @@ class _ViewModeToggle extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(icon,
-                  size: 15, color: selected ? palette.bg : palette.textMuted),
+                  size: 15,
+                  color: selected
+                      ? TreinoButtonTokens.foreground(context)
+                      : palette.textMuted),
               const SizedBox(width: 6),
               Text(
                 label,
                 style: TextStyle(
-                  color: selected ? palette.bg : palette.textMuted,
+                  color: selected
+                      ? TreinoButtonTokens.foreground(context)
+                      : palette.textMuted,
                   fontSize: 13,
                   fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
                 ),

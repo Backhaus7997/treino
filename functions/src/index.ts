@@ -34,6 +34,9 @@ export { notifyWearOnWorkoutStarted } from "./notifications/notify-wear-workout"
 export { maintainFollowCounters } from "./social/maintain-follow-counters";
 export { maintainReactionCounters } from "./social/maintain-reaction-counters";
 export { notifyOnReview } from "./notifications/notify-review";
+// #628: canal alumno → PF durante la sesión. Notifica SOLO cuando
+// kind === 'discomfort' — un comment no debe vibrarle el teléfono al PF.
+export { notifyOnExerciseFeedback } from "./notifications/notify-exercise-feedback";
 export { cleanupAssignedPlansOnUnlink } from "./cleanup-assigned-plans";
 export { addAlias } from "./add-alias";
 export { syncSessionShareOnTrainerLink } from "./sync-session-share";
@@ -43,6 +46,32 @@ export { syncSessionShareOnTrainerLink } from "./sync-session-share";
 // pagado"). Redeploying functions (`firebase deploy --only functions`) prunes
 // this function from the deployed set.
 export { notifyOverduePayments } from "./payments/notify-overdue-payments";
+// Email transaccional (Resend): consumer del outbox `mail_queue`. Los triggers
+// de dominio NUNCA llaman a Resend — escriben una fila de cola con ID
+// determinístico y esta función es la única que envía. Ver
+// functions/src/mail/enqueue-mail.ts para el contrato de idempotencia.
+// OJO en el deploy: necesita el secret RESEND_API_KEY
+// (`firebase functions:secrets:set RESEND_API_KEY`) y que el dominio del
+// remitente esté verificado por DNS en Resend, o cada envío devuelve 403.
+export { sendQueuedMail } from "./mail/send-queued-mail";
+// SHELVED (email de auth por Resend): requestPasswordReset y
+// requestEmailVerification estan escritos y testeados pero NO se despliegan
+// todavia. `requestPasswordReset` es un endpoint SIN autenticar que escribe en
+// Firestore; activarlo antes de que el dominio del remitente este verificado
+// por DNS en Resend deja superficie de abuso a cambio de nada, porque el mail
+// se encola y despues falla con 403.
+//
+// PARA ACTIVAR, el mismo dia que el dominio quede verificado:
+//   1. `firebase functions:secrets:set RESEND_API_KEY`
+//   2. descomentar el export de abajo
+//   3. cambiar AuthService.sendPasswordResetEmail / sendEmailVerification para
+//      que llamen a estos callables en vez de a FirebaseAuth directo
+//      (lib/features/auth/data/auth_service.dart:121 y :130)
+//   4. `firebase deploy --only functions`
+//
+// Hasta el paso 3 los mails siguen saliendo por las plantillas default de
+// Firebase, asi que el flujo de recuperacion NUNCA queda sin cobertura.
+// export { requestPasswordReset, requestEmailVerification } from "./auth/request-auth-email";
 export { syncSharedProfile } from "./profile/sync-shared-profile";
 // Paywall Fase 7, PR4 (ISSUE-1): keeps users/{trainerId}.weightedLoad
 // accurate for display after client-side pause/terminate/decline/cancel —

@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../app/theme/app_motion.dart';
 import '../../app/theme/app_palette.dart';
+import '../../core/analytics/analytics_service.dart';
+import '../../core/analytics/sub_tab_analytics.dart';
 import '../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../core/widgets/motion/treino_state_switcher.dart';
 import '../../core/widgets/motion/treino_tappable.dart';
+import '../../core/widgets/treino_segmented_pill.dart';
 import '../../core/widgets/treino_bottom_bar.dart';
 import '../../core/widgets/treino_glass_surface.dart';
 import '../../core/widgets/treino_icon.dart';
@@ -93,13 +97,19 @@ class _AthleteFeed extends StatelessWidget {
 
   static const _labels = <String>['FEED', 'RANKINGS'];
 
+  /// Slugs de analytics — estables, en el orden del [TabBarView]. No son los
+  /// labels: esos cambian con el copy y con el idioma.
+  static const _analyticsSurface = 'feed';
+  static const _analyticsTabs = <String>['feed', 'rankings'];
+
+  static const _pages = TabBarView(
+    children: [_FeedPage(showTitle: false), _RankingsPage()],
+  );
+
   static int _resolveInitialIndex(String? tab) => tab == 'rankings' ? 1 : 0;
 
   @override
   Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    final theme = Theme.of(context);
-
     return DefaultTabController(
       length: _labels.length,
       initialIndex: _resolveInitialIndex(initialTab),
@@ -124,43 +134,12 @@ class _AthleteFeed extends StatelessWidget {
                     Flexible(
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 176),
-                        child: Container(
-                          key: const ValueKey('feed-rankings-toggle'),
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: palette.bgCard,
-                            borderRadius: BorderRadius.circular(24),
-                            border: Border.all(
-                              color: palette.textMuted.withValues(alpha: 0.12),
-                            ),
-                          ),
-                          child: TabBar(
-                            dividerColor: Colors.transparent,
-                            indicatorSize: TabBarIndicatorSize.tab,
-                            indicator: BoxDecoration(
-                              color: palette.accent,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            splashBorderRadius: BorderRadius.circular(20),
-                            labelPadding:
-                                const EdgeInsets.symmetric(horizontal: 8),
-                            labelColor: palette.bg,
-                            unselectedLabelColor: palette.textMuted,
-                            labelStyle: theme.textTheme.labelLarge?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.5,
-                            ),
-                            tabs: [
-                              for (final label in _labels)
-                                Tab(
-                                  height: 40,
-                                  child: FittedBox(
-                                    fit: BoxFit.scaleDown,
-                                    child: Text(label),
-                                  ),
-                                ),
-                            ],
-                          ),
+                        // La key va en el componente: los tests de layout de
+                        // esta fila la usan para medir el centrado contra las
+                        // acciones.
+                        child: const TreinoSegmentedPill(
+                          key: ValueKey('feed-rankings-toggle'),
+                          labels: _labels,
                         ),
                       ),
                     ),
@@ -177,9 +156,17 @@ class _AthleteFeed extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
+          // FEED y RANKINGS son las dos la ruta `/feed`: el observer de rutas
+          // las ve como una sola pantalla, así que este wrapper es el único
+          // que puede distinguirlas. Envuelve las PÁGINAS y no el pill a
+          // propósito — el pill sigue siendo presentación pura, y así el
+          // evento tampoco depende de qué widget dibuje el control (#646 lo
+          // está reemplazando).
           const Expanded(
-            child: TabBarView(
-              children: [_FeedPage(showTitle: false), _RankingsPage()],
+            child: SubTabAnalytics(
+              surface: _analyticsSurface,
+              tabs: _analyticsTabs,
+              child: _pages,
             ),
           ),
         ],
@@ -211,9 +198,43 @@ class _FeedPageState extends ConsumerState<_FeedPage>
   @override
   bool get wantKeepAlive => true;
 
+  /// Slug estable por segmento. Se mapea a mano en vez de usar `.name` para
+  /// que renombrar el enum no renombre el evento y parta la serie histórica.
+  /// Además `FeedSegment.public` se reporta como `publico`, que es como se
+  /// llama el segmento en la UI.
+  static const _segmentSlugs = <FeedSegment, String>{
+    FeedSegment.amigos: 'amigos',
+    FeedSegment.gym: 'gym',
+    FeedSegment.public: 'publico',
+  };
+
+  void _logSegment(FeedSegment segment) {
+    ref.read(analyticsServiceProvider).logSubTabViewed(
+          surface: 'feed_segments',
+          tab: _segmentSlugs[segment]!,
+        );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // El segmento inicial también cuenta: sin esto `amigos` (el default)
+    // quedaría sistemáticamente subcontado contra `gym` y `publico`, que sólo
+    // se alcanzan tapeando.
+    _logSegment(ref.read(feedSegmentProvider));
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    // Los segmentos no son un TabController sino un StateProvider, así que
+    // acá se escucha el provider. Escuchar el estado y no el `onTap` de los
+    // pills mantiene el evento correcto si mañana el segmento se cambia desde
+    // otro lado (deep-link, restaurar preferencia).
+    ref.listen<FeedSegment>(feedSegmentProvider, (previous, next) {
+      if (previous == next) return;
+      _logSegment(next);
+    });
     final segment = ref.watch(feedSegmentProvider);
 
     return switch (segment) {
@@ -383,7 +404,7 @@ class _FeedActions extends ConsumerWidget {
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
                               height: 1.2,
-                              color: palette.bg,
+                              color: TreinoButtonTokens.foreground(context),
                             ),
                           ),
                         ),
@@ -433,7 +454,7 @@ class _FeedActions extends ConsumerWidget {
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
                               height: 1.2,
-                              color: palette.bg,
+                              color: TreinoButtonTokens.foreground(context),
                             ),
                           ),
                         ),
@@ -480,7 +501,8 @@ class _FeedActions extends ConsumerWidget {
                     color: palette.accent,
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(TreinoIcon.plus, size: 20, color: palette.bg),
+                  child: Icon(TreinoIcon.plus,
+                      size: 20, color: TreinoButtonTokens.foreground(context)),
                 ),
               ),
             ),

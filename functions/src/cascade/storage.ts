@@ -40,6 +40,26 @@ export async function deleteAvatar(
  *    athlete's chats, resolved from Firestore)
  *  - athleteFiles/{trainerId}_{uid}/** (trainer-authored files about the
  *    athlete — deleted per the trainer-authored-data product decision)
+ *  - postPhotos/{uid}/**              (QA-CMP-004b — uid-prefixed tree)
+ *  - sessionFeedback/{uid}/**        (#628 — uid-prefixed tree, DATO DE SALUD)
+ *
+ * QA-CMP-004b: `postPhotos/` was missing from this sweep because the header of
+ * `cascade/posts.ts` claimed posts had no Storage-backed media field. They do:
+ * `photoUrl` (firestore.rules:638 and :675) points at
+ * `postPhotos/{uid}/{postId}.{ext}`. Deleting the post document leaves the
+ * object in the bucket with a live download token, and storage.rules grants
+ * `get` on it to any authenticated user.
+ *
+ * #628 — `sessionFeedback/{uid}/{sessionId}/{file}` is the SAME failure mode,
+ * one notch worse. `deleteUserDocs` does a `recursiveDelete` over
+ * `users/{uid}`, so the Firestore side (the `exerciseFeedback` sub-collection
+ * under each session) goes with it and needs no step of its own — that is
+ * asserted in `__tests__/cascade/users.test.ts`, not assumed. The bucket has
+ * no such cascade: without this prefix the photo of a reported injury survives
+ * the account deletion with a live `?alt=media&token=` download URL, which is
+ * a bearer credential that never evaluates storage.rules at all
+ * (docs/security.md §3.1). Deleting the object is the ONLY thing that revokes
+ * it — tightening the rules does not.
  *
  * Returns the total number of objects deleted.
  */
@@ -58,6 +78,8 @@ export async function deleteAthleteStorage(
 
   await deleteByPrefix(`temp/uploads/${uid}/`);
   await deleteByPrefix(`customExerciseVideos/${uid}/`);
+  await deleteByPrefix(`postPhotos/${uid}/`);
+  await deleteByPrefix(`sessionFeedback/${uid}/`);
 
   // chatMedia is keyed chatMedia/{chatId}/{uid}/… — the uid is the SECOND
   // segment, so there is no single prefix. Scope by the athlete's chats.

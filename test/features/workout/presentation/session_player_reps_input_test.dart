@@ -133,6 +133,11 @@ void main() {
     await tester.enterText(find.byType(TextField).first, '8');
     await tester.pump();
 
+    // La ranura del ajuste de tiempo (#645) corre la fila hacia abajo:
+    // el check sigue en el arbol pero puede quedar fuera del viewport del
+    // test, y un tap sin scroll aterriza en otra cosa.
+    await tester.ensureVisible(find.byIcon(TreinoIcon.checkCircleEmpty));
+    await tester.pump();
     await tester.tap(find.byIcon(TreinoIcon.checkCircleEmpty));
     await tester.pump();
 
@@ -164,6 +169,11 @@ void main() {
     await tester.enterText(find.byType(TextField).first, '15');
     await tester.pump();
 
+    // La ranura del ajuste de tiempo (#645) corre la fila hacia abajo:
+    // el check sigue en el arbol pero puede quedar fuera del viewport del
+    // test, y un tap sin scroll aterriza en otra cosa.
+    await tester.ensureVisible(find.byIcon(TreinoIcon.checkCircleEmpty));
+    await tester.pump();
     await tester.tap(find.byIcon(TreinoIcon.checkCircleEmpty));
     await tester.pump();
 
@@ -194,6 +204,11 @@ void main() {
     await tester.enterText(find.byType(TextField).first, '');
     await tester.pump();
 
+    // La ranura del ajuste de tiempo (#645) corre la fila hacia abajo:
+    // el check sigue en el arbol pero puede quedar fuera del viewport del
+    // test, y un tap sin scroll aterriza en otra cosa.
+    await tester.ensureVisible(find.byIcon(TreinoIcon.checkCircleEmpty));
+    await tester.pump();
     await tester.tap(find.byIcon(TreinoIcon.checkCircleEmpty));
     await tester.pump();
 

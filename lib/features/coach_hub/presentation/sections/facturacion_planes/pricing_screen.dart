@@ -8,6 +8,7 @@ import '../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../../core/widgets/treino_icon.dart';
 import '../../../../coach/domain/subscription_tier.dart';
 import '../../../../profile/application/user_providers.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 /// Umbral entre el layout ancho (Coach Hub web) y el apilado del teléfono.
 ///
@@ -381,7 +382,7 @@ class _SavingsChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: palette.accent.withValues(alpha: 0.08),
         border: Border.all(color: palette.accent.withValues(alpha: 0.33)),
-        borderRadius: BorderRadius.circular(9999),
+        borderRadius: BorderRadius.circular(AppRadius.full),
       ),
       child: Text(
         '¡Ahorrá 2 meses con el anual!', // i18n: Fase W3
@@ -415,7 +416,7 @@ class _NarrowCycleToggle extends StatelessWidget {
       decoration: BoxDecoration(
         color: palette.bgCard,
         border: Border.all(color: palette.border),
-        borderRadius: BorderRadius.circular(9999),
+        borderRadius: BorderRadius.circular(AppRadius.full),
       ),
       child: Row(
         children: [
@@ -467,7 +468,7 @@ class _NarrowCycleOption extends StatelessWidget {
         decoration: BoxDecoration(
           // El activo invierte: fondo claro (textPrimary) y texto oscuro (bg).
           color: selected ? palette.textPrimary : Colors.transparent,
-          borderRadius: BorderRadius.circular(9999),
+          borderRadius: BorderRadius.circular(AppRadius.full),
         ),
         child: Text(
           label,
@@ -970,7 +971,7 @@ class _StudentsBox extends StatelessWidget {
         // flotar sobre ella.
         color: palette.bg,
         border: Border.all(color: palette.border),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -1015,12 +1016,12 @@ class _PopularBadge extends StatelessWidget {
       padding: padding,
       decoration: BoxDecoration(
         color: palette.accent,
-        borderRadius: BorderRadius.circular(9999),
+        borderRadius: BorderRadius.circular(AppRadius.full),
       ),
       child: Text(
         'MÁS POPULAR', // i18n: Fase W3
         style: GoogleFonts.barlowCondensed(
-          color: palette.bg,
+          color: TreinoButtonTokens.foreground(context),
           fontSize: fontSize,
           fontWeight: FontWeight.w800,
           letterSpacing: letterSpacing,
@@ -1058,7 +1059,7 @@ class _PlanCtaButton extends StatelessWidget {
         alignment: Alignment.center,
         decoration: BoxDecoration(
           border: Border.all(color: palette.border),
-          borderRadius: BorderRadius.circular(9999),
+          borderRadius: BorderRadius.circular(AppRadius.full),
         ),
         child: Text(
           'TU PLAN ACTUAL', // i18n: Fase W3
@@ -1089,12 +1090,14 @@ class _PlanCtaButton extends StatelessWidget {
             border: Border.all(
               color: filled ? palette.accent : palette.border,
             ),
-            borderRadius: BorderRadius.circular(9999),
+            borderRadius: BorderRadius.circular(AppRadius.full),
           ),
           child: Text(
             isFree ? 'GRATIS' : 'ELEGIR PLAN', // i18n: Fase W3
             style: GoogleFonts.barlowCondensed(
-              color: filled ? palette.bg : palette.textPrimary,
+              color: filled
+                  ? TreinoButtonTokens.foreground(context)
+                  : palette.textPrimary,
               fontSize: 13,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.6,

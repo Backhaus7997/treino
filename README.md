@@ -43,7 +43,7 @@ lib/
 │   ├── app.dart               # MaterialApp.router + ProviderScope
 │   ├── router.dart            # go_router con ShellRoute (5 tabs)
 │   └── theme/
-│       ├── app_palette.dart   # AppPalette (mintMagenta default + electricViolet)
+│       ├── app_palette.dart   # AppPalette (mintMagenta dark + mintMagentaLight)
 │       ├── app_theme.dart     # ThemeData con Barlow
 │       └── app_background.dart
 ├── core/widgets/

@@ -4,11 +4,21 @@ import 'package:treino/features/profile/application/user_providers.dart';
 
 /// Canales de entrega de notificaciones del Coach Hub.
 ///
-/// IMPORTANTE (honestidad de scope W3.2): hoy SOLO `push` tiene backend (FCM),
-/// y las Cloud Functions todavía NO leen estas preferencias (siempre mandan).
-/// `email` y `whatsapp` no tienen envío implementado. Esta pantalla PERSISTE
-/// las preferencias en `users/{uid}.notificationPrefs`; que las CFs las
-/// respeten + los canales email/whatsapp son follow-ups de `functions/`.
+/// ESTADO REAL DE CADA CANAL (mantener sincronizado con `functions/`):
+///
+/// - `push`   — implementado (FCM). Las CFs mandan SIEMPRE, sin leer estas
+///              preferencias todavía. Ese es el follow-up pendiente del canal.
+/// - `email`  — implementado para los dos tipos que el outbox transaccional
+///              cubre hoy: `nueva_solicitud` y `sesion_cancelada`. Esos dos SÍ
+///              respetan el toggle: `enqueueMail` recibe el `prefKey` y
+///              `sendQueuedMail` descarta el envío si el canal está apagado.
+///              El resto de las filas no tienen envío por email.
+/// - `whatsapp` — sin implementar. Queda como placeholder de roadmap y arranca
+///              apagado en todas las filas, así no promete nada.
+///
+/// Las preferencias se persisten en `users/{uid}.notificationPrefs`, un campo
+/// libremente escribible por el dueño del doc (`firestore.rules`, regla update
+/// de `users`: solo pinea uid/role/email/createdAt/subscription/weightedLoad).
 enum NotifChannel { email, push, whatsapp }
 
 extension NotifChannelX on NotifChannel {
@@ -28,14 +38,38 @@ class NotifType {
   final String label;
 }
 
-/// Tipos de aviso del mockup `notificaciones.png`, en orden.
+/// Tipos de aviso que el PF puede configurar.
+///
+/// REGLA: cada fila de esta lista tiene que corresponder a una notificación que
+/// REALMENTE se dispara hacia el entrenador. Una fila sin Cloud Function detrás
+/// es una promesa que el producto no cumple — el usuario apaga algo que nunca
+/// estuvo prendido, o deja prendido algo que nunca va a llegar.
+///
+/// El mockup original (`notificaciones.png`) traía tres filas sin backend
+/// alguno: `pago_recibido`, `alumno_inactivo` y `comida_pendiente`. Ninguna
+/// tenía CF y se quitaron. Si alguna de esas features aterriza, se vuelven a
+/// agregar JUNTO con su trigger, no antes.
+///
+/// Trazabilidad fila → Cloud Function (`functions/src/`):
+///   nueva_solicitud    → notifications/notify-link-change.ts, rama `pending`
+///   vinculo_finalizado → notifications/notify-link-change.ts, rama `terminated`
+///   resena_nueva       → notifications/notify-review.ts
+///   sesion_cancelada   → notifications/notify-appointment.ts, rama `cancelled`
+///   mensaje_nuevo      → notifications/notify-chat-message.ts
 const kNotifTypes = <NotifType>[
-  NotifType('pago_recibido', 'PAGOS', 'Pago recibido'), // i18n: Fase W3
-  NotifType('nueva_solicitud', 'ALUMNOS', 'Nueva solicitud (Discovery)'),
-  NotifType('alumno_inactivo', 'ALUMNOS', 'Alumno inactivo'),
-  NotifType('comida_pendiente', 'ALUMNOS', 'Comida pendiente de revisar'),
+  NotifType('nueva_solicitud', 'ALUMNOS', 'Nueva solicitud de vinculación'),
+  NotifType('vinculo_finalizado', 'ALUMNOS', 'Vínculo finalizado'),
+  NotifType('resena_nueva', 'ALUMNOS', 'Reseña nueva'), // i18n: Fase W3
+  NotifType('sesion_cancelada', 'AGENDA', 'Sesión cancelada'),
   NotifType('mensaje_nuevo', 'CHAT', 'Mensaje nuevo'),
 ];
+
+/// Filas cuyo canal `email` tiene envío real detrás (outbox transaccional).
+///
+/// El valor tiene que coincidir con el `prefKey` que pasan los productores en
+/// `functions/src/notifications/`. Si agregás un mail nuevo con `prefKey`,
+/// sumá la clave acá también.
+const kEmailBackedTypes = <String>{'nueva_solicitud', 'sesion_cancelada'};
 
 /// Preferencias de notificación: matriz `tipo -> canal -> bool`.
 ///
@@ -78,14 +112,20 @@ class NotifPrefs {
     });
   }
 
-  /// Defaults sensatos: push siempre on; email on para pago y chat; whatsapp
-  /// off (todavía sin canal real).
+  /// Defaults: push siempre on; email on SOLO donde hay envío real; whatsapp
+  /// off en todo (sin canal implementado).
+  ///
+  /// El default anterior dejaba `mensaje_nuevo` con email en ON. Eso era una
+  /// bomba de tiempo: el día que alguien conectara la matriz al backend, cada
+  /// mensaje de chat se convertía en un mail. Volumen de chat por email =
+  /// denuncias de spam = reputación de remitente quemada, que es lo único que
+  /// no se recupera rápido. El chat se queda en push, a propósito.
   static bool _defaultFor(String typeKey, NotifChannel ch) {
     switch (ch) {
       case NotifChannel.push:
         return true;
       case NotifChannel.email:
-        return typeKey == 'pago_recibido' || typeKey == 'mensaje_nuevo';
+        return kEmailBackedTypes.contains(typeKey);
       case NotifChannel.whatsapp:
         return false;
     }

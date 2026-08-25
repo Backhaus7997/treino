@@ -36,11 +36,12 @@ Estas son las que más fácil se olvidan o más fácil rompen el producto. Si el
 
 ### 2. Diseño (no negociable)
 
-- **Paleta default**: Mint Magenta (`accent #2CE5A2`, `highlight #C123E0`, `ink #0A0A0A`). Alterna: Electric Violet.
-- **Modo oscuro siempre**. No hay light theme.
+- **Paleta única**: Mint Magenta (`accent #2CE5A2`, `highlight #C123E0`, `ink #0A0A0A`). No hay alterna — Electric Violet fue dropeada antes del lanzamiento.
+- **Dos temas**: `AppPalette.mintMagenta` (dark) y `mintMagentaLight` (light). La app arranca en `ThemeMode.system` — el tema claro se sirve desde el primer arranque.
+- **Todo par de tokens donde `accent` sea FONDO se mide en las DOS paletas.** El mint es idéntico en ambas pero `bg` no: `palette.bg` sobre `accent` da 12.10:1 en dark y **1.57:1 en light**. Para texto sobre acento va `TreinoButtonTokens.foreground` (ink invariante), nunca `palette.bg`.
 - **Headings**: Barlow Condensed 700 UPPERCASE.
 - **Body**: Barlow 400/600/700.
-- **Spacing**: sólo `8 · 12 · 14 · 18 · 20` px. No 4/16/24.
+- **Spacing**: sólo `8 · 12 · 14 · 18 · 20` px para separar elementos. No 16/24. El 4 existe **sólo** como `AppSpacing.hairline`, para separaciones ópticas sub-8 y gutters internos de un componente del kit — nunca como padding de layout. Ver su dartdoc.
 - **Nunca** HEX literal en widgets — usar `AppPalette.of(context).accent`.
 - **Nunca** PhosphorIcons directo — usar `TreinoIcon.X`.
 

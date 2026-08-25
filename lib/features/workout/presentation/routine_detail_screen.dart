@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/utils/kg_format.dart';
@@ -184,13 +185,21 @@ class _RoutineDetailScreenState extends ConsumerState<RoutineDetailScreen> {
                 : '/workout',
           ),
         ),
-        // Edit affordance only for the owner of a user-created routine —
-        // trainer-assigned plans and system templates render read-only.
-        // Sits opposite the back button, same chip treatment for parity.
+        // Top-right affordances, opposite the back button, same chip
+        // treatment for parity. The two are mutually exclusive by `source`
+        // (own routine → edit it; copyable template → fork it), so at most
+        // one chip ever measures anything; the Row just keeps them from
+        // stacking on top of each other if that ever stops being true.
         Positioned(
           top: 0,
           right: 0,
-          child: _EditBar(routineAsync: routineAsync),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _UseAsBaseBar(routineAsync: routineAsync),
+              _EditBar(routineAsync: routineAsync),
+            ],
+          ),
         ),
       ],
     );
@@ -277,6 +286,83 @@ class _EditBar extends ConsumerWidget {
             icon: Icon(Icons.edit, color: palette.textPrimary),
             onPressed: () =>
                 context.push('/workout/my-routine-editor', extra: routine.id),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Top-right "Usar como base" affordance — the middle ground the usability
+/// study found missing (#647). Today the athlete's choice is binary: run a
+/// template exactly as written, or face the blank `SelfCreating` editor and
+/// rebuild every session by hand. This opens the editor with the template
+/// already loaded and saves the result as a routine of their OWN.
+///
+/// Renders on the two sources an athlete may legitimately copy:
+///   * `system` — the TREINO catalogue.
+///   * `trainer-template` PUBLISHED to the community (`visibility: public`).
+///     Publishing IS the trainer's opt-in to being used as a starting point;
+///     a private template was never on offer, and the read rule would not
+///     hand it over anyway.
+///
+/// Deliberately ABSENT on `trainer-assigned` plans. A plan the PF wrote FOR
+/// this athlete is a prescription; letting them fork it into an editable copy
+/// quietly turns it into a suggestion, and the trainer would keep coaching
+/// against a plan that is no longer the one being trained. If the athlete
+/// wants changes, they ask their PF. (Different from #645's time-based
+/// trimming, which only ever touches today's session.)
+///
+/// Also absent on `user-created` routines: the owner gets [_EditBar] instead,
+/// and copying somebody else's shared routine is a separate product call.
+///
+/// The copy keeps NO link to its origin — nothing to reconcile when the
+/// trainer later edits or unpublishes the original.
+class _UseAsBaseBar extends ConsumerWidget {
+  const _UseAsBaseBar({required this.routineAsync});
+
+  final AsyncValue<Routine?> routineAsync;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final routine = routineAsync.valueOrNull;
+    if (routine == null) return const SizedBox.shrink();
+
+    final copyable = routine.source == RoutineSource.system ||
+        (routine.source == RoutineSource.trainerTemplate &&
+            routine.visibility == RoutineVisibility.public);
+    if (!copyable) return const SizedBox.shrink();
+
+    // Trainers coach, they don't train in-app — the copy would land in MIS
+    // RUTINAS, a section their role does not have. Same guard the pinned
+    // start action uses.
+    final role = ref.watch(
+      userProfileProvider.select((async) => async.valueOrNull?.role),
+    );
+    if (role == UserRole.trainer) return const SizedBox.shrink();
+
+    // The copy is stamped with `createdBy: <uid>`; without a signed-in uid
+    // there is nobody to own it.
+    final uid = ref.watch(currentUidProvider);
+    if (uid == null || uid.isEmpty) return const SizedBox.shrink();
+
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(right: 12, top: 8),
+      child: Material(
+        color: palette.scrimDark.withValues(alpha: 0.35),
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: Semantics(
+          button: true,
+          label: l10n.workoutRoutineUseAsBase,
+          child: IconButton(
+            key: const Key('routine_use_as_base'),
+            tooltip: l10n.workoutRoutineUseAsBase,
+            icon: Icon(TreinoIcon.copy, color: palette.textPrimary),
+            onPressed: () =>
+                context.push('/workout/customize-routine/${routine.id}'),
           ),
         ),
       ),
@@ -656,7 +742,7 @@ class _SupersetBlock extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
       decoration: BoxDecoration(
         color: palette.highlight.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: palette.highlight),
       ),
       child: Column(
@@ -891,7 +977,7 @@ class _AssignedByChip extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
         color: palette.accent.withValues(alpha: 0.20),
-        borderRadius: BorderRadius.circular(9999),
+        borderRadius: BorderRadius.circular(AppRadius.full),
       ),
       child: Text(
         label,
@@ -918,7 +1004,7 @@ class _DayChipBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
         color: palette.accent.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(9999),
+        borderRadius: BorderRadius.circular(AppRadius.full),
       ),
       child: Text(
         text,
@@ -1195,7 +1281,7 @@ class _StartActionButton extends StatelessWidget {
           backgroundColor: palette.accent,
           minimumSize: const Size.fromHeight(56),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(9999),
+            borderRadius: BorderRadius.circular(AppRadius.full),
           ),
         ),
         child: Text(
@@ -1204,7 +1290,7 @@ class _StartActionButton extends StatelessWidget {
             fontWeight: FontWeight.w700,
             fontSize: 16,
             letterSpacing: 1.0,
-            color: palette.bg,
+            color: TreinoButtonTokens.foreground(context),
           ),
         ),
       ),
@@ -1224,7 +1310,7 @@ class _PlanCompleteBanner extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: palette.accent.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(color: palette.accent),
       ),
       child: Row(
@@ -1261,7 +1347,7 @@ class _CompletedDayChip extends StatelessWidget {
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: BorderRadius.circular(9999),
+        borderRadius: BorderRadius.circular(AppRadius.full),
         border: Border.all(color: palette.border),
       ),
       child: Row(
@@ -1489,7 +1575,7 @@ class _RoutineLoadingSkeleton extends StatelessWidget {
                         height: 76,
                         decoration: BoxDecoration(
                           color: palette.bgCard,
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
                         ),
                       ),
                     ),

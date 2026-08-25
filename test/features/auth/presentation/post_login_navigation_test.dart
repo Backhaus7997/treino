@@ -21,6 +21,8 @@ import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
+import '../../../helpers/onboarding_test_helpers.dart';
+
 // ---------------------------------------------------------------------------
 // Issue #499 — flicker /home → /profile-setup en el 100% de los registros
 // nuevos.
@@ -123,6 +125,9 @@ UserProfile _completeProfile() => UserProfile(
       role: UserRole.athlete,
       createdAt: DateTime.utc(2026, 1, 1),
       updatedAt: DateTime.utc(2026, 1, 1),
+      // El tour (#627) se monta sobre /home; sin esto tapa la pantalla
+      // bajo test y todos los finders fallan.
+      onboardingSeen: allSurfacesSeen(),
     );
 
 /// Monta una pantalla de auth real sobre un router cuyo redirect ES el

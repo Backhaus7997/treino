@@ -64,7 +64,10 @@ Future<void> _pumpEditor(
   String? routineId,
 }) async {
   // Desktop viewport — Coach Hub web dialogs (exercise picker) assume it.
-  tester.view.physicalSize = const Size(1400, 900);
+  // Raised 900 → 1100 when the RESUMEN field (#648) landed above DÍAS: the
+  // form is a SingleChildScrollView, so a short viewport leaves the day and
+  // set controls in the tree but under the pinned footer, where tap() misses.
+  tester.view.physicalSize = const Size(1400, 1100);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
@@ -722,6 +725,157 @@ Routine _presenceRoutine({String id = 'r7'}) => Routine(
               restSeconds: 90,
               sets: [SetSpec(reps: 8, weightKg: 60)],
               activeWeeks: [0],
+            ),
+          ],
+        ),
+      ],
+    );
+
+/// Two exercises in ONE day with deliberately different prescriptions — the
+/// shape "copiar sets del anterior" acts on (#655). The source carries a
+/// warm-up so the copy has a set TYPE to prove it moved, and a different rest
+/// so the test can prove rest does NOT move.
+Routine _copyPrescriptionRoutine({String id = 'r20'}) => Routine(
+      id: id,
+      name: 'Copiar prescripción',
+      split: 'Full Body',
+      level: ExperienceLevel.intermediate,
+      source: RoutineSource.trainerAssigned,
+      assignedBy: _trainerId,
+      assignedTo: _athleteId,
+      visibility: RoutineVisibility.private,
+      days: const [
+        RoutineDay(
+          dayNumber: 1,
+          name: 'Día A',
+          slots: [
+            RoutineSlot(
+              exerciseId: 'bench-press',
+              exerciseName: 'Press de Banca',
+              muscleGroup: 'chest',
+              targetSets: 2,
+              targetRepsMin: 8,
+              targetRepsMax: 12,
+              targetReps: [12, 8],
+              targetWeightKg: 20,
+              restSeconds: 90,
+              sets: [
+                SetSpec(type: SetType.warmup, reps: 12, weightKg: 20),
+                SetSpec(reps: 8, weightKg: 60),
+              ],
+            ),
+            RoutineSlot(
+              exerciseId: 'incline-press',
+              exerciseName: 'Press Inclinado',
+              muscleGroup: 'chest',
+              targetSets: 1,
+              targetRepsMin: 5,
+              targetRepsMax: 5,
+              targetReps: [5],
+              targetWeightKg: 30,
+              restSeconds: 60,
+              sets: [SetSpec(reps: 5, weightKg: 30)],
+            ),
+          ],
+        ),
+      ],
+    );
+
+/// Source is a DURATION exercise, target is plain reps — copying must re-mode
+/// the target, not paste seconds into a REPS/KG grid (#655).
+Routine _copyModeRoutine({String id = 'r21'}) => Routine(
+      id: id,
+      name: 'Copiar modo',
+      split: 'Full Body',
+      level: ExperienceLevel.beginner,
+      source: RoutineSource.trainerAssigned,
+      assignedBy: _trainerId,
+      assignedTo: _athleteId,
+      visibility: RoutineVisibility.private,
+      days: const [
+        RoutineDay(
+          dayNumber: 1,
+          name: 'Día A',
+          slots: [
+            RoutineSlot(
+              exerciseId: 'plank',
+              exerciseName: 'Plancha',
+              muscleGroup: 'core',
+              targetSets: 1,
+              targetRepsMin: 0,
+              targetRepsMax: 0,
+              restSeconds: 30,
+              exerciseMode: ExerciseMode.duration,
+              durationSeconds: 45,
+              sets: [SetSpec(durationSeconds: 45)],
+            ),
+            RoutineSlot(
+              exerciseId: 'bench-press',
+              exerciseName: 'Press de Banca',
+              muscleGroup: 'chest',
+              targetSets: 1,
+              targetRepsMin: 5,
+              targetRepsMax: 5,
+              targetReps: [5],
+              targetWeightKg: 30,
+              restSeconds: 60,
+              sets: [SetSpec(reps: 5, weightKg: 30)],
+            ),
+          ],
+        ),
+      ],
+    );
+
+/// 2-week plan whose TARGET exercise is scheduled only in week 2 and carries a
+/// different prescription per week — so a copy on week 2 can be proved to leave
+/// week 1 and the presence mask alone (#655, ADR-WPRES).
+Routine _copyPerWeekRoutine({String id = 'r22'}) => Routine(
+      id: id,
+      name: 'Copiar por semana',
+      split: 'Full Body',
+      level: ExperienceLevel.advanced,
+      source: RoutineSource.trainerAssigned,
+      assignedBy: _trainerId,
+      assignedTo: _athleteId,
+      visibility: RoutineVisibility.private,
+      numWeeks: 2,
+      days: const [
+        RoutineDay(
+          dayNumber: 1,
+          name: 'Día A',
+          slots: [
+            RoutineSlot(
+              exerciseId: 'bench-press',
+              exerciseName: 'Press de Banca',
+              muscleGroup: 'chest',
+              targetSets: 1,
+              targetRepsMin: 10,
+              targetRepsMax: 10,
+              targetReps: [10],
+              targetWeightKg: 55,
+              restSeconds: 90,
+              sets: [SetSpec(reps: 10, weightKg: 55)],
+              weeklySets: [
+                [SetSpec(reps: 10, weightKg: 55)],
+                [SetSpec(reps: 8, weightKg: 60)],
+              ],
+            ),
+            RoutineSlot(
+              exerciseId: 'incline-press',
+              exerciseName: 'Press Inclinado',
+              muscleGroup: 'chest',
+              targetSets: 1,
+              targetRepsMin: 5,
+              targetRepsMax: 5,
+              targetReps: [5],
+              targetWeightKg: 30,
+              restSeconds: 60,
+              sets: [SetSpec(reps: 5, weightKg: 30)],
+              weeklySets: [
+                [SetSpec(reps: 5, weightKg: 30)],
+                [SetSpec(reps: 6, weightKg: 35)],
+              ],
+              activeWeeks: [1],
             ),
           ],
         ),
@@ -2365,7 +2519,7 @@ void main() {
       RoutineRepository? repo,
       String? templateId,
     }) async {
-      tester.view.physicalSize = const Size(1400, 900);
+      tester.view.physicalSize = const Size(1400, 1100);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
@@ -2479,6 +2633,374 @@ void main() {
           draft: any(named: 'draft'),
         ),
       );
+    });
+  });
+
+  // ── Resumen en criollo (#648) ────────────────────────────────────────────
+  //
+  // Both modes of this screen are PF modes, so unlike mobile there is no
+  // "the athlete must not see it" case to assert here — that gate lives in
+  // test/features/workout/presentation/routine_editor_summary_test.dart,
+  // against RoutineEditorScreen.
+  group('RoutineEditorWebScreen — resumen (#648)', () {
+    const resumen =
+        'Empujar, tirar y piernas: cada día trabajás un tipo de movimiento '
+        'distinto.';
+    final summaryField = find.byKey(const Key('routine_editor_summary_field'));
+
+    testWidgets('renders with a label and a plain-language explanation',
+        (tester) async {
+      await _pumpEditor(tester);
+
+      expect(summaryField, findsOneWidget);
+      expect(find.text('RESUMEN'), findsOneWidget);
+      expect(
+        find.text(
+          'Una frase que explique qué es la rutina, para alguien que nunca '
+          'pisó un gimnasio.',
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('caps input at 280 characters and shows a live counter',
+        (tester) async {
+      await _pumpEditor(tester);
+
+      expect(find.text('0/280'), findsOneWidget);
+
+      await tester.enterText(summaryField, 'A' * 400);
+      await tester.pumpAndSettle();
+
+      final field = tester.widget<TextField>(summaryField);
+      expect(field.maxLength, 280);
+      expect(field.controller!.text.length, 280);
+      expect(find.text('280/280'), findsOneWidget);
+    });
+
+    testWidgets('saves the trimmed resumen on a new assigned routine',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.createAssigned(any())).thenAnswer(
+        (i) async => (i.positionalArguments.first as Routine).copyWith(id: 'x'),
+      );
+      await _pumpEditor(tester, repo: repo);
+
+      await _fillMinimalValidForm(tester);
+      await tester.enterText(summaryField, '  $resumen  ');
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      final saved = verify(() => repo.createAssigned(captureAny()))
+          .captured
+          .single as Routine;
+      expect(saved.summary, resumen);
+    });
+
+    testWidgets(
+        'is OPTIONAL — a routine saved with the field blank persists '
+        'summary: null, not an empty string', (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.createAssigned(any())).thenAnswer(
+        (i) async => (i.positionalArguments.first as Routine).copyWith(id: 'x'),
+      );
+      await _pumpEditor(tester, repo: repo);
+
+      // Resumen deliberately left untouched — the save must still go through.
+      await _fillMinimalValidForm(tester);
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      final saved = verify(() => repo.createAssigned(captureAny()))
+          .captured
+          .single as Routine;
+      expect(saved.summary, isNull);
+      expect(saved.name, 'Fuerza 4x semana');
+    });
+
+    testWidgets('whitespace-only input saves as null', (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.createAssigned(any())).thenAnswer(
+        (i) async => (i.positionalArguments.first as Routine).copyWith(id: 'x'),
+      );
+      await _pumpEditor(tester, repo: repo);
+
+      await _fillMinimalValidForm(tester);
+      await tester.enterText(summaryField, '   ');
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      final saved = verify(() => repo.createAssigned(captureAny()))
+          .captured
+          .single as Routine;
+      expect(saved.summary, isNull);
+    });
+
+    testWidgets('hydrates an existing resumen and round-trips it on save',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById('r1')).thenAnswer(
+        (_) async => _simpleRoutine().copyWith(summary: resumen),
+      );
+      when(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: any(named: 'draft'),
+        ),
+      ).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+
+      await _pumpEditor(tester, repo: repo, routineId: 'r1');
+
+      final field = tester.widget<TextField>(summaryField);
+      expect(field.controller!.text, resumen);
+
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      final draft = verify(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: captureAny(named: 'draft'),
+        ),
+      ).captured.single as Routine;
+      expect(draft.summary, resumen);
+    });
+
+    testWidgets('an emptied field clears the resumen on an existing routine',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById('r1')).thenAnswer(
+        (_) async => _simpleRoutine().copyWith(summary: resumen),
+      );
+      when(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: any(named: 'draft'),
+        ),
+      ).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+
+      await _pumpEditor(tester, repo: repo, routineId: 'r1');
+
+      await tester.enterText(summaryField, '');
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      final draft = verify(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: captureAny(named: 'draft'),
+        ),
+      ).captured.single as Routine;
+      expect(draft.summary, isNull);
+    });
+  });
+
+  // Issue #655 — el editor web gana "copiar prescripción entre ejercicios",
+  // el único de los tres atajos de #640 que rinde igual con teclado físico.
+  //
+  // Cubre el contrato (copia profunda de la semana visible, arrastra el modo,
+  // NO toca presencia ni otras semanas ni el descanso) y —lo que en web es
+  // propio— que los campos EN PANTALLA muestren lo copiado: las filas de set
+  // son stateless con `TextFormField(initialValue:)`, así que sin la
+  // ObjectKey la copia se vería como un no-op hasta guardar.
+  group('RoutineEditorWebScreen — copiar prescripción entre ejercicios (#655)',
+      () {
+    const copyTooltip = 'Copiar sets del anterior';
+
+    Finder copyButtons() => find.byWidgetPredicate(
+          (w) => w is IconButton && w.tooltip == copyTooltip,
+        );
+
+    List<IconButton> copyButtonsOf(WidgetTester tester) =>
+        tester.widgetList<IconButton>(copyButtons()).toList();
+
+    /// Text the trainer actually SEES in the n-th field carrying [hint] —
+    /// read off the controller of the [TextField] that [TextFormField] builds,
+    /// not off the model.
+    String fieldText(WidgetTester tester, String hint, int n) => tester
+        .widget<TextField>(
+          find
+              .byWidgetPredicate(
+                (w) => w is TextField && w.decoration?.hintText == hint,
+              )
+              .at(n),
+        )
+        .controller!
+        .text;
+
+    Future<_MockRoutineRepository> pump(
+      WidgetTester tester,
+      Routine routine,
+    ) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any())).thenAnswer((_) async => routine);
+      when(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: any(named: 'draft'),
+        ),
+      ).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
+      await _pumpEditor(tester, repo: repo, routineId: routine.id);
+      // Every fixture here has TWO exercises, and the second card's header —
+      // where the copy button lives — sits past 1100px. The form scrolls in
+      // the real app; in the harness a taller viewport is cheaper than
+      // scrolling before every tap. `_pumpEditor` already registered the
+      // teardown that resets this.
+      tester.view.physicalSize = const Size(1400, 1800);
+      await tester.pumpAndSettle();
+      return repo;
+    }
+
+    Future<Routine> saveAndCapture(
+      WidgetTester tester,
+      _MockRoutineRepository repo,
+    ) async {
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+      return verify(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: captureAny(named: 'draft'),
+        ),
+      ).captured.single as Routine;
+    }
+
+    Future<void> copyInto(WidgetTester tester, int slotIndex) async {
+      await tester.tap(copyButtons().at(slotIndex));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('copy_prescription_confirm_button')),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets(
+        'el botón se ofrece en todos los ejercicios y está deshabilitado en '
+        'el primero del día', (tester) async {
+      await pump(tester, _copyPrescriptionRoutine());
+
+      final buttons = copyButtonsOf(tester);
+      expect(buttons, hasLength(2), reason: 'siempre visible = descubrible');
+      expect(
+        buttons[0].onPressed,
+        isNull,
+        reason: 'no hay ejercicio anterior del cual copiar',
+      );
+      expect(buttons[1].onPressed, isNotNull);
+    });
+
+    testWidgets('copia los sets del anterior, con sus tipos', (tester) async {
+      final repo = await pump(tester, _copyPrescriptionRoutine());
+
+      await copyInto(tester, 1);
+
+      final slots = (await saveAndCapture(tester, repo)).days.single.slots;
+      expect(slots[1].sets.map((s) => s.reps).toList(), const [12, 8]);
+      expect(slots[1].sets.map((s) => s.weightKg).toList(), const [20.0, 60.0]);
+      expect(
+        slots[1].sets.map((s) => s.type).toList(),
+        const [SetType.warmup, SetType.normal],
+      );
+      expect(slots[0].sets.map((s) => s.reps).toList(), const [12, 8],
+          reason: 'la fuente no se toca');
+    });
+
+    testWidgets('no copia identidad, descanso ni notas — sólo la grilla',
+        (tester) async {
+      final repo = await pump(tester, _copyPrescriptionRoutine());
+
+      await copyInto(tester, 1);
+
+      final target = (await saveAndCapture(tester, repo)).days.single.slots[1];
+      expect(target.exerciseName, 'Press Inclinado');
+      expect(target.restSeconds, 60, reason: 'el descanso del destino sigue');
+      expect(target.notes, isNull);
+    });
+
+    testWidgets(
+        'los campos en pantalla muestran lo copiado, no los valores viejos',
+        (tester) async {
+      // La regresión propia de web: la fila de set es stateless y su
+      // TextFormField siembra el texto UNA sola vez. Si la fila no se
+      // reconstruye, el modelo cambia y la pantalla miente.
+      await pump(tester, _copyPrescriptionRoutine());
+      expect(fieldText(tester, 'reps', 2), '5');
+      expect(fieldText(tester, 'kg', 2), '30.0');
+
+      await copyInto(tester, 1);
+
+      expect(fieldText(tester, 'reps', 2), '12');
+      expect(fieldText(tester, 'reps', 3), '8');
+      expect(fieldText(tester, 'kg', 2), '20.0');
+      expect(fieldText(tester, 'kg', 3), '60.0');
+    });
+
+    testWidgets('cancelar no cambia nada', (tester) async {
+      final repo = await pump(tester, _copyPrescriptionRoutine());
+
+      await tester.tap(copyButtons().at(1));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('copy_prescription_cancel_button')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(fieldText(tester, 'reps', 2), '5');
+      final target = (await saveAndCapture(tester, repo)).days.single.slots[1];
+      expect(target.sets.map((s) => s.reps).toList(), const [5]);
+    });
+
+    testWidgets('arrastra el modo de medición (TIEMPO) al destino',
+        (tester) async {
+      final repo = await pump(tester, _copyModeRoutine());
+
+      await copyInto(tester, 1);
+
+      // El destino dejó de mostrar REPS/KG: ahora pide segundos.
+      expect(fieldText(tester, 'seg', 1), '45');
+
+      final target = (await saveAndCapture(tester, repo)).days.single.slots[1];
+      expect(target.exerciseMode, ExerciseMode.duration);
+      expect(target.sets.single.durationSeconds, 45);
+    });
+
+    testWidgets('no toca la presencia semanal ni las otras semanas',
+        (tester) async {
+      final repo = await pump(tester, _copyPerWeekRoutine());
+      await tester.tap(find.byKey(const Key('week_tab_1')));
+      await tester.pumpAndSettle();
+
+      await copyInto(tester, 1);
+
+      final target = (await saveAndCapture(tester, repo)).days.single.slots[1];
+      expect(target.weeklySets[1].map((s) => s.reps).toList(), const [8]);
+      expect(
+        target.weeklySets[0].map((s) => s.reps).toList(),
+        const [5],
+        reason: 'copiar actúa sobre la semana visible, como "Copiar Sem N acá"',
+      );
+      expect(
+        target.activeWeeks,
+        const [1],
+        reason: 'la presencia es ortogonal a la prescripción (ADR-WPRES)',
+      );
+    });
+
+    testWidgets(
+        'está deshabilitado sobre un ejercicio ausente de la semana vista',
+        (tester) async {
+      // Web atenúa las tarjetas ausentes en vez de esconderlas como mobile,
+      // así que el botón es alcanzable sobre un ejercicio que esa semana no
+      // tiene prescripción visible que pisar.
+      await pump(tester, _copyPerWeekRoutine());
+      expect(copyButtonsOf(tester)[1].onPressed, isNull);
+
+      await tester.tap(find.byKey(const Key('week_tab_1')));
+      await tester.pumpAndSettle();
+      expect(copyButtonsOf(tester)[1].onPressed, isNotNull);
     });
   });
 }

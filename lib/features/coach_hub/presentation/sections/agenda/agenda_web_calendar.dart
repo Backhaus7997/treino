@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../../app/theme/app_palette.dart';
 import '../../../../../core/widgets/treino_icon.dart';
@@ -128,7 +129,7 @@ class AgendaWebCalendar extends ConsumerWidget {
           fontWeight: FontWeight.w600,
         ),
         selectedTextStyle: GoogleFonts.barlow(
-          color: palette.bg,
+          color: TreinoButtonTokens.foreground(context),
           fontWeight: FontWeight.w700,
         ),
       ),
@@ -146,7 +147,7 @@ class AgendaWebCalendar extends ConsumerWidget {
         ),
         formatButtonDecoration: BoxDecoration(
           border: Border.all(color: palette.accent),
-          borderRadius: BorderRadius.circular(9999),
+          borderRadius: BorderRadius.circular(AppRadius.full),
         ),
         titleTextStyle: GoogleFonts.barlowCondensed(
           fontWeight: FontWeight.w700,

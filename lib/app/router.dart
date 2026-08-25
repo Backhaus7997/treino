@@ -56,6 +56,7 @@ import '../features/insights/presentation/measurements_screen.dart';
 import '../features/insights/presentation/monthly_report_screen.dart';
 import '../features/insights/presentation/muscle_distribution_screen.dart';
 import '../features/insights/presentation/volume_by_group_screen.dart';
+import '../features/insights/presentation/wellbeing_trend_screen.dart';
 import '../features/profile/application/user_providers.dart';
 import '../features/profile/domain/user_profile_trainer_completeness.dart';
 import '../features/profile/domain/user_role.dart';
@@ -391,6 +392,22 @@ GoRouter buildRouter({
           mode: SelfCreating(existingRoutineId: state.extra as String?),
         ),
       ),
+      GoRoute(
+        // "Usar como base" (#647): open the editor pre-loaded with an existing
+        // routine and save the result as a NEW routine owned by the athlete.
+        //
+        // The source id travels as a PATH param, not as `extra`: unlike
+        // `my-routine-editor` (where a null extra legitimately means "create
+        // from blank"), this route is meaningless without a source, and a path
+        // param makes that non-optional at the type level AND survives a deep
+        // link / process death, which `extra` does not.
+        path: '/workout/customize-routine/:routineId',
+        builder: (context, state) => RoutineEditorScreen(
+          mode: SelfCustomizing(
+            sourceRoutineId: state.pathParameters['routineId']!,
+          ),
+        ),
+      ),
 
       // ─── Full-screen sub-screens moved OUT of the ShellRoute ──────────────
       // These were shell sub-routes that showed the bottom nav bar; they read
@@ -515,6 +532,11 @@ GoRouter buildRouter({
         path: '/home/insights/measurements',
         pageBuilder: (_, state) =>
             _report(state.pageKey, _immersive(const _MeasurementsRouteHost())),
+      ),
+      GoRoute(
+        path: '/home/insights/wellbeing',
+        pageBuilder: (_, state) => _report(
+            state.pageKey, _immersive(const _WellbeingTrendRouteHost())),
       ),
       GoRoute(
         // `?exerciseId=` opcional: preselecciona un ejercicio. Lo usa
@@ -931,6 +953,18 @@ class _MuscleDistributionRouteHost extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final uid = ref.watch(currentUidProvider) ?? '';
     return MuscleDistributionScreen(uid: uid);
+  }
+}
+
+/// Resuelve el uid actual y monta [WellbeingTrendScreen] — mismo patrón que
+/// los demás hosts del hub.
+class _WellbeingTrendRouteHost extends ConsumerWidget {
+  const _WellbeingTrendRouteHost();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final uid = ref.watch(currentUidProvider) ?? '';
+    return WellbeingTrendScreen(uid: uid);
   }
 }
 

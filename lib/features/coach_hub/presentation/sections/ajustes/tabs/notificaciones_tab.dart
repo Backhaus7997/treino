@@ -77,9 +77,11 @@ class _NotifBody extends StatelessWidget {
         _Matrix(prefs: prefs, uid: uid, colW: colW),
         const SizedBox(height: 12),
         Text(
-          // Honestidad de scope (W3.2): ver notificaciones_prefs.dart.
-          'Las preferencias se guardan. La entrega por email y WhatsApp se '
-          'activa próximamente.', // i18n: Fase W3
+          // Honestidad de scope: ver el estado por canal en
+          // notificaciones_prefs.dart. Email ya entrega en las filas de
+          // kEmailBackedTypes; WhatsApp todavía no entrega en ninguna.
+          'El email ya se envía en las filas donde está disponible. '
+          'WhatsApp se activa próximamente.', // i18n: Fase W3
           style: TextStyle(
             color: palette.textMuted,
             fontSize: 12,
@@ -140,7 +142,9 @@ class _NotifSkeleton extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 18),
-                for (var i = 0; i < 5; i++)
+                // Derivado de kNotifTypes: un 5 hardcodeado se desincroniza en
+                // silencio la próxima vez que la taxonomía cambie.
+                for (var i = 0; i < kNotifTypes.length; i++)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     child: Row(

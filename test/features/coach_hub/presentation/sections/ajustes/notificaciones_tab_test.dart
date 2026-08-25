@@ -65,7 +65,7 @@ void main() {
       expect(find.byType(CircularProgressIndicator), findsNothing);
     });
 
-    testWidgets('data: muestra NOTIFICACIONES, PUSH, PAGOS y las filas',
+    testWidgets('data: muestra NOTIFICACIONES, PUSH, ALUMNOS y las filas',
         (tester) async {
       await tester.pumpWidget(
         _harness(prefsStream: Stream.value(NotifPrefs.fromFirestore(null))),
@@ -76,8 +76,8 @@ void main() {
 
       expect(find.text('NOTIFICACIONES'), findsOneWidget);
       expect(find.text('PUSH'), findsOneWidget);
-      expect(find.text('PAGOS'), findsOneWidget);
-      expect(find.text('Pago recibido'), findsOneWidget);
+      expect(find.text('ALUMNOS'), findsOneWidget);
+      expect(find.text('Nueva solicitud de vinculación'), findsOneWidget);
       expect(find.byKey(const Key('notif_skeleton')), findsNothing);
     });
 
@@ -92,7 +92,8 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      // Primer checkbox = pago_recibido × EMAIL (default on) → lo apago.
+      // Primer checkbox = nueva_solicitud × EMAIL (default on) → lo apago.
+      // `nueva_solicitud` es una de las dos filas de kEmailBackedTypes.
       await tester.tap(find.byType(Checkbox).first);
       await tester.pump();
 
@@ -100,8 +101,8 @@ void main() {
           .captured
           .single as Map<String, Object?>;
       final prefs = captured['notificationPrefs'] as Map<String, dynamic>;
-      expect((prefs['pago_recibido'] as Map)['email'], false);
-      expect((prefs['pago_recibido'] as Map)['push'], true);
+      expect((prefs['nueva_solicitud'] as Map)['email'], false);
+      expect((prefs['nueva_solicitud'] as Map)['push'], true);
     });
 
     testWidgets('error: copy honesto sin crashear', (tester) async {
@@ -125,7 +126,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.textContaining('La entrega por email y WhatsApp se activa'),
+        find.textContaining('WhatsApp se activa'),
         findsOneWidget,
       );
     });

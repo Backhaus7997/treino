@@ -1,0 +1,127 @@
+# Dependabot — slice B de #680.
+#
+# Es la contraparte del job `npm-audit` de .github/workflows/security.yml: ese
+# job SÓLO reporta (functions/ arranca con 1 critical y 3 high heredadas), y
+# este archivo es lo que efectivamente las baja. Cuando el contador llegue a
+# cero, el gate de npm audit pasa a bloqueante.
+#
+# Ritmo pensado para un equipo de 3: agrupado y semanal, no un PR por paquete.
+# Sin `groups` esto abriría ~20 PRs la primera semana y nadie los revisa.
+version: 2
+
+updates:
+  # ---------------------------------------------------------------------------
+  # Cloud Functions — el código con privilegios de Admin SDK. Es el que más
+  # importa: un CVE acá corre con permisos de servidor sobre todos los datos.
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: npm
+    directory: /functions
+    schedule:
+      interval: weekly
+      day: monday
+      time: '09:00'
+      timezone: America/Argentina/Buenos_Aires
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
+      include: scope
+    labels:
+      - 'type:chore'
+    groups:
+      # Los majors van sueltos: firebase-admin 12→14 y jest 29→30 rompen API y
+      # necesitan review humano, no pueden viajar de polizón en un PR grupal.
+      functions-minor-patch:
+        patterns: ['*']
+        update-types: [minor, patch]
+
+  # ---------------------------------------------------------------------------
+  # Tooling local de seed (scripts/) — no corre en producción, pero comparte
+  # firebase-admin con functions/ y hoy también tiene 1 critical + 3 high.
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: npm
+    directory: /scripts
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: chore
+      include: scope
+    labels:
+      - 'type:chore'
+    groups:
+      scripts-minor-patch:
+        patterns: ['*']
+        update-types: [minor, patch]
+
+  # ---------------------------------------------------------------------------
+  # Tests de reglas standalone (scripts/rules_test/). @firebase/rules-unit-testing
+  # está en ^3 acá y en ^5 en functions/ — Dependabot va a proponer alinearlos.
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: npm
+    directory: /scripts/rules_test
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: chore
+      include: scope
+    labels:
+      - 'type:chore'
+    groups:
+      rules-test-minor-patch:
+        patterns: ['*']
+        update-types: [minor, patch]
+
+  # ---------------------------------------------------------------------------
+  # GitHub Actions.
+  #
+  # Los workflows corren con acceso al repo y, en el caso de CodeQL, con
+  # `security-events: write`. Una action desactualizada con una vuln de command
+  # injection es escalación directa sobre el CI. Barato de mantener: son 5
+  # actions en total entre ci.yml y security.yml.
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: ci
+    labels:
+      - 'type:chore'
+    groups:
+      actions:
+        patterns: ['*']
+
+  # ---------------------------------------------------------------------------
+  # pub.dev — las 61 dependencias de pubspec.yaml.
+  #
+  # LEER ESTO ANTES DE CONFIAR EN EL BLOQUE: Dependabot hace VERSION updates
+  # para pub, pero NO security updates ni alertas. pub.dev no está en la GitHub
+  # Advisory Database, así que no existe un feed de CVEs de paquetes Dart que
+  # GitHub pueda mirar. En criollo: esto avisa "salió firebase_auth 5.4", no
+  # "firebase_auth 5.3 tiene una vulnerabilidad".
+  #
+  # O sea que el ecosistema Dart —la mayor parte del código de TREINO— NO tiene
+  # hoy escaneo de vulnerabilidades de dependencias, del mismo modo que no tiene
+  # SAST (CodeQL tampoco soporta Dart). Es un hueco conocido y sin herramienta
+  # gratuita que lo tape; queda anotado acá para que nadie lea "Dependabot para
+  # pub" y asuma cobertura que no existe.
+  #
+  # Mensual y agrupado: un bump de Flutter/Firebase obliga a correr la suite
+  # entera (~13 min) y a probar en device. Semanal sería ruido puro.
+  - package-ecosystem: pub
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: chore
+      include: scope
+    labels:
+      - 'type:chore'
+    groups:
+      pub-minor-patch:
+        patterns: ['*']
+        update-types: [minor, patch]
