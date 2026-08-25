@@ -291,15 +291,34 @@ Future<ProviderContainer> pumpGate(
 /// una línea que dice a dónde fue a parar la captura.
 void _expectLandedOn(WidgetTester tester, GoRouter router, String route) {
   final landed = router.routerDelegate.currentConfiguration.uri.toString();
-  final onScreen = tester.widgetList<Scaffold>(find.byType(Scaffold)).length;
 
   expect(
     landed,
     route,
     reason: 'la captura tenía que salir de $route y el router quedó en '
-        '$landed ($onScreen Scaffold en el árbol). Si es /login o '
-        '/not-allowed, el redirect corrió antes de que auth o el perfil '
-        'estuvieran resueltos — mirá el warm-up de pumpGate.',
+        '$landed. Si es /login o /not-allowed, el redirect corrió antes de '
+        'que auth o el perfil estuvieran resueltos — mirá el warm-up.',
+  );
+
+  // El shell tiene que estar montado en los TRES viewports: abajo de 768 el
+  // `CoachHubScaffold` sigue en el árbol y devuelve `MobileBanner` desde
+  // adentro. Si no está, la captura es de otra cosa.
+  //
+  // El `reason` lista los widgets montados porque un `findsOneWidget` que
+  // falla sólo dice qué NO hay. Saber qué SÍ hay es la diferencia entre
+  // diagnosticar en una corrida de CI o en cinco.
+  final types = tester.allWidgets
+      .map((w) => w.runtimeType.toString())
+      .where((t) => !t.startsWith('_'))
+      .toSet()
+      .toList()
+    ..sort();
+
+  expect(
+    types,
+    contains('CoachHubScaffold'),
+    reason: 'el router dice $landed pero el shell no está en el árbol. '
+        'Widgets montados: ${types.join(", ")}',
   );
 }
 
