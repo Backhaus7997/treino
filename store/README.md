@@ -53,9 +53,9 @@ repetición desperdicia lugar del índice.
 
 | Asset | Especificación | Archivo |
 |---|---|---|
-| Ícono | **512 × 512**, PNG 32-bit con alpha, ≤ 1024 KB | `android/graphics/icon-512.png` |
-| Feature graphic | **1024 × 500**, JPEG o PNG 24-bit **sin alpha** | `android/graphics/feature-graphic.png` |
-| Capturas teléfono | mín. 2 · para ser elegible a recomendaciones: **4+ a 1080 × 1920** | `android/screenshots/<locale>/phone/` |
+| Ícono | **512 × 512**, PNG 32-bit con alpha, ≤ 1024 KB | `android/metadata/<locale>/images/icon.png` |
+| Feature graphic | **1024 × 500**, JPEG o PNG 24-bit **sin alpha** | `android/metadata/<locale>/images/featureGraphic.png` |
+| Capturas teléfono | mín. 2 · para ser elegible a recomendaciones: **4+ a 1080 × 1920** | `android/metadata/<locale>/images/phoneScreenshots/` |
 
 - Dimensión mínima 320 px, máxima 3840 px, y el lado mayor no puede superar el
   doble del menor.
@@ -68,7 +68,7 @@ repetición desperdicia lugar del índice.
 | Nombre | 30 | `android/metadata/<locale>/title.txt` |
 | Descripción corta | 80 | `android/metadata/<locale>/short_description.txt` |
 | Descripción larga | 4000 | `android/metadata/<locale>/full_description.txt` |
-| Novedades | 500 | `android/metadata/<locale>/release_notes.txt` |
+| Novedades | 500 | `android/metadata/<locale>/changelogs/<versionCode>.txt` |
 
 Los límites cuentan igual caracteres de ancho completo y medio.
 
@@ -88,19 +88,37 @@ renombrar nada.
 
 ```
 store/
-  ios/
-    screenshots/<locale>/{iphone-6.9,ipad-13,watch}/NN_nombre.png
+  ios/                                    ← layout de fastlane deliver
     metadata/<locale>/{name,subtitle,keywords,promotional_text,description,release_notes}.txt
-  android/
-    screenshots/<locale>/{phone,tablet-7,tablet-10}/NN_nombre.png
-    graphics/{icon-512.png,feature-graphic.png}
-    metadata/<locale>/{title,short_description,full_description,release_notes}.txt
+    screenshots/<locale>/{iphone-6.9,ipad-13,watch}/NN_nombre.png
+  android/                                ← layout de fastlane supply
+    metadata/<locale>/
+      {title,short_description,full_description}.txt
+      changelogs/{<versionCode>.txt,default.txt}
+      images/{featureGraphic.png,icon.png}
+      images/{phoneScreenshots,sevenInchScreenshots,tenInchScreenshots}/NN_nombre.png
   privacy/
     data-safety.md        ← borrador del form de Play
     privacy-labels.md     ← borrador de las nutrition labels de Apple
 ```
 
-Locales: `es-AR` y `en-US`.
+⚠️ Los nombres de `android/` **no son libres**: `supply` sólo encuentra las
+capturas bajo `images/phoneScreenshots` (y sus variantes de tablet) y las
+release notes bajo `changelogs/<versionCode>.txt`. Cualquier otro árbol exige
+preprocesado manual. El `versionCode` sale del sufijo de `pubspec.yaml`
+(`version: 0.1.0+16` → `changelogs/16.txt`).
+
+### Locales — no inventar el código
+
+**`es-AR` no existe en ninguna de las dos stores.** Los códigos válidos son:
+
+| Store | Español | Por qué |
+|---|---|---|
+| App Store Connect | **`es-MX`** | Apple sólo tiene `es-ES` y `es-MX`. Y `es-MX` ya es el *primary language* del app record (`docs/roadmap.md`, App ID `6781307745`) |
+| Play Console | **`es-419`** | Es el código de español latinoamericano de Play |
+
+El contenido sigue siendo rioplatense; lo que cambia es la carpeta bajo la que
+la store lo acepta. Inglés va en `en-US` en las dos.
 
 El prefijo numérico del archivo (`01_`, `02_`, …) fija el orden en que la store
 las muestra. No es decorativo: Play y App Store ordenan alfabéticamente.
@@ -176,7 +194,7 @@ pod repo update
 ### 4.4 Capturar
 
 ```bash
-xcrun simctl io booted screenshot --type=png store/ios/screenshots/es-AR/iphone-6.9/01_sesion_activa.png
+xcrun simctl io booted screenshot --type=png store/ios/screenshots/es-MX/iphone-6.9/01_sesion_activa.png
 ```
 
 El simulador devuelve exactamente los píxeles del device, así que la captura ya
@@ -190,7 +208,7 @@ Apple rechaza PNG con transparencia y Play la rechaza en feature graphic y
 capturas. `simctl` puede dejar alpha, así que aplanar siempre antes de subir:
 
 ```bash
-sips -s format png --setProperty hasAlpha false store/ios/screenshots/es-AR/iphone-6.9/01_sesion_activa.png
+sips -s format png --setProperty hasAlpha false store/ios/screenshots/es-MX/iphone-6.9/01_sesion_activa.png
 ```
 
 ---
@@ -202,6 +220,14 @@ sips -s format png --setProperty hasAlpha false store/ios/screenshots/es-AR/ipho
 - **Naming** (AGENTS.md §1, `docs/product.md`): **TREINO** es la marca ·
   **Coach** es el módulo del PF · **Entreno IA** es el feature de IA — nunca
   "Coach IA".
+- ⚠️ **En App Store el nombre "TREINO" está ocupado.** El app record real se
+  llama **"TREINO Fitness"** (`docs/roadmap.md`, App ID `6781307745`). El
+  `name.txt` tiene que coincidir con eso, no con la marca a secas.
+- ⚠️ **No publicitar Entreno IA.** El naming es correcto cuando el feature
+  exista, pero hoy **no está implementado**: no hay ruta `/workout/ai`, ni
+  `WorkoutAIView`, ni servicio generador en `lib/`. `docs/product.md` lo
+  describe y `docs/roadmap.md` lo deja diferido a Fase 7 con Gemini. Anunciarlo
+  en la ficha es prometer algo que el binario no entrega.
 - **Tono** (`docs/product.md`): voseo rioplatense, CTAs imperativos en
   mayúsculas, sin signos de apertura, sin copy corporativo.
 - **Fuera de scope, no mencionar en el copy**: Retos, Missions, Bets,

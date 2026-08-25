@@ -46,13 +46,26 @@ Apple es más estricta que Google acá. Dos cosas que importan:
    dos — hay que poder sostenerlo si Review pregunta.
 2. TREINO **no** usa HealthKit. Si algún día se integra, esto se reabre entero.
 
-### Location
+### Location ⚠️
 | Dato | Propósito |
 |---|---|
-| Coarse Location | Funcionalidad — discovery de PF y gimnasios cercanos |
+| **Precise Location** | Funcionalidad — ubicación de trabajo del PF |
+| Coarse Location | Funcionalidad — discovery de gimnasios cercanos |
 
-Precise Location **no** se declara: sólo se persiste un geohash de precisión
-reducida para búsqueda por proximidad.
+**Hay que declarar Precise Location, no sólo Coarse.** `TrainerLocation`
+(`lib/features/coach/domain/trainer_location.dart`) tiene `required double lat`
+y `required double lng`, y su propio dartdoc dice que *"`lat`, `lng` y
+`geohash` SIEMPRE están seteados"*. Cuando el PF usa "Detectar ubicación",
+`profile_edit_trainer_screen.dart:1049-1050` toma `pos.latitude` /
+`pos.longitude` crudos y se persisten enteros — el `geohash5` se guarda
+**además**, no en lugar de.
+
+O sea: para el rol **trainer** se recolectan coordenadas exactas. Declarar sólo
+Coarse sería sub-reportar.
+
+Del lado **atleta** la ubicación sí queda en geohash para discovery. Si se
+quiere declarar sólo Coarse, primero hay que dejar de persistir `lat`/`lng`
+crudos en `trainerLocations` — es un cambio de código, no de formulario.
 
 ### User Content
 | Dato | Propósito |

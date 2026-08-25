@@ -6,5 +6,4 @@ Primera versión pública de TREINO.
 - Reporte por ejercicio: contale a tu PF cómo te sentiste, serie por serie.
 - Medidas corporales: peso, altura y más de veinte medidas con su evolución.
 - Rankings por gimnasio, opt-in.
-- Entreno IA para arrancar una rutina desde cero.
 - Tema claro y oscuro, siguiendo el de tu teléfono.

@@ -30,10 +30,6 @@ Si querés, entrá al ranking de tu gym y compará rachas, volumen y tus levanta
 
 Es opt-in: si no lo activás, no aparecés. Y el alcance es tu gimnasio, no el mundo entero.
 
-ENTRENO IA
-
-Contale qué buscás y cuántos días tenés, y te arma una rutina para empezar. Después la editás a mano, como cualquier otra.
-
 TU FEED, TU GENTE
 
 Compartí tus sesiones con tus amigos, con tu comunidad o en público. Vos elegís quién ve cada cosa.

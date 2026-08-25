@@ -17,6 +17,16 @@ más fácil se rompe en texto de marketing:
 - **Coach** es el módulo del PF. No decirle "TREINO" al módulo.
 - **Entreno IA** es el feature de IA. **Nunca** "Coach IA".
 
+⚠️ **El nombre "TREINO" está ocupado en App Store.** El app record real se
+llama **"TREINO Fitness"** (App ID `6781307745`). El `name.txt` y el
+`title.txt` tienen que decir eso.
+
+⚠️ **No escribir nada sobre Entreno IA.** El naming de arriba vale para cuando
+el feature exista, pero **hoy no está implementado**: no hay ruta
+`/workout/ai`, ni `WorkoutAIView`, ni servicio generador en `lib/`.
+`docs/roadmap.md` lo deja diferido a Fase 7. Anunciarlo es prometer algo que el
+binario no entrega, y es causal de rechazo en review.
+
 **Tono** (`docs/product.md`):
 
 - Voseo rioplatense: *entrená*, *empezá*, *no rompas la racha*.
@@ -35,7 +45,7 @@ implementado, y es un diferencial vendible. No es "gamificación".
 
 ## Lo que hay que escribir
 
-### App Store — `ios/metadata/es-AR/`
+### App Store — `ios/metadata/es-MX/`
 
 | # | Archivo | Límite | Qué es |
 |---|---|---|---|
@@ -46,14 +56,20 @@ implementado, y es un diferencial vendible. No es "gamificación".
 | 5 | `description.txt` | 4000 | Los primeros ~170 caracteres son lo único visible sin tocar "más" |
 | 6 | `release_notes.txt` | 4000 | Novedades de esta versión |
 
-### Play Store — `android/metadata/es-AR/`
+### Play Store — `android/metadata/es-419/`
 
 | # | Archivo | Límite | Qué es |
 |---|---|---|---|
 | 7 | `title.txt` | 30 | |
 | 8 | `short_description.txt` | 80 | Lo primero que se ve en la ficha |
 | 9 | `full_description.txt` | 4000 | |
-| 10 | `release_notes.txt` | 500 | Más corto que el de Apple |
+| 10 | `changelogs/16.txt` | 500 | Más corto que el de Apple. El `16` es el versionCode de `pubspec.yaml` (`0.1.0+16`) |
+
+### Locales
+
+Las carpetas son `es-MX` (Apple) y `es-419` (Play). **`es-AR` no existe en
+ninguna de las dos stores** — ver `README.md` §2. El contenido sigue siendo
+rioplatense; lo que cambia es la carpeta.
 
 ### `en-US/` — bloqueado
 
@@ -79,7 +95,8 @@ promesa escrita en la ficha es el peor escenario posible.
 
 - [ ] Contar los caracteres de cada campo (`wc -m`, no `wc -c` — hay acentos)
 - [ ] Ninguna mención de Retos / Missions / Bets / XP / gamificación
-- [ ] "Entreno IA", nunca "Coach IA"
+- [ ] Cero menciones de Entreno IA — el feature no existe todavía
+- [ ] El nombre dice "TREINO Fitness", no "TREINO" a secas
 - [ ] Voseo consistente, sin `¡` ni `¿`
 - [ ] Ninguna afirmación sobre precio mientras #644 esté abierta
 - [ ] Ningún nombre de gimnasio o persona real

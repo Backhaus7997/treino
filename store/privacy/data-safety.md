@@ -31,15 +31,26 @@ Verificado contra el código el **2026-08-25**.
 | Email | Sí | No | **Obligatorio** | Funcionalidad, autenticación | `firebase_auth` |
 | Teléfono | Sí | No | Opcional | Funcionalidad | `UserProfile.phone` — privado, no se propaga a `userPublicProfiles` |
 | ID de usuario | Sí | No | Obligatorio | Funcionalidad, autenticación | `uid` de Firebase Auth |
+| **Género** | Sí | No | Opcional | Funcionalidad | `UserProfile.gender` (`user_profile.dart:37`) — se escribe en cada profile setup completo |
+| **Fecha de nacimiento** | Sí | No | Opcional | Funcionalidad | `UserProfile.bornAt` (`user_profile.dart:48`) — desde el editor de perfil personal |
+
+Google clasifica **género** y **fecha de nacimiento** como información
+personal. Los dos se escriben a Firestore desde el cliente de producción, así
+que van declarados sí o sí.
 
 ### Ubicación
 
 | Tipo | Recolectado | Compartido | Obligatorio | Propósito | Dónde |
 |---|---|---|---|---|---|
-| Ubicación aproximada | Sí | No | **Opcional** | Funcionalidad — discovery de PF y gimnasios cercanos | `geolocator`, `lib/core/utils/geohash.dart`, `nearby_gyms_list.dart` |
+| Ubicación aproximada | Sí | No | **Opcional** | Funcionalidad — discovery de gimnasios cercanos | `geolocator`, `lib/core/utils/geohash.dart`, `nearby_gyms_list.dart` |
+| **Ubicación precisa** | Sí | No | **Opcional** | Funcionalidad — ubicación de trabajo del PF | `TrainerLocation.lat` / `.lng` (`trainer_location.dart`), seteados desde `profile_edit_trainer_screen.dart:1049-1050` |
 
-Es opcional de verdad: si el atleta no da permiso, discovery cae a búsqueda por
-nombre y especialidad sin orden geográfico.
+Para el atleta es opcional de verdad: si no da permiso, discovery cae a búsqueda
+por nombre y especialidad sin orden geográfico.
+
+⚠️ Para el **trainer** hay que declarar **ubicación precisa**: `TrainerLocation`
+persiste `lat` y `lng` crudos, no sólo el geohash. Ver
+[`privacy-labels.md`](./privacy-labels.md) — el mismo hallazgo aplica a Apple.
 
 ### Fotos y videos
 
