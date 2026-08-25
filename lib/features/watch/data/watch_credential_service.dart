@@ -112,8 +112,15 @@ class WatchCredentialService {
       //
       // Ahora el motivo queda escrito. Es lo que pide la condición de salida de
       // la deuda de App Check (`functions/src/mint-watch-credential.ts`):
-      // instrumentar el cliente para saber POR QUÉ App Attest no emite token.
-      // Sin esto, volver a prender `enforceAppCheck` es a ciegas otra vez.
+      // saber POR QUÉ App Attest no emite token.
+      //
+      // Matiz medido el 2026-08-25: para saber QUIÉN falla ya no hace falta
+      // instrumentar nada — `firebase-functions` v2 loguea la verificación de
+      // cada callable en `jsonPayload.verifications.app`, y cruzándola con el
+      // user-agent sale que el roto es Android (1 VALID / 8 INVALID) y no iOS
+      // (8 VALID / 2 INVALID). Ver docs/security.md §4.8.2. Lo que este log
+      // sigue aportando, y el server no puede, es el POR QUÉ del lado del
+      // dispositivo.
       if (e is FirebaseFunctionsException) {
         debugPrint(
           '[watch] mintWatchCredential falló: code=${e.code} '
