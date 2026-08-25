@@ -190,6 +190,36 @@ del job lista los archivos que cambiaron.
 > tu próximo push —aunque sea el que actualiza la descripción— los corre
 > normalmente. Si no tenés nada que pushear, aprobalos desde la pestaña Actions.
 
+### Traé `main` a tu rama ANTES de regenerar
+
+Los dos workflows no miran el mismo árbol, y la diferencia muerde:
+
+| | Evento | Qué código corre |
+|---|---|---|
+| `regen-goldens.yml` | `push` | **tu rama, sola** |
+| `visual-gate` (ci.yml) | `pull_request` | **el merge** de tu rama con `main` |
+
+O sea que si `main` avanzó desde que abriste la rama, regenerás contra un árbol
+y el gate valida contra otro. Los goldens salen "correctos" y el gate los
+rechaza, sin que el diff del PR muestre nada raro.
+
+```bash
+git merge origin/main        # primero esto
+git commit --allow-empty -m "chore(gate): regenerar goldens [regen-goldens]"
+```
+
+Pasó construyendo este gate, y con el peor disfraz posible: `main` sumó
+`CoachHubTourGate` —el tour de bienvenida de #627, que se empuja a pantalla
+completa sobre el shell— mientras esta rama estaba abierta. La regeneración no
+lo tenía y el gate sí, así que las capturas eran de las pantallas y la
+validación era del tour. Se arregló sembrando `onboardingSeen` en el perfil del
+seed, con el helper `test/helpers/onboarding_test_helpers.dart` que el repo ya
+tenía para esto.
+
+Vale la pena quedarse con la otra lectura: **el gate detectó que un modal nuevo
+tapaba el Coach Hub entero**. Es exactamente la clase de regresión visual que
+un diff no muestra.
+
 ### Cuando el gate rompe y NO sabés si el cambio era deliberado
 
 El job `Visual Gate (Coach Hub)` sube un artefacto **`visual-gate-failures`**

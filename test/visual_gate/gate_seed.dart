@@ -37,6 +37,8 @@ import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 
+import '../helpers/onboarding_test_helpers.dart';
+
 import 'gate_environment.dart';
 
 /// UID del PF logueado en todos los goldens.
@@ -70,6 +72,21 @@ const List<GateAthlete> kGateAthletes = [
 ];
 
 /// Perfil del PF logueado.
+///
+/// `onboardingSeen` con TODAS las superficies vistas, vía el helper del repo.
+/// No es decoración: `CoachHubTourGate` empuja el tour de bienvenida (#627) a
+/// pantalla completa sobre el shell apenas el PF entra, y un `ModalBarrier`
+/// arriba hace que el `Overlay` saltee todo lo de abajo — el shell queda en el
+/// árbol pero invisible para `find.byType`, y las doce capturas serían del
+/// tour.
+///
+/// Es exactamente el modo de falla que este gate rompió en CI, y vale la pena
+/// leerlo al derecho: **el tour entró a `main` mientras esta rama estaba
+/// abierta, y el gate lo detectó**. Un modal nuevo que tapa el Hub entero es
+/// justo la clase de regresión visual que un diff no muestra.
+///
+/// Si algún día el tour merece su propio golden, va como pantalla aparte y con
+/// su porqué escrito — no colándose arriba de las otras cinco.
 UserProfile gateTrainerProfile() => UserProfile(
       uid: kGateTrainerId,
       email: 'mateo@treino.app',
@@ -77,6 +94,7 @@ UserProfile gateTrainerProfile() => UserProfile(
       role: UserRole.trainer,
       createdAt: DateTime.utc(2025, 9, 1),
       updatedAt: DateTime.utc(2026, 1, 12),
+      onboardingSeen: allSurfacesSeen(),
     );
 
 /// Perfil público de un alumno, sin avatar remoto (ver dartdoc de la librería).
