@@ -2282,8 +2282,21 @@ inventario quedaría vacío y todo lo demás pasaría, porque *"cero callables s
 atestación"* es trivialmente cierto sobre una lista vacía.
 
 Verificado por mutación a mano, no sólo por el caso negativo sintético: sacándole
-`enforceAppCheck: true` a `delete-account.ts:219` cae exactamente un test y
-ninguno más; restaurándolo vuelve a verde. La tabla está en el cuerpo del PR.
+`enforceAppCheck: true` a `delete-account.ts:219` caen exactamente los dos
+asserts que corresponden y ninguno más; restaurándolo vuelve a verde. La tabla
+está en el cuerpo del PR.
+
+**Endurecido después por la review de Codex** ([#806](https://github.com/Backhaus7997/treino/pull/806)),
+dos formas de evadir el guard que la primera versión dejaba abiertas:
+
+| Evasión | Por qué pasaba | Cómo se cierra |
+|---|---|---|
+| Un `acceptTrainerLink` sin atestar declarado en **otro módulo** heredaba la exención del original | el registry se keyeaba sólo por el símbolo local | la clave pasó a ser `<módulo>:<símbolo>`, así una exención ampara exactamente al código para el que se escribió |
+| `{ enforceAppCheck: true, ...runtimeOptions }` se leía como atestado | el scanner cortaba en la primera propiedad que matcheaba | recorre las propiedades **en orden** y gana la última escritura; un spread posterior no es demostrable, así que **falla cerrado**. `{ ...base, enforceAppCheck: true }` sigue contando como atestado, que es correcto |
+
+La primera es la que más importa: el motivo escrito de una exención —*"lo llama
+el Coach Hub web"*— sólo vale para el callable para el que se escribió, y una
+clave que no distingue definiciones deja que otro se lo apropie.
 
 ---
 

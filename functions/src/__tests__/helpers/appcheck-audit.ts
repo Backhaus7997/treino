@@ -113,22 +113,39 @@ function isOnCall(expr: ts.Expression): expr is ts.CallExpression {
 /**
  * `enforceAppCheck: true` en las opciones de ESTE `onCall` — no en cualquier
  * parte del archivo.
+ *
+ * Recorre las propiedades EN ORDEN y se queda con la ultima que decide, porque
+ * en un object literal gana la ultima escritura. Dos consecuencias:
+ *
+ *   { ...base, enforceAppCheck: true }   -> enforced  (el explicito gana)
+ *   { enforceAppCheck: true, ...base }   -> absent    (el spread puede pisarlo)
+ *
+ * El segundo caso es deliberadamente conservador: no podemos resolver el valor
+ * efectivo de un spread sin type checker, asi que se falla cerrado. Un refactor
+ * a `{ enforceAppCheck: true, ...runtimeOptions }` apagaria la atestacion en
+ * runtime sin que se note; preferimos un rojo que obligue a escribirlo explicito.
+ * Reportado por la review de Codex en el PR #805.
  */
 function attestationOf(call: ts.CallExpression): Attestation {
   const options = call.arguments[0];
   if (!options || !ts.isObjectLiteralExpression(options)) return "absent";
 
+  let attested = false;
   for (const prop of options.properties) {
+    if (ts.isSpreadAssignment(prop)) {
+      // No sabemos que trae: cualquier atestacion anterior deja de ser
+      // demostrable.
+      attested = false;
+      continue;
+    }
     if (!ts.isPropertyAssignment(prop)) continue;
     const key = ts.isIdentifier(prop.name) || ts.isStringLiteral(prop.name)
       ? prop.name.text
       : undefined;
     if (key !== "enforceAppCheck") continue;
-    return prop.initializer.kind === ts.SyntaxKind.TrueKeyword
-      ? "enforced"
-      : "absent";
+    attested = prop.initializer.kind === ts.SyntaxKind.TrueKeyword;
   }
-  return "absent";
+  return attested ? "enforced" : "absent";
 }
 
 /** Busca `export const <symbol> = <onCall>(...)` en un modulo ya parseado. */
@@ -180,6 +197,21 @@ export function collectDeployedCallables(
   return out.sort((a, b) => a.exportedName.localeCompare(b.exportedName));
 }
 
+/**
+ * La identidad con la que se keyea una exencion: `<modulo>:<simbolo>`.
+ *
+ * NO alcanza con el simbolo local. Keyeando solo por simbolo, un
+ * `acceptTrainerLink` sin atestar declarado en OTRO modulo y exportado con otro
+ * nombre publico hereda la exencion del original, aunque el motivo escrito
+ * —"lo llama el Coach Hub web"— no tenga nada que ver con el. El par
+ * modulo+simbolo identifica una definicion y una sola, asi que una exencion
+ * ampara exactamente al codigo para el que se escribio. Reportado por la review
+ * de Codex en el PR #805.
+ */
+export const callableKey = (
+  c: Pick<DeployedCallable, "module" | "symbol">,
+): string => `${c.module}:${c.symbol}`;
+
 export interface AuditVerdict {
   /**
    * Callables desplegados sin atestacion y sin exencion declarada. Cualquier
@@ -188,10 +220,11 @@ export interface AuditVerdict {
    */
   unguarded: DeployedCallable[];
   /**
-   * Exenciones que ya no corresponden — el simbolo dejo de estar desplegado,
-   * o volvio a exigir atestacion. Tambien fallan: un registry que solo crece
-   * se pudre igual que la lista que vino a reemplazar, y el dia que alguien
-   * restaure el flag queremos que el test le diga que borre la exencion.
+   * Exenciones que ya no corresponden — el callable dejo de estar desplegado,
+   * se movio de modulo, o volvio a exigir atestacion. Tambien fallan: un
+   * registry que solo crece se pudre igual que la lista que vino a reemplazar,
+   * y el dia que alguien restaure el flag queremos que el test le diga que
+   * borre la exencion.
    */
   staleExemptions: string[];
 }
@@ -201,13 +234,13 @@ export function auditAttestation(
   exemptions: Readonly<Record<string, Exemption>>,
 ): AuditVerdict {
   const unguarded = callables.filter(
-    (c) => c.attestation === "absent" && !(c.symbol in exemptions),
+    (c) => c.attestation === "absent" && !(callableKey(c) in exemptions),
   );
 
-  const bySymbol = new Map(callables.map((c) => [c.symbol, c]));
+  const byKey = new Map(callables.map((c) => [callableKey(c), c]));
   const staleExemptions = Object.keys(exemptions)
-    .filter((symbol) => {
-      const c = bySymbol.get(symbol);
+    .filter((key) => {
+      const c = byKey.get(key);
       return c === undefined || c.attestation === "enforced";
     })
     .sort();
