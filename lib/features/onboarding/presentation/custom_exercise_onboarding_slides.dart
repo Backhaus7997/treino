@@ -32,8 +32,14 @@ const athleteCustomExerciseSlides = <OnboardingCardContent>[
   OnboardingCardContent(
     icon: TreinoIcon.video,
     title: 'SUMALE UN VIDEO', // i18n
-    body: 'Pegá un link de YouTube o subí tu propio MP4 / MOV. Se reproduce '
-        'inline mientras entrenás, sin salir de TREINO.', // i18n
+    // La distinción es real, no un matiz de redacción: `ExerciseVideoPlayer`
+    // reproduce inline SÓLO lo subido a Storage. YouTube va como thumbnail y
+    // abre un Safari View Controller / Chrome Custom Tab, porque el embed
+    // inline lo rechaza el propio YouTube en WKWebView (ver el dartdoc de
+    // `exercise_video_player.dart`). Prometer "inline" para los dos era
+    // prometer algo que la app decidió deliberadamente no hacer.
+    body: 'Subí tu MP4 / MOV y se reproduce inline mientras entrenás. O pegá '
+        'un link de YouTube: se abre en un visor arriba de la app.', // i18n
     illustration: CustomExerciseOnboardingArt.video(),
   ),
   OnboardingCardContent(
@@ -57,8 +63,9 @@ const trainerCustomExerciseSlides = <OnboardingCardContent>[
   OnboardingCardContent(
     icon: TreinoIcon.video,
     title: 'SUMALE UN VIDEO', // i18n
-    body: 'Link de YouTube o tu propio MP4 / MOV. Tu alumno lo ve inline en la '
-        'ficha del ejercicio, sin salir de la app.', // i18n
+    // Misma corrección que en el deck del alumno: inline es sólo Storage.
+    body: 'Subí un MP4 / MOV y tu alumno lo ve inline en la ficha. O pegá un '
+        'link de YouTube: se le abre en un visor arriba de la app.', // i18n
     illustration: CustomExerciseOnboardingArt.video(),
   ),
   OnboardingCardContent(
