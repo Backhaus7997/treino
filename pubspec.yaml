@@ -133,6 +133,7 @@ flutter:
     - assets/muscles/
     - assets/exercises/
     - assets/body/
+    - assets/onboarding/
     # Tipografías bundleadas. Van bajo `assets:` y NO bajo `fonts:` a
     # propósito: google_fonts las resuelve buscando en el AssetManifest un
     # archivo llamado `{Familia}-{Variante}.ttf`. Declaradas bajo `fonts:`

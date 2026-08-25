@@ -12,6 +12,8 @@ import 'package:treino/features/workout/domain/session_status.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
+import '../../helpers/onboarding_test_helpers.dart';
+
 UserProfile _profile() => UserProfile(
       uid: 'u1',
       email: 'u1@test.com',
@@ -19,6 +21,9 @@ UserProfile _profile() => UserProfile(
       role: UserRole.athlete,
       createdAt: DateTime.utc(2026, 5, 12),
       updatedAt: DateTime.utc(2026, 5, 12),
+      // El tour (#627) se monta sobre /home; sin esto tapa la pantalla
+      // bajo test y todos los finders fallan.
+      onboardingSeen: allSurfacesSeen(),
     );
 
 Session _session() => Session(

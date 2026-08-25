@@ -32,6 +32,8 @@ import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
+import '../../../helpers/onboarding_test_helpers.dart';
+
 class _MockUser extends Mock implements User {
   _MockUser({required String uid}) : _uid = uid;
   final String _uid;
@@ -101,6 +103,7 @@ Post _makePost({
     );
 
 UserProfile _makeProfile({String? gymId}) => UserProfile(
+      onboardingSeen: allSurfacesSeen(),
       uid: 'u1',
       email: 'tincho@test.com',
       displayName: 'Tincho',

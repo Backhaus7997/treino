@@ -3615,4 +3615,139 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get sessionTimeFitApply => 'TRIM TODAY';
+
+  @override
+  String get onboardingCardDismiss => 'GOT IT';
+
+  @override
+  String get onboardingCardAthleteHomeTitle => 'YOUR DAY AT A GLANCE';
+
+  @override
+  String get onboardingCardAthleteHomeBody =>
+      'See what you\'re training today, how your week is going and your streak. If you left a session half-done, it offers to pick it back up.';
+
+  @override
+  String get onboardingCardAthleteWorkoutTitle => 'YOUR TRAINING STARTS HERE';
+
+  @override
+  String get onboardingCardAthleteWorkoutBody =>
+      'There are three ways to get a routine:';
+
+  @override
+  String get onboardingCardAthleteWorkoutBullet1 =>
+      'Your coach\'s plan, already built and assigned to you';
+
+  @override
+  String get onboardingCardAthleteWorkoutBullet2 =>
+      'A TREINO template, ready to use';
+
+  @override
+  String get onboardingCardAthleteWorkoutBullet3 =>
+      'Your own routine, built exercise by exercise';
+
+  @override
+  String get onboardingCardAthleteFeedTitle => 'THE SOCIAL SIDE';
+
+  @override
+  String get onboardingCardAthleteFeedBody =>
+      'Post your workouts and follow your friends. Rankings sits right next to it:';
+
+  @override
+  String get onboardingCardAthleteFeedBullet1 =>
+      'It compares you with people at your gym';
+
+  @override
+  String get onboardingCardAthleteFeedBullet2 =>
+      'It\'s optional: leave it off and you neither appear nor see anyone';
+
+  @override
+  String get onboardingCardAthleteCoachTitle => 'YOUR COACH';
+
+  @override
+  String get onboardingCardAthleteCoachBody =>
+      'Find and hire a coach near you. You control what they see:';
+
+  @override
+  String get onboardingCardAthleteCoachBullet1 =>
+      'They see your workouts as soon as you accept the link';
+
+  @override
+  String get onboardingCardAthleteCoachBullet2 =>
+      'Your personal data and measurements only if you turn it on in Profile › Privacy';
+
+  @override
+  String get onboardingCardAthleteProfileTitle => 'YOUR ACCOUNT';
+
+  @override
+  String get onboardingCardAthleteProfileBody =>
+      'Your data, your measurements and your privacy. This is where you decide what your public profile shares and what your coach can see.';
+
+  @override
+  String get onboardingCardTrainerHomeTitle => 'YOUR DAY';
+
+  @override
+  String get onboardingCardTrainerHomeBody =>
+      'Your upcoming sessions, who trained today, your athletes\' recent activity and what you have left to collect.';
+
+  @override
+  String get onboardingCardTrainerWorkoutTitle => 'YOUR TEMPLATES';
+
+  @override
+  String get onboardingCardTrainerWorkoutBody =>
+      'Your own template library and the shortcut to assign a plan to an athlete. The full editor lives in Coach Hub, on your computer.';
+
+  @override
+  String get onboardingCardTrainerFeedTitle => 'THE COMMUNITY';
+
+  @override
+  String get onboardingCardTrainerFeedBody =>
+      'TREINO\'s social feed. Follow what your athletes post, and post yourself.';
+
+  @override
+  String get onboardingCardTrainerCoachTitle => 'ATHLETES AND SCHEDULE';
+
+  @override
+  String get onboardingCardTrainerCoachBody =>
+      'This is where you work with your athletes. First things worth knowing:';
+
+  @override
+  String get onboardingCardTrainerCoachBullet1 =>
+      'The athlete sends you the request from their app, not the other way round';
+
+  @override
+  String get onboardingCardTrainerCoachBullet2 =>
+      'Open an athlete to see their plan, sets, progress and chat';
+
+  @override
+  String get onboardingCardTrainerCoachBullet3 =>
+      'Under SCHEDULE you create one-off sessions or recurring series';
+
+  @override
+  String get onboardingCardTrainerProfileTitle => 'YOUR PROFESSIONAL PROFILE';
+
+  @override
+  String get onboardingCardTrainerProfileBody =>
+      'This is how athletes searching for a coach see you. From here you also:';
+
+  @override
+  String get onboardingCardTrainerProfileBullet1 =>
+      'Accept incoming requests from new athletes';
+
+  @override
+  String get onboardingCardTrainerProfileBullet2 =>
+      'Set your weekly availability';
+
+  @override
+  String get onboardingTourSkip => 'SKIP';
+
+  @override
+  String get onboardingTourNext => 'NEXT';
+
+  @override
+  String get onboardingTourFinish => 'START';
+
+  @override
+  String onboardingTourProgress(int current, int total) {
+    return 'Step $current of $total';
+  }
 }

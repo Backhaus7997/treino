@@ -27,6 +27,8 @@ import 'package:treino/features/workout/domain/session_status.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
+import '../../helpers/onboarding_test_helpers.dart';
+
 UserProfile makeProfile({
   String? displayName = 'Martín',
   String? avatarUrl,
@@ -34,6 +36,7 @@ UserProfile makeProfile({
   String email = 'u1@test.com',
 }) =>
     UserProfile(
+      onboardingSeen: allSurfacesSeen(),
       uid: uid,
       email: email,
       displayName: displayName,
