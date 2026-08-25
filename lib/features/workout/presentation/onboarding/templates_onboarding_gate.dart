@@ -14,6 +14,7 @@ import '../../application/template_preferences_providers.dart';
 import '../../domain/template_preferences.dart';
 import 'templates_onboarding_steps.dart';
 import 'templates_onboarding_view.dart';
+import '../../../../app/theme/tokens/primitives.dart';
 
 /// Runs the PLANTILLAS mini-onboarding once, the first time an athlete opens
 /// Entrenar → PLANTILLAS (#635 PR#2).
@@ -79,7 +80,17 @@ Future<void> maybeShowTemplatesOnboarding({
   final palette = AppPalette.of(context);
   final steps = templatesOnboardingSteps(l10n);
 
-  ref.read(onboardingTourOpenProvider.notifier).state = true;
+  // Capturados ANTES del await, igual que `OnboardingGate` y el gate de
+  // ejercicios propios. Si un redirect de auth o un reemplazo de ruta desarma
+  // /workout con la hoja abierta, `context.mounted` es false y el cleanup
+  // guardado por él dejaba `onboardingTourOpenProvider` —root-scoped— en
+  // `true` para siempre: desde ahí `onboardingBlocksProvider` suprime TODO
+  // onboarding posterior, incluido el de otro login, hasta reiniciar el
+  // proceso. Y el `ref.read` de `markSeen` corría sobre un ref ya dispuesto.
+  final tourOpen = ref.read(onboardingTourOpenProvider.notifier);
+  final onboardingController = ref.read(onboardingControllerProvider);
+
+  tourOpen.state = true;
   try {
     await showModalBottomSheet<void>(
       context: context,
@@ -111,13 +122,11 @@ Future<void> maybeShowTemplatesOnboarding({
       ),
     );
   } finally {
-    if (context.mounted) {
-      ref.read(onboardingTourOpenProvider.notifier).state = false;
-    }
+    tourOpen.state = false;
     // Persist however it closed — CTA, SALTAR, Android back, drag, or a route
     // torn down under us. Marking only on the two buttons is how an onboarding
     // comes back forever for anyone who dismissed it once.
-    await ref.read(onboardingControllerProvider).markSeen(surface);
+    await onboardingController.markSeen(surface);
   }
 }
 
@@ -168,7 +177,7 @@ class _TemplatesOnboardingSheet extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
         border: Border(top: BorderSide(color: palette.border)),
       ),
       child: SafeArea(
