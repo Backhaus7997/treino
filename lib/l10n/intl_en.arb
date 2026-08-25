@@ -1600,5 +1600,15 @@
   "exerciseFeedbackSuccess": "Done. Your coach will see it next to the set.",
   "@exerciseFeedbackSuccess": {},
   "exerciseFeedbackError": "We could not save your report. Try again.",
-  "@exerciseFeedbackError": {}
+  "@exerciseFeedbackError": {},
+  "exerciseFeedbackNoteTagComment": "FROM ATHLETE",
+  "@exerciseFeedbackNoteTagComment": {},
+  "exerciseFeedbackNoteTagDiscomfort": "DISCOMFORT",
+  "@exerciseFeedbackNoteTagDiscomfort": {},
+  "exerciseFeedbackNoteSetTag": "SET {setNumber}",
+  "@exerciseFeedbackNoteSetTag": {"placeholders": {"setNumber": {"type": "int"}}},
+  "coachSessionFeedbackLoadError": "We could not load the athlete's reports.",
+  "@coachSessionFeedbackLoadError": {},
+  "sessionFeedbackLoadError": "We could not load your reports.",
+  "@sessionFeedbackLoadError": {}
 }

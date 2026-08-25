@@ -3920,4 +3920,22 @@ class AppL10nEn extends AppL10n {
   @override
   String get exerciseFeedbackError =>
       'We could not save your report. Try again.';
+
+  @override
+  String get exerciseFeedbackNoteTagComment => 'FROM ATHLETE';
+
+  @override
+  String get exerciseFeedbackNoteTagDiscomfort => 'DISCOMFORT';
+
+  @override
+  String exerciseFeedbackNoteSetTag(int setNumber) {
+    return 'SET $setNumber';
+  }
+
+  @override
+  String get coachSessionFeedbackLoadError =>
+      'We could not load the athlete\'s reports.';
+
+  @override
+  String get sessionFeedbackLoadError => 'We could not load your reports.';
 }

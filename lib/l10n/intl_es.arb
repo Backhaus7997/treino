@@ -976,5 +976,10 @@
   "exerciseFeedbackCancel": "CANCELAR",
   "exerciseFeedbackSubmit": "ENVIAR",
   "exerciseFeedbackSuccess": "Listo. Tu PF lo va a ver junto a la serie.",
-  "exerciseFeedbackError": "No pudimos guardar tu reporte. Probá de nuevo."
+  "exerciseFeedbackError": "No pudimos guardar tu reporte. Probá de nuevo.",
+  "exerciseFeedbackNoteTagComment": "DEL ALUMNO",
+  "exerciseFeedbackNoteTagDiscomfort": "MOLESTIA",
+  "exerciseFeedbackNoteSetTag": "SERIE {setNumber}",
+  "coachSessionFeedbackLoadError": "No pudimos cargar los reportes del alumno.",
+  "sessionFeedbackLoadError": "No pudimos cargar tus reportes."
 }

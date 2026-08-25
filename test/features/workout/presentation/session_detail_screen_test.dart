@@ -9,7 +9,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/features/workout/application/exercise_feedback_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
+import 'package:treino/features/workout/domain/exercise_feedback.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
@@ -46,15 +48,39 @@ SetLog _makeSetLog({
   int setNumber = 1,
   int reps = 10,
   double weightKg = 80.0,
+  // #628 — el id se deriva del nombre en vez de ser 'e1' fijo: la pantalla
+  // ahora agrupa por `exerciseId` (es la clave a la que se anclan los
+  // reportes), y un fixture con dos ejercicios DISTINTOS compartiendo id no
+  // existe en datos reales — el nombre está denormalizado desde el id.
+  String? exerciseId,
 }) =>
     SetLog(
       id: 'sl-$exerciseName-$setNumber',
-      exerciseId: 'e1',
+      exerciseId: exerciseId ?? 'e-$exerciseName',
       exerciseName: exerciseName,
       setNumber: setNumber,
       reps: reps,
       weightKg: weightKg,
       completedAt: DateTime.utc(2026, 5, 19, 10, 35),
+    );
+
+/// Un reporte del alumno sobre esta sesión (#628).
+ExerciseFeedback _makeFeedback({
+  String id = 'fb1',
+  String exerciseId = 'e-Bench Press',
+  String exerciseName = 'Bench Press',
+  int? setNumber,
+  ExerciseFeedbackKind kind = ExerciseFeedbackKind.discomfort,
+  String text = 'Me tira el hombro',
+}) =>
+    ExerciseFeedback(
+      id: id,
+      exerciseId: exerciseId,
+      exerciseName: exerciseName,
+      setNumber: setNumber,
+      kind: kind,
+      text: text,
+      createdAt: DateTime.utc(2026, 5, 19, 10, 36),
     );
 
 typedef _SummaryRecord = ({Session? session, List<SetLog> setLogs});
@@ -67,6 +93,11 @@ Widget _pumpDetailScreen({
   String uid = 'u1',
   // If provided, wrap in a GoRouter with an initial route so back-nav tests work
   bool withBackRoute = false,
+  // #628 — lo que el alumno reportó en ESTA sesión. Se overridea siempre
+  // (default vacío) para que ningún test toque Firestore por el stream real.
+  List<ExerciseFeedback> feedback = const [],
+  // #628 — la lectura de reportes ROTA, que no es lo mismo que "sin reportes".
+  bool feedbackError = false,
 }) {
   final router = GoRouter(
     initialLocation:
@@ -102,6 +133,9 @@ Widget _pumpDetailScreen({
       if (error) return Future<_SummaryRecord>.error(Exception('load error'));
       return Future.value(summaryOverride());
     }),
+    sessionExerciseFeedbackProvider.overrideWith((ref, key) => feedbackError
+        ? Stream<List<ExerciseFeedback>>.error(Exception('boom'))
+        : Stream.value(feedback)),
   ];
 
   return ProviderScope(
@@ -392,5 +426,84 @@ void main() {
 
     // No edit/delete buttons anywhere in the tree.
     expect(find.byType(IconButton), findsOneWidget); // only the back button
+  });
+
+  // ── #628 — el alumno relee lo que él mismo reportó ────────────────────────
+
+  testWidgets('#628: el alumno ve su propio reporte pegado a la serie',
+      (tester) async {
+    // No alcanza con que lo vea el PF: si el reporte sólo existe del otro
+    // lado, la persona no tiene registro de lo que dijo que le pasó.
+    await tester.pumpWidget(_pumpDetailScreen(
+      summaryOverride: () => (
+        session: _makeSession(),
+        setLogs: [_makeSetLog(setNumber: 1), _makeSetLog(setNumber: 2)],
+      ),
+      feedback: [_makeFeedback(setNumber: 2)],
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Me tira el hombro'), findsOneWidget);
+  });
+
+  testWidgets('#628: un reporte sobre un ejercicio SIN series igual se ve',
+      (tester) async {
+    // Serie pendiente que nunca se registró / miembro de superset que no fue
+    // la celda activa: cero SetLogs de ese exerciseId.
+    await tester.pumpWidget(_pumpDetailScreen(
+      summaryOverride: () => (
+        session: _makeSession(),
+        setLogs: [_makeSetLog(exerciseName: 'Squat')],
+      ),
+      feedback: [
+        _makeFeedback(
+          exerciseId: 'e-remo',
+          exerciseName: 'Remo en polea',
+          setNumber: 1,
+        ),
+      ],
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Squat'), findsOneWidget);
+    expect(find.text('Remo en polea'), findsOneWidget);
+    expect(find.text('Me tira el hombro'), findsOneWidget);
+  });
+
+  testWidgets('#628: sesión con reportes y CERO series no muestra el vacío',
+      (tester) async {
+    await tester.pumpWidget(_pumpDetailScreen(
+      summaryOverride: () => (session: _makeSession(), setLogs: <SetLog>[]),
+      feedback: [_makeFeedback(exerciseName: 'Remo en polea')],
+    ));
+    await tester.pumpAndSettle();
+
+    final l10n = await AppL10n.delegate.load(const Locale('es', 'AR'));
+    expect(find.text(l10n.sessionDetailNoSets), findsNothing);
+    expect(find.text('Remo en polea'), findsOneWidget);
+    expect(find.text('Me tira el hombro'), findsOneWidget);
+  });
+
+  testWidgets(
+      '#628: si FALLA la lectura de reportes se avisa Y la sesión sigue',
+      (tester) async {
+    // Del lado del alumno el silencio es igual de malo: relee la sesión, no ve
+    // ningún reporte y da por hecho que no reportó nada. El aviso usa la clave
+    // PROPIA (`sessionFeedbackLoadError`, "tus reportes") — la del PF habla de
+    // "los reportes del alumno" y acá el alumno es el que lee.
+    await tester.pumpWidget(_pumpDetailScreen(
+      summaryOverride: () => (
+        session: _makeSession(),
+        setLogs: [_makeSetLog(exerciseName: 'Squat')],
+      ),
+      feedbackError: true,
+    ));
+    await tester.pumpAndSettle();
+
+    final l10n = await AppL10n.delegate.load(const Locale('es', 'AR'));
+    expect(find.text(l10n.sessionFeedbackLoadError), findsOneWidget);
+    // La sesión NO se cae ni se vacía por un fallo leyendo reportes.
+    expect(find.text('Squat'), findsOneWidget);
+    expect(find.text(l10n.sessionDetailNoSets), findsNothing);
   });
 }
