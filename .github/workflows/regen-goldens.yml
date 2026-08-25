@@ -88,10 +88,14 @@ jobs:
             echo "Ningun golden cambio. Nada que commitear."
             exit 0
           fi
-          # `git status` del staging va al log del job a propósito: es el
+          # La lista de archivos staged va al log del job a propósito: es el
           # registro de QUÉ se aceptó como baseline nuevo, y es lo que un
           # reviewer quiere ver cuando pregunta por qué cambió una imagen.
-          git status --short --cached
+          #
+          # `git diff --cached --name-status` y no `git status`: éste último no
+          # tiene `--cached` y aborta con exit 129 (usage error), que con
+          # `set -e` se lleva puesto el job entero — pasó en la primera corrida.
+          git diff --cached --name-status
           # El mensaje del commit NO lleva el marcador, así que el push que
           # esto genera no vuelve a disparar este workflow: no hay bucle. Y SÍ
           # dispara ci.yml, que es lo que se quiere — el job `visual-gate`
