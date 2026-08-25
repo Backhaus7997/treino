@@ -176,7 +176,7 @@ posts y turnos — suficiente para que Insights y las gráficas de progresión
 salgan **llenas**. Una app de fitness con gráficos vacíos no vende.
 
 Los nombres de personas y de gimnasios del seed son **ficticios**. Los de
-gimnasio lo son desde este PR — ver §6.2.
+gimnasio lo son desde este PR — ver §6.3.
 
 ### 4.3 Correr la app contra el emulador
 
@@ -184,11 +184,19 @@ gimnasio lo son desde este PR — ver §6.2.
 flutter run --dart-define=USE_EMULATOR=true -d "iPhone 17 Pro Max"
 ```
 
-Si falla con `CocoaPods's specs repository is too out-of-date`, actualizar el
-índice de specs y reintentar. Tarda varios minutos:
+Si `pod install` falla con `could not find compatible versions`, el
+`Podfile.lock` se desincronizó de `pubspec.yaml`. **`pod repo update` no lo
+arregla** — el problema es el lockfile, no el índice de specs:
 
 ```bash
-pod repo update
+cd ios && pod update <NombreDelPod>
+```
+
+Y si `pod` revienta con `Unicode Normalization not appropriate for ASCII-8BIT`,
+es Ruby sin locale UTF-8, no un problema del Podfile:
+
+```bash
+export LANG=en_US.UTF-8
 ```
 
 ### 4.4 Capturar
@@ -269,7 +277,19 @@ Una captura en inglés hoy sale con botones vacíos y títulos en castellano.
 **Las carpetas `en-US/` quedan creadas y vacías a propósito**, para que el set
 en inglés entre sin mover nada de lugar cuando el l10n esté completo.
 
-### 6.2 Los gimnasios del seed eran marcas registradas — resuelto acá
+### 6.2 El build de iOS estaba roto en un checkout limpio — resuelto acá
+
+`ios/Podfile.lock` pinneaba `TOCropViewController 2.7.4` mientras
+`image_cropper ^12.2.1` exigía `~> 3.1.2`. `pod install` abortaba, así que en un
+worktree nuevo no se podía compilar iOS — y sin compilar no hay capturas.
+
+Resuelto en este PR con `pod update TOCropViewController`. Aparecieron además
+`integration_test` y `package_info_plus`, que tampoco estaban en el lockfile.
+
+Verificado: `flutter build ios --debug --no-codesign --simulator` termina con
+exit 0.
+
+### 6.3 Los gimnasios del seed eran marcas registradas — resuelto acá
 
 `seed_emulator_full.js` usaba `Megatlon Palermo`, `SmartFit Caballito` y
 `Megatlon Nueva Córdoba`: cadenas de gimnasios **reales**. Salían en la captura
@@ -287,7 +307,7 @@ real termine en una captura de la ficha.
 Antes de publicar, confirmar que los tres nombres inventados no colisionen con
 un gimnasio real existente.
 
-### 6.3 El iPad es obligatorio en Apple y quizá nunca se probó
+### 6.4 El iPad es obligatorio en Apple y quizá nunca se probó
 
 Asimetría entre las dos plataformas:
 
@@ -309,7 +329,7 @@ decisión de producto, no de este issue:
 
 Las carpetas `ipad-13/` quedan creadas para cualquiera de los dos desenlaces.
 
-### 6.4 El ícono puede ser placeholder
+### 6.5 El ícono puede ser placeholder
 
 `pubspec.yaml` documenta que `android: false` estuvo activo mucho tiempo y los
 `mipmap-*/ic_launcher.png` fueron el logo de Flutter hasta que se corrigió.
@@ -317,7 +337,7 @@ Falta confirmar que `assets/icon/app_icon.png` es el ícono **definitivo** antes
 de derivar el `icon-512.png` de Play. Si es placeholder, sale como issue de
 diseño aparte (#629 lo excluye explícitamente).
 
-### 6.5 Peso del repo
+### 6.6 Peso del repo
 
 Las capturas son PNG grandes: 3 familias iOS + 3 Android × 5 pantallas × 2
 locales. Definir si van versionadas directo o con Git LFS **antes** de commitear
