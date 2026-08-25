@@ -45,7 +45,7 @@ const RESEND_API_KEY = defineSecret("RESEND_API_KEY");
  * domain makes every send return 403.
  */
 const MAIL_FROM = defineString("MAIL_FROM", {
-  default: "TREINO <hola@treino.app>",
+  default: "TREINO <hola@send.gettreino.com>",
 });
 
 /** Past this many attempts a document is declared permanently failed. */
