@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../app/theme/tokens/primitives.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import 'wear_round_scaffold.dart';
 import 'wear_strings.dart';
@@ -105,7 +106,7 @@ class _RoutineRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: palette.bgCard,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
           border: Border.all(color: palette.border),
         ),
         child: Column(

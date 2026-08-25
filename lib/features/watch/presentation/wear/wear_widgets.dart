@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../app/theme/tokens/primitives.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../domain/watch_effort.dart';
 import 'wear_strings.dart';
@@ -154,7 +155,7 @@ class WearButton extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
           decoration: BoxDecoration(
             color: color.withValues(alpha: 0.18),
-            borderRadius: BorderRadius.circular(999),
+            borderRadius: BorderRadius.circular(AppRadius.full),
             border: Border.all(color: color.withValues(alpha: 0.5)),
           ),
           child: Text(
