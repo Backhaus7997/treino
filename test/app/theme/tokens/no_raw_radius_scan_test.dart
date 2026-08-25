@@ -65,11 +65,11 @@ void main() {
     /// Techo de archivos permitidos. Congelado en el estado de `main` al abrir
     /// la issue #665. NUNCA subir este número: cada fase que migra un archivo
     /// lo baja.
-    const allowlistCeiling = 85;
+    const allowlistCeiling = 84;
 
     /// Techo de ocurrencias totales de radio crudo en `lib/`. Mismo contrato
     /// que [allowlistCeiling]: sólo baja.
-    const rawRadiusDebtCeiling = 246;
+    const rawRadiusDebtCeiling = 245;
 
     /// Allowlist de rutas relativas a `lib/` que todavía contienen radios
     /// crudos. Es un REGISTRO DE DEUDA, no una licencia: estar acá significa
@@ -78,7 +78,6 @@ void main() {
       'core/widgets/treino_bottom_bar.dart',
       'features/auth/presentation/widgets/password_strength_bar.dart',
       'features/chat/presentation/chat_screen.dart',
-      'features/checkins/presentation/post_session_check_in_sheet.dart',
       'features/coach/athlete_coach_view.dart',
       'features/coach/presentation/athlete_agenda_screen.dart',
       'features/coach/presentation/athlete_detail_screen.dart',

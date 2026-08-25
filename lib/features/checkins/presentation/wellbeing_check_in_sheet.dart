@@ -147,7 +147,7 @@ class _WellbeingCheckInSheetState extends ConsumerState<WellbeingCheckInSheet> {
                 height: 4,
                 decoration: BoxDecoration(
                   color: palette.border,
-                  borderRadius: BorderRadius.circular(2),
+                  borderRadius: BorderRadius.circular(AppRadius.full),
                 ),
               ),
             ),
