@@ -128,7 +128,7 @@ Cinco paths siguen **sin una sola aserción negativa**:
 > cambia el resultado según el estado del documento, el test tiene que
 > recorrer los dos estados o la celda miente por omisión.
 
-### 1.2 Storage — 6 paths declarados en `storage.rules`
+### 1.2 Storage — 7 paths declarados en `storage.rules`
 
 | Path | get | list | write | delete |
 |---|---|---|---|---|
@@ -138,13 +138,24 @@ Cinco paths siguen **sin una sola aserción negativa**:
 | `chatMedia/{chatId}/{uid}/**` | 🟡 | 🟡 | — | — |
 | `athleteFiles/{pairId}/**` | ✅ | ✅ | ✅ | ✅ |
 | `postPhotos/{uid}/{file}` | ✅ | ✅ | ✅ | ✅ |
+| `sessionFeedback/{uid}/{sid}/{file}` | ✅ | ✅ | ✅ | ✅ |
 
-**22 de 24 celdas** (92%). Las dos que faltan son `write` y `delete` de
-`chatMedia`. Hay además un séptimo bloque, el catch-all
+**26 de 28 celdas** (93%). Las dos que faltan son `write` y `delete` de
+`chatMedia`. Hay además un octavo bloque, el catch-all
 `match /{allPaths=**} { allow read, write: if false; }`, que sólo se ejercita
-de refilón: los casos "listar `postPhotos/`" y "listar `temp/uploads/`" —de
-`post-photos-storage-rules.test.ts` y `temp-uploads-storage-rules.test.ts`—
-caen en él, pero nada lo testea de frente.
+de refilón: el caso "listar `postPhotos/`" de
+`post-photos-storage-rules.test.ts` cae en él, pero nada lo testea de frente.
+
+> **Nota de recuento (#804).** La fila de `sessionFeedback` y el header
+> ("7 paths", 28 celdas) los agrega este PR, pero el path no es suyo: lo
+> introdujo **#801**, que sumó el `match` a `storage.rules` y su
+> `session-feedback-storage-rules.test.ts` sin actualizar esta tabla. Se
+> corrige acá porque el total de §1.2 es un conteo global: dejarlo en "6 paths
+> / 24 celdas" habría hecho que el número de **este** PR también fuera falso.
+> Las cuatro celdas se marcaron leyendo el archivo de test, no por inferencia:
+> `get` (dueño, PF con grant, PF sin grant, PF ajeno, autenticado cualquiera,
+> revocado y anónimo), `list` (los tres niveles), `write` (dueño, ajeno, PF,
+> content-type y anónimo) y `delete` (dueño, PF, tercero y anónimo).
 
 > **† — cobertura de piso, no de fondo. Leer esas dos celdas como "cubierto"
 > sería un error.** El único negativo que existe sobre ellas es el del usuario
@@ -212,7 +223,7 @@ Esto es lo primero que hay que saber antes de tocar una regla:
 
 | Suite | Archivos | Job de CI | Cómo se corre a mano |
 |---|---|---|---|---|
-| `functions/src/__tests__/*-rules.test.ts` | 31 | *Functions Test* | `npm --prefix functions run test:rules:emulator` |
+| `functions/src/__tests__/*-rules.test.ts` | 34 | *Functions Test* | `npm --prefix functions run test:rules:emulator` |
 | `scripts/rules_test/*.test.js` | 8 | *Rules Test* | `bash scripts/test_rules.sh` |
 
 La segunda entró en CI con **#680 Slice B**. Hasta ahí era un ítem de checklist
