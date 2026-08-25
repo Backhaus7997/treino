@@ -638,6 +638,46 @@ class AppL10nEn extends AppL10n {
   String get workoutPostAutoCompleteText => '';
 
   @override
+  String get wellbeingTrendScreenTitle => 'HOW I FELT';
+
+  @override
+  String get wellbeingTrendEmptyState =>
+      'You haven\'t logged how you feel yet. Once you do, your own series shows up here.';
+
+  @override
+  String get wellbeingTrendNeedsMoreData => 'One entry isn\'t a trend yet.';
+
+  @override
+  String get wellbeingTrendLoadError =>
+      'We couldn\'t load your log. Try again.';
+
+  @override
+  String get wellbeingTrendPainHeading => 'PAIN OR DISCOMFORT';
+
+  @override
+  String wellbeingTrendPainCount(int painCount, int total) {
+    return '$painCount of $total entries with pain';
+  }
+
+  @override
+  String wellbeingTrendPainCountPrevious(int painCount, int total) {
+    return 'Previous period: $painCount of $total';
+  }
+
+  @override
+  String get wellbeingTrendAreasHeading => 'LOGGED AREAS';
+
+  @override
+  String get wellbeingTrendPainMark => 'with pain';
+
+  @override
+  String get insightsTileWellbeingTitle => 'How I felt';
+
+  @override
+  String get insightsTileWellbeingSubtitle =>
+      'Your feeling and pain log over time';
+
+  @override
   String get wellbeingDailyTitle => 'HOW ARE YOU FEELING TODAY?';
 
   @override

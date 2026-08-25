@@ -312,6 +312,58 @@
   "workoutSnackShareSuccess": "¡Post compartido!",
   "workoutSnackShareError": "No pudimos compartir tu post. Intentá de nuevo.",
   "workoutPostAutoCompleteText": "¡Terminé mi entreno! 💪",
+  "wellbeingTrendScreenTitle": "CÓMO ME SENTÍ",
+  "@wellbeingTrendScreenTitle": {
+    "description": "Title of the wellbeing trend screen in the Insights hub. Past tense, first person: it is the user's own record, not an assessment of them."
+  },
+  "wellbeingTrendEmptyState": "Todavía no registraste cómo te sentís. Cuando lo hagas, vas a ver tu propia serie acá.",
+  "@wellbeingTrendEmptyState": {
+    "description": "Empty state of the wellbeing trend screen — no check-ins in the selected period. Must not nag or imply the user is failing at anything."
+  },
+  "wellbeingTrendNeedsMoreData": "Con un solo registro todavía no hay tendencia que mostrar.",
+  "@wellbeingTrendNeedsMoreData": {
+    "description": "Shown when the period has exactly one check-in: a single data point is not a curve. Distinct from the empty state on purpose."
+  },
+  "wellbeingTrendLoadError": "No pudimos cargar tu registro. Probá de nuevo.",
+  "@wellbeingTrendLoadError": {
+    "description": "Error state of the wellbeing trend screen, paired with the shared retry CTA."
+  },
+  "wellbeingTrendPainHeading": "DOLOR O MOLESTIA",
+  "@wellbeingTrendPainHeading": {
+    "description": "Section heading above the pain counters on the wellbeing trend screen."
+  },
+  "wellbeingTrendPainCount": "{painCount} de {total} registros con dolor",
+  "@wellbeingTrendPainCount": {
+    "description": "Pain frequency in the selected period. A COUNT, never a verdict — no wording may qualify the number as good or bad.",
+    "placeholders": {
+      "painCount": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "wellbeingTrendPainCountPrevious": "Período anterior: {painCount} de {total}",
+  "@wellbeingTrendPainCountPrevious": {
+    "description": "Same count for the previous window, so the user can compare their own data with their own data. Stated side by side, never as a qualified difference — no 'better', no 'worse', no trend arrow.",
+    "placeholders": {
+      "painCount": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "wellbeingTrendAreasHeading": "ZONAS REGISTRADAS",
+  "@wellbeingTrendAreasHeading": {
+    "description": "Section heading above the per-zone pain counts. Zones use the shared MuscleGroup vocabulary."
+  },
+  "wellbeingTrendPainMark": "con dolor",
+  "@wellbeingTrendPainMark": {
+    "description": "Chart tooltip suffix marking a day the user reported pain. A mark, not a judgement."
+  },
+  "insightsTileWellbeingTitle": "Cómo me sentí",
+  "@insightsTileWellbeingTitle": {
+    "description": "Tile title on InsightsScreen navigating to the wellbeing trend screen."
+  },
+  "insightsTileWellbeingSubtitle": "Tu registro de sensación y dolor en el tiempo",
+  "@insightsTileWellbeingSubtitle": {
+    "description": "Tile subtitle for the wellbeing entry in the stats hub."
+  },
   "wellbeingDailyTitle": "¿CÓMO TE SENTÍS HOY?",
   "@wellbeingDailyTitle": {
     "description": "Title of the daily wellbeing card on Home, and of the sheet it opens. Present tense on purpose: the daily check-in does not assume a workout happened. Concrete, never abstract — the segment that asked for this feature is the one that tolerates abstraction worst."

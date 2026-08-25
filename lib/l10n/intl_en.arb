@@ -269,6 +269,29 @@
   "workoutSnackShareSuccess": "",
   "workoutSnackShareError": "",
   "workoutPostAutoCompleteText": "",
+  "wellbeingTrendScreenTitle": "HOW I FELT",
+  "wellbeingTrendEmptyState": "You haven't logged how you feel yet. Once you do, your own series shows up here.",
+  "wellbeingTrendNeedsMoreData": "One entry isn't a trend yet.",
+  "wellbeingTrendLoadError": "We couldn't load your log. Try again.",
+  "wellbeingTrendPainHeading": "PAIN OR DISCOMFORT",
+  "wellbeingTrendPainCount": "{painCount} of {total} entries with pain",
+  "@wellbeingTrendPainCount": {
+    "placeholders": {
+      "painCount": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "wellbeingTrendPainCountPrevious": "Previous period: {painCount} of {total}",
+  "@wellbeingTrendPainCountPrevious": {
+    "placeholders": {
+      "painCount": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "wellbeingTrendAreasHeading": "LOGGED AREAS",
+  "wellbeingTrendPainMark": "with pain",
+  "insightsTileWellbeingTitle": "How I felt",
+  "insightsTileWellbeingSubtitle": "Your feeling and pain log over time",
   "wellbeingDailyTitle": "HOW ARE YOU FEELING TODAY?",
   "wellbeingDailyPrompt": "Log how you woke up, workout or not.",
   "wellbeingCheckInTitle": "HOW DID YOU FEEL?",

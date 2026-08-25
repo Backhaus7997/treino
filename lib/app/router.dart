@@ -56,6 +56,7 @@ import '../features/insights/presentation/measurements_screen.dart';
 import '../features/insights/presentation/monthly_report_screen.dart';
 import '../features/insights/presentation/muscle_distribution_screen.dart';
 import '../features/insights/presentation/volume_by_group_screen.dart';
+import '../features/insights/presentation/wellbeing_trend_screen.dart';
 import '../features/profile/application/user_providers.dart';
 import '../features/profile/domain/user_profile_trainer_completeness.dart';
 import '../features/profile/domain/user_role.dart';
@@ -533,6 +534,11 @@ GoRouter buildRouter({
             _report(state.pageKey, _immersive(const _MeasurementsRouteHost())),
       ),
       GoRoute(
+        path: '/home/insights/wellbeing',
+        pageBuilder: (_, state) => _report(
+            state.pageKey, _immersive(const _WellbeingTrendRouteHost())),
+      ),
+      GoRoute(
         // `?exerciseId=` opcional: preselecciona un ejercicio. Lo usa
         // "Ejercicios frecuentes" al tocar una fila — hasta ahora esas filas
         // no navegaban a ningún lado porque este destino no existía.
@@ -947,6 +953,18 @@ class _MuscleDistributionRouteHost extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final uid = ref.watch(currentUidProvider) ?? '';
     return MuscleDistributionScreen(uid: uid);
+  }
+}
+
+/// Resuelve el uid actual y monta [WellbeingTrendScreen] — mismo patrón que
+/// los demás hosts del hub.
+class _WellbeingTrendRouteHost extends ConsumerWidget {
+  const _WellbeingTrendRouteHost();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final uid = ref.watch(currentUidProvider) ?? '';
+    return WellbeingTrendScreen(uid: uid);
   }
 }
 

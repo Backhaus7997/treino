@@ -1274,6 +1274,72 @@ abstract class AppL10n {
   /// **'¡Terminé mi entreno! 💪'**
   String get workoutPostAutoCompleteText;
 
+  /// Title of the wellbeing trend screen in the Insights hub. Past tense, first person: it is the user's own record, not an assessment of them.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CÓMO ME SENTÍ'**
+  String get wellbeingTrendScreenTitle;
+
+  /// Empty state of the wellbeing trend screen — no check-ins in the selected period. Must not nag or imply the user is failing at anything.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía no registraste cómo te sentís. Cuando lo hagas, vas a ver tu propia serie acá.'**
+  String get wellbeingTrendEmptyState;
+
+  /// Shown when the period has exactly one check-in: a single data point is not a curve. Distinct from the empty state on purpose.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Con un solo registro todavía no hay tendencia que mostrar.'**
+  String get wellbeingTrendNeedsMoreData;
+
+  /// Error state of the wellbeing trend screen, paired with the shared retry CTA.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar tu registro. Probá de nuevo.'**
+  String get wellbeingTrendLoadError;
+
+  /// Section heading above the pain counters on the wellbeing trend screen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DOLOR O MOLESTIA'**
+  String get wellbeingTrendPainHeading;
+
+  /// Pain frequency in the selected period. A COUNT, never a verdict — no wording may qualify the number as good or bad.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{painCount} de {total} registros con dolor'**
+  String wellbeingTrendPainCount(int painCount, int total);
+
+  /// Same count for the previous window, so the user can compare their own data with their own data. Stated side by side, never as a qualified difference — no 'better', no 'worse', no trend arrow.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Período anterior: {painCount} de {total}'**
+  String wellbeingTrendPainCountPrevious(int painCount, int total);
+
+  /// Section heading above the per-zone pain counts. Zones use the shared MuscleGroup vocabulary.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ZONAS REGISTRADAS'**
+  String get wellbeingTrendAreasHeading;
+
+  /// Chart tooltip suffix marking a day the user reported pain. A mark, not a judgement.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'con dolor'**
+  String get wellbeingTrendPainMark;
+
+  /// Tile title on InsightsScreen navigating to the wellbeing trend screen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cómo me sentí'**
+  String get insightsTileWellbeingTitle;
+
+  /// Tile subtitle for the wellbeing entry in the stats hub.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu registro de sensación y dolor en el tiempo'**
+  String get insightsTileWellbeingSubtitle;
+
   /// Title of the daily wellbeing card on Home, and of the sheet it opens. Present tense on purpose: the daily check-in does not assume a workout happened. Concrete, never abstract — the segment that asked for this feature is the one that tolerates abstraction worst.
   ///
   /// In es_AR, this message translates to:

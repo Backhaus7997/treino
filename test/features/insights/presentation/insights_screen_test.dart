@@ -595,6 +595,8 @@ void main() {
     expect(find.text('Ejercicios frecuentes'), findsOneWidget);
     expect(find.text('Reporte mensual'), findsOneWidget);
     expect(find.text('Volumen por grupo'), findsOneWidget);
+    // Séptima entrada (#643): la única del hub que no mide kilos ni volumen.
+    expect(find.text('Cómo me sentí'), findsOneWidget);
     // Inline sections must be GONE — moved to dedicated screens.
     expect(find.text('DISTRIBUCIÓN MUSCULAR'), findsNothing);
     expect(find.text('VOLUMEN POR GRUPO'), findsNothing);
@@ -752,6 +754,12 @@ void main() {
             body: Text('exercise-progression-route'),
           ),
         ),
+        GoRoute(
+          path: '/home/insights/wellbeing',
+          builder: (_, __) => const Scaffold(
+            body: Text('wellbeing-route'),
+          ),
+        ),
       ],
     );
     addTearDown(router.dispose);
@@ -842,6 +850,20 @@ void main() {
     await tester.tap(find.text('Evolución por ejercicio'));
     await tester.pumpAndSettle();
     expect(find.text('exercise-progression-route'), findsOneWidget);
+
+    // Cómo me sentí (#643): la serie subjetiva. Sin esta entrada, los dos
+    // slices de captura serían un diario que nadie lee.
+    router.go('/home/insights');
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Cómo me sentí'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cómo me sentí'));
+    await tester.pumpAndSettle();
+    expect(find.text('wellbeing-route'), findsOneWidget);
   });
 }
 

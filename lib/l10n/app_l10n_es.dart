@@ -653,6 +653,47 @@ class AppL10nEs extends AppL10n {
   String get workoutPostAutoCompleteText => '¡Terminé mi entreno! 💪';
 
   @override
+  String get wellbeingTrendScreenTitle => 'CÓMO ME SENTÍ';
+
+  @override
+  String get wellbeingTrendEmptyState =>
+      'Todavía no registraste cómo te sientes. Cuando lo hagas, verás tu propia serie aquí.';
+
+  @override
+  String get wellbeingTrendNeedsMoreData =>
+      'Con un solo registro todavía no hay tendencia que mostrar.';
+
+  @override
+  String get wellbeingTrendLoadError =>
+      'No pudimos cargar tu registro. Inténtalo de nuevo.';
+
+  @override
+  String get wellbeingTrendPainHeading => 'DOLOR O MOLESTIA';
+
+  @override
+  String wellbeingTrendPainCount(int painCount, int total) {
+    return '$painCount de $total registros con dolor';
+  }
+
+  @override
+  String wellbeingTrendPainCountPrevious(int painCount, int total) {
+    return 'Período anterior: $painCount de $total';
+  }
+
+  @override
+  String get wellbeingTrendAreasHeading => 'ZONAS REGISTRADAS';
+
+  @override
+  String get wellbeingTrendPainMark => 'con dolor';
+
+  @override
+  String get insightsTileWellbeingTitle => 'Cómo me sentí';
+
+  @override
+  String get insightsTileWellbeingSubtitle =>
+      'Tu registro de sensación y dolor en el tiempo';
+
+  @override
   String get wellbeingDailyTitle => '¿CÓMO TE SIENTES HOY?';
 
   @override
@@ -4286,6 +4327,47 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get workoutPostAutoCompleteText => '¡Terminé mi entreno! 💪';
+
+  @override
+  String get wellbeingTrendScreenTitle => 'CÓMO ME SENTÍ';
+
+  @override
+  String get wellbeingTrendEmptyState =>
+      'Todavía no registraste cómo te sentís. Cuando lo hagas, vas a ver tu propia serie acá.';
+
+  @override
+  String get wellbeingTrendNeedsMoreData =>
+      'Con un solo registro todavía no hay tendencia que mostrar.';
+
+  @override
+  String get wellbeingTrendLoadError =>
+      'No pudimos cargar tu registro. Probá de nuevo.';
+
+  @override
+  String get wellbeingTrendPainHeading => 'DOLOR O MOLESTIA';
+
+  @override
+  String wellbeingTrendPainCount(int painCount, int total) {
+    return '$painCount de $total registros con dolor';
+  }
+
+  @override
+  String wellbeingTrendPainCountPrevious(int painCount, int total) {
+    return 'Período anterior: $painCount de $total';
+  }
+
+  @override
+  String get wellbeingTrendAreasHeading => 'ZONAS REGISTRADAS';
+
+  @override
+  String get wellbeingTrendPainMark => 'con dolor';
+
+  @override
+  String get insightsTileWellbeingTitle => 'Cómo me sentí';
+
+  @override
+  String get insightsTileWellbeingSubtitle =>
+      'Tu registro de sensación y dolor en el tiempo';
 
   @override
   String get wellbeingDailyTitle => '¿CÓMO TE SENTÍS HOY?';
