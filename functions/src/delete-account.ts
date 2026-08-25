@@ -213,10 +213,51 @@ export const deleteAccountHandler = functions.onCall(
   // Region aligned with the existing parsePlan CF for latency
   // consistency for LATAM users.
   //
-  // QA-SEC-006: enforce App Check so only the legitimate, attested app can
-  // invoke account deletion. Defense-in-depth on top of the request.auth
-  // guard below. See PR body for the release prerequisite before deploy.
-  { region: "southamerica-east1", enforceAppCheck: true },
+  // SIN enforceAppCheck (2026-08-25). Lo tuvo desde el 2026-07-20 (commit
+  // 2bb8d1c7, QA-SEC-006) y en ese lapso el borrado de cuenta NO FUNCIONO
+  // NUNCA.
+  //
+  // MEDIDO, no deducido. Cloud Logging de treino-dev, todo el historico
+  // retenido (desde 2026-05-01):
+  //
+  //   service_name="deleteaccount" AND httpRequest.status=200  ->  0 entradas
+  //
+  // Los unicos tres intentos autenticados que existen fueron rechazados:
+  //
+  //   2026-08-11T13:12:37Z  401  {"verifications":{"auth":"VALID","app":"INVALID"}}
+  //   2026-08-11T13:12:51Z  401  "AppCheck token was rejected."
+  //   2026-08-11T13:13:05Z  401  Decoding App Check token failed
+  //
+  // Tres toques en 28 segundos: alguien apreto ELIMINAR, no paso nada y
+  // reintento. El handler de abajo nunca corrio — App Check corta en la capa
+  // de transporte, antes.
+  //
+  // POR QUE SE SACA: Apple Guideline 5.1.1(v) exige que el borrado de cuenta
+  // funcione, y una parte real de los clientes no puede atestar hoy. Contado
+  // sobre los logs de mintWatchCredential, que recibe trafico real y no tiene
+  // el flag: iPhone fisico 8 VALID / 2 INVALID, Android 1 VALID / 8 INVALID
+  // (ultimo rechazo 2026-08-24). Cualquiera de esos clientes come 401 aca.
+  //
+  // Mismo criterio que el PR #704 aplico a acceptTrainerLink/resumeTrainerLink:
+  // un flag que convierte un boton en un error permanente no da seguridad, da
+  // un boton roto.
+  //
+  // LO QUE SIGUE PROTEGIENDO, y es lo que importa: `request.auth` es
+  // obligatorio, y el guard anti-spoofing de abajo exige
+  // `callerUid === data.uid`. O sea que un llamador solo puede borrar SU
+  // propia cuenta. App Check era defensa en profundidad contra abuso
+  // automatizado, no la cerradura — y con el enforcement por API en UNENFORCED
+  // (firestore e identitytoolkit, re-verificado 2026-08-25) no estaba cerrando
+  // una puerta que estuviera cerrada en otro lado.
+  //
+  // PARA RESTAURARLO: volver a `enforceAppCheck: true` cuando el cliente emita
+  // atestacion valida en las DOS plataformas. No hace falta instrumentar nada:
+  // firebase-functions v2 ya loguea la verificacion de cada llamada. Contar
+  // sobre `jsonPayload.verifications.app` filtrando por
+  // `jsonPayload.message:"Callable request verification"` y pedir cero INVALID
+  // por plataforma. Hasta entonces esto es deuda, no decision de diseno, y
+  // figura como tal en el registry de appcheck-enforcement.test.ts.
+  { region: "southamerica-east1" },
   async (request): Promise<DeleteAccountResponse> => {
     // ── Guard: caller must be authenticated ─────────────────────────────────
     if (!request.auth) {

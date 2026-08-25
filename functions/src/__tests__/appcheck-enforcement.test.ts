@@ -62,6 +62,26 @@ const readModule = (modulePath: string): string | undefined => {
  * sin condicion de salida es una decision disfrazada.
  */
 const EXEMPTIONS: Readonly<Record<string, Exemption>> = {
+  "delete-account:deleteAccountHandler": {
+    permanence: "debt",
+    reason:
+      "Tuvo el flag desde el 2026-07-20 (2bb8d1c7) y en ese lapso el borrado " +
+      "de cuenta no funciono nunca: medido sobre Cloud Logging, cero " +
+      "respuestas 200 en todo el historico retenido, y los unicos tres " +
+      "intentos autenticados (2026-08-11) rechazados con app=INVALID. Apple " +
+      "Guideline 5.1.1(v) exige que el borrado funcione. Mismo criterio que " +
+      "el PR #704: un flag que convierte un boton en un error permanente no " +
+      "da seguridad, da un boton roto. Sigue exigiendo request.auth y el " +
+      "guard anti-spoofing callerUid === data.uid, asi que un llamador solo " +
+      "puede borrar SU cuenta. Ver delete-account.ts:212.",
+    exitCondition:
+      "El mismo que mintWatchCredential, y conviene restaurarlos juntos: que " +
+      "el cliente emita atestacion valida en iOS y Android. Al 2026-08-25 " +
+      "falta Android (1 VALID / 8 INVALID sobre los logs de " +
+      "mintWatchCredential, ultimo rechazo 2026-08-24). Contar sobre " +
+      "jsonPayload.verifications.app y pedir cero INVALID por plataforma " +
+      "antes de volver a poner el flag.",
+  },
   "subscriptions/accept-trainer-link:acceptTrainerLink": {
     permanence: "decided",
     reason:
@@ -199,7 +219,12 @@ describe("QA-SEC-016: el guard falla cuando tiene que fallar", () => {
    * El test de deriva de mas abajo mantiene los dos en sincronia.
    */
   const BASELINE = [
-    { module: "delete-account", symbol: "deleteAccountHandler", as: "deleteAccount", attested: true },
+    {
+      module: "delete-account",
+      symbol: "deleteAccountHandler",
+      as: "deleteAccount",
+      attested: false,
+    },
     { module: "add-alias", symbol: "addAlias", as: "addAlias", attested: true },
     {
       module: "subscriptions/accept-trainer-link",
