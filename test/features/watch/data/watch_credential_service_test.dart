@@ -55,12 +55,30 @@ void main() {
         () async {
       when(() => bridge.isSupported).thenAnswer((_) async => true);
       when(() => bridge.isPaired).thenAnswer((_) async => false);
+      when(() => bridge.isReachable).thenAnswer((_) async => false);
 
       final outcome = await service.deliverCredential(uid: uid);
 
       expect(outcome, WatchCredentialOutcome.noWatchPaired);
       verifyNever(() => functions.httpsCallable(any()));
       verifyNever(() => bridge.updateApplicationContext(any()));
+    });
+
+    test('un nodo conectado alcanza aunque isPaired diga que no', () async {
+      // El agujero de Android: `isPaired` lista apps companion instaladas en el
+      // TELÉFONO, no relojes. Si ninguna está visible da false con el reloj
+      // perfectamente conectado, y sin esto la entrega cortaba en
+      // `noWatchPaired` — sin error, sin minteo, y la muñeca esperando una
+      // credencial que nadie llegó a pedir.
+      when(() => bridge.isSupported).thenAnswer((_) async => true);
+      when(() => bridge.isPaired).thenAnswer((_) async => false);
+      when(() => bridge.isReachable).thenAnswer((_) async => true);
+      stubMintReturns('custom-token-abc');
+
+      final outcome = await service.deliverCredential(uid: uid);
+
+      expect(outcome, WatchCredentialOutcome.delivered);
+      verify(() => bridge.updateApplicationContext(any())).called(1);
     });
 
     test('tampoco entrega nada si la plataforma no soporta relojes', () async {
@@ -77,6 +95,16 @@ void main() {
     setUp(() {
       when(() => bridge.isSupported).thenAnswer((_) async => true);
       when(() => bridge.isPaired).thenAnswer((_) async => true);
+    });
+
+    test('no pregunta por alcanzabilidad si ya sabe que hay reloj', () async {
+      // El camino barato y el común. Preguntar de más no rompe nada, pero
+      // `connectedNodes` es un viaje por MethodChannel y no hace falta.
+      stubMintReturns('custom-token-abc');
+
+      await service.deliverCredential(uid: uid);
+
+      verifyNever(() => bridge.isReachable);
     });
 
     test('mintea y entrega el payload completo al reloj', () async {

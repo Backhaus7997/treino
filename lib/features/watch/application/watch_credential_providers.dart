@@ -9,15 +9,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../firebase_options.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../profile/application/user_providers.dart' show userProfileProvider;
-import '../data/watch_bridge.dart';
 import '../data/watch_credential_service.dart';
 import '../data/watch_launcher_service.dart';
 import '../data/watch_nudge_service.dart';
 import '../data/watch_timer_service.dart';
+import 'watch_bridge_provider.dart';
 
-/// Envoltorio sobre `WatchConnectivity`. Se sobreescribe en tests vía
-/// `ProviderScope.overrides`.
-final watchBridgeProvider = Provider<WatchBridge>((ref) => WatchBridge());
+// `watchBridgeProvider` se mudó a su propio archivo para que el companion de
+// Wear pueda compartir la instancia sin arrastrar `cloud_functions` ni el
+// perfil del usuario. Se RE-EXPORTA desde acá porque su lugar histórico es
+// éste: el resto del código —incluido el que vino de main con el Apple Watch—
+// lo importa así, y romper todos esos imports para mover una línea sería
+// cambiar veinte archivos por nada.
+export 'watch_bridge_provider.dart' show watchBridgeProvider;
 
 /// Instancia de Cloud Functions en la región donde vive `mintWatchCredential`.
 ///

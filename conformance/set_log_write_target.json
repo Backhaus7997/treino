@@ -1,0 +1,108 @@
+{
+  "rule": "set-log-write-target",
+  "source_of_truth": "lib/features/workout/domain/set_log_identity.dart",
+  "description": "Donde tiene que escribir un RELOJ la serie setNumber de exerciseId, dado lo que el historial ya tiene. Contrato compartido entre la implementacion Dart (reloj Wear OS) y la Swift (reloj Apple). El telefono NO usa esta regla: su camino es SessionRepository.addSetLog, que ADOPTA el documento del reloj si esta y si no crea uno con id autogenerado. La estabilidad del id alternativo entre llamadas no necesita caso propio: la funcion es pura, asi que se sigue de que la misma entrada de el mismo resultado.",
+  "inputs": {
+    "exerciseId": "El ejercicio de la serie que se esta por escribir.",
+    "setNumber": "Numero de serie 1-based.",
+    "remote": "Lo que el historial YA tiene, como lista de {docId, exerciseId, setNumber}. Lista vacia = historial sin nada de esta sesion."
+  },
+  "expect": {
+    "kind": "'alreadyThere' = la serie logica ya esta; NO escribir. 'write' = escribir en docId.",
+    "docId": "En 'alreadyThere', donde ya esta. En 'write', donde hay que escribir."
+  },
+  "cases": [
+    {
+      "name": "sin nada en el historial se usa el id deterministico",
+      "why": "El caso normal. El id deterministico es lo que le permite al telefono encontrar el documento del reloj y adoptarlo en vez de duplicarlo.",
+      "given": { "exerciseId": "peso-muerto", "setNumber": 1, "remote": [] },
+      "expect": { "kind": "write", "docId": "peso-muerto__1" }
+    },
+    {
+      "name": "ya la escribio el telefono, con id autogenerado",
+      "why": "Se busca por identidad LOGICA, no por id: el documento del telefono tiene un id autogenerado y por id no matchearia nunca. Ese era exactamente el agujero que dejaba dos documentos de la misma serie.",
+      "given": {
+        "exerciseId": "peso-muerto",
+        "setNumber": 1,
+        "remote": [
+          { "docId": "EeFxyim8WMzP8qQvpGxj", "exerciseId": "peso-muerto", "setNumber": 1 }
+        ]
+      },
+      "expect": { "kind": "alreadyThere", "docId": "EeFxyim8WMzP8qQvpGxj" }
+    },
+    {
+      "name": "ya la escribio un intento anterior del reloj",
+      "why": "Reintentar tiene que ser idempotente. Y reescribir podria pisar una correccion que el atleta hizo en el celular.",
+      "given": {
+        "exerciseId": "peso-muerto",
+        "setNumber": 2,
+        "remote": [
+          { "docId": "peso-muerto__2", "exerciseId": "peso-muerto", "setNumber": 2 }
+        ]
+      },
+      "expect": { "kind": "alreadyThere", "docId": "peso-muerto__2" }
+    },
+    {
+      "name": "otras series del mismo ejercicio no son esta serie",
+      "why": "La identidad es el par ejercicio + numero de serie, no el ejercicio.",
+      "given": {
+        "exerciseId": "peso-muerto",
+        "setNumber": 3,
+        "remote": [
+          { "docId": "peso-muerto__1", "exerciseId": "peso-muerto", "setNumber": 1 }
+        ]
+      },
+      "expect": { "kind": "write", "docId": "peso-muerto__3" }
+    },
+    {
+      "name": "la misma serie de OTRO ejercicio no cuenta",
+      "why": "Idem: el ejercicio tambien es parte de la identidad.",
+      "given": {
+        "exerciseId": "peso-muerto",
+        "setNumber": 1,
+        "remote": [
+          { "docId": "remo-barra__1", "exerciseId": "remo-barra", "setNumber": 1 }
+        ]
+      },
+      "expect": { "kind": "write", "docId": "peso-muerto__1" }
+    },
+    {
+      "name": "una ruta ocupada por otra serie no se pisa: se usa un id propio",
+      "why": "Pasa despues de que el telefono borre una serie: al renumerar conserva el id del documento y baja el campo setNumber, asi que peso-muerto__3 puede contener la serie 2. Escribir ahi PERDERIA esa serie, y perder un dato que el atleta cargo es peor que el duplicado que este arreglo vino a cerrar.",
+      "given": {
+        "exerciseId": "peso-muerto",
+        "setNumber": 3,
+        "remote": [
+          { "docId": "peso-muerto__3", "exerciseId": "peso-muerto", "setNumber": 2 }
+        ]
+      },
+      "expect": { "kind": "write", "docId": "peso-muerto__3__alt" }
+    },
+    {
+      "name": "si el id alternativo ya contiene la serie, se adopta",
+      "why": "Cierra el ciclo: el reintento sobre una ruta desplazada tampoco acumula documentos.",
+      "given": {
+        "exerciseId": "peso-muerto",
+        "setNumber": 3,
+        "remote": [
+          { "docId": "peso-muerto__3", "exerciseId": "peso-muerto", "setNumber": 2 },
+          { "docId": "peso-muerto__3__alt", "exerciseId": "peso-muerto", "setNumber": 3 }
+        ]
+      },
+      "expect": { "kind": "alreadyThere", "docId": "peso-muerto__3__alt" }
+    },
+    {
+      "name": "la identidad logica gana sobre la ruta ocupada",
+      "why": "Precedencia. Si la serie YA esta en algun lado y ademas la ruta deterministica esta tomada por otra, no se escribe nada: adoptar es siempre mejor que crear.",
+      "given": {
+        "exerciseId": "peso-muerto",
+        "setNumber": 3,
+        "remote": [
+          { "docId": "peso-muerto__3", "exerciseId": "peso-muerto", "setNumber": 2 },
+          { "docId": "kJ2p0qWmEXAMPLE", "exerciseId": "peso-muerto", "setNumber": 3 }
+        ]
+      },
+      "expect": { "kind": "alreadyThere", "docId": "kJ2p0qWmEXAMPLE" }
+    }
+  ]
+}

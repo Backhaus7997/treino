@@ -62,6 +62,8 @@ fuera de rango) son justo los que alguien va a querer "arreglar" sin entender.
 | `set_resolution.json` | Qué series le tocan en un ejercicio, por semana | `lib/features/workout/domain/routine_slot.dart` | `ios/TreinoWatch Watch App/SetResolution.swift` |
 | `session_counting.json` | Si una sesión cuenta como entrenamiento HECHO — la **entrada** de `plan_advance` | `lib/features/workout/domain/session.dart` | `ios/TreinoWatch Watch App/SessionCounting.swift` |
 | `set_log_identity.json` | Qué identidad lógica tiene una serie cargada, para que los dos clientes no la dupliquen | `lib/features/workout/domain/set_log_identity.dart` | `ios/TreinoWatch Watch App/SetLogIdentity.swift` |
+| `exercise_cursor.json` | En qué ejercicio queda parado el cliente durante un entreno — **siempre absoluto, nunca un delta** | `lib/features/workout/domain/exercise_cursor.dart` | `ios/TreinoWatch Watch App/ExerciseCursor.swift` |
+| `set_log_write_target.json` | Dónde escribe un **reloj** una serie: adoptar la que ya está, o un id propio antes que pisar otra | `lib/features/workout/domain/set_log_identity.dart` | `ios/TreinoWatch Watch App/SetLogIdentity.swift` |
 | `superset_order.json` | Qué celda (ejercicio + serie) toca AHORA dentro de una superserie | `lib/features/workout/domain/superset_order.dart` | `ios/TreinoWatch Watch App/SupersetOrder.swift` |
 | `duration_timer.json` | Cuánto falta de un ejercicio POR TIEMPO y si terminó — contra el reloj de pared | `lib/features/workout/domain/duration_timer.dart` | `ios/TreinoWatch Watch App/CountdownRules.swift` |
 

@@ -1,11 +1,21 @@
+import 'dart:async';
 import 'dart:developer' as developer;
 
 import 'package:cloud_firestore/cloud_firestore.dart'
-    show CollectionReference, DocumentSnapshot, FirebaseFirestore, Timestamp;
+    show
+        CollectionReference,
+        DocumentSnapshot,
+        FieldValue,
+        FirebaseFirestore,
+        SetOptions,
+        Timestamp;
 
 import '../../../core/utils/argentina_time.dart';
 import '../../../core/utils/streak_calculator.dart';
 import '../../profile/data/user_public_profile_repository.dart';
+import '../domain/duration_timer.dart';
+import '../domain/duration_timer_owner.dart';
+import '../domain/duration_timer_state.dart';
 import '../domain/session.dart';
 import '../domain/session_status.dart';
 import '../domain/set_log.dart';
@@ -59,6 +69,19 @@ class SessionRepository {
 
   // ─── create ─────────────────────────────────────────────────────────────
 
+  /// Crea la sesión.
+  ///
+  /// [waitForServer] en false devuelve apenas la escritura se aplica al caché
+  /// LOCAL, sin esperar el ack del servidor. Es lo que necesita el reloj: el
+  /// `Future` de `set()` no completa hasta que Firestore confirma, y sin red no
+  /// completa NUNCA — el atleta tocaba «Empezar» y la app quedaba en «cargando»
+  /// para siempre, con el entreno igual creado localmente.
+  ///
+  /// El id no depende del servidor: sale de `doc()`, que lo genera en el
+  /// cliente. Así que la sesión que se devuelve es válida en los dos modos.
+  ///
+  /// El teléfono sigue esperando por defecto: ahí un fallo de escritura tiene
+  /// que poder propagarse, y la pantalla puede mostrarlo.
   Future<Session> create({
     required String uid,
     required String routineId,
@@ -66,6 +89,7 @@ class SessionRepository {
     required DateTime startedAt,
     int dayNumber = 1,
     int weekNumber = 0,
+    bool waitForServer = true,
   }) async {
     final ref = _sessions(uid).doc();
     final session = Session(
@@ -81,7 +105,21 @@ class SessionRepository {
       dayNumber: dayNumber,
       weekNumber: weekNumber,
     );
-    await ref.set(session.toJson());
+    final escritura = ref.set(session.toJson());
+    if (waitForServer) {
+      await escritura;
+    } else {
+      // La escritura ya se aplicó al caché al llamar a `set`. Lo que se saltea
+      // es la confirmación del servidor, que Firestore reintenta solo.
+      unawaited(
+        escritura.catchError(
+          (Object e) => developer.log(
+            'create: la sesión no llegó al servidor todavía — $e',
+            name: 'SessionRepository',
+          ),
+        ),
+      );
+    }
     return session;
   }
 
@@ -481,6 +519,95 @@ class SessionRepository {
     return withId;
   }
 
+  // ─── addSetLogFromWatch ─────────────────────────────────────────────────
+
+  /// Escribe una serie marcada desde un RELOJ.
+  ///
+  /// Es un camino aparte de [addSetLog] a propósito, y la diferencia importa:
+  /// [addSetLog] es el camino del TELÉFONO, que ADOPTA el documento del reloj si
+  /// está y si no crea uno con id autogenerado. Un reloj escribiendo por ahí
+  /// sería invisible para esa adopción — el teléfono no lo encontraría en la
+  /// ruta determinística— y volverían los duplicados que costaron 24 documentos
+  /// de más y 11.450 kg fantasma.
+  ///
+  /// **Lee el historial ANTES de escribir, y ese orden es parte del contrato.**
+  /// Estaba al revés en el companion de Apple y por eso no había nada que
+  /// adoptar (HANDOFF §4.3). El estado local no sirve para decidir esto: es tan
+  /// fresco como el último snapshot que llegó, y la ventana medida entre los dos
+  /// clientes fue de 37 segundos.
+  ///
+  /// Dónde escribir lo decide [resolveSetLogWriteTarget], que está bajo el
+  /// contrato compartido de `conformance/set_log_write_target.json`.
+  ///
+  /// Devuelve la serie escrita, o **null** si ya estaba en el historial — en ese
+  /// caso no se toca nada, porque reescribirla podría pisar una corrección que
+  /// el atleta hizo en el teléfono.
+  ///
+  /// ## [knownRemote]: el historial que quien llama YA tiene
+  ///
+  /// Pasarlo evita releer la colección, y eso importa más de lo que parece. Sin
+  /// él, marcar n series cuesta n(n-1)/2 lecturas de documento —para un entreno
+  /// de 30 series, más de 400— porque cada escritura relee TODO el historial.
+  ///
+  /// El companion de Apple no hace eso: `WorkoutCoordinator.sync` lee el
+  /// historial UNA vez y resuelve todas las series pendientes contra ese
+  /// snapshot. El §4.3 del HANDOFF fija el ORDEN —leer antes de escribir— no la
+  /// granularidad; leer por cada serie es endurecerlo a cuadrático sin que nadie
+  /// lo pidiera.
+  ///
+  /// El reloj Wear tiene algo que watchOS no: un listener vivo sobre `setLogs`.
+  /// Su vista está, como mucho, un push atrás —mediana medida de 206 ms— y
+  /// además el teléfono tiene su propia defensa de adopción en [addSetLog]. Esa
+  /// ventana es aceptable; cuatrocientas lecturas por entreno en una muñeca, no.
+  ///
+  /// Sin [knownRemote] se relee, para que un llamador sin listener siga siendo
+  /// correcto.
+  Future<SetLog?> addSetLogFromWatch({
+    required String uid,
+    required String sessionId,
+    required SetLog setLog,
+    List<RemoteSetLogRef>? knownRemote,
+  }) async {
+    final remote = knownRemote ?? await _leerHistorial(uid, sessionId);
+
+    final target = resolveSetLogWriteTarget(
+      exerciseId: setLog.exerciseId,
+      setNumber: setLog.setNumber,
+      remote: remote,
+    );
+
+    if (target is SetLogAlreadyThere) return null;
+
+    final withId = setLog.copyWith(id: target.docId);
+    await _setLogs(uid, sessionId).doc(target.docId).set(withId.toJson());
+    return withId;
+  }
+
+  /// El historial de la sesión, reducido a lo que decide dónde escribir.
+  Future<List<RemoteSetLogRef>> _leerHistorial(
+    String uid,
+    String sessionId,
+  ) async {
+    final snapshot = await _setLogs(uid, sessionId).get();
+    final remote = <RemoteSetLogRef>[];
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+      final exerciseId = data['exerciseId'];
+      final setNumber = data['setNumber'];
+      // Un documento corrupto o a medio escribir se saltea: no puede impedir
+      // que el atleta marque una serie.
+      if (exerciseId is! String || setNumber is! int) continue;
+      remote.add(
+        RemoteSetLogRef(
+          docId: doc.id,
+          exerciseId: exerciseId,
+          setNumber: setNumber,
+        ),
+      );
+    }
+    return remote;
+  }
+
   // ─── updateSetLog ───────────────────────────────────────────────────────
 
   /// Overwrites an existing SetLog doc with new values. Used by the inline
@@ -543,6 +670,142 @@ class SessionRepository {
         .snapshots()
         .map((s) => s.docs.map(_setLogFromDoc).whereType<SetLog>().toList());
   }
+
+  // ─── Temporizador del ejercicio por tiempo ──────────────────────────────
+
+  /// Campos del temporizador dentro del doc de sesión.
+  ///
+  /// Viven en la SESIÓN y no viajan como mensaje, y esa es la decisión de
+  /// fondo. Un mensaje se pierde si el otro aparato no está escuchando en ese
+  /// instante; el caso real es justamente el contrario — el atleta arranca el
+  /// ejercicio en el teléfono y mira el reloj un rato después. Con estado
+  /// persistido, el que llega tarde lo lee igual.
+  ///
+  /// Y va por Firestore y no por la Data Layer porque ésta exige que el reloj
+  /// esté emparejado con ESE teléfono: medido en hardware, con un teléfono sin
+  /// app companion el envío muere en «no hay nodos conectados» y no cruza nada.
+  /// Firestore ya es el canal por el que los dos aparatos se mantienen al día.
+  ///
+  /// Lo que viaja es el shape de [DurationTimerState]: identidad, duración
+  /// total, INSTANTE DE FIN y DUEÑO. El instante de fin y no los segundos que
+  /// faltan, para que los dos lados deriven la cuenta con [DurationTimerRules]
+  /// —la misma aritmética que el reloj de Apple, bajo contrato en
+  /// `conformance/duration_timer.json`—. Y el dueño porque el documento es
+  /// COMPARTIDO: a diferencia de un mensaje, acá el canal no dice quién arrancó,
+  /// y sin eso los dos aparatos cargarían la misma serie al llegar a cero.
+  static const String fieldTimerExerciseId = 'timerExerciseId';
+  static const String fieldTimerSetNumber = 'timerSetNumber';
+  static const String fieldTimerTotalSeconds = 'timerTotalSeconds';
+  static const String fieldTimerEndsAt = 'timerEndsAtMs';
+  static const String fieldTimerOwner = 'timerOwner';
+
+  /// El dueño, escrito explícito y NO como `enum.name`.
+  ///
+  /// Renombrar el enum en Dart no puede cambiar en silencio lo que ya está
+  /// escrito en una sesión viva: si el valor guardado deja de reconocerse, el
+  /// espejo pasa a creerse dueño y carga la serie por segunda vez.
+  static const String ownerPhone = 'phone';
+  static const String ownerWatch = 'watch';
+
+  /// Deja anotado el cronómetro que está corriendo.
+  ///
+  /// [DurationTimerState.endsAt] se guarda en epoch UTC de milisegundos. Es
+  /// absoluto a propósito: ronda 1,8e12 y no entra en 32 bits, por lo mismo que
+  /// documenta `conformance/duration_timer.json`.
+  Future<void> startExerciseTimer({
+    required String uid,
+    required String sessionId,
+    required DurationTimerState timer,
+  }) async {
+    if (uid.isEmpty || sessionId.isEmpty) return;
+    if (timer.totalSeconds <= 0 || timer.exerciseId.isEmpty) return;
+    final owner = _ownerToDoc(timer.owner);
+    if (owner == null) return;
+    await _sessions(uid).doc(sessionId).set(
+      {
+        fieldTimerExerciseId: timer.exerciseId,
+        fieldTimerSetNumber: timer.setNumber,
+        fieldTimerTotalSeconds: timer.totalSeconds,
+        fieldTimerEndsAt: timer.endsAt.toUtc().millisecondsSinceEpoch,
+        fieldTimerOwner: owner,
+      },
+      SetOptions(merge: true),
+    );
+  }
+
+  /// Borra el temporizador. Se llama al cancelar y al completar la serie.
+  Future<void> clearExerciseTimer({
+    required String uid,
+    required String sessionId,
+  }) async {
+    if (uid.isEmpty || sessionId.isEmpty) return;
+    await _sessions(uid).doc(sessionId).set(
+      {
+        fieldTimerExerciseId: FieldValue.delete(),
+        fieldTimerSetNumber: FieldValue.delete(),
+        fieldTimerTotalSeconds: FieldValue.delete(),
+        fieldTimerEndsAt: FieldValue.delete(),
+        fieldTimerOwner: FieldValue.delete(),
+      },
+      SetOptions(merge: true),
+    );
+  }
+
+  /// El temporizador anotado en la sesión, o null si no hay ninguno.
+  ///
+  /// Emite el valor inicial apenas se suscribe, así el aparato que entra TARDE
+  /// —el caso que un mensaje no puede cubrir— encuentra el temporizador en
+  /// curso.
+  ///
+  /// Un documento al que le falta cualquier campo se lee como "no hay
+  /// temporizador". Es deliberado: media cuenta no se puede ubicar en una fila
+  /// ni se le puede saber el dueño, y un espejo sin dueño se cree dueño.
+  Stream<DurationTimerState?> watchExerciseTimer({
+    required String uid,
+    required String sessionId,
+  }) {
+    if (uid.isEmpty || sessionId.isEmpty) {
+      return Stream.value(null);
+    }
+    return _sessions(uid)
+        .doc(sessionId)
+        .snapshots()
+        .map((snap) => _timerFromDoc(snap.data()))
+        .distinct();
+  }
+
+  static DurationTimerState? _timerFromDoc(Map<String, Object?>? data) {
+    if (data == null) return null;
+    final exerciseId = data[fieldTimerExerciseId];
+    final setNumber = (data[fieldTimerSetNumber] as num?)?.toInt();
+    final totalSeconds = (data[fieldTimerTotalSeconds] as num?)?.toInt();
+    final endsAtMs = (data[fieldTimerEndsAt] as num?)?.toInt();
+    final owner = _ownerFromDoc(data[fieldTimerOwner]);
+    if (exerciseId is! String || exerciseId.isEmpty) return null;
+    if (setNumber == null || setNumber <= 0) return null;
+    if (totalSeconds == null || totalSeconds <= 0) return null;
+    if (endsAtMs == null || owner == null) return null;
+    return DurationTimerState(
+      exerciseId: exerciseId,
+      setNumber: setNumber,
+      totalSeconds: totalSeconds,
+      endsAt: DateTime.fromMillisecondsSinceEpoch(endsAtMs, isUtc: true),
+      owner: owner,
+    );
+  }
+
+  static String? _ownerToDoc(DurationTimerOwner owner) => switch (owner) {
+        DurationTimerOwner.telefono => ownerPhone,
+        DurationTimerOwner.reloj => ownerWatch,
+        // Un cronómetro de nadie no es un cronómetro: no se escribe.
+        DurationTimerOwner.nadie => null,
+      };
+
+  static DurationTimerOwner? _ownerFromDoc(Object? raw) => switch (raw) {
+        ownerPhone => DurationTimerOwner.telefono,
+        ownerWatch => DurationTimerOwner.reloj,
+        _ => null,
+      };
 
   // ─── watchSessionFinished ───────────────────────────────────────────────
 

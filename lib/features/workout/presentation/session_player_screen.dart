@@ -17,6 +17,7 @@ import '../../profile/application/user_providers.dart';
 import '../../gyms/application/gym_providers.dart';
 import '../../gyms/domain/gym_display_name.dart';
 import '../../coach/application/trainer_link_providers.dart';
+import '../application/duration_timer_providers.dart';
 import '../application/exercise_providers.dart';
 import '../application/routine_providers.dart';
 import '../application/session_init.dart';
@@ -29,6 +30,7 @@ import '../domain/duration_timer.dart';
 import '../domain/routine.dart';
 import '../domain/superset_order.dart';
 import '../domain/routine_slot.dart';
+import '../domain/superset_blocks.dart';
 import '../domain/set_enums.dart';
 import '../domain/set_limits.dart';
 import '../domain/session_time_fit.dart';
@@ -67,29 +69,21 @@ typedef BlockInfo = ({List<RoutineSlot> slots, bool isSuperset});
 
 /// Splits the day's slots into ordered blocks (standalone or superset groups).
 /// A lone slot tagged with a supersetGroup falls back to standalone.
-List<BlockInfo> buildBlocks(List<RoutineSlot> slots) {
-  final blocks = <BlockInfo>[];
-  var i = 0;
-  while (i < slots.length) {
-    final group = slots[i].supersetGroup;
-    if (group != null) {
-      var scan = i;
-      final members = <RoutineSlot>[];
-      while (scan < slots.length && slots[scan].supersetGroup == group) {
-        members.add(slots[scan]);
-        scan++;
-      }
-      if (members.length >= 2) {
-        blocks.add((slots: members, isSuperset: true));
-        i = scan;
-        continue;
-      }
-    }
-    blocks.add((slots: [slots[i]], isSuperset: false));
-    i++;
-  }
-  return blocks;
-}
+/// El agrupamiento en sí vive en `superset_blocks.dart`, o sea en DOMINIO.
+///
+/// Estaba acá adentro, y por eso el companion de Wear no lo vio nunca: aplanaba
+/// los slots del día en una lista lineal y trataba una superserie A/B/C como
+/// tres ejercicios sueltos. Ahora los dos lados leen la misma definición de
+/// bloque y no pueden volver a divergir. Esta función sólo la envuelve en el
+/// tipo que consume la pantalla.
+List<BlockInfo> buildBlocks(List<RoutineSlot> slots) => [
+      for (final posiciones
+          in supersetBlockIndices([for (final s in slots) s.supersetGroup]))
+        (
+          slots: [for (final i in posiciones) slots[i]],
+          isSuperset: posiciones.length >= 2,
+        ),
+    ];
 
 /// Returns true if a standalone block (single slot) is fully completed.
 /// [week] is the 0-based active week (from [SessionState.activeWeek]).
@@ -838,66 +832,81 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
             ),
           ),
         ),
-        data: (state) => PopScope(
-          canPop: _isFinalizing,
-          onPopInvokedWithResult: (didPop, _) {
-            if (didPop || _isFinalizing) return;
-            _showAbandonConfirm();
-          },
-          child: SafeArea(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _SessionHeader(
-                  routineSplit: routineSplit,
-                  dayNumber: state.day.dayNumber,
-                  onAbandon: _showAbandonConfirm,
-                  onBack: _showAbandonConfirm,
-                ),
-                Expanded(
-                  child: ScrollConfiguration(
-                    behavior: ScrollConfiguration.of(context).copyWith(
-                      physics: const ClampingScrollPhysics(),
-                      overscroll: false,
-                    ),
-                    child: ListView(
-                      // Sin padding horizontal global: las cards de arriba
-                      // conservan su margen de 20, pero la zona EJERCICIOS
-                      // corre full-width con margen propio reducido (12).
-                      padding: EdgeInsets.zero,
-                      physics: const ClampingScrollPhysics(),
-                      children: [
-                        const SizedBox(height: 12),
-                        const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 20),
-                          child: _AttendanceCard(),
-                        ),
-                        const SizedBox(height: 14),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: _SessionStatsCard(state: state),
-                        ),
-                        ..._buildTimeFitSlot(state),
-                        const SizedBox(height: 20),
-                        const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 12),
-                          child: _SectionLabel('EJERCICIOS'),
-                        ),
-                        const SizedBox(height: 12),
-                        ..._buildExerciseList(state),
-                        const SizedBox(height: 20),
-                      ],
+        // El subarbol que dibuja ESTA sesion sabe cual es.
+        //
+        // Sin esto, la fila por tiempo tenia que deducirla —y la deducia con
+        // `getActive`, una lectura que va al servidor primero y no tiene
+        // timeout—: hasta que resolviera, el cronometro no se anotaba en la
+        // sesion y el reloj nunca se enteraba, sin ningun sintoma de este lado.
+        // Medido. El porque completo esta en [playerSessionIdProvider].
+        //
+        // Va en la rama `data` y no mas arriba porque es el unico punto donde
+        // la sesion esta resuelta de verdad.
+        data: (state) => ProviderScope(
+          overrides: [
+            playerSessionIdProvider.overrideWithValue(state.session.id),
+          ],
+          child: PopScope(
+            canPop: _isFinalizing,
+            onPopInvokedWithResult: (didPop, _) {
+              if (didPop || _isFinalizing) return;
+              _showAbandonConfirm();
+            },
+            child: SafeArea(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _SessionHeader(
+                    routineSplit: routineSplit,
+                    dayNumber: state.day.dayNumber,
+                    onAbandon: _showAbandonConfirm,
+                    onBack: _showAbandonConfirm,
+                  ),
+                  Expanded(
+                    child: ScrollConfiguration(
+                      behavior: ScrollConfiguration.of(context).copyWith(
+                        physics: const ClampingScrollPhysics(),
+                        overscroll: false,
+                      ),
+                      child: ListView(
+                        // Sin padding horizontal global: las cards de arriba
+                        // conservan su margen de 20, pero la zona EJERCICIOS
+                        // corre full-width con margen propio reducido (12).
+                        padding: EdgeInsets.zero,
+                        physics: const ClampingScrollPhysics(),
+                        children: [
+                          const SizedBox(height: 12),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 20),
+                            child: _AttendanceCard(),
+                          ),
+                          const SizedBox(height: 14),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            child: _SessionStatsCard(state: state),
+                          ),
+                          ..._buildTimeFitSlot(state),
+                          const SizedBox(height: 20),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 12),
+                            child: _SectionLabel('EJERCICIOS'),
+                          ),
+                          const SizedBox(height: 12),
+                          ..._buildExerciseList(state),
+                          const SizedBox(height: 20),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
-                  child: _TerminarSessionButton(
-                    enabled: state.isFullyCompleted,
-                    onPressed: state.isFullyCompleted ? _finishSession : null,
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
+                    child: _TerminarSessionButton(
+                      enabled: state.isFullyCompleted,
+                      onPressed: state.isFullyCompleted ? _finishSession : null,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

@@ -40,6 +40,41 @@ android {
         versionName = flutter.versionName
     }
 
+    // El companion de Wear OS es OTRO APK, que se instala en el reloj. La doc de
+    // Google es explícita: "Wear OS APKs are separate from mobile APKs, and are
+    // uploaded and updated independently from within the Play Console."
+    //
+    // Se separa por flavor y no por proyecto aparte para no duplicar pubspec, CI
+    // ni el arbol Dart: el companion reusa la capa de dominio TAL CUAL (medido:
+    // 22/22 casos del contrato de `conformance/` corriendo en el reloj, con cero
+    // cambios en lib/features/workout/domain/).
+    flavorDimensions += "device"
+    productFlavors {
+        create("phone") {
+            dimension = "device"
+        }
+        create("wear") {
+            dimension = "device"
+            // Wear OS 3 = API 30. Por debajo no existe el Wear OS moderno.
+            minSdk = 30
+
+            // versionCode PROPIO, en un rango que no se cruza con el del
+            // teléfono. Play distribuye los dos artefactos bajo el MISMO
+            // applicationId —los separa por el `uses-feature watch`— y exige
+            // que cada uno tenga su versionCode único: con el mismo número,
+            // el segundo que subas se rechaza.
+            //
+            // El offset de 1000 deja los dos rangos legibles de un vistazo: el
+            // teléfono va 14, 15, 16… y el reloj 1014, 1015, 1016… así que el
+            // número dice solo de qué artefacto es.
+            versionCode = flutter.versionCode + 1000
+            // NADA de applicationIdSuffix: la Data Layer API exige que reloj y
+            // teléfono compartan applicationId Y clave de firma. Con un sufijo,
+            // el handoff de credencial deja de funcionar y el sintoma aparece
+            // lejos de la causa.
+        }
+    }
+
     signingConfigs {
         // Credenciales de la upload key, leídas de android/key.properties
         // (gitignored — nunca se commitea). Sólo se declara el config si el
@@ -58,7 +93,8 @@ android {
         release {
             // Con key.properties presente firma con la upload key (único
             // artefacto que Play acepta). Sin el archivo cae a las debug keys
-            // para que `flutter run --release` siga funcionando localmente.
+            // para que `flutter run --release` siga funcionando localmente —
+            // pero ese fallback ya NO es silencioso: ver el guard de abajo.
             signingConfig = if (keystorePropertiesFile.exists()) {
                 signingConfigs.getByName("release")
             } else {
@@ -66,6 +102,174 @@ android {
             }
         }
     }
+}
+
+// ── El fallback a debug NO puede ser silencioso ──────────────────────────────
+//
+// Sin `key.properties`, el release firmaba con debug keys y el build salía
+// VERDE: .aab generado, cero warnings, todo aparentemente perfecto. El error
+// aparecía recién al subir a Play —que rechaza cualquier cosa que no venga
+// firmada con la upload key registrada— después de esperar el build entero y
+// sin una sola pista de la causa.
+//
+// Es el mismo patrón que ya mordió tres veces en este proyecto: degradar en
+// silencio deja el síntoma lejísimos de la causa. Acá se corta.
+//
+// El guard va en `doFirst` de las tareas de RELEASE y no en el bloque de
+// configuración a propósito: Gradle evalúa `buildTypes` para cualquier tarea,
+// así que tirar ahí rompería también los builds de debug y profile, que son los
+// que se usan todo el día.
+//
+// Escape para quien no tiene el keystore:
+//     flutter build apk --release -PallowDebugSigning=true
+val exigirFirmaDeRelease = !project.hasProperty("allowDebugSigning")
+
+tasks.configureEach {
+    val esRelease = name.contains("Release") &&
+        (name.startsWith("assemble") || name.startsWith("bundle") || name.startsWith("package"))
+    if (esRelease && exigirFirmaDeRelease) {
+        doFirst {
+            if (!keystorePropertiesFile.exists()) {
+                throw GradleException(
+                    """
+                    No existe android/key.properties, asi que este release se
+                    firmaria con DEBUG KEYS y Play lo rechazaria al subirlo.
+
+                    Creá android/key.properties apuntando al upload keystore:
+
+                        storePassword=...
+                        keyPassword=...
+                        keyAlias=upload
+                        storeFile=/ruta/al/upload-keystore.jks
+
+                    Tiene que ser el MISMO keystore con el que ya publicaste:
+                    una clave nueva la rechaza Play igual.
+
+                    Si sabes lo que hacés y querés un release firmado con debug
+                    —para probar local, nunca para subir— repetí el comando con:
+
+                        -PallowDebugSigning=true
+                    """.trimIndent()
+                )
+            }
+        }
+    }
+}
+
+// El reloj no dibuja NI UNA imagen de ejercicio. La pantalla HOY lista nombres
+// (denormalizados en `RoutineSlot.exerciseName`) y la de entreno muestra series.
+// Medido con rg sobre `lib/features/watch/`: cero `Image.asset`, cero
+// `AssetImage`, cero `rootBundle`.
+//
+// Pero `pubspec.yaml` declara los assets de forma global, sin distincion por
+// flavor, asi que el APK del reloj se llevaba entero el catalogo del telefono:
+// 18.20 MiB de `assets/exercises` (26 PNGs; `plank.png` sola pesa 2.80 MiB) +
+// 8.46 MiB de `assets/muscles` (11 PNGs). Van `Stored` en el zip, sin comprimir,
+// asi que el peso del APK baja exactamente esos 26.66 MiB.
+//
+// Medido con builds LIMPIOS de `--flavor wear --target-platform android-arm64`
+// (el APK que se instala al reloj), antes -> despues:
+//   debug   153.33 MiB -> 126.67 MiB  (-17.4%)
+//   profile  93.53 MiB ->  66.87 MiB  (-28.5%)
+//
+// OJO al medir: `ls -l` sobre un APK RE-empaquetado miente. AGP repackagea
+// incremental —reemplaza entradas en el lugar y deja huecos de ceros— asi que un
+// APK incremental daba 281.70 MiB con 128.44 MiB de gaps internos. Comparar
+// siempre builds limpios, o sumar los tamanios comprimidos de `unzip -v`.
+//
+// Se excluyen del `Copy` que inyecta `flutter_assets` dentro de los merged
+// assets del variant. El scope al reloj es POR CONSTRUCCION: la tarea se llama
+// `copyFlutterAssets${variant}` (FlutterPlugin.kt), o sea que el nombre lleva el
+// flavor adentro y el flavor `phone` no se entera de nada.
+//
+// Se hace aca y NO con `androidResources.ignoreAssetsPattern` por dos razones:
+// ese patron es global en AGP —no admite scope por variant— y encima corre
+// durante el merge de assets, mientras que `flutter_assets` los inyecta esta
+// tarea DESPUES del merge.
+//
+// OJO con lo que NO se saca: `assets/fonts/` se queda. `main_wear.dart` importa
+// `app/theme/app_theme.dart`, que usa `GoogleFonts.barlow*`, y google_fonts
+// resuelve las familias buscandolas en el AssetManifest. Sin las fuentes
+// bundleadas se las baja por red, que es justo lo que el pubspec viene a evitar.
+//
+// Sabido y aceptado: `AssetManifest.bin` lo genera la herramienta de Flutter
+// antes de esta tarea, asi que sigue listando las PNGs que aca se sacan. En el
+// reloj es inofensivo porque nadie las busca nunca. Si algun dia la UI del reloj
+// dibuja una imagen, el sintoma va a ser un asset faltante en runtime, no un
+// error de build.
+val phoneOnlyAssetPatterns =
+    listOf(
+        "flutter_assets/assets/exercises/**",
+        "flutter_assets/assets/muscles/**"
+    )
+
+tasks.withType<Copy>().configureEach {
+    if (name.startsWith("copyFlutterAssetsWear")) {
+        exclude(phoneOnlyAssetPatterns)
+    }
+}
+
+// `copyFlutterAssets{Variant}` es un detalle interno del plugin de Gradle de
+// Flutter. Si un upgrade lo renombra, el `configureEach` de arriba deja de
+// matchear EN SILENCIO y el APK del reloj vuelve a cargar los ~27 MB de imagenes
+// sin que nadie se entere. Este chequeo lo convierte en un build roto, que es lo
+// que corresponde: si empaquetas el reloj, la exclusion existe o no hay build.
+gradle.taskGraph.whenReady {
+    val wearVariantsBeingPackaged =
+        allTasks
+            .mapNotNull {
+                Regex("^package(Wear(?:Debug|Profile|Release))$").find(it.name)?.groupValues?.get(1)
+            }.toSet()
+    wearVariantsBeingPackaged.forEach { variant ->
+        val copyTaskName = "copyFlutterAssets$variant"
+        check(allTasks.any { it.name == copyTaskName }) {
+            "No se encontro la tarea `$copyTaskName` en el task graph. La exclusion de " +
+                "assets del flavor `wear` (android/app/build.gradle.kts) cuelga de ese " +
+                "nombre, que es interno del plugin de Gradle de Flutter. Si un upgrade lo " +
+                "renombro, actualiza el prefijo `copyFlutterAssetsWear` — sin eso el APK " +
+                "del reloj se lleva ~27 MB de imagenes que no usa."
+        }
+    }
+}
+
+dependencies {
+    // `wearImplementation` = SOLO el flavor `wear`. El APK del teléfono no
+    // carga nada de esto: no tiene sensores de muñeca ni corre entrenos.
+    //
+    // Health Services es el equivalente de HealthKit en Wear OS. Es lo que
+    // provee pulsaciones y calorías durante el entreno. OJO con lo que NO
+    // hace: NO mantiene vivo el proceso. Trackea en el MCU, fuera de nuestro
+    // proceso, y nos entrega datos — mantener la app viva es trabajo del
+    // WorkoutForegroundService, y eso ya está medido (22.6% de cobertura sin
+    // el servicio, 100.0% con él).
+    //
+    // 1.0.0 es la última ESTABLE. La última publicada es 1.1.0-rc02; se
+    // arranca en estable y se evalúa después.
+    "wearImplementation"("androidx.health:health-services-client:1.0.0")
+
+    // La Data Layer API, para LOS DOS flavors.
+    //
+    // No es `wearImplementation` aunque suene a cosa de reloj: `TreinoLinkPlugin`
+    // vive en `src/main` y lo compilan los dos APKs, porque el canal es
+    // simétrico — el teléfono manda y escucha igual que el reloj.
+    //
+    // Se declara EXPLÍCITA aunque `watch_connectivity` ya la traiga con `api`:
+    // depender de la transitividad de un plugin para compilar código propio es
+    // frágil, y el día que ese plugin pase a `implementation` esto dejaría de
+    // compilar por un motivo invisible. Misma versión que él, para no forzar
+    // una resolución de conflicto.
+    implementation("com.google.android.gms:play-services-wearable:19.0.0")
+
+    // FCM nativo, SOLO para el reloj: es el segundo transporte del aviso de
+    // "arrancó un entreno", el que no necesita emparejamiento. Ver
+    // WearMessagingService.
+    //
+    // El BoM es el MISMO que fija firebase_core (gradle.properties del plugin,
+    // FirebaseSDKVersion). Clavar una versión suelta acá desalinearía el SDK
+    // nativo respecto del que usan los plugins de Flutter, y esos conflictos se
+    // manifiestan en runtime, no al compilar.
+    "wearImplementation"(platform("com.google.firebase:firebase-bom:33.16.0"))
+    "wearImplementation"("com.google.firebase:firebase-messaging")
 }
 
 flutter {
