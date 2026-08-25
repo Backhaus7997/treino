@@ -2332,6 +2332,32 @@ Tres consecuencias que conviene tener escritas:
 flujo real a la vista, que es mejor que adivinar hoy un cap y un MIME para un
 consumidor que no existe.
 
+**Verificación de mutación.** Como pide §1.8, antes de dar las cuatro celdas por
+cerradas se aflojó la regla y se comprobó qué se pone rojo. Tres mutaciones,
+medidas contra el emulador sobre las 5 suites `*-storage-rules.test.ts` de
+`functions/`, con el baseline probado primero (62 tests verdes):
+
+| Mutación | Qué se aflojó | Rojos |
+|---|---|---|
+| A | La regla pre-PR (`read: if false` + `write` por dueño) | **3** — `write` del dueño (con y sin content-type de Excel) y `delete` |
+| B | `get`/`list` → `if request.auth != null` | **4** — `get` dueño y ajeno, `list` de la carpeta y **de la raíz** |
+| C | Bloque abierto del todo (`if true`) | **10** — el archivo entero |
+
+En las tres, el único archivo que se pone rojo es
+`temp-uploads-storage-rules.test.ts`: cero rojos en `avatars`, `athleteFiles`,
+`customExerciseVideos` y `postPhotos`. La mutación C está para que ningún
+negativo quede de decoración — los tres que A y B no matan (`write` ajeno,
+`write` anónimo, `get` anónimo) son el piso, y C demuestra que también son
+vivos.
+
+⚠️ **La mutación desmintió un supuesto, y ese es el punto de correrla.** El test
+afirmaba que listar la raíz `temp/uploads/` lo cerraba el catch-all
+`{allPaths=**}` y no este bloque, copiando el razonamiento de §3.4 —donde para
+`postPhotos` eso **sí** es cierto porque su `match` pide dos segmentos—. Acá no:
+al aflojar el `list` de este bloque, la raíz pasó a ALLOW junto con la carpeta,
+o sea que el `{file=**}` la alcanza. El comentario del test quedó corregido para
+decir lo medido.
+
 ---
 
 **QA-SEC-016 — El scanner de App Check cubre 2 de los 5 callables desplegados.**
