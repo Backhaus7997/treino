@@ -11,11 +11,44 @@ import 'onboarding_module.dart';
 /// trainer-only — athletes are redirected to `/not-allowed`). Adding one later
 /// is a single enum value; the exhaustive `switch` in [slides] makes the
 /// compiler point at every site that needs a decision.
+///
+/// ── Two kinds of surface ────────────────────────────────────────────────────
+/// The first three are WELCOME TOURS: full-screen, once per role, right after
+/// login. The `customExercise*` ones are FEATURE ONBOARDINGS — a modal shown the
+/// first time a user opens one specific screen.
+///
+/// They share this enum on purpose rather than getting one of their own: the
+/// flag mechanism is identical, `OnboardingController.markSeen` takes this type,
+/// and `allSurfacesSeen()` in `test/helpers/onboarding_test_helpers.dart`
+/// iterates [values] — so every unrelated widget test suppresses a new surface
+/// automatically instead of silently rendering a modal over the screen it is
+/// asserting on. A parallel enum would have to re-earn all three.
 enum OnboardingSurface {
   athleteMobile,
   trainerMobile,
   trainerWeb,
+
+  /// "Creá tus propios ejercicios", shown over the mobile routine editor.
+  /// Split by role because the copy differs: the athlete builds their own
+  /// library, the trainer assigns theirs to students.
+  customExerciseAthleteMobile,
+  customExerciseTrainerMobile,
+
+  /// Same feature onboarding on the Coach Hub routine editor. Trainer-only by
+  /// construction — `coachHubRedirect` sends everyone else to `/not-allowed`.
+  customExerciseTrainerWeb,
 }
+
+/// The WELCOME tours — the surfaces that own a full-screen module tour.
+///
+/// Exists so callers and tests can say "the tours" without spelling out a
+/// negation of the feature onboardings, and so adding a fourth tour is one edit
+/// rather than a hunt through `where` clauses.
+const onboardingTourSurfaces = <OnboardingSurface>[
+  OnboardingSurface.athleteMobile,
+  OnboardingSurface.trainerMobile,
+  OnboardingSurface.trainerWeb,
+];
 
 extension OnboardingSurfaceX on OnboardingSurface {
   /// Firestore key under `users/{uid}.onboardingSeen`.
@@ -40,13 +73,23 @@ extension OnboardingSurfaceX on OnboardingSurface {
         OnboardingSurface.athleteMobile => 1,
         OnboardingSurface.trainerMobile => 1,
         OnboardingSurface.trainerWeb => 1,
+        OnboardingSurface.customExerciseAthleteMobile => 1,
+        OnboardingSurface.customExerciseTrainerMobile => 1,
+        OnboardingSurface.customExerciseTrainerWeb => 1,
       };
 
-  /// The slides, in order.
+  /// The MODULE slides, in order — welcome tours only.
   ///
   /// Mobile mirrors the bottom bar so the tour matches what the user is about
   /// to see; web mirrors the eight sidebar items after the "W2 reduce" — not
   /// the ~20 directories on disk, and not the 19 the openspec doc still claims.
+  ///
+  /// Empty for the `customExercise*` surfaces, and not a placeholder: a feature
+  /// onboarding does not tour modules at all. Its three slides are a fixed deck
+  /// in `custom_exercise_onboarding_slides.dart`, keyed by role rather than by
+  /// module, so there is nothing to enumerate here. `CoachHubTourGate` already
+  /// bails on an empty list, which is what keeps a wrong caller from rendering
+  /// a blank tour.
   List<OnboardingModule> get slides => switch (this) {
         OnboardingSurface.athleteMobile ||
         OnboardingSurface.trainerMobile =>
@@ -67,6 +110,10 @@ extension OnboardingSurfaceX on OnboardingSurface {
             OnboardingModule.webPagos,
             OnboardingModule.webAjustes,
           ],
+        OnboardingSurface.customExerciseAthleteMobile ||
+        OnboardingSurface.customExerciseTrainerMobile ||
+        OnboardingSurface.customExerciseTrainerWeb =>
+          const <OnboardingModule>[],
       };
 
   /// Whether the tour should run, given the persisted map.
