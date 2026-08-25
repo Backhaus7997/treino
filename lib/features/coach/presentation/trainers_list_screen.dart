@@ -54,6 +54,12 @@ class _TrainersListScreenState extends ConsumerState<TrainersListScreen> {
   Future<void> _maybeShowRationale() async {
     if (_rationaleShown) return;
     // Esperar al tour (#627): ambos disparan post-frame y se apilarían.
+    //
+    // Salir por acá NO descarta el intento: `build` escucha
+    // `onboardingBlocksProvider` y vuelve a llamar cuando el tour se cierra.
+    // Sin ese listener, un alumno nuevo que entra por deep-link a /coach con
+    // el tour pendiente se quedaba sin el pedido de ubicación hasta remontar
+    // la ruta — `athleteLocationProvider` quieto en `initial` para siempre.
     if (ref.read(onboardingBlocksProvider)) return;
     final notifier = ref.read(athleteLocationProvider.notifier);
     if (!notifier.isInitial) return;
@@ -69,6 +75,16 @@ class _TrainersListScreenState extends ConsumerState<TrainersListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Reintento del rationale cuando el tour (#627) deja de bloquear.
+    // `ref.listen` y no `watch`: presentar una hoja modal es un efecto, no
+    // parte del árbol, y un `watch` acá rebuildearía la pantalla entera cada
+    // vez que el flag cambia.
+    ref.listen<bool>(onboardingBlocksProvider, (previous, next) {
+      if (previous == true && next == false) {
+        _maybeShowRationale();
+      }
+    });
+
     final palette = AppPalette.of(context);
     final selected = ref.watch(selectedSpecialtyProvider);
     // Estado del toggle MAPA/LISTA vive en `mapModeProvider` (top-level del
