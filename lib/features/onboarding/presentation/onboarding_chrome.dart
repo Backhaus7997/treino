@@ -18,6 +18,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
+import '../../../app/theme/tokens/primitives.dart';
 
 /// "PASO 1 DE 4" over the headline. Barlow Condensed 700, accent, tracked out.
 class OnboardingKicker extends StatelessWidget {
@@ -106,7 +107,7 @@ class OnboardingGrabber extends StatelessWidget {
         height: 4,
         decoration: BoxDecoration(
           color: palette.border,
-          borderRadius: BorderRadius.circular(9999),
+          borderRadius: BorderRadius.circular(AppRadius.full),
         ),
       ),
     );
@@ -148,7 +149,7 @@ class OnboardingDots extends StatelessWidget {
                 color: i == current
                     ? palette.accent
                     : palette.textPrimary.withValues(alpha: 0.25),
-                borderRadius: BorderRadius.circular(9999),
+                borderRadius: BorderRadius.circular(AppRadius.full),
               ),
             ),
         ],
@@ -262,7 +263,7 @@ class OnboardingPrimaryCta extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 20),
           decoration: BoxDecoration(
             color: palette.accent,
-            borderRadius: BorderRadius.circular(9999),
+            borderRadius: BorderRadius.circular(AppRadius.full),
             boxShadow: [
               BoxShadow(
                 color: palette.accent.withValues(alpha: 0.18),

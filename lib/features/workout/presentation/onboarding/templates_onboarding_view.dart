@@ -9,6 +9,7 @@ import '../../../onboarding/presentation/onboarding_chrome.dart';
 import '../../domain/routine_goal.dart';
 import '../../domain/template_preferences.dart';
 import 'templates_onboarding_steps.dart';
+import '../../../../app/theme/tokens/primitives.dart';
 
 /// Finder keys used by the widget tests.
 const templatesOnboardingSkipKey = Key('templates_onboarding_skip_button');
@@ -463,7 +464,7 @@ class _BackButton extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(TreinoIcon.chevronLeft, size: 14, color: palette.textMuted),
-          const SizedBox(width: 2),
+          const SizedBox(width: AppSpacing.hairline),
           Text(
             label,
             maxLines: 1,
@@ -512,7 +513,7 @@ class _InsetCard extends StatelessWidget {
         // in light and #1D2422 in dark, and follows any future palette change
         // for free.
         color: palette.textPrimary.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -636,7 +637,7 @@ class _OptionPill extends StatelessWidget {
             color: isSelected
                 ? palette.accent
                 : palette.textPrimary.withValues(alpha: 0.06),
-            borderRadius: BorderRadius.circular(9999),
+            borderRadius: BorderRadius.circular(AppRadius.full),
           ),
           child: Center(
             widthFactor: 1,
@@ -697,7 +698,7 @@ class _OptionRow extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
           decoration: BoxDecoration(
             color: palette.bgCard,
-            borderRadius: BorderRadius.circular(9999),
+            borderRadius: BorderRadius.circular(AppRadius.full),
             border: Border.all(
               color: isSelected ? palette.accent : Colors.transparent,
               width: 1.5,
