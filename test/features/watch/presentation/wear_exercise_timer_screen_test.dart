@@ -5,6 +5,7 @@ import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/features/watch/data/wear_workout_service.dart';
 import 'package:treino/features/watch/domain/watch_effort.dart';
 import 'package:treino/features/watch/presentation/wear/wear_exercise_timer_screen.dart';
+import 'package:treino/features/watch/presentation/wear/wear_strings.dart';
 
 /// Renderiza la pantalla del temporizador EN EL TAMAÑO REAL del reloj.
 ///
@@ -154,5 +155,23 @@ void main() {
 
     expect(find.text('118'), findsOneWidget);
     expect(find.text('8'), findsOneWidget);
+  });
+
+  testWidgets('con calorías pero sin pulso todavía, el pulso NO desaparece',
+      (tester) async {
+    // Los dos sensores no llegan juntos: las calorías aparecen enseguida y el
+    // pulso unos segundos más tarde. En esa ventana la fila dibujaba sólo
+    // `🔥 0 kcal`, sin corazón, y en la muñeca eso se lee como «este reloj no
+    // mide el pulso» en vez de «el sensor está calentando».
+    //
+    // El caso «sin ninguna medición» ya estaba cubierto arriba, y pasaba: el
+    // placeholder colgaba de `effort.isEmpty`, o sea de la fila ENTERA. La
+    // medición PARCIAL no entraba por ese camino.
+    await montar(tester, effort: const WatchEffortDisplay(kcal: 0));
+
+    expect(find.text('--'), findsOneWidget);
+    expect(find.text(WearStrings.bpmUnit), findsOneWidget);
+    expect(find.text('0'), findsOneWidget);
+    expect(find.text(WearStrings.kcalUnit), findsOneWidget);
   });
 }

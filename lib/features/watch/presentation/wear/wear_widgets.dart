@@ -185,11 +185,12 @@ class WearEffortRow extends StatelessWidget {
     this.mostrarSinDatos = false,
   });
 
-  /// Si dibujar la fila con guiones cuando todavía no hay medición.
+  /// Si dibujar con guiones la métrica que todavía no midió.
   ///
   /// En la lista de series va en false: reservar un hueco haría saltar el
   /// layout al llegar el primer pulso, y ahí el atleta está mirando los
-  /// círculos, no el esfuerzo.
+  /// círculos, no el esfuerzo. Con esto en false una métrica sin dato
+  /// simplemente no se dibuja, exactamente como antes.
   ///
   /// En la pantalla del ejercicio por tiempo va en TRUE. Health Services tarda
   /// unos segundos en entregar la primera medición, y la fila oculta hacía
@@ -201,46 +202,42 @@ class WearEffortRow extends StatelessWidget {
   /// teléfono para el reloj de Apple. Un solo tipo para las dos plataformas.
   final WatchEffortDisplay effort;
 
+  /// Si esta métrica ocupa un lugar en la fila.
+  ///
+  /// El placeholder se resuelve POR MÉTRICA y no por la fila entera, y esa es
+  /// justamente la corrección. Los dos sensores no llegan juntos: las calorías
+  /// aparecen enseguida y el pulso tarda unos segundos más. Atado a
+  /// `effort.isEmpty`, una medición PARCIAL —kcal presente, bpm en null— no
+  /// entraba por el camino del placeholder y cada métrica se dibujaba sólo si
+  /// tenía dato. Resultado en la muñeca: `🔥 0 kcal` solo, sin corazón, que se
+  /// lee como "este reloj no mide el pulso" en vez de "el sensor está
+  /// calentando".
+  bool _ocupaLugar(int? valor) => valor != null || mostrarSinDatos;
+
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    if (effort.isEmpty) {
-      if (!mostrarSinDatos) return const SizedBox.shrink();
-      return Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          _WearEffortSinDato(
-            icon: TreinoIcon.heartRate,
-            iconColor: palette.danger,
-            unit: WearStrings.bpmUnit,
-          ),
-          const SizedBox(width: 12),
-          _WearEffortSinDato(
-            icon: TreinoIcon.calories,
-            iconColor: palette.warning,
-            unit: WearStrings.kcalUnit,
-          ),
-        ],
-      );
-    }
+
+    final hayPulso = _ocupaLugar(effort.bpm);
+    final hayCalorias = _ocupaLugar(effort.kcal);
+    if (!hayPulso && !hayCalorias) return const SizedBox.shrink();
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        if (effort.bpm != null)
-          _WearEffortStat(
+        if (hayPulso)
+          _WearEffortCell(
             icon: TreinoIcon.heartRate,
             iconColor: palette.danger,
-            value: effort.bpm!,
+            value: effort.bpm,
             unit: WearStrings.bpmUnit,
           ),
-        if (effort.bpm != null && effort.kcal != null)
-          const SizedBox(width: 12),
-        if (effort.kcal != null)
-          _WearEffortStat(
+        if (hayPulso && hayCalorias) const SizedBox(width: 12),
+        if (hayCalorias)
+          _WearEffortCell(
             icon: TreinoIcon.calories,
             iconColor: palette.warning,
-            value: effort.kcal!,
+            value: effort.kcal,
             unit: WearStrings.kcalUnit,
           ),
       ],
@@ -248,8 +245,22 @@ class WearEffortRow extends StatelessWidget {
   }
 }
 
-class _WearEffortStat extends StatelessWidget {
-  const _WearEffortStat({
+/// Una métrica de esfuerzo: ícono, número y unidad.
+///
+/// ## Por qué es UN widget y no dos
+///
+/// Antes eran dos —uno con dato y otro con guiones— y esa separación fue la que
+/// dejó pasar el bug de la medición parcial: la decisión de cuál usar vivía
+/// arriba, en la fila entera. Con un solo widget la pregunta se vuelve local y
+/// trivial: si hay número se dibuja el número, y si no, `--`.
+///
+/// Y hay una razón de LAYOUT además de una de diseño. Las dos versiones tenían
+/// tipografías y separadores distintos —16 condensada con huecos de 4 y 2 contra
+/// 13 normal con huecos de 8—, algo que no se notaba mientras la fila era toda
+/// dato o toda guiones. Con medición parcial conviven, y ahí la diferencia se ve
+/// como dos columnas desalineadas. Misma métrica, misma caja.
+class _WearEffortCell extends StatelessWidget {
+  const _WearEffortCell({
     required this.icon,
     required this.iconColor,
     required this.value,
@@ -258,94 +269,35 @@ class _WearEffortStat extends StatelessWidget {
 
   final IconData icon;
   final Color iconColor;
-  final int value;
+
+  /// El valor medido, o null mientras el sensor todavía no entregó nada.
+  final int? value;
+
   final String unit;
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final medido = value != null;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(icon, size: 12, color: iconColor),
         const SizedBox(width: 8),
         Text(
-          '$value',
+          medido ? '$value' : '--',
           style: GoogleFonts.barlow(
             fontSize: 13,
             fontWeight: FontWeight.w700,
-            color: palette.textPrimary,
+            // Apagado sin dato: el guion tiene que leerse como "todavía no",
+            // no como una medición más.
+            color: medido ? palette.textPrimary : palette.textMuted,
+            // Cifras de ancho fijo: sin esto la fila se corre sola cada vez que
+            // el pulso pasa de 99 a 100.
             fontFeatures: const [FontFeature.tabularFigures()],
           ),
         ),
         const SizedBox(width: 8),
-        Text(
-          unit,
-          style: GoogleFonts.barlow(fontSize: 10, color: palette.textMuted),
-        ),
-      ],
-    );
-  }
-}
-
-/// El descanso, como ANILLO.
-///
-/// ## Por qué se fue la píldora
-///
-/// La versión anterior era una píldora ancha: contador a la izquierda, `Spacer`,
-/// y "Saltar" a la derecha. El dueño lo dijo sin vueltas: *"el botón de
-/// temporizador está feo"*. Y tenía razón — es una toolbar de escritorio metida
-/// en una pantalla redonda de 206 dp. Ocupaba el 23% del alto, obligaba a un
-/// `Spacer` que dejaba un agujero sin área táctil en el medio, y no hablaba el
-/// idioma de la pantalla.
-///
-/// Un anillo dice lo mismo con menos: el arco ES el tiempo que queda, se lee de
-/// reojo sin procesar dígitos, y todo el círculo es tocable — sin `Spacer`, sin
-/// hack de área mínima.
-/// El descanso, como una barra sobre las series.
-///
-/// **Réplica de `restBanner` de `WorkoutView.swift`**: ícono, los segundos que
-/// quedan, y «Saltar». Antes era un anillo de 64 px centrado, que se comía la
-/// altura justo donde tienen que estar las series que el atleta va a marcar —
-/// en una pantalla de 206 dp eso es medio entreno fuera de vista.
-///
-/// El separador es FIJO y la fila va centrada, en vez de empujar «Saltar» al
-/// borde con un `Spacer` como hace el Swift. Es preferencia del dueño, y acá
-/// además ayuda: pegado al bisel, en una pantalla redonda, el objetivo de toque
-/// se recorta.
-///
-/// Vencido cambia de color en vez de desaparecer: el atleta mira el reloj de
-/// reojo, sin enfocar, y el color se lee antes que un número.
-
-/// La misma fila, pero mientras el sensor todavía no entregó nada.
-class _WearEffortSinDato extends StatelessWidget {
-  const _WearEffortSinDato({
-    required this.icon,
-    required this.iconColor,
-    required this.unit,
-  });
-
-  final IconData icon;
-  final Color iconColor;
-  final String unit;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 12, color: iconColor),
-        const SizedBox(width: 4),
-        Text(
-          '--',
-          style: GoogleFonts.barlowCondensed(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: palette.textMuted,
-          ),
-        ),
-        const SizedBox(width: 2),
         Text(
           unit,
           style: GoogleFonts.barlow(fontSize: 10, color: palette.textMuted),
