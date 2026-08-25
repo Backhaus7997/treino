@@ -31,6 +31,7 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import {
   auditAttestation,
+  callableKey,
   collectDeployedCallables,
   type AuditVerdict,
   type DeployedCallable,
@@ -48,7 +49,11 @@ const readModule = (modulePath: string): string | undefined => {
 };
 
 /**
- * Exenciones, keyeadas por el simbolo local del callable.
+ * Exenciones, keyeadas por `<modulo>:<simbolo>` (ver `callableKey`).
+ *
+ * La clave NO es el simbolo solo: asi una exencion ampara exactamente a la
+ * definicion para la que se escribio, y un homonimo en otro modulo no hereda
+ * un motivo que no le corresponde.
  *
  * Cada motivo vive TAMBIEN en el archivo del callable, con todo el detalle.
  * Aca va la version corta y, sobre todo, la clasificacion: `decided` es un
@@ -57,7 +62,7 @@ const readModule = (modulePath: string): string | undefined => {
  * sin condicion de salida es una decision disfrazada.
  */
 const EXEMPTIONS: Readonly<Record<string, Exemption>> = {
-  acceptTrainerLink: {
+  "subscriptions/accept-trainer-link:acceptTrainerLink": {
     permanence: "decided",
     reason:
       "Lo llama el Coach Hub web, que no activa App Check (main_coach_hub.dart " +
@@ -67,7 +72,7 @@ const EXEMPTIONS: Readonly<Record<string, Exemption>> = {
       "el PR #704. Sigue validando request.auth, que el caller sea el trainer " +
       "del vinculo, y el estado de origen. Ver accept-trainer-link.ts:82.",
   },
-  resumeTrainerLink: {
+  "subscriptions/resume-trainer-link:resumeTrainerLink": {
     permanence: "decided",
     reason:
       "Mismo caso y mismo PR #704 que acceptTrainerLink: se llama desde el " +
@@ -75,7 +80,7 @@ const EXEMPTIONS: Readonly<Record<string, Exemption>> = {
       "a 0.5— asi que las dos transiciones que suben peso van juntas, con o sin " +
       "atestacion. Ver resume-trainer-link.ts:77.",
   },
-  mintWatchCredential: {
+  "mint-watch-credential:mintWatchCredential": {
     permanence: "debt",
     reason:
       "Apagado el 2026-08-18 por decision del dueno: el cliente mandaba un " +
@@ -141,7 +146,7 @@ describe("QA-SEC-006/016: atestacion en los callables desplegados", () => {
     (exportedName) => {
       const c = deployed.find((x) => x.exportedName === exportedName);
       expect(c).toBeDefined();
-      const exempt = c!.symbol in EXEMPTIONS;
+      const exempt = callableKey(c!) in EXEMPTIONS;
       expect(c!.attestation === "enforced").toBe(!exempt);
     },
   );
@@ -161,11 +166,9 @@ describe("QA-SEC-006/016: atestacion en los callables desplegados", () => {
     }
   });
 
-  it("no hay exenciones para simbolos que no estan desplegados", () => {
-    const symbols = new Set(deployed.map((c) => c.symbol));
-    expect(
-      Object.keys(EXEMPTIONS).filter((s) => !symbols.has(s)),
-    ).toEqual([]);
+  it("no hay exenciones para callables que no estan desplegados", () => {
+    const keys = new Set(deployed.map(callableKey));
+    expect(Object.keys(EXEMPTIONS).filter((k) => !keys.has(k))).toEqual([]);
   });
 });
 
@@ -196,12 +199,25 @@ describe("QA-SEC-016: el guard falla cuando tiene que fallar", () => {
    * El test de deriva de mas abajo mantiene los dos en sincronia.
    */
   const BASELINE = [
-    { module: "w/delete-account", symbol: "deleteAccountHandler", as: "deleteAccount", attested: true },
-    { module: "w/add-alias", symbol: "addAlias", as: "addAlias", attested: true },
-    { module: "w/accept", symbol: "acceptTrainerLink", as: "acceptTrainerLink", attested: false },
-    { module: "w/resume", symbol: "resumeTrainerLink", as: "resumeTrainerLink", attested: false },
-    { module: "w/mint", symbol: "mintWatchCredential", as: "mintWatchCredential", attested: false },
+    { module: "delete-account", symbol: "deleteAccountHandler", as: "deleteAccount", attested: true },
+    { module: "add-alias", symbol: "addAlias", as: "addAlias", attested: true },
+    {
+      module: "subscriptions/accept-trainer-link",
+      symbol: "acceptTrainerLink",
+      as: "acceptTrainerLink",
+      attested: false,
+    },
+    {
+      module: "subscriptions/resume-trainer-link",
+      symbol: "resumeTrainerLink",
+      as: "resumeTrainerLink",
+      attested: false,
+    },
+    { module: "mint-watch-credential", symbol: "mintWatchCredential", as: "mintWatchCredential", attested: false },
   ];
+
+  // Los modulos son los reales para que las claves del registry apliquen, pero
+  // las FUENTES son sinteticas: `world()` nunca lee del disco.
 
   const onCallSource = (symbol: string, attested: boolean) =>
     `export const ${symbol} = functions.onCall(\n` +
@@ -241,8 +257,8 @@ describe("QA-SEC-016: el guard falla cuando tiene que fallar", () => {
       indexSource: readFileSync(join(SRC, "index.ts"), "utf8"),
       readModule,
     });
-    expect(world().map((c) => c.exportedName)).toEqual(
-      real.map((c) => c.exportedName),
+    expect(world().map((c) => `${callableKey(c)} as ${c.exportedName}`)).toEqual(
+      real.map((c) => `${callableKey(c)} as ${c.exportedName}`),
     );
   });
 
@@ -282,12 +298,14 @@ describe("QA-SEC-016: el guard falla cuando tiene que fallar", () => {
   it("una exencion que sobrevivio a su causa tambien falla", () => {
     // El flag volvio a acceptTrainerLink, pero nadie borro su exencion.
     const deployed = world([], {
-      "w/accept": onCallSource("acceptTrainerLink", true),
+      "subscriptions/accept-trainer-link": onCallSource("acceptTrainerLink", true),
     });
 
     const verdict = auditAttestation(deployed, EXEMPTIONS);
     expect(verdict.unguarded).toEqual([]);
-    expect(verdict.staleExemptions).toEqual(["acceptTrainerLink"]);
+    expect(verdict.staleExemptions).toEqual([
+      "subscriptions/accept-trainer-link:acceptTrainerLink",
+    ]);
     expect(() => assertEveryCallableIsGuarded(verdict)).toThrow();
   });
 
@@ -334,6 +352,94 @@ describe("QA-SEC-016: el guard falla cuando tiene que fallar", () => {
       },
     );
     expect(deployed).toEqual([]);
+  });
+
+  it("un homonimo en otro modulo NO hereda la exencion", () => {
+    // Hallazgo P2 de la review de Codex en el PR #805. Con las exenciones
+    // keyeadas solo por simbolo, este callable —mismo nombre local, otro
+    // modulo, otro nombre publico— pasaba amparado por un motivo escrito para
+    // el Coach Hub web, que no tiene nada que ver con el.
+    const deployed = world(
+      ["export { acceptTrainerLink as promoteLink } from \"./impostor\";"],
+      { impostor: onCallSource("acceptTrainerLink", false) },
+    );
+
+    const verdict = auditAttestation(deployed, EXEMPTIONS);
+    expect(verdict.unguarded.map((c) => c.exportedName)).toEqual([
+      "promoteLink",
+    ]);
+    expect(() => assertEveryCallableIsGuarded(verdict)).toThrow();
+
+    // Y la demostracion de que la clave vieja lo dejaba pasar: con el registry
+    // keyeado por simbolo pelado, el impostor NO aparece como unguarded.
+    const bySymbolOnly = Object.fromEntries(
+      Object.keys(EXEMPTIONS).map((k) => [k.split(":")[1], true]),
+    );
+    expect(
+      deployed
+        .filter((c) => c.attestation === "absent" && !(c.symbol in bySymbolOnly))
+        .map((c) => c.exportedName),
+    ).not.toContain("promoteLink");
+  });
+
+  it("mover un callable de modulo deja su exencion obsoleta", () => {
+    // La contracara: la exencion sigue apuntando al modulo viejo, asi que hay
+    // que reescribirla (y reconfirmar que el motivo sigue valiendo).
+    const moved = collectDeployedCallables({
+      indexSource:
+        "export { acceptTrainerLink } from \"./subscriptions/promote\";",
+      readModule: (m) =>
+        m === "subscriptions/promote"
+          ? onCallSource("acceptTrainerLink", false)
+          : undefined,
+    });
+
+    const verdict = auditAttestation(moved, EXEMPTIONS);
+    expect(verdict.unguarded.map(callableKey)).toEqual([
+      "subscriptions/promote:acceptTrainerLink",
+    ]);
+    expect(verdict.staleExemptions).toContain(
+      "subscriptions/accept-trainer-link:acceptTrainerLink",
+    );
+  });
+
+  it("un spread DESPUES del flag no cuenta como atestado", () => {
+    // Hallazgo P2 de la review de Codex en el PR #805: el spread puede pisar
+    // `enforceAppCheck` en runtime y el scanner no puede resolverlo sin type
+    // checker. Se falla cerrado.
+    const deployed = world(["export { sneakyHandler as sneaky } from \"./s\";"], {
+      s:
+        "export const sneakyHandler = functions.onCall(\n" +
+        "  { enforceAppCheck: true, ...runtimeOptions },\n" +
+        "  async () => 1,\n" +
+        ");",
+    });
+
+    expect(
+      deployed.find((c) => c.exportedName === "sneaky")?.attestation,
+    ).toBe("absent");
+    expect(() =>
+      assertEveryCallableIsGuarded(auditAttestation(deployed, EXEMPTIONS)),
+    ).toThrow();
+  });
+
+  it("un spread ANTES del flag si cuenta como atestado", () => {
+    // Aca el explicito es la ultima escritura, asi que el valor efectivo es
+    // demostrable. Ser conservador tambien en este caso daria rojos falsos.
+    const deployed = world(["export { sneakyHandler as sneaky } from \"./s\";"], {
+      s:
+        "export const sneakyHandler = functions.onCall(\n" +
+        "  { ...runtimeOptions, enforceAppCheck: true },\n" +
+        "  async () => 1,\n" +
+        ");",
+    });
+
+    expect(
+      deployed.find((c) => c.exportedName === "sneaky")?.attestation,
+    ).toBe("enforced");
+    expect(() =>
+      assertEveryCallableIsGuarded(auditAttestation(deployed, EXEMPTIONS)),
+    ).not.toThrow();
   });
 
   it("`enforceAppCheck: false` explicito cuenta como ausente", () => {
