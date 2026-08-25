@@ -10,8 +10,14 @@ import '../../../l10n/app_l10n.dart';
 import '../../workout/domain/muscle_group.dart';
 import '../application/check_in_providers.dart';
 import '../domain/check_in.dart';
+import 'widgets/wellbeing_mood_row.dart';
 
-/// Abre el paso de check-in al terminar la sesión.
+/// Abre el paso de check-in de bienestar.
+///
+/// Lo usan los DOS puntos de captura, y es a propósito que sea el mismo sheet:
+/// al terminar una sesión ([sessionId] cargado) y desde la tarjeta diaria de
+/// Inicio ([sessionId] en `null`). Dos formularios distintos para el mismo
+/// dato serían dos vocabularios divergiendo desde el día uno.
 ///
 /// **Es saltable de verdad y no cuesta nada saltearlo.** El momento
 /// post-entreno es cuando el usuario quiere irse: el sheet se cierra con el
@@ -22,13 +28,13 @@ import '../domain/check_in.dart';
 ///
 /// Devuelve `true` si el usuario guardó, y `null` si salió sin guardar.
 ///
-/// [initialFeeling] precarga el nivel que el usuario ya tocó en el resumen, así
-/// el tap que abre el sheet no se pierde. [existing] es el registro que ESTA
-/// sesión ya dejó: con él, guardar EDITA ese documento; sin él se crea uno
-/// nuevo, que no pisa lo que hayan registrado otras sesiones del mismo día.
-Future<bool?> showPostSessionCheckInSheet(
+/// [initialFeeling] precarga el nivel que el usuario ya tocó afuera, así el tap
+/// que abre el sheet no se pierde. [existing] es el registro que este mismo
+/// origen ya dejó: con él, guardar EDITA ese documento; sin él se crea uno
+/// nuevo, que no pisa nada de lo ya registrado ese día.
+Future<bool?> showWellbeingCheckInSheet(
   BuildContext context, {
-  required String sessionId,
+  String? sessionId,
   CheckInFeeling? initialFeeling,
   CheckIn? existing,
 }) {
@@ -37,7 +43,7 @@ Future<bool?> showPostSessionCheckInSheet(
     useRootNavigator: true,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => PostSessionCheckInSheet(
+    builder: (_) => WellbeingCheckInSheet(
       sessionId: sessionId,
       initialFeeling: initialFeeling ?? existing?.feeling,
       existing: existing,
@@ -47,25 +53,25 @@ Future<bool?> showPostSessionCheckInSheet(
 
 /// Contenido del sheet. Público sólo para que los tests lo monten sin pasar por
 /// una ruta modal.
-class PostSessionCheckInSheet extends ConsumerStatefulWidget {
-  const PostSessionCheckInSheet({
+class WellbeingCheckInSheet extends ConsumerStatefulWidget {
+  const WellbeingCheckInSheet({
     super.key,
-    required this.sessionId,
+    this.sessionId,
     this.initialFeeling,
     this.existing,
   });
 
-  final String sessionId;
+  /// Sesión que originó el registro, o `null` para el check-in diario.
+  final String? sessionId;
   final CheckInFeeling? initialFeeling;
   final CheckIn? existing;
 
   @override
-  ConsumerState<PostSessionCheckInSheet> createState() =>
-      _PostSessionCheckInSheetState();
+  ConsumerState<WellbeingCheckInSheet> createState() =>
+      _WellbeingCheckInSheetState();
 }
 
-class _PostSessionCheckInSheetState
-    extends ConsumerState<PostSessionCheckInSheet> {
+class _WellbeingCheckInSheetState extends ConsumerState<WellbeingCheckInSheet> {
   late CheckInFeeling? _feeling;
   late bool _hasPain;
   late Set<MuscleGroup> _painAreas;
@@ -141,7 +147,7 @@ class _PostSessionCheckInSheetState
                 height: 4,
                 decoration: BoxDecoration(
                   color: palette.border,
-                  borderRadius: BorderRadius.circular(2),
+                  borderRadius: BorderRadius.circular(AppRadius.full),
                 ),
               ),
             ),
@@ -153,7 +159,13 @@ class _PostSessionCheckInSheetState
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      l10n.wellbeingCheckInTitle,
+                      // Pasado al cerrar una sesión ("¿cómo te sentiste?"),
+                      // presente desde Inicio ("¿cómo te sentís hoy?"): el
+                      // check-in diario no pregunta por un entreno que puede
+                      // no haber existido.
+                      widget.sessionId == null
+                          ? l10n.wellbeingDailyTitle
+                          : l10n.wellbeingCheckInTitle,
                       style: GoogleFonts.barlowCondensed(
                         color: palette.textPrimary,
                         fontSize: 22,
@@ -391,21 +403,7 @@ class _FeelingOption extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // FittedBox por glifo: cuando un emoji mide más ancho de lo
-              // esperado (tofu .notdef, font scale grande) la celda escala en
-              // vez de desbordar (mismo cuidado que el resumen, #456).
-              ExcludeSemantics(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    feeling.emoji,
-                    style: const TextStyle(
-                      fontSize: 26,
-                      fontFamilyFallback: ['Apple Color Emoji'],
-                    ),
-                  ),
-                ),
-              ),
+              WellbeingMoodGlyph(feeling.emoji, fontSize: 26),
               const SizedBox(height: 4),
               FittedBox(
                 fit: BoxFit.scaleDown,

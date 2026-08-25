@@ -24,6 +24,7 @@ import '../watch/application/watch_credential_providers.dart'
 import '../watch/data/watch_nudge_service.dart';
 import '../workout/domain/set_log.dart';
 import '../workout/presentation/widgets/resume_session_modal.dart';
+import 'widgets/daily_check_in_card.dart';
 import 'widgets/empezar_entrenamiento_card.dart';
 import 'widgets/esta_semana_card.dart';
 import 'widgets/home_cta_button.dart';
@@ -151,6 +152,14 @@ class _AthleteHome extends ConsumerWidget {
             TreinoFadeSlideIn(
               delay: AppMotion.stagger(2),
               child: const EstaSemanaCard(),
+            ),
+            const SizedBox(height: 12),
+            // Debajo de "Esta semana" a propósito: lo que trae al atleta a
+            // Inicio sigue siendo entrenar. El check-in SUMA una dimensión, no
+            // reemplaza ni desplaza a las métricas objetivas (#643).
+            TreinoFadeSlideIn(
+              delay: AppMotion.stagger(3),
+              child: const DailyCheckInCard(),
             ),
           ],
         ),

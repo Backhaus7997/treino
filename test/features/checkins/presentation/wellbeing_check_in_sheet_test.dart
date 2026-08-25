@@ -18,7 +18,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/checkins/domain/check_in.dart';
-import 'package:treino/features/checkins/presentation/post_session_check_in_sheet.dart';
+import 'package:treino/features/checkins/presentation/wellbeing_check_in_sheet.dart';
 import 'package:treino/features/profile/application/user_providers.dart'
     show firestoreProvider;
 import 'package:treino/features/workout/application/session_providers.dart'
@@ -31,7 +31,7 @@ import 'package:treino/l10n/app_l10n.dart';
 const _uid = 'u1';
 
 /// Monta un host con un botón que abre el sheet REAL (vía
-/// [showPostSessionCheckInSheet]), para que la ruta modal, el pop y el valor
+/// [showWellbeingCheckInSheet]), para que la ruta modal, el pop y el valor
 /// devuelto entren en el test.
 Widget _host({
   required FakeFirebaseFirestore firestore,
@@ -55,7 +55,7 @@ Widget _host({
           builder: (context) => Center(
             child: TextButton(
               onPressed: () async {
-                onClosed(await showPostSessionCheckInSheet(
+                onClosed(await showWellbeingCheckInSheet(
                   context,
                   sessionId: sessionId,
                   existing: existing,

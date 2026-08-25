@@ -782,6 +782,8 @@
   "volumeByGroupEmptyTarget": "Necesitás una rutina asignada para ver tu volumen objetivo.",
   "workoutRutinasCoachChip": "DE TU COACH",
   "workoutPostAutoCompleteText": "¡Terminé mi entreno! 💪",
+  "wellbeingDailyTitle": "¿CÓMO TE SIENTES HOY?",
+  "wellbeingDailyPrompt": "Anota cómo amaneces, entrenes o no.",
   "wellbeingCheckInTitle": "¿CÓMO TE SENTISTE?",
   "wellbeingCheckInOptional": "Opcional. Podés saltearlo.",
   "wellbeingFeelingVeryBad": "Muy mal",
