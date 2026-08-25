@@ -91,7 +91,7 @@ son `get` / `list` / `write` / `delete`.
 | `measurements` | ✅ | ✅ | ✅ | ✅ | 🟡 |
 | `performance_tests` | — | — | ✅ | ✅ | — |
 | `athlete_billing` | ✅ | — | 🟡 | 🟡 | — |
-| `athlete_notes` | 🟡 | — | 🟡 | 🟡 | — |
+| `athlete_notes` | ✅ | — | 🟡 | 🟡 | — |
 | `athlete_files` | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `follow_up_entries` | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `nutrition_plans` | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -112,6 +112,21 @@ son `get` / `list` / `write` / `delete`.
 Cinco paths siguen **sin una sola aserción negativa**:
 `users/{uid}/customExercises`, `exercises`, `coach_availability_rules`,
 `coach_availability_overrides`, `mail_queue`.
+
+> **QA-SEC-010 (oráculo de existencia) no mueve los totales, y conviene que se
+> entienda por qué.** `existence-oracle-rules.test.ts` agregó 8 negativos
+> nuevos sobre `chats`, `friendships`, `follows` y `athlete_notes`, pero las
+> cuatro celdas `get` ya estaban marcadas: lo que faltaba no era *una* aserción
+> negativa, era la **segunda dirección** de la misma celda. Los negativos que
+> había probaban "el doc existe y no es tuyo → DENY"; ninguno probaba "el doc
+> no existe → DENY", que es justo el estado que respondía la pregunta. La
+> celda `get` de `athlete_notes` sí cambia de marca (🟡 → ✅) porque su
+> cobertura pasó a vivir también en `functions/`.
+>
+> Lección para §1.8: una celda en ✅ dice que existe **al menos un** negativo,
+> no que la operación esté agotada. Cuando una regla tiene un disyunto que
+> cambia el resultado según el estado del documento, el test tiene que
+> recorrer los dos estados o la celda miente por omisión.
 
 ### 1.2 Storage — 6 paths declarados en `storage.rules`
 
@@ -349,6 +364,15 @@ No son agujeros, pero salieron al leer y conviene que estén escritas:
   y nunca traen `_`. Si alguna vez entra un id con guión bajo (un uid
   sintético, un id de test), el prefijo deja de ser único y la regla se rompe
   en silencio.
+
+  **Al cerrar QA-SEC-010 ese idiom dejó de estar en un solo lugar.** Cuatro
+  bloques de `firestore.rules` —`chats`, `friendships`, `follows` y
+  `athlete_notes`— ahora acotan su disyunto `resource == null` con
+  `split('_')` sobre el doc id, así que la premisa "los uid no traen guión
+  bajo" pasó de sostener una regla a sostener cinco. Sigue siendo cierta y
+  sigue sin estar verificada en ningún lado: no hay nada que impida sembrar
+  un uid sintético con `_` desde el Admin SDK. Si algún día se agrega un
+  guard, va acá y no en cada bloque.
 
 ### 1.8 Cómo mantener esta matriz
 

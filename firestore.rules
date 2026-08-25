@@ -1274,14 +1274,30 @@ service cloud.firestore {
       // reversibilidad la da el dato intacto, no el código — y para que una
       // build vieja que solo lee su lista de amigos no se rompa.
       //
-      // Read: only members of the friendship — OR doc does not exist (returns
-      // empty snapshot without leaking data). The `resource == null` branch is
-      // required for `getByPair()` to gracefully resolve "no friendship yet"
-      // between two users who have never interacted (e.g. fresh public profile
-      // visits). Discovered during user-public-profiles smoke test;
-      // pre-existing from PR #28 friendships introduction (REQ-PFM-010).
+      // Read: only members of the friendship — OR doc does not exist AND the
+      // caller is one of the two uids the doc id encodes. El `resource == null`
+      // hace falta para que `getByPair()` resuelva "todavía no hay amistad"
+      // entre dos personas que nunca interactuaron (p. ej. visitar un perfil
+      // público recién creado) sin tirar permission-denied. Pre-existente
+      // desde el PR #28 (REQ-PFM-010).
+      //
+      // ⚠️  QA-SEC-010 — el disyunto está ACOTADO al par. La versión anterior
+      // decía "returns empty snapshot without leaking data", y eso medía
+      // FALSO: el doc id es el par ordenado `{uidA}_{uidB}` y los dos padrones
+      // de uid son enumerables (`userPublicProfiles` y `trainerPublicProfiles`
+      // son list-ables por cualquier autenticado), así que armar el par exacto
+      // no cuesta nada. El segundo check bloquea el CONTENIDO, no la PREGUNTA:
+      // "no existe" volvía como snapshot vacío y "existe y no es tuyo" como
+      // PERMISSION_DENIED, y esa diferencia ES la respuesta. Con el acote, un
+      // tercero recibe PERMISSION_DENIED en los DOS estados y no distingue uno
+      // del otro.
+      //
+      // El acote usa `split('_')`, que es seguro sólo mientras los uid de
+      // Firebase Auth sigan siendo alfanuméricos sin guión bajo (docs/security.md
+      // §1.7). Es el mismo idiom que ya usa `storage.rules:athleteFiles`.
       allow read: if request.auth != null
-                  && (resource == null
+                  && ((resource == null
+                       && request.auth.uid in friendshipId.split('_'))
                       || request.auth.uid in resource.data.members);
 
       allow create: if false;
@@ -1305,6 +1321,20 @@ service cloud.firestore {
     match /follows/{followId} {
       // `resource == null` permite preguntar "¿lo sigo?" y que la respuesta
       // legítima "no" resuelva en vez de tirar permission-denied.
+      //
+      // ⚠️  QA-SEC-010 — ese disyunto está ACOTADO a los dos uid que el doc id
+      // encodea. Sin el acote era un oráculo: `{follower}_{followee}` es
+      // determinístico y los padrones de uid son enumerables, así que un
+      // tercero preguntaba por un par cualquiera y leía la respuesta en la
+      // FORMA de la respuesta — snapshot vacío = "no existe", PERMISSION_DENIED
+      // = "existe y está `pending`". O sea: quién le mandó solicitud a quién y
+      // todavía no fue aceptada, que es exactamente el estado de las cuentas
+      // privadas. Con el acote los dos estados devuelven lo mismo a un tercero.
+      //
+      // Lo que NO cambia: una arista `accepted` la sigue leyendo cualquiera
+      // (último disyunto), que es lo que abre las listas de seguidores/seguidos
+      // públicas. El acote sólo tapa la diferencia entre "no existe" y "existe
+      // pendiente".
       //
       // ⚠️ LAS RULES NO SE EVALÚAN DOCUMENTO POR DOCUMENTO EN UNA QUERY.
       //
@@ -1344,7 +1374,8 @@ service cloud.firestore {
       // siendo asunto de los dos involucrados, y una query sin el filtro de
       // status no se puede probar, así que se cae entera en vez de filtrar.
       allow read: if request.auth != null
-                  && (resource == null
+                  && ((resource == null
+                       && request.auth.uid in followId.split('_'))
                       || request.auth.uid in resource.data.members
                       || request.auth.uid == resource.data.followerUid
                       || request.auth.uid == resource.data.followeeUid
@@ -1592,8 +1623,29 @@ service cloud.firestore {
             || followAccepted(other, uid);
       }
 
+      // ⚠️  QA-SEC-010 — el disyunto `resource == null` está ACOTADO al par que
+      // codifica el doc id. Hace falta para que `getOrCreate()` pregunte "¿ya
+      // existe este chat?" sin comerse un permission-denied, pero sin acote era
+      // el oráculo más sensible de los cuatro: `chatId` es
+      // `sorted([a,b]).join('_')` y los uid son enumerables, así que una sola
+      // llamada por par respondía **"¿estas dos personas se escriben?"** — el
+      // "no existe" volvía como snapshot vacío y el "existe y no sos miembro"
+      // como PERMISSION_DENIED.
+      //
+      // La premisa correcta ya estaba escrita del lado de Storage: el bloque
+      // `chatMedia` de `storage.rules` cerró su `get` con gate de membresía
+      // citando textualmente que "uids are enumerable (userPublicProfiles is
+      // world-readable)". Esto es esa misma premisa aplicada del lado de
+      // Firestore.
+      //
+      // El segundo disyunto queda INTACTO a propósito: es el que prueba el
+      // `list` (`where('members', arrayContains: uid)`), y `resource == null`
+      // nunca es probablemente-verdadero en una query, así que el primer
+      // disyunto corta antes de tocar `chatId` — que en un `list` no está
+      // ligado. Verificado contra el emulador.
       allow read: if request.auth != null
-                  && (resource == null
+                  && ((resource == null
+                       && request.auth.uid in chatId.split('_'))
                       || request.auth.uid in resource.data.members);
 
       allow create: if request.auth != null
@@ -2292,12 +2344,27 @@ service cloud.firestore {
     match /athlete_notes/{docId} {
       // Read: dueño solo (trainer). Si el doc NO existe, `resource == null` y
       // la rule debe permitir la lectura para que el cliente vea "sin nota"
-      // en vez de un permission-denied que la UI captura como error. El docId
-      // encodea `{trainerId}_{athleteId}` así que un attacker no puede
-      // fishearse leyendo docs de otro PF: solo llegaría al doc si armara el
-      // par exacto — y si existe, el segundo check bloquea el acceso.
+      // en vez de un permission-denied que la UI captura como error.
+      //
+      // ⚠️  QA-SEC-010 — ese disyunto está ACOTADO al PF que el docId encodea.
+      // El comentario anterior decía que un atacante "no puede fishearse
+      // leyendo docs de otro PF: solo llegaría al doc si armara el par exacto
+      // — y si existe, el segundo check bloquea el acceso". Las dos mitades
+      // medían falso: armar el par exacto es trivial (los padrones de uid de
+      // `userPublicProfiles` y `trainerPublicProfiles` son list-ables por
+      // cualquier autenticado), y el segundo check bloquea el CONTENIDO, no la
+      // PREGUNTA — "no existe" volvía como snapshot vacío y "existe y es de
+      // otro PF" como PERMISSION_DENIED. Cruzando los dos padrones eso
+      // reconstruye la cartera de clientes de cada PF sin leer un solo campo.
+      //
+      // Con `docId.split('_')[0] == request.auth.uid` sólo el PF dueño del
+      // prefijo puede preguntar, y para todos los demás los dos estados se ven
+      // igual. Mismo idiom que `storage.rules:athleteFiles`, con la misma
+      // condición de validez: uid de Firebase Auth sin guión bajo
+      // (docs/security.md §1.7).
       allow read: if request.auth != null
-                  && (resource == null
+                  && ((resource == null
+                       && docId.split('_')[0] == request.auth.uid)
                       || request.auth.uid == resource.data.trainerId);
       // Create y update SEPARADOS (QA-2026-07-30 C1). Antes iban combinados
       // validando SOLO el post-image, con dos agujeros que el docId
