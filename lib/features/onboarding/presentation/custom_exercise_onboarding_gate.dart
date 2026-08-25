@@ -84,7 +84,17 @@ Future<void> maybeShowCustomExerciseOnboarding({
   final palette = AppPalette.of(context);
   final isWeb = surface == OnboardingSurface.customExerciseTrainerWeb;
 
-  ref.read(onboardingTourOpenProvider.notifier).state = true;
+  // Capturados ANTES del await, igual que en `OnboardingGate` (#627). Si un
+  // redirect de auth o un reemplazo de ruta desarma el editor con el modal
+  // abierto, `context.mounted` es false y el cleanup guardado por él dejaba
+  // `onboardingTourOpenProvider` —root-scoped— en `true` para siempre: a
+  // partir de ahí `onboardingBlocksProvider` suprime TODO onboarding
+  // posterior, incluido el de otro login, hasta reiniciar el proceso. Y el
+  // `ref.read` de `markSeen` corría sobre un ref ya dispuesto.
+  final tourOpen = ref.read(onboardingTourOpenProvider.notifier);
+  final onboardingController = ref.read(onboardingControllerProvider);
+
+  tourOpen.state = true;
   try {
     if (isWeb) {
       await showDialog<void>(
@@ -123,16 +133,14 @@ Future<void> maybeShowCustomExerciseOnboarding({
       );
     }
   } finally {
-    if (context.mounted) {
-      ref.read(onboardingTourOpenProvider.notifier).state = false;
-    }
+    tourOpen.state = false;
     // Persist however it closed — CTA, SALTAR, Android back, or a route torn
     // down under us. Marking only on the two buttons is how an onboarding comes
     // back forever for anyone who pressed back once.
     //
     // The controller swallows write failures behind its session flag, so this
     // never throws into the caller's `initState`.
-    await ref.read(onboardingControllerProvider).markSeen(surface);
+    await onboardingController.markSeen(surface);
   }
 }
 
