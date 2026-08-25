@@ -96,13 +96,18 @@ void main() {
 
     /// Techo de ocurrencias totales. Mismo contrato: sólo baja.
     ///
-    /// 86 → 81 con #761: los cinco call-sites de reloj crudo que quedaban en
-    /// el camino de RENDER de las cinco pantallas del gate visual pasaron a
-    /// `AppClock.now()` (dashboard right column, chat list pane, y dos en la
-    /// ficha de alumno; el quinto es el default de `nowWall()`). Bajar el
-    /// techo es obligatorio al migrar: dejarlo en 86 regalaría cupo para
-    /// cinco regresiones nuevas.
-    const rawClockDebtCeiling = 81;
+    /// 86 → 80 con #761. Cinco son call-sites de código que quedaban en el
+    /// camino de RENDER de las pantallas del gate visual y pasaron a
+    /// `AppClock.now()`: dashboard right column, chat list pane, dos en la
+    /// ficha de alumno, y el default de `nowWall()`. La sexta es prosa — el
+    /// dartdoc de `wall_clock.dart` decía *"defaults to `DateTime.now()`"*,
+    /// que este cambio vuelve falso. El scanner es textual y no distingue
+    /// código de comentario, así que las cuenta igual.
+    ///
+    /// Bajar el techo es obligatorio al migrar: dejarlo arriba de la medición
+    /// real regala cupo para regresiones nuevas, que es justo lo que el
+    /// ratchet existe para impedir.
+    const rawClockDebtCeiling = 80;
 
     /// Registro de deuda, rutas relativas a `lib/`.
     const allowlist = {
@@ -198,8 +203,9 @@ void main() {
             '(coach/domain/wall_clock.dart)\n'
             '  • bucket de día/mes/semana     →  argentinaNow()  '
             '(core/utils/argentina_time.dart)\n'
-            '  • instante real (createdAt…)   →  DateTime.now() está BIEN, '
-            'pero el archivo va a la allowlist con un comentario que lo diga\n\n'
+            '  • instante real (createdAt…)   →  AppClock.now()  '
+            '(core/utils/app_clock.dart) — es passthrough en prod y un test '
+            'lo puede congelar\n\n'
             'Ojo: un `difference` entre instantes NO necesita arreglo — ver el '
             'dartdoc de este test.',
       );
