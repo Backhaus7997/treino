@@ -5,6 +5,7 @@ import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
 import 'onboarding_card_content.dart';
+import '../../../app/theme/tokens/primitives.dart';
 
 /// How the onboarding is being presented.
 ///
@@ -369,10 +370,10 @@ class _Grabber extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 18),
       child: Container(
         width: 40,
-        height: 4,
+        height: AppSpacing.hairline,
         decoration: BoxDecoration(
           color: palette.border,
-          borderRadius: BorderRadius.circular(9999),
+          borderRadius: BorderRadius.circular(AppRadius.full),
         ),
       ),
     );
@@ -413,7 +414,7 @@ class _Dots extends StatelessWidget {
                 color: i == current
                     ? palette.accent
                     : palette.textPrimary.withValues(alpha: 0.25),
-                borderRadius: BorderRadius.circular(9999),
+                borderRadius: BorderRadius.circular(AppRadius.full),
               ),
             ),
         ],
@@ -517,7 +518,7 @@ class _PrimaryCta extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 20),
           decoration: BoxDecoration(
             color: palette.accent,
-            borderRadius: BorderRadius.circular(9999),
+            borderRadius: BorderRadius.circular(AppRadius.full),
             boxShadow: [
               BoxShadow(
                 color: palette.accent.withValues(alpha: 0.18),

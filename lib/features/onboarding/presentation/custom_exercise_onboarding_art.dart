@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../app/theme/tokens/primitives.dart';
 
 /// A schematic of the "Nuevo ejercicio" screen, drawn for the feature
 /// onboarding.
@@ -68,7 +69,7 @@ class CustomExerciseOnboardingArt extends StatelessWidget {
             border: Border.all(
               color: palette.textPrimary.withValues(alpha: 0.10),
             ),
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppRadius.md),
           ),
           // The frame (border, radius) stays outside the FittedBox so it renders
           // at true scale and never goes blurry.
@@ -193,7 +194,7 @@ class _FocusedNameField extends StatelessWidget {
       decoration: BoxDecoration(
         color: palette.textPrimary.withValues(alpha: 0.04),
         border: Border.all(color: palette.accent, width: 1.5),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
         boxShadow: [
           BoxShadow(
             color: palette.accent.withValues(alpha: 0.14),
@@ -212,7 +213,7 @@ class _FocusedNameField extends StatelessWidget {
               color: palette.textPrimary,
             ),
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: AppSpacing.hairline),
           Container(width: 1.5, height: 15, color: palette.accent),
         ],
       ),
@@ -306,7 +307,7 @@ class _VideoBody extends StatelessWidget {
                   height: 22,
                   decoration: BoxDecoration(
                     color: palette.accent,
-                    borderRadius: BorderRadius.circular(9999),
+                    borderRadius: BorderRadius.circular(AppRadius.full),
                   ),
                   // Ink on accent — never `palette.bg`, which is near-white in
                   // the light theme and drops this to 1.6:1.
@@ -330,7 +331,7 @@ class _VideoBody extends StatelessWidget {
                           color: palette.textPrimary,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: AppSpacing.hairline),
                       const _Placeholder(
                         'MP4 / MOV — reproduce inline en TREINO', // i18n
                         size: 9,
@@ -361,7 +362,7 @@ class _VideoPlayer extends StatelessWidget {
       decoration: BoxDecoration(
         // The player letterbox is dark in BOTH themes — video needs it.
         color: palette.scrimDark,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Stack(
         alignment: Alignment.center,
@@ -375,10 +376,10 @@ class _VideoPlayer extends StatelessWidget {
             top: 8,
             right: 8,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: AppSpacing.hairline),
               decoration: BoxDecoration(
                 color: palette.highlight.withValues(alpha: 0.22),
-                borderRadius: BorderRadius.circular(9999),
+                borderRadius: BorderRadius.circular(AppRadius.full),
               ),
               child: Text(
                 'TU VIDEO', // i18n
@@ -489,7 +490,7 @@ class _ExerciseRow extends StatelessWidget {
         border: isOwn
             ? Border.all(color: palette.accent.withValues(alpha: 0.35))
             : null,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: Row(
         children: [
@@ -500,7 +501,7 @@ class _ExerciseRow extends StatelessWidget {
               color: isOwn
                   ? palette.accent
                   : palette.textPrimary.withValues(alpha: 0.16),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
             ),
             child: isOwn
                 ? const Icon(TreinoIcon.play, size: 12, color: _onAccent)
@@ -522,7 +523,7 @@ class _ExerciseRow extends StatelessWidget {
                     color: palette.textPrimary,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: AppSpacing.hairline),
                 _Placeholder(detail, size: 9),
               ],
             ),
@@ -530,10 +531,10 @@ class _ExerciseRow extends StatelessWidget {
           if (isOwn) ...[
             const SizedBox(width: 8),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: AppSpacing.hairline),
               decoration: BoxDecoration(
                 color: palette.accent.withValues(alpha: 0.16),
-                borderRadius: BorderRadius.circular(9999),
+                borderRadius: BorderRadius.circular(AppRadius.full),
               ),
               child: Text(
                 'MÍO', // i18n
@@ -632,7 +633,7 @@ class _Box extends StatelessWidget {
         border: Border.all(
           color: palette.textPrimary.withValues(alpha: 0.14),
         ),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
       ),
       child: child,
     );

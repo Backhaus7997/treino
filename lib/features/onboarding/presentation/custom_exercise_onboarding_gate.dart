@@ -9,6 +9,7 @@ import '../domain/onboarding_surface.dart';
 import 'custom_exercise_onboarding_slides.dart';
 import 'onboarding_card_content.dart';
 import 'custom_exercise_onboarding_view.dart';
+import '../../../app/theme/tokens/primitives.dart';
 
 /// Runs the "Creá tus propios ejercicios" onboarding once, the first time a
 /// user opens the routine editor in CREATE mode.
@@ -146,7 +147,7 @@ class _OnboardingSheet extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
         border: Border(top: BorderSide(color: palette.border)),
       ),
       child: SafeArea(
@@ -188,7 +189,7 @@ class _OnboardingDialog extends StatelessWidget {
     return Dialog(
       backgroundColor: palette.bgCard,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         side: BorderSide(color: palette.border),
       ),
       child: ConstrainedBox(
