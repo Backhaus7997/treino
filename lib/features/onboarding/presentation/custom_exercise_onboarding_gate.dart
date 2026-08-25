@@ -60,6 +60,20 @@ Future<void> maybeShowCustomExerciseOnboarding({
   // reports success.
   if (ref.read(onboardingBlocksProvider)) return;
 
+  // En el Coach Hub, `onboardingBlocksProvider` NO alcanza: sólo mira el tour
+  // MOBILE (`pendingMobileTourProvider`). Un PF que ya vio `trainerMobile`
+  // pero no `trainerWeb`, y cuyo perfil resuelve después de que monta esta
+  // pantalla, pasaba el guard de arriba, abría este diálogo, y recién ahí
+  // `CoachHubTourGate` rebuildeaba y le empujaba el tour por encima.
+  //
+  // Se chequea acá y no dentro de `onboardingBlocksProvider` a propósito:
+  // sumarlo allá bloquearía las superficies MOBILE por un tour WEB pendiente
+  // que en el teléfono no se puede ver, que es peor que el bug original.
+  if (surface == OnboardingSurface.customExerciseTrainerWeb &&
+      ref.read(shouldShowTourProvider(OnboardingSurface.trainerWeb))) {
+    return;
+  }
+
   if (!ref.read(shouldShowTourProvider(surface))) return;
 
   final slides = customExerciseSlidesFor(surface);
