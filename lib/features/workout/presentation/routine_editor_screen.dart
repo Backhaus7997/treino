@@ -483,7 +483,9 @@ String? _existingIdFor(RoutineEditorMode mode) => switch (mode) {
 /// are writing for themselves.
 OnboardingSurface _onboardingSurfaceFor(RoutineEditorMode mode) =>
     switch (mode) {
-      SelfCreating() => OnboardingSurface.customExerciseAthleteMobile,
+      SelfCreating() ||
+      SelfCustomizing() =>
+        OnboardingSurface.customExerciseAthleteMobile,
       TrainerAssigning() ||
       TrainerTemplating() =>
         OnboardingSurface.customExerciseTrainerMobile,
@@ -585,9 +587,18 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     if (existingId != null) {
       _loadExistingRoutine(existingId);
     } else {
-      // Create mode only — `existingId == null` is exactly that, for all three
-      // variants, so someone deep-linking into an existing routine never gets
-      // the onboarding on top of their plan.
+      // Create mode only — `existingId == null` is exactly that for three of
+      // the four variants, so quien entra por deep-link a una rutina que ya
+      // existe nunca recibe el onboarding encima de su plan.
+      //
+      // `SelfCustomizing` es la excepción y hoy queda AFUERA: su id es un
+      // SOURCE, no un destino (ver `_existingIdFor`), así que nunca es null y
+      // esta rama no corre. O sea que el atleta que arranca de una plantilla
+      // —que está armando su propia rutina igual que `SelfCreating`— no ve
+      // este onboarding. Es un gap conocido, no un descuido: incluirlo pide
+      // separar "hidrata de un id" de "edita algo existente", que es un
+      // cambio de #647 y no de este PR. `_onboardingSurfaceFor` ya lo mapea
+      // al deck de atleta para cuando eso pase.
       //
       // Post-frame, not here: `initState` has no `Localizations` ancestor
       // resolved yet and the navigator cannot present mid-frame. In create mode
