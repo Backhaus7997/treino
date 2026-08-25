@@ -1,0 +1,1 @@
+gimnasio,gym,pesas,fuerza,series,repeticiones,progresion,musculacion,entrenador,ejercicios
