@@ -128,21 +128,34 @@ Cinco paths siguen **sin una sola aserción negativa**:
 > cambia el resultado según el estado del documento, el test tiene que
 > recorrer los dos estados o la celda miente por omisión.
 
-### 1.2 Storage — 6 paths declarados en `storage.rules`
+### 1.2 Storage — 7 paths declarados en `storage.rules`
 
 | Path | get | list | write | delete |
 |---|---|---|---|---|
 | `avatars/{file}` | ✅† | ✅ | ✅ | ✅ |
-| `temp/uploads/{uid}/**` | — | — | — | — |
+| `temp/uploads/{uid}/**` | ✅ | ✅ | ✅ | ✅ |
 | `customExerciseVideos/{uid}/**` | ✅† | ✅ | ✅ | ✅ |
 | `chatMedia/{chatId}/{uid}/**` | 🟡 | 🟡 | — | — |
 | `athleteFiles/{pairId}/**` | ✅ | ✅ | ✅ | ✅ |
 | `postPhotos/{uid}/{file}` | ✅ | ✅ | ✅ | ✅ |
+| `sessionFeedback/{uid}/{sid}/{file}` | ✅ | ✅ | ✅ | ✅ |
 
-**18 de 24 celdas** (75%). Hay además un séptimo bloque, el catch-all
+**26 de 28 celdas** (93%). Las dos que faltan son `write` y `delete` de
+`chatMedia`. Hay además un octavo bloque, el catch-all
 `match /{allPaths=**} { allow read, write: if false; }`, que sólo se ejercita
 de refilón: el caso "listar `postPhotos/`" de
 `post-photos-storage-rules.test.ts` cae en él, pero nada lo testea de frente.
+
+> **Nota de recuento (#804).** La fila de `sessionFeedback` y el header
+> ("7 paths", 28 celdas) los agrega este PR, pero el path no es suyo: lo
+> introdujo **#801**, que sumó el `match` a `storage.rules` y su
+> `session-feedback-storage-rules.test.ts` sin actualizar esta tabla. Se
+> corrige acá porque el total de §1.2 es un conteo global: dejarlo en "6 paths
+> / 24 celdas" habría hecho que el número de **este** PR también fuera falso.
+> Las cuatro celdas se marcaron leyendo el archivo de test, no por inferencia:
+> `get` (dueño, PF con grant, PF sin grant, PF ajeno, autenticado cualquiera,
+> revocado y anónimo), `list` (los tres niveles), `write` (dueño, ajeno, PF,
+> content-type y anónimo) y `delete` (dueño, PF, tercero y anónimo).
 
 > **† — cobertura de piso, no de fondo. Leer esas dos celdas como "cubierto"
 > sería un error.** El único negativo que existe sobre ellas es el del usuario
@@ -171,6 +184,15 @@ de refilón: el caso "listar `postPhotos/`" de
 > `allow delete`.
 >
 > Los tres tickets están medidos contra el emulador y explicados en §3.
+
+> **La fila de `temp/uploads` pasó de cuatro `—` a cuatro ✅ de una sola vez**,
+> y no por haber escrito cuatro tests sobre una regla que seguía igual: el
+> bloque se **cerró entero** (QA-SEC-015, §4.9). Las cuatro operaciones son
+> ahora `if false`, así que cada celda se pinea con el negativo del **dueño**
+> además del ajeno y el anónimo — no hay ningún permiso amplio que un
+> `assertSucceeds` pudiera congelar, que es lo que §1.6 regla 1 prohíbe. Las
+> celdas no llevan † por el mismo motivo: acá no hay "cobertura de piso", el
+> piso y el fondo son la misma denegación.
 
 ### 1.3 De dónde salen estos números
 
@@ -201,7 +223,7 @@ Esto es lo primero que hay que saber antes de tocar una regla:
 
 | Suite | Archivos | Job de CI | Cómo se corre a mano |
 |---|---|---|---|---|
-| `functions/src/__tests__/*-rules.test.ts` | 24 | *Functions Test* | `npm --prefix functions run test:rules:emulator` |
+| `functions/src/__tests__/*-rules.test.ts` | 34 | *Functions Test* | `npm --prefix functions run test:rules:emulator` |
 | `scripts/rules_test/*.test.js` | 8 | *Rules Test* | `bash scripts/test_rules.sh` |
 
 La segunda entró en CI con **#680 Slice B**. Hasta ahí era un ítem de checklist
@@ -307,12 +329,15 @@ Ordenados por lo que me preocuparía primero:
    verificación. Slice E también dejó tests para las celdas que **sí** estaban
    decididas (§3.7). **Los dos leaks ya cerraron: QA-SEC-008 en #763 y
    QA-SEC-007 en #764.**
-2. **`storage:temp/uploads` y el catch-all `{allPaths=**}`**: cero tests.
-   `temp/uploads` es `read: if false` + write por dueño, y ahí van los Excel
-   que sube el PF. Barato de cerrar; quedó afuera por tiempo. El threat model
-   además midió que ese `write` **no tiene allowlist de content-type ni cap de
-   tamaño** —el único del archivo que no los tiene— y le abrió ticket propio:
-   **QA-SEC-015** (§4.9).
+2. ~~**`storage:temp/uploads` y el catch-all `{allPaths=**}`**: cero tests.~~
+   — **`temp/uploads` CERRADO en #804**; el catch-all sigue sin test de frente.
+   El texto original decía que ahí "van los Excel que sube el PF": era falso.
+   **Nunca hubo un writer en `lib/`** —`git log -S "temp/uploads" --all --
+   lib/` devuelve cero commits— y el import de planes es 100% client-side en
+   memoria. Con eso, QA-SEC-015 no se cerró poniéndole allowlist + cap al
+   `write` sino **eliminando el camino de escritura**: las cuatro operaciones
+   son `if false` y las cuatro celdas de §1.2 quedaron cubiertas por
+   `temp-uploads-storage-rules.test.ts`. Ver §4.9.
 3. **`users/{uid}` get/list**: la regla es owner-only y no hay ni un negativo
    que compruebe que un tercero no lee el doc de otro. Cubierto de refilón por
    los tests de subcolecciones, nunca de frente. El threat model **lo midió**
@@ -507,7 +532,7 @@ personal que guarda es el uid del PF que lo dio de alta.
 | # | Path | Contenido | De quién | Lectura |
 |---|---|---|---|---|
 | S1 | `avatars/{uid}.{ext}` | Foto de perfil | 👤 | Cualquier autenticado |
-| S2 | `temp/uploads/{uid}/**` | Excel de planes que sube el PF | 👤 (PF) | Nadie (`read: if false`) |
+| S2 | `temp/uploads/{uid}/**` | ~~Excel de planes que sube el PF~~ → **nada nuevo**: el bloque quedó cerrado a la escritura (QA-SEC-015, §4.9). Nunca hubo un writer en `lib/`; lo que haya en reposo es de antes | 👤 | Nadie (`get`/`list` `if false`) |
 | S3 | `customExerciseVideos/{uid}/**` | Videos tutoriales | 👤 | Cualquier autenticado |
 | S4 | `chatMedia/{chatId}/{uid}/**` | Fotos y videos de chats 1-1 | 👤 | `get` sólo miembros del chat; `list` cerrado |
 | S5 | `athleteFiles/{trainerId}_{athleteId}/**` | PDFs e imágenes del PF **sobre** el alumno | 🫱 | Sólo el PF del par |
@@ -1315,7 +1340,7 @@ donde se aclara.
 | `customExerciseVideos/` | ALLOW | ~~ALLOW~~ → **DENY** ✅ | ~~ALLOW~~ → **DENY** ✅ | DENY | ALLOW | DENY |
 | `postPhotos/` | ALLOW | DENY | DENY | DENY | ALLOW | DENY |
 | `chatMedia/` | DENY (no miembro) | DENY | DENY | DENY | — | DENY |
-| `temp/uploads/` | DENY | DENY | DENY | DENY | — | DENY |
+| `temp/uploads/` | DENY | DENY | DENY | DENY | ~~—~~ → **DENY** ✅ | DENY |
 | catch-all `/` | — | — | DENY | — | — | — |
 
 Anónimo: **DENY en todas las celdas de todos los paths**. El piso está bien.
@@ -1333,6 +1358,19 @@ ticket — el 🐛 no era un permiso mal puesto sino una evaluación que explota
 `chatMedia` y `temp/uploads` se midieron sólo como control — están fuera del
 alcance de este slice y salieron cerrados en todos los casos probados, lo que
 confirma que el endurecimiento de `chatMedia` (Slice A / AD-2) hace lo que dice.
+
+**Re-medición de `temp/uploads` (#804, QA-SEC-015).** Como pide la regla 5 de
+§3.8, la fila se volvió a medir cuando el bloque cambió, no se heredó. Las cinco
+celdas que ya eran DENY siguen DENY, pero **por otro motivo**: antes el ajeno
+rebotaba contra `request.auth.uid == userId` y el `read: if false`; ahora rebota
+contra un bloque cerrado en las cuatro operaciones. La celda `delete dueño` sale
+de `—` a DENY —y deniega **por permiso**, no por el null deref de QA-SEC-009:
+este bloque no dereferencia `request.resource`—.
+
+Ojo con leer esta fila como "acá no cambió nada". **El hallazgo de QA-SEC-015
+nunca estuvo en esta tabla**: el actor de §3.5 es el que **no** es dueño, y lo
+que estaba abierto era el `write` del **dueño sobre su propia carpeta**. Esa
+celda vive en la tabla de §4.9, y ahí es donde se ve el ALLOW → DENY.
 
 ### 3.6 Veredicto y tickets
 
@@ -1637,7 +1675,7 @@ hallazgo:
 | `trainerPublicProfiles` **propio**, sin ser trainer | **ALLOW** → QA-SEC-013 |
 | `gyms/{id}` `google-places` nuevo, con campos arbitrarios | **ALLOW** → §4.10 |
 | `appointments` en la agenda de **cualquier** PF, con 30 KB de texto libre | **ALLOW** → QA-SEC-014 |
-| `temp/uploads/{self}/payload.exe`, sin límite de tamaño | **ALLOW** → QA-SEC-015 |
+| `temp/uploads/{self}/payload.exe`, sin límite de tamaño | ~~**ALLOW**~~ → **DENY** ✅ (QA-SEC-015 cerrado en #804) |
 
 ---
 
@@ -2018,7 +2056,7 @@ Ordenados por lo que me preocuparía primero.
 | **QA-SEC-012** | `visibility: 'shared'` concede lectura y enumeración mundial a una feature que el dominio declara reservada | `:259` | Media | [#779](https://github.com/Backhaus7997/treino/issues/779) |
 | **QA-SEC-013** | El gate de rol de Slice C no llegó a las 3 colecciones que publican al PF | `:1111`, `:1816`, `:1826` | Media | [#780](https://github.com/Backhaus7997/treino/issues/780) |
 | **QA-SEC-014** | `appointments` create sin allowlist de campos ni cap de tamaño: un desconocido escribe en la agenda de cualquier PF | `:1858` | Media | [#781](https://github.com/Backhaus7997/treino/issues/781) |
-| **QA-SEC-015** | `temp/uploads` es el único write de Storage sin allowlist de content-type ni cap de tamaño | `storage.rules:19` | Baja | [#782](https://github.com/Backhaus7997/treino/issues/782) |
+| ~~**QA-SEC-015**~~ | `temp/uploads` es el único write de Storage sin allowlist de content-type ni cap de tamaño | `storage.rules:88` | Baja | **CERRADO** en #804 ([#782](https://github.com/Backhaus7997/treino/issues/782)) |
 | **QA-SEC-016** | El scanner de App Check cubre 2 de los 5 callables desplegados | `appcheck-enforcement.test.ts:18` | Baja | ~~[#783](https://github.com/Backhaus7997/treino/issues/783)~~ cerrado |
 
 ---
@@ -2214,7 +2252,10 @@ rango sobre `startsAt`, y decidir aparte si el auto-booking debería exigir
 
 ---
 
-**QA-SEC-015 — `temp/uploads` es el único write de Storage sin allowlist ni cap.**
+**~~QA-SEC-015~~ — `temp/uploads` es el único write de Storage sin allowlist ni
+cap. — CERRADO en #804 (issue [#782](https://github.com/Backhaus7997/treino/issues/782)).**
+
+La regla al momento del hallazgo:
 
 ```
 match /temp/uploads/{userId}/{file=**} {
@@ -2228,7 +2269,7 @@ declara ninguno de los dos. Medido, con el mismo payload:
 
 | Path | `.exe` de 4 bytes | 8 MB |
 |---|---|---|
-| `temp/uploads/{self}/` | **ALLOW** | **ALLOW** |
+| `temp/uploads/{self}/` | ~~**ALLOW**~~ → **DENY** ✅ | ~~**ALLOW**~~ → **DENY** ✅ |
 | `avatars/{self}.exe` | DENY | (cap 5 MB) |
 | `postPhotos/{self}/` | DENY | (cap 15 MB) |
 | `customExerciseVideos/{self}/` | DENY | (cap 100 MB) |
@@ -2238,16 +2279,95 @@ y el `read: if false` aguanta — medido, `getDownloadURL()` sobre lo que uno mi
 subió **también da DENY**, porque mintear el token exige leer la metadata. **No es
 un file host público**, y eso es lo que baja la severidad a Baja.
 
-Lo que queda es: cualquier autenticado —incluido un rol `athlete`, que no tiene
-nada que hacer ahí, porque el path es para los Excel que importa el PF— puede
-escribir bytes arbitrarios, en cantidad arbitraria, en nuestro bucket. Sin ciclo
-de vida: el prefijo se llama `temp/` pero no hay TTL ni job de limpieza; lo único
-que barre `temp/uploads/{uid}/` es el cascade de borrado de cuenta
-(`cascade/storage.ts:67`), o sea que los bytes viven mientras viva la cuenta.
+Lo que quedaba era: cualquier autenticado —incluido un rol `athlete`, que no
+tiene nada que hacer ahí— podía escribir bytes arbitrarios, en cantidad
+arbitraria, en nuestro bucket. Sin ciclo de vida: el prefijo se llama `temp/`
+pero no hay TTL ni job de limpieza; lo único que barre `temp/uploads/{uid}/` es
+el cascade de borrado de cuenta (`cascade/storage.ts:67`), o sea que los bytes
+vivían mientras viviera la cuenta.
 
-*Arreglo propuesto:* content-type allowlist (los MIME de Excel) + cap de tamaño,
-espejo del guard del cliente, y una regla de ciclo de vida en el bucket. Ojo con
-uno solo de los dos: sin TTL, el cap sólo hace la acumulación más lenta.
+*Arreglo propuesto en su momento:* content-type allowlist (los MIME de Excel) +
+cap de tamaño, espejo del guard del cliente, y una regla de ciclo de vida en el
+bucket. Ojo con uno solo de los dos: sin TTL, el cap sólo hace la acumulación
+más lenta.
+
+**Lo que se hizo, y por qué es otra cosa.** El arreglo propuesto arriba —y el
+alcance del issue— daban por sentado que el path tenía un camino de escritura
+legítimo que había que acotar. **No lo tenía.** Este párrafo y el comentario
+viejo del bloque decían que ahí "van los Excel que importa el PF"; es falso, y
+la comprobación es de una línea:
+
+```bash
+git log --oneline -S "temp/uploads" --all -- lib/   # → cero commits
+```
+
+Nunca existió un writer en `lib/`. No es que se removió: el bloque entró
+**vestigial** en `75581f89` (#106), el commit que trajo `storage.rules` desde el
+repo viejo, describiendo una arquitectura server-side que TREINO Flutter nunca
+implementó. El import de planes por Excel es 100% client-side y en memoria
+(`FilePicker.pickFiles(withData: true)` → `file.bytes` →
+`PlanImportRepository.parseAndMatch(bytes:)` → `parseExcelBytes()`); los bytes
+del `.xlsx` no salen del proceso. Y del lado servidor no hay un solo reader:
+lo único que toca el prefijo es `functions/src/cascade/storage.ts:67`, con
+Admin SDK, que ignora estas reglas (ADR-ACCDEL-013).
+
+Con eso, poner allowlist + cap habría **preservado** una superficie de escritura
+que ningún código usa, a cambio de nada. El bloque se cerró entero:
+
+```
+match /temp/uploads/{userId}/{file=**} {
+  allow get: if false;
+  allow list: if false;
+  allow write: if false;
+}
+```
+
+Tres consecuencias que conviene tener escritas:
+
+1. **La regla de ciclo de vida del bucket que pedía el issue dejó de hacer
+   falta.** El issue insistía —con razón, dado su supuesto— en que cap sin TTL
+   sólo hace la acumulación más lenta. Sin escrituras no hay acumulación que
+   expirar. Lo que ya está en reposo lo sigue barriendo el cascade de borrado
+   de cuenta.
+2. **No lleva `allow delete` propio, y eso es correcto acá.** La regla 3 de
+   §3.8 aplica a los bloques que dereferencian `request.resource.<algo>`: ahí
+   el delete explota con "Null value error" y se deniega hasta para el dueño
+   (QA-SEC-009). Este bloque no dereferencia nada, así que el `write: if false`
+   cubre el delete **denegando por permiso**, que es la denegación que se
+   quiere. Está medido, no razonado: ver la celda `delete dueño` de §3.5.
+3. **`get` y `list` van separados aunque los dos sean `if false`** (§3.8 regla
+   2). No cambia el comportamiento; evita que el próximo que afloje el bloque
+   escriba `read` a secas y se lleve `list` puesto sin darse cuenta.
+
+*Si el import alguna vez se mueve a server-side*, este bloque se reabre — con el
+flujo real a la vista, que es mejor que adivinar hoy un cap y un MIME para un
+consumidor que no existe.
+
+**Verificación de mutación.** Como pide §1.8, antes de dar las cuatro celdas por
+cerradas se aflojó la regla y se comprobó qué se pone rojo. Tres mutaciones,
+medidas contra el emulador sobre las 5 suites `*-storage-rules.test.ts` de
+`functions/`, con el baseline probado primero (62 tests verdes):
+
+| Mutación | Qué se aflojó | Rojos |
+|---|---|---|
+| A | La regla pre-PR (`read: if false` + `write` por dueño) | **3** — `write` del dueño (con y sin content-type de Excel) y `delete` |
+| B | `get`/`list` → `if request.auth != null` | **4** — `get` dueño y ajeno, `list` de la carpeta y **de la raíz** |
+| C | Bloque abierto del todo (`if true`) | **10** — el archivo entero |
+
+En las tres, el único archivo que se pone rojo es
+`temp-uploads-storage-rules.test.ts`: cero rojos en `avatars`, `athleteFiles`,
+`customExerciseVideos` y `postPhotos`. La mutación C está para que ningún
+negativo quede de decoración — los tres que A y B no matan (`write` ajeno,
+`write` anónimo, `get` anónimo) son el piso, y C demuestra que también son
+vivos.
+
+⚠️ **La mutación desmintió un supuesto, y ese es el punto de correrla.** El test
+afirmaba que listar la raíz `temp/uploads/` lo cerraba el catch-all
+`{allPaths=**}` y no este bloque, copiando el razonamiento de §3.4 —donde para
+`postPhotos` eso **sí** es cierto porque su `match` pide dos segmentos—. Acá no:
+al aflojar el `list` de este bloque, la raíz pasó a ALLOW junto con la carpeta,
+o sea que el `{file=**}` la alcanza. El comentario del test quedó corregido para
+decir lo medido.
 
 ---
 
@@ -2419,7 +2539,7 @@ y se tacha acá con la referencia al PR — nunca se borra. Los hallazgos de
 | QA-SEC-012 | `visibility: 'shared'` concede lectura mundial a una feature reservada | Abierto — [#779](https://github.com/Backhaus7997/treino/issues/779), §4.9 |
 | QA-SEC-013 | El gate de rol de trainer no llegó a 3 colecciones | Abierto — [#780](https://github.com/Backhaus7997/treino/issues/780), §4.9 |
 | QA-SEC-014 | `appointments` create sin allowlist ni cap de tamaño | Abierto — [#781](https://github.com/Backhaus7997/treino/issues/781), §4.9 |
-| QA-SEC-015 | `temp/uploads` sin allowlist de content-type ni cap | Abierto — [#782](https://github.com/Backhaus7997/treino/issues/782), §4.9 |
+| QA-SEC-015 | `temp/uploads` sin allowlist de content-type ni cap | ~~Cerrado~~ — #804 (issue [#782](https://github.com/Backhaus7997/treino/issues/782)): bloque cerrado entero, no acotado. `storage.rules:88`, `temp-uploads-storage-rules.test.ts`, §4.9 |
 | QA-SEC-016 | El scanner de App Check cubre 2 de 5 callables | ~~Cerrado~~ — [#783](https://github.com/Backhaus7997/treino/issues/783) / [#805](https://github.com/Backhaus7997/treino/pull/805), `appcheck-enforcement.test.ts` + `helpers/appcheck-audit.ts`, §4.8.1 y §4.9 |
 | QA-SEC-100 | Android: `allowBackup` | ~~Cerrado~~ — `test/security/android_manifest_backup_test.dart` |
 
