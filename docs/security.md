@@ -1871,7 +1871,7 @@ Es exactamente el defecto que §1.4 midió para `rules.test.js` —un guard que 
 distingue "cambió porque quisimos" de "se rompió"— con el agravante de que acá el
 inventario es manual y el drift es la operación normal. → **QA-SEC-016**.
 
-**Cerrado en [#784](https://github.com/Backhaus7997/treino/pull/784)**: el scanner
+**Cerrado en [#805](https://github.com/Backhaus7997/treino/pull/805)**: el scanner
 ya no tiene lista propia. La deriva de `index.ts` por AST —los callables
 desplegados son los símbolos exportados ahí que resuelven a un `onCall`— y las
 tres exenciones pasaron a un registry con motivo, permanencia
@@ -2234,7 +2234,7 @@ está decidido es que el guard afirme una propiedad que no verifica. Y una de la
 tres exenciones (`mintWatchCredential`) se declara a sí misma *"deuda, no decisión
 de diseño"*, con un TODO de restauración que nada vigila.
 
-*Arreglado en [#784](https://github.com/Backhaus7997/treino/pull/784):* la lista
+*Arreglado en [#805](https://github.com/Backhaus7997/treino/pull/805):* la lista
 se deriva de `index.ts` por AST —los callables desplegados son exactamente los
 símbolos exportados ahí que resuelven a un `onCall`— y las exenciones son
 entradas explícitas con motivo, de modo que agregar un callable sin atestación
@@ -2386,7 +2386,7 @@ y se tacha acá con la referencia al PR — nunca se borra. Los hallazgos de
 | QA-SEC-003 | `gyms`: coordenadas sin validar + campos de identidad sin pinear en el update | ~~Cerrado~~ — `firestore.rules:1203`, `rules.test.js` |
 | QA-SEC-004 | — | **nunca asignado** |
 | QA-SEC-005 | — | **nunca asignado** |
-| QA-SEC-006 | App Check obligatorio en los callables desplegados | ~~Cerrado~~ — `appcheck-enforcement.test.ts`. Su cobertura quedó desactualizada (→ QA-SEC-016) y se **re-cerró** con inventario derivado de `index.ts` en [#784](https://github.com/Backhaus7997/treino/pull/784) |
+| QA-SEC-006 | App Check obligatorio en los callables desplegados | ~~Cerrado~~ — `appcheck-enforcement.test.ts`. Su cobertura quedó desactualizada (→ QA-SEC-016) y se **re-cerró** con inventario derivado de `index.ts` en [#805](https://github.com/Backhaus7997/treino/pull/805) |
 | QA-SEC-007 | `storage:avatars/` — `list` enumera el padrón de uids con avatar | Abierto — [#764](https://github.com/Backhaus7997/treino/issues/764), §3.6 |
 | QA-SEC-008 | `storage:customExerciseVideos/` — `list` exfiltra la videoteca entera de un PF | Abierto — [#763](https://github.com/Backhaus7997/treino/issues/763), §3.6 |
 | QA-SEC-009 | `storage:avatars/` — `delete` denegado hasta para el dueño por null deref | Abierto — [#765](https://github.com/Backhaus7997/treino/issues/765), §3.6 |
@@ -2396,7 +2396,7 @@ y se tacha acá con la referencia al PR — nunca se borra. Los hallazgos de
 | QA-SEC-013 | El gate de rol de trainer no llegó a 3 colecciones | Abierto — [#780](https://github.com/Backhaus7997/treino/issues/780), §4.9 |
 | QA-SEC-014 | `appointments` create sin allowlist ni cap de tamaño | Abierto — [#781](https://github.com/Backhaus7997/treino/issues/781), §4.9 |
 | QA-SEC-015 | `temp/uploads` sin allowlist de content-type ni cap | Abierto — [#782](https://github.com/Backhaus7997/treino/issues/782), §4.9 |
-| QA-SEC-016 | El scanner de App Check cubre 2 de 5 callables | ~~Cerrado~~ — [#783](https://github.com/Backhaus7997/treino/issues/783) / [#784](https://github.com/Backhaus7997/treino/pull/784), `appcheck-enforcement.test.ts` + `helpers/appcheck-audit.ts`, §4.8.1 y §4.9 |
+| QA-SEC-016 | El scanner de App Check cubre 2 de 5 callables | ~~Cerrado~~ — [#783](https://github.com/Backhaus7997/treino/issues/783) / [#805](https://github.com/Backhaus7997/treino/pull/805), `appcheck-enforcement.test.ts` + `helpers/appcheck-audit.ts`, §4.8.1 y §4.9 |
 | QA-SEC-100 | Android: `allowBackup` | ~~Cerrado~~ — `test/security/android_manifest_backup_test.dart` |
 
 **Próximo id libre: QA-SEC-017** (y `QA-SEC-1xx`: 101).
