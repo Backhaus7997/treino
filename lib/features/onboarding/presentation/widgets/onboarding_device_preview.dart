@@ -144,10 +144,19 @@ class OnboardingDevicePreview extends StatelessWidget {
                               viewPadding: EdgeInsets.zero,
                               viewInsets: EdgeInsets.zero,
                             ),
-                            child: ExcludeSemantics(
-                              child: ProviderScope(
-                                overrides: onboardingSampleOverrides(),
-                                child: child,
+                            // `ExcludeSemantics` saca el preview del recorrido
+                            // de accesibilidad, pero NO apaga el hit testing:
+                            // los decks montan widgets vivos (`RutinasSection`,
+                            // `LinkStateCard`), así que sin `IgnorePointer` un
+                            // tap sobre la miniatura dispara navegación real o
+                            // callbacks de repositorio por detrás del tour.
+                            // Es una foto de la app, no la app.
+                            child: IgnorePointer(
+                              child: ExcludeSemantics(
+                                child: ProviderScope(
+                                  overrides: onboardingSampleOverrides(),
+                                  child: child,
+                                ),
                               ),
                             ),
                           ),
