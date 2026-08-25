@@ -8,15 +8,25 @@
  * wiping the simulator does NOT bring the cards back. This does.
  *
  * Deleting the whole field is the correct reset: an absent map reads as
- * "nothing seen" for every module (see OnboardingModuleX.shouldShow), which is
+ * "nothing seen" for every surface (see OnboardingSurface.shouldShow), which is
  * exactly the state a brand-new account is in. No backfill, no migration.
+ *
+ * The map is keyed by SURFACE, not by module/tab. The keys are the names of
+ * `OnboardingSurface` (lib/features/onboarding/domain/onboarding_surface.dart,
+ * `wireKey => name`) — it is a data contract, so keep the two in step:
+ *
+ *   athleteMobile · trainerMobile · trainerWeb
+ *
+ * An earlier draft of this header advertised module names (`home`, `feed`).
+ * Those never matched anything, so the partial reset silently cleared nothing
+ * and QA could believe an account had been reset when it had not.
  *
  * USAGE
  *   export GOOGLE_APPLICATION_CREDENTIALS="scripts/treino-dev-service-account.json"
  *   node scripts/reset_onboarding_cards.js <email>
  *
- *   # Reset only some modules instead of all of them:
- *   node scripts/reset_onboarding_cards.js <email> home feed
+ *   # Reset only some surfaces instead of all of them:
+ *   node scripts/reset_onboarding_cards.js <email> athleteMobile trainerWeb
  */
 
 'use strict';
@@ -64,6 +74,8 @@ async function run() {
     const unknown = modules.filter((m) => !seenKeys.includes(m));
     if (unknown.length > 0) {
       console.warn(`  (not currently seen, skipping: ${unknown.join(', ')})`);
+      console.warn(`  surfaces on this account: ${seenKeys.join(', ') || '(none)'}`);
+      console.warn('  expected surface keys: athleteMobile, trainerMobile, trainerWeb');
     }
     // Rewrite the whole map rather than deleting nested keys: it keeps this
     // script's semantics identical to the client's read-modify-write, and side-
