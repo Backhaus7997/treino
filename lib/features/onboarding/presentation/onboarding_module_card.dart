@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../app/theme/app_palette.dart';
 import 'onboarding_card_content.dart';
+import '../../../app/theme/tokens/primitives.dart';
 
 /// The card a module shows the first time the user opens it.
 ///
@@ -53,7 +54,7 @@ class OnboardingModuleCard extends StatelessWidget {
             decoration: BoxDecoration(
               color: palette.bgCard,
               border: Border.all(color: palette.border),
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(AppRadius.lg),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,

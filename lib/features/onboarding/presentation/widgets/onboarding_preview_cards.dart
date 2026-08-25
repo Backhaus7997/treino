@@ -15,6 +15,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../app/theme/tokens/primitives.dart';
 
 /// The card shell these share: `bgCard`, hairline border, rounded.
 ///
@@ -103,7 +104,7 @@ class OnboardingVolumeCard extends StatelessWidget {
                           color: i >= _bars.length - 2
                               ? palette.accent
                               : palette.textMuted.withValues(alpha: 0.18),
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: BorderRadius.circular(AppDecorativeRadii.previewChartBar),
                         ),
                       ),
                     ),
@@ -165,7 +166,7 @@ class OnboardingAssignedPlanCard extends StatelessWidget {
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: palette.highlight.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(999),
+                  borderRadius: BorderRadius.circular(AppRadius.full),
                 ),
                 child: Text(
                   'SEMANA 3', // i18n
@@ -192,7 +193,7 @@ class OnboardingAssignedPlanCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           ClipRRect(
-            borderRadius: BorderRadius.circular(999),
+            borderRadius: BorderRadius.circular(AppRadius.full),
             child: SizedBox(
               height: 8,
               child: Stack(
@@ -392,7 +393,7 @@ class OnboardingPhotoPost extends StatelessWidget {
       decoration: BoxDecoration(
         color: palette.bgCard,
         border: Border.all(color: palette.border),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -469,7 +470,7 @@ class OnboardingPhotoPost extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 18),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(AppDecorativeRadii.previewPhoto),
               child: SizedBox(
                 height: 190,
                 width: double.infinity,

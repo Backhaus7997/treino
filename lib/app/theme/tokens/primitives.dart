@@ -288,6 +288,57 @@ abstract final class AppRadius {
   static const double full = 9999.0;
 }
 
+/// Capa 1 — Radios de las ILUSTRACIONES del onboarding (#627).
+///
+/// Contraparte de [AppDecorativePalettes] para la escala de radios, y existe
+/// por la misma razón: los decks del tour **dibujan** la app —un chasis de
+/// teléfono, una nav bar replicada, fotos en miniatura— en vez de mostrar
+/// capturas, y la geometría de un dibujo no es la geometría de la UI.
+///
+/// Estos valores **no son excepciones a [AppRadius] ni deuda pendiente de
+/// migrar**: forzarlos a la escala no los "corrige", deforma el dibujo. El
+/// marco exterior de 34 y la pantalla de 26 son proporciones de un teléfono
+/// visto en chico; con `AppRadius.lg` (20) los dos dejan de leerse como un
+/// teléfono. Y `AppRadius.sm` (12) es casi el ancho completo de la barra de
+/// progreso de 4px, que necesita 2.
+///
+/// La regla que sí aplica: **nada acá se usa en UI real**. Si un widget de
+/// producto necesita uno de estos números, el que está mal es el widget —
+/// va [AppRadius]. Estos son para pintar, no para construir.
+abstract final class AppDecorativeRadii {
+  /// `41.0` — Pill de la nav bar replicada en el deck (`OnboardingNavBar`).
+  ///
+  /// Deliberadamente distinto del `36` de `TreinoBottomBar`: la réplica se
+  /// dibuja más chata que la barra real para que entre en el device preview.
+  static const double navBarPill = 41.0;
+
+  /// `34.0` — Esquina exterior del chasis blanco (`OnboardingDevicePreview`).
+  static const double deviceFrame = 34.0;
+
+  /// `26.0` — Pantalla recortada dentro del chasis. La diferencia con
+  /// [deviceFrame] es el grosor del bezel; moverlos por separado lo deforma.
+  static const double deviceScreen = 26.0;
+
+  /// `24.0` — Marco de las cards que el deck del entrenador dibuja adentro
+  /// del preview (`trainer_previews.dart`).
+  static const double previewCardFrame = 24.0;
+
+  /// `14.0` — Fotos en miniatura dentro de un preview. No es `AppRadius.sm`
+  /// (12) ni `md` (16): a este tamaño de dibujo la foto es de ~90px de ancho
+  /// y los 2px se ven.
+  static const double previewPhoto = 14.0;
+
+  /// `7.0` — Barras de las ilustraciones esquemáticas
+  /// (`OnboardingIllustration`).
+  static const double illustrationBar = 7.0;
+
+  /// `6.0` — Barras del gráfico dibujado en las preview cards.
+  static const double previewChartBar = 6.0;
+
+  /// `2.0` — Segmento de la barra de progreso del flow (4px de ancho).
+  static const double progressSegment = 2.0;
+}
+
 /// Capa 1 — Tokens tipográficos del sistema de diseño TREINO.
 ///
 /// Solo expone familias y pesos. Los [TextStyle] completos viven en

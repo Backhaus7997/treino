@@ -5,6 +5,7 @@ import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
 import 'onboarding_card_content.dart';
+import '../../../app/theme/tokens/primitives.dart';
 
 /// Full-screen, swipeable welcome tour: one slide per section, run once right
 /// after login.
@@ -193,7 +194,7 @@ class _TourProgressBars extends StatelessWidget {
             height: 4,
             decoration: BoxDecoration(
               color: filled ? palette.accent : palette.border,
-              borderRadius: BorderRadius.circular(9999),
+              borderRadius: BorderRadius.circular(AppRadius.full),
             ),
           ),
         );
@@ -365,7 +366,7 @@ class _PrimaryCta extends StatelessWidget {
       width: double.infinity,
       height: 56,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(9999),
+        borderRadius: BorderRadius.circular(AppRadius.full),
         boxShadow: [
           BoxShadow(
             color: palette.accent.withValues(alpha: 0.18),

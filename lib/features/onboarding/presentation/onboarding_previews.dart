@@ -34,6 +34,7 @@ import 'onboarding_sample_data.dart';
 import 'widgets/onboarding_device_preview.dart';
 import 'widgets/onboarding_nav_bar.dart';
 import 'widgets/onboarding_preview_cards.dart';
+import '../../../app/theme/tokens/primitives.dart';
 
 // ── 1 — Resumen del día ─────────────────────────────────────────────────────
 
@@ -326,7 +327,7 @@ class _SegmentedPill extends StatelessWidget {
       decoration: BoxDecoration(
         color: palette.bgCard,
         border: Border.all(color: palette.border),
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(AppRadius.full),
       ),
       child: Row(
         children: [
@@ -335,7 +336,7 @@ class _SegmentedPill extends StatelessWidget {
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   color: i == 0 ? palette.accent : Colors.transparent,
-                  borderRadius: BorderRadius.circular(999),
+                  borderRadius: BorderRadius.circular(AppRadius.full),
                 ),
                 child: Center(
                   child: Text(

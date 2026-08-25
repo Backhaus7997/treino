@@ -18,6 +18,7 @@ import '../../../core/widgets/treino_icon.dart';
 import 'widgets/onboarding_nav_bar.dart';
 import 'widgets/onboarding_pulsing_dot.dart';
 import 'widgets/trainer_preview_kit.dart';
+import '../../../app/theme/tokens/primitives.dart';
 
 // ── 1 — Inicio · resumen del día ────────────────────────────────────────────
 
@@ -500,7 +501,7 @@ class _ToggleOn extends StatelessWidget {
       alignment: Alignment.centerRight,
       decoration: BoxDecoration(
         color: palette.accent,
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(AppRadius.full),
       ),
       child: Container(
         width: 19,
@@ -671,7 +672,7 @@ class TrainerFeedPreview extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               ClipRRect(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(AppDecorativeRadii.previewPhoto),
                 child: const SizedBox(
                   height: 180,
                   width: double.infinity,
@@ -988,7 +989,7 @@ class _SegmentedPill extends StatelessWidget {
       decoration: BoxDecoration(
         color: palette.bgCard,
         border: Border.all(color: palette.border),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppDecorativeRadii.previewCardFrame),
       ),
       child: Row(
         children: [
@@ -997,7 +998,7 @@ class _SegmentedPill extends StatelessWidget {
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   color: i == 0 ? palette.accent : Colors.transparent,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
                 ),
                 child: Center(
                   child: Text(

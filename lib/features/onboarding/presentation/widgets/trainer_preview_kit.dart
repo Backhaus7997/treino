@@ -20,6 +20,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
+import '../../../../app/theme/tokens/primitives.dart';
 
 /// Card shell: `bgCard`, hairline border, r-20 by default.
 class TCard extends StatelessWidget {
@@ -185,7 +186,7 @@ class TChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: filled ? color : color.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(AppRadius.full),
       ),
       child: Text(
         label,
@@ -234,7 +235,7 @@ class TButton extends StatelessWidget {
       decoration: BoxDecoration(
         color: filled ? palette.accent : Colors.transparent,
         border: filled ? null : Border.all(color: border),
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(AppRadius.full),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,

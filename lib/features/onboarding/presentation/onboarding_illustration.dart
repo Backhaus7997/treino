@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../app/theme/tokens/primitives.dart';
 
 /// A schematic drawing of the screen a slide is talking about.
 ///
@@ -280,7 +281,7 @@ class _MobileBody extends StatelessWidget {
               height: 5,
               decoration: BoxDecoration(
                 color: palette.textMuted.withValues(alpha: 0.30),
-                borderRadius: BorderRadius.circular(999),
+                borderRadius: BorderRadius.circular(AppRadius.full),
               ),
             ),
           ),
@@ -389,7 +390,7 @@ class _Block extends StatelessWidget {
         color: spec.accent
             ? palette.accent.withValues(alpha: 0.80)
             : palette.textMuted.withValues(alpha: 0.13),
-        borderRadius: BorderRadius.circular(7),
+        borderRadius: BorderRadius.circular(AppDecorativeRadii.illustrationBar),
       ),
       child: spec.avatar
           ? Row(
@@ -448,7 +449,7 @@ class _Pill extends StatelessWidget {
       padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
         color: palette.textMuted.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(AppRadius.full),
       ),
       child: Row(
         children: [
@@ -460,7 +461,7 @@ class _Pill extends StatelessWidget {
                   color: i == pill.activeIndex
                       ? palette.accent
                       : Colors.transparent,
-                  borderRadius: BorderRadius.circular(999),
+                  borderRadius: BorderRadius.circular(AppRadius.full),
                 ),
               ),
             ),
@@ -484,7 +485,7 @@ class _BottomBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 6),
       decoration: BoxDecoration(
         color: palette.textMuted.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(AppRadius.full),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -542,7 +543,7 @@ class _Line extends StatelessWidget {
           height: height,
           decoration: BoxDecoration(
             color: color,
-            borderRadius: BorderRadius.circular(999),
+            borderRadius: BorderRadius.circular(AppRadius.full),
           ),
         ),
       ),

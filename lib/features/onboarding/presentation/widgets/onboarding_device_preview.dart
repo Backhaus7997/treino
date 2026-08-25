@@ -62,7 +62,7 @@ class OnboardingDevicePreview extends StatelessWidget {
           // rule and lives in AppDecorativePalettes for the same reason —
           // decorative and theme-invariant, not a semantic token.
           color: Colors.white,
-          borderRadius: BorderRadius.circular(34),
+          borderRadius: BorderRadius.circular(AppDecorativeRadii.deviceFrame),
           boxShadow: [
             BoxShadow(
               color: AppDecorativePalettes.deviceFrameShadow
@@ -81,7 +81,7 @@ class OnboardingDevicePreview extends StatelessWidget {
           alignment: Alignment.topCenter,
           children: [
             ClipRRect(
-              borderRadius: BorderRadius.circular(26),
+              borderRadius: BorderRadius.circular(AppDecorativeRadii.deviceScreen),
               child: SizedBox(
                 width: kScreenSize.width,
                 height: kScreenSize.height,
@@ -167,7 +167,7 @@ class OnboardingDevicePreview extends StatelessWidget {
                 height: 4,
                 decoration: BoxDecoration(
                   color: Colors.black.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(999),
+                  borderRadius: BorderRadius.circular(AppRadius.full),
                 ),
               ),
             ),

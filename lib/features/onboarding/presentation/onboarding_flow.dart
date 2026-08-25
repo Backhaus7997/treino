@@ -5,6 +5,7 @@ import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
 import 'onboarding_slide.dart';
 import 'widgets/onboarding_device_preview.dart';
+import '../../../app/theme/tokens/primitives.dart';
 
 /// The welcome tour shell: five slides, each pairing a shrunk-down view of an
 /// app screen with a headline, a line of copy, and a CTA.
@@ -194,7 +195,7 @@ class _SlideView extends StatelessWidget {
                           height: 38,
                           decoration: BoxDecoration(
                             color: palette.accent,
-                            borderRadius: BorderRadius.circular(2),
+                            borderRadius: BorderRadius.circular(AppDecorativeRadii.progressSegment),
                           ),
                         ),
                         const SizedBox(width: 14),
@@ -256,7 +257,7 @@ class _ProgressBar extends StatelessWidget {
             height: 4,
             decoration: BoxDecoration(
               color: i <= current ? palette.accent : palette.border,
-              borderRadius: BorderRadius.circular(999),
+              borderRadius: BorderRadius.circular(AppRadius.full),
             ),
           ),
         );
@@ -343,7 +344,7 @@ class _PrimaryCta extends StatelessWidget {
       width: double.infinity,
       height: 56,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(AppRadius.full),
         boxShadow: [
           BoxShadow(
             color: palette.accent.withValues(alpha: 0.42),

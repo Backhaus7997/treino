@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
+import '../../../../app/theme/tokens/primitives.dart';
 
 /// The bottom bar as the onboarding handoff draws it — a still, onboarding-only
 /// rendering.
@@ -73,7 +74,7 @@ class OnboardingNavBar extends StatelessWidget {
         decoration: BoxDecoration(
           // High-opacity fill instead of a blur, matching production's choice.
           color: palette.bgCard.withValues(alpha: 0.92),
-          borderRadius: BorderRadius.circular(41),
+          borderRadius: BorderRadius.circular(AppDecorativeRadii.navBarPill),
           border: Border.all(color: palette.border),
           boxShadow: [
             BoxShadow(
