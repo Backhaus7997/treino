@@ -97,9 +97,15 @@ jobs:
           # `set -e` se lleva puesto el job entero — pasó en la primera corrida.
           git diff --cached --name-status
           # El mensaje del commit NO lleva el marcador, así que el push que
-          # esto genera no vuelve a disparar este workflow: no hay bucle. Y SÍ
-          # dispara ci.yml, que es lo que se quiere — el job `visual-gate`
-          # valida los goldens recién nacidos contra el código actual.
+          # esto genera no vuelve a disparar este workflow: no hay bucle.
+          #
+          # OJO: tampoco arranca ci.yml solo. GitHub deja los runs de un push
+          # hecho con GITHUB_TOKEN en `action_required`, esperando aprobación
+          # manual — su guardia contra bucles de automatización. El próximo
+          # push humano a la rama los corre normalmente. Documentado en
+          # docs/visual-gate.md §7, porque es el tipo de detalle que sin
+          # escribirlo se descubre a la mala: el gate en rojo, los goldens ya
+          # correctos en la rama, y nadie entendiendo por qué CI no dice nada.
           git commit -m "chore(gate): regenerar goldens del Coach Hub en el runner"
           git push origin HEAD
 

@@ -180,9 +180,15 @@ Flutter y **commitea los PNGs nuevos a tu rama**. Después:
 git pull
 ```
 
-En el PR, contá **qué cambió y por qué** — el commit de los PNGs lo firma un
+En el PR, contá **qué cambió y por qué** — el commit de los PNG lo firma un
 bot, así que el único lugar donde queda la intención es tu descripción. El log
 del job lista los archivos que cambiaron.
+
+> **El commit del bot no dispara CI por sí solo.** GitHub deja los runs de un
+> push hecho con `GITHUB_TOKEN` en `action_required`, esperando aprobación
+> manual: es su guardia contra bucles de automatización. Después del `git pull`,
+> tu próximo push —aunque sea el que actualiza la descripción— los corre
+> normalmente. Si no tenés nada que pushear, aprobalos desde la pestaña Actions.
 
 ### Cuando el gate rompe y NO sabés si el cambio era deliberado
 
