@@ -170,7 +170,7 @@ class WellbeingTrendChart extends StatelessWidget {
               touchTooltipData: LineTouchTooltipData(
                 getTooltipColor: (_) => palette.bgCard,
                 tooltipBorder: BorderSide(color: palette.border),
-                tooltipBorderRadius: BorderRadius.circular(8),
+                tooltipBorderRadius: BorderRadius.circular(AppRadius.sm),
                 getTooltipItems: (spots) => [
                   for (final s in spots)
                     LineTooltipItem(
