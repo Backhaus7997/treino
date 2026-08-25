@@ -14,7 +14,17 @@ import '../../../../coach/domain/subscription_tier.dart';
 import '../../../../coach/domain/trainer_subscription.dart';
 import '../../../../profile/application/user_providers.dart';
 import '../../../../profile/application/user_public_profile_providers.dart';
+import 'plan_copy.dart';
 import 'plan_limit_paywall.dart';
+
+/// La ruta de esta pantalla, en UN solo lugar.
+///
+/// La registra `routes.dart` y la empuja el banner de denegación del editor de
+/// rutinas. Escrita dos veces, un typo en cualquiera de las dos manda al PF a
+/// la página de error de go_router justo en el momento en que más necesita la
+/// respuesta — y compila, y pasa la suite, porque nada compara los dos
+/// literales.
+const String kBlockedStudentsRoutePath = '/facturacion/alumnos-solo-lectura';
 
 /// Qué alumnos del PF quedaron fuera del cupo de su plan, y qué significa eso.
 ///
@@ -44,14 +54,6 @@ import 'plan_limit_paywall.dart';
 /// que su plan Free incluye 2 alumnos y le ofrecería comprar el Plan 1. Por eso
 /// el `loading` de cualquiera de las dos gana sobre todo lo demás, y un perfil
 /// que no cargó nunca deriva en [_BlockCause.unknownPlan] en vez de en Free.
-/// La ruta de esta pantalla, en UN solo lugar.
-///
-/// La registra `routes.dart` y la empuja el banner de denegación del editor de
-/// rutinas. Escrita dos veces, un typo en cualquiera de las dos manda al PF a
-/// la página de error de go_router justo en el momento en que más necesita la
-/// respuesta — y compila, y pasa la suite, porque nada compara los dos
-/// literales.
-const String kBlockedStudentsRoutePath = '/facturacion/alumnos-solo-lectura';
 
 class BlockedStudentsScreen extends ConsumerWidget {
   const BlockedStudentsScreen({super.key});
@@ -266,8 +268,8 @@ class _EmptyState extends StatelessWidget {
               body: 'Ninguno de tus alumnos quedó fuera de tu cupo. Pero '
                   'mientras tu suscripción no esté al día tu cuenta funciona '
                   'con el límite del plan Free '
-                  '(${_cupoTexto(SubscriptionTier.free)}), no con el de tu '
-                  'plan ${_tierName(tier)}.', // i18n: Fase W3
+                  '(${cupoTexto(SubscriptionTier.free)}), no con el de tu '
+                  'plan ${tierName(tier)}.', // i18n: Fase W3
               palette: palette,
             ),
             const SizedBox(height: 20),
@@ -285,10 +287,10 @@ class _EmptyState extends StatelessWidget {
           icon: TreinoIcon.users,
           title: 'NINGUNO', // i18n: Fase W3
           body: 'Ninguno de tus alumnos quedó fuera de tu cupo. Cancelaste tu '
-              'suscripción: tu plan ${_tierName(tier)} rige hasta el '
+              'suscripción: tu plan ${tierName(tier)} rige hasta el '
               '${_fechaArg(subscription!.currentPeriodEnd!)} y después tu '
               'cuenta funciona con el límite del plan Free '
-              '(${_cupoTexto(SubscriptionTier.free)}).', // i18n: Fase W3
+              '(${cupoTexto(SubscriptionTier.free)}).', // i18n: Fase W3
           palette: palette,
         ),
       // Sin el doc del PF no se puede nombrar su cupo. Se dice lo que sí se
@@ -308,7 +310,7 @@ class _EmptyState extends StatelessWidget {
           // PF que dejó de tener sentido mirar su plan. Sin ella, el que llegó
           // desde un error se queda sin saber qué mirar.
           body: 'Ninguno de tus alumnos quedó fuera del cupo de tu plan '
-              '${_tierName(tier)} (${_cupoTexto(tier)}). Si aun así te rebotó '
+              '${tierName(tier)} (${cupoTexto(tier)}). Si aun así te rebotó '
               'una acción, no fue por el cupo de tu plan.', // i18n: Fase W3
           palette: palette,
         ),
@@ -381,14 +383,27 @@ bool _ctaFits(_BlockCause cause) =>
 /// → still paid tier»). O sea que la causa depende de de qué lado de esa fecha
 /// estamos, y eso pide el reloj.
 ///
-/// El reloj crudo no se puede usar: `no_raw_clock_scan_test.dart` prohíbe el
-/// `DateTime.now` pelado en archivos nuevos de `coach/` y `coach_hub/`, y su
-/// allowlist es un ratchet que no crece. Y el helper que sí está permitido,
-/// `argentinaNow()`, sería PEOR que el problema: devuelve el instante corrido
-/// tres horas para que los campos de calendario lean en ART, así que
-/// compararlo contra un instante real da tres horas de ventana equivocada. Lo
-/// dice `argentina_time.dart` textual: «INSTANTS (createdAt, paidAt, "has it
-/// ended yet") stay in true UTC».
+/// Ninguna de las tres herramientas de reloj del módulo sirve, y conviene ser
+/// preciso sobre por qué, porque «no se puede» a secas sería falso:
+///   - el reloj crudo (`DateTime.now` pelado, sin parentesis a proposito:
+///     el escaner hace regex sobre el TEXTO del archivo y este comentario
+///     tambien contaria) lo prohíbe `no_raw_clock_scan_test.dart` en
+///     archivos nuevos de `coach/` y `coach_hub/`, y su allowlist es un ratchet
+///     que no crece;
+///   - `argentinaNow()` sería PEOR que el problema: devuelve el instante
+///     corrido tres horas para que los campos de calendario lean en ART, así
+///     que compararlo contra un instante real da tres horas de ventana
+///     equivocada. Lo dice `argentina_time.dart` textual: «INSTANTS
+///     (createdAt, paidAt, "has it ended yet") stay in true UTC»;
+///   - `wallClockNow()` tampoco: existe para comparar contra `startsAt`, que se
+///     guarda en wall-clock UTC, y su propio doc aclara que es distinto de un
+///     instante real.
+///
+/// SÍ se podría con un proveedor de reloj en `core/` —el escáner solo mira
+/// `features/coach*`, así que sería legal y además correcto—, y eso habilitaría
+/// un CTA distinto según de qué lado de la fecha estamos. No se hace acá porque
+/// agregar una abstracción de reloj al núcleo excede este slice; queda anotado
+/// como la salida real, no como imposible.
 ///
 /// Así que no se decide: se devuelve [_BlockCause.subscriptionCancelled], que
 /// dice el hecho comprobable (cancelaste, tu plan rige hasta tal fecha) y no
@@ -437,15 +452,15 @@ String _explanation({
       // reloj. No se afirma cuál límite rige HOY, porque eso sí dependería de
       // saberlo.
       _BlockCause.subscriptionCancelled =>
-        'Cancelaste tu suscripción: tu plan ${_tierName(tier)} rige hasta el '
+        'Cancelaste tu suscripción: tu plan ${tierName(tier)} rige hasta el '
             '${_fechaArg(subscription!.currentPeriodEnd!)} y después tu cuenta '
             'funciona con el límite del plan Free '
-            '(${_cupoTexto(SubscriptionTier.free)}). Sobre estos $count pasás '
+            '(${cupoTexto(SubscriptionTier.free)}). Sobre estos $count pasás '
             'a solo lectura: los seguís viendo y podés chatear, pero no podés '
             'editarles rutinas ni notas.', // i18n: Fase W3
       _BlockCause.subscriptionInactive =>
         'Mientras tu suscripción no esté al día, tu cuenta funciona con el '
-            'límite del plan Free (${_cupoTexto(SubscriptionTier.free)}). '
+            'límite del plan Free (${cupoTexto(SubscriptionTier.free)}). '
             'Sobre estos $count pasás a solo lectura: los seguís viendo y '
             'podés chatear, pero no podés editarles rutinas ni '
             'notas.', // i18n: Fase W3
@@ -454,8 +469,8 @@ String _explanation({
       // alumnos de los cuales 6 están pausados pesa 6.0 y NO superó un tope de
       // 7. Compararlo contra lo que el PF cuenta en su lista lo dejaría
       // leyendo una resta que no cierra.
-      _BlockCause.planLimit => 'Tu plan ${_tierName(tier)} incluye '
-          '${_cupoTexto(tier)} y tu cuenta superó ese cupo (un alumno pausado '
+      _BlockCause.planLimit => 'Tu plan ${tierName(tier)} incluye '
+          '${cupoTexto(tier)} y tu cuenta superó ese cupo (un alumno pausado '
           'cuenta mitad). Sobre estos $count pasás a solo lectura: los seguís '
           'viendo y podés chatear, pero no podés editarles rutinas ni '
           'notas.', // i18n: Fase W3
@@ -464,7 +479,7 @@ String _explanation({
       _BlockCause.unexplained =>
         'Sobre estos $count alumnos tu cuenta quedó en solo lectura: los '
             'seguís viendo y podés chatear, pero no podés editarles rutinas '
-            'ni notas. Tu plan ${_tierName(tier)} no tiene tope de alumnos, '
+            'ni notas. Tu plan ${tierName(tier)} no tiene tope de alumnos, '
             'así que esto no es por el cupo.', // i18n: Fase W3
       _BlockCause.unknownPlan =>
         'Sobre estos $count alumnos tu cuenta quedó en solo lectura: los '
@@ -674,19 +689,3 @@ class _Message extends StatelessWidget {
     );
   }
 }
-
-/// Cupo del tier en texto.
-///
-/// `weightLimit == null` (plan3) NO es un dato faltante: es SIN LÍMITE.
-/// Interpolarlo directo renderiza la palabra «null» — ya pasó una vez, en el
-/// upsell del plan más caro («Hasta null alumnos»).
-String _cupoTexto(SubscriptionTier tier) => tier.isUnlimited
-    ? 'alumnos sin límite' // i18n: Fase W3
-    : '${tier.weightLimit} alumnos'; // i18n: Fase W3
-
-String _tierName(SubscriptionTier tier) => switch (tier) {
-      SubscriptionTier.free => 'Free', // i18n: Fase W3
-      SubscriptionTier.plan1 => 'Plan 1', // i18n: Fase W3
-      SubscriptionTier.plan2 => 'Plan 2', // i18n: Fase W3
-      SubscriptionTier.plan3 => 'Plan 3', // i18n: Fase W3
-    };
