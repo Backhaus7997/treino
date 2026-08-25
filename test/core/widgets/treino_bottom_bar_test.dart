@@ -517,16 +517,14 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    /// Rect REAL del pill de gradient. El `AnimatedPositioned` no tiene
+    /// Rect REAL del pill de gradient. El widget que lo posiciona no tiene
     /// RenderObject propio, así que `getRect` baja al `_PillHighlight` — o
     /// sea, a la caja que efectivamente se pinta con su parentData ya
-    /// aplicada por el `Stack`.
-    Rect pillRect(WidgetTester tester) => tester.getRect(
-          find.descendant(
-            of: find.byType(TreinoBottomBar),
-            matching: find.byType(AnimatedPositioned),
-          ),
-        );
+    /// aplicada por el `Stack`. Se lo busca por su key pública y no por el
+    /// tipo del posicionador, que es justo la pieza que cambia cuando se toca
+    /// la animación del pill (#734).
+    Rect pillRect(WidgetTester tester) =>
+        tester.getRect(find.byKey(TreinoBottomBar.pillKey));
 
     /// Rect del tab. El `Semantics` de cada tab recibe constraints tight del
     /// `Expanded`, así que su caja ES la celda del tab.
