@@ -1915,7 +1915,7 @@ exigen `request.auth`:
 
 | Callable | App Check | Estado |
 |---|---|---|
-| `deleteAccount` | **off** desde 2026-08-25 | **deuda** — lo tuvo un mes y en ese mes el borrado nunca funcionó (§4.8.2). Sacado en [#810](https://github.com/Backhaus7997/treino/pull/810) |
+| `deleteAccount` | **off** desde 2026-08-25 | **deuda** — lo tuvo un mes y en ese mes el borrado nunca funcionó (§4.8.2). Sacado en [#811](https://github.com/Backhaus7997/treino/pull/811) |
 | `addAlias` | `true` | atestado — **pero se llama sólo desde web, donde nunca puede pasar** (§4.10) |
 | `acceptTrainerLink` | **off** | exención **decidida** y comentada (`accept-trainer-link.ts:82`) — el Coach Hub web no activa App Check |
 | `resumeTrainerLink` | **off** | exención decidida y comentada (`resume-trainer-link.ts:77`) |
@@ -1978,7 +1978,7 @@ credencial no se puede borrar ni escribir nada, así que la sonda es inocua:
 | `mintWatchCredential` | `"Authentication required."` | ídem |
 
 † Estado al 2026-08-25 por la mañana. El flag de `deleteAccount` se sacó ese
-mismo día ([#810](https://github.com/Backhaus7997/treino/pull/810), §4.8.2), así
+mismo día ([#811](https://github.com/Backhaus7997/treino/pull/811), §4.8.2), así
 que **la sonda ahora devuelve `"Caller is not authenticated."`** — el mensaje
 propio de su handler. Repetirla es la forma más barata de confirmar que el
 deploy salió.
@@ -2011,7 +2011,7 @@ Tres toques en 28 segundos: alguien apretó ELIMINAR, no pasó nada y reintentó
 Apple Guideline 5.1.1(v) exige que el borrado de cuenta funcione.
 
 > **Resuelto — el flag se sacó el 2026-08-25**
-> ([#810](https://github.com/Backhaus7997/treino/pull/810)), con el mismo
+> ([#811](https://github.com/Backhaus7997/treino/pull/811)), con el mismo
 > criterio que el PR [#704](https://github.com/Backhaus7997/treino/pull/704)
 > aplicó a los dos callables del paywall: *"un flag que convierte un botón en un
 > error permanente no da seguridad: da un botón roto."*
