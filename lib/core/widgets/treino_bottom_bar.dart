@@ -284,6 +284,13 @@ class TreinoBottomBar extends StatelessWidget {
   /// se queda en el caso expandido (el peor caso) y punto.
   static const double collapsedHeight = 52;
 
+  /// Key del pill de gradient activo.
+  ///
+  /// Es pública a propósito: es el ancla con la que los tests lo miden contra
+  /// su tab. Buscarlo por el tipo del widget que lo posiciona ataba el finder
+  /// justo a la pieza que cambia cuando se toca la animación.
+  static const Key pillKey = ValueKey('treino-bottom-bar-pill');
+
   static const List<_TabSpec> _items = [
     _TabSpec(
       label: 'ENTRENAR',
@@ -437,7 +444,10 @@ class TreinoBottomBar extends StatelessWidget {
                                   top: _kPillInset,
                                   bottom: _kPillInset,
                                   width: tabWidth - 2 * _kPillInset,
-                                  child: _PillHighlight(palette: palette),
+                                  child: _PillHighlight(
+                                    key: TreinoBottomBar.pillKey,
+                                    palette: palette,
+                                  ),
                                 ),
                                 Row(
                                   children: List.generate(_items.length, (i) {
@@ -500,7 +510,7 @@ class _TabSpec {
 }
 
 class _PillHighlight extends StatelessWidget {
-  const _PillHighlight({required this.palette});
+  const _PillHighlight({super.key, required this.palette});
 
   final AppPalette palette;
 
