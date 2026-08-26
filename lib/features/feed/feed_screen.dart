@@ -12,7 +12,6 @@ import '../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../core/widgets/motion/treino_state_switcher.dart';
 import '../../core/widgets/motion/treino_tappable.dart';
 import '../../core/widgets/treino_segmented_pill.dart';
-import '../../core/widgets/treino_bottom_bar.dart';
 import '../../core/widgets/treino_glass_surface.dart';
 import '../../core/widgets/treino_icon.dart';
 import '../../l10n/app_l10n.dart';
@@ -637,8 +636,22 @@ class _FeedScrollViewState extends State<_FeedScrollView> {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final bottomInset =
-        MediaQuery.paddingOf(context).bottom + TreinoBottomBar.minHeight;
+    // Inset inferior: SÓLO `padding.bottom`, sin sumarle el alto de la barra
+    // (#830). Acá se le sumaba `TreinoBottomBar.minHeight` y el hueco al final
+    // del scroll salía DUPLICADO.
+    //
+    // El shell corre con `extendBody: true`, y en ese modo el `Scaffold` le
+    // borra al body el inset del sistema y publica en su lugar la caja ENTERA
+    // de la `bottomNavigationBar` —margen inferior propio + 8 de separación +
+    // alto de la barra— a través de `MediaQuery.padding.bottom`
+    // (`_BodyBuilder`: `bottom = max(padding.bottom, bottomWidgetsHeight)`).
+    // Medido en el shell real: 114 con los labels a la vista.
+    //
+    // El `SafeArea(bottom: false)` de `_ShellScaffold` NO lo consume —ése es
+    // justamente el punto: el body llega al borde físico y este inset es lo
+    // único que despega el último post de la barra. Ver el dartdoc de
+    // [TreinoBottomBar.minHeight].
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
 
     return CustomScrollView(
       // Restaura el offset aunque el widget se reconstruya. Hace falta porque

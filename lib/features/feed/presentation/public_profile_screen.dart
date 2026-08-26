@@ -98,12 +98,23 @@ class PublicProfileScreen extends ConsumerWidget {
           final isAcceptedFollower =
               view.outgoingFollow?.status == FollowStatus.accepted;
           final gated = !view.isSelf && !view.isPublic && !isAcceptedFollower;
-          // Bottom inset so the last post/routine clears the floating
-          // TreinoBottomBar (WhatsApp-style: extendBody + translucent pill).
-          // Composition: pill height (72) + top margin (8) + bottom safe
-          // area + a small breathing gap. Without this the last card sits
-          // behind the bar and can't be fully read even on scroll.
-          final bottomInset = MediaQuery.paddingOf(context).bottom + 88;
+          // Inset inferior para que el último post/rutina despeje la
+          // TreinoBottomBar flotante. Acá había un `+ 88` que rearmaba a mano
+          // la composición de la barra (72 del pill + 8 de margen + safe
+          // area) SOBRE un `padding.bottom` que ya la traía entera: el hueco
+          // al final del scroll salía duplicado (#830).
+          //
+          // Esta pantalla se monta DENTRO del shell: `/feed/profile/:uid` y
+          // `/home/profile/:uid` son subrutas de la `ShellRoute`
+          // (`router.dart:673` y `:716`), así que la barra se ve y el
+          // `Scaffold` del shell ya publicó su caja entera en
+          // `padding.bottom`. El `Scaffold` propio de esta pantalla no la
+          // toca: no tiene `bottomNavigationBar`, y `extendBodyBehindAppBar`
+          // sólo reescribe el inset de ARRIBA.
+          //
+          // Mismo criterio que su gemela `TrainerPublicProfileScreen`. Ver el
+          // dartdoc de [TreinoBottomBar.minHeight].
+          final bottomInset = MediaQuery.paddingOf(context).bottom;
           return SingleChildScrollView(
             padding: EdgeInsets.only(bottom: bottomInset),
             child: Column(

@@ -9,7 +9,6 @@ import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_background.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
-import 'package:treino/core/widgets/treino_bottom_bar.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
@@ -1248,31 +1247,17 @@ void main() {
       expect(pillsRect.top, lessThan(viewportRect.bottom));
     });
 
-    testWidgets('post sliver preserves shell-safe bottom padding', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        _wrapProvider(const FeedScreen(), publicOverrides(longPosts())),
-      );
-      await tester.pumpAndSettle();
-
-      final context = tester.element(find.byType(PostCard).first);
-      final expectedBottom =
-          MediaQuery.paddingOf(context).bottom + TreinoBottomBar.minHeight;
-      final paddings = tester.widgetList<SliverPadding>(
-        find.descendant(
-          of: feedScrollView(),
-          matching: find.byType(SliverPadding),
-        ),
-      );
-
-      expect(
-        paddings.any(
-          (sliver) => (sliver.padding as EdgeInsets).bottom == expectedBottom,
-        ),
-        isTrue,
-      );
-    });
+    // Acá vivía `post sliver preserves shell-safe bottom padding`, borrado en
+    // #830. Leía del `SliverPadding` el mismo
+    // `padding.bottom + TreinoBottomBar.minHeight` que escribía la pantalla, o
+    // sea que comparaba producción contra una copia de producción: pasaba con
+    // el bug adentro. Y encima corría en `_wrapProvider`, un `Scaffold` pelado
+    // sin barra, donde `padding.bottom` vale 0 — así que el número que daba
+    // por bueno (72) no era el de ninguna pantalla real.
+    //
+    // Lo reemplaza `shell_bottom_inset_test.dart`, que monta el feed en un
+    // shell con `extendBody` y una `TreinoBottomBar` de verdad, scrollea hasta
+    // el fondo y mide el hueco EFECTIVO contra la caja medida de la barra.
 
     testWidgets('loadMore still fires within 400px of the end', (tester) async {
       final posts = longPosts();

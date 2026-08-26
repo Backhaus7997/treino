@@ -247,9 +247,7 @@ class TreinoBottomBar extends StatelessWidget {
   /// [resolveBarMetrics]). Este flag es "el usuario está leyendo"; el otro es
   /// "el texto no entra". Cualquiera de los dos alcanza.
   ///
-  /// El `minHeight` que usan los scrollables para su padding inferior NO
-  /// cambia, así que el contenido no salta cuando la barra se achica. El área
-  /// tapeable de cada tab SÍ se achica con la barra (de [minHeight] a
+  /// El área tapeable de cada tab SÍ se achica con la barra (de [minHeight] a
   /// [collapsedHeight]), porque el `GestureDetector` vive adentro de la caja
   /// animada; a 52px sigue holgadamente por encima del mínimo de 44 de la HIG.
   final bool collapsed;
@@ -265,23 +263,62 @@ class TreinoBottomBar extends StatelessWidget {
 
   /// Altura mínima de la barra, sin contar el safe area.
   ///
-  /// Las pantallas del shell corren con `extendBody: true`, así que su
-  /// contenido pasa POR DEBAJO de la barra: cualquier lista scrolleable tiene
-  /// que sumar esto (más `MediaQuery.paddingOf(context).bottom`) a su padding
-  /// inferior, o el último item queda tapado y el scroll rebota antes de
-  /// dejarlo ver.
-  ///
   /// Es el piso, no la altura exacta: con textScale grande la barra crece
-  /// (`22 + 8 + altoDelLabel + 20`) y el padding queda algo justo, pero el
-  /// contenido sigue siendo alcanzable.
+  /// (`22 + 8 + altoDelLabel + 20`).
+  ///
+  /// ## ⚠️ Las pantallas NO suman esto a su padding inferior (#830)
+  ///
+  /// Esta constante es para el LAYOUT DE LA BARRA. Ninguna pantalla del shell
+  /// tiene que sumarla al padding de sus scrollables: el `Scaffold` ya publicó
+  /// la caja entera de la barra en `MediaQuery.padding.bottom`, y sumarla otra
+  /// vez duplica el hueco al final del scroll. Este dartdoc decía lo contrario
+  /// y fue exactamente lo que produjo el bug en `/feed` y en
+  /// `public_profile_screen`.
+  ///
+  /// El mecanismo, que está en el `Scaffold` y no acá: `_ShellScaffold` corre
+  /// con `extendBody: true`, y en ese modo el `Scaffold`
+  ///
+  ///  1. le BORRA al body el inset del sistema (lo hace siempre que haya
+  ///     `bottomNavigationBar`), y
+  ///  2. publica en su lugar `bottomWidgetsHeight`, que es la caja completa
+  ///     que ocupa esta barra: su margen inferior propio
+  ///     (`max(safeArea, _kBottomMarginMin)`) + los 8 de separación + el alto
+  ///     animado.
+  ///
+  /// O sea que `MediaQuery.paddingOf(context).bottom` adentro del shell YA
+  /// vale margen + 8 + alto. Medido: 114 con los labels a la vista y un home
+  /// indicator de 34.
+  ///
+  /// El `SafeArea(bottom: false)` del shell no lo consume a propósito —el body
+  /// tiene que llegar al borde físico para que el contenido se vea pasar por
+  /// debajo del vidrio—, así que el número llega intacto a la pantalla.
+  ///
+  /// Lo mismo vale para las subrutas que se montan adentro del shell
+  /// (`/feed/profile/:uid`, `/home/profile/:uid`, `/coach/trainer/:uid`…):
+  /// tienen `Scaffold` propio, pero sin `bottomNavigationBar`, y un `Scaffold`
+  /// así deja pasar el `padding.bottom` que heredó.
+  ///
+  /// **Regla**: en el shell, `padding.bottom` a secas. Sumale un gap de diseño
+  /// si lo querés (varias pantallas usan 8 o 20), nunca el alto de la barra.
+  /// Y sirve igual afuera del shell: ahí el `SafeArea` de `_immersive` ya se
+  /// comió el inset y la misma expresión da 0, sin ramas por contexto (ver
+  /// `routine_detail_screen.dart`).
   static const double minHeight = 72;
 
   /// Alto de la barra compactada ([collapsed] en `true`): solo íconos.
   ///
-  /// Deliberadamente NO afecta a [minHeight]: si el padding inferior de los
-  /// scrollables siguiera al alto real de la barra, colapsar la barra
-  /// reacomodaría toda la lista y el scroll saltaría bajo el dedo. El padding
-  /// se queda en el caso expandido (el peor caso) y punto.
+  /// Acá decía que el padding inferior de los scrollables se queda en el caso
+  /// expandido y no sigue al alto real de la barra. **No es cierto** y se
+  /// corrigió con #830: el padding es `MediaQuery.padding.bottom`, que el
+  /// `Scaffold` deriva del alto MEDIDO de la barra frame a frame, así que
+  /// sigue la animación de colapso. Medido en el shell, con un home indicator
+  /// de 34: 114 expandida → 94 compactada.
+  ///
+  /// Sólo se quedaba fijo en las dos pantallas que hardcodeaban [minHeight]
+  /// —las mismas que duplicaban el hueco—, así que la estabilidad que este
+  /// dartdoc prometía nunca existió en el resto del shell. Lo que sí es
+  /// constante es la separación entre el último item y el vidrio: los 8 del
+  /// margen superior de la barra viajan adentro de `padding.bottom`.
   static const double collapsedHeight = 52;
 
   /// Key del pill de gradient activo.
