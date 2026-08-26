@@ -2169,10 +2169,12 @@ service cloud.firestore {
     }
 
     // Coach Agenda — appointments (Fase 5 Etapa 6, REQ-029, ADR-1, ADR-5).
-    // Create: athlete books their own slot (status must be 'confirmed').
-    // Update: two valid paths —
+    // Create: athlete books their own slot, or trainer registers a session
+    //         (status must be 'confirmed'). Shape-validated — QA-SEC-014 (#781).
+    // Update: three valid paths —
     //   Path 1 (cancellation): member cancels with >24h notice.
     //   Path 2 (ADR-1 flip): new athlete flips cancelled → confirmed.
+    //   Path 3 (coaching): trainer edits notes / links a Payment.
     // Delete: never (audit trail preserved per ADR-1).
     match /appointments/{appointmentId} {
       // Privacy: a member only reads appointments they are part of — their own
@@ -2182,6 +2184,70 @@ service cloud.firestore {
       allow read: if request.auth != null
                   && (request.auth.uid == resource.data.athleteId
                       || request.auth.uid == resource.data.trainerId);
+      // ── Forma del documento (QA-SEC-014, #781) ───────────────────────────
+      //
+      // Hasta este change `appointments` era el ÚNICO documento escribible por
+      // un tercero sin un solo límite: sin `keys().hasOnly()`, sin cap de
+      // longitud en ningún campo y sin rango sobre `startsAt`. Medido contra el
+      // emulador: una cuenta sin ninguna relación con el PF creaba un turno
+      // `confirmed` en la agenda de CUALQUIER PF con 30 KB de texto arbitrario
+      // en `athleteDisplayName` y en `noteBefore`. Y no se podía sacar —
+      // `allow delete: if false` (ADR-1, audit trail) y la cancelación exige
+      // >24 h de anticipación—, así que un turno forjado con `startsAt` dentro
+      // de las próximas 24 h o en el pasado quedaba FIJO en la agenda hasta que
+      // alguien entrara con el Admin SDK.
+      //
+      // Los caps NO son inventados: salen de las colecciones hermanas de este
+      // mismo archivo. `athleteDisplayName` es un título corto → 200, como
+      // `nutrition_plans.title` y `payments.concept`. `noteBefore` / `noteAfter`
+      // son texto libre del PF → 5000, como `athlete_notes.note` y
+      // `follow_up_entries.text`. Los ids van a 128 (largo de un uid de Firebase
+      // Auth con margen), igual que `coach_availability_*`.
+      //
+      // ⚠️  COUPLING WARNING — la lista de `hasOnly` es el juego EXACTO de claves
+      // de `Appointment.toJson()` (appointment.g.dart). Agregar un campo al
+      // modelo Dart sin agregarlo acá hace fallar TODA escritura a la colección.
+      //
+      // `id` viaja en el body (`set(appt.toJson())`) pero queda OPCIONAL y sin
+      // pinear al doc id, por el mismo motivo que en `measurements`:
+      // `AppointmentRepository` reconstruye el modelo con `{...data, 'id': snap.id}`,
+      // así que la copia del body no se lee nunca y exigirla sólo agregaría un
+      // requisito de PRESENCIA que no protege nada observable.
+      //
+      // `cancellationLog` es una lista de mapas y las reglas de Firestore no
+      // saben mirar adentro de un elemento de lista: se acota la CANTIDAD de
+      // entradas, no el texto de cada `reason`. Residual asumido y documentado
+      // en docs/security.md §4.9 — sólo un miembro del turno puede escribir ahí.
+      function apptShapeOk(d) {
+        return d.keys().hasOnly(['id', 'trainerId', 'athleteId',
+                                 'athleteDisplayName', 'startsAt', 'durationMin',
+                                 'status', 'cancelledAt', 'cancelledBy',
+                                 'cancellationLog', 'noteBefore', 'noteAfter',
+                                 'recurringId', 'paymentId'])
+               && d.keys().hasAll(['trainerId', 'athleteId', 'athleteDisplayName',
+                                   'startsAt', 'durationMin', 'status'])
+               && d.trainerId is string && d.trainerId.size() <= 128
+               && d.athleteId is string && d.athleteId.size() <= 128
+               && d.athleteDisplayName is string
+               && d.athleteDisplayName.size() <= 200
+               && d.startsAt is timestamp
+               // El selector de la UI ofrece 30/45/60/90/120 min. Se valida un
+               // RANGO y no la allowlist exacta (a diferencia de
+               // `coach_availability_*.slotDurationMin`) para no congelar en el
+               // `update` a los docs viejos con una duración fuera del set.
+               && d.durationMin is int && d.durationMin > 0 && d.durationMin <= 480
+               && (d.status == 'confirmed' || d.status == 'cancelled')
+               && (d.get('cancelledAt', null) == null || d.cancelledAt is timestamp)
+               && optStrMaxLen(d.get('id', null), 128)
+               && optStrMaxLen(d.get('cancelledBy', null), 128)
+               && optStrMaxLen(d.get('recurringId', null), 128)
+               && optStrMaxLen(d.get('paymentId', null), 128)
+               && optStrMaxLen(d.get('noteBefore', null), 5000)
+               && optStrMaxLen(d.get('noteAfter', null), 5000)
+               && (d.get('cancellationLog', null) == null
+                   || (d.cancellationLog is list && d.cancellationLog.size() <= 50));
+      }
+
       // Create: either the athlete books their own slot (legacy self-booking),
       // or the trainer registers a session (new trainer-driven model 2026-06-03).
       //
@@ -2194,24 +2260,130 @@ service cloud.firestore {
       // auth.uid`) is UNCHANGED, preserving that live path (regression-
       // tested: SCENARIO-CC-08). Role-check only, NOT a trainer_links
       // relationship check — see design.md AD-1 / engram obs #413.
+      //
+      // ── QA-SEC-014 (#781): la ventana de `startsAt` ──────────────────────
+      //
+      // El piso general es `request.time - 24 h`, no `request.time`, y eso NO es
+      // holgura gratuita: `startsAt` se guarda como WALL-CLOCK UTC (ADR-7 /
+      // QA-COA-003) — la hora local del picker escrita en un DateTime marcado
+      // UTC, sin conversión—, así que en ART (UTC-3) el `startsAt` de una sesión
+      // que empieza dentro de un rato queda 3 h POR DETRÁS de `request.time`.
+      // Un `startsAt > request.time` pelado habría denegado el alta de toda
+      // sesión del mismo día a menos de 3 h vista, que es el flujo principal del
+      // PF. Las 24 h absorben el offset de cualquier huso (máximo −12) y siguen
+      // matando el vector real: el turno fechado en 1970 o el mes pasado, que
+      // nadie puede cancelar (la cancelación exige >24 h de anticipación) ni
+      // borrar (`delete: if false`).
+      //
+      // El techo son 730 días. El máximo legítimo es ~449: el date picker corta
+      // en `today + 365` (new_session_sheet.dart / new_session_dialog.dart) y la
+      // recurrencia estira hasta 12 semanas más (`_kWeekOptions`). 730 deja el
+      // margen justo sin admitir el año 9999.
+      //
+      // ── El auto-booking del atleta queda acotado, no removido ─────────────
+      //
+      // El disyunto sigue vivo (Slice C lo decidió), pero pide DOS cosas más, y
+      // ninguna de las dos rompe nada vivo: hoy NINGÚN caller de `lib/` invoca
+      // `AppointmentRepository.book()` — el modelo es read-only para el alumno
+      // desde 2026-06-03—, así que este camino no tiene tráfico legítimo que
+      // proteger. Se verificó con `rg '\.book\('` sobre `lib/`, no se asumió.
+      //
+      //  1. `startsAt` a más de 24 h vista, con la MISMA expresión que el Path 1
+      //     del update. Es la resolución del agravante del issue: si el alta
+      //     puede caer DENTRO de la ventana de cancelación, el atleta fabrica un
+      //     turno que nadie puede cancelar ni borrar. Pidiendo el mismo margen,
+      //     todo lo que un atleta puede crear nace CANCELABLE por construcción.
+      //     El disyunto del PF no lo pide —el PF es el dueño de la agenda y
+      //     anotar la sesión de esta tarde es su flujo principal; el que ensucia
+      //     ahí ensucia su propia agenda.
+      //  2. Sin notas. `Appointment.create()` emite `noteBefore`/`noteAfter` en
+      //     null, y las notas son de coaching (las escribe el PF por el Path 3),
+      //     así que el alumno no pierde nada y el vector de texto libre
+      //     desaparece del disyunto abierto. Lo único que el atacante sigue
+      //     eligiendo es su propio `athleteDisplayName`, ahora con tope de 200.
+      //
+      // `cancelledAt` / `cancelledBy` / `cancellationLog` / `paymentId` se
+      // exigen vacíos: un turno NACE sin rastro de cancelación y sin cobro. Sin
+      // el pin de `paymentId` el `create` era el agujero por el que se saltaba
+      // el set-once del Path 3 — se nacía ya "cobrado" contra un Payment ajeno.
       allow create: if request.auth != null
                     && request.resource.data.status == 'confirmed'
-                    && (request.resource.data.athleteId == request.auth.uid
-                        || (request.resource.data.trainerId == request.auth.uid
-                            && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'));
+                    && apptShapeOk(request.resource.data)
+                    && request.resource.data.get('cancelledAt', null) == null
+                    && request.resource.data.get('cancelledBy', null) == null
+                    && request.resource.data.get('cancellationLog', []).size() == 0
+                    && request.resource.data.get('paymentId', null) == null
+                    && request.resource.data.startsAt.toMillis()
+                         > request.time.toMillis() - 86400000
+                    && request.resource.data.startsAt.toMillis()
+                         < request.time.toMillis() + 63072000000
+                    && (
+                         (request.resource.data.athleteId == request.auth.uid
+                          && request.resource.data.startsAt.toMillis() - 86400000
+                               > request.time.toMillis()
+                          && request.resource.data.get('noteBefore', null) == null
+                          && request.resource.data.get('noteAfter', null) == null)
+                         || (request.resource.data.trainerId == request.auth.uid
+                             && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer')
+                       );
       // Update has 3 valid paths: cancellation by member, flip cancelled→confirmed,
       // or trainer edits coaching notes.
+      //
+      // QA-SEC-014 (#781): acotar sólo el `create` no cierra nada si el `update`
+      // deja meter lo mismo un segundo después. Los tres caminos pasaron a
+      // acotar QUÉ se escribe, cada uno con la herramienta que le corresponde.
       allow update: if request.auth != null && (
         // Path 1: cancellation by member with >24h
+        //
+        // Cancelar es cambiar `status` + el rastro de la cancelación, NADA más.
+        // Sin estos pines el Path 1 era un canal de escritura libre: el mismo
+        // `update` que cancela podía reescribir `athleteDisplayName` con 30 KB.
+        //
+        // Se pinea POR VALOR y NO con `apptShapeOk()` a propósito: un turno
+        // forjado ANTES de este fix tiene claves de más, y un `hasOnly()` acá lo
+        // volvería INCANCELABLE — la regla que cierra el agujero congelaría su
+        // propio residuo, que es exactamente lo contrario de lo que hace falta.
+        // Los pines usan `get(campo, null)` de los dos lados para que un doc
+        // viejo al que le falte un campo opcional siga siendo cancelable.
         (request.resource.data.status == 'cancelled'
          && (request.auth.uid == resource.data.athleteId
              || request.auth.uid == resource.data.trainerId)
-         && resource.data.startsAt.toMillis() - 86400000 > request.time.toMillis())
+         && resource.data.startsAt.toMillis() - 86400000 > request.time.toMillis()
+         && request.resource.data.get('athleteId', null) == resource.data.get('athleteId', null)
+         && request.resource.data.get('trainerId', null) == resource.data.get('trainerId', null)
+         && request.resource.data.get('athleteDisplayName', null) == resource.data.get('athleteDisplayName', null)
+         && request.resource.data.get('startsAt', null) == resource.data.get('startsAt', null)
+         && request.resource.data.get('durationMin', null) == resource.data.get('durationMin', null)
+         && request.resource.data.get('noteBefore', null) == resource.data.get('noteBefore', null)
+         && request.resource.data.get('noteAfter', null) == resource.data.get('noteAfter', null)
+         && request.resource.data.get('recurringId', null) == resource.data.get('recurringId', null)
+         && request.resource.data.get('paymentId', null) == resource.data.get('paymentId', null)
+         // `cancel()` agrega UNA entrada por `arrayUnion`. Se acota el
+         // crecimiento y el total; el texto de cada entrada no es alcanzable
+         // desde las reglas (ver la nota de `apptShapeOk`).
+         && request.resource.data.get('cancellationLog', []).size()
+              <= resource.data.get('cancellationLog', []).size() + 1
+         && request.resource.data.get('cancellationLog', []).size() <= 50)
         ||
         // Path 2: flip cancelled→confirmed by new athlete (ADR-1)
+        //
+        // Es un `create` disfrazado —un alumno nuevo se apropia de un slot
+        // liberado— así que pide EXACTAMENTE lo mismo que el `create` del
+        // atleta: forma válida, >24 h vista, y sin tocar nada del slot que no
+        // sea la identidad del alumno. Sin esto el atacante forjaba el turno por
+        // el `update` en vez de por el `create` y el fix no cerraba nada.
         (resource.data.status == 'cancelled'
          && request.resource.data.status == 'confirmed'
-         && request.resource.data.athleteId == request.auth.uid)
+         && request.resource.data.athleteId == request.auth.uid
+         && apptShapeOk(request.resource.data)
+         && request.resource.data.trainerId == resource.data.trainerId
+         && request.resource.data.startsAt == resource.data.startsAt
+         && request.resource.data.get('durationMin', null) == resource.data.get('durationMin', null)
+         && request.resource.data.get('noteBefore', null) == resource.data.get('noteBefore', null)
+         && request.resource.data.get('noteAfter', null) == resource.data.get('noteAfter', null)
+         && request.resource.data.get('recurringId', null) == resource.data.get('recurringId', null)
+         && request.resource.data.get('paymentId', null) == resource.data.get('paymentId', null)
+         && request.resource.data.startsAt.toMillis() - 86400000 > request.time.toMillis())
         ||
         // Path 3: trainer edits coaching notes OR links a Payment on their own
         // appointment (Slice 2a, Agenda→cobro bridge, money-critical).
@@ -2224,11 +2396,21 @@ service cloud.firestore {
         // billAppointment creates the Payment and sets paymentId in the SAME
         // Firestore transaction, and rules exists() reads pre-commit state, so
         // an exists() check would reject the legitimate atomic flow.
+        //
+        // QA-SEC-014 (#781): `apptShapeOk()` + los pines de `athleteDisplayName`
+        // y `durationMin`. Los únicos writes legítimos de este camino son
+        // `updateNotes` (noteBefore/noteAfter) y `markBilled`/`billAppointment(s)`
+        // (paymentId) — no existe flujo de reprogramación, y el `startsAt`
+        // inmutable ya lo demostraba. Sin el pin, el PF era el único que podía
+        // reescribirle el nombre al alumno en su propia ficha.
         (request.auth.uid == resource.data.trainerId
+         && apptShapeOk(request.resource.data)
          && request.resource.data.status == resource.data.status
          && request.resource.data.athleteId == resource.data.athleteId
          && request.resource.data.trainerId == resource.data.trainerId
          && request.resource.data.startsAt == resource.data.startsAt
+         && request.resource.data.athleteDisplayName == resource.data.athleteDisplayName
+         && request.resource.data.get('durationMin', null) == resource.data.get('durationMin', null)
          && ((resource.data.get('paymentId', null) == null
               && request.resource.data.get('paymentId', null) is string
               && request.resource.data.get('paymentId', null).size() > 0)

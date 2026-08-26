@@ -281,9 +281,17 @@ test('SCENARIO-CC-07: real trainer CAN create a confirmed appointment for an ath
   const coach = testEnv.authenticatedContext('coach6');
   await assertSucceeds(
     coach.firestore().collection('appointments').doc('legit7').set({
+      // QA-SEC-014 (#781): el `create` ahora valida la FORMA del documento, así
+      // que el ancla del camino legítimo tiene que escribir el turno entero —
+      // el juego de claves de `Appointment.toJson()`— y no el esqueleto de 4
+      // campos que alcanzaba cuando la regla no miraba adentro. El escenario
+      // que este test custodia (un PF real puede crear turnos) no cambia.
+      id: 'legit7',
       status: 'confirmed',
       trainerId: 'coach6',
       athleteId: 'athlete',
+      athleteDisplayName: 'Alumno',
+      durationMin: 60,
       startsAt: new Date(),
     }),
   );
@@ -302,10 +310,20 @@ test('SCENARIO-CC-08: athlete (role athlete, no trainer role) CAN self-book thei
   const athlete = testEnv.authenticatedContext('athlete1');
   await assertSucceeds(
     athlete.firestore().collection('appointments').doc('legit8').set({
+      // QA-SEC-014 (#781): el disyunto del atleta sigue vivo —es lo que este
+      // escenario custodia— pero quedó ACOTADO en dos puntos, y el fixture
+      // tenía que seguirlos: forma completa, y `startsAt` a más de 24 h vista.
+      // El `new Date()` de antes creaba justamente el turno que nadie podía
+      // cancelar (la cancelación exige >24 h) ni borrar (`delete: if false`),
+      // o sea que el fixture codificaba el agujero del ticket. El escenario NO
+      // cambia: sigue midiendo que el gate de rol no alcance a este disyunto.
+      id: 'legit8',
       status: 'confirmed',
       athleteId: 'athlete1',
       trainerId: 'coach7',
-      startsAt: new Date(),
+      athleteDisplayName: 'Athlete Uno',
+      durationMin: 60,
+      startsAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
     }),
   );
 });

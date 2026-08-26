@@ -87,7 +87,7 @@ son `get` / `list` / `write` / `delete`.
 | `profile_shares` | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `coach_availability_rules` | — | — | ✅ | ✅ | — |
 | `coach_availability_overrides` | — | — | ✅ | ✅ | — |
-| `appointments` | — | — | 🟡 | — | — |
+| `appointments` | — | — | ✅ | ✅ | — |
 | `measurements` | ✅ | ✅ | ✅ | ✅ | 🟡 |
 | `performance_tests` | — | — | ✅ | ✅ | — |
 | `athlete_billing` | ✅ | — | 🟡 | 🟡 | — |
@@ -99,19 +99,27 @@ son `get` / `list` / `write` / `delete`.
 | `reviews` | — | — | ✅ | — | — |
 | `mail_queue` | — | — | — | — | — |
 
-**102 de 170 celdas** tienen test negativo (60%). Por operación:
+**103 de 170 celdas** tienen test negativo (61%). Por operación:
 
 | Operación | Paths con test negativo |
 |---|---|
 | `get` | 21 / 34 |
 | `list` | 15 / 34 |
 | `create` | 28 / 34 |
-| `update` | 22 / 34 |
+| `update` | 23 / 34 |
 | `delete` | 12 / 34 |
 
 Cinco paths siguen **sin una sola aserción negativa**:
 `users/{uid}/customExercises`, `exercises`, `coach_availability_rules`,
 `coach_availability_overrides`, `mail_queue`.
+
+> **QA-SEC-014 (#781) mueve UNA celda, no dos.** El `create` de `appointments`
+> ya estaba marcado (🟡, `scripts/rules_test/coach-collections-role.test.js`) y
+> sólo cambia de archivo (→ ✅, `appointments-shape-rules.test.ts`): la celda
+> nueva es `update`, que no tenía una sola aserción negativa **pese a tener tres
+> caminos válidos**. Vale la misma lección del recuadro de arriba al revés: una
+> celda en `—` sobre una regla con disyuntos no dice "falta un test", dice "no
+> sabemos nada de ninguno de los tres".
 
 > **QA-SEC-010 (oráculo de existencia) no mueve los totales, y conviene que se
 > entienda por qué.** `existence-oracle-rules.test.ts` agregó 8 negativos
@@ -1674,7 +1682,7 @@ hallazgo:
 | `coach_availability_rules` **propia**, con 50 KB de payload arbitrario | **ALLOW** → QA-SEC-013 |
 | `trainerPublicProfiles` **propio**, sin ser trainer | **ALLOW** → QA-SEC-013 |
 | `gyms/{id}` `google-places` nuevo, con campos arbitrarios | **ALLOW** → §4.10 |
-| `appointments` en la agenda de **cualquier** PF, con 30 KB de texto libre | **ALLOW** → QA-SEC-014 |
+| `appointments` en la agenda de **cualquier** PF, con 30 KB de texto libre | ~~**ALLOW**~~ → **DENY** ✅ (QA-SEC-014 cerrado en #781) |
 | `temp/uploads/{self}/payload.exe`, sin límite de tamaño | ~~**ALLOW**~~ → **DENY** ✅ (QA-SEC-015 cerrado en #804) |
 
 ---
@@ -2079,7 +2087,7 @@ Ordenados por lo que me preocuparía primero.
 | ~~**QA-SEC-011**~~ | `isProfilePublic` no existe en las reglas: "Perfil privado" se aplica sólo en el cliente | `:942`, `:894`, `:738`, `:256` | **Media-alta** | **CERRADO** en #806 por Opción B ([#778](https://github.com/Backhaus7997/treino/issues/778)) |
 | **QA-SEC-012** | `visibility: 'shared'` concede lectura y enumeración mundial a una feature que el dominio declara reservada | `:259` | Media | [#779](https://github.com/Backhaus7997/treino/issues/779) |
 | ~~**QA-SEC-013**~~ | El gate de rol de Slice C no llegó a las 3 colecciones que publican al PF | `:1175`, `:2078`, `:2125` | Media | **CERRADO** ([#780](https://github.com/Backhaus7997/treino/issues/780)) |
-| **QA-SEC-014** | `appointments` create sin allowlist de campos ni cap de tamaño: un desconocido escribe en la agenda de cualquier PF | `:1858` | Media | [#781](https://github.com/Backhaus7997/treino/issues/781) |
+| ~~**QA-SEC-014**~~ | `appointments` create sin allowlist de campos ni cap de tamaño: un desconocido escribe en la agenda de cualquier PF | `:2221`, `:2309`, `:2335` | Media | **CERRADO** ([#781](https://github.com/Backhaus7997/treino/issues/781)) |
 | ~~**QA-SEC-015**~~ | `temp/uploads` es el único write de Storage sin allowlist de content-type ni cap de tamaño | `storage.rules:88` | Baja | **CERRADO** en #804 ([#782](https://github.com/Backhaus7997/treino/issues/782)) |
 | **QA-SEC-016** | El scanner de App Check cubre 2 de los 5 callables desplegados | `appcheck-enforcement.test.ts:18` | Baja | ~~[#783](https://github.com/Backhaus7997/treino/issues/783)~~ cerrado |
 
@@ -2368,7 +2376,8 @@ mergear**, y el resultado esperado es cero.
 
 ---
 
-**QA-SEC-014 — `appointments` create: un desconocido escribe en la agenda de cualquier PF.**
+**~~QA-SEC-014~~ — `appointments` create: un desconocido escribe en la agenda de
+cualquier PF. — CERRADO en [#781](https://github.com/Backhaus7997/treino/issues/781).**
 Slice C razonó **el disyunto del trainer** y dejó el del atleta explícitamente
 intacto (`firestore.rules:1854`: *"the legacy athlete self-book disjunct
 (`athleteId == auth.uid`) is UNCHANGED, preserving that live path"*). El
@@ -2405,11 +2414,97 @@ mismo archivo: `athlete_notes` limita `note` a 5000 caracteres,
 `appointments` es el único documento escribible por un tercero **sin un solo
 límite**.
 
-*Arreglo propuesto:* `keys().hasOnly()` + `optStrMaxLen()` sobre
-`athleteDisplayName` / `noteBefore` / `noteAfter` —los guards compartidos del
-tope de `firestore.rules` (QA #508) ya existen y son exactamente para esto—, un
-rango sobre `startsAt`, y decidir aparte si el auto-booking debería exigir
-`trainer_links` activo. Eso último es cambio de producto, no de regla.
+*Arreglo aplicado* (`firestore.rules:2221`, `:2309`, `:2335`;
+`functions/src/__tests__/appointments-shape-rules.test.ts`, 35 casos):
+
+1. **`apptShapeOk()`** — `keys().hasOnly()` con el juego exacto de claves de
+   `Appointment.toJson()` (appointment.g.dart, no el modelo), `hasAll()` sobre
+   los seis obligatorios, tipos, y los caps sacados de las hermanas de este
+   mismo archivo: `athleteDisplayName` ≤ 200 (como `nutrition_plans.title` y
+   `payments.concept`), `noteBefore`/`noteAfter` ≤ 5000 (como
+   `athlete_notes.note` y `follow_up_entries.text`), ids ≤ 128.
+2. **Ventana de `startsAt` en el `create`**: piso `request.time - 24 h`, techo
+   `request.time + 730 días`. El piso NO es `request.time` a propósito —
+   `startsAt` se guarda como wall-clock UTC (ADR-7 / QA-COA-003), así que en ART
+   el `startsAt` de una sesión inminente queda 3 h por detrás de `request.time` y
+   un piso ingenuo habría denegado el alta de toda sesión del mismo día, que es
+   el flujo principal del PF. Hay un positivo dedicado que se pone rojo si
+   alguien "corrige" el piso. El techo de 730 días deja pasar el máximo legítimo
+   (~449: picker a 365 días + 12 semanas de recurrencia) y no el año 9999.
+3. **El agravante del turno incancelable, resuelto sin tocar la política de
+   cancelación.** El disyunto del atleta pide ahora `startsAt` a más de 24 h
+   vista — la MISMA expresión que el Path 1 del `update`—, así que todo lo que un
+   atleta puede crear nace **cancelable por construcción**. No se le pide al
+   disyunto del PF: el PF es el dueño de la agenda y anotar la sesión de esta
+   tarde es su flujo principal; el que ensucia ahí ensucia lo suyo. Verificado
+   antes de decidirlo: hoy **ningún caller de `lib/` invoca
+   `AppointmentRepository.book()`** — el modelo es read-only para el alumno desde
+   2026-06-03—, así que apretar ese disyunto no tiene tráfico legítimo que
+   romper. El disyunto **sigue vivo**, como decidió Slice C; queda acotado, no
+   removido. Y además pide venir **sin notas**: las notas son de coaching (las
+   escribe el PF por el Path 3), con lo cual el vector de texto libre desaparece
+   del único disyunto que un desconocido puede usar.
+4. **Los tres caminos del `update`**, porque acotar sólo el `create` no cierra
+   nada si el `update` deja meter lo mismo un segundo después. Cada uno con la
+   herramienta que le corresponde:
+   - **Path 1 (cancelar)** pinea por VALOR los campos de contenido en vez de
+     exigir `hasOnly()`. Es deliberado: un turno forjado ANTES del fix tiene
+     claves de más, y un `hasOnly()` acá lo volvería **incancelable** — la regla
+     que cierra el agujero congelaría su propio residuo. Hay un test que exige
+     que el residuo siga siendo limpiable.
+   - **Path 2 (flip ADR-1)** es un `create` disfrazado y pide exactamente lo
+     mismo que el `create` del atleta.
+   - **Path 3 (el PF sobre su turno)** suma `apptShapeOk()` y el pin de
+     `athleteDisplayName`/`durationMin`: los únicos writes legítimos son
+     `updateNotes` y `markBilled`/`billAppointment(s)`.
+5. **`paymentId`, `cancelledAt`, `cancelledBy` y `cancellationLog` vacíos en el
+   `create`.** El `create` era el agujero por el que se salteaba el set-once de
+   `paymentId` del Path 3: un turno podía nacer ya "cobrado" contra un Payment
+   ajeno.
+
+*Lo que NO entró.* Exigir `trainer_links` activo para el auto-booking: es cambio
+de producto, no de regla, y va como issue aparte si se quiere. Tampoco se tocó
+`allow delete: if false` (ADR-1, audit trail) ni la ventana de 24 h de la
+cancelación — el agravante se resolvió por el lado del alta, que es el que estaba
+sin validar.
+
+*Residual asumido.* `cancellationLog` es una **lista de mapas** y las reglas de
+Firestore no saben mirar adentro de un elemento de lista: se acota la cantidad de
+entradas (≤ 50, y crecimiento de a una por `update`), no el texto de cada
+`reason`. Sólo un miembro del turno puede escribir ahí, y el `reason` no se
+renderiza en la agenda. Si algún día hace falta acotarlo, el lugar es una CF, no
+la regla.
+
+**Verificación de mutación** (§1.8). Baseline 35/35 verde. Antes que eso, la
+prueba que importa: los 4 casos del bloque *"el vector del ticket"* corridos
+contra `firestore.rules` **de `HEAD`** dan **4 rojos** — el ataque del issue era
+ALLOW y ahora es DENY, medido, no argumentado.
+
+| Mutación | Rojos |
+|---|---|
+| Desactivar `apptShapeOk()` | **8** — los negativos de forma, tamaño y tipo, en `create`, Path 2 y Path 3 |
+| Sacarle al disyunto del atleta las 24 h y el veto de notas | **2** — el turno incancelable y las notas en el auto-booking |
+| Sacar la ventana de `startsAt` del `create` | **2** — la sesión de hace un mes y la de +800 días |
+| Piso ingenuo `startsAt > request.time` (sin absorber el wall-clock) | **1** — el positivo del PF anotando la sesión de hoy |
+| Sacar los pines del Path 1 | **3** — los 3 negativos de "cancelar no es escribir" |
+
+El caso del ataque del ticket (30 KB desde una cuenta sin relación) no aparece en
+ninguna fila: lo deniegan **dos** cláusulas independientes —la forma y el veto de
+notas del disyunto del atleta— y ninguna mutación sola lo revive. Es cobertura de
+más, no de menos, pero conviene que esté escrito para que nadie lea el hueco como
+un olvido.
+
+El negativo que ninguna mutación mata es `DENIEGA reservar a nombre de OTRO
+alumno`: custodia una regla preexistente que este change no toca, así que es
+correcto que no se mueva.
+
+*Cómo se corrió* (esta máquina tiene JDK 17 y el emulador pide 21):
+
+```bash
+export PATH="/opt/homebrew/opt/openjdk@21/bin:$PATH"
+npm --prefix functions run test:rules:emulator   # 689/689 en 36 suites
+npm --prefix scripts/rules_test ci && bash scripts/test_rules.sh   # 149/149
+```
 
 ---
 
@@ -2595,8 +2690,11 @@ escritas. Mismo criterio que §1.7.
   ajeno (20 KB en la prueba) y setea `createdBy` a su propio uid, en una
   colección mundo-legible y mundo-enumerable. Nada lee `createdBy` en
   `google-places` hoy, así que no escala a nada; es inyección de contenido en un
-  catálogo, no un leak. Si se toca `appointments` por QA-SEC-014, la allowlist
-  acá cuesta lo mismo y puede ir en el mismo change.
+  catálogo, no un leak. Se dejó dicho que si se tocaba `appointments` por
+  QA-SEC-014 la allowlist acá costaba lo mismo y podía ir en el mismo change;
+  #781 **no la incluyó** — el alcance del ticket eran los turnos y meter `gyms`
+  adentro habría mezclado dos superficies con actores distintos en un mismo
+  diff. Sigue pendiente, con el patrón ya escrito al lado para copiar.
 - **Varias denegaciones de `routines` llegan por error de evaluación, no por
   permiso.** Los disyuntos del `read` dereferencian `resource.data.assignedTo`,
   `assignedBy` y `createdBy` **crudo**, sin el `.get(campo, default)` que el
@@ -2712,7 +2810,7 @@ y se tacha acá con la referencia al PR — nunca se borra. Los hallazgos de
 | QA-SEC-011 | `isProfilePublic` no se aplica en las reglas | ~~Cerrado~~ — #806 (issue [#778](https://github.com/Backhaus7997/treino/issues/778)) por **Opción B**: se corrigió el copy, no el gate. Las reglas no filtran por campo, así que el gate real exige partir el doc — queda como feature aparte. `firestore.rules:942`, §4.9 |
 | QA-SEC-012 | `visibility: 'shared'` concede lectura mundial a una feature reservada | Abierto — [#779](https://github.com/Backhaus7997/treino/issues/779), §4.9 |
 | QA-SEC-013 | El gate de rol de trainer no llegó a 3 colecciones | ~~Cerrado~~ — [#780](https://github.com/Backhaus7997/treino/issues/780): gate de rol en las 3 + `keys().hasOnly()` y rangos en las 2 de agenda. `firestore.rules:1175`, `:2078`, `:2125`, `coach-role-gate-rules.test.ts`, §4.9 |
-| QA-SEC-014 | `appointments` create sin allowlist ni cap de tamaño | Abierto — [#781](https://github.com/Backhaus7997/treino/issues/781), §4.9 |
+| QA-SEC-014 | `appointments` create sin allowlist ni cap de tamaño | ~~Cerrado~~ — [#781](https://github.com/Backhaus7997/treino/issues/781): `keys().hasOnly()` + caps + ventana de `startsAt` en el `create` **y en los tres caminos del `update`**. `firestore.rules:2221`, `:2309`, `:2335`, `appointments-shape-rules.test.ts`, §4.9 |
 | QA-SEC-015 | `temp/uploads` sin allowlist de content-type ni cap | ~~Cerrado~~ — #804 (issue [#782](https://github.com/Backhaus7997/treino/issues/782)): bloque cerrado entero, no acotado. `storage.rules:88`, `temp-uploads-storage-rules.test.ts`, §4.9 |
 | QA-SEC-016 | El scanner de App Check cubre 2 de 5 callables | ~~Cerrado~~ — [#783](https://github.com/Backhaus7997/treino/issues/783) / [#805](https://github.com/Backhaus7997/treino/pull/805), `appcheck-enforcement.test.ts` + `helpers/appcheck-audit.ts`, §4.8.1 y §4.9 |
 | QA-SEC-100 | Android: `allowBackup` | ~~Cerrado~~ — `test/security/android_manifest_backup_test.dart` |
