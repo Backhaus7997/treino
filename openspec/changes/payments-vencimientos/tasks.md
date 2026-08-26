@@ -87,7 +87,7 @@ Chain strategy: feature-branch-chain
 - [ ] 9.1 Run `npm test -- --testPathPattern=generate-due-payments` with emulator running; all 8 cases GREEN. (SCENARIO-VENC-02 to SCENARIO-VENC-07 + REQ-VENC-03, REQ-VENC-07)
 - [ ] 9.2 Run full functions test suite (`npm test`) — existing tests still green.
 - [ ] 9.3 Run functions lint (`npm run lint`) — 0 errors.
-- [ ] 9.4 Note in PR description: deploy is NOT part of this PR. User runs `firebase deploy --only functions,firestore:rules,firestore:indexes` from `treino/` after merge.
+- [ ] 9.4 Note in PR description: deploy is NOT part of this PR. User runs 🚨 PROD `firebase deploy --only functions,firestore:rules,firestore:indexes --project prod` from `treino/` after merge. **Write it with `--project prod` in the PR description too** — `prod` and `treino-dev` are the same and only Firebase project, and the bare form resolves there without naming it (#826).
 
 ---
 

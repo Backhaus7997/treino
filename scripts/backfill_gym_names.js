@@ -34,11 +34,13 @@
  *   # Dry run (default-safe) — reports what WOULD change, writes nothing:
  *   node scripts/backfill_gym_names.js --dry-run
  *
- *   # Real run against treino-dev (sa-key.json's project):
+ *   # ⚠️ REAL RUN — WRITES TO PRODUCTION (#826). `treino-dev` is TREINO's only
+ *   # Firebase project and it holds real users; the name lies. Emulator first,
+ *   # then --dry-run, then this, with maintainer sign-off:
  *   node scripts/backfill_gym_names.js
  *
- *   # Only if you explicitly intend to run against a non-dev project
- *   # (e.g. treino-prod), after dev verification + maintainer sign-off:
+ *   # Only if you intend to run against some OTHER project whose id has no
+ *   # "dev" in it (there is none today — treino-prod does not exist):
  *   node scripts/backfill_gym_names.js --allow-prod
  *
  *   # Against the local emulator — no service-account key needed:
@@ -51,8 +53,13 @@
  * ────────────────────────────────────────────────────────────────────────────
  * SAFETY
  * ────────────────────────────────────────────────────────────────────────────
+ * - Prints a loud PRODUCTION banner when the target project is a known
+ *   production id (`lib/firebase_projects.js`). `treino-dev` IS one (#826).
  * - Refuses to run against any Firebase project whose id doesn't contain
  *   "dev" (case-insensitive), unless `--allow-prod` is passed explicitly.
+ *   ⚠️ That name check does NOT stop a run against `treino-dev` — "treino-dev"
+ *   contains "dev", so the guard passes and this writes to production without
+ *   `--allow-prod`. It only ever guarded against an unexpected project.
  * - Prints the target project_id before doing anything.
  * - `--dry-run` performs zero writes; every action is logged as "WOULD".
  * - Only touches `userPublicProfiles/{uid}` (mirrors the Phase 3 dual-write
@@ -61,9 +68,14 @@
  */
 
 const admin = require('firebase-admin');
+const { bannerDeProduccion } = require('./lib/firebase_projects');
+
+// #826 — el emulador reusa el id `treino-dev` como namespace local; distinguirlo
+// del proyecto real es lo que evita que el cartel de producción grite en falso.
+const USANDO_EMULADOR = Boolean(process.env.FIRESTORE_EMULATOR_HOST);
 
 let PROJECT_ID;
-if (process.env.FIRESTORE_EMULATOR_HOST) {
+if (USANDO_EMULADOR) {
   // Admin SDK with emulator — no service account needed.
   PROJECT_ID = 'treino-dev';
   admin.initializeApp({ projectId: PROJECT_ID });
@@ -97,15 +109,37 @@ function parseArgs() {
   };
 }
 
+/**
+ * Imprime el proyecto destino y decide si seguir.
+ *
+ * ⚠️ #826 — LA DECISIÓN DE ACÁ NO PROTEGE CONTRA `treino-dev`, y nunca lo hizo.
+ * El chequeo es sobre el NOMBRE (`/dev/i`), y `treino-dev` —que es el único
+ * proyecto de TREINO, el que tiene los usuarios reales— contiene "dev". O sea
+ * que la rama que corta (`!looksLikeDev`) jamás se toma contra producción.
+ * Sólo protege contra un proyecto INESPERADO, que es un caso distinto y mucho
+ * menos probable que el que motivó el guard.
+ *
+ * Se deja la decisión intacta a propósito (mismos exit codes que antes) y se
+ * suma el cartel: exigir `--allow-prod` para `treino-dev` rompería la
+ * invocación documentada de este script, y eso es cambio de conducta, no
+ * documentación. Lo que cierra el hueco de verdad es el alcance 2/3 del #826
+ * (renombrar el proyecto o tener un dev real).
+ */
 function assertDevProject(allowProd) {
   console.log(`Target Firebase project: ${PROJECT_ID}`);
+
+  // El cartel primero: si el destino es producción, que se lea ANTES que
+  // cualquier "Running in --dry-run mode" que invite a relajarse.
+  const banner = bannerDeProduccion(PROJECT_ID, { contraEmulador: USANDO_EMULADOR });
+  if (banner) console.warn(banner);
+
   const looksLikeDev = /dev/i.test(PROJECT_ID);
   if (!looksLikeDev && !allowProd) {
     console.error(
       `\nREFUSING TO RUN: project_id "${PROJECT_ID}" does not look like a ` +
         'dev project. This script is dev-first. If you really intend to run ' +
-        'against this project (e.g. treino-prod, after dev verification and ' +
-        'maintainer sign-off), re-run with --allow-prod.',
+        'against this project (after emulator verification and maintainer ' +
+        'sign-off), re-run with --allow-prod.',
     );
     process.exit(1);
   }

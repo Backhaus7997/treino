@@ -1,15 +1,54 @@
 # scripts/
 
-Admin SDK utilities operated by the team against `treino-dev` and (rarely) `treino-prod`.
+Admin SDK utilities operated by the team against `treino-dev`.
+
+> ## 🚨 `treino-dev` IS PRODUCTION
+>
+> It is TREINO's **only** Firebase project. There is no `treino-prod` — a
+> previous version of this line claimed there was, and that was wrong
+> (`firebase projects:list` returns exactly one TREINO project; `.firebaserc`,
+> `lib/firebase_options.dart`, `android/app/google-services.json` and
+> `ios/Runner/GoogleService-Info.plist` all point at `treino-dev`).
+>
+> **39 of the 43 scripts** here write through the Admin SDK, which **bypasses
+> the Firestore security rules**. A mis-pointed `backfill_*` / `seed_*` /
+> `cleanup_*` / `migrate_*` run destroys real user data.
+>
+> Firestore has a daily backup schedule with 28-day retention
+> (`firebase firestore:backups:schedules:list --project prod`), so a Firestore
+> mistake is recoverable — at the cost of a restore and whatever was written in
+> between. **The schedule does not cover Cloud Storage or Auth users**: anything
+> a script does there is irreversible.
+>
+> The four that do **not** write are `audit_trainer_profiles.mjs`,
+> `audit_ranking_optin.js`, `build_catalog_proposal.js` and
+> `match_drive_videos_to_catalog.js` (the last two write only local files under
+> `docs/`). Assume "writes" for anything not on that list — but do not assume
+> a script is dangerous just because it is here, either: a doc that cries wolf
+> stops being read, which is the failure mode this whole banner exists to fix.
+>
+> **Default to the emulator** (see below). A run against `treino-dev` needs
+> explicit maintainer sign-off, and `--dry-run` first where the script supports
+> it. → [AGENTS.md → Entornos](../AGENTS.md#-entornos--leer-antes-de-correr-cualquier-comando) · issue #826.
 
 ## Prerequisites
 
-- Service-account JSON at `scripts/treino-dev-service-account.json` (gitignored).
-- `GOOGLE_APPLICATION_CREDENTIALS` env var pointing at that file:
+- Service-account JSON at **`scripts/sa-key.json`** (gitignored). That is the
+  name the code actually uses: 19 scripts `require('./sa-key.json')` directly
+  and another ~15 document it as the `GOOGLE_APPLICATION_CREDENTIALS` target.
+  Save the key from the Firebase Console under exactly that name or those
+  scripts fail with a "sa-key.json not found" error.
+  > A handful of older script headers still say
+  > `treino-dev-service-account.json` (the pre-`sa-key` name — also gitignored,
+  > via `.gitignore:52`). It is the same key; only the filename differs, and
+  > only the scripts that read `GOOGLE_APPLICATION_CREDENTIALS` accept it.
+  > Nothing `require`s it. (#826)
+- `GOOGLE_APPLICATION_CREDENTIALS` env var pointing at that file, for the
+  scripts that read it instead of `require`-ing the key:
   ```sh
-  export GOOGLE_APPLICATION_CREDENTIALS="scripts/treino-dev-service-account.json"
+  export GOOGLE_APPLICATION_CREDENTIALS="scripts/sa-key.json"
   # Windows PowerShell:
-  $env:GOOGLE_APPLICATION_CREDENTIALS = "scripts\treino-dev-service-account.json"
+  $env:GOOGLE_APPLICATION_CREDENTIALS = "scripts\sa-key.json"
   ```
 - `firebase-admin` installed in `scripts/`:
   ```sh
@@ -18,9 +57,10 @@ Admin SDK utilities operated by the team against `treino-dev` and (rarely) `trei
 
 ### Running against the emulator (no service-account key)
 
-Every Admin SDK script here checks `FIRESTORE_EMULATOR_HOST` **before** loading
-`sa-key.json`. Set it and the script initializes against the local emulator
-(`projectId: 'treino-dev'`) with no credentials at all:
+**21 of the 43 scripts** here branch on `FIRESTORE_EMULATOR_HOST` **before**
+loading `sa-key.json`. For those, setting the variable initializes against the
+local emulator (`projectId: 'treino-dev'`, which here is just the emulator's
+namespace) with no credentials at all:
 
 ```sh
 FIRESTORE_EMULATOR_HOST=localhost:8080 node scripts/<script>.js
@@ -28,6 +68,49 @@ FIRESTORE_EMULATOR_HOST=localhost:8080 node scripts/<script>.js
 
 Without that env var the key is required, and a missing `sa-key.json` fails
 with an actionable message instead of a raw `MODULE_NOT_FOUND`.
+
+> ⚠️ **The other 22 have no such branch** — they call `admin.initializeApp()`
+> straight away and go to production with whatever the service account points
+> at. (#826)
+>
+> **Do not settle this with grep.** A previous version of this file said "23
+> check" and told you to `grep -n FIRESTORE_EMULATOR_HOST scripts/<script>.js`
+> before running one. Both halves were wrong in the reassuring direction:
+> `seed_posts.js` and `seed_sessions.js` name the variable **only in their
+> usage docstring** and then call `admin.initializeApp()` bare. A grep hit
+> there looks exactly like a grep hit on a script that really branches. Read
+> the `initializeApp` call, not the file.
+>
+> (Setting the variable still routes *Firestore* to the emulator in those two —
+> the Admin SDK reads it on its own. What is missing is the credential branch:
+> they demand a real `sa-key.json` anyway, and anything they touch outside
+> Firestore is not redirected at all.)
+
+### 🚨 The npm scripts — the shortest path to production in this repo
+
+`scripts/package.json` exposes six one-liners that write to production, and
+**none of them names the project on screen**: the Admin SDK resolves it from
+`GOOGLE_APPLICATION_CREDENTIALS`.
+
+| `npm run …` | Runs | Blast radius |
+|---|---|---|
+| `seed:exercises` / `seed:routines` / `seed:all` | `seed_workout_catalog.js` | `set()` over the whole `exercises` + `routines` stock catalogue |
+| `seed:trainers` | `seed_trainer_profiles.js` | upserts 5 `users/{uid}` + `trainerPublicProfiles/{uid}` |
+| **`seed:trainers:clear`** | `seed_trainer_profiles.js --clear` | **`batch.delete()`** on those same 10 docs |
+| `promote:trainer` | `promote_user_to_trainer.js` | flips `users/{uid}.role`, bypassing the role-immutability rule |
+
+That `seed:emulator` and `seed:emulator:clear` carry
+`FIREBASE_AUTH_EMULATOR_HOST` + `FIRESTORE_EMULATOR_HOST` **inline** while the
+six above carry nothing reads like the bare ones are the safe default. It is
+the other way round: **the safe one is the exception.** To point any of the six
+at the emulator you have to add the variables by hand.
+
+All six now print the production banner before their first write. The banner is
+visibility, not a gate — exit codes are unchanged, and it stays quiet against
+the emulator and against any non-production project id.
+
+> `deploy_rules.js` is a **44th** write path that this "43" does not even
+> count: it never loads `firebase-admin`. See its own entry below.
 
 ---
 
@@ -110,9 +193,35 @@ reproducible data. Session `muscleGroup` values use the canonical English keys
 | `backfill_gym_names.js` | gyms-foundation Phase 4 (2/2). Fills `userPublicProfiles.gymName` from the resolved `gyms/` doc. **Run after `backfill_gym_ids.js`.** |
 | `accept_pending_link.js` | Accepts a pending trainer-athlete link for smoke testing. |
 | `migrate_trainer_locations.js` | One-time migration from singular `trainerLatitude/Longitude/Geohash` fields to the `trainerLocations` array model. |
-| `deploy_rules.js` | Deploys Firestore security rules to the active Firebase project. |
+| `deploy_rules.js` | 🚨 Deploys Firestore security rules. **Ignores `.firebaserc`, `firebase use` and `--project`** — see below. |
 
 For scripts not listed here, read their inline header comment for usage.
+
+---
+
+## 🚨 deploy_rules.js — el camino que ningún default frena
+
+```sh
+cd scripts && node deploy_rules.js
+```
+
+Publica `firestore.rules` **en producción**, y no por el CLI de Firebase: arma
+el ruleset y mueve el release contra la REST API de Firebase Rules
+(`firebaserules.googleapis.com`) autenticándose con `sa-key.json`.
+
+De ahí que sea su propia sección y no una fila más de la tabla:
+
+- **No lee `.firebaserc`.** El proyecto sale del `project_id` del service
+  account (`deploy_rules.js:~30`). Cambiar el default del `.firebaserc`, correr
+  `firebase use`, o pasar `--project`: ninguna de las tres lo desvía.
+- **`FIRESTORE_EMULATOR_HOST` tampoco lo desvía.** No hay modo emulador acá.
+- **Pega al instante en las apps ya instaladas.** Unas rules más duras cortan
+  lecturas y escrituras de usuarios reales en el próximo request, sin release
+  de por medio y sin vuelta atrás salvo re-deployando las anteriores.
+
+Imprime el banner de producción antes del primer request (`lib/firebase_projects.js`),
+y a diferencia del resto lo imprime **siempre** que el destino sea producción:
+apagarlo con la variable del emulador sería mentir. (#826)
 
 ---
 
@@ -131,21 +240,28 @@ Run every command below from the **repo root** (the paths are repo-root-relative
 ```sh
 (cd scripts && npm install)   # once — subshell keeps cwd at the repo root
 
-# 1. Ids first — dry run, then real run against treino-dev:
+# 1. Ids first — dry run, then real run. ⚠️ the second line WRITES TO PRODUCTION:
 node scripts/backfill_gym_ids.js --dry-run
 node scripts/backfill_gym_ids.js
 
-# 2. Names second — dry run, then real run against treino-dev:
+# 2. Names second — same deal, the second line WRITES TO PRODUCTION:
 node scripts/backfill_gym_names.js --dry-run
 node scripts/backfill_gym_names.js
 ```
 
+⚠️ Prefer the emulator for both:
+`FIRESTORE_EMULATOR_HOST=localhost:8080 node scripts/backfill_gym_ids.js`.
+
 Both scripts:
 - Print the target `project_id` (from `sa-key.json`, or `treino-dev` when
-  `FIRESTORE_EMULATOR_HOST` is set) before doing anything,
-  and **refuse to run** unless the project id looks like a dev project
-  (contains "dev"). Pass `--allow-prod` to override, only after dev
-  verification + maintainer sign-off.
+  `FIRESTORE_EMULATOR_HOST` is set) before doing anything, and **refuse to run**
+  unless the project id contains "dev" — pass `--allow-prod` to override.
+  ⚠️ **That name check does NOT protect you here**: `treino-dev` contains "dev",
+  so the guard passes and the script writes to production without `--allow-prod`.
+  It only ever guarded against a *different*, unexpected project. Since #826 the
+  scripts print an explicit PRODUCTION banner when the target is a known
+  production project id (`scripts/lib/firebase_projects.js`) — read it, don't
+  scroll past it.
 - Support `--dry-run`, which reports every change that WOULD be made without
   writing anything.
 - Print a final VERIFIED COUNT / summary of docs checked, corrected, and
@@ -170,5 +286,7 @@ Both scripts:
   `kNoGymId` → `gymName: null`. Unknown/unresolved ids are skipped and
   logged, not guessed.
 
-Prod runs are a separate, maintainer-approved gate after dev counts are
-verified — silent, no user notice (per the locked gyms-foundation decision).
+A run without `FIRESTORE_EMULATOR_HOST` **is** the prod run — there is no
+separate dev project to verify against first (#826). Verify on the emulator,
+then `--dry-run` against `treino-dev`, then the real run with maintainer
+sign-off — silent, no user notice (per the locked gyms-foundation decision).

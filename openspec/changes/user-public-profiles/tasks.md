@@ -90,7 +90,7 @@ Resolved: Query normalization (toLowercase) happens INSIDE `searchUsersProvider`
 
 - [x] A8.1 Add the `userPublicProfiles/{uid}` block to `firestore.rules` per design Section A.4 (read for auth != null; create with uid check; update with uid immutability; delete: false). Commit.
 - [x] A8.2 Covers: REQ-UPP-014, REQ-UPP-015, REQ-UPP-016. AUTOMATED TESTS NOT APPLICABLE — `fake_cloud_firestore` does not enforce rules.
-- [ ] A8.3 **MANDATORY MANUAL GATE (pre-merge)**: Run T35-style emulator test. Start `firebase emulators:start`, deploy updated rules, seed via Admin SDK, attempt: (a) user B reads `userPublicProfiles/A` — MUST succeed (SCENARIO-268); (b) user B lists prefix query — MUST succeed (SCENARIO-269 semantics); (c) user B writes `userPublicProfiles/A` where B != A — MUST be denied (SCENARIO-269/270). Document results in PR description before requesting review.
+- [ ] A8.3 **MANDATORY MANUAL GATE (pre-merge)**: Run T35-style emulator test. Start `firebase emulators:start`, **load the updated rules into the EMULATOR** (🚨 do NOT run a bare `firebase deploy --only firestore:rules` — that ignores the emulator and ships to PRODUCTION: `.firebaserc` resolves the default to `treino-dev`, TREINO's only project, with real users in it. The emulator picks up `firestore.rules` from `firebase.json` on start/restart. See [openspec/AGENTS.md](../../AGENTS.md) · #826), seed via Admin SDK, attempt: (a) user B reads `userPublicProfiles/A` — MUST succeed (SCENARIO-268); (b) user B lists prefix query — MUST succeed (SCENARIO-269 semantics); (c) user B writes `userPublicProfiles/A` where B != A — MUST be denied (SCENARIO-269/270). Document results in PR description before requesting review.
 
 ### Phase A9: Backfill Script
 

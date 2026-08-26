@@ -6,6 +6,15 @@
  * cleanupAssignedPlansOnUnlink: hard-deletes assigned plans when a link ends.
  * sdd/rankings-integrity Phase 1 (PR#1): exports rankingAggregateOnSession +
  * rankingAggregateOnOptIn — server-authoritative ranking-metric recompute.
+ *
+ * ⚠️ TODO `firebase deploy` de este archivo va a PRODUCCIÓN (#826).
+ * `treino-dev` es el único proyecto Firebase de TREINO — el nombre dice "dev"
+ * por historia, adentro viven los usuarios reales. Un `firebase deploy` PELADO,
+ * sin `--project`, también va ahí: `.firebaserc` declara `"default":
+ * "treino-dev"` y la CLI lo completa en silencio, así que el comando no nombra
+ * al proyecto que está por tocar. Los comandos de abajo llevan `--project prod`
+ * (alias del mismo project ID) para que el destino se vea en pantalla.
+ * Ver AGENTS.md § Entornos antes de deployar.
  */
 
 export { deleteAccountHandler as deleteAccount } from "./delete-account";
@@ -43,16 +52,18 @@ export { syncSessionShareOnTrainerLink } from "./sync-session-share";
 // generateDuePayments (auto-created mensual/semanal pending Payment docs) was
 // removed — Slice 1 of the payments redesign makes billing 100% manual (the
 // trainer creates/marks every charge by hand via "Registrar pago" / "Marcar
-// pagado"). Redeploying functions (`firebase deploy --only functions`) prunes
-// this function from the deployed set.
+// pagado"). Redeploying functions (`firebase deploy --only functions --project
+// prod`) prunes this function from the deployed set — ⚠️ en PRODUCCIÓN, y la
+// poda es inmediata para los usuarios reales.
 export { notifyOverduePayments } from "./payments/notify-overdue-payments";
 // Email transaccional (Resend): consumer del outbox `mail_queue`. Los triggers
 // de dominio NUNCA llaman a Resend — escriben una fila de cola con ID
 // determinístico y esta función es la única que envía. Ver
 // functions/src/mail/enqueue-mail.ts para el contrato de idempotencia.
 // OJO en el deploy: necesita el secret RESEND_API_KEY
-// (`firebase functions:secrets:set RESEND_API_KEY`) y que el dominio del
-// remitente esté verificado por DNS en Resend, o cada envío devuelve 403.
+// (`firebase functions:secrets:set RESEND_API_KEY --project prod` — ⚠️ escribe
+// en Secret Manager de PRODUCCIÓN, #826) y que el dominio del remitente esté
+// verificado por DNS en Resend, o cada envío devuelve 403.
 export { sendQueuedMail } from "./mail/send-queued-mail";
 // SHELVED (email de auth por Resend): requestPasswordReset y
 // requestEmailVerification estan escritos y testeados pero NO se despliegan
@@ -61,13 +72,22 @@ export { sendQueuedMail } from "./mail/send-queued-mail";
 // por DNS en Resend deja superficie de abuso a cambio de nada, porque el mail
 // se encola y despues falla con 403.
 //
-// PARA ACTIVAR, el mismo dia que el dominio quede verificado:
-//   1. `firebase functions:secrets:set RESEND_API_KEY`
+// ⚠️ PARA ACTIVAR — los pasos 1 y 4 TOCAN PRODUCCIÓN (#826). No es un runbook
+// que un agente pueda correr solo: el paso 4 publica un endpoint SIN autenticar
+// a los usuarios reales de `treino-dev`. Requiere OK explícito de un humano, y
+// recién el mismo dia que el dominio quede verificado:
+//   1. `firebase functions:secrets:set RESEND_API_KEY --project prod`
+//      ⚠️ PRODUCCIÓN — escribe en Secret Manager del proyecto real.
 //   2. descomentar el export de abajo
 //   3. cambiar AuthService.sendPasswordResetEmail / sendEmailVerification para
 //      que llamen a estos callables en vez de a FirebaseAuth directo
 //      (lib/features/auth/data/auth_service.dart:121 y :130)
-//   4. `firebase deploy --only functions`
+//   4. `firebase deploy --only functions --project prod`
+//      ⚠️ PRODUCCIÓN. El `--project prod` no cambia el destino respecto del
+//      comando pelado — lo hace VISIBLE. `prod` y `treino-dev` son el mismo
+//      project ID; sin la flag, `.firebaserc` resuelve al mismo lugar sin que
+//      aparezca en pantalla. Además, un `--only functions` sin filtros PODA
+//      del set desplegado toda función ausente de este archivo.
 //
 // Hasta el paso 3 los mails siguen saliendo por las plantillas default de
 // Firebase, asi que el flujo de recuperacion NUNCA queda sin cobertura.

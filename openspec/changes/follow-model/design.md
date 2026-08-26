@@ -552,6 +552,15 @@ Regla de consistencia, no negociable: **el cliente y las rules se mueven juntos*
 
 ## 7. Coexistencia, migración y criterio de corte
 
+> 🚨 **Todo lo que esta sección describe corre contra PRODUCCIÓN.** `treino-dev`
+> es el único proyecto Firebase de TREINO: ahí viven los usuarios reales, y el
+> nombre "dev" es exactamente lo que engaña. Los `--apply` escriben por Admin SDK
+> —que **saltea las Firestore rules**, incluido el freeze de M-03b— y los
+> `firebase deploy` cambian la app publicada al instante. Esto es el **contrato**
+> de los scripts, no el runbook: los pasos ejecutables, con marca por línea, están
+> en [`tasks.md`](./tasks.md). Ver [openspec/AGENTS.md](../../AGENTS.md) ·
+> [#826](https://github.com/Backhaus7997/treino/issues/826).
+
 LD-03 ya cerró: **coexistencia sí, dual-write no**. `friendships` se congela (deny-all-writes) y **no se borra**. Lo que el design agrega es el criterio de corte explícito, el contrato exacto de los dos scripts, el orden del recálculo de contadores y **el momento exacto del freeze** — porque "cuando esté verificado" no es un criterio, y porque congelar tarde abre un agujero de privacidad (ADR-FOLLOW-015).
 
 ### 7.0 El freeze de `friendships` se adelanta a **antes** de M-04

@@ -74,7 +74,7 @@ raíz.**
 ## 2 · Firebase — el secret
 
 ```bash
-firebase functions:secrets:set RESEND_API_KEY
+firebase functions:secrets:set RESEND_API_KEY --project prod
 ```
 
 El remitente por defecto ya está en el código
@@ -141,8 +141,8 @@ Recién **después** de que Resend diga Verified:
    llamar a los callables en vez de a FirebaseAuth directo.
 3. Desplegar:
    ```bash
-   firebase deploy --only firestore:rules
-   firebase deploy --only functions
+   firebase deploy --only firestore:rules --project prod
+   firebase deploy --only functions --project prod
    ```
 
 **Las reglas primero.** `mail_queue` está cerrada en los cuatro verbos y conviene

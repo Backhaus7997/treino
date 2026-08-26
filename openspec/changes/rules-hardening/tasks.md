@@ -12,6 +12,18 @@
 > spec requirement (numbered per spec file, in read order); `[RISK:<n>]` = design.md
 > Risks table row.
 
+> ## 🚨 Every `[MANUAL]` deploy in this file ships rules to PRODUCTION
+>
+> `treino-dev` is TREINO's only Firebase project — real users. A bare
+> `firebase deploy` with no `--project` goes there: `.firebaserc` fills in
+> `"default": "treino-dev"` silently, so the target never appears on screen.
+> The `--project prod` written into the commands below does not change the
+> destination — it makes it **visible**. Tightened rules take effect instantly
+> for every shipped app build, so a wrong deploy is a live outage.
+> The `[GATE]` `--dry-run` steps only compile and are safe; the `[MANUAL]` steps
+> are human-run with explicit sign-off, never by an agent.
+> See [openspec/AGENTS.md](../../AGENTS.md) · #826.
+
 ## Pre-flight (spec/design conflicts found during read — resolve before Slice work)
 
 - [ ] **0.1** `[BLOCKER-DOC]` Flag two spec-vs-design divergences to the user/reviewer
@@ -138,7 +150,7 @@ spec file), `scripts/test_rules.sh` (~29-31). Zero client changes.
       branch's changes) — unrelated to Slice A, out of scope for this PR, not a
       regression introduced here.
 - [x] **1.10** `[GATE]` Dry-run compile: `firebase deploy --only storage:rules --dry-run`
-      (or equivalent `firebase deploy --only firestore:rules,storage:rules --dry-run` if
+      (or equivalent `firebase deploy --only firestore:rules,storage:rules --dry-run --project prod` if
       the CLI requires both together) compiles with no syntax errors.
       DONE, with a CLI-syntax correction: this project has no named Storage deploy
       targets configured, so `--only storage:rules` errors
@@ -149,7 +161,7 @@ spec file), `scripts/test_rules.sh` (~29-31). Zero client changes.
       → "rules file storage.rules compiled successfully" +
       "rules file firestore.rules compiled successfully". No deploy executed.
 - [ ] **1.11** `[MANUAL]` User's manual step (not automatable by this task list): run
-      `firebase deploy --only firestore:rules,storage:rules` to ship PR A. Do this only
+      🚨 PROD (see banner at top) — `firebase deploy --only firestore:rules,storage:rules --project prod` to ship PR A. Do this only
       after 1.9 and 1.10 are both green and the PR is merged.
 
 ---
@@ -233,10 +245,10 @@ client changes — review payload already carries `linkId` (`Review.toJson`).
       2.8 stays `assertSucceeds`. Suite green for this file.
 - [ ] **2.13** `[GATE]` Full `scripts/rules_test/` suite green (Slice A + Slice B tests
       together) via `scripts/test_rules.sh`.
-- [ ] **2.14** `[GATE]` `firebase deploy --only firestore:rules,storage:rules --dry-run`
+- [ ] **2.14** `[GATE]` `firebase deploy --only firestore:rules,storage:rules --dry-run --project prod`
       compiles with no syntax errors.
 - [ ] **2.15** `[MANUAL]` User's manual step: run
-      `firebase deploy --only firestore:rules,storage:rules` to ship PR B, only after
+      🚨 PROD (see banner at top) — `firebase deploy --only firestore:rules,storage:rules --project prod` to ship PR B, only after
       2.13 and 2.14 are green and the PR is merged.
 
 ---
@@ -321,10 +333,10 @@ Role-check only per design.md AD-1 option b (NOT the full link check — see pre
       3.5 stay `assertSucceeds`. Suite green for this file.
 - [ ] **3.8** `[GATE]` Full `scripts/rules_test/` suite green (Slices A+B+C) via
       `scripts/test_rules.sh`.
-- [ ] **3.9** `[GATE]` `firebase deploy --only firestore:rules,storage:rules --dry-run`
+- [ ] **3.9** `[GATE]` `firebase deploy --only firestore:rules,storage:rules --dry-run --project prod`
       compiles with no syntax errors.
 - [ ] **3.10** `[MANUAL]` User's manual step: run
-      `firebase deploy --only firestore:rules,storage:rules` to ship PR C, only after
+      🚨 PROD (see banner at top) — `firebase deploy --only firestore:rules,storage:rules --project prod` to ship PR C, only after
       3.8 and 3.9 are green and the PR is merged.
 
 ---
@@ -465,10 +477,10 @@ hardening, no cross-doc lookups. Zero client changes.
       test file) via `scripts/test_rules.sh`. This is the final regression gate before
       PR D deploy — non-vacuity across the entire suite (every deny paired with an allow)
       must hold end to end.
-- [ ] **4.24** `[GATE]` `firebase deploy --only firestore:rules,storage:rules --dry-run`
+- [ ] **4.24** `[GATE]` `firebase deploy --only firestore:rules,storage:rules --dry-run --project prod`
       compiles with no syntax errors.
 - [ ] **4.25** `[MANUAL]` User's manual step: run
-      `firebase deploy --only firestore:rules,storage:rules` to ship PR D, only after
+      🚨 PROD (see banner at top) — `firebase deploy --only firestore:rules,storage:rules --project prod` to ship PR D, only after
       4.23 and 4.24 are green and the PR is merged. This is the FINAL deploy of the
       rules-hardening change — all 11 audit findings from Engram obs #405 are now closed
       (10 confirmed findings + the Slice C role-vs-link residual explicitly documented as

@@ -1,11 +1,38 @@
 'use strict';
 
+/**
+ * seed_workout_catalog.js
+ *
+ * 🚨 ESCRIBE EN PRODUCCIÓN por Admin SDK —salteándose las rules— salvo que
+ * apuntes al emulador. Es el entrypoint de `npm run seed:exercises`,
+ * `seed:routines` y `seed:all`, y ninguno de esos tres nombra el proyecto: lo
+ * resuelve el SDK desde `GOOGLE_APPLICATION_CREDENTIALS`. El que SÍ trae las
+ * env vars del emulador es `seed:emulator`, que es la EXCEPCIÓN, no el default.
+ * Imprime un cartel antes del primer write cuando el destino es producción.
+ *
+ *   # Emulador (recomendado):
+ *   FIRESTORE_EMULATOR_HOST=localhost:8080 node scripts/seed_workout_catalog.js --all
+ *
+ * Contexto: #826 · scripts/README.md · AGENTS.md → Entornos.
+ */
+
 const admin = require('firebase-admin');
 const { equipmentMap } = require('./_equipment_map.js');
 const { videoMap } = require('./_video_map.js');
 // Guarded: seed_emulator_full.js requires this module after initializing its
 // own emulator-bound app — a second initializeApp() here would throw.
 if (!admin.apps.length) {
+  // El cartel va ANTES de `initializeApp()` y adentro del guard: cuando
+  // `seed_emulator_full.js` requiere este módulo ya inicializó su propia app
+  // contra el emulador, y ahí no hay nada que advertir. Fuera del guard,
+  // `npm run seed:all` escribe el catálogo entero en producción sin que
+  // `treino-dev` aparezca una sola vez en pantalla. (#826)
+  const { bannerDeProduccion } = require('./lib/firebase_projects');
+  const { usandoEmulador, projectIdObjetivo } = require('./lib/target_project');
+  const bannerProd = bannerDeProduccion(projectIdObjetivo(), {
+    contraEmulador: usandoEmulador(),
+  });
+  if (bannerProd) console.warn(bannerProd);
   admin.initializeApp(); // uses GOOGLE_APPLICATION_CREDENTIALS env var
 }
 const db = admin.firestore();

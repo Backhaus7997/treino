@@ -590,8 +590,8 @@ Chain strategy: feature-branch-chain
 ### T46 [POST] Deploy Firestore rules
 
 - **Files**: none (command-only)
-- **Description**: After PR1 merges to `main`: `cd scripts && node deploy_rules.js`. This deploys the 3 new collection rules + 24h CEL guard to production Firestore. Must be executed by team member with Firebase Admin access.
-- **Acceptance**: `firebase deploy --only firestore:rules` exits 0; no existing rules regressed.
+- **Description**: 🚨 **PRODUCTION.** After PR1 merges to `main`: `cd scripts && node deploy_rules.js`. This deploys the 3 new collection rules + 24h CEL guard to `treino-dev` — TREINO's only Firebase project, with real users in it. Must be executed by a team member with Firebase Admin access; **an agent does NOT run this**. See [openspec/AGENTS.md](../../AGENTS.md) · #826.
+- **Acceptance**: 🚨 PROD — `firebase deploy --only firestore:rules --project prod` exits 0; no existing rules regressed. The `--project prod` does not change the destination (bare resolves to the same place via `.firebaserc`) — it makes it visible.
 
 ---
 
