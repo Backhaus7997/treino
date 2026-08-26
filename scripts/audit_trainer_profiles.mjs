@@ -31,17 +31,25 @@ import admin from "firebase-admin";
 const projectArg = process.argv.find((a) => a.startsWith("--project="));
 const projectId = projectArg ? projectArg.split("=")[1] : undefined;
 
-if (!process.env.GOOGLE_APPLICATION_CREDENTIALS && !projectId) {
+// `--project` NO es una credencial: sólo elige contra qué proyecto correr.
+// La primera versión de este guard aceptaba `--project=X` sin credenciales y
+// dejaba que el script muriera recién en la primera lectura de Firestore —
+// justo el modo de fallar que no querés en la herramienta que se corre ANTES
+// de mergear. Las credenciales se exigen siempre, aparte del proyecto.
+if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
   console.error(
-    "Falta GOOGLE_APPLICATION_CREDENTIALS (o pasá --project=<id>).\n" +
-      "Este script es de sólo lectura, pero necesita credenciales de Admin SDK."
+    "Faltan credenciales de Admin SDK.\n\n" +
+      "  export GOOGLE_APPLICATION_CREDENTIALS=/ruta/al/service-account.json\n\n" +
+      "`--project=<id>` sólo elige el proyecto; no autentica nada.\n" +
+      "Este script es de SÓLO LECTURA, pero el Admin SDK necesita credenciales igual."
   );
   process.exit(2);
 }
 
-admin.initializeApp(
-  projectId ? { projectId } : { credential: admin.credential.applicationDefault() }
-);
+admin.initializeApp({
+  credential: admin.credential.applicationDefault(),
+  ...(projectId ? { projectId } : {}),
+});
 
 const db = admin.firestore();
 

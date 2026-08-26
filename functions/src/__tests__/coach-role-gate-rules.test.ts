@@ -396,6 +396,45 @@ describe("coach_availability_* — update valida forma (QA-SEC-013)", () => {
     );
   });
 
+  // El caso legacy: docs de agenda forjados por un athlete ANTES de que
+  // existiera el gate. Cerrar sólo `create` los dejaría editables para
+  // siempre, sobre una colección que TODA la plataforma puede listar. Es el
+  // mismo argumento que ya justificaba el gate de `update` en
+  // `trainerPublicProfiles`; no aplicarlo acá era incoherente.
+  it("DENIEGA que un athlete edite una REGLA forjada antes del gate", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(
+        doc(ctx.firestore(), "coach_availability_rules", "legacy1"),
+        availabilityRule("legacy1", ATHLETE)
+      );
+    });
+    await assertFails(
+      setDoc(
+        doc(dbAs(ATHLETE), "coach_availability_rules", "legacy1"),
+        availabilityRule("legacy1", ATHLETE, { startHour: 6 })
+      )
+    );
+  });
+
+  it("DENIEGA que un athlete edite un OVERRIDE forjado antes del gate", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "coach_availability_overrides", "legacy2"), {
+        id: "legacy2",
+        trainerId: ATHLETE,
+        date,
+        type: "block",
+      });
+    });
+    await assertFails(
+      setDoc(doc(dbAs(ATHLETE), "coach_availability_overrides", "legacy2"), {
+        id: "legacy2",
+        trainerId: ATHLETE,
+        date: Timestamp.fromDate(new Date("2026-09-03T00:00:00Z")),
+        type: "block",
+      })
+    );
+  });
+
   it("DENIEGA que un tercero edite la agenda ajena", async () => {
     await assertFails(
       setDoc(

@@ -2098,13 +2098,18 @@ service cloud.firestore {
                     && request.resource.data.trainerId == request.auth.uid
                     && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
                     && ruleShapeOk(request.resource.data);
-      // El `update` valida forma pero NO pide rol: el alcance de #780 pone el
-      // gate de rol de update sólo en `trainerPublicProfiles`. Acá el dueño de
-      // un doc forjado antes del gate queda igual acotado a la forma válida, y
-      // no puede crear ninguno nuevo.
+      // El `update` pide rol igual que el `create`. La primera versión de este
+      // change no lo hacía —me apoyé en que el alcance del issue sólo pedía el
+      // gate de update para `trainerPublicProfiles`— y era **incoherente con mi
+      // propio argumento**: si cerrar sólo `create` "deja vivo lo que ya se
+      // coló" para el directorio de PFs, vale igual para la agenda. Peor acá,
+      // porque esta colección es mundo-legible: un atleta con una regla
+      // forjada antes del gate podría seguir reemplazando indefinidamente una
+      // agenda que **toda la plataforma lee**. Lo marcó el bot de review.
       allow update: if request.auth != null
                     && resource.data.trainerId == request.auth.uid
                     && request.resource.data.trainerId == request.auth.uid
+                    && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
                     && ruleShapeOk(request.resource.data);
       allow delete: if request.auth != null
                     && resource.data.trainerId == request.auth.uid;
@@ -2151,9 +2156,13 @@ service cloud.firestore {
                     && request.resource.data.trainerId == request.auth.uid
                     && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
                     && overrideShapeOk(request.resource.data);
+      // Mismo gate de rol que en `coach_availability_rules`, por el mismo
+      // motivo: sin él, un override forjado antes del gate seguiría siendo
+      // editable para siempre sobre una colección mundo-legible.
       allow update: if request.auth != null
                     && resource.data.trainerId == request.auth.uid
                     && request.resource.data.trainerId == request.auth.uid
+                    && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
                     && overrideShapeOk(request.resource.data);
       allow delete: if request.auth != null
                     && resource.data.trainerId == request.auth.uid;
