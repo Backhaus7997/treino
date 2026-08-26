@@ -79,6 +79,8 @@ Future<void> maybeShowTemplatesOnboarding({
   final l10n = AppL10n.of(context);
   final palette = AppPalette.of(context);
   final steps = templatesOnboardingSteps(l10n);
+  // Primera entrada: no hay nada que sembrar.
+  const TemplatePreferences? initialPreferences = null;
 
   // Capturados ANTES del await, igual que `OnboardingGate` y el gate de
   // ejercicios propios. Si un redirect de auth o un reemplazo de ruta desarma
@@ -110,6 +112,7 @@ Future<void> maybeShowTemplatesOnboarding({
       builder: (sheetContext) => _TemplatesOnboardingSheet(
         steps: steps,
         l10n: l10n,
+        initialPreferences: initialPreferences,
         onFinish: (preferences) {
           // Persist BEFORE popping: after the pop this callback's `ref` is
           // still valid (it belongs to the caller, not the sheet), but keeping
@@ -127,6 +130,63 @@ Future<void> maybeShowTemplatesOnboarding({
     // torn down under us. Marking only on the two buttons is how an onboarding
     // comes back forever for anyone who dismissed it once.
     await onboardingController.markSeen(surface);
+  }
+}
+
+/// Reabre el flow de 4 pasos para AJUSTAR las respuestas ya dadas (#635 PR#3).
+///
+/// Es la contraparte editable que pide el issue: *"la gente cambia de
+/// disponibilidad —se le libera un día, se le acorta el gimnasio—; sin filtros
+/// editables tendría que rehacer el cuestionario entero, o peor, no puede"*.
+///
+/// Tres diferencias con [maybeShowTemplatesOnboarding], y las tres importan:
+///
+///   1. **No consulta `shouldShowTourProvider`.** Es una acción explícita del
+///      atleta, no un disparo automático: negarla porque "ya lo vio" sería
+///      justamente lo que rompe.
+///   2. **No llama a `markSeen`.** La superficie ya está vista; re-marcarla no
+///      agrega nada y enmascararía un bump de versión futuro.
+///   3. **Siembra el formulario** con lo respondido. Reabrirlo en blanco
+///      obligaría a recordar y re-tipear lo que ya estaba, que es la fricción
+///      que esto viene a sacar.
+///
+/// SALTAR acá significa "cerrar sin cambiar", no "no quiero responder": el
+/// `onSkip` popea sin escribir, así que las preferencias viejas sobreviven.
+Future<void> showTemplatesPreferencesEditor({
+  required BuildContext context,
+  required WidgetRef ref,
+}) async {
+  final l10n = AppL10n.of(context);
+  final palette = AppPalette.of(context);
+  final steps = templatesOnboardingSteps(l10n);
+  final initial = ref.read(athleteTemplatePreferencesProvider);
+
+  // Mismo flag que el gate: mientras esta hoja está abierta, ningún otro
+  // onboarding puede montarse encima.
+  final tourOpen = ref.read(onboardingTourOpenProvider.notifier);
+  tourOpen.state = true;
+  try {
+    await showModalBottomSheet<void>(
+      context: context,
+      useRootNavigator: true,
+      isScrollControlled: true,
+      enableDrag: false,
+      isDismissible: false,
+      backgroundColor: Colors.transparent,
+      barrierColor: palette.scrimDark.withValues(alpha: 0.66),
+      builder: (sheetContext) => _TemplatesOnboardingSheet(
+        steps: steps,
+        l10n: l10n,
+        initialPreferences: initial,
+        onFinish: (preferences) {
+          ref.read(templatePreferencesControllerProvider).save(preferences);
+          Navigator.of(sheetContext).pop();
+        },
+        onSkip: () => Navigator.of(sheetContext).pop(),
+      ),
+    );
+  } finally {
+    tourOpen.state = false;
   }
 }
 
@@ -160,12 +220,17 @@ class _TemplatesOnboardingSheet extends StatelessWidget {
     required this.l10n,
     required this.onFinish,
     required this.onSkip,
+    this.initialPreferences,
   });
 
   final List<TemplatesOnboardingStep> steps;
   final AppL10n l10n;
   final void Function(TemplatePreferences preferences) onFinish;
   final VoidCallback onSkip;
+
+  /// Respuestas con las que sembrar el formulario. `null` en la primera
+  /// entrada; las guardadas cuando el atleta lo reabre para ajustarlas.
+  final TemplatePreferences? initialPreferences;
 
   @override
   Widget build(BuildContext context) {
@@ -185,6 +250,7 @@ class _TemplatesOnboardingSheet extends StatelessWidget {
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
           child: TemplatesOnboardingView(
+            initialPreferences: initialPreferences,
             steps: steps,
             onFinish: onFinish,
             onSkip: onSkip,

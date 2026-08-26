@@ -3937,6 +3937,15 @@ class AppL10nEs extends AppL10n {
   String get templatesOnboardingBack => 'VOLVER';
 
   @override
+  String get templatesFilterBarAdjust => 'AJUSTAR';
+
+  @override
+  String get templatesFilterBarSetUp => 'AJUSTAR MI BÚSQUEDA';
+
+  @override
+  String get templatesFilterBarHint => 'Ordenado según lo que buscás';
+
+  @override
   String get exerciseFeedbackAction => 'COMENTAR / REPORTAR';
 
   @override
@@ -7940,6 +7949,15 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get templatesOnboardingBack => 'VOLVER';
+
+  @override
+  String get templatesFilterBarAdjust => 'AJUSTAR';
+
+  @override
+  String get templatesFilterBarSetUp => 'AJUSTAR MI BÚSQUEDA';
+
+  @override
+  String get templatesFilterBarHint => 'Ordenado según lo que buscás';
 
   @override
   String get exerciseFeedbackAction => 'COMENTAR / REPORTAR';
