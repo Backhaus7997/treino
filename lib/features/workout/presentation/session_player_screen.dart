@@ -231,6 +231,23 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
   /// El canal por el que el RELOJ pide cortar la cuenta del teléfono.
   WatchTimerControlNotifier? _controlDelReloj;
 
+  /// El contenedor del `ProviderScope` que ESTA pantalla monta en su rama
+  /// `data`, capturado para poder escribir desde el `State`.
+  ///
+  /// Parece un rodeo y no lo es (#817). `durationTimerRecorderProvider` declara
+  /// `dependencies: [playerSessionIdProvider]`, o sea que sólo resuelve la
+  /// sesión DENTRO de ese scope. Y el `ref` de este `State` cuelga del elemento
+  /// de la pantalla, que está ARRIBA del scope que la propia pantalla crea en
+  /// `build`: leer el recorder desde acá con `ref.read` devuelve uno cuyo
+  /// `playerSessionIdProvider` es el default `null`, así que `borrar()` no
+  /// borra nada — y no falla, no loguea, no deja rastro. Un fix que no borra y
+  /// no rompe es peor que el bug, porque además parece arreglado.
+  ///
+  /// Se guarda el CONTENEDOR y no el `WidgetRef`: el contenedor es un objeto
+  /// plano, estable mientras el scope viva, y no ata nada al ciclo de vida de
+  /// un widget que se reconstruye en cada frame.
+  ProviderContainer? _contenedorDelPlayer;
+
   @override
   void initState() {
     super.initState();
@@ -287,11 +304,59 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
     // interactiva a propósito, y con la cuenta vencida todavía puesta el botón
     // "Iniciar" quedaría muerto.
     _cronometro!.clear();
+    // Y con el estado local se va también la anotación de la sesión (#817).
+    // `clear()` toca sólo el `ValueNotifier` —a propósito: no le avisa al
+    // reloj, que llega a cero solo—, así que hasta acá el fin natural de la
+    // cuenta era el ÚNICO camino que no borraba el espejo de Firestore: los
+    // dos que sí borraban cubren cancelaciones (la fila y el pedido del
+    // reloj). El dato quedaba huérfano y el companion de Wear, que espeja lo
+    // anotado en la sesión, podía mostrar horas después un cronómetro vencido
+    // que nadie limpió. `wearTimerAjenoProvider` ya documentaba este borrado
+    // como un hecho ("el teléfono borra el documento al llegar a cero") — el
+    // teléfono era el que no cumplía.
+    _borrarAnotacionDelCronometro();
     HapticFeedback.heavyImpact();
 
     final slot = _slotDe(cuenta.exerciseId);
     if (slot == null) return;
     _logSet(slot, cuenta.setNumber, 0, 0.0);
+  }
+
+  /// Saca de la sesión la anotación del cronómetro que acaba de terminar.
+  ///
+  /// ── Por qué no se espera ──────────────────────────────────────────────────
+  ///
+  /// Igual que los otros dos borrados (`duration_set_row` cuando cancela el
+  /// teléfono, `WearTimerSync.cancelar` cuando cancela el reloj): la escritura
+  /// es el ESPEJO, no la serie. `DurationTimerRecorder.borrar()` es `void` y ya
+  /// hace `unawaited` con su propio `catchError` adentro, así que no hay nada
+  /// que esperar ni forma de esperarlo. Atar la vibración y el marcado de la
+  /// serie al ack del servidor es exactamente el error que costó tres bugs en
+  /// este ciclo: sin señal en el gimnasio, el atleta se queda mirando.
+  ///
+  /// ── Y por qué acá arriba y no después de `_logSet` ────────────────────────
+  ///
+  /// No hay carrera entre las dos escrituras: ésta borra campos del documento
+  /// de la sesión con `merge`, y `_logSet` crea un documento en la
+  /// subcolección `setLogs` — no se pisan, y ningún camino de log vuelve a
+  /// escribir los campos del timer. Pero el orden igual importa por otra
+  /// razón: abajo hay un `return` temprano si el slot ya no está en el día, y
+  /// con el borrado después de ese `return` el caso raro volvería a dejar la
+  /// anotación colgada. Se borra en el mismo punto en que se corta el estado
+  /// local, que es donde la cuenta termina de verdad.
+  void _borrarAnotacionDelCronometro() {
+    final contenedor = _contenedorDelPlayer;
+    // Sin scope montado no hay sesión resuelta y no hay nada que borrar: la
+    // cuenta no pudo haber arrancado desde una fila que nunca se dibujó.
+    if (contenedor == null) return;
+    try {
+      contenedor.read(durationTimerRecorderProvider).borrar();
+    } catch (e) {
+      // El scope puede haberse desmontado entre el tick y esta lectura (la
+      // sesión dejó de ser `data`). Un espejo que no se limpia no puede tumbar
+      // el entreno que está corriendo.
+      debugPrint('[duration-timer] no se pudo borrar al llegar a cero — $e');
+    }
   }
 
   /// El reloj pidió cortar la cuenta que corre acá.
@@ -846,69 +911,92 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
           overrides: [
             playerSessionIdProvider.overrideWithValue(state.session.id),
           ],
-          child: PopScope(
-            canPop: _isFinalizing,
-            onPopInvokedWithResult: (didPop, _) {
-              if (didPop || _isFinalizing) return;
-              _showAbandonConfirm();
+          // El `Builder` existe para tomar el contexto de ADENTRO del scope
+          // (#817): es la única forma de que el `State` —que cuelga de un
+          // elemento de más arriba— alcance el contenedor donde el override de
+          // la sesion vale. Ver [_contenedorDelPlayer]. Es una asignación
+          // idempotente y sin `setState`, así que no reprograma el frame.
+          child: Builder(
+            builder: (scopeContext) {
+              _contenedorDelPlayer = ProviderScope.containerOf(
+                scopeContext,
+                listen: false,
+              );
+              return _cuerpoDelPlayer(state, routineSplit);
             },
-            child: SafeArea(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _SessionHeader(
-                    routineSplit: routineSplit,
-                    dayNumber: state.day.dayNumber,
-                    onAbandon: _showAbandonConfirm,
-                    onBack: _showAbandonConfirm,
-                  ),
-                  Expanded(
-                    child: ScrollConfiguration(
-                      behavior: ScrollConfiguration.of(context).copyWith(
-                        physics: const ClampingScrollPhysics(),
-                        overscroll: false,
-                      ),
-                      child: ListView(
-                        // Sin padding horizontal global: las cards de arriba
-                        // conservan su margen de 20, pero la zona EJERCICIOS
-                        // corre full-width con margen propio reducido (12).
-                        padding: EdgeInsets.zero,
-                        physics: const ClampingScrollPhysics(),
-                        children: [
-                          const SizedBox(height: 12),
-                          const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 20),
-                            child: _AttendanceCard(),
-                          ),
-                          const SizedBox(height: 14),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            child: _SessionStatsCard(state: state),
-                          ),
-                          ..._buildTimeFitSlot(state),
-                          const SizedBox(height: 20),
-                          const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 12),
-                            child: _SectionLabel('EJERCICIOS'),
-                          ),
-                          const SizedBox(height: 12),
-                          ..._buildExerciseList(state),
-                          const SizedBox(height: 20),
-                        ],
-                      ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// El árbol del player, ya con la sesión resuelta.
+  ///
+  /// Vive afuera de `build` sólo para que el `Builder` que captura el contenedor
+  /// del scope (#817) no empuje sesenta líneas de árbol dos niveles más adentro.
+  /// El `context` que usa adentro es el mismo `State.context` de siempre, así
+  /// que las búsquedas por herencia —`ScrollConfiguration.of`— resuelven igual.
+  Widget _cuerpoDelPlayer(SessionState state, String routineSplit) {
+    return PopScope(
+      canPop: _isFinalizing,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop || _isFinalizing) return;
+        _showAbandonConfirm();
+      },
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _SessionHeader(
+              routineSplit: routineSplit,
+              dayNumber: state.day.dayNumber,
+              onAbandon: _showAbandonConfirm,
+              onBack: _showAbandonConfirm,
+            ),
+            Expanded(
+              child: ScrollConfiguration(
+                behavior: ScrollConfiguration.of(context).copyWith(
+                  physics: const ClampingScrollPhysics(),
+                  overscroll: false,
+                ),
+                child: ListView(
+                  // Sin padding horizontal global: las cards de arriba
+                  // conservan su margen de 20, pero la zona EJERCICIOS
+                  // corre full-width con margen propio reducido (12).
+                  padding: EdgeInsets.zero,
+                  physics: const ClampingScrollPhysics(),
+                  children: [
+                    const SizedBox(height: 12),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 20),
+                      child: _AttendanceCard(),
                     ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
-                    child: _TerminarSessionButton(
-                      enabled: state.isFullyCompleted,
-                      onPressed: state.isFullyCompleted ? _finishSession : null,
+                    const SizedBox(height: 14),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: _SessionStatsCard(state: state),
                     ),
-                  ),
-                ],
+                    ..._buildTimeFitSlot(state),
+                    const SizedBox(height: 20),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12),
+                      child: _SectionLabel('EJERCICIOS'),
+                    ),
+                    const SizedBox(height: 12),
+                    ..._buildExerciseList(state),
+                    const SizedBox(height: 20),
+                  ],
+                ),
               ),
             ),
-          ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
+              child: _TerminarSessionButton(
+                enabled: state.isFullyCompleted,
+                onPressed: state.isFullyCompleted ? _finishSession : null,
+              ),
+            ),
+          ],
         ),
       ),
     );
