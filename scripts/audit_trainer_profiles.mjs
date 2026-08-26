@@ -17,7 +17,7 @@
  *
  * Uso:
  *
- *   export GOOGLE_APPLICATION_CREDENTIALS=/ruta/al/service-account.json
+ *   export TREINO_SA_KEY=~/.config/treino/sa-key.json
  *   node scripts/audit_trainer_profiles.mjs                 # sólo reporta
  *   node scripts/audit_trainer_profiles.mjs --project=X     # proyecto explícito
  *
@@ -26,7 +26,11 @@
  * con el rol mal seteado (se le corrige el rol) — el script NO escribe nada.
  */
 
-import admin from "firebase-admin";
+// `lib/admin.js` es CommonJS: se importa el módulo entero y se desestructura,
+// que es lo que funciona igual en todas las versiones de Node.
+import frontera from "./lib/admin.js";
+
+const { inicializarAdmin } = frontera;
 
 const projectArg = process.argv.find((a) => a.startsWith("--project="));
 const projectId = projectArg ? projectArg.split("=")[1] : undefined;
@@ -36,20 +40,11 @@ const projectId = projectArg ? projectArg.split("=")[1] : undefined;
 // dejaba que el script muriera recién en la primera lectura de Firestore —
 // justo el modo de fallar que no querés en la herramienta que se corre ANTES
 // de mergear. Las credenciales se exigen siempre, aparte del proyecto.
-if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-  console.error(
-    "Faltan credenciales de Admin SDK.\n\n" +
-      "  export GOOGLE_APPLICATION_CREDENTIALS=/ruta/al/service-account.json\n\n" +
-      "`--project=<id>` sólo elige el proyecto; no autentica nada.\n" +
-      "Este script es de SÓLO LECTURA, pero el Admin SDK necesita credenciales igual."
-  );
-  process.exit(2);
-}
-
-admin.initializeApp({
-  credential: admin.credential.applicationDefault(),
-  ...(projectId ? { projectId } : {}),
-});
+//
+// Quién las exige ahora es la frontera (#834), que además chequea de dónde
+// salen: una ruta adentro de un árbol de git se rechaza. El guard propio que
+// vivía acá sólo miraba que la variable existiera.
+const { admin } = inicializarAdmin(projectId ? { projectId } : {});
 
 const db = admin.firestore();
 

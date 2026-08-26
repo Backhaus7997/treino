@@ -9,7 +9,7 @@
  *                 set the equipment the clip indicates. Never overwrites a
  *                 defined equipment.
  *
- * Run: GOOGLE_APPLICATION_CREDENTIALS=scripts/sa-key.json node scripts/apply_catalog_video_fill.js --add-safe --fill-empty [--apply]
+ * Run: TREINO_SA_KEY=~/.config/treino/sa-key.json node scripts/apply_catalog_video_fill.js --add-safe --fill-empty [--apply]
  *
  * ⚠️ DESTINO (#838) — el bucket ya no está hardcodeado: sale de
  * `lib/storage_target.js` (`--bucket=` > `FIREBASE_STORAGE_BUCKET` > derivado
@@ -24,8 +24,8 @@ const os = require('os');
 const path = require('path');
 const { execFileSync } = require('child_process');
 const { randomUUID } = require('crypto');
-const admin = require('firebase-admin');
 const { exigirDestinoCoherente } = require('./lib/storage_target');
+const { inicializarAdmin } = require('./lib/admin');
 
 const APPLY = process.argv.includes('--apply');
 const DO_ADD = process.argv.includes('--add-safe');
@@ -37,7 +37,14 @@ const DO_FILL = process.argv.includes('--fill-empty');
 const DESTINO = exigirDestinoCoherente({ argv: process.argv.slice(2) });
 const BUCKET = DESTINO.bucket;
 
-admin.initializeApp({ storageBucket: BUCKET, projectId: DESTINO.projectId });
+// Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla cerrado
+// con la migración; contra el emulador no pide nada. Ver scripts/lib/admin.js.
+// El `projectId` sale del DESTINO de #838, no de la credencial: es el que el
+// guard ya validó contra el bucket.
+const { admin } = inicializarAdmin({
+  projectId: DESTINO.projectId,
+  extra: { storageBucket: BUCKET },
+});
 const db = admin.firestore();
 const bucket = admin.storage().bucket();
 

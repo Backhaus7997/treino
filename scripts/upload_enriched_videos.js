@@ -15,7 +15,7 @@
  * Guarda el JSON tras cada subida (sobrevive a una interrupción).
  *
  * Uso:
- *   GOOGLE_APPLICATION_CREDENTIALS=scripts/sa-key.json \
+ *   TREINO_SA_KEY=~/.config/treino/sa-key.json \
  *   NODE_PATH=functions/node_modules \
  *   node scripts/upload_enriched_videos.js [--limit=N] [--only=id1,id2] [--force] [--dry-run]
  *
@@ -32,8 +32,8 @@ const os = require('os');
 const path = require('path');
 const { execFileSync } = require('child_process');
 const { randomUUID } = require('crypto');
-const admin = require('firebase-admin');
 const { exigirDestinoCoherente } = require('./lib/storage_target');
+const { inicializarAdmin } = require('./lib/admin');
 
 // #838 — se llena en main() con el bucket resuelto. Era una constante con el
 // bucket de producción adentro; ahora el `let` es a propósito: nadie puede
@@ -71,7 +71,17 @@ async function main() {
 
   let bucket = null;
   if (!DRY) {
-    admin.initializeApp({ storageBucket: BUCKET, projectId: destino.projectId });
+    // Credenciales: la única puerta (#834). En `--dry-run` no se inicializa
+    // nada, así que un dry-run sigue andando sin credencial — como antes.
+    //
+    // El `projectId` sale del destino que ya resolvió el guard de #838, no de
+    // la credencial: es el MISMO objeto del que sale la etiqueta que se
+    // imprime, así que no puede haber un proyecto en pantalla y otro en el
+    // write. Que es exactamente el bug que #838 vino a cerrar.
+    const { admin } = inicializarAdmin({
+      projectId: destino.projectId,
+      extra: { storageBucket: BUCKET },
+    });
     bucket = admin.storage().bucket();
   }
 

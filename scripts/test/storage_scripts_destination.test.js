@@ -12,8 +12,10 @@
  * cableado (`const DESTINO = exigirDestinoCoherente(...)`), y borrándolas los
  * tests del módulo seguirían todos en verde porque ninguno carga los scripts.
  * Éstos los cargan: cada test levanta el script REAL en un subproceso con
- * `firebase-admin` stubbeado por `fixtures/stub_firebase_admin.js`, cero I/O de
- * red y cero credenciales.
+ * `firebase-admin` stubbeado por `fixtures/stub_firebase_admin.js` y cero I/O
+ * de red. Credencial hay UNA desde el #834 —la frontera falla cerrado sin
+ * ella— pero es falsa, la finge el stub y no existe en disco: ver el bloque de
+ * CREDENCIALES sobre `ESCRITORES`.
  *
  * El stub tira `STUB_STORAGE_REACHED bucket=<nombre>` en el primer `.bucket()`,
  * así que un script que llega hasta Storage siempre termina en 1. Eso es a
@@ -38,10 +40,10 @@
  *      prueba que el #840 sirvió — antes esta misma corrida aterrizaba en
  *      `treino-dev.firebasestorage.app`.
  *
- *   2. NOMBRANDO PRODUCCIÓN a propósito (`--project=treino-dev`,
- *      `GCLOUD_PROJECT`, o la credencial de prod) → sale el cartel y sale ANTES
- *      de la primera escritura. Éste prueba que el guard del #838 sigue vivo:
- *      el #840 le sacó el default de encima, no la salvaguarda.
+ *   2. NOMBRANDO PRODUCCIÓN a propósito (`--project=treino-dev` o
+ *      `GCLOUD_PROJECT=treino-dev`) → sale el cartel y sale ANTES de la primera
+ *      escritura. Éste prueba que el guard del #838 sigue vivo: el #840 le sacó
+ *      el default de encima, no la salvaguarda.
  *
  * Hacer que el caso 1 volviera a esperar el cartel sería reescribir el test
  * para que mida el mundo viejo. El cartel que no sale ahí no es una regresión:
@@ -57,6 +59,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const { RUTA_CREDENCIAL_FALSA } = require('./fixtures/stub_firebase_admin');
 
 const SCRIPTS_DIR = path.join(__dirname, '..');
 const STUB = path.join(__dirname, 'fixtures', 'stub_firebase_admin.js');
@@ -75,41 +78,70 @@ const DEMO = 'demo-treino';
  * el punto de escritura. Los tres primeros son los del #838; el cuarto
  * (`upload_drive_exercise_videos.js`) apareció en el barrido y es el mismo bug.
  *
- * `credencial` es la ruta de un `sa-key.json` que NO existe y no hace falta que
- * exista: el stub intercepta cualquier `readFileSync` que termine en ese nombre
- * y devuelve `{ project_id: STUB_PROJECT_ID || 'treino-dev' }`. O sea que
- * setearla hace DOS cosas a la vez —satisface el chequeo de credenciales de
- * `extract_exercise_thumbnails.js`, que corre DESPUÉS del guard, y NOMBRA
- * producción— y por eso desde el #840 va sólo en los casos que apuntan a
- * producción a propósito. En el caso "sin nada" arruinaría justo lo que se
- * quiere medir.
+ * CREDENCIALES (#834). Los cuatro pasan ahora por `lib/admin.js`, que falla
+ * cerrado contra la nube si no hay credencial: sin una, estos tests medirían el
+ * error de #834 en vez de lo que dicen medir — el script moriría ANTES de
+ * llegar a Storage y el marcador nunca aparecería. La inyecta `correr()` para
+ * los cuatro por igual, con la misma `RUTA_CREDENCIAL_FALSA` del stub que usa
+ * el resto de la suite: en `os.tmpdir()`, afuera de todo árbol de git —adentro
+ * la frontera la rechaza— y sin existir en disco, porque la finge el stub.
  *
- * Sólo `extract_exercise_thumbnails.js` la necesita: es el único que exige
- * `GOOGLE_APPLICATION_CREDENTIALS` por su cuenta antes de subir.
+ * ── DONDE EL #834 Y EL #840 SE TOCAN ──────────────────────────────────────
+ *
+ * Vale la pena ser preciso, porque acá es fácil romper el caso "sin nada" sin
+ * que nadie lo note. La credencial que finge el stub es la de `treino-dev`: su
+ * `client_email` es `…@treino-dev.iam.gserviceaccount.com`. O sea que el
+ * proceso AUTENTICA como producción. Lo que NO hace es NOMBRAR producción como
+ * destino, y ésa es la razón por la que el caso 1 del #840 sigue midiendo lo
+ * que dice:
+ *
+ *   `resolverProjectId` (`lib/storage_target.js`) mira, en orden, `--project=`,
+ *   `GOOGLE_CLOUD_PROJECT` / `GCLOUD_PROJECT`, el `project_id` de
+ *   `$GOOGLE_APPLICATION_CREDENTIALS`, y recién después `.firebaserc`.
+ *   `$TREINO_SA_KEY` NO está en esa lista, y no es un olvido: el destino de
+ *   estos cuatro scripts no sale de la credencial sino del plan del #838
+ *   —`projectId: DESTINO.projectId`, `storageBucket: DESTINO.bucket`—, que es
+ *   justamente lo que impide que haya un proyecto en pantalla y otro en el
+ *   write.
+ *
+ * Así que "sin nada, con la credencial exportada" sigue cayendo en el default
+ * de `.firebaserc`, que desde el #840 es `demo-treino`. Y no es un caso de
+ * laboratorio: el mensaje de migración del propio #834 manda a poner
+ * `export TREINO_SA_KEY=…` en el `~/.zshrc`, así que "la credencial exportada y
+ * ninguna otra variable" ES la corrida más común que queda después del #834.
+ * El caso 1 mide exactamente ésa, y por eso mide MÁS que antes: la corrida que
+ * comprueba ya es la que la gente va a tener.
+ *
+ * Lo que sí nombraría producción es `$GOOGLE_APPLICATION_CREDENTIALS` —paso 3
+ * de esa lista—, y por eso el campo `credencial` por escritor que tenía este
+ * archivo se fue. Hoy además ABORTARÍA: con `$TREINO_SA_KEY` puesta, una
+ * segunda variable apuntando a OTRO archivo son dos identidades en el mismo
+ * proceso y `lib/credenciales.js` frena antes que elegir una. No se pierde
+ * nada, y esto importa: los dos casos que apuntan a producción a propósito la
+ * nombran con `--project=` o con `GCLOUD_PROJECT`, que en `resolverProjectId`
+ * le ganan a la credencial de todas formas — o sea que la credencial nunca fue
+ * lo que los hacía disparar.
+ *
+ * `extract_exercise_thumbnails.js` era el único que traía credencial propia
+ * acá, para el chequeo a mano que tenía adentro. Ese chequeo lo reemplazó la
+ * frontera, así que ya no queda nada que lo distinga de los otros tres.
  */
 const ESCRITORES = [
   {
     script: 'extract_exercise_thumbnails.js',
     argv: ['--upload', `--thumbs=${THUMBS_VACIO}`],
-    credencial: path.join(THUMBS_VACIO, 'sa-key.json'),
   },
   { script: 'apply_catalog_video_fill.js', argv: ['--add-safe'] },
   { script: 'upload_enriched_videos.js', argv: ['--limit=1'] },
   { script: 'upload_drive_exercise_videos.js', argv: ['--limit=1'] },
 ];
 
-/**
- * El env de una corrida que apunta a producción a propósito: la credencial que
- * el script pida, si pide alguna. Los que no piden nada llegan a producción por
- * el `--project=` o el `GCLOUD_PROJECT` que pone cada test.
- */
-function credencialDe({ credencial }) {
-  return credencial ? { GOOGLE_APPLICATION_CREDENTIALS: credencial } : {};
-}
-
 /** Levanta el script con el stub puesto y devuelve salida + exit code. */
 function correr({ script, argv }, extraEnv = {}) {
-  const env = { ...process.env };
+  // `TREINO_SA_KEY` va para los CUATRO por igual (#834): sin credencial
+  // `lib/admin.js` falla cerrado contra la nube y el test mediría ese error.
+  // No nombra producción — ver el bloque largo de arriba.
+  const env = { ...process.env, TREINO_SA_KEY: RUTA_CREDENCIAL_FALSA };
   // Limpieza explícita: si la máquina que corre los tests tiene alguna de estas
   // exportada, el test mediría otra cosa que la que dice medir.
   //
@@ -119,6 +151,12 @@ function correr({ script, argv }, extraEnv = {}) {
   // devuelve `treino-dev`, así que una credencial heredada convertiría el caso
   // "sin nada" en el caso "producción" sin que nadie lo note — verde en CI,
   // rojo en la máquina de quien la tenga, y midiendo el mundo viejo.
+  //
+  // Con el #834 esa misma línea gana un segundo motivo, y hace falta que gane
+  // los dos: como `correr()` pone `$TREINO_SA_KEY`, una
+  // `GOOGLE_APPLICATION_CREDENTIALS` heredada apuntando a OTRO archivo son dos
+  // identidades en el mismo proceso y la frontera ABORTA. El test mediría ese
+  // abort en vez del destino. Borrar la línea rompe las dos cosas a la vez.
   for (const v of [
     'FIRESTORE_EMULATOR_HOST',
     'STORAGE_EMULATOR_HOST',
@@ -209,31 +247,32 @@ for (const escritor of ESCRITORES) {
     // marcador del stub dice contra QUÉ bucket iba el `.bucket()`. Que el
     // script llegue a Storage no es el problema; el problema era a dónde.
     //
-    // `extract_exercise_thumbnails.js` ni siquiera llega: exige
-    // GOOGLE_APPLICATION_CREDENTIALS antes de subir, y sin credencial muere ahí.
-    // Las dos salidas son correctas y ninguna toca producción.
+    // ESTA ASERCIÓN ERA UN `if/else` Y EL #834 LA CERRÓ, que es una mejora y
+    // no una pérdida. La rama `else` existía para `extract_exercise_thumbnails.js`,
+    // que moría antes de Storage en su propio chequeo de
+    // `GOOGLE_APPLICATION_CREDENTIALS`; ese chequeo lo reemplazó la frontera, y
+    // ahora los cuatro llegan igual. Dejar el `else` sería dejar un colador: el
+    // mensaje que la frontera imprime cuando NO hay credencial
+    // (`mensajeSinVariable`) NOMBRA `GOOGLE_APPLICATION_CREDENTIALS`, así que
+    // una regresión que matara los cuatro scripts antes de Storage habría
+    // entrado por esa rama en VERDE. Un test con una salida de escape que la
+    // falla sabe usar no es un test.
     const r = correr(escritor);
 
-    const llego = r.todo.includes('STUB_STORAGE_REACHED');
-    if (llego) {
-      assert.match(
-        r.todo,
-        new RegExp(`STUB_STORAGE_REACHED bucket=${DEMO}\\.firebasestorage\\.app`),
-        'llegó a Storage con un bucket que no es el de demo',
-      );
-    } else {
-      assert.match(
-        r.todo,
-        /GOOGLE_APPLICATION_CREDENTIALS/,
-        'no llegó a Storage y tampoco explicó por qué: eso no es una salida, es un cuelgue',
-      );
-    }
+    assert.ok(
+      r.todo.includes('STUB_STORAGE_REACHED'),
+      'no llegó a Storage: sin el marcador no se puede saber contra qué bucket iba',
+    );
+    assert.ok(
+      r.todo.includes(`STUB_STORAGE_REACHED bucket=${DEMO}.firebasestorage.app`),
+      `llegó a Storage con un bucket que no es ${DEMO}.firebasestorage.app`,
+    );
   });
 
   test(`${script}: nombrando treino-dev con --project, grita el cartel de PRODUCCIÓN`, () => {
     // El guard del #838 sigue entero: lo que el #840 le sacó de encima es el
     // default que lo hacía disparar sin que nadie pidiera producción.
-    const r = correr({ ...escritor, argv: [...escritor.argv, `--project=${PROD}`] }, credencialDe(escritor));
+    const r = correr({ ...escritor, argv: [...escritor.argv, `--project=${PROD}`] });
 
     assert.match(r.stderr, /IS PRODUCTION/, 'esperaba el cartel de producción en stderr');
     assert.match(r.stderr, new RegExp(PROD));
@@ -258,7 +297,7 @@ for (const escritor of ESCRITORES) {
     // La otra forma de nombrar producción, y la que más se usa: exportar la
     // variable que mira el Admin SDK. Si el cartel dependiera del flag, un
     // `export GCLOUD_PROJECT=treino-dev` sería la puerta de atrás.
-    const r = correr(escritor, { ...credencialDe(escritor), GCLOUD_PROJECT: PROD });
+    const r = correr(escritor, { GCLOUD_PROJECT: PROD });
 
     assert.match(r.stderr, /IS PRODUCTION/);
     // `includes` y no `new RegExp(...)`: lo que buscamos es un LITERAL, y armar
@@ -275,7 +314,7 @@ for (const escritor of ESCRITORES) {
   test(`${script}: contra producción el cartel sale ANTES de tocar Storage`, () => {
     // Un cartel que sale después de la primera subida no sirve de nada: para
     // cuando lo leés, el archivo ya está en el bucket real.
-    const r = correr({ ...escritor, argv: [...escritor.argv, `--project=${PROD}`] }, credencialDe(escritor));
+    const r = correr({ ...escritor, argv: [...escritor.argv, `--project=${PROD}`] });
 
     const cartel = r.todo.indexOf('IS PRODUCTION');
     const storage = r.todo.indexOf('STUB_STORAGE_REACHED');

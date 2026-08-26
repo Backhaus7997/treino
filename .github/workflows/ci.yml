@@ -417,6 +417,15 @@ jobs:
   # Borrando una, sin este job, no se pone nada en rojo — y el script vuelve a
   # subir archivos a producción imprimiendo "destino: EMULADOR".
   #
+  # Lo mismo vale para el trinquete del #834: `test/frontera.test.js` escanea
+  # `scripts/` y falla si aparece un `initializeApp`, un `credential.cert` o una
+  # lectura de `sa-key.json` fuera de `lib/`. Es un gate sobre archivos que
+  # TODAVÍA NO EXISTEN, así que su valor entero depende de que corra solo: un
+  # trinquete que alguien tiene que acordarse de mirar no es un trinquete. El
+  # #834 llegó a tener el resolutor escrito y sin llamadores — mismo error, una
+  # capa más arriba: un gate que nadie ejecuta y un módulo que nadie llama
+  # fallan igual de silenciosos.
+  #
   # Corre la suite ENTERA del directorio, no un archivo puntual: el #835 ya
   # dejó cuatro archivos de test ahí que tampoco corría nadie, y el que venga
   # después va a hacer lo mismo. `npm test` expande `test/*.test.js` en el

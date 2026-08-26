@@ -12,14 +12,16 @@
  *   NO_VIDEO   no clip for this exact movement+equipment (decide: keep / drop)
  *   DUPLICATE  another doc maps to the same movement+equipment
  *
- * Run: GOOGLE_APPLICATION_CREDENTIALS=scripts/sa-key.json node scripts/build_catalog_proposal.js
+ * Run: TREINO_SA_KEY=~/.config/treino/sa-key.json node scripts/build_catalog_proposal.js
  */
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const admin = require('firebase-admin');
+const { inicializarAdmin } = require('./lib/admin');
 
-admin.initializeApp({ storageBucket: 'treino-dev.firebasestorage.app' });
+// Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla cerrado
+// con la migración; contra el emulador no pide nada. Ver scripts/lib/admin.js.
+const { admin } = inicializarAdmin({ extra: { storageBucket: 'treino-dev.firebasestorage.app' } });
 const db = admin.firestore();
 
 // canonical equipment vocabulary shared by ids and Drive folders

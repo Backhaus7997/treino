@@ -28,24 +28,33 @@ const { spawnSync } = require('node:child_process');
 
 const SCRIPTS_DIR = path.join(__dirname, '..');
 const STUB = path.join(__dirname, 'fixtures', 'stub_firebase_admin.js');
-const { STUB_FIRESTORE_REACHED, STUB_NETWORK_REACHED } = require('./fixtures/stub_firebase_admin');
+const {
+  STUB_FIRESTORE_REACHED,
+  STUB_NETWORK_REACHED,
+  RUTA_CREDENCIAL_FALSA,
+} = require('./fixtures/stub_firebase_admin');
 
 /**
  * Corre un script con el stub puesto.
  *
  * `credenciales: true` fija `GOOGLE_APPLICATION_CREDENTIALS`, que es como
- * resuelven el proyecto los entrypoints que llaman a `admin.initializeApp()`
- * pelado. La ruta apunta a `scripts/sa-key.json`, pero el stub intercepta la
- * lectura: el archivo real no se abre nunca (y puede no existir).
+ * resuelven el proyecto los entrypoints. La ruta apunta AFUERA del repo
+ * (`RUTA_CREDENCIAL_FALSA`): desde #834 cualquier ruta adentro de un árbol de
+ * git se rechaza, y apuntar a `scripts/sa-key.json` —como hacía la primera
+ * versión de este helper— frenaría el script antes del cartel. El stub
+ * intercepta la lectura: el archivo real no se abre nunca ni existe.
  */
 function correr(script, args = [], { emulador = false, projectId = 'treino-dev', credenciales = true } = {}) {
   const env = { ...process.env, STUB_PROJECT_ID: projectId };
 
   if (credenciales) {
-    env.GOOGLE_APPLICATION_CREDENTIALS = path.join(SCRIPTS_DIR, 'sa-key.json');
+    env.GOOGLE_APPLICATION_CREDENTIALS = RUTA_CREDENCIAL_FALSA;
   } else {
     delete env.GOOGLE_APPLICATION_CREDENTIALS;
   }
+  // #834 — la variable canónica. Se limpia siempre para que el caso
+  // `credenciales: false` sea de verdad "sin ninguna credencial".
+  delete env.TREINO_SA_KEY;
   delete env.GOOGLE_CLOUD_PROJECT;
   delete env.GCLOUD_PROJECT;
 
