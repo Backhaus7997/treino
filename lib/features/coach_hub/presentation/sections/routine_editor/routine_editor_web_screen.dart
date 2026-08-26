@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
+import 'package:treino/features/workout/domain/routine_goal.dart';
 
 import '../../../../../app/theme/app_palette.dart';
 import '../../../../../core/widgets/motion/treino_state_switcher.dart';
@@ -227,6 +228,16 @@ class _RoutineEditorWebScreenState
   ExperienceLevel _level = ExperienceLevel.beginner;
   int _numWeeks = 1;
 
+  /// Objetivos declarados de la plantilla (#635 PR#1b).
+  ///
+  /// `Set` porque la selección no tiene orden ni repetidos; se serializa en el
+  /// orden del enum para que dos PF que eligen lo mismo en distinto orden no
+  /// produzcan documentos distintos.
+  ///
+  /// Vacío es válido: sin objetivos la plantilla sigue en la grilla, sólo que
+  /// sin señal para rankear.
+  final Set<RoutineGoal> _goals = <RoutineGoal>{};
+
   /// 0-based week shown in the editor — drives which inner list of each
   /// slot's `weeklySets` the day/slot cards render and edit (Fase 4b).
   /// Display is 1-based ("Sem 1"). Always kept in `[0, _numWeeks - 1]`.
@@ -258,6 +269,11 @@ class _RoutineEditorWebScreenState
   /// not as `''`. An empty string would make `routine.summary != null` true on
   /// the detail screen and render an empty paragraph where the layout is
   /// supposed to collapse.
+  /// Los objetivos elegidos, en orden del enum: la selección es un conjunto,
+  /// pero el array que va a Firestore no puede depender del orden de tap.
+  List<RoutineGoal> get _goalsOrdered =>
+      RoutineGoal.values.where(_goals.contains).toList(growable: false);
+
   String? get _summaryOrNull {
     final trimmed = _summaryCtrl.text.trim();
     return trimmed.isEmpty ? null : trimmed;
@@ -330,6 +346,9 @@ class _RoutineEditorWebScreenState
     _nameCtrl.text = routine.name;
     _splitCtrl.text = routine.split ?? '';
     _summaryCtrl.text = routine.summary ?? '';
+    _goals
+      ..clear()
+      ..addAll(routine.goals);
     _level = routine.level;
     _numWeeks = routine.numWeeks.clamp(1, _kMaxWeeks);
     _days
@@ -1418,6 +1437,10 @@ class _RoutineEditorWebScreenState
           days: days,
           numWeeks: _numWeeks,
           summary: _summaryOrNull,
+          // Sólo la plantilla los edita. En un plan asignado se conservan los
+          // del doc cargado —`_goals` se hidrató de ahí y el selector no se
+          // muestra—, y `updateAssigned` ni siquiera los manda.
+          goals: widget.isTemplate ? _goalsOrdered : _loadedRoutine!.goals,
         );
         if (widget.isTemplate) {
           await repo.updateTemplate(uid: trainerUid, draft: draft);
@@ -1436,6 +1459,7 @@ class _RoutineEditorWebScreenState
           days: days,
           numWeeks: _numWeeks,
           summary: _summaryOrNull,
+          goals: _goalsOrdered,
           source: RoutineSource.trainerTemplate,
           assignedBy: trainerUid,
           visibility: RoutineVisibility.private,
@@ -1713,6 +1737,62 @@ class _RoutineEditorWebScreenState
                                       ),
                                     ), // i18n
                                   ),
+                                  // ── Para qué sirve — SOLO plantilla (#635 PR#1b)
+                                  //
+                                  // `widget.isTemplate` y no el modo PF a
+                                  // secas: un plan asignado es privado de un
+                                  // alumno y no entra a la grilla de
+                                  // PLANTILLAS, y firestore.rules deja `goals`
+                                  // fuera del affectedKeys de ese path. El
+                                  // selector ahí sería un campo cuyo guardado
+                                  // siempre falla.
+                                  if (widget.isTemplate) ...[
+                                    const SizedBox(height: AppSpacing.s18),
+                                    _FieldLabel(
+                                      'PARA QUÉ SIRVE',
+                                      palette,
+                                    ), // i18n
+                                    const SizedBox(height: AppSpacing.hairline),
+                                    Text(
+                                      'Elegí uno o más. Ayuda a que el alumno '
+                                      'encuentre la plantilla cuando busca por '
+                                      'objetivo.', // i18n
+                                      style: GoogleFonts.barlow(
+                                        color: palette.textMuted,
+                                        fontSize: 12,
+                                        height: 1.35,
+                                      ),
+                                    ),
+                                    const SizedBox(height: AppSpacing.s8),
+                                    Wrap(
+                                      key: const Key(
+                                        'routine_editor_goals_picker',
+                                      ),
+                                      spacing: AppSpacing.s8,
+                                      runSpacing: AppSpacing.s8,
+                                      children: [
+                                        for (final goal in RoutineGoal.values)
+                                          _GoalChip(
+                                            key: Key(
+                                              'routine_editor_goal_'
+                                              '${goal.wireKey}',
+                                            ),
+                                            label: _goalLabel(goal),
+                                            selected: _goals.contains(goal),
+                                            palette: palette,
+                                            onTap: () {
+                                              _markDirty();
+                                              setState(() {
+                                                // Toggle: re-tocar deselecciona.
+                                                if (!_goals.remove(goal)) {
+                                                  _goals.add(goal);
+                                                }
+                                              });
+                                            },
+                                          ),
+                                      ],
+                                    ),
+                                  ],
                                   const SizedBox(height: 16),
                                   _FieldLabel('NIVEL', palette), // i18n
                                   const SizedBox(height: 8),
@@ -1944,6 +2024,79 @@ InputDecoration _inputDecoration(AppPalette palette, String hint) {
       borderSide: BorderSide(color: palette.accent),
     ),
   );
+}
+
+/// Etiqueta de un objetivo en el editor web (#635 PR#1b).
+///
+/// Duplicada respecto de `templatesGoalLabel` del mini-onboarding a
+/// propósito: ese pasa por `AppL10n` y **este archivo tiene prohibido
+/// llamarlo** (constraint C-6, ver el header). Reusarlo obligaría a romper la
+/// restricción o a inyectar un `AppL10n` que el resto del archivo no tiene.
+///
+/// El día que el Coach Hub entre a la pasada de i18n, las dos se colapsan en
+/// una. Hasta entonces: si cambia el copy de un objetivo, cambia en los DOS
+/// lados.
+String _goalLabel(RoutineGoal goal) => switch (goal) {
+      RoutineGoal.health => 'Salud', // i18n
+      RoutineGoal.injuryPrevention => 'Prevención de lesión', // i18n
+      RoutineGoal.aesthetics => 'Estética', // i18n
+      RoutineGoal.sport => 'Deporte', // i18n
+      RoutineGoal.wellbeing => 'Bienestar', // i18n
+    };
+
+/// Pill de objetivo del editor web (#635 PR#1b).
+///
+/// Texto sobre acento vía `TreinoButtonTokens.foreground` y no `palette.bg`:
+/// esa convención da 1.57:1 en tema claro y falla AA (AGENTS.md §2).
+class _GoalChip extends StatelessWidget {
+  const _GoalChip({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.palette,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final AppPalette palette;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.full),
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.s14,
+            vertical: AppSpacing.s8,
+          ),
+          decoration: BoxDecoration(
+            color: selected ? palette.accent : palette.bgCard,
+            borderRadius: BorderRadius.circular(AppRadius.full),
+            border: Border.all(
+              color: selected ? palette.accent : palette.border,
+            ),
+          ),
+          child: Text(
+            label,
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+              letterSpacing: 0.5,
+              color: selected
+                  ? TreinoButtonTokens.foreground(context)
+                  : palette.textMuted,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _FieldLabel extends StatelessWidget {

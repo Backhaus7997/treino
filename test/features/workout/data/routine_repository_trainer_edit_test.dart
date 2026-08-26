@@ -16,12 +16,15 @@
 //   summary (#648):      updateAssigned / updateTemplate persist the resumen
 //                        (and clear it when emptied), while updateUserOwned
 //                        deliberately never sends it.
+//   goals (#635 PR#1b):  updateTemplate persists the catalogue goals; NEITHER
+//                        updateAssigned NOR updateUserOwned send them.
 
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/workout/data/routine_repository.dart';
 import 'package:treino/features/workout/domain/routine.dart';
+import 'package:treino/features/workout/domain/routine_goal.dart';
 import 'package:treino/features/workout/domain/routine_source.dart';
 import 'package:treino/features/workout/domain/routine_visibility.dart';
 
@@ -344,6 +347,127 @@ void main() {
   // Routine.toJson() (PR #751) does NOT reach Firestore on its own. Without
   // the explicit key the PF's resumen is dropped on the floor with no error —
   // the exact silent-drop the COUPLING WARNING on each method warns about.
+
+  // ── goals (#635 PR#1b) ────────────────────────────────────────────────────
+  //
+  // El reparto NO es el mismo que el de `summary`, y esa diferencia es el
+  // punto: `summary` lo escriben los DOS paths del PF; `goals` sólo el de
+  // PLANTILLA. Un plan asignado es privado de un alumno y no entra a la grilla
+  // de PLANTILLAS, así que nada lo rankea por objetivo — y firestore.rules deja
+  // `goals` fuera del affectedKeys de ese path justamente para que no se pueda.
+  // Si `updateAssigned` lo mandara, cada edición de plan sería un
+  // permission-denied.
+  group('goals (#635 PR#1b)', () {
+    test('updateTemplate persiste los objetivos que declaró el PF', () async {
+      final id = await seedTemplate();
+
+      await repo.updateTemplate(
+        uid: 'trainer-a',
+        draft: Routine(
+          id: id,
+          name: 'Plantilla Original',
+          split: 'PPL',
+          level: ExperienceLevel.beginner,
+          days: const [],
+          source: RoutineSource.trainerTemplate,
+          assignedBy: 'trainer-a',
+          visibility: RoutineVisibility.private,
+          goals: const [RoutineGoal.health, RoutineGoal.aesthetics],
+        ),
+      );
+
+      final data =
+          (await firestore.collection('routines').doc(id).get()).data()!;
+      expect(data['goals'], equals(['health', 'aesthetics']));
+    });
+
+    test('updateTemplate escribe los wireKey, no los nombres del enum',
+        () async {
+      // `injuryPrevention` es el caso que lo delata: el nombre del enum y su
+      // wireKey difieren, y Firestore tiene que ver el segundo o el catálogo
+      // sembrado y lo que escribe el PF hablarían idiomas distintos.
+      final id = await seedTemplate();
+
+      await repo.updateTemplate(
+        uid: 'trainer-a',
+        draft: Routine(
+          id: id,
+          name: 'Plantilla Original',
+          split: 'PPL',
+          level: ExperienceLevel.beginner,
+          days: const [],
+          source: RoutineSource.trainerTemplate,
+          assignedBy: 'trainer-a',
+          visibility: RoutineVisibility.private,
+          goals: const [RoutineGoal.injuryPrevention],
+        ),
+      );
+
+      final data =
+          (await firestore.collection('routines').doc(id).get()).data()!;
+      expect(data['goals'], equals(['injury_prevention']));
+    });
+
+    test('updateTemplate los vacía cuando el PF deselecciona todo', () async {
+      final id = await seedTemplate();
+      await firestore
+          .collection('routines')
+          .doc(id)
+          .update({'goals': ['sport']});
+
+      await repo.updateTemplate(
+        uid: 'trainer-a',
+        draft: Routine(
+          id: id,
+          name: 'Plantilla Original',
+          split: 'PPL',
+          level: ExperienceLevel.beginner,
+          days: const [],
+          source: RoutineSource.trainerTemplate,
+          assignedBy: 'trainer-a',
+          visibility: RoutineVisibility.private,
+        ),
+      );
+
+      final data =
+          (await firestore.collection('routines').doc(id).get()).data()!;
+      expect(data['goals'], isEmpty,
+          reason: 'sin objetivos es un estado válido, no un no-op');
+    });
+
+    test('updateAssigned NO manda goals — sería permission-denied', () async {
+      final id = await seedAssignedPlan();
+      await firestore
+          .collection('routines')
+          .doc(id)
+          .update({'goals': ['sport']});
+
+      await repo.updateAssigned(
+        uid: 'trainer-a',
+        draft: Routine(
+          id: id,
+          name: 'Plan Renombrado',
+          split: 'PPL',
+          level: ExperienceLevel.beginner,
+          days: const [],
+          source: RoutineSource.trainerAssigned,
+          assignedBy: 'trainer-a',
+          assignedTo: 'athlete-b',
+          visibility: RoutineVisibility.private,
+          // Aunque el draft los traiga, el payload no debe incluirlos.
+          goals: const [RoutineGoal.aesthetics],
+        ),
+      );
+
+      final data =
+          (await firestore.collection('routines').doc(id).get()).data()!;
+      expect(data['name'], equals('Plan Renombrado'),
+          reason: 'el resto del update sí se aplica');
+      expect(data['goals'], equals(['sport']),
+          reason: 'los objetivos del doc quedan intactos: el payload no los '
+              'nombra, así que el PF no puede pisarlos desde este path');
+    });
+  });
 
   group('summary (#648)', () {
     test('updateAssigned writes the resumen the PF authored', () async {

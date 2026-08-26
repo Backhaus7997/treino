@@ -1961,6 +1961,13 @@ class AppL10nEs extends AppL10n {
       'Ej: Empujar, tirar y piernas: cada día trabaja un tipo de movimiento distinto.';
 
   @override
+  String get routineEditorGoalsLabel => 'PARA QUÉ SIRVE';
+
+  @override
+  String get routineEditorGoalsHelp =>
+      'Opcional. Ayuda a que el alumno encuentre la plantilla cuando busca por objetivo.';
+
+  @override
   String get exerciseNoteFromCoachTag => 'DEL COACH';
 
   @override
@@ -3928,6 +3935,8 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get templatesOnboardingBack => 'VOLVER';
+
+  @override
   String get exerciseFeedbackAction => 'COMENTAR / REPORTAR';
 
   @override
@@ -5960,6 +5969,13 @@ class AppL10nEsAr extends AppL10nEs {
       'Ej: Empujar, tirar y piernas: cada día trabajás un tipo de movimiento distinto.';
 
   @override
+  String get routineEditorGoalsLabel => 'PARA QUÉ SIRVE';
+
+  @override
+  String get routineEditorGoalsHelp =>
+      'Opcional. Ayuda a que el alumno encuentre la plantilla cuando busca por objetivo.';
+
+  @override
   String get exerciseNoteFromCoachTag => 'DEL COACH';
 
   @override
@@ -7924,6 +7940,8 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get templatesOnboardingBack => 'VOLVER';
+
+  @override
   String get exerciseFeedbackAction => 'COMENTAR / REPORTAR';
 
   @override

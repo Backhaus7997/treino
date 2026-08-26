@@ -235,7 +235,16 @@ void main() {
     // but in trainer mode days must be non-empty. Add one slot via the CTA.
     // The CTA lives inside the editor's ListView, below the RESUMEN field
     // added in #648 — scroll it into the 800x600 test viewport before tapping.
-    await tester.ensureVisible(find.text('Agregar ejercicio'));
+    // `scrollUntilVisible` y no `ensureVisible`: el editor es un ListView y
+    // el CTA no está CONSTRUIDO hasta que se scrollea hasta él —
+    // `ensureVisible` necesita un elemento que ya exista y tira "No element".
+    // Se notó al sumar el selector PARA QUÉ SIRVE (#635 PR#1b), que corrió el
+    // CTA fuera del área inicial en modo plantilla.
+    await tester.scrollUntilVisible(
+      find.text('Agregar ejercicio'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Agregar ejercicio'));
     await tester.pumpAndSettle();
@@ -354,7 +363,16 @@ void main() {
     // Add a slot so the form is valid.
     // The CTA lives inside the editor's ListView, below the RESUMEN field
     // added in #648 — scroll it into the 800x600 test viewport before tapping.
-    await tester.ensureVisible(find.text('Agregar ejercicio'));
+    // `scrollUntilVisible` y no `ensureVisible`: el editor es un ListView y
+    // el CTA no está CONSTRUIDO hasta que se scrollea hasta él —
+    // `ensureVisible` necesita un elemento que ya exista y tira "No element".
+    // Se notó al sumar el selector PARA QUÉ SIRVE (#635 PR#1b), que corrió el
+    // CTA fuera del área inicial en modo plantilla.
+    await tester.scrollUntilVisible(
+      find.text('Agregar ejercicio'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Agregar ejercicio'));
     await tester.pumpAndSettle();
@@ -406,7 +424,16 @@ void main() {
 
     // The CTA lives inside the editor's ListView, below the RESUMEN field
     // added in #648 — scroll it into the 800x600 test viewport before tapping.
-    await tester.ensureVisible(find.text('Agregar ejercicio'));
+    // `scrollUntilVisible` y no `ensureVisible`: el editor es un ListView y
+    // el CTA no está CONSTRUIDO hasta que se scrollea hasta él —
+    // `ensureVisible` necesita un elemento que ya exista y tira "No element".
+    // Se notó al sumar el selector PARA QUÉ SIRVE (#635 PR#1b), que corrió el
+    // CTA fuera del área inicial en modo plantilla.
+    await tester.scrollUntilVisible(
+      find.text('Agregar ejercicio'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Agregar ejercicio'));
     await tester.pumpAndSettle();
