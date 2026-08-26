@@ -117,10 +117,19 @@ for (const escritor of ESCRITORES) {
     assert.match(r.stderr, /IS PRODUCTION/, 'esperaba el cartel de producción en stderr');
     assert.match(r.stderr, /treino-dev/);
     assert.match(r.stderr, /#826/);
+    // La frase que se asserta es la del #826 sobre STORAGE, no una genérica
+    // sobre backups: el cartel lo escribe `lib/firebase_projects.js`, que es
+    // copia literal del PR #835 y al mergear se reemplaza por la de allá. Si
+    // acá se assertea una frase que sólo existe en la copia del #838, el
+    // merge que el propio PR indica ("quedarse con la del #835") pone estos
+    // cuatro tests en rojo. Ésta vive en las dos, y además es la mitad del
+    // cartel que importa para un script que sube archivos: el backup diario
+    // de Firestore NO cubre Cloud Storage.
     assert.match(
       r.stderr,
-      /no declared backup/,
-      'el cartel tiene que decir que no hay backup — es la mitad que frena a alguien',
+      /does NOT cover Cloud Storage/,
+      'el cartel tiene que decir que el backup no cubre Storage — lo que este ' +
+        'script escribe no se recupera',
     );
   });
 
