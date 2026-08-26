@@ -1915,8 +1915,8 @@ exigen `request.auth`:
 
 | Callable | App Check | Estado |
 |---|---|---|
-| `deleteAccount` | `true` | atestado — **y rechazando clientes reales, ver más abajo** |
-| `addAlias` | `true` | atestado — se llama desde web, donde nunca puede pasar (§4.10) |
+| `deleteAccount` | **off** desde 2026-08-25 | **deuda** — lo tuvo un mes y en ese mes el borrado nunca funcionó (§4.8.2). Sacado en [#811](https://github.com/Backhaus7997/treino/pull/811) |
+| `addAlias` | `true` | atestado — **pero se llama sólo desde web, donde nunca puede pasar** (§4.10) |
 | `acceptTrainerLink` | **off** | exención **decidida** y comentada (`accept-trainer-link.ts:82`) — el Coach Hub web no activa App Check |
 | `resumeTrainerLink` | **off** | exención decidida y comentada (`resume-trainer-link.ts:77`) |
 | `mintWatchCredential` | **off** | **deuda**, no decisión — el propio archivo lo dice (`mint-watch-credential.ts:115`) |
@@ -1971,11 +1971,17 @@ credencial no se puede borrar ni escribir nada, así que la sonda es inocua:
 
 | Callable | Respuesta | Lectura |
 |---|---|---|
-| `deleteAccount` | `"Unauthenticated"` | cortado en la capa de transporte, el handler **no corre** |
+| `deleteAccount` | `"Unauthenticated"` | cortado en la capa de transporte, el handler **no corre** † |
 | `addAlias` | `"Unauthenticated"` | ídem |
 | `acceptTrainerLink` | `"Authentication required."` | llegó al handler → sin enforcement |
 | `resumeTrainerLink` | `"Authentication required."` | ídem |
 | `mintWatchCredential` | `"Authentication required."` | ídem |
+
+† Estado al 2026-08-25 por la mañana. El flag de `deleteAccount` se sacó ese
+mismo día ([#811](https://github.com/Backhaus7997/treino/pull/811), §4.8.2), así
+que **la sonda ahora devuelve `"Caller is not authenticated."`** — el mensaje
+propio de su handler. Repetirla es la forma más barata de confirmar que el
+deploy salió.
 
 `"Caller is not authenticated."` es el mensaje propio de
 `delete-account.ts:222`; el que vuelve es el genérico de `firebase-functions` v2.
@@ -2003,6 +2009,24 @@ ua="com.backhaus.treino/0.1.0 iPhone/17.5 hw/sim"
 Tres toques en 28 segundos: alguien apretó ELIMINAR, no pasó nada y reintentó.
 `enforceAppCheck: true` entró en `deleteAccount` el 2026-07-20 (`2bb8d1c7`).
 Apple Guideline 5.1.1(v) exige que el borrado de cuenta funcione.
+
+> **Resuelto — el flag se sacó el 2026-08-25**
+> ([#811](https://github.com/Backhaus7997/treino/pull/811)), con el mismo
+> criterio que el PR [#704](https://github.com/Backhaus7997/treino/pull/704)
+> aplicó a los dos callables del paywall: *"un flag que convierte un botón en un
+> error permanente no da seguridad: da un botón roto."*
+>
+> **Lo que sigue protegiendo, que es lo que importa**: `request.auth` es
+> obligatorio y el guard anti-spoofing exige `callerUid === data.uid`, así que un
+> llamador sólo puede borrar **su propia** cuenta. App Check era defensa en
+> profundidad contra abuso automatizado, no la cerradura — y con el enforcement
+> por API en UNENFORCED (§4.8.1) no estaba cerrando una puerta que estuviera
+> cerrada en otro lado.
+>
+> `deleteAccount` entra al registry de `appcheck-enforcement.test.ts` como
+> **`debt`**, no como decisión, con la misma condición de salida que
+> `mintWatchCredential` — conviene restaurar los dos juntos el día que Android
+> emita atestación válida.
 
 Ese cliente era un **simulador** (`hw/sim`), no un tester de TestFlight — pero el
 modo de falla no es exclusivo del simulador. Cruzando cada verificación con su

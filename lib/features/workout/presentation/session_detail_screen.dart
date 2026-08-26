@@ -6,14 +6,18 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
+import '../../../app/theme/tokens/tokens.dart';
 import '../../../core/utils/kg_format.dart';
 import '../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../application/exercise_feedback_providers.dart';
 import '../application/session_providers.dart';
+import '../domain/exercise_feedback.dart';
 import '../domain/session.dart';
 import '../domain/set_log.dart';
 import 'utils/date_helpers.dart';
+import 'widgets/feedback_load_error_note.dart';
 import 'widgets/session_exercise_block.dart';
 import 'widgets/session_stats_card.dart';
 import 'widgets/stat_tile.dart';
@@ -30,6 +34,19 @@ class SessionDetailScreen extends ConsumerWidget {
     final summaryAsync = ref.watch(
       sessionSummaryProvider((uid: uid, sessionId: sessionId)),
     );
+    // #628 — el alumno tiene que poder releer lo que él mismo reportó: si sólo
+    // lo ve el PF, la persona no tiene registro de lo que dijo que le pasó.
+    // Va la variante de dueño (`uid` propio), no la del PF, y se watchea
+    // aparte de la sesión a propósito: un fallo leyendo reportes degrada a
+    // "sin reportes" y NO tumba el detalle, igual que en las dos superficies
+    // del PF — pero se AVISA, también igual que en las dos del PF. Que la
+    // persona relea "no reporté nada" cuando en realidad no se pudo leer es el
+    // mismo silencio, sólo que del lado del que escribió.
+    final feedbackAsync = ref.watch(
+      sessionExerciseFeedbackProvider((uid: uid, sessionId: sessionId)),
+    );
+    final feedback = feedbackAsync.valueOrNull ?? const <ExerciseFeedback>[];
+    final feedbackFailed = feedbackAsync.hasError;
 
     return Scaffold(
       body: AppBackground(
@@ -55,6 +72,8 @@ class SessionDetailScreen extends ConsumerWidget {
                 return _DetailLoaded(
                   session: session,
                   setLogs: data.setLogs,
+                  feedback: feedback,
+                  feedbackFailed: feedbackFailed,
                 );
               },
             ),
@@ -68,25 +87,40 @@ class SessionDetailScreen extends ConsumerWidget {
 // ── Loaded body ───────────────────────────────────────────────────────────────
 
 class _DetailLoaded extends StatelessWidget {
-  const _DetailLoaded({required this.session, required this.setLogs});
+  const _DetailLoaded({
+    required this.session,
+    required this.setLogs,
+    this.feedback = const <ExerciseFeedback>[],
+    this.feedbackFailed = false,
+  });
 
   final Session session;
   final List<SetLog> setLogs;
+
+  /// Lo que el alumno reportó en esta sesión (#628). Ya filtrado por sesión;
+  /// el reparto por ejercicio y por serie lo hace [SessionExerciseBlock].
+  final List<ExerciseFeedback> feedback;
+
+  /// `true` cuando la lectura de [feedback] falló y la lista vacía de arriba
+  /// NO significa "no reportó nada". Se renderiza como aviso propio, arriba de
+  /// los bloques: la sesión se sigue viendo entera.
+  final bool feedbackFailed;
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
 
-    // Group setLogs by exerciseName preserving first-appearance order.
-    // Map literal {} creates a LinkedHashMap in Dart — insertion order preserved.
-    final grouped = <String, List<SetLog>>{};
-    for (final log in setLogs) {
-      grouped.putIfAbsent(log.exerciseName, () => []).add(log);
-    }
+    // #628 — se agrupa por `exerciseId` y no por `exerciseName` como antes:
+    // los reportes se anclan al id, así que sin él no hay forma de pegarle a
+    // cada bloque lo suyo. De paso deja de fusionar dos ejercicios distintos
+    // que casualmente compartan nombre, y queda igual que las dos superficies
+    // del PF. La lista incluye al final los ejercicios que SÓLO tienen
+    // reportes (serie pendiente, miembro de superset, serie borrada).
     // Indexado para el stagger de abajo — lista eager (no builder), así que
     // TreinoFadeSlideIn es seguro (docs/design-system.md).
-    final groupedList = grouped.entries.toList();
+    final groupedList =
+        buildSessionExerciseGroups(sets: setLogs, feedback: feedback);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -176,6 +210,13 @@ class _DetailLoaded extends StatelessWidget {
           ),
           const SizedBox(height: 20),
 
+          // El aviso de reportes ilegibles va antes de los bloques y también
+          // cuando la sesión quedó vacía: son dos hechos distintos.
+          if (feedbackFailed) ...[
+            FeedbackLoadErrorNote(message: l10n.sessionFeedbackLoadError),
+            const SizedBox(height: AppSpacing.s8),
+          ],
+
           // Exercise blocks — or empty state when no sets were logged.
           if (groupedList.isEmpty)
             Padding(
@@ -196,8 +237,9 @@ class _DetailLoaded extends StatelessWidget {
                   (indexed) => TreinoFadeSlideIn(
                     delay: AppMotion.stagger(indexed.key + 2),
                     child: SessionExerciseBlock(
-                      exerciseName: indexed.value.key,
-                      sets: indexed.value.value,
+                      exerciseName: indexed.value.exerciseName,
+                      sets: indexed.value.sets,
+                      feedback: indexed.value.feedback,
                     ),
                   ),
                 ),

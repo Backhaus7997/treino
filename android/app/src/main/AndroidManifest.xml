@@ -49,5 +49,20 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!-- App companion NUEVA de Wear OS. Va acá y no en el plugin porque el
+             manifest de watch_connectivity 0.2.8 declara sólo dos de los TRES
+             paquetes que su propio `isPaired` consulta: le falta justo éste.
+
+             En Android 11+ `getInstalledApplications` filtra por visibilidad de
+             paquetes, así que en un teléfono que sólo tenga la app nueva el
+             chequeo da FALSE con el reloj perfectamente emparejado. El síntoma
+             es el peor posible: `deliverCredential` corta en `noWatchPaired`, no
+             se mintea nada, y no hay ni un error — la muñeca queda esperando una
+             credencial que nunca se pidió.
+
+             Los otros dos (com.google.android.wearable.app y
+             com.samsung.android.app.watchmanager) ya los declara el plugin y el
+             merge de manifests los suma; no hace falta repetirlos. -->
+        <package android:name="com.google.android.apps.wear.companion" />
     </queries>
 </manifest>

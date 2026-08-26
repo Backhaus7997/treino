@@ -3865,4 +3865,77 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get templatesOnboardingBack => 'BACK';
+  String get exerciseFeedbackAction => 'COMMENT / REPORT';
+
+  @override
+  String exerciseFeedbackActionA11y(String exerciseName) {
+    return 'Comment or report discomfort on $exerciseName';
+  }
+
+  @override
+  String get exerciseFeedbackSheetTitle => 'TELL YOUR COACH';
+
+  @override
+  String exerciseFeedbackSheetAnchorSet(String exerciseName, int setNumber) {
+    return '$exerciseName · set $setNumber';
+  }
+
+  @override
+  String get exerciseFeedbackKindComment => 'Comment';
+
+  @override
+  String get exerciseFeedbackKindDiscomfort => 'Discomfort / pain';
+
+  @override
+  String get exerciseFeedbackDiscomfortNotice =>
+      'Your coach gets notified right away.';
+
+  @override
+  String get exerciseFeedbackTextHint =>
+      'What do you want to tell them? E.g. my right shoulder pulled on set 3.';
+
+  @override
+  String get exerciseFeedbackPhotoCamera => 'Camera';
+
+  @override
+  String get exerciseFeedbackPhotoGallery => 'Gallery';
+
+  @override
+  String get exerciseFeedbackPhotoRemove => 'Remove photo';
+
+  @override
+  String get exerciseFeedbackPhotoError =>
+      'We could not open the photo. Try again.';
+
+  @override
+  String get exerciseFeedbackCancel => 'CANCEL';
+
+  @override
+  String get exerciseFeedbackSubmit => 'SEND';
+
+  @override
+  String get exerciseFeedbackSuccess =>
+      'Done. Your coach will see it next to the set.';
+
+  @override
+  String get exerciseFeedbackError =>
+      'We could not save your report. Try again.';
+
+  @override
+  String get exerciseFeedbackNoteTagComment => 'FROM ATHLETE';
+
+  @override
+  String get exerciseFeedbackNoteTagDiscomfort => 'DISCOMFORT';
+
+  @override
+  String exerciseFeedbackNoteSetTag(int setNumber) {
+    return 'SET $setNumber';
+  }
+
+  @override
+  String get coachSessionFeedbackLoadError =>
+      'We could not load the athlete\'s reports.';
+
+  @override
+  String get sessionFeedbackLoadError => 'We could not load your reports.';
 }

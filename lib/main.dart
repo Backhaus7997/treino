@@ -93,10 +93,19 @@ Future<void> main() async {
     //
     // ⚠️ OJO, lo de arriba NO aplica a los callables: `enforceAppCheck` en las
     // opciones de un `onCall` lo aplica la propia función, en su código, y es
-    // independiente de la consola. Medido el 2026-08-25: `deleteAccount` y
-    // `addAlias` rechazan hoy a cualquier cliente sin atestación válida. El
-    // inventario de qué callable exige qué vive en
-    // functions/src/__tests__/appcheck-enforcement.test.ts.
+    // independiente de la consola. Hoy el único que lo exige es `addAlias`, y
+    // como se llama sólo desde el Coach Hub web —que nunca activa App Check—
+    // falla siempre, con el error tragado en un `debugPrint`
+    // (docs/security.md §4.10).
+    //
+    // `deleteAccount` lo tuvo del 2026-07-20 al 2026-08-25 y en ese mes el
+    // borrado de cuenta no funcionó nunca; se sacó por eso (§4.8.2). No
+    // confundir "el callable exige atestación" con "el cliente puede
+    // producirla": al 2026-08-25 Android va 1 token válido cada 9.
+    //
+    // El inventario de qué callable exige qué —y por qué los que no, no— vive
+    // en functions/src/__tests__/appcheck-enforcement.test.ts, derivado del
+    // AST de index.ts para que no se pueda quedar viejo.
     //
     // Consecuencia práctica el día que se vuelva a encender por API: en un
     // device de dev cuyo debug token NO esté registrado, TODA escritura a

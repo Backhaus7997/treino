@@ -30,9 +30,13 @@ export { notifyOnLinkChange } from "./notifications/notify-link-change";
 export { notifyOnFollow } from "./notifications/notify-friendship";
 export { notifyOnReaction } from "./notifications/notify-reaction";
 export { reassignFcmToken } from "./notifications/reassign-fcm-token";
+export { notifyWearOnWorkoutStarted } from "./notifications/notify-wear-workout";
 export { maintainFollowCounters } from "./social/maintain-follow-counters";
 export { maintainReactionCounters } from "./social/maintain-reaction-counters";
 export { notifyOnReview } from "./notifications/notify-review";
+// #628: canal alumno → PF durante la sesión. Notifica SOLO cuando
+// kind === 'discomfort' — un comment no debe vibrarle el teléfono al PF.
+export { notifyOnExerciseFeedback } from "./notifications/notify-exercise-feedback";
 export { cleanupAssignedPlansOnUnlink } from "./cleanup-assigned-plans";
 export { addAlias } from "./add-alias";
 export { syncSessionShareOnTrainerLink } from "./sync-session-share";

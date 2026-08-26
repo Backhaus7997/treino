@@ -43,7 +43,9 @@ import '../../workout/application/session_providers.dart'
 import '../../workout/domain/routine.dart';
 import '../../workout/domain/session.dart';
 import '../../workout/domain/session_status.dart';
-import '../../workout/domain/set_log.dart';
+import '../../workout/application/exercise_feedback_providers.dart';
+import '../../workout/domain/exercise_feedback.dart';
+import '../../workout/presentation/widgets/feedback_load_error_note.dart';
 import '../../workout/presentation/widgets/exercise_progression_chart.dart'
     show ExerciseProgressionChartLabels;
 import '../../workout/presentation/widgets/exercise_progression_section.dart';
@@ -2314,6 +2316,19 @@ class _SessionSetLogsExpansion extends ConsumerWidget {
       coachSessionSetLogsProvider(
           (athleteUid: athleteId, sessionId: sessionId)),
     );
+    // #628 — se watchea aparte de los setLogs a propósito: si el alumno no
+    // reportó nada (el caso normal) esto resuelve en una lista vacía y no
+    // cambia nada de lo que ya se veía.
+    final feedbackAsync = ref.watch(
+      coachSessionExerciseFeedbackProvider(
+          (athleteUid: athleteId, sessionId: sessionId)),
+    );
+    final feedback = feedbackAsync.valueOrNull ?? const <ExerciseFeedback>[];
+    // …pero degradar a lista vacía SIN decirlo deja el fallo de lectura
+    // indistinguible de "no reportó nada": el PF ve el historial de siempre y
+    // concluye que no hubo molestias. El error se renderiza aparte, arriba de
+    // las series, sin reemplazarlas.
+    final feedbackFailed = feedbackAsync.hasError;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(0, 0, 0, 8),
@@ -2341,31 +2356,45 @@ class _SessionSetLogsExpansion extends ConsumerWidget {
           ),
         ),
         data: (logs) {
-          if (logs.isEmpty) {
-            return Padding(
-              padding: const EdgeInsets.only(top: 4, bottom: 4),
-              child: Text(
-                l10n.coachSessionSetLogsEmpty,
-                style:
-                    GoogleFonts.barlow(fontSize: 12, color: palette.textMuted),
-              ),
-            );
-          }
-          // Group by exerciseId preserving insertion order (same as web).
-          final groups = <String, List<SetLog>>{};
-          for (final log in logs) {
-            groups.putIfAbsent(log.exerciseId, () => <SetLog>[]).add(log);
-          }
+          // Group by exerciseId preserving insertion order (same as web), más
+          // la pasada por los ejercicios que SÓLO tienen reportes (#628).
+          final groups =
+              buildSessionExerciseGroups(sets: logs, feedback: feedback);
+          // El placeholder es sólo para la sesión GENUINAMENTE vacía: sin
+          // series Y sin reportes. Cortar acá por `logs.isEmpty` era tragarse
+          // todo lo que el alumno dijo — el caso MÁS ruidoso del bug #628, no
+          // un borde.
           return Padding(
-            padding: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.only(top: AppSpacing.s8),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                for (final entry in groups.entries)
-                  SessionExerciseBlock(
-                    exerciseName: entry.value.first.exerciseName,
-                    sets: entry.value,
-                  ),
+                // El aviso va ARRIBA y siempre que haya fallado, incluso con la
+                // sesión vacía: "no hay series" + "no pudimos leer los
+                // reportes" son dos cosas distintas y el PF tiene que ver las
+                // dos.
+                if (feedbackFailed) ...[
+                  FeedbackLoadErrorNote(
+                      message: l10n.coachSessionFeedbackLoadError),
+                  const SizedBox(height: AppSpacing.s8),
+                ],
+                if (groups.isEmpty)
+                  Text(
+                    l10n.coachSessionSetLogsEmpty,
+                    style: GoogleFonts.barlow(
+                        fontSize: 12, color: palette.textMuted),
+                  )
+                else
+                  for (final group in groups)
+                    SessionExerciseBlock(
+                      exerciseName: group.exerciseName,
+                      sets: group.sets,
+                      // #628 — los reportes del alumno, pegados a la serie que
+                      // los originó. Un fallo al leerlos NO tumba las series:
+                      // degrada a "sin reportes" y lo dice con el aviso de
+                      // arriba, en vez de mentir por omisión.
+                      feedback: group.feedback,
+                    ),
               ],
             ),
           );

@@ -52,6 +52,66 @@ jobs:
       - name: Run tests
         run: flutter test
 
+  # Gate de regresion visual del Coach Hub (#761).
+  #
+  # Job APARTE, y no un paso de "Analyze & Test", por dos motivos:
+  #
+  # 1. Corre con TREINO_VISUAL_GATE=1. Sin esa variable la suite de
+  #    test/visual_gate/ se saltea, asi que `flutter test` a secas —el que
+  #    corren los devs en su Mac— nunca la ejecuta. Eso es deliberado: los
+  #    goldens estan rasterizados por ESTE runner. Correrlos en macOS da
+  #    rojo por antialiasing, y un gate que falla donde no se puede arreglar
+  #    dura hasta que alguien lo apaga. Ver docs/visual-gate.md.
+  #
+  # 2. Cuando rompe, el diff es una imagen. Job propio = artefacto propio:
+  #    el reviewer se baja las tres imagenes (esperada / real / mascara del
+  #    diff) sin bucear en un log de miles de lineas.
+  #
+  # TZ=UTC no es cosmetico. El seed congela el reloj en un DateTime local; si
+  # el runner no estuviera en UTC, argentinaNow() —que hace .toUtc() sobre ese
+  # instante— rendiria otra hora y las pantallas con horarios cambiarian de
+  # pixeles sin que nadie tocara la UI. El job lo fija y el propio gate lo
+  # verifica en un test con nombre ("el entorno del gate esta pinneado").
+  #
+  # ESTE JOB ES BLOQUEANTE. Hoy `main` no tiene branch protection
+  # (/branches/main/protection -> 404), asi que en rojo NO impide mergear: hay
+  # que mirarlo. Cuando se active la proteccion, este check va a la lista de
+  # obligatorios — sin eso el gate avisa pero no frena, que es exactamente el
+  # corpus que #723 borro con otro nombre.
+  visual-gate:
+    name: Visual Gate (Coach Hub)
+    runs-on: ubuntu-latest
+    env:
+      TREINO_VISUAL_GATE: '1'
+      TZ: UTC
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Flutter
+        # MISMA version que analyze-and-test. Si se mueve una, se mueve la
+        # otra: los goldens estan atados a esta rasterizacion.
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.9'
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Gate de regresion visual
+        run: flutter test test/visual_gate/
+
+      - name: Subir los diffs de imagen si el gate rompio
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-gate-failures
+          path: test/visual_gate/failures/
+          if-no-files-found: ignore
+          retention-days: 14
+
   # Conformidad Dart <-> Swift (change watch-standalone-client).
   #
   # El cliente watchOS no puede usar el SDK de Firestore, asi que reimplementa

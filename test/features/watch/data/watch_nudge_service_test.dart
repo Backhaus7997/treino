@@ -35,10 +35,17 @@ void main() {
     verifyNever(() => bridge.updateApplicationContext(any()));
   });
 
-  test('sin reloj emparejado no manda nada', () async {
+  test('un nodo alcanzable ALCANZA, aunque isPaired diga que no', () async {
+    // En Android `isPaired` no pregunta si hay un reloj: lista las apps
+    // companion instaladas en el TELÉFONO. Cortar por eso dejaba sin aviso a un
+    // reloj perfectamente conectado — y ese aviso es lo que despierta al
+    // companion cuando el atleta arranca el entreno desde el celular.
+    //
+    // Un reloj alcanzable es, por definición, un reloj que está.
     when(() => bridge.isPaired).thenAnswer((_) async => false);
-    expect(await service.nudge(), isFalse);
-    verifyNever(() => bridge.sendMessage(any()));
+
+    expect(await service.nudge(), isTrue);
+    verify(() => bridge.sendMessage(any())).called(1);
   });
 
   test('reloj no alcanzable: no intenta, y no rompe', () async {

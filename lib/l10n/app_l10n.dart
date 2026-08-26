@@ -6944,6 +6944,131 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'VOLVER'**
   String get templatesOnboardingBack;
+  /// Acción en la card del ejercicio del player que abre el sheet de reporte al PF (#628).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'COMENTAR / REPORTAR'**
+  String get exerciseFeedbackAction;
+
+  /// Semantics del botón de reporte por ejercicio.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Comentar o reportar una molestia en {exerciseName}'**
+  String exerciseFeedbackActionA11y(String exerciseName);
+
+  /// Título del bottom sheet de reporte por ejercicio.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CONTALE A TU PF'**
+  String get exerciseFeedbackSheetTitle;
+
+  /// Subtítulo del sheet cuando el reporte queda anclado a una serie concreta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{exerciseName} · serie {setNumber}'**
+  String exerciseFeedbackSheetAnchorSet(String exerciseName, int setNumber);
+
+  /// Chip de tipo: comentario común, no notifica al PF.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Comentario'**
+  String get exerciseFeedbackKindComment;
+
+  /// Chip de tipo: molestia o dolor. Es el único que le avisa al PF.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Molestia / dolor'**
+  String get exerciseFeedbackKindDiscomfort;
+
+  /// Aclaración bajo los chips cuando está elegido 'molestia': el usuario tiene que saber que ESTE tipo notifica y el otro no.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu PF recibe un aviso al toque.'**
+  String get exerciseFeedbackDiscomfortNotice;
+
+  /// Placeholder del cuadro de texto del sheet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Qué le querés contar? Ej: en la 3ª me tiró el hombro derecho.'**
+  String get exerciseFeedbackTextHint;
+
+  /// Botón para sacar la foto con la cámara.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cámara'**
+  String get exerciseFeedbackPhotoCamera;
+
+  /// Botón para elegir la foto de la galería.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Galería'**
+  String get exerciseFeedbackPhotoGallery;
+
+  /// Saca la foto elegida antes de enviar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Quitar foto'**
+  String get exerciseFeedbackPhotoRemove;
+
+  /// Error al elegir o sacar la foto.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos abrir la foto. Probá de nuevo.'**
+  String get exerciseFeedbackPhotoError;
+
+  /// Descarta el reporte sin guardarlo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CANCELAR'**
+  String get exerciseFeedbackCancel;
+
+  /// Guarda el reporte. Deshabilitado mientras no haya ni texto ni foto.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ENVIAR'**
+  String get exerciseFeedbackSubmit;
+
+  /// Confirmación después de guardar el reporte.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Listo. Tu PF lo va a ver junto a la serie.'**
+  String get exerciseFeedbackSuccess;
+
+  /// Error al guardar el reporte.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos guardar tu reporte. Probá de nuevo.'**
+  String get exerciseFeedbackError;
+
+  /// Tag del reporte cuando es un comentario común. Espejo de 'DEL COACH' en la otra dirección.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DEL ALUMNO'**
+  String get exerciseFeedbackNoteTagComment;
+
+  /// Tag del reporte cuando el alumno marcó dolor o molestia. Se ve distinto de un comentario a propósito.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MOLESTIA'**
+  String get exerciseFeedbackNoteTagDiscomfort;
+
+  /// Serie a la que quedó anclado el reporte, al lado del tag.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SERIE {setNumber}'**
+  String exerciseFeedbackNoteSetTag(int setNumber);
+
+  /// Error al cargar el feedback por ejercicio en las superficies del PF.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar los reportes del alumno.'**
+  String get coachSessionFeedbackLoadError;
+
+  /// Mismo fallo que coachSessionFeedbackLoadError pero en la superficie del PROPIO alumno: ahi los reportes son suyos, no 'del alumno'.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar tus reportes.'**
+  String get sessionFeedbackLoadError;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

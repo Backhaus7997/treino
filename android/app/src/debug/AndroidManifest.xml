@@ -4,4 +4,13 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+
+    <!-- Habilita HTTP en claro contra los emuladores de Firebase. Solo debug:
+         este manifest no se mergea en el build de release. Ver el comentario de
+         res/xml/network_security_config.xml.
+
+         El foreground service y sus permisos VIVÍAN acá y se mudaron a
+         src/wear/: acá adentro no entraban en profile ni release, así que el
+         mecanismo no existía en el build que se publica. -->
+    <application android:networkSecurityConfig="@xml/network_security_config" />
 </manifest>
