@@ -3608,6 +3608,24 @@ abstract class AppL10n {
   /// **'Ej: Empujar, tirar y piernas: cada día trabajás un tipo de movimiento distinto.'**
   String get routineEditorSummaryHint;
 
+  /// Etiqueta del selector de objetivos en el editor de PLANTILLAS del PF (#635 PR#1b). Sólo aparece en modo plantilla: un plan asignado no entra al catálogo, así que nada lo rankea por objetivo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PARA QUÉ SIRVE'**
+  String get routineEditorGoalsLabel;
+
+  /// Bajada del selector. Dice qué se gana respondiendo, no que sea obligatorio: sin objetivos la plantilla sigue apareciendo en la grilla, sólo que sin señal para rankear.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Elegí uno o más. Ayuda a que el alumno encuentre la plantilla cuando busca por objetivo.'**
+  String get routineEditorGoalsHelp;
+
+  /// Estado del selector cuando no hay ninguno elegido. Neutro a propósito: no es un error ni una advertencia.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sin objetivo declarado'**
+  String get routineEditorGoalsEmpty;
+
   /// No description provided for @exerciseNoteFromCoachTag.
   ///
   /// In es_AR, this message translates to:
@@ -6944,6 +6962,7 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'VOLVER'**
   String get templatesOnboardingBack;
+
   /// Acción en la card del ejercicio del player que abre el sheet de reporte al PF (#628).
   ///
   /// In es_AR, this message translates to:

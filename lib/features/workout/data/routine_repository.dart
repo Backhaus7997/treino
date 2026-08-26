@@ -307,6 +307,16 @@ class RoutineRepository {
       // trainer's edit is dropped on the floor. Listed in the
       // trainer-template UPDATE path's affectedKeys() allowlist.
       'summary': draft.summary,
+      // Objetivos del catálogo (#635 PR#1b). Mismo motivo que `summary`: el
+      // payload se arma a mano, así que sin nombrarlo acá la edición del PF
+      // se pierde en silencio.
+      //
+      // Va SÓLO en este método, no en `updateAssigned`. Un plan asignado es
+      // privado de un alumno y no entra a la grilla de PLANTILLAS, así que
+      // nada lo rankea por objetivo — y `firestore.rules` deja `goals` fuera
+      // del `affectedKeys()` de ese path justamente para que no se pueda.
+      // Mandarlo desde allá sería un permission-denied garantizado.
+      'goals': draft.goals.map((g) => g.wireKey).toList(),
     };
 
     await _collection.doc(draft.id).update(json);

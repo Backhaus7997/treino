@@ -1911,6 +1911,16 @@ class AppL10nEn extends AppL10n {
       'E.g. Push, pull and legs: each day trains a different kind of movement.';
 
   @override
+  String get routineEditorGoalsLabel => 'WHAT IT IS FOR';
+
+  @override
+  String get routineEditorGoalsHelp =>
+      'Pick one or more. It helps athletes find the template when they search by goal.';
+
+  @override
+  String get routineEditorGoalsEmpty => 'No goal declared';
+
+  @override
   String get exerciseNoteFromCoachTag => 'FROM COACH';
 
   @override
@@ -3865,6 +3875,8 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get templatesOnboardingBack => 'BACK';
+
+  @override
   String get exerciseFeedbackAction => 'COMMENT / REPORT';
 
   @override

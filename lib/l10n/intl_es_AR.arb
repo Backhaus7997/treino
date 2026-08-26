@@ -1211,6 +1211,12 @@
   "@routineEditorSummaryHint": {
     "description": "Hint of the routine summary field. Verbatim one of the 7 seeded system-template summaries, so its length (78 chars) calibrates the expected answer."
   },
+  "routineEditorGoalsLabel": "PARA QUÉ SIRVE",
+  "@routineEditorGoalsLabel": {"description": "Etiqueta del selector de objetivos en el editor de PLANTILLAS del PF (#635 PR#1b). Sólo aparece en modo plantilla: un plan asignado no entra al catálogo, así que nada lo rankea por objetivo."},
+  "routineEditorGoalsHelp": "Elegí uno o más. Ayuda a que el alumno encuentre la plantilla cuando busca por objetivo.",
+  "@routineEditorGoalsHelp": {"description": "Bajada del selector. Dice qué se gana respondiendo, no que sea obligatorio: sin objetivos la plantilla sigue apareciendo en la grilla, sólo que sin señal para rankear."},
+  "routineEditorGoalsEmpty": "Sin objetivo declarado",
+  "@routineEditorGoalsEmpty": {"description": "Estado del selector cuando no hay ninguno elegido. Neutro a propósito: no es un error ni una advertencia."},
   "exerciseNoteFromCoachTag": "DEL COACH",
   "@exerciseNoteFromCoachTag": {},
   "routineEditorIncompleteSetsFeedback": "Completá los sets de \"{exerciseName}\" antes de guardar.",

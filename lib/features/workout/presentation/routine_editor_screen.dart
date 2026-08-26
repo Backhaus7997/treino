@@ -29,6 +29,11 @@ import '../application/user_routines_providers.dart'
 import '../domain/exercise.dart';
 import '../domain/routine.dart';
 import '../domain/routine_day.dart';
+import '../domain/routine_goal.dart';
+// `templatesGoalLabel` vive con el mini-onboarding (#635 PR#2) y se reusa acá
+// a propósito: es el ÚNICO mapeo de `RoutineGoal` a copy. Dos vocabularios
+// para el mismo enum es exactamente cómo se desincronizan las etiquetas.
+import 'onboarding/templates_onboarding_steps.dart';
 import '../domain/routine_slot.dart';
 import '../domain/routine_source.dart';
 import '../domain/routine_visibility.dart';
@@ -553,6 +558,17 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   /// trainer flows.
   bool _sharedOnProfile = false;
 
+  /// Objetivos declarados de la plantilla (#635 PR#1b).
+  ///
+  /// `Set` y no `List`: la selección es un conjunto sin orden ni repetidos, y
+  /// que dos PF elijan lo mismo en distinto orden no puede producir documentos
+  /// distintos. Se serializa en el orden del enum al guardar.
+  ///
+  /// Vacío es un estado VÁLIDO, no un formulario a medio llenar: sin objetivos
+  /// la plantilla sigue apareciendo en la grilla, sólo que sin señal para
+  /// rankear. Por eso no hay validación que lo exija.
+  final Set<RoutineGoal> _goals = <RoutineGoal>{};
+
   bool _submitting = false;
 
   /// True while the existing routine is being fetched from Firestore.
@@ -613,6 +629,15 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       });
     }
   }
+
+  /// Los objetivos elegidos, en orden del enum.
+  ///
+  /// El orden importa aunque el conjunto no: sin normalizar, dos PF que
+  /// eligen lo mismo tocando en distinto orden producirían arrays distintos
+  /// en Firestore, y cualquier comparación de documentos —tests, diffs,
+  /// deduplicación futura— los vería como diferentes sin serlo.
+  List<RoutineGoal> get _goalsOrdered =>
+      RoutineGoal.values.where(_goals.contains).toList(growable: false);
 
   /// Marks the editor as having unsaved changes. No-op while hydrating.
   ///
@@ -746,6 +771,15 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       // prosa del PF que la copia no va a tener, y el día que el editor del
       // atleta gane un campo de resumen empezaría a copiarla en silencio. Que
       // el estado coincida con el resultado.
+      // Los objetivos SÍ se hidratan al personalizar (#635 PR#1b): a
+      // diferencia del resumen, describen el contenido que se está copiando,
+      // no la autoría de quien lo escribió. Una copia de una plantilla de
+      // fuerza sigue siendo de fuerza. Y el selector sólo se muestra en modo
+      // plantilla, así que en `SelfCustomizing` esto queda inerte de todos
+      // modos — se hidrata igual para no depender de esa coincidencia.
+      _goals
+        ..clear()
+        ..addAll(routine.goals);
       if (!_isCustomizing && routine.summary != null) {
         _summaryController.text = routine.summary!;
       }
@@ -910,6 +944,16 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   /// REQ-RER-012, REQ-RER-013, ADR-RER-04.
   bool get _isTrainerMode =>
       widget.mode is TrainerAssigning || widget.mode is TrainerTemplating;
+
+  /// Sólo el editor de PLANTILLAS, no el de planes asignados (#635 PR#1b).
+  ///
+  /// Más angosto que [_isTrainerMode] a propósito. Un plan asignado es privado
+  /// de un alumno y nunca entra a la grilla de PLANTILLAS, así que declarar su
+  /// objetivo no ordena nada — y `firestore.rules` deja `goals` fuera del
+  /// `affectedKeys()` de ese path. Mostrar el selector ahí daría un campo cuyo
+  /// guardado siempre falla con permission-denied, que es peor que no tenerlo:
+  /// el mismo criterio con el que `summary` se ausenta del editor del atleta.
+  bool get _isTemplateMode => widget.mode is TrainerTemplating;
 
   /// Whether the editor is copying an existing routine into a new one (#647).
   /// Drives the three places where hydration must NOT be faithful: the name
@@ -1622,6 +1666,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             visibility: RoutineVisibility.private,
             numWeeks: _numWeeks,
             summary: _summaryOrNull,
+            goals: _goalsOrdered,
           );
           await repo.updateTemplate(uid: uid, draft: draft);
           if (!mounted) return;
@@ -1644,6 +1689,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             visibility: RoutineVisibility.private,
             numWeeks: _numWeeks,
             summary: _summaryOrNull,
+            goals: _goalsOrdered,
           );
           await repo.createTemplate(routine);
           if (!mounted) return;
@@ -2119,6 +2165,70 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                       ),
                     ],
 
+                    // ── Para qué sirve — SOLO modo plantilla (#635 PR#1b) ──
+                    //
+                    // Debajo del RESUMEN porque son la misma pregunta a dos
+                    // niveles: el resumen la contesta en prosa para el humano
+                    // que lee la card, los objetivos la contestan en enum para
+                    // el ranking que ordena la grilla.
+                    //
+                    // `_isTemplateMode` y no `_isTrainerMode`: en un plan
+                    // asignado el guardado sería permission-denied, porque
+                    // firestore.rules deja `goals` fuera del affectedKeys de
+                    // ese path. Ver el dartdoc del predicado.
+                    if (_isTemplateMode) ...[
+                      const SizedBox(height: AppSpacing.s12),
+                      _SectionLabel(
+                        label: l10n.routineEditorGoalsLabel,
+                        palette: palette,
+                      ),
+                      const SizedBox(height: AppSpacing.hairline),
+                      Text(
+                        l10n.routineEditorGoalsHelp,
+                        style: GoogleFonts.barlow(
+                          fontWeight: FontWeight.w400,
+                          fontSize: 12,
+                          height: 1.35,
+                          color: palette.textMuted,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.s8),
+                      Wrap(
+                        key: const Key('editor_goals_picker'),
+                        spacing: AppSpacing.s8,
+                        runSpacing: AppSpacing.s8,
+                        children: [
+                          for (final goal in RoutineGoal.values)
+                            _GoalChip(
+                              key: Key('editor_goal_${goal.wireKey}'),
+                              label: templatesGoalLabel(l10n, goal),
+                              selected: _goals.contains(goal),
+                              palette: palette,
+                              onTap: () {
+                                _markDirty();
+                                setState(() {
+                                  // Toggle: volver a tocar deselecciona. Sin
+                                  // esto no habría forma de corregir un tap
+                                  // equivocado salvo recargando el editor.
+                                  if (!_goals.remove(goal)) _goals.add(goal);
+                                });
+                              },
+                            ),
+                        ],
+                      ),
+                      if (_goals.isEmpty) ...[
+                        const SizedBox(height: AppSpacing.s8),
+                        Text(
+                          l10n.routineEditorGoalsEmpty,
+                          style: GoogleFonts.barlow(
+                            fontWeight: FontWeight.w400,
+                            fontSize: 12,
+                            color: palette.textMuted,
+                          ),
+                        ),
+                      ],
+                    ],
+
                     // ── Row: Share on public profile — SelfCreating only
                     //
                     // Toggle that flips the routine's `visibility`
@@ -2465,6 +2575,66 @@ class _WeekTabBar extends StatelessWidget {
 
 /// One selectable week pill — accent-filled when [selected]; shows a danger
 /// dot when [warning] (the week fails validation while not on screen).
+/// Pill de objetivo del editor de plantillas (#635 PR#1b).
+///
+/// Calcado de [_WeekChip] a propósito: misma geometría, mismo relleno de
+/// acento al seleccionar, mismo `Semantics(button/selected)`. Dos controles
+/// de selección en la misma pantalla que se vieran distinto serían ruido.
+///
+/// El texto sobre acento sale de `TreinoButtonTokens.foreground`, no de
+/// `palette.bg`: en tema claro esa convención da 1.57:1 y falla AA
+/// (AGENTS.md §2).
+class _GoalChip extends StatelessWidget {
+  const _GoalChip({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.palette,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final AppPalette palette;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.full),
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.s14,
+            vertical: AppSpacing.s8,
+          ),
+          decoration: BoxDecoration(
+            color: selected ? palette.accent : palette.bgCard,
+            borderRadius: BorderRadius.circular(AppRadius.full),
+            border: Border.all(
+              color: selected ? palette.accent : palette.border,
+            ),
+          ),
+          child: Text(
+            label,
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+              letterSpacing: 0.5,
+              color: selected
+                  ? TreinoButtonTokens.foreground(context)
+                  : palette.textMuted,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _WeekChip extends StatelessWidget {
   const _WeekChip({
     super.key,
