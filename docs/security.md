@@ -2319,6 +2319,23 @@ el doc de OTRO uid`, `publicar agenda a nombre de OTRO trainer`): custodian
 reglas preexistentes que este change no toca, así que es correcto que no se
 muevan.
 
+**Un rojo colateral que conviene leer, no tapar.** Correr la suite **completa**
+—y no sólo el archivo nuevo— puso en rojo tres tests preexistentes de
+`trainer-public-profiles-rules.test.ts`, y eran sus **positivos del dueño**. El
+motivo: ese fixture nunca seedeaba `users/{uid}`, así que modelaba un PF **sin
+doc privado**. Eso no puede existir —los trainers se provisionan por Admin SDK y
+ese doc es lo que les da el rol (AGENTS.md regla 3)— y el fixture se corrigió.
+
+Pero el rojo dejó a la vista una propiedad de la regla nueva que sí importa:
+**`get()` sobre un `users/{uid}` inexistente rompe la evaluación y deniega.** O
+sea que un `trainerPublicProfiles` huérfano no queda "sin gate": queda
+**inmutable**. Por eso el script de auditoría reporta esos huérfanos en una
+lista aparte de los que simplemente tienen el rol mal.
+
+La moraleja operativa: al tocar un archivo de reglas compartido, la suite de un
+solo archivo no alcanza. Los tres rojos no aparecían corriendo
+`coach-role-gate-rules.test.ts` solo.
+
 **⚠️ Nota de despliegue.** El gate de rol en `update` de `trainerPublicProfiles`
 congela la edición de cualquier perfil cuyo dueño no tenga `role: 'trainer'`.
 Para los forjados es lo buscado; para un PF legítimo con el rol mal seteado
