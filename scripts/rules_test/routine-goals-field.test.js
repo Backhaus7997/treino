@@ -79,6 +79,20 @@ const trainerTemplate = (uid, extra = {}) => ({
   ...extra,
 });
 
+const trainerAssigned = (uid, athleteUid, extra = {}) => ({
+  source: 'trainer-assigned',
+  assignedBy: uid,
+  assignedTo: athleteUid,
+  visibility: 'private',
+  name: 'Plan',
+  split: 'PPL',
+  level: 'intermediate',
+  days: [],
+  status: 'active',
+  createdAt: new Date(),
+  ...extra,
+});
+
 const seed = (docId, data) =>
   testEnv.withSecurityRulesDisabled((ctx) =>
     ctx.firestore().collection('routines').doc(docId).set(data),
@@ -185,5 +199,45 @@ test('un PF ajeno no puede tocar los goals de una plantilla que no es suya', asy
       .collection('routines')
       .doc('t-goals-foreign')
       .update({ goals: ['sport'] }),
+  );
+});
+
+// ── El plan ASIGNADO: arrastra el campo, no lo edita ───────────────────────
+
+test('el PF puede editar el contenido de un plan asignado que arrastra goals', async () => {
+  // Un plan copiado desde una plantilla puede traer el campo. Si `keys()` no
+  // lo conociera, editar ese plan fallaría con permission-denied.
+  await seed(
+    'a-goals-content',
+    trainerAssigned('trainer-a', 'athlete-a', { goals: ['sport'] }),
+  );
+
+  const trainer = testEnv.authenticatedContext('trainer-a');
+  await assertSucceeds(
+    trainer
+      .firestore()
+      .collection('routines')
+      .doc('a-goals-content')
+      .update({ name: 'Renombrado' }),
+  );
+});
+
+test('el PF NO puede cambiar los goals de un plan asignado', async () => {
+  // Deliberado: un plan asignado es privado de un alumno y no aparece en la
+  // grilla de PLANTILLAS, así que nada lo rankea por objetivo. `updateAssigned`
+  // tampoco lo manda. El permiso de escritura vive sólo en el path de
+  // PLANTILLA, que es la superficie que el catálogo realmente lee.
+  await seed(
+    'a-goals-edit',
+    trainerAssigned('trainer-a', 'athlete-a', { goals: ['sport'] }),
+  );
+
+  const trainer = testEnv.authenticatedContext('trainer-a');
+  await assertFails(
+    trainer
+      .firestore()
+      .collection('routines')
+      .doc('a-goals-edit')
+      .update({ goals: ['health'] }),
   );
 });
