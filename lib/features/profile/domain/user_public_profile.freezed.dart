@@ -49,17 +49,37 @@ mixin _$UserPublicProfile {
 // becomes public retroactively. Off = athletes only see plans the
 // trainer assigned to them one-by-one.
   bool get sharedTemplatesWithAthletes =>
-      throw _privateConstructorUsedError; // Profile visibility to other users in the social feed. Default `true`
-// preserves current behavior: pre-existing docs decode as public and
-// stay discoverable. When flipped to `false`:
-//   - The identity header (name / avatar / gym) remains public.
-//   - Detailed stats (workouts, followers, following), rutinas públicas
-//     and actividad are gated to accepted followers + the owner.
-//   - New follow requests are created as `pending` (require approval).
-//     Existing `accepted` friendships are preserved (see Option X of
-//     the privacy scope discussion).
-// When `true`, incoming follow requests are auto-accepted at write time
-// (Instagram-style public account).
+      throw _privateConstructorUsedError; // Cómo se tratan las solicitudes de seguimiento. Default `true` preserva
+// el comportamiento previo: los docs que ya existían decodifican como
+// públicos y siguen siendo descubribles.
+//   - `true`  → las solicitudes entrantes se auto-aceptan en el write
+//               (cuenta pública estilo Instagram).
+//   - `false` → las solicitudes nuevas se crean como `pending` y las
+//               aprueba el dueño a mano. Las amistades `accepted` que ya
+//               existían NO se ven afectadas al flipear el flag (Opción X
+//               de la discusión de alcance de privacidad).
+//
+// ⚠️ ESTE FLAG NO ES UN CONTROL DE ACCESO (QA-SEC-011, #778).
+//
+// El comentario anterior decía que con `false` "las stats detalladas,
+// rutinas públicas y actividad quedan gateadas a seguidores aceptados".
+// **Era falso.** `firestore.rules:942` sirve este documento entero a
+// cualquier autenticado (`allow read: if request.auth != null`) y ninguna
+// regla de lectura consulta este flag: medido contra el emulador en
+// `docs/security.md` §4.9. Un tercero que no te sigue puede leer racha,
+// workoutsCount, contadores, volumen y PRs de una cuenta "privada".
+//
+// El único gate real que existe hoy es el de `posts` con
+// `privacy: 'friends'`, que sí vive en las reglas y no depende de este
+// flag. Lo que esconde `public_profile_screen.dart` es **presentación**,
+// no protección.
+//
+// Y no se puede arreglar apretando esta regla: las reglas de Firestore no
+// filtran por campo en las lecturas —son todo-o-nada por documento—, así
+// que servir el header de identidad y negar las métricas exige partir el
+// documento en dos colecciones. Eso es una feature, no un parche: si se
+// decide hacerla, va con épico propio y con una decisión sobre los
+// rankings por gym, que son opt-in explícito sobre estas mismas métricas.
   bool get isProfilePublic =>
       throw _privateConstructorUsedError; // Opt-in flag an athlete controls to expose their ranking metrics
 // (lifetimeVolumeKg, best<Lift>Kg, and the already-public `racha`) on
@@ -430,17 +450,37 @@ class _$UserPublicProfileImpl implements _UserPublicProfile {
   @override
   @JsonKey()
   final bool sharedTemplatesWithAthletes;
-// Profile visibility to other users in the social feed. Default `true`
-// preserves current behavior: pre-existing docs decode as public and
-// stay discoverable. When flipped to `false`:
-//   - The identity header (name / avatar / gym) remains public.
-//   - Detailed stats (workouts, followers, following), rutinas públicas
-//     and actividad are gated to accepted followers + the owner.
-//   - New follow requests are created as `pending` (require approval).
-//     Existing `accepted` friendships are preserved (see Option X of
-//     the privacy scope discussion).
-// When `true`, incoming follow requests are auto-accepted at write time
-// (Instagram-style public account).
+// Cómo se tratan las solicitudes de seguimiento. Default `true` preserva
+// el comportamiento previo: los docs que ya existían decodifican como
+// públicos y siguen siendo descubribles.
+//   - `true`  → las solicitudes entrantes se auto-aceptan en el write
+//               (cuenta pública estilo Instagram).
+//   - `false` → las solicitudes nuevas se crean como `pending` y las
+//               aprueba el dueño a mano. Las amistades `accepted` que ya
+//               existían NO se ven afectadas al flipear el flag (Opción X
+//               de la discusión de alcance de privacidad).
+//
+// ⚠️ ESTE FLAG NO ES UN CONTROL DE ACCESO (QA-SEC-011, #778).
+//
+// El comentario anterior decía que con `false` "las stats detalladas,
+// rutinas públicas y actividad quedan gateadas a seguidores aceptados".
+// **Era falso.** `firestore.rules:942` sirve este documento entero a
+// cualquier autenticado (`allow read: if request.auth != null`) y ninguna
+// regla de lectura consulta este flag: medido contra el emulador en
+// `docs/security.md` §4.9. Un tercero que no te sigue puede leer racha,
+// workoutsCount, contadores, volumen y PRs de una cuenta "privada".
+//
+// El único gate real que existe hoy es el de `posts` con
+// `privacy: 'friends'`, que sí vive en las reglas y no depende de este
+// flag. Lo que esconde `public_profile_screen.dart` es **presentación**,
+// no protección.
+//
+// Y no se puede arreglar apretando esta regla: las reglas de Firestore no
+// filtran por campo en las lecturas —son todo-o-nada por documento—, así
+// que servir el header de identidad y negar las métricas exige partir el
+// documento en dos colecciones. Eso es una feature, no un parche: si se
+// decide hacerla, va con épico propio y con una decisión sobre los
+// rankings por gym, que son opt-in explícito sobre estas mismas métricas.
   @override
   @JsonKey()
   final bool isProfilePublic;
@@ -624,17 +664,37 @@ abstract class _UserPublicProfile implements UserPublicProfile {
 // trainer assigned to them one-by-one.
   @override
   bool
-      get sharedTemplatesWithAthletes; // Profile visibility to other users in the social feed. Default `true`
-// preserves current behavior: pre-existing docs decode as public and
-// stay discoverable. When flipped to `false`:
-//   - The identity header (name / avatar / gym) remains public.
-//   - Detailed stats (workouts, followers, following), rutinas públicas
-//     and actividad are gated to accepted followers + the owner.
-//   - New follow requests are created as `pending` (require approval).
-//     Existing `accepted` friendships are preserved (see Option X of
-//     the privacy scope discussion).
-// When `true`, incoming follow requests are auto-accepted at write time
-// (Instagram-style public account).
+      get sharedTemplatesWithAthletes; // Cómo se tratan las solicitudes de seguimiento. Default `true` preserva
+// el comportamiento previo: los docs que ya existían decodifican como
+// públicos y siguen siendo descubribles.
+//   - `true`  → las solicitudes entrantes se auto-aceptan en el write
+//               (cuenta pública estilo Instagram).
+//   - `false` → las solicitudes nuevas se crean como `pending` y las
+//               aprueba el dueño a mano. Las amistades `accepted` que ya
+//               existían NO se ven afectadas al flipear el flag (Opción X
+//               de la discusión de alcance de privacidad).
+//
+// ⚠️ ESTE FLAG NO ES UN CONTROL DE ACCESO (QA-SEC-011, #778).
+//
+// El comentario anterior decía que con `false` "las stats detalladas,
+// rutinas públicas y actividad quedan gateadas a seguidores aceptados".
+// **Era falso.** `firestore.rules:942` sirve este documento entero a
+// cualquier autenticado (`allow read: if request.auth != null`) y ninguna
+// regla de lectura consulta este flag: medido contra el emulador en
+// `docs/security.md` §4.9. Un tercero que no te sigue puede leer racha,
+// workoutsCount, contadores, volumen y PRs de una cuenta "privada".
+//
+// El único gate real que existe hoy es el de `posts` con
+// `privacy: 'friends'`, que sí vive en las reglas y no depende de este
+// flag. Lo que esconde `public_profile_screen.dart` es **presentación**,
+// no protección.
+//
+// Y no se puede arreglar apretando esta regla: las reglas de Firestore no
+// filtran por campo en las lecturas —son todo-o-nada por documento—, así
+// que servir el header de identidad y negar las métricas exige partir el
+// documento en dos colecciones. Eso es una feature, no un parche: si se
+// decide hacerla, va con épico propio y con una decisión sobre los
+// rankings por gym, que son opt-in explícito sobre estas mismas métricas.
   @override
   bool
       get isProfilePublic; // Opt-in flag an athlete controls to expose their ranking metrics

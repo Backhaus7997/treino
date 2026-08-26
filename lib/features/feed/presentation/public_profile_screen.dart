@@ -81,6 +81,20 @@ class PublicProfileScreen extends ConsumerWidget {
           // contenido de una cuenta privada hay que SEGUIRLA. Que ella te siga
           // a vos no te da acceso a lo suyo (REQ-FOLLOW-010, mismo criterio que
           // el gate de posts en las rules).
+          // ⚠️ `gated` es PRESENTACIÓN, no un límite de seguridad
+          // (QA-SEC-011, #778). No hay contraparte en las reglas: el `read` de
+          // `userPublicProfiles` es `if request.auth != null`
+          // (`firestore.rules:942`) y ninguna regla de lectura consulta
+          // `isProfilePublic`. Un tercero que no sigue a esta persona puede
+          // leer igual racha, workoutsCount, contadores, volumen y PRs, y lo
+          // mismo vale para sus posts `public` y sus rutinas `public`. Está
+          // medido contra el emulador en `docs/security.md` §4.9.
+          //
+          // O sea: esconder acá evita mostrarlo en la app, no protege el dato.
+          // No agregues copy que le prometa al usuario que esto lo protege, ni
+          // asumas enforcement server-side al tocar este bloque. El único gate
+          // real es el de `posts` con `privacy: 'friends'`, que vive en las
+          // reglas y no depende de este flag.
           final isAcceptedFollower =
               view.outgoingFollow?.status == FollowStatus.accepted;
           final gated = !view.isSelf && !view.isPublic && !isAcceptedFollower;
@@ -201,8 +215,26 @@ class PublicProfileScreen extends ConsumerWidget {
   }
 }
 
-/// Notice shown when the target profile is private and the viewer is not
-/// an accepted follower. Renders a lock icon + short explanatory copy.
+/// Aviso que se muestra cuando el perfil es privado y el visitante no es un
+/// seguidor aceptado. Ícono de candado + copy corto.
+///
+/// ⚠️ El copy describe el modelo de aprobación, NO promete protección
+/// (QA-SEC-011, #778). Decía "Seguí a esta persona para ver su actividad y sus
+/// rutinas públicas", que le insinuaba al lector que ese contenido estaba
+/// resguardado. No lo está: las reglas sirven el perfil, sus posts `public` y
+/// sus rutinas `public` a cualquier autenticado (`docs/security.md` §4.9).
+///
+/// La segunda frase atribuye el ocultamiento a **la app**, no a un permiso, y
+/// eso es deliberado. La primera versión de este arreglo decía "Seguila para
+/// ver su actividad y sus rutinas", que seguía planteando el seguir como
+/// **requisito de acceso** — media mentira en vez de la mentira entera. Al
+/// lado de un candado y de un título "Perfil privado", eso se lee igual como
+/// barrera de seguridad. Si vas a reescribir este texto, la línea es: podés
+/// decir qué muestra o deja de mostrar la app, no qué puede o no puede leer
+/// el visitante.
+/// Si algún día se implementa el gate de verdad —que exige partir
+/// `userPublicProfiles` en dos documentos, porque las reglas de Firestore no
+/// filtran por campo— este copy se puede volver a endurecer.
 class _PrivateProfileNotice extends StatelessWidget {
   const _PrivateProfileNotice();
 
@@ -225,7 +257,7 @@ class _PrivateProfileNotice extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Seguí a esta persona para ver su actividad y sus rutinas públicas.', // i18n: Fase W2
+            'Esta persona aprueba a mano quién la sigue. Hasta que te acepte, la app no muestra su actividad acá.', // i18n: Fase W2
             textAlign: TextAlign.center,
             style: GoogleFonts.barlow(
               fontSize: 13,

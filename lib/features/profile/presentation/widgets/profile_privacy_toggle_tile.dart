@@ -9,15 +9,23 @@ import 'profile_section_tile.dart';
 
 /// PRIVACIDAD section tile — flips `UserPublicProfile.isProfilePublic`.
 ///
-/// UX model (Instagram-style):
-/// - Public (default): anyone can see your feed / stats / rutinas; new
-///   follow requests are auto-accepted.
-/// - Private: only the identity header stays visible to non-followers;
-///   detailed content is gated until you accept their request.
+/// Modelo de UX (estilo Instagram):
+/// - Público (default): las solicitudes de seguimiento se auto-aceptan.
+/// - Privado: las solicitudes nuevas quedan `pending` y las aprobás a mano.
 ///
-/// Existing `accepted` friendships are NOT affected by flipping this flag
-/// (Option X of the privacy scope discussion) — the change only shapes
-/// how NEW requests are handled from now on.
+/// Las amistades `accepted` que ya existían NO se ven afectadas al flipear el
+/// flag (Opción X de la discusión de alcance de privacidad) — el cambio sólo
+/// gobierna cómo se tratan las solicitudes NUEVAS de ahí en adelante.
+///
+/// ⚠️ El flag NO esconde contenido del lado servidor (QA-SEC-011, #778).
+/// La versión anterior de este comentario decía que en privado "sólo el header
+/// de identidad queda visible para no-seguidores; el contenido detallado queda
+/// gateado hasta que aceptes". Era falso: `firestore.rules:942` sirve
+/// `userPublicProfiles` entero a cualquier autenticado. Lo que esconde
+/// `public_profile_screen.dart` es presentación. El subtítulo que ve el usuario
+/// —"Los nuevos seguidores necesitan tu aprobación"— sí describe bien lo que
+/// hace el flag, y por eso no cambió. Ver `UserPublicProfile.isProfilePublic`
+/// y `docs/security.md` §4.9.
 class ProfilePrivacyToggleTile extends ConsumerStatefulWidget {
   const ProfilePrivacyToggleTile({super.key});
 
