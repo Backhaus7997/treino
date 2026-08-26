@@ -58,7 +58,15 @@ changed=0
 # filtrar los pins por `$ROOT` se perderia los otros 27.
 WT_LIST="$(mktemp)"
 trap 'rm -f "$WT_LIST"' EXIT
-git -C "$ROOT" worktree list --porcelain | awk '/^worktree /{print $2}' > "$WT_LIST"
+# Sacar el prefijo `worktree ` en vez de `awk '{print $2}'`: awk corta en el
+# primer espacio y un path con espacios quedaria truncado, el `.firebaserc` no
+# existiria, y el worktree se saltearia EN SILENCIO — o sea, reportando "todo
+# seguro" con uno todavia apuntando a produccion.
+while IFS= read -r line; do
+  case "$line" in
+    "worktree "*) printf '%s\n' "${line#worktree }" ;;
+  esac
+done < <(git -C "$ROOT" worktree list --porcelain) > "$WT_LIST"
 
 while IFS= read -r wt; do
   f="${wt}/.firebaserc"

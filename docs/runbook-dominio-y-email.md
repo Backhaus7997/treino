@@ -77,6 +77,11 @@ raíz.**
 firebase functions:secrets:set RESEND_API_KEY --project prod
 ```
 
+> `--project prod` no es opcional desde [#840](https://github.com/Backhaus7997/treino/issues/840):
+> el default de `.firebaserc` es `demo-treino` (proyecto offline del emulador), así
+> que el comando pelado **falla** en vez de tocar producción. Vale para todos los
+> comandos de este runbook.
+
 El remitente por defecto ya está en el código
 (`MAIL_FROM = "TREINO <hola@send.gettreino.com>"`,
 `functions/src/mail/send-queued-mail.ts`). Si querés otro, se sobrescribe con la
