@@ -47,6 +47,19 @@
  * - Nunca adivina una dirección: los docs malformados se enumeran nominalmente
  *   y se excluyen del `--apply`.
  *
+ * 🚨 `--apply` ESCRIBE EN PRODUCCIÓN — la colección `follows` ENTERA. La
+ * credencial que le pasás por `GOOGLE_APPLICATION_CREDENTIALS` apunta a
+ * `treino-dev`, que es el ÚNICO proyecto Firebase de TREINO: ahí viven los
+ * usuarios reales. El proyecto NO aparece en el comando —lo resuelve el Admin
+ * SDK desde la credencial— y el Admin SDK **saltea las Firestore rules**,
+ * incluido el freeze de `friendships` de M-03b. Que `--dry-run` sea el default
+ * no dice nada del destino: dice que hace falta un flag más para llegar a él.
+ * Ver AGENTS.md → Entornos y #826.
+ *
+ * La "regla de la ventana muda" de acá abajo **no es este aviso**: habla de un
+ * efecto colateral de escribir (los pushes que disparan las CFs), no de dónde
+ * caen las escrituras.
+ *
  * ## Regla de la ventana muda (design §7.2)
  *
  * Ningún `--apply` corre mientras `maintainFollowCounters` y `notifyOnFollow`
