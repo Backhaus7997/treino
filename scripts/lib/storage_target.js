@@ -36,18 +36,39 @@
  * antes de la primera escritura.** Un script que escribe mitad en local y mitad
  * en prod deja basura en los dos lados y ninguna de las dos mitades se puede
  * revertir mirando la otra.
+ *
+ * ─── Y EL DESTINO SON DOS COSAS, NO UNA ─────────────────────────────────────
+ *
+ * Producción se evalúa por proyecto Y por bucket, con un OR. El guard del #826
+ * mira sólo el project id, que para un backfill de Firestore ES el destino;
+ * para un script que sube archivos no lo es. `--project=treino-scratch
+ * --bucket=treino-dev.firebasestorage.app` es una corrida contra producción con
+ * un project id que no está en ninguna lista, y hasta que se agregó
+ * `esBucketDeProduccion` pasaba sin cartel. Ver ahí el detalle.
  */
 
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { esProduccion, bannerDeProduccion } = require('./firebase_projects');
+const {
+  PROYECTOS_DE_PRODUCCION,
+  esProduccion,
+  bannerDeProduccion,
+} = require('./firebase_projects');
 
 /** `.firebaserc` de la raíz del repo — `scripts/lib/..` dos veces. */
 const FIREBASERC = path.join(__dirname, '..', '..', '.firebaserc');
 
 /** El sufijo de bucket que usa Firebase desde 2024 (antes era `.appspot.com`). */
 const SUFIJO_BUCKET = '.firebasestorage.app';
+
+/**
+ * El sufijo VIEJO. No se usa para derivar nada —los buckets nuevos salen con el
+ * de arriba— pero sí para RECONOCER: un `--bucket=treino-dev.appspot.com`
+ * escrito de memoria por alguien que arrancó antes de 2024 apunta al mismo
+ * proyecto de producción, y un guard que no lo reconoce no grita.
+ */
+const SUFIJO_BUCKET_LEGACY = '.appspot.com';
 
 /** Lee `--nombre=valor` de un argv ya cortado (sin `node` ni el script). */
 function opcion(argv, nombre) {
@@ -112,6 +133,74 @@ function resolverProjectId({ argv = [], env = process.env, rutaFirebaserc = FIRE
 function bucketDeProyecto(projectId) {
   if (typeof projectId !== 'string' || !projectId.trim()) return null;
   return `${projectId.trim()}${SUFIJO_BUCKET}`;
+}
+
+/**
+ * El nombre de bucket, sin el ruido que el Admin SDK igual tolera: `gs://`,
+ * barra final, mayúsculas, espacios. Devuelve `''` si no hay nada que mirar.
+ */
+function normalizarBucket(bucket) {
+  if (typeof bucket !== 'string') return '';
+  return bucket.trim().toLowerCase().replace(/^gs:\/\//, '').replace(/\/+$/, '');
+}
+
+/**
+ * ¿Este BUCKET es producción?
+ *
+ * Existe porque `esProduccion` mira el PROJECT ID, y para un script que sube
+ * archivos el project id no es el destino: el destino es el bucket. Los dos se
+ * pueden separar, y separarlos no requiere mala fe ni un caso rebuscado —
+ * alcanza con un `--project` de prueba y un `--bucket` copiado del README:
+ *
+ *   node upload_drive_exercise_videos.js --project=treino-scratch \
+ *        --bucket=treino-dev.firebasestorage.app
+ *
+ * Antes de este chequeo esa corrida imprimía `destino: prod (…)` en una línea
+ * suelta y NO gritaba el cartel, porque `treino-scratch` no está en la lista.
+ * Los `.mp4` terminaban igual en el bucket real — y Storage es justo lo que el
+ * backup diario de Firestore NO cubre.
+ *
+ * Se reconoce por los tres nombres con los que se puede escribir el mismo
+ * bucket de un proyecto de la lista: el sufijo nuevo, el legacy, y el id pelado
+ * (que el SDK acepta y resuelve al default). La lista sigue siendo la del #826,
+ * explícita — acá no se hereda ninguna heurística sobre el nombre.
+ */
+function esBucketDeProduccion(bucket) {
+  const b = normalizarBucket(bucket);
+  if (!b) return false;
+  return PROYECTOS_DE_PRODUCCION.some(
+    (p) => b === p || b === `${p}${SUFIJO_BUCKET}` || b === `${p}${SUFIJO_BUCKET_LEGACY}`,
+  );
+}
+
+/**
+ * El cartel para el caso "el proyecto no es producción pero el bucket sí".
+ *
+ * Es un cartel APARTE y no una rama del `bannerDeProduccion` del #826 a
+ * propósito, por dos motivos. Uno: ése vive en `firebase_projects.js`, que es
+ * copia literal del PR #835 y se borra al mergearlo — meterle una rama sería
+ * plantar el conflicto que todo este archivo viene esquivando. Dos: diría una
+ * cosa falsa. Su primera línea es `"<projectId>" IS PRODUCTION`, y acá el
+ * projectId justamente NO lo es; lo que es producción es el bucket. Un cartel
+ * que nombra mal lo que está en riesgo es el bug del #838 otra vez.
+ */
+function bannerDeBucketDeProduccion(bucket, projectId) {
+  return [
+    '',
+    '🚨 ─────────────────────────────────────────────────────────────────────',
+    `🚨  Bucket "${bucket}" IS PRODUCTION STORAGE.`,
+    `🚨  The project ("${projectId}") is not, so the #826 project banner does`,
+    '🚨  NOT fire — but the files land in the real bucket all the same.',
+    '🚨',
+    '🚨  The daily Firestore backup does NOT cover Cloud Storage: what this',
+    '🚨  script writes there is gone for good.',
+    '🚨',
+    '🚨  Emulator instead:  FIRESTORE_EMULATOR_HOST=localhost:8080',
+    '🚨                     FIREBASE_STORAGE_EMULATOR_HOST=localhost:9199',
+    '🚨  Context: issue #838 / AGENTS.md → Entornos',
+    '🚨 ─────────────────────────────────────────────────────────────────────',
+    '',
+  ].join('\n');
 }
 
 /**
@@ -182,6 +271,13 @@ function planDeStorage({ argv = [], env = process.env, rutaFirebaserc = FIREBASE
       'ningún cliente puede abrir.';
   }
 
+  // Contra el emulador ninguno de los dos nombres es un destino real: el SDK
+  // enruta por la env var y tanto el project id como el bucket son namespaces
+  // locales. Gritar ahí enseña a ignorar el cartel (misma razón que el
+  // `contraEmulador` de `bannerDeProduccion`).
+  const proyectoEsProduccion = !contraEmulador && esProduccion(projectId);
+  const bucketEsProduccion = !contraEmulador && esBucketDeProduccion(bucket);
+
   return {
     projectId,
     origenProyecto,
@@ -192,8 +288,17 @@ function planDeStorage({ argv = [], env = process.env, rutaFirebaserc = FIREBASE
     contraEmulador,
     coherente,
     motivo,
-    esProduccion: !contraEmulador && esProduccion(projectId),
-    banner: bannerDeProduccion(projectId, { contraEmulador }),
+    proyectoEsProduccion,
+    bucketEsProduccion,
+    // El destino es producción si CUALQUIERA de los dos lo es. Que el proyecto
+    // sea de prueba no vuelve descartable al bucket que recibe los archivos.
+    esProduccion: proyectoEsProduccion || bucketEsProduccion,
+    // Uno solo: si el proyecto ya es producción, el cartel del #826 cuenta la
+    // historia entera y el del bucket sería una segunda pared de emojis que se
+    // aprende a saltear. El del bucket es para el hueco que el otro no ve.
+    banner:
+      bannerDeProduccion(projectId, { contraEmulador }) ||
+      (bucketEsProduccion ? bannerDeBucketDeProduccion(bucket, projectId) : null),
     etiquetaDestino: !coherente
       ? null
       : contraEmulador
@@ -307,8 +412,11 @@ function exigirDestinoCoherente({
 
 module.exports = {
   SUFIJO_BUCKET,
+  SUFIJO_BUCKET_LEGACY,
+  bannerDeBucketDeProduccion,
   bucketDeProyecto,
   emuladoresActivos,
+  esBucketDeProduccion,
   exigirDestinoCoherente,
   planDeStorage,
   resolverBucket,

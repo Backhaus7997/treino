@@ -23,6 +23,7 @@ const path = require('node:path');
 const {
   bucketDeProyecto,
   emuladoresActivos,
+  esBucketDeProduccion,
   exigirDestinoCoherente,
   planDeStorage,
   resolverBucket,
@@ -163,6 +164,89 @@ test('contra un proyecto que no es producción no hay cartel', () => {
   });
   assert.strictEqual(p.banner, null);
   assert.strictEqual(p.etiquetaDestino, 'prod (treino-otro-dev.firebasestorage.app)');
+});
+
+// ── el bucket también decide si esto es producción ────────────────────────
+//
+// El agujero que estos tests cierran: `esProduccion` de `firebase_projects.js`
+// mira el PROJECT ID, y para un script que sube archivos el project id no es
+// el destino. Antes de `esBucketDeProduccion`, la corrida de abajo pasaba sin
+// cartel y los archivos aterrizaban igual en el bucket real.
+
+test('esBucketDeProduccion reconoce los tres nombres del mismo bucket', () => {
+  // El sufijo nuevo, el viejo, y el id pelado —que el SDK acepta y resuelve al
+  // bucket default—. Reconocer sólo uno deja los otros dos como escape hatch.
+  assert.strictEqual(esBucketDeProduccion('treino-dev.firebasestorage.app'), true);
+  assert.strictEqual(esBucketDeProduccion('treino-dev.appspot.com'), true);
+  assert.strictEqual(esBucketDeProduccion('treino-dev'), true);
+
+  // Y tolera el ruido que el SDK igual acepta.
+  assert.strictEqual(esBucketDeProduccion('  GS://Treino-Dev.firebasestorage.app/  '), true);
+
+  // Sin falsos positivos: el prefijo compartido no alcanza.
+  assert.strictEqual(esBucketDeProduccion('treino-dev-scratch.firebasestorage.app'), false);
+  assert.strictEqual(esBucketDeProduccion('bucket-de-prueba'), false);
+  assert.strictEqual(esBucketDeProduccion(''), false);
+  assert.strictEqual(esBucketDeProduccion(null), false);
+});
+
+test('proyecto de prueba + bucket de producción: ES producción y grita', () => {
+  // La invocación exacta que reportó el revisor.
+  const p = planDeStorage({
+    argv: ['--project=treino-scratch', '--bucket=treino-dev.firebasestorage.app'],
+    env: ENV_LIMPIO,
+    rutaFirebaserc: FIREBASERC_REAL,
+  });
+
+  assert.strictEqual(p.proyectoEsProduccion, false, 'treino-scratch no está en la lista');
+  assert.strictEqual(p.bucketEsProduccion, true);
+  assert.strictEqual(p.esProduccion, true, 'el destino de las subidas ES producción');
+
+  assert.ok(p.banner, 'tenía que salir un cartel');
+  assert.match(p.banner, /IS PRODUCTION STORAGE/);
+  assert.match(p.banner, /treino-dev\.firebasestorage\.app/);
+  // Y NO puede decir que treino-scratch es producción: nombrar mal lo que está
+  // en riesgo es el bug del #838 con otra cara.
+  assert.doesNotMatch(p.banner, /"treino-scratch" IS PRODUCTION\b/);
+  assert.match(p.banner, /does NOT cover Cloud Storage/);
+});
+
+test('cuando el proyecto ya es producción sale UN cartel, el del #826', () => {
+  // Dos paredes de emojis seguidas se saltean las dos.
+  const p = planDeStorage({
+    argv: ['--project=treino-dev', '--bucket=treino-dev.firebasestorage.app'],
+    env: ENV_LIMPIO,
+    rutaFirebaserc: FIREBASERC_REAL,
+  });
+  assert.strictEqual(p.proyectoEsProduccion, true);
+  assert.strictEqual(p.bucketEsProduccion, true);
+  assert.match(p.banner, /IS PRODUCTION\./, 'esperaba el cartel de proyecto (#826)');
+  assert.doesNotMatch(p.banner, /IS PRODUCTION STORAGE/, 'el del bucket sobra acá');
+});
+
+test('contra el emulador el bucket de prod no grita — es un namespace local', () => {
+  const p = planDeStorage({
+    argv: ['--project=treino-scratch', '--bucket=treino-dev.firebasestorage.app'],
+    env: {
+      FIRESTORE_EMULATOR_HOST: 'localhost:8080',
+      FIREBASE_STORAGE_EMULATOR_HOST: 'localhost:9199',
+    },
+    rutaFirebaserc: FIREBASERC_REAL,
+  });
+  assert.strictEqual(p.contraEmulador, true);
+  assert.strictEqual(p.bucketEsProduccion, false, 'el SDK enruta por la env var, no por el nombre');
+  assert.strictEqual(p.esProduccion, false);
+  assert.strictEqual(p.banner, null);
+});
+
+test('el guard imprime el cartel del bucket antes de devolver el plan', () => {
+  const r = correrGuard(ENV_LIMPIO, [
+    '--project=treino-scratch',
+    '--bucket=treino-dev.firebasestorage.app',
+  ]);
+  assert.deepStrictEqual(r.codigos, [], 'el destino es coherente: no aborta, advierte');
+  assert.match(r.stderr, /IS PRODUCTION STORAGE/);
+  assert.match(r.stderr, /este script escribe en Storage/, 'la coletilla del #838 también');
 });
 
 // ── exigirDestinoCoherente: que efectivamente corte ───────────────────────
