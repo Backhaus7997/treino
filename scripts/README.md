@@ -290,3 +290,44 @@ A run without `FIRESTORE_EMULATOR_HOST` **is** the prod run — there is no
 separate dev project to verify against first (#826). Verify on the emulator,
 then `--dry-run` against `treino-dev`, then the real run with maintainer
 sign-off — silent, no user notice (per the locked gyms-foundation decision).
+
+## Scripts que escriben en Firebase Storage (#838)
+
+Cuatro scripts suben archivos al bucket y después escriben la URL resultante en
+Firestore:
+
+| Script | Qué sube | Qué escribe en Firestore |
+| --- | --- | --- |
+| `extract_exercise_thumbnails.js --upload` | `exercises/thumbs/{id}.jpg` | `exercises/{id}.thumbnailUrl` |
+| `apply_catalog_video_fill.js --apply` | `exerciseVideos/{id}.mp4` | `exercises/{id}.videoUrl` (+ `equipment` con `--fill-empty`) |
+| `upload_enriched_videos.js` | `exerciseVideos/{id}.mp4` | nada (patchea el JSON del catálogo) |
+| `upload_drive_exercise_videos.js` | `exerciseVideos/{id}.mp4` | `exercises/{id}.videoUrl` |
+
+Los cuatro pasan por `lib/storage_target.js` antes de la primera escritura.
+
+**El bucket ya no está hardcodeado.** Se resuelve en este orden:
+`--bucket=<bucket>` → `FIREBASE_STORAGE_BUCKET` → derivado del proyecto activo
+(`--project=` → `GOOGLE_CLOUD_PROJECT` → `project_id` del
+`GOOGLE_APPLICATION_CREDENTIALS` → `.firebaserc`).
+
+**Firestore y Storage tienen que apuntar al mismo lado, o el script aborta.**
+Antes, `extract_exercise_thumbnails.js` miraba sólo `FIRESTORE_EMULATOR_HOST`,
+imprimía `destino: EMULADOR` y subía los `.jpg` a producción igual, porque
+`initializeApp` traía el bucket real fijo (#838). Hoy esa combinación no corre.
+
+Para correr entero contra el emulador hay que levantarlo **con Storage** —
+`scripts/emulator.sh` arranca `--only firestore,auth,functions`, así que el
+emulador de Storage (puerto 9199, declarado en `firebase.json`) no está:
+
+```bash
+firebase emulators:start --only firestore,auth,storage
+export FIRESTORE_EMULATOR_HOST=localhost:8080
+export FIREBASE_STORAGE_EMULATOR_HOST=localhost:9199
+```
+
+Sin ninguna de las dos variables, el destino es **producción** (`treino-dev`, ver
+#826) y sale el cartel antes de escribir.
+
+Los tests del cableado —que cada script llame al guard, y que lo llame antes de
+tocar Storage— están en `test/storage_scripts_destination.test.js`. Corren con
+`firebase-admin` stubbeado, cero red: `npm --prefix scripts test`.
