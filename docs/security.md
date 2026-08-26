@@ -2080,7 +2080,60 @@ Ordenados por lo que me preocuparía primero.
 | **QA-SEC-012** | `visibility: 'shared'` concede lectura y enumeración mundial a una feature que el dominio declara reservada | `:259` | Media | [#779](https://github.com/Backhaus7997/treino/issues/779) |
 | ~~**QA-SEC-013**~~ | El gate de rol de Slice C no llegó a las 3 colecciones que publican al PF | `:1175`, `:2078`, `:2125` | Media | **CERRADO** ([#780](https://github.com/Backhaus7997/treino/issues/780)) |
 | **QA-SEC-014** | `appointments` create sin allowlist de campos ni cap de tamaño: un desconocido escribe en la agenda de cualquier PF | `:1858` | Media | [#781](https://github.com/Backhaus7997/treino/issues/781) |
-| ~~**QA-SEC-015**~~ | `temp/uploads` es el único write de Storage sin allowlist de content-type ni cap de tamaño | `storage.rules:88` | Baja | **CERRADO** en #804 ([#782](https://github.com/Backhaus7997/treino/issues/782)) |
+| ~~**Resuelto en #781.** `keys().hasOnly()` + cotas de texto + rango de `startsAt`
+en el `create`, y la misma cota de forma en los **tres** caminos del `update` —
+sin eso el cap del create se esquiva creando un turno chico y engordándolo un
+segundo después.
+
+**⚠️ `startsAt` es wall-clock UTC, no un instante real** (ADR-7 / QA-COA-003).
+En ART (UTC−3) el valor guardado queda 3 h ANTES del instante real, así que el
+`startsAt > request.time` que pide el texto de arriba —"no en el pasado"—
+**habría denegado toda reserva dentro de las próximas 3 horas**. El rango que
+quedó lleva un día de tolerancia hacia atrás: absorbe cualquier offset de zona
+(±14 h) sin dejar de matar el vector, que es el turno forjado en 1970 o en el
+año 3000.
+
+El `update` usa una variante **sin** el rango, y no es descuido: el Path 3 es el
+PF cargando `noteAfter` DESPUÉS de la sesión, o sea con `startsAt` ya en el
+pasado. Reusar la misma función habría roto todas las notas post-sesión.
+
+**Verificación de mutación — y lo que encontró sobre mis propios tests.**
+Baseline 14/14. Tres mutaciones:
+
+| Mutación | Rojos |
+|---|---|
+| Desactivar la forma del `create` | **8** |
+| `startsAt` → `> request.time` (el rango ingenuo) | **1** — el caso wall-clock |
+| Desactivar la cota del `update` | **2** |
+
+Pero la primera pasada dio **0 rojos** en las dos últimas, y eso es el hallazgo
+que vale guardar: **tres de los tests eran decoración**, escritos por alguien
+—yo— que tenía el vector en la cabeza.
+
+1. El test del wall-clock escribía `Date.now() + 1h`, un instante real futuro,
+   que pasa igual con `> request.time`. No modelaba el corrimiento que decía
+   custodiar. Ahora usa `now + 2h − 3h`: el valor que la app **realmente**
+   persiste para una sesión a 2 h vista en ART.
+2. Los dos negativos del `update` eran un `noteBefore` suelto desde el atleta,
+   que no matchea NINGUNO de los tres caminos válidos. Los denegaba la
+   estructura de paths; la cota de forma nunca se evaluaba. Ahora viajan sobre
+   el Path 1 (cancelación con >24 h), o sea un update que **sin** la cota sería
+   válido.
+
+**La regla general, que es la tercera variante del mismo problema en este
+épico:** un `assertFails` sobre una operación que **ya está denegada por otro
+motivo** no custodia nada. Verde no es lo mismo que cubierto, y lo único que los
+distingue es la mutación. Las otras dos variantes están en QA-SEC-013.
+
+**Lo que NO arregla este change**, y conviene tenerlo escrito: un turno legítimo
+creado a menos de 24 h tampoco se puede cancelar (el Path 1 exige >24 h) ni
+borrar (`allow delete: if false`). Eso es un hueco de **producto** preexistente
+—el cliente permite reservar más cerca que eso— y apretarlo en las reglas
+rompería reservas válidas. Queda como candidato a ticket propio.
+
+---
+
+**QA-SEC-015**~~ | `temp/uploads` es el único write de Storage sin allowlist de content-type ni cap de tamaño | `storage.rules:88` | Baja | **CERRADO** en #804 ([#782](https://github.com/Backhaus7997/treino/issues/782)) |
 | **QA-SEC-016** | El scanner de App Check cubre 2 de los 5 callables desplegados | `appcheck-enforcement.test.ts:18` | Baja | ~~[#783](https://github.com/Backhaus7997/treino/issues/783)~~ cerrado |
 
 ---
