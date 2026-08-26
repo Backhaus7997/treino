@@ -1179,9 +1179,26 @@ service cloud.firestore {
       // Only the owner can create their own doc; uid in body must match doc id.
       // (SCENARIO-418). averageRating/reviewCount must be absent or null —
       // a create cannot seed a forged starting value (AD-3).
+      // QA-SEC-013 (#780): además del ownership, exige rol `trainer`. Slice C
+      // (AD-1 opción b) había puesto este mismo disyunto en cinco colecciones
+      // y las tres que publican al PF quedaron afuera. Medido contra el
+      // emulador: una cuenta `role: 'athlete'` creaba su propio
+      // `trainerPublicProfiles/{self}` y **aparecía en el descubrimiento** —
+      // la sonda corrió la misma query que
+      // `TrainerPublicProfileRepository.listAll()`
+      // (`orderBy('displayNameLowercase').limit(50)`) y el doc forjado volvía
+      // PRIMERO, porque el atacante elige el string por el que se ordena.
+      // Ver `docs/security.md` §4.9.
+      //
+      // Es un gate de INTEGRIDAD, no de confidencialidad: no filtra datos de
+      // terceros, evita que se ensucie el directorio comercial, que es la
+      // superficie de venta del producto. Los campos del perfil siguen siendo
+      // self-attested a propósito (AD-3) — esto decide **quién puede existir**
+      // en el directorio, no qué dice su bio.
       allow create: if request.auth != null
                     && request.auth.uid == uid
                     && request.resource.data.uid == uid
+                    && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
                     && request.resource.data.get('averageRating', null) == null
                     && request.resource.data.get('reviewCount', null) == null
                     && request.resource.data.get('athleteCount', null) == null;
@@ -1189,9 +1206,21 @@ service cloud.firestore {
       // Only the owner can update; uid in body must not change (SCENARIO-418).
       // averageRating/reviewCount must be absent or unchanged from the
       // stored value (AD-3) — closes the raw set(merge)/update forgery path.
+      // El gate de rol va también en `update`, y no es simetría cosmética: sin
+      // él, un doc forjado ANTES de que existiera este gate seguiría siendo
+      // editable por su dueño athlete para siempre. Cerrar sólo `create` deja
+      // vivo lo que ya se coló.
+      //
+      // ⚠️ DESPLIEGUE: esto congela la edición de cualquier
+      // `trainerPublicProfiles` cuyo dueño NO tenga `users/{uid}.role ==
+      // 'trainer'`. Para los forjados es exactamente lo que se busca; para un
+      // PF legítimo cuyo doc privado tuviera el rol mal sería una regresión.
+      // Antes de mergear se corre `scripts/audit_trainer_profiles.mjs`, que
+      // cruza las dos colecciones y lista los huérfanos.
       allow update: if request.auth != null
                     && request.auth.uid == uid
                     && request.resource.data.uid == resource.data.uid
+                    && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
                     && request.resource.data.get('averageRating', null) == resource.data.get('averageRating', null)
                     && request.resource.data.get('reviewCount', null) == resource.data.get('reviewCount', null)
                     && request.resource.data.get('athleteCount', null) == resource.data.get('athleteCount', null);
@@ -2021,22 +2050,113 @@ service cloud.firestore {
     // (needed to compute free slots client-side). Create/update/delete
     // restricted to the owning trainer.
     // SCENARIOs 525-527 tested via emulator (emulator-deferred per Decision #25).
+    // QA-SEC-013 (#780) — dos huecos en el mismo bloque:
+    //
+    // 1. Sin gate de rol. Medido: una cuenta `role: 'athlete'` creaba su
+    //    propia regla de agenda. Se agrega el mismo disyunto de Slice C.
+    // 2. Sin `keys().hasOnly()` ni cap de tamaño. Combinado con el `read`
+    //    amplio de arriba —que está bien y NO se discute acá— cualquier
+    //    autenticado publicaba documentos arbitrarios de hasta 1 MB que
+    //    **toda la plataforma puede listar**. El comentario decía
+    //    "restricted to the owning trainer": dueño sí, pero de un documento
+    //    que se acuñaba solo.
+    //
+    // La forma sale de `availability_rule.g.dart`, que es la fuente de verdad
+    // de lo que emite `toJson()`. `id` VIAJA en el body: el repositorio hace
+    // `set(rule.toJson())` y el campo no está anotado para excluirse.
+    //
+    // ⚠️ `dayOfWeek` es 1..7, NO 0..6. Sale de `DateTime.monday` (=1) en
+    // `availability_editor_screen.dart` y del mapa
+    // `AgendaFormatters.dayOfWeekLabels` (1: Lunes … 7: Domingo). Escribir
+    // 0..6 acá habría denegado en silencio todas las reglas de **domingo**.
+    // Las horas son `TimeOfDay`, así que 0..23 / 0..59.
+    //
+    // El cruce start < end NO se valida acá a propósito: es regla de negocio
+    // que el editor ya aplica, y duplicarla dejaría dos definiciones que se
+    // desincronizan. Acá se acota la FORMA, que es lo que cierra el vector de
+    // basura arbitraria.
     match /coach_availability_rules/{ruleId} {
+      function ruleShapeOk(d) {
+        return d.keys().hasOnly(['id', 'trainerId', 'dayOfWeek', 'startHour',
+                                 'startMinute', 'endHour', 'endMinute',
+                                 'slotDurationMin'])
+               && d.keys().hasAll(['id', 'trainerId', 'dayOfWeek', 'startHour',
+                                   'startMinute', 'endHour', 'endMinute',
+                                   'slotDurationMin'])
+               && d.id is string && d.id.size() <= 128
+               && d.dayOfWeek is int && d.dayOfWeek >= 1 && d.dayOfWeek <= 7
+               && d.startHour is int && d.startHour >= 0 && d.startHour <= 23
+               && d.startMinute is int && d.startMinute >= 0 && d.startMinute <= 59
+               && d.endHour is int && d.endHour >= 0 && d.endHour <= 23
+               && d.endMinute is int && d.endMinute >= 0 && d.endMinute <= 59
+               && (d.slotDurationMin == 30 || d.slotDurationMin == 60
+                   || d.slotDurationMin == 90 || d.slotDurationMin == 120);
+      }
+
       allow read: if request.auth != null;
       allow create: if request.auth != null
-                    && request.resource.data.trainerId == request.auth.uid;
-      allow update, delete: if request.auth != null
-                            && resource.data.trainerId == request.auth.uid;
+                    && request.resource.data.trainerId == request.auth.uid
+                    && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
+                    && ruleShapeOk(request.resource.data);
+      // El `update` valida forma pero NO pide rol: el alcance de #780 pone el
+      // gate de rol de update sólo en `trainerPublicProfiles`. Acá el dueño de
+      // un doc forjado antes del gate queda igual acotado a la forma válida, y
+      // no puede crear ninguno nuevo.
+      allow update: if request.auth != null
+                    && resource.data.trainerId == request.auth.uid
+                    && request.resource.data.trainerId == request.auth.uid
+                    && ruleShapeOk(request.resource.data);
+      allow delete: if request.auth != null
+                    && resource.data.trainerId == request.auth.uid;
     }
 
     // Coach Agenda — availability overrides (Fase 5 Etapa 6, REQ-028).
     // Same ownership model as rules.
+    // Mismo par de huecos y mismo arreglo que `coach_availability_rules`
+    // (QA-SEC-013, #780).
+    //
+    // ⚠️ Acá la forma NO es una sola: `AvailabilityOverride` es una unión
+    // sellada discriminada por `type` (ADR-6), y las dos variantes tienen
+    // juegos de claves distintos —`block` lleva 4, `extra` lleva 9—. El
+    // `hasOnly()` de arriba lista las 9 y acepta las dos, porque hasOnly es un
+    // techo y no un piso; lo que las distingue es el `hasAll()` por variante.
+    // Si se escribiera un solo `hasAll` con los 9 campos se denegarían **todos
+    // los días bloqueados**, que son la mitad de la feature.
     match /coach_availability_overrides/{overrideId} {
+      function overrideShapeOk(d) {
+        return d.keys().hasOnly(['id', 'trainerId', 'date', 'type', 'startHour',
+                                 'startMinute', 'endHour', 'endMinute',
+                                 'slotDurationMin'])
+               && d.keys().hasAll(['id', 'trainerId', 'date', 'type'])
+               && d.id is string && d.id.size() <= 128
+               && d.date is timestamp
+               && (
+                    (d.type == 'block'
+                     && d.keys().hasOnly(['id', 'trainerId', 'date', 'type']))
+                    ||
+                    (d.type == 'extra'
+                     && d.keys().hasAll(['startHour', 'startMinute', 'endHour',
+                                         'endMinute', 'slotDurationMin'])
+                     && d.startHour is int && d.startHour >= 0 && d.startHour <= 23
+                     && d.startMinute is int && d.startMinute >= 0 && d.startMinute <= 59
+                     && d.endHour is int && d.endHour >= 0 && d.endHour <= 23
+                     && d.endMinute is int && d.endMinute >= 0 && d.endMinute <= 59
+                     && (d.slotDurationMin == 30 || d.slotDurationMin == 60
+                         || d.slotDurationMin == 90 || d.slotDurationMin == 120))
+                  );
+      }
+
       allow read: if request.auth != null;
       allow create: if request.auth != null
-                    && request.resource.data.trainerId == request.auth.uid;
-      allow update, delete: if request.auth != null
-                            && resource.data.trainerId == request.auth.uid;
+                    && request.resource.data.trainerId == request.auth.uid
+                    && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
+                    && overrideShapeOk(request.resource.data);
+      allow update: if request.auth != null
+                    && resource.data.trainerId == request.auth.uid
+                    && request.resource.data.trainerId == request.auth.uid
+                    && overrideShapeOk(request.resource.data);
+      allow delete: if request.auth != null
+                    && resource.data.trainerId == request.auth.uid;
     }
 
     // Coach Agenda — appointments (Fase 5 Etapa 6, REQ-029, ADR-1, ADR-5).
