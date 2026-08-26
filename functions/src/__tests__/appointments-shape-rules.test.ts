@@ -42,6 +42,9 @@ const RULES_PATH = path.resolve(__dirname, "../../../firestore.rules");
 
 const ATHLETE = "athlete-uid";
 const TRAINER = "trainer-uid";
+// PF que reserva por el camino `createByTrainer` — necesita rol para el
+// disyunto del trainer, así que se seedea su `users/{uid}` en beforeEach.
+const TRAINER_BOOKER = "trainer-booker-uid";
 const COL = "appointments";
 
 let testEnv: RulesTestEnvironment;
@@ -60,6 +63,15 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await testEnv.cleanup();
+});
+
+beforeEach(async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), "users", TRAINER_BOOKER), {
+      uid: TRAINER_BOOKER,
+      role: "trainer",
+    });
+  });
 });
 
 afterEach(async () => {
@@ -164,11 +176,54 @@ describe("appointments create — forma y cotas (QA-SEC-014)", () => {
     );
   });
 
+  it("acepta el horizonte REAL del PF: 365 días + 12 semanas de recurrencia", async () => {
+    // ⚠️ El caso que el primer intento rompía. Yo había puesto el tope en 60
+    // días generalizando el guard de 28 de `AppointmentRepository.book…`, que
+    // aplica SÓLO al auto-booking del atleta. `createByTrainer` no tiene
+    // guard, y las dos UIs de sesión del PF ofrecen
+    // `lastDate: today.add(Duration(days: 365))`; con la recurrencia
+    // (`_kWeekOptions = [2, 4, 8, 12]`) el último turno del lote cae a ~449
+    // días. Y como el lote es un batch atómico, el tope de 60 habría
+    // rechazado **la serie entera**, no sólo las fechas lejanas.
+    //
+    // Lo marcó el bot de review. Este caso se pone rojo si alguien vuelve a
+    // apretar el borde superior sin mirar el camino del PF.
+    await assertSucceeds(
+      setDoc(
+        doc(dbAs(TRAINER_BOOKER), COL, "appt-lejos"),
+        appointment({
+          id: "appt-lejos",
+          athleteId: "otro-atleta",
+          trainerId: TRAINER_BOOKER,
+          startsAt: inDays(365 + 12 * 7),
+        })
+      )
+    );
+  });
+
   it("DENIEGA un turno absurdamente lejano en el futuro", async () => {
     await assertFails(
       setDoc(
         doc(dbAs(ATHLETE), COL, "appt-6"),
-        appointment({ id: "appt-6", startsAt: inDays(400) })
+        appointment({ id: "appt-6", startsAt: inDays(600) })
+      )
+    );
+  });
+
+  it("DENIEGA sembrar cancellationLog en el create", async () => {
+    // Un turno nuevo no tiene cancelaciones: el modelo lo crea con
+    // `@Default([])`. Exigirlo vacío cierra el inflado por esta vía, que es
+    // más fuerte que acotar el largo — las reglas no pueden mirar el tamaño
+    // de cada elemento de una lista.
+    await assertFails(
+      setDoc(
+        doc(dbAs(ATHLETE), COL, "appt-log"),
+        appointment({
+          id: "appt-log",
+          cancellationLog: [
+            { byUid: ATHLETE, atMs: 1, reason: "x".repeat(30000) },
+          ],
+        })
       )
     );
   });
