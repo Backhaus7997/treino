@@ -329,3 +329,79 @@ describe("coach_availability_overrides — unión sellada (QA-SEC-013)", () => {
     );
   });
 });
+
+// El `update` de las dos colecciones de agenda también cambió —ahora valida
+// forma— así que necesita sus propias celdas. Sin estos casos, la fila de
+// §1.1 diría ✅ en `update` apoyándose en tests que sólo ejercitan `create`,
+// que es exactamente la celda mentida que §1.8 prohíbe.
+describe("coach_availability_* — update valida forma (QA-SEC-013)", () => {
+  const date = Timestamp.fromDate(new Date("2026-09-01T00:00:00Z"));
+
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(
+        doc(db, "coach_availability_rules", "u1"),
+        availabilityRule("u1", TRAINER)
+      );
+      await setDoc(doc(db, "coach_availability_overrides", "u2"), {
+        id: "u2",
+        trainerId: TRAINER,
+        date,
+        type: "block",
+      });
+    });
+  });
+
+  it("permite al trainer editar su propia regla con forma válida", async () => {
+    await assertSucceeds(
+      setDoc(
+        doc(dbAs(TRAINER), "coach_availability_rules", "u1"),
+        availabilityRule("u1", TRAINER, { startHour: 10 })
+      )
+    );
+  });
+
+  it("DENIEGA meter basura por el update de una regla", async () => {
+    // El `create` acotado no sirve de nada si el `update` deja colar lo mismo
+    // un segundo después.
+    await assertFails(
+      setDoc(
+        doc(dbAs(TRAINER), "coach_availability_rules", "u1"),
+        availabilityRule("u1", TRAINER, { basura: "x".repeat(50000) })
+      )
+    );
+  });
+
+  it("permite al trainer editar su propio override", async () => {
+    await assertSucceeds(
+      setDoc(doc(dbAs(TRAINER), "coach_availability_overrides", "u2"), {
+        id: "u2",
+        trainerId: TRAINER,
+        date: Timestamp.fromDate(new Date("2026-09-02T00:00:00Z")),
+        type: "block",
+      })
+    );
+  });
+
+  it("DENIEGA meter basura por el update de un override", async () => {
+    await assertFails(
+      setDoc(doc(dbAs(TRAINER), "coach_availability_overrides", "u2"), {
+        id: "u2",
+        trainerId: TRAINER,
+        date,
+        type: "block",
+        basura: "x".repeat(50000),
+      })
+    );
+  });
+
+  it("DENIEGA que un tercero edite la agenda ajena", async () => {
+    await assertFails(
+      setDoc(
+        doc(dbAs(ATHLETE), "coach_availability_rules", "u1"),
+        availabilityRule("u1", ATHLETE)
+      )
+    );
+  });
+});
