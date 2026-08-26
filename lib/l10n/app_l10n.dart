@@ -6957,6 +6957,24 @@ abstract class AppL10n {
   /// **'VOLVER'**
   String get templatesOnboardingBack;
 
+  /// Acción de la barra de PLANTILLAS que reabre el mini-onboarding (#635 PR#3) sembrado con lo ya respondido. La gente cambia de disponibilidad; sin esto tendría que rehacer el cuestionario o no podría.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'AJUSTAR'**
+  String get templatesFilterBarAdjust;
+
+  /// Misma acción cuando el atleta todavía no respondió nada: el texto invita en vez de referirse a respuestas que no existen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'AJUSTAR MI BÚSQUEDA'**
+  String get templatesFilterBarSetUp;
+
+  /// Explica por qué la grilla está en ese orden. Dice ORDENADO, no filtrado: con 7 plantillas un filtro duro la vaciaría, así que nada se esconde.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ordenado según lo que buscás'**
+  String get templatesFilterBarHint;
+
   /// Acción en la card del ejercicio del player que abre el sheet de reporte al PF (#628).
   ///
   /// In es_AR, this message translates to:

@@ -3874,6 +3874,15 @@ class AppL10nEn extends AppL10n {
   String get templatesOnboardingBack => 'BACK';
 
   @override
+  String get templatesFilterBarAdjust => 'ADJUST';
+
+  @override
+  String get templatesFilterBarSetUp => 'SET UP MY SEARCH';
+
+  @override
+  String get templatesFilterBarHint => 'Sorted to match what you are after';
+
+  @override
   String get exerciseFeedbackAction => 'COMMENT / REPORT';
 
   @override

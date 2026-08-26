@@ -12,6 +12,8 @@ import '../onboarding/templates_onboarding_gate.dart';
 import 'coach_chip.dart';
 import 'level_filter_pills.dart';
 import 'routine_card.dart';
+import 'templates_preferences_bar.dart';
+import '../../../../app/theme/tokens/primitives.dart';
 
 /// PLANTILLAS tab page (workout redesign slice 2) — EVERY template in one
 /// square grid: the linked coach's shared templates first (badged
@@ -103,9 +105,18 @@ class _PlantillasTabState extends ConsumerState<PlantillasTab>
               delay: AppMotion.stagger(0),
               child: const LevelFilterPills(),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: AppSpacing.s8),
+            // Por qué la grilla está en ese orden, y cómo cambiarlo (#635 PR#3).
+            // Encima de la grilla y debajo de las pills de nivel: el nivel
+            // FILTRA (saca cosas), esto ORDENA (no saca nada), y verlos en ese
+            // orden es lo que hace legible la diferencia.
             TreinoFadeSlideIn(
               delay: AppMotion.stagger(1),
+              child: const TemplatesPreferencesBar(),
+            ),
+            const SizedBox(height: AppSpacing.s8),
+            TreinoFadeSlideIn(
+              delay: AppMotion.stagger(2),
               child: entriesAsync.when(
                 data: (entries) {
                   if (entries.isEmpty) {

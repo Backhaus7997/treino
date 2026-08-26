@@ -53,9 +53,19 @@ class TemplatesOnboardingView extends StatefulWidget {
     required this.finishLabel,
     required this.backLabel,
     required this.stepSemanticsLabel,
+    this.initialPreferences,
   });
 
   final List<TemplatesOnboardingStep> steps;
+
+  /// Respuestas con las que arranca el flow (#635 PR#3).
+  ///
+  /// `null` en la primera entrada —nadie respondió nada todavía— y con las
+  /// preferencias guardadas cuando el atleta lo reabre desde PLANTILLAS para
+  /// ajustarlas. Reabrirlo en blanco lo obligaría a recordar y re-tipear lo
+  /// que ya había contestado, que es exactamente la fricción que el issue
+  /// quiere evitar con los filtros editables.
+  final TemplatePreferences? initialPreferences;
 
   /// Last step's CTA. The caller persists and closes.
   final void Function(TemplatePreferences preferences) onFinish;
@@ -97,6 +107,25 @@ class _TemplatesOnboardingViewState extends State<TemplatesOnboardingView> {
   /// Answers so far, keyed by dimension. A `Set` even for single-choice steps
   /// so one selection path covers both; single-choice replaces, multi toggles.
   final _answers = <TemplatesOnboardingDimension, Set<String>>{};
+
+  @override
+  void initState() {
+    super.initState();
+    final seed = widget.initialPreferences;
+    if (seed == null) return;
+    void put(TemplatesOnboardingDimension d, Iterable<String> values) {
+      final v = values.where((e) => e.isNotEmpty).toSet();
+      if (v.isNotEmpty) _answers[d] = v;
+    }
+
+    put(TemplatesOnboardingDimension.days,
+        [if (seed.daysPerWeek != null) '${seed.daysPerWeek}']);
+    put(TemplatesOnboardingDimension.minutes,
+        [if (seed.minutesPerSession != null) '${seed.minutesPerSession}']);
+    put(TemplatesOnboardingDimension.goal,
+        [if (seed.goal != null) seed.goal!.wireKey]);
+    put(TemplatesOnboardingDimension.zones, seed.priorityMuscleGroups);
+  }
 
   bool get _isLast => _index == widget.steps.length - 1;
 

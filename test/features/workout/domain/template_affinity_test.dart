@@ -165,11 +165,11 @@ void main() {
       final noCubre =
           TemplateAffinity.score(_routine(zones: const ['chest']), prefs);
       final sinSlots = TemplateAffinity.score(
-        Routine(
+        const Routine(
           id: 'r',
           name: 'R',
           level: ExperienceLevel.beginner,
-          days: const [],
+          days: [],
         ),
         prefs,
       );
