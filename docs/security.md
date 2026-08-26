@@ -85,8 +85,8 @@ son `get` / `list` / `write` / `delete`.
 | `chats/{id}/messages` | ✅ | ✅ | ✅ | — | — |
 | `session_shares` | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `profile_shares` | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `coach_availability_rules` | — | — | — | — | — |
-| `coach_availability_overrides` | — | — | — | — | — |
+| `coach_availability_rules` | — | — | ✅ | ✅ | — |
+| `coach_availability_overrides` | — | — | ✅ | ✅ | — |
 | `appointments` | — | — | 🟡 | — | — |
 | `measurements` | ✅ | ✅ | ✅ | ✅ | 🟡 |
 | `performance_tests` | — | — | ✅ | ✅ | — |
@@ -99,7 +99,7 @@ son `get` / `list` / `write` / `delete`.
 | `reviews` | — | — | ✅ | — | — |
 | `mail_queue` | — | — | — | — | — |
 
-**98 de 170 celdas** tienen test negativo (57%). Por operación:
+**102 de 170 celdas** tienen test negativo (60%). Por operación:
 
 | Operación | Paths con test negativo |
 |---|---|
@@ -2078,7 +2078,7 @@ Ordenados por lo que me preocuparía primero.
 | **QA-SEC-010** | `resource == null` + doc id determinístico = oráculo de existencia en 4 bloques | `firestore.rules:1564`, `:1252`, `:2181`, `:1315` | **Media-alta** | [#777](https://github.com/Backhaus7997/treino/issues/777) |
 | ~~**QA-SEC-011**~~ | `isProfilePublic` no existe en las reglas: "Perfil privado" se aplica sólo en el cliente | `:942`, `:894`, `:738`, `:256` | **Media-alta** | **CERRADO** en #806 por Opción B ([#778](https://github.com/Backhaus7997/treino/issues/778)) |
 | **QA-SEC-012** | `visibility: 'shared'` concede lectura y enumeración mundial a una feature que el dominio declara reservada | `:259` | Media | [#779](https://github.com/Backhaus7997/treino/issues/779) |
-| **QA-SEC-013** | El gate de rol de Slice C no llegó a las 3 colecciones que publican al PF | `:1111`, `:1816`, `:1826` | Media | [#780](https://github.com/Backhaus7997/treino/issues/780) |
+| ~~**QA-SEC-013**~~ | El gate de rol de Slice C no llegó a las 3 colecciones que publican al PF | `:1175`, `:2078`, `:2125` | Media | **CERRADO** ([#780](https://github.com/Backhaus7997/treino/issues/780)) |
 | **QA-SEC-014** | `appointments` create sin allowlist de campos ni cap de tamaño: un desconocido escribe en la agenda de cualquier PF | `:1858` | Media | [#781](https://github.com/Backhaus7997/treino/issues/781) |
 | ~~**QA-SEC-015**~~ | `temp/uploads` es el único write de Storage sin allowlist de content-type ni cap de tamaño | `storage.rules:88` | Baja | **CERRADO** en #804 ([#782](https://github.com/Backhaus7997/treino/issues/782)) |
 | **QA-SEC-016** | El scanner de App Check cubre 2 de los 5 callables desplegados | `appcheck-enforcement.test.ts:18` | Baja | ~~[#783](https://github.com/Backhaus7997/treino/issues/783)~~ cerrado |
@@ -2279,6 +2279,92 @@ un documento que se acuña solo.
 allowlist de campos y un cap de longitud en `coach_availability_*`. Cuidado con
 el orden de despliegue: hoy hay perfiles de PF creados antes del gate y la regla
 de `update` también los tocaría.
+
+---
+
+**Resuelto en #780.** El gate de rol va en las tres colecciones, y las dos de
+agenda suman `keys().hasOnly()` + rangos. La medición del hallazgo sigue siendo
+la de arriba; lo que cambió es la regla.
+
+**Dos trampas que aparecieron al escribir la forma, y que valen más que el fix:**
+
+1. **`dayOfWeek` es 1..7, no 0..6.** Es el rango que uno escribiría de memoria.
+   Sale de `DateTime.monday` (=1) en el editor y del mapa
+   `AgendaFormatters.dayOfWeekLabels` (1: Lunes … 7: Domingo). Un `>= 0 && <= 6`
+   habría **denegado en silencio todas las reglas de domingo** de todos los PFs
+   — una regla de seguridad que rompe la feature que dice proteger. Hay un test
+   positivo dedicado (`acepta domingo (dayOfWeek 7)`) que se pone rojo si
+   alguien "corrige" el rango, y la mutación lo confirma.
+2. **`AvailabilityOverride` es una unión sellada** (ADR-6) con variantes de 4 y
+   9 campos. Un solo `hasAll()` con los 9 habría denegado **todos los días
+   bloqueados**, que son la mitad de la feature. El `hasOnly()` lista las 9
+   —es techo, no piso— y el `hasAll()` discrimina por `type`.
+
+La lección general: la forma se saca de los `.g.dart`, que es lo que realmente
+emite `toJson()`, no del modelo ni de lo que uno supone que manda el editor. En
+este caso eso también reveló que `id` **viaja en el body** (`set(rule.toJson())`
+sin anotación de exclusión), cosa que un `hasOnly()` sin ese campo habría roto.
+
+**Verificación de mutación** (§1.8). Baseline 25/25 verde, y tres mutaciones que
+no se pisan entre sí:
+
+| Mutación | Rojos |
+|---|---|
+| Sacar el gate de rol de los tres bloques | **4** — los 4 negativos de rol, ninguno más |
+| Desactivar la validación de forma | **8** — los 8 negativos de forma |
+| `dayOfWeek` 1..7 → 0..6 | **2** — el positivo de domingo y el negativo de rango |
+
+Los 2 negativos que ninguna mutación mata son los de ownership (`publicarse en
+el doc de OTRO uid`, `publicar agenda a nombre de OTRO trainer`): custodian
+reglas preexistentes que este change no toca, así que es correcto que no se
+muevan.
+
+**Un rojo colateral que conviene leer, no tapar.** Correr la suite **completa**
+—y no sólo el archivo nuevo— puso en rojo tres tests preexistentes de
+`trainer-public-profiles-rules.test.ts`, y eran sus **positivos del dueño**. El
+motivo: ese fixture nunca seedeaba `users/{uid}`, así que modelaba un PF **sin
+doc privado**. Eso no puede existir —los trainers se provisionan por Admin SDK y
+ese doc es lo que les da el rol (AGENTS.md regla 3)— y el fixture se corrigió.
+
+Pero el rojo dejó a la vista una propiedad de la regla nueva que sí importa:
+**`get()` sobre un `users/{uid}` inexistente rompe la evaluación y deniega.** O
+sea que un `trainerPublicProfiles` huérfano no queda "sin gate": queda
+**inmutable**. Por eso el script de auditoría reporta esos huérfanos en una
+lista aparte de los que simplemente tienen el rol mal.
+
+La moraleja operativa: al tocar un archivo de reglas compartido, la suite de un
+solo archivo no alcanza. Los tres rojos no aparecían corriendo
+`coach-role-gate-rules.test.ts` solo.
+
+**Y tampoco alcanza con una sola de las dos suites.** §1.4 dice que hay dos y
+que las dos corren en CI; corriendo sólo la de `functions/` este change llegó a
+CI con la de `scripts/rules_test/` en rojo. Ahí el efecto fue **peor que un
+rojo**, y conviene tenerlo escrito porque no es intuitivo:
+
+En `reviews-links.test.js`, el seed de perfiles de PF tampoco traía
+`users/{uid}`. Al agregar el gate de rol pasaron dos cosas:
+
+1. Los **positivos** se pusieron rojos — visible y honesto.
+2. Los **negativos siguieron verdes, pero por el motivo equivocado**: los
+   denegaba el gate de rol nuevo, no el pin CF-write-only de
+   `averageRating`/`reviewCount` que dicen custodiar.
+
+Lo segundo es lo peligroso. Un `assertFails` que pasa por otra razón **no
+avisa nunca**: la suite se ve sana mientras dejó de proteger lo que dice
+proteger. Es la versión invertida del "rojo por el motivo equivocado" de §1.8, y
+es peor, porque el rojo al menos frena.
+
+Regla práctica que sale de acá: **un gate de rol nuevo invalida el fixture de
+todo test que escriba en esa colección**, incluidos los que sólo tienen
+negativos. Hay que revisarlos uno por uno, no confiar en que sigan verdes.
+
+**⚠️ Nota de despliegue.** El gate de rol en `update` de `trainerPublicProfiles`
+congela la edición de cualquier perfil cuyo dueño no tenga `role: 'trainer'`.
+Para los forjados es lo buscado; para un PF legítimo con el rol mal seteado
+sería una regresión, y eso no se puede verificar desde una sesión de desarrollo.
+Por eso el change trae `scripts/audit_trainer_profiles.mjs`, que cruza las dos
+colecciones y lista los huérfanos: **se corre contra producción antes de
+mergear**, y el resultado esperado es cero.
 
 ---
 
@@ -2625,7 +2711,7 @@ y se tacha acá con la referencia al PR — nunca se borra. Los hallazgos de
 | QA-SEC-010 | Oráculo de existencia por `resource == null` + doc id determinístico | Abierto — [#777](https://github.com/Backhaus7997/treino/issues/777), §4.9 |
 | QA-SEC-011 | `isProfilePublic` no se aplica en las reglas | ~~Cerrado~~ — #806 (issue [#778](https://github.com/Backhaus7997/treino/issues/778)) por **Opción B**: se corrigió el copy, no el gate. Las reglas no filtran por campo, así que el gate real exige partir el doc — queda como feature aparte. `firestore.rules:942`, §4.9 |
 | QA-SEC-012 | `visibility: 'shared'` concede lectura mundial a una feature reservada | Abierto — [#779](https://github.com/Backhaus7997/treino/issues/779), §4.9 |
-| QA-SEC-013 | El gate de rol de trainer no llegó a 3 colecciones | Abierto — [#780](https://github.com/Backhaus7997/treino/issues/780), §4.9 |
+| QA-SEC-013 | El gate de rol de trainer no llegó a 3 colecciones | ~~Cerrado~~ — [#780](https://github.com/Backhaus7997/treino/issues/780): gate de rol en las 3 + `keys().hasOnly()` y rangos en las 2 de agenda. `firestore.rules:1175`, `:2078`, `:2125`, `coach-role-gate-rules.test.ts`, §4.9 |
 | QA-SEC-014 | `appointments` create sin allowlist ni cap de tamaño | Abierto — [#781](https://github.com/Backhaus7997/treino/issues/781), §4.9 |
 | QA-SEC-015 | `temp/uploads` sin allowlist de content-type ni cap | ~~Cerrado~~ — #804 (issue [#782](https://github.com/Backhaus7997/treino/issues/782)): bloque cerrado entero, no acotado. `storage.rules:88`, `temp-uploads-storage-rules.test.ts`, §4.9 |
 | QA-SEC-016 | El scanner de App Check cubre 2 de 5 callables | ~~Cerrado~~ — [#783](https://github.com/Backhaus7997/treino/issues/783) / [#805](https://github.com/Backhaus7997/treino/pull/805), `appcheck-enforcement.test.ts` + `helpers/appcheck-audit.ts`, §4.8.1 y §4.9 |
