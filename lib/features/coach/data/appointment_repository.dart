@@ -30,6 +30,23 @@ class AppointmentRepository {
   // SCENARIO-491-amended: slot exists status=cancelled → flip, preserve log.
   // SCENARIO-496: doc ID is exactly '${trainerId}_${startsAt.millisecondsSinceEpoch}'.
   // REQ-COACH-AGENDA-009 / SCENARIO-496: reject slots more than 28 days out.
+  //
+  // ⚠️ LEGACY — SIN LLAMADORES EN `lib/` (#831). El auto-booking del atleta
+  // quedó como camino muerto en Slice C; los dos creadores vivos son
+  // `createByTrainer` y `createRecurringByTrainer`.
+  //
+  // Y desde #831 la rama de ADR-1 de acá abajo —el `txn.update` que flipea
+  // `cancelled → confirmed`— YA NO LA PERMITEN LAS REGLAS: ese camino se
+  // removió del `allow update` de `appointments` porque era la superficie de
+  // ataque del residuo de QA-SEC-014, y no había ninguna feature viva
+  // sosteniéndola. Si alguien vuelve a llamar a `book()` contra un slot
+  // cancelado, va a comer un PERMISSION_DENIED del servidor.
+  //
+  // El método NO se borra —eso es más de lo que pidió el ticket, y los dos
+  // tests unitarios que lo cubren siguen siendo válidos: son mocks, no tocan
+  // reglas—. Queda esta nota para que el próximo que lo cablee sepa que la
+  // decisión de producto (¿vuelve el auto-booking? ¿con `trainer_links`? ¿con
+  // una CF?) hay que tomarla ANTES, no descubrirla en un permission-denied.
 
   Future<Appointment> book({
     required String trainerId,
@@ -344,9 +361,12 @@ class AppointmentRepository {
   // one wraps BOTH writes in a single Firestore transaction so they can never
   // diverge (see its doc comment). This method exists for direct unit tests
   // of the "mark" half in isolation and for a manual re-link if ever needed.
-  // firestore.rules enforces set-once on `paymentId` (Path 3 of the
-  // appointments update rule) — a second call with a DIFFERENT paymentId on an
-  // already-billed doc will be rejected server-side.
+  // firestore.rules enforces set-once on `paymentId` (Path 2 of the
+  // appointments update rule — it was Path 3 until #831 removed the ADR-1
+  // flip) — a second call with a DIFFERENT paymentId on an already-billed doc
+  // will be rejected server-side. Since #831 the cancellation path (Path 1)
+  // also pins `paymentId`, so the set-once can no longer be bypassed by
+  // clearing it during a cancel and re-linking afterwards.
 
   Future<void> markBilled({
     required String appointmentId,
