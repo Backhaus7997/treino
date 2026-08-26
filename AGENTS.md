@@ -17,6 +17,30 @@ pagos, turnos, mediciones, chats y perfiles comerciales publicados.
 - Todo comando con `--project treino-dev` **toca datos de usuarios reales**.
 - El alias `prod` de `.firebaserc` apunta ahí. En docs y runbooks va explícito:
   `--project prod`.
+- **El default de `.firebaserc` ya NO puede llegar a producción** (#840). Es
+  `demo-treino`: Firebase trata el prefijo `demo-` como proyecto offline del
+  emulador, así que un `deploy`, un `firestore:delete` o un backfill **sin
+  `--project` falla** en vez de resolver a `treino-dev`. Era el agujero real —
+  el repo vive en ~27 directorios a la vez (raíz + `.claude/worktrees/`), cada
+  uno con su copia de `.firebaserc` y un agente adentro.
+  - Corolario: para tocar producción **hay que escribir `--project prod`**. Que
+    duela un poco es el punto.
+  - Corolario 2: los comandos del **emulador** llevan `--project treino-dev`
+    explícito, y no es contradictorio. `emulators:*` no sale a la red de los
+    servicios emulados; ese id es sólo el *namespace* local donde escriben la
+    app (`lib/firebase_options.dart`) y las semillas
+    (`scripts/seed_emulator_full.js`), y el proyecto al que
+    `emulators.singleProjectMode: true` pinea el `firestore.get()`
+    cross-service de las reglas de Storage. Con otro id la suite de reglas se
+    pone **roja** (medido: `chat-media-storage.test.js`, 2 tests). Ya está
+    resuelto en `scripts/emulator.sh` y `scripts/test_rules.sh`: **usalos** en
+    vez de escribir `firebase emulators:start` a mano, que ahora resolvería
+    `demo-treino` y te dejaría la UI de :4444 mirando un namespace vacío.
+  - Corolario 3 — **worktrees**: `.firebaserc` está versionado, así que todo
+    worktree creado después de #840 hereda el default seguro solo. Los que ya
+    existían siguen con el viejo hasta que rebaseen main; para cerrarlos hoy hay
+    `bash scripts/sync_firebaserc_worktrees.sh` (dry-run por default, `--write`
+    aplica).
 - **Nunca** corras `firestore:delete`, un script de `scripts/backfill_*.js`, ni un
   `deploy` de rules/indexes/functions contra ese proyecto sin confirmarlo con un
   humano primero. Aplica la misma regla de "frená y confirmá" que el resto de este

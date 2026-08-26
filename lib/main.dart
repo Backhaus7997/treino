@@ -184,7 +184,8 @@ Future<void> main() async {
       // cachea por región, y apuntar otra deja la real sin redirigir.
       //
       // Requiere levantar el emulador de functions:
-      //   firebase emulators:start --only firestore,auth,functions
+      //   ./scripts/emulator.sh   (fija --project treino-dev; el default de
+      //   .firebaserc es `demo-treino`, ver #840)
       FirebaseFunctions.instanceFor(region: 'southamerica-east1')
           .useFunctionsEmulator('localhost', 5001);
     }

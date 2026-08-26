@@ -61,7 +61,9 @@ flutter emulators --launch Pixel_6      # or: Pixel_9_Pro
 # JDK 21 (msys path form — the C: form gets split on the ':' by Git Bash).
 export JAVA_HOME="C:/Program Files/Android/Android Studio/jbr"
 export PATH="/c/Program Files/Android/Android Studio/jbr/bin:$PATH"; hash -r
-firebase emulators:start --only auth,firestore
+# Vía el script: fija `--project treino-dev`, el namespace donde siembran los
+# seeds. El default de .firebaserc es `demo-treino` a propósito (#840).
+SKIP_FUNCTIONS=1 ./scripts/emulator.sh
 
 # Seed the emulator with the SEED CONTRACT data for the suites you want to run
 # (Auth user + Firestore docs). See each suite header + its TODO(seed) markers.

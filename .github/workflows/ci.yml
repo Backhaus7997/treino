@@ -249,10 +249,26 @@ jobs:
   # La corre el job `rules-test` de abajo (#680 Slice B).
   #
   # Una sola pasada `emulators:exec --only firestore,auth "npm test"` replica el
-  # flujo documentado en functions/README.md: emulador con el project default
-  # `treino-dev` (.firebaserc) + `npm test`. Los tests de reglas usan sus propios
-  # projectIds vía @firebase/rules-unit-testing y conviven en el mismo emulador
-  # (mismo esquema que corren los devs en local). El emulador NO necesita login.
+  # flujo documentado en functions/README.md: emulador con el project
+  # `treino-dev` + `npm test`. Los tests de reglas usan sus propios projectIds
+  # vía @firebase/rules-unit-testing y conviven en el mismo emulador (mismo
+  # esquema que corren los devs en local). El emulador NO necesita login.
+  #
+  # El `--project treino-dev` del step es de #840 y antes era implícito: se
+  # resolvía por el default de `.firebaserc`, que ahora es `demo-treino` — un id
+  # que Firebase trata como proyecto offline del emulador, puesto justamente
+  # para que un `deploy` sin `--project` no llegue a producción desde ninguno de
+  # los ~27 worktrees del repo.
+  #
+  # Honestidad sobre cuánto pesa el flag ACÁ, porque se midió en local: sin él
+  # este job igual da verde (95 suites / 1391 tests), porque
+  # `session-feedback-storage-rules.test.ts` lee su projectId de GCLOUD_PROJECT
+  # en vez de hardcodearlo y se adapta solo. Lo que sí cambia es el ruido: 173
+  # warnings de `Multiple projectIds are not recommended in single project mode`
+  # contra 0, uno por cada suite que pide `treino-dev` mientras el emulador está
+  # configurado para otro proyecto. El flag está para que ese desacople no
+  # exista, no para tapar un rojo. Donde el id SÍ decide verde/rojo es en el job
+  # `rules-test` de abajo (ver scripts/test_rules.sh).
   functions-test:
     name: Functions Test
     runs-on: ubuntu-latest
@@ -290,7 +306,7 @@ jobs:
       #     intermitente en tests de transición). Serial las aísla. El script
       #     `test` ya trae --forceExit.
       - name: Run functions tests against the emulator
-        run: firebase emulators:exec --only firestore,auth,storage "npm --prefix functions test -- --runInBand"
+        run: firebase emulators:exec --only firestore,auth,storage --project treino-dev "npm --prefix functions test -- --runInBand"
 
   # La SEGUNDA suite de reglas: scripts/rules_test/*.test.js (#680 Slice B).
   #

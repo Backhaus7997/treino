@@ -21,7 +21,7 @@
 ///
 /// Cómo correr:
 /// ```
-/// firebase emulators:start --only firestore,auth,functions
+/// ./scripts/emulator.sh   # fija --project treino-dev (#840)
 /// flutter run -d emulator-5554 -t lib/main_wear_spike.dart \
 ///   --dart-define=USE_EMULATOR=true
 /// ```
