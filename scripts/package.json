@@ -5,7 +5,8 @@
   "description": "Treino workout catalog seed scripts.",
   "//  LEER ANTES DE CORRER CUALQUIERA DE ESTOS": "npm ignora toda clave que empiece con '//' y las imprime en `npm run` sin argumentos, que es justo donde alguien busca el nombre del script. Contexto completo: scripts/README.md y AGENTS.md § Entornos. (#826)",
   "scripts": {
-    "test": "node --test \"test/*.test.js\"",
+    "//  el glob va SIN comillas a propósito": "así lo expande el shell y `node --test` recibe rutas reales, que es lo único que entiende en Node 20; el runner sólo expande globs por su cuenta desde Node 22. Entrecomillado anda en 22 y revienta en 20 — y 20 es la versión del job `scripts-test` de ci.yml, igual que la del resto de los jobs de Node del repo. Sin comillas anda en las dos. (#838)",
+    "test": "node --test test/*.test.js",
     "//  🚨 LOS 6 DE ABAJO ESCRIBEN EN PRODUCCIÓN": "`treino-dev` es el ÚNICO proyecto Firebase de TREINO y ahí viven los usuarios reales. Estos 6 escriben por Admin SDK, que SALTEA las Firestore rules, y NO nombran el proyecto en pantalla: lo resuelve el SDK desde GOOGLE_APPLICATION_CREDENTIALS. Que `seed:emulator` traiga las env vars inline y estos no, NO significa que estos sean el default seguro: significa que el seguro es la excepción. Para correrlos contra el emulador hay que ponerlas a mano. (#826)",
     "seed:exercises": "node seed_workout_catalog.js --exercises",
     "seed:routines": "node seed_workout_catalog.js --routines",
