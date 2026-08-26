@@ -2076,7 +2076,7 @@ Ordenados por lo que me preocuparía primero.
 | ID | Qué | Dónde | Severidad | Ticket |
 |---|---|---|---|---|
 | **QA-SEC-010** | `resource == null` + doc id determinístico = oráculo de existencia en 4 bloques | `firestore.rules:1564`, `:1252`, `:2181`, `:1315` | **Media-alta** | [#777](https://github.com/Backhaus7997/treino/issues/777) |
-| **QA-SEC-011** | `isProfilePublic` no existe en las reglas: "Perfil privado" se aplica sólo en el cliente | `:894`, `:738`, `:256` | **Media-alta** | [#778](https://github.com/Backhaus7997/treino/issues/778) |
+| ~~**QA-SEC-011**~~ | `isProfilePublic` no existe en las reglas: "Perfil privado" se aplica sólo en el cliente | `:942`, `:894`, `:738`, `:256` | **Media-alta** | **CERRADO** en #806 por Opción B ([#778](https://github.com/Backhaus7997/treino/issues/778)) |
 | **QA-SEC-012** | `visibility: 'shared'` concede lectura y enumeración mundial a una feature que el dominio declara reservada | `:259` | Media | [#779](https://github.com/Backhaus7997/treino/issues/779) |
 | **QA-SEC-013** | El gate de rol de Slice C no llegó a las 3 colecciones que publican al PF | `:1111`, `:1816`, `:1826` | Media | [#780](https://github.com/Backhaus7997/treino/issues/780) |
 | **QA-SEC-014** | `appointments` create sin allowlist de campos ni cap de tamaño: un desconocido escribe en la agenda de cualquier PF | `:1858` | Media | [#781](https://github.com/Backhaus7997/treino/issues/781) |
@@ -2144,6 +2144,48 @@ significa lo que dice el widget, `userPublicProfiles` read tiene que partirse en
 seguidor. Si "privado" sólo significa "aprobación manual de seguidores" —que es
 lo que el modelo hace hoy— entonces hay que **corregir el copy**, que es más
 barato y más honesto. Lo que no puede quedar es la brecha entre las dos cosas.
+
+**Resuelto: Opción B, en #806.** La brecha se cerró por el lado del copy. Las
+mediciones de la tabla de arriba **siguen siendo válidas** — no cambió ni una
+regla de lectura, y a propósito.
+
+**Por qué B y no A.** La Opción A no era el cambio de reglas que este párrafo
+sugería. **Las reglas de Firestore no filtran por campo en las lecturas**: son
+todo-o-nada por documento. "Header de identidad para cualquiera, métricas sólo
+para seguidores" **no se puede escribir en una regla** mientras las dos cosas
+vivan en el mismo doc. A exige partir `userPublicProfiles` en dos colecciones,
+con dual-write, backfill de los perfiles existentes y ~20 archivos consumidores
+a tocar (rankings por gym, `searchByDisplayName`, sugeridos, lista de chat,
+picker de alumnos del PF). Y arriba de eso hay un choque de producto sin
+resolver: los **rankings por gym son opt-in explícito** sobre esas mismas
+métricas, así que un perfil privado anotado al ranking está publicando su
+volumen a propósito. Eso es una feature con épico propio, no un fix de bug.
+
+**Qué se cambió, entonces.** Nada de comportamiento. Sólo dejó de prometerse un
+gate que no existe:
+
+| Dónde | Antes | Ahora |
+|---|---|---|
+| `user_public_profile.dart` (dartdoc) | "stats detalladas, rutinas y actividad **gateadas** a seguidores aceptados" | describe el modelo de aprobación + ⚠️ explícito de que el flag **no es control de acceso** |
+| `profile_privacy_toggle_tile.dart` (dartdoc) | "only the identity header stays visible; detailed content is **gated**" | ídem, con el porqué |
+| `_PrivateProfileNotice` (copy al visitante) | "Seguí a esta persona para ver su actividad y sus rutinas públicas" | "Esta persona aprueba a mano quién la sigue. Seguila para ver su actividad y sus rutinas." |
+| `public_profile_screen.dart:86` | `gated` sin contexto | comentario de que es **presentación, no límite de seguridad** |
+| `firestore.rules:942` | "Read Access Unchanged" | por qué el flag no se consulta acá, y por qué apretar esta regla no alcanza |
+
+**El copy que ve el dueño no se tocó, y es el detalle que más importa:** el
+subtítulo del toggle ya decía *"Los nuevos seguidores necesitan tu aprobación"*,
+que describe **exactamente** lo que el flag hace. La promesa falsa nunca estuvo
+ahí — estaba en las dos dartdocs (dev-facing) y, más suave, en el aviso al
+visitante. O sea que el usuario que prendió el toggle leyendo el switch no fue
+engañado; el que iba a ser engañado era el próximo dev que tocara el bloque.
+
+**Lo que sigue abierto, y hay que decirlo:** un perfil "privado" sigue
+entregando racha, volumen, PRs, contadores y su grafo de seguidores a cualquier
+autenticado. Eso ya no es un bug de expectativa —el producto dejó de prometer lo
+contrario— pero **sigue siendo una superficie de datos personales sin gate**, y
+§2 lo inventaría como tal. Si antes de stores (#629) se decide que "privado"
+tiene que esconder de verdad, el trabajo es A y el punto de partida es el
+comentario que quedó en `firestore.rules:942`.
 
 ---
 
@@ -2572,7 +2614,7 @@ y se tacha acá con la referencia al PR — nunca se borra. Los hallazgos de
 | QA-SEC-008 | `storage:customExerciseVideos/` — `list` exfiltra la videoteca entera de un PF | Abierto — [#763](https://github.com/Backhaus7997/treino/issues/763), §3.6 |
 | QA-SEC-009 | `storage:avatars/` — `delete` denegado hasta para el dueño por null deref | Abierto — [#765](https://github.com/Backhaus7997/treino/issues/765), §3.6 |
 | QA-SEC-010 | Oráculo de existencia por `resource == null` + doc id determinístico | Abierto — [#777](https://github.com/Backhaus7997/treino/issues/777), §4.9 |
-| QA-SEC-011 | `isProfilePublic` no se aplica en las reglas | Abierto — [#778](https://github.com/Backhaus7997/treino/issues/778), §4.9 |
+| QA-SEC-011 | `isProfilePublic` no se aplica en las reglas | ~~Cerrado~~ — #806 (issue [#778](https://github.com/Backhaus7997/treino/issues/778)) por **Opción B**: se corrigió el copy, no el gate. Las reglas no filtran por campo, así que el gate real exige partir el doc — queda como feature aparte. `firestore.rules:942`, §4.9 |
 | QA-SEC-012 | `visibility: 'shared'` concede lectura mundial a una feature reservada | Abierto — [#779](https://github.com/Backhaus7997/treino/issues/779), §4.9 |
 | QA-SEC-013 | El gate de rol de trainer no llegó a 3 colecciones | Abierto — [#780](https://github.com/Backhaus7997/treino/issues/780), §4.9 |
 | QA-SEC-014 | `appointments` create sin allowlist ni cap de tamaño | Abierto — [#781](https://github.com/Backhaus7997/treino/issues/781), §4.9 |
