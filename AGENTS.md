@@ -23,9 +23,9 @@ pagos, turnos, mediciones, chats y perfiles comerciales publicados.
   falla** en vez de resolver a `treino-dev`. Era el agujero real — el repo vive
   en 29 directorios a la vez (raíz + `.claude/worktrees/`), cada uno con su
   copia de `.firebaserc` y un agente adentro.
-  - Corolario: para tocar producción **hay que escribir `--project prod`**. Que
+  - Corolario 1: para tocar producción **hay que escribir `--project prod`**. Que
     duela un poco es el punto.
-  - Corolario 0 — **esto cubre el CLI de `firebase`, NO los scripts de Node**.
+  - Corolario 2 — **esto cubre el CLI de `firebase`, NO los scripts de Node**.
     Los `scripts/backfill_*.js` (y `cleanup_*`, `restore_*`, `seed_*`) **no leen
     `.firebaserc` nunca**: resuelven el proyecto con
     `admin.initializeApp({credential: cert(require('./sa-key.json'))})` —
@@ -39,7 +39,7 @@ pagos, turnos, mediciones, chats y perfiles comerciales publicados.
     **no protege**: testea `/dev/i` contra el project id, y `treino-dev`
     matchea — es exactamente el bug de #826. Antes de correr cualquiera de
     ellos, leé qué proyecto imprime en la primera línea.
-  - Corolario 2: los comandos del **emulador** llevan `--project treino-dev`
+  - Corolario 3: los comandos del **emulador** llevan `--project treino-dev`
     explícito, y no es contradictorio. `emulators:*` no sale a la red de los
     servicios emulados; ese id es sólo el *namespace* local donde escriben la
     app (`lib/firebase_options.dart`) y las semillas
@@ -50,7 +50,7 @@ pagos, turnos, mediciones, chats y perfiles comerciales publicados.
     resuelto en `scripts/emulator.sh` y `scripts/test_rules.sh`: **usalos** en
     vez de escribir `firebase emulators:start` a mano, que ahora resolvería
     `demo-treino` y te dejaría la UI de :4444 mirando un namespace vacío.
-  - Corolario 3 — **`firebase use` le gana al default, y no deja rastro en el
+  - Corolario 4 — **`firebase use` le gana al default, y no deja rastro en el
     repo**. `firebase use <alias>` escribe `activeProjects` en
     `~/.config/configstore/firebase-tools.json`, que **no está versionado**. La
     precedencia real es `--project` → `activeProjects[projectRoot]` → default de
@@ -69,11 +69,11 @@ pagos, turnos, mediciones, chats y perfiles comerciales publicados.
     **no existe** — nadie corrió nunca `firebase use`. Si vas a correr algo
     destructivo, **escribí `--project` siempre** en vez de confiar en el
     default: es lo único que gana en toda la cadena.
-  - Corolario 4 — **worktrees**: `.firebaserc` está versionado, así que todo
+  - Corolario 5 — **worktrees**: `.firebaserc` está versionado, así que todo
     worktree creado después de #840 hereda el default seguro solo — no hay nada
     que regenerar. Los que ya existían siguen con el viejo hasta que rebaseen
     main, y esperar eso no es una mitigación. Para cerrarlos hoy —y para
-    auditar el `activeProjects` del corolario 3— hay
+    auditar el `activeProjects` del corolario 4— hay
     `bash scripts/sync_firebaserc_worktrees.sh` (dry-run por default, `--write`
     aplica). Al escribir esto lista **28 pendientes**.
 - **Nunca** corras `firestore:delete`, un script de `scripts/backfill_*.js`, ni un
