@@ -131,6 +131,38 @@ test('SCENARIO-CC-04: athlete-role user cannot forge athlete_billing naming them
   );
 });
 
+
+// QA-SEC-014 (#781): el `create` de `appointments` ahora valida forma —
+// `keys().hasOnly()`, los 7 campos no-nullables presentes y cotas de texto—
+// así que los payloads mínimos de este archivo dejaron de ser válidos.
+//
+// No es que la regla esté de más: `Appointment.fromJson` hace
+// `json['athleteDisplayName'] as String`, o sea que un doc sin ese campo
+// revienta el cliente. El fixture modelaba un turno que no puede existir.
+//
+// Ojo con el negativo (SCENARIO-CC-05): con el payload viejo habría seguido
+// verde **por el motivo equivocado** —denegado por la forma, no por el gate de
+// rol que dice custodiar—. Un assertFails que pasa por otra razón no avisa
+// nunca. Por eso también él usa el payload completo.
+function appointmentDoc({ id, trainerId, athleteId }) {
+  return {
+    id,
+    trainerId,
+    athleteId,
+    athleteDisplayName: 'Atleta de prueba',
+    startsAt: new Date(Date.now() + 3 * 86400000),
+    durationMin: 60,
+    status: 'confirmed',
+    cancelledAt: null,
+    cancelledBy: null,
+    cancellationLog: [],
+    noteBefore: null,
+    noteAfter: null,
+    recurringId: null,
+    paymentId: null,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // SCENARIO-CC-05: An athlete-role user forges a confirmed appointment naming
 // themselves as the TRAINER of a victim athlete. [AD-1][REQ:coach-
@@ -144,12 +176,9 @@ test('SCENARIO-CC-05: athlete-role user cannot forge an appointment naming thems
 
   const attacker = testEnv.authenticatedContext('attacker');
   await assertFails(
-    attacker.firestore().collection('appointments').doc('forged5').set({
-      status: 'confirmed',
-      trainerId: 'attacker',
-      athleteId: 'victim',
-      startsAt: new Date(),
-    }),
+    attacker.firestore().collection('appointments').doc('forged5').set(
+      appointmentDoc({ id: 'forged5', trainerId: 'attacker', athleteId: 'victim' }),
+    ),
   );
 });
 
@@ -280,12 +309,9 @@ test('SCENARIO-CC-07: real trainer CAN create a confirmed appointment for an ath
 
   const coach = testEnv.authenticatedContext('coach6');
   await assertSucceeds(
-    coach.firestore().collection('appointments').doc('legit7').set({
-      status: 'confirmed',
-      trainerId: 'coach6',
-      athleteId: 'athlete',
-      startsAt: new Date(),
-    }),
+    coach.firestore().collection('appointments').doc('legit7').set(
+      appointmentDoc({ id: 'legit7', trainerId: 'coach6', athleteId: 'athlete' }),
+    ),
   );
 });
 
@@ -301,11 +327,8 @@ test('SCENARIO-CC-08: athlete (role athlete, no trainer role) CAN self-book thei
 
   const athlete = testEnv.authenticatedContext('athlete1');
   await assertSucceeds(
-    athlete.firestore().collection('appointments').doc('legit8').set({
-      status: 'confirmed',
-      athleteId: 'athlete1',
-      trainerId: 'coach7',
-      startsAt: new Date(),
-    }),
+    athlete.firestore().collection('appointments').doc('legit8').set(
+      appointmentDoc({ id: 'legit8', trainerId: 'coach7', athleteId: 'athlete1' }),
+    ),
   );
 });

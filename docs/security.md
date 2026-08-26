@@ -85,9 +85,9 @@ son `get` / `list` / `write` / `delete`.
 | `chats/{id}/messages` | ✅ | ✅ | ✅ | — | — |
 | `session_shares` | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `profile_shares` | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `coach_availability_rules` | — | — | — | — | — |
-| `coach_availability_overrides` | — | — | — | — | — |
-| `appointments` | — | — | 🟡 | — | — |
+| `coach_availability_rules` | — | — | ✅ | ✅ | — |
+| `coach_availability_overrides` | — | — | ✅ | ✅ | — |
+| `appointments` | — | — | ✅ | ✅ | — |
 | `measurements` | ✅ | ✅ | ✅ | ✅ | 🟡 |
 | `performance_tests` | — | — | ✅ | ✅ | — |
 | `athlete_billing` | ✅ | — | 🟡 | 🟡 | — |
@@ -99,7 +99,7 @@ son `get` / `list` / `write` / `delete`.
 | `reviews` | — | — | ✅ | — | — |
 | `mail_queue` | — | — | — | — | — |
 
-**98 de 170 celdas** tienen test negativo (57%). Por operación:
+**103 de 170 celdas** tienen test negativo (61%). Por operación:
 
 | Operación | Paths con test negativo |
 |---|---|
@@ -2076,10 +2076,10 @@ Ordenados por lo que me preocuparía primero.
 | ID | Qué | Dónde | Severidad | Ticket |
 |---|---|---|---|---|
 | **QA-SEC-010** | `resource == null` + doc id determinístico = oráculo de existencia en 4 bloques | `firestore.rules:1564`, `:1252`, `:2181`, `:1315` | **Media-alta** | [#777](https://github.com/Backhaus7997/treino/issues/777) |
-| **QA-SEC-011** | `isProfilePublic` no existe en las reglas: "Perfil privado" se aplica sólo en el cliente | `:894`, `:738`, `:256` | **Media-alta** | [#778](https://github.com/Backhaus7997/treino/issues/778) |
+| ~~**QA-SEC-011**~~ | `isProfilePublic` no existe en las reglas: "Perfil privado" se aplica sólo en el cliente | `:942`, `:894`, `:738`, `:256` | **Media-alta** | **CERRADO** en #806 por Opción B ([#778](https://github.com/Backhaus7997/treino/issues/778)) |
 | **QA-SEC-012** | `visibility: 'shared'` concede lectura y enumeración mundial a una feature que el dominio declara reservada | `:259` | Media | [#779](https://github.com/Backhaus7997/treino/issues/779) |
-| **QA-SEC-013** | El gate de rol de Slice C no llegó a las 3 colecciones que publican al PF | `:1111`, `:1816`, `:1826` | Media | [#780](https://github.com/Backhaus7997/treino/issues/780) |
-| **QA-SEC-014** | `appointments` create sin allowlist de campos ni cap de tamaño: un desconocido escribe en la agenda de cualquier PF | `:1858` | Media | [#781](https://github.com/Backhaus7997/treino/issues/781) |
+| ~~**QA-SEC-013**~~ | El gate de rol de Slice C no llegó a las 3 colecciones que publican al PF | `:1175`, `:2078`, `:2125` | Media | **CERRADO** ([#780](https://github.com/Backhaus7997/treino/issues/780)) |
+| ~~**QA-SEC-014**~~ | `appointments` create sin allowlist de campos ni cap de tamaño: un desconocido escribe en la agenda de cualquier PF | `:2048` | Media | **CERRADO** ([#781](https://github.com/Backhaus7997/treino/issues/781)) |
 | ~~**QA-SEC-015**~~ | `temp/uploads` es el único write de Storage sin allowlist de content-type ni cap de tamaño | `storage.rules:88` | Baja | **CERRADO** en #804 ([#782](https://github.com/Backhaus7997/treino/issues/782)) |
 | **QA-SEC-016** | El scanner de App Check cubre 2 de los 5 callables desplegados | `appcheck-enforcement.test.ts:18` | Baja | ~~[#783](https://github.com/Backhaus7997/treino/issues/783)~~ cerrado |
 
@@ -2144,6 +2144,57 @@ significa lo que dice el widget, `userPublicProfiles` read tiene que partirse en
 seguidor. Si "privado" sólo significa "aprobación manual de seguidores" —que es
 lo que el modelo hace hoy— entonces hay que **corregir el copy**, que es más
 barato y más honesto. Lo que no puede quedar es la brecha entre las dos cosas.
+
+**Resuelto: Opción B, en #806.** La brecha se cerró por el lado del copy. Las
+mediciones de la tabla de arriba **siguen siendo válidas** — no cambió ni una
+regla de lectura, y a propósito.
+
+**Por qué B y no A.** La Opción A no era el cambio de reglas que este párrafo
+sugería. **Las reglas de Firestore no filtran por campo en las lecturas**: son
+todo-o-nada por documento. "Header de identidad para cualquiera, métricas sólo
+para seguidores" **no se puede escribir en una regla** mientras las dos cosas
+vivan en el mismo doc. A exige partir `userPublicProfiles` en dos colecciones,
+con dual-write, backfill de los perfiles existentes y ~20 archivos consumidores
+a tocar (rankings por gym, `searchByDisplayName`, sugeridos, lista de chat,
+picker de alumnos del PF). Y arriba de eso hay un choque de producto sin
+resolver: los **rankings por gym son opt-in explícito** sobre esas mismas
+métricas, así que un perfil privado anotado al ranking está publicando su
+volumen a propósito. Eso es una feature con épico propio, no un fix de bug.
+
+**Qué se cambió, entonces.** Nada de comportamiento. Sólo dejó de prometerse un
+gate que no existe:
+
+| Dónde | Antes | Ahora |
+|---|---|---|
+| `user_public_profile.dart` (dartdoc) | "stats detalladas, rutinas y actividad **gateadas** a seguidores aceptados" | describe el modelo de aprobación + ⚠️ explícito de que el flag **no es control de acceso** |
+| `profile_privacy_toggle_tile.dart` (dartdoc) | "only the identity header stays visible; detailed content is **gated**" | ídem, con el porqué |
+| `_PrivateProfileNotice` (copy al visitante) | "Seguí a esta persona para ver su actividad y sus rutinas públicas" | "Esta persona aprueba a mano quién la sigue. Hasta que te acepte, la app no muestra su actividad acá." |
+| `public_profile_screen.dart:86` | `gated` sin contexto | comentario de que es **presentación, no límite de seguridad** |
+| `firestore.rules:942` | "Read Access Unchanged" | por qué el flag no se consulta acá, y por qué apretar esta regla no alcanza |
+
+> **Sobre la redacción del aviso al visitante.** El primer intento de este
+> arreglo decía *"Seguila para ver su actividad y sus rutinas"*, y estaba mal
+> por la mitad: seguía planteando el seguir como **requisito de acceso**, que
+> es justo la expectativa que el hallazgo pide desarmar. Al lado de un candado
+> y de un título "Perfil privado", eso se lee como barrera de seguridad igual.
+> La regla que quedó escrita en el widget, para el que lo reescriba mañana:
+> **se puede decir qué muestra o deja de mostrar la app; no se puede decir qué
+> puede o no puede leer el visitante.** Lo detectó el bot de review del PR.
+
+**El copy que ve el dueño no se tocó, y es el detalle que más importa:** el
+subtítulo del toggle ya decía *"Los nuevos seguidores necesitan tu aprobación"*,
+que describe **exactamente** lo que el flag hace. La promesa falsa nunca estuvo
+ahí — estaba en las dos dartdocs (dev-facing) y, más suave, en el aviso al
+visitante. O sea que el usuario que prendió el toggle leyendo el switch no fue
+engañado; el que iba a ser engañado era el próximo dev que tocara el bloque.
+
+**Lo que sigue abierto, y hay que decirlo:** un perfil "privado" sigue
+entregando racha, volumen, PRs, contadores y su grafo de seguidores a cualquier
+autenticado. Eso ya no es un bug de expectativa —el producto dejó de prometer lo
+contrario— pero **sigue siendo una superficie de datos personales sin gate**, y
+§2 lo inventaría como tal. Si antes de stores (#629) se decide que "privado"
+tiene que esconder de verdad, el trabajo es A y el punto de partida es el
+comentario que quedó en `firestore.rules:942`.
 
 ---
 
@@ -2231,6 +2282,92 @@ de `update` también los tocaría.
 
 ---
 
+**Resuelto en #780.** El gate de rol va en las tres colecciones, y las dos de
+agenda suman `keys().hasOnly()` + rangos. La medición del hallazgo sigue siendo
+la de arriba; lo que cambió es la regla.
+
+**Dos trampas que aparecieron al escribir la forma, y que valen más que el fix:**
+
+1. **`dayOfWeek` es 1..7, no 0..6.** Es el rango que uno escribiría de memoria.
+   Sale de `DateTime.monday` (=1) en el editor y del mapa
+   `AgendaFormatters.dayOfWeekLabels` (1: Lunes … 7: Domingo). Un `>= 0 && <= 6`
+   habría **denegado en silencio todas las reglas de domingo** de todos los PFs
+   — una regla de seguridad que rompe la feature que dice proteger. Hay un test
+   positivo dedicado (`acepta domingo (dayOfWeek 7)`) que se pone rojo si
+   alguien "corrige" el rango, y la mutación lo confirma.
+2. **`AvailabilityOverride` es una unión sellada** (ADR-6) con variantes de 4 y
+   9 campos. Un solo `hasAll()` con los 9 habría denegado **todos los días
+   bloqueados**, que son la mitad de la feature. El `hasOnly()` lista las 9
+   —es techo, no piso— y el `hasAll()` discrimina por `type`.
+
+La lección general: la forma se saca de los `.g.dart`, que es lo que realmente
+emite `toJson()`, no del modelo ni de lo que uno supone que manda el editor. En
+este caso eso también reveló que `id` **viaja en el body** (`set(rule.toJson())`
+sin anotación de exclusión), cosa que un `hasOnly()` sin ese campo habría roto.
+
+**Verificación de mutación** (§1.8). Baseline 25/25 verde, y tres mutaciones que
+no se pisan entre sí:
+
+| Mutación | Rojos |
+|---|---|
+| Sacar el gate de rol de los tres bloques | **4** — los 4 negativos de rol, ninguno más |
+| Desactivar la validación de forma | **8** — los 8 negativos de forma |
+| `dayOfWeek` 1..7 → 0..6 | **2** — el positivo de domingo y el negativo de rango |
+
+Los 2 negativos que ninguna mutación mata son los de ownership (`publicarse en
+el doc de OTRO uid`, `publicar agenda a nombre de OTRO trainer`): custodian
+reglas preexistentes que este change no toca, así que es correcto que no se
+muevan.
+
+**Un rojo colateral que conviene leer, no tapar.** Correr la suite **completa**
+—y no sólo el archivo nuevo— puso en rojo tres tests preexistentes de
+`trainer-public-profiles-rules.test.ts`, y eran sus **positivos del dueño**. El
+motivo: ese fixture nunca seedeaba `users/{uid}`, así que modelaba un PF **sin
+doc privado**. Eso no puede existir —los trainers se provisionan por Admin SDK y
+ese doc es lo que les da el rol (AGENTS.md regla 3)— y el fixture se corrigió.
+
+Pero el rojo dejó a la vista una propiedad de la regla nueva que sí importa:
+**`get()` sobre un `users/{uid}` inexistente rompe la evaluación y deniega.** O
+sea que un `trainerPublicProfiles` huérfano no queda "sin gate": queda
+**inmutable**. Por eso el script de auditoría reporta esos huérfanos en una
+lista aparte de los que simplemente tienen el rol mal.
+
+La moraleja operativa: al tocar un archivo de reglas compartido, la suite de un
+solo archivo no alcanza. Los tres rojos no aparecían corriendo
+`coach-role-gate-rules.test.ts` solo.
+
+**Y tampoco alcanza con una sola de las dos suites.** §1.4 dice que hay dos y
+que las dos corren en CI; corriendo sólo la de `functions/` este change llegó a
+CI con la de `scripts/rules_test/` en rojo. Ahí el efecto fue **peor que un
+rojo**, y conviene tenerlo escrito porque no es intuitivo:
+
+En `reviews-links.test.js`, el seed de perfiles de PF tampoco traía
+`users/{uid}`. Al agregar el gate de rol pasaron dos cosas:
+
+1. Los **positivos** se pusieron rojos — visible y honesto.
+2. Los **negativos siguieron verdes, pero por el motivo equivocado**: los
+   denegaba el gate de rol nuevo, no el pin CF-write-only de
+   `averageRating`/`reviewCount` que dicen custodiar.
+
+Lo segundo es lo peligroso. Un `assertFails` que pasa por otra razón **no
+avisa nunca**: la suite se ve sana mientras dejó de proteger lo que dice
+proteger. Es la versión invertida del "rojo por el motivo equivocado" de §1.8, y
+es peor, porque el rojo al menos frena.
+
+Regla práctica que sale de acá: **un gate de rol nuevo invalida el fixture de
+todo test que escriba en esa colección**, incluidos los que sólo tienen
+negativos. Hay que revisarlos uno por uno, no confiar en que sigan verdes.
+
+**⚠️ Nota de despliegue.** El gate de rol en `update` de `trainerPublicProfiles`
+congela la edición de cualquier perfil cuyo dueño no tenga `role: 'trainer'`.
+Para los forjados es lo buscado; para un PF legítimo con el rol mal seteado
+sería una regresión, y eso no se puede verificar desde una sesión de desarrollo.
+Por eso el change trae `scripts/audit_trainer_profiles.mjs`, que cruza las dos
+colecciones y lista los huérfanos: **se corre contra producción antes de
+mergear**, y el resultado esperado es cero.
+
+---
+
 **QA-SEC-014 — `appointments` create: un desconocido escribe en la agenda de cualquier PF.**
 Slice C razonó **el disyunto del trainer** y dejó el del atleta explícitamente
 intacto (`firestore.rules:1854`: *"the legacy athlete self-book disjunct
@@ -2273,6 +2410,82 @@ límite**.
 tope de `firestore.rules` (QA #508) ya existen y son exactamente para esto—, un
 rango sobre `startsAt`, y decidir aparte si el auto-booking debería exigir
 `trainer_links` activo. Eso último es cambio de producto, no de regla.
+
+---
+
+**Resuelto en #781.** `keys().hasOnly()` + cotas de texto + rango de `startsAt`
+en el `create`, y la misma cota de forma en los **tres** caminos del `update` —
+sin eso el cap del create se esquiva creando un turno chico y engordándolo un
+segundo después.
+
+**⚠️ `startsAt` es wall-clock UTC, no un instante real** (ADR-7 / QA-COA-003).
+En ART (UTC−3) el valor guardado queda 3 h ANTES del instante real, así que el
+`startsAt > request.time` que pide el texto de arriba —"no en el pasado"—
+**habría denegado toda reserva dentro de las próximas 3 horas**. El rango que
+quedó lleva un día de tolerancia hacia atrás: absorbe cualquier offset de zona
+(±14 h) sin dejar de matar el vector, que es el turno forjado en 1970 o en el
+año 3000.
+
+El `update` usa una variante **sin** el rango, y no es descuido: el Path 3 es el
+PF cargando `noteAfter` DESPUÉS de la sesión, o sea con `startsAt` ya en el
+pasado. Reusar la misma función habría roto todas las notas post-sesión.
+
+**Verificación de mutación — y lo que encontró sobre mis propios tests.**
+Baseline 14/14. Tres mutaciones:
+
+| Mutación | Rojos |
+|---|---|
+| Desactivar la forma del `create` | **8** |
+| `startsAt` → `> request.time` (el rango ingenuo) | **1** — el caso wall-clock |
+| Desactivar la cota del `update` | **2** |
+| Volver el tope de `startsAt` a 60 días | **1** — el horizonte real del PF |
+| Volver a `size() <= 50` en el `create` | **1** — el `cancellationLog` sembrado |
+
+Pero la primera pasada dio **0 rojos** en las dos últimas, y eso es el hallazgo
+que vale guardar: **tres de los tests eran decoración**, escritos por alguien
+—yo— que tenía el vector en la cabeza.
+
+1. El test del wall-clock escribía `Date.now() + 1h`, un instante real futuro,
+   que pasa igual con `> request.time`. No modelaba el corrimiento que decía
+   custodiar. Ahora usa `now + 2h − 3h`: el valor que la app **realmente**
+   persiste para una sesión a 2 h vista en ART.
+2. Los dos negativos del `update` eran un `noteBefore` suelto desde el atleta,
+   que no matchea NINGUNO de los tres caminos válidos. Los denegaba la
+   estructura de paths; la cota de forma nunca se evaluaba. Ahora viajan sobre
+   el Path 1 (cancelación con >24 h), o sea un update que **sin** la cota sería
+   válido.
+
+**El review encontró un P1 que ninguna de esas mutaciones cubría.** El tope
+superior de `startsAt` estaba en 60 días, generalizando el guard de 28 de
+`AppointmentRepository.book…` — que aplica SÓLO al auto-booking del atleta.
+`createByTrainer` no tiene guard, las dos UIs de sesión del PF ofrecen
+`lastDate: today.add(Duration(days: 365))`, y con la recurrencia
+(`_kWeekOptions = [2, 4, 8, 12]`) el último turno de una serie cae a ~449 días.
+Como el lote es un **batch atómico**, el tope habría rechazado **la serie
+entera**. Corregido a 550 días.
+
+Es el mismo mecanismo que las dos trampas de arriba —leer UN camino de
+escritura y asumir que aplica a todos— cometido por quien las estaba
+documentando. Las dos últimas mutaciones de la tabla existen para que ese
+arreglo, y el del `cancellationLog`, no se puedan revertir en silencio.
+
+**Sobre `cancellationLog`:** el `size() <= 50` acotaba la cantidad de
+elementos, no el tamaño de cada uno — un solo map de ~1 MB pasaba. El `create`
+lo exige vacío (`@Default([])` en el modelo) y el `update` acota el
+crecimiento a +1 por escritura. ⚠️ Residuo: las reglas **no pueden** mirar el
+tamaño de un elemento de lista, no hay iteración. El techo real es el límite de
+1 MB por documento de Firestore, no la regla.
+
+**La regla general, que es la tercera variante del mismo problema en este
+épico:** un `assertFails` sobre una operación que **ya está denegada por otro
+motivo** no custodia nada. Verde no es lo mismo que cubierto, y lo único que los
+distingue es la mutación. Las otras dos variantes están en QA-SEC-013.
+
+**Lo que NO arregla este change**, y conviene tenerlo escrito: un turno legítimo
+creado a menos de 24 h tampoco se puede cancelar (el Path 1 exige >24 h) ni
+borrar (`allow delete: if false`). Eso es un hueco de **producto** preexistente
+—el cliente permite reservar más cerca que eso— y apretarlo en las reglas
+rompería reservas válidas. Queda como candidato a ticket propio.
 
 ---
 
@@ -2572,10 +2785,10 @@ y se tacha acá con la referencia al PR — nunca se borra. Los hallazgos de
 | QA-SEC-008 | `storage:customExerciseVideos/` — `list` exfiltra la videoteca entera de un PF | Abierto — [#763](https://github.com/Backhaus7997/treino/issues/763), §3.6 |
 | QA-SEC-009 | `storage:avatars/` — `delete` denegado hasta para el dueño por null deref | Abierto — [#765](https://github.com/Backhaus7997/treino/issues/765), §3.6 |
 | QA-SEC-010 | Oráculo de existencia por `resource == null` + doc id determinístico | Abierto — [#777](https://github.com/Backhaus7997/treino/issues/777), §4.9 |
-| QA-SEC-011 | `isProfilePublic` no se aplica en las reglas | Abierto — [#778](https://github.com/Backhaus7997/treino/issues/778), §4.9 |
+| QA-SEC-011 | `isProfilePublic` no se aplica en las reglas | ~~Cerrado~~ — #806 (issue [#778](https://github.com/Backhaus7997/treino/issues/778)) por **Opción B**: se corrigió el copy, no el gate. Las reglas no filtran por campo, así que el gate real exige partir el doc — queda como feature aparte. `firestore.rules:942`, §4.9 |
 | QA-SEC-012 | `visibility: 'shared'` concede lectura mundial a una feature reservada | Abierto — [#779](https://github.com/Backhaus7997/treino/issues/779), §4.9 |
-| QA-SEC-013 | El gate de rol de trainer no llegó a 3 colecciones | Abierto — [#780](https://github.com/Backhaus7997/treino/issues/780), §4.9 |
-| QA-SEC-014 | `appointments` create sin allowlist ni cap de tamaño | Abierto — [#781](https://github.com/Backhaus7997/treino/issues/781), §4.9 |
+| QA-SEC-013 | El gate de rol de trainer no llegó a 3 colecciones | ~~Cerrado~~ — [#780](https://github.com/Backhaus7997/treino/issues/780): gate de rol en las 3 + `keys().hasOnly()` y rangos en las 2 de agenda. `firestore.rules:1175`, `:2078`, `:2125`, `coach-role-gate-rules.test.ts`, §4.9 |
+| QA-SEC-014 | `appointments` create sin allowlist ni cap de tamaño | ~~Cerrado~~ — [#781](https://github.com/Backhaus7997/treino/issues/781): `keys().hasOnly()` + cotas de texto + rango de `startsAt`, y la misma cota en los 3 caminos del update. `firestore.rules:2048`, `appointments-shape-rules.test.ts`, §4.9 |
 | QA-SEC-015 | `temp/uploads` sin allowlist de content-type ni cap | ~~Cerrado~~ — #804 (issue [#782](https://github.com/Backhaus7997/treino/issues/782)): bloque cerrado entero, no acotado. `storage.rules:88`, `temp-uploads-storage-rules.test.ts`, §4.9 |
 | QA-SEC-016 | El scanner de App Check cubre 2 de 5 callables | ~~Cerrado~~ — [#783](https://github.com/Backhaus7997/treino/issues/783) / [#805](https://github.com/Backhaus7997/treino/pull/805), `appcheck-enforcement.test.ts` + `helpers/appcheck-audit.ts`, §4.8.1 y §4.9 |
 | QA-SEC-100 | Android: `allowBackup` | ~~Cerrado~~ — `test/security/android_manifest_backup_test.dart` |

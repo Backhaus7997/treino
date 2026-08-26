@@ -939,6 +939,29 @@ service cloud.firestore {
       // Any authenticated user can read (get or list). Enables prefix-range
       // search queries from searchByDisplayName. REQ-UPP-014. Unchanged by
       // this hardening pass (Read Access Unchanged).
+      //
+      // ⚠️ `isProfilePublic` NO se consulta acá, y es deliberado
+      // (QA-SEC-011, #778 — decidido como Opción B). El flag existe en el doc
+      // y las reglas saben leerlo (`follows` create lo hace en :1350 para el
+      // auto-accept), pero NO gobierna lecturas: un perfil con
+      // `isProfilePublic: false` entrega igual racha, workoutsCount,
+      // contadores, volumen y PRs a cualquier autenticado. Medido contra el
+      // emulador en `docs/security.md` §4.9.
+      //
+      // El motivo no es descuido: las reglas de Firestore **no filtran por
+      // campo en las lecturas** —son todo-o-nada por documento—, así que
+      // "header de identidad público, métricas gateadas" no se puede escribir
+      // acá. Exige partir el documento en dos colecciones, con dual-write,
+      // backfill y ~20 consumidores a tocar, más una decisión sobre los
+      // rankings por gym, que son opt-in explícito sobre estas mismas
+      // métricas. Eso es feature con épico propio, no un ajuste de regla.
+      //
+      // Lo que se hizo en #778 fue cerrar la brecha por el otro lado: el copy
+      // y las dartdocs ya no prometen un gate de contenido. Si algún día se
+      // implementa el gate de verdad, este comentario es el lugar donde
+      // empieza. NO agregues acá un `isProfilePublic == true` creyendo que
+      // alcanza: rompe `searchByDisplayName` (:894) y los rankings, y sigue
+      // sin poder esconder campos sueltos.
       allow read: if request.auth != null;
 
       // Only the owner can create their own doc; uid in body must match doc
@@ -1156,9 +1179,26 @@ service cloud.firestore {
       // Only the owner can create their own doc; uid in body must match doc id.
       // (SCENARIO-418). averageRating/reviewCount must be absent or null —
       // a create cannot seed a forged starting value (AD-3).
+      // QA-SEC-013 (#780): además del ownership, exige rol `trainer`. Slice C
+      // (AD-1 opción b) había puesto este mismo disyunto en cinco colecciones
+      // y las tres que publican al PF quedaron afuera. Medido contra el
+      // emulador: una cuenta `role: 'athlete'` creaba su propio
+      // `trainerPublicProfiles/{self}` y **aparecía en el descubrimiento** —
+      // la sonda corrió la misma query que
+      // `TrainerPublicProfileRepository.listAll()`
+      // (`orderBy('displayNameLowercase').limit(50)`) y el doc forjado volvía
+      // PRIMERO, porque el atacante elige el string por el que se ordena.
+      // Ver `docs/security.md` §4.9.
+      //
+      // Es un gate de INTEGRIDAD, no de confidencialidad: no filtra datos de
+      // terceros, evita que se ensucie el directorio comercial, que es la
+      // superficie de venta del producto. Los campos del perfil siguen siendo
+      // self-attested a propósito (AD-3) — esto decide **quién puede existir**
+      // en el directorio, no qué dice su bio.
       allow create: if request.auth != null
                     && request.auth.uid == uid
                     && request.resource.data.uid == uid
+                    && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
                     && request.resource.data.get('averageRating', null) == null
                     && request.resource.data.get('reviewCount', null) == null
                     && request.resource.data.get('athleteCount', null) == null;
@@ -1166,9 +1206,21 @@ service cloud.firestore {
       // Only the owner can update; uid in body must not change (SCENARIO-418).
       // averageRating/reviewCount must be absent or unchanged from the
       // stored value (AD-3) — closes the raw set(merge)/update forgery path.
+      // El gate de rol va también en `update`, y no es simetría cosmética: sin
+      // él, un doc forjado ANTES de que existiera este gate seguiría siendo
+      // editable por su dueño athlete para siempre. Cerrar sólo `create` deja
+      // vivo lo que ya se coló.
+      //
+      // ⚠️ DESPLIEGUE: esto congela la edición de cualquier
+      // `trainerPublicProfiles` cuyo dueño NO tenga `users/{uid}.role ==
+      // 'trainer'`. Para los forjados es exactamente lo que se busca; para un
+      // PF legítimo cuyo doc privado tuviera el rol mal sería una regresión.
+      // Antes de mergear se corre `scripts/audit_trainer_profiles.mjs`, que
+      // cruza las dos colecciones y lista los huérfanos.
       allow update: if request.auth != null
                     && request.auth.uid == uid
                     && request.resource.data.uid == resource.data.uid
+                    && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
                     && request.resource.data.get('averageRating', null) == resource.data.get('averageRating', null)
                     && request.resource.data.get('reviewCount', null) == resource.data.get('reviewCount', null)
                     && request.resource.data.get('athleteCount', null) == resource.data.get('athleteCount', null);
@@ -1998,22 +2050,122 @@ service cloud.firestore {
     // (needed to compute free slots client-side). Create/update/delete
     // restricted to the owning trainer.
     // SCENARIOs 525-527 tested via emulator (emulator-deferred per Decision #25).
+    // QA-SEC-013 (#780) — dos huecos en el mismo bloque:
+    //
+    // 1. Sin gate de rol. Medido: una cuenta `role: 'athlete'` creaba su
+    //    propia regla de agenda. Se agrega el mismo disyunto de Slice C.
+    // 2. Sin `keys().hasOnly()` ni cap de tamaño. Combinado con el `read`
+    //    amplio de arriba —que está bien y NO se discute acá— cualquier
+    //    autenticado publicaba documentos arbitrarios de hasta 1 MB que
+    //    **toda la plataforma puede listar**. El comentario decía
+    //    "restricted to the owning trainer": dueño sí, pero de un documento
+    //    que se acuñaba solo.
+    //
+    // La forma sale de `availability_rule.g.dart`, que es la fuente de verdad
+    // de lo que emite `toJson()`. `id` VIAJA en el body: el repositorio hace
+    // `set(rule.toJson())` y el campo no está anotado para excluirse.
+    //
+    // ⚠️ `dayOfWeek` es 1..7, NO 0..6. Sale de `DateTime.monday` (=1) en
+    // `availability_editor_screen.dart` y del mapa
+    // `AgendaFormatters.dayOfWeekLabels` (1: Lunes … 7: Domingo). Escribir
+    // 0..6 acá habría denegado en silencio todas las reglas de **domingo**.
+    // Las horas son `TimeOfDay`, así que 0..23 / 0..59.
+    //
+    // El cruce start < end NO se valida acá a propósito: es regla de negocio
+    // que el editor ya aplica, y duplicarla dejaría dos definiciones que se
+    // desincronizan. Acá se acota la FORMA, que es lo que cierra el vector de
+    // basura arbitraria.
     match /coach_availability_rules/{ruleId} {
+      function ruleShapeOk(d) {
+        return d.keys().hasOnly(['id', 'trainerId', 'dayOfWeek', 'startHour',
+                                 'startMinute', 'endHour', 'endMinute',
+                                 'slotDurationMin'])
+               && d.keys().hasAll(['id', 'trainerId', 'dayOfWeek', 'startHour',
+                                   'startMinute', 'endHour', 'endMinute',
+                                   'slotDurationMin'])
+               && d.id is string && d.id.size() <= 128
+               && d.dayOfWeek is int && d.dayOfWeek >= 1 && d.dayOfWeek <= 7
+               && d.startHour is int && d.startHour >= 0 && d.startHour <= 23
+               && d.startMinute is int && d.startMinute >= 0 && d.startMinute <= 59
+               && d.endHour is int && d.endHour >= 0 && d.endHour <= 23
+               && d.endMinute is int && d.endMinute >= 0 && d.endMinute <= 59
+               && (d.slotDurationMin == 30 || d.slotDurationMin == 60
+                   || d.slotDurationMin == 90 || d.slotDurationMin == 120);
+      }
+
       allow read: if request.auth != null;
       allow create: if request.auth != null
-                    && request.resource.data.trainerId == request.auth.uid;
-      allow update, delete: if request.auth != null
-                            && resource.data.trainerId == request.auth.uid;
+                    && request.resource.data.trainerId == request.auth.uid
+                    && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
+                    && ruleShapeOk(request.resource.data);
+      // El `update` pide rol igual que el `create`. La primera versión de este
+      // change no lo hacía —me apoyé en que el alcance del issue sólo pedía el
+      // gate de update para `trainerPublicProfiles`— y era **incoherente con mi
+      // propio argumento**: si cerrar sólo `create` "deja vivo lo que ya se
+      // coló" para el directorio de PFs, vale igual para la agenda. Peor acá,
+      // porque esta colección es mundo-legible: un atleta con una regla
+      // forjada antes del gate podría seguir reemplazando indefinidamente una
+      // agenda que **toda la plataforma lee**. Lo marcó el bot de review.
+      allow update: if request.auth != null
+                    && resource.data.trainerId == request.auth.uid
+                    && request.resource.data.trainerId == request.auth.uid
+                    && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
+                    && ruleShapeOk(request.resource.data);
+      allow delete: if request.auth != null
+                    && resource.data.trainerId == request.auth.uid;
     }
 
     // Coach Agenda — availability overrides (Fase 5 Etapa 6, REQ-028).
     // Same ownership model as rules.
+    // Mismo par de huecos y mismo arreglo que `coach_availability_rules`
+    // (QA-SEC-013, #780).
+    //
+    // ⚠️ Acá la forma NO es una sola: `AvailabilityOverride` es una unión
+    // sellada discriminada por `type` (ADR-6), y las dos variantes tienen
+    // juegos de claves distintos —`block` lleva 4, `extra` lleva 9—. El
+    // `hasOnly()` de arriba lista las 9 y acepta las dos, porque hasOnly es un
+    // techo y no un piso; lo que las distingue es el `hasAll()` por variante.
+    // Si se escribiera un solo `hasAll` con los 9 campos se denegarían **todos
+    // los días bloqueados**, que son la mitad de la feature.
     match /coach_availability_overrides/{overrideId} {
+      function overrideShapeOk(d) {
+        return d.keys().hasOnly(['id', 'trainerId', 'date', 'type', 'startHour',
+                                 'startMinute', 'endHour', 'endMinute',
+                                 'slotDurationMin'])
+               && d.keys().hasAll(['id', 'trainerId', 'date', 'type'])
+               && d.id is string && d.id.size() <= 128
+               && d.date is timestamp
+               && (
+                    (d.type == 'block'
+                     && d.keys().hasOnly(['id', 'trainerId', 'date', 'type']))
+                    ||
+                    (d.type == 'extra'
+                     && d.keys().hasAll(['startHour', 'startMinute', 'endHour',
+                                         'endMinute', 'slotDurationMin'])
+                     && d.startHour is int && d.startHour >= 0 && d.startHour <= 23
+                     && d.startMinute is int && d.startMinute >= 0 && d.startMinute <= 59
+                     && d.endHour is int && d.endHour >= 0 && d.endHour <= 23
+                     && d.endMinute is int && d.endMinute >= 0 && d.endMinute <= 59
+                     && (d.slotDurationMin == 30 || d.slotDurationMin == 60
+                         || d.slotDurationMin == 90 || d.slotDurationMin == 120))
+                  );
+      }
+
       allow read: if request.auth != null;
       allow create: if request.auth != null
-                    && request.resource.data.trainerId == request.auth.uid;
-      allow update, delete: if request.auth != null
-                            && resource.data.trainerId == request.auth.uid;
+                    && request.resource.data.trainerId == request.auth.uid
+                    && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
+                    && overrideShapeOk(request.resource.data);
+      // Mismo gate de rol que en `coach_availability_rules`, por el mismo
+      // motivo: sin él, un override forjado antes del gate seguiría siendo
+      // editable para siempre sobre una colección mundo-legible.
+      allow update: if request.auth != null
+                    && resource.data.trainerId == request.auth.uid
+                    && request.resource.data.trainerId == request.auth.uid
+                    && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
+                    && overrideShapeOk(request.resource.data);
+      allow delete: if request.auth != null
+                    && resource.data.trainerId == request.auth.uid;
     }
 
     // Coach Agenda — appointments (Fase 5 Etapa 6, REQ-029, ADR-1, ADR-5).
@@ -2023,6 +2175,97 @@ service cloud.firestore {
     //   Path 2 (ADR-1 flip): new athlete flips cancelled → confirmed.
     // Delete: never (audit trail preserved per ADR-1).
     match /appointments/{appointmentId} {
+      // Forma del turno (QA-SEC-014). Las claves salen de
+      // `appointment.g.dart`, que es lo que realmente emite `toJson()` — son
+      // las 14 que el cliente manda siempre, nulls incluidos.
+      //
+      // `hasOnly` es el que cierra el vector de basura arbitraria. El `hasAll`
+      // se limita a los 7 campos NO nullables del modelo: pedir los 14
+      // rompería cualquier escritura que omita un opcional, y `hasOnly` ya
+      // alcanza para el objetivo.
+      //
+      // `cancellationLog` es una lista de objetos; las reglas no pueden
+      // validar su contenido en profundidad, así que se le acota el largo —
+      // que es lo que evita el inflado del documento.
+      function appointmentShapeOk(d) {
+        return d.keys().hasOnly(['id', 'trainerId', 'athleteId',
+                                 'athleteDisplayName', 'startsAt',
+                                 'durationMin', 'status', 'cancelledAt',
+                                 'cancelledBy', 'cancellationLog',
+                                 'noteBefore', 'noteAfter', 'recurringId',
+                                 'paymentId'])
+               && d.keys().hasAll(['id', 'trainerId', 'athleteId',
+                                   'athleteDisplayName', 'startsAt',
+                                   'durationMin', 'status'])
+               && d.athleteDisplayName is string
+               && d.athleteDisplayName.size() <= 200
+               && optStrMaxLen(d.get('noteBefore', null), 5000)
+               && optStrMaxLen(d.get('noteAfter', null), 5000)
+               && optStrMaxLen(d.get('cancelledBy', null), 128)
+               && optStrMaxLen(d.get('recurringId', null), 128)
+               && optStrMaxLen(d.get('paymentId', null), 128)
+               && d.durationMin is int
+               && d.durationMin > 0 && d.durationMin <= 600
+               && d.startsAt is timestamp
+               && d.startsAt.toMillis() > request.time.toMillis() - 86400000
+               // ⚠️ 550 días, NO 60. La primera versión generalizó el guard de
+               // 28 días de `AppointmentRepository.book…`, que aplica SÓLO al
+               // auto-booking del atleta. `createByTrainer` NO tiene guard, y
+               // las dos UIs de sesión del PF ofrecen
+               // `lastDate: today.add(Duration(days: 365))`; con la
+               // recurrencia (`_kWeekOptions = [2, 4, 8, 12]`) el último turno
+               // del lote cae a ~449 días. Como el lote es un batch atómico,
+               // un tope de 60 habría rechazado LA SERIE ENTERA. Lo marcó el
+               // bot de review.
+               //
+               // Este borde no custodia el vector de "turno imborrable" —ése
+               // lo cierra el de abajo, porque un turno lejano SÍ se puede
+               // cancelar—; sólo evita basura absurda tipo año 3000, así que
+               // puede ser generoso sin perder nada.
+               && d.startsAt.toMillis() < request.time.toMillis() + 47520000000
+               // Un turno nuevo no tiene cancelaciones: el modelo lo crea
+               // con `@Default([])`. Exigirlo vacío cierra del todo el
+               // inflado por esta vía, que es más fuerte que acotar el largo:
+               // las reglas NO pueden mirar el tamaño de cada elemento de una
+               // lista, así que un solo map de ~1 MB pasaba el `size() <= 50`.
+               && d.get('cancellationLog', []).size() == 0;
+      }
+
+      // Variante para `update`. Misma cota de claves y de texto, PERO sin el
+      // rango de `startsAt`, y no es un descuido: el Path 3 de abajo es el PF
+      // cargando `noteAfter` **después** de la sesión, o sea con `startsAt` ya
+      // en el pasado. Reusar `appointmentShapeOk()` acá denegaría todas las
+      // notas post-sesión, que es el uso normal de la feature.
+      //
+      // `startsAt` no necesita rango en el update porque los tres caminos ya
+      // lo pinean inmutable contra `resource.data`.
+      function appointmentUpdateShapeOk(d) {
+        return d.keys().hasOnly(['id', 'trainerId', 'athleteId',
+                                 'athleteDisplayName', 'startsAt',
+                                 'durationMin', 'status', 'cancelledAt',
+                                 'cancelledBy', 'cancellationLog',
+                                 'noteBefore', 'noteAfter', 'recurringId',
+                                 'paymentId'])
+               && optStrMaxLen(d.get('athleteDisplayName', null), 200)
+               && optStrMaxLen(d.get('noteBefore', null), 5000)
+               && optStrMaxLen(d.get('noteAfter', null), 5000)
+               && optStrMaxLen(d.get('cancelledBy', null), 128)
+               && optStrMaxLen(d.get('recurringId', null), 128)
+               && optStrMaxLen(d.get('paymentId', null), 128)
+               // El log crece de a UNA entrada por escritura: los dos
+               // caminos que lo tocan usan `FieldValue.arrayUnion([entry])`
+               // con un solo elemento. Acotar el CRECIMIENTO además del total
+               // obliga a 50 writes para llenarlo, en vez de uno solo.
+               //
+               // ⚠️ Residuo honesto: el tamaño de cada elemento no se puede
+               // mirar desde las reglas —no hay iteración—. El techo real de
+               // eso es el límite de 1 MB por documento de Firestore, no esta
+               // regla. Si alguna vez molesta, el lugar es una CF.
+               && d.get('cancellationLog', []).size() <= 50
+               && d.get('cancellationLog', []).size()
+                  <= resource.data.get('cancellationLog', []).size() + 1;
+      }
+
       // Privacy: a member only reads appointments they are part of — their own
       // (athleteId) or the ones they run (trainerId). Closes the prior
       // any-authenticated-user read. Safe now that athlete self-booking (whose
@@ -2042,14 +2285,55 @@ service cloud.firestore {
       // auth.uid`) is UNCHANGED, preserving that live path (regression-
       // tested: SCENARIO-CC-08). Role-check only, NOT a trainer_links
       // relationship check — see design.md AD-1 / engram obs #413.
+      //
+      // QA-SEC-014 (#781) — el create no validaba NADA del documento: sin
+      // `keys().hasOnly()`, sin cap en ningún campo de texto, sin rango en
+      // `startsAt`. Medido: un desconocido escribía un turno `confirmed` en la
+      // agenda de CUALQUIER PF con 30 KB de texto arbitrario en
+      // `athleteDisplayName` y `noteBefore`. Y no se podía sacar:
+      // `allow delete: if false`, y la cancelación exige >24 h de
+      // anticipación, así que un turno forjado con `startsAt` cercano o pasado
+      // quedaba **fijo** en la agenda hasta que alguien entrara con Admin SDK.
+      //
+      // Es la única colección escribible por un tercero del archivo que no
+      // acotaba su texto libre (`athlete_notes` <5000, `follow_up_entries`
+      // <5000, `nutrition_plans` <200, `payments` <=200, `measurements`
+      // <=2000). Era un olvido, no una decisión.
+      //
+      // El auto-booking NO se toca (Slice C lo dejó explícitamente intacto) ni
+      // se exige `trainer_links`: eso es cambio de producto. Acá sólo se acota
+      // QUÉ se puede meter adentro del documento.
+      //
+      // ⚠️ `startsAt` es **wall-clock UTC**, no un instante real (ADR-7,
+      // QA-COA-003): en ART (UTC−3) el valor guardado queda 3 h ANTES del
+      // instante real. Un `startsAt > request.time` a secas denegaría toda
+      // reserva dentro de las próximas 3 horas. Por eso el rango lleva un día
+      // de tolerancia hacia atrás — absorbe cualquier offset de zona horaria
+      // (±14 h) sin dejar de matar el vector, que es el turno forjado en 1970
+      // o en el año 3000. El tope a futuro es 60 días: el cliente ya acota a
+      // 28 (`REQ-COACH-AGENDA-009`), así que sobra margen y la regla nunca
+      // deniega algo que el cliente produjo.
+      //
+      // Lo que este cambio NO arregla, y conviene tener escrito: un turno
+      // legítimo creado a menos de 24 h tampoco se puede cancelar, porque el
+      // Path 1 de abajo exige >24 h. Eso es un hueco de PRODUCTO preexistente
+      // —el cliente permite reservar más cerca que eso— y apretarlo acá
+      // rompería reservas válidas. Ver §4.9.
       allow create: if request.auth != null
                     && request.resource.data.status == 'confirmed'
+                    && appointmentShapeOk(request.resource.data)
                     && (request.resource.data.athleteId == request.auth.uid
                         || (request.resource.data.trainerId == request.auth.uid
                             && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'));
       // Update has 3 valid paths: cancellation by member, flip cancelled→confirmed,
       // or trainer edits coaching notes.
-      allow update: if request.auth != null && (
+      //
+      // QA-SEC-014 (#781): la cota de forma se aplica a los TRES caminos, con
+      // un `&&` afuera del paréntesis. Ninguno la tenía, así que el cap del
+      // `create` se esquivaba creando un turno chico y engordándolo después.
+      allow update: if request.auth != null
+                    && appointmentUpdateShapeOk(request.resource.data)
+                    && (
         // Path 1: cancellation by member with >24h
         (request.resource.data.status == 'cancelled'
          && (request.auth.uid == resource.data.athleteId
