@@ -2168,9 +2168,18 @@ gate que no existe:
 |---|---|---|
 | `user_public_profile.dart` (dartdoc) | "stats detalladas, rutinas y actividad **gateadas** a seguidores aceptados" | describe el modelo de aprobación + ⚠️ explícito de que el flag **no es control de acceso** |
 | `profile_privacy_toggle_tile.dart` (dartdoc) | "only the identity header stays visible; detailed content is **gated**" | ídem, con el porqué |
-| `_PrivateProfileNotice` (copy al visitante) | "Seguí a esta persona para ver su actividad y sus rutinas públicas" | "Esta persona aprueba a mano quién la sigue. Seguila para ver su actividad y sus rutinas." |
+| `_PrivateProfileNotice` (copy al visitante) | "Seguí a esta persona para ver su actividad y sus rutinas públicas" | "Esta persona aprueba a mano quién la sigue. Hasta que te acepte, la app no muestra su actividad acá." |
 | `public_profile_screen.dart:86` | `gated` sin contexto | comentario de que es **presentación, no límite de seguridad** |
 | `firestore.rules:942` | "Read Access Unchanged" | por qué el flag no se consulta acá, y por qué apretar esta regla no alcanza |
+
+> **Sobre la redacción del aviso al visitante.** El primer intento de este
+> arreglo decía *"Seguila para ver su actividad y sus rutinas"*, y estaba mal
+> por la mitad: seguía planteando el seguir como **requisito de acceso**, que
+> es justo la expectativa que el hallazgo pide desarmar. Al lado de un candado
+> y de un título "Perfil privado", eso se lee como barrera de seguridad igual.
+> La regla que quedó escrita en el widget, para el que lo reescriba mañana:
+> **se puede decir qué muestra o deja de mostrar la app; no se puede decir qué
+> puede o no puede leer el visitante.** Lo detectó el bot de review del PR.
 
 **El copy que ve el dueño no se tocó, y es el detalle que más importa:** el
 subtítulo del toggle ya decía *"Los nuevos seguidores necesitan tu aprobación"*,
