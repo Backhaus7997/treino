@@ -2169,11 +2169,16 @@ service cloud.firestore {
     }
 
     // Coach Agenda — appointments (Fase 5 Etapa 6, REQ-029, ADR-1, ADR-5).
-    // Create: athlete books their own slot (status must be 'confirmed').
-    // Update: two valid paths —
-    //   Path 1 (cancellation): member cancels with >24h notice.
-    //   Path 2 (ADR-1 flip): new athlete flips cancelled → confirmed.
+    // Create: athlete books their own slot, or the trainer registers a session
+    //         (status must be 'confirmed').
+    // Update: DOS caminos válidos —
+    //   Path 1 (cancelación): un miembro cancela con >24 h de anticipación.
+    //   Path 2 (PF): el PF edita las notas de coaching o linkea un Payment.
     // Delete: never (audit trail preserved per ADR-1).
+    //
+    // ⚠️ #831 — acá había un TERCER camino, el flip `cancelled → confirmed` de
+    // ADR-1, que era el Path 2. Se REMOVIÓ, y lo que era Path 3 pasó a ser
+    // Path 2. El porqué entero está sobre el `allow update`.
     match /appointments/{appointmentId} {
       // Forma del turno (QA-SEC-014). Las claves salen de
       // `appointment.g.dart`, que es lo que realmente emite `toJson()` — son
@@ -2199,11 +2204,40 @@ service cloud.firestore {
                                    'durationMin', 'status'])
                && d.athleteDisplayName is string
                && d.athleteDisplayName.size() <= 200
+               // ⚠️ #831 (quinta pasada) — el TIPO de `athleteId` y `trainerId`
+               // no se miraba acá, y su variante de update SÍ los exige string
+               // de forma INCONDICIONAL. Las dos mitades juntas son un turno
+               // imborrable, medido: el `create` aceptaba `trainerId: 12345`
+               // (el disyunto sólo compara UNO de los dos contra
+               // `request.auth.uid`, el otro quedaba libre), y a partir de ahí
+               // `appointmentUpdateShapeOk()` denegaba TODO update sobre ese
+               // doc — no se podía anotar, ni cancelar, y `delete: if false`.
+               // La familia de #781 otra vez, sembrada desde el create.
+               //
+               // Se cierra en el ORIGEN, que es donde no cuesta nada: un doc
+               // nuevo nace con los dos campos bien tipados. Los docs viejos
+               // que ya nacieron mal se destraban por el otro lado — el
+               // chequeo del update pasó a ser condicional, ver allá.
+               // Cierra #837.
+               && d.athleteId is string
+               && d.athleteId.size() > 0 && d.athleteId.size() <= 128
+               && d.trainerId is string
+               && d.trainerId.size() > 0 && d.trainerId.size() <= 128
+               // #831 (matriz campo × camino) — `id` no tenía NI tipo NI cota.
+               // `hasAll` lo exigía presente y ahí terminaba: medido, un
+               // `create` con 30 KB adentro de `id` daba ALLOW, o sea el
+               // MISMO inflado de #781 por un campo que la allowlist dejaba
+               // pasar sin mirar. El tope es el del propio Firestore para un
+               // doc id (1500 bytes); lo que se custodia acá es el inflado, no
+               // la forma del id — los tres lectores de `lib/` pisan el campo
+               // con `{...d.data(), 'id': d.id}`, así que el valor guardado no
+               // se lee nunca.
+               && d.id is string
+               && d.id.size() > 0 && d.id.size() <= 1500
                && optStrMaxLen(d.get('noteBefore', null), 5000)
                && optStrMaxLen(d.get('noteAfter', null), 5000)
                && optStrMaxLen(d.get('cancelledBy', null), 128)
                && optStrMaxLen(d.get('recurringId', null), 128)
-               && optStrMaxLen(d.get('paymentId', null), 128)
                && d.durationMin is int
                && d.durationMin > 0 && d.durationMin <= 600
                && d.startsAt is timestamp
@@ -2228,17 +2262,103 @@ service cloud.firestore {
                // inflado por esta vía, que es más fuerte que acotar el largo:
                // las reglas NO pueden mirar el tamaño de cada elemento de una
                // lista, así que un solo map de ~1 MB pasaba el `size() <= 50`.
-               && d.get('cancellationLog', []).size() == 0;
+               //
+               // ⚠️ #831 (sexta pasada) — el `is list` NO es decoración, y su
+               // ausencia era el ÚNICO hueco de tipo que quedaba en la columna
+               // del `create`.
+               //
+               // `size()` en las reglas NO es un método de las listas: lo
+               // tienen también los String y los Map. Así que
+               // `size() == 0` no dice "log vacío" —que es como se leyó al
+               // escribirlo— sino **"algo que mide cero"**, y eso lo cumplen
+               // `[]`, `""` y `{}` por igual. Medido, las tres escrituras
+               // ALLOW con la regla anterior; las dos últimas siguen ALLOW.
+               //
+               // Y no es cosmético, porque el daño NO es el inflado: un
+               // `cancellationLog` de 30 KB ya daba DENY (mide 30000, no 0).
+               // Lo que pasaba era peor. El doc nace `status: 'confirmed'`, o
+               // sea entra al stream VIVO —las tres queries de
+               // `appointment_repository.dart` filtran
+               // `where('status', isEqualTo: 'confirmed')`— y ahí
+               // `Appointment.fromJson` lo casteo:
+               //   `(json['cancellationLog'] as List<dynamic>?)`
+               // Medido en Dart, las dos variantes tiran `_TypeError`:
+               //   · `""` → type 'String' is not a subtype of 'List<dynamic>?'
+               //   · `{}` → type '_Map<String, dynamic>' is not a subtype…
+               // Una sola fila forjada rompe la deserialización de TODO el
+               // snapshot, o sea la agenda ENTERA del PF, y de un desconocido:
+               // el disyunto del `create` sólo pide `athleteId == auth.uid`.
+               // Y es imborrable — `delete: if false`.
+               //
+               // Es la misma familia que #781, sembrada desde el create, por
+               // la pregunta que a la matriz le faltaba en cada celda: **¿esta
+               // cota chequea el TIPO, o sólo una propiedad que varios tipos
+               // comparten?**. Las otras 13 filas de la columna sobreviven la
+               // pregunta —están medidas una por una, ver §4.9—: los cuatro
+               // `optStrMaxLen` llevan `v is string` adentro, `athleteId` /
+               // `trainerId` / `id` / `athleteDisplayName` llevan `is string`,
+               // `durationMin` `is int`, `startsAt` `is timestamp`, `status`
+               // se compara contra el literal `'confirmed'`, y `cancelledAt` /
+               // `cancelledBy` / `paymentId` contra `null` — que es la única
+               // otra forma de fijar un tipo sin nombrarlo.
+               && d.get('cancellationLog', []) is list
+               && d.get('cancellationLog', []).size() == 0
+               // …y tampoco tiene `cancelledAt` ni `cancelledBy`. Es el mismo
+               // invariante que la línea de arriba, sobre los otros dos campos
+               // de la cancelación, y cierra el segundo agujero que encontró
+               // la matriz: `cancelledAt` no tenía tipo ni cota —medido, un
+               // `create` con 30 KB adentro daba ALLOW—. `cancelledBy` ya
+               // estaba acotado a 128, así que ahí no había inflado; se le
+               // exige null por coherencia del invariante, no por tamaño.
+               && d.get('cancelledAt', null) == null
+               && d.get('cancelledBy', null) == null
+               // ⚠️ #831 (quinta pasada) — …y tampoco viene COBRADO.
+               //
+               // Es la quinta vuelta del mismo patrón, en el eje que a la
+               // matriz le faltaba: se habían modelado los dos caminos de
+               // UPDATE y quedó afuera el `create`, que es justamente el que
+               // SIEMBRA el estado del que dependen todos los gates de update.
+               //
+               // El set-once de `paymentId` del Path 2 lee
+               // `resource.data.paymentId`: sólo deja escribir cuando el valor
+               // guardado es `null`. Su vecino no es un update — es el
+               // `create`. Medido, un desconocido creaba un turno en la agenda
+               // de un PF cualquiera con `paymentId` ya sembrado, y el cobro de
+               // ese turno quedaba MUERTO para siempre:
+               //   · re-linkear al Payment real → DENY (set-once: ya no es null)
+               //   · limpiarlo a null           → DENY (el Path 1 lo pinea)
+               //   · borrar el turno            → DENY (`delete: if false`)
+               //
+               // Exigirlo null es el MISMO invariante que las dos líneas de
+               // arriba y que el log vacío, sobre el campo money-critical: un
+               // turno nuevo no viene cancelado y no viene cobrado. La cota de
+               // 128 que había acá antes era irrelevante — el daño no era el
+               // tamaño, era que el valor existiera.
+               && d.get('paymentId', null) == null;
       }
 
       // Variante para `update`. Misma cota de claves y de texto, PERO sin el
-      // rango de `startsAt`, y no es un descuido: el Path 3 de abajo es el PF
+      // rango de `startsAt`, y no es un descuido: el Path 2 de abajo es el PF
       // cargando `noteAfter` **después** de la sesión, o sea con `startsAt` ya
       // en el pasado. Reusar `appointmentShapeOk()` acá denegaría todas las
       // notas post-sesión, que es el uso normal de la feature.
       //
-      // `startsAt` no necesita rango en el update porque los tres caminos ya
-      // lo pinean inmutable contra `resource.data`.
+      // ⚠️ #831 — acá decía: "`startsAt` no necesita rango en el update porque
+      // los TRES caminos ya lo pinean inmutable contra `resource.data`". Era
+      // FALSO desde #823, y es la premisa que hizo parecer suficiente el fix
+      // anterior. Sólo lo pineaba el camino del PF; el de cancelación no
+      // miraba `startsAt` para nada salvo el gate de 24 h, que lee el valor
+      // VIEJO. La frase es cierta AHORA, y lo es porque el Path 1 pinea desde
+      // #831 — no porque siempre lo haya hecho. Y son DOS caminos, no tres: el
+      // flip de ADR-1 se removió, ver el `allow update`.
+      //
+      // #831 — el TIPO de `athleteId`, `trainerId`, `durationMin` y `startsAt`
+      // tampoco se miraba: `hasOnly()` acota QUÉ claves entran, no de qué tipo
+      // son ni con qué valor. Un update podía dejar `durationMin` en un string
+      // o en 100000 y ninguna cota se quejaba. Los pines de cada camino matan
+      // el vector cuando el camino aplica; el tipo se chequea acá para que no
+      // dependa de eso. El de `durationMin` va condicionado a que el campo
+      // cambie — el porqué está abajo, en su propio bloque.
       function appointmentUpdateShapeOk(d) {
         return d.keys().hasOnly(['id', 'trainerId', 'athleteId',
                                  'athleteDisplayName', 'startsAt',
@@ -2246,7 +2366,106 @@ service cloud.firestore {
                                  'cancelledBy', 'cancellationLog',
                                  'noteBefore', 'noteAfter', 'recurringId',
                                  'paymentId'])
-               && optStrMaxLen(d.get('athleteDisplayName', null), 200)
+               // ⚠️ #831 (quinta pasada) — estos dos chequeos estaban
+               // INCONDICIONALES, que es el mismo error que los bloques de
+               // `durationMin` y `startsAt` de acá abajo documentan. Corren
+               // sobre el doc MERGEADO, así que validaban el DOCUMENTO, no la
+               // escritura: un turno cuyo `athleteId` o `trainerId` estuviera
+               // guardado con otro tipo no se podía anotar NI cancelar nunca
+               // más, y `delete: if false` — imborrable.
+               //
+               // Esos docs se podían fabricar desde el `create` hasta esta
+               // misma pasada (ver `appointmentShapeOk()`), y además pueden
+               // existir de antes de #781, cuando el create no validaba nada.
+               // `treino-dev` ES producción (#826) y no se le corren queries,
+               // así que se asume que están.
+               //
+               // Condicionarlo a que el campo CAMBIE no pierde nada: los DOS
+               // caminos pinean los dos campos contra `resource.data`, y el
+               // create ahora los tipa en el origen. El chequeo queda —
+               // convención del archivo, y para que el invariante no dependa
+               // de que todo camino FUTURO se acuerde de pinear—, pero
+               // validando la ESCRITURA.
+               && (d.get('athleteId', null) == resource.data.get('athleteId', null)
+                   || (d.get('athleteId', null) is string
+                       && d.get('athleteId', null).size() > 0
+                       && d.get('athleteId', null).size() <= 128))
+               && (d.get('trainerId', null) == resource.data.get('trainerId', null)
+                   || (d.get('trainerId', null) is string
+                       && d.get('trainerId', null).size() > 0
+                       && d.get('trainerId', null).size() <= 128))
+               // ⚠️ #831 (segunda pasada) — el rango va contra el valor que se
+               // ESCRIBE, no contra el documento HEREDADO.
+               //
+               // Esta función corre sobre el doc MERGEADO, así que un rango
+               // incondicional acá no valida la escritura: valida el
+               // DOCUMENTO. Un turno viejo con `durationMin` en 900, o
+               // guardado como double, quedaba sin poder cancelarse ni
+               // anotarse NUNCA más — y `delete: if false`. O sea la misma
+               // familia "turno imborrable" que #781 vino a cerrar,
+               // reintroducida por el fix. Y no se puede saber si esos
+               // documentos existen: `treino-dev` ES producción (#826), no se
+               // le corren queries; se asume que pueden estar.
+               //
+               // Condicionarlo a que el campo CAMBIE no pierde nada: el Path 1
+               // lo pinea contra `resource.data` y el Path 2 sólo puede
+               // escribirlo dentro del rango, así que el valor no puede
+               // EMPEORAR — que es lo único que una regla puede custodiar.
+               // Validar el valor heredado no agregaba seguridad y sí rompía
+               // datos existentes.
+               && (d.get('durationMin', null)
+                     == resource.data.get('durationMin', null)
+                   || (d.get('durationMin', null) is int
+                       && d.get('durationMin', null) > 0
+                       && d.get('durationMin', null) <= 600))
+               // ⚠️ #831 (cuarta pasada) — este chequeo estaba INCONDICIONAL, y
+               // es exactamente el error que el bloque de `durationMin` de acá
+               // arriba documenta, cometido dos líneas más abajo. Medido: un
+               // doc heredado con `startsAt` guardado como string, como número
+               // de millis, o sin el campo, dejaba de poder anotarse Y de
+               // poder cancelarse — imborrable otra vez, la familia de #781.
+               //
+               // Condicionarlo a que el campo CAMBIE no pierde nada: los DOS
+               // caminos pinean `startsAt` contra `resource.data`, así que el
+               // valor escrito nunca puede diferir del guardado. El chequeo
+               // queda igual —convención del archivo, y para que el invariante
+               // no dependa de que todo camino FUTURO se acuerde de pinear—,
+               // pero validando la ESCRITURA, no el documento heredado.
+               && (d.get('startsAt', null) == resource.data.get('startsAt', null)
+                   || d.get('startsAt', null) is timestamp)
+               // Mismo patrón para `cancelledAt`, que no tenía tipo NI cota en
+               // ninguna de las dos funciones de forma: medido, una cancelación
+               // escribía 30 KB adentro del campo y el turno quedaba engordado
+               // sin tocar el `cancellationLog`. El Path 1 lo escribe de
+               // verdad, así que acá no alcanza con pinearlo — hace falta el
+               // tipo.
+               && (d.get('cancelledAt', null) == resource.data.get('cancelledAt', null)
+                   || d.get('cancelledAt', null) == null
+                   || d.get('cancelledAt', null) is timestamp)
+               // ⚠️ #831 (quinta pasada) — acá decía
+               // `optStrMaxLen(…, 200)`, y esa cota es "`<= 200` **O null O
+               // ausente**": el `opt` del nombre es literal. La matriz lo
+               // documentaba como `<= 200` a secas, que es la cota que uno
+               // CREE que escribió, no la que midió.
+               //
+               // El null importa: `athleteDisplayName` es `required String` en
+               // el modelo, así que `Appointment.fromJson` explota con null.
+               // Medido, dos escrituras: el PF ponía el campo en null por el
+               // Path 2 (ALLOW), y a partir de ahí el doc rompía la
+               // deserialización de `watchForTrainer` y `watchForAthlete` — o
+               // sea el stream de las DOS partes, no una fila fea. Y el atleta
+               // NO lo puede reparar: el Path 1 pinea el campo, así que su
+               // único update posible es cancelar el turno.
+               //
+               // La forma correcta es la misma que la de los campos de acá
+               // arriba: o el valor no CAMBIA —y entonces un doc legacy sin
+               // nombre se sigue pudiendo cerrar— o es un string dentro de la
+               // cota. Lo que deja de existir es la escritura que lo pone en
+               // null.
+               && (d.get('athleteDisplayName', null)
+                     == resource.data.get('athleteDisplayName', null)
+                   || (d.get('athleteDisplayName', null) is string
+                       && d.get('athleteDisplayName', null).size() <= 200))
                && optStrMaxLen(d.get('noteBefore', null), 5000)
                && optStrMaxLen(d.get('noteAfter', null), 5000)
                && optStrMaxLen(d.get('cancelledBy', null), 128)
@@ -2310,9 +2529,11 @@ service cloud.firestore {
       // reserva dentro de las próximas 3 horas. Por eso el rango lleva un día
       // de tolerancia hacia atrás — absorbe cualquier offset de zona horaria
       // (±14 h) sin dejar de matar el vector, que es el turno forjado en 1970
-      // o en el año 3000. El tope a futuro es 60 días: el cliente ya acota a
-      // 28 (`REQ-COACH-AGENDA-009`), así que sobra margen y la regla nunca
-      // deniega algo que el cliente produjo.
+      // o en el año 3000. El tope a futuro es **550 días**, no 60: el guard de
+      // 28 días es del auto-booking del atleta (`REQ-COACH-AGENDA-009`) y no
+      // aplica a `createByTrainer`, cuyas dos UIs ofrecen 365 días y con la
+      // recurrencia llegan a ~449. El porqué entero está en
+      // `appointmentShapeOk()`, sobre el borde mismo.
       //
       // Lo que este cambio NO arregla, y conviene tener escrito: un turno
       // legítimo creado a menos de 24 h tampoco se puede cancelar, porque el
@@ -2325,29 +2546,200 @@ service cloud.firestore {
                     && (request.resource.data.athleteId == request.auth.uid
                         || (request.resource.data.trainerId == request.auth.uid
                             && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'));
-      // Update has 3 valid paths: cancellation by member, flip cancelled→confirmed,
-      // or trainer edits coaching notes.
+      // Update: DOS caminos válidos — cancelación por un miembro (Path 1) y
+      // edición del PF sobre su propio turno (Path 2). Eran tres.
       //
-      // QA-SEC-014 (#781): la cota de forma se aplica a los TRES caminos, con
+      // QA-SEC-014 (#781): la cota de forma se aplica a TODOS los caminos, con
       // un `&&` afuera del paréntesis. Ninguno la tenía, así que el cap del
       // `create` se esquivaba creando un turno chico y engordándolo después.
+      //
+      // ─── #831 — el flip de ADR-1 se REMOVIÓ, no se endureció ───────────────
+      //
+      // Acá vivía un tercer camino, `cancelled → confirmed` por un atleta
+      // NUEVO (ADR-1, design.md §43). Era el paso A3 de la cadena del ticket:
+      // crear un turno en la agenda de un PF desconocido, cancelarlo inflando
+      // `cancellationLog` con 30 KB, y re-confirmarlo para que el documento
+      // engordado volviera al stream VIVO de `watchForTrainer` —que filtra
+      // `status == 'confirmed'`— imborrable (`allow delete: if false`).
+      //
+      // La pasada anterior lo endureció con
+      // `athleteId != resource.data.athleteId`. El review mostró que ese gate
+      // se EVADE: el Path 1 no pineaba `athleteId`, así que el atacante lo
+      // movía en la CANCELACIÓN (A2) y llegaba al flip con un `athleteId` ya
+      // distinto del que tenía el doc. Blindar un camino cuyo vecino escribe
+      // la misma variable es perseguir el vector, no cerrarlo.
+      //
+      // Así que se borra. El camino está muerto, y está verificado en tres
+      // puntos, no supuesto:
+      //  · La ÚNICA implementación del flip es `AppointmentRepository.book()`
+      //    (`appointment_repository.dart:72-90`, el `txn.update` con
+      //    `status: 'confirmed'`).
+      //  · `book()` tiene CERO llamadores en `lib/` — sólo dos tests unitarios
+      //    con mock. El auto-booking quedó legacy en Slice C.
+      //  · Los dos creadores VIVOS —`createByTrainer` y
+      //    `createRecurringByTrainer`, llamados desde `new_session_sheet.dart`
+      //    y `new_session_dialog.dart`— usan `_appointments.doc()`, o sea
+      //    AUTO-ID. Estrenan documento siempre, nunca caen sobre uno cancelado,
+      //    así que pasan por `allow create` y nunca necesitaron este camino.
+      //
+      // Mantener una superficie de ataque abierta para una feature que no
+      // existe es peor que no tener la feature: el costo es real y el
+      // beneficio es cero. Si el auto-booking vuelve, que vuelva con su regla
+      // escrita para el modelo de ESE momento — y con `trainer_links` o una
+      // Cloud Function, que es lo que el spec de coach-agenda pide textual
+      // para este camino y hoy no se puede escribir acá (el doc id de
+      // `trainer_links` es autogenerado y `Appointment` no guarda `linkId`).
+      //
+      // Consecuencia buscada, y conviene tenerla escrita: un turno cancelado
+      // ya NO vuelve a `confirmed` desde el cliente. Es un estado TERMINAL.
+      // Todo lo que se escriba en un doc cancelado —notas, log— se queda ahí,
+      // fuera de las tres queries de `lib/`, que filtran las tres
+      // `status == 'confirmed'`.
       allow update: if request.auth != null
                     && appointmentUpdateShapeOk(request.resource.data)
                     && (
-        // Path 1: cancellation by member with >24h
+        // Path 1: cancelación por un miembro con >24 h de anticipación.
+        //
+        // QA-SEC-014 residual (#831) — `cancelledBy` se pinea contra el actor.
+        // Antes el camino no lo miraba: cualquiera de los dos miembros podía
+        // cancelar firmando la cancelación con el uid del OTRO, y como
+        // `delete: if false` y el log es append-only, esa atribución falsa
+        // quedaba fija. No es el vector de texto del ticket —`cancelledBy` ya
+        // está acotado a 128 en la forma— pero es el mismo tipo de daño:
+        // escritura de un tercero que no se puede corregir.
+        //
+        // #831 — y se pinean `athleteId`, `trainerId`, `startsAt`,
+        // `durationMin` y `paymentId` contra `resource.data`. El camino no los tocaba, pero
+        // NO TOCAR NO ES PROHIBIR: `request.resource.data` es el documento
+        // MERGEADO, así que una cancelación podía reescribir los cuatro de
+        // paso. Cada pin mata algo propio, y ninguno es decoración:
+        //  · `startsAt` — el gate de 24 h de abajo lee
+        //    `resource.data.startsAt`, o sea el valor VIEJO. Sin el pin, la
+        //    cancelación pasaba el gate con el horario anterior y guardaba
+        //    otro. Un turno movido al pasado en esa misma escritura no se
+        //    puede cancelar nunca más (el gate exige >24 h) ni borrar
+        //    (`delete: if false`): el turno imborrable de #781, por otra
+        //    puerta.
+        //  · `durationMin` — sin cota de tipo ni pin, la cancelación lo dejaba
+        //    en 100000 y el bloque tapaba el día entero de la agenda del PF.
+        //    Ahora hay las dos cosas: tipo y rango en
+        //    `appointmentUpdateShapeOk()`, y el pin acá.
+        //  · `trainerId` — sin el pin, un miembro mudaba el turno a la agenda
+        //    de un TERCER PF que nunca lo vio.
+        //  · `athleteId` — es el que hacía evadible el gate del viejo flip.
+        //    Con el flip borrado ya no hay a qué encadenarlo, pero el pin se
+        //    queda por sí solo: sin él la cancelación se le atribuye a otro
+        //    atleta, y eso también queda fijo.
+        //  · `paymentId` — money-critical, y es LA MISMA dependencia circular
+        //    que este change vino a cerrar, una vuelta más abajo. El Path 2
+        //    tiene un gate set-once (null → string no vacío, o re-afirmar el
+        //    MISMO valor) que impide reapuntar el cobro. Sin este pin ese gate
+        //    se evadía en DOS pasos sin tocarlo nunca: cancelar limpiando
+        //    `paymentId`, y re-linkear después contra el `null` recién
+        //    fabricado, que el Path 2 lee como primera facturación. Blindar un
+        //    camino cuyo VECINO escribe la misma variable es perseguir el
+        //    vector, no cerrarlo — es literalmente lo que ya había pasado con
+        //    el gate del flip y `athleteId`.
+        //
+        // No rompe nada, y esto sale de leer los escritores, no de suponer:
+        // los DOS únicos que escriben el status `cancelled` en el cliente
+        // —`AppointmentRepository.cancel()` y `cancelFutureSeries()`— mandan
+        // updates PARCIALES de {status, cancelledAt, cancelledBy,
+        // cancellationLog}. Los cinco campos pineados no viajan, así que el
+        // merge los deja idénticos a `resource.data` y las igualdades se
+        // cumplen solas. Los dos ya mandaban además `cancelledBy: actorUid`, y
+        // las cuatro superficies que los llaman derivan ese uid de
+        // `currentUidProvider` (trainer_dashboard_tab, day_timeline vía
+        // TrainerAgendaTab, trainer_day_detail_sheet, agenda_web_screen). El
+        // cascade de borrado de cuenta
+        // (`functions/src/cascade/appointments.ts`) escribe con Admin SDK, así
+        // que las reglas no lo tocan.
+        //
+        // ⚠️ Residuo acotado y consciente #1: esto pinea el ESCALAR
+        // `cancelledBy`, no el `byUid` de la entrada que `arrayUnion` agrega
+        // al `cancellationLog`. Ese sigue siendo forjable porque las reglas no
+        // iteran listas. Cerrarlo pide mover la escritura del log a una CF —
+        // anotado en #831 como decisión de producto, fuera de alcance acá.
+        //
+        // ⚠️ Residuo acotado y consciente #2: `noteBefore` / `noteAfter` NO se
+        // pinean en este camino. Una cancelación puede escribirlos, acotados a
+        // 5000 por la forma. El daño se cierra por el otro lado, no por acá:
+        // sin el flip, ese texto ya no puede llegar NUNCA a un documento
+        // `confirmed`, y ninguna query de `lib/` deserializa uno cancelado.
+        // Pinearlos rompería un futuro "cancelar con motivo" sin cerrar nada
+        // que siguiera abierto.
         (request.resource.data.status == 'cancelled'
          && (request.auth.uid == resource.data.athleteId
              || request.auth.uid == resource.data.trainerId)
+         && request.resource.data.get('cancelledBy', null) == request.auth.uid
+         && request.resource.data.athleteId == resource.data.athleteId
+         && request.resource.data.trainerId == resource.data.trainerId
+         && request.resource.data.startsAt == resource.data.startsAt
+         && request.resource.data.durationMin == resource.data.durationMin
+         && request.resource.data.get('paymentId', null)
+            == resource.data.get('paymentId', null)
+         // #831 (cuarta pasada) — los tres que faltaban, y que aparecieron
+         // recién cuando la pregunta se dio vuelta: en vez de "¿quién escribe
+         // el campo del que depende esta regla?", **"para cada campo de la
+         // allowlist, ¿qué puede hacerle CADA camino?"**. Esa es la matriz de
+         // §4.9 de `docs/security.md`, y es lo que evita la quinta vuelta.
+         //  · `id` — el campo espeja el doc id. Ninguna query de `lib/` lo lee
+         //    (las tres pisan con `{...d.data(), 'id': d.id}`), así que el
+         //    daño era el inflado; con la cota del `create` y este pin el
+         //    campo queda fijo y acotado en todo su ciclo de vida.
+         //  · `athleteDisplayName` — el actor de este camino puede ser el
+         //    ATLETA. Sin el pin, cancelaba dejando 200 caracteres de ruido
+         //    como nombre en la agenda del PF, de forma permanente.
+         //  · `recurringId` — es el que agrupa la serie; `cancelFutureSeries`
+         //    consulta por él. Ningún escritor lo mueve después del `create`.
+         && request.resource.data.get('id', null) == resource.data.get('id', null)
+         && request.resource.data.get('athleteDisplayName', null)
+            == resource.data.get('athleteDisplayName', null)
+         && request.resource.data.get('recurringId', null)
+            == resource.data.get('recurringId', null)
          && resource.data.startsAt.toMillis() - 86400000 > request.time.toMillis())
         ||
-        // Path 2: flip cancelled→confirmed by new athlete (ADR-1)
-        (resource.data.status == 'cancelled'
-         && request.resource.data.status == 'confirmed'
-         && request.resource.data.athleteId == request.auth.uid)
-        ||
-        // Path 3: trainer edits coaching notes OR links a Payment on their own
+        // Path 2: trainer edits coaching notes OR links a Payment on their own
         // appointment (Slice 2a, Agenda→cobro bridge, money-critical).
         // status / athleteId / trainerId / startsAt stay immutable.
+        //
+        // ─── #831 (cuarta pasada) — `cancelledBy` acá era el mismo error ────
+        //
+        // El Path 1 pinea `cancelledBy` contra el actor, y el comentario de
+        // arriba dice textual por qué: *"blindar un camino cuyo VECINO escribe
+        // la misma variable es perseguir el vector, no cerrarlo"*. Este camino
+        // ERA ese vecino, y no lo miraba. Medido, dos escrituras, las dos
+        // ALLOW: el PF cancelaba firmando con su propio uid (Path 1, el pin se
+        // cumple) y en la escritura siguiente ponía `cancelledBy` en el uid del
+        // ATLETA por acá (Path 2, ni lo miraba). Doc `cancelled`, firmado por
+        // quien no canceló, imborrable (`delete: if false`).
+        //
+        // Lo que lo hace peor que el bug: el pin de `paymentId` del Path 1
+        // —el GAP anterior, cerrado bien— es la MISMA lección, aplicada al
+        // campo de al lado, en el mismo commit. Por eso ahora hay una matriz
+        // campo × camino en `docs/security.md` §4.9 y no una lista de vectores:
+        // la lista se recorre buscando el que ya conocés, la matriz obliga a
+        // mirar las 14 filas.
+        //
+        // Los cuatro pines nuevos de este camino son los que la matriz dejó
+        // sin justificación posible: `cancelledBy` y `cancelledAt` son la
+        // ATRIBUCIÓN de una cancelación y este camino no cancela;
+        // `cancellationLog` es su rastro de auditoría —sin el pin el PF le
+        // colgaba entradas forjadas al turno, de a una por escritura—; `id` y
+        // `recurringId` no los mueve ningún escritor después del `create`.
+        // Ninguno viaja en los mapas de `updateNotes`, `markBilled`,
+        // `billAppointment` ni `billAppointments`, que son updates PARCIALES de
+        // `{noteBefore, noteAfter}` o `{paymentId}`: el merge los deja
+        // idénticos y las igualdades se cumplen solas.
+        //
+        // Lo que queda escribible en este camino, y por qué está bien:
+        //  · `noteBefore` / `noteAfter` — son el propósito del camino, acotados
+        //    a 5000 por la forma.
+        //  · `durationMin` — acotado al rango 1..600 por la forma, decisión de
+        //    diseño: el PF es dueño de su agenda y puede corregir la duración.
+        //  · `athleteDisplayName` — acotado a 200, es una denormalización del
+        //    nombre del propio atleta y el PF es dueño de la superficie donde
+        //    se muestra; refrescarlo es una edición legítima.
         // `paymentId` is SET-ONCE: null → a NON-EMPTY STRING (first bill), or
         // re-assert the SAME value (a notes edit that leaves the charge alone).
         // A client can never overwrite it with a different Payment id, clear it
@@ -2361,6 +2753,15 @@ service cloud.firestore {
          && request.resource.data.athleteId == resource.data.athleteId
          && request.resource.data.trainerId == resource.data.trainerId
          && request.resource.data.startsAt == resource.data.startsAt
+         && request.resource.data.get('cancelledBy', null)
+            == resource.data.get('cancelledBy', null)
+         && request.resource.data.get('cancelledAt', null)
+            == resource.data.get('cancelledAt', null)
+         && request.resource.data.get('cancellationLog', [])
+            == resource.data.get('cancellationLog', [])
+         && request.resource.data.get('id', null) == resource.data.get('id', null)
+         && request.resource.data.get('recurringId', null)
+            == resource.data.get('recurringId', null)
          && ((resource.data.get('paymentId', null) == null
               && request.resource.data.get('paymentId', null) is string
               && request.resource.data.get('paymentId', null).size() > 0)
