@@ -29,29 +29,38 @@ import '../../../profile_setup/presentation/widgets/gym_card.dart';
 /// location pattern. Never calls `requestPermission()` except after the
 /// user taps the inline affordance AND accepts the rationale sheet.
 ///
-/// A tap on a row resolves and persists the selection immediately via
-/// `selectGymActionProvider.select(uid, placeId)` — spec gym-places-search
-/// "Selecting a nearby gym uses the same selection path as Autocomplete"
-/// (no session token, unlike a staged Autocomplete tap). [onGymSelected] is
-/// then notified so the host screen can update its highlighted/pinned
-/// state.
+/// Un tap en una fila es SOLO selección de borrador (issue #814): avisa por
+/// [onGymSelected] y la pantalla anfitriona guarda el `placeId` en su
+/// `_pendingGymId`. NO resuelve el Place ni escribe nada — la resolución
+/// (Place Details, facturable) y el write a `users/{uid}.gymId` ocurren
+/// recién en `ProfileGymScreen._save()`, al tocar GUARDAR.
+///
+/// Antes este widget llamaba `selectGymActionProvider.select(...)` en el
+/// tap, así que tocar un cercano cambiaba el gimnasio del atleta en
+/// Firestore sin confirmación — un mis-tap ya le movía rankings y feed por
+/// gimnasio, y GUARDAR quedaba deshabilitado porque el valor pendiente ya
+/// coincidía con el persistido. Ahora este camino es idéntico al del
+/// buscador de [GymSearchBox], que siempre fue draft-only.
 class NearbyGymsList extends ConsumerStatefulWidget {
   const NearbyGymsList({
     super.key,
-    required this.uid,
     required this.currentGymId,
+    this.selectedGymId,
     this.onGymSelected,
   });
 
-  /// Athlete uid — passed straight through to
-  /// `selectGymActionProvider.select(uid: uid, placeId: ...)`.
-  final String uid;
-
-  /// Suppressed from the rendered rows per design AD-5 (the pinned card is
-  /// the single source of truth for the current gym).
+  /// Suppressed from the rendered rows per design AD-5 (la tarjeta pinneada
+  /// es la única fuente de verdad del gimnasio actual).
   final String? currentGymId;
 
-  /// Called with the resolved `gymId` after a successful nearby selection.
+  /// Selección PENDIENTE (borrador) de la pantalla anfitriona. Resalta la
+  /// fila que coincide, igual que `GymSearchBox` resalta la sugerencia
+  /// tipeada elegida: sin esto el tap no tendría ningún feedback visible,
+  /// porque ya no dispara la escritura que antes movía la tarjeta pinneada.
+  final String? selectedGymId;
+
+  /// Avisa el `placeId` tocado. Es una NOTIFICACIÓN de borrador, no una
+  /// confirmación de guardado (#814).
   final void Function(String gymId)? onGymSelected;
 
   @override
@@ -83,18 +92,10 @@ class _NearbyGymsListState extends ConsumerState<NearbyGymsList> {
     await ref.read(nearbyLocationProvider.notifier).requestPermission();
   }
 
-  Future<void> _onGymTap(String placeId) async {
-    await ref.read(selectGymActionProvider.notifier).select(
-          uid: widget.uid,
-          placeId: placeId,
-          useSessionToken: false,
-        );
-    if (!mounted) return;
-    final actionState = ref.read(selectGymActionProvider);
-    if (!actionState.hasError) {
-      widget.onGymSelected?.call(placeId);
-    }
-  }
+  /// Tap = SOLO borrador (#814). Sincrónico y sin `ref.read` de acciones:
+  /// no hay nada que esperar, así que tampoco hay ventana en la que la
+  /// pantalla se desmonte con una operación en vuelo.
+  void _onGymTap(String placeId) => widget.onGymSelected?.call(placeId);
 
   @override
   Widget build(BuildContext context) {
@@ -190,7 +191,10 @@ class _NearbyGymsListState extends ConsumerState<NearbyGymsList> {
                     gym.lng,
                   ),
                 ),
-                selected: false,
+                // El resalte lo manda el borrador de la pantalla, no el
+                // valor persistido: es el único feedback del tap ahora que
+                // no escribe (#814).
+                selected: gym.placeId == widget.selectedGymId,
                 onTap: () => _onGymTap(gym.placeId),
               ),
               const SizedBox(height: 12),

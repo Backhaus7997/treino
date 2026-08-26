@@ -29,6 +29,18 @@ import '../widgets/gym_search_box.dart';
 ///
 /// `kNoGymId` needs no resolution — it updates the local draft only.
 ///
+/// ASIMETRÍA DELIBERADA con `ProfileGymScreen` (issue #814): ahí el tap es
+/// draft-only y GUARDAR es el único punto de persistencia, porque tocar un
+/// gimnasio le pisaba al atleta un `gymId` YA EXISTENTE —el que alimenta sus
+/// rankings y su feed por gimnasio— sin confirmación. Acá no hay nada que
+/// pisar: el alta todavía no tiene `gymId`, el paso no se abandona sin
+/// pasar por `submit()`, y la escritura temprana existe por una dependencia
+/// real —`submit()` escribe el `gymId` crudo y NUNCA resuelve el Place, así
+/// que `gyms/{placeId}` tiene que existir antes o el dual-write de
+/// `gymName` queda vacío—. Diferir esto exigiría mover el resolve adentro de
+/// `ProfileSetupNotifier.submit()`, que es otro cambio de contrato, no la
+/// corrección de #814. Si alguien lo unifica algún día, que empiece por ahí.
+///
 /// Either way, `profileSetupNotifierProvider`'s draft is kept in sync
 /// (`updateGymId`) so `submit()`'s `draft.gymId` read and the search box's
 /// `selected` highlight stay consistent.
