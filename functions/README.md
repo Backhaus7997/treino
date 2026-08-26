@@ -2,6 +2,21 @@
 
 Firebase Cloud Functions for the TREINO app — Node.js 20 + TypeScript 5.
 
+> ## 🚨 `treino-dev` IS PRODUCTION
+>
+> It is TREINO's **only** Firebase project — `treino-prod` does not exist, and
+> there is no separate cloud dev environment. Real users live there. The
+> `firebase deploy` under [Deploying](#deploying) publishes to them.
+>
+> **A bare `firebase deploy`, with no `--project`, goes there too.**
+> `.firebaserc` declares `"default": "treino-dev"` and the CLI fills it in
+> silently, so nothing on the command line warns you. Run `firebase use`
+> (read-only) first to see which project you are actually pointed at.
+>
+> Emulators are the only disposable environment — everything under
+> [Running Tests](#running-tests) is safe. Read
+> [AGENTS.md → Entornos](../AGENTS.md#entornos) before deploying. (#826)
+
 ## Prerequisites
 
 - Node.js 20+
@@ -69,11 +84,19 @@ npm run build
 
 ## Deploying
 
+⚠️ **This deploys to PRODUCTION.** `treino-dev` is TREINO's only Firebase
+project and it serves real users (#826). Maintainer sign-off required. Dropping
+`--project treino-dev` does **not** make it safer — `.firebaserc` defaults to
+the same project, it just stops showing you the name.
+
 ```bash
 # Authenticate first
 firebase login --reauth
 
-# Deploy to treino-dev (requires Blaze plan)
+# Confirm the target BEFORE deploying (read-only)
+firebase use
+
+# ⚠️ WRITES TO PRODUCTION — treino-dev is the live project (requires Blaze plan)
 firebase deploy --only functions --project treino-dev
 ```
 

@@ -23,6 +23,12 @@ import 'firebase_options.dart';
 /// Build para hosting:
 ///   flutter build web -t lib/main_coach_hub.dart
 ///   firebase deploy --only hosting:coach-hub-dev
+///
+/// ⚠️ Ese deploy va a PRODUCCIÓN (#826). El target dice "dev" y el sitio se
+/// llama `coach-treino-dev`, pero es el Coach Hub que usan los PFs reales:
+/// `.firebaserc` resuelve el `--only hosting:` contra `treino-dev`, el único
+/// proyecto Firebase de TREINO. Que el comando no nombre `treino-dev` no
+/// significa que no le esté pegando. Ver AGENTS.md → Entornos.
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
