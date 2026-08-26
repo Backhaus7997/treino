@@ -205,7 +205,7 @@ service cloud.firestore {
         return ['name', 'level', 'days',
                 'source', 'createdBy', 'visibility', 'createdAt', 'status',
                 'split', 'estimatedMinutesPerDay', 'imageUrl', 'numWeeks',
-                'ratingAvg', 'ratingsCount', 'summary'];
+                'ratingAvg', 'ratingsCount', 'summary', 'goals'];
       }
 
       // Read: público para autenticados si la rutina es `visibility: 'public'`
@@ -465,7 +465,7 @@ service cloud.firestore {
                          'source', 'assignedBy', 'assignedTo', 'visibility',
                          'status', 'createdBy', 'createdAt',
                          'estimatedMinutesPerDay', 'imageUrl', 'numWeeks',
-                         'ratingAvg', 'ratingsCount', 'summary'])
+                         'ratingAvg', 'ratingsCount', 'summary', 'goals'])
                        // summary (#648): lo escribe el PF, con tope de largo.
                        // El tope vive ACA y no en el cliente: un cliente
                        // parcheado no lo respetaria. Los 7 sembrados miden
@@ -475,6 +475,16 @@ service cloud.firestore {
                     // The diff must touch ONLY content fields.
                     && request.resource.data.diff(resource.data).affectedKeys()
                          // + numWeeks (periodization) — repo always sends it.
+                         // `goals` (#635 PR#1) NO va acá, y sí en el path de
+                         // PLANTILLA de abajo. Un plan asignado es privado de un
+                         // alumno: no aparece en la grilla de PLANTILLAS, así que
+                         // nada lo rankea por objetivo, y `updateAssigned` tampoco
+                         // lo manda. Darle permiso de escritura sería superficie
+                         // que ningún cliente usa.
+                         //
+                         // Sí está en el `keys()` de arriba: un plan copiado desde
+                         // una plantilla puede ARRASTRAR el campo, y sin eso su
+                         // edición fallaría con permission-denied.
                          .hasOnly(['name', 'split', 'level', 'days', 'numWeeks',
                                    'summary']);
 
@@ -522,7 +532,7 @@ service cloud.firestore {
                          'source', 'assignedBy', 'assignedTo', 'visibility',
                          'status', 'createdBy', 'createdAt',
                          'estimatedMinutesPerDay', 'imageUrl', 'numWeeks',
-                         'ratingAvg', 'ratingsCount', 'summary'])
+                         'ratingAvg', 'ratingsCount', 'summary', 'goals'])
                        // summary (#648): lo escribe el PF, con tope de largo.
                        // El tope vive ACA y no en el cliente: un cliente
                        // parcheado no lo respetaria. Los 7 sembrados miden
@@ -532,8 +542,15 @@ service cloud.firestore {
                     // The diff must touch ONLY content fields.
                     && request.resource.data.diff(resource.data).affectedKeys()
                          // + numWeeks (periodization) — repo always sends it.
+                         // + goals (#635 PR#1): el PF declara para qué sirve la
+                         //   plantilla, y lo edita. Va acá Y en el `keys()` de
+                         //   arriba. En el path del ATLETA va sólo en `keys()`:
+                         //   convive con el campo pero no lo cambia, porque el
+                         //   objetivo es una afirmación de quien publica, no una
+                         //   preferencia de quien la usa. Mismo reparto
+                         //   asimétrico que `summary`.
                          .hasOnly(['name', 'split', 'level', 'days', 'numWeeks',
-                                   'summary']);
+                                   'summary', 'goals']);
 
       // UPDATE path 5 (narrow, Fase W3): the owning trainer publishes /
       // unpublishes their template — flips ONLY `visibility` between

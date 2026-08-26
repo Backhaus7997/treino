@@ -1,3 +1,5 @@
+import 'package:freezed_annotation/freezed_annotation.dart';
+
 import 'package:json_annotation/json_annotation.dart';
 
 /// Why someone trains — the vocabulary shared by the athlete's stated goal and
@@ -57,4 +59,40 @@ enum RoutineGoal {
     }
     return null;
   }
+}
+
+/// Decodifica `List<RoutineGoal>` DESCARTANDO lo que no conoce, en vez de
+/// tirar.
+///
+/// Sin esto, `json_serializable` genera `$enumDecode`, que revienta ante un
+/// valor desconocido — y como `goals` se decodifica como parte de `Routine`,
+/// un objetivo agregado por un cliente nuevo haría que uno viejo **falle al
+/// parsear la rutina entera**. La plantilla no se degradaría: desaparecería
+/// de la grilla, y con ella cualquier rutina del atleta que lo tuviera.
+///
+/// Es el mismo modo de falla que se corrigió en `TemplatePreferences.goal`
+/// con `unknownEnumValue`, pero ese atajo no existe para listas: hay que
+/// filtrar elemento por elemento.
+///
+/// Descartar es la degradación correcta y no una pérdida silenciosa: `goals`
+/// vacío o incompleto significa NEUTRO para el scoring de PLANTILLAS — rankea
+/// más abajo, nunca excluye. El write del cliente viejo sí perdería el valor
+/// desconocido, pero un cliente que no lo entiende tampoco puede editarlo con
+/// criterio; el editor del PF vive en el cliente que sí lo conoce.
+class RoutineGoalListConverter
+    implements JsonConverter<List<RoutineGoal>, List<dynamic>?> {
+  const RoutineGoalListConverter();
+
+  @override
+  List<RoutineGoal> fromJson(List<dynamic>? json) {
+    if (json == null) return const <RoutineGoal>[];
+    return json
+        .map((e) => RoutineGoal.fromWireKey(e is String ? e : null))
+        .whereType<RoutineGoal>()
+        .toList(growable: false);
+  }
+
+  @override
+  List<dynamic> toJson(List<RoutineGoal> object) =>
+      object.map((g) => g.wireKey).toList(growable: false);
 }
