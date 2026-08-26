@@ -2438,6 +2438,8 @@ Baseline 14/14. Tres mutaciones:
 | Desactivar la forma del `create` | **8** |
 | `startsAt` → `> request.time` (el rango ingenuo) | **1** — el caso wall-clock |
 | Desactivar la cota del `update` | **2** |
+| Volver el tope de `startsAt` a 60 días | **1** — el horizonte real del PF |
+| Volver a `size() <= 50` en el `create` | **1** — el `cancellationLog` sembrado |
 
 Pero la primera pasada dio **0 rojos** en las dos últimas, y eso es el hallazgo
 que vale guardar: **tres de los tests eran decoración**, escritos por alguien
@@ -2452,6 +2454,27 @@ que vale guardar: **tres de los tests eran decoración**, escritos por alguien
    estructura de paths; la cota de forma nunca se evaluaba. Ahora viajan sobre
    el Path 1 (cancelación con >24 h), o sea un update que **sin** la cota sería
    válido.
+
+**El review encontró un P1 que ninguna de esas mutaciones cubría.** El tope
+superior de `startsAt` estaba en 60 días, generalizando el guard de 28 de
+`AppointmentRepository.book…` — que aplica SÓLO al auto-booking del atleta.
+`createByTrainer` no tiene guard, las dos UIs de sesión del PF ofrecen
+`lastDate: today.add(Duration(days: 365))`, y con la recurrencia
+(`_kWeekOptions = [2, 4, 8, 12]`) el último turno de una serie cae a ~449 días.
+Como el lote es un **batch atómico**, el tope habría rechazado **la serie
+entera**. Corregido a 550 días.
+
+Es el mismo mecanismo que las dos trampas de arriba —leer UN camino de
+escritura y asumir que aplica a todos— cometido por quien las estaba
+documentando. Las dos últimas mutaciones de la tabla existen para que ese
+arreglo, y el del `cancellationLog`, no se puedan revertir en silencio.
+
+**Sobre `cancellationLog`:** el `size() <= 50` acotaba la cantidad de
+elementos, no el tamaño de cada uno — un solo map de ~1 MB pasaba. El `create`
+lo exige vacío (`@Default([])` en el modelo) y el `update` acota el
+crecimiento a +1 por escritura. ⚠️ Residuo: las reglas **no pueden** mirar el
+tamaño de un elemento de lista, no hay iteración. El techo real es el límite de
+1 MB por documento de Firestore, no la regla.
 
 **La regla general, que es la tercera variante del mismo problema en este
 épico:** un `assertFails` sobre una operación que **ya está denegada por otro
