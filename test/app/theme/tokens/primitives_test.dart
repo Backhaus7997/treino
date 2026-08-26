@@ -81,6 +81,10 @@ void main() {
       expect(AppColorPrimitives.white20, const Color(0x33FFFFFF));
     });
 
+    test('white35 == 0x59FFFFFF (borderStrong dark)', () {
+      expect(AppColorPrimitives.white35, const Color(0x59FFFFFF));
+    });
+
     test('white55 == 0x8CFFFFFF (textMuted dark)', () {
       expect(AppColorPrimitives.white55, const Color(0x8CFFFFFF));
     });
@@ -91,6 +95,10 @@ void main() {
 
     test('black20 == 0x33000000 (borderHover light)', () {
       expect(AppColorPrimitives.black20, const Color(0x33000000));
+    });
+
+    test('black50 == 0x80000000 (borderStrong light)', () {
+      expect(AppColorPrimitives.black50, const Color(0x80000000));
     });
 
     test('black60 == 0x99000000 (textMuted light)', () {

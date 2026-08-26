@@ -32,6 +32,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     required this.bgCard,
     required this.border,
     required this.borderHover,
+    required this.borderStrong,
     required this.textPrimary,
     required this.textMuted,
     required this.sage,
@@ -54,6 +55,28 @@ class AppPalette extends ThemeExtension<AppPalette> {
   /// Border at a brighter alpha for hover states (eg. Coach Hub web sidebar
   /// rows). Additive over [border]; mobile never references it.
   final Color borderHover;
+
+  /// Filo con el que una superficie GRANDE se separa del fondo de la app.
+  ///
+  /// [border] es un borde decorativo: sobre una card, que ya se distingue por
+  /// su propio relleno, alcanza. Pero una superficie translúcida apoyada
+  /// directamente sobre `bg` no tiene relleno propio que la delate —el
+  /// `bgCard` de la bottom bar compone 1,05:1 contra `bg` en dark y 1,15:1 en
+  /// light, o sea NADA— y ahí el filo es lo único que dice dónde empieza el
+  /// contenedor. Con [border] ese filo medía 1,37:1 (dark) y 1,15:1 (light):
+  /// el usuario no veía la barra y leía el pill mint del tab activo como un
+  /// elemento suelto tapando el contenido de arriba (#821).
+  ///
+  /// Está calibrado contra el mínimo de WCAG 2.2 SC 1.4.11 (Non-text Contrast,
+  /// 3:1) para el LÍMITE de un componente de interfaz. Ese piso lo verifica
+  /// `test/core/widgets/treino_bottom_bar_containment_test.dart` sobre píxeles
+  /// rasterizados, no sobre el color declarado: el filo real sale de tres capas
+  /// encimadas (relleno + borde + reflejo especular).
+  ///
+  /// Úsalo SOLO donde una superficie se apoya sobre el fondo desnudo. Para
+  /// bordes internos —celdas, divisores, cards sobre cards— sigue siendo
+  /// [border]: subirle el contraste a todo convierte la UI en un wireframe.
+  final Color borderStrong;
 
   final Color textPrimary;
   final Color textMuted;
@@ -95,6 +118,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     bgCard: AppColorPrimitives.ink900,
     border: AppColorPrimitives.white10,
     borderHover: AppColorPrimitives.white20,
+    borderStrong: AppColorPrimitives.white35,
     textPrimary: AppColorPrimitives.bone,
     textMuted: AppColorPrimitives.white55,
     sage: AppColorPrimitives.sage500,
@@ -116,6 +140,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     bgCard: AppColorPrimitives.white,
     border: AppColorPrimitives.black10,
     borderHover: AppColorPrimitives.black20,
+    borderStrong: AppColorPrimitives.black50,
     textPrimary: AppColorPrimitives.inkText900,
     textMuted: AppColorPrimitives.black60,
     sage: AppColorPrimitives.sageTint50,
@@ -140,6 +165,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     Color? bgCard,
     Color? border,
     Color? borderHover,
+    Color? borderStrong,
     Color? textPrimary,
     Color? textMuted,
     Color? sage,
@@ -159,6 +185,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
         bgCard: bgCard ?? this.bgCard,
         border: border ?? this.border,
         borderHover: borderHover ?? this.borderHover,
+        borderStrong: borderStrong ?? this.borderStrong,
         textPrimary: textPrimary ?? this.textPrimary,
         textMuted: textMuted ?? this.textMuted,
         sage: sage ?? this.sage,
@@ -182,6 +209,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
       bgCard: Color.lerp(bgCard, other.bgCard, t)!,
       border: Color.lerp(border, other.border, t)!,
       borderHover: Color.lerp(borderHover, other.borderHover, t)!,
+      borderStrong: Color.lerp(borderStrong, other.borderStrong, t)!,
       textPrimary: Color.lerp(textPrimary, other.textPrimary, t)!,
       textMuted: Color.lerp(textMuted, other.textMuted, t)!,
       sage: Color.lerp(sage, other.sage, t)!,

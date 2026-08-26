@@ -130,6 +130,18 @@ abstract final class AppColorPrimitives {
   /// `0x33FFFFFF` — Blanco ~20% alpha, borde hover en dark.
   static const Color white20 = Color(0x33FFFFFF);
 
+  /// `0x59FFFFFF` — Blanco ~35% alpha, filo de superficie en dark.
+  ///
+  /// Existe porque [white10] y [white20] NO alcanzan para el LÍMITE de un
+  /// componente: compuestos sobre el relleno translúcido de la bottom bar dan
+  /// 1,37:1 y 1,79:1 contra `ink950`, muy por debajo del 3:1 que pide WCAG 2.2
+  /// SC 1.4.11 para el borde de un control. Con 35% el filo mide ~3,1:1 y la
+  /// barra vuelve a leerse como el contenedor del pill activo (#821).
+  ///
+  /// No confundir con [white20], que es el borde de HOVER de la web: aquel
+  /// marca un estado, éste marca un límite.
+  static const Color white35 = Color(0x59FFFFFF);
+
   /// `0x8CFFFFFF` — Blanco ~55% alpha, texto mutado en dark.
   static const Color white55 = Color(0x8CFFFFFF);
 
@@ -142,6 +154,14 @@ abstract final class AppColorPrimitives {
 
   /// `0x33000000` — Negro ~20% alpha, borde hover en light.
   static const Color black20 = Color(0x33000000);
+
+  /// `0x80000000` — Negro ~50% alpha, filo de superficie en light.
+  ///
+  /// Contraparte clara de [white35], y con MÁS alpha que él a propósito: el
+  /// relleno de la barra en light compone casi blanco puro, así que oscurecerlo
+  /// hasta el 3:1 contra `paper50` cuesta más tinta que aclarar el filo oscuro.
+  /// Ver [white35] para la medición completa (#821).
+  static const Color black50 = Color(0x80000000);
 
   /// `0x99000000` — Negro ~60% alpha, texto mutado en light.
   static const Color black60 = Color(0x99000000);

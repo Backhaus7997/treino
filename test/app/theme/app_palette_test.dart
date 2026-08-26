@@ -39,4 +39,45 @@ void main() {
       expect(result.borderHover, const Color(0x00FFFFFF));
     });
   });
+
+  group('AppPalette.borderStrong token (#821)', () {
+    test('las dos paletas lo exponen', () {
+      expect(AppPalette.mintMagenta.borderStrong, isA<Color>());
+      expect(AppPalette.mintMagentaLight.borderStrong, isA<Color>());
+    });
+
+    test('en dark es 0x59FFFFFF (~35% blanco)', () {
+      expect(AppPalette.mintMagenta.borderStrong, const Color(0x59FFFFFF));
+    });
+
+    test('en light es 0x80000000 (~50% negro)', () {
+      expect(AppPalette.mintMagentaLight.borderStrong, const Color(0x80000000));
+    });
+
+    test('tiene más alpha que border y que borderHover en las dos paletas', () {
+      for (final p in [AppPalette.mintMagenta, AppPalette.mintMagentaLight]) {
+        expect(p.borderStrong.a, greaterThan(p.border.a));
+        expect(p.borderStrong.a, greaterThan(p.borderHover.a));
+      }
+    });
+
+    test('copyWith() sin args lo preserva (exhaustividad)', () {
+      final copy = AppPalette.mintMagenta.copyWith();
+      expect(copy.borderStrong, AppPalette.mintMagenta.borderStrong);
+    });
+
+    test('copyWith(borderStrong:) sobreescribe sólo ese campo', () {
+      final copy = AppPalette.mintMagenta
+          .copyWith(borderStrong: const Color(0x40FFFFFF));
+      expect(copy.borderStrong, const Color(0x40FFFFFF));
+      expect(copy.border, AppPalette.mintMagenta.border);
+      expect(copy.borderHover, AppPalette.mintMagenta.borderHover);
+    });
+
+    test('lerp lo interpola sin romper exhaustividad', () {
+      const a = AppPalette.mintMagenta;
+      final b = a.copyWith(borderStrong: const Color(0x00FFFFFF));
+      expect(a.lerp(b, 1.0).borderStrong, const Color(0x00FFFFFF));
+    });
+  });
 }

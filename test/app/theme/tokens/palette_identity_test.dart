@@ -24,6 +24,8 @@ void main() {
         () => expect(p.border, const Color(0x1AFFFFFF)));
     test('borderHover == 0x33FFFFFF',
         () => expect(p.borderHover, const Color(0x33FFFFFF)));
+    test('borderStrong == 0x59FFFFFF',
+        () => expect(p.borderStrong, const Color(0x59FFFFFF)));
     test('textPrimary == 0xFFFFFFFF',
         () => expect(p.textPrimary, const Color(0xFFFFFFFF)));
     test('textMuted == 0x8CFFFFFF',
@@ -55,6 +57,8 @@ void main() {
         () => expect(p.border, const Color(0x1A000000)));
     test('borderHover == 0x33000000',
         () => expect(p.borderHover, const Color(0x33000000)));
+    test('borderStrong == 0x80000000',
+        () => expect(p.borderStrong, const Color(0x80000000)));
     test('textPrimary == 0xFF0F1513',
         () => expect(p.textPrimary, const Color(0xFF0F1513)));
     test('textMuted == 0x99000000',
