@@ -106,14 +106,23 @@ describe("appointments create — forma y cotas (QA-SEC-014)", () => {
     );
   });
 
-  it("acepta un turno dentro de las próximas horas — el rango tolera el wall-clock", async () => {
-    // ADR-7: `startsAt` es wall-clock, no instante real. Este caso se pone
-    // rojo si alguien endurece el rango a `> request.time`, que denegaría
-    // toda reserva cercana en cualquier zona al oeste de UTC.
+  it("acepta un turno cercano guardado como wall-clock ART — el caso que rompe un rango ingenuo", async () => {
+    // ⚠️ Este caso tiene que MODELAR el corrimiento, no escribir un futuro
+    // real. La primera versión usaba `Date.now() + 1h` y era decoración: ese
+    // valor pasa igual con `> request.time`, así que la mutación que endurece
+    // el borde no lo ponía rojo. Lo destapó la verificación por mutación.
+    //
+    // ADR-7 / QA-COA-003: `startsAt` se guarda como wall-clock UTC. En ART
+    // (UTC−3) una sesión a 2 h vista se persiste como `instante_real − 3 h`,
+    // o sea **1 hora ANTES de ahora** en tiempo real. Ese es el valor que la
+    // app escribe de verdad, y el que un `> request.time` denegaría.
+    const wallClockArtIn2h = Timestamp.fromMillis(
+      Date.now() + 2 * 3600000 - 3 * 3600000
+    );
     await assertSucceeds(
       setDoc(
         doc(dbAs(ATHLETE), COL, "appt-soon"),
-        appointment({ id: "appt-soon", startsAt: Timestamp.fromMillis(Date.now() + 3600000) })
+        appointment({ id: "appt-soon", startsAt: wallClockArtIn2h })
       )
     );
   });
@@ -225,19 +234,33 @@ describe("appointments update — la cota también aplica (QA-SEC-014)", () => {
     });
   });
 
-  it("DENIEGA engordar el turno por el update", async () => {
+  // ⚠️ Estos dos casos viajan sobre el Path 1 (cancelación por un miembro con
+  // >24 h) A PROPÓSITO, y la primera versión no lo hacía.
+  //
+  // Escritos como un update suelto de `noteBefore` desde el atleta, pasaban en
+  // verde **por el motivo equivocado**: no los denegaba la cota de forma sino
+  // la estructura de paths —un atleta cambiando notas no matchea ninguno de
+  // los tres—. La mutación lo destapó: sacar `appointmentUpdateShapeOk()` no
+  // ponía rojo a nadie.
+  //
+  // Para que el negativo custodie lo que dice, el update tiene que ser uno que
+  // SIN la cota sería válido. De ahí el `status: 'cancelled'` acompañando la
+  // basura.
+  it("DENIEGA engordar el turno colgándose de una cancelación válida", async () => {
     // Sin cota en el update, el cap del create se esquiva creando un turno
-    // chico y engordándolo un segundo después.
+    // chico y engordándolo un segundo después por un camino legítimo.
     await assertFails(
       updateDoc(doc(dbAs(ATHLETE), COL, "appt-u"), {
+        status: "cancelled",
         noteBefore: "x".repeat(30000),
       })
     );
   });
 
-  it("DENIEGA agregar claves nuevas por el update", async () => {
+  it("DENIEGA agregar claves nuevas colgándose de una cancelación válida", async () => {
     await assertFails(
       updateDoc(doc(dbAs(ATHLETE), COL, "appt-u"), {
+        status: "cancelled",
         basura: "x".repeat(30000),
       })
     );
