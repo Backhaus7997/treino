@@ -939,6 +939,29 @@ service cloud.firestore {
       // Any authenticated user can read (get or list). Enables prefix-range
       // search queries from searchByDisplayName. REQ-UPP-014. Unchanged by
       // this hardening pass (Read Access Unchanged).
+      //
+      // ⚠️ `isProfilePublic` NO se consulta acá, y es deliberado
+      // (QA-SEC-011, #778 — decidido como Opción B). El flag existe en el doc
+      // y las reglas saben leerlo (`follows` create lo hace en :1350 para el
+      // auto-accept), pero NO gobierna lecturas: un perfil con
+      // `isProfilePublic: false` entrega igual racha, workoutsCount,
+      // contadores, volumen y PRs a cualquier autenticado. Medido contra el
+      // emulador en `docs/security.md` §4.9.
+      //
+      // El motivo no es descuido: las reglas de Firestore **no filtran por
+      // campo en las lecturas** —son todo-o-nada por documento—, así que
+      // "header de identidad público, métricas gateadas" no se puede escribir
+      // acá. Exige partir el documento en dos colecciones, con dual-write,
+      // backfill y ~20 consumidores a tocar, más una decisión sobre los
+      // rankings por gym, que son opt-in explícito sobre estas mismas
+      // métricas. Eso es feature con épico propio, no un ajuste de regla.
+      //
+      // Lo que se hizo en #778 fue cerrar la brecha por el otro lado: el copy
+      // y las dartdocs ya no prometen un gate de contenido. Si algún día se
+      // implementa el gate de verdad, este comentario es el lugar donde
+      // empieza. NO agregues acá un `isProfilePublic == true` creyendo que
+      // alcanza: rompe `searchByDisplayName` (:894) y los rankings, y sigue
+      // sin poder esconder campos sueltos.
       allow read: if request.auth != null;
 
       // Only the owner can create their own doc; uid in body must match doc
