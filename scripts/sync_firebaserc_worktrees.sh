@@ -30,6 +30,21 @@ set -euo pipefail
 #   bash scripts/sync_firebaserc_worktrees.sh --write  # aplica
 #
 # Es idempotente y sólo toca archivos que todavía dicen `treino-dev`.
+#
+# ── TAMBIÉN AUDITA `activeProjects` ──────────────────────────────────────────
+# Arreglar los 28 `.firebaserc` no alcanza: `firebase use <alias>` escribe
+# `activeProjects` en `~/.config/configstore/firebase-tools.json` (NO versionado)
+# y eso le GANA al default. La precedencia real, en
+# `firebase-tools/lib/command.js:196` (`applyRC`):
+#
+#     options.project = --project ?? activeProjects[projectRoot] ?? .firebaserc default
+#
+# Medido contra firebase-tools 13.35.1 con este mismo `.firebaserc`: sin la clave
+# resuelve `demo-treino`; con `activeProjects[dir] = "prod"` resuelve
+# `treino-dev`, o sea PRODUCCIÓN. Es por directorio (`projectRoot`), así que
+# pinea un worktree y no los otros. Como no deja rastro en el repo, la única
+# forma de saberlo es mirar el configstore — que es lo que hace la segunda
+# sección de este script, siempre read-only, incluso con `--write`.
 
 WRITE=0
 [ "${1:-}" = "--write" ] && WRITE=1
@@ -37,6 +52,13 @@ WRITE=0
 ROOT="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
 found=0
 changed=0
+
+# Los directorios de los 29 worktrees, para reusarlos en el audit de abajo.
+# OJO: `$ROOT` es el toplevel de ESTE worktree, no el del repo principal —
+# filtrar los pins por `$ROOT` se perderia los otros 27.
+WT_LIST="$(mktemp)"
+trap 'rm -f "$WT_LIST"' EXIT
+git -C "$ROOT" worktree list --porcelain | awk '/^worktree /{print $2}' > "$WT_LIST"
 
 while IFS= read -r wt; do
   f="${wt}/.firebaserc"
@@ -57,12 +79,53 @@ PY
   else
     echo "  pendiente    ${f}"
   fi
-done < <(git -C "$ROOT" worktree list --porcelain | awk '/^worktree /{print $2}')
+done < "$WT_LIST"
 
 if [ "$found" = "0" ]; then
   echo "Todos los worktrees ya tienen el default seguro (demo-treino)."
 elif [ "$WRITE" = "1" ]; then
   echo "Listo: ${changed} worktree(s) actualizados. Quedan como cambio SIN commitear en cada uno."
 else
-  echo "${found} worktree(s) con el default de PRODUCCIÓN. Corré con --write para arreglarlos."
+  echo "${found} worktree(s) con el default de PRODUCCION. Corre con --write para arreglarlos."
+fi
+
+# -- `activeProjects`: lo que le gana al default (ver cabecera) ----------------
+# READ-ONLY siempre. Nunca escribe el configstore: sacar un pin ajeno es una
+# decision de la persona que lo puso, no de este script.
+echo
+CONFIGSTORE="${XDG_CONFIG_HOME:-${HOME}/.config}/configstore/firebase-tools.json"
+if [ ! -f "$CONFIGSTORE" ]; then
+  echo "activeProjects: sin configstore (${CONFIGSTORE}). Nada que pueda pisar el default."
+else
+  python3 - "$CONFIGSTORE" "$WT_LIST" <<'PYEOF'
+import io, json, sys
+
+path, wt_list = sys.argv[1], sys.argv[2]
+worktrees = [l.strip() for l in io.open(wt_list, encoding='utf-8') if l.strip()]
+try:
+    data = json.loads(io.open(path, encoding='utf-8').read())
+except Exception as err:  # configstore corrupto o ilegible: decilo, no lo tapes
+    print("activeProjects: no se pudo leer %s (%s)." % (path, err))
+    raise SystemExit(0)
+
+active = data.get('activeProjects') or {}
+if not active:
+    print("activeProjects: la clave no existe. Ningun directorio esta pineado; "
+          "manda el default de `.firebaserc`.")
+    raise SystemExit(0)
+
+mine = {d: p for d, p in active.items() if d in worktrees}
+if not mine:
+    print("activeProjects: %d pin(es) en la maquina, ninguno en los %d worktrees "
+          "de este repo." % (len(active), len(worktrees)))
+    raise SystemExit(0)
+
+print("activeProjects: %d directorio(s) de este repo PINEADOS -- le ganan al "
+      "default de `.firebaserc`:" % len(mine))
+for d, proj in sorted(mine.items()):
+    # `prod` y `treino-dev` resuelven los dos a produccion (alias de .firebaserc)
+    danger = '  <-- PRODUCCION' if proj in ('prod', 'treino-dev') else ''
+    print("  %s  ->  %s%s" % (d, proj, danger))
+print("Para soltar uno: `firebase use --clear` dentro de ese directorio.")
+PYEOF
 fi
