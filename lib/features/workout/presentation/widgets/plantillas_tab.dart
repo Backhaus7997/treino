@@ -69,7 +69,12 @@ class _PlantillasTabState extends ConsumerState<PlantillasTab>
     super.build(context);
     final palette = AppPalette.of(context);
     final theme = Theme.of(context);
-    final entriesAsync = ref.watch(filteredUnifiedTemplatesProvider);
+    // Rankeado, no sólo filtrado (#635 PR#3): las pills de nivel siguen
+    // filtrando, y encima de eso el catálogo se ordena por afinidad con lo que
+    // el atleta respondió en el mini-onboarding. Quien no respondió ve el
+    // mismo orden de siempre — con preferencias vacías el provider devuelve la
+    // lista sin tocar.
+    final entriesAsync = ref.watch(rankedUnifiedTemplatesProvider);
     final filter = ref.watch(routinesLevelFilterProvider);
 
     return Padding(

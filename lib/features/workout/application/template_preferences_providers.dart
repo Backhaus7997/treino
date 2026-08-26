@@ -55,3 +55,22 @@ class TemplatePreferencesController {
     }
   }
 }
+
+/// Las preferencias de plantillas del atleta firmado, o vacías si no respondió
+/// (#635 PR#3).
+///
+/// `select` sobre el campo y no `watch` del perfil entero: el stream de
+/// `users/{uid}` re-emite por cualquier cambio —una foto de perfil, un flag de
+/// onboarding, el peso— y sin esto el ranking de PLANTILLAS se recalcularía
+/// con cada uno.
+///
+/// Vacío y ausente colapsan al mismo valor a propósito: quien saltó el
+/// cuestionario y quien lo respondió sin elegir nada están en el mismo estado
+/// —sin señal— y el scoring los trata igual.
+final athleteTemplatePreferencesProvider = Provider<TemplatePreferences>((ref) {
+  return ref.watch(
+        userProfileProvider
+            .select((p) => p.valueOrNull?.templatePreferences),
+      ) ??
+      const TemplatePreferences();
+});
