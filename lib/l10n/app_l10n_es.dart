@@ -1965,10 +1965,7 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get routineEditorGoalsHelp =>
-      'Elegí uno o más. Ayuda a que el alumno encuentre la plantilla cuando busca por objetivo.';
-
-  @override
-  String get routineEditorGoalsEmpty => 'Sin objetivo declarado';
+      'Opcional. Ayuda a que el alumno encuentre la plantilla cuando busca por objetivo.';
 
   @override
   String get exerciseNoteFromCoachTag => 'DEL COACH';
@@ -5976,10 +5973,7 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get routineEditorGoalsHelp =>
-      'Elegí uno o más. Ayuda a que el alumno encuentre la plantilla cuando busca por objetivo.';
-
-  @override
-  String get routineEditorGoalsEmpty => 'Sin objetivo declarado';
+      'Opcional. Ayuda a que el alumno encuentre la plantilla cuando busca por objetivo.';
 
   @override
   String get exerciseNoteFromCoachTag => 'DEL COACH';

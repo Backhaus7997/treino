@@ -2192,6 +2192,11 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                           color: palette.textMuted,
                         ),
                       ),
+                      // Sin estado vacío explícito: la bajada ya dice
+                      // "opcional". Vacío es un estado válido —la plantilla
+                      // sigue en la grilla, sin señal para rankear— y una línea
+                      // extra sólo para decirlo empujaba DÍAS DEL PLAN fuera
+                      // del área construida del ListView.
                       const SizedBox(height: AppSpacing.s8),
                       Wrap(
                         key: const Key('editor_goals_picker'),
@@ -2216,17 +2221,6 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                             ),
                         ],
                       ),
-                      if (_goals.isEmpty) ...[
-                        const SizedBox(height: AppSpacing.s8),
-                        Text(
-                          l10n.routineEditorGoalsEmpty,
-                          style: GoogleFonts.barlow(
-                            fontWeight: FontWeight.w400,
-                            fontSize: 12,
-                            color: palette.textMuted,
-                          ),
-                        ),
-                      ],
                     ],
 
                     // ── Row: Share on public profile — SelfCreating only

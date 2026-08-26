@@ -461,6 +461,15 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      // El editor es un ListView y en modo PLANTILLA el selector PARA QUÉ
+      // SIRVE (#635 PR#1b) corre el botón fuera del área construida. SS-001
+      // no lo necesita: en TrainerAssigning ese selector no se muestra,
+      // porque un plan asignado no entra al catálogo.
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('add_superset_button')),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(find.byKey(const Key('add_superset_button')), findsOneWidget);
     });
 

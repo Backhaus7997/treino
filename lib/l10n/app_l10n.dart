@@ -3617,14 +3617,8 @@ abstract class AppL10n {
   /// Bajada del selector. Dice qué se gana respondiendo, no que sea obligatorio: sin objetivos la plantilla sigue apareciendo en la grilla, sólo que sin señal para rankear.
   ///
   /// In es_AR, this message translates to:
-  /// **'Elegí uno o más. Ayuda a que el alumno encuentre la plantilla cuando busca por objetivo.'**
+  /// **'Opcional. Ayuda a que el alumno encuentre la plantilla cuando busca por objetivo.'**
   String get routineEditorGoalsHelp;
-
-  /// Estado del selector cuando no hay ninguno elegido. Neutro a propósito: no es un error ni una advertencia.
-  ///
-  /// In es_AR, this message translates to:
-  /// **'Sin objetivo declarado'**
-  String get routineEditorGoalsEmpty;
 
   /// No description provided for @exerciseNoteFromCoachTag.
   ///

@@ -220,7 +220,20 @@ void main() {
     // never created days). Day count is driven only by "DÍAS DEL PLAN".
     expect(find.text('DÍAS/SEM'), findsNothing);
     expect(find.text('NIVEL'), findsOneWidget);
+
+    // El editor es un ListView: lo que queda bajo el fold no está
+    // construido. Desde que el modo PLANTILLA suma el selector PARA QUÉ
+    // SIRVE (#635 PR#1b), DÍAS DEL PLAN cae fuera del área inicial y hay
+    // que traerlo — igual que haría el PF con el dedo. El test de
+    // TrainerAssigning de arriba no lo necesita: ahí el selector no se
+    // muestra, justamente porque un plan asignado no entra al catálogo.
+    await tester.scrollUntilVisible(
+      find.text('DÍAS DEL PLAN'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('DÍAS DEL PLAN'), findsOneWidget);
+    expect(find.byKey(const Key('editor_goals_picker')), findsOneWidget);
   });
 
   // ── Validation: athlete mode passes without split ─────────────────────────────

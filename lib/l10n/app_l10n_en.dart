@@ -1915,10 +1915,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get routineEditorGoalsHelp =>
-      'Pick one or more. It helps athletes find the template when they search by goal.';
-
-  @override
-  String get routineEditorGoalsEmpty => 'No goal declared';
+      'Optional. It helps athletes find the template when they search by goal.';
 
   @override
   String get exerciseNoteFromCoachTag => 'FROM COACH';
