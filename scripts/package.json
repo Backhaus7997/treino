@@ -3,14 +3,18 @@
   "version": "1.0.0",
   "private": true,
   "description": "Treino workout catalog seed scripts.",
+  "//  LEER ANTES DE CORRER CUALQUIERA DE ESTOS": "npm ignora toda clave que empiece con '//' y las imprime en `npm run` sin argumentos, que es justo donde alguien busca el nombre del script. Contexto completo: scripts/README.md y AGENTS.md § Entornos. (#826)",
   "scripts": {
     "test": "node --test \"test/*.test.js\"",
+    "//  🚨 LOS 6 DE ABAJO ESCRIBEN EN PRODUCCIÓN": "`treino-dev` es el ÚNICO proyecto Firebase de TREINO y ahí viven los usuarios reales. Estos 6 escriben por Admin SDK, que SALTEA las Firestore rules, y NO nombran el proyecto en pantalla: lo resuelve el SDK desde GOOGLE_APPLICATION_CREDENTIALS. Que `seed:emulator` traiga las env vars inline y estos no, NO significa que estos sean el default seguro: significa que el seguro es la excepción. Para correrlos contra el emulador hay que ponerlas a mano. (#826)",
     "seed:exercises": "node seed_workout_catalog.js --exercises",
     "seed:routines": "node seed_workout_catalog.js --routines",
     "seed:all": "node seed_workout_catalog.js --all",
     "seed:trainers": "node seed_trainer_profiles.js",
+    "//  🚨 seed:trainers:clear ADEMÁS BORRA": "corre seed_trainer_profiles.js --clear, que hace batch.delete() sobre users/{uid} y trainerPublicProfiles/{uid} de los 5 uids sembrados. El backup diario de Firestore cubre esa colección; NO cubre Cloud Storage ni los usuarios de Auth. (#826)",
     "seed:trainers:clear": "node seed_trainer_profiles.js --clear",
     "promote:trainer": "node promote_user_to_trainer.js",
+    "//  ✅ LOS DOS DE ABAJO SON LOS SEGUROS": "traen FIREBASE_AUTH_EMULATOR_HOST + FIRESTORE_EMULATOR_HOST inline, así que van al emulador local siempre. Son la EXCEPCIÓN en este archivo, no la regla. (#826)",
     "seed:emulator": "FIREBASE_AUTH_EMULATOR_HOST=localhost:9099 FIRESTORE_EMULATOR_HOST=localhost:8080 node seed_emulator_full.js",
     "seed:emulator:clear": "FIREBASE_AUTH_EMULATOR_HOST=localhost:9099 FIRESTORE_EMULATOR_HOST=localhost:8080 node seed_emulator_full.js --clear"
   },

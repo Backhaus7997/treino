@@ -28,8 +28,10 @@
  */
 
 const Module = require('node:module');
+const fs = require('node:fs');
 
 const STUB_FIRESTORE_REACHED = 'STUB_FIRESTORE_REACHED';
+const STUB_NETWORK_REACHED = 'STUB_NETWORK_REACHED';
 
 function firestoreStub() {
   return {
@@ -43,15 +45,36 @@ function firestoreStub() {
 }
 
 const adminStub = {
+  // `seed_workout_catalog.js` consulta `admin.apps.length` para no inicializar
+  // dos veces cuando `seed_emulator_full.js` lo requiere. En el módulo real
+  // arranca vacío; el stub replica eso y nunca lo llena, así que cada carga en
+  // subproceso ve el mismo estado limpio.
+  apps: [],
   initializeApp() {},
   credential: { cert: (serviceAccount) => serviceAccount },
   firestore: firestoreStub,
+};
+
+/**
+ * `deploy_rules.js` no pasa por `firebase-admin`: usa `google-auth-library` y
+ * pega directo contra la REST API de Firebase Rules. Sin este stub el test
+ * saldría A LA RED. `getClient()` tira en vez de devolver un cliente, así que
+ * el marcador prueba lo mismo que `STUB_FIRESTORE_REACHED` prueba para los
+ * backfills: si aparece DESPUÉS del cartel, el cartel salió primero. (#826)
+ */
+const googleAuthStub = {
+  GoogleAuth: class {
+    async getClient() {
+      throw new Error(STUB_NETWORK_REACHED);
+    }
+  },
 };
 
 const cargaOriginal = Module._load;
 
 Module._load = function cargaInterceptada(request, parent, isMain) {
   if (request === 'firebase-admin') return adminStub;
+  if (request === 'google-auth-library') return googleAuthStub;
 
   // El nombre real del key (#826): `sa-key.json`, no
   // `treino-dev-service-account.json`. Los backfills lo hacen `require`
@@ -64,4 +87,17 @@ Module._load = function cargaInterceptada(request, parent, isMain) {
   return cargaOriginal.apply(this, arguments);
 };
 
-module.exports = { STUB_FIRESTORE_REACHED };
+// `deploy_rules.js` NO hace `require` del key: lo lee con `fs.readFileSync`.
+// Interceptar la lectura (en vez de escribir un `sa-key.json` de mentira en
+// `scripts/`) es lo único seguro: ese archivo es gitignored justamente porque
+// puede existir de verdad en la máquina de quien corre los tests, y un test
+// jamás puede pisarlo.
+const readFileSyncOriginal = fs.readFileSync;
+fs.readFileSync = function lecturaInterceptada(ruta, ...resto) {
+  if (typeof ruta === 'string' && ruta.endsWith('sa-key.json')) {
+    return JSON.stringify({ project_id: process.env.STUB_PROJECT_ID || 'treino-dev' });
+  }
+  return readFileSyncOriginal.call(this, ruta, ...resto);
+};
+
+module.exports = { STUB_FIRESTORE_REACHED, STUB_NETWORK_REACHED };

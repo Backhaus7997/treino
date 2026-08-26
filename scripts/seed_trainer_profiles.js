@@ -34,12 +34,17 @@
  *   trainerPublicProfiles which is auth-only-read (any logged-in athlete
  *   can read).
  * - To deploy in prod: do NOT run this. Only for dev/QA emulator or a
- *   throwaway test project.
+ *   throwaway test project. 🚨 Y ojo con el atajo: `npm run seed:trainers:clear`
+ *   corre este mismo archivo con `--clear` y **BORRA** `users/{uid}` +
+ *   `trainerPublicProfiles/{uid}` de los 5 uids sembrados, sin nombrar el
+ *   proyecto en pantalla. Imprime un cartel antes del primer write cuando el
+ *   destino es producción. (#826)
  */
 
 'use strict';
 
 const admin = require('firebase-admin');
+const { bannerDeProduccion } = require('./lib/firebase_projects');
 
 if (process.env.FIRESTORE_EMULATOR_HOST) {
   // Admin SDK with emulator — no service account needed.
@@ -58,6 +63,11 @@ if (process.env.FIRESTORE_EMULATOR_HOST) {
     );
     process.exit(1);
   }
+  // El cartel va ANTES de `initializeApp()`. Este script ya tiene el
+  // `project_id` a mano —lo acaba de leer del key—, así que no hace falta
+  // resolverlo desde el entorno. `npm run seed:trainers:clear` BORRA. (#826)
+  const bannerProd = bannerDeProduccion(serviceAccount.project_id);
+  if (bannerProd) console.warn(bannerProd);
   admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 }
 

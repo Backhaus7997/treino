@@ -20,9 +20,23 @@
  * See scripts/README.md for full usage and prerequisites.
  *
  * ADR-TPO-007: role-flip + name backfill, uid-based, validate doc exists, idempotent.
+ *
+ * 🚨 ESCRIBE EN PRODUCCIÓN por Admin SDK —salteándose la regla de rol
+ * inmutable— salvo que apuntes al emulador. Es el entrypoint de
+ * `npm run promote:trainer`, que no nombra el proyecto en ningún lado.
+ * Imprime un cartel antes del primer write cuando el destino es producción. (#826)
  */
 
 const admin = require('firebase-admin');
+// El cartel va ANTES de `initializeApp()`: lo que frena a alguien tiene que
+// estar en pantalla antes del primer write, no después. `npm run promote:trainer`
+// no nombra el proyecto en ningún lado — lo resuelve el SDK desde el entorno. (#826)
+const { bannerDeProduccion } = require('./lib/firebase_projects');
+const { usandoEmulador, projectIdObjetivo } = require('./lib/target_project');
+const bannerProd = bannerDeProduccion(projectIdObjetivo(), {
+  contraEmulador: usandoEmulador(),
+});
+if (bannerProd) console.warn(bannerProd);
 admin.initializeApp();
 const db = admin.firestore();
 
