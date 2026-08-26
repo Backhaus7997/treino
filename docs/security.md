@@ -87,7 +87,7 @@ son `get` / `list` / `write` / `delete`.
 | `profile_shares` | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `coach_availability_rules` | — | — | ✅ | ✅ | — |
 | `coach_availability_overrides` | — | — | ✅ | ✅ | — |
-| `appointments` | — | — | 🟡 | — | — |
+| `appointments` | — | — | ✅ | ✅ | — |
 | `measurements` | ✅ | ✅ | ✅ | ✅ | 🟡 |
 | `performance_tests` | — | — | ✅ | ✅ | — |
 | `athlete_billing` | ✅ | — | 🟡 | 🟡 | — |
@@ -99,7 +99,7 @@ son `get` / `list` / `write` / `delete`.
 | `reviews` | — | — | ✅ | — | — |
 | `mail_queue` | — | — | — | — | — |
 
-**102 de 170 celdas** tienen test negativo (60%). Por operación:
+**103 de 170 celdas** tienen test negativo (61%). Por operación:
 
 | Operación | Paths con test negativo |
 |---|---|
