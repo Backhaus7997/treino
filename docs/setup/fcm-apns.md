@@ -95,11 +95,6 @@ The CF itself returns 200 OK and shows no internal error in its logs unless the 
 
 ### Option B — gcloud CLI
 
-🚨 This grants an IAM role on **production** — `treino-dev` is TREINO's only
-Firebase project (see the warning at the top of this file). The grant itself is
-additive and low-risk, but it is a real change to the live project: run it
-knowingly, not as a copy-paste.
-
 ```bash
 gcloud projects add-iam-policy-binding treino-dev \
   --member="serviceAccount:1079774251763-compute@developer.gserviceaccount.com" \
