@@ -27,6 +27,9 @@ pagos, turnos, mediciones, chats y perfiles comerciales publicados.
   (`firebase firestore:backups:schedules:list --project prod`).
   **No cubre Cloud Storage ni los usuarios de Auth.**
 
+- Los checklists de `openspec/changes/` traen comandos de escritura contra ese
+  proyecto. Antes de ejecutar un ítem de ahí: [openspec/AGENTS.md](./openspec/AGENTS.md).
+
 → Contexto y decisión: [#826](https://github.com/Backhaus7997/treino/issues/826).
 
 ---

@@ -26,9 +26,15 @@
  *   location.latitude/longitude, types.
  *
  * The Places server API key (`PLACES_API_KEY`) is provisioned via Secret
- * Manager (`firebase functions:secrets:set PLACES_API_KEY`) — never
- * hardcoded, never logged, never included in error messages sent to the
+ * Manager (`firebase functions:secrets:set PLACES_API_KEY --project prod`) —
+ * never hardcoded, never logged, never included in error messages sent to the
  * client (see errors below).
+ *
+ * ⚠️ Ese comando escribe en PRODUCCIÓN (#826): `prod` y `treino-dev` son el
+ * mismo y único proyecto Firebase de TREINO, con los usuarios reales adentro.
+ * Sin `--project`, `.firebaserc` resuelve al mismo lugar sin nombrarlo. La key
+ * es facturable: pisarla o rotarla mal rompe la búsqueda de gimnasios en la
+ * app publicada. Ver AGENTS.md § Entornos.
  *
  * Design: sdd/gym-google-places/design (#348).
  * Spec:   sdd/gym-google-places/spec — gym-places-search (#347).
@@ -268,7 +274,8 @@ export async function runResolveGymPlace(
  * Named export so firebase-functions-test can wrap it directly.
  * Deployed to southamerica-east1, holds PLACES_API_KEY via Secret Manager.
  *
- * Operator setup: `firebase functions:secrets:set PLACES_API_KEY`.
+ * Operator setup: `firebase functions:secrets:set PLACES_API_KEY --project prod`
+ * — ⚠️ PRODUCCIÓN (#826). Ver el header de este archivo antes de correrlo.
  */
 export const resolveGymPlace = functions.onCall(
   { region: "southamerica-east1", secrets: ["PLACES_API_KEY"] },

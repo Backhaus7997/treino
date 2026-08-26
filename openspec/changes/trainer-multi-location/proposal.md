@@ -164,8 +164,16 @@ Script `scripts/seed_gyms.js` con **~20 gyms reales** de Argentina (Córdoba + B
 
 ## 7. Success criteria
 
-- [ ] Schema migration corrida en `treino-dev`; todos los PFs existentes (incluye Mateo) tienen `trainerLocations` no-vacío sin perder datos.
-- [ ] Seed inicial de gyms corrido en `treino-dev`; ~20 docs en `gyms/`.
+> 🚨 **`treino-dev` es PRODUCCIÓN.** Los dos primeros criterios describen una
+> migración de schema y un seed **sobre los datos reales de los PFs** (sí:
+> "los PFs existentes, incluye Mateo" son cuentas de verdad). Ambos corren por
+> Admin SDK, que **saltea las security rules**, y una migración mal apuntada no
+> se deshace. Probalos primero contra el emulador (`./scripts/emulator.sh`); la
+> corrida real necesita OK explícito de un humano.
+> Ver [openspec/AGENTS.md](../../AGENTS.md) · #826.
+
+- [ ] 🚨 PROD — Schema migration corrida en `treino-dev`; todos los PFs existentes (incluye Mateo) tienen `trainerLocations` no-vacío sin perder datos. **Dry-run + backup antes; no la corre un agente por su cuenta.**
+- [ ] 🚨 PROD — Seed inicial de gyms corrido en `treino-dev`; ~20 docs en `gyms/`. **Verificá primero que no pise `gyms/` ya poblado.**
 - [ ] Discovery query funciona end-to-end: atleta busca PF que tiene 2 ubicaciones, lo encuentra desde cualquiera de las 2.
 - [ ] `UserRepository.update()` rechaza el caso `empty trainerLocations + offersOnline:false` con error claro.
 - [ ] Firestore rules para `gyms/` deployadas + tests en `scripts/rules_test/`.

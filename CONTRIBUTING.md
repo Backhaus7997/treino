@@ -302,7 +302,7 @@ No hay rama de fase. El tag sirve como punto de referencia para `git diff v0.1.0
 >
 > Te van a agregar como **Editor**, o sea que vas a poder deployar y borrar.
 > Antes de correr cualquier `firebase deploy`, `firestore:delete` o script de
-> `scripts/`, leé [AGENTS.md → Entornos](./AGENTS.md#entornos).
+> `scripts/`, leé [AGENTS.md → Entornos](./AGENTS.md#-entornos--leer-antes-de-correr-cualquier-comando).
 >
 > Para desarrollar y probar usá el emulador — es el único entorno descartable:
 > `./scripts/emulator.sh` y `flutter run --dart-define=USE_EMULATOR=true`.

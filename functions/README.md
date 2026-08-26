@@ -15,7 +15,7 @@ Firebase Cloud Functions for the TREINO app — Node.js 20 + TypeScript 5.
 >
 > Emulators are the only disposable environment — everything under
 > [Running Tests](#running-tests) is safe. Read
-> [AGENTS.md → Entornos](../AGENTS.md#entornos) before deploying. (#826)
+> [AGENTS.md → Entornos](../AGENTS.md#-entornos--leer-antes-de-correr-cualquier-comando) before deploying. (#826)
 
 ## Prerequisites
 

@@ -35,8 +35,14 @@ import { MailSendError, MailSender, createResendSender } from "./resend-client";
 
 /**
  * Resend API key. Create it with:
- *   firebase functions:secrets:set RESEND_API_KEY
+ *   firebase functions:secrets:set RESEND_API_KEY --project prod
  * Deploying without it fails fast rather than sending nothing silently.
+ *
+ * ⚠️ Ese comando escribe en PRODUCCIÓN (#826). `prod` y `treino-dev` son el
+ * mismo y único proyecto Firebase de TREINO: adentro están los usuarios reales.
+ * Sin `--project`, `.firebaserc` resuelve al mismo destino sin nombrarlo en
+ * pantalla. Pisar esta key manda a 403 todo el mail transaccional de la app
+ * publicada. Ver AGENTS.md § Entornos.
  */
 const RESEND_API_KEY = defineSecret("RESEND_API_KEY");
 

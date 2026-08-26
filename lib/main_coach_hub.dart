@@ -22,7 +22,7 @@ import 'firebase_options.dart';
 ///
 /// Build para hosting:
 ///   flutter build web -t lib/main_coach_hub.dart
-///   firebase deploy --only hosting:coach-hub-dev
+///   firebase deploy --only hosting:coach-hub-dev --project prod
 ///
 /// ⚠️ Ese deploy va a PRODUCCIÓN (#826). El target dice "dev" y el sitio se
 /// llama `coach-treino-dev`, pero es el Coach Hub que usan los PFs reales:

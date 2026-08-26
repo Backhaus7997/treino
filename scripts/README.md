@@ -11,9 +11,14 @@ Admin SDK utilities operated by the team against `treino-dev`.
 > `ios/Runner/GoogleService-Info.plist` all point at `treino-dev`).
 >
 > **39 of the 43 scripts** here write through the Admin SDK, which **bypasses
-> the Firestore security rules**. There is no declared backup. A mis-pointed
-> `backfill_*` / `seed_*` / `cleanup_*` / `migrate_*` run destroys real user
-> data, irreversibly.
+> the Firestore security rules**. A mis-pointed `backfill_*` / `seed_*` /
+> `cleanup_*` / `migrate_*` run destroys real user data.
+>
+> Firestore has a daily backup schedule with 28-day retention
+> (`firebase firestore:backups:schedules:list --project prod`), so a Firestore
+> mistake is recoverable — at the cost of a restore and whatever was written in
+> between. **The schedule does not cover Cloud Storage or Auth users**: anything
+> a script does there is irreversible.
 >
 > The four that do **not** write are `audit_trainer_profiles.mjs`,
 > `audit_ranking_optin.js`, `build_catalog_proposal.js` and
@@ -24,7 +29,7 @@ Admin SDK utilities operated by the team against `treino-dev`.
 >
 > **Default to the emulator** (see below). A run against `treino-dev` needs
 > explicit maintainer sign-off, and `--dry-run` first where the script supports
-> it. → [AGENTS.md → Entornos](../AGENTS.md#entornos) · issue #826.
+> it. → [AGENTS.md → Entornos](../AGENTS.md#-entornos--leer-antes-de-correr-cualquier-comando) · issue #826.
 
 ## Prerequisites
 

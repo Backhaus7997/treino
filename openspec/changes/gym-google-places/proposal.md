@@ -57,10 +57,15 @@ Retire the now-dead two-step machinery:
 
 ### Prerequisite (external, user's action — BLOCKS end-to-end testing)
 
+> 🚨 **This is PRODUCTION setup.** `treino-dev` is TREINO's only Firebase project
+> — real users live there. Every step below is a billable change on the live
+> project. Operator-only, human sign-off required.
+> See [openspec/AGENTS.md](../../AGENTS.md) · #826.
+
 GCP setup on the project backing `treino-dev`:
 1. Enable **Places API (New)** (distinct from legacy "Places API").
 2. Confirm **Blaze billing** is active on the Firebase project (near-certain given Functions + Firestore already run).
-3. Create a **server-only key** in **Secret Manager**: `firebase functions:secrets:set PLACES_API_KEY`.
+3. Create a **server-only key** in **Secret Manager**: `firebase functions:secrets:set PLACES_API_KEY --project prod`.
 4. Create a **bundle-id-restricted client key** for Autocomplete (separate from the server key).
 5. Set a **Cloud Billing budget alert** (Places is metered per-call; guards against a debounce bug).
 6. **Provide the `treino-dev` GCP project id / number** — not found in scanned files; needed to enable the API + billing.

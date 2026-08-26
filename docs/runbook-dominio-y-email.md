@@ -74,8 +74,12 @@ raíz.**
 ## 2 · Firebase — el secret
 
 ```bash
-firebase functions:secrets:set RESEND_API_KEY
+firebase functions:secrets:set RESEND_API_KEY --project prod
 ```
+
+🚨 Ese `--project prod` no cambia el destino: `prod` y `treino-dev` son
+el mismo project ID y, sin la flag, `.firebaserc` resuelve ahí igual. Lo que
+hace es que el destino **se vea** en pantalla y en el log.
 
 El remitente por defecto ya está en el código
 (`MAIL_FROM = "TREINO <hola@send.gettreino.com>"`,
@@ -139,11 +143,14 @@ Recién **después** de que Resend diga Verified:
    ```
 2. Cambiar `lib/features/auth/data/auth_service.dart` (líneas 121 y 130) para
    llamar a los callables en vez de a FirebaseAuth directo.
-3. Desplegar:
+3. Desplegar (🚨 los dos comandos van a PRODUCCIÓN; el segundo publica un
+   endpoint SIN autenticar a los usuarios reales):
    ```bash
-   firebase deploy --only firestore:rules
-   firebase deploy --only functions
+   firebase deploy --only firestore:rules --project prod
+   firebase deploy --only functions --project prod
    ```
+   Un `--only functions` sin filtros además **poda** del set desplegado toda
+   función ausente de `functions/src/index.ts`.
 
 **Las reglas primero.** `mail_queue` está cerrada en los cuatro verbos y conviene
 que esa protección esté arriba antes de que la colección empiece a existir.
