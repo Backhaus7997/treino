@@ -29,6 +29,14 @@ import 'widgets/pinned_current_gym.dart';
 /// (client-side Details call, billable) happens on explicit "GUARDAR" tap,
 /// not on every suggestion tap, to avoid unnecessary Places billing on
 /// accidental selections. `kNoGymId` needs no resolution.
+///
+/// Ese contrato vale para TODOS los caminos de selección de la pantalla
+/// (issue #814): buscador tipeado, "OTRO GYM / SIN GYM" y lista de cercanos
+/// ([NearbyGymsList]) mueven únicamente `_pendingGymId`. Hasta #814 el tap
+/// en un cercano resolvía y escribía en el acto, así que cambiaba el
+/// gimnasio del atleta —dato que alimenta rankings y feed por gimnasio— sin
+/// que apretara GUARDAR y sin forma de arrepentirse. [_save] es el único
+/// método que toca el repositorio.
 class ProfileGymScreen extends ConsumerStatefulWidget {
   const ProfileGymScreen({super.key});
 
@@ -48,6 +56,10 @@ class _ProfileGymScreenState extends ConsumerState<ProfileGymScreen> {
         // Google Place selection — resolve (server-side Details + upsert)
         // then persist. selectGymActionProvider writes `gymId` to
         // `users/{uid}` itself (UserRepository.update dual-writes gymName).
+        // Mismo camino venga el `placeId` del buscador tipeado o de la
+        // lista de cercanos (#814): el origen del tap no cambia cómo se
+        // resuelve ni cómo se escribe, sólo CUÁNDO — acá, con el botón
+        // mostrando su spinner (`_saving`) mientras el Details viaja.
         await ref
             .read(selectGymActionProvider.notifier)
             .select(uid: uid, placeId: gymId);
@@ -139,14 +151,17 @@ class _ProfileGymScreenState extends ConsumerState<ProfileGymScreen> {
                     selectedGymId: _pendingGymId,
                     onGymIdSelected: (gymId) =>
                         setState(() => _pendingGymId = gymId ?? kNoGymId),
-                    // gym-selection-v2 AD-10: nearby list backs the
-                    // empty-query state; a nearby tap resolves + persists
-                    // immediately (spec gym-places-search "nearby selection
-                    // path"), so the callback just syncs the pending
-                    // selection the screen already shows as active/highlighted.
+                    // gym-selection-v2 AD-10: la lista de cercanos ocupa el
+                    // estado de query vacía. Su tap es draft-only, igual que
+                    // el del buscador de acá arriba (#814): sólo mueve
+                    // `_pendingGymId`. La resolución del Place y el write a
+                    // `users/{uid}.gymId` los hace `_save()` al tocar
+                    // GUARDAR, que es el ÚNICO punto de persistencia de esta
+                    // pantalla. `selectedGymId` le devuelve el borrador para
+                    // que la fila tocada se resalte.
                     emptyQueryContent: NearbyGymsList(
-                      uid: myUid,
                       currentGymId: currentGymId,
+                      selectedGymId: _pendingGymId,
                       onGymSelected: (gymId) =>
                           setState(() => _pendingGymId = gymId),
                     ),
