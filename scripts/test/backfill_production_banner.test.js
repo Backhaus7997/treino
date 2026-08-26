@@ -70,8 +70,10 @@ for (const script of BACKFILLS) {
     assert.match(stderr, /#826/);
     assert.match(
       stderr,
-      /no declared backup/,
-      'el cartel tiene que decir que no hay backup — es la mitad que frena a alguien',
+      /does NOT cover Cloud Storage or Auth users/,
+      'el cartel tiene que decir QUÉ no cubre el backup — es la mitad que frena a alguien. ' +
+        'Decir "no hay backup" a secas contradice AGENTS.md (hay schedule diario, 28 días) ' +
+        'y un dato falso en el cartel es exactamente el bug de #826.',
     );
   });
 
