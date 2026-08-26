@@ -2336,6 +2336,28 @@ La moraleja operativa: al tocar un archivo de reglas compartido, la suite de un
 solo archivo no alcanza. Los tres rojos no aparecían corriendo
 `coach-role-gate-rules.test.ts` solo.
 
+**Y tampoco alcanza con una sola de las dos suites.** §1.4 dice que hay dos y
+que las dos corren en CI; corriendo sólo la de `functions/` este change llegó a
+CI con la de `scripts/rules_test/` en rojo. Ahí el efecto fue **peor que un
+rojo**, y conviene tenerlo escrito porque no es intuitivo:
+
+En `reviews-links.test.js`, el seed de perfiles de PF tampoco traía
+`users/{uid}`. Al agregar el gate de rol pasaron dos cosas:
+
+1. Los **positivos** se pusieron rojos — visible y honesto.
+2. Los **negativos siguieron verdes, pero por el motivo equivocado**: los
+   denegaba el gate de rol nuevo, no el pin CF-write-only de
+   `averageRating`/`reviewCount` que dicen custodiar.
+
+Lo segundo es lo peligroso. Un `assertFails` que pasa por otra razón **no
+avisa nunca**: la suite se ve sana mientras dejó de proteger lo que dice
+proteger. Es la versión invertida del "rojo por el motivo equivocado" de §1.8, y
+es peor, porque el rojo al menos frena.
+
+Regla práctica que sale de acá: **un gate de rol nuevo invalida el fixture de
+todo test que escriba en esa colección**, incluidos los que sólo tienen
+negativos. Hay que revisarlos uno por uno, no confiar en que sigan verdes.
+
 **⚠️ Nota de despliegue.** El gate de rol en `update` de `trainerPublicProfiles`
 congela la edición de cualquier perfil cuyo dueño no tenga `role: 'trainer'`.
 Para los forjados es lo buscado; para un PF legítimo con el rol mal seteado
