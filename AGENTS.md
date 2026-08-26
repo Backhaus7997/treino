@@ -6,6 +6,31 @@ Este archivo es **un índice + las reglas críticas mínimas**. Para detalle com
 
 ---
 
+## ⚠️ Entornos — leer antes de correr cualquier comando
+
+**`treino-dev` es PRODUCCIÓN.** No existe un entorno de desarrollo separado.
+
+El nombre dice "dev" por razones históricas: el project ID de Firebase no se puede
+cambiar una vez creado. En ese proyecto viven los usuarios reales de la app — sus
+pagos, turnos, mediciones, chats y perfiles comerciales publicados.
+
+- Todo comando con `--project treino-dev` **toca datos de usuarios reales**.
+- El alias `prod` de `.firebaserc` apunta ahí. En docs y runbooks va explícito:
+  `--project prod`.
+- **Nunca** corras `firestore:delete`, un script de `scripts/backfill_*.js`, ni un
+  `deploy` de rules/indexes/functions contra ese proyecto sin confirmarlo con un
+  humano primero. Aplica la misma regla de "frená y confirmá" que el resto de este
+  archivo.
+- Para desarrollo local **usá el emulador**, no el proyecto real:
+  `./scripts/emulator.sh` + `flutter run --dart-define=USE_EMULATOR=true`.
+- Backup: hay un schedule diario de Firestore con 28 días de retención
+  (`firebase firestore:backups:schedules:list --project prod`).
+  **No cubre Cloud Storage ni los usuarios de Auth.**
+
+→ Contexto y decisión: [#826](https://github.com/Backhaus7997/treino/issues/826).
+
+---
+
 ## Índice de la documentación
 
 | Doc | Cuándo leerlo |
