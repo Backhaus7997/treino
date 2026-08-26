@@ -166,6 +166,7 @@ Dark es la identidad visual de TREINO y el tema que se aplica cuando el usuario 
 | `bgCard` | `ink900` | `#0F1513` | Fondo de cards |
 | `border` | `white10` | `rgba(255,255,255,0.10)` | Border 1px de cards |
 | `borderHover` | `white20` | `rgba(255,255,255,0.20)` | Border en hover (web sidebar) |
+| `borderStrong` | `white35` | `rgba(255,255,255,0.35)` | Filo de una superficie apoyada sobre `bg` (bottom bar) — ≥3:1, WCAG 1.4.11 |
 | `textPrimary` | `bone` | `#FFFFFF` | Texto principal |
 | `textMuted` | `white55` | `rgba(255,255,255,0.55)` | Texto secundario, captions |
 | `sage` | `sage500` | `#4F6358` | Cards secundarias, outlines sutiles |
@@ -187,6 +188,7 @@ Light está soportado como alternativa al dark. Se activa cuando el usuario sele
 | `bgCard` | `white` | `#FFFFFF` | Fondo de cards en light |
 | `border` | `black10` | `rgba(0,0,0,0.10)` | Border 1px en light |
 | `borderHover` | `black20` | `rgba(0,0,0,0.20)` | Border hover en light |
+| `borderStrong` | `black50` | `rgba(0,0,0,0.50)` | Filo de superficie sobre `bg` en light — ≥3:1, WCAG 1.4.11 |
 | `textPrimary` | `inkText900` | `#0F1513` | Texto principal en light |
 | `textMuted` | `black60` | `rgba(0,0,0,0.60)` | Texto secundario en light |
 | `sage` | `sageTint50` | `#DDE5DF` | Superficies secundarias light |
@@ -397,6 +399,8 @@ TREINO soporta **dark y light** de forma explícita:
 El modo activo lo gestiona `ThemeModeNotifier` (Riverpod). El usuario puede elegir Sistema/Claro/Oscuro en Perfil → Apariencia. El default del sistema es dark cuando el dispositivo está en modo oscuro; en modo claro del sistema, se aplica light salvo que el usuario haya fijado "Oscuro" explícitamente.
 
 Cards: fondo `bgCard`, border 1px `border`, **sin shadow** (el contraste lo da el ink en dark, y el paper en light).
+
+Superficies translúcidas apoyadas sobre el fondo desnudo (la bottom bar) usan `borderStrong` y no `border`: `bgCard` sobre `bg` compone 1,05:1 en dark, así que el relleno no delata dónde empieza el contenedor y el filo es lo único que lo hace (#821).
 Hero con glow: streak card y CTA usan halo radial sutil de `accent @ 18% → 0%`.
 
 ---
@@ -414,7 +418,7 @@ final palette = AppPalette.of(context);
 Container(color: palette.accent);
 ```
 
-Tokens disponibles: `accent`, `highlight`, `bg`, `bgCard`, `border`, `borderHover`, `textPrimary`, `textMuted`, `sage`, `espresso`, `danger`, `warning`, `onDanger`, `scrimDark`.
+Tokens disponibles: `accent`, `highlight`, `bg`, `bgCard`, `border`, `borderHover`, `borderStrong`, `textPrimary`, `textMuted`, `sage`, `espresso`, `danger`, `warning`, `onDanger`, `scrimDark`.
 
 El test `test/app/theme/tokens/no_hex_scan_test.dart` falla si se agrega un HEX fuera de la allowlist (hoy: sólo `primitives.dart` — `app_palette.dart` salió de la lista en WU-02). Este test corre en CI.
 

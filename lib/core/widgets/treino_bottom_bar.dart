@@ -427,6 +427,37 @@ class TreinoBottomBar extends StatelessWidget {
                       height: lerpDouble(collapsedHeight, barHeight, expansion),
                       child: TreinoGlassSurface(
                         borderRadius: BorderRadius.circular(36),
+                        // Filo REFORZADO, no el `palette.border` que trae por
+                        // defecto [TreinoGlassSurface].
+                        //
+                        // El pill activo siempre estuvo contenido: se separa
+                        // [_kPillInset] del borde del tab en los cuatro lados
+                        // y el test de contención lo mide. Lo que se reportó
+                        // en #821 —"el pill sobresale y tapa el contenido de
+                        // arriba"— no era geometría sino que la barra no se
+                        // veía: rasterizando el árbol, el relleno translúcido
+                        // daba 1,05:1 contra `palette.bg` en dark y el borde
+                        // 1,37:1. Con el fondo de la app casi negro y la
+                        // sombra de abajo pintada en `palette.bg` (negro sobre
+                        // negro), el contenedor entero era invisible y el pill
+                        // mint, a 9,3:1, quedaba como el único objeto de la
+                        // zona. El ojo lee eso como un elemento flotando
+                        // encima del contenido, no como un tab adentro de una
+                        // barra.
+                        //
+                        // Subir `fillOpacity` NO lo arregla: `bgCard` sobre
+                        // `bg` es `ink900` sobre `ink950`, 1,07:1 aun al 100%
+                        // de opacidad. Los dos tonos son casi el mismo color a
+                        // propósito, así que el límite tiene que venir del
+                        // filo. [AppPalette.borderStrong] lo lleva a ~3:1, el
+                        // piso de WCAG 2.2 SC 1.4.11 para el borde de un
+                        // componente.
+                        //
+                        // Va SOLO acá y no en el default de la superficie: las
+                        // burbujas del header del feed se apoyan sobre
+                        // contenido, no sobre el fondo desnudo, y con este filo
+                        // se leerían como botones delineados.
+                        borderColor: palette.borderStrong,
                         child: LayoutBuilder(
                           builder: (context, innerConstraints) {
                             final tabWidth =
