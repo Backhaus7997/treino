@@ -10,6 +10,13 @@
  *                 defined equipment.
  *
  * Run: GOOGLE_APPLICATION_CREDENTIALS=scripts/sa-key.json node scripts/apply_catalog_video_fill.js --add-safe --fill-empty [--apply]
+ *
+ * ⚠️ DESTINO (#838) — el bucket ya no está hardcodeado: sale de
+ * `lib/storage_target.js` (`--bucket=` > `FIREBASE_STORAGE_BUCKET` > derivado
+ * del proyecto activo), y antes de nada se exige que Firestore y Storage
+ * apunten al mismo lado. Este script no tenía NINGÚN chequeo: con `--apply`
+ * subía el `.mp4` al bucket de producción y encima pisaba `videoUrl` Y
+ * `equipment` del catálogo vivo, que ven todos los usuarios.
  */
 'use strict';
 const fs = require('fs');
@@ -18,13 +25,19 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 const { randomUUID } = require('crypto');
 const admin = require('firebase-admin');
+const { exigirDestinoCoherente } = require('./lib/storage_target');
 
-const BUCKET = 'treino-dev.firebasestorage.app';
 const APPLY = process.argv.includes('--apply');
 const DO_ADD = process.argv.includes('--add-safe');
 const DO_FILL = process.argv.includes('--fill-empty');
 
-admin.initializeApp({ storageBucket: BUCKET });
+// #838 — el guard corre SIEMPRE, también sin `--apply`. La corrida en seco es
+// la que más invita a relajarse, y es justo donde el operador decide si después
+// va a pasar `--apply`: si el destino es producción, que lo lea ahí.
+const DESTINO = exigirDestinoCoherente({ argv: process.argv.slice(2) });
+const BUCKET = DESTINO.bucket;
+
+admin.initializeApp({ storageBucket: BUCKET, projectId: DESTINO.projectId });
 const db = admin.firestore();
 const bucket = admin.storage().bucket();
 
@@ -101,7 +114,7 @@ async function uploadVideo(fileId, id) {
     }
   }
 
-  console.log(`${APPLY ? '[APPLY]' : '[DRY]'}  add-safe: ${add.length}  |  fill-empty: ${fill.length}`);
+  console.log(`${APPLY ? '[APPLY]' : '[DRY]'}  destino: ${DESTINO.etiquetaDestino}  |  add-safe: ${add.length}  |  fill-empty: ${fill.length}`);
   if (DO_ADD) { console.log('--- ADD-SAFE ---'); add.forEach((p) => console.log(`  ${p.id.padEnd(34)} ← ${p.filename}`)); }
   if (DO_FILL) { console.log('--- FILL-EMPTY (id | name | equipo nuevo | video) ---'); fill.forEach((p) => console.log(`  ${p.id.padEnd(28)} ${(p.name || '').padEnd(28)} ${p.equipJson.padEnd(12)} ${p.filename}`)); }
   fs.writeFileSync(path.join(__dirname, '..', 'docs', 'video-catalog-audit', 'catalog-fill-empty.csv'),

@@ -290,3 +290,64 @@ A run without `FIRESTORE_EMULATOR_HOST` **is** the prod run — there is no
 separate dev project to verify against first (#826). Verify on the emulator,
 then `--dry-run` against `treino-dev`, then the real run with maintainer
 sign-off — silent, no user notice (per the locked gyms-foundation decision).
+
+## Scripts que escriben en Firebase Storage (#838)
+
+Cuatro scripts suben archivos al bucket y después escriben la URL resultante en
+Firestore:
+
+| Script | Qué sube | Qué escribe en Firestore |
+| --- | --- | --- |
+| `extract_exercise_thumbnails.js --upload` | `exercises/thumbs/{id}.jpg` | `exercises/{id}.thumbnailUrl` |
+| `apply_catalog_video_fill.js --apply` | `exerciseVideos/{id}.mp4` | `exercises/{id}.videoUrl` (+ `equipment` con `--fill-empty`) |
+| `upload_enriched_videos.js` | `exerciseVideos/{id}.mp4` | nada (patchea el JSON del catálogo) |
+| `upload_drive_exercise_videos.js` | `exerciseVideos/{id}.mp4` | `exercises/{id}.videoUrl` |
+
+Los cuatro pasan por `lib/storage_target.js` antes de la primera escritura.
+
+**El bucket ya no está hardcodeado.** Se resuelve en este orden:
+`--bucket=<bucket>` → `FIREBASE_STORAGE_BUCKET` → derivado del proyecto activo
+(`--project=` → `GOOGLE_CLOUD_PROJECT` → `project_id` del
+`GOOGLE_APPLICATION_CREDENTIALS` → `.firebaserc`).
+
+**Firestore y Storage tienen que apuntar al mismo lado, o el script aborta.**
+Antes, `extract_exercise_thumbnails.js` miraba sólo `FIRESTORE_EMULATOR_HOST`,
+imprimía `destino: EMULADOR` y subía los `.jpg` a producción igual, porque
+`initializeApp` traía el bucket real fijo (#838). Hoy esa combinación no corre.
+
+Para correr entero contra el emulador hay que levantarlo **con Storage** —
+`scripts/emulator.sh` arranca `--only firestore,auth,functions`, así que el
+emulador de Storage (puerto 9199, declarado en `firebase.json`) no está:
+
+```bash
+firebase emulators:start --only firestore,auth,storage
+export FIRESTORE_EMULATOR_HOST=localhost:8080
+export FIREBASE_STORAGE_EMULATOR_HOST=localhost:9199
+```
+
+Sin ninguna de las dos variables, el destino es **producción** (`treino-dev`, ver
+#826) y sale el cartel antes de escribir.
+
+**Producción se mide por proyecto Y por bucket.** El guard del #826 mira sólo el
+project id, que para un backfill de Firestore ES el destino; para estos cuatro
+no lo es. Un `--project` de prueba con un `--bucket` copiado del README es una
+corrida contra producción que ninguna lista de proyectos ve:
+
+```bash
+node upload_drive_exercise_videos.js \
+  --project=treino-scratch --bucket=treino-dev.firebasestorage.app
+```
+
+Ahí `treino-scratch` no es producción pero el bucket sí, y los `.mp4` aterrizan
+en el bucket real. `esBucketDeProduccion` reconoce las tres formas de escribir
+el mismo bucket (`treino-dev.firebasestorage.app`, el legacy
+`treino-dev.appspot.com`, y el id pelado) y saca su propio cartel, que nombra al
+bucket y no al proyecto. El backup diario de Firestore **no cubre Cloud
+Storage**: lo que estos scripts escriben ahí no se recupera.
+
+Los tests del cableado —que cada script llame al guard, y que lo llame antes de
+tocar Storage— están en `test/storage_scripts_destination.test.js`. Corren con
+`firebase-admin` stubbeado, cero red y sin `node_modules`:
+`npm --prefix scripts test`. Los corre el job **`Scripts Test (scripts/test)`**
+de `.github/workflows/ci.yml`, así que borrar una línea de cableado pone el PR
+en rojo — antes de ese job la suite entera dependía de que alguien se acordara.

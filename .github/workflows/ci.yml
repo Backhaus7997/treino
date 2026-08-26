@@ -358,3 +358,55 @@ jobs:
       # clearFirestore() en afterEach) y levanta y baja su propio emulador.
       - name: Run rules test suite
         run: bash scripts/test_rules.sh
+
+  # La TERCERA suite de Node del repo: scripts/test/*.test.js (#838).
+  #
+  # Mismo agujero que documenta `rules-test` acá arriba, con otro directorio.
+  # Los tests de `scripts/test/` —los guards que deciden si un script de
+  # `scripts/` puede escribir contra producción— no los corría NINGÚN job:
+  # `analyze-and-test` es Flutter, `functions-*` tiene su testMatch acotado a
+  # `functions/src/__tests__/`, y `rules-test` sólo toca `scripts/rules_test/`,
+  # que es otro paquete con su propio lockfile. La única ejecución era que
+  # alguien se acordara de correr `npm --prefix scripts test` a mano.
+  #
+  # Y lo que hay ahí adentro es exactamente el tipo de cosa que se borra sin
+  # que nadie note: el arreglo del #838 son cuatro líneas de cableado
+  # (`exigirDestinoCoherente(...)` al tope de cada script que sube a Storage).
+  # Borrando una, sin este job, no se pone nada en rojo — y el script vuelve a
+  # subir archivos a producción imprimiendo "destino: EMULADOR".
+  #
+  # Corre la suite ENTERA del directorio, no un archivo puntual: el #835 ya
+  # dejó cuatro archivos de test ahí que tampoco corría nadie, y el que venga
+  # después va a hacer lo mismo. `npm test` expande `test/*.test.js` en el
+  # shell, así que cualquier archivo nuevo entra solo — por eso se invoca el
+  # script del package.json y no una línea `run:` con el comando copiado
+  # (misma razón que en `rules-test`).
+  #
+  # SIN `npm ci` a propósito, y no es un olvido: estos tests no importan una
+  # sola dependencia de `scripts/package.json`. Los scripts bajo prueba se
+  # cargan con `--require test/fixtures/stub_firebase_admin.js`, que intercepta
+  # `Module._load` y devuelve un `firebase-admin` falso; el resto es todo
+  # `node:` builtin. Verificado corriendo la suite con `scripts/node_modules`
+  # inexistente: 112/112 en verde. Instalar `firebase-admin` acá sería medio
+  # minuto por run para nada — y peor, dejaría que un test toque la red sin que
+  # se note.
+  #
+  # Node 20 igual que los otros jobs de Node. Anda en 20 y en 22 porque el
+  # glob del `npm test` lo expande el shell. El `--test "test/*.test.js"`
+  # entrecomillado que traía el #835 exigía Node >= 22 —el test runner recién
+  # expande globs por su cuenta desde ahí— y habría roto este job en silencio
+  # el día que se agregara; por eso el merge se quedó con la forma sin comillas.
+  scripts-test:
+    name: Scripts Test (scripts/test)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '20'
+
+      - name: Run scripts test suite
+        run: npm --prefix scripts test
