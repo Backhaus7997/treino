@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/utils/app_clock.dart';
 import '../../workout/application/session_providers.dart';
 import '../../workout/data/session_repository.dart';
 import '../../workout/domain/duration_timer_owner.dart';
@@ -71,7 +72,7 @@ class WearTimerSync {
               exerciseId: exerciseId,
               setNumber: setNumber,
               totalSeconds: seconds,
-              start: DateTime.now().toUtc(),
+              start: AppClock.now().toUtc(),
               owner: DurationTimerOwner.reloj,
             ),
           )
@@ -191,7 +192,13 @@ Future<void> _espejar(
   debugPrint('[wear-timer] local=$actual');
   if (actual != null && !actual.finished) return;
 
-  final restante = remoto.remainingAt(DateTime.now().toUtc());
+  // `AppClock` y no `DateTime.now()`: lo que se le pasa al nativo son los
+  // segundos que FALTAN, o sea una resta contra el reloj de pared. Con la hora
+  // global no inyectada, cuánto da esa resta depende de lo que la máquina haya
+  // tardado en llegar hasta acá — y `wear_timer_inbox_test.dart` lo pagaba,
+  // esperando 40 y recibiendo 39 cuando el runner venía cargado. Congelado el
+  // seam, la resta da siempre lo mismo.
+  final restante = remoto.remainingAt(AppClock.now().toUtc());
   if (restante <= 0) return;
 
   debugPrint('[wear-timer] sincronizado desde la sesión ($restante s)');
