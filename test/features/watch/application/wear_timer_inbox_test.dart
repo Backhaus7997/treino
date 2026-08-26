@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:treino/core/utils/app_clock.dart';
 import 'package:treino/features/watch/application/wear_rest_providers.dart';
 import 'package:treino/features/watch/application/wear_timer_sync_providers.dart';
 import 'package:treino/features/watch/data/wear_workout_service.dart';
@@ -21,14 +22,27 @@ void main() {
   late StreamController<DurationTimerState?> sesion;
   late ProviderContainer container;
 
-  /// El reloj de pared al empezar CADA test, y no uno solo para todo el
-  /// archivo: lo que falta se deriva del instante de fin contra la hora real,
-  /// así que un `ahora` compartido se iría corriendo test a test hasta cruzar
-  /// un segundo entero y volver el archivo flaky.
+  /// El instante contra el que se arma cada `endsAt`.
+  ///
+  /// Sale del reloj CONGELADO, y eso es lo que vuelve determinístico al
+  /// archivo. Lo que falta es una resta entre este `ahora` y el que lee el
+  /// provider: con la hora real, esa resta valía 40 o 39 según lo que la
+  /// máquina hubiera tardado en llegar hasta la llamada, y bastaba un runner
+  /// cargado para cruzar el segundo entero. Congelar los dos lados en el mismo
+  /// instante hace que la resta dé siempre lo mismo.
+  ///
+  /// Vale la aclaración porque el reloj congelado NO avanza: si algún día un
+  /// test de acá necesita ver pasar el tiempo, se vuelve a congelar en otro
+  /// instante, y ese salto queda como una línea visible del test.
   late DateTime ahora;
 
   setUp(() {
-    ahora = DateTime.now().toUtc();
+    // Local, no UTC: `AppClock` reemplaza a `DateTime.now()` y lo asegura con
+    // un assert. El `.toUtc()` va del lado del consumidor, igual que en
+    // producción.
+    AppClock.freeze(DateTime(2026, 3, 17, 10, 30));
+    addTearDown(AppClock.unfreeze);
+    ahora = AppClock.now().toUtc();
     service = _ServicioFalso();
     sesion = StreamController<DurationTimerState?>();
     when(() => service.startExerciseTimer(any())).thenAnswer((_) async {});
