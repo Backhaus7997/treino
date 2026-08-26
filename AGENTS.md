@@ -21,14 +21,16 @@ pagos, turnos, mediciones, chats y perfiles comerciales publicados.
   `deploy` de rules/indexes/functions contra ese proyecto sin confirmarlo con un
   humano primero. Aplica la misma regla de "frená y confirmá" que el resto de este
   archivo.
+- Los checklists de `openspec/changes/` traen comandos de escritura contra ese
+  proyecto, y los npm scripts de `scripts/package.json` escriben por Admin SDK
+  —saltándose las rules— sin nombrar el proyecto en pantalla. Antes de ejecutar
+  un ítem de ahí: [openspec/AGENTS.md](./openspec/AGENTS.md) y
+  [scripts/README.md](./scripts/README.md).
 - Para desarrollo local **usá el emulador**, no el proyecto real:
   `./scripts/emulator.sh` + `flutter run --dart-define=USE_EMULATOR=true`.
 - Backup: hay un schedule diario de Firestore con 28 días de retención
   (`firebase firestore:backups:schedules:list --project prod`).
   **No cubre Cloud Storage ni los usuarios de Auth.**
-
-- Los checklists de `openspec/changes/` traen comandos de escritura contra ese
-  proyecto. Antes de ejecutar un ítem de ahí: [openspec/AGENTS.md](./openspec/AGENTS.md).
 
 → Contexto y decisión: [#826](https://github.com/Backhaus7997/treino/issues/826).
 
