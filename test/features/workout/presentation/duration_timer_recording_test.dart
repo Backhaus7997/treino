@@ -12,6 +12,8 @@ import 'package:treino/features/workout/application/duration_timer_providers.dar
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/application/workout_clock.dart';
 import 'package:treino/features/workout/data/session_repository.dart';
+import 'package:treino/features/workout/domain/duration_timer_owner.dart';
+import 'package:treino/features/workout/domain/duration_timer_state.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/presentation/widgets/duration_set_row.dart';
 
@@ -155,6 +157,33 @@ void main() {
     expect(repo.llamadasAGetActive, 0);
   });
 
+  testWidgets('en el scope, cancelar BORRA la anotación', (tester) async {
+    // La contracara de anotar, y la que el fin natural de la cuenta no cubría
+    // (#817): mientras la anotación siga puesta, el reloj de Wear —que espeja
+    // lo anotado en la sesión— sigue contando algo que ya no existe, llega a
+    // cero y vibra por una serie que nadie cargó.
+    await montar(tester, enElScope: true);
+    await arrancarYa(tester);
+    expect(
+      (await docDeSesion())?[SessionRepository.fieldTimerEndsAt],
+      isNotNull,
+      reason: 'sin anotación previa, el borrado no probaría nada',
+    );
+
+    await tester.tap(find.text('Cancelar'));
+    await tester.pump();
+    await tester.pump();
+
+    final doc = await docDeSesion();
+    expect(doc?[SessionRepository.fieldTimerEndsAt], isNull);
+    // Los cinco campos se van juntos: media anotación se lee como "no hay",
+    // pero deja basura en el documento.
+    expect(doc?[SessionRepository.fieldTimerExerciseId], isNull);
+    expect(doc?[SessionRepository.fieldTimerSetNumber], isNull);
+    expect(doc?[SessionRepository.fieldTimerTotalSeconds], isNull);
+    expect(doc?[SessionRepository.fieldTimerOwner], isNull);
+  });
+
   testWidgets('fuera del scope del player no anota nada, y no revienta',
       (tester) async {
     // El default es `null` a propósito: una fila montada suelta —un test de
@@ -181,6 +210,49 @@ void main() {
     // Y la cuenta del teléfono arranca igual: la sincronización es el espejo,
     // no la serie.
     expect(find.text('Cancelar'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('fuera del scope del player tampoco BORRA nada, y no revienta',
+      (tester) async {
+    // El mismo borde, del lado del borrado (#817). Importa por dos motivos
+    // distintos:
+    //
+    // 1. Igual que al anotar, la fila suelta no puede tirar. Un `borrar()` sin
+    //    sesión resuelta tiene que ser un no-op limpio.
+    // 2. Y el no-op es SILENCIOSO — no falla, no loguea, no deja rastro. Eso es
+    //    exactamente lo que hace peligroso llamar al recorder desde afuera del
+    //    scope: parece arreglado y no borra nada. Por eso el borrado del fin
+    //    natural de la cuenta (`session_player_screen`) se prueba contra
+    //    Firestore y no contra un doble del recorder.
+    //
+    // Se siembra una anotación A MANO —la fila no puede escribirla desde acá,
+    // que es el punto— para que "no borra" signifique algo: sin este documento
+    // previo, el test pasaría con cualquier implementación.
+    await repo.startExerciseTimer(
+      uid: uid,
+      sessionId: sesion.id,
+      timer: DurationTimerState.startedAt(
+        exerciseId: 'plancha',
+        setNumber: 2,
+        totalSeconds: 60,
+        start: DateTime.now().toUtc(),
+        owner: DurationTimerOwner.reloj,
+      ),
+    );
+
+    await montar(tester, enElScope: false);
+    await arrancarYa(tester);
+    await tester.tap(find.text('Cancelar'));
+    await tester.pump();
+    await tester.pump();
+
+    expect(
+      (await docDeSesion())?[SessionRepository.fieldTimerEndsAt],
+      isNotNull,
+      reason: 'sin sesión resuelta no hay a qué apuntar: el borrado tiene que '
+          'ser un no-op, no adivinar un documento',
+    );
     expect(tester.takeException(), isNull);
   });
 }
