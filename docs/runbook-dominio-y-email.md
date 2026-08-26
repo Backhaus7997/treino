@@ -1,5 +1,11 @@
 # Runbook — dominio, email transaccional y Coach Hub web
 
+> [!WARNING]
+> **`treino-dev` es el proyecto de PRODUCCIÓN.** No hay un entorno de desarrollo
+> separado: todo comando de este documento que lleve `--project treino-dev`
+> (o `--project prod`) toca datos de usuarios reales.
+> Ver [AGENTS.md § Entornos](../AGENTS.md#-entornos--leer-antes-de-correr-cualquier-comando) y [#826](https://github.com/Backhaus7997/treino/issues/826).
+
 Todo lo que hay que hacer **a mano** para poner en producción el email
 transaccional (PR #720, #749) y publicar el Coach Hub web.
 

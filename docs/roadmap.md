@@ -1,5 +1,11 @@
 # Roadmap — TREINO
 
+> [!WARNING]
+> **`treino-dev` es el proyecto de PRODUCCIÓN.** No hay un entorno de desarrollo
+> separado: todo comando de este documento que lleve `--project treino-dev`
+> (o `--project prod`) toca datos de usuarios reales.
+> Ver [AGENTS.md § Entornos](../AGENTS.md#-entornos--leer-antes-de-correr-cualquier-comando) y [#826](https://github.com/Backhaus7997/treino/issues/826).
+
 Estado de las fases y desglose detallado de Fases 5 (✅) y 6 (en curso).
 
 ## Estado por fase

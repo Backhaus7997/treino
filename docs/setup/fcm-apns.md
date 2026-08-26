@@ -1,5 +1,11 @@
 # FCM Setup — APNs Auth Key + Cloud Function IAM
 
+> [!WARNING]
+> **`treino-dev` es el proyecto de PRODUCCIÓN.** No hay un entorno de desarrollo
+> separado: todo comando de este documento que lleve `--project treino-dev`
+> (o `--project prod`) toca datos de usuarios reales.
+> Ver [AGENTS.md § Entornos](../../AGENTS.md#-entornos--leer-antes-de-correr-cualquier-comando) y [#826](https://github.com/Backhaus7997/treino/issues/826).
+
 This document describes the manual steps required to make FCM push notifications deliver end-to-end in TREINO. There are TWO independent setup items, both **out-of-band prerequisites for smoke testing** — neither is required for code review or merge.
 
 1. **APNs Auth Key** (iOS only) — blocks real FCM delivery to iOS devices.

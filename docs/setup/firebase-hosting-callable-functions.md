@@ -1,5 +1,11 @@
 # Making Callable v2 Cloud Functions Publicly Reachable
 
+> [!WARNING]
+> **`treino-dev` es el proyecto de PRODUCCIÓN.** No hay un entorno de desarrollo
+> separado: todo comando de este documento que lleve `--project treino-dev`
+> (o `--project prod`) toca datos de usuarios reales.
+> Ver [AGENTS.md § Entornos](../../AGENTS.md#-entornos--leer-antes-de-correr-cualquier-comando) y [#826](https://github.com/Backhaus7997/treino/issues/826).
+
 How `treino-dev` exposes Firebase **callable v2** Cloud Functions, why the
 obvious answer (`allUsers` → `roles/run.invoker`) does **not** work here, and
 what to check when a freshly deployed callable returns **403**.
