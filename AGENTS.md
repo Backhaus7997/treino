@@ -129,6 +129,8 @@ bookmarks y notificaciones vivas apuntándoles. No lo confundas con
 - PR con **1+ approve**, **squash and merge**, branch auto-delete.
 - Cambios no triviales → ciclo SDD vía gentle-ai (`/sdd-new <name>`).
 - Si modificás `AGENTS.md` o algo en `docs/` → reviewer aprueba **explícitamente** la modificación de las reglas.
+- **Después de todo rebase y antes de todo force-push**, por cada archivo del diff:
+  `diff <(git show origin/main:ARCHIVO) ARCHIVO | rg '^<'` — ver §11.
 
 → Detalle en [docs/workflow.md](./docs/workflow.md).
 
@@ -139,6 +141,99 @@ Engram MCP guarda decisiones bajo `--project treino`. **Es local por máquina** 
 → Detalle en [docs/architecture.md](./docs/architecture.md).
 
 ---
+
+### 10. Trabajo en paralelo (varias herramientas, varios worktrees)
+
+Este repo corre con varios agentes a la vez (Claude Code, Codex, Cursor…) y con
+worktrees en `.claude/worktrees/`. Cuatro reglas:
+
+**a. Antes de empezar, fijate si ya hay alguien en el mismo scope.**
+
+```bash
+./scripts/agent-ledger.sh check 826    # ¿hay otro agente en este issue?
+./scripts/agent-ledger.sh list         # todo lo que está en curso
+```
+
+Si `check` sale con error, **frená y confirmá** con el usuario antes de seguir.
+Dos ramas arreglando el mismo bug es la forma más cara de perder trabajo.
+
+**b. Al arrancar, anotate. Al terminar o abandonar, borrate.**
+
+```bash
+./scripts/agent-ledger.sh claim 826 "banner de entornos en docs"
+./scripts/agent-ledger.sh release
+```
+
+El ledger vive en `.git/agent-ledger.tsv` — el único directorio que comparten
+todos los worktrees y que nunca se commitea. No lo edites a mano. Si tu
+herramienta aparece como `unknown`, exportá `AGENT_NAME` (ej. `AGENT_NAME=codex`).
+
+**c. Lo que tiene que sobrevivir a tu sesión va a un archivo del repo.**
+
+Engram es **local por máquina** (regla 9): lo que guardes ahí no lo ve Codex, ni
+otro worktree, ni vos mañana desde otra máquina. Las decisiones van a `docs/` o a
+`openspec/changes/<name>/`, y se commitean. Ese es el formato de handoff entre
+herramientas: un agente deja el SDD escrito, otro lo levanta y sigue.
+
+**d. Una sola fuente de reglas.**
+
+`AGENTS.md` es la única. `CLAUDE.md` es un puntero vacío **a propósito** — no le
+agregues reglas ni resúmenes de conveniencia. Ya pasó una vez: el "Quick
+reference" de `CLAUDE.md` se desincronizó y Claude Code y Codex quedaron leyendo
+constituciones distintas.
+
+### 11. Verificación — las dos que nos costaron caro
+
+Estas dos salieron de una jornada entera de arreglos de seguridad (#826, #831, #838).
+No son teoría: cada una tiene un incidente atrás.
+
+#### 11.1 Una advertencia falsa es PEOR que ninguna
+
+Un mensaje tranquilizador que miente desactiva la sospecha justo donde hacía falta.
+Casos reales de este repo:
+
+- `treino-dev` **suena** a entorno descartable. Es producción (§ Entornos).
+- El guard de los backfills usaba `/dev/i.test(projectId)`. Contra `treino-dev` ese
+  guard **pasaba** — la única protección contra escrituras a producción estaba, por
+  construcción, apagada justo contra producción.
+- `extract_exercise_thumbnails.js` imprimía **`destino: EMULADOR`** y subía a Storage
+  de producción: chequeaba el emulador de Firestore y nada más.
+- Un header de test decía **"SUPERSET"** y era subset: al quedarse con esa versión,
+  otro test levantaba `deploy_rules.js` con la credencial real y deployaba reglas.
+
+**La regla:** antes de escribir un mensaje que tranquiliza —"seguro", "sólo dev",
+"ya cubierto", "cerrado"— verificá que sea cierto. Si no lo podés verificar, escribí
+lo que sí sabés. Un "no sé si esto toca producción" honesto vale más que un "esto es
+seguro" que no chequeaste.
+
+**Corolario para PRs e issues:** una afirmación de completitud sin un comando
+reproducible al lado no cuenta. Si decís "barrí todo el repo", publicá el comando —
+que otro pueda correrlo y refutarte es lo que la hace valer. Un barrido de este tipo
+falló cinco veces seguidas, cada una en un eje distinto: el path, la regex, la forma
+del comando, el criterio de descarte y la doctrina. Ninguna se encontró leyendo el
+reporte; todas, corriendo el comando.
+
+#### 11.2 Un rebase puede borrar trabajo ajeno SIN marcar conflicto
+
+Si tu rama sale de una base vieja y reescribe un archivo entero, git no tiene forma de
+saber que estás pisando trabajo de otro: ve un archivo distinto de punta a punta y se
+queda con el tuyo. `git status` limpio, cero marcadores, tests en verde, y medio PR
+ajeno borrado.
+
+Pasó con `scripts/README.md`: el rebase lo auto-mergeó sin conflicto y el resultado
+reintroducía, palabra por palabra, las afirmaciones falsas que el PR pisado existía
+para corregir.
+
+**El chequeo, obligatorio antes de todo force-push post-rebase**, por cada archivo del
+diff:
+
+```bash
+diff <(git show origin/main:ARCHIVO) ARCHIVO | rg '^<'
+```
+
+- Salida vacía → tu cambio es **aditivo**. Seguí.
+- Cualquier salida → estás **borrando** algo que está en `main`. Que sea a propósito, y
+  que quede escrito en el mensaje del commit por qué.
 
 ## Setup desde una máquina nueva
 
