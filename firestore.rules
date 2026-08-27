@@ -2674,7 +2674,19 @@ service cloud.firestore {
          && request.resource.data.get('cancelledBy', null) == request.auth.uid
          && request.resource.data.athleteId == resource.data.athleteId
          && request.resource.data.trainerId == resource.data.trainerId
-         && request.resource.data.startsAt == resource.data.startsAt
+         // ⚠️ #847 — el pin va por `.get()`, no por acceso directo. Un doc
+         // heredado SIN el campo hacía que las DOS mitades de la igualdad no
+         // evaluaran, y la regla falla cerrado: turno imborrable otra vez, por
+         // la misma puerta que el gate de 24 h de más abajo. `hasAll()` sólo
+         // corre en el `create`, así que "el campo está" no es un invariante
+         // del `update` — y antes de #781 el create no validaba nada.
+         //
+         // El pin NO se afloja: si el doc tiene `startsAt` y la escritura lo
+         // mueve, `.get()` devuelve valores distintos y sigue dando DENY. Lo
+         // único que cambia es que un doc sin el campo deja de ser un error de
+         // evaluación y pasa a ser `null == null`.
+         && request.resource.data.get('startsAt', null)
+            == resource.data.get('startsAt', null)
          && request.resource.data.durationMin == resource.data.durationMin
          && request.resource.data.get('paymentId', null)
             == resource.data.get('paymentId', null)
@@ -2697,7 +2709,40 @@ service cloud.firestore {
             == resource.data.get('athleteDisplayName', null)
          && request.resource.data.get('recurringId', null)
             == resource.data.get('recurringId', null)
-         && resource.data.startsAt.toMillis() - 86400000 > request.time.toMillis())
+         // ─── #847 — el gate de 24 h no puede ser la puerta que traba el doc ──
+         //
+         // Este gate lee `resource.data`, o sea el valor VIEJO, y lo leía con
+         // ACCESO DIRECTO. Sobre un `startsAt` que no es `timestamp` —o que no
+         // está— `.toMillis()` no evalúa y la regla FALLA CERRADO. El Path 1 es
+         // el ÚNICO camino de salida de un turno y `allow delete: if false`:
+         // otra vez la familia de #781.
+         //
+         // #831 arregló la mitad: condicionó el `is timestamp` de
+         // `appointmentUpdateShapeOk()` a que el campo CAMBIE, y eso hizo que
+         // el doc heredado se volviera ANOTABLE. Medido entonces, y por eso
+         // esto es un issue aparte: `startsAt: "manana"` → anotar ALLOW,
+         // cancelar DENY. El turno seguía sin poder salir de la agenda.
+         //
+         // La decisión: un `startsAt` que no es timestamp **no tiene "24 horas
+         // antes" que calcular**, así que no hay gate temporal que aplicarle —
+         // se lo deja cancelar sin él. No es aflojar el freno: es no exigir una
+         // comparación imposible.
+         //
+         // Y no abre nada, porque ese estado ya NO se puede fabricar. Las dos
+         // puertas están cerradas desde #831:
+         //  · `create` → `d.startsAt is timestamp` (incondicional).
+         //  · `update` → o el campo NO cambia, o lo escrito `is timestamp`.
+         // O sea que la rama de abajo sólo la alcanzan documentos que YA nacen
+         // rotos: los de antes de #781, cuando el create no validaba nada.
+         // `treino-dev` ES producción (#826) y no se le corren queries, así que
+         // se asume que están.
+         //
+         // El `.get()` cubre las dos formas del mismo daño —el campo con otro
+         // tipo y el campo AUSENTE—, que es el residuo que quedó anotado junto
+         // a éste y depende del mismo acceso directo.
+         && (!(resource.data.get('startsAt', null) is timestamp)
+             || resource.data.startsAt.toMillis() - 86400000
+                > request.time.toMillis()))
         ||
         // Path 2: trainer edits coaching notes OR links a Payment on their own
         // appointment (Slice 2a, Agenda→cobro bridge, money-critical).
@@ -2752,7 +2797,12 @@ service cloud.firestore {
          && request.resource.data.status == resource.data.status
          && request.resource.data.athleteId == resource.data.athleteId
          && request.resource.data.trainerId == resource.data.trainerId
-         && request.resource.data.startsAt == resource.data.startsAt
+         // #847 — mismo cambio que en el Path 1, por el mismo motivo: un doc
+         // heredado SIN `startsAt` rompía la evaluación del pin y el turno
+         // quedaba sin poder anotarse. El pin sigue mordiendo cuando el campo
+         // existe y la escritura lo mueve.
+         && request.resource.data.get('startsAt', null)
+            == resource.data.get('startsAt', null)
          && request.resource.data.get('cancelledBy', null)
             == resource.data.get('cancelledBy', null)
          && request.resource.data.get('cancelledAt', null)

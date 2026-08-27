@@ -2360,3 +2360,174 @@ describe("appointments update — el `reason` del cascade congela el turno (#846
   });
 });
 
+/**
+ * #847 — un turno con `startsAt` de otro tipo se podía ANOTAR pero no CANCELAR.
+ *
+ * Residuo medido de #831. Ese PR condicionó el `is timestamp` de
+ * `appointmentUpdateShapeOk()` a que el campo CAMBIE, y con eso el doc heredado
+ * se volvió anotable. Arregló **la mitad**: el gate de 24 h del Path 1 lee el
+ * valor VIEJO con acceso directo (`resource.data.startsAt.toMillis()`), y sobre
+ * un `startsAt` que no es `timestamp` —o que no está— `.toMillis()` no evalúa y
+ * la regla FALLA CERRADO.
+ *
+ * Medido sobre el HEAD anterior, y es la tabla del issue:
+ *   · `startsAt: "manana"` (string)   → anotar ALLOW, cancelar **DENY**
+ *   · `startsAt: 1787…` (millis, int) → cancelar **DENY**
+ *   · sin el campo                    → cancelar **DENY** (residuo hermano)
+ * El Path 1 es el ÚNICO camino de salida de un turno y `allow delete: if false`:
+ * el turno quedaba fijo en la agenda. La familia de #781, por la puerta que
+ * quedaba.
+ *
+ * La decisión que cierra el issue está escrita sobre el gate mismo: un
+ * `startsAt` que no es timestamp NO TIENE "24 horas antes" que calcular, así
+ * que se lo cancela sin gate temporal. No abre nada porque ese estado ya no se
+ * puede fabricar — el `create` exige `is timestamp` incondicional y el `update`
+ * sólo deja escribir un timestamp cuando el campo cambia. La rama nueva sólo la
+ * alcanzan documentos anteriores a #781.
+ *
+ * ⚠️ El caso de no-vacuidad del gate va en el bloque de acá abajo, y NO es
+ * decoración: al condicionar el gate hay que probar que sigue mordiendo sobre
+ * un doc bien tipado. Sin ese negativo, el gate entero pasa a ser borrable con
+ * la suite en verde — que es exactamente el hallazgo de #850.
+ */
+describe("appointments update — un turno legacy con startsAt roto se puede CANCELAR (#847)", () => {
+  const L_STR = "appt-847-string";
+  const L_MS = "appt-847-millis";
+  const L_NONE = "appt-847-sin-campo";
+
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(
+        doc(ctx.firestore(), COL, L_STR),
+        appointment({ id: L_STR, startsAt: "manana" })
+      );
+      await setDoc(
+        doc(ctx.firestore(), COL, L_MS),
+        appointment({ id: L_MS, startsAt: Date.now() + 5 * 86400000 })
+      );
+      const sinCampo = appointment({ id: L_NONE });
+      delete sinCampo.startsAt;
+      await setDoc(doc(ctx.firestore(), COL, L_NONE), sinCampo);
+    });
+  });
+
+  it("permite al atleta cancelar un legacy con startsAt string — sin esto es imborrable", async () => {
+    await assertSucceeds(
+      updateDoc(doc(dbAs(ATHLETE), COL, L_STR), {
+        status: "cancelled",
+        cancelledBy: ATHLETE,
+      })
+    );
+  });
+
+  it("permite al PF cancelar un legacy con startsAt guardado en millis", async () => {
+    await assertSucceeds(
+      updateDoc(doc(dbAs(TRAINER), COL, L_MS), {
+        status: "cancelled",
+        cancelledBy: TRAINER,
+      })
+    );
+  });
+
+  it("permite cancelar un legacy SIN startsAt — el residuo hermano del mismo acceso directo", async () => {
+    await assertSucceeds(
+      updateDoc(doc(dbAs(ATHLETE), COL, L_NONE), {
+        status: "cancelled",
+        cancelledBy: ATHLETE,
+      })
+    );
+  });
+
+  it("el legacy roto se sigue pudiendo ANOTAR — la mitad que #831 ya había cerrado", async () => {
+    // Ancla: este caso es el que separa "#847 agregó algo" de "#847 rompió lo
+    // anterior". Si el fix del gate hubiera tocado la forma, esto se cae.
+    await assertSucceeds(
+      updateDoc(doc(dbAs(TRAINER), COL, L_STR), { noteAfter: "ok" })
+    );
+  });
+
+  it("DENIEGA que la cancelación del legacy MUEVA startsAt de paso", async () => {
+    // El pin pasó a `.get()` para no fallar cerrado sobre el doc sin campo;
+    // sigue mordiendo cuando la escritura toca el valor.
+    await assertFails(
+      updateDoc(doc(dbAs(ATHLETE), COL, L_STR), {
+        status: "cancelled",
+        cancelledBy: ATHLETE,
+        startsAt: inDays(9),
+      })
+    );
+  });
+
+  it("DENIEGA ponerle un startsAt al doc que no lo tiene, colgándose de la cancelación", async () => {
+    await assertFails(
+      updateDoc(doc(dbAs(ATHLETE), COL, L_NONE), {
+        status: "cancelled",
+        cancelledBy: ATHLETE,
+        startsAt: inDays(9),
+      })
+    );
+  });
+});
+
+/**
+ * #847 / #850 — el gate de 24 h no tenía UN SOLO negativo.
+ *
+ * `resource.data.startsAt.toMillis() - 86400000 > request.time.toMillis()` es
+ * el único freno del camino de cancelación —el vector que #781 vino a cerrar—
+ * y era borrable con la suite entera en verde: el bloque de arriba tiene el
+ * positivo (`permite al miembro cancelar con más de 24 h`), pero un positivo no
+ * custodia nada. Medido con el conjunto reemplazado por `true`: 0 rojos.
+ *
+ * Y ahora hace falta el doble, porque #847 le agregó una rama: sin este caso,
+ * la mutación del gate condicionado tampoco se pone roja y el fix habría
+ * cambiado "gate sin custodia" por "gate sin custodia, más ancho".
+ */
+describe("appointments update — el gate de 24 h sigue mordiendo (#847)", () => {
+  const CERCA = "appt-24h-cerca";
+  const LEJOS = "appt-24h-lejos";
+
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      // 6 h vista: bien tipado, o sea la rama del gate que SÍ compara.
+      await setDoc(
+        doc(ctx.firestore(), COL, CERCA),
+        appointment({
+          id: CERCA,
+          startsAt: Timestamp.fromMillis(Date.now() + 6 * 3600000),
+        })
+      );
+      await setDoc(
+        doc(ctx.firestore(), COL, LEJOS),
+        appointment({ id: LEJOS, startsAt: inDays(5) })
+      );
+    });
+  });
+
+  it("DENIEGA al atleta cancelar a menos de 24 h — REQ-007", async () => {
+    await assertFails(
+      updateDoc(doc(dbAs(ATHLETE), COL, CERCA), {
+        status: "cancelled",
+        cancelledBy: ATHLETE,
+      })
+    );
+  });
+
+  it("DENIEGA al PF cancelar a menos de 24 h", async () => {
+    await assertFails(
+      updateDoc(doc(dbAs(TRAINER), COL, CERCA), {
+        status: "cancelled",
+        cancelledBy: TRAINER,
+      })
+    );
+  });
+
+  it("permite cancelar el mismo turno a 5 días — lo único que separa el DENY es la distancia", async () => {
+    await assertSucceeds(
+      updateDoc(doc(dbAs(ATHLETE), COL, LEJOS), {
+        status: "cancelled",
+        cancelledBy: ATHLETE,
+      })
+    );
+  });
+});
+
