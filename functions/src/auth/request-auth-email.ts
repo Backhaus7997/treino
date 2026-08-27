@@ -6,12 +6,10 @@
  *
  * QUE CAMBIA Y QUE NO
  *
- * El link NO cambia: `generatePasswordResetLink` /
- * `generateEmailVerificationLink` devuelven la misma URL con `oobCode` que
- * Firebase pondria en su propio mail, apuntando al action handler que Firebase
- * ya hostea. Lo unico que cambia es QUIEN manda el mail y COMO se ve. No hace
- * falta una pagina de action handler propia para que esto funcione; eso es un
- * paso opcional de branding, aparte.
+ * El link es el mismo que Firebase pondria en su propio mail —mismo `oobCode`,
+ * mismo handler— con el HOST reescrito al dominio propio (ver
+ * `rewriteActionHost`). No hace falta escribir una pagina de action handler:
+ * `auth.gettreino.com` sirve el mismo `/__/auth/action` que hostea Firebase.
  *
  * ANTI-ENUMERACION (REQ-AUTH-011) — la invariante de este archivo
  *
@@ -69,10 +67,14 @@ function getApp(): admin.app.App {
  * boton que miente es peor que no tener boton.
  *
  * Con 1 minuto el peor caso queda acotado a ~60 mails por hora por cuenta en
- * vez de ilimitado. Es mas flojo que una ventana larga, y se elige igual:
- * `enforceAppCheck` ya obliga a que el que llama sea una instancia real de la
- * app, y sobre un flujo de RECUPERACION el riesgo de dejar afuera a alguien
+ * vez de ilimitado. Es mas flojo que una ventana larga, y se elige igual
+ * porque sobre un flujo de RECUPERACION el riesgo de dejar afuera a alguien
  * que de verdad no puede entrar pesa mas que el de mandar un mail de mas.
+ *
+ * OJO: esta ventana es el UNICO control de abuso que tiene este endpoint. No
+ * hay `enforceAppCheck` (ver el bloque de los onCall wrappers y por que), asi
+ * que aflojarla no es solo una decision de UX. Si algun dia se sube este
+ * numero, revisar primero si App Check ya volvio.
  *
  * No es un limitador exacto: dos pedidos a caballo del borde de la ventana
  * mandan dos mails. Tambien a proposito, por la misma razon.
@@ -82,6 +84,53 @@ const THROTTLE_WINDOW_MIN = 1;
 /** Numero de ventana para `nowMs`. Inyectable para testear. */
 export function throttleWindow(nowMs: number): number {
   return Math.floor(nowMs / (THROTTLE_WINDOW_MIN * 60 * 1000));
+}
+
+/**
+ * Host propio donde vive el action handler de Firebase.
+ *
+ * `auth.gettreino.com` apunta por CNAME al sitio de Hosting `treino-dev`, que
+ * sirve el mismo `/__/auth/action` que `treino-dev.firebaseapp.com`. Verificado
+ * en produccion: ambos devuelven 200 sobre ese path.
+ *
+ * POR QUE SE REESCRIBE EN CODIGO Y NO EN LA CONSOLA
+ *
+ * Firebase Auth tiene un ajuste para esto ("Customize action URL", que escribe
+ * `notification.sendEmail.callbackUri`). En este proyecto ese PATCH devuelve
+ * **400 EMAIL_TEMPLATE_UPDATE_NOT_ALLOWED** con un payload perfectamente
+ * valido, asi que el ajuste esta bloqueado a nivel proyecto por una causa que
+ * no pudimos diagnosticar.
+ *
+ * Reescribir el host aca es mejor igual, con o sin ese bloqueo: queda
+ * versionado, revisable, cubierto por tests, y no depende de una config
+ * invisible en una consola. `generatePasswordResetLink` devuelve el link con
+ * el `oobCode` ya firmado; cambiar el host NO lo invalida, porque el codigo
+ * viaja en el query string y lo valida el backend de Auth, no el host.
+ */
+const ACTION_HANDLER_HOST = "auth.gettreino.com";
+
+/**
+ * Cambia el host del action link al dominio propio, dejando intacto el resto.
+ *
+ * Conservador a proposito: si el link no parsea, o su path no es el namespace
+ * reservado de Firebase, se devuelve tal cual. Un link de recuperacion roto es
+ * peor que uno feo — el usuario que lo recibe ya no puede entrar a su cuenta.
+ *
+ * @param link - URL que devolvio el Admin SDK.
+ */
+export function rewriteActionHost(link: string): string {
+  try {
+    const url = new URL(link);
+    // Solo el namespace reservado de Hosting. Cualquier otra forma queda igual.
+    if (!url.pathname.startsWith("/__/auth/")) return link;
+
+    url.protocol = "https:";
+    url.host = ACTION_HANDLER_HOST;
+    url.port = "";
+    return url.toString();
+  } catch {
+    return link;
+  }
 }
 
 /** Respuesta uniforme. Nunca revela si la cuenta existe. */
@@ -125,7 +174,7 @@ export async function runRequestPasswordReset(
       toUid: user.uid,
       kind: "password-reset",
       scope: `${user.uid}_${throttleWindow(nowMs)}`,
-      params: { actionLink: link },
+      params: { actionLink: rewriteActionHost(link) },
     });
   } catch (error: unknown) {
     // Se traga TODO a proposito — incluido user-not-found. Se logea para
@@ -176,7 +225,7 @@ export async function runRequestEmailVerification(
       toUid: uid,
       kind: "email-verification",
       scope: `${uid}_${throttleWindow(nowMs)}`,
-      params: { actionLink: link },
+      params: { actionLink: rewriteActionHost(link) },
     });
   } catch (error: unknown) {
     logger.warn("requestEmailVerification: no se encolo", { uid, error });
@@ -188,17 +237,47 @@ export async function runRequestEmailVerification(
 // ---------------------------------------------------------------------------
 // onCall wrappers
 //
-// `enforceAppCheck: true` en los dos. Importa MAS en requestPasswordReset que
-// en cualquier otro callable del repo: es el unico que se puede invocar sin
-// sesion, y cada llamada le manda un mail a un tercero. Sin atestacion es un
-// amplificador de spam apuntable contra cualquier direccion registrada.
+// SIN `enforceAppCheck`, y NO es un olvido. Es deuda declarada, con la misma
+// condicion de salida que `deleteAccount` y `mintWatchCredential`.
+//
+// POR QUE
+//
+// App Check en Android no emite atestacion valida. Medido sobre los logs de
+// `mintWatchCredential` el 2026-08-25: iPhone 8 VALID / 2 INVALID, Android
+// 1 VALID / 8 INVALID. Con el flag puesto, un usuario de Android no podria
+// resetear su contraseña — y es el peor flujo posible para romper, porque el
+// que lo necesita ya esta afuera de su cuenta.
+//
+// Es la misma piedra que el repo ya piso dos veces. `deleteAccount` tuvo el
+// flag desde el 2026-07-20 y en ese lapso el borrado no funciono NUNCA: cero
+// respuestas 200 en todo el historico retenido. La regla que quedo escrita
+// ahi vale igual aca: un flag que convierte un boton en un error permanente
+// no da seguridad, da un boton roto.
+//
+// POR QUE NO EMPEORA NADA
+//
+// La superficie ya esta abierta HOY, sin nosotros: el SDK del cliente llama a
+// `sendPasswordResetEmail` directo contra Firebase, con la API key que viaja
+// en el bundle. Cualquiera puede invocarla.
+//
+// Esta CF no agrega una puerta: le pone un cerrojo a una que ya estaba
+// abierta. La ventana de `THROTTLE_WINDOW_MIN` acota el peor caso a ~60 mails
+// por hora por cuenta, control que hoy no existe. Y la anti-enumeracion se
+// sostiene sola: quien abuse no aprende nada sobre que direcciones existen.
+//
+// CONDICION DE SALIDA
+//
+// Que el cliente emita atestacion valida en las DOS plataformas. Contar sobre
+// `jsonPayload.verifications.app` en Cloud Logging y pedir cero INVALID por
+// plataforma. Cuando eso pase, vuelven los tres callables juntos: este,
+// `deleteAccount` y `mintWatchCredential`.
 //
 // Los dos van a southamerica-east1 como el resto de las CFs de TREINO.
 // ---------------------------------------------------------------------------
 
 /** Callable: pedir mail de reseteo. NO requiere sesion, a proposito. */
 export const requestPasswordReset = functions.onCall(
-  { region: "southamerica-east1", enforceAppCheck: true },
+  { region: "southamerica-east1" },
   async (request) => {
     const email = (request.data ?? {}).email;
     return runRequestPasswordReset(getApp(), email);
@@ -207,7 +286,7 @@ export const requestPasswordReset = functions.onCall(
 
 /** Callable: reenviar el mail de verificacion. Requiere sesion. */
 export const requestEmailVerification = functions.onCall(
-  { region: "southamerica-east1", enforceAppCheck: true },
+  { region: "southamerica-east1" },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Authentication required.");
