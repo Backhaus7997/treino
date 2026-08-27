@@ -15,8 +15,11 @@
  * answerable from data already in Firestore.
  *
  * ⚠️  WHICH PROJECT YOU POINT THIS AT DECIDES WHETHER THE NUMBER MEANS ANYTHING.
- * `.firebaserc` only declares `treino-dev`. Run against dev and you are
- * measuring seed and test accounts — `scripts/seed_emulator_full.js` writes
+ * Since #840 the `.firebaserc` default is `demo-treino` (offline emulator id) and
+ * the real project sits behind the `prod` alias — but this script never reads
+ * `.firebaserc`: it resolves the project from `scripts/sa-key.json`, or pins
+ * `treino-dev` when `FIRESTORE_EMULATOR_HOST` is set. Run against the emulator
+ * and you are measuring seed and test accounts — `seed_emulator_full.js` writes
  * `userPublicProfiles` docs directly, so the ratio is whatever the seed author
  * happened to pick. Only a project with real athletes answers #642.
  *

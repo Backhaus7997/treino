@@ -14,7 +14,9 @@
 // leaves them as a ready-to-run deliverable.
 //
 // EMULATORS ONLY — NEVER cloud. Auth 9099 / Firestore 8080 on 127.0.0.1.
-// Start them first with:  firebase emulators:start  (JAVA_HOME → JDK 21).
+// Start them first with:  ./scripts/emulator.sh  (JAVA_HOME → JDK 21).
+// El script fija `--project treino-dev`; el default de .firebaserc es
+// `demo-treino` y dejaría los datos en otro namespace (#840).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import 'package:cloud_firestore/cloud_firestore.dart';

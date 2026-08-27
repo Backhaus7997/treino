@@ -65,10 +65,17 @@ import { doc, setDoc, deleteDoc } from "firebase/firestore";
  *
  * El default NO es el mismo en los dos caminos que corren esta suite:
  *   - local, `npm run test:rules:emulator` → `--project treino-rules-test`
- *   - CI, job *Functions Test*             → sin `--project`, o sea `.firebaserc` = `treino-dev`
+ *   - CI, job *Functions Test*             → `--project treino-dev` explícito
  * así que se lee de `GCLOUD_PROJECT`, que `emulators:exec` exporta con el
  * proyecto ya resuelto. Si algún día se resolviera mal, el efecto es un ROJO
  * ruidoso en "permite al PF nombrado en el grant bajarla", no un verde falso.
+ *
+ * Ese `--project` de CI era implícito hasta #840: se resolvía por el default de
+ * `.firebaserc`, que era `treino-dev` — o sea PRODUCCIÓN. Ahora el default es
+ * `demo-treino` (proyecto offline del emulador) para que un `deploy` o un
+ * `firestore:delete` sin `--project` falle en vez de tocar datos reales, y el
+ * id que necesita el emulador se nombra en el step. Leer de `GCLOUD_PROJECT`
+ * en vez de hardcodear fue lo que hizo que este archivo sobreviviera el cambio.
  */
 const PROJECT_ID = process.env.GCLOUD_PROJECT ?? "treino-dev";
 const STORAGE_RULES_PATH = path.resolve(__dirname, "../../../storage.rules");

@@ -29,6 +29,9 @@ import 'firebase_options.dart';
 /// `.firebaserc` resuelve el `--only hosting:` contra `treino-dev`, el único
 /// proyecto Firebase de TREINO. Que el comando no nombre `treino-dev` no
 /// significa que no le esté pegando. Ver AGENTS.md → Entornos.
+///
+/// `--project prod` es obligatorio desde #840: el default de `.firebaserc` es
+/// `demo-treino` (proyecto offline del emulador) y el comando pelado falla.
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 

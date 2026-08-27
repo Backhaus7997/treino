@@ -1,6 +1,6 @@
 {
   "projects": {
-    "default": "treino-dev",
+    "default": "demo-treino",
     "prod": "treino-dev"
   },
   "targets": {

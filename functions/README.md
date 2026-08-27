@@ -36,8 +36,11 @@ npm install
 Tests run against the Firebase Local Emulator Suite. Start emulators first:
 
 ```bash
-# From project root
-firebase emulators:start --only firestore,auth
+# From project root. El script fija `--project treino-dev`, que es el namespace
+# donde la app y las semillas escriben; un `emulators:start` pelado resolvería
+# `demo-treino` (el default seguro de .firebaserc, #840) y los datos quedarían
+# en otro proyecto: la UI de :4444 vacía y las suites de Storage en rojo.
+SKIP_FUNCTIONS=1 ./scripts/emulator.sh
 
 # In a second terminal
 cd functions
@@ -53,8 +56,9 @@ export JAVA_HOME=/opt/homebrew/opt/openjdk@21   # macOS via Homebrew
 ## Running the Full Emulator (with Functions)
 
 ```bash
-# From project root — builds functions first via predeploy hook
-firebase emulators:start --only firestore,auth,functions
+# From project root — compila functions antes de arrancar, y fija
+# `--project treino-dev` (ver nota de arriba, #840).
+./scripts/emulator.sh
 ```
 
 The `deleteAccount` callable will be available at:
