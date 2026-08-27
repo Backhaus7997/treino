@@ -72,6 +72,7 @@ import {
 } from "@firebase/rules-unit-testing";
 import {
   arrayUnion,
+  deleteField,
   collection,
   doc,
   getDoc,
@@ -2269,3 +2270,93 @@ describe("appointments — los escritores reales de AppointmentRepository siguen
     }
   });
 });
+
+/**
+ * #846 — el `reason` que escribía la Cloud Function del cascade.
+ *
+ * `functions/src/cascade/appointments.ts` escribía `reason:
+ * 'athlete-account-deleted'` como clave suelta, con Admin SDK. `reason` no
+ * existe en `Appointment.toJson()` ni en las 14 claves de `hasOnly()` — sólo
+ * existe DENTRO de `CancellationEntry`, que es un elemento del
+ * `cancellationLog`.
+ *
+ * El Admin SDK saltea las reglas, así que la escritura pasaba. Lo que quedaba
+ * después es el daño: `hasOnly()` corre sobre `request.resource.data`, el
+ * documento **MERGEADO**, así que cualquier update PARCIAL posterior del
+ * cliente arrastraba el `reason` guardado y la allowlist lo rechazaba. Nuestro
+ * propio backend fabricaba turnos imborrables.
+ *
+ * ⚠️ Los dos primeros casos assertean el DENY, o sea el estado ROTO. No están
+ * para custodiar una regla: están para que quede escrito, y medido, que el fix
+ * de la CF **no destraba los documentos que ya se escribieron** — la clave
+ * sigue guardada en ellos. Eso lo destraba
+ * `scripts/migrations/strip_appointment_reason.mjs`, que NO se corrió contra
+ * producción, y el tercer caso es su prueba: mismo documento, sin la clave, la
+ * misma escritura pasa a ALLOW.
+ */
+describe("appointments update — el `reason` del cascade congela el turno (#846)", () => {
+  const CONGELADO = "appt-846-con-reason";
+
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), COL, CONGELADO), {
+        ...appointment({ id: CONGELADO, startsAt: inDays(5) }),
+        reason: "athlete-account-deleted",
+      });
+    });
+  });
+
+  it("DENIEGA al atleta cancelar un turno que lleva `reason` — el daño medido", async () => {
+    await assertFails(
+      updateDoc(doc(dbAs(ATHLETE), COL, CONGELADO), {
+        status: "cancelled",
+        cancelledBy: ATHLETE,
+      })
+    );
+  });
+
+  it("DENIEGA al PF anotar un turno que lleva `reason`", async () => {
+    await assertFails(
+      updateDoc(doc(dbAs(TRAINER), COL, CONGELADO), { noteAfter: "ok" })
+    );
+  });
+
+  it("sacando la clave con Admin SDK el mismo turno se cancela — la migración funciona", async () => {
+    // Es la medición del alcance del fix, no un test de la regla: lo único que
+    // cambia entre este caso y el primero es la clave de más.
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), COL, CONGELADO), {
+        reason: deleteField(),
+      });
+    });
+    await assertSucceeds(
+      updateDoc(doc(dbAs(ATHLETE), COL, CONGELADO), {
+        status: "cancelled",
+        cancelledBy: ATHLETE,
+      })
+    );
+  });
+
+  it("la entrada del cancellationLog que escribe la CF ahora NO congela nada", async () => {
+    // La forma nueva de la CF: el motivo va adentro del log, que sí está en la
+    // allowlist. Es el mismo mapa que arma `cancelFutureAppointments`.
+    const CF = "appt-846-log";
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(
+        doc(ctx.firestore(), COL, CF),
+        appointment({
+          id: CF,
+          status: "cancelled",
+          startsAt: inDays(5),
+          cancellationLog: [
+            { byUid: ATHLETE, atMs: 1, reason: "athlete-account-deleted" },
+          ],
+        })
+      );
+    });
+    await assertSucceeds(
+      updateDoc(doc(dbAs(TRAINER), COL, CF), { noteAfter: "no vino" })
+    );
+  });
+});
+
