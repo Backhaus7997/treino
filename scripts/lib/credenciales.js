@@ -26,7 +26,12 @@
  *   2. Ninguna ruta adentro de un árbol de git funciona. Ni la del repo raíz,
  *      ni la de un worktree, ni `../../../scripts/sa-key.json`. Ver
  *      `arbolDeGitQueContiene`.
- *   3. El camino del emulador no toca nada de esto: sin credencial, anda.
+ *   3. El camino del emulador no toca nada de esto: sin credencial, anda. Pero
+ *      "emulador" significa UNA cosa y sólo una: `FIRESTORE_EMULATOR_HOST`
+ *      puesta, que es lo único que desvía el destino de estos scripts. Las
+ *      otras variables de emulador —Auth, Storage, Realtime Database— sin ésa
+ *      son un ambiente que se contradice y ABORTAN. Ver
+ *      `VARS_DE_EMULADOR_PARCIALES`.
  *   4. La identidad que se verifica es la EFECTIVA — el `client_email` de la
  *      credencial que realmente se cargó — no el project id declarado. Ver
  *      `evaluarProduccion` y el comentario largo que la precede.
@@ -95,9 +100,35 @@ const PROYECTOS_DE_PRODUCCION = new Set(['treino-dev', 'treino-prod']);
 /** Raíz del checkout desde el que se cargó este módulo (`<repo>/scripts/lib`). */
 const RAIZ_DEL_REPO = path.resolve(__dirname, '..', '..');
 
-/** Variables que hacen que el Admin SDK hable con el emulador y no con la nube. */
-const VARS_DE_EMULADOR = [
-  'FIRESTORE_EMULATOR_HOST',
+/**
+ * LA ÚNICA VARIABLE QUE DESVÍA EL DESTINO DE ESTOS SCRIPTS.
+ *
+ * Los 44 scripts de `scripts/` escriben en Firestore, y `FIRESTORE_EMULATOR_HOST`
+ * es lo único que hace que esa escritura aterrice en localhost. No es una de
+ * cuatro variables equivalentes: es LA condición.
+ */
+const VAR_EMULADOR_FIRESTORE = 'FIRESTORE_EMULATOR_HOST';
+
+/**
+ * Las que DICEN emulador y NO desvían Firestore.
+ *
+ * Cada una redirige otro producto —Auth, Storage, Realtime Database— y ninguna
+ * toca Firestore. Un proceso con sólo una de éstas puesta está, para todo lo
+ * que estos scripts hacen, apuntando a LA NUBE.
+ *
+ * Estuvieron en la misma lista que la de arriba, sumadas con un `.some()`, y
+ * ese `.some()` era el bug: `FIREBASE_DATABASE_EMULATOR_HOST` —de un producto
+ * que TREINO ni usa— alcanzaba para que el contexto dijera `modo: 'emulador'`,
+ * y con eso el script se saltea la credencial ENTERA (#834) y apaga el cartel
+ * de producción (#826) mientras escribe en el `treino-dev` real. Si la máquina
+ * tiene ADC de `gcloud` puesto, esa escritura además AUTENTICA.
+ *
+ * Es la misma familia que el #838 —una etiqueta que dice EMULADOR mientras los
+ * bytes van a producción— y se cierra con la misma regla que `storage_target.js`
+ * fijó para el par Firestore/Storage: o todo redirigido, o nada; la mezcla
+ * ABORTA antes de la primera escritura. Ver `mensajeEmuladorIncoherente`.
+ */
+const VARS_DE_EMULADOR_PARCIALES = [
   'FIREBASE_AUTH_EMULATOR_HOST',
   'FIREBASE_STORAGE_EMULATOR_HOST',
   'FIREBASE_DATABASE_EMULATOR_HOST',
@@ -460,13 +491,65 @@ function evaluarProduccion(credencial, { projectIdDeclarado = null } = {}) {
 // ── Emulador ───────────────────────────────────────────────────────────────
 
 /**
- * `true` si el Admin SDK va a hablar con el emulador local.
+ * `true` si el DESTINO DE ESTOS SCRIPTS —Firestore— está redirigido al emulador.
+ *
+ * No es "¿alguna variable sugiere emulador?". Es la pregunta exacta que el
+ * llamador necesita responder, porque de esto cuelgan las dos decisiones más
+ * peligrosas del módulo: saltear la credencial (#834) y apagar el cartel de
+ * producción (#826). Una condición más laxa que el redirect real convierte las
+ * dos en una mentira — ver `VARS_DE_EMULADOR_PARCIALES`.
+ *
+ * Vacío o whitespace NO cuenta: exportar la variable en blanco no desvía nada.
  *
  * Se chequea ANTES que la credencial en todo el flujo: contra el emulador no
  * hay nada que proteger y no debe hacer falta ninguna variable (#834, (c)).
  */
 function usandoEmulador(env = process.env) {
-  return VARS_DE_EMULADOR.some((v) => Boolean((env[v] || '').trim()));
+  return Boolean((env[VAR_EMULADOR_FIRESTORE] || '').trim());
+}
+
+/** Las variables de emulador PARCIAL que están puestas. Lista, para nombrarlas. */
+function emuladoresParcialesPuestos(env = process.env) {
+  return VARS_DE_EMULADOR_PARCIALES.filter((v) => Boolean((env[v] || '').trim()));
+}
+
+/**
+ * EL MENSAJE DEL DESFASAJE: el ambiente dice emulador y Firestore no lo está.
+ *
+ * Se ABORTA en vez de seguir por el camino de la nube, aunque seguir sería
+ * "seguro" (pediría credencial y gritaría el cartel). El motivo es el mismo por
+ * el que `storage_target.js` aborta en vez de auto-redirigir: quien exportó
+ * `FIREBASE_AUTH_EMULATOR_HOST` cree que está corriendo local, y una corrida que
+ * escribe en producción mientras el operador cree otra cosa es el #838 exacto.
+ * Entre romper la corrida y ejecutarla contra un destino que nadie eligió, se
+ * rompe la corrida.
+ */
+function mensajeEmuladorIncoherente(puestas) {
+  return [
+    '',
+    '⛔ ─────────────────────────────────────────────────────────────────────',
+    '⛔  ABORTADO: el ambiente dice EMULADOR pero Firestore NO está redirigido.',
+    '⛔',
+    ...puestas.map((v) => `⛔    ${v} = puesta`),
+    `⛔    ${VAR_EMULADOR_FIRESTORE} = NO PUESTA  ← la única que desvía Firestore`,
+    '⛔',
+    '⛔  Estos scripts escriben en Firestore. Ninguna de las variables de arriba',
+    '⛔  lo desvía: Auth, Storage y Realtime Database van cada uno por su lado.',
+    '⛔  Sin la de Firestore, esta corrida escribe en `treino-dev`, que ES',
+    '⛔  PRODUCCIÓN (#826) — y lo haría sin cartel y sin pedir credencial,',
+    '⛔  porque el proceso se cree local.',
+    '⛔',
+    '⛔  Si querés el emulador, agregá la que falta:',
+    `⛔    export ${VAR_EMULADOR_FIRESTORE}=localhost:8080`,
+    '⛔',
+    '⛔  Si querés correr contra la nube, sacá las otras del ambiente y leé el',
+    '⛔  cartel que sale después: es producción.',
+    `⛔    unset ${puestas.join(' ')}`,
+    '⛔',
+    '⛔  Contexto: #834 / #838 / AGENTS.md → Entornos',
+    '⛔ ─────────────────────────────────────────────────────────────────────',
+    '',
+  ].join('\n');
 }
 
 /**
@@ -505,7 +588,9 @@ function rechazarSiApuntaAlRepo(io) {
  * Lo que un script necesita saber antes de inicializar el Admin SDK.
  *
  * Emulador  → `{ modo: 'emulador', projectId, produccion: false }`, sin tocar
- *             el resolutor ni pedir credencial.
+ *             el resolutor ni pedir credencial. SÓLO con Firestore redirigido:
+ *             es lo único que hace que `modo: 'emulador'` sea cierto para lo
+ *             que estos scripts escriben.
  * Si no     → `{ modo: 'credencial', ruta, credencial, produccion, motivo, … }`
  *             o `ErrorDeCredencial` con el mensaje de qué hacer.
  */
@@ -514,6 +599,15 @@ function resolverContexto({
   projectIdEmulador = 'treino-dev',
   ...io
 } = {}) {
+  // La coherencia va PRIMERO: si el ambiente se contradice, el error útil es
+  // "tu emulador no desvía Firestore", no "falta la credencial". El segundo
+  // manda a exportar la clave de producción para arreglar una corrida que la
+  // persona quería local.
+  const parciales = emuladoresParcialesPuestos(env);
+  if (!usandoEmulador(env) && parciales.length > 0) {
+    throw new ErrorDeCredencial('EMULADOR_INCOHERENTE', mensajeEmuladorIncoherente(parciales));
+  }
+
   if (usandoEmulador(env)) {
     rechazarSiApuntaAlRepo({ env, ...io });
     return {
@@ -541,6 +635,8 @@ function resolverContexto({
 module.exports = {
   VAR_RUTA,
   VAR_ADC,
+  VAR_EMULADOR_FIRESTORE,
+  VARS_DE_EMULADOR_PARCIALES,
   RUTA_RECOMENDADA,
   RUTA_RECOMENDADA_SHELL,
   PROYECTOS_DE_PRODUCCION,
@@ -554,6 +650,7 @@ module.exports = {
   proyectoDeLaIdentidad,
   evaluarProduccion,
   usandoEmulador,
+  emuladoresParcialesPuestos,
   rechazarSiApuntaAlRepo,
   resolverContexto,
 };

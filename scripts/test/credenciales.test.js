@@ -34,6 +34,7 @@ const {
   proyectoDeLaIdentidad,
   evaluarProduccion,
   usandoEmulador,
+  emuladoresParcialesPuestos,
   resolverContexto,
   RAIZ_DEL_REPO,
 } = require('../lib/credenciales');
@@ -299,12 +300,78 @@ test('una ruta fuera del repo pero inexistente falla como inexistente', () => {
 
 // ── 3. El emulador anda sin credencial ─────────────────────────────────────
 
-test('usandoEmulador reconoce cada variable del emulador', () => {
+test('usandoEmulador es SÓLO la variable que desvía Firestore', () => {
   assert.strictEqual(usandoEmulador({}), false);
   assert.strictEqual(usandoEmulador({ FIRESTORE_EMULATOR_HOST: '' }), false);
+  assert.strictEqual(usandoEmulador({ FIRESTORE_EMULATOR_HOST: '   ' }), false);
   assert.strictEqual(usandoEmulador({ FIRESTORE_EMULATOR_HOST: 'localhost:8080' }), true);
-  assert.strictEqual(usandoEmulador({ FIREBASE_AUTH_EMULATOR_HOST: 'localhost:9099' }), true);
-  assert.strictEqual(usandoEmulador({ FIREBASE_STORAGE_EMULATOR_HOST: 'localhost:9199' }), true);
+
+  // Ésta es la aserción que cambió de signo, y el cambio ES el arreglo. Antes
+  // cualquiera de las tres devolvía `true`, y de ese `true` cuelgan las dos
+  // decisiones más peligrosas del módulo: saltear la credencial (#834) y apagar
+  // el cartel de producción (#826). Ninguna de las tres desvía Firestore, que
+  // es lo que estos scripts escriben — o sea que las dos decisiones se tomaban
+  // sobre una corrida que iba derecho a producción.
+  assert.strictEqual(usandoEmulador({ FIREBASE_AUTH_EMULATOR_HOST: 'localhost:9099' }), false);
+  assert.strictEqual(usandoEmulador({ FIREBASE_STORAGE_EMULATOR_HOST: 'localhost:9199' }), false);
+  assert.strictEqual(usandoEmulador({ FIREBASE_DATABASE_EMULATOR_HOST: 'localhost:9000' }), false);
+});
+
+test('emuladoresParcialesPuestos nombra las que están, en orden', () => {
+  assert.deepStrictEqual(emuladoresParcialesPuestos({}), []);
+  assert.deepStrictEqual(emuladoresParcialesPuestos({ FIRESTORE_EMULATOR_HOST: 'x' }), []);
+  assert.deepStrictEqual(
+    emuladoresParcialesPuestos({
+      FIREBASE_DATABASE_EMULATOR_HOST: 'localhost:9000',
+      FIREBASE_AUTH_EMULATOR_HOST: 'localhost:9099',
+      FIREBASE_STORAGE_EMULATOR_HOST: '   ',
+    }),
+    ['FIREBASE_AUTH_EMULATOR_HOST', 'FIREBASE_DATABASE_EMULATOR_HOST'],
+  );
+});
+
+test('un emulador parcial SIN Firestore redirigido aborta por incoherencia', () => {
+  for (const v of [
+    'FIREBASE_AUTH_EMULATOR_HOST',
+    'FIREBASE_STORAGE_EMULATOR_HOST',
+    'FIREBASE_DATABASE_EMULATOR_HOST',
+  ]) {
+    const err = capturar(() =>
+      resolverContexto({
+        env: { [v]: 'localhost:9999' },
+        existeEntrada: () => assert.fail('no tiene que llegar a mirar el filesystem'),
+        leerArchivo: () => assert.fail('no tiene que llegar a leer credenciales'),
+        home: HOME,
+      }),
+    );
+    assert.strictEqual(err.codigo, 'EMULADOR_INCOHERENTE');
+    assert.match(err.message, new RegExp(v));
+    assert.match(err.message, /FIRESTORE_EMULATOR_HOST/);
+  }
+});
+
+test('la incoherencia se chequea ANTES que la credencial', () => {
+  // Con el orden al revés el error sería "falta TREINO_SA_KEY", que manda a
+  // exportar la clave de PRODUCCIÓN para arreglar una corrida que la persona
+  // quería local. El mensaje equivocado acá es una invitación al accidente.
+  const err = capturar(() =>
+    resolverContexto({ env: { FIREBASE_AUTH_EMULATOR_HOST: 'localhost:9099' }, home: HOME }),
+  );
+  assert.strictEqual(err.codigo, 'EMULADOR_INCOHERENTE');
+});
+
+test('con Firestore redirigido, las parciales acompañan sin abortar', () => {
+  const ctx = resolverContexto({
+    env: {
+      FIRESTORE_EMULATOR_HOST: 'localhost:8080',
+      FIREBASE_AUTH_EMULATOR_HOST: 'localhost:9099',
+      FIREBASE_STORAGE_EMULATOR_HOST: 'localhost:9199',
+    },
+    existeEntrada: () => assert.fail('el emulador no debe mirar el filesystem'),
+    leerArchivo: () => assert.fail('el emulador no debe leer credenciales'),
+    home: HOME,
+  });
+  assert.strictEqual(ctx.modo, 'emulador');
 });
 
 test('con el emulador el contexto resuelve sin credencial y sin TREINO_SA_KEY', () => {

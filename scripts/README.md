@@ -79,6 +79,9 @@ Las reglas:
   igual. `FIRESTORE_EMULATOR_HOST` desvía **Firestore y nada más** — Storage y
   Auth de Admin siguen yendo a la nube, así que eso sería producción disfrazada
   de local. Una variable vieja o rota, en cambio, no frena nada.
+- **Emulador significa `FIRESTORE_EMULATOR_HOST`, ni más ni menos.** Las otras
+  tres variables de emulador no desvían Firestore; un ambiente que las tenga sin
+  ésa **aborta**. Ver "Sin credencial: el emulador".
 
 Lo que impide que el próximo script nazca salteándose todo esto es
 `test/frontera.test.js`: escanea `scripts/` y falla si aparece un
@@ -131,6 +134,30 @@ Todo lo local se corre contra el emulador y no necesita ninguna clave:
 ./scripts/emulator.sh
 FIRESTORE_EMULATOR_HOST=localhost:8080 node scripts/<script>.js
 ```
+
+**"Emulador" es esa variable y ninguna otra.** `FIRESTORE_EMULATOR_HOST` es lo
+único que desvía Firestore, que es lo que estos scripts escriben.
+`FIREBASE_AUTH_EMULATOR_HOST`, `FIREBASE_STORAGE_EMULATOR_HOST` y
+`FIREBASE_DATABASE_EMULATOR_HOST` redirigen otros productos y **no tocan
+Firestore**.
+
+Por eso un ambiente con alguna de esas tres puesta y la de Firestore no **aborta
+antes de escribir**:
+
+```
+⛔  ABORTADO: el ambiente dice EMULADOR pero Firestore NO está redirigido.
+```
+
+No es celo: mientras el contexto aceptó cualquiera de las cuatro, exportar
+`FIREBASE_DATABASE_EMULATOR_HOST` —de un producto que TREINO ni usa— alcanzaba
+para que un backfill se saltee la credencial entera, apague el cartel de
+producción y escriba en el `treino-dev` real. Con ADC de `gcloud` en la máquina,
+esa escritura además autentica. Es la misma regla que `lib/storage_target.js`
+aplica al par Firestore/Storage (#838): **o todo redirigido, o nada; la mezcla
+aborta**.
+
+Si querés el emulador, agregá la que falta. Si querés la nube, sacá las otras
+del ambiente y leé el cartel que sale después.
 
 ### Por qué se mira la identidad y no el project id
 

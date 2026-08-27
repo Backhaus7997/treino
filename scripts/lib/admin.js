@@ -21,6 +21,14 @@
  *      apuntando ADENTRO de un árbol de git — `FIRESTORE_EMULATOR_HOST` desvía
  *      Firestore y nada más, así que eso sería un camino real a producción
  *      disfrazado de local. Ver `rechazarSiApuntaAlRepo`.
+ *
+ *      "Emulador" acá es `FIRESTORE_EMULATOR_HOST`, ni más ni menos: es la
+ *      única variable que desvía lo que estos scripts escriben. Un ambiente que
+ *      dice emulador por otra vía (Auth, Storage, RTDB) sin ésa no llega hasta
+ *      acá — `resolverContexto` aborta antes. Sin ese corte, `contexto.modo`
+ *      valdría `'emulador'` para una corrida que escribe en producción, y las
+ *      dos cosas que cuelgan de él —saltear la credencial y apagar el cartel—
+ *      serían las dos falsas a la vez.
  *   2. Si no, resuelve la credencial ANTES de `initializeApp`. Tiene que ser
  *      antes: `admin.initializeApp()` sin argumentos y
  *      `admin.credential.applicationDefault()` leen

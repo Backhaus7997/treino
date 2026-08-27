@@ -79,6 +79,16 @@ const { admin, contexto } = inicializarAdmin();
 // #826 — el cartel necesita saber el destino y si es el emulador. Los dos salen
 // ahora del contexto que resolvió la frontera, que además mira la identidad
 // EFECTIVA de la credencial y no sólo el project id declarado (#843).
+//
+// `modo === 'emulador'` significa EXACTAMENTE `FIRESTORE_EMULATOR_HOST` puesta
+// — lo mismo que decía el `Boolean(process.env.FIRESTORE_EMULATOR_HOST)` que
+// había acá antes de #834, ni un caso más. La versión intermedia aceptaba
+// cualquiera de cuatro variables de emulador y sólo una desvía Firestore, así
+// que este booleano podía valer `true` mientras el script escribía en
+// producción: apagaba el cartel de abajo y salteaba la credencial. Si algún día
+// se vuelve a tocar la condición, lo que lo agarra es
+// `test/emulador_coherente.test.js`, que corre este script de verdad y mira la
+// salida — el desfasaje no se ve en un diff.
 const PROJECT_ID = proyectoDe(contexto);
 const USANDO_EMULADOR = contexto.modo === 'emulador';
 
