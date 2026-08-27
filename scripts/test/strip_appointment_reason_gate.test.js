@@ -165,6 +165,28 @@ test('FIREBASE_AUTH_EMULATOR_HOST solo NO habilita el --apply contra producción
   assert.match(r.salida, CARTEL);
 });
 
+test('`--project=` VACIO no puentea la compuerta', () => {
+  // La matriz de 32 combinaciones no puede ver esto: no toca el argumento.
+  // `--project=` daba projectId = "" y `??` NO cae al fallback con string
+  // vacio, asi que `destino` quedaba "" —la compuerta no lo reconocia como
+  // produccion— mientras el Admin SDK ignoraba el vacio y resolvia por su
+  // cuenta a `treino-dev`. Compuerta mirando un destino, write yendo a otro.
+  const r = correr(['--project=', '--apply']);
+
+  assert.strictEqual(r.code, 2, 'tendria que frenar por falta de confirmacion');
+  assert.ok(!r.tocoFirestore, 'le hablo al Firestore de treino-dev');
+  assert.match(r.stdout, /destino : treino-dev/, 'el destino tiene que resolverse, no quedar vacio');
+  assert.match(r.salida, CARTEL, 'sin el cartel nadie se entera de que va a produccion');
+});
+
+test('`--project=   ` (solo espacios) tampoco lo puentea', () => {
+  const r = correr(['--project=   ', '--apply']);
+
+  assert.strictEqual(r.code, 2);
+  assert.ok(!r.tocoFirestore);
+  assert.match(r.salida, CARTEL);
+});
+
 test('avisa que el emulador que SÍ está puesto no desvía nada de este script', () => {
   const r = correr(['--apply'], { emuladores: ['FIREBASE_AUTH_EMULATOR_HOST'] });
 

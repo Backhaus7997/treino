@@ -133,7 +133,16 @@ const SERVICIOS_QUE_TOCA = ["firestore"];
 
 const args = process.argv.slice(2);
 const projectArg = args.find((a) => a.startsWith("--project="));
-const projectId = projectArg ? projectArg.split("=")[1] : undefined;
+// `--project=` VACIO cuenta como ausente, no como "proyecto llamado cadena
+// vacia". Con `??` un string vacio NO cae al fallback —solo null/undefined lo
+// hacen— asi que `destino` quedaba "", la compuerta no lo reconocia como
+// produccion, no salia el cartel... y el Admin SDK lo ignoraba y resolvia por
+// su cuenta a `treino-dev`. La compuerta miraba un destino y el SDK escribia en
+// otro. Es la misma familia de #826: el aviso decia una cosa y el write iba a
+// otra.
+const projectIdCrudo = projectArg ? projectArg.split("=")[1] : undefined;
+const projectId =
+  projectIdCrudo && projectIdCrudo.trim() !== "" ? projectIdCrudo.trim() : undefined;
 const apply = args.includes("--apply");
 const confirmado = args.includes("--si-escribo-en-produccion");
 
