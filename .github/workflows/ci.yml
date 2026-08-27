@@ -385,17 +385,34 @@ jobs:
   # SIN `npm ci` a propósito, y no es un olvido: estos tests no importan una
   # sola dependencia de `scripts/package.json`. Los scripts bajo prueba se
   # cargan con `--require test/fixtures/stub_firebase_admin.js`, que intercepta
-  # `Module._load` y devuelve un `firebase-admin` falso; el resto es todo
-  # `node:` builtin. Verificado corriendo la suite con `scripts/node_modules`
-  # inexistente: 112/112 en verde. Instalar `firebase-admin` acá sería medio
-  # minuto por run para nada — y peor, dejaría que un test toque la red sin que
-  # se note.
+  # `Module._load` (CJS) y `module.register()` (ESM) y devuelve un
+  # `firebase-admin` falso; el resto es todo `node:` builtin. Verificado
+  # corriendo la suite con `scripts/node_modules` inexistente, en Node 20 y en
+  # Node 22: 165/165 en verde. Instalar `firebase-admin` acá sería medio minuto
+  # por run para nada — y peor, dejaría que un test toque la red sin que se
+  # note.
   #
-  # Node 20 igual que los otros jobs de Node. Anda en 20 y en 22 porque el
-  # glob del `npm test` lo expande el shell. El `--test "test/*.test.js"`
-  # entrecomillado que traía el #835 exigía Node >= 22 —el test runner recién
-  # expande globs por su cuenta desde ahí— y habría roto este job en silencio
-  # el día que se agregara; por eso el merge se quedó con la forma sin comillas.
+  # Node 20 igual que los otros jobs de Node, y NO se sube. Este job ya se puso
+  # rojo una vez por una API que sólo existe de Node 22.15 para arriba
+  # (`module.registerHooks`), y la tentación fue subir el job. Habría tapado el
+  # problema real: sin el hook, el subproceso carga el `firebase-admin` DE
+  # VERDAD y los tests de compuerta —que prueban la AUSENCIA de un marcador—
+  # quedan verdes midiendo nada. El fix fue `module.register()`, que existe
+  # desde Node 20.6, más un marcador de intercepción que los tests exigen en
+  # cada corrida: `esm_stub_interception.test.js` lo custodia con control
+  # negativo. La versión vieja de Node no es una molestia acá, es el CANARIO.
+  #
+  # Anda en 20 y en 22 también por el glob: el del `npm test` lo expande el
+  # shell. El `--test "test/*.test.js"` entrecomillado que traía el #835 exigía
+  # Node >= 22 —el test runner recién expande globs por su cuenta desde ahí— y
+  # habría roto este job en silencio el día que se agregara; por eso el merge se
+  # quedó con la forma sin comillas.
+  #
+  # Y por la misma razón los subtests de la matriz de 32 combinaciones se
+  # `await`ean: hasta Node 24 el runner no espera solo a los subtests y los
+  # cancela con `cancelledByParent`. Medido acá: en Node 20 y en Node 22 corría
+  # UNA de las 32 y las otras 31 salían canceladas; en Node 26 pasaban todas.
+  # Otra cobertura que decía estar y no estaba.
   scripts-test:
     name: Scripts Test (scripts/test)
     runs-on: ubuntu-latest

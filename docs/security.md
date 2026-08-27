@@ -3558,6 +3558,31 @@ marcador con exit 2 es la prueba de que la compuerta frenó antes del primer
 contacto. Mutación: volviendo la compuerta al OR, **11 de 42 casos se ponen
 rojos**.
 
+**Y esa forma de medir tenía un punto ciego que costó una ronda entera.** El
+marcador tampoco aparece cuando el stub **no se aplicó**, así que "ausencia de
+`STUB_FIRESTORE_REACHED`" no distinguía *la compuerta frenó* de *no medí nada*.
+Corriendo la suite en la versión de Node que usa CI aparecieron **dos**
+coberturas que decían estar y no estaban:
+
+| Modo degradado | Dónde pasaba | Qué se creía medir | Qué se medía |
+|---|---|---|---|
+| `module.registerHooks()` no existe antes de Node 22.15 | Node 20 (el job `scripts-test`) | 42 casos de compuerta | el `firebase-admin` REAL: el `import` de un `.mjs` no pasa por `Module._load` |
+| el runner no espera solo a los subtests antes de Node 24 | Node 20 **y** Node 22 | 32 combinaciones | **1**; las otras 31 salían `cancelledByParent` |
+
+Las dos se arreglaron en el harness, no bajando la versión del job — bajarla
+habría tapado el modo de fallar en vez de cerrarlo. La intercepción ESM pasó a
+`module.register()` (existe desde **Node 20.6**, o sea el mismo camino en 20, 22
+y 26) y los subtests de la matriz se `await`ean.
+
+**Lo que impide que vuelva a pasar** es que la intercepción dejó de probarse por
+ausencia: el módulo sintético anuncia `STUB_ESM_INTERCEPTED` al evaluarse, y
+`correr()` lo exige en **cada** corrida. `scripts/test/esm_stub_interception.test.js`
+custodia al harness con **control negativo** —la misma sonda sin el preload
+tiene que decir `ESM=REAL`—, porque un marcador que aparece siempre no prueba
+nada. Mutación, apagando la intercepción ESM en Node 20: **46 casos rojos**, con
+el mensaje *"este test NO está midiendo la compuerta"*. Antes ese mismo mutante
+dejaba la matriz en verde.
+
 #### #847 — el gate de 24 h leía el valor viejo con acceso directo
 
 El Path 1 es el ÚNICO camino de salida de un turno, y su gate temporal es

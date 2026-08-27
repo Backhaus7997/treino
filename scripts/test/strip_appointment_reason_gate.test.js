@@ -37,6 +37,20 @@
  * a hablarle a Firestore, y su AUSENCIA —con exit 2— es la prueba de que la
  * compuerta lo frenó antes. No se testea lo que el script IMPRIME: se testea
  * hasta dónde LLEGA.
+ *
+ * ─── Y por qué cada corrida exige `STUB_ESM_INTERCEPTED` ────────────────────
+ *
+ * Medir por ausencia tiene un punto ciego que se cobró una ronda entera: el
+ * marcador de Firestore tampoco aparece cuando **el stub no se aplicó**. La
+ * primera intercepción del `import` ESM usaba `module.registerHooks()`, que
+ * existe desde Node 22.15; el job `scripts-test` de CI corre Node 20, así que
+ * ahí el preload reventaba, el subproceso cargaba el `firebase-admin` REAL y
+ * estas 42 pruebas pasaban a medir NADA — en verde.
+ *
+ * Por eso `correr()` exige, en TODAS las corridas, la prueba POSITIVA de que el
+ * import se interceptó. Si la intercepción se rompe otra vez, este archivo se
+ * pone rojo entero en vez de degradarse a un test vacuo. El harness en sí lo
+ * custodia `esm_stub_interception.test.js`, con control negativo incluido.
  */
 
 const test = require('node:test');
@@ -47,7 +61,10 @@ const { spawnSync } = require('node:child_process');
 const SCRIPTS_DIR = path.join(__dirname, '..');
 const STUB = path.join(__dirname, 'fixtures', 'stub_firebase_admin.js');
 const SCRIPT = path.join(SCRIPTS_DIR, 'migrations', 'strip_appointment_reason.mjs');
-const { STUB_FIRESTORE_REACHED } = require('./fixtures/stub_firebase_admin');
+const {
+  STUB_FIRESTORE_REACHED,
+  STUB_ESM_INTERCEPTED,
+} = require('./fixtures/stub_firebase_admin');
 
 /**
  * Las CINCO variables de emulador que mira el Admin SDK. Storage tiene dos
@@ -97,6 +114,16 @@ function correr(
   });
   assert.strictEqual(res.error, undefined, `no pude ejecutar el script: ${res.error}`);
   const salida = `${res.stdout}${res.stderr}`;
+
+  // EL HARNESS ANTES QUE LA COMPUERTA. Los casos negativos de abajo prueban la
+  // ausencia de `STUB_FIRESTORE_REACHED`; esa ausencia es indistinguible de "el
+  // stub nunca interceptó nada". Este assert es lo que las separa. (#846)
+  assert.ok(
+    salida.includes(STUB_ESM_INTERCEPTED),
+    'el stub NO interceptó el `import firebase-admin`: este test NO está midiendo la ' +
+      `compuerta, está mirando el firebase-admin REAL.\n${salida}`,
+  );
+
   return {
     stdout: res.stdout,
     stderr: res.stderr,
@@ -118,12 +145,23 @@ function combinaciones() {
 
 // ── La matriz ──────────────────────────────────────────────────────────────
 
-test('matriz de las 5 variables × --apply: sólo FIRESTORE_EMULATOR_HOST desvía el write', (t) => {
+// El callback es `async` y cada subtest se ESPERA, y no es cosmético.
+//
+// Hasta Node 24 el runner NO espera solo a los subtests: si el padre termina
+// antes, los que quedaron pendientes se cancelan con `cancelledByParent`.
+// Medido con este mismo archivo: **Node 20 corría 1 de las 32 combinaciones y
+// Node 22 corría 1; las otras 31 salían canceladas.** En Node 26 —donde el
+// runner sí las espera— pasaban las 44 y no se notaba nada.
+//
+// O sea: la matriz que este archivo existe para custodiar era decorativa en las
+// dos versiones que importan, incluida la de CI. Misma familia que el stub que
+// no interceptaba: algo que dice estar cubriendo y no cubre. (#846)
+test('matriz de las 5 variables × --apply: sólo FIRESTORE_EMULATOR_HOST desvía el write', async (t) => {
   for (const emuladores of combinaciones()) {
     const firestoreDesviado = emuladores.includes('FIRESTORE_EMULATOR_HOST');
     const etiqueta = emuladores.length ? emuladores.join('+') : '(ninguna)';
 
-    t.test(etiqueta, () => {
+    await t.test(etiqueta, () => {
       const r = correr(['--apply'], { emuladores });
 
       // Lo que el script AFIRMA sobre Firestore tiene que coincidir con la
