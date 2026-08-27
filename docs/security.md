@@ -90,7 +90,7 @@ son `get` / `list` / `write` / `delete`.
 | `appointments` | — | — | ✅ | ✅ | — |
 | `measurements` | ✅ | ✅ | ✅ | ✅ | 🟡 |
 | `performance_tests` | — | — | ✅ | ✅ | — |
-| `athlete_billing` | ✅ | — | 🟡 | 🟡 | — |
+| `athlete_billing` | ✅ | — | ✅ | ✅ | — |
 | `athlete_notes` | ✅ | — | 🟡 | 🟡 | — |
 | `athlete_files` | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `follow_up_entries` | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -127,6 +127,20 @@ Cinco paths siguen **sin una sola aserción negativa**:
 > no que la operación esté agotada. Cuando una regla tiene un disyunto que
 > cambia el resultado según el estado del documento, el test tiene que
 > recorrer los dos estados o la celda miente por omisión.
+
+> **QA-SEC-017 (#849) tampoco mueve los totales.**
+> `legacy-doc-freeze-rules.test.ts` agregó 18 negativos y 10 positivos sobre
+> `userPublicProfiles`, `measurements`, `performance_tests` y
+> `athlete_billing`, pero las cuatro filas ya estaban marcadas. Lo único que
+> cambia de marca es `athlete_billing` `create`/`update` (🟡 → ✅), por el
+> mismo motivo que `athlete_notes` arriba: su cobertura pasó a vivir también
+> en `functions/`.
+>
+> Y vale la misma lección, en su segunda dirección. Los negativos que había
+> probaban *"escribo un valor inválido → DENY"*. Ninguno probaba *"el valor
+> inválido ya está GUARDADO y no lo toco → ALLOW"*, que es el estado donde
+> vivía el bug: la celda decía ✅ mientras la operación estaba rota para todo
+> documento legacy. Ver §4.14.
 
 ### 1.2 Storage — 7 paths declarados en `storage.rules`
 
@@ -448,6 +462,22 @@ Y sobre la regla misma, no sobre su test: **¿esta cota chequea el TIPO, o sólo
 una propiedad que varios tipos comparten?** `size()` en las reglas lo tienen las
 listas, los `String` **y** los `Map`, así que `size() == 0` no dice "lista
 vacía": dice "algo que mide cero".
+
+Y la cuarta, que #849 pagó fuera de `appointments` (§4.14): **¿este chequeo
+valida la ESCRITURA o el DOCUMENTO?** En un `update`, `request.resource.data` es
+el documento resultante, así que una cota de **RANGO** o de **TIPO**
+incondicional rechaza para siempre cualquier doc viejo que la incumpla. Van
+condicionadas a que el campo cambie:
+
+```
+&& (unchanged(d, prior, 'campo') || <la cota>)
+```
+
+Las de **FORMA** (`keys().hasOnly()`, `hasAll()`, cotas de largo de texto) sí
+van incondicionales. Y ojo con el atajo *"pero este writer manda el modelo
+completo con `set()`, no un merge"*: no cierra nada si el cliente armó ese
+modelo releyendo el doc y prefilleando el formulario, que es justo lo que hacen
+`measurements` y `performance_tests`.
 
 ---
 
@@ -3891,6 +3921,189 @@ y se tacha acá con la referencia al PR — nunca se borra. Los hallazgos de
 | QA-SEC-014 | `appointments` create sin allowlist ni cap de tamaño | **Abierto** — [#781](https://github.com/Backhaus7997/treino/issues/781): `keys().hasOnly()` + cotas de texto + rango de `startsAt`, y la misma cota en todos los caminos del update. Residual **NO cerrado** — [#831](https://github.com/Backhaus7997/treino/issues/831) cerró vectores, no el hallazgo: el payload volvía a `confirmed` por el flip de ADR-1 — **el flip se REMOVIÓ** (su única implementación, `book()`, no tiene llamadores en `lib/`), y el Path 1 pinea ahora `cancelledBy`, `athleteId`, `trainerId`, `startsAt`, `durationMin` y `paymentId` — este último cierra el bypass de dos pasos del set-once money-critical del Path 2. Cuarta pasada: la **matriz campo × camino** (las 14 filas de `hasOnly()` × los 2 caminos) reemplazó a la lista de vectores y destapó 11 celdas que nadie había decidido — entre ellas `cancelledBy` **escribible por el Path 2**, que reabría en dos pasos lo que el pin del Path 1 cerraba, y `id` / `cancelledAt` **sin tipo ni cota en el `create`**, o sea el inflado original de #781 todavía abierto. **Sexta pasada:** el `cancellationLog` del `create` tenía cota de TAMAÑO y no de TIPO —`size()` lo tienen las listas, los String **y** los Map—, así que un `""` o un `{}` daba ALLOW, el doc nacía `confirmed`, entraba al stream y **rompía la deserialización de la agenda entera del PF**, imborrable. Se cierra con `is list`; medido, la query del PF pasa de 2 docs forjados a 0. Y el barrido de mutación en serio —los 42 conjuntos, uno por uno— destapó que **la cota de 5000 del camino de update, o sea el vector con el que empezó #781, era borrable con la suite entera en verde**. Residuos abiertos y acotados: el `byUid` y el tamaño de la entrada del log (piden una CF), el inflado dentro de un doc `cancelled` (techo 1 MiB, inerte), el `is list` que falta en el update, y [#846](https://github.com/Backhaus7997/treino/issues/846) / [#847](https://github.com/Backhaus7997/treino/issues/847) / [#848](https://github.com/Backhaus7997/treino/issues/848) / [#849](https://github.com/Backhaus7997/treino/issues/849) / [#850](https://github.com/Backhaus7997/treino/issues/850). `firestore.rules:2171`, `appointments-shape-rules.test.ts`, §4.9 |
 | QA-SEC-015 | `temp/uploads` sin allowlist de content-type ni cap | ~~Cerrado~~ — #804 (issue [#782](https://github.com/Backhaus7997/treino/issues/782)): bloque cerrado entero, no acotado. `storage.rules:88`, `temp-uploads-storage-rules.test.ts`, §4.9 |
 | QA-SEC-016 | El scanner de App Check cubre 2 de 5 callables | ~~Cerrado~~ — [#783](https://github.com/Backhaus7997/treino/issues/783) / [#805](https://github.com/Backhaus7997/treino/pull/805), `appcheck-enforcement.test.ts` + `helpers/appcheck-audit.ts`, §4.8.1 y §4.9 |
+| QA-SEC-017 | Chequeos de RANGO/TIPO incondicionales en `update` congelan el documento legacy | ~~Cerrado~~ — [#849](https://github.com/Backhaus7997/treino/issues/849): condicionados a que el campo CAMBIE en `userPublicProfiles`, `measurements`, `performance_tests` y `athlete_billing`. Los otros 5 candidatos del issue NO se tocaron: se midió que no tienen ventana legacy. `firestore.rules:62`, `legacy-doc-freeze-rules.test.ts`, §4.14 |
 | QA-SEC-100 | Android: `allowBackup` | ~~Cerrado~~ — `test/security/android_manifest_backup_test.dart` |
 
-**Próximo id libre: QA-SEC-017** (y `QA-SEC-1xx`: 101).
+**Próximo id libre: QA-SEC-018** (y `QA-SEC-1xx`: 101).
+
+---
+
+### 4.14 QA-SEC-017 — un chequeo de rango en un `update` no valida la escritura: congela el documento
+
+Sale de [#849](https://github.com/Backhaus7997/treino/issues/849), que pide
+barrer el resto de `firestore.rules` con la pregunta que en `appointments` se
+contestó mal cuatro veces (§4.9, QA-SEC-014).
+
+#### El patrón
+
+Una función de forma compartida por `create` y `update` corre sobre
+`request.resource.data`, que en un `update` es el documento **RESULTANTE**, no
+el diff. Entonces:
+
+> Un chequeo de **RANGO** o de **TIPO** incondicional en un `update` no valida
+> la **escritura**: valida el **DOCUMENTO**. Si existe un doc viejo con el valor
+> fuera de rango, ese documento no se puede actualizar **nunca más**.
+
+Y no hace falta que el writer use `set(merge:true)` para que pase. Hay dos
+caminos, y los dos aparecen en este repo:
+
+1. **Merge parcial.** `set(campo, merge:true)` deja que el valor guardado entre
+   al doc resultante sin que el cliente lo mencione.
+   (`userPublicProfiles`, `athlete_billing`.)
+2. **Round-trip del modelo.** Un `set()` del modelo COMPLETO donde el cliente
+   rearmó ese modelo releyendo el doc y prefilleando el formulario. El valor
+   legacy vuelve escrito por el propio cliente.
+   (`measurements`, `performance_tests`.)
+
+El segundo es el que se escapa leyendo la regla sola: el comentario de
+`performanceTestShapeOk` decía *"both `set(t.toJson())` the full model, no
+merge"* como si eso cerrara el tema. No lo cierra. Lo único que decide es si el
+valor legacy vuelve por el merge del servidor o por el prefill del formulario —
+`log_measurement_screen.dart:66` lo dice explícito: *"Edit mode pre-populates
+every field"*.
+
+#### La matriz
+
+Fechada con `git log -S` contra el modelo, que es lo que separa una ventana real
+de una teórica. `delete` importa porque decide si el documento congelado es
+**recuperable**: donde `delete` está permitido el dueño puede borrar y rehacer;
+donde dice `if false`, el documento queda muerto.
+
+| Colección | Chequeo incondicional | `delete` | Writer del update | Ventana legacy | Veredicto |
+|---|---|---|---|---|---|
+| `userPublicProfiles` | 4 cotas de métricas + `rachaUpdatedAt is timestamp` + `isProfilePublic`/`rankingOptIn is bool` | **`if false`** | `set(merge:true)` parcial | **SÍ** — métricas escritas por el cliente sin cota entre 2026-07-03 (`a13f96f9`, el modelo) y 2026-07-06 (`c646376e`, la cota); `isProfilePublic` sin tipo entre 2026-07-06 (`64d8de3f`) y 2026-07-24 (`1f3b9c6c`) | **ARREGLADO — crítico** |
+| `performance_tests` | `optPositiveNum` ×17 + `recordedAt is timestamp` | permitido | `set()` completo con round-trip | **SÍ** — la pantalla no tuvo **ningún** validador entre 2026-06-02 (`b8e919f0`) y 2026-06-17 (`737cb5f3`); la regla llegó el 2026-07-23 (`d1259165`) | **ARREGLADO — alto** |
+| `measurements` | `optNumInRange(…,0,500)` ×20 + `recordedAt is timestamp` | permitido | `set()` completo con round-trip | **SÍ** — misma ventana y mismo commit de validador que arriba | **ARREGLADO — alto** |
+| `athlete_billing` | `amountArs is int` + cota, `cadence in […]`, `updatedAt is timestamp` | permitido | `set(merge:true)` parcial | **SÍ, angosta** — el monto es texto libre **sin tope en el cliente**; modelo desde 2026-06-03 (`76364132`), regla desde 2026-07-21 (`d3ecfb37`) | **ARREGLADO — medio** (sólo `amountArs`) |
+| `coach_availability_rules` | `dayOfWeek`, horas, `slotDurationMin` | permitido | `update(rule.toJson())` | **NO** — todos los valores salen de un dropdown 1..7, un `TimeOfDay` y un dropdown de 4 opciones; el modelo nació con ellos (`eb4069f7`, 2026-05-22) | **NO SE TOCÓ** |
+| `coach_availability_overrides` | ídem | permitido | **no existe** — `availability_repository.dart` sólo tiene `addOverride`/`deleteOverride` | **NO** | **NO SE TOCÓ** |
+| `posts` (inline) | `privacy in […]`, `text.size() <= 1120`, `workoutSnapshot.exercises <= 30` | permitido | `update({text, privacy, routineTag})` | **NO** — ver abajo | **NO SE TOCÓ** |
+| `ratingPayloadOk` | `rating is int`, `createdAt`/`updatedAt is timestamp` | `if false` | — | **NO** — regla (`e8e8019a`) y modelo (`cc161a5b`) el mismo día, 2026-07-28 | **NO SE TOCÓ** |
+| `reviews` | `rating >= 1 && <= 5` | `if false` | — | **NO** — la regla entró en `8046374f` (2026-06-02), el **mismo commit** que la data layer y antes del flujo de escritura (`207bbcc1`) | **NO SE TOCÓ** |
+| `feedbackShapeOk` | `exerciseId`/`exerciseName is string`, `createdAt is timestamp` | permitido | — | **NO** — la regla entró en #795 (`99644ed3`) **antes** que el modelo, en #797 (`b1822372`); los dos el 2026-08-25 | **NO SE TOCÓ** |
+
+**Cinco de los diez candidatos no se tocaron a propósito.** Cambiar una regla de
+producción sin necesidad es riesgo sin beneficio, y la evidencia de que no hay
+ventana es tan parte del cierre como el fix.
+
+Los tres de `posts` merecen el detalle porque el issue los marcaba como riesgo:
+
+- `privacy`: `PostPrivacy` tiene exactamente los tres valores de wire
+  (`friends`/`gym`/`public`) desde que nació, en `5058cb60` (2026-05-14). El
+  único writer es el enum. Un valor fuera de la lista nunca fue escribible.
+- `text.size() <= 1120`: el composer capea en `kMaxPostChars = 280` desde
+  `739bcc3d` (2026-05-18), o sea desde su primer commit. La cota de la regla es
+  4× esa, que es el margen de expansión UTF-8. (Queda un borde **teórico**: 280
+  grafemas de emoji compuesto pueden pasar de 1120 unidades. No se arregló
+  porque nadie midió un post así, y la regla es idéntica en `create` y `update`
+  desde el mismo commit.)
+- `workoutSnapshot.exercises <= 30`: la cota y el campo entraron en el **mismo
+  commit**, `bd81d4a3` (2026-07-28).
+
+#### Por qué `userPublicProfiles` es la urgente
+
+Es la única que combina las tres cosas:
+
+1. `allow delete: if false` — el dueño no puede borrar y rehacer.
+2. Las cuatro métricas están **pineadas** (sólo se puede reescribir el valor
+   guardado): el dueño tampoco puede reparar el valor que lo bloquea.
+3. Todos sus writers son `set(merge:true)` parciales
+   (`user_public_profile_repository.dart:92,116,131,140,150,160,278`), así que
+   la métrica corrupta se re-presenta en **cada** escritura.
+
+Resultado medido: con `bestSquatKg: 1200` guardado, el dueño no podía cambiarse
+el `displayName`, ni el avatar, ni tocar el toggle de privacidad. **Permanente.**
+
+Y no es un escenario de laboratorio. `bestSquatKg` sale de `familyMaxWeight`
+(`functions/src/ranking-aggregate.ts:95`), que **no acota**, corre con Admin SDK
+—o sea saltea estas reglas— y lee `setLogs` que no tuvieron tope hasta
+`kMaxWeightKg = 500` en `8fa63c35` (2026-07-20). O sea: la CF puede seguir
+escribiendo hoy un valor que la regla de update rechaza para siempre.
+
+#### El fix
+
+Un helper compartido, `unchanged(d, prior, campo)` (`firestore.rules:62`), que
+se suma como disyunto: la cota se exige **sólo cuando el campo cambia**. `prior`
+es `resource.data` en el update y el mapa vacío `{}` en el create, donde todo
+valor es nuevo.
+
+No sirve para chequeos de **presencia obligatoria**: con `prior` vacío y el
+campo ausente los dos lados dan `null` y el requisito se saltearía. `recordedAt`
+usa por eso la forma explícita, que exige `prior` no-nulo.
+
+Los chequeos de **FORMA** —`keys().hasOnly()`, `keys().hasAll()`, cotas de largo
+de texto— siguen incondicionales: no dependen del valor histórico de un campo.
+
+#### La medición
+
+Las 28 filas de `legacy-doc-freeze-rules.test.ts` corren contra el emulador.
+Sembrando el doc legacy con `withSecurityRulesDisabled`, **contra el ruleset
+pre-fix fallan exactamente las 10 filas del caso legacy** y pasan las 18 de
+custodia — que es la forma de mostrar que el fix arregla el bug sin aflojar
+ningún gate.
+
+**Mutación por GATE, no por fix (§1.8, punto 1).** Se aflojó cada conjunto del
+bloque de a uno, reemplazándolo por `true`:
+
+| Gate mutado | Filas rojas |
+|---|---|
+| `upp.rachaUpdatedAt` / `upp.isProfilePublic` / `upp.rankingOptIn` | 1 cada uno |
+| `upp.bestSquatKg` **pin** | 1 |
+| `upp.bestSquatKg` **cota** | **0** |
+| `upp.lifetimeVolumeKg` **cota** | **0** |
+| `upp.bestSquatKg` pin **+** cota, juntos | 1 |
+| `perf.recordedAt` / `perf.sitAndReachCm` / `perf.cmjCm` | 1 cada uno |
+| `meas.recordedAt` / `meas.weightKg` / `meas.waistCm` | 1 cada uno |
+| `bill.amountArs` / `bill.cadence` / `bill.affectedKeys` | 1 cada uno |
+
+La primera pasada dio **cuatro** ceros, y los cuatro decían cosas distintas
+(§1.8, punto 2: *un cero no prueba nada por sí solo*):
+
+- `meas.waistCm` y `bill.affectedKeys` eran **gates sin custodia**: la suite no
+  tenía ninguna fila que los ejercitara. Las 20 métricas de `measurements`
+  comparten `optNumInRange`, pero comparten la **función**, no el conjunto —
+  cada `&&` es su propio gate. Y `affectedKeys()` no custodia el dinero sino la
+  inmutabilidad de `trainerId`/`athleteId`. Se agregó una fila para cada uno.
+- `upp.bestSquatKg` **pin** era un cero **falso**: el pin y la cota se tapaban
+  mutuamente porque los valores del test (1200, 1500) los rechazan los dos. Se
+  agregó la escritura que **sólo** el pin custodia — una métrica forjada pero
+  **dentro** de rango (900) — y el gate pasó a 1.
+- Las dos cotas de rango son un cero **real**: están **SUBSUMIDAS** por el pin.
+  Mutar las dos juntas da 1 fila roja; mutar cada una sola da 0. Para una
+  escritura fresca el pin ya rechaza todo valor que no sea el guardado o el
+  default, así que la cota no tiene custodia propia.
+
+Ese último punto es el que vuelve el fix barato de decidir: **condicionar esas
+dos cotas no saca superficie de ataque ninguna**, porque no custodiaban nada que
+el pin no custodiara ya. Se conservan igual —cubren el disyunto de
+disable-reset, y son defensa en profundidad si algún día se afloja el pin— pero
+ahora está medido y escrito, en vez de asumido.
+
+El comentario que había sobre esas cotas decía que protegían *"contra un valor
+corrupto que algún día se re-afirme para siempre"*. Describía el efecto al
+revés: no protegían contra eso, lo **causaban**.
+
+#### Cómo correr esto
+
+```bash
+export PATH="/opt/homebrew/opt/openjdk@21/bin:$PATH"
+npx -y firebase-tools@13 emulators:exec --only firestore,auth \
+  --project treino-rules-test \
+  "sh -c 'cd functions && node_modules/.bin/jest --runInBand legacy-doc-freeze-rules'"
+```
+
+Verificado además contra las **dos** suites completas, sin regresión:
+827 tests en `functions/` (37 suites) y 149 en `scripts/rules_test/` (9 suites).
+
+#### Lo que queda abierto
+
+- **`reviews` mide `size()` sin `is string`, y `rating` sin `is int`**
+  (`firestore.rules`, bloque `match /reviews/{reviewId}`). Es la pregunta gemela
+  de #849 —*¿esta cota chequea el TIPO, o sólo una propiedad que varios tipos
+  comparten?*— y es el mismo error que en `appointments` destapó la sexta
+  pasada. No se tocó acá porque **apretar** ese bloque es un cambio de otra
+  naturaleza que **aflojar** un gate que congela, y merece su propia medición.
+- **La CF de rankings no acota lo que escribe.** Mientras `familyMaxWeight` no
+  tenga tope, va a seguir escribiendo métricas por encima del rango que la regla
+  de update considera válido. Hoy eso ya no congela el documento, pero deja el
+  ranking con valores que la propia regla llama imposibles.
