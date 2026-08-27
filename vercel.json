@@ -4,6 +4,19 @@
   "installCommand": "echo 'sin instalación de paquetes: el SDK lo trae vercel-build.sh'",
   "buildCommand": "bash scripts/vercel-build.sh",
   "outputDirectory": "build/web",
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "treino-coach-hub.vercel.app"
+        }
+      ],
+      "destination": "https://app.gettreino.com/:path*",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     {
       "source": "/(.*)",
@@ -11,6 +24,15 @@
     }
   ],
   "headers": [
+    {
+      "source": "/",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    },
     {
       "source": "/index.html",
       "headers": [
