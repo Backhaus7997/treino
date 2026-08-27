@@ -261,7 +261,15 @@ for (const escritor of ESCRITORES) {
     const r = correr(escritor, { ...credencialDe(escritor), GCLOUD_PROJECT: PROD });
 
     assert.match(r.stderr, /IS PRODUCTION/);
-    assert.match(r.stdout, new RegExp(`bucket: ${BUCKET_PROD.replace(/\./g, '\\.')}`));
+    // `includes` y no `new RegExp(...)`: lo que buscamos es un LITERAL, y armar
+    // un regex escapando sólo los puntos deja afuera el resto de los
+    // metacaracteres. CodeQL lo marca como js/double-escaping y tiene razón —
+    // no es explotable con esta constante, pero el patrón invita a que el día
+    // que el bucket cambie de forma el test empiece a matchear cualquier cosa.
+    assert.ok(
+      r.stdout.includes(`bucket: ${BUCKET_PROD}`),
+      `esperaba "bucket: ${BUCKET_PROD}" en stdout`,
+    );
   });
 
   test(`${script}: contra producción el cartel sale ANTES de tocar Storage`, () => {
@@ -279,9 +287,8 @@ for (const escritor of ESCRITORES) {
       'el script no llegó a Storage — el stub no se aplicó y el test no mide nada',
     );
     assert.ok(cartel < storage, 'el cartel tiene que salir ANTES de la primera escritura');
-    assert.match(
-      r.todo,
-      new RegExp(`STUB_STORAGE_REACHED bucket=${BUCKET_PROD.replace(/\./g, '\\.')}`),
+    assert.ok(
+      r.todo.includes(`STUB_STORAGE_REACHED bucket=${BUCKET_PROD}`),
       'y el bucket al que iba tiene que ser el que el cartel nombra',
     );
   });
