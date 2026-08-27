@@ -129,7 +129,7 @@ Cinco paths siguen **sin una sola aserción negativa**:
 > recorrer los dos estados o la celda miente por omisión.
 
 > **QA-SEC-017 (#849) tampoco mueve los totales.**
-> `legacy-doc-freeze-rules.test.ts` agregó 18 negativos y 10 positivos sobre
+> `legacy-doc-freeze-rules.test.ts` agregó 18 negativos y 11 positivos sobre
 > `userPublicProfiles`, `measurements`, `performance_tests` y
 > `athlete_billing`, pero las cuatro filas ya estaban marcadas. Lo único que
 > cambia de marca es `athlete_billing` `create`/`update` (🟡 → ✅), por el
@@ -473,8 +473,16 @@ condicionadas a que el campo cambie:
 && (unchanged(d, prior, 'campo') || <la cota>)
 ```
 
-Las de **FORMA** (`keys().hasOnly()`, `hasAll()`, cotas de largo de texto) sí
-van incondicionales. Y ojo con el atajo *"pero este writer manda el modelo
+Las de **FORMA** (`keys().hasOnly()`, `hasAll()`) sí van incondicionales.
+
+⚠️ Las **cotas de largo de texto NO son chequeos de forma**, aunque se las
+agrupe ahí por costumbre: dependen del valor histórico igual que una cota de
+rango y congelan por el mismo mecanismo. Si se dejan incondicionales tiene que
+ser por una razón escrita —en `measurements` / `performance_tests` es que la
+congelación de `notes` es reparable por el dueño— y no por creer que son
+inmunes. Ver §4.14.
+
+Y ojo con el atajo *"pero este writer manda el modelo
 completo con `set()`, no un merge"*: no cierra nada si el cliente armó ese
 modelo releyendo el doc y prefilleando el formulario, que es justo lo que hacen
 `measurements` y `performance_tests`.
@@ -3921,7 +3929,7 @@ y se tacha acá con la referencia al PR — nunca se borra. Los hallazgos de
 | QA-SEC-014 | `appointments` create sin allowlist ni cap de tamaño | **Abierto** — [#781](https://github.com/Backhaus7997/treino/issues/781): `keys().hasOnly()` + cotas de texto + rango de `startsAt`, y la misma cota en todos los caminos del update. Residual **NO cerrado** — [#831](https://github.com/Backhaus7997/treino/issues/831) cerró vectores, no el hallazgo: el payload volvía a `confirmed` por el flip de ADR-1 — **el flip se REMOVIÓ** (su única implementación, `book()`, no tiene llamadores en `lib/`), y el Path 1 pinea ahora `cancelledBy`, `athleteId`, `trainerId`, `startsAt`, `durationMin` y `paymentId` — este último cierra el bypass de dos pasos del set-once money-critical del Path 2. Cuarta pasada: la **matriz campo × camino** (las 14 filas de `hasOnly()` × los 2 caminos) reemplazó a la lista de vectores y destapó 11 celdas que nadie había decidido — entre ellas `cancelledBy` **escribible por el Path 2**, que reabría en dos pasos lo que el pin del Path 1 cerraba, y `id` / `cancelledAt` **sin tipo ni cota en el `create`**, o sea el inflado original de #781 todavía abierto. **Sexta pasada:** el `cancellationLog` del `create` tenía cota de TAMAÑO y no de TIPO —`size()` lo tienen las listas, los String **y** los Map—, así que un `""` o un `{}` daba ALLOW, el doc nacía `confirmed`, entraba al stream y **rompía la deserialización de la agenda entera del PF**, imborrable. Se cierra con `is list`; medido, la query del PF pasa de 2 docs forjados a 0. Y el barrido de mutación en serio —los 42 conjuntos, uno por uno— destapó que **la cota de 5000 del camino de update, o sea el vector con el que empezó #781, era borrable con la suite entera en verde**. Residuos abiertos y acotados: el `byUid` y el tamaño de la entrada del log (piden una CF), el inflado dentro de un doc `cancelled` (techo 1 MiB, inerte), el `is list` que falta en el update, y [#846](https://github.com/Backhaus7997/treino/issues/846) / [#847](https://github.com/Backhaus7997/treino/issues/847) / [#848](https://github.com/Backhaus7997/treino/issues/848) / [#849](https://github.com/Backhaus7997/treino/issues/849) / [#850](https://github.com/Backhaus7997/treino/issues/850). `firestore.rules:2171`, `appointments-shape-rules.test.ts`, §4.9 |
 | QA-SEC-015 | `temp/uploads` sin allowlist de content-type ni cap | ~~Cerrado~~ — #804 (issue [#782](https://github.com/Backhaus7997/treino/issues/782)): bloque cerrado entero, no acotado. `storage.rules:88`, `temp-uploads-storage-rules.test.ts`, §4.9 |
 | QA-SEC-016 | El scanner de App Check cubre 2 de 5 callables | ~~Cerrado~~ — [#783](https://github.com/Backhaus7997/treino/issues/783) / [#805](https://github.com/Backhaus7997/treino/pull/805), `appcheck-enforcement.test.ts` + `helpers/appcheck-audit.ts`, §4.8.1 y §4.9 |
-| QA-SEC-017 | Chequeos de RANGO/TIPO incondicionales en `update` congelan el documento legacy | ~~Cerrado~~ — [#849](https://github.com/Backhaus7997/treino/issues/849): condicionados a que el campo CAMBIE en `userPublicProfiles`, `measurements`, `performance_tests` y `athlete_billing`. Los otros 5 candidatos del issue NO se tocaron: se midió que no tienen ventana legacy. `firestore.rules:62`, `legacy-doc-freeze-rules.test.ts`, §4.14 |
+| QA-SEC-017 | Chequeos de RANGO/TIPO incondicionales en `update` congelan el documento legacy | **Cerrado PARCIAL** — [#849](https://github.com/Backhaus7997/treino/issues/849): condicionados a que el campo CAMBIE en `userPublicProfiles`, `measurements`, `performance_tests` y `athlete_billing`. Los otros 6 candidatos del issue NO se tocaron: se midió que no tienen ventana legacy. **Lo que queda adentro:** las dos cotas de largo de `notes` (`measurements`, `performance_tests`) siguen incondicionales y congelan igual — entraron en el mismo commit que las cotas numéricas y comparten su ventana. Se dejaron porque ahí la congelación es reparable por el dueño (truncar, o `delete`), no porque no exista. Se cierra del todo cuando se decidan esas dos. `firestore.rules:62`, `legacy-doc-freeze-rules.test.ts`, §4.14 |
 | QA-SEC-100 | Android: `allowBackup` | ~~Cerrado~~ — `test/security/android_manifest_backup_test.dart` |
 
 **Próximo id libre: QA-SEC-018** (y `QA-SEC-1xx`: 101).
@@ -3975,14 +3983,16 @@ donde dice `if false`, el documento queda muerto.
 | `performance_tests` | `optPositiveNum` ×17 + `recordedAt is timestamp` | permitido | `set()` completo con round-trip | **SÍ** — la pantalla no tuvo **ningún** validador entre 2026-06-02 (`b8e919f0`) y 2026-06-17 (`737cb5f3`); la regla llegó el 2026-07-23 (`d1259165`) | **ARREGLADO — alto** |
 | `measurements` | `optNumInRange(…,0,500)` ×20 + `recordedAt is timestamp` | permitido | `set()` completo con round-trip | **SÍ** — misma ventana y mismo commit de validador que arriba | **ARREGLADO — alto** |
 | `athlete_billing` | `amountArs is int` + cota, `cadence in […]`, `updatedAt is timestamp` | permitido | `set(merge:true)` parcial | **SÍ, angosta** — el monto es texto libre **sin tope en el cliente**; modelo desde 2026-06-03 (`76364132`), regla desde 2026-07-21 (`d3ecfb37`) | **ARREGLADO — medio** (sólo `amountArs`) |
-| `coach_availability_rules` | `dayOfWeek`, horas, `slotDurationMin` | permitido | `update(rule.toJson())` | **NO** — todos los valores salen de un dropdown 1..7, un `TimeOfDay` y un dropdown de 4 opciones; el modelo nació con ellos (`eb4069f7`, 2026-05-22) | **NO SE TOCÓ** |
+| `coach_availability_rules` | `dayOfWeek`, horas, `slotDurationMin` | permitido | `update(rule.toJson())` | **NO** — `availability_rule.dart` es de **un solo commit** (`eb4069f7`, 2026-05-22) y nunca se volvió a tocar: `git log --follow` y `git log -S` sobre los tres campos devuelven esa única entrada, así que la forma no derivó nunca. Y los valores están **acotados por el widget desde su primer commit** (`36136693`): `_kDurations = [30, 60, 90, 120]` —los mismos 4 de la regla—, `ChoiceChip` sobre `dayOfWeekLabels` (7 entradas, 1..7) y `showTimePicker`, que no puede devolver una hora fuera de 0..23 ni un minuto fuera de 0..59 | **NO SE TOCÓ** |
 | `coach_availability_overrides` | ídem | permitido | **no existe** — `availability_repository.dart` sólo tiene `addOverride`/`deleteOverride` | **NO** | **NO SE TOCÓ** |
 | `posts` (inline) | `privacy in […]`, `text.size() <= 1120`, `workoutSnapshot.exercises <= 30` | permitido | `update({text, privacy, routineTag})` | **NO** — ver abajo | **NO SE TOCÓ** |
 | `ratingPayloadOk` | `rating is int`, `createdAt`/`updatedAt is timestamp` | `if false` | — | **NO** — regla (`e8e8019a`) y modelo (`cc161a5b`) el mismo día, 2026-07-28 | **NO SE TOCÓ** |
 | `reviews` | `rating >= 1 && <= 5` | `if false` | — | **NO** — la regla entró en `8046374f` (2026-06-02), el **mismo commit** que la data layer y antes del flujo de escritura (`207bbcc1`) | **NO SE TOCÓ** |
 | `feedbackShapeOk` | `exerciseId`/`exerciseName is string`, `createdAt is timestamp` | permitido | — | **NO** — la regla entró en #795 (`99644ed3`) **antes** que el modelo, en #797 (`b1822372`); los dos el 2026-08-25 | **NO SE TOCÓ** |
 
-**Cinco de los diez candidatos no se tocaron a propósito.** Cambiar una regla de
+**Seis de los diez candidatos no se tocaron a propósito** (los seis
+`NO SE TOCÓ` de la tabla; una versión anterior de este párrafo decía "cinco" y
+se contradecía con su propia tabla). Cambiar una regla de
 producción sin necesidad es riesgo sin beneficio, y la evidencia de que no hay
 ventana es tan parte del cierre como el fix.
 
@@ -4031,16 +4041,49 @@ No sirve para chequeos de **presencia obligatoria**: con `prior` vacío y el
 campo ausente los dos lados dan `null` y el requisito se saltearía. `recordedAt`
 usa por eso la forma explícita, que exige `prior` no-nulo.
 
-Los chequeos de **FORMA** —`keys().hasOnly()`, `keys().hasAll()`, cotas de largo
-de texto— siguen incondicionales: no dependen del valor histórico de un campo.
+Los chequeos de **FORMA** —`keys().hasOnly()`, `keys().hasAll()`— siguen
+incondicionales.
+
+##### `notes`: una decisión, no una categoría
+
+La versión anterior de este párrafo metía las **cotas de largo de texto** en la
+bolsa de "forma", con el argumento de que *no dependen del valor histórico de un
+campo*. **Es falso, y hay que sacarlo de la doctrina.** Una cota de largo depende
+del valor histórico exactamente igual que una de rango: un `notes` de 3000
+caracteres guardado se re-presenta en cada `set()` del modelo completo, y la cota
+lo rechaza. Congela el documento por el mismo mecanismo.
+
+Y la ventana es real, medida igual que las otras: `optStrMaxLen(notes, 2000)`
+entró en **el mismo commit** que las 20 cotas numéricas de `measurements` y las
+17 de `performance_tests` (`d1259165`, 2026-07-23), y el campo **nunca** tuvo
+`maxLength` en el cliente — es un `TextFormField` pelado en
+`log_measurement_screen.dart:588` y `log_performance_test_screen.dart:506`. Un
+`notes` legacy largo es tan posible como un `sitAndReachCm: -5`.
+
+**Se dejaron incondicionales igual, y la razón es otra:** acá la congelación es
+**diagnosticable y reparable por el dueño**. El texto es suyo, lo ve prefilleado
+en el formulario, y truncarlo destraba la escritura; si no quiere truncar, las
+dos colecciones permiten `delete` y puede rehacer el doc. Nada de eso valía en
+`userPublicProfiles`, donde el pin le prohibía reparar el valor y
+`allow delete: if false` le prohibía empezar de cero. Y a diferencia de una cota
+numérica, el valor rechazado no puede confundirse con un resultado legítimo: el
+usuario ve que escribió mucho texto.
+
+No es gratis — se le está pidiendo a alguien que borre texto que escribió — así
+que **QA-SEC-017 queda CERRADO PARCIAL** mientras esas dos líneas sigan como
+están. Ver "Lo que queda abierto".
 
 #### La medición
 
-Las 28 filas de `legacy-doc-freeze-rules.test.ts` corren contra el emulador.
+Las 29 filas de `legacy-doc-freeze-rules.test.ts` corren contra el emulador.
 Sembrando el doc legacy con `withSecurityRulesDisabled`, **contra el ruleset
-pre-fix fallan exactamente las 10 filas del caso legacy** y pasan las 18 de
-custodia — que es la forma de mostrar que el fix arregla el bug sin aflojar
-ningún gate.
+pre-fix fallan exactamente las 10 filas del caso legacy más la fila del
+tradeoff** (11 rojas) y pasan las 18 de custodia — que es la forma de mostrar
+que el fix arregla el bug sin aflojar ningún gate.
+
+La fila 29 es la del tradeoff, y **muerde**: contra el ruleset pre-fix se pone
+roja como las otras 10, que es lo que prueba que el bit que entrega es real y no
+retórica. Ver abajo.
 
 **Mutación por GATE, no por fix (§1.8, punto 1).** Se aflojó cada conjunto del
 bloque de a uno, reemplazándolo por `true`:
@@ -4068,16 +4111,64 @@ La primera pasada dio **cuatro** ceros, y los cuatro decían cosas distintas
   mutuamente porque los valores del test (1200, 1500) los rechazan los dos. Se
   agregó la escritura que **sólo** el pin custodia — una métrica forjada pero
   **dentro** de rango (900) — y el gate pasó a 1.
-- Las dos cotas de rango son un cero **real**: están **SUBSUMIDAS** por el pin.
-  Mutar las dos juntas da 1 fila roja; mutar cada una sola da 0. Para una
-  escritura fresca el pin ya rechaza todo valor que no sea el guardado o el
-  default, así que la cota no tiene custodia propia.
+- Las dos cotas de rango dan 0 aflojadas de a una y 1 aflojadas juntas. **La
+  primera lectura de este PR fue que estaban SUBSUMIDAS por el pin. Era
+  incorrecta, y la medición la contradice** — ver abajo.
 
-Ese último punto es el que vuelve el fix barato de decidir: **condicionar esas
-dos cotas no saca superficie de ataque ninguna**, porque no custodiaban nada que
-el pin no custodiara ya. Se conservan igual —cubren el disyunto de
-disable-reset, y son defensa en profundidad si algún día se afloja el pin— pero
-ahora está medido y escrito, en vez de asumido.
+##### El cero de las cotas de rango no era subsunción
+
+Subsunción significa que el pin deniega **todo** lo que deniega la cota. No es
+el caso, y el contraejemplo es de una línea:
+
+> Una escritura que vuelve a presentar el valor guardado `bestSquatKg: 1200`.
+> **El pin la permite** —iguala lo guardado, disyunto (b)—. **La cota la
+> rechazaba.**
+
+O sea que la cota deniega un conjunto que el pin no toca. Ese conjunto no está
+vacío: es **toda escritura sobre un documento legacy**, que es exactamente la
+congelación que este PR arregla.
+
+Por qué la mutación no lo vio: el barrido cuenta **filas `assertFails` que se
+ponen verdes**, o sea escrituras HOSTILES que dejan de denegarse. La diferencia
+entre el pin y la cota no es una escritura hostil — es una legacy. Una mutación
+por negativos es estructuralmente ciega a eso.
+
+**Es el punto 2 de §1.8 mordiendo a quien lo escribió.** El cero no era
+*subsumido*: era un gate cuya única custodia distintiva la suite no ejercitaba,
+que es la otra rama del mismo diagnóstico. La forma de distinguirlas no es
+mirar el número, es escribir la escritura que **sólo** ese gate decide — y
+cuando esa escritura resulta ser un ALLOW y no un DENY, la mutación por
+negativos ya no alcanza y hay que correr la suite contra el ruleset viejo.
+
+##### El tradeoff que el fix paga
+
+Sacada la subsunción, el fix **no** es gratis, y hay que escribirlo como lo que
+es:
+
+> Con el disyunto, un dueño con una métrica legacy fuera de rango puede volver a
+> poner `rankingOptIn` en `true` y **re-entrar al ranking arrastrando ese
+> valor** — la query filtra por `rankingOptIn == true`
+> (`user_public_profile_repository.dart:195`). Pre-fix esa escritura estaba
+> denegada. **El fix entrega ese bit a cambio de descongelar el documento.**
+
+La honestidad del "pre-fix estaba denegada" importa: no la denegaba un gate, la
+denegaba la **congelación** — la misma que le prohibía cambiarse el
+`displayName`. Descongelar el documento y entregar este bit son el **mismo**
+cambio; no había forma de quedarse con uno solo.
+
+Lo que acota el tradeoff, y por eso se decidió pagarlo:
+
+- **No es un camino de blanqueo.** El pin sigue prohibiendo escribir cualquier
+  **otro** valor: el dueño sólo puede arrastrar el que ya estaba guardado, que
+  no eligió él. Lo mide la fila *"forjar un bestSquatKg dentro de rango"*.
+- **La regla de update nunca fue lo que sostenía ese invariante.** Ese valor lo
+  escribió la CF con Admin SDK, que saltea estas reglas, y el propio flip
+  dispara `rankingAggregateOnOptIn`, que recomputa desde `familyMaxWeight`
+  (`ranking-aggregate.ts:95`) — que **tampoco acota**. Si se quiere cerrar de
+  verdad, el lugar es la CF, no `firestore.rules`.
+
+Queda medido en la fila 29, `"TRADEOFF: el opt-in false→true arrastra al ranking
+una metrica legacy"`, que contra el ruleset pre-fix se pone **roja**.
 
 El comentario que había sobre esas cotas decía que protegían *"contra un valor
 corrupto que algún día se re-afirme para siempre"*. Describía el efecto al
@@ -4096,6 +4187,14 @@ Verificado además contra las **dos** suites completas, sin regresión:
 827 tests en `functions/` (37 suites) y 149 en `scripts/rules_test/` (9 suites).
 
 #### Lo que queda abierto
+
+- **Las dos cotas de largo de `notes` siguen incondicionales** y congelan por el
+  mismo mecanismo que las numéricas (`measurementShapeOk`,
+  `performanceTestShapeOk`). Es lo que deja **QA-SEC-017 en cerrado PARCIAL**.
+  La decisión y su razón están arriba, en *"`notes`: una decisión, no una
+  categoría"*: la congelación es reparable por el dueño, no inexistente.
+  Cerrarlo del todo es condicionarlas —una línea cada una— o medir que no queda
+  ningún doc con `notes` > 2000 y dejarlas.
 
 - **`reviews` mide `size()` sin `is string`, y `rating` sin `is int`**
   (`firestore.rules`, bloque `match /reviews/{reviewId}`). Es la pregunta gemela

@@ -14,8 +14,14 @@
  *
  * Es el mismo error que en `appointments` se cometio cuatro veces (#831), y
  * la doctrina esta en `docs/security.md` §1.8: los chequeos de FORMA
- * (`keys().hasOnly()`, cotas de largo de texto) van incondicionales; los de
- * RANGO y TIPO van condicionados a que el campo CAMBIE.
+ * (`keys().hasOnly()`, `keys().hasAll()`) van incondicionales; los de RANGO y
+ * TIPO van condicionados a que el campo CAMBIE.
+ *
+ * Las cotas de LARGO DE TEXTO no son chequeos de forma: dependen del valor
+ * historico igual que las de rango, y congelan igual. En este PR quedaron
+ * incondicionales igual, por un motivo distinto que esta escrito en
+ * `measurementShapeOk` — la congelacion es diagnosticable y reparable por el
+ * dueno. Es la parte de QA-SEC-017 que queda ABIERTA (§4.14).
  *
  * QUE MIDE ESTE ARCHIVO
  * ---------------------
@@ -27,6 +33,13 @@
  *   2. LA CUSTODIA DEL GATE — una escritura que CAMBIA el valor a uno invalido
  *      tiene que seguir denegada, y el `create` no se afloja. Sin esta mitad,
  *      "arreglar" el bug seria indistinguible de borrar el gate.
+ *
+ * Y una tercera clase de fila, con una sola instancia:
+ *
+ *   3. EL TRADEOFF — una escritura que el fix ENTREGA. No es un caso legacy
+ *      neutro ni una custodia: es superficie que antes estaba denegada y
+ *      ahora no. Va con nombre propio para que nadie la lea como un ALLOW
+ *      inocente. Ver "TRADEOFF: el opt-in false->true".
  *
  * MUTACION POR GATE (§1.8, punto 1)
  * ---------------------------------
@@ -178,6 +191,42 @@ describe("userPublicProfiles: un doc legacy fuera de rango sigue siendo editable
         .collection("userPublicProfiles")
         .doc(OWNER)
         .set({ rankingOptIn: false, bestSquatKg: null }, { merge: true }),
+    );
+  });
+
+  // ── EL TRADEOFF que este fix paga ─────────────────────────────────────────
+  //
+  // Esta fila NO es un caso legacy mas: documenta un bit que el fix ENTREGA.
+  //
+  // Con `bestSquatKg: 1200` guardado y el opt-in apagado, esta escritura vuelve
+  // a poner el perfil DENTRO del ranking —la query filtra por
+  // `rankingOptIn == true` (`user_public_profile_repository.dart:195`)— y el
+  // valor fuera de rango viaja con el.
+  //
+  // Pre-fix la escritura estaba DENEGADA. Pero no por un gate: por la
+  // congelacion. La cota de rango denegaba TODA escritura sobre el doc,
+  // incluida la reparacion, asi que "no podias re-entrar al ranking" era el
+  // mismo hecho que "no podias cambiarte el displayName". Descongelar el
+  // documento y entregar este bit son el MISMO cambio.
+  //
+  // Lo que acota el tradeoff, y por eso se decidio pagarlo:
+  //   - No es un camino de blanqueo. El pin sigue prohibiendo escribir
+  //     cualquier OTRO valor: el dueno solo puede arrastrar el que ya estaba
+  //     guardado, que no eligio el. La fila "forjar un bestSquatKg dentro de
+  //     rango" de abajo es la que mide eso.
+  //   - Ese valor lo escribio la CF con Admin SDK, que saltea estas reglas, y
+  //     el propio flip dispara `rankingAggregateOnOptIn`, que recomputa desde
+  //     `familyMaxWeight` (`ranking-aggregate.ts:95`) — que TAMPOCO acota. La
+  //     regla de update nunca fue lo que mantenia ese valor afuera del ranking.
+  //
+  // Si algun dia se quiere cerrar de verdad, el lugar es la CF, no esta regla.
+  it("TRADEOFF: el opt-in false->true arrastra al ranking una metrica legacy", async () => {
+    await seedOwner({ bestSquatKg: 1200, rankingOptIn: false });
+    await assertSucceeds(
+      db(OWNER)
+        .collection("userPublicProfiles")
+        .doc(OWNER)
+        .set({ rankingOptIn: true }, { merge: true }),
     );
   });
 

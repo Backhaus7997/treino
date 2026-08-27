@@ -51,14 +51,37 @@ service cloud.firestore {
     // cota rige siempre. El gate no pierde custodia: una escritura hostil
     // CAMBIA el valor, así que sigue pagando el chequeo completo.
     //
+    // ⚠️ POR QUÉ EL `create` SIGUE ACOTADO, que no se lee solo. En el create
+    // `prior` es `{}`, y lo ÚNICO que sostiene la cota ahí es que
+    // `{}.get(campo, null)` devuelve `null`: para cualquier valor PRESENTE en
+    // el create, `d.get(campo, null)` no es null, `unchanged` da false, y la
+    // cota se exige entera. O sea que la custodia del create no está escrita
+    // en ningún lado — se apoya en el default de un `get()` sobre el mapa
+    // vacío.
+    //
+    // Anda bien hoy y es FRÁGIL de una forma que no es obvia leyendo. Si algún
+    // día una función de forma se llama con un `prior` que no sea `{}` ni
+    // `resource.data` —un mapa con defaults, o `request.resource.data` por un
+    // copy-paste— `unchanged` empieza a dar true sobre valores FRESCOS y todas
+    // las cotas de ese bloque se apagan en silencio, sin que ningún test de
+    // update se ponga rojo. Lo primero que hay que verificar al tocar un
+    // call-site es qué es `prior` ahí.
+    //
     // ⚠️ NO sirve para chequeos de PRESENCIA obligatoria. Con `prior` vacío y
     // el campo ausente los dos lados dan `null`, `unchanged` da true y el
     // requisito se saltea. Para esos (p. ej. `recordedAt`) va la forma
     // explícita que exige `prior` no-nulo — ver `measurementShapeOk`.
     //
-    // Los chequeos de FORMA —`keys().hasOnly()`, `keys().hasAll()`, cotas de
-    // largo de texto— sí van incondicionales: no dependen del valor histórico
-    // de un campo, y condicionarlos sería aflojar la regla sin motivo.
+    // Los chequeos de FORMA —`keys().hasOnly()`, `keys().hasAll()`— van
+    // incondicionales.
+    //
+    // ⚠️ Las cotas de LARGO DE TEXTO **no** entran en esa categoría, aunque en
+    // este archivo se las dejó incondicionales. Una cota de largo depende del
+    // valor histórico exactamente igual que una de rango: un `notes` legacy de
+    // 3000 caracteres se re-presenta en cada `set()` del modelo completo y la
+    // cota lo rechaza. Se dejaron así por un motivo distinto —la congelación
+    // es diagnosticable y reparable por el dueño—, escrito en
+    // `measurementShapeOk`. Es la parte de QA-SEC-017 que queda abierta.
     function unchanged(d, prior, field) {
       return d.get(field, null) == prior.get(field, null);
     }
@@ -1157,9 +1180,16 @@ service cloud.firestore {
                     // Type/Range Validation (AD-8): cotas de defensa en
                     // profundidad detrás del pin de arriba. Una escritura
                     // FRESCA ya fue rechazada por el pin salvo que iguale el
-                    // valor guardado o el default fijo, así que lo único que
-                    // estas cotas custodian de verdad es el disyunto de
-                    // disable-reset (0 / null, siempre en rango).
+                    // valor guardado o el default fijo.
+                    //
+                    // ⚠️ Lo que estas cotas SÍ deniegan y el pin no: volver a
+                    // presentar un valor guardado que está fuera de rango. El
+                    // pin lo permite —iguala lo guardado— y la cota lo
+                    // rechazaba. Ese conjunto no está vacío, así que las cotas
+                    // NO están subsumidas por el pin. Lo que pasa es que ese
+                    // conjunto no contiene ninguna escritura hostil: contiene
+                    // TODA escritura sobre un doc legacy, que es exactamente
+                    // la congelación.
                     //
                     // ⚠️ #849 — el comentario anterior decía que estas cotas
                     // protegían "contra un valor corrupto que algún día se
@@ -1187,6 +1217,30 @@ service cloud.firestore {
                     // El disyunto `unchanged(...)` conserva la custodia real
                     // —un valor que CAMBIA sigue pagando la cota entera— y
                     // devuelve la edición de los docs legacy.
+                    //
+                    // EL TRADEOFF, escrito porque es real y no cero. Con el
+                    // disyunto, un dueño con una métrica legacy fuera de rango
+                    // puede volver a poner `rankingOptIn` en true y RE-ENTRAR
+                    // al ranking arrastrando ese valor: la query filtra por
+                    // `rankingOptIn == true`
+                    // (`user_public_profile_repository.dart:195`). Antes esa
+                    // escritura estaba denegada, pero no por un gate: por la
+                    // congelación, la misma que le prohibía cambiarse el
+                    // displayName. El fix ENTREGA ese bit a cambio de
+                    // descongelar el documento.
+                    //
+                    // Lo que lo acota, y por eso se decidió pagarlo: no es un
+                    // camino de blanqueo —el pin sigue prohibiendo escribir
+                    // cualquier OTRO valor, así que el dueño sólo arrastra el
+                    // que ya estaba guardado, que no eligió él— y ese valor lo
+                    // escribió la CF con Admin SDK, que saltea estas reglas. El
+                    // propio flip dispara `rankingAggregateOnOptIn`, que
+                    // recomputa desde `familyMaxWeight`
+                    // (`ranking-aggregate.ts:95`), que TAMPOCO acota. Esta
+                    // regla de update nunca fue lo que mantenía un valor
+                    // imposible afuera del ranking; si se quiere cerrar de
+                    // verdad, el lugar es la CF. Medido en
+                    // `legacy-doc-freeze-rules.test.ts`, fila "TRADEOFF".
                     && (!('lifetimeVolumeKg' in request.resource.data)
                         || unchanged(request.resource.data, resource.data, 'lifetimeVolumeKg')
                         || (request.resource.data.lifetimeVolumeKg is number
@@ -3065,6 +3119,30 @@ service cloud.firestore {
                    || optNumInRange(d.get('calfLCm', null), 0, 500))
                && (unchanged(d, prior, 'calfRCm')
                    || optNumInRange(d.get('calfRCm', null), 0, 500))
+               // #849 — `notes` queda INCONDICIONAL, y es una decisión, no un
+               // olvido. Esta cota entró en el MISMO commit que las cotas
+               // numéricas de arriba (`d1259165`, 2026-07-23) y comparte su
+               // ventana entera: el campo nunca tuvo `maxLength` en el cliente
+               // (`log_measurement_screen.dart:588`,
+               // `log_performance_test_screen.dart:506`), así que un `notes`
+               // legacy de más de 2000 caracteres es tan posible como un
+               // `sitAndReachCm: -5`, y el round-trip del formulario lo
+               // re-presenta igual. Congela el documento igual.
+               //
+               // La razón de dejarla es otra: acá la congelación es
+               // DIAGNOSTICABLE y REPARABLE por el dueño. El texto es suyo, lo
+               // ve prefilleado en el formulario, y truncarlo destraba la
+               // escritura; si no quiere truncar, esta colección permite
+               // `delete` y puede rehacer el doc. Nada de eso valía en
+               // `userPublicProfiles`, donde el pin le prohibía reparar el
+               // valor y `allow delete: if false` le prohibía empezar de cero.
+               // Y a diferencia de una cota numérica, el valor rechazado no
+               // puede confundirse con un resultado legítimo.
+               //
+               // No es gratis: se le está pidiendo a un usuario que borre
+               // texto que escribió. Por eso QA-SEC-017 queda CERRADO PARCIAL
+               // mientras estas dos líneas sigan incondicionales — §4.14, "Lo
+               // que queda abierto".
                && optStrMaxLen(d.get('notes', null), 2000);
       }
 
@@ -3198,6 +3276,14 @@ service cloud.firestore {
                    || optPositiveNum(d.get('cooperMeters', null), 100000))
                && (unchanged(d, prior, 'sitAndReachCm')
                    || optPositiveNum(d.get('sitAndReachCm', null), 100000))
+               // #849 — `notes` queda INCONDICIONAL por la misma decisión y
+               // el mismo motivo que en `measurementShapeOk`, donde está el
+               // argumento entero: la cota entró en el mismo commit que las
+               // numéricas (`d1259165`), comparte su ventana —el campo nunca
+               // tuvo `maxLength` en `log_performance_test_screen.dart:506`— y
+               // congela igual, pero acá la congelación es reparable por el
+               // dueño. No se repite el razonamiento a propósito: dos copias
+               // se desincronizan. Es lo que deja QA-SEC-017 en PARCIAL.
                && optStrMaxLen(d.get('notes', null), 2000);
       }
 
