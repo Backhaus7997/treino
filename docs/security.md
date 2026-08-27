@@ -3373,10 +3373,18 @@ la clave guardada y la allowlist lo rechazaba.
 sacar `reason` de la CF y mover el motivo al `cancellationLog`. La segunda
 —meterlo en las dos allowlists— pedía una clave nueva escribible por el cliente,
 con su cota de texto y su pin en los DOS caminos (o sea tres gates nuevos, cada
-uno con su negativo), más el campo en el modelo, para un dato que **nadie lee**:
-no está en `Appointment`, no está en ninguna query de `lib/`, y el motivo ya
-tiene su lugar en `CancellationEntry.reason`. Agrandar la superficie de la
-allowlist para acomodar un error de escritura es al revés.
+uno con su negativo), más el campo en el modelo. Y el motivo ya tiene su lugar
+en `CancellationEntry.reason`. Agrandar la superficie de la allowlist para
+acomodar un error de escritura es al revés.
+
+> **⚠️ Corrección.** La primera versión de este párrafo justificaba la decisión
+> diciendo que `reason` era **«un dato que nadie lee»**: «no está en
+> `Appointment`, no está en ninguna query de `lib/`». Eso se verificó **sólo en
+> el cliente Dart**, y ahí es cierto. En `functions/src/` es **falso**, y el
+> detalle importa porque no se lee como dato sino como **control de flujo** —el
+> daño que eso causó está en la sección de abajo—. La decisión de mover el
+> motivo al log **no cambia**; lo que cambia es que ya no se apoya en una
+> premisa falsa: se apoya en que la allowlist no crece.
 
 **⚠️ Y el alcance real del fix, medido y no supuesto: NO destraba los documentos
 que ya están escritos.** La clave sigue guardada en ellos, y `hasOnly()` mira el
@@ -3398,6 +3406,62 @@ La urgencia es baja y conviene que esté escrito: los turnos que la CF tocó ya
 están `cancelled` y su atleta fue borrado, así que hoy nadie los edita. Lo que la
 migración recupera es el invariante —*"el cliente siempre puede cancelar lo
 suyo"*— y el margen de que la CF cambie y la clave llegue a un doc `confirmed`.
+
+#### #846 (secuela) — sacar la clave suelta mató un guard de notificaciones
+
+`notifications/notify-appointment.ts` leía `after.reason ===
+'athlete-account-deleted'` para **NO** mandar la notificación de cancelación
+cuando el write venía del cascade. Está documentado en el header del archivo y
+en ADR-PN-006 / REQ-PN-CF-003, y que es un contrato CF→CF deliberado lo prueba
+el par hermano, que quedó intacto: `cascade/trainer-links.ts` escribe
+`reason: 'account-deleted'` y `notify-link-change.ts` lo lee igual.
+
+Al mover el motivo adentro del `cancellationLog` el guard quedó comparando
+contra `undefined`. Medido contra el emulador, con el cascade REAL:
+
+| `confirmed` → `cancelled` por el cascade | Antes de #846 | Con #846 | Ahora |
+|---|---|---|---|
+| `sendFcm` | 0 llamadas | **1 por turno** | 0 llamadas |
+| destinatarios | — | **`[athleteId, trainerId]`** | — |
+| mail encolado | 0 | **2 por turno** | 0 |
+
+Y llegaban a **las dos** partes —incluido el atleta que acababa de borrar su
+cuenta— porque el cascade tampoco escribía `cancelledBy`, así que
+`notify-appointment.ts` caía en el fallback de ambos. Un atleta con 12 turnos
+futuros son 12 push al PF y 12 a un fantasma.
+
+**El arreglo, y por qué así.**
+
+1. **El guard mira lo que el write AGREGÓ al log**, no el estado final:
+   `after.cancellationLog` menos `before.cancellationLog`. Los dos caminos que
+   tocan el log usan `arrayUnion` con un elemento y las reglas acotan el
+   crecimiento a `+1` por escritura, así que lo agregado es la cola del array.
+   Mirar sólo la última entrada alcanzaría hoy, pero silenciaría **para
+   siempre** cualquier cambio de estado posterior de un turno que el cascade —o
+   la migración— ya tocó: el motivo queda en el log para siempre, el write no.
+   El escalar se sigue leyendo como legacy, porque los documentos que la CF
+   escribió antes de #846 lo tienen guardado en producción y la migración NO se
+   corrió.
+2. **El motivo es una constante exportada**, `ATHLETE_ACCOUNT_DELETED_REASON`,
+   que vive en el productor y el consumidor importa. Eran dos literales
+   iguales en dos archivos: un solo símbolo no se desincroniza en silencio.
+3. **El cascade escribe además `cancelledBy: uid`.** Con el guard sano no se
+   llega a la rama de destinatarios, pero el campo es quién canceló, está en las
+   dos allowlists (`optStrMaxLen(..., 128)` — o sea que no repite el error de
+   #846) y deja el documento con la misma forma que escribe
+   `AppointmentRepository.cancel()`.
+
+**Y el test que faltaba, que es el verdadero hallazgo.** El único caso que
+custodiaba el guard —SCENARIO-635 en `notify-appointment.test.ts`— le pasa el
+motivo **a mano** al handler: testea al consumidor contra un payload sintético,
+o sea contra la creencia del test sobre lo que el productor escribe. Con el
+contrato productor→consumidor sin cobertura, la regresión pasó la suite entera
+en verde, y `ApptData = Record<string, unknown>` hizo que `tsc` tampoco
+chistara. `functions/src/__tests__/cascade/appointments-notify-contract.test.ts`
+corre el cascade REAL, toma el snapshot de antes y el de después —literalmente
+el par que `onDocumentWritten` le entrega al trigger— y se los da al handler
+REAL. Con las fuentes de #846 el test da rojo con las cifras de la tabla; con el
+fix, verde.
 
 #### #847 — el gate de 24 h leía el valor viejo con acceso directo
 

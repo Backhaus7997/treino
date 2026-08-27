@@ -6,8 +6,9 @@
  *
  * Design:
  *   - ADR-PN-006.
- *   - Guards: after missing → skip; after.reason === 'athlete-account-deleted' → skip;
- *     before?.status === after.status → skip (no-op write).
+ *   - Guards: after missing → skip; el write es el cascade de baja de cuenta
+ *     (ver `isAthleteAccountDeletedWrite`) → skip; before?.status ===
+ *     after.status → skip (no-op write).
  *   - Branches:
  *       create + requested → notify trainer, deepLink "/coach?tab=agenda"
  *       requested → confirmed → notify athlete, deepLink "/coach?tab=agenda"
@@ -21,6 +22,7 @@ import * as admin from "firebase-admin";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 import { sendFcm } from "./send-fcm";
+import { ATHLETE_ACCOUNT_DELETED_REASON } from "../cascade/appointments";
 import { enqueueMail } from "../mail/enqueue-mail";
 import {
   formatDateAR,
@@ -39,6 +41,47 @@ function getApp(): admin.app.App {
 }
 
 type ApptData = Record<string, unknown>;
+
+/** Una entrada del `cancellationLog` tal como llega del snapshot. */
+type CancellationEntry = { reason?: unknown };
+
+function cancellationLogOf(data: ApptData | undefined): CancellationEntry[] {
+  const log = data?.cancellationLog;
+  return Array.isArray(log) ? (log as CancellationEntry[]) : [];
+}
+
+/**
+ * ¿Este write es el cascade cancelando el turno de un atleta que se dio de baja?
+ *
+ * ─── #846 (secuela) — el guard leía una clave que dejó de escribirse ────────
+ *
+ * Esto era `after.reason === 'athlete-account-deleted'`. #846 sacó esa clave
+ * suelta del documento —con razón: congelaba el turno contra `hasOnly()`— y
+ * movió el motivo adentro del `cancellationLog`. Nadie miró para acá, así que
+ * el guard quedó comparando contra `undefined`: el cascade volvía a notificar.
+ * Medido contra el emulador, un atleta con 12 turnos futuros = 12 push al PF y
+ * 12 a la cuenta recién borrada.
+ *
+ * Ahora se mira lo que el write AGREGÓ al log, no el estado final. Los dos
+ * caminos que tocan el log usan `arrayUnion` con un elemento —y las reglas
+ * acotan el crecimiento a +1 por escritura—, o sea que lo agregado es la cola
+ * del array. Mirar sólo la última entrada alcanzaría hoy, pero silenciaría
+ * para siempre cualquier cambio de estado POSTERIOR de un turno que el cascade
+ * (o la migración `strip_appointment_reason.mjs`) ya tocó: el motivo queda en
+ * el log para siempre, el write no.
+ *
+ * El escalar se sigue leyendo como legacy: los documentos que la CF escribió
+ * antes de #846 lo tienen guardado en producción y la migración NO se corrió.
+ */
+function isAthleteAccountDeletedWrite(
+  before: ApptData | undefined,
+  after: ApptData,
+): boolean {
+  if (after.reason === ATHLETE_ACCOUNT_DELETED_REASON) return true;
+
+  const added = cancellationLogOf(after).slice(cancellationLogOf(before).length);
+  return added.some((e) => e?.reason === ATHLETE_ACCOUNT_DELETED_REASON);
+}
 
 /**
  * Queues the email counterpart of an appointment push, when the branch has one.
@@ -144,15 +187,16 @@ export async function notifyOnAppointmentHandler(
     return;
   }
 
-  const reason = after.reason as string | undefined;
   const afterStatus = after.status as string | undefined;
   const beforeStatus = before?.status as string | undefined;
   const trainerId = after.trainerId as string | undefined;
   const athleteId = after.athleteId as string | undefined;
 
   // Guard: cascade delete — athlete account deleted.
-  if (reason === "athlete-account-deleted") {
-    logger.info("notifyOnAppointment: skipping cascade reason=athlete-account-deleted");
+  if (isAthleteAccountDeletedWrite(before, after)) {
+    logger.info(
+      `notifyOnAppointment: skipping cascade reason=${ATHLETE_ACCOUNT_DELETED_REASON}`,
+    );
     return;
   }
 

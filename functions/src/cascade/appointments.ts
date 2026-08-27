@@ -33,17 +33,45 @@
  * colección, SÍ está en la allowlist, y ya tiene el campo `reason` en el
  * modelo (`CancellationEntry.reason`, `appointment.dart:25`). No agrega
  * superficie: la otra salida —meter `reason` en las dos allowlists— pedía
- * cota, pin en los DOS caminos y un campo nuevo en el modelo que nadie lee.
+ * cota, pin en los DOS caminos y una clave nueva escribible por el cliente.
  *
  * ⚠️ Este fix evita turnos NUEVOS congelados; NO destraba los que ya se
  * escribieron en producción, porque la clave sigue guardada en esos documentos
  * y `hasOnly()` mira el merge. Para eso está
  * `scripts/migrations/strip_appointment_reason.mjs`, que NO se corrió.
+ *
+ * ─── CORRECCIÓN — `reason` SÍ se lee, y como control de flujo ───────────────
+ *
+ * La primera versión de este header, del commit de #846 y de `docs/security.md`
+ * decían que `reason` era «un dato que nadie lee». Se verificó el cliente Dart
+ * y ahí es cierto. **En `functions/src/` no**: `notify-appointment.ts` lo lee
+ * como GUARD —si el motivo es el del cascade, no manda la notificación— y está
+ * documentado como ADR-PN-006 / REQ-PN-CF-003. Es un contrato CF→CF
+ * deliberado, igual que el par intacto `cascade/trainer-links.ts` (escribe
+ * `reason: 'account-deleted'`) ↔ `notify-link-change.ts` (lo lee).
+ *
+ * O sea que al sacar la clave suelta el guard quedó muerto: un atleta con 12
+ * turnos futuros disparaba 12 notificaciones al PF y 12 al fantasma que acaba
+ * de borrar su cuenta. Por eso el motivo se exporta acá como
+ * `ATHLETE_ACCOUNT_DELETED_REASON` —un solo símbolo para productor y
+ * consumidor, en vez de dos literales que se desincronizan en silencio— y por
+ * eso el cascade escribe además `cancelledBy`.
  */
 
 import * as admin from "firebase-admin";
 
 const BATCH_SIZE = 500;
+
+/**
+ * Motivo del cascade, dentro de la entrada del `cancellationLog`.
+ *
+ * CONTRATO CF→CF: `notifications/notify-appointment.ts` importa esta constante
+ * y la usa de guard para NO notificar la cancelación (ADR-PN-006 /
+ * REQ-PN-CF-003). No es un string decorativo: si cambia el valor, cambia el
+ * comportamiento del consumidor. Vive acá —en el productor— y se importa, para
+ * que renombrarlo no pueda romper el guard en silencio.
+ */
+export const ATHLETE_ACCOUNT_DELETED_REASON = "athlete-account-deleted";
 
 /**
  * Cancels all future, non-cancelled appointments for the given athlete uid.
@@ -97,10 +125,20 @@ export async function cancelFutureAppointments(
     for (const doc of chunk) {
       batch.update(doc.ref, {
         status: "cancelled",
+        // `cancelledBy` es quién canceló, y acá el actor es el atleta que dio
+        // de baja la cuenta. Faltaba, y no es cosmético: `notify-appointment`
+        // elige el destinatario con este campo y sin él cae en
+        // `[athleteId, trainerId]` —o sea le escribe también al fantasma—.
+        // Con el guard sano no se llega a esa rama; esto es el segundo cierre,
+        // y de paso deja el documento con la MISMA forma que escribe
+        // `AppointmentRepository.cancel()`. Está en las dos allowlists de
+        // `firestore.rules` (`optStrMaxLen(..., 128)`), así que no repite el
+        // error de #846.
+        cancelledBy: uid,
         cancellationLog: admin.firestore.FieldValue.arrayUnion({
           byUid: uid,
           atMs,
-          reason: "athlete-account-deleted",
+          reason: ATHLETE_ACCOUNT_DELETED_REASON,
         }),
       });
     }
