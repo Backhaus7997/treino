@@ -27,14 +27,18 @@ class AppColors {
 class AppPalette extends ThemeExtension<AppPalette> {
   const AppPalette({
     required this.accent,
+    required this.accentText,
     required this.highlight,
     required this.bg,
     required this.bgCard,
+    required this.bgElevated,
+    required this.surfaceSubtle,
     required this.border,
     required this.borderHover,
     required this.borderStrong,
     required this.textPrimary,
     required this.textMuted,
+    required this.textFaint,
     required this.sage,
     required this.espresso,
     required this.danger,
@@ -47,9 +51,40 @@ class AppPalette extends ThemeExtension<AppPalette> {
   });
 
   final Color accent;
+
+  /// Acento en su versión para TEXTO e ÍCONOS, no para rellenos.
+  ///
+  /// [accent] es un color de fondo: en light compone 1,57:1 contra `bg`, así
+  /// que un label pintado con él es ilegible aunque el mismo mint sirva
+  /// perfecto como relleno de un CTA con texto ink encima. Este token resuelve
+  /// esa bifurcación una sola vez —mint pleno en dark, `mintText700` en
+  /// light— para que el widget escriba `palette.accentText` y no ramifique por
+  /// `Theme.of(context).brightness`.
+  ///
+  /// Regla: si el acento va como FONDO → [accent] (y el texto encima sale de
+  /// `TreinoButtonTokens.foreground`). Si va como TINTA → [accentText].
+  final Color accentText;
+
   final Color highlight;
   final Color bg;
   final Color bgCard;
+
+  /// Superficie que FLOTA sobre el contenido, un escalón por encima de
+  /// [bgCard]: bottom sheets y la barra de accesorio anclada al teclado.
+  ///
+  /// En dark sube el valor del relleno (`ink850`). En light coincide con
+  /// [bgCard] a propósito —no hay nada más claro que el papel— y la capa se
+  /// lee por el filo superior, no por el relleno.
+  final Color bgElevated;
+
+  /// Relleno MÍNIMO con el que un control chico se despega de la superficie
+  /// que lo contiene, sin dibujarle un marco: chip de set en estado normal,
+  /// botón circular del app bar, pill de acción secundaria.
+  ///
+  /// Nace de un bug concreto: el chip de número de set usaba [bgCard], el
+  /// mismo color de su card contenedora, y era literalmente invisible.
+  final Color surfaceSubtle;
+
   final Color border;
 
   /// Border at a brighter alpha for hover states (eg. Coach Hub web sidebar
@@ -80,6 +115,14 @@ class AppPalette extends ThemeExtension<AppPalette> {
 
   final Color textPrimary;
   final Color textMuted;
+
+  /// Tercer escalón de texto, por debajo de [textMuted]: headers de columna
+  /// (`SET`/`KG`/`REPS`), hints de campo, ayudas al pie de una sección.
+  ///
+  /// Sigue siendo TEXTO, así que cumple 4,5:1 contra `bg` en las dos paletas
+  /// —ver `AppColorPrimitives.white45` para la medición. No usarlo para
+  /// bordes ni rellenos: para eso están [border] y [surfaceSubtle].
+  final Color textFaint;
 
   /// Sage green — secondary cards, subtle outlines.
   final Color sage;
@@ -113,14 +156,18 @@ class AppPalette extends ThemeExtension<AppPalette> {
   /// Paleta oscura — identidad de marca TREINO (default).
   static const mintMagenta = AppPalette(
     accent: AppColorPrimitives.mint500,
+    accentText: AppColorPrimitives.mint500,
     highlight: AppColorPrimitives.magenta500,
     bg: AppColorPrimitives.ink950,
     bgCard: AppColorPrimitives.ink900,
+    bgElevated: AppColorPrimitives.ink850,
+    surfaceSubtle: AppColorPrimitives.white06,
     border: AppColorPrimitives.white10,
     borderHover: AppColorPrimitives.white20,
     borderStrong: AppColorPrimitives.white35,
     textPrimary: AppColorPrimitives.bone,
     textMuted: AppColorPrimitives.white55,
+    textFaint: AppColorPrimitives.white45,
     sage: AppColorPrimitives.sage500,
     espresso: AppColorPrimitives.espresso500,
     danger: AppColorPrimitives.dangerRed,
@@ -135,14 +182,18 @@ class AppPalette extends ThemeExtension<AppPalette> {
   /// Paleta clara — soportada como alternativa al dark (dark = identidad).
   static const mintMagentaLight = AppPalette(
     accent: AppColorPrimitives.mint500,
+    accentText: AppColorPrimitives.mintText700,
     highlight: AppColorPrimitives.magenta500,
     bg: AppColorPrimitives.paper50,
     bgCard: AppColorPrimitives.white,
+    bgElevated: AppColorPrimitives.white,
+    surfaceSubtle: AppColorPrimitives.black06,
     border: AppColorPrimitives.black10,
     borderHover: AppColorPrimitives.black20,
     borderStrong: AppColorPrimitives.black50,
     textPrimary: AppColorPrimitives.inkText900,
     textMuted: AppColorPrimitives.black60,
+    textFaint: AppColorPrimitives.black55,
     sage: AppColorPrimitives.sageTint50,
     espresso: AppColorPrimitives.espressoTint50,
     danger: AppColorPrimitives.dangerRedDark,
@@ -160,14 +211,18 @@ class AppPalette extends ThemeExtension<AppPalette> {
   @override
   AppPalette copyWith({
     Color? accent,
+    Color? accentText,
     Color? highlight,
     Color? bg,
     Color? bgCard,
+    Color? bgElevated,
+    Color? surfaceSubtle,
     Color? border,
     Color? borderHover,
     Color? borderStrong,
     Color? textPrimary,
     Color? textMuted,
+    Color? textFaint,
     Color? sage,
     Color? espresso,
     Color? danger,
@@ -180,14 +235,18 @@ class AppPalette extends ThemeExtension<AppPalette> {
   }) =>
       AppPalette(
         accent: accent ?? this.accent,
+        accentText: accentText ?? this.accentText,
         highlight: highlight ?? this.highlight,
         bg: bg ?? this.bg,
         bgCard: bgCard ?? this.bgCard,
+        bgElevated: bgElevated ?? this.bgElevated,
+        surfaceSubtle: surfaceSubtle ?? this.surfaceSubtle,
         border: border ?? this.border,
         borderHover: borderHover ?? this.borderHover,
         borderStrong: borderStrong ?? this.borderStrong,
         textPrimary: textPrimary ?? this.textPrimary,
         textMuted: textMuted ?? this.textMuted,
+        textFaint: textFaint ?? this.textFaint,
         sage: sage ?? this.sage,
         espresso: espresso ?? this.espresso,
         danger: danger ?? this.danger,
@@ -204,14 +263,18 @@ class AppPalette extends ThemeExtension<AppPalette> {
     if (other is! AppPalette) return this;
     return AppPalette(
       accent: Color.lerp(accent, other.accent, t)!,
+      accentText: Color.lerp(accentText, other.accentText, t)!,
       highlight: Color.lerp(highlight, other.highlight, t)!,
       bg: Color.lerp(bg, other.bg, t)!,
       bgCard: Color.lerp(bgCard, other.bgCard, t)!,
+      bgElevated: Color.lerp(bgElevated, other.bgElevated, t)!,
+      surfaceSubtle: Color.lerp(surfaceSubtle, other.surfaceSubtle, t)!,
       border: Color.lerp(border, other.border, t)!,
       borderHover: Color.lerp(borderHover, other.borderHover, t)!,
       borderStrong: Color.lerp(borderStrong, other.borderStrong, t)!,
       textPrimary: Color.lerp(textPrimary, other.textPrimary, t)!,
       textMuted: Color.lerp(textMuted, other.textMuted, t)!,
+      textFaint: Color.lerp(textFaint, other.textFaint, t)!,
       sage: Color.lerp(sage, other.sage, t)!,
       espresso: Color.lerp(espresso, other.espresso, t)!,
       danger: Color.lerp(danger, other.danger, t)!,

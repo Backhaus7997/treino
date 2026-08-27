@@ -15,6 +15,19 @@ abstract final class AppColorPrimitives {
   /// `#2CE5A2` — Mint esmeralda, acento primario TREINO.
   static const Color mint500 = Color(0xFF2CE5A2);
 
+  /// `#0B7A55` — Mint OSCURECIDO, para texto e íconos acento sobre light.
+  ///
+  /// El mint pleno es un color de FONDO. Sobre `paper50` compone 1,57:1: sirve
+  /// para pintar el relleno de un CTA (con texto ink encima), no para pintar
+  /// el texto mismo. Este tono baja la luminancia hasta 5,35:1 contra blanco y
+  /// 5,20:1 contra `paper50`, así que un label acento en tema claro cumple
+  /// WCAG AA (4,5:1) sin salirse del hue de marca.
+  ///
+  /// En dark no hace falta contraparte: el mint pleno ya mide 12,10:1 sobre
+  /// `ink950`. Por eso `AppPalette.accentText` resuelve a [mint500] en dark y
+  /// a este tono en light — el widget usa un token y no ramifica por tema.
+  static const Color mintText700 = Color(0xFF0B7A55);
+
   // ---------------------------------------------------------------------------
   // Familia Magenta (destaque secundario)
   // ---------------------------------------------------------------------------
@@ -31,6 +44,15 @@ abstract final class AppColorPrimitives {
 
   /// `#0F1513` — Ink profundo con tinte mint, fondo de card dark.
   static const Color ink900 = Color(0xFF0F1513);
+
+  /// `#141A18` — Ink elevado, un escalón POR ENCIMA de [ink900].
+  ///
+  /// Para superficies que flotan sobre el contenido en vez de apoyarse en él:
+  /// bottom sheets y la barra de accesorio anclada arriba del teclado. Una card
+  /// va en [ink900] porque comparte plano con el resto del scroll; una hoja que
+  /// tapa ese scroll necesita leerse como otra capa, y sin sombras (regla del
+  /// kit) el único recurso es subir el valor del relleno.
+  static const Color ink850 = Color(0xFF141A18);
 
   // ---------------------------------------------------------------------------
   // Familia Bone (texto claro)
@@ -145,6 +167,24 @@ abstract final class AppColorPrimitives {
   /// `0x8CFFFFFF` — Blanco ~55% alpha, texto mutado en dark.
   static const Color white55 = Color(0x8CFFFFFF);
 
+  /// `0x0FFFFFFF` — Blanco ~6% alpha, relleno de superficie sutil en dark.
+  ///
+  /// NO es un borde ni texto: es el relleno mínimo con el que un control
+  /// pequeño (chip de set, botón circular del header) se despega de la card
+  /// que lo contiene sin dibujar un marco. Compone `#1A1A1A` sobre `ink950`.
+  static const Color white06 = Color(0x0FFFFFFF);
+
+  /// `0x73FFFFFF` — Blanco ~45% alpha, texto TERCIARIO en dark.
+  ///
+  /// El escalón por debajo de [white55], para headers de columna y hints.
+  ///
+  /// ⚠ Es 45% y no 40% por medición, no por gusto: al 40% compone `#6C6C6C`
+  /// sobre `ink950` y da **3,77:1**, abajo del 4,5:1 que WCAG AA pide para
+  /// texto chico (el header `SET`/`KG`/`REPS` mide 10,5 px — no califica como
+  /// texto grande ni siendo bold). Al 45% compone `#7A7A7A` y llega a 4,52:1.
+  /// La diferencia óptica entre ambos es imperceptible; la de accesibilidad no.
+  static const Color white45 = Color(0x73FFFFFF);
+
   // ---------------------------------------------------------------------------
   // Negros con alpha (overlays sobre light)
   // ---------------------------------------------------------------------------
@@ -165,6 +205,17 @@ abstract final class AppColorPrimitives {
 
   /// `0x99000000` — Negro ~60% alpha, texto mutado en light.
   static const Color black60 = Color(0x99000000);
+
+  /// `0x0F000000` — Negro ~6% alpha, relleno de superficie sutil en light.
+  /// Contraparte clara de [white06].
+  static const Color black06 = Color(0x0F000000);
+
+  /// `0x8C000000` — Negro ~55% alpha, texto TERCIARIO en light.
+  ///
+  /// Contraparte clara de [white45], y con MÁS alpha que él: sobre `#FFFFFF`
+  /// hace falta bajar hasta `#737373` (53,5% de negro) para tocar 4,5:1, así
+  /// que 55% es el primer escalón redondo que cumple. Ver [white45].
+  static const Color black55 = Color(0x8C000000);
 
   // ---------------------------------------------------------------------------
   // Transparente (evita `Colors.transparent` crudo en el kit)
