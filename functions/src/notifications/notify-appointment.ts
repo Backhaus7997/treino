@@ -6,9 +6,10 @@
  *
  * Design:
  *   - ADR-PN-006.
- *   - Guards: after missing → skip; el write es el cascade de baja de cuenta
- *     (ver `isAthleteAccountDeletedWrite`) → skip; before?.status ===
- *     after.status → skip (no-op write).
+ *   - Guards: after missing → skip; el write ESCRIBIÓ `reason` =
+ *     'athlete-account-deleted', o sea es el cascade de baja de cuenta (ver
+ *     `isAthleteAccountDeletedWrite`) → skip; before?.status === after.status →
+ *     skip (no-op write).
  *   - Branches:
  *       create + requested → notify trainer, deepLink "/coach?tab=agenda"
  *       requested → confirmed → notify athlete, deepLink "/coach?tab=agenda"
@@ -42,45 +43,45 @@ function getApp(): admin.app.App {
 
 type ApptData = Record<string, unknown>;
 
-/** Una entrada del `cancellationLog` tal como llega del snapshot. */
-type CancellationEntry = { reason?: unknown };
-
-function cancellationLogOf(data: ApptData | undefined): CancellationEntry[] {
-  const log = data?.cancellationLog;
-  return Array.isArray(log) ? (log as CancellationEntry[]) : [];
-}
-
 /**
  * ¿Este write es el cascade cancelando el turno de un atleta que se dio de baja?
  *
- * ─── #846 (secuela) — el guard leía una clave que dejó de escribirse ────────
+ * ─── #846 — el guard tiene que leer algo que el cliente NO pueda escribir ───
  *
- * Esto era `after.reason === 'athlete-account-deleted'`. #846 sacó esa clave
- * suelta del documento —con razón: congelaba el turno contra `hasOnly()`— y
- * movió el motivo adentro del `cancellationLog`. Nadie miró para acá, así que
- * el guard quedó comparando contra `undefined`: el cascade volvía a notificar.
- * Medido contra el emulador, un atleta con 12 turnos futuros = 12 push al PF y
- * 12 a la cuenta recién borrada.
+ * Esto era `after.reason === 'athlete-account-deleted'` a secas, y esa parte
+ * estaba bien: `reason` es una clave que sólo escribe el Admin SDK. Lo que la
+ * volvía frágil era el otro lado —la clave estaba FUERA de `hasOnly()` en
+ * `firestore.rules`, así que congelaba el turno—, y el primer intento de fix
+ * movió el motivo adentro del `cancellationLog`.
  *
- * Ahora se mira lo que el write AGREGÓ al log, no el estado final. Los dos
- * caminos que tocan el log usan `arrayUnion` con un elemento —y las reglas
- * acotan el crecimiento a +1 por escritura—, o sea que lo agregado es la cola
- * del array. Mirar sólo la última entrada alcanzaría hoy, pero silenciaría
- * para siempre cualquier cambio de estado POSTERIOR de un turno que el cascade
- * (o la migración `strip_appointment_reason.mjs`) ya tocó: el motivo queda en
- * el log para siempre, el write no.
+ * Eso ROMPÍA el guard, y no por descuido de tipos: las reglas **no iteran
+ * listas**, o sea que el contenido de una entrada del log no se valida. Medido
+ * de punta a punta: un atleta autenticado cancela SU turno por el Path 1
+ * legítimo agregando `{byUid, atMs, reason: 'athlete-account-deleted'}` →
+ * ALLOW, y este handler emitía CERO push y CERO mail. El PF nunca se enteraba
+ * de que le cancelaron. Simétrico: el PF podía silenciar al atleta.
  *
- * El escalar se sigue leyendo como legacy: los documentos que la CF escribió
- * antes de #846 lo tienen guardado en producción y la migración NO se corrió.
+ * Un guard es CONTROL DE FLUJO. Lo único que puede leer es una señal que el
+ * cliente no pueda emitir. `reason` volvió a ser esa señal: `firestore.rules`
+ * la pinea en los DOS caminos de update, la exige `null` en el `create` y el
+ * `delete` está cerrado, así que ningún cliente la agrega, la cambia ni la
+ * borra. El Admin SDK sí, porque saltea las reglas.
+ *
+ * ─── Y se mira la ESCRITURA, no el estado final ─────────────────────────────
+ *
+ * `before?.reason !== …` no es cosmético: el motivo queda guardado en el
+ * documento para siempre, pero el write que lo puso ocurre UNA vez. Sin esa
+ * mitad, cualquier cambio de estado POSTERIOR de un turno que el cascade ya
+ * tocó quedaría mudo para siempre.
  */
 function isAthleteAccountDeletedWrite(
   before: ApptData | undefined,
   after: ApptData,
 ): boolean {
-  if (after.reason === ATHLETE_ACCOUNT_DELETED_REASON) return true;
-
-  const added = cancellationLogOf(after).slice(cancellationLogOf(before).length);
-  return added.some((e) => e?.reason === ATHLETE_ACCOUNT_DELETED_REASON);
+  return (
+    after.reason === ATHLETE_ACCOUNT_DELETED_REASON &&
+    before?.reason !== ATHLETE_ACCOUNT_DELETED_REASON
+  );
 }
 
 /**

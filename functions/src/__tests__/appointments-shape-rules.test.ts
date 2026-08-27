@@ -2272,32 +2272,37 @@ describe("appointments — los escritores reales de AppointmentRepository siguen
 });
 
 /**
- * #846 — el `reason` que escribía la Cloud Function del cascade.
+ * #846 — el `reason` del cascade: la clave que congelaba el turno, y que ahora
+ * es la señal CF→CF que ningún cliente puede escribir.
  *
- * `functions/src/cascade/appointments.ts` escribía `reason:
- * 'athlete-account-deleted'` como clave suelta, con Admin SDK. `reason` no
- * existe en `Appointment.toJson()` ni en las 14 claves de `hasOnly()` — sólo
- * existe DENTRO de `CancellationEntry`, que es un elemento del
- * `cancellationLog`.
+ * `functions/src/cascade/appointments.ts` escribe `reason:
+ * 'athlete-account-deleted'` con Admin SDK, y `notify-appointment.ts` la lee de
+ * GUARD para NO notificar la cancelación (ADR-PN-006 / REQ-PN-CF-003).
  *
- * El Admin SDK saltea las reglas, así que la escritura pasaba. Lo que quedaba
- * después es el daño: `hasOnly()` corre sobre `request.resource.data`, el
- * documento **MERGEADO**, así que cualquier update PARCIAL posterior del
- * cliente arrastraba el `reason` guardado y la allowlist lo rechazaba. Nuestro
- * propio backend fabricaba turnos imborrables.
+ * El bug: `reason` NO estaba en `hasOnly()`. El Admin SDK saltea las reglas,
+ * así que la escritura pasaba; el daño quedaba después. `hasOnly()` corre sobre
+ * `request.resource.data`, el documento **MERGEADO**, así que cualquier update
+ * PARCIAL posterior del cliente arrastraba el `reason` guardado y la allowlist
+ * lo rechazaba. Nuestro propio backend fabricaba turnos imborrables.
  *
- * ⚠️ Los dos primeros casos assertean el DENY, o sea el estado ROTO. No están
- * para custodiar una regla: están para que quede escrito, y medido, que el fix
- * de la CF **no destraba los documentos que ya se escribieron** — la clave
- * sigue guardada en ellos. Eso lo destraba
- * `scripts/migrations/strip_appointment_reason.mjs`, que NO se corrió contra
- * producción, y el tercer caso es su prueba: mismo documento, sin la clave, la
- * misma escritura pasa a ALLOW.
+ * ⚠️ El primer fix MOVÍA el motivo adentro del `cancellationLog` y pedía una
+ * migración contra producción para destrabar lo ya escrito. Se revirtió por el
+ * bloque de abajo: las reglas **no iteran listas** —está escrito sobre el
+ * Path 1: *«ese sigue siendo forjable porque las reglas no iteran listas»*—,
+ * así que ese motivo lo forja cualquier miembro del turno y el guard deja de
+ * ser un guard.
+ *
+ * La salida es la contraria: `reason` ENTRA a las dos allowlists y queda
+ * pineada en los dos caminos de cliente, `== null` en el `create` y con el
+ * `delete` cerrado. Los documentos que ya están escritos se destraban con el
+ * deploy de las reglas, sin correr nada contra producción.
  */
-describe("appointments update — el `reason` del cascade congela el turno (#846)", () => {
+describe("appointments — `reason` es la señal del cascade y NO congela el turno (#846)", () => {
   const CONGELADO = "appt-846-con-reason";
 
   beforeEach(async () => {
+    // El documento tal como lo dejó la CF: `reason` de primer nivel, escrito
+    // con Admin SDK. Es la forma que HAY en producción hoy.
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), COL, CONGELADO), {
         ...appointment({ id: CONGELADO, startsAt: inDays(5) }),
@@ -2306,8 +2311,10 @@ describe("appointments update — el `reason` del cascade congela el turno (#846
     });
   });
 
-  it("DENIEGA al atleta cancelar un turno que lleva `reason` — el daño medido", async () => {
-    await assertFails(
+  it("el atleta PUEDE cancelar un turno que lleva `reason` — el daño de #846, cerrado", async () => {
+    // Éste es EL caso del issue. Contra las reglas anteriores daba DENY, y con
+    // `allow delete: if false` el turno quedaba fijo en la agenda para siempre.
+    await assertSucceeds(
       updateDoc(doc(dbAs(ATHLETE), COL, CONGELADO), {
         status: "cancelled",
         cancelledBy: ATHLETE,
@@ -2315,47 +2322,122 @@ describe("appointments update — el `reason` del cascade congela el turno (#846
     );
   });
 
-  it("DENIEGA al PF anotar un turno que lleva `reason`", async () => {
-    await assertFails(
+  it("el PF PUEDE anotar un turno que lleva `reason`", async () => {
+    await assertSucceeds(
       updateDoc(doc(dbAs(TRAINER), COL, CONGELADO), { noteAfter: "ok" })
     );
   });
 
-  it("sacando la clave con Admin SDK el mismo turno se cancela — la migración funciona", async () => {
-    // Es la medición del alcance del fix, no un test de la regla: lo único que
-    // cambia entre este caso y el primero es la clave de más.
+  // ── Y la contraparte: la clave es INESCRIBIBLE para el cliente ───────────
+  //
+  // Estos cinco casos son lo que hace confiable al guard de
+  // `notify-appointment.ts`. Si alguno se pone verde en ALLOW, el guard pasa a
+  // ser forjable y un miembro del turno silencia al otro.
+
+  it("DENIEGA al atleta AGREGAR `reason` mientras cancela (Path 1)", async () => {
+    const LIMPIO = "appt-846-limpio";
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      await updateDoc(doc(ctx.firestore(), COL, CONGELADO), {
-        reason: deleteField(),
-      });
+      await setDoc(
+        doc(ctx.firestore(), COL, LIMPIO),
+        appointment({ id: LIMPIO, startsAt: inDays(5) })
+      );
     });
-    await assertSucceeds(
-      updateDoc(doc(dbAs(ATHLETE), COL, CONGELADO), {
+    await assertFails(
+      updateDoc(doc(dbAs(ATHLETE), COL, LIMPIO), {
         status: "cancelled",
         cancelledBy: ATHLETE,
+        reason: "athlete-account-deleted",
       })
     );
   });
 
-  it("la entrada del cancellationLog que escribe la CF ahora NO congela nada", async () => {
-    // La forma nueva de la CF: el motivo va adentro del log, que sí está en la
-    // allowlist. Es el mismo mapa que arma `cancelFutureAppointments`.
-    const CF = "appt-846-log";
+  it("DENIEGA al PF AGREGAR `reason` mientras anota (Path 2)", async () => {
+    const LIMPIO = "appt-846-limpio-2";
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(
-        doc(ctx.firestore(), COL, CF),
-        appointment({
-          id: CF,
-          status: "cancelled",
-          startsAt: inDays(5),
-          cancellationLog: [
-            { byUid: ATHLETE, atMs: 1, reason: "athlete-account-deleted" },
-          ],
-        })
+        doc(ctx.firestore(), COL, LIMPIO),
+        appointment({ id: LIMPIO, startsAt: inDays(5) })
+      );
+    });
+    // El vecino del Path 1. Blindar un solo camino es perseguir el vector.
+    await assertFails(
+      updateDoc(doc(dbAs(TRAINER), COL, LIMPIO), {
+        noteAfter: "ok",
+        reason: "athlete-account-deleted",
+      })
+    );
+  });
+
+  it("DENIEGA CAMBIAR el `reason` que ya tiene el documento", async () => {
+    // Por el Path 2, que es el único camino que el PF tiene sobre un turno
+    // `confirmed`.
+    await assertFails(
+      updateDoc(doc(dbAs(TRAINER), COL, CONGELADO), { reason: "otra-cosa" })
+    );
+  });
+
+  it("DENIEGA al PF BORRAR el `reason` que escribió la CF", async () => {
+    // Borrarlo también es control de flujo: deja el documento sin la marca de
+    // que el cascade lo tocó.
+    //
+    // ⚠️ El actor es el PF a propósito. Con el ATLETA este caso sería VACUO: su
+    // único camino es el Path 1, que exige `status == 'cancelled'`, así que un
+    // update que sólo borra `reason` sobre un turno `confirmed` da DENY por el
+    // status y no por el pin. Medido sacando el pin: con el atleta seguía en
+    // verde. Un caso que no se pone rojo cuando borrás la regla que dice
+    // custodiar no custodia nada.
+    await assertFails(
+      updateDoc(doc(dbAs(TRAINER), COL, CONGELADO), { reason: deleteField() })
+    );
+  });
+
+  it("DENIEGA crear un turno con `reason`", async () => {
+    await assertFails(
+      setDoc(doc(dbAs(ATHLETE), COL, "appt-846-create"), {
+        ...appointment({ id: "appt-846-create" }),
+        reason: "athlete-account-deleted",
+      })
+    );
+  });
+
+  it("crear con `reason: null` explícito sigue estando bien", async () => {
+    // Ancla de no-vacuidad: lo que se prohíbe es el VALOR, no la clave. Un
+    // cliente que mande la clave en null no se rompe.
+    await assertSucceeds(
+      setDoc(doc(dbAs(ATHLETE), COL, "appt-846-create-null"), {
+        ...appointment({ id: "appt-846-create-null" }),
+        reason: null,
+      })
+    );
+  });
+
+  // ── La forja que tumbó el fix anterior ──────────────────────────────────
+
+  it("el motivo DENTRO del cancellationLog sí lo forja el cliente — por eso el guard no lo lee", async () => {
+    // Esto es ALLOW, y está bien que lo sea: es una cancelación legítima por el
+    // Path 1, y las reglas no pueden mirar adentro de la entrada del log.
+    //
+    // Lo que prueba es por qué el guard NO puede leer ahí: mientras lo hizo,
+    // esta misma escritura dejaba al PF sin push y sin mail. La consecuencia
+    // está medida en
+    // `functions/src/__tests__/cascade/appointments-notify-contract.test.ts`.
+    const FORJA = "appt-846-forja";
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(
+        doc(ctx.firestore(), COL, FORJA),
+        appointment({ id: FORJA, startsAt: inDays(5) })
       );
     });
     await assertSucceeds(
-      updateDoc(doc(dbAs(TRAINER), COL, CF), { noteAfter: "no vino" })
+      updateDoc(doc(dbAs(ATHLETE), COL, FORJA), {
+        status: "cancelled",
+        cancelledBy: ATHLETE,
+        cancellationLog: arrayUnion({
+          byUid: ATHLETE,
+          atMs: 1,
+          reason: "athlete-account-deleted",
+        }),
+      })
     );
   });
 });

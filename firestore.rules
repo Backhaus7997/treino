@@ -2192,13 +2192,45 @@ service cloud.firestore {
       // `cancellationLog` es una lista de objetos; las reglas no pueden
       // validar su contenido en profundidad, así que se le acota el largo —
       // que es lo que evita el inflado del documento.
+      //
+      // ─── #846 — `reason` entra a la allowlist, y NUNCA lo escribe un cliente ──
+      //
+      // Son 15 claves, no 14. La quinceava —`reason`— NO sale de
+      // `Appointment.toJson()`: la escribe SÓLO `functions/src/cascade/appointments.ts`
+      // con Admin SDK, y `notifications/notify-appointment.ts` la lee de GUARD
+      // (ADR-PN-006 / REQ-PN-CF-003). Es un canal CF→CF.
+      //
+      // El bug de #846 era que estaba FUERA de la allowlist: `hasOnly()` corre
+      // sobre `request.resource.data`, que es el documento MERGEADO, así que
+      // cualquier update parcial posterior del cliente arrastraba el `reason`
+      // guardado y la allowlist lo rechazaba. Turno imborrable, la familia de
+      // #781, sembrada por nuestro propio backend.
+      //
+      // Meterla acá lo cierra **sin migración** —los documentos que ya están
+      // escritos en producción se destraban solos— y el precio es cero
+      // superficie nueva, porque la clave queda INESCRIBIBLE para el cliente
+      // por las tres puertas:
+      //   · `create`  → `d.get('reason', null) == null`, acá abajo.
+      //   · `update`  → pineada contra `resource.data` en el Path 1 Y en el
+      //                 Path 2 (los DOS caminos; blindar uno solo es perseguir
+      //                 el vector, no cerrarlo).
+      //   · `delete`  → `if false`.
+      // El Admin SDK saltea las reglas, así que la CF la escribe igual. Ése es
+      // exactamente el punto: es una señal que sólo el backend puede emitir.
+      //
+      // ⚠️ Y por eso NO lleva cota de tipo ni de largo. Una cota corre sobre el
+      // documento mergeado, o sea validaría el DOCUMENTO y no la escritura: un
+      // doc heredado con `reason` de otro tipo quedaría sin poder anotarse ni
+      // cancelarse nunca más. Es el error que #831 y #847 ya pagaron dos veces.
+      // El cliente no puede escribir el campo, así que no hay nada que acotar
+      // contra el cliente; contra la CF la cota la pone el code review.
       function appointmentShapeOk(d) {
         return d.keys().hasOnly(['id', 'trainerId', 'athleteId',
                                  'athleteDisplayName', 'startsAt',
                                  'durationMin', 'status', 'cancelledAt',
                                  'cancelledBy', 'cancellationLog',
                                  'noteBefore', 'noteAfter', 'recurringId',
-                                 'paymentId'])
+                                 'paymentId', 'reason'])
                && d.keys().hasAll(['id', 'trainerId', 'athleteId',
                                    'athleteDisplayName', 'startsAt',
                                    'durationMin', 'status'])
@@ -2303,6 +2335,10 @@ service cloud.firestore {
                // otra forma de fijar un tipo sin nombrarlo.
                && d.get('cancellationLog', []) is list
                && d.get('cancellationLog', []).size() == 0
+               // #846 — un turno recién creado NO tiene motivo de cascade, y
+               // el cliente no puede fabricarlo. La CF escribe con Admin SDK,
+               // que no pasa por acá.
+               && d.get('reason', null) == null
                // …y tampoco tiene `cancelledAt` ni `cancelledBy`. Es el mismo
                // invariante que la línea de arriba, sobre los otros dos campos
                // de la cancelación, y cierra el segundo agujero que encontró
@@ -2360,12 +2396,19 @@ service cloud.firestore {
       // dependa de eso. El de `durationMin` va condicionado a que el campo
       // cambie — el porqué está abajo, en su propio bloque.
       function appointmentUpdateShapeOk(d) {
+        // #846 — `reason` entra a la allowlist (ver `appointmentShapeOk()`).
+        // Sin ella, un turno que la CF del cascade ya tocó no se podía anotar
+        // ni cancelar NUNCA MÁS, porque `hasOnly()` mira el documento
+        // MERGEADO. Sin cota, y a propósito: una cota acá validaría el
+        // documento en vez de la escritura, que es el error de #831/#847. Lo
+        // que impide que el cliente la escriba son los pines de los DOS
+        // caminos, no una cota.
         return d.keys().hasOnly(['id', 'trainerId', 'athleteId',
                                  'athleteDisplayName', 'startsAt',
                                  'durationMin', 'status', 'cancelledAt',
                                  'cancelledBy', 'cancellationLog',
                                  'noteBefore', 'noteAfter', 'recurringId',
-                                 'paymentId'])
+                                 'paymentId', 'reason'])
                // ⚠️ #831 (quinta pasada) — estos dos chequeos estaban
                // INCONDICIONALES, que es el mismo error que los bloques de
                // `durationMin` y `startsAt` de acá abajo documentan. Corren
@@ -2709,6 +2752,25 @@ service cloud.firestore {
             == resource.data.get('athleteDisplayName', null)
          && request.resource.data.get('recurringId', null)
             == resource.data.get('recurringId', null)
+         // ─── #846 — `reason` es la señal CF→CF, y acá se PINEA ───────────────
+         //
+         // `notify-appointment.ts` decide con este campo si manda la
+         // notificación de cancelación. O sea que no es un dato: es CONTROL DE
+         // FLUJO. Si un cliente lo pudiera escribir, un atleta cancelaría su
+         // propio turno por este mismo camino haciéndose pasar por el cascade
+         // de baja de cuenta, y el PF no se enteraría — cero push y cero mail.
+         // Es simétrico: el PF puede silenciar al atleta.
+         //
+         // Con el pin, `request.resource.data.reason` sólo puede valer lo que
+         // ya estaba en el documento. El cliente no lo agrega, no lo cambia y
+         // no lo borra. El Admin SDK sí, porque saltea las reglas.
+         //
+         // El `.get(…, null)` en las dos mitades es obligatorio y no cosmético:
+         // el 99% de los turnos NO tiene la clave, y con acceso directo la
+         // igualdad no evaluaría y la regla fallaría CERRADA — el turno
+         // imborrable de #781 otra vez, por la puerta que abre el fix.
+         && request.resource.data.get('reason', null)
+            == resource.data.get('reason', null)
          // ─── #847 — el gate de 24 h no puede ser la puerta que traba el doc ──
          //
          // Este gate lee `resource.data`, o sea el valor VIEJO, y lo leía con
@@ -2812,6 +2874,13 @@ service cloud.firestore {
          && request.resource.data.get('id', null) == resource.data.get('id', null)
          && request.resource.data.get('recurringId', null)
             == resource.data.get('recurringId', null)
+         // #846 — el MISMO pin que el Path 1, en el camino de al lado. Sin
+         // esto, el PF escribe `reason` de paso en una edición de notas y
+         // silencia la notificación del atleta: "blindar un camino cuyo VECINO
+         // escribe la misma variable es perseguir el vector, no cerrarlo" — la
+         // lección de #831, aplicada de entrada esta vez.
+         && request.resource.data.get('reason', null)
+            == resource.data.get('reason', null)
          && ((resource.data.get('paymentId', null) == null
               && request.resource.data.get('paymentId', null) is string
               && request.resource.data.get('paymentId', null).size() > 0)

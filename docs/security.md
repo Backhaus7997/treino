@@ -2717,7 +2717,7 @@ estaba anotado como fuera de alcance.
   fuera de cota queda imborrable.
 - **libre** — el camino lo escribe sin ninguna cota.
 
-### La matriz 14 × 3
+### La matriz 15 × 3
 
 | # | Campo | `create` | Path 1 — cancelación (miembro) | Path 2 — edición del PF |
 |---|---|---|---|---|
@@ -2735,8 +2735,17 @@ estaba anotado como fuera de alcance.
 | 12 | `noteAfter` | acotado — `<= 5000` | acotado — `<= 5000` | acotado — `<= 5000` |
 | 13 | `recurringId` | acotado — `<= 128` | **pineado** | **pineado** |
 | 14 | `paymentId` | acotado — **`== null`** | **pineado** | acotado — **set-once** |
+| 15 | `reason` ⭐ | acotado — **`== null`** | **pineado** | **pineado** |
 
-**No queda ninguna celda libre.** Las 42 se midieron una por una contra el
+⭐ **La fila 15 es nueva de [#846](https://github.com/Backhaus7997/treino/issues/846)**, y es la única del
+documento que **ningún camino de cliente escribe**. `reason` no sale de
+`Appointment.toJson()`: la escribe SÓLO el cascade con Admin SDK y
+`notify-appointment.ts` la lee de GUARD, o sea que es **control de flujo**, no
+un dato. Por eso sus tres celdas están cerradas de entrada —`== null` en el
+`create`, pineada en los DOS caminos— y el `delete` ya era `if false`. Una señal
+CF→CF sólo vale si el cliente no la puede emitir.
+
+**No queda ninguna celda libre.** Las 45 se midieron una por una contra el
 emulador —una escritura hostil por celda— antes y después del fix. Las únicas
 que aceptan la escritura hostil son las seis que la tabla de abajo justifica:
 `status`·P1, `noteBefore`/`noteAfter` en P1 y P2, y `paymentId`·P2 (la primera
@@ -2764,6 +2773,7 @@ falta para poder dejarlas abiertas: si una no se puede justificar, se pinea.
 | `noteBefore` / `noteAfter` · P1 | Residuo consciente: una cancelación puede escribirlos (acotados a 5000). Pinearlos rompería un futuro *"cancelar con motivo"*, y el daño está cerrado del otro lado — sin el flip ese texto no llega nunca a un doc `confirmed` |
 | `noteBefore` / `noteAfter` · P2 | Son el **propósito** del camino |
 | `paymentId` · P2 | Set-once (`null` → string no vacío, o re-afirmar el MISMO valor). Money-critical. **Su premisa —que el valor nace en `null`— la sostiene el `create`, no este camino**: por eso la columna que faltaba era la que importaba |
+| `reason` · los tres caminos | **Ninguno**, y es el punto: es la única fila cerrada en las tres columnas. Ver ⭐ arriba |
 | todo el `create` | Un turno nuevo nace `confirmed`, sin cancelación, sin log y **sin cobro**. Los tres `== null` (`cancelledAt`, `cancelledBy`, `paymentId`) y el `is list` + `size() == 0` del log son el mismo invariante escrito sobre cuatro campos. ⚠️ El `== null` fija el tipo de paso; el `size() == 0` **no** — ver la sexta pasada |
 
 **Las celdas que estaban abiertas y nadie había decidido.** Medidas contra el
@@ -2941,15 +2951,15 @@ residuos, todos medidos:
   cerrarlo pide el condicional, no el chequeo suelto. Ver la sexta pasada.
   **ABIERTO a propósito.**
 - ~~**La Cloud Function del cascade escribe `reason`, una clave fuera de la
-  allowlist.**~~ **CERRADO EN LA CF, con residuo de DATOS** —
-  [#846](https://github.com/Backhaus7997/treino/issues/846), séptima pasada. El
-  motivo se mudó adentro del `cancellationLog`, que sí está en la allowlist, así
-  que la CF ya no siembra turnos imborrables. ⚠️ **Lo que NO destraba es lo ya
-  escrito en producción**: la clave sigue guardada en esos documentos y
-  `hasOnly()` mira el merge. Para eso está
-  `scripts/migrations/strip_appointment_reason.mjs`, **que no se corrió** y va
-  con decisión humana atrás (`treino-dev` ES producción, #826). **RESIDUO DE
-  DATOS ABIERTO.**
+  allowlist.**~~ **CERRADO, sin residuo de datos** —
+  [#846](https://github.com/Backhaus7997/treino/issues/846), séptima pasada.
+  `reason` **entró** a las dos allowlists y quedó **pineada en los dos caminos
+  de cliente** (`== null` en el `create`, `delete: if false`): es la fila 15 de
+  la matriz, la única que ningún camino de cliente escribe. Los documentos que
+  la CF ya escribió en producción **se destraban con el deploy de las reglas**,
+  sin correr nada. ⚠️ La primera versión de este fix movía el motivo adentro del
+  `cancellationLog` y pedía una migración contra producción; se revirtió porque
+  volvía **forjable** el guard de `notify-appointment.ts` — ver abajo.
 - ~~**Borrar un Payment deja el `paymentId` del turno colgado para siempre.**~~
   **CERRADO** — [#848](https://github.com/Backhaus7997/treino/issues/848),
   séptima pasada. El `delete` de `payments` pasó a `if false`: no tenía NINGÚN
@@ -2998,8 +3008,10 @@ lista completa, no un resumen optimista:
 - el hueco de PRODUCTO del turno legítimo creado a menos de 24 h;
 - el patrón del chequeo INCONDICIONAL fuera de `appointments`
   ([#849](https://github.com/Backhaus7997/treino/issues/849));
-- y el **residuo de datos** de #846: los documentos que la CF ya escribió en
-  producción siguen congelados hasta que alguien corra la migración.
+- ~~el **residuo de datos** de #846~~ — **ya no existe**: `reason` entró a la
+  allowlist pineada, así que los documentos que la CF escribió en producción se
+  destraban con el deploy de las reglas y no hace falta correr ninguna migración
+  contra `treino-dev`.
 
 Es la cuarta pasada seguida en que se escribió "cerrado" antes de medirlo.
 **Antes de tachar un hallazgo: aflojá cada gate, uno por uno, y mirá qué se pone
@@ -3354,8 +3366,8 @@ tercera el **choque entre dos bloques de reglas que por separado están bien**.
 
 `functions/src/cascade/appointments.ts` escribía, con Admin SDK,
 `{ status: 'cancelled', reason: 'athlete-account-deleted' }`. `reason` **no
-existe** en `Appointment.toJson()` ni en las 14 claves de `hasOnly()` — sólo
-existe DENTRO de `CancellationEntry`, que es un elemento del `cancellationLog`.
+existía** en las 14 claves de `hasOnly()` de `appointmentShapeOk()` /
+`appointmentUpdateShapeOk()`.
 
 El Admin SDK saltea las reglas, así que la escritura pasaba. El daño es lo que
 quedaba después: `hasOnly()` corre sobre `request.resource.data`, el documento
@@ -3364,62 +3376,89 @@ la clave guardada y la allowlist lo rechazaba.
 
 | Escritura sobre un turno que lleva `reason` | Antes | Ahora |
 |---|---|---|
-| el PF lo anota (`noteAfter`) | **DENY** | DENY *(sigue congelado — ver abajo)* |
-| el atleta lo cancela | **DENY** | DENY *(ídem)* |
+| el PF lo anota (`noteAfter`) | **DENY** | **ALLOW** |
+| el atleta lo cancela | **DENY** | **ALLOW** |
 | borrarlo | DENY (`allow delete: if false`) | DENY |
-| un turno NUEVO tocado por el cascade, anotado / cancelado | **DENY** | **ALLOW** |
+| el cliente AGREGA `reason` (P1 o P2) | DENY *(por `hasOnly()`)* | **DENY** *(por el pin)* |
+| el cliente CAMBIA o BORRA el `reason` | DENY *(por `hasOnly()`)* | **DENY** *(por el pin)* |
+| el cliente CREA un turno con `reason` | DENY *(por `hasOnly()`)* | **DENY** *(por `== null`)* |
 
-**La decisión, y por qué.** De las dos salidas del issue se tomó la primera:
-sacar `reason` de la CF y mover el motivo al `cancellationLog`. La segunda
-—meterlo en las dos allowlists— pedía una clave nueva escribible por el cliente,
-con su cota de texto y su pin en los DOS caminos (o sea tres gates nuevos, cada
-uno con su negativo), más el campo en el modelo. Y el motivo ya tiene su lugar
-en `CancellationEntry.reason`. Agrandar la superficie de la allowlist para
-acomodar un error de escritura es al revés.
+**La decisión, y por qué.** `reason` **entra** a las dos allowlists y queda
+**pineada en los DOS caminos de cliente**
+(`request.resource.data.get('reason', null) == resource.data.get('reason', null)`),
+más `== null` en el `create` y el `delete` que ya era `if false`. O sea que la
+clave existe para las reglas —y por eso deja de congelar el documento— pero
+**ningún cliente la puede agregar, cambiar ni borrar por ninguna de las tres
+puertas**. El Admin SDK la escribe porque saltea las reglas: es exactamente una
+señal que sólo el backend puede emitir.
 
-> **⚠️ Corrección.** La primera versión de este párrafo justificaba la decisión
-> diciendo que `reason` era **«un dato que nadie lee»**: «no está en
-> `Appointment`, no está en ninguna query de `lib/`». Eso se verificó **sólo en
-> el cliente Dart**, y ahí es cierto. En `functions/src/` es **falso**, y el
-> detalle importa porque no se lee como dato sino como **control de flujo** —el
-> daño que eso causó está en la sección de abajo—. La decisión de mover el
-> motivo al log **no cambia**; lo que cambia es que ya no se apoya en una
-> premisa falsa: se apoya en que la allowlist no crece.
+Y no lleva cota de tipo ni de largo, a propósito. Una cota corre sobre el
+documento MERGEADO, o sea validaría el DOCUMENTO y no la escritura: un doc
+heredado con `reason` de otro tipo quedaría sin poder anotarse ni cancelarse
+nunca más. Es el error que #831 y #847 ya pagaron dos veces. Contra el cliente
+no hay nada que acotar —no puede escribir el campo—; contra la CF la cota la
+pone el code review.
 
-**⚠️ Y el alcance real del fix, medido y no supuesto: NO destraba los documentos
-que ya están escritos.** La clave sigue guardada en ellos, y `hasOnly()` mira el
-merge, no la escritura. Las dos primeras filas de la tabla siguen en DENY
-después del fix, y están asserteadas así en
-`appointments-shape-rules.test.ts` — no para custodiar una regla, sino para que
-el residuo quede escrito y medido en vez de asumido.
+> **⚠️ Corrección — dos afirmaciones que quedaron escritas y son FALSAS.**
+>
+> 1. **«`reason` es un dato que nadie lee»**, con el argumento «no está en
+>    `Appointment`, no está en ninguna query de `lib/`». Eso se verificó **sólo
+>    en el cliente Dart**, y ahí es cierto. En `functions/src/` es **falso**:
+>    `notify-appointment.ts` lo lee como **control de flujo** (ADR-PN-006 /
+>    REQ-PN-CF-003), igual que el par hermano intacto `cascade/trainer-links.ts`
+>    ↔ `notify-link-change.ts`.
+> 2. **«Meter `reason` en las allowlists pide una clave nueva escribible por el
+>    cliente»**, con «su cota de texto y su pin en los DOS caminos». También es
+>    **falso**: con el pin en los dos caminos la clave es exactamente lo
+>    contrario —la ÚNICA del documento que el cliente **no** puede tocar—, y la
+>    cota no hace falta justamente porque el cliente no la escribe. La segunda
+>    afirmación es la que descartó la salida correcta, y la primera es la que
+>    hizo parecer inofensivo mover el motivo al log.
+>
+> La decisión **cambió** por eso: la salida que se había descartado es la que se
+> tomó.
 
-Lo que sí los destraba es
-**`scripts/migrations/strip_appointment_reason.mjs`**, que saca la clave con
-Admin SDK y reescribe el motivo como entrada del log. **NO se corrió**:
-`treino-dev` ES producción ([#826](https://github.com/Backhaus7997/treino/issues/826))
-y una migración con escritura va con una decisión humana atrás. Sin `--apply` es
-dry-run. Que funciona está medido en el emulador: el caso *"sacando la clave con
-Admin SDK el mismo turno se cancela"* es exactamente lo que hace el script, y es
-lo único que lo separa del caso que da DENY.
+**Lo que la primera versión de este fix hacía, y por qué se revirtió.** Movía el
+motivo adentro del `cancellationLog` y sacaba la clave suelta. Dos problemas,
+los dos medidos:
 
-La urgencia es baja y conviene que esté escrito: los turnos que la CF tocó ya
-están `cancelled` y su atleta fue borrado, así que hoy nadie los edita. Lo que la
-migración recupera es el invariante —*"el cliente siempre puede cancelar lo
-suyo"*— y el margen de que la CF cambie y la clave llegue a un doc `confirmed`.
+1. **Volvía FORJABLE el guard.** Las reglas **no iteran listas** —lo dice esta
+   misma sección para el `byUid`—, así que el contenido de una entrada del log
+   no se valida. Medido de punta a punta: un atleta autenticado cancela **su**
+   turno por el Path 1 legítimo agregando
+   `{byUid, atMs, reason: 'athlete-account-deleted'}` → **ALLOW**, y el handler
+   real emite **0 push y 0 mail**. El PF nunca se entera de que le cancelaron. Y
+   es simétrico: el PF puede silenciar al atleta. Con la clave suelta eso era
+   **imposible**, justamente porque no estaba en `hasOnly()`.
+2. **Pedía una migración con escritura contra producción** para destrabar los
+   documentos ya escritos. `treino-dev` ES producción
+   ([#826](https://github.com/Backhaus7997/treino/issues/826)) y es el único
+   proyecto que hay.
 
-#### #846 (secuela) — sacar la clave suelta mató un guard de notificaciones
+Cerrarlo en las reglas resuelve las dos cosas de una: la señal vuelve a ser
+CF-only, y los documentos viejos se destraban con el deploy. Las dos primeras
+filas de la tabla pasaron de DENY a **ALLOW**, y están asserteadas así en
+`appointments-shape-rules.test.ts`.
 
-`notifications/notify-appointment.ts` leía `after.reason ===
-'athlete-account-deleted'` para **NO** mandar la notificación de cancelación
-cuando el write venía del cascade. Está documentado en el header del archivo y
-en ADR-PN-006 / REQ-PN-CF-003, y que es un contrato CF→CF deliberado lo prueba
-el par hermano, que quedó intacto: `cascade/trainer-links.ts` escribe
-`reason: 'account-deleted'` y `notify-link-change.ts` lo lee igual.
+`scripts/migrations/strip_appointment_reason.mjs` **queda escrito y NO se
+corre**: con `reason` en la allowlist ya no destraba nada —no hay nada
+congelado—, y correrlo sería un retroceso, porque cambia una señal CF-only por
+una entrada de log forjable. Su compuerta de escritura sí se arregló, y eso está
+abajo.
 
-Al mover el motivo adentro del `cancellationLog` el guard quedó comparando
+#### #846 (secuela) — el guard de notificaciones, y por qué su señal tiene que ser CF-only
+
+`notifications/notify-appointment.ts` lee `reason` para **NO** mandar la
+notificación de cancelación cuando el write viene del cascade. Está documentado
+en el header del archivo y en ADR-PN-006 / REQ-PN-CF-003, y que es un contrato
+CF→CF deliberado lo prueba el par hermano, que quedó intacto:
+`cascade/trainer-links.ts` escribe `reason: 'account-deleted'` y
+`notify-link-change.ts` lo lee igual.
+
+Al mover el motivo adentro del `cancellationLog`, el guard quedó comparando
 contra `undefined`. Medido contra el emulador, con el cascade REAL:
 
-| `confirmed` → `cancelled` por el cascade | Antes de #846 | Con #846 | Ahora |
+| `confirmed` → `cancelled` por el cascade | Antes de #846 | Con la 1ª versión de #846 | Ahora |
 |---|---|---|---|
 | `sendFcm` | 0 llamadas | **1 por turno** | 0 llamadas |
 | destinatarios | — | **`[athleteId, trainerId]`** | — |
@@ -3432,24 +3471,32 @@ futuros son 12 push al PF y 12 a un fantasma.
 
 **El arreglo, y por qué así.**
 
-1. **El guard mira lo que el write AGREGÓ al log**, no el estado final:
-   `after.cancellationLog` menos `before.cancellationLog`. Los dos caminos que
-   tocan el log usan `arrayUnion` con un elemento y las reglas acotan el
-   crecimiento a `+1` por escritura, así que lo agregado es la cola del array.
-   Mirar sólo la última entrada alcanzaría hoy, pero silenciaría **para
-   siempre** cualquier cambio de estado posterior de un turno que el cascade —o
-   la migración— ya tocó: el motivo queda en el log para siempre, el write no.
-   El escalar se sigue leyendo como legacy, porque los documentos que la CF
-   escribió antes de #846 lo tienen guardado en producción y la migración NO se
-   corrió.
-2. **El motivo es una constante exportada**, `ATHLETE_ACCOUNT_DELETED_REASON`,
-   que vive en el productor y el consumidor importa. Eran dos literales
-   iguales en dos archivos: un solo símbolo no se desincroniza en silencio.
-3. **El cascade escribe además `cancelledBy: uid`.** Con el guard sano no se
-   llega a la rama de destinatarios, pero el campo es quién canceló, está en las
-   dos allowlists (`optStrMaxLen(..., 128)` — o sea que no repite el error de
-   #846) y deja el documento con la misma forma que escribe
-   `AppointmentRepository.cancel()`.
+1. **La señal es `reason`, que el cliente no puede escribir.** Un guard es
+   control de flujo, así que la pregunta no termina en *"¿el productor y el
+   consumidor coinciden?"*. Sigue en **"¿alguien MÁS puede emitir esa señal?"**.
+   Leer el `cancellationLog` respondía que sí. La tabla es la probe, medida de
+   punta a punta:
+
+   | Cancelación del turno | Rules | `sendFcm` — guard sobre el log | `sendFcm` — guard sobre `reason` |
+   |---|---|---|---|
+   | cascade real (Admin SDK) | *(saltea)* | 0 | **0** ✅ |
+   | atleta, Path 1 legítimo | ALLOW | 0 | **1** ✅ |
+   | atleta, Path 1 + motivo FORJADO en el log | **ALLOW** | **0** ❌ | **1** ✅ |
+   | atleta o PF escribiendo `reason` | **DENY** | — | — |
+
+2. **El guard mira la ESCRITURA, no el estado final**:
+   `after.reason === … && before?.reason !== …`. El motivo queda guardado en el
+   documento para siempre, pero el write que lo puso ocurre una vez. Sin esa
+   mitad, cualquier cambio de estado posterior de un turno que el cascade ya
+   tocó quedaría mudo para siempre.
+3. **El motivo es una constante exportada**, `ATHLETE_ACCOUNT_DELETED_REASON`,
+   que vive en el productor y el consumidor importa. Eran dos literales iguales
+   en dos archivos: un solo símbolo no se desincroniza en silencio.
+4. **El cascade escribe además `cancelledBy: uid`** y la entrada del
+   `cancellationLog`. El log es el **rastro** que la app deserializa
+   (`CancellationEntry.reason`), no la señal. `cancelledBy` es quién canceló:
+   con el guard sano no se llega a la rama de destinatarios, pero sin él el
+   fallback le escribe también al fantasma.
 
 **Y el test que faltaba, que es el verdadero hallazgo.** El único caso que
 custodiaba el guard —SCENARIO-635 en `notify-appointment.test.ts`— le pasa el
@@ -3460,8 +3507,56 @@ en verde, y `ApptData = Record<string, unknown>` hizo que `tsc` tampoco
 chistara. `functions/src/__tests__/cascade/appointments-notify-contract.test.ts`
 corre el cascade REAL, toma el snapshot de antes y el de después —literalmente
 el par que `onDocumentWritten` le entrega al trigger— y se los da al handler
-REAL. Con las fuentes de #846 el test da rojo con las cifras de la tabla; con el
-fix, verde.
+REAL. Y trae además la **probe de forja**: contra el guard que leía el log da
+rojo con las cifras de la tabla; con la señal CF-only, verde.
+
+#### #846 (tercera parte) — la compuerta de la migración creía estar en el emulador
+
+`scripts/migrations/strip_appointment_reason.mjs` decidía si escribir con
+`usandoEmulador()` (`scripts/lib/target_project.js`), que hacía **OR** entre
+`FIRESTORE_EMULATOR_HOST` y `FIREBASE_AUTH_EMULATOR_HOST`. **El script escribe
+sólo en Firestore.**
+
+Medido con `--apply` y una service account falsa:
+
+| `FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099`, Firestore **no** | Antes | Ahora |
+|---|---|---|
+| lo que imprime | `emulador: sí` | `emulador: Firestore=no · Auth=sí` |
+| cartel 🚨 de producción | **no sale** | **sale** |
+| puerta "no sé el destino" | **salteada** | aplica |
+| puerta "es producción, confirmá" | **salteada** | aplica |
+| destino real de los `batch.update` | **`treino-dev`** | *(abortó antes)* |
+
+Murió recién en el canje del token, y sólo porque la key era falsa: ya le estaba
+hablando al Firestore de producción. Y no hay que buscar el escenario —esa
+variable queda exportada de una sesión de `emulator.sh` o la hereda una shell—.
+Es literalmente el modo de fallar de #826, en el script cuyo header lo cita como
+motivo de existir.
+
+**Y no es heredado.** En `origin/main` `usandoEmulador()` tiene dos llamadores y
+en los dos alimenta a `bannerDeProduccion({contraEmulador})`: **apaga un cartel,
+no cambia una decisión**, y el peor caso es no gritar. Este script fue el primero
+en ascenderla a **compuerta de escritura** sin ajustar la semántica.
+
+**El arreglo.** `usandoEmulador()` **se borró**. En su lugar,
+`emuladoresActivos(env)` devuelve el estado **por servicio** —`firestore`,
+`auth`, `storage`, `database`, sobre las cinco variables que lee el Admin SDK— y
+`contraEmuladorDe(servicios, env)` exige que estén desviados **todos** los que
+el proceso toca. Es el mismo criterio por servicio que ya aplicaba
+`scripts/lib/storage_target.js`, que hasta aborta el split-brain
+(*"Firestore apunta al EMULADOR pero Storage NO"*). Los dos entrypoints del #826
+pasaron a `contraEmuladorDe(['firestore'])`, que es estrictamente más seguro: el
+cartel sale MÁS veces, nunca menos.
+
+**Y el script pasó de cero tests a tenerlos.** Era el único consumidor del repo
+del que depende que una escritura contra producción ocurra o no.
+`scripts/test/strip_appointment_reason_gate.test.js` corre el script REAL en un
+subproceso sobre **la matriz completa de las cinco variables (32 combinaciones)**
+con `--apply`, y no mide lo que imprime sino **hasta dónde llega**: el stub tira
+`STUB_FIRESTORE_REACHED` en el primer `.collection()`, así que la ausencia del
+marcador con exit 2 es la prueba de que la compuerta frenó antes del primer
+contacto. Mutación: volviendo la compuerta al OR, **11 de 42 casos se ponen
+rojos**.
 
 #### #847 — el gate de 24 h leía el valor viejo con acceso directo
 

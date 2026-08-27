@@ -8,17 +8,17 @@
  *
  * Updates each matching doc:
  *   - `status` → 'cancelled'
- *   - `cancellationLog` → += una entrada con el motivo
+ *   - `reason` → 'athlete-account-deleted'   (señal CF→CF, ver abajo)
+ *   - `cancelledBy` → el uid del atleta
+ *   - `cancellationLog` → += una entrada con el motivo (rastro de auditoría)
  *
  * Past appointments are never touched — historical integrity preserved.
  * REQ-ACCDEL-CF-009 | ADR-ACCDEL-007
  *
- * ─── #846 — el motivo va DENTRO del log, no como campo de primer nivel ──────
+ * ─── #846 — el turno que esta CF congelaba, y por qué se cerró en las REGLAS ─
  *
- * Acá se escribía `reason: 'athlete-account-deleted'` como clave suelta del
- * documento. `reason` NO existe en `Appointment.toJson()` —sólo existe adentro
- * de `CancellationEntry`, que es un elemento del `cancellationLog`— ni está en
- * las 14 claves de `hasOnly()` de `appointmentShapeOk()` /
+ * Acá se escribía `reason: 'athlete-account-deleted'`, y `reason` no estaba en
+ * las claves de `hasOnly()` de `appointmentShapeOk()` /
  * `appointmentUpdateShapeOk()` en `firestore.rules`.
  *
  * El Admin SDK saltea las reglas, así que la escritura pasaba. El daño es lo
@@ -29,18 +29,38 @@
  * → DENY, y `allow delete: if false`. O sea nuestro propio backend fabricaba
  * turnos imborrables — la familia de #781, sembrada desde adentro.
  *
- * El motivo se mueve al `cancellationLog`, que ES el rastro de auditoría de la
- * colección, SÍ está en la allowlist, y ya tiene el campo `reason` en el
- * modelo (`CancellationEntry.reason`, `appointment.dart:25`). No agrega
- * superficie: la otra salida —meter `reason` en las dos allowlists— pedía
- * cota, pin en los DOS caminos y una clave nueva escribible por el cliente.
+ * ⚠️ La primera versión de este fix MOVÍA el motivo adentro del
+ * `cancellationLog` y sacaba la clave suelta. Se revirtió, y las dos razones
+ * están medidas:
  *
- * ⚠️ Este fix evita turnos NUEVOS congelados; NO destraba los que ya se
- * escribieron en producción, porque la clave sigue guardada en esos documentos
- * y `hasOnly()` mira el merge. Para eso está
- * `scripts/migrations/strip_appointment_reason.mjs`, que NO se corrió.
+ *  1. **El guard se volvía forjable.** `notify-appointment.ts` lee el motivo
+ *     como CONTROL DE FLUJO. Las reglas no iteran listas —está escrito en
+ *     `firestore.rules`, sobre el Path 1: *«ese sigue siendo forjable porque
+ *     las reglas no iteran listas»*—, así que el contenido de una entrada del
+ *     log NO se valida. Medido de punta a punta: un atleta autenticado cancela
+ *     SU turno por el Path 1 legítimo agregando
+ *     `{byUid, atMs, reason: 'athlete-account-deleted'}` → ALLOW, y el handler
+ *     real emite CERO push y CERO mail. El PF nunca se entera de que le
+ *     cancelaron, y es simétrico: el PF puede silenciar al atleta. Con la clave
+ *     suelta eso era IMPOSIBLE, justamente porque no estaba en `hasOnly()`.
  *
- * ─── CORRECCIÓN — `reason` SÍ se lee, y como control de flujo ───────────────
+ *  2. **Pedía una migración contra producción para destrabar lo ya escrito.**
+ *     `treino-dev` ES producción (#826) y es el único proyecto que hay.
+ *
+ * La salida es la contraria: `reason` ENTRA a las dos allowlists de
+ * `firestore.rules` y queda **pineada en los DOS caminos de cliente**
+ * (`request.resource.data.get('reason', null) == resource.data.get(...)`),
+ * más `== null` en el `create` y `delete: if false`. O sea que el cliente no
+ * la puede agregar, cambiar ni borrar por ninguna puerta, y el Admin SDK la
+ * escribe porque saltea las reglas. Los documentos que ya están en producción
+ * se destraban SOLOS con el deploy de las reglas, sin correr nada.
+ *
+ * ⚠️ Y queda dicho porque el commit anterior decía lo contrario: meter `reason`
+ * en la allowlist **NO** la vuelve «una clave nueva escribible por el cliente».
+ * Con el pin en los dos caminos es exactamente lo opuesto — es la única clave
+ * del documento que el cliente NO puede tocar, y por eso sirve de señal CF→CF.
+ *
+ * ─── `reason` SÍ se lee, y como control de flujo ────────────────────────────
  *
  * La primera versión de este header, del commit de #846 y de `docs/security.md`
  * decían que `reason` era «un dato que nadie lee». Se verificó el cliente Dart
@@ -50,12 +70,10 @@
  * deliberado, igual que el par intacto `cascade/trainer-links.ts` (escribe
  * `reason: 'account-deleted'`) ↔ `notify-link-change.ts` (lo lee).
  *
- * O sea que al sacar la clave suelta el guard quedó muerto: un atleta con 12
- * turnos futuros disparaba 12 notificaciones al PF y 12 al fantasma que acaba
- * de borrar su cuenta. Por eso el motivo se exporta acá como
- * `ATHLETE_ACCOUNT_DELETED_REASON` —un solo símbolo para productor y
- * consumidor, en vez de dos literales que se desincronizan en silencio— y por
- * eso el cascade escribe además `cancelledBy`.
+ * Por eso el motivo se exporta acá como `ATHLETE_ACCOUNT_DELETED_REASON` —un
+ * solo símbolo para productor y consumidor, en vez de dos literales que se
+ * desincronizan en silencio—, y por eso el cascade escribe además
+ * `cancelledBy` y la entrada del `cancellationLog`.
  */
 
 import * as admin from "firebase-admin";
@@ -63,13 +81,19 @@ import * as admin from "firebase-admin";
 const BATCH_SIZE = 500;
 
 /**
- * Motivo del cascade, dentro de la entrada del `cancellationLog`.
+ * Motivo del cascade. Va en la clave `reason` de primer nivel.
  *
  * CONTRATO CF→CF: `notifications/notify-appointment.ts` importa esta constante
  * y la usa de guard para NO notificar la cancelación (ADR-PN-006 /
  * REQ-PN-CF-003). No es un string decorativo: si cambia el valor, cambia el
  * comportamiento del consumidor. Vive acá —en el productor— y se importa, para
  * que renombrarlo no pueda romper el guard en silencio.
+ *
+ * Y va en `reason` y NO en el `cancellationLog` porque el guard necesita una
+ * señal que el cliente no pueda emitir: `firestore.rules` pinea `reason` en
+ * los dos caminos de cliente, y en cambio NO puede validar el contenido de una
+ * entrada del log —las reglas no iteran listas—. Un motivo escrito adentro del
+ * log lo forja cualquier miembro del turno. (#846)
  */
 export const ATHLETE_ACCOUNT_DELETED_REASON = "athlete-account-deleted";
 
@@ -111,11 +135,11 @@ export async function cancelFutureAppointments(
 
   let updated = 0;
 
-  // #846 — el motivo viaja como entrada del `cancellationLog`, que es una de
-  // las 14 claves de la allowlist de las reglas. La forma es la de
-  // `CancellationEntry` (`byUid` / `atMs` / `reason`), o sea la MISMA que
-  // escriben `AppointmentRepository.cancel()` y `cancelFutureSeries()`, para
-  // que `Appointment.fromJson` la deserialice igual que cualquier otra.
+  // #846 — la entrada del `cancellationLog` acompaña al `reason`, no lo
+  // reemplaza. La forma es la de `CancellationEntry` (`byUid` / `atMs` /
+  // `reason`), o sea la MISMA que escriben `AppointmentRepository.cancel()` y
+  // `cancelFutureSeries()`, para que `Appointment.fromJson` la deserialice
+  // igual que cualquier otra y el motivo se vea en la app.
   // `byUid` es el atleta cuya baja de cuenta disparó el cascade.
   const atMs = Date.now();
 
@@ -125,16 +149,24 @@ export async function cancelFutureAppointments(
     for (const doc of chunk) {
       batch.update(doc.ref, {
         status: "cancelled",
+        // La SEÑAL. Es la única clave del documento que el cliente no puede
+        // escribir —`firestore.rules` la pinea en los dos caminos de update y
+        // la exige `null` en el `create`—, así que cuando aparece, la escribió
+        // el Admin SDK. Eso es lo que hace confiable el guard de
+        // `notify-appointment.ts`. (#846)
+        reason: ATHLETE_ACCOUNT_DELETED_REASON,
         // `cancelledBy` es quién canceló, y acá el actor es el atleta que dio
         // de baja la cuenta. Faltaba, y no es cosmético: `notify-appointment`
         // elige el destinatario con este campo y sin él cae en
         // `[athleteId, trainerId]` —o sea le escribe también al fantasma—.
         // Con el guard sano no se llega a esa rama; esto es el segundo cierre,
         // y de paso deja el documento con la MISMA forma que escribe
-        // `AppointmentRepository.cancel()`. Está en las dos allowlists de
-        // `firestore.rules` (`optStrMaxLen(..., 128)`), así que no repite el
-        // error de #846.
+        // `AppointmentRepository.cancel()`.
         cancelledBy: uid,
+        // El RASTRO. Es lo que la app deserializa y muestra
+        // (`CancellationEntry.reason`, `appointment.dart:25`). No es la señal:
+        // el contenido de una entrada del log lo puede forjar cualquier
+        // miembro del turno, porque las reglas no iteran listas.
         cancellationLog: admin.firestore.FieldValue.arrayUnion({
           byUid: uid,
           atMs,

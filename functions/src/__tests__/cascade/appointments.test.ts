@@ -84,20 +84,27 @@ describe("SCENARIO-544: future appointment cancelled, past appointment unchanged
 
   // ─── #846 ──────────────────────────────────────────────────────────────
   //
-  // Esto asserteaba `snap.data()?.reason === 'athlete-account-deleted'`, o sea
-  // custodiaba EXACTAMENTE la escritura que congelaba el turno. `reason` no
-  // existe en `Appointment.toJson()` ni en las 14 claves de `hasOnly()` de
-  // `firestore.rules`; el Admin SDK saltea las reglas, pero `hasOnly()` corre
-  // sobre el documento MERGEADO, así que cualquier update parcial POSTERIOR
-  // del cliente arrastraba la clave y la allowlist lo rechazaba. Medido: el PF
-  // anotando ese turno → DENY, el atleta cancelándolo → DENY, y
-  // `allow delete: if false`.
+  // `reason` de primer nivel se queda, y ahora es deliberado: es la señal
+  // CF→CF que lee el guard de `notify-appointment.ts`, y es la única clave del
+  // documento que un cliente NO puede escribir —`firestore.rules` la pinea en
+  // los dos caminos de update y la exige `null` en el `create`—.
   //
-  // El motivo ahora va DENTRO del `cancellationLog`, que sí está en la
-  // allowlist y ya tiene el campo en el modelo (`CancellationEntry.reason`).
-  // Los dos casos de abajo son la pinza: el motivo sigue quedando registrado,
-  // y la clave de primer nivel NO vuelve.
-  it("#846: el motivo queda en el cancellationLog, no en una clave suelta", async () => {
+  // El bug de #846 no era la clave: era que estaba FUERA de `hasOnly()`, así
+  // que congelaba el turno (`hasOnly()` corre sobre el documento MERGEADO). Eso
+  // se cerró en las reglas, sin migración.
+  //
+  // ⚠️ El primer intento movía el motivo adentro del `cancellationLog`. Se
+  // revirtió: las reglas no iteran listas, o sea que ese motivo lo forja
+  // cualquier miembro del turno y el guard deja de ser un guard. La prueba de
+  // punta a punta está en `appointments-notify-contract.test.ts`.
+  it("#846: escribe `reason` de primer nivel — la señal que sólo emite el backend", async () => {
+    await cancelFutureAppointments(testApp, uid);
+
+    const snap = await db().collection("appointments").doc(futureId).get();
+    expect(snap.data()?.reason).toBe("athlete-account-deleted");
+  });
+
+  it("#846: y deja el motivo también en el cancellationLog, que es el rastro", async () => {
     await cancelFutureAppointments(testApp, uid);
 
     const snap = await db().collection("appointments").doc(futureId).get();
@@ -108,17 +115,16 @@ describe("SCENARIO-544: future appointment cancelled, past appointment unchanged
     expect(typeof log[0].atMs).toBe("number");
   });
 
-  it("#846: NO escribe una clave `reason` de primer nivel — la que congela el turno", async () => {
+  it("#846: no escribe ninguna clave fuera de la allowlist de las reglas", async () => {
     await cancelFutureAppointments(testApp, uid);
 
     const snap = await db().collection("appointments").doc(futureId).get();
-    expect(snap.data()?.reason).toBeUndefined();
-    // Y ninguna otra clave fuera de las 14 de la allowlist de las reglas.
+    // Las 15 de `hasOnly()`, `reason` incluida desde #846.
     const permitidas = [
       "id", "trainerId", "athleteId", "athleteDisplayName", "startsAt",
       "durationMin", "status", "cancelledAt", "cancelledBy",
       "cancellationLog", "noteBefore", "noteAfter", "recurringId",
-      "paymentId",
+      "paymentId", "reason",
       // el seed de este archivo trae `createdAt`, que es del test, no de la CF
       "createdAt",
     ];
@@ -132,6 +138,7 @@ describe("SCENARIO-544: future appointment cancelled, past appointment unchanged
 
     const snap = await db().collection("appointments").doc(pastId).get();
     expect(snap.data()?.status).toBe("confirmed");
+    expect(snap.data()?.reason).toBeUndefined();
     expect(snap.data()?.cancellationLog).toBeUndefined();
   });
 });
