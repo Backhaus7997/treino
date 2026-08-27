@@ -33,6 +33,59 @@ service cloud.firestore {
       return v == null || (v is string && v.size() <= maxLen);
     }
 
+    // ── El disyunto "no cambió" (#849, doctrina de §1.8) ──────────────────────
+    // Un chequeo de RANGO o de TIPO **incondicional** dentro de una función de
+    // forma compartida por `create` y `update` NO valida la escritura: valida
+    // el DOCUMENTO. En un `update`, `request.resource.data` es el documento
+    // RESULTANTE — el merge en un `set(merge:true)`, o el modelo entero que el
+    // cliente rearmó releyendo el doc en un `set()` completo. En los dos casos
+    // un valor legacy fuera de rango se vuelve a presentar en CADA escritura
+    // posterior, así que la cota lo rechaza para siempre: el documento queda
+    // congelado, y si el bloque además tiene `allow delete: if false`, queda
+    // imborrable. Es el error que en `appointments` se cometió cuatro veces
+    // (#831).
+    //
+    // `unchanged(d, prior, campo)` es el disyunto que lo rompe: la cota se
+    // exige SÓLO cuando el campo cambia. `prior` es `resource.data` en el
+    // update y el mapa vacío `{}` en el create, donde todo valor es nuevo y la
+    // cota rige siempre. El gate no pierde custodia: una escritura hostil
+    // CAMBIA el valor, así que sigue pagando el chequeo completo.
+    //
+    // ⚠️ POR QUÉ EL `create` SIGUE ACOTADO, que no se lee solo. En el create
+    // `prior` es `{}`, y lo ÚNICO que sostiene la cota ahí es que
+    // `{}.get(campo, null)` devuelve `null`: para cualquier valor PRESENTE en
+    // el create, `d.get(campo, null)` no es null, `unchanged` da false, y la
+    // cota se exige entera. O sea que la custodia del create no está escrita
+    // en ningún lado — se apoya en el default de un `get()` sobre el mapa
+    // vacío.
+    //
+    // Anda bien hoy y es FRÁGIL de una forma que no es obvia leyendo. Si algún
+    // día una función de forma se llama con un `prior` que no sea `{}` ni
+    // `resource.data` —un mapa con defaults, o `request.resource.data` por un
+    // copy-paste— `unchanged` empieza a dar true sobre valores FRESCOS y todas
+    // las cotas de ese bloque se apagan en silencio, sin que ningún test de
+    // update se ponga rojo. Lo primero que hay que verificar al tocar un
+    // call-site es qué es `prior` ahí.
+    //
+    // ⚠️ NO sirve para chequeos de PRESENCIA obligatoria. Con `prior` vacío y
+    // el campo ausente los dos lados dan `null`, `unchanged` da true y el
+    // requisito se saltea. Para esos (p. ej. `recordedAt`) va la forma
+    // explícita que exige `prior` no-nulo — ver `measurementShapeOk`.
+    //
+    // Los chequeos de FORMA —`keys().hasOnly()`, `keys().hasAll()`— van
+    // incondicionales.
+    //
+    // ⚠️ Las cotas de LARGO DE TEXTO **no** entran en esa categoría, aunque en
+    // este archivo se las dejó incondicionales. Una cota de largo depende del
+    // valor histórico exactamente igual que una de rango: un `notes` legacy de
+    // 3000 caracteres se re-presenta en cada `set()` del modelo completo y la
+    // cota lo rechaza. Se dejaron así por un motivo distinto —la congelación
+    // es diagnosticable y reparable por el dueño—, escrito en
+    // `measurementShapeOk`. Es la parte de QA-SEC-017 que queda abierta.
+    function unchanged(d, prior, field) {
+      return d.get(field, null) == prior.get(field, null);
+    }
+
     // ── Grafo social dirigido (change `follow-model`) ─────────────────────────
     // Domain helper a top scope A PROPÓSITO, y es la única excepción a la regla
     // de arriba: lo consumen dos bloques `match` que no se contienen entre sí
@@ -1051,10 +1104,18 @@ service cloud.firestore {
                     // present (always serverTimestamp() derived in
                     // UserPublicProfileRepository.updateCounters).
                     && (!('rachaUpdatedAt' in request.resource.data)
+                        // #849 — sin este disyunto el chequeo de TIPO valida el
+                        // DOCUMENTO y no la escritura: un doc legacy con el
+                        // campo mal tipado no se puede actualizar nunca más.
+                        || unchanged(request.resource.data, resource.data, 'rachaUpdatedAt')
                         || request.resource.data.rachaUpdatedAt is timestamp)
                     // #563: Instagram-style privacy flag — bool when
                     // present. See the create-branch comment above.
                     && (!('isProfilePublic' in request.resource.data)
+                        // #849 — sin este disyunto el chequeo de TIPO valida el
+                        // DOCUMENTO y no la escritura: un doc legacy con el
+                        // campo mal tipado no se puede actualizar nunca más.
+                        || unchanged(request.resource.data, resource.data, 'isProfilePublic')
                         || request.resource.data.isProfilePublic is bool)
                     // gymId Integrity (AD-4): when the write touches gymId,
                     // it must equal the athlete's own private gymId.
@@ -1076,6 +1137,10 @@ service cloud.firestore {
                            == getAfter(/databases/$(database)/documents/users/$(uid)).data.gymId)
                     // rankingOptIn: bool when present (Type Validation).
                     && (!('rankingOptIn' in request.resource.data)
+                        // #849 — sin este disyunto el chequeo de TIPO valida el
+                        // DOCUMENTO y no la escritura: un doc legacy con el
+                        // campo mal tipado no se puede actualizar nunca más.
+                        || unchanged(request.resource.data, resource.data, 'rankingOptIn')
                         || request.resource.data.rankingOptIn is bool)
                     // CF-Write-Only Ranking Metrics (AD-3) + Opt-In Disable
                     // exception (gym-rankings spec, AD-6 resolution): each
@@ -1112,30 +1177,90 @@ service cloud.firestore {
                         || (request.resource.data.get('rankingOptIn', true) == false
                             && resource.data.get('rankingOptIn', false) == true
                             && request.resource.data.bestDeadliftKg == null))
-                    // Type/Range Validation (AD-8): defense-in-depth bounds
-                    // when a metric is present AND is a fresh (non-pinned,
-                    // non-disable-reset) numeric write would already have
-                    // been rejected above unless it equals the stored value
-                    // or the fixed default — both of which are always within
-                    // bounds. These checks guard the stored/reasserted value
-                    // itself is well-typed, protecting against a corrupt
-                    // stored value some day being re-asserted forever.
+                    // Type/Range Validation (AD-8): cotas de defensa en
+                    // profundidad detrás del pin de arriba. Una escritura
+                    // FRESCA ya fue rechazada por el pin salvo que iguale el
+                    // valor guardado o el default fijo.
+                    //
+                    // ⚠️ Lo que estas cotas SÍ deniegan y el pin no: volver a
+                    // presentar un valor guardado que está fuera de rango. El
+                    // pin lo permite —iguala lo guardado— y la cota lo
+                    // rechazaba. Ese conjunto no está vacío, así que las cotas
+                    // NO están subsumidas por el pin. Lo que pasa es que ese
+                    // conjunto no contiene ninguna escritura hostil: contiene
+                    // TODA escritura sobre un doc legacy, que es exactamente
+                    // la congelación.
+                    //
+                    // ⚠️ #849 — el comentario anterior decía que estas cotas
+                    // protegían "contra un valor corrupto que algún día se
+                    // re-afirme para siempre". Eso describía el EFECTO al
+                    // revés: no protegían contra nada, CAUSABAN el bloqueo.
+                    // `request.resource.data` en un update es el doc mergeado
+                    // y todos los writers de esta colección son
+                    // `set(merge:true)` parciales
+                    // (`user_public_profile_repository.dart:92,116,131,140,
+                    // 150,160,278`), así que la métrica guardada se re-presenta
+                    // en CADA escritura. Con `bestSquatKg: 1200` guardado, el
+                    // dueño no podía ni cambiarse el displayName — y no podía
+                    // repararlo, porque el pin de arriba le prohíbe escribir
+                    // otro valor y `allow delete: if false` le prohíbe empezar
+                    // de cero. Documento inmovilizado de forma PERMANENTE.
+                    //
+                    // Y no es hipotético: `bestSquatKg` sale de
+                    // `familyMaxWeight` (`functions/src/ranking-aggregate.ts:95`),
+                    // que NO acota, corre con Admin SDK —o sea saltea estas
+                    // reglas— y lee setLogs que no tuvieron tope hasta
+                    // `kMaxWeightKg = 500` (2026-07-20). Antes de eso el
+                    // cliente escribía las métricas él mismo y sin cota alguna
+                    // (2026-07-03 … 2026-07-06).
+                    //
+                    // El disyunto `unchanged(...)` conserva la custodia real
+                    // —un valor que CAMBIA sigue pagando la cota entera— y
+                    // devuelve la edición de los docs legacy.
+                    //
+                    // EL TRADEOFF, escrito porque es real y no cero. Con el
+                    // disyunto, un dueño con una métrica legacy fuera de rango
+                    // puede volver a poner `rankingOptIn` en true y RE-ENTRAR
+                    // al ranking arrastrando ese valor: la query filtra por
+                    // `rankingOptIn == true`
+                    // (`user_public_profile_repository.dart:195`). Antes esa
+                    // escritura estaba denegada, pero no por un gate: por la
+                    // congelación, la misma que le prohibía cambiarse el
+                    // displayName. El fix ENTREGA ese bit a cambio de
+                    // descongelar el documento.
+                    //
+                    // Lo que lo acota, y por eso se decidió pagarlo: no es un
+                    // camino de blanqueo —el pin sigue prohibiendo escribir
+                    // cualquier OTRO valor, así que el dueño sólo arrastra el
+                    // que ya estaba guardado, que no eligió él— y ese valor lo
+                    // escribió la CF con Admin SDK, que saltea estas reglas. El
+                    // propio flip dispara `rankingAggregateOnOptIn`, que
+                    // recomputa desde `familyMaxWeight`
+                    // (`ranking-aggregate.ts:95`), que TAMPOCO acota. Esta
+                    // regla de update nunca fue lo que mantenía un valor
+                    // imposible afuera del ranking; si se quiere cerrar de
+                    // verdad, el lugar es la CF. Medido en
+                    // `legacy-doc-freeze-rules.test.ts`, fila "TRADEOFF".
                     && (!('lifetimeVolumeKg' in request.resource.data)
+                        || unchanged(request.resource.data, resource.data, 'lifetimeVolumeKg')
                         || (request.resource.data.lifetimeVolumeKg is number
                             && request.resource.data.lifetimeVolumeKg >= 0
                             && request.resource.data.lifetimeVolumeKg <= 100000000))
                     && (!('bestSquatKg' in request.resource.data)
                         || request.resource.data.bestSquatKg == null
+                        || unchanged(request.resource.data, resource.data, 'bestSquatKg')
                         || (request.resource.data.bestSquatKg is number
                             && request.resource.data.bestSquatKg >= 0
                             && request.resource.data.bestSquatKg <= 1000))
                     && (!('bestBenchKg' in request.resource.data)
                         || request.resource.data.bestBenchKg == null
+                        || unchanged(request.resource.data, resource.data, 'bestBenchKg')
                         || (request.resource.data.bestBenchKg is number
                             && request.resource.data.bestBenchKg >= 0
                             && request.resource.data.bestBenchKg <= 1000))
                     && (!('bestDeadliftKg' in request.resource.data)
                         || request.resource.data.bestDeadliftKg == null
+                        || unchanged(request.resource.data, resource.data, 'bestDeadliftKg')
                         || (request.resource.data.bestDeadliftKg is number
                             && request.resource.data.bestDeadliftKg >= 0
                             && request.resource.data.bestDeadliftKg <= 1000));
@@ -2933,7 +3058,7 @@ service cloud.firestore {
       // ⚠️  COUPLING WARNING — the hasOnly list below is the exact key set of
       // Measurement.toJson() (measurement.g.dart). Adding a field to the Dart
       // model without adding it here makes EVERY write to this collection fail.
-      function measurementShapeOk(d) {
+      function measurementShapeOk(d, prior) {
         return d.keys().hasOnly([
                  'id', 'athleteId', 'recordedBy', 'recordedAt',
                  'weightKg', 'fatPercentage', 'muscleMassKg',
@@ -2945,27 +3070,79 @@ service cloud.firestore {
                  'notes'
                ])
                && optStrMaxLen(d.get('id', null), 128)
-               && d.get('recordedAt', null) is timestamp
-               && optNumInRange(d.get('weightKg', null), 0, 500)
-               && optNumInRange(d.get('fatPercentage', null), 0, 500)
-               && optNumInRange(d.get('muscleMassKg', null), 0, 500)
-               && optNumInRange(d.get('shouldersCm', null), 0, 500)
-               && optNumInRange(d.get('chestCm', null), 0, 500)
-               && optNumInRange(d.get('waistCm', null), 0, 500)
-               && optNumInRange(d.get('hipsCm', null), 0, 500)
-               && optNumInRange(d.get('glutesCm', null), 0, 500)
-               && optNumInRange(d.get('bicepsLCm', null), 0, 500)
-               && optNumInRange(d.get('bicepsRCm', null), 0, 500)
-               && optNumInRange(d.get('bicepsFlexedLCm', null), 0, 500)
-               && optNumInRange(d.get('bicepsFlexedRCm', null), 0, 500)
-               && optNumInRange(d.get('forearmLCm', null), 0, 500)
-               && optNumInRange(d.get('forearmRCm', null), 0, 500)
-               && optNumInRange(d.get('upperThighLCm', null), 0, 500)
-               && optNumInRange(d.get('upperThighRCm', null), 0, 500)
-               && optNumInRange(d.get('midThighLCm', null), 0, 500)
-               && optNumInRange(d.get('midThighRCm', null), 0, 500)
-               && optNumInRange(d.get('calfLCm', null), 0, 500)
-               && optNumInRange(d.get('calfRCm', null), 0, 500)
+               // #849 — `recordedAt` es OBLIGATORIO, así que no puede usar
+               // `unchanged()` a secas: con `prior` vacío y el campo ausente,
+               // los dos lados darían null y el requisito se saltearía. La
+               // forma explícita exige `prior` no-nulo, de modo que el create
+               // (prior == {}) sigue pidiendo el timestamp y sólo un update
+               // que NO toca un `recordedAt` legacy mal tipado lo tolera.
+               && (d.get('recordedAt', null) is timestamp
+                   || (prior.get('recordedAt', null) != null
+                       && d.get('recordedAt', null) == prior.get('recordedAt', null)))
+               && (unchanged(d, prior, 'weightKg')
+                   || optNumInRange(d.get('weightKg', null), 0, 500))
+               && (unchanged(d, prior, 'fatPercentage')
+                   || optNumInRange(d.get('fatPercentage', null), 0, 500))
+               && (unchanged(d, prior, 'muscleMassKg')
+                   || optNumInRange(d.get('muscleMassKg', null), 0, 500))
+               && (unchanged(d, prior, 'shouldersCm')
+                   || optNumInRange(d.get('shouldersCm', null), 0, 500))
+               && (unchanged(d, prior, 'chestCm')
+                   || optNumInRange(d.get('chestCm', null), 0, 500))
+               && (unchanged(d, prior, 'waistCm')
+                   || optNumInRange(d.get('waistCm', null), 0, 500))
+               && (unchanged(d, prior, 'hipsCm')
+                   || optNumInRange(d.get('hipsCm', null), 0, 500))
+               && (unchanged(d, prior, 'glutesCm')
+                   || optNumInRange(d.get('glutesCm', null), 0, 500))
+               && (unchanged(d, prior, 'bicepsLCm')
+                   || optNumInRange(d.get('bicepsLCm', null), 0, 500))
+               && (unchanged(d, prior, 'bicepsRCm')
+                   || optNumInRange(d.get('bicepsRCm', null), 0, 500))
+               && (unchanged(d, prior, 'bicepsFlexedLCm')
+                   || optNumInRange(d.get('bicepsFlexedLCm', null), 0, 500))
+               && (unchanged(d, prior, 'bicepsFlexedRCm')
+                   || optNumInRange(d.get('bicepsFlexedRCm', null), 0, 500))
+               && (unchanged(d, prior, 'forearmLCm')
+                   || optNumInRange(d.get('forearmLCm', null), 0, 500))
+               && (unchanged(d, prior, 'forearmRCm')
+                   || optNumInRange(d.get('forearmRCm', null), 0, 500))
+               && (unchanged(d, prior, 'upperThighLCm')
+                   || optNumInRange(d.get('upperThighLCm', null), 0, 500))
+               && (unchanged(d, prior, 'upperThighRCm')
+                   || optNumInRange(d.get('upperThighRCm', null), 0, 500))
+               && (unchanged(d, prior, 'midThighLCm')
+                   || optNumInRange(d.get('midThighLCm', null), 0, 500))
+               && (unchanged(d, prior, 'midThighRCm')
+                   || optNumInRange(d.get('midThighRCm', null), 0, 500))
+               && (unchanged(d, prior, 'calfLCm')
+                   || optNumInRange(d.get('calfLCm', null), 0, 500))
+               && (unchanged(d, prior, 'calfRCm')
+                   || optNumInRange(d.get('calfRCm', null), 0, 500))
+               // #849 — `notes` queda INCONDICIONAL, y es una decisión, no un
+               // olvido. Esta cota entró en el MISMO commit que las cotas
+               // numéricas de arriba (`d1259165`, 2026-07-23) y comparte su
+               // ventana entera: el campo nunca tuvo `maxLength` en el cliente
+               // (`log_measurement_screen.dart:588`,
+               // `log_performance_test_screen.dart:506`), así que un `notes`
+               // legacy de más de 2000 caracteres es tan posible como un
+               // `sitAndReachCm: -5`, y el round-trip del formulario lo
+               // re-presenta igual. Congela el documento igual.
+               //
+               // La razón de dejarla es otra: acá la congelación es
+               // DIAGNOSTICABLE y REPARABLE por el dueño. El texto es suyo, lo
+               // ve prefilleado en el formulario, y truncarlo destraba la
+               // escritura; si no quiere truncar, esta colección permite
+               // `delete` y puede rehacer el doc. Nada de eso valía en
+               // `userPublicProfiles`, donde el pin le prohibía reparar el
+               // valor y `allow delete: if false` le prohibía empezar de cero.
+               // Y a diferencia de una cota numérica, el valor rechazado no
+               // puede confundirse con un resultado legítimo.
+               //
+               // No es gratis: se le está pidiendo a un usuario que borre
+               // texto que escribió. Por eso QA-SEC-017 queda CERRADO PARCIAL
+               // mientras estas dos líneas sigan incondicionales — §4.14, "Lo
+               // que queda abierto".
                && optStrMaxLen(d.get('notes', null), 2000);
       }
 
@@ -3005,7 +3182,7 @@ service cloud.firestore {
                     // QA #508 — value shape. Placed BEFORE the branch below so
                     // a malformed doc is rejected without paying for the role
                     // get() on the trainer path.
-                    && measurementShapeOk(request.resource.data)
+                    && measurementShapeOk(request.resource.data, {})
                     && (
                          // Athlete-self branch: may log ONLY about themselves.
                          request.resource.data.athleteId == request.auth.uid
@@ -3016,7 +3193,7 @@ service cloud.firestore {
                     && resource.data.recordedBy == request.auth.uid
                     && request.resource.data.recordedBy == resource.data.recordedBy
                     && request.resource.data.athleteId == resource.data.athleteId
-                    && measurementShapeOk(request.resource.data);
+                    && measurementShapeOk(request.resource.data, resource.data);
       allow delete: if request.auth != null
                     && resource.data.recordedBy == request.auth.uid;
     }
@@ -3048,7 +3225,7 @@ service cloud.firestore {
       // ⚠️  COUPLING WARNING — the hasOnly list below is the exact key set of
       // PerformanceTest.toJson() (performance_test.g.dart). Adding a field to
       // the Dart model without adding it here makes EVERY write fail.
-      function performanceTestShapeOk(d) {
+      function performanceTestShapeOk(d, prior) {
         return d.keys().hasOnly([
                  'id', 'athleteId', 'recordedBy', 'recordedAt',
                  'cmjCm', 'squatJumpCm', 'abalakovCm', 'broadJumpCm',
@@ -3060,24 +3237,53 @@ service cloud.firestore {
                  'notes'
                ])
                && optStrMaxLen(d.get('id', null), 128)
-               && d.get('recordedAt', null) is timestamp
-               && optPositiveNum(d.get('cmjCm', null), 100000)
-               && optPositiveNum(d.get('squatJumpCm', null), 100000)
-               && optPositiveNum(d.get('abalakovCm', null), 100000)
-               && optPositiveNum(d.get('broadJumpCm', null), 100000)
-               && optPositiveNum(d.get('sprint10mS', null), 100000)
-               && optPositiveNum(d.get('sprint20mS', null), 100000)
-               && optPositiveNum(d.get('sprint30mS', null), 100000)
-               && optPositiveNum(d.get('sprint40mS', null), 100000)
-               && optPositiveNum(d.get('squat1rmKg', null), 100000)
-               && optPositiveNum(d.get('benchPress1rmKg', null), 100000)
-               && optPositiveNum(d.get('deadlift1rmKg', null), 100000)
-               && optPositiveNum(d.get('overheadPress1rmKg', null), 100000)
-               && optPositiveNum(d.get('pullUp1rmKg', null), 100000)
-               && optPositiveNum(d.get('vo2maxMlKgMin', null), 100000)
-               && optPositiveNum(d.get('courseNavetteLevel', null), 100000)
-               && optPositiveNum(d.get('cooperMeters', null), 100000)
-               && optPositiveNum(d.get('sitAndReachCm', null), 100000)
+               // #849 — mismo motivo que en `measurementShapeOk`: presencia
+               // obligatoria, así que la forma explícita y no `unchanged()`.
+               && (d.get('recordedAt', null) is timestamp
+                   || (prior.get('recordedAt', null) != null
+                       && d.get('recordedAt', null) == prior.get('recordedAt', null)))
+               && (unchanged(d, prior, 'cmjCm')
+                   || optPositiveNum(d.get('cmjCm', null), 100000))
+               && (unchanged(d, prior, 'squatJumpCm')
+                   || optPositiveNum(d.get('squatJumpCm', null), 100000))
+               && (unchanged(d, prior, 'abalakovCm')
+                   || optPositiveNum(d.get('abalakovCm', null), 100000))
+               && (unchanged(d, prior, 'broadJumpCm')
+                   || optPositiveNum(d.get('broadJumpCm', null), 100000))
+               && (unchanged(d, prior, 'sprint10mS')
+                   || optPositiveNum(d.get('sprint10mS', null), 100000))
+               && (unchanged(d, prior, 'sprint20mS')
+                   || optPositiveNum(d.get('sprint20mS', null), 100000))
+               && (unchanged(d, prior, 'sprint30mS')
+                   || optPositiveNum(d.get('sprint30mS', null), 100000))
+               && (unchanged(d, prior, 'sprint40mS')
+                   || optPositiveNum(d.get('sprint40mS', null), 100000))
+               && (unchanged(d, prior, 'squat1rmKg')
+                   || optPositiveNum(d.get('squat1rmKg', null), 100000))
+               && (unchanged(d, prior, 'benchPress1rmKg')
+                   || optPositiveNum(d.get('benchPress1rmKg', null), 100000))
+               && (unchanged(d, prior, 'deadlift1rmKg')
+                   || optPositiveNum(d.get('deadlift1rmKg', null), 100000))
+               && (unchanged(d, prior, 'overheadPress1rmKg')
+                   || optPositiveNum(d.get('overheadPress1rmKg', null), 100000))
+               && (unchanged(d, prior, 'pullUp1rmKg')
+                   || optPositiveNum(d.get('pullUp1rmKg', null), 100000))
+               && (unchanged(d, prior, 'vo2maxMlKgMin')
+                   || optPositiveNum(d.get('vo2maxMlKgMin', null), 100000))
+               && (unchanged(d, prior, 'courseNavetteLevel')
+                   || optPositiveNum(d.get('courseNavetteLevel', null), 100000))
+               && (unchanged(d, prior, 'cooperMeters')
+                   || optPositiveNum(d.get('cooperMeters', null), 100000))
+               && (unchanged(d, prior, 'sitAndReachCm')
+                   || optPositiveNum(d.get('sitAndReachCm', null), 100000))
+               // #849 — `notes` queda INCONDICIONAL por la misma decisión y
+               // el mismo motivo que en `measurementShapeOk`, donde está el
+               // argumento entero: la cota entró en el mismo commit que las
+               // numéricas (`d1259165`), comparte su ventana —el campo nunca
+               // tuvo `maxLength` en `log_performance_test_screen.dart:506`— y
+               // congela igual, pero acá la congelación es reparable por el
+               // dueño. No se repite el razonamiento a propósito: dos copias
+               // se desincronizan. Es lo que deja QA-SEC-017 en PARCIAL.
                && optStrMaxLen(d.get('notes', null), 2000);
       }
 
@@ -3094,12 +3300,12 @@ service cloud.firestore {
                     && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'trainer'
                     && request.resource.data.athleteId is string
                     && request.resource.data.athleteId.size() > 0
-                    && performanceTestShapeOk(request.resource.data);
+                    && performanceTestShapeOk(request.resource.data, {});
       allow update: if request.auth != null
                     && resource.data.recordedBy == request.auth.uid
                     && request.resource.data.recordedBy == resource.data.recordedBy
                     && request.resource.data.athleteId == resource.data.athleteId
-                    && performanceTestShapeOk(request.resource.data);
+                    && performanceTestShapeOk(request.resource.data, resource.data);
       allow delete: if request.auth != null
                     && resource.data.recordedBy == request.auth.uid;
     }
@@ -3152,9 +3358,22 @@ service cloud.firestore {
                   && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
                        'amountArs', 'cadence', 'updatedAt'
                      ])
-                  && request.resource.data.amountArs is int
-                  && request.resource.data.amountArs > 0
-                  && request.resource.data.amountArs <= 100000000
+                  // #849 — `affectedKeys()` acota lo que la escritura CAMBIA,
+                  // pero la cota de abajo corre sobre el doc POST-merge igual.
+                  // `setConfig` reescribe siempre los tres campos con el modelo
+                  // releído (`billing_repository.dart:25`,
+                  // `athlete_detail_screen.dart:1243` prefillea el monto
+                  // guardado), así que un `amountArs` legacy por encima del tope
+                  // se re-presentaba en cada guardado y congelaba el doc: el PF
+                  // no podía ni cambiar la cadencia. El monto es un campo de
+                  // texto libre SIN tope en el cliente y la regla llegó el
+                  // 2026-07-21, con el modelo desde el 2026-06-03 — la ventana
+                  // existió. `cadence` y `updatedAt` NO se condicionan: salen de
+                  // un enum y de `DateTime.now()`, nunca tuvieron ventana.
+                  && (unchanged(request.resource.data, resource.data, 'amountArs')
+                      || (request.resource.data.amountArs is int
+                          && request.resource.data.amountArs > 0
+                          && request.resource.data.amountArs <= 100000000))
                   && request.resource.data.cadence in ['mensual', 'semanal', 'por_sesion', 'suelto']
                   && request.resource.data.updatedAt is timestamp;
       allow delete: if request.auth != null && resource.data.trainerId == request.auth.uid;
