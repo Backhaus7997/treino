@@ -27,14 +27,19 @@
  * RESPUESTA. Cerrarlo pide un delay constante artificial; se documenta en vez
  * de fingir que no esta.
  *
- * ESTADO: SHELVED — no se exporta desde index.ts todavia.
+ * ESTADO: desplegado, pero EL CLIENTE TODAVIA NO LO LLAMA.
+ *
+ * `AuthService.sendPasswordResetEmail` y `sendEmailVerification`
+ * (lib/features/auth/data/auth_service.dart:121 y :130) siguen yendo a
+ * FirebaseAuth directo, asi que los mails de recuperacion aun salen por las
+ * plantillas default. Es a proposito: `treino-dev` es produccion y el padron de
+ * Auth es uno solo, no hay donde ensayar. Primero se comprueba a mano que estos
+ * callables mandan bien, y recien despues se migra el cliente — sobre un flujo
+ * donde el usuario ya esta afuera de su cuenta, ese orden no es opcional.
  *
  * `requestPasswordReset` es un endpoint SIN autenticar que escribe en
- * Firestore. Desplegarlo antes de que el dominio del remitente este verificado
- * por DNS en Resend deja superficie de abuso a cambio de nada: el mail se
- * encola y despues falla con 403. Se activa el mismo dia que el dominio,
- * descomentando el export en index.ts. Ver el comentario de
- * `mail/send-queued-mail.ts`.
+ * Firestore. Se publico recien cuando `send.gettreino.com` quedo verificado en
+ * Resend: antes habria encolado mail que despues fallaba con 403.
  */
 
 import * as admin from "firebase-admin";
@@ -242,11 +247,20 @@ export async function runRequestEmailVerification(
 //
 // POR QUE
 //
-// App Check en Android no emite atestacion valida. Medido sobre los logs de
+// El cliente Android no emite atestacion valida HOY. Medido sobre los logs de
 // `mintWatchCredential` el 2026-08-25: iPhone 8 VALID / 2 INVALID, Android
 // 1 VALID / 8 INVALID. Con el flag puesto, un usuario de Android no podria
 // resetear su contraseña — y es el peor flujo posible para romper, porque el
 // que lo necesita ya esta afuera de su cuenta.
+//
+// PRECISION (2026-08-27): decir "App Check en Android esta roto" seria pasarse
+// de la evidencia. Esos 8 INVALID salieron de APKs SIDELOADEADOS, que no
+// pueden atestar por construccion — Play Integrity devuelve
+// UNRECOGNIZED_VERSION para binarios que Play no distribuyo. No sabemos si
+// Play Integrity funciona en este proyecto: nunca se probo en una
+// configuracion capaz de ganar. Lo que si esta medido, y es lo unico que hace
+// falta para justificar la ausencia del flag, es que el cliente Android que
+// existe hoy no atesta. Ver docs/security.md §4.8.2.
 //
 // Es la misma piedra que el repo ya piso dos veces. `deleteAccount` tuvo el
 // flag desde el 2026-07-20 y en ese lapso el borrado no funciono NUNCA: cero
@@ -268,9 +282,27 @@ export async function runRequestEmailVerification(
 // CONDICION DE SALIDA
 //
 // Que el cliente emita atestacion valida en las DOS plataformas. Contar sobre
-// `jsonPayload.verifications.app` en Cloud Logging y pedir cero INVALID por
-// plataforma. Cuando eso pase, vuelven los tres callables juntos: este,
-// `deleteAccount` y `mintWatchCredential`.
+// `jsonPayload.verifications.app` en Cloud Logging, SCOPEADO A INSTALACIONES
+// DE PLAY / APP STORE CON BUILD DE RELEASE.
+//
+// El scope no es un detalle de redaccion (corregido el 2026-08-27). Pedir
+// "cero INVALID por plataforma" a secas NO SE PUEDE CUMPLIR NUNCA: el log
+// mezcla dispositivos de desarrollo con usuarios reales, y mientras alguien
+// corra `flutter run` en un Android va a haber INVALID. Sin el scope, esta
+// exencion se vuelve permanente por omision — que es justo lo que el registry
+// de `appcheck-enforcement.test.ts` existe para evitar.
+//
+// LOS TRES NO VUELVEN CON UN SOLO INTERRUPTOR. Comparten la causa, no el
+// umbral, y este es el que VUELVE ULTIMO. Es el unico de los tres cuyo fallo
+// no tiene workaround del lado del usuario: si `deleteAccount` se rompe, un
+// boton no anda; si `mintWatchCredential` se rompe, el reloj no vincula. Si
+// esto se rompe, alguien que ya no puede entrar a su cuenta se queda sin
+// forma de recuperarla, y no se entera nadie — App Check corta en la capa de
+// transporte, sin log de aplicacion ni excepcion que capturar.
+//
+// (`deleteAccount` pide otra cosa, no menos: monitoreo activo del ratio
+// VALID/INVALID despues del deploy, porque lo que se cae ahi es Apple
+// Guideline 5.1.1(v). Ver el bloque PARA RESTAURARLO de `delete-account.ts`.)
 //
 // Los dos van a southamerica-east1 como el resto de las CFs de TREINO.
 // ---------------------------------------------------------------------------
