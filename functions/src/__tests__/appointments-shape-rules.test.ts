@@ -2531,3 +2531,171 @@ describe("appointments update — el gate de 24 h sigue mordiendo (#847)", () =>
   });
 });
 
+/**
+ * #850 — los 10 gates de `appointmentShapeOk()` que nadie custodiaba.
+ *
+ * Del barrido de mutación en serio de #831: los **42 conjuntos** de
+ * `appointmentShapeOk()` / `appointmentUpdateShapeOk()`, uno por uno,
+ * reemplazados por `true` de a UNO SOLO, corriendo esta suite entre cada
+ * mutación. #831 cerró 7 de las 25 filas que daban 0 rojos; estas 10 quedaban
+ * **borrables con la suite entera en verde**, y cada una con su daño medido —
+ * o sea que no son ceros por gate SUBSUMIDO, son ceros por gate SIN CUSTODIA.
+ *
+ * ⚠️ Las reglas están bien escritas: ninguna de estas escrituras pasa hoy. Lo
+ * que faltaba es que borrar el gate ponga rojo a alguien, porque si no un
+ * refactor futuro lo saca sin enterarse. Es literalmente lo que le pasó a
+ * `cancelledBy == null` y a `athleteDisplayName <= 200` antes de #831.
+ *
+ * ─── Por qué el payload de cada caso es EXACTAMENTE ése ─────────────────────
+ *
+ * La suite YA tenía negativos para varios de estos campos, y pasaban **por el
+ * motivo equivocado**: con `athleteId: 12345` y el `is string` borrado, la
+ * regla no se afloja — `12345.size()` no evalúa y falla cerrado igual. El
+ * ataque que mide el gate es el que **sobrevive a su ausencia**, y para los
+ * `is string` eso es una LISTA: `['x'].size()` da 1, así que sin el `is string`
+ * entra. Es la misma pregunta que destapó el `cancellationLog` en la sexta
+ * pasada de #831: **¿esta cota chequea el TIPO, o sólo una propiedad que varios
+ * tipos comparten?**
+ *
+ * `athleteDisplayName: []` es el más interesante de los diez: una lista vacía
+ * mide 0, o sea cumple `<= 200`, y el campo es `required String` en el modelo.
+ * Sin el `is string`, `Appointment.fromJson` explota y **una sola fila rompe el
+ * stream entero** de `watchForTrainer` y `watchForAthlete`.
+ *
+ * ─── Y por qué el disyunto importa ──────────────────────────────────────────
+ *
+ * Los ataques sobre `athleteId` van por el camino del PF con rol
+ * (`TRAINER_BOOKER`), no por el del atleta: el disyunto del atleta compara
+ * `athleteId == request.auth.uid` y se cae AHÍ, antes de llegar a la forma —
+ * el "negativo que no avisa" de #837. Los de `trainerId` van al revés, por el
+ * disyunto del atleta, que deja `trainerId` libre.
+ */
+describe("appointments create — los 10 gates sin custodia (#850)", () => {
+  // ── athleteId: por el disyunto del PF, que lo deja libre ────────────────
+
+  it("DENIEGA un athleteId que es una LISTA — `['x']` mide 1 y esquiva las cotas", async () => {
+    await assertFails(
+      setDoc(
+        doc(dbAs(TRAINER_BOOKER), COL, "g-athleteid-list"),
+        appointment({
+          id: "g-athleteid-list",
+          trainerId: TRAINER_BOOKER,
+          athleteId: ["x"],
+        })
+      )
+    );
+  });
+
+  it("DENIEGA un athleteId vacío", async () => {
+    await assertFails(
+      setDoc(
+        doc(dbAs(TRAINER_BOOKER), COL, "g-athleteid-vacio"),
+        appointment({
+          id: "g-athleteid-vacio",
+          trainerId: TRAINER_BOOKER,
+          athleteId: "",
+        })
+      )
+    );
+  });
+
+  it("DENIEGA un athleteId de 200 caracteres — la cota de 128", async () => {
+    await assertFails(
+      setDoc(
+        doc(dbAs(TRAINER_BOOKER), COL, "g-athleteid-largo"),
+        appointment({
+          id: "g-athleteid-largo",
+          trainerId: TRAINER_BOOKER,
+          athleteId: "x".repeat(200),
+        })
+      )
+    );
+  });
+
+  // ── trainerId: por el disyunto del atleta, que lo deja libre ────────────
+
+  it("DENIEGA un trainerId que es una LISTA", async () => {
+    await assertFails(
+      setDoc(
+        doc(dbAs(ATHLETE), COL, "g-trainerid-list"),
+        appointment({ id: "g-trainerid-list", trainerId: ["x"] })
+      )
+    );
+  });
+
+  it("DENIEGA un trainerId de 200 caracteres — la cota de 128", async () => {
+    await assertFails(
+      setDoc(
+        doc(dbAs(ATHLETE), COL, "g-trainerid-largo"),
+        appointment({ id: "g-trainerid-largo", trainerId: "x".repeat(200) })
+      )
+    );
+  });
+
+  // ── athleteDisplayName ─────────────────────────────────────────────────
+
+  it("DENIEGA un athleteDisplayName que es una LISTA VACÍA — mide 0 y cumple `<= 200`", async () => {
+    // El campo es `required String` en el modelo: sin el `is string`, esta
+    // fila rompe la deserialización del snapshot entero del PF.
+    await assertFails(
+      setDoc(
+        doc(dbAs(ATHLETE), COL, "g-nombre-list"),
+        appointment({ id: "g-nombre-list", athleteDisplayName: [] })
+      )
+    );
+  });
+
+  // ── id ─────────────────────────────────────────────────────────────────
+
+  it("DENIEGA un id que es una LISTA — el `12` de antes no medía el gate", async () => {
+    await assertFails(
+      setDoc(
+        doc(dbAs(ATHLETE), COL, "g-id-list"),
+        appointment({ id: ["x"] })
+      )
+    );
+  });
+
+  it("DENIEGA un id vacío", async () => {
+    await assertFails(
+      setDoc(doc(dbAs(ATHLETE), COL, "g-id-vacio"), appointment({ id: "" }))
+    );
+  });
+
+  // ── durationMin ────────────────────────────────────────────────────────
+
+  it("DENIEGA un durationMin double — `60.5` está DENTRO del rango 1..600", async () => {
+    // El negativo que ya existía usaba 100000, o sea medía `<= 600`. Este
+    // valor pasa las dos cotas de rango: lo único que lo frena es el `is int`.
+    await assertFails(
+      setDoc(
+        doc(dbAs(ATHLETE), COL, "g-duration-double"),
+        appointment({ id: "g-duration-double", durationMin: 60.5 })
+      )
+    );
+  });
+
+  it("DENIEGA un durationMin en cero — el borde inferior", async () => {
+    await assertFails(
+      setDoc(
+        doc(dbAs(ATHLETE), COL, "g-duration-cero"),
+        appointment({ id: "g-duration-cero", durationMin: 0 })
+      )
+    );
+  });
+
+  it("permite el turno legítimo con los mismos campos — ancla de no-vacuidad de los diez", async () => {
+    await assertSucceeds(
+      setDoc(
+        doc(dbAs(TRAINER_BOOKER), COL, "g-ancla"),
+        appointment({
+          id: "g-ancla",
+          trainerId: TRAINER_BOOKER,
+          athleteId: "atleta-cualquiera",
+          athleteDisplayName: "Ana",
+          durationMin: 60,
+        })
+      )
+    );
+  });
+});
