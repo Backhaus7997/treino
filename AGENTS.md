@@ -222,6 +222,16 @@ pagos, turnos, mediciones, chats y perfiles comerciales publicados.
   [scripts/README.md](./scripts/README.md).
 - Para desarrollo local **usá el emulador**, no el proyecto real:
   `./scripts/emulator.sh` + `flutter run --dart-define=USE_EMULATOR=true`.
+- **La credencial del Admin SDK no vive adentro del repo** (#834). Los 44
+  scripts de `scripts/` inicializan Firebase por `scripts/lib/admin.js` y por
+  ningún otro lado: la ruta sale de `$TREINO_SA_KEY` (o de
+  `$GOOGLE_APPLICATION_CREDENTIALS`, con las mismas reglas) y cualquier ruta
+  adentro de un árbol de git —el repo, un worktree, un repo de dotfiles— se
+  rechaza antes de inicializar nada. Sin variable, fallan cerrado con la
+  migración en el mensaje. Un script nuevo **de primer nivel** que se saltee la
+  frontera lo frena `scripts/test/frontera.test.js`; los de subdirectorios
+  (`migrations/`) todavía no están cubiertos. Migración y detalle:
+  [scripts/README.md](./scripts/README.md#credenciales--la-frontera-834).
 - Backup: hay un schedule diario de Firestore con 28 días de retención
   (`firebase firestore:backups:schedules:list --project prod`).
   **No cubre Cloud Storage ni los usuarios de Auth.**

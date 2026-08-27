@@ -27,10 +27,9 @@
  * Imprime un cartel antes del primer write cuando el destino es producción. (#826)
  */
 
-const admin = require('firebase-admin');
-// El cartel va ANTES de `initializeApp()`: lo que frena a alguien tiene que
-// estar en pantalla antes del primer write, no después. `npm run promote:trainer`
-// no nombra el proyecto en ningún lado — lo resuelve el SDK desde el entorno. (#826)
+// El cartel va ANTES de inicializar: lo que frena a alguien tiene que estar en
+// pantalla antes del primer write, no después. `npm run promote:trainer` no
+// nombra el proyecto en ningún lado — lo resuelve el SDK desde el entorno. (#826)
 const { bannerDeProduccion } = require('./lib/firebase_projects');
 const { contraEmuladorDe, projectIdObjetivo } = require('./lib/target_project');
 // #846 — `contraEmuladorDe(['firestore'])`, no el `usandoEmulador()` que hacía
@@ -43,7 +42,12 @@ const bannerProd = bannerDeProduccion(projectIdObjetivo(), {
   contraEmulador: contraEmuladorDe(['firestore']),
 });
 if (bannerProd) console.warn(bannerProd);
-admin.initializeApp();
+
+// Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla cerrado
+// con la migración; contra el emulador no pide nada. Ver scripts/lib/admin.js.
+const { inicializarAdmin } = require('./lib/admin');
+
+const { admin } = inicializarAdmin();
 const db = admin.firestore();
 
 async function run() {

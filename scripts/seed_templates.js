@@ -14,7 +14,7 @@
  * DRY-RUN por default. Para aplicar: --write.
  *
  * Uso:
- *   GOOGLE_APPLICATION_CREDENTIALS=scripts/sa-key.json \
+ *   TREINO_SA_KEY=~/.config/treino/sa-key.json \
  *   NODE_PATH=functions/node_modules \
  *   node scripts/seed_templates.js            # dry-run
  *   ... node scripts/seed_templates.js --write
@@ -58,8 +58,9 @@ async function main() {
     return;
   }
 
-  const admin = require('firebase-admin');
-  admin.initializeApp();
+  // Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla
+  // cerrado; contra el emulador no pide nada. Ver scripts/lib/admin.js.
+  const { admin } = require('./lib/admin').inicializarAdmin();
   const db = admin.firestore();
   for (const t of templates) {
     const doc = { ...t, source: 'system', visibility: 'public' };

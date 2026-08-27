@@ -13,8 +13,8 @@
  *       --catalog=/path/docs/video-catalog-audit/enriched-catalog.json \
  *       --out=/path/thumbs
  *
- *   FASE B — upload + patch Firestore (requiere sa-key o emulador):
- *     GOOGLE_APPLICATION_CREDENTIALS=scripts/sa-key.json \
+ *   FASE B — upload + patch Firestore (requiere credencial o emulador):
+ *     TREINO_SA_KEY=~/.config/treino/sa-key.json \
  *       node extract_exercise_thumbnails.js --upload --thumbs=/path/thumbs [--dry-run]
  *
  * Detalles de la fase A:
@@ -26,9 +26,9 @@
  *   - 256x256 JPEG (~8-15 KB). Resumible: saltea los .jpg ya generados.
  *   - Reporta fallas en <out>/failures.csv y resumen al final.
  *
- * Fase B (patrón backfill_athlete_counts.js post-#490: nunca sa-key incondicional):
+ * Fase B (pasa por la frontera de #834, como todo `scripts/`):
  *   - Contra emulador: FIRESTORE_EMULATOR_HOST seteado -> no exige credenciales.
- *   - Contra prod: exige GOOGLE_APPLICATION_CREDENTIALS.
+ *   - Contra prod: exige `$TREINO_SA_KEY` apuntando AFUERA del repo.
  *   - Sube exercises/thumbs/{id}.jpg al bucket con download token (mismo esquema
  *     que upload_enriched_videos.js) y setea `thumbnailUrl` en exercises/{id}.
  *   - La app ignora campos desconocidos en fromJson: escribir thumbnailUrl es
@@ -158,20 +158,22 @@ async function upload() {
   // aborta. La etiqueta que se imprime más abajo sale de acá, así que ya no
   // puede desmentir a lo que el script hace — es el mismo objeto.
   const destino = exigirDestinoCoherente({ argv: args });
-  const { bucket: BUCKET, contraEmulador } = destino;
+  const { bucket: BUCKET } = destino;
 
-  if (!contraEmulador && !process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    console.error(
-      'Contra producción hace falta GOOGLE_APPLICATION_CREDENTIALS=scripts/sa-key.json\n' +
-      '(o el emulador COMPLETO: FIRESTORE_EMULATOR_HOST + FIREBASE_STORAGE_EMULATOR_HOST).',
-    );
-    process.exit(1);
-  }
-
-  const admin = require('firebase-admin');
-  // `projectId` explícito: contra emulador no hay credenciales de donde sacarlo,
-  // y sin él el Admin SDK muere con un error mucho menos legible que el nuestro.
-  admin.initializeApp({ storageBucket: BUCKET, projectId: destino.projectId });
+  // Credenciales: la única puerta (#834). Reemplaza al guard propio que estaba
+  // acá, que exigía `GOOGLE_APPLICATION_CREDENTIALS` a mano y encima mandaba a
+  // guardar la clave EN `scripts/` — justo la ruta que #834 rechaza. El chequeo
+  // no se pierde: `inicializarAdmin` falla cerrado sin credencial contra la
+  // nube y no pide ninguna contra el emulador, que es lo que aquel `if`
+  // aproximaba leyendo una env var suelta.
+  //
+  // Por eso `contraEmulador` ya no se destructura: existía sólo para ese `if`.
+  // `projectId` sí sigue explícito, por el motivo de #838 — contra el emulador
+  // no hay credencial de donde sacarlo.
+  const { admin } = require('./lib/admin').inicializarAdmin({
+    projectId: destino.projectId,
+    extra: { storageBucket: BUCKET },
+  });
   const db = admin.firestore();
   const bucket = admin.storage().bucket();
 

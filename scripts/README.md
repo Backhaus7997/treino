@@ -31,43 +31,241 @@ Admin SDK utilities operated by the team against `treino-dev`.
 > explicit maintainer sign-off, and `--dry-run` first where the script supports
 > it. → [AGENTS.md → Entornos](../AGENTS.md#-entornos--leer-antes-de-correr-cualquier-comando) · issue #826.
 
-## Prerequisites
+## Credenciales — la frontera (#834)
 
-- Service-account JSON at **`scripts/sa-key.json`** (gitignored). That is the
-  name the code actually uses: 19 scripts `require('./sa-key.json')` directly
-  and another ~15 document it as the `GOOGLE_APPLICATION_CREDENTIALS` target.
-  Save the key from the Firebase Console under exactly that name or those
-  scripts fail with a "sa-key.json not found" error.
-  > A handful of older script headers still say
-  > `treino-dev-service-account.json` (the pre-`sa-key` name — also gitignored,
-  > via `.gitignore:52`). It is the same key; only the filename differs, and
-  > only the scripts that read `GOOGLE_APPLICATION_CREDENTIALS` accept it.
-  > Nothing `require`s it. (#826)
-- `GOOGLE_APPLICATION_CREDENTIALS` env var pointing at that file, for the
-  scripts that read it instead of `require`-ing the key:
-  ```sh
-  export GOOGLE_APPLICATION_CREDENTIALS="scripts/sa-key.json"
-  # Windows PowerShell:
-  $env:GOOGLE_APPLICATION_CREDENTIALS = "scripts\sa-key.json"
-  ```
-- `firebase-admin` installed in `scripts/`:
-  ```sh
-  cd scripts && npm install
-  ```
+> **La clave del Admin SDK no vive adentro del repo.** Ni en el repo raíz, ni en
+> un worktree, ni en ningún árbol de git.
 
-### Running against the emulator (no service-account key)
+Los headers viejos que todavía nombran `treino-dev-service-account.json` (el
+nombre pre-`sa-key`) hablan de la MISMA clave; sólo cambia el nombre del
+archivo, y ahora tampoco puede vivir adentro del repo. (#826)
 
-**21 of the 43 scripts** here branch on `FIRESTORE_EMULATOR_HOST` **before**
-loading `sa-key.json`. For those, setting the variable initializes against the
-local emulator (`projectId: 'treino-dev'`, which here is just the emulator's
-namespace) with no credentials at all:
+La clave que usaban estos scripts es la de
+`firebase-adminsdk-fbsvc@treino-dev.iam.gserviceaccount.com`: permisos amplios
+sobre el proyecto donde viven los usuarios REALES (`treino-dev` **es**
+producción, #826). Estaba en `scripts/sa-key.json` con permisos `644` —
+legible por cualquier proceso del usuario y alcanzable con
+`../../../scripts/sa-key.json` desde cualquiera de los ~27 worktrees de agente
+que corren en paralelo.
+
+**Los 44 scripts de `scripts/` pasan por dos archivos, y sólo por esos dos.**
+Antes eran 21 de 43 los que ramificaban en `FIRESTORE_EMULATOR_HOST` antes de
+cargar la clave; ahora ramifican **todos**, en un solo lugar (#834).
+
+
+| | |
+|---|---|
+| `lib/credenciales.js` | **decide**: de dónde puede salir una credencial y si esa credencial es producción. Sin dependencias, testeado entero con stubs. |
+| `lib/admin.js` | **aplica**: es el único que llama a `initializeApp`. Los scripts hacen `inicializarAdmin()` y nada más. |
+
+Las reglas:
+
+- La ruta sale de `$TREINO_SA_KEY` o de `$GOOGLE_APPLICATION_CREDENTIALS`.
+  **No hay default.** Sin ninguna de las dos se falla ruidosamente, con la
+  migración completa en el mensaje.
+- `GOOGLE_APPLICATION_CREDENTIALS` está aceptada porque el ADC de Google **la
+  lee por su cuenta**, adentro de la librería. Ignorarla habría dejado la
+  frontera decorativa: `GOOGLE_APPLICATION_CREDENTIALS=scripts/sa-key.json`
+  seguiría cargando la clave desde adentro del repo. Se valida con las **mismas
+  reglas** y antes de inicializar nada. Si las dos están y apuntan a archivos
+  distintos, se frena: son dos identidades en el mismo proceso.
+- Cualquier ruta adentro de un árbol de git se **rechaza**, exista o no el
+  archivo. (`.git` se detecta como entrada, no como directorio: en un worktree
+  es un archivo.)
+- La identidad que se verifica es la **efectiva** — el `client_email` de la
+  credencial que se cargó —, no el project id declarado. Ver más abajo.
+- El camino del emulador no toca nada de esto: **sin credencial, anda**. La
+  única excepción: una variable apuntando adentro de un árbol de git se rechaza
+  igual. `FIRESTORE_EMULATOR_HOST` desvía **Firestore y nada más** — Storage y
+  Auth de Admin siguen yendo a la nube, así que eso sería producción disfrazada
+  de local. Una variable vieja o rota, en cambio, no frena nada.
+- **Emulador significa `FIRESTORE_EMULATOR_HOST`, ni más ni menos.** Las otras
+  tres variables de emulador no desvían Firestore; un ambiente que las tenga sin
+  ésa **aborta**. Ver "Sin credencial: el emulador".
+
+Lo que impide que el próximo script nazca salteándose todo esto es
+`test/frontera.test.js`: escanea los archivos **de primer nivel** de `scripts/`
+y falla si aparece un `initializeApp`, un `credential.cert`, un `sa-key.json` o
+una lectura de `GOOGLE_APPLICATION_CREDENTIALS` fuera de `lib/`.
+
+**Lo que todavía NO cubre: los subdirectorios.**
+`scripts/migrations/strip_appointment_reason.mjs` (#846) inicializa con
+`admin.credential.applicationDefault()` por su cuenta. No es el agujero de #834
+—no lee nada de adentro del repo, y su header manda a
+`export GOOGLE_APPLICATION_CREDENTIALS="$TREINO_SA_KEY"`—, pero **tampoco pasa
+por la validación de árbol de git**: un `GOOGLE_APPLICATION_CREDENTIALS`
+apuntando a `scripts/sa-key.json` lo cargaría igual. Queda anotado acá en vez de
+tapado con una excepción en el trinquete, que sería un trinquete con un agujero
+hecho a medida del único que lo viola.
+
+Tests: `cd scripts && npm test`.
+
+### Migración (una sola vez, si todavía tenés el archivo en el repo)
 
 ```sh
+mkdir -p ~/.config/treino
+mv scripts/sa-key.json ~/.config/treino/sa-key.json
+chmod 600 ~/.config/treino/sa-key.json
+
+# En tu ~/.zshrc (o ~/.bashrc), para que valga en toda sesión:
+export TREINO_SA_KEY="$HOME/.config/treino/sa-key.json"
+```
+
+Verificá que quedó bien:
+
+```sh
+[ -e scripts/sa-key.json ] && echo "TODAVÍA ESTÁ EN EL REPO" || echo "fuera del repo, ok"
+stat -f '%Sp' "$TREINO_SA_KEY"   # tiene que decir -rw-------
+```
+
+**Qué se rompe si NO hacés esto, y por qué está bien:** todo. Los 43 scripts
+que tocan credenciales fallan cerrado hasta que exportes la variable — no hay
+default y no hay fallback a `scripts/sa-key.json`. Es el punto: mientras
+existiera un camino que funcionara sin migrar, nadie migraba, y la clave seguía
+en el árbol al alcance de cualquiera de los ~27 worktrees.
+
+El corte es de un comando: el mensaje de error trae el bloque de arriba entero.
+
+Si preferís seguir usando `GOOGLE_APPLICATION_CREDENTIALS` porque ya la tenés
+en el ambiente, sirve igual — con las mismas reglas, y apuntando afuera del
+repo:
+
+```sh
+export GOOGLE_APPLICATION_CREDENTIALS="$HOME/.config/treino/sa-key.json"
+```
+
+No las pongas a las dos apuntando a archivos distintos: eso se rechaza.
+
+### Sin credencial: el emulador (el camino por defecto)
+
+Todo lo local se corre contra el emulador y no necesita ninguna clave:
+
+```sh
+./scripts/emulator.sh
 FIRESTORE_EMULATOR_HOST=localhost:8080 node scripts/<script>.js
 ```
 
-Without that env var the key is required, and a missing `sa-key.json` fails
-with an actionable message instead of a raw `MODULE_NOT_FOUND`.
+**"Emulador" es esa variable y ninguna otra.** `FIRESTORE_EMULATOR_HOST` es lo
+único que desvía Firestore, que es lo que estos scripts escriben.
+`FIREBASE_AUTH_EMULATOR_HOST`, `FIREBASE_STORAGE_EMULATOR_HOST` y
+`FIREBASE_DATABASE_EMULATOR_HOST` redirigen otros productos y **no tocan
+Firestore**.
+
+Por eso un ambiente con alguna de esas tres puesta y la de Firestore no **aborta
+antes de escribir**:
+
+```
+⛔  ABORTADO: el ambiente dice EMULADOR pero Firestore NO está redirigido.
+```
+
+No es celo: mientras el contexto aceptó cualquiera de las cuatro, exportar
+`FIREBASE_DATABASE_EMULATOR_HOST` —de un producto que TREINO ni usa— alcanzaba
+para que un backfill se saltee la credencial entera, apague el cartel de
+producción y escriba en el `treino-dev` real. Con ADC de `gcloud` en la máquina,
+esa escritura además autentica. Es la misma regla que `lib/storage_target.js`
+aplica al par Firestore/Storage (#838): **o todo redirigido, o nada; la mezcla
+aborta**.
+
+Si querés el emulador, agregá la que falta. Si querés la nube, sacá las otras
+del ambiente y leé el cartel que sale después.
+
+### Por qué se mira la identidad y no el project id
+
+El guard viejo miraba el proyecto. El revisor de #843 encontró por dónde se
+escapa: `firebase use` escribe `activeProjects` en
+`~/.config/configstore/firebase-tools.json`, ese valor le gana al default de
+`.firebaserc`, y **no deja ningún rastro adentro del repo**. Mirando el
+proyecto declarado no hay forma de darse cuenta.
+
+La identidad no se escapa. Una credencial de
+`…@treino-dev.iam.gserviceaccount.com` sólo puede escribir en `treino-dev`,
+diga lo que diga el project id que la acompañe. Si la service account es de un
+proyecto de producción, **esto es producción**, venga de donde venga la
+configuración.
+
+### Otros requisitos
+
+```sh
+cd scripts && npm install   # firebase-admin
+```
+
+---
+
+## Lo que sólo puede hacer un humano (#834)
+
+Nada de esto lo corre un agente: son operaciones de IAM sobre el proyecto de
+producción. Los comandos están completos para copiar y pegar; **leelos antes de
+ejecutarlos** y hacelos en este orden.
+
+**1. Auditar qué puede realmente la SA de hoy.** Es la SA por defecto del Admin
+SDK y arranca con permisos amplios; hay que ver el alcance real antes de
+reemplazarla.
+
+```sh
+gcloud projects get-iam-policy treino-dev \
+  --flatten="bindings[].members" \
+  --filter="bindings.members:firebase-adminsdk-fbsvc@treino-dev.iam.gserviceaccount.com" \
+  --format="table(bindings.role)"
+
+# Cuántas claves tiene vivas y desde cuándo (las de tipo USER_MANAGED son las
+# descargables — cada una es una copia de la credencial dando vueltas):
+gcloud iam service-accounts keys list \
+  --iam-account=firebase-adminsdk-fbsvc@treino-dev.iam.gserviceaccount.com \
+  --project=treino-dev
+```
+
+**2. Crear una SA de menor privilegio** para el trabajo de scripts, en vez de
+seguir usando la de permisos amplios.
+
+```sh
+gcloud iam service-accounts create treino-scripts \
+  --display-name="TREINO — scripts de mantenimiento" \
+  --project=treino-dev
+
+# Sólo lo que los scripts necesitan de verdad. `datastore.user` da lectura y
+# escritura de Firestore y NADA más: ni rules, ni deploys, ni Auth, ni Storage.
+gcloud projects add-iam-policy-binding treino-dev \
+  --member="serviceAccount:treino-scripts@treino-dev.iam.gserviceaccount.com" \
+  --role="roles/datastore.user"
+
+gcloud iam service-accounts keys create ~/.config/treino/sa-key.json \
+  --iam-account=treino-scripts@treino-dev.iam.gserviceaccount.com \
+  --project=treino-dev
+chmod 600 ~/.config/treino/sa-key.json
+```
+
+Si algún script necesita más que Firestore (Auth, Storage), sumá el rol
+puntual — `roles/firebaseauth.admin`, `roles/storage.objectAdmin` — y no
+`roles/editor`. El punto del ejercicio es que la clave que anda suelta por la
+máquina no pueda borrar el proyecto.
+
+**3. Rotar la clave vieja.** La de `firebase-adminsdk-fbsvc@` estuvo en `644`
+adentro del repo: hay que tratarla como comprometida. Primero deshabilitala
+(reversible) y dejá correr unos días por si algo la usaba sin que sepamos;
+después borrala.
+
+```sh
+gcloud iam service-accounts keys list \
+  --iam-account=firebase-adminsdk-fbsvc@treino-dev.iam.gserviceaccount.com \
+  --managed-by=user --project=treino-dev          # anotá el KEY_ID
+
+gcloud iam service-accounts keys disable <KEY_ID> \
+  --iam-account=firebase-adminsdk-fbsvc@treino-dev.iam.gserviceaccount.com \
+  --project=treino-dev
+
+# Días después, si nada se rompió:
+gcloud iam service-accounts keys delete <KEY_ID> \
+  --iam-account=firebase-adminsdk-fbsvc@treino-dev.iam.gserviceaccount.com \
+  --project=treino-dev
+```
+
+**4. Confirmar que no quedaron copias.** El repo estaba limpio (gitignored,
+`.gitignore:54`) y había una sola copia, pero después de rotar conviene
+verificar la máquina entera:
+
+```sh
+fd -HI 'sa-key.json|.*-firebase-adminsdk-.*\.json' ~ --exec stat -f '%Sp %N'
+```
 
 > ⚠️ **The other 22 have no such branch** — they call `admin.initializeApp()`
 > straight away and go to production with whatever the service account points

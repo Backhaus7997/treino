@@ -87,6 +87,19 @@ const Module = require('node:module');
 const { register } = require('node:module');
 const { pathToFileURL } = require('node:url');
 const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+
+/**
+ * DÓNDE finge estar la credencial (#834).
+ *
+ * Fuera de `scripts/` a propósito: desde #834 el resolutor RECHAZA toda ruta
+ * adentro de un árbol de git, así que apuntar `$TREINO_SA_KEY` a
+ * `scripts/sa-key.json` —como hacía la primera versión de estos tests— ahora
+ * frena el script antes del cartel y el test mediría el error equivocado.
+ * `os.tmpdir()` no está versionado. El archivo NO existe: lo finge el stub.
+ */
+const RUTA_CREDENCIAL_FALSA = path.join(os.tmpdir(), 'treino-stub-sa-key.json');
 
 const STUB_FIRESTORE_REACHED = 'STUB_FIRESTORE_REACHED';
 const STUB_STORAGE_REACHED = 'STUB_STORAGE_REACHED';
@@ -129,6 +142,22 @@ firestoreStub.FieldValue = {
   delete: () => ({ __stub: 'delete' }),
   arrayUnion: (...v) => ({ __stub: 'arrayUnion', v }),
 };
+
+/**
+ * La credencial falsa. `client_email` NO es decorativo: desde #834 la identidad
+ * EFECTIVA —el proyecto que sale del mail de la service account— es lo que
+ * decide si esto es producción, justamente porque el project id declarado se
+ * puede cambiar sin dejar rastro (#843). Sin `client_email` el resolutor frena.
+ */
+function credencialFalsa() {
+  const proyecto = process.env.STUB_PROJECT_ID || 'treino-dev';
+  return {
+    type: 'service_account',
+    project_id: proyecto,
+    client_email: `firebase-adminsdk-fbsvc@${proyecto}.iam.gserviceaccount.com`,
+    private_key: '-----BEGIN PRIVATE KEY-----FALSA-----END PRIVATE KEY-----',
+  };
+}
 
 const adminStub = {
   // Firma del stub. La usa `esm_stub_interception.test.js` para distinguir
@@ -187,7 +216,7 @@ Module._load = function cargaInterceptada(request, parent, isMain) {
   // directo, así que devolverlo acá evita tener que crear un archivo de
   // credenciales —aunque sea falso— en el árbol del repo.
   if (request.endsWith('sa-key.json')) {
-    return { project_id: process.env.STUB_PROJECT_ID || 'treino-dev' };
+    return credencialFalsa();
   }
 
   return cargaOriginal.apply(this, arguments);
@@ -201,7 +230,7 @@ Module._load = function cargaInterceptada(request, parent, isMain) {
 const readFileSyncOriginal = fs.readFileSync;
 fs.readFileSync = function lecturaInterceptada(ruta, ...resto) {
   if (typeof ruta === 'string' && ruta.endsWith('sa-key.json')) {
-    return JSON.stringify({ project_id: process.env.STUB_PROJECT_ID || 'treino-dev' });
+    return JSON.stringify(credencialFalsa());
   }
   return readFileSyncOriginal.call(this, ruta, ...resto);
 };
@@ -253,9 +282,30 @@ if (typeof register !== 'function') {
 // la prueba de que esa migración no rompió nada.
 register('./esm_stub_hooks.mjs', pathToFileURL(__filename));
 
+// #834 — el resolutor chequea que el archivo EXISTA antes de leerlo. Sin esto
+// diría "apunta a un archivo que no existe" y el test nunca llegaría al cartel.
+// Sólo se finge la credencial: el resto de `existsSync` pasa derecho, y tiene
+// que pasar, porque de eso depende la caminata que busca el `.git`.
+const existsSyncOriginal = fs.existsSync;
+fs.existsSync = function existenciaInterceptada(ruta, ...resto) {
+  if (typeof ruta === 'string' && ruta.endsWith('sa-key.json')) return true;
+  return existsSyncOriginal.call(this, ruta, ...resto);
+};
+
+// La UNIÓN de los CUATRO PRs que tocaron este fixture (#835, #838, #834, #846).
+// Los tres primeros marcadores son la prueba de que un camino distinto NO se
+// ejecutó: Firestore y Storage para los backfills y los uploads, red para
+// `deploy_rules.js`. Sacar uno no rompe nada visible hoy — deja pasar el test
+// que lo usaba.
+//
+// `STUB_ESM_INTERCEPTED` es el único que se afirma en POSITIVO, y por eso no se
+// puede sacar sin que algo se ponga rojo: es lo que distingue "la compuerta
+// frenó" de "el stub nunca existió". `RUTA_CREDENCIAL_FALSA` es la ruta fuera
+// del árbol de git que los tests del #834 le pasan a `$TREINO_SA_KEY`.
 module.exports = {
   STUB_FIRESTORE_REACHED,
   STUB_STORAGE_REACHED,
   STUB_NETWORK_REACHED,
   STUB_ESM_INTERCEPTED,
+  RUTA_CREDENCIAL_FALSA,
 };

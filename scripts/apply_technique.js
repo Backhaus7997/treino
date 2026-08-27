@@ -6,15 +6,17 @@
  * technique (never overwrites curated/merged technique). Idempotent.
  *
  * Usage:
- *   GOOGLE_APPLICATION_CREDENTIALS=scripts/sa-key.json node scripts/apply_technique.js          # dry-run
- *   GOOGLE_APPLICATION_CREDENTIALS=scripts/sa-key.json node scripts/apply_technique.js --write
+ *   TREINO_SA_KEY=~/.config/treino/sa-key.json node scripts/apply_technique.js          # dry-run
+ *   TREINO_SA_KEY=~/.config/treino/sa-key.json node scripts/apply_technique.js --write
  */
 
-const admin = require('firebase-admin');
+const { inicializarAdmin } = require('./lib/admin');
 const path = require('path');
 const WRITE = process.argv.includes('--write');
 
-admin.initializeApp();
+// Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla cerrado
+// con la migración; contra el emulador no pide nada. Ver scripts/lib/admin.js.
+const { admin } = inicializarAdmin();
 const db = admin.firestore();
 
 const { technique } = require(path.join(__dirname, '..', 'docs', 'exercise_technique.json'));

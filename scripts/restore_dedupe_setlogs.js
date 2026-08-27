@@ -24,23 +24,13 @@
  *     node scripts/restore_dedupe_setlogs.js scripts/dedupe-setlogs-backup-<n>.json --apply
  */
 
-const admin = require('firebase-admin');
 const fs = require('fs');
 
-if (process.env.FIRESTORE_EMULATOR_HOST) {
-  admin.initializeApp({ projectId: 'treino-dev' });
-} else {
-  let serviceAccount;
-  try {
-    serviceAccount = require('./sa-key.json');
-  } catch (err) {
-    if (err.code !== 'MODULE_NOT_FOUND') throw err;
-    console.error('\nERROR: scripts/sa-key.json not found.\n');
-    process.exitCode = 1;
-    return;
-  }
-  admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-}
+// Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla cerrado
+// con la migración; contra el emulador no pide nada. Ver scripts/lib/admin.js.
+const { inicializarAdmin } = require('./lib/admin');
+
+const { admin } = inicializarAdmin();
 const db = admin.firestore();
 
 const ARCHIVO = process.argv[2];

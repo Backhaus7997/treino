@@ -198,3 +198,31 @@ test('projectIdObjetivo: credencial sin project_id devuelve null', () => {
   const ruta = credencialFalsa({ type: 'service_account' });
   assert.strictEqual(projectIdObjetivo({ GOOGLE_APPLICATION_CREDENTIALS: ruta }), null);
 });
+
+// ── #834 — la variable canónica ────────────────────────────────────────────
+
+// Las dos van por `credencialFalsa()`, que ya estaba en este archivo, y no por
+// un `path.join(os.tmpdir(), ...)` armado a mano como traía la primera versión.
+// No es estilo: `os.tmpdir()` es world-writable y un nombre predecible —lo era,
+// `treino-target-${process.pid}-a.json`— lo puede pre-crear otro usuario de la
+// máquina como symlink y hacer que el test escriba donde él quiera. CodeQL lo
+// marcó (`js/insecure-temporary-file`, 3 alertas) y tenía razón: el patrón lo
+// introdujo este PR. `mkdtempSync` resuelve las dos mitades de una, porque
+// crea el directorio con nombre aleatorio y permisos 0700.
+
+test('projectIdObjetivo lee TREINO_SA_KEY, no sólo GOOGLE_APPLICATION_CREDENTIALS', () => {
+  // Sin esto, el cartel de #826 desaparecía justo para quien ya había migrado
+  // la clave afuera del repo: el que hizo lo correcto se quedaba sin aviso.
+  const ruta = credencialFalsa({ project_id: 'treino-dev' });
+  assert.strictEqual(projectIdObjetivo({ TREINO_SA_KEY: ruta }), 'treino-dev');
+});
+
+test('TREINO_SA_KEY le gana a GOOGLE_APPLICATION_CREDENTIALS, como en la frontera', () => {
+  // Dos llamadas, dos `mkdtemp` distintos: las rutas no pueden colisionar.
+  const canonica = credencialFalsa({ project_id: 'el-canonico' });
+  const adc = credencialFalsa({ project_id: 'el-otro' });
+  assert.strictEqual(
+    projectIdObjetivo({ TREINO_SA_KEY: canonica, GOOGLE_APPLICATION_CREDENTIALS: adc }),
+    'el-canonico',
+  );
+});

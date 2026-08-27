@@ -30,6 +30,7 @@ const { spawnSync } = require('node:child_process');
 
 const SCRIPTS_DIR = path.join(__dirname, '..');
 const STUB = path.join(__dirname, 'fixtures', 'stub_firebase_admin.js');
+const { RUTA_CREDENCIAL_FALSA } = require('./fixtures/stub_firebase_admin');
 
 const BACKFILLS = ['backfill_gym_ids.js', 'backfill_gym_names.js'];
 
@@ -44,7 +45,15 @@ const BACKFILLS = ['backfill_gym_ids.js', 'backfill_gym_names.js'];
  * distingue el proyecto real del namespace local.
  */
 function correrBackfill(script, { emulador = false, projectId = 'treino-dev' } = {}) {
-  const env = { ...process.env, STUB_PROJECT_ID: projectId };
+  // #834 — los backfills ya no hacen `require('./sa-key.json')`: la ruta sale de
+  // `$TREINO_SA_KEY` y tiene que apuntar AFUERA de todo árbol de git. El stub
+  // finge el archivo; acá sólo se dice dónde estaría.
+  const env = {
+    ...process.env,
+    STUB_PROJECT_ID: projectId,
+    TREINO_SA_KEY: RUTA_CREDENCIAL_FALSA,
+  };
+  delete env.GOOGLE_APPLICATION_CREDENTIALS;
   if (emulador) {
     env.FIRESTORE_EMULATOR_HOST = 'localhost:8080';
   } else {

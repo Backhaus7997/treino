@@ -23,6 +23,11 @@
  * (un id, un booleano) y se queda sin I/O. Este lee el entorno y, si hace
  * falta, el JSON de credenciales — un `readFileSync` de un archivo local, sin
  * red y sin `firebase-admin`, para que siga siendo testeable en milisegundos.
+ *
+ * #834: lee `$TREINO_SA_KEY` además de `$GOOGLE_APPLICATION_CREDENTIALS`, en el
+ * mismo orden que `lib/credenciales.js`. Este módulo NO valida la ruta —de eso
+ * se ocupa la frontera, que corre igual un renglón más abajo—; acá sólo hace
+ * falta saber el destino para poder nombrarlo en el cartel.
  */
 
 const fs = require('node:fs');
@@ -135,7 +140,11 @@ function projectIdObjetivo(env = process.env) {
     return explicito.trim();
   }
 
-  const credPath = env.GOOGLE_APPLICATION_CREDENTIALS;
+  // Las dos variables de credencial, en el orden en que las resuelve
+  // `lib/credenciales.js`. `TREINO_SA_KEY` es la canónica desde #834; mirar
+  // sólo `GOOGLE_APPLICATION_CREDENTIALS` dejaba sin cartel exactamente a quien
+  // ya migró — o sea, al que hizo lo correcto. Ese es el peor reparto posible.
+  const credPath = env.TREINO_SA_KEY || env.GOOGLE_APPLICATION_CREDENTIALS;
   if (typeof credPath !== 'string' || credPath.trim() === '') return null;
 
   try {

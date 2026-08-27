@@ -17,7 +17,9 @@
  * ⚠️  WHICH PROJECT YOU POINT THIS AT DECIDES WHETHER THE NUMBER MEANS ANYTHING.
  * Since #840 the `.firebaserc` default is `demo-treino` (offline emulator id) and
  * the real project sits behind the `prod` alias — but this script never reads
- * `.firebaserc`: it resolves the project from `scripts/sa-key.json`, or pins
+ * `.firebaserc`: it resolves the project from the service account in
+ * `$TREINO_SA_KEY` (#834 — the key lives OUTSIDE the repo now; the frontier in
+ * `lib/credenciales.js` rejects any path inside a git tree), or pins
  * `treino-dev` when `FIRESTORE_EMULATOR_HOST` is set. Run against the emulator
  * and you are measuring seed and test accounts — `seed_emulator_full.js` writes
  * `userPublicProfiles` docs directly, so the ratio is whatever the seed author
@@ -47,7 +49,7 @@
  * and firestore.indexes.json:250-294 already covers the gym-scoped variants.
  *
  * Usage:
- *   # Against a real project (needs scripts/sa-key.json, gitignored):
+ *   # Contra un proyecto real (necesita $TREINO_SA_KEY — ver scripts/README.md):
  *   cd scripts && node audit_ranking_optin.js
  *
  *   # Against the emulator (no credentials):
@@ -59,27 +61,11 @@
 
 'use strict';
 
-const admin = require('firebase-admin');
+// Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla cerrado
+// con la migración; contra el emulador no pide nada. Ver scripts/lib/admin.js.
+const { inicializarAdmin } = require('./lib/admin');
 
-if (process.env.FIRESTORE_EMULATOR_HOST) {
-  // Admin SDK with emulator — no service account needed.
-  admin.initializeApp({ projectId: 'treino-dev' });
-} else {
-  let serviceAccount;
-  try {
-    serviceAccount = require('./sa-key.json');
-  } catch (err) {
-    if (err.code !== 'MODULE_NOT_FOUND') throw err;
-    console.error(
-      '\nERROR: scripts/sa-key.json not found — required to run against a real project.\n' +
-      'Download a service-account key from the Firebase console and save it as\n' +
-      'scripts/sa-key.json (gitignored), or target the local emulator instead:\n\n' +
-      '  FIRESTORE_EMULATOR_HOST=localhost:8080 node scripts/audit_ranking_optin.js\n',
-    );
-    process.exit(1);
-  }
-  admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-}
+const { admin } = inicializarAdmin();
 const db = admin.firestore();
 
 const asJson = process.argv.includes('--json');
