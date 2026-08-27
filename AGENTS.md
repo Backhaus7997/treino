@@ -21,24 +21,51 @@ pagos, turnos, mediciones, chats y perfiles comerciales publicados.
   `demo-treino`: Firebase trata el prefijo `demo-` como proyecto offline del
   emulador, así que un `deploy` o un `firestore:delete` **sin `--project`
   falla** en vez de resolver a `treino-dev`. Era el agujero real — el repo vive
-  en 29 directorios a la vez (raíz + `.claude/worktrees/`), cada uno con su
+  en ~30 directorios a la vez (raíz + `.claude/worktrees/`), cada uno con su
   copia de `.firebaserc` y un agente adentro.
   - Corolario 1: para tocar producción **hay que escribir `--project prod`**. Que
     duela un poco es el punto.
   - Corolario 2 — **esto cubre el CLI de `firebase`, NO los scripts de Node**.
-    Los `scripts/backfill_*.js` (y `cleanup_*`, `restore_*`, `seed_*`) **no leen
-    `.firebaserc` nunca**: resuelven el proyecto con
-    `admin.initializeApp({credential: cert(require('./sa-key.json'))})` —
-    o sea, el `project_id` de la key — y hardcodean `treino-dev` cuando hay
-    `FIRESTORE_EMULATOR_HOST`. Verificable: los hits de
+    Los `scripts/*.js` (`backfill_*`, `cleanup_*`, `restore_*`, `seed_*`,
+    `import_*`, `migrate_*`) **no leen `.firebaserc` nunca**: los hits de
     `rg 'firebaserc' -g '*.js' scripts/` son **todos comentarios** — ni un solo
     `require`/`readFile` del archivo. **Un backfill sin `--project` no falla:
     `--project` ni siquiera existe como flag** (`backfill_gym_ids.js:102` sólo
-    parsea `--dry-run` y `--allow-prod`). Para esos scripts la única barrera sigue
-    siendo tener o no `scripts/sa-key.json`, y su guard `assertDevProject()`
-    **no protege**: testea `/dev/i` contra el project id, y `treino-dev`
-    matchea — es exactamente el bug de #826. Antes de correr cualquiera de
-    ellos, leé qué proyecto imprime en la primera línea.
+    parsea `--dry-run` y `--allow-prod`). Y su guard `assertDevProject()` **no
+    protege**: testea `/dev/i` contra el project id, y `treino-dev` matchea — es
+    exactamente el bug de #826.
+
+    **Ojo con "la barrera es `sa-key.json`": son DOS familias, no una.**
+
+    | familia | de dónde saca la credencial | qué la frena |
+    | --- | --- | --- |
+    | ~20 scripts (`backfill_athlete_counts`, `cleanup_*`, `restore_*`, `seed_measurements`, `audit_ranking_optin`, …) | `admin.credential.cert(require('./sa-key.json'))` | que exista `scripts/sa-key.json`. **Hoy NO existe** (`ls` → ausente; está gitignoreado). Fallan cerrado y avisan. |
+    | **16 scripts con `admin.initializeApp()` pelado** | `GOOGLE_APPLICATION_CREDENTIALS` o las ADC de `gcloud` | **`sa-key.json` es irrelevante para éstos.** Que la variable de entorno esté seteada. |
+
+    Los 16 del segundo grupo, para que nadie tenga que adivinar cuáles son:
+    `accept_pending_link`, `apply_technique`, `backfill_exercise_aliases`,
+    `backfill_exercise_equipment`, `backfill_exercise_videos`,
+    `dedup_exercise_generics`, `import_enriched_catalog`,
+    `import_exercises_catalog`, `migrate_trainer_locations`,
+    `promote_user_to_trainer`, `reset_onboarding_cards`, `seed_gyms`,
+    `seed_posts`, `seed_sessions`, `seed_templates`, `seed_workout_catalog`.
+
+    **Y la credencial de producción está en la máquina.** Se movió del repo a
+    `~/.config/treino/sa-key.json`, exportada como `$TREINO_SA_KEY` en
+    `~/.zshrc`. Su `project_id` es **`treino-dev`**, o sea PRODUCCIÓN
+    (`firebase-adminsdk-fbsvc@treino-dev.iam.gserviceaccount.com`). Ningún
+    script del repo lee `$TREINO_SA_KEY`, así que la variable sola no dispara
+    nada — pero un `GOOGLE_APPLICATION_CREDENTIALS=$TREINO_SA_KEY node
+    scripts/seed_gyms.js`, que es literalmente lo que dice el header de varios
+    de esos archivos, **escribe en producción**. (Las ADC de `gcloud` —
+    `~/.config/gcloud/application_default_credentials.json`— hoy no existen.)
+
+    **El consejo de "leé qué proyecto imprime en la primera línea" vale sólo
+    para la primera familia.** Los 16 del `initializeApp()` pelado **no imprimen
+    ningún proyecto**: `rg 'projectId|project_id|PROJECT_ID'` da **0 hits en los
+    16**. Antes de correr cualquiera de ellos, mirá `echo
+    $GOOGLE_APPLICATION_CREDENTIALS` y el `project_id` de ese archivo — no hay
+    otra forma de saber a dónde van a escribir.
   - Corolario 3: los comandos del **emulador** llevan `--project treino-dev`
     explícito, y no es contradictorio. `emulators:*` no sale a la red de los
     servicios emulados; ese id es sólo el *namespace* local donde escriben la
@@ -50,32 +77,66 @@ pagos, turnos, mediciones, chats y perfiles comerciales publicados.
     resuelto en `scripts/emulator.sh` y `scripts/test_rules.sh`: **usalos** en
     vez de escribir `firebase emulators:start` a mano, que ahora resolvería
     `demo-treino` y te dejaría la UI de :4444 mirando un namespace vacío.
-  - Corolario 4 — **`firebase use` le gana al default, y no deja rastro en el
-    repo**. `firebase use <alias>` escribe `activeProjects` en
-    `~/.config/configstore/firebase-tools.json`, que **no está versionado**. La
-    precedencia real es `--project` → `activeProjects[projectRoot]` → default de
-    `.firebaserc` (`firebase-tools/lib/command.js:196`, `applyRC`). Medido
-    contra 13.35.1 con un configstore aislado, mismo `.firebaserc` de este repo:
+  - Corolario 4 — **`firebase use` le gana al default, no deja rastro en el
+    repo, y SE HEREDA DE LOS DIRECTORIOS PADRE**. `firebase use <alias>` escribe
+    `activeProjects` en `~/.config/configstore/firebase-tools.json`, que **no
+    está versionado**. La precedencia real es `--project` →
+    `activeProjects[<el directorio o cualquier ANCESTRO>]` → default de
+    `.firebaserc`.
 
-    | `activeProjects[dir]` | proyecto que resuelve un comando pelado |
-    | --------------------- | --------------------------------------- |
-    | (ausente)             | `demo-treino` ← el default nos protege  |
-    | `prod`                | **`treino-dev`** ← PRODUCCIÓN           |
+    Medido contra **firebase-tools 15.19.0**, la que está en el PATH y la que
+    ejecutan los scripts de este repo (`firebase --version`), con un configstore
+    aislado y un repo sandbox que imita raíz + `.claude/worktrees/<wt>`:
 
-    O sea: **un solo `firebase use prod` desarma el fix de #840 en ese
-    directorio, para siempre y en silencio.** Dos cosas lo acotan, las dos
-    medidas: la clave es el *directorio* (`projectRoot`), así que pinea un
-    directorio y no los otros 28; y hoy en esta máquina la clave `activeProjects`
-    **no existe** — nadie corrió nunca `firebase use`. Si vas a correr algo
-    destructivo, **escribí `--project` siempre** en vez de confiar en el
-    default: es lo único que gana en toda la cadena.
+    | dónde está el pin | qué resuelve un comando pelado DENTRO del worktree |
+    | --- | --- |
+    | (ninguno) | el `default` de `.firebaserc` ← nos protege |
+    | en el worktree | el pin |
+    | **en la raíz del repo** | **el pin** ← alcanza a los ~30 worktrees de una |
+    | **dos niveles más arriba** | **el pin** ← sube hasta `/` |
+
+    Es `configstoreProject(dir)` en `firebase-tools/lib/command.js:234`: arranca
+    en `projectRoot` y sube por `path.dirname()` hasta `/`, devolviendo el primer
+    directorio con pin.
+
+    ⚠️ **Esto no es lo que hacía la 13.x.** La 13.35.1 leía
+    `activeProjects[projectRoot]` **exacto** (`command.js:196`), sin subir. Medir
+    contra una 13 cacheada por `npx` da la respuesta tranquilizadora —"pinea un
+    directorio y no los otros"— y **equivocada** para la CLI que el repo
+    realmente corre. Cuando el hallazgo es *"esto acota el riesgo"*, la barra de
+    qué contás como entorno de prueba sube, no baja: un falso positivo cuesta un
+    rato; un falso *"estás a salvo"* cuesta datos de usuarios.
+
+    **Qué cambia esto en la decisión de no agregar un guard.** Antes el
+    argumento era que la exposición estaba acotada *por directorio*. **Ese
+    argumento no existe**: un solo `firebase use prod` en la raíz —o en
+    `$HOME`— desarma el fix de #840 en **todos** los worktrees a la vez, para
+    siempre y en silencio. Aun así **no hay guard de código posible** para esto,
+    y conviene decir por qué en vez de inventar uno: `activeProjects` vive fuera
+    del repo, se aplica *antes* de que corra cualquier cosa versionada, y el
+    único hook que el repo controla (`predeploy` en `firebase.json`) cubre
+    `deploy` y **no** `firestore:delete`, que es el más destructivo. Lo que queda
+    es, en orden:
+
+    1. **`--project` explícito, siempre.** Es lo único que gana en toda la
+       cadena, en cualquier versión de la CLI.
+    2. **`bash scripts/sync_firebaserc_worktrees.sh`** — audita el configstore
+       subiendo por `dirname` igual que la CLI, así que ve los pins heredados.
+       Read-only, incluso con `--write`.
+    3. **El job `firebaserc-default` de CI** (`scripts/check_firebaserc_default.sh`)
+       cubre la mitad versionada: falla si el `default` de `.firebaserc` deja de
+       ser un proyecto `demo-`.
+
+    Hoy en esta máquina la clave `activeProjects` **no existe** — nadie corrió
+    nunca `firebase use`, verificado leyendo el configstore real. Eso es un
+    hecho de hoy, no una garantía: la cambia un solo comando.
   - Corolario 5 — **worktrees**: `.firebaserc` está versionado, así que todo
     worktree creado después de #840 hereda el default seguro solo — no hay nada
     que regenerar. Los que ya existían siguen con el viejo hasta que rebaseen
     main, y esperar eso no es una mitigación. Para cerrarlos hoy —y para
     auditar el `activeProjects` del corolario 4— hay
     `bash scripts/sync_firebaserc_worktrees.sh` (dry-run por default, `--write`
-    aplica). Al escribir esto lista **28 pendientes**.
+    aplica). Al escribir esto: **30 worktrees, 29 pendientes**.
 - **Nunca** corras `firestore:delete`, un script de `scripts/backfill_*.js`, ni un
   `deploy` de rules/indexes/functions contra ese proyecto sin confirmarlo con un
   humano primero. Aplica la misma regla de "frená y confirmá" que el resto de este
