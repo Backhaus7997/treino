@@ -40,15 +40,37 @@ pagos, turnos, mediciones, chats y perfiles comerciales publicados.
     | familia | de dónde saca la credencial | qué la frena |
     | --- | --- | --- |
     | ~20 scripts (`backfill_athlete_counts`, `cleanup_*`, `restore_*`, `seed_measurements`, `audit_ranking_optin`, …) | `admin.credential.cert(require('./sa-key.json'))` | que exista `scripts/sa-key.json`. **Hoy NO existe** (`ls` → ausente; está gitignoreado). Fallan cerrado y avisan. |
-    | **16 scripts con `admin.initializeApp()` pelado** | `GOOGLE_APPLICATION_CREDENTIALS` o las ADC de `gcloud` | **`sa-key.json` es irrelevante para éstos.** Que la variable de entorno esté seteada. |
+    | **22 scripts con `initializeApp()` SIN `credential`** | `GOOGLE_APPLICATION_CREDENTIALS` o las ADC de `gcloud` | **`sa-key.json` es irrelevante para éstos.** Que la variable de entorno esté seteada. |
 
-    Los 16 del segundo grupo, para que nadie tenga que adivinar cuáles son:
-    `accept_pending_link`, `apply_technique`, `backfill_exercise_aliases`,
-    `backfill_exercise_equipment`, `backfill_exercise_videos`,
-    `dedup_exercise_generics`, `import_enriched_catalog`,
-    `import_exercises_catalog`, `migrate_trainer_locations`,
+    El criterio NO es `initializeApp()` **pelado**: es `initializeApp()` **sin
+    `credential`**, que también incluye `initializeApp({ storageBucket: … })`.
+    Escrito angosto la primera vez, esta lista perdía 6 scripts — justo los que
+    además **hardcodean el bucket de producción**. El comando que la regenera,
+    para que no haya que confiar en la enumeración:
+
+    ```bash
+    for f in scripts/*.js scripts/*.mjs; do
+      rg -q 'initializeApp\(' "$f" && ! rg -q 'initializeApp\([^)]*credential' "$f" && echo "$f"
+    done
+    ```
+
+    Los 22 que escriben, para que nadie tenga que adivinar:
+    `accept_pending_link`, `apply_catalog_video_fill`†, `apply_technique`,
+    `backfill_exercise_aliases`, `backfill_exercise_equipment`,
+    `backfill_exercise_videos`, `build_catalog_proposal`†,
+    `dedup_exercise_generics`, `extract_exercise_thumbnails`†,
+    `import_enriched_catalog`, `import_exercises_catalog`,
+    `match_drive_videos_to_catalog`†, `migrate_trainer_locations`,
     `promote_user_to_trainer`, `reset_onboarding_cards`, `seed_gyms`,
-    `seed_posts`, `seed_sessions`, `seed_templates`, `seed_workout_catalog`.
+    `seed_posts`, `seed_sessions`, `seed_templates`, `seed_workout_catalog`,
+    `upload_drive_exercise_videos`†, `upload_enriched_videos`†.
+
+    El comando devuelve 24: los otros dos son `seed_emulator_full` (se niega a
+    correr sin emulador) y `audit_trainer_profiles` (sólo lee).
+
+    **† = hardcodean el bucket de Storage de producción** (#838). Para esos seis
+    el consejo de mirar el `project_id` de tu credencial **ni siquiera alcanza**:
+    el destino de Storage está fijo en el código y ninguna variable lo redirige.
 
     **Y la credencial de producción está en la máquina.** Se movió del repo a
     `~/.config/treino/sa-key.json`, exportada como `$TREINO_SA_KEY` en
@@ -61,9 +83,8 @@ pagos, turnos, mediciones, chats y perfiles comerciales publicados.
     `~/.config/gcloud/application_default_credentials.json`— hoy no existen.)
 
     **El consejo de "leé qué proyecto imprime en la primera línea" vale sólo
-    para la primera familia.** Los 16 del `initializeApp()` pelado **no imprimen
-    ningún proyecto**: `rg 'projectId|project_id|PROJECT_ID'` da **0 hits en los
-    16**. Antes de correr cualquiera de ellos, mirá `echo
+    para la primera familia.** Los 22 del `initializeApp()` sin `credential` **no imprimen
+    ningún proyecto**: `rg 'projectId|project_id|PROJECT_ID'` da **0 hits**. Antes de correr cualquiera de ellos, mirá `echo
     $GOOGLE_APPLICATION_CREDENTIALS` y el `project_id` de ese archivo — no hay
     otra forma de saber a dónde van a escribir.
   - Corolario 3: los comandos del **emulador** llevan `--project treino-dev`
