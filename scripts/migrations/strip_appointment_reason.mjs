@@ -52,22 +52,53 @@
  *
  *   export GOOGLE_APPLICATION_CREDENTIALS="$TREINO_SA_KEY"   # ~/.config/treino/sa-key.json
  *   node scripts/migrations/strip_appointment_reason.mjs --project=<id>            # DRY-RUN
- *   node scripts/migrations/strip_appointment_reason.mjs --project=<id> --apply    # escribe
+ *   node scripts/migrations/strip_appointment_reason.mjs --project=<id> --apply \
+ *        --si-escribo-en-produccion                                               # escribe
  *
  * Sin `--apply` no escribe nada: cuenta los documentos afectados y muestra los
  * primeros. `treino-dev` **ES** producción (#826), así que el `--apply` va con
  * una decisión humana atrás, no dentro de una sesión de agente.
  *
+ * ─── Y por qué el destino se ANUNCIA antes de escribir ──────────────────────
+ *
+ * Lo marcó la review de Codex sobre este mismo PR, y tiene razón: la primera
+ * versión hacía `initializeApp()` sin resolver ni mostrar el destino, y omitir
+ * `--project` deja que el SDK lo elija desde las credenciales del ambiente. O
+ * sea que una invocación copiada podía reescribir turnos de producción
+ * mostrando en pantalla nada más que un conteo de documentos. Es exactamente el
+ * modo de fallar que #826 vino a cerrar, y para el que ya existen
+ * `scripts/lib/firebase_projects.js` y `scripts/lib/target_project.js`.
+ *
+ * Este script va UN PASO más que la convención del #826, y a propósito. Esa
+ * convención es "el operador VE la verdad, pero la decisión de correr o no
+ * correr NO cambia", porque cambiarla rompía invocaciones documentadas
+ * (`npm run seed:all`, `npm run promote:trainer`). Acá no hay ninguna
+ * invocación previa que romper —es una migración de una sola vez—, así que
+ * contra producción el `--apply` **falla cerrado** sin el flag explícito. Y si
+ * el destino no se puede resolver, tampoco escribe: no saber contra qué
+ * proyecto estás no es lo mismo que saber que no es producción.
+ *
  * Idempotente: sólo toca documentos que tienen la clave, y correrlo dos veces
  * deja el mismo resultado.
  */
 
+import { createRequire } from "node:module";
+
 import admin from "firebase-admin";
+
+// Los dos módulos del #826 son CommonJS y viven en `scripts/lib/`. Se cargan
+// con `createRequire` en vez de un `import` porque el interop de nombres sobre
+// CJS depende del lexer de Node, y acá lo que importa es que el cartel salga —
+// no ahorrarse dos líneas.
+const require = createRequire(import.meta.url);
+const { bannerDeProduccion, esProduccion } = require("../lib/firebase_projects");
+const { usandoEmulador, projectIdObjetivo } = require("../lib/target_project");
 
 const args = process.argv.slice(2);
 const projectArg = args.find((a) => a.startsWith("--project="));
 const projectId = projectArg ? projectArg.split("=")[1] : undefined;
 const apply = args.includes("--apply");
+const confirmado = args.includes("--si-escribo-en-produccion");
 
 if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
   console.error(
@@ -76,6 +107,41 @@ if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
       "`--project=<id>` sólo elige el proyecto; no autentica nada."
   );
   process.exit(2);
+}
+
+// ─── El destino, ANTES de `initializeApp()` y antes del primer write ────────
+//
+// `--project` gana porque es lo que se le pasa al SDK abajo; si no está, se
+// resuelve por las mismas fuentes y en el mismo orden que usa el Admin SDK.
+const destino = projectId ?? projectIdObjetivo();
+const contraEmulador = usandoEmulador();
+
+console.log("");
+console.log(`  destino : ${destino ?? "(no resuelto — lo elige el Admin SDK)"}`);
+console.log(`  modo    : ${apply ? "APLICA (escribe)" : "DRY-RUN (no escribe)"}`);
+console.log(`  emulador: ${contraEmulador ? "sí" : "no"}`);
+console.log("");
+
+const bannerProd = bannerDeProduccion(destino, { contraEmulador });
+if (bannerProd) console.warn(bannerProd);
+
+if (apply && !contraEmulador) {
+  if (destino === null) {
+    console.error(
+      "No se puede resolver contra qué proyecto se va a escribir, y esto ESCRIBE.\n" +
+        "Pasá `--project=<id>` explícito. No saber si es producción NO es saber\n" +
+        "que no lo es (#826)."
+    );
+    process.exit(2);
+  }
+  if (esProduccion(destino) && !confirmado) {
+    console.error(
+      `"${destino}" es PRODUCCIÓN y falta la confirmación explícita.\n\n` +
+        "  … --apply --si-escribo-en-produccion\n\n" +
+        "Es una migración de una sola vez sobre turnos de usuarios reales."
+    );
+    process.exit(2);
+  }
 }
 
 admin.initializeApp({
