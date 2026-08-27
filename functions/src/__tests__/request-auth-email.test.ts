@@ -13,6 +13,7 @@ import * as admin from "firebase-admin";
 import {
   runRequestPasswordReset,
   runRequestEmailVerification,
+  rewriteActionHost,
   throttleWindow,
 } from "../auth/request-auth-email";
 import { dedupeKey } from "../mail/enqueue-mail";
@@ -78,6 +79,65 @@ async function seedUser(opts: {
     emailVerified: opts.emailVerified ?? false,
   });
 }
+
+// ---------------------------------------------------------------------------
+// rewriteActionHost — el link lleva NUESTRO dominio
+//
+// Firebase tiene un ajuste para esto ("Customize action URL"), pero en este
+// proyecto ese PATCH devuelve 400 EMAIL_TEMPLATE_UPDATE_NOT_ALLOWED con un
+// payload válido. Se resuelve en código, que además deja UNA sola fuente de
+// verdad: si el host viviera en la consola Y acá, podrían discrepar y el código
+// ganaría en silencio.
+// ---------------------------------------------------------------------------
+describe("rewriteActionHost", () => {
+  const FIREBASE_LINK =
+    "https://treino-dev.firebaseapp.com/__/auth/action" +
+    "?mode=resetPassword&oobCode=ABC123&apiKey=XYZ&lang=es";
+
+  it("cambia el host y deja el resto intacto", () => {
+    const out = new URL(rewriteActionHost(FIREBASE_LINK));
+
+    expect(out.host).toBe("auth.gettreino.com");
+    expect(out.pathname).toBe("/__/auth/action");
+    // El oobCode va firmado: si se tocara, el link se invalida.
+    expect(out.searchParams.get("oobCode")).toBe("ABC123");
+    expect(out.searchParams.get("apiKey")).toBe("XYZ");
+    expect(out.searchParams.get("mode")).toBe("resetPassword");
+    expect(out.searchParams.get("lang")).toBe("es");
+  });
+
+  it("es idempotente: aplicarlo dos veces da lo mismo", () => {
+    const once = rewriteActionHost(FIREBASE_LINK);
+    expect(rewriteActionHost(once)).toBe(once);
+  });
+
+  // Si algún día la consola SÍ deja fijar el action URL, el link ya viene con
+  // el host correcto y esto no hace nada. Convivir sin pisarse es el punto.
+  it("no rompe un link que ya viene con nuestro dominio", () => {
+    const yaNuestro =
+      "https://auth.gettreino.com/__/auth/action?mode=verifyEmail&oobCode=Z";
+    expect(rewriteActionHost(yaNuestro)).toBe(yaNuestro);
+  });
+
+  it("fuerza https aunque venga en http", () => {
+    const inseguro = "http://treino-dev.firebaseapp.com/__/auth/action?oobCode=Q";
+    expect(rewriteActionHost(inseguro)).toContain("https://auth.gettreino.com");
+    expect(rewriteActionHost(inseguro)).not.toContain("http://");
+  });
+
+  // Conservador a propósito: un link de recuperación roto es peor que uno feo,
+  // porque el que lo recibe ya no puede entrar a su cuenta.
+  it("deja intacto lo que no reconoce", () => {
+    for (const raro of [
+      "no-es-una-url",
+      "",
+      "https://treino-dev.firebaseapp.com/otra/cosa",
+      "https://ejemplo.test/",
+    ]) {
+      expect(rewriteActionHost(raro)).toBe(raro);
+    }
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Anti-enumeración — REQ-AUTH-011
@@ -157,6 +217,14 @@ describe("requestPasswordReset: cuenta que existe", () => {
     expect(doc?.status).toBe("pending");
     // El link lo minta el Admin SDK y lleva el oobCode.
     expect(String(doc?.params.actionLink)).toContain("oobCode=");
+
+    // OJO: acá NO se puede verificar el host reescrito. El emulador de Auth
+    // devuelve el link en `/emulator/action`, no en el namespace reservado
+    // `/__/auth/action`, así que `rewriteActionHost` lo deja intacto — y eso es
+    // lo correcto: reescribirlo apuntaría al dominio real y rompería el testing
+    // local. La reescritura se cubre en el describe `rewriteActionHost`, que es
+    // puro y no depende del entorno.
+    expect(String(doc?.params.actionLink)).toContain("/emulator/action");
   });
 
   it("normaliza mayúsculas y espacios de la dirección", async () => {

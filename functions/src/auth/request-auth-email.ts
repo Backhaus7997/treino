@@ -6,12 +6,10 @@
  *
  * QUE CAMBIA Y QUE NO
  *
- * El link NO cambia: `generatePasswordResetLink` /
- * `generateEmailVerificationLink` devuelven la misma URL con `oobCode` que
- * Firebase pondria en su propio mail, apuntando al action handler que Firebase
- * ya hostea. Lo unico que cambia es QUIEN manda el mail y COMO se ve. No hace
- * falta una pagina de action handler propia para que esto funcione; eso es un
- * paso opcional de branding, aparte.
+ * El link es el mismo que Firebase pondria en su propio mail —mismo `oobCode`,
+ * mismo handler— con el HOST reescrito al dominio propio (ver
+ * `rewriteActionHost`). No hace falta escribir una pagina de action handler:
+ * `auth.gettreino.com` sirve el mismo `/__/auth/action` que hostea Firebase.
  *
  * ANTI-ENUMERACION (REQ-AUTH-011) — la invariante de este archivo
  *
@@ -84,6 +82,53 @@ export function throttleWindow(nowMs: number): number {
   return Math.floor(nowMs / (THROTTLE_WINDOW_MIN * 60 * 1000));
 }
 
+/**
+ * Host propio donde vive el action handler de Firebase.
+ *
+ * `auth.gettreino.com` apunta por CNAME al sitio de Hosting `treino-dev`, que
+ * sirve el mismo `/__/auth/action` que `treino-dev.firebaseapp.com`. Verificado
+ * en produccion: ambos devuelven 200 sobre ese path.
+ *
+ * POR QUE SE REESCRIBE EN CODIGO Y NO EN LA CONSOLA
+ *
+ * Firebase Auth tiene un ajuste para esto ("Customize action URL", que escribe
+ * `notification.sendEmail.callbackUri`). En este proyecto ese PATCH devuelve
+ * **400 EMAIL_TEMPLATE_UPDATE_NOT_ALLOWED** con un payload perfectamente
+ * valido, asi que el ajuste esta bloqueado a nivel proyecto por una causa que
+ * no pudimos diagnosticar.
+ *
+ * Reescribir el host aca es mejor igual, con o sin ese bloqueo: queda
+ * versionado, revisable, cubierto por tests, y no depende de una config
+ * invisible en una consola. `generatePasswordResetLink` devuelve el link con
+ * el `oobCode` ya firmado; cambiar el host NO lo invalida, porque el codigo
+ * viaja en el query string y lo valida el backend de Auth, no el host.
+ */
+const ACTION_HANDLER_HOST = "auth.gettreino.com";
+
+/**
+ * Cambia el host del action link al dominio propio, dejando intacto el resto.
+ *
+ * Conservador a proposito: si el link no parsea, o su path no es el namespace
+ * reservado de Firebase, se devuelve tal cual. Un link de recuperacion roto es
+ * peor que uno feo — el usuario que lo recibe ya no puede entrar a su cuenta.
+ *
+ * @param link - URL que devolvio el Admin SDK.
+ */
+export function rewriteActionHost(link: string): string {
+  try {
+    const url = new URL(link);
+    // Solo el namespace reservado de Hosting. Cualquier otra forma queda igual.
+    if (!url.pathname.startsWith("/__/auth/")) return link;
+
+    url.protocol = "https:";
+    url.host = ACTION_HANDLER_HOST;
+    url.port = "";
+    return url.toString();
+  } catch {
+    return link;
+  }
+}
+
 /** Respuesta uniforme. Nunca revela si la cuenta existe. */
 export interface AuthEmailResult {
   status: "ok";
@@ -125,7 +170,7 @@ export async function runRequestPasswordReset(
       toUid: user.uid,
       kind: "password-reset",
       scope: `${user.uid}_${throttleWindow(nowMs)}`,
-      params: { actionLink: link },
+      params: { actionLink: rewriteActionHost(link) },
     });
   } catch (error: unknown) {
     // Se traga TODO a proposito — incluido user-not-found. Se logea para
@@ -176,7 +221,7 @@ export async function runRequestEmailVerification(
       toUid: uid,
       kind: "email-verification",
       scope: `${uid}_${throttleWindow(nowMs)}`,
-      params: { actionLink: link },
+      params: { actionLink: rewriteActionHost(link) },
     });
   } catch (error: unknown) {
     logger.warn("requestEmailVerification: no se encolo", { uid, error });
