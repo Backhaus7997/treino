@@ -329,8 +329,19 @@ export FIRESTORE_EMULATOR_HOST=localhost:8080
 export FIREBASE_STORAGE_EMULATOR_HOST=localhost:9199
 ```
 
-Sin ninguna de las dos variables, el destino es **producción** (`treino-dev`, ver
-#826) y sale el cartel antes de escribir.
+Sin ninguna de las dos variables el destino ya **no** es producción: desde el
+#840 el `default` del `.firebaserc` es `demo-treino`, el último eslabón de la
+cadena de arriba cae ahí, y el bucket que se deriva es
+`demo-treino.firebasestorage.app` — un bucket que no existe. La corrida falla
+sin haber tocado nada. Hasta el #840 ese mismo comando subía a producción, con
+cartel, pero subía.
+
+Para escribir en producción hay que **nombrarla**, por cualquiera de los cuatro
+caminos de la cadena (`--project=treino-dev`, `GOOGLE_CLOUD_PROJECT`,
+`GCLOUD_PROJECT` o la credencial de prod en `GOOGLE_APPLICATION_CREDENTIALS`).
+Ahí sí sale el cartel del #826 antes de la primera escritura, igual que antes:
+lo que el #840 le sacó de encima al guard es el default que lo hacía disparar
+sin que nadie hubiera pedido producción.
 
 **Producción se mide por proyecto Y por bucket.** El guard del #826 mira sólo el
 project id, que para un backfill de Firestore ES el destino; para estos cuatro
@@ -348,6 +359,30 @@ el mismo bucket (`treino-dev.firebasestorage.app`, el legacy
 `treino-dev.appspot.com`, y el id pelado) y saca su propio cartel, que nombra al
 bucket y no al proyecto. El backup diario de Firestore **no cubre Cloud
 Storage**: lo que estos scripts escriben ahí no se recupera.
+
+**Quedan tres archivos con el bucket de producción hardcodeado, y ninguno abre
+Storage.** El #840 cambia el proyecto por default, no el literal: donde el
+bucket está escrito a mano, sigue escrito a mano. Se midió qué pasa ahí y la
+respuesta es que hoy es inerte —
+
+- `build_catalog_proposal.js` y `match_drive_videos_to_catalog.js` son
+  read-only: leen `exercises` de Firestore y escriben un CSV/JSON en `docs/`. El
+  `storageBucket:` de su `initializeApp` es opción muerta, no hay un solo
+  `admin.storage()` en esos archivos.
+- `_video_map.js` no es un script sino un mapa `exerciseId → videoUrl`. El
+  bucket vive adentro de una URL de **descarga** que `seed_workout_catalog.js` y
+  `backfill_exercise_videos.js` estampan en Firestore. Contra el emulador esas
+  URLs ya apuntaban al bucket real desde antes del #840; leer de producción no
+  es escribir en producción.
+
+Inerte hoy no es inerte siempre, y las dos formas de romperlo son silenciosas:
+agregarle un `admin.storage().bucket()` a alguno de esos archivos escribiría en
+producción sin pasar por `exigirDestinoCoherente` y sin cartel, y un cuarto
+archivo que copie el literal sería un cuarto destino que no responde ni a
+`--bucket=` ni al default del `.firebaserc`. Las dos las agarra
+`test/storage_scripts_destination.test.js`, que barre `scripts/*.js` y
+`scripts/lib/*.js` y falla si la lista de archivos con el literal cambia o si
+alguno de ellos empieza a tocar Storage.
 
 Los tests del cableado —que cada script llame al guard, y que lo llame antes de
 tocar Storage— están en `test/storage_scripts_destination.test.js`. Corren con

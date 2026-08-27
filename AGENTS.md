@@ -25,15 +25,42 @@ pagos, turnos, mediciones, chats y perfiles comerciales publicados.
   copia de `.firebaserc` y un agente adentro.
   - Corolario 1: para tocar producción **hay que escribir `--project prod`**. Que
     duela un poco es el punto.
-  - Corolario 2 — **esto cubre el CLI de `firebase`, NO los scripts de Node**.
-    Los `scripts/*.js` (`backfill_*`, `cleanup_*`, `restore_*`, `seed_*`,
-    `import_*`, `migrate_*`) **no leen `.firebaserc` nunca**: los hits de
-    `rg 'firebaserc' -g '*.js' scripts/` son **todos comentarios** — ni un solo
-    `require`/`readFile` del archivo. **Un backfill sin `--project` no falla:
-    `--project` ni siquiera existe como flag** (`backfill_gym_ids.js:102` sólo
-    parsea `--dry-run` y `--allow-prod`). Y su guard `assertDevProject()` **no
-    protege**: testea `/dev/i` contra el project id, y `treino-dev` matchea — es
-    exactamente el bug de #826.
+  - Corolario 2 — **esto cubre el CLI de `firebase` y CASI ningún script de
+    Node**. La excepción es una y hay que saberla, porque es la única parte del
+    #840 que protege del lado de Node:
+
+    **Lee `.firebaserc` exactamente un módulo: `scripts/lib/storage_target.js`**
+    (`FIREBASERC` en la línea 60, leído por `proyectoDeFirebaserc`). Es el
+    último eslabón de su cadena `--project=` → `GOOGLE_CLOUD_PROJECT` →
+    `GOOGLE_APPLICATION_CREDENTIALS` → `.firebaserc`, y de él dependen los
+    **cuatro scripts que suben a Storage** (los † de la lista de más abajo). Para
+    esos cuatro, y sólo para esos, el default de `demo-treino` sí desvía la
+    corrida sin variables: antes del #840 un `node scripts/upload_enriched_videos.js`
+    pelado derivaba el bucket real y subía; hoy deriva
+    `demo-treino.firebasestorage.app`, que no existe. Lo fijan los tests de
+    `scripts/test/storage_scripts_destination.test.js`.
+
+    **Todos los demás** (`backfill_*`, `cleanup_*`, `restore_*`, `seed_*`,
+    `import_*`, `migrate_*`) **no leen `.firebaserc` nunca**, y ahí el default
+    no protege nada: resuelven el proyecto por `sa-key.json` o por
+    `GOOGLE_APPLICATION_CREDENTIALS` / ADC. **Un backfill sin `--project` no
+    falla: `--project` ni siquiera existe como flag** (`backfill_gym_ids.js:102`
+    sólo parsea `--dry-run` y `--allow-prod`). Y su guard `assertDevProject()`
+    **no protege**: testea `/dev/i` contra el project id, y `treino-dev`
+    matchea — es exactamente el bug de #826.
+
+    El comando que separa las dos familias, para no confiar en la enumeración
+    (saca los tests y las líneas que arrancan con `*` o `//`; hoy devuelve tres
+    hits y los tres son de `storage_target.js`):
+
+    ```bash
+    rg -n 'firebaserc' -g '*.js' scripts/ | rg -v '/test/' | rg -v ':\s*(\*|//|/\*)'
+    ```
+
+    (Una versión anterior de este corolario decía que los hits de ese `rg` eran
+    **todos comentarios**, «ni un solo `require`/`readFile` del archivo». Era
+    falso —`storage_target.js:60` es código— y encima subestimaba al propio
+    #840: hacía creer que del lado de Node el default no cambia nada.)
 
     **Ojo con "la barrera es `sa-key.json`": son DOS familias, no una.**
 
@@ -45,8 +72,8 @@ pagos, turnos, mediciones, chats y perfiles comerciales publicados.
     El criterio NO es `initializeApp()` **pelado**: es `initializeApp()` **sin
     `credential`**, que también incluye `initializeApp({ storageBucket: … })`.
     Escrito angosto la primera vez, esta lista perdía 6 scripts — justo los que
-    además **hardcodean el bucket de producción**. El comando que la regenera,
-    para que no haya que confiar en la enumeración:
+    además tocan **Storage**. El comando que la regenera, para que no haya que
+    confiar en la enumeración:
 
     ```bash
     for f in scripts/*.js scripts/*.mjs; do
@@ -57,10 +84,10 @@ pagos, turnos, mediciones, chats y perfiles comerciales publicados.
     Los 22 que escriben, para que nadie tenga que adivinar:
     `accept_pending_link`, `apply_catalog_video_fill`†, `apply_technique`,
     `backfill_exercise_aliases`, `backfill_exercise_equipment`,
-    `backfill_exercise_videos`, `build_catalog_proposal`†,
+    `backfill_exercise_videos`, `build_catalog_proposal`‡,
     `dedup_exercise_generics`, `extract_exercise_thumbnails`†,
     `import_enriched_catalog`, `import_exercises_catalog`,
-    `match_drive_videos_to_catalog`†, `migrate_trainer_locations`,
+    `match_drive_videos_to_catalog`‡, `migrate_trainer_locations`,
     `promote_user_to_trainer`, `reset_onboarding_cards`, `seed_gyms`,
     `seed_posts`, `seed_sessions`, `seed_templates`, `seed_workout_catalog`,
     `upload_drive_exercise_videos`†, `upload_enriched_videos`†.
@@ -68,9 +95,35 @@ pagos, turnos, mediciones, chats y perfiles comerciales publicados.
     El comando devuelve 24: los otros dos son `seed_emulator_full` (se niega a
     correr sin emulador) y `audit_trainer_profiles` (sólo lee).
 
-    **† = hardcodean el bucket de Storage de producción** (#838). Para esos seis
-    el consejo de mirar el `project_id` de tu credencial **ni siquiera alcanza**:
-    el destino de Storage está fijo en el código y ninguna variable lo redirige.
+    **† = suben archivos a Firebase Storage** (#838). Para esos cuatro el
+    consejo de mirar el `project_id` de tu credencial **no alcanza**: el destino
+    son DOS cosas, proyecto y bucket, y se pueden separar. Los cuatro pasan por
+    `exigirDestinoCoherente` (`lib/storage_target.js`) antes de la primera
+    escritura: el bucket ya no está hardcodeado —se deriva del proyecto activo y
+    lo redirigen `--bucket=` y `FIREBASE_STORAGE_BUCKET`—, el cartel grita si el
+    bucket es de producción aunque el proyecto no lo sea, y una corrida con
+    Firestore en el emulador y Storage sin redirigir **aborta** en vez de subir
+    a producción. Lo que Storage escribe **no lo cubre el backup diario de
+    Firestore**.
+
+    **‡ = todavía tienen el bucket de producción escrito a mano**, y son los dos
+    únicos que quedan (más `_video_map.js`, que no llama a `initializeApp` y por
+    eso no está en esta lista). El hardcodeo sobrevive porque hoy es **inerte**:
+    los dos son read-only —leen `exercises` y escriben un CSV/JSON en `docs/`— y
+    no hay un solo `admin.storage()` en ninguno de los dos, así que ese
+    `storageBucket:` es opción muerta. En `_video_map.js` el bucket vive adentro
+    de una URL de **descarga** que se estampa en Firestore, no de un destino de
+    escritura. Que siga inerte lo fija un test estructural en
+    `scripts/test/storage_scripts_destination.test.js`: falla si alguno de los
+    tres empieza a abrir Storage, o si aparece un cuarto archivo que copie el
+    literal.
+
+    La versión anterior de esta nota marcaba los SEIS con † y decía que en todos
+    «el destino de Storage está fijo en el código y ninguna variable lo
+    redirige». Era falso por los dos lados: para los cuatro escritores porque el
+    #838 les sacó el hardcodeo (`--bucket=` los redirige, y hay tests que lo
+    prueban), y para los otros dos porque nunca abren Storage. Otra vez el
+    patrón del #826 — un cartel que nombra mal lo que está en riesgo.
 
     **Y la credencial de producción está en la máquina.** Se movió del repo a
     `~/.config/treino/sa-key.json`, exportada como `$TREINO_SA_KEY` en
