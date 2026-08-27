@@ -55,6 +55,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 
+// El vocabulario del emulador sale de UN solo módulo (#846). Ver
+// `contraEmuladorDeFirestore` más abajo para por qué no se define acá.
+// `target_project.js` no requiere este archivo: no hay ciclo.
+const { VARIABLES_POR_SERVICIO, contraEmuladorDe } = require('./target_project');
+
 /** La variable canónica que dice dónde está la credencial. No hay default (#834). */
 const VAR_RUTA = 'TREINO_SA_KEY';
 
@@ -128,11 +133,11 @@ const VAR_EMULADOR_FIRESTORE = 'FIRESTORE_EMULATOR_HOST';
  * fijó para el par Firestore/Storage: o todo redirigido, o nada; la mezcla
  * ABORTA antes de la primera escritura. Ver `mensajeEmuladorIncoherente`.
  */
-const VARS_DE_EMULADOR_PARCIALES = [
-  'FIREBASE_AUTH_EMULATOR_HOST',
-  'FIREBASE_STORAGE_EMULATOR_HOST',
-  'FIREBASE_DATABASE_EMULATOR_HOST',
-];
+const VARS_DE_EMULADOR_PARCIALES = Object.freeze(
+  Object.entries(VARIABLES_POR_SERVICIO)
+    .filter(([servicio]) => servicio !== 'firestore')
+    .flatMap(([, vars]) => vars),
+);
 
 /**
  * Error con `codigo` estable para que los tests afirmen sobre el caso y no
@@ -503,9 +508,23 @@ function evaluarProduccion(credencial, { projectIdDeclarado = null } = {}) {
  *
  * Se chequea ANTES que la credencial en todo el flujo: contra el emulador no
  * hay nada que proteger y no debe hacer falta ninguna variable (#834, (c)).
+ *
+ * ─── Por qué DELEGA en vez de decidir (#846) ───────────────────────────────
+ *
+ * Esto era una implementación propia —`(env[VAR] || '').trim()`— idéntica a la
+ * de `target_project.js`, y había un test que verificaba que las dos dijeran lo
+ * mismo. Un test así avisa DESPUÉS de que alguien las separó; el problema es
+ * que se puedan separar. Dos definiciones de "emulador" en el mismo proceso es
+ * exactamente el hueco que abrió el OR de #846, y la respuesta correcta no es
+ * custodiar la copia: es no tener copia.
+ *
+ * `target_project.js` es el dueño del vocabulario (qué variable desvía qué
+ * servicio) y acá se le pregunta por el único servicio que estos 44 scripts
+ * escriben. El nombre dice el servicio a propósito: el `usandoEmulador()` que
+ * había no lo decía, y esa vaguedad es la que dejó pasar el OR.
  */
-function usandoEmulador(env = process.env) {
-  return Boolean((env[VAR_EMULADOR_FIRESTORE] || '').trim());
+function contraEmuladorDeFirestore(env = process.env) {
+  return contraEmuladorDe(['firestore'], env);
 }
 
 /** Las variables de emulador PARCIAL que están puestas. Lista, para nombrarlas. */
@@ -604,11 +623,11 @@ function resolverContexto({
   // manda a exportar la clave de producción para arreglar una corrida que la
   // persona quería local.
   const parciales = emuladoresParcialesPuestos(env);
-  if (!usandoEmulador(env) && parciales.length > 0) {
+  if (!contraEmuladorDeFirestore(env) && parciales.length > 0) {
     throw new ErrorDeCredencial('EMULADOR_INCOHERENTE', mensajeEmuladorIncoherente(parciales));
   }
 
-  if (usandoEmulador(env)) {
+  if (contraEmuladorDeFirestore(env)) {
     rechazarSiApuntaAlRepo({ env, ...io });
     return {
       modo: 'emulador',
@@ -649,7 +668,7 @@ module.exports = {
   cargarCredencial,
   proyectoDeLaIdentidad,
   evaluarProduccion,
-  usandoEmulador,
+  contraEmuladorDeFirestore,
   emuladoresParcialesPuestos,
   rechazarSiApuntaAlRepo,
   resolverContexto,

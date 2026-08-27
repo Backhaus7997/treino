@@ -83,7 +83,21 @@ function sinComentarios(fuente) {
     .replace(/(^|[^:])\/\/.*$/gm, '$1');
 }
 
-/** Los scripts de primer nivel de `scripts/`. */
+/**
+ * Los scripts de primer nivel de `scripts/`.
+ *
+ * PRIMER NIVEL, y eso es una LIMITACIÓN conocida, no una decisión cómoda:
+ * `scripts/migrations/strip_appointment_reason.mjs` (#846) llama a
+ * `admin.initializeApp({ credential: admin.credential.applicationDefault() })`
+ * por su cuenta y este barrido no lo ve.
+ *
+ * No se le hace una excepción en `DIRS_EXCLUIDOS` a propósito: un trinquete con
+ * un agujero recortado a la medida del único archivo que lo viola no es un
+ * trinquete. Cubrir `migrations/` es cambiarle la inicialización a ese script
+ * —que tiene sus propios 42 tests de compuerta— y eso es un PR aparte, no un
+ * rebase. Está anotado en `scripts/README.md` y en `AGENTS.md` para que la
+ * cobertura que se promete sea la que hay.
+ */
 function scriptsDelRepo() {
   return fs
     .readdirSync(RAIZ_SCRIPTS, { withFileTypes: true })

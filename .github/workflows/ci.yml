@@ -438,10 +438,11 @@ jobs:
   # cargan con `--require test/fixtures/stub_firebase_admin.js`, que intercepta
   # `Module._load` (CJS) y `module.register()` (ESM) y devuelve un
   # `firebase-admin` falso; el resto es todo `node:` builtin. Verificado
-  # corriendo la suite con `scripts/node_modules` inexistente, en Node 20 y en
-  # Node 22: 165/165 en verde. Instalar `firebase-admin` acá sería medio minuto
-  # por run para nada — y peor, dejaría que un test toque la red sin que se
-  # note.
+  # corriendo la suite con `scripts/node_modules` inexistente, en Node 20, 22
+  # y 26: 421/421 en verde, y el MISMO número en las tres —un conteo que baja
+  # con la versión es la firma de los subtests cancelados de más abajo—.
+  # Instalar `firebase-admin` acá sería medio minuto por run para nada — y
+  # peor, dejaría que un test toque la red sin que se note.
   #
   # Node 20 igual que los otros jobs de Node, y NO se sube. Este job ya se puso
   # rojo una vez por una API que sólo existe de Node 22.15 para arriba

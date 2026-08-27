@@ -33,7 +33,7 @@ const {
   permisosDemasiadoAbiertos,
   proyectoDeLaIdentidad,
   evaluarProduccion,
-  usandoEmulador,
+  contraEmuladorDeFirestore,
   emuladoresParcialesPuestos,
   resolverContexto,
   RAIZ_DEL_REPO,
@@ -300,11 +300,11 @@ test('una ruta fuera del repo pero inexistente falla como inexistente', () => {
 
 // ── 3. El emulador anda sin credencial ─────────────────────────────────────
 
-test('usandoEmulador es SÓLO la variable que desvía Firestore', () => {
-  assert.strictEqual(usandoEmulador({}), false);
-  assert.strictEqual(usandoEmulador({ FIRESTORE_EMULATOR_HOST: '' }), false);
-  assert.strictEqual(usandoEmulador({ FIRESTORE_EMULATOR_HOST: '   ' }), false);
-  assert.strictEqual(usandoEmulador({ FIRESTORE_EMULATOR_HOST: 'localhost:8080' }), true);
+test('contraEmuladorDeFirestore es SÓLO la variable que desvía Firestore', () => {
+  assert.strictEqual(contraEmuladorDeFirestore({}), false);
+  assert.strictEqual(contraEmuladorDeFirestore({ FIRESTORE_EMULATOR_HOST: '' }), false);
+  assert.strictEqual(contraEmuladorDeFirestore({ FIRESTORE_EMULATOR_HOST: '   ' }), false);
+  assert.strictEqual(contraEmuladorDeFirestore({ FIRESTORE_EMULATOR_HOST: 'localhost:8080' }), true);
 
   // Ésta es la aserción que cambió de signo, y el cambio ES el arreglo. Antes
   // cualquiera de las tres devolvía `true`, y de ese `true` cuelgan las dos
@@ -312,9 +312,15 @@ test('usandoEmulador es SÓLO la variable que desvía Firestore', () => {
   // el cartel de producción (#826). Ninguna de las tres desvía Firestore, que
   // es lo que estos scripts escriben — o sea que las dos decisiones se tomaban
   // sobre una corrida que iba derecho a producción.
-  assert.strictEqual(usandoEmulador({ FIREBASE_AUTH_EMULATOR_HOST: 'localhost:9099' }), false);
-  assert.strictEqual(usandoEmulador({ FIREBASE_STORAGE_EMULATOR_HOST: 'localhost:9199' }), false);
-  assert.strictEqual(usandoEmulador({ FIREBASE_DATABASE_EMULATOR_HOST: 'localhost:9000' }), false);
+  assert.strictEqual(contraEmuladorDeFirestore({ FIREBASE_AUTH_EMULATOR_HOST: 'localhost:9099' }), false);
+  assert.strictEqual(contraEmuladorDeFirestore({ FIREBASE_STORAGE_EMULATOR_HOST: 'localhost:9199' }), false);
+  assert.strictEqual(contraEmuladorDeFirestore({ FIREBASE_DATABASE_EMULATOR_HOST: 'localhost:9000' }), false);
+  // El OTRO nombre de Storage. Estaba fuera de `VARS_DE_EMULADOR_PARCIALES`
+  // cuando la lista se escribía a mano acá, así que `STORAGE_EMULATOR_HOST`
+  // suelto no disparaba el abort de incoherencia: pasaba por el camino de la
+  // nube sin que nadie lo nombrara. Derivar la lista del mapa de
+  // `target_project.js` lo trajo solo. (#846)
+  assert.strictEqual(contraEmuladorDeFirestore({ STORAGE_EMULATOR_HOST: 'localhost:9199' }), false);
 });
 
 test('emuladoresParcialesPuestos nombra las que están, en orden', () => {

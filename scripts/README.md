@@ -84,9 +84,19 @@ Las reglas:
   ésa **aborta**. Ver "Sin credencial: el emulador".
 
 Lo que impide que el próximo script nazca salteándose todo esto es
-`test/frontera.test.js`: escanea `scripts/` y falla si aparece un
-`initializeApp`, un `credential.cert`, un `sa-key.json` o una lectura de
-`GOOGLE_APPLICATION_CREDENTIALS` fuera de `lib/`.
+`test/frontera.test.js`: escanea los archivos **de primer nivel** de `scripts/`
+y falla si aparece un `initializeApp`, un `credential.cert`, un `sa-key.json` o
+una lectura de `GOOGLE_APPLICATION_CREDENTIALS` fuera de `lib/`.
+
+**Lo que todavía NO cubre: los subdirectorios.**
+`scripts/migrations/strip_appointment_reason.mjs` (#846) inicializa con
+`admin.credential.applicationDefault()` por su cuenta. No es el agujero de #834
+—no lee nada de adentro del repo, y su header manda a
+`export GOOGLE_APPLICATION_CREDENTIALS="$TREINO_SA_KEY"`—, pero **tampoco pasa
+por la validación de árbol de git**: un `GOOGLE_APPLICATION_CREDENTIALS`
+apuntando a `scripts/sa-key.json` lo cargaría igual. Queda anotado acá en vez de
+tapado con una excepción en el trinquete, que sería un trinquete con un agujero
+hecho a medida del único que lo viola.
 
 Tests: `cd scripts && npm test`.
 

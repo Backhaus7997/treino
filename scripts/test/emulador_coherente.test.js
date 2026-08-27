@@ -70,10 +70,13 @@ const {
  * en producción sin cartel.
  *
  * Están los DOS caminos por los que hoy se responde esa pregunta, a propósito:
- *   · `contexto.modo === 'emulador'`  (lib/credenciales.js)  → los backfills
- *   · `usandoEmulador()`              (lib/target_project.js) → los entrypoints
- * Tener una sola familia acá dejaría a la otra libre de volver a divergir, que
- * es justo cómo el desfasaje se metió.
+ *   · `contexto.modo === 'emulador'`      (lib/credenciales.js)  → los backfills
+ *   · `contraEmuladorDe(['firestore'])`   (lib/target_project.js) → los entrypoints
+ * Desde #846 los dos terminan en la MISMA función —`credenciales.js` delega—,
+ * así que ya no pueden discrepar por implementación. Lo que este archivo sigue
+ * cubriendo es el nivel de arriba, que es donde todavía se puede meter el
+ * desfasaje: que un script pregunte por el servicio equivocado, o que se saltee
+ * la pregunta. Eso no lo ve ningún test unitario.
  */
 const SCRIPTS = [
   { script: 'backfill_gym_ids.js', argv: ['--dry-run'] },
@@ -94,10 +97,12 @@ function correr({ script, argv }, emuladores = {}, { conCredencial = true } = {}
   const env = { ...process.env };
   // Si la máquina que corre los tests tiene alguna exportada, el test mediría
   // otra cosa que la que dice medir.
+  // `PARCIALES` ya sale del mapa de `target_project.js`, así que incluye los
+  // DOS nombres de Storage. Antes `STORAGE_EMULATOR_HOST` se listaba a mano acá
+  // porque la lista de `credenciales.js` se le olvidaba. (#846)
   for (const v of [
     FIRESTORE,
     ...PARCIALES,
-    'STORAGE_EMULATOR_HOST',
     'GOOGLE_CLOUD_PROJECT',
     'GCLOUD_PROJECT',
     'FIREBASE_STORAGE_BUCKET',
