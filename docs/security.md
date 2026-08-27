@@ -453,6 +453,20 @@ Tres cosas más, que en `appointments` costaron seis pasadas de aprender (§4.9)
    conjunto tapa el mismo ataque) o un gate **sin custodia**. Distinguirlos pide
    una segunda medición: aplicar la mutación y tirarle la escritura hostil que
    ese gate custodia, y ver si pasa a ALLOW.
+
+   **Y hay una tercera lectura, que #849 pagó (§4.14): un gate cuya custodia
+   distintiva no es una escritura hostil.** El barrido de mutación cuenta filas
+   `assertFails` que se ponen verdes, o sea ataques que dejan de denegarse. Si
+   lo único que un gate deniega y sus vecinos no es una escritura **legítima**
+   —un doc legacy que se re-presenta a sí mismo—, el barrido da cero y **no hay
+   ninguna escritura hostil que se lo saque**, porque no existe. Ahí el cero se
+   lee como "subsumido" y es mentira: el gate deniega algo más, sólo que ese
+   algo más no es un ataque, es una congelación.
+
+   La regla práctica: antes de escribir "subsumido", nombrá la escritura que
+   **sólo** ese gate decide. Si esa escritura es un **ALLOW** y no un DENY, la
+   mutación por negativos es estructuralmente ciega y hay que correr la suite
+   contra el ruleset viejo para verla.
 3. **"El negativo es válido sin el gate" no es una propiedad permanente.** Un fix
    en un camino VECINO la invalida sin tocar el test: pasó dos veces con el mismo
    caso. Lo único que lo detecta es re-correr la mutación de esa fila después de
