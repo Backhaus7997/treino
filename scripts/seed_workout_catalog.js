@@ -28,9 +28,13 @@ if (!admin.apps.length) {
   // `npm run seed:all` escribe el catálogo entero en producción sin que
   // `treino-dev` aparezca una sola vez en pantalla. (#826)
   const { bannerDeProduccion } = require('./lib/firebase_projects');
-  const { usandoEmulador, projectIdObjetivo } = require('./lib/target_project');
+  const { contraEmuladorDe, projectIdObjetivo } = require('./lib/target_project');
+  // #846 — por servicio, no por OR. Este script escribe SÓLO en Firestore, y
+  // el viejo `usandoEmulador()` también miraba `FIREBASE_AUTH_EMULATOR_HOST`:
+  // esa variable suelta apagaba el cartel de `npm run seed:all` sin desviar un
+  // solo write.
   const bannerProd = bannerDeProduccion(projectIdObjetivo(), {
-    contraEmulador: usandoEmulador(),
+    contraEmulador: contraEmuladorDe(['firestore']),
   });
   if (bannerProd) console.warn(bannerProd);
   admin.initializeApp(); // uses GOOGLE_APPLICATION_CREDENTIALS env var

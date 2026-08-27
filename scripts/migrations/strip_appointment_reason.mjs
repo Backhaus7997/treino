@@ -2,53 +2,57 @@
 /**
  * Migración #846 — saca la clave `reason` de primer nivel de `appointments`.
  *
- * ⚠️ ESTE SCRIPT NO SE CORRIÓ. Escribe en producción y por eso queda escrito y
- * escalado, no ejecutado. Ver el final de este comentario.
+ * ⚠️⚠️ ESTE SCRIPT YA NO HACE FALTA, Y NO SE DEBE CORRER. ⚠️⚠️
  *
- * ─── Qué arregla ────────────────────────────────────────────────────────────
+ * Queda escrito porque su compuerta de escritura es el caso de estudio del
+ * issue, y porque borrarlo tiraría los tests que la custodian. Leé la sección
+ * "Por qué NO se corre" antes que nada.
  *
- * `functions/src/cascade/appointments.ts` escribía, con Admin SDK:
+ * ─── Qué arreglaba ──────────────────────────────────────────────────────────
  *
- *     batch.update(doc.ref, { status: "cancelled", reason: "athlete-account-deleted" });
+ * `functions/src/cascade/appointments.ts` escribe, con Admin SDK:
  *
- * `reason` NO existe en `Appointment.toJson()` ni en las 14 claves de
+ *     batch.update(doc.ref, { status: "cancelled", reason: "athlete-account-deleted", … });
+ *
+ * Cuando este script se escribió, `reason` NO estaba en las claves de
  * `hasOnly()` de `appointmentShapeOk()` / `appointmentUpdateShapeOk()` en
- * `firestore.rules` — sólo existe DENTRO de `CancellationEntry`, que es un
- * elemento del `cancellationLog`.
- *
- * El Admin SDK saltea las reglas, así que la escritura pasaba. El daño es lo
- * que queda después: `hasOnly()` corre sobre `request.resource.data`, que es el
- * documento **MERGEADO**, así que cualquier update PARCIAL posterior del
- * cliente arrastra el `reason` guardado y la allowlist lo rechaza. Medido
- * contra el emulador (`appointments-shape-rules.test.ts`, bloque #846):
+ * `firestore.rules`. El Admin SDK saltea las reglas, así que la escritura
+ * pasaba; el daño era lo que quedaba después. `hasOnly()` corre sobre
+ * `request.resource.data`, que es el documento **MERGEADO**, así que cualquier
+ * update PARCIAL posterior del cliente arrastraba el `reason` guardado y la
+ * allowlist lo rechazaba. Medido contra el emulador:
  *
  *   · el PF anota un turno que lleva `reason`   → DENY
  *   · el atleta cancela un turno con `reason`   → DENY
  *   · borrar el turno                           → DENY (`allow delete: if false`)
  *
  * O sea: turno imborrable, la familia de #781, sembrada por nuestro propio
- * backend.
+ * backend. Este script sacaba la clave para destrabarlos.
  *
- * ─── Por qué hace falta una migración y no alcanza el fix de la CF ──────────
+ * ─── Por qué NO se corre ────────────────────────────────────────────────────
  *
- * El fix de la CF (mover el motivo adentro del `cancellationLog`) evita turnos
- * NUEVOS congelados. **No destraba los que ya se escribieron**: la clave sigue
- * guardada en esos documentos y `hasOnly()` mira el merge, no la escritura.
- * Está medido en el mismo bloque de tests: el caso "sacando la clave con Admin
- * SDK el mismo turno se cancela" es exactamente lo que hace este script.
+ * Porque #846 terminó cerrándose **en las reglas**, no en los datos.
  *
- * El motivo NO se pierde: se reescribe como una entrada de `cancellationLog`,
- * que es el rastro de auditoría real de la colección y sí está en la allowlist.
+ * `reason` ENTRÓ a las dos allowlists y quedó **pineada en los dos caminos de
+ * cliente** (`request.resource.data.get('reason', null) ==
+ * resource.data.get('reason', null)`), con `== null` en el `create` y el
+ * `delete` ya cerrado. O sea que la clave existe para las reglas —y por eso deja
+ * de congelar el documento— pero ningún cliente la puede agregar, cambiar ni
+ * borrar. **Los documentos que están en producción se destrabaron solos con el
+ * deploy de las reglas.** No hay nada que migrar.
  *
- * ─── Urgencia ───────────────────────────────────────────────────────────────
+ * Y correrlo sería un RETROCESO. `notify-appointment.ts` usa `reason` de GUARD
+ * —si el motivo es el del cascade, no manda la notificación—, y esa clave sirve
+ * de señal precisamente porque el cliente no la puede escribir. Este script la
+ * borra y deja el motivo sólo adentro del `cancellationLog`, donde **cualquier
+ * miembro del turno lo puede forjar**: las reglas no iteran listas. Cambiaría
+ * una señal CF-only por una falsificable, que es exactamente el bloqueante que
+ * hizo revertir la primera versión del fix.
  *
- * Baja, y conviene que esté escrito. Los turnos que la CF tocó ya están
- * `cancelled` y su atleta fue borrado, así que hoy nadie los edita. Lo que la
- * migración recupera es el invariante —"el cliente siempre puede cancelar lo
- * suyo"— y el margen de que la CF cambie y la clave llegue a un doc
- * `confirmed`.
+ * Si algún día vuelve a hacer falta sacar la clave, la pregunta que hay que
+ * contestar primero es qué señal lee el guard después.
  *
- * ─── Uso ────────────────────────────────────────────────────────────────────
+ * ─── Uso (si alguna vez volviera a aplicar) ─────────────────────────────────
  *
  *   export GOOGLE_APPLICATION_CREDENTIALS="$TREINO_SA_KEY"   # ~/.config/treino/sa-key.json
  *   node scripts/migrations/strip_appointment_reason.mjs --project=<id>            # DRY-RUN
@@ -56,27 +60,51 @@
  *        --si-escribo-en-produccion                                               # escribe
  *
  * Sin `--apply` no escribe nada: cuenta los documentos afectados y muestra los
- * primeros. `treino-dev` **ES** producción (#826), así que el `--apply` va con
- * una decisión humana atrás, no dentro de una sesión de agente.
+ * primeros. `treino-dev` **ES** producción (#826).
+ *
+ * ─── La compuerta: por qué lee UN SERVICIO y no "algún emulador" ────────────
+ *
+ * La primera versión decidía con `usandoEmulador()`, que hacía **OR** entre
+ * `FIRESTORE_EMULATOR_HOST` y `FIREBASE_AUTH_EMULATOR_HOST`. Este script
+ * escribe SÓLO en Firestore. Medido con `--apply` y una service account falsa:
+ *
+ *     FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099   (y Firestore NO)
+ *       → "emulador: sí", sin cartel 🚨, salteando las DOS puertas del --apply
+ *       → destino real: treino-dev, o sea PRODUCCIÓN, escribiendo
+ *       → murió recién en el canje del token, y sólo porque la key era falsa
+ *
+ * Y es la situación de todos los días: esa variable queda exportada de una
+ * sesión de `emulator.sh` o la hereda una shell. Es literalmente el modo de
+ * fallar de #826, en el script que lo cita como motivo de existir.
+ *
+ * El OR alcanzaba en #826 porque ahí alimentaba a `bannerDeProduccion()`:
+ * apagaba un CARTEL, no cambiaba una decisión, y el peor caso era no gritar.
+ * Este script fue el primero en ascenderlo a **compuerta de escritura**, y ahí
+ * la pregunta es otra: no "¿hay algún emulador puesto?", sino **"¿está desviado
+ * el servicio que voy a ESCRIBIR?"**. `contraEmuladorDe(['firestore'])` la
+ * contesta. Es el mismo criterio por servicio de `scripts/lib/storage_target.js`,
+ * que hasta aborta el split-brain.
+ *
+ * La matriz completa de las cinco variables de emulador, corriendo este script
+ * de verdad con `--apply`, está en
+ * `scripts/test/strip_appointment_reason_gate.test.js`.
  *
  * ─── Y por qué el destino se ANUNCIA antes de escribir ──────────────────────
  *
- * Lo marcó la review de Codex sobre este mismo PR, y tiene razón: la primera
- * versión hacía `initializeApp()` sin resolver ni mostrar el destino, y omitir
- * `--project` deja que el SDK lo elija desde las credenciales del ambiente. O
- * sea que una invocación copiada podía reescribir turnos de producción
- * mostrando en pantalla nada más que un conteo de documentos. Es exactamente el
- * modo de fallar que #826 vino a cerrar, y para el que ya existen
- * `scripts/lib/firebase_projects.js` y `scripts/lib/target_project.js`.
+ * Lo marcó la review de Codex sobre este mismo PR: la primera versión hacía
+ * `initializeApp()` sin resolver ni mostrar el destino, y omitir `--project`
+ * deja que el SDK lo elija desde las credenciales del ambiente. O sea que una
+ * invocación copiada podía reescribir turnos de producción mostrando en
+ * pantalla nada más que un conteo de documentos.
  *
  * Este script va UN PASO más que la convención del #826, y a propósito. Esa
  * convención es "el operador VE la verdad, pero la decisión de correr o no
  * correr NO cambia", porque cambiarla rompía invocaciones documentadas
  * (`npm run seed:all`, `npm run promote:trainer`). Acá no hay ninguna
- * invocación previa que romper —es una migración de una sola vez—, así que
- * contra producción el `--apply` **falla cerrado** sin el flag explícito. Y si
- * el destino no se puede resolver, tampoco escribe: no saber contra qué
- * proyecto estás no es lo mismo que saber que no es producción.
+ * invocación previa que romper, así que contra producción el `--apply` **falla
+ * cerrado** sin el flag explícito. Y si el destino no se puede resolver,
+ * tampoco escribe: no saber contra qué proyecto estás no es lo mismo que saber
+ * que no es producción.
  *
  * Idempotente: sólo toca documentos que tienen la clave, y correrlo dos veces
  * deja el mismo resultado.
@@ -92,7 +120,16 @@ import admin from "firebase-admin";
 // no ahorrarse dos líneas.
 const require = createRequire(import.meta.url);
 const { bannerDeProduccion, esProduccion } = require("../lib/firebase_projects");
-const { usandoEmulador, projectIdObjetivo } = require("../lib/target_project");
+const {
+  emuladoresActivos,
+  contraEmuladorDe,
+  projectIdObjetivo,
+} = require("../lib/target_project");
+
+// Los servicios que ESTE proceso toca. Es la lista entera: el script hace
+// `db.collection(...)` y `batch.commit()`, y nada más. Auth, Storage y RTDB no
+// se rozan, así que sus variables de emulador no desvían NI UN write de acá.
+const SERVICIOS_QUE_TOCA = ["firestore"];
 
 const args = process.argv.slice(2);
 const projectArg = args.find((a) => a.startsWith("--project="));
@@ -114,13 +151,50 @@ if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
 // `--project` gana porque es lo que se le pasa al SDK abajo; si no está, se
 // resuelve por las mismas fuentes y en el mismo orden que usa el Admin SDK.
 const destino = projectId ?? projectIdObjetivo();
-const contraEmulador = usandoEmulador();
+
+// ─── La compuerta lee EL SERVICIO QUE ESCRIBE ───────────────────────────────
+//
+// Acá había `usandoEmulador()`, que hace OR entre `FIRESTORE_EMULATOR_HOST` y
+// `FIREBASE_AUTH_EMULATOR_HOST`. Este script escribe SÓLO en Firestore, así que
+// un `FIREBASE_AUTH_EMULATOR_HOST` suelto —heredado de una sesión de
+// `emulator.sh`, que es la situación de todos los días— daba "emulador: sí",
+// apagaba el cartel y salteaba las DOS puertas del `--apply` mientras los
+// `batch.update` iban a `treino-dev`. Medido con una key falsa: murió recién en
+// el canje del token, ya hablándole al Firestore de producción.
+//
+// El OR alcanzaba en #826 porque ahí alimentaba a `bannerDeProduccion()` — o
+// sea apagaba un CARTEL, no cambiaba una decisión. Esta es la primera vez que
+// el valor decide si una escritura ocurre, y para eso la pregunta es otra: no
+// "¿hay algún emulador puesto?", sino "¿está desviado el servicio que voy a
+// escribir?". Es el mismo criterio por servicio que ya aplica
+// `scripts/lib/storage_target.js`.
+const emuladores = emuladoresActivos();
+const contraEmulador = contraEmuladorDe(SERVICIOS_QUE_TOCA);
+
+// Los OTROS emuladores puestos, que no desvían nada de lo que este script hace.
+// Se nombran a propósito: son exactamente los que producen la ilusión.
+const emuladoresIrrelevantes = Object.keys(emuladores).filter(
+  (s) => emuladores[s] && !SERVICIOS_QUE_TOCA.includes(s),
+);
 
 console.log("");
 console.log(`  destino : ${destino ?? "(no resuelto — lo elige el Admin SDK)"}`);
 console.log(`  modo    : ${apply ? "APLICA (escribe)" : "DRY-RUN (no escribe)"}`);
-console.log(`  emulador: ${contraEmulador ? "sí" : "no"}`);
+console.log(`  escribe : ${SERVICIOS_QUE_TOCA.join(", ")}`);
+console.log(`  emulador: Firestore=${emuladores.firestore ? "sí" : "no"}` +
+  `  ·  Auth=${emuladores.auth ? "sí" : "no"}` +
+  `  ·  Storage=${emuladores.storage ? "sí" : "no"}` +
+  `  ·  RTDB=${emuladores.database ? "sí" : "no"}`);
 console.log("");
+
+if (emuladoresIrrelevantes.length > 0 && !contraEmulador) {
+  console.warn(
+    `⚠️  Tenés el emulador de ${emuladoresIrrelevantes.join(" y ")} puesto, ` +
+      "pero NO el de Firestore.\n" +
+      "⚠️  Este script escribe SÓLO en Firestore: esas variables no desvían nada.\n" +
+      "⚠️  El destino de abajo es real.\n",
+  );
+}
 
 const bannerProd = bannerDeProduccion(destino, { contraEmulador });
 if (bannerProd) console.warn(bannerProd);

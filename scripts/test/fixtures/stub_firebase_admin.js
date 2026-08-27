@@ -47,6 +47,18 @@
  *   Del #838 (lo consume `storage_scripts_destination.test.js`):
  *     · `storageStub` + `STUB_STORAGE_REACHED`
  *
+ *   Del #846 (lo consume `strip_appointment_reason_gate.test.js`):
+ *     · `registerHooks` — la intercepción por el loader de ESM
+ *     · `credential.applicationDefault` y `firestore.FieldValue`
+ *
+ * La mitad del #846 hace falta porque `scripts/migrations/*.mjs` son MÓDULOS
+ * ESM, y un `import admin from "firebase-admin"` **no pasa por `Module._load`**:
+ * medido, el subproceso cargaba el `firebase-admin` REAL y el stub no veía
+ * nada. `module.registerHooks()` es síncrono y en el mismo hilo, así que
+ * convive con la intercepción de CJS en vez de reemplazarla — los `.mjs` usan
+ * `createRequire` para los módulos de `lib/`, o sea que los DOS caminos corren
+ * en el mismo proceso.
+ *
  * Sacar CUALQUIERA de las dos mitades pone en rojo los tests de la otra, y en
  * el caso de la mitad del #835 el rojo es lo de MENOS: sin `googleAuthStub` y
  * sin la intercepción de `readFileSync`, el subproceso de `deploy_rules.js`
@@ -62,6 +74,7 @@
  */
 
 const Module = require('node:module');
+const { registerHooks } = require('node:module');
 const fs = require('node:fs');
 
 const STUB_FIRESTORE_REACHED = 'STUB_FIRESTORE_REACHED';
@@ -87,6 +100,16 @@ function storageStub() {
   };
 }
 
+// `admin.firestore` es función Y namespace. Los `.mjs` de `migrations/` usan
+// `admin.firestore.FieldValue.delete()` / `.arrayUnion()` para armar el update,
+// pero eso pasa DESPUÉS del primer `.collection()`, que tira el marcador. Están
+// acá para que un cambio de orden falle con el marcador y no con un TypeError
+// que no se entiende. (#846)
+firestoreStub.FieldValue = {
+  delete: () => ({ __stub: 'delete' }),
+  arrayUnion: (...v) => ({ __stub: 'arrayUnion', v }),
+};
+
 const adminStub = {
   // `seed_workout_catalog.js` consulta `admin.apps.length` para no inicializar
   // dos veces cuando `seed_emulator_full.js` lo requiere. En el módulo real
@@ -94,7 +117,12 @@ const adminStub = {
   // subproceso ve el mismo estado limpio. (#826)
   apps: [],
   initializeApp() {},
-  credential: { cert: (serviceAccount) => serviceAccount },
+  // `applicationDefault` es la que usan los `.mjs` de `migrations/`: no lee
+  // nada, sólo tiene que existir para llegar al `initializeApp()`. (#846)
+  credential: {
+    cert: (serviceAccount) => serviceAccount,
+    applicationDefault: () => ({ __stub: 'applicationDefault' }),
+  },
   firestore: firestoreStub,
   storage: storageStub,
 };
@@ -145,5 +173,40 @@ fs.readFileSync = function lecturaInterceptada(ruta, ...resto) {
   }
   return readFileSyncOriginal.call(this, ruta, ...resto);
 };
+
+// ─── La mitad ESM (#846) ────────────────────────────────────────────────────
+//
+// `Module._load` cubre `require()`. Los scripts de `scripts/migrations/` son
+// `.mjs`, y su `import admin from "firebase-admin"` se resuelve por el loader
+// de ESM, que NO pasa por ahí — medido: sin esto el subproceso carga el
+// `firebase-admin` de verdad. `registerHooks` es síncrono y en el hilo actual,
+// así que no necesita worker ni `--experimental-loader`.
+//
+// El módulo sintético devuelve el MISMO `adminStub` que ve el lado CJS, por
+// `globalThis`: un `.mjs` puede mezclar los dos caminos (`createRequire` para
+// `lib/`, `import` para `firebase-admin`) y los dos tienen que contar la misma
+// historia.
+globalThis.__STUB_FIREBASE_ADMIN__ = adminStub;
+
+const URL_ADMIN_STUB = 'stub:firebase-admin';
+
+registerHooks({
+  resolve(specifier, context, nextResolve) {
+    if (specifier === 'firebase-admin') {
+      return { url: URL_ADMIN_STUB, shortCircuit: true };
+    }
+    return nextResolve(specifier, context);
+  },
+  load(url, context, nextLoad) {
+    if (url === URL_ADMIN_STUB) {
+      return {
+        format: 'module',
+        shortCircuit: true,
+        source: 'export default globalThis.__STUB_FIREBASE_ADMIN__;',
+      };
+    }
+    return nextLoad(url, context);
+  },
+});
 
 module.exports = { STUB_FIRESTORE_REACHED, STUB_STORAGE_REACHED, STUB_NETWORK_REACHED };

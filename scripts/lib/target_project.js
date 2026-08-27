@@ -28,17 +28,94 @@
 const fs = require('node:fs');
 
 /**
- * ¿Este proceso apunta al emulador?
+ * Qué variable de entorno desvía CADA servicio, con los nombres que lee el SDK.
  *
- * Cualquiera de las dos variables alcanza: `FIRESTORE_EMULATOR_HOST` desvía
- * Firestore y `FIREBASE_AUTH_EMULATOR_HOST` desvía Auth, y un script que setea
- * una sola igual está en modo local. Vacío o whitespace NO cuenta: exportar la
- * variable en blanco no desvía nada, y tratarla como emulador apagaría el
- * cartel exactamente cuando el proceso sí va a producción.
+ * Storage tiene DOS: `firebase-admin` acepta las dos y normaliza
+ * `FIREBASE_STORAGE_EMULATOR_HOST` a `STORAGE_EMULATOR_HOST`. Mirar una sola
+ * daría un falso negativo — el mismo criterio que ya usa
+ * `storage_target.js:emuladoresActivos()`.
  */
-function usandoEmulador(env = process.env) {
-  const hosts = [env.FIRESTORE_EMULATOR_HOST, env.FIREBASE_AUTH_EMULATOR_HOST];
-  return hosts.some((h) => typeof h === 'string' && h.trim() !== '');
+const VARIABLES_POR_SERVICIO = Object.freeze({
+  firestore: Object.freeze(['FIRESTORE_EMULATOR_HOST']),
+  auth: Object.freeze(['FIREBASE_AUTH_EMULATOR_HOST']),
+  storage: Object.freeze(['STORAGE_EMULATOR_HOST', 'FIREBASE_STORAGE_EMULATOR_HOST']),
+  database: Object.freeze(['FIREBASE_DATABASE_EMULATOR_HOST']),
+});
+
+const SERVICIOS = Object.freeze(Object.keys(VARIABLES_POR_SERVICIO));
+
+/**
+ * Vacío o whitespace NO cuenta: exportar la variable en blanco no desvía nada,
+ * y tratarla como emulador apagaría la salvaguarda exactamente cuando el
+ * proceso sí va a producción.
+ */
+function seteada(valor) {
+  return typeof valor === 'string' && valor.trim() !== '';
+}
+
+/**
+ * Qué emuladores están puestos, SERVICIO POR SERVICIO.
+ *
+ * ─── #846 — por qué esto reemplaza al `usandoEmulador()` que había ──────────
+ *
+ * Ese helper hacía un **OR** entre `FIRESTORE_EMULATOR_HOST` y
+ * `FIREBASE_AUTH_EMULATOR_HOST` y devolvía UN booleano. En #826 eso era
+ * suficiente porque sus dos únicos llamadores lo pasaban a
+ * `bannerDeProduccion({contraEmulador})`: apagaba un CARTEL, no cambiaba una
+ * decisión, y el peor caso era no gritar.
+ *
+ * `scripts/migrations/strip_appointment_reason.mjs` fue el primero en
+ * ascenderlo a **compuerta de escritura**, y ahí el OR miente. Medido con
+ * `--apply` y una key falsa:
+ *
+ *     FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099   (y Firestore NO)
+ *       → "emulador: sí", sin cartel, salteando las dos puertas
+ *       → destino real: treino-dev, o sea PRODUCCIÓN, escribiendo
+ *
+ * Y es la situación de todos los días: esa variable queda exportada de una
+ * sesión de `emulator.sh` o la hereda una shell. Es literalmente el modo de
+ * fallar de #826 — una salvaguarda que tranquiliza justo contra producción.
+ *
+ * La forma correcta ya estaba a dos archivos: `storage_target.js` chequea POR
+ * SERVICIO y aborta el split-brain. Un booleano global no puede responder la
+ * única pregunta que importa antes de un write: **¿el servicio que voy a
+ * ESCRIBIR está desviado?**
+ */
+function emuladoresActivos(env = process.env) {
+  const estado = {};
+  for (const servicio of SERVICIOS) {
+    estado[servicio] = VARIABLES_POR_SERVICIO[servicio].some((v) => seteada(env[v]));
+  }
+  return estado;
+}
+
+/**
+ * ¿TODOS los servicios que este proceso toca están desviados al emulador?
+ *
+ * `servicios` es la lista de los que el llamador va a ESCRIBIR o LEER, con las
+ * claves de `VARIABLES_POR_SERVICIO`. Se exige que estén TODOS —no cualquiera—
+ * porque basta que uno no lo esté para que el proceso le hable a producción:
+ * es el mismo criterio del `contraEmulador` de `planDeStorage()`.
+ *
+ * Una lista vacía devuelve `false` a propósito. "No declaré qué toco" no es
+ * "no toco nada", y un default permisivo acá es exactamente el bug que este
+ * módulo dejó de tener.
+ *
+ * Un servicio desconocido tira: un typo (`'firestor'`) que devolviera `false`
+ * silencioso convertiría una corrida contra el emulador en un cartel de
+ * producción, y uno que devolviera `true` haría lo contrario. Que se rompa.
+ */
+function contraEmuladorDe(servicios, env = process.env) {
+  if (!Array.isArray(servicios) || servicios.length === 0) return false;
+  const estado = emuladoresActivos(env);
+  return servicios.every((servicio) => {
+    if (!Object.prototype.hasOwnProperty.call(estado, servicio)) {
+      throw new Error(
+        `servicio desconocido: "${servicio}". Válidos: ${SERVICIOS.join(', ')}.`,
+      );
+    }
+    return estado[servicio];
+  });
 }
 
 /**
@@ -72,4 +149,10 @@ function projectIdObjetivo(env = process.env) {
   }
 }
 
-module.exports = { usandoEmulador, projectIdObjetivo };
+module.exports = {
+  SERVICIOS,
+  VARIABLES_POR_SERVICIO,
+  emuladoresActivos,
+  contraEmuladorDe,
+  projectIdObjetivo,
+};
