@@ -21,6 +21,32 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # El fix de #840 vive en UN valor de UN archivo: el `default` de `.firebaserc`.
+  # `treino-dev` es PRODUCCION, y mientras fue el default cualquier `deploy` o
+  # `firestore:delete` sin `--project` llegaba a datos de usuarios reales. Ahora
+  # es `demo-treino`, que Firebase trata como proyecto offline del emulador.
+  #
+  # Un merge mal resuelto, un `firebase use --add` que reescribe el bloque, o un
+  # revert distraido lo deshacen sin que nada chille: el archivo sigue siendo
+  # JSON valido, todo compila, todos los tests pasan, y el sintoma recien aparece
+  # el dia que alguien corre algo destructivo. Este job es el unico lugar donde
+  # ese silencio se vuelve rojo. Va PRIMERO y sin toolchain (solo checkout +
+  # bash) para que falle en segundos.
+  #
+  # Cubre la mitad VERSIONADA del agujero. El pin de `firebase use` vive en
+  # `~/.config/configstore/` de cada maquina, le gana al default y se hereda de
+  # los directorios padre: CI no lo ve. Para esa mitad hay
+  # `scripts/sync_firebaserc_worktrees.sh`.
+  firebaserc-default:
+    name: .firebaserc default no apunta a produccion
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: El default de .firebaserc tiene que ser un proyecto demo-
+        run: bash scripts/check_firebaserc_default.sh
+
   analyze-and-test:
     name: Analyze & Test
     runs-on: ubuntu-latest
