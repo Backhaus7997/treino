@@ -2,9 +2,31 @@
 
 **Change**: `gyms-foundation` · **Engram**: `sdd/gyms-foundation/design` · Reads proposal (id 336) + explore (id 335).
 
+> ## 🚨 `treino-dev` es PRODUCCIÓN — el "dev-first" de este change apuntaba a un proyecto que no existe
+>
+> `treino-dev` es el **único** proyecto Firebase de TREINO. **`treino-prod` no
+> existe** y nunca existió. Las versiones anteriores de este change decían
+> *"correr contra `treino-dev`, verificar el conteo, después contra
+> `treino-prod`"*: el paso 1 de ese ensayo **ya era la escritura a producción**,
+> y el paso 2 apuntaba a la nada. Quien lo siguiera creía estar ensayando
+> mientras remapeaba el `gymId` de usuarios reales.
+>
+> El ensayo real es el **emulador**, que es el único entorno descartable
+> (`./scripts/emulator.sh`; ambos backfills ya lo soportan con
+> `FIRESTORE_EMULATOR_HOST=localhost:8080`, sin service-account key). Contra
+> `treino-dev` se corre **después**, con OK explícito de un humano, sabiendo que
+> es producción.
+>
+> Ojo con el guard de los scripts: refuerza `/dev/i.test(projectId)`, y contra
+> `treino-dev` ese test **pasa** — no hay refusal, no hay `--allow-prod`. La
+> única protección visible es el banner de `scripts/lib/firebase_projects.js`.
+> Ver [AGENTS.md § Entornos](../../../AGENTS.md#-entornos--leer-antes-de-correr-cualquier-comando),
+> [openspec/AGENTS.md](../../AGENTS.md), [#826](https://github.com/Backhaus7997/treino/issues/826)
+> y [#845](https://github.com/Backhaus7997/treino/issues/845).
+
 ## Technical Approach
 
-Collapse two gym systems into ONE rich `gyms/` collection as sole source of truth, now modeled as a **two-level catalog: brand/chain (marca) → branch (sucursal)**. Each `gyms/{gymId}` doc IS a sucursal and carries `brandId`/`brandName` for grouping. The picker is a two-step drill-down (brand → branch) derived client-side from `gymsProvider`. Name resolution goes HYBRID: denormalize a composed `gymName` ("Brand - Branch") on `UserPublicProfile` (dual-write, mirrors `CheckIn.gymName`) for lists; `gymByIdProvider` for detail. Legacy model + hardcoded providers + `gymNameFromId` map retire. Two Admin-SDK backfills (dev-first, idempotent). NO rules change, geo stays required.
+Collapse two gym systems into ONE rich `gyms/` collection as sole source of truth, now modeled as a **two-level catalog: brand/chain (marca) → branch (sucursal)**. Each `gyms/{gymId}` doc IS a sucursal and carries `brandId`/`brandName` for grouping. The picker is a two-step drill-down (brand → branch) derived client-side from `gymsProvider`. Name resolution goes HYBRID: denormalize a composed `gymName` ("Brand - Branch") on `UserPublicProfile` (dual-write, mirrors `CheckIn.gymName`) for lists; `gymByIdProvider` for detail. Legacy model + hardcoded providers + `gymNameFromId` map retire. Two Admin-SDK backfills (emulator-first, idempotent). NO rules change, geo stays required.
 
 ## Architecture Decisions
 
@@ -46,7 +68,7 @@ Read:  list  → UserPublicProfile.gymName (denormalized "Brand - Branch", 0 fet
 | `profile/data/user_repository.dart` | Modify | Add `gymName` to public dual-write; resolve from sucursal doc on `gymId` change (inject GymRepository) |
 | 7 call sites (feed_screen, session_player, user_search_result_tile, friend_request_inbox_tile, public_profile_hero, profile_avatar_card, profile_cuenta_section) | Modify | Lists→`profile.gymName`; detail→`gymByIdProvider`. (check_in_dialog reads own `profile.gymName`) |
 | `scripts/seed_gyms.js` | Rewrite | Grouped by brand→branches: `brandId/brandName/branchName` + coords + `city/province`. Córdoba + KEEP BA; `smart-fit-palermo`/`sportclub-belgrano`/`megatlon-recoleta` as real sucursal docs under their brand |
-| `scripts/backfill_gym_ids.js` | Create | Legacy→real id map (1:1 identity, 3 legacy ids now real docs), idempotent, dual-write, verified count, dev-first |
+| `scripts/backfill_gym_ids.js` | Create | Legacy→real id map (1:1 identity, 3 legacy ids now real docs), idempotent, dual-write, verified count, emulator-first |
 | `scripts/backfill_gym_names.js` | Create | Populate `userPublicProfiles.gymName` from `gyms[gymId].name`; run AFTER id backfill |
 
 ## Interfaces / Contracts
@@ -73,11 +95,11 @@ if (partial.containsKey('gymId')) {
 | Unit | name fallback: unknown/`no-gym`/null → hidden | replaces deleted `gym_name_test.dart` |
 | Rules | NONE — `firestore.rules` unchanged (confirmed) | NO emulator work |
 
-Backfill idempotency verified manually vs `treino-dev` (not unit-tested; mirrors `migrate_trainer_locations.js`).
+Backfill idempotency verified manually vs the local Firestore emulator (not unit-tested; mirrors `migrate_trainer_locations.js`). Not vs `treino-dev` — that is production, and "verifying" there means the write already happened.
 
 ## Migration / Rollout
 
-Order: seed (real sucursal docs w/ brand fields) → `backfill_gym_ids.js` (1:1, no-op for legacy since now real) → `backfill_gym_names.js`, each `treino-dev` then verified count before `treino-prod`. Dev-first silent backfill (locked).
+Order: seed (real sucursal docs w/ brand fields) → `backfill_gym_ids.js` (1:1, no-op for legacy since now real) → `backfill_gym_names.js`. Each one is rehearsed on the **local emulator** to a verified count, and only then run against `treino-dev` — which is production, and is the end of the line: there is no `treino-prod` to promote to. Silent backfill (locked); the production run needs explicit maintainer sign-off.
 
 ## Ranking flexibility (note only — not designed here)
 
