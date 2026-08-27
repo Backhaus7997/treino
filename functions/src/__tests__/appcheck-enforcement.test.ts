@@ -100,6 +100,39 @@ const EXEMPTIONS: Readonly<Record<string, Exemption>> = {
       "a 0.5— asi que las dos transiciones que suben peso van juntas, con o sin " +
       "atestacion. Ver resume-trainer-link.ts:77.",
   },
+  "auth/request-auth-email:requestPasswordReset": {
+    permanence: "debt",
+    reason:
+      "Es el UNICO callable del repo invocable SIN sesion, y aun asi sale sin " +
+      "atestacion: con el flag, un usuario de Android no podria resetear su " +
+      "contraseña — el peor flujo posible para romper, porque el que lo " +
+      "necesita ya esta afuera de su cuenta y no puede ni reportarlo desde la " +
+      "app. No empeora la postura: el SDK del cliente ya llama a " +
+      "`sendPasswordResetEmail` directo contra Firebase con la API key del " +
+      "bundle, asi que la superficie YA esta abierta. Esta CF le agrega un " +
+      "control que hoy no existe (THROTTLE_WINDOW_MIN acota a ~60 mails/hora " +
+      "por cuenta) y mantiene la anti-enumeracion. Ver " +
+      "auth/request-auth-email.ts, bloque de los onCall wrappers.",
+    exitCondition:
+      "El mismo que deleteAccount y mintWatchCredential, y los tres vuelven " +
+      "juntos: que el cliente emita atestacion valida en iOS y Android. Al " +
+      "2026-08-25 falta Android (1 VALID / 8 INVALID). Contar sobre " +
+      "jsonPayload.verifications.app y pedir cero INVALID por plataforma. " +
+      "OJO: si vuelve el flag y Android sigue fallando, el sintoma es un " +
+      "reseteo que no llega nunca, sin error visible en ningun lado.",
+  },
+  "auth/request-auth-email:requestEmailVerification": {
+    permanence: "debt",
+    reason:
+      "Mismo motivo de plataforma que requestPasswordReset. Este SI exige " +
+      "sesion (request.auth), asi que la superficie es menor — pero con el " +
+      "flag un usuario de Android no podria reenviarse la verificacion y " +
+      "quedaria con la cuenta a medio activar. Los dos van juntos: gatear uno " +
+      "solo deja media migracion andando.",
+    exitCondition:
+      "El mismo que requestPasswordReset. Restaurar los tres callables a la " +
+      "vez, no de a uno.",
+  },
   "mint-watch-credential:mintWatchCredential": {
     permanence: "debt",
     reason:
@@ -130,6 +163,8 @@ const EXPECTED_DEPLOYED = [
   "addAlias",
   "deleteAccount",
   "mintWatchCredential",
+  "requestEmailVerification",
+  "requestPasswordReset",
   "resumeTrainerLink",
 ] as const;
 
@@ -239,6 +274,18 @@ describe("QA-SEC-016: el guard falla cuando tiene que fallar", () => {
       attested: false,
     },
     { module: "mint-watch-credential", symbol: "mintWatchCredential", as: "mintWatchCredential", attested: false },
+    {
+      module: "auth/request-auth-email",
+      symbol: "requestPasswordReset",
+      as: "requestPasswordReset",
+      attested: false,
+    },
+    {
+      module: "auth/request-auth-email",
+      symbol: "requestEmailVerification",
+      as: "requestEmailVerification",
+      attested: false,
+    },
   ];
 
   // Los modulos son los reales para que las claves del registry apliquen, pero
@@ -258,7 +305,15 @@ describe("QA-SEC-016: el guard falla cuando tiene que fallar", () => {
     const modules: Record<string, string> = {};
     const exports: string[] = [];
     for (const c of BASELINE) {
-      modules[c.module] = onCallSource(c.symbol, c.attested);
+      // ACUMULA, no pisa: un modulo puede exportar mas de un callable —
+      // `auth/request-auth-email` define dos. La version anterior asignaba
+      // directo y el segundo borraba al primero, asi que el mundo sintetico
+      // nacia con un callable menos que el real. Lo agarro el guard de deriva,
+      // que es exactamente para lo que existe.
+      modules[c.module] = modules[c.module]
+        ? `${modules[c.module]}
+${onCallSource(c.symbol, c.attested)}`
+        : onCallSource(c.symbol, c.attested);
       exports.push(`export { ${c.symbol} as ${c.as} } from "./${c.module}";`);
     }
     return collectDeployedCallables({

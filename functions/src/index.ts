@@ -65,33 +65,41 @@ export { notifyOverduePayments } from "./payments/notify-overdue-payments";
 // en Secret Manager de PRODUCCIÓN, #826) y que el dominio del remitente esté
 // verificado por DNS en Resend, o cada envío devuelve 403.
 export { sendQueuedMail } from "./mail/send-queued-mail";
-// SHELVED (email de auth por Resend): requestPasswordReset y
-// requestEmailVerification estan escritos y testeados pero NO se despliegan
-// todavia. `requestPasswordReset` es un endpoint SIN autenticar que escribe en
-// Firestore; activarlo antes de que el dominio del remitente este verificado
-// por DNS en Resend deja superficie de abuso a cambio de nada, porque el mail
-// se encola y despues falla con 403.
+// Email de auth por Resend. `requestPasswordReset` es un endpoint SIN
+// autenticar que escribe en Firestore; se despliega recien ahora porque
+// `send.gettreino.com` ya esta verificado en Resend y el secret cargado — antes
+// habria encolado mail que despues fallaba con 403.
 //
-// ⚠️ PARA ACTIVAR — los pasos 1 y 4 TOCAN PRODUCCIÓN (#826). No es un runbook
-// que un agente pueda correr solo: el paso 4 publica un endpoint SIN autenticar
-// a los usuarios reales de `treino-dev`. Requiere OK explícito de un humano, y
-// recién el mismo dia que el dominio quede verificado:
-//   1. `firebase functions:secrets:set RESEND_API_KEY --project prod`
-//      ⚠️ PRODUCCIÓN — escribe en Secret Manager del proyecto real.
-//   2. descomentar el export de abajo
-//   3. cambiar AuthService.sendPasswordResetEmail / sendEmailVerification para
-//      que llamen a estos callables en vez de a FirebaseAuth directo
-//      (lib/features/auth/data/auth_service.dart:121 y :130)
-//   4. `firebase deploy --only functions --project prod`
-//      ⚠️ PRODUCCIÓN. El `--project prod` no cambia el destino respecto del
-//      comando pelado — lo hace VISIBLE. `prod` y `treino-dev` son el mismo
-//      project ID; sin la flag, `.firebaserc` resuelve al mismo lugar sin que
-//      aparezca en pantalla. Además, un `--only functions` sin filtros PODA
-//      del set desplegado toda función ausente de este archivo.
+// SIN App Check, y es DELIBERADO. App Check en Android no emite atestacion
+// valida (iPhone 8 VALID / 2 INVALID, Android 1 VALID / 8 INVALID, medido el
+// 2026-08-25), asi que el flag dejaria a los usuarios de Android sin poder
+// resetear su contraseña. Misma deuda que `deleteAccount` y
+// `mintWatchCredential`, con la misma condicion de salida. El motivo completo
+// esta en el bloque de los onCall wrappers de `auth/request-auth-email.ts`, y
+// la exencion declarada en `__tests__/appcheck-enforcement.test.ts`.
 //
-// Hasta el paso 3 los mails siguen saliendo por las plantillas default de
-// Firebase, asi que el flujo de recuperacion NUNCA queda sin cobertura.
-// export { requestPasswordReset, requestEmailVerification } from "./auth/request-auth-email";
+// EL CLIENTE TODAVIA NO LOS LLAMA. `AuthService.sendPasswordResetEmail` y
+// `sendEmailVerification` (lib/features/auth/data/auth_service.dart:121 y :130)
+// siguen yendo a FirebaseAuth directo, asi que los mails de recuperacion aun
+// salen por las plantillas default. Se cambia en un PR aparte, DESPUES de
+// verificar a mano que estos callables mandan bien — sobre un flujo donde el
+// usuario ya esta afuera de su cuenta, primero se comprueba y despues se migra.
+//
+// ⚠️ EL DEPLOY TOCA PRODUCCIÓN (#826). No es algo que un agente corra solo:
+// publica un endpoint SIN autenticar a los usuarios reales de `treino-dev`.
+// Requiere OK explícito de un humano.
+//   firebase deploy --only firestore:rules --project prod
+//   firebase deploy --only functions --project prod
+//
+// Las REGLAS PRIMERO: `mail_queue` esta cerrada en los cuatro verbos y conviene
+// que esa proteccion este arriba antes de que la coleccion empiece a existir.
+//
+// El `--project prod` no cambia el destino respecto del comando pelado — lo
+// hace VISIBLE. `prod` y `treino-dev` son el mismo project ID; sin la flag,
+// `.firebaserc` resuelve al mismo lugar sin que aparezca en pantalla. Ademas,
+// un `--only functions` sin filtros PODA del set desplegado toda funcion
+// ausente de este archivo.
+export { requestPasswordReset, requestEmailVerification } from "./auth/request-auth-email";
 export { syncSharedProfile } from "./profile/sync-shared-profile";
 // Paywall Fase 7, PR4 (ISSUE-1): keeps users/{trainerId}.weightedLoad
 // accurate for display after client-side pause/terminate/decline/cancel —
