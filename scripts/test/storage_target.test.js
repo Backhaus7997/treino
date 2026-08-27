@@ -12,6 +12,15 @@
  * hacer: si Firestore está redirigido y Storage no, no puede existir ninguna
  * etiqueta que imprimir.
  *
+ * El #840 le dio vuelta la premisa a los tres tests que leen el `.firebaserc`
+ * REAL (los que usan `FIREBASERC_REAL` con `ENV_LIMPIO`). Antes el default era
+ * `treino-dev`, así que "sin ninguna variable" significaba PRODUCCIÓN y esos
+ * tests esperaban el cartel. Ahora el default es `demo-treino` —un proyecto que
+ * no existe en la nube— y el mismo caso significa lo contrario. Donde había un
+ * caso ahora hay dos, y los dos están escritos abajo: el que prueba que el
+ * default ya no lleva a producción, y el que prueba que nombrarla explícitamente
+ * sigue disparando el cartel del #838.
+ *
  * `node:test` y `node:assert`, sin dependencias nuevas — mismo criterio que
  * `dedupe_setlogs_plan.test.js`.
  */
@@ -59,11 +68,19 @@ test('sin flag manda GOOGLE_CLOUD_PROJECT — es la que mira el Admin SDK', () =
   assert.strictEqual(r.projectId, 'treino-otro-dev');
 });
 
-test('sin nada cae en .firebaserc, que hoy declara treino-dev', () => {
-  // Si algún día se crea un proyecto de dev de verdad (alcance 3 del #826) y
-  // cambia el default del .firebaserc, este test cambia con el hecho.
+test('sin nada cae en .firebaserc, que desde el #840 declara demo-treino', () => {
+  // Este test cambió con el hecho, que es para lo que estaba.
+  //
+  // Hasta el #840 el default de `.firebaserc` era `treino-dev` y esta línea
+  // decía `assert.strictEqual(r.projectId, 'treino-dev')`. O sea: el último
+  // eslabón de la cadena de resolución —el que atrapa al que no pasó flag, ni
+  // env, ni credencial— apuntaba a producción. El #840 lo movió a
+  // `demo-treino`, el proyecto del emulador, que no existe en la nube.
+  //
+  // Sigue siendo el ÚLTIMO recurso y sigue sin ser un permiso: quien nombra
+  // producción a propósito la sigue teniendo, con cartel (ver más abajo).
   const r = resolverProjectId({ argv: [], env: ENV_LIMPIO, rutaFirebaserc: FIREBASERC_REAL });
-  assert.strictEqual(r.projectId, 'treino-dev');
+  assert.strictEqual(r.projectId, 'demo-treino');
   assert.strictEqual(r.origen, '.firebaserc');
 });
 
@@ -146,13 +163,32 @@ test('los dos en el emulador: coherente, etiqueta EMULADOR y sin cartel', () => 
   assert.strictEqual(p.esProduccion, false);
 });
 
-test('los dos en la nube: coherente, etiqueta con el bucket real y CARTEL', () => {
+test('los dos en la nube SIN NADA: coherente, bucket de demo y SIN cartel', () => {
+  // El caso que el #840 dio vuelta. Antes esta corrida —sin una sola variable—
+  // derivaba `treino-dev.firebasestorage.app` y sacaba el cartel; el cartel
+  // avisaba, pero el destino ERA producción. Ahora el destino es un bucket que
+  // no existe, y por eso no hay nada que gritar.
   const p = plan(ENV_LIMPIO);
   assert.strictEqual(p.coherente, true);
-  assert.strictEqual(p.bucket, 'treino-dev.firebasestorage.app');
-  assert.strictEqual(p.etiquetaDestino, 'prod (treino-dev.firebasestorage.app)');
-  assert.ok(p.banner, 'treino-dev ES producción (#826) — tiene que salir el cartel');
-  assert.match(p.banner, /IS PRODUCTION/);
+  assert.strictEqual(p.bucket, 'demo-treino.firebasestorage.app');
+  assert.strictEqual(p.esProduccion, false);
+  assert.strictEqual(p.banner, null, 'demo-treino no es producción: gritar acá enseña a ignorar el cartel');
+});
+
+test('los dos en la nube NOMBRANDO treino-dev: bucket real y CARTEL', () => {
+  // Y el guard del #838 intacto: quien pide producción la recibe, con cartel.
+  // Alcanza con nombrarla por cualquiera de los caminos que mira el SDK.
+  for (const [comoSeNombra, args] of [
+    ['--project=', { argv: ['--project=treino-dev'], env: ENV_LIMPIO }],
+    ['GCLOUD_PROJECT', { argv: [], env: { GCLOUD_PROJECT: 'treino-dev' } }],
+  ]) {
+    const p = planDeStorage({ ...args, rutaFirebaserc: FIREBASERC_REAL });
+    assert.strictEqual(p.coherente, true, comoSeNombra);
+    assert.strictEqual(p.bucket, 'treino-dev.firebasestorage.app', comoSeNombra);
+    assert.strictEqual(p.etiquetaDestino, 'prod (treino-dev.firebasestorage.app)', comoSeNombra);
+    assert.ok(p.banner, `treino-dev ES producción (#826) — tiene que salir el cartel por ${comoSeNombra}`);
+    assert.match(p.banner, /IS PRODUCTION/, comoSeNombra);
+  }
 });
 
 test('contra un proyecto que no es producción no hay cartel', () => {
@@ -286,10 +322,24 @@ test('el abort explica que emulator.sh no levanta Storage', () => {
 });
 
 test('el guard deja pasar y grita el cartel cuando el destino es producción', () => {
-  const r = correrGuard(ENV_LIMPIO);
+  // Ojo con el env: desde el #840 hay que NOMBRAR producción para llegar acá.
+  // Con `ENV_LIMPIO` y sin flag el guard cae en el default de `.firebaserc`,
+  // que es `demo-treino`, y no grita — ver el test de abajo.
+  const r = correrGuard(ENV_LIMPIO, ['--project=treino-dev']);
   assert.deepStrictEqual(r.codigos, [], 'no tenía que abortar');
   assert.match(r.stderr, /IS PRODUCTION/);
   assert.match(r.stdout, /bucket: treino-dev\.firebasestorage\.app/);
+});
+
+test('el guard deja pasar SIN gritar cuando nadie nombró producción', () => {
+  // El #840 en una línea: la corrida por default deja de ser una corrida contra
+  // producción. Que no salga el cartel acá no es una salvaguarda perdida —es
+  // que el default dejó de necesitarla, y un cartel que sale siempre es un
+  // cartel que no se lee.
+  const r = correrGuard(ENV_LIMPIO);
+  assert.deepStrictEqual(r.codigos, [], 'no tenía que abortar');
+  assert.doesNotMatch(r.stderr, /IS PRODUCTION/);
+  assert.match(r.stdout, /bucket: demo-treino\.firebasestorage\.app/);
 });
 
 test('el guard aborta si no puede resolver el proyecto — no adivina', () => {

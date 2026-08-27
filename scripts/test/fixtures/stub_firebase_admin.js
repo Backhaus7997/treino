@@ -91,6 +91,10 @@ const fs = require('node:fs');
 const STUB_FIRESTORE_REACHED = 'STUB_FIRESTORE_REACHED';
 const STUB_STORAGE_REACHED = 'STUB_STORAGE_REACHED';
 const STUB_NETWORK_REACHED = 'STUB_NETWORK_REACHED';
+// #840 — el `storageBucket` que el script le declaro a `initializeApp()`. Va al
+// marcador para que el test distinga "aterrizo en el bucket de demo" de
+// "aterrizo en el REAL": sin el nombre, las dos cosas se ven identicas.
+let bucketDeclarado = null;
 // Prueba POSITIVA de que el import ESM cayó en el stub. Lo escribe el módulo
 // sintético de `esm_stub_hooks.mjs` por stderr apenas se evalúa. (#846)
 const STUB_ESM_INTERCEPTED = 'STUB_ESM_INTERCEPTED';
@@ -108,8 +112,10 @@ function firestoreStub() {
 
 function storageStub() {
   return {
-    bucket() {
-      throw new Error(STUB_STORAGE_REACHED);
+    bucket(nombre) {
+      throw new Error(
+        `${STUB_STORAGE_REACHED} bucket=${nombre || bucketDeclarado || '(sin nombre)'}`
+      );
     },
   };
 }
@@ -134,7 +140,15 @@ const adminStub = {
   // arranca vacío; el stub replica eso y nunca lo llena, así que cada carga en
   // subproceso ve el mismo estado limpio. (#826)
   apps: [],
-  initializeApp() {},
+  // #840 — el stub recuerda el `storageBucket` que le declararon, para que los
+  // tests puedan distinguir "aterrizo en el bucket de demo" de "aterrizo en el
+  // real". Sin esto, `storage_scripts_destination.test.js` no puede probar que
+  // el default `demo-treino` efectivamente desvia el destino.
+  initializeApp(opciones) {
+    if (opciones && typeof opciones.storageBucket === 'string' && opciones.storageBucket) {
+      bucketDeclarado = opciones.storageBucket;
+    }
+  },
   // `applicationDefault` es la que usan los `.mjs` de `migrations/`: no lee
   // nada, sólo tiene que existir para llegar al `initializeApp()`. (#846)
   credential: {
