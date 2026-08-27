@@ -296,13 +296,38 @@ describe("payments update — dueAt is CF-only (SCENARIO-VENC-14)", () => {
   });
 });
 
-describe("payments delete", () => {
+/**
+ * #848 — el `delete` de `payments` chocaba con el set-once de
+ * `appointments.paymentId`.
+ *
+ * Los dos bloques por separado están bien; lo que nunca se cruzó es que el
+ * set-once asume que el Payment NO desaparece. Medido contra el emulador, con
+ * el PF dueño de los DOS documentos:
+ *   · borrar el Payment                  → ALLOW
+ *   · limpiar el `paymentId` del turno    → DENY (set-once, Path 2)
+ *   · reapuntarlo a otro Payment          → DENY (set-once, Path 2)
+ * El turno quedaba apuntando PERMANENTEMENTE a un documento inexistente, en el
+ * campo money-critical, y `appointments` tiene `allow delete: if false`.
+ *
+ * El `delete` se cerró en vez de acotarse: aflojar el set-once no se puede
+ * ESCRIBIR (haría falta un `exists()` y `exists()` lee estado pre-commit,
+ * mientras `billAppointment` crea el Payment y setea el `paymentId` en la MISMA
+ * transacción). Y es gratis: `PaymentRepository` no tiene delete, ningún
+ * `.delete()` de `lib/` cae sobre `collection('payments')`, y el cascade de
+ * borrado de cuenta RETIENE los payments a propósito por motivos fiscales.
+ *
+ * ⚠️ El primer caso ERA `allows the owner trainer to delete their own record`.
+ * Se CONVIRTIÓ a DENY en vez de borrarse — el mismo criterio que #831 usó con
+ * el flip: un camino que se remueve necesita un test que se ponga rojo si
+ * alguien lo reintroduce sin pensarlo.
+ */
+describe("payments delete — cerrado (#848)", () => {
   beforeEach(async () => {
     await seedPayment();
   });
 
-  it("allows the owner trainer to delete their own record", async () => {
-    await assertSucceeds(
+  it("DENIES the owner trainer deleting their own record — el `paymentId` colgado", async () => {
+    await assertFails(
       ctxDb(TRAINER).collection(COL_PAYMENTS).doc(PAYMENT_ID).delete(),
     );
   });
@@ -317,5 +342,80 @@ describe("payments delete", () => {
     await assertFails(
       ctxDb(OTHER_TRAINER).collection(COL_PAYMENTS).doc(PAYMENT_ID).delete(),
     );
+  });
+});
+
+/**
+ * #848 — la referencia rota, de punta a punta.
+ *
+ * Los tres casos de arriba miden el `delete` solo. Éste mide el CHOQUE, que es
+ * lo que el issue reporta: el turno apunta al Payment, el Payment se va, y el
+ * `paymentId` queda colgado para siempre porque el set-once del Path 2 no deja
+ * ni limpiarlo ni reapuntarlo, y `appointments` tiene `allow delete: if false`.
+ *
+ * Con el `delete` cerrado, el primer paso de la cadena ya no ocurre. Los otros
+ * dos siguen dando DENY —el gate money-critical NO se tocó, que es justamente
+ * el punto de haber cerrado el `delete` en vez de aflojar el set-once— y por
+ * eso están acá: si alguien "arregla" #848 aflojando el set-once, estos dos se
+ * ponen verdes por el motivo equivocado y este bloque deja de custodiar nada.
+ */
+describe("payments delete — el paymentId del turno no queda colgado (#848)", () => {
+  const APPT_ID = "appt-848";
+
+  beforeEach(async () => {
+    await seedPayment();
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection("appointments").doc(APPT_ID).set({
+        id: APPT_ID,
+        trainerId: TRAINER,
+        athleteId: ATHLETE,
+        athleteDisplayName: "Ana",
+        startsAt: new Date(Date.now() + 5 * 86400000),
+        durationMin: 60,
+        status: "confirmed",
+        cancelledAt: null,
+        cancelledBy: null,
+        cancellationLog: [],
+        noteBefore: null,
+        noteAfter: null,
+        recurringId: null,
+        paymentId: PAYMENT_ID,
+      });
+    });
+  });
+
+  it("el PF dueño de los DOS documentos ya no puede borrar el Payment apuntado", async () => {
+    await assertFails(
+      ctxDb(TRAINER).collection(COL_PAYMENTS).doc(PAYMENT_ID).delete(),
+    );
+  });
+
+  it("y el set-once sigue intacto: no puede limpiar el paymentId del turno", async () => {
+    await assertFails(
+      ctxDb(TRAINER)
+        .collection("appointments")
+        .doc(APPT_ID)
+        .update({ paymentId: null }),
+    );
+  });
+
+  it("ni reapuntarlo a otro Payment", async () => {
+    await assertFails(
+      ctxDb(TRAINER)
+        .collection("appointments")
+        .doc(APPT_ID)
+        .update({ paymentId: "otro-pago" }),
+    );
+  });
+
+  it("el Payment sigue existiendo después del intento — la referencia no se rompe", async () => {
+    await assertFails(
+      ctxDb(TRAINER).collection(COL_PAYMENTS).doc(PAYMENT_ID).delete(),
+    );
+    const snap = await ctxDb(TRAINER)
+      .collection(COL_PAYMENTS)
+      .doc(PAYMENT_ID)
+      .get();
+    expect(snap.exists).toBe(true);
   });
 });

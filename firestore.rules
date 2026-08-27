@@ -3300,7 +3300,51 @@ service cloud.firestore {
                   && request.resource.data.get('periodKey', null) == resource.data.get('periodKey', null)
                   && request.resource.data.get('dueAt', null) == resource.data.get('dueAt', null)
                   && request.resource.data.get('lastOverdueNotifiedAt', null) == resource.data.get('lastOverdueNotifiedAt', null);
-      allow delete: if request.auth != null && resource.data.trainerId == request.auth.uid;
+      // ─── #848 — el `delete` se CIERRA, no se acota ──────────────────────────
+      //
+      // Acá decía `if request.auth != null && resource.data.trainerId ==
+      // request.auth.uid`, y chocaba de frente con el set-once de
+      // `appointments.paymentId`. Los dos bloques por separado están bien; lo
+      // que nunca se cruzó es que uno asume que el Payment NO desaparece.
+      //
+      // Medido contra el emulador, turno con `paymentId: 'pay-1'`, actor = el
+      // PF dueño de los dos documentos:
+      //   · borrar el Payment `pay-1`            → ALLOW
+      //   · limpiar el `paymentId` del turno     → DENY (set-once, Path 2)
+      //   · reapuntarlo a otro Payment           → DENY (set-once, Path 2)
+      // O sea el turno quedaba apuntando PERMANENTEMENTE a un documento que no
+      // existe, en el campo money-critical, y el propio dueño de los dos no lo
+      // podía reparar desde el cliente. Y `appointments` tiene
+      // `allow delete: if false`, así que el turno tampoco se va.
+      //
+      // Aflojar el set-once no se puede ESCRIBIR: haría falta un `exists()`
+      // sobre el Payment apuntado, y `exists()` en reglas lee estado
+      // PRE-COMMIT, mientras que `billAppointment` crea el Payment y setea el
+      // `paymentId` en la MISMA transacción (ya está documentado sobre el
+      // Path 2 por qué ahí no va un `exists()`). Cerrar el `delete` es la única
+      // salida que no toca el gate money-critical.
+      //
+      // Y es gratis, verificado leyendo los escritores y no suponiendo —el
+      // mismo método que dejó sin llamadores a `book()` en #831—:
+      //  · `PaymentRepository` (`lib/features/payments/data/payment_repository.dart`)
+      //    tiene `add`, `markPaid`, `markManyPaid`, `watchForTrainer` y
+      //    `watchForAthlete`. NO tiene delete.
+      //  · `rg '\.delete\(\)' lib/` no devuelve NINGUNA baja sobre
+      //    `collection('payments')`; los otros dos escritores de la colección
+      //    son `AppointmentRepository.billAppointment(s)`, que sólo crean.
+      //  · El cascade de borrado de cuenta RETIENE los payments a propósito
+      //    ("payments — RETAINED for fiscal/accounting",
+      //    `functions/src/cascade/athlete-data.ts:19`) y escribe con Admin SDK,
+      //    que saltea estas reglas.
+      // O sea: superficie de ataque abierta para una capacidad que ningún
+      // cliente usa, y que además contradice la retención fiscal que el
+      // cascade declara.
+      //
+      // ⚠️ Si algún día el PF necesita anular un cobro cargado por error, la
+      // salida es un `status: 'void'` —que preserva el rastro contable— y eso
+      // es cambio de PRODUCTO: valor nuevo en el enum, UI y filtros de
+      // `pagosPorCobrarProvider`. No entra en un fix de reglas.
+      allow delete: if false;
     }
 
     // Athlete → trainer reviews (Fase 6 Etapa 7).
