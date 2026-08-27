@@ -227,8 +227,12 @@ apagarlo con la variable del emulador sería mentir. (#826)
 
 ## backfill_gym_ids.js / backfill_gym_names.js (gyms-foundation Phase 4)
 
-Two idempotent, dev-first Admin SDK scripts that close out the gyms-foundation
+Two idempotent, **emulator-first** Admin SDK scripts that close out the gyms-foundation
 migration (two-level brand→sucursal catalog, `gymName` denormalization).
+There is no "dev-first" here: `treino-dev` is production, `treino-prod` does not
+exist, and the only disposable environment is the local emulator
+(`./scripts/emulator.sh`, then prefix the command with
+`FIRESTORE_EMULATOR_HOST=localhost:8080`). (#845)
 **Order matters**: run `backfill_gym_ids.js` before `backfill_gym_names.js` —
 the name backfill resolves display names against the ids the first script
 corrects.

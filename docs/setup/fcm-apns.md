@@ -11,14 +11,14 @@ This document describes the manual steps required to make FCM push notifications
 1. **APNs Auth Key** (iOS only) — blocks real FCM delivery to iOS devices.
 2. **Cloud Function IAM** (both platforms) — blocks the CF triggers from dispatching FCM messages.
 
-Both were discovered during the Fase 6 Etapa 2 smoke and are required for any environment that runs the notification CFs (`treino-dev`, future `treino-prod`).
+Both were discovered during the Fase 6 Etapa 2 smoke and are required by `treino-dev`, the single Firebase project that runs the notification CFs. (There is no `treino-prod`, present or planned — an earlier version of this line said "future `treino-prod`" and that environment was never going to exist. #845)
 
 ---
 
 ## Prerequisites
 
 - Access to the Apple Developer Program account for TREINO.
-- Access to the Firebase Console project for TREINO (Firebase Project ID: `treino-dev` or production equivalent).
+- Access to the Firebase Console project for TREINO (Firebase Project ID: `treino-dev` — that **is** the production project; there is no separate one).
 
 ---
 

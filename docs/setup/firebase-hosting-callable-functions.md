@@ -108,6 +108,14 @@ entire difference between 401 and 403.
 
 ## The fix
 
+> [!CAUTION]
+> 🚨 **This modifies a LIVE Cloud Run service in production.** `treino-dev` is
+> TREINO's only Firebase project and real users are behind these callables — the
+> command below changes who can reach them, and it takes effect immediately, with
+> no deploy in between. Run it with explicit human sign-off, never from an agent.
+> (Same command, same warning, as
+> [`openspec/changes/watch-standalone-client/HANDOFF.md`](../../openspec/changes/watch-standalone-client/HANDOFF.md). #845)
+
 ```bash
 gcloud run services update <service-name> \
   --project=treino-dev \
