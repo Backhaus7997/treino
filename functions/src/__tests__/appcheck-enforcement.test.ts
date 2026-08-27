@@ -484,32 +484,45 @@ describe("QA-SEC-016: el guard falla cuando tiene que fallar", () => {
 
 /**
  * Los callables SHELVED. No estan desplegados, asi que no entran al inventario
- * derivado — pero el dia que alguien los exporte tienen que llegar atestados,
- * y eso hay que vigilarlo desde antes.
+ * derivado — pero lo que decidan sobre atestacion hay que vigilarlo desde
+ * antes, para que no llegue a produccion por omision.
+ *
+ * OJO: estos dos NO exigen App Check, y es DELIBERADO. App Check en Android no
+ * emite atestacion valida (iPhone 8 VALID / 2 INVALID, Android 1 VALID /
+ * 8 INVALID, medido el 2026-08-25), asi que el flag dejaria a los usuarios de
+ * Android sin poder resetear su contraseña. Misma deuda y misma condicion de
+ * salida que `deleteAccount` y `mintWatchCredential`.
+ *
+ * Lo que este bloque sostiene NO es "tienen el flag", sino algo mas util: que
+ * la AUSENCIA este escrita con su motivo y su condicion de salida. Una
+ * exencion sin motivo escrito es indistinguible de un olvido.
  */
 describe("QA-SEC-006: callables shelved", () => {
   const index = () => readFileSync(join(SRC, "index.ts"), "utf8");
 
   it.each(["requestPasswordReset", "requestEmailVerification"])(
-    "%s exige App Check apenas se exporte",
+    "%s: la ausencia de App Check esta declarada, no es un olvido",
     (symbol) => {
-      const deployed = collectDeployedCallables({
+      const src = readModule("auth/request-auth-email") ?? "";
+
+      // No tiene el flag...
+      expect(src).not.toMatch(/enforceAppCheck:\s*true/);
+      // ...y el archivo dice POR QUE y CUANDO vuelve.
+      expect(src).toContain("SIN `enforceAppCheck`, y NO es un olvido");
+      expect(src).toContain("CONDICION DE SALIDA");
+
+      const live = collectDeployedCallables({
         indexSource: index(),
         readModule,
-      });
-      const live = deployed.find((c) => c.symbol === symbol);
-
-      // Shelved o no, el archivo ya tiene que declarar la atestacion.
-      // `requestPasswordReset` es el UNICO callable del repo invocable sin
-      // sesion, y cada llamada le manda un mail a un tercero: sin atestacion
-      // es un amplificador de spam apuntable.
-      const src = readModule("auth/request-auth-email") ?? "";
-      expect(src).toMatch(/enforceAppCheck:\s*true/);
+      }).find((c) => c.symbol === symbol);
 
       if (live) {
-        // Ya se exporto: pasa a ser desplegado y lo juzga el inventario de
-        // arriba, no este bloque.
-        expect(live.attestation).toBe("enforced");
+        // Ya se exporto: pasa a ser desplegado, y entonces la exencion tiene
+        // que estar en el registry de arriba, como `debt` y con salida. Sin
+        // eso, el assert de `assertEveryCallableIsGuarded` lo marca.
+        const exemption = EXEMPTIONS[callableKey(live)];
+        expect(exemption).toBeDefined();
+        expect(exemption.permanence).toBe("debt");
       }
     },
   );
