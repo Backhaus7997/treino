@@ -4108,7 +4108,7 @@ bloque de a uno, reemplazándolo por `true`:
 | `upp.bestSquatKg` **pin** | 1 |
 | `upp.bestSquatKg` **cota** | **0** |
 | `upp.lifetimeVolumeKg` **cota** | **0** |
-| `upp.bestSquatKg` pin **+** cota, juntos | 1 |
+| `upp.bestSquatKg` pin **+** cota, juntos | **3** |
 | `perf.recordedAt` / `perf.sitAndReachCm` / `perf.cmjCm` | 1 cada uno |
 | `meas.recordedAt` / `meas.weightKg` / `meas.waistCm` | 1 cada uno |
 | `bill.amountArs` / `bill.cadence` / `bill.affectedKeys` | 1 cada uno |
@@ -4125,9 +4125,13 @@ La primera pasada dio **cuatro** ceros, y los cuatro decían cosas distintas
   mutuamente porque los valores del test (1200, 1500) los rechazan los dos. Se
   agregó la escritura que **sólo** el pin custodia — una métrica forjada pero
   **dentro** de rango (900) — y el gate pasó a 1.
-- Las dos cotas de rango dan 0 aflojadas de a una y 1 aflojadas juntas. **La
-  primera lectura de este PR fue que estaban SUBSUMIDAS por el pin. Era
-  incorrecta, y la medición la contradice** — ver abajo.
+- Las dos cotas de rango dan **0 aflojadas de a una y 0 aflojadas juntas**. Ese
+  segundo cero es la mejor evidencia del PR y conviene decirlo entero: **ni
+  siquiera aflojando las dos a la vez se pone roja una sola fila `assertFails`**.
+  O sea que lo que esas cotas custodian de distinto NO es una escritura hostil
+  — y por eso la mutación por negativos es ciega ahí. **La primera lectura de
+  este PR fue que estaban SUBSUMIDAS por el pin. Era incorrecta, y la medición
+  la contradice** — ver abajo.
 
 ##### El cero de las cotas de rango no era subsunción
 
@@ -4198,7 +4202,9 @@ npx -y firebase-tools@13 emulators:exec --only firestore,auth \
 ```
 
 Verificado además contra las **dos** suites completas, sin regresión:
-827 tests en `functions/` (37 suites) y 149 en `scripts/rules_test/` (9 suites).
+1563 tests en `functions/` (97 suites) y 149 en `scripts/rules_test/` (9 suites).
+La corrida completa necesita `--runInBand`: en paralelo hay interferencia entre
+suites que comparten `projectId` en el emulador y salen 41 rojas espurias.
 
 #### Lo que queda abierto
 
