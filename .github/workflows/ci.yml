@@ -438,9 +438,14 @@ jobs:
   # cargan con `--require test/fixtures/stub_firebase_admin.js`, que intercepta
   # `Module._load` (CJS) y `module.register()` (ESM) y devuelve un
   # `firebase-admin` falso; el resto es todo `node:` builtin. Verificado
-  # corriendo la suite con `scripts/node_modules` inexistente, en Node 20, 22
-  # y 26: 421/421 en verde, y el MISMO número en las tres —un conteo que baja
-  # con la versión es la firma de los subtests cancelados de más abajo—.
+  # corriendo la suite con `scripts/node_modules` inexistente, con el comando
+  # EXACTO de este job (`npm --prefix scripts test`, o sea
+  # `node --test test/*.test.js` — el glob lo expande la shell, no Node) en
+  # Node 20, 22 y 26: 439/439 en verde, y el MISMO número en las tres —un
+  # conteo que baja con la versión es la firma de los subtests cancelados de
+  # más abajo—. El comando importa para poder comparar: `--test scripts/test/`
+  # a secas cuenta 442 en vez de 439 porque suma las entradas de directorio, y
+  # dos números que no son el mismo experimento no se pueden restar.
   # Instalar `firebase-admin` acá sería medio minuto por run para nada — y
   # peor, dejaría que un test toque la red sin que se note.
   #
