@@ -2192,13 +2192,45 @@ service cloud.firestore {
       // `cancellationLog` es una lista de objetos; las reglas no pueden
       // validar su contenido en profundidad, así que se le acota el largo —
       // que es lo que evita el inflado del documento.
+      //
+      // ─── #846 — `reason` entra a la allowlist, y NUNCA lo escribe un cliente ──
+      //
+      // Son 15 claves, no 14. La quinceava —`reason`— NO sale de
+      // `Appointment.toJson()`: la escribe SÓLO `functions/src/cascade/appointments.ts`
+      // con Admin SDK, y `notifications/notify-appointment.ts` la lee de GUARD
+      // (ADR-PN-006 / REQ-PN-CF-003). Es un canal CF→CF.
+      //
+      // El bug de #846 era que estaba FUERA de la allowlist: `hasOnly()` corre
+      // sobre `request.resource.data`, que es el documento MERGEADO, así que
+      // cualquier update parcial posterior del cliente arrastraba el `reason`
+      // guardado y la allowlist lo rechazaba. Turno imborrable, la familia de
+      // #781, sembrada por nuestro propio backend.
+      //
+      // Meterla acá lo cierra **sin migración** —los documentos que ya están
+      // escritos en producción se destraban solos— y el precio es cero
+      // superficie nueva, porque la clave queda INESCRIBIBLE para el cliente
+      // por las tres puertas:
+      //   · `create`  → `d.get('reason', null) == null`, acá abajo.
+      //   · `update`  → pineada contra `resource.data` en el Path 1 Y en el
+      //                 Path 2 (los DOS caminos; blindar uno solo es perseguir
+      //                 el vector, no cerrarlo).
+      //   · `delete`  → `if false`.
+      // El Admin SDK saltea las reglas, así que la CF la escribe igual. Ése es
+      // exactamente el punto: es una señal que sólo el backend puede emitir.
+      //
+      // ⚠️ Y por eso NO lleva cota de tipo ni de largo. Una cota corre sobre el
+      // documento mergeado, o sea validaría el DOCUMENTO y no la escritura: un
+      // doc heredado con `reason` de otro tipo quedaría sin poder anotarse ni
+      // cancelarse nunca más. Es el error que #831 y #847 ya pagaron dos veces.
+      // El cliente no puede escribir el campo, así que no hay nada que acotar
+      // contra el cliente; contra la CF la cota la pone el code review.
       function appointmentShapeOk(d) {
         return d.keys().hasOnly(['id', 'trainerId', 'athleteId',
                                  'athleteDisplayName', 'startsAt',
                                  'durationMin', 'status', 'cancelledAt',
                                  'cancelledBy', 'cancellationLog',
                                  'noteBefore', 'noteAfter', 'recurringId',
-                                 'paymentId'])
+                                 'paymentId', 'reason'])
                && d.keys().hasAll(['id', 'trainerId', 'athleteId',
                                    'athleteDisplayName', 'startsAt',
                                    'durationMin', 'status'])
@@ -2303,6 +2335,10 @@ service cloud.firestore {
                // otra forma de fijar un tipo sin nombrarlo.
                && d.get('cancellationLog', []) is list
                && d.get('cancellationLog', []).size() == 0
+               // #846 — un turno recién creado NO tiene motivo de cascade, y
+               // el cliente no puede fabricarlo. La CF escribe con Admin SDK,
+               // que no pasa por acá.
+               && d.get('reason', null) == null
                // …y tampoco tiene `cancelledAt` ni `cancelledBy`. Es el mismo
                // invariante que la línea de arriba, sobre los otros dos campos
                // de la cancelación, y cierra el segundo agujero que encontró
@@ -2360,12 +2396,19 @@ service cloud.firestore {
       // dependa de eso. El de `durationMin` va condicionado a que el campo
       // cambie — el porqué está abajo, en su propio bloque.
       function appointmentUpdateShapeOk(d) {
+        // #846 — `reason` entra a la allowlist (ver `appointmentShapeOk()`).
+        // Sin ella, un turno que la CF del cascade ya tocó no se podía anotar
+        // ni cancelar NUNCA MÁS, porque `hasOnly()` mira el documento
+        // MERGEADO. Sin cota, y a propósito: una cota acá validaría el
+        // documento en vez de la escritura, que es el error de #831/#847. Lo
+        // que impide que el cliente la escriba son los pines de los DOS
+        // caminos, no una cota.
         return d.keys().hasOnly(['id', 'trainerId', 'athleteId',
                                  'athleteDisplayName', 'startsAt',
                                  'durationMin', 'status', 'cancelledAt',
                                  'cancelledBy', 'cancellationLog',
                                  'noteBefore', 'noteAfter', 'recurringId',
-                                 'paymentId'])
+                                 'paymentId', 'reason'])
                // ⚠️ #831 (quinta pasada) — estos dos chequeos estaban
                // INCONDICIONALES, que es el mismo error que los bloques de
                // `durationMin` y `startsAt` de acá abajo documentan. Corren
@@ -2674,7 +2717,19 @@ service cloud.firestore {
          && request.resource.data.get('cancelledBy', null) == request.auth.uid
          && request.resource.data.athleteId == resource.data.athleteId
          && request.resource.data.trainerId == resource.data.trainerId
-         && request.resource.data.startsAt == resource.data.startsAt
+         // ⚠️ #847 — el pin va por `.get()`, no por acceso directo. Un doc
+         // heredado SIN el campo hacía que las DOS mitades de la igualdad no
+         // evaluaran, y la regla falla cerrado: turno imborrable otra vez, por
+         // la misma puerta que el gate de 24 h de más abajo. `hasAll()` sólo
+         // corre en el `create`, así que "el campo está" no es un invariante
+         // del `update` — y antes de #781 el create no validaba nada.
+         //
+         // El pin NO se afloja: si el doc tiene `startsAt` y la escritura lo
+         // mueve, `.get()` devuelve valores distintos y sigue dando DENY. Lo
+         // único que cambia es que un doc sin el campo deja de ser un error de
+         // evaluación y pasa a ser `null == null`.
+         && request.resource.data.get('startsAt', null)
+            == resource.data.get('startsAt', null)
          && request.resource.data.durationMin == resource.data.durationMin
          && request.resource.data.get('paymentId', null)
             == resource.data.get('paymentId', null)
@@ -2697,7 +2752,59 @@ service cloud.firestore {
             == resource.data.get('athleteDisplayName', null)
          && request.resource.data.get('recurringId', null)
             == resource.data.get('recurringId', null)
-         && resource.data.startsAt.toMillis() - 86400000 > request.time.toMillis())
+         // ─── #846 — `reason` es la señal CF→CF, y acá se PINEA ───────────────
+         //
+         // `notify-appointment.ts` decide con este campo si manda la
+         // notificación de cancelación. O sea que no es un dato: es CONTROL DE
+         // FLUJO. Si un cliente lo pudiera escribir, un atleta cancelaría su
+         // propio turno por este mismo camino haciéndose pasar por el cascade
+         // de baja de cuenta, y el PF no se enteraría — cero push y cero mail.
+         // Es simétrico: el PF puede silenciar al atleta.
+         //
+         // Con el pin, `request.resource.data.reason` sólo puede valer lo que
+         // ya estaba en el documento. El cliente no lo agrega, no lo cambia y
+         // no lo borra. El Admin SDK sí, porque saltea las reglas.
+         //
+         // El `.get(…, null)` en las dos mitades es obligatorio y no cosmético:
+         // el 99% de los turnos NO tiene la clave, y con acceso directo la
+         // igualdad no evaluaría y la regla fallaría CERRADA — el turno
+         // imborrable de #781 otra vez, por la puerta que abre el fix.
+         && request.resource.data.get('reason', null)
+            == resource.data.get('reason', null)
+         // ─── #847 — el gate de 24 h no puede ser la puerta que traba el doc ──
+         //
+         // Este gate lee `resource.data`, o sea el valor VIEJO, y lo leía con
+         // ACCESO DIRECTO. Sobre un `startsAt` que no es `timestamp` —o que no
+         // está— `.toMillis()` no evalúa y la regla FALLA CERRADO. El Path 1 es
+         // el ÚNICO camino de salida de un turno y `allow delete: if false`:
+         // otra vez la familia de #781.
+         //
+         // #831 arregló la mitad: condicionó el `is timestamp` de
+         // `appointmentUpdateShapeOk()` a que el campo CAMBIE, y eso hizo que
+         // el doc heredado se volviera ANOTABLE. Medido entonces, y por eso
+         // esto es un issue aparte: `startsAt: "manana"` → anotar ALLOW,
+         // cancelar DENY. El turno seguía sin poder salir de la agenda.
+         //
+         // La decisión: un `startsAt` que no es timestamp **no tiene "24 horas
+         // antes" que calcular**, así que no hay gate temporal que aplicarle —
+         // se lo deja cancelar sin él. No es aflojar el freno: es no exigir una
+         // comparación imposible.
+         //
+         // Y no abre nada, porque ese estado ya NO se puede fabricar. Las dos
+         // puertas están cerradas desde #831:
+         //  · `create` → `d.startsAt is timestamp` (incondicional).
+         //  · `update` → o el campo NO cambia, o lo escrito `is timestamp`.
+         // O sea que la rama de abajo sólo la alcanzan documentos que YA nacen
+         // rotos: los de antes de #781, cuando el create no validaba nada.
+         // `treino-dev` ES producción (#826) y no se le corren queries, así que
+         // se asume que están.
+         //
+         // El `.get()` cubre las dos formas del mismo daño —el campo con otro
+         // tipo y el campo AUSENTE—, que es el residuo que quedó anotado junto
+         // a éste y depende del mismo acceso directo.
+         && (!(resource.data.get('startsAt', null) is timestamp)
+             || resource.data.startsAt.toMillis() - 86400000
+                > request.time.toMillis()))
         ||
         // Path 2: trainer edits coaching notes OR links a Payment on their own
         // appointment (Slice 2a, Agenda→cobro bridge, money-critical).
@@ -2752,7 +2859,12 @@ service cloud.firestore {
          && request.resource.data.status == resource.data.status
          && request.resource.data.athleteId == resource.data.athleteId
          && request.resource.data.trainerId == resource.data.trainerId
-         && request.resource.data.startsAt == resource.data.startsAt
+         // #847 — mismo cambio que en el Path 1, por el mismo motivo: un doc
+         // heredado SIN `startsAt` rompía la evaluación del pin y el turno
+         // quedaba sin poder anotarse. El pin sigue mordiendo cuando el campo
+         // existe y la escritura lo mueve.
+         && request.resource.data.get('startsAt', null)
+            == resource.data.get('startsAt', null)
          && request.resource.data.get('cancelledBy', null)
             == resource.data.get('cancelledBy', null)
          && request.resource.data.get('cancelledAt', null)
@@ -2762,6 +2874,13 @@ service cloud.firestore {
          && request.resource.data.get('id', null) == resource.data.get('id', null)
          && request.resource.data.get('recurringId', null)
             == resource.data.get('recurringId', null)
+         // #846 — el MISMO pin que el Path 1, en el camino de al lado. Sin
+         // esto, el PF escribe `reason` de paso en una edición de notas y
+         // silencia la notificación del atleta: "blindar un camino cuyo VECINO
+         // escribe la misma variable es perseguir el vector, no cerrarlo" — la
+         // lección de #831, aplicada de entrada esta vez.
+         && request.resource.data.get('reason', null)
+            == resource.data.get('reason', null)
          && ((resource.data.get('paymentId', null) == null
               && request.resource.data.get('paymentId', null) is string
               && request.resource.data.get('paymentId', null).size() > 0)
@@ -3250,7 +3369,51 @@ service cloud.firestore {
                   && request.resource.data.get('periodKey', null) == resource.data.get('periodKey', null)
                   && request.resource.data.get('dueAt', null) == resource.data.get('dueAt', null)
                   && request.resource.data.get('lastOverdueNotifiedAt', null) == resource.data.get('lastOverdueNotifiedAt', null);
-      allow delete: if request.auth != null && resource.data.trainerId == request.auth.uid;
+      // ─── #848 — el `delete` se CIERRA, no se acota ──────────────────────────
+      //
+      // Acá decía `if request.auth != null && resource.data.trainerId ==
+      // request.auth.uid`, y chocaba de frente con el set-once de
+      // `appointments.paymentId`. Los dos bloques por separado están bien; lo
+      // que nunca se cruzó es que uno asume que el Payment NO desaparece.
+      //
+      // Medido contra el emulador, turno con `paymentId: 'pay-1'`, actor = el
+      // PF dueño de los dos documentos:
+      //   · borrar el Payment `pay-1`            → ALLOW
+      //   · limpiar el `paymentId` del turno     → DENY (set-once, Path 2)
+      //   · reapuntarlo a otro Payment           → DENY (set-once, Path 2)
+      // O sea el turno quedaba apuntando PERMANENTEMENTE a un documento que no
+      // existe, en el campo money-critical, y el propio dueño de los dos no lo
+      // podía reparar desde el cliente. Y `appointments` tiene
+      // `allow delete: if false`, así que el turno tampoco se va.
+      //
+      // Aflojar el set-once no se puede ESCRIBIR: haría falta un `exists()`
+      // sobre el Payment apuntado, y `exists()` en reglas lee estado
+      // PRE-COMMIT, mientras que `billAppointment` crea el Payment y setea el
+      // `paymentId` en la MISMA transacción (ya está documentado sobre el
+      // Path 2 por qué ahí no va un `exists()`). Cerrar el `delete` es la única
+      // salida que no toca el gate money-critical.
+      //
+      // Y es gratis, verificado leyendo los escritores y no suponiendo —el
+      // mismo método que dejó sin llamadores a `book()` en #831—:
+      //  · `PaymentRepository` (`lib/features/payments/data/payment_repository.dart`)
+      //    tiene `add`, `markPaid`, `markManyPaid`, `watchForTrainer` y
+      //    `watchForAthlete`. NO tiene delete.
+      //  · `rg '\.delete\(\)' lib/` no devuelve NINGUNA baja sobre
+      //    `collection('payments')`; los otros dos escritores de la colección
+      //    son `AppointmentRepository.billAppointment(s)`, que sólo crean.
+      //  · El cascade de borrado de cuenta RETIENE los payments a propósito
+      //    ("payments — RETAINED for fiscal/accounting",
+      //    `functions/src/cascade/athlete-data.ts:19`) y escribe con Admin SDK,
+      //    que saltea estas reglas.
+      // O sea: superficie de ataque abierta para una capacidad que ningún
+      // cliente usa, y que además contradice la retención fiscal que el
+      // cascade declara.
+      //
+      // ⚠️ Si algún día el PF necesita anular un cobro cargado por error, la
+      // salida es un `status: 'void'` —que preserva el rastro contable— y eso
+      // es cambio de PRODUCTO: valor nuevo en el enum, UI y filtros de
+      // `pagosPorCobrarProvider`. No entra en un fix de reglas.
+      allow delete: if false;
     }
 
     // Athlete → trainer reviews (Fase 6 Etapa 7).

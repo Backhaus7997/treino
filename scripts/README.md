@@ -355,3 +355,16 @@ tocar Storage— están en `test/storage_scripts_destination.test.js`. Corren co
 `npm --prefix scripts test`. Los corre el job **`Scripts Test (scripts/test)`**
 de `.github/workflows/ci.yml`, así que borrar una línea de cableado pone el PR
 en rojo — antes de ese job la suite entera dependía de que alguien se acordara.
+
+El stub (`test/fixtures/stub_firebase_admin.js`) tapa los **dos** caminos de
+carga, porque los scripts de `migrations/` son `.mjs` y su `import` no pasa por
+`Module._load`: `Module._load` para CJS y `module.register()` —con los hooks de
+`test/fixtures/esm_stub_hooks.mjs`— para ESM. `register()` y no
+`registerHooks()` a propósito: la segunda existe recién en Node 22.15 y el job
+corre **Node 20**, donde el subproceso pasaba a cargar el `firebase-admin` de
+verdad. Ese modo es peor que un rojo, porque los tests que prueban la
+**ausencia** de un marcador quedan verdes midiendo nada. Por eso la intercepción
+ahora se **anuncia** (`STUB_ESM_INTERCEPTED`), los tests la exigen en cada
+corrida y `test/esm_stub_interception.test.js` la custodia con control negativo.
+Si tocás el stub, corré la suite en Node 20 —no sólo en el tuyo—:
+`npx -y node@20 --test test/*.test.js` desde `scripts/`.

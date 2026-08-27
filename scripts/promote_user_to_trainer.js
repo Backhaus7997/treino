@@ -32,9 +32,15 @@ const admin = require('firebase-admin');
 // estar en pantalla antes del primer write, no después. `npm run promote:trainer`
 // no nombra el proyecto en ningún lado — lo resuelve el SDK desde el entorno. (#826)
 const { bannerDeProduccion } = require('./lib/firebase_projects');
-const { usandoEmulador, projectIdObjetivo } = require('./lib/target_project');
+const { contraEmuladorDe, projectIdObjetivo } = require('./lib/target_project');
+// #846 — `contraEmuladorDe(['firestore'])`, no el `usandoEmulador()` que hacía
+// OR entre Firestore y Auth. Este script escribe SÓLO en Firestore
+// (`users/<uid>`, no toca `admin.auth()`), así que un
+// `FIREBASE_AUTH_EMULATOR_HOST` heredado de una sesión de `emulator.sh` apagaba
+// el cartel mientras el write iba a `treino-dev`. El cartel se calla cuando
+// está desviado el servicio que este proceso TOCA, no cualquiera.
 const bannerProd = bannerDeProduccion(projectIdObjetivo(), {
-  contraEmulador: usandoEmulador(),
+  contraEmulador: contraEmuladorDe(['firestore']),
 });
 if (bannerProd) console.warn(bannerProd);
 admin.initializeApp();

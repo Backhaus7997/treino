@@ -72,6 +72,7 @@ import {
 } from "@firebase/rules-unit-testing";
 import {
   arrayUnion,
+  deleteField,
   collection,
   doc,
   getDoc,
@@ -2267,5 +2268,516 @@ describe("appointments — los escritores reales de AppointmentRepository siguen
         updateDoc(doc(dbAs(TRAINER), COL, id), { paymentId: "pay-lote" })
       );
     }
+  });
+});
+
+/**
+ * #846 — el `reason` del cascade: la clave que congelaba el turno, y que ahora
+ * es la señal CF→CF que ningún cliente puede escribir.
+ *
+ * `functions/src/cascade/appointments.ts` escribe `reason:
+ * 'athlete-account-deleted'` con Admin SDK, y `notify-appointment.ts` la lee de
+ * GUARD para NO notificar la cancelación (ADR-PN-006 / REQ-PN-CF-003).
+ *
+ * El bug: `reason` NO estaba en `hasOnly()`. El Admin SDK saltea las reglas,
+ * así que la escritura pasaba; el daño quedaba después. `hasOnly()` corre sobre
+ * `request.resource.data`, el documento **MERGEADO**, así que cualquier update
+ * PARCIAL posterior del cliente arrastraba el `reason` guardado y la allowlist
+ * lo rechazaba. Nuestro propio backend fabricaba turnos imborrables.
+ *
+ * ⚠️ El primer fix MOVÍA el motivo adentro del `cancellationLog` y pedía una
+ * migración contra producción para destrabar lo ya escrito. Se revirtió por el
+ * bloque de abajo: las reglas **no iteran listas** —está escrito sobre el
+ * Path 1: *«ese sigue siendo forjable porque las reglas no iteran listas»*—,
+ * así que ese motivo lo forja cualquier miembro del turno y el guard deja de
+ * ser un guard.
+ *
+ * La salida es la contraria: `reason` ENTRA a las dos allowlists y queda
+ * pineada en los dos caminos de cliente, `== null` en el `create` y con el
+ * `delete` cerrado. Los documentos que ya están escritos se destraban con el
+ * deploy de las reglas, sin correr nada contra producción.
+ */
+describe("appointments — `reason` es la señal del cascade y NO congela el turno (#846)", () => {
+  const CONGELADO = "appt-846-con-reason";
+
+  beforeEach(async () => {
+    // El documento tal como lo dejó la CF: `reason` de primer nivel, escrito
+    // con Admin SDK. Es la forma que HAY en producción hoy.
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), COL, CONGELADO), {
+        ...appointment({ id: CONGELADO, startsAt: inDays(5) }),
+        reason: "athlete-account-deleted",
+      });
+    });
+  });
+
+  it("el atleta PUEDE cancelar un turno que lleva `reason` — el daño de #846, cerrado", async () => {
+    // Éste es EL caso del issue. Contra las reglas anteriores daba DENY, y con
+    // `allow delete: if false` el turno quedaba fijo en la agenda para siempre.
+    await assertSucceeds(
+      updateDoc(doc(dbAs(ATHLETE), COL, CONGELADO), {
+        status: "cancelled",
+        cancelledBy: ATHLETE,
+      })
+    );
+  });
+
+  it("el PF PUEDE anotar un turno que lleva `reason`", async () => {
+    await assertSucceeds(
+      updateDoc(doc(dbAs(TRAINER), COL, CONGELADO), { noteAfter: "ok" })
+    );
+  });
+
+  // ── Y la contraparte: la clave es INESCRIBIBLE para el cliente ───────────
+  //
+  // Estos cinco casos son lo que hace confiable al guard de
+  // `notify-appointment.ts`. Si alguno se pone verde en ALLOW, el guard pasa a
+  // ser forjable y un miembro del turno silencia al otro.
+
+  it("DENIEGA al atleta AGREGAR `reason` mientras cancela (Path 1)", async () => {
+    const LIMPIO = "appt-846-limpio";
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(
+        doc(ctx.firestore(), COL, LIMPIO),
+        appointment({ id: LIMPIO, startsAt: inDays(5) })
+      );
+    });
+    await assertFails(
+      updateDoc(doc(dbAs(ATHLETE), COL, LIMPIO), {
+        status: "cancelled",
+        cancelledBy: ATHLETE,
+        reason: "athlete-account-deleted",
+      })
+    );
+  });
+
+  it("DENIEGA al PF AGREGAR `reason` mientras anota (Path 2)", async () => {
+    const LIMPIO = "appt-846-limpio-2";
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(
+        doc(ctx.firestore(), COL, LIMPIO),
+        appointment({ id: LIMPIO, startsAt: inDays(5) })
+      );
+    });
+    // El vecino del Path 1. Blindar un solo camino es perseguir el vector.
+    await assertFails(
+      updateDoc(doc(dbAs(TRAINER), COL, LIMPIO), {
+        noteAfter: "ok",
+        reason: "athlete-account-deleted",
+      })
+    );
+  });
+
+  it("DENIEGA CAMBIAR el `reason` que ya tiene el documento", async () => {
+    // Por el Path 2, que es el único camino que el PF tiene sobre un turno
+    // `confirmed`.
+    await assertFails(
+      updateDoc(doc(dbAs(TRAINER), COL, CONGELADO), { reason: "otra-cosa" })
+    );
+  });
+
+  it("DENIEGA al PF BORRAR el `reason` que escribió la CF", async () => {
+    // Borrarlo también es control de flujo: deja el documento sin la marca de
+    // que el cascade lo tocó.
+    //
+    // ⚠️ El actor es el PF a propósito. Con el ATLETA este caso sería VACUO: su
+    // único camino es el Path 1, que exige `status == 'cancelled'`, así que un
+    // update que sólo borra `reason` sobre un turno `confirmed` da DENY por el
+    // status y no por el pin. Medido sacando el pin: con el atleta seguía en
+    // verde. Un caso que no se pone rojo cuando borrás la regla que dice
+    // custodiar no custodia nada.
+    await assertFails(
+      updateDoc(doc(dbAs(TRAINER), COL, CONGELADO), { reason: deleteField() })
+    );
+  });
+
+  it("DENIEGA crear un turno con `reason`", async () => {
+    await assertFails(
+      setDoc(doc(dbAs(ATHLETE), COL, "appt-846-create"), {
+        ...appointment({ id: "appt-846-create" }),
+        reason: "athlete-account-deleted",
+      })
+    );
+  });
+
+  it("crear con `reason: null` explícito sigue estando bien", async () => {
+    // Ancla de no-vacuidad: lo que se prohíbe es el VALOR, no la clave. Un
+    // cliente que mande la clave en null no se rompe.
+    await assertSucceeds(
+      setDoc(doc(dbAs(ATHLETE), COL, "appt-846-create-null"), {
+        ...appointment({ id: "appt-846-create-null" }),
+        reason: null,
+      })
+    );
+  });
+
+  // ── La forja que tumbó el fix anterior ──────────────────────────────────
+
+  it("el motivo DENTRO del cancellationLog sí lo forja el cliente — por eso el guard no lo lee", async () => {
+    // Esto es ALLOW, y está bien que lo sea: es una cancelación legítima por el
+    // Path 1, y las reglas no pueden mirar adentro de la entrada del log.
+    //
+    // Lo que prueba es por qué el guard NO puede leer ahí: mientras lo hizo,
+    // esta misma escritura dejaba al PF sin push y sin mail. La consecuencia
+    // está medida en
+    // `functions/src/__tests__/cascade/appointments-notify-contract.test.ts`.
+    const FORJA = "appt-846-forja";
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(
+        doc(ctx.firestore(), COL, FORJA),
+        appointment({ id: FORJA, startsAt: inDays(5) })
+      );
+    });
+    await assertSucceeds(
+      updateDoc(doc(dbAs(ATHLETE), COL, FORJA), {
+        status: "cancelled",
+        cancelledBy: ATHLETE,
+        cancellationLog: arrayUnion({
+          byUid: ATHLETE,
+          atMs: 1,
+          reason: "athlete-account-deleted",
+        }),
+      })
+    );
+  });
+});
+
+/**
+ * #847 — un turno con `startsAt` de otro tipo se podía ANOTAR pero no CANCELAR.
+ *
+ * Residuo medido de #831. Ese PR condicionó el `is timestamp` de
+ * `appointmentUpdateShapeOk()` a que el campo CAMBIE, y con eso el doc heredado
+ * se volvió anotable. Arregló **la mitad**: el gate de 24 h del Path 1 lee el
+ * valor VIEJO con acceso directo (`resource.data.startsAt.toMillis()`), y sobre
+ * un `startsAt` que no es `timestamp` —o que no está— `.toMillis()` no evalúa y
+ * la regla FALLA CERRADO.
+ *
+ * Medido sobre el HEAD anterior, y es la tabla del issue:
+ *   · `startsAt: "manana"` (string)   → anotar ALLOW, cancelar **DENY**
+ *   · `startsAt: 1787…` (millis, int) → cancelar **DENY**
+ *   · sin el campo                    → cancelar **DENY** (residuo hermano)
+ * El Path 1 es el ÚNICO camino de salida de un turno y `allow delete: if false`:
+ * el turno quedaba fijo en la agenda. La familia de #781, por la puerta que
+ * quedaba.
+ *
+ * La decisión que cierra el issue está escrita sobre el gate mismo: un
+ * `startsAt` que no es timestamp NO TIENE "24 horas antes" que calcular, así
+ * que se lo cancela sin gate temporal. No abre nada porque ese estado ya no se
+ * puede fabricar — el `create` exige `is timestamp` incondicional y el `update`
+ * sólo deja escribir un timestamp cuando el campo cambia. La rama nueva sólo la
+ * alcanzan documentos anteriores a #781.
+ *
+ * ⚠️ El caso de no-vacuidad del gate va en el bloque de acá abajo, y NO es
+ * decoración: al condicionar el gate hay que probar que sigue mordiendo sobre
+ * un doc bien tipado. Sin ese negativo, el gate entero pasa a ser borrable con
+ * la suite en verde — que es exactamente el hallazgo de #850.
+ */
+describe("appointments update — un turno legacy con startsAt roto se puede CANCELAR (#847)", () => {
+  const L_STR = "appt-847-string";
+  const L_MS = "appt-847-millis";
+  const L_NONE = "appt-847-sin-campo";
+
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(
+        doc(ctx.firestore(), COL, L_STR),
+        appointment({ id: L_STR, startsAt: "manana" })
+      );
+      await setDoc(
+        doc(ctx.firestore(), COL, L_MS),
+        appointment({ id: L_MS, startsAt: Date.now() + 5 * 86400000 })
+      );
+      const sinCampo = appointment({ id: L_NONE });
+      delete sinCampo.startsAt;
+      await setDoc(doc(ctx.firestore(), COL, L_NONE), sinCampo);
+    });
+  });
+
+  it("permite al atleta cancelar un legacy con startsAt string — sin esto es imborrable", async () => {
+    await assertSucceeds(
+      updateDoc(doc(dbAs(ATHLETE), COL, L_STR), {
+        status: "cancelled",
+        cancelledBy: ATHLETE,
+      })
+    );
+  });
+
+  it("permite al PF cancelar un legacy con startsAt guardado en millis", async () => {
+    await assertSucceeds(
+      updateDoc(doc(dbAs(TRAINER), COL, L_MS), {
+        status: "cancelled",
+        cancelledBy: TRAINER,
+      })
+    );
+  });
+
+  it("permite cancelar un legacy SIN startsAt — el residuo hermano del mismo acceso directo", async () => {
+    await assertSucceeds(
+      updateDoc(doc(dbAs(ATHLETE), COL, L_NONE), {
+        status: "cancelled",
+        cancelledBy: ATHLETE,
+      })
+    );
+  });
+
+  it("el legacy roto se sigue pudiendo ANOTAR — la mitad que #831 ya había cerrado", async () => {
+    // Ancla: este caso es el que separa "#847 agregó algo" de "#847 rompió lo
+    // anterior". Si el fix del gate hubiera tocado la forma, esto se cae.
+    await assertSucceeds(
+      updateDoc(doc(dbAs(TRAINER), COL, L_STR), { noteAfter: "ok" })
+    );
+  });
+
+  it("DENIEGA que la cancelación del legacy MUEVA startsAt de paso", async () => {
+    // El pin pasó a `.get()` para no fallar cerrado sobre el doc sin campo;
+    // sigue mordiendo cuando la escritura toca el valor.
+    await assertFails(
+      updateDoc(doc(dbAs(ATHLETE), COL, L_STR), {
+        status: "cancelled",
+        cancelledBy: ATHLETE,
+        startsAt: inDays(9),
+      })
+    );
+  });
+
+  it("DENIEGA ponerle un startsAt al doc que no lo tiene, colgándose de la cancelación", async () => {
+    await assertFails(
+      updateDoc(doc(dbAs(ATHLETE), COL, L_NONE), {
+        status: "cancelled",
+        cancelledBy: ATHLETE,
+        startsAt: inDays(9),
+      })
+    );
+  });
+});
+
+/**
+ * #847 / #850 — el gate de 24 h no tenía UN SOLO negativo.
+ *
+ * `resource.data.startsAt.toMillis() - 86400000 > request.time.toMillis()` es
+ * el único freno del camino de cancelación —el vector que #781 vino a cerrar—
+ * y era borrable con la suite entera en verde: el bloque de arriba tiene el
+ * positivo (`permite al miembro cancelar con más de 24 h`), pero un positivo no
+ * custodia nada. Medido con el conjunto reemplazado por `true`: 0 rojos.
+ *
+ * Y ahora hace falta el doble, porque #847 le agregó una rama: sin este caso,
+ * la mutación del gate condicionado tampoco se pone roja y el fix habría
+ * cambiado "gate sin custodia" por "gate sin custodia, más ancho".
+ */
+describe("appointments update — el gate de 24 h sigue mordiendo (#847)", () => {
+  const CERCA = "appt-24h-cerca";
+  const LEJOS = "appt-24h-lejos";
+
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      // 6 h vista: bien tipado, o sea la rama del gate que SÍ compara.
+      await setDoc(
+        doc(ctx.firestore(), COL, CERCA),
+        appointment({
+          id: CERCA,
+          startsAt: Timestamp.fromMillis(Date.now() + 6 * 3600000),
+        })
+      );
+      await setDoc(
+        doc(ctx.firestore(), COL, LEJOS),
+        appointment({ id: LEJOS, startsAt: inDays(5) })
+      );
+    });
+  });
+
+  it("DENIEGA al atleta cancelar a menos de 24 h — REQ-007", async () => {
+    await assertFails(
+      updateDoc(doc(dbAs(ATHLETE), COL, CERCA), {
+        status: "cancelled",
+        cancelledBy: ATHLETE,
+      })
+    );
+  });
+
+  it("DENIEGA al PF cancelar a menos de 24 h", async () => {
+    await assertFails(
+      updateDoc(doc(dbAs(TRAINER), COL, CERCA), {
+        status: "cancelled",
+        cancelledBy: TRAINER,
+      })
+    );
+  });
+
+  it("permite cancelar el mismo turno a 5 días — lo único que separa el DENY es la distancia", async () => {
+    await assertSucceeds(
+      updateDoc(doc(dbAs(ATHLETE), COL, LEJOS), {
+        status: "cancelled",
+        cancelledBy: ATHLETE,
+      })
+    );
+  });
+});
+
+/**
+ * #850 — los 10 gates de `appointmentShapeOk()` que nadie custodiaba.
+ *
+ * Del barrido de mutación en serio de #831: los **42 conjuntos** de
+ * `appointmentShapeOk()` / `appointmentUpdateShapeOk()`, uno por uno,
+ * reemplazados por `true` de a UNO SOLO, corriendo esta suite entre cada
+ * mutación. #831 cerró 7 de las 25 filas que daban 0 rojos; estas 10 quedaban
+ * **borrables con la suite entera en verde**, y cada una con su daño medido —
+ * o sea que no son ceros por gate SUBSUMIDO, son ceros por gate SIN CUSTODIA.
+ *
+ * ⚠️ Las reglas están bien escritas: ninguna de estas escrituras pasa hoy. Lo
+ * que faltaba es que borrar el gate ponga rojo a alguien, porque si no un
+ * refactor futuro lo saca sin enterarse. Es literalmente lo que le pasó a
+ * `cancelledBy == null` y a `athleteDisplayName <= 200` antes de #831.
+ *
+ * ─── Por qué el payload de cada caso es EXACTAMENTE ése ─────────────────────
+ *
+ * La suite YA tenía negativos para varios de estos campos, y pasaban **por el
+ * motivo equivocado**: con `athleteId: 12345` y el `is string` borrado, la
+ * regla no se afloja — `12345.size()` no evalúa y falla cerrado igual. El
+ * ataque que mide el gate es el que **sobrevive a su ausencia**, y para los
+ * `is string` eso es una LISTA: `['x'].size()` da 1, así que sin el `is string`
+ * entra. Es la misma pregunta que destapó el `cancellationLog` en la sexta
+ * pasada de #831: **¿esta cota chequea el TIPO, o sólo una propiedad que varios
+ * tipos comparten?**
+ *
+ * `athleteDisplayName: []` es el más interesante de los diez: una lista vacía
+ * mide 0, o sea cumple `<= 200`, y el campo es `required String` en el modelo.
+ * Sin el `is string`, `Appointment.fromJson` explota y **una sola fila rompe el
+ * stream entero** de `watchForTrainer` y `watchForAthlete`.
+ *
+ * ─── Y por qué el disyunto importa ──────────────────────────────────────────
+ *
+ * Los ataques sobre `athleteId` van por el camino del PF con rol
+ * (`TRAINER_BOOKER`), no por el del atleta: el disyunto del atleta compara
+ * `athleteId == request.auth.uid` y se cae AHÍ, antes de llegar a la forma —
+ * el "negativo que no avisa" de #837. Los de `trainerId` van al revés, por el
+ * disyunto del atleta, que deja `trainerId` libre.
+ */
+describe("appointments create — los 10 gates sin custodia (#850)", () => {
+  // ── athleteId: por el disyunto del PF, que lo deja libre ────────────────
+
+  it("DENIEGA un athleteId que es una LISTA — `['x']` mide 1 y esquiva las cotas", async () => {
+    await assertFails(
+      setDoc(
+        doc(dbAs(TRAINER_BOOKER), COL, "g-athleteid-list"),
+        appointment({
+          id: "g-athleteid-list",
+          trainerId: TRAINER_BOOKER,
+          athleteId: ["x"],
+        })
+      )
+    );
+  });
+
+  it("DENIEGA un athleteId vacío", async () => {
+    await assertFails(
+      setDoc(
+        doc(dbAs(TRAINER_BOOKER), COL, "g-athleteid-vacio"),
+        appointment({
+          id: "g-athleteid-vacio",
+          trainerId: TRAINER_BOOKER,
+          athleteId: "",
+        })
+      )
+    );
+  });
+
+  it("DENIEGA un athleteId de 200 caracteres — la cota de 128", async () => {
+    await assertFails(
+      setDoc(
+        doc(dbAs(TRAINER_BOOKER), COL, "g-athleteid-largo"),
+        appointment({
+          id: "g-athleteid-largo",
+          trainerId: TRAINER_BOOKER,
+          athleteId: "x".repeat(200),
+        })
+      )
+    );
+  });
+
+  // ── trainerId: por el disyunto del atleta, que lo deja libre ────────────
+
+  it("DENIEGA un trainerId que es una LISTA", async () => {
+    await assertFails(
+      setDoc(
+        doc(dbAs(ATHLETE), COL, "g-trainerid-list"),
+        appointment({ id: "g-trainerid-list", trainerId: ["x"] })
+      )
+    );
+  });
+
+  it("DENIEGA un trainerId de 200 caracteres — la cota de 128", async () => {
+    await assertFails(
+      setDoc(
+        doc(dbAs(ATHLETE), COL, "g-trainerid-largo"),
+        appointment({ id: "g-trainerid-largo", trainerId: "x".repeat(200) })
+      )
+    );
+  });
+
+  // ── athleteDisplayName ─────────────────────────────────────────────────
+
+  it("DENIEGA un athleteDisplayName que es una LISTA VACÍA — mide 0 y cumple `<= 200`", async () => {
+    // El campo es `required String` en el modelo: sin el `is string`, esta
+    // fila rompe la deserialización del snapshot entero del PF.
+    await assertFails(
+      setDoc(
+        doc(dbAs(ATHLETE), COL, "g-nombre-list"),
+        appointment({ id: "g-nombre-list", athleteDisplayName: [] })
+      )
+    );
+  });
+
+  // ── id ─────────────────────────────────────────────────────────────────
+
+  it("DENIEGA un id que es una LISTA — el `12` de antes no medía el gate", async () => {
+    await assertFails(
+      setDoc(
+        doc(dbAs(ATHLETE), COL, "g-id-list"),
+        appointment({ id: ["x"] })
+      )
+    );
+  });
+
+  it("DENIEGA un id vacío", async () => {
+    await assertFails(
+      setDoc(doc(dbAs(ATHLETE), COL, "g-id-vacio"), appointment({ id: "" }))
+    );
+  });
+
+  // ── durationMin ────────────────────────────────────────────────────────
+
+  it("DENIEGA un durationMin double — `60.5` está DENTRO del rango 1..600", async () => {
+    // El negativo que ya existía usaba 100000, o sea medía `<= 600`. Este
+    // valor pasa las dos cotas de rango: lo único que lo frena es el `is int`.
+    await assertFails(
+      setDoc(
+        doc(dbAs(ATHLETE), COL, "g-duration-double"),
+        appointment({ id: "g-duration-double", durationMin: 60.5 })
+      )
+    );
+  });
+
+  it("DENIEGA un durationMin en cero — el borde inferior", async () => {
+    await assertFails(
+      setDoc(
+        doc(dbAs(ATHLETE), COL, "g-duration-cero"),
+        appointment({ id: "g-duration-cero", durationMin: 0 })
+      )
+    );
+  });
+
+  it("permite el turno legítimo con los mismos campos — ancla de no-vacuidad de los diez", async () => {
+    await assertSucceeds(
+      setDoc(
+        doc(dbAs(TRAINER_BOOKER), COL, "g-ancla"),
+        appointment({
+          id: "g-ancla",
+          trainerId: TRAINER_BOOKER,
+          athleteId: "atleta-cualquiera",
+          athleteDisplayName: "Ana",
+          durationMin: 60,
+        })
+      )
+    );
   });
 });
