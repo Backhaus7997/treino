@@ -3579,9 +3579,10 @@ ausencia: el módulo sintético anuncia `STUB_ESM_INTERCEPTED` al evaluarse, y
 `correr()` lo exige en **cada** corrida. `scripts/test/esm_stub_interception.test.js`
 custodia al harness con **control negativo** —la misma sonda sin el preload
 tiene que decir `ESM=REAL`—, porque un marcador que aparece siempre no prueba
-nada. Mutación, apagando la intercepción ESM en Node 20: **46 casos rojos**, con
-el mensaje *"este test NO está midiendo la compuerta"*. Antes ese mismo mutante
-dejaba la matriz en verde.
+nada. Mutación, apagando la intercepción ESM en Node 20: **46 casos rojos** en la
+suite —las 44 de la matriz, con el mensaje *"este test NO está midiendo la
+compuerta"*, más 2 del propio harness—. Antes ese mismo mutante dejaba la matriz
+en verde.
 
 #### #847 — el gate de 24 h leía el valor viejo con acceso directo
 
