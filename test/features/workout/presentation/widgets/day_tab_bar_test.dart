@@ -25,7 +25,18 @@ DayTabBar _barra({
       selectedIndex: seleccionado,
       onSelect: onSelect ?? (_) {},
       onAddDay: sinAgregar ? null : () {},
+      addDayLabel: 'Agregar día',
+      statusLabel: (e) => e == DayTabStatus.empty ? 'día vacío' : 'sin reps',
     );
+
+/// Todos los labels de semántica presentes en el árbol.
+///
+/// Se mira el conjunto y no un ancestro puntual: `find.ancestor(...).first`
+/// devuelve el Semantics más externo —el del Scaffold— cuyo label es null.
+Iterable<String> _labels(WidgetTester tester) => tester
+    .widgetList<Semantics>(find.byType(Semantics))
+    .map((s) => s.properties.label)
+    .whereType<String>();
 
 void main() {
   const paletas = <String, AppPalette>{
@@ -123,6 +134,8 @@ void main() {
         selectedIndex: 0,
         onSelect: (_) {},
         onAddDay: () {},
+        addDayLabel: 'Agregar día',
+        statusLabel: (_) => '',
       ),
     ));
     expect(find.text('Pecho, hombro y…'), findsOneWidget);
@@ -147,4 +160,45 @@ void main() {
       }
     });
   }
+
+  // Guards de accesibilidad — salieron del review del bot en #883/#884.
+  testWidgets('el botón + tiene nombre accesible', (tester) async {
+    // El control anterior era un TextButton.icon con "Agregar día" VISIBLE.
+    // Este es sólo un "+": sin label, un lector de pantalla anuncia un botón
+    // sin nombre y el usuario no sabe qué hace.
+    await tester.pumpWidget(_host(AppPalette.mintMagenta, _barra()));
+    expect(_labels(tester), contains('Agregar día'));
+  });
+
+  testWidgets('una pestaña inactiva con problema lo ANUNCIA, no sólo lo pinta',
+      (tester) async {
+    // El punto de color no existe para asistencia técnica: sin label, un día
+    // vacío y uno con sets sin completar suenan idénticos.
+    await tester.pumpWidget(_host(AppPalette.mintMagenta, _barra()));
+
+    final labels = _labels(tester);
+    // 0 está seleccionada: sin sufijo de estado.
+    expect(labels, contains('Día 1'));
+    // 1 vacía, 2 inválida: cada una dice lo suyo.
+    expect(labels, contains('Día 2, día vacío'));
+    expect(labels, contains('Día 3, sin reps'));
+  });
+
+  testWidgets('el label accesible usa el nombre COMPLETO, no el truncado',
+      (tester) async {
+    await tester.pumpWidget(_host(
+      AppPalette.mintMagenta,
+      DayTabBar(
+        labels: const ['Pecho, hombro y tríceps completo'],
+        statuses: const [DayTabStatus.ok],
+        selectedIndex: 0,
+        onSelect: (_) {},
+        onAddDay: () {},
+        addDayLabel: 'Agregar día',
+        statusLabel: (_) => '',
+      ),
+    ));
+    // La elipsis es una limitación de ancho, no información.
+    expect(_labels(tester), contains('Pecho, hombro y tríceps completo'));
+  });
 }

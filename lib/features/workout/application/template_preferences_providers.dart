@@ -69,8 +69,7 @@ class TemplatePreferencesController {
 /// —sin señal— y el scoring los trata igual.
 final athleteTemplatePreferencesProvider = Provider<TemplatePreferences>((ref) {
   return ref.watch(
-        userProfileProvider
-            .select((p) => p.valueOrNull?.templatePreferences),
+        userProfileProvider.select((p) => p.valueOrNull?.templatePreferences),
       ) ??
       const TemplatePreferences();
 });

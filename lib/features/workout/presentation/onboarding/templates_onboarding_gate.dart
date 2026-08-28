@@ -242,7 +242,8 @@ class _TemplatesOnboardingSheet extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         color: palette.bgCard,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
+        borderRadius:
+            const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
         border: Border(top: BorderSide(color: palette.border)),
       ),
       child: SafeArea(

@@ -34,7 +34,22 @@ class DayTabBar extends StatelessWidget {
     required this.selectedIndex,
     required this.onSelect,
     required this.onAddDay,
+    required this.addDayLabel,
+    required this.statusLabel,
   });
+
+  /// Nombre accesible del botón `+`.
+  ///
+  /// El control anterior era un `TextButton.icon` con el texto "Agregar día"
+  /// visible; éste es sólo un `+`. Sin label, un lector de pantalla anuncia un
+  /// botón sin nombre.
+  final String addDayLabel;
+
+  /// Cómo se anuncia el estado de un día que NO está seleccionado.
+  ///
+  /// El punto de color no existe para asistencia técnica: sin esto, un día
+  /// vacío y uno con sets sin completar suenan idénticos.
+  final String Function(DayTabStatus) statusLabel;
 
   /// Nombre visible de cada día, en orden.
   final List<String> labels;
@@ -65,17 +80,26 @@ class DayTabBar extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s14),
         itemCount: labels.length + 1,
-        separatorBuilder: (_, __) =>
-            const SizedBox(width: AppSpacing.hairline * 2),
+        separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.s8),
         itemBuilder: (context, i) {
           if (i == labels.length) {
-            return _BotonAgregar(palette: palette, onTap: onAddDay);
+            return _BotonAgregar(
+              palette: palette,
+              onTap: onAddDay,
+              label: addDayLabel,
+            );
           }
+          final selected = i == selectedIndex;
           return _Pestana(
             key: Key('day_tab_$i'),
             label: _truncar(labels[i]),
+            // El label accesible lleva el nombre COMPLETO, no el truncado: la
+            // elipsis es una limitación de ancho, no información.
+            semanticsLabel: selected || statuses[i] == DayTabStatus.ok
+                ? labels[i]
+                : '${labels[i]}, ${statusLabel(statuses[i])}',
             status: statuses[i],
-            selected: i == selectedIndex,
+            selected: selected,
             palette: palette,
             onTap: () => onSelect(i),
           );
@@ -89,6 +113,7 @@ class _Pestana extends StatelessWidget {
   const _Pestana({
     super.key,
     required this.label,
+    required this.semanticsLabel,
     required this.status,
     required this.selected,
     required this.palette,
@@ -96,6 +121,7 @@ class _Pestana extends StatelessWidget {
   });
 
   final String label;
+  final String semanticsLabel;
   final DayTabStatus status;
   final bool selected;
   final AppPalette palette;
@@ -111,6 +137,7 @@ class _Pestana extends StatelessWidget {
     return Semantics(
       button: true,
       selected: selected,
+      label: semanticsLabel,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(AppRadius.sm),
@@ -145,7 +172,7 @@ class _Pestana extends StatelessWidget {
                 // Sólo en las inactivas: en la activa el problema ya se ve
                 // abajo, en el contenido del día.
                 if (!selected && status != DayTabStatus.ok) ...[
-                  const SizedBox(width: AppSpacing.hairline + 2),
+                  const SizedBox(width: AppSpacing.hairline),
                   Container(
                     width: 6,
                     height: 6,
@@ -167,32 +194,42 @@ class _Pestana extends StatelessWidget {
 }
 
 class _BotonAgregar extends StatelessWidget {
-  const _BotonAgregar({required this.palette, required this.onTap});
+  const _BotonAgregar({
+    required this.palette,
+    required this.onTap,
+    required this.label,
+  });
 
   final AppPalette palette;
   final VoidCallback? onTap;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
     final habilitado = onTap != null;
-    return InkWell(
-      key: const Key('day_tab_add'),
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppRadius.sm),
-      child: Container(
-        width: 44,
-        constraints: const BoxConstraints(minHeight: 44),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-          border: Border.all(
-            color: habilitado ? palette.borderStrong : palette.border,
+    return Semantics(
+      button: true,
+      enabled: habilitado,
+      label: label,
+      child: InkWell(
+        key: const Key('day_tab_add'),
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        child: Container(
+          width: 44,
+          constraints: const BoxConstraints(minHeight: 44),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            border: Border.all(
+              color: habilitado ? palette.borderStrong : palette.border,
+            ),
           ),
-        ),
-        child: Center(
-          child: Icon(
-            TreinoIcon.plus,
-            size: 15,
-            color: habilitado ? palette.textMuted : palette.textFaint,
+          child: Center(
+            child: Icon(
+              TreinoIcon.plus,
+              size: 15,
+              color: habilitado ? palette.textMuted : palette.textFaint,
+            ),
           ),
         ),
       ),

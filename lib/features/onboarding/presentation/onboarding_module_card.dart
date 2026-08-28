@@ -42,7 +42,8 @@ class OnboardingModuleCard extends StatelessWidget {
     return Dialog(
       backgroundColor: Colors.transparent,
       elevation: 0,
-      insetPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20, vertical: AppSpacing.s20),
+      insetPadding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.s20, vertical: AppSpacing.s20),
       child: ConstrainedBox(
         // Fixed max width, no breakpoints — the idiom every dialog in this repo
         // already uses. SingleChildScrollView absorbs short viewports and large

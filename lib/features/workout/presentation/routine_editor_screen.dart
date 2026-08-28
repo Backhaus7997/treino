@@ -1282,6 +1282,29 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         day: invalid.day,
       );
     }
+    // 5) El problema está en OTRA semana.
+    //
+    // `_firstInvalidSlot` mira sólo `_selectedWeek`, pero `_isValid` mira
+    // todas: sin esta rama el guardado quedaba bloqueado y sin mensaje —el
+    // botón parecía muerto—. Antes el chip de semana con warning estaba
+    // siempre a la vista y alcanzaba como explicación; desde #866 vive dentro
+    // de la hoja del engranaje, así que hay que decirlo en voz alta.
+    final semanasRotas = _invalidWeekFirstDay;
+    final otra = semanasRotas.keys.where((w) => w != _selectedWeek).toList()
+      ..sort();
+    if (otra.isNotEmpty) {
+      final semana = otra.first;
+      final dia = semanasRotas[semana]!;
+      // Llevar al usuario al problema, no sólo nombrárselo.
+      if (semana != _selectedWeek) {
+        FocusManager.instance.primaryFocus?.unfocus();
+        setState(() => _selectedWeek = semana);
+      }
+      return (
+        message: l10n.routineEditorInvalidWeekHint(semana + 1, dia),
+        day: null,
+      );
+    }
     return null;
   }
 
@@ -2581,6 +2604,13 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                         setState(() => _selectedDayIndex = i);
                       },
                       onAddDay: _days.length < _kMaxDays ? _addDay : null,
+                      addDayLabel: l10n.coachEditorAddDay,
+                      statusLabel: (estado) => switch (estado) {
+                        DayTabStatus.empty =>
+                          l10n.routineEditorEmptyDayTitle.toLowerCase(),
+                        DayTabStatus.invalid => l10n.routineEditorMissingReps,
+                        DayTabStatus.ok => '',
+                      },
                     ),
                     const SizedBox(height: AppSpacing.s12),
 
