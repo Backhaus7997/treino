@@ -145,6 +145,33 @@ class AuthService {
     return user;
   }
 
+  /// Traduce el fallo de un callable a un [AuthFailure] con copy accionable.
+  ///
+  /// ─── Por que solo `unavailable` ────────────────────────────────────────────
+  ///
+  /// El plugin `cloud_functions` NORMALIZA el code en el lado nativo, a
+  /// proposito, para que Android, iOS y Web coincidan
+  /// (FlutterFirebaseFunctionsPlugin.kt:129-141):
+  ///
+  ///   - `IOException` de red        -> `unavailable`
+  ///   - cancel / timeout            -> `deadline-exceeded`
+  ///   - la funcion corrio y fallo   -> `internal`
+  ///
+  /// O sea que `unavailable` ES el modo avion, y es el unico que lo es.
+  /// `internal` NO: significa que el server contesto y algo se rompio adentro;
+  /// mandarlo a "Sin conexion" seria mentirle al usuario en la direccion
+  /// contraria, y lo dejaria mirando el wifi mientras el problema es nuestro.
+  ///
+  /// `deadline-exceeded` queda afuera a proposito: en `southamerica-east1` un
+  /// cold start puede agotar el plazo con la conexion perfecta. "Algo salio
+  /// mal, intenta de nuevo" es el consejo correcto para un timeout; "revisa tu
+  /// internet" no.
+  AuthFailure _failureFromCallable(FirebaseFunctionsException e) =>
+      switch (e.code) {
+        'unavailable' => const AuthFailure.networkError(),
+        final code => AuthFailure.unknown(code),
+      };
+
   /// Pide el mail de reseteo a la CF `requestPasswordReset`.
   ///
   /// Ya NO llama a `FirebaseAuth.sendPasswordResetEmail`. El servidor manda el
@@ -167,7 +194,7 @@ class AuthService {
       final callable = _functions.httpsCallable('requestPasswordReset');
       await callable.call<Map<String, dynamic>>({'email': email});
     } on FirebaseFunctionsException catch (e) {
-      throw AuthFailure.unknown(e.code);
+      throw _failureFromCallable(e);
     } catch (e) {
       throw const AuthFailure.unknown('reset-request-failed');
     }
@@ -186,7 +213,7 @@ class AuthService {
       final callable = _functions.httpsCallable('requestEmailVerification');
       await callable.call<Map<String, dynamic>>(<String, dynamic>{});
     } on FirebaseFunctionsException catch (e) {
-      throw AuthFailure.unknown(e.code);
+      throw _failureFromCallable(e);
     } catch (e) {
       throw const AuthFailure.unknown('verification-request-failed');
     }

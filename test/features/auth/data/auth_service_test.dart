@@ -527,14 +527,71 @@ void main() {
       );
     });
 
-    test('un fallo real del callable sí propaga como AuthFailure', () async {
+    // ── El copy tiene que decir la verdad sobre QUE fallo ───────────────────
+    //
+    // El plugin `cloud_functions` normaliza los codes en nativo para igualar
+    // Android, iOS y Web: un `IOException` de red sale como `unavailable`, un
+    // timeout como `deadline-exceeded`, y un fallo de la funcion ya corriendo
+    // como `internal`. Estos tests fijan esa distincion, porque es la unica
+    // pantalla donde el usuario ya esta AFUERA de su cuenta: si le decimos
+    // "algo salio mal" cuando esta sin datos, reintenta sin tocar el wifi y
+    // concluye que su cuenta se rompio.
+    test('sin conexión dice SIN CONEXIÓN, no "algo salió mal"', () async {
       when(() => callable.call<Map<String, dynamic>>(any())).thenThrow(
-        FirebaseFunctionsException(code: 'unavailable', message: 'down'),
+        FirebaseFunctionsException(code: 'unavailable', message: 'network'),
       );
 
+      await expectLater(
+        sut.sendPasswordResetEmail(email: 'a@b.c'),
+        throwsA(const AuthFailure.networkError()),
+      );
       expect(
-        () => sut.sendPasswordResetEmail(email: 'a@b.c'),
-        throwsA(const AuthFailure.unknown('unavailable')),
+        const AuthFailure.networkError().userMessage,
+        contains('Sin conexión'),
+      );
+    });
+
+    // La otra mitad, y la que impide el sobre-mapeo: `internal` significa que
+    // el server SI contesto y se rompio adentro. Mandarlo a "revisá tu
+    // internet" deja al usuario mirando el wifi mientras el problema es
+    // nuestro.
+    test('un fallo del server NO se disfraza de problema de conexión',
+        () async {
+      when(() => callable.call<Map<String, dynamic>>(any())).thenThrow(
+        FirebaseFunctionsException(code: 'internal', message: 'boom'),
+      );
+
+      await expectLater(
+        sut.sendPasswordResetEmail(email: 'a@b.c'),
+        throwsA(const AuthFailure.unknown('internal')),
+      );
+    });
+
+    // Un cold start de southamerica-east1 puede agotar el plazo con la
+    // conexión perfecta, así que este tampoco es "sin conexión".
+    test('un timeout tampoco se disfraza de problema de conexión', () async {
+      when(() => callable.call<Map<String, dynamic>>(any())).thenThrow(
+        FirebaseFunctionsException(
+          code: 'deadline-exceeded',
+          message: 'timeout',
+        ),
+      );
+
+      await expectLater(
+        sut.sendPasswordResetEmail(email: 'a@b.c'),
+        throwsA(const AuthFailure.unknown('deadline-exceeded')),
+      );
+    });
+
+    test('el reenvío de verificación usa el mismo mapeo', () async {
+      when(() => fbAuth.currentUser).thenReturn(user);
+      when(() => callable.call<Map<String, dynamic>>(any())).thenThrow(
+        FirebaseFunctionsException(code: 'unavailable', message: 'network'),
+      );
+
+      await expectLater(
+        sut.sendEmailVerification(),
+        throwsA(const AuthFailure.networkError()),
       );
     });
   });
