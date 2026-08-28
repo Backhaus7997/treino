@@ -33,6 +33,8 @@ import 'package:treino/features/workout/presentation/routine_editor_screen.dart'
 
 import '../../../helpers/fake_analytics_service.dart';
 import '../../../fixtures/exercises.dart';
+import 'package:treino/features/workout/presentation/widgets/day_tab_bar.dart';
+import '../../../fixtures/routine_editor_ui.dart';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -148,7 +150,8 @@ void main() {
     expect(find.text('NIVEL'), findsNothing);
 
     // Days-of-plan section visible
-    expect(find.text('DÍAS DEL PLAN'), findsOneWidget);
+    expect(find.byType(DayTabBar), findsOneWidget,
+        reason: 'la barra de pestañas reemplazó al label DÍAS DEL PLAN');
   });
 
   // ── SCENARIO-RER-021: SelfCreating shows name + days-of-plan ─────────────────
@@ -162,7 +165,8 @@ void main() {
     );
 
     expect(find.byKey(const Key('editor_name_field')), findsOneWidget);
-    expect(find.text('DÍAS DEL PLAN'), findsOneWidget);
+    expect(find.byType(DayTabBar), findsOneWidget,
+        reason: 'la barra de pestañas reemplazó al label DÍAS DEL PLAN');
     // Starts with 1 day
     expect(find.text('Día 1'), findsWidgets);
   });
@@ -200,7 +204,8 @@ void main() {
     // never created days). Day count is driven only by "DÍAS DEL PLAN".
     expect(find.text('DÍAS/SEM'), findsNothing);
     expect(find.text('NIVEL'), findsOneWidget);
-    expect(find.text('DÍAS DEL PLAN'), findsOneWidget);
+    expect(find.byType(DayTabBar), findsOneWidget,
+        reason: 'la barra de pestañas reemplazó al label DÍAS DEL PLAN');
   });
 
   // ── SCENARIO-RER-023: TrainerTemplating shows all fields ──────────────────────
@@ -228,11 +233,12 @@ void main() {
     // TrainerAssigning de arriba no lo necesita: ahí el selector no se
     // muestra, justamente porque un plan asignado no entra al catálogo.
     await tester.scrollUntilVisible(
-      find.text('DÍAS DEL PLAN'),
+      find.byType(DayTabBar),
       200,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(find.text('DÍAS DEL PLAN'), findsOneWidget);
+    expect(find.byType(DayTabBar), findsOneWidget,
+        reason: 'la barra de pestañas reemplazó al label DÍAS DEL PLAN');
     expect(find.byKey(const Key('editor_goals_picker')), findsOneWidget);
   });
 
@@ -311,6 +317,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Add exercises via the add-slot button in Day 1
+    await desplazarHastaAgregarEjercicio(tester);
     await tester.tap(find.text('Agregar ejercicio'));
     await tester.pumpAndSettle();
 
@@ -443,6 +450,7 @@ void main() {
 
     // Name field is hydrated — still need to add a slot for valid form.
     // Tap + Agregar ejercicio to add a slot.
+    await desplazarHastaAgregarEjercicio(tester);
     await tester.tap(find.text('Agregar ejercicio'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Press de Banca').first);
@@ -816,7 +824,11 @@ void main() {
     expect(find.text('GUARDAR COMO MÍA'), findsOneWidget);
     // Abre CARGADO — el punto entero del issue es que no sea una pantalla en
     // blanco.
-    expect(find.text('Empuje'), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('day_header_name'))).data,
+      'Empuje',
+      reason: 'el nombre también aparece en la pestaña: mirar la cabecera',
+    );
     // Y sigue siendo un modo de atleta: la plantilla trae split 'PPL', pero el
     // campo es trainer-only (ADR-RER-04).
     expect(find.byKey(const Key('editor_split_field')), findsNothing);

@@ -3374,6 +3374,24 @@ abstract class AppL10n {
   /// **'{n, plural, =1{1 set sin reps} other{{n} sets sin reps}}'**
   String routineEditorSetsMissingReps(int n);
 
+  /// No description provided for @routineEditorEmptyDayTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DÍA VACÍO'**
+  String get routineEditorEmptyDayTitle;
+
+  /// No description provided for @routineEditorEmptyDayBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Agregá el primer ejercicio y ya queda listo para entrenar.'**
+  String get routineEditorEmptyDayBody;
+
+  /// No description provided for @routineEditorDayTabA11y.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Día {n}{estado}'**
+  String routineEditorDayTabA11y(int n, String estado);
+
   /// No description provided for @routineEditorDayName.
   ///
   /// In es_AR, this message translates to:

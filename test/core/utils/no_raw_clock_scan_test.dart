@@ -176,9 +176,8 @@ void main() {
 
         if (!scannedRoots.any(relativePath.startsWith)) continue;
 
-        final matches = rawClockPattern
-            .allMatches(entity.readAsStringSync())
-            .length;
+        final matches =
+            rawClockPattern.allMatches(entity.readAsStringSync()).length;
         totalDebt += matches;
 
         if (matches == 0) continue;
@@ -195,8 +194,7 @@ void main() {
       expect(
         offenders,
         isEmpty,
-        reason:
-            'Reloj crudo fuera de la allowlist:\n'
+        reason: 'Reloj crudo fuera de la allowlist:\n'
             '${offenders.join('\n')}\n\n'
             'Elegí según QUÉ estás comparando:\n'
             '  • contra Appointment.startsAt  →  nowWall()  '
@@ -241,8 +239,7 @@ void main() {
       expect(
         staleEntries,
         isEmpty,
-        reason:
-            'Estos archivos ya no usan reloj crudo (o no existen) pero '
+        reason: 'Estos archivos ya no usan reloj crudo (o no existen) pero '
             'siguen en la allowlist:\n${staleEntries.join('\n')}\n\n'
             'Sacalos y bajá allowlistCeiling.',
       );

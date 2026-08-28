@@ -573,6 +573,14 @@
     "description": "Resumen de error en la cabecera colapsada de un ejercicio",
     "placeholders": { "n": { "type": "int" } }
   },
+  "routineEditorEmptyDayTitle": "EMPTY DAY",
+  "@routineEditorEmptyDayTitle": {},
+  "routineEditorEmptyDayBody": "Add the first exercise and it is ready to train.",
+  "@routineEditorEmptyDayBody": {},
+  "routineEditorDayTabA11y": "Day {n}{estado}",
+  "@routineEditorDayTabA11y": {
+    "placeholders": { "n": { "type": "int" }, "estado": { "type": "String" } }
+  },
   "routineEditorDayName": "Day {n}",
   "@routineEditorDayName": {
     "placeholders": {

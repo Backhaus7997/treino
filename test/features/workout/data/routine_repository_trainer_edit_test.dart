@@ -410,10 +410,9 @@ void main() {
 
     test('updateTemplate los vacía cuando el PF deselecciona todo', () async {
       final id = await seedTemplate();
-      await firestore
-          .collection('routines')
-          .doc(id)
-          .update({'goals': ['sport']});
+      await firestore.collection('routines').doc(id).update({
+        'goals': ['sport']
+      });
 
       await repo.updateTemplate(
         uid: 'trainer-a',
@@ -437,10 +436,9 @@ void main() {
 
     test('updateAssigned NO manda goals — sería permission-denied', () async {
       final id = await seedAssignedPlan();
-      await firestore
-          .collection('routines')
-          .doc(id)
-          .update({'goals': ['sport']});
+      await firestore.collection('routines').doc(id).update({
+        'goals': ['sport']
+      });
 
       await repo.updateAssigned(
         uid: 'trainer-a',

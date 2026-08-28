@@ -42,6 +42,8 @@ import '../domain/set_limits.dart';
 import '../domain/set_spec.dart';
 import 'routine_editor_mode.dart';
 import 'widgets/duration_text_field.dart';
+import 'widgets/day_tab_bar.dart';
+import 'widgets/empty_day_state.dart';
 import 'widgets/exercise_card.dart';
 import 'widgets/prescription_chips.dart';
 import 'widgets/set_cell_field.dart';
@@ -550,6 +552,31 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   List<_EditableDay> _days = [
     _EditableDay(dayNumber: 1, name: '', isDefaultName: true),
   ];
+
+  /// Día visible en las pestañas. Presentación pura: no viaja al modelo.
+  ///
+  /// Se acota en [_removeDay]: borrar el último día dejaría el índice
+  /// apuntando fuera de la lista.
+  int _selectedDayIndex = 0;
+
+  /// Estado que la pestaña de un día comunica con su punto de color.
+  ///
+  /// Distingue "vacío" de "inválido" a propósito: un día sin ejercicios es un
+  /// estado intermedio legítimo mientras se arma la rutina (warning), y un día
+  /// con sets sin completar bloquea el guardado (danger).
+  DayTabStatus _dayStatus(_EditableDay day) {
+    final visibles =
+        day.slots.where((s) => s.isPresentInWeek(_selectedWeek)).toList();
+    if (visibles.isEmpty) return DayTabStatus.empty;
+    for (final slot in visibles) {
+      final sets = slot.setsForWeek(_selectedWeek);
+      if (sets.isEmpty ||
+          !sets.every((s) => isSetValid(s, slot.exerciseMode, slot.repMode))) {
+        return DayTabStatus.invalid;
+      }
+    }
+    return DayTabStatus.ok;
+  }
 
   /// 0-based week shown in the editor. Display is 1-based ("Sem 1").
   int _selectedWeek = 0;
@@ -1206,6 +1233,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           isDefaultName: true,
         ),
       ];
+      // Agregar un día y quedarse mirando el anterior no tiene sentido.
+      _selectedDayIndex = _days.length - 1;
     });
   }
 
@@ -1213,6 +1242,13 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     final l10n = AppL10n.of(context);
     _markDirty();
     setState(() {
+      // Acotar la pestaña activa ANTES de tocar la lista: borrar el último día
+      // dejaría _selectedDayIndex apuntando a un índice que ya no existe.
+      if (_selectedDayIndex >= _days.length - 1) {
+        _selectedDayIndex = (_days.length - 2).clamp(0, _days.length - 1);
+      } else if (index < _selectedDayIndex) {
+        _selectedDayIndex--;
+      }
       _days = [
         for (int i = 0; i < _days.length; i++)
           if (i != index) _days[i],
@@ -1574,11 +1610,15 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         // no day — nothing to scroll to).
         final day = error.day;
         if (day != null) {
-          // Ensure the day is expanded so the user can see the offending sets.
-          if (!day.expanded) {
-            setState(() => day.expanded = true);
+          // Con pestañas, "llevar al usuario al error" es SELECCIONAR el día,
+          // no expandirlo: si el día ofensor no es el visible, el scroll no
+          // tenía a dónde llevarlo porque su contenido ni está en el árbol.
+          final indice = _days.indexOf(day);
+          if (indice >= 0 && indice != _selectedDayIndex) {
+            FocusManager.instance.primaryFocus?.unfocus();
+            setState(() => _selectedDayIndex = indice);
           }
-          // Wait one frame for the expansion to apply before scrolling.
+          // Esperar un frame a que el día nuevo se monte antes de scrollear.
           WidgetsBinding.instance.addPostFrameCallback((_) {
             final key = _keyForDay(day);
             if (key.currentContext != null) {
@@ -2321,72 +2361,70 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                     const SizedBox(height: 12),
 
                     // ── Días del plan ───────────────────────────────────
-                    _SectionLabel(
-                        label: l10n.routineEditorDaysSection, palette: palette),
-                    const SizedBox(height: 6),
-
-                    for (int di = 0; di < _days.length; di++) ...[
-                      _DayExpansionTile(
-                        key: _keyForDay(_days[di]),
-                        day: _days[di],
-                        week: _selectedWeek,
-                        palette: palette,
-                        onAddSlot: () => _pickExercisesForDay(context, di),
-                        onRemoveSlot: (si) => _onDeleteSlot(context, di, si),
-                        onReorderSlots: (newOrder) =>
-                            _reorderSlots(di, newOrder),
-                        onRemoveDay:
-                            _days.length > 1 ? () => _removeDay(di) : null,
-                        onSlotChanged: () {
-                          _markDirty();
-                          setState(() {});
-                        },
-                        onAddToGroup: (g) =>
-                            _addExerciseToGroup(context, di, g),
-                        onReplaceExercise: (slot, ex) =>
-                            _replaceExercise(slot, ex),
-                        onMoveSlotInGroup: (absIndex, dir) =>
-                            _moveSlotWithinGroup(di, absIndex, dir),
-                        onNameChanged: (newName) =>
-                            _onDayNameChanged(di, newName),
-                        // Supersets available in every mode, including the
-                        // athlete's SelfCreating editor.
-                        allowSuperset: true,
-                        onAddSuperset: () => _addSupersetForDay(context, di),
-                        slotIsValid: (slot) {
-                          if (!slot.isPresentInWeek(_selectedWeek)) {
-                            return true;
-                          }
-                          final weekSets = slot.setsForWeek(_selectedWeek);
-                          return weekSets.isNotEmpty &&
-                              weekSets.every((s) => isSetValid(
-                                  s, slot.exerciseMode, slot.repMode));
-                        },
-                        isTrainerMode: _isTrainerMode,
-                      ),
-                      const SizedBox(height: 6),
-                    ],
-
-                    // Add day button — disabled at the 7-day cap.
-                    TextButton.icon(
-                      onPressed: _days.length < _kMaxDays ? _addDay : null,
-                      icon: Icon(TreinoIcon.plus,
-                          size: 14,
-                          color: _days.length < _kMaxDays
-                              ? palette.accent
-                              : palette.textMuted),
-                      label: Text(
-                        l10n.coachEditorAddDay,
-                        style: GoogleFonts.barlowCondensed(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
-                          color: _days.length < _kMaxDays
-                              ? palette.accent
-                              : palette.textMuted,
-                        ),
-                      ),
+                    // ── Días del plan ─────────────────────────────────
+                    // Pestañas en vez de la pila de acordeones: se renderiza
+                    // UN día a la vez, así el scroll vertical es el de un día
+                    // y no el de la rutina entera.
+                    DayTabBar(
+                      labels: [for (final d in _days) d.name],
+                      statuses: [for (final d in _days) _dayStatus(d)],
+                      selectedIndex: _selectedDayIndex,
+                      onSelect: (i) {
+                        // Soltar el foco ANTES de cambiar el árbol de campos:
+                        // el IME de iOS puede restaurar su sesión de edición
+                        // dentro del TextField de reemplazo y filtrar el valor
+                        // del día anterior. Mismo motivo que en onSelectWeek.
+                        FocusManager.instance.primaryFocus?.unfocus();
+                        setState(() => _selectedDayIndex = i);
+                      },
+                      onAddDay: _days.length < _kMaxDays ? _addDay : null,
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: AppSpacing.s12),
+
+                    _DayExpansionTile(
+                      key: _keyForDay(_days[_selectedDayIndex]),
+                      day: _days[_selectedDayIndex],
+                      week: _selectedWeek,
+                      palette: palette,
+                      onAddSlot: () =>
+                          _pickExercisesForDay(context, _selectedDayIndex),
+                      onRemoveSlot: (si) =>
+                          _onDeleteSlot(context, _selectedDayIndex, si),
+                      onReorderSlots: (newOrder) =>
+                          _reorderSlots(_selectedDayIndex, newOrder),
+                      onRemoveDay: _days.length > 1
+                          ? () => _removeDay(_selectedDayIndex)
+                          : null,
+                      onSlotChanged: () {
+                        _markDirty();
+                        setState(() {});
+                      },
+                      onAddToGroup: (g) =>
+                          _addExerciseToGroup(context, _selectedDayIndex, g),
+                      onReplaceExercise: (slot, ex) =>
+                          _replaceExercise(slot, ex),
+                      onMoveSlotInGroup: (absIndex, dir) =>
+                          _moveSlotWithinGroup(
+                              _selectedDayIndex, absIndex, dir),
+                      onNameChanged: (newName) =>
+                          _onDayNameChanged(_selectedDayIndex, newName),
+                      // Supersets available in every mode, including the
+                      // athlete's SelfCreating editor.
+                      allowSuperset: true,
+                      onAddSuperset: () =>
+                          _addSupersetForDay(context, _selectedDayIndex),
+                      slotIsValid: (slot) {
+                        if (!slot.isPresentInWeek(_selectedWeek)) {
+                          return true;
+                        }
+                        final weekSets = slot.setsForWeek(_selectedWeek);
+                        return weekSets.isNotEmpty &&
+                            weekSets.every((s) =>
+                                isSetValid(s, slot.exerciseMode, slot.repMode));
+                      },
+                      isTrainerMode: _isTrainerMode,
+                    ),
+                    const SizedBox(height: AppSpacing.s8),
                   ],
                 ),
               ),
@@ -2774,8 +2812,6 @@ class _DayExpansionTile extends StatefulWidget {
 class _DayExpansionTileState extends State<_DayExpansionTile> {
   // Reads/writes widget.day.expanded so the collapse survives the ListView
   // recycling the tile off-screen.
-  bool get _expanded => widget.day.expanded;
-  set _expanded(bool v) => widget.day.expanded = v;
 
   /// True while the inline TextField is replacing the Text label. Local to the
   /// tile — does NOT survive the tile being recycled off-screen by the
@@ -2912,6 +2948,13 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
 
   /// Walks the slot list and emits either a standalone [_SlotEditor] or a
   /// "SUPERSERIE" wrapper card for consecutive slots sharing a non-null group.
+  /// Slots que se ven en la semana en curso. Un slot borrado "sólo de esta
+  /// semana" sigue en el modelo pero no se renderiza (ADR-WPRES), así que un
+  /// día puede tener slots y verse vacío.
+  List<_EditableSlot> get _slotsVisibles => widget.day.slots
+      .where((s) => s.isPresentInWeek(widget.week))
+      .toList(growable: false);
+
   List<Widget> _buildSlotRows(AppPalette palette) {
     final blocks = _blocks();
     final rows = <Widget>[];
@@ -3040,122 +3083,149 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
       child: Column(
         children: [
           // Header row
-          InkWell(
-            onTap: () => setState(() => _expanded = !_expanded),
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(AppRadius.sm)),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              child: Row(
-                children: [
-                  Icon(
-                    _expanded
-                        ? TreinoIcon.chevronDown
-                        : TreinoIcon.chevronRight,
-                    size: 16,
-                    color: hasDayError ? palette.danger : palette.textMuted,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _editingName
-                        ? TextField(
-                            key: const Key('day_name_editing_field'),
-                            controller: _nameController,
-                            focusNode: _nameFocus,
-                            textInputAction: TextInputAction.done,
-                            onSubmitted: (_) => _commitName(),
-                            // Keep the tile expanded during edit so the tap on
-                            // an inner area (slot rows, etc.) doesn't collapse
-                            // the day under the user.
-                            onTap: () {},
-                            style: GoogleFonts.barlowCondensed(
+          // Ya no es un toggle: con pestañas de día el día visible está
+          // siempre abierto, y colapsarlo dejaría la pantalla vacía.
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _editingName
+                      ? TextField(
+                          key: const Key('day_name_editing_field'),
+                          controller: _nameController,
+                          focusNode: _nameFocus,
+                          textInputAction: TextInputAction.done,
+                          onSubmitted: (_) => _commitName(),
+                          // Keep the tile expanded during edit so the tap on
+                          // an inner area (slot rows, etc.) doesn't collapse
+                          // the day under the user.
+                          onTap: () {},
+                          style: GoogleFonts.barlowCondensed(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                            color: palette.textPrimary,
+                          ),
+                          decoration: InputDecoration(
+                            isDense: true,
+                            contentPadding: EdgeInsets.zero,
+                            border: InputBorder.none,
+                            hintText:
+                                l10n.routineEditorDayName(widget.day.dayNumber),
+                            hintStyle: GoogleFonts.barlowCondensed(
                               fontWeight: FontWeight.w600,
                               fontSize: 15,
-                              color: palette.textPrimary,
-                            ),
-                            decoration: InputDecoration(
-                              isDense: true,
-                              contentPadding: EdgeInsets.zero,
-                              border: InputBorder.none,
-                              hintText: l10n
-                                  .routineEditorDayName(widget.day.dayNumber),
-                              hintStyle: GoogleFonts.barlowCondensed(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 15,
-                                color: palette.textMuted,
-                              ),
-                            ),
-                          )
-                        : Text(
-                            widget.day.name,
-                            style: GoogleFonts.barlowCondensed(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 15,
-                              color: palette.textPrimary,
+                              color: palette.textMuted,
                             ),
                           ),
+                        )
+                      : Text(
+                          widget.day.name,
+                          // El nombre también vive en la pestaña de arriba: la
+                          // pestaña navega y trunca a 15 caracteres, la
+                          // cabecera muestra el nombre completo y es donde se
+                          // edita. La key desambigua a los tests.
+                          key: const Key('day_header_name'),
+                          style: GoogleFonts.barlowCondensed(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                            color: palette.textPrimary,
+                          ),
+                        ),
+                ),
+                if (!_editingName)
+                  IconButton(
+                    key: Key('day_name_edit_button_${widget.day.dayNumber}'),
+                    icon: Icon(
+                      TreinoIcon.edit,
+                      size: 16,
+                      color: palette.textMuted,
+                    ),
+                    tooltip: l10n.routineEditorEditDayNameA11y,
+                    onPressed: _startEditing,
+                    constraints:
+                        const BoxConstraints(minWidth: 44, minHeight: 44),
+                    padding: EdgeInsets.zero,
                   ),
-                  if (!_editingName)
-                    IconButton(
-                      key: Key('day_name_edit_button_${widget.day.dayNumber}'),
-                      icon: Icon(
-                        TreinoIcon.edit,
-                        size: 16,
-                        color: palette.textMuted,
-                      ),
-                      tooltip: l10n.routineEditorEditDayNameA11y,
-                      onPressed: _startEditing,
-                      constraints:
-                          const BoxConstraints(minWidth: 44, minHeight: 44),
-                      padding: EdgeInsets.zero,
+                if (hasDayError) ...[
+                  Container(
+                    width: 7,
+                    height: 7,
+                    margin: const EdgeInsets.only(right: 8),
+                    decoration: BoxDecoration(
+                      color: palette.danger,
+                      shape: BoxShape.circle,
                     ),
-                  if (hasDayError) ...[
-                    Container(
-                      width: 7,
-                      height: 7,
-                      margin: const EdgeInsets.only(right: 8),
-                      decoration: BoxDecoration(
-                        color: palette.danger,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ],
-                  if (widget.onRemoveDay != null)
-                    IconButton(
-                      icon: Icon(TreinoIcon.trash,
-                          size: 18, color: palette.textMuted),
-                      tooltip: l10n.routineEditorDeleteDayA11y,
-                      onPressed: widget.onRemoveDay,
-                      constraints:
-                          const BoxConstraints(minWidth: 44, minHeight: 44),
-                      padding: EdgeInsets.zero,
-                    ),
+                  ),
                 ],
-              ),
+                if (widget.onRemoveDay != null)
+                  IconButton(
+                    icon: Icon(TreinoIcon.trash,
+                        size: 18, color: palette.textMuted),
+                    tooltip: l10n.routineEditorDeleteDayA11y,
+                    onPressed: widget.onRemoveDay,
+                    constraints:
+                        const BoxConstraints(minWidth: 44, minHeight: 44),
+                    padding: EdgeInsets.zero,
+                  ),
+              ],
             ),
           ),
 
           // Body
-          if (_expanded) ...[
-            const Divider(height: 1),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
-              child: Column(
-                children: [
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
+            child: Column(
+              children: [
+                // Un día sin ejercicios era un acordeón que se abría
+                // y no mostraba nada, sin decir si estaba bien así.
+                if (_slotsVisibles.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.s12),
+                    child: EmptyDayState(
+                      title: l10n.routineEditorEmptyDayTitle,
+                      body: l10n.routineEditorEmptyDayBody,
+                    ),
+                  )
+                else
                   ..._buildSlotRows(palette),
-                  // Add slot button
+                // Add slot button
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton.icon(
+                    onPressed: widget.onAddSlot,
+                    icon:
+                        Icon(TreinoIcon.plus, size: 14, color: palette.accent),
+                    label: Text(
+                      l10n.routineEditorAddExercise,
+                      style: GoogleFonts.barlowCondensed(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        color: palette.accent,
+                      ),
+                    ),
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size.fromHeight(44),
+                      alignment: Alignment.centerLeft,
+                    ),
+                  ),
+                ),
+                // "+ Superserie" button — trainer mode only
+                if (widget.allowSuperset)
                   SizedBox(
                     width: double.infinity,
                     child: TextButton.icon(
-                      onPressed: widget.onAddSlot,
-                      icon: Icon(TreinoIcon.plus,
-                          size: 14, color: palette.accent),
+                      key: const Key('add_superset_button'),
+                      onPressed: widget.onAddSuperset,
+                      icon: Icon(TreinoIcon.streak,
+                          size: 14, color: palette.highlight),
                       label: Text(
-                        l10n.routineEditorAddExercise,
+                        l10n.coachEditorAddSuperset,
                         style: GoogleFonts.barlowCondensed(
                           fontWeight: FontWeight.w600,
                           fontSize: 14,
-                          color: palette.accent,
+                          color: palette.highlight,
                         ),
                       ),
                       style: TextButton.styleFrom(
@@ -3164,33 +3234,9 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
                       ),
                     ),
                   ),
-                  // "+ Superserie" button — trainer mode only
-                  if (widget.allowSuperset)
-                    SizedBox(
-                      width: double.infinity,
-                      child: TextButton.icon(
-                        key: const Key('add_superset_button'),
-                        onPressed: widget.onAddSuperset,
-                        icon: Icon(TreinoIcon.streak,
-                            size: 14, color: palette.highlight),
-                        label: Text(
-                          l10n.coachEditorAddSuperset,
-                          style: GoogleFonts.barlowCondensed(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                            color: palette.highlight,
-                          ),
-                        ),
-                        style: TextButton.styleFrom(
-                          minimumSize: const Size.fromHeight(44),
-                          alignment: Alignment.centerLeft,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+              ],
             ),
-          ],
+          ),
         ],
       ),
     );

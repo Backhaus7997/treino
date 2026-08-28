@@ -1834,6 +1834,18 @@ class AppL10nEs extends AppL10n {
   }
 
   @override
+  String get routineEditorEmptyDayTitle => 'DÍA VACÍO';
+
+  @override
+  String get routineEditorEmptyDayBody =>
+      'Agregá el primer ejercicio y ya queda listo para entrenar.';
+
+  @override
+  String routineEditorDayTabA11y(int n, String estado) {
+    return 'Día $n$estado';
+  }
+
+  @override
   String routineEditorDayName(int n) {
     return 'Día $n';
   }
@@ -5859,6 +5871,18 @@ class AppL10nEsAr extends AppL10nEs {
       one: '1 set sin reps',
     );
     return '$_temp0';
+  }
+
+  @override
+  String get routineEditorEmptyDayTitle => 'DÍA VACÍO';
+
+  @override
+  String get routineEditorEmptyDayBody =>
+      'Agregá el primer ejercicio y ya queda listo para entrenar.';
+
+  @override
+  String routineEditorDayTabA11y(int n, String estado) {
+    return 'Día $n$estado';
   }
 
   @override
