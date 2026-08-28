@@ -244,6 +244,30 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
       String(params.actionLink ?? ""),
     );
 
+  // Va EN LUGAR del reseteo cuando la cuenta no tiene contraseña que
+  // restablecer. Sin `actionLink`: no hay nada que un link pueda resolver.
+  //
+  // El copy no nombra al usuario ni confirma que la cuenta exista para nadie
+  // mas que para el dueño del buzon — que es justamente quien tiene derecho a
+  // saber como entra a su propia cuenta. La respuesta del callable sigue siendo
+  // identica en las tres ramas, asi que la anti-enumeracion no se toca.
+  case "federated-signin-hint":
+    return build(
+      "Cómo entrar a tu cuenta de TREINO", // i18n: email transaccional
+      "Entrá con Google o Apple",
+      [
+        ["Recibimos un pedido para cambiar la contraseña de tu cuenta."],
+        [
+          "Esa cuenta no usa contraseña: se creó con ",
+          strong("Iniciar sesión con Google o Apple"),
+          ", así que entrás con ese botón.",
+        ],
+        ["Si no lo pediste vos, no hace falta que hagas nada."],
+      ],
+      "IR A TREINO",
+      ctaUrl,
+    );
+
   case "email-verification":
     return build(
       "Confirmá tu email en TREINO",
