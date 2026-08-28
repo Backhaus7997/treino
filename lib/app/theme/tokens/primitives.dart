@@ -174,16 +174,28 @@ abstract final class AppColorPrimitives {
   /// que lo contiene sin dibujar un marco. Compone `#1A1A1A` sobre `ink950`.
   static const Color white06 = Color(0x0FFFFFFF);
 
-  /// `0x73FFFFFF` — Blanco ~45% alpha, texto TERCIARIO en dark.
+  /// `0x75FFFFFF` — Blanco ~46% alpha, texto TERCIARIO en dark.
   ///
   /// El escalón por debajo de [white55], para headers de columna y hints.
   ///
-  /// ⚠ Es 45% y no 40% por medición, no por gusto: al 40% compone `#6C6C6C`
-  /// sobre `ink950` y da **3,77:1**, abajo del 4,5:1 que WCAG AA pide para
-  /// texto chico (el header `SET`/`KG`/`REPS` mide 10,5 px — no califica como
-  /// texto grande ni siendo bold). Al 45% compone `#7A7A7A` y llega a 4,52:1.
-  /// La diferencia óptica entre ambos es imperceptible; la de accesibilidad no.
-  static const Color white45 = Color(0x73FFFFFF);
+  /// ⚠ El alpha exacto sale de dos mediciones, no de un redondeo lindo:
+  ///
+  /// 1. Al 40% —el valor del handoff de diseño— compone `#6C6C6C` sobre
+  ///    `ink950` y da **3,77:1**, abajo del 4,5:1 que WCAG AA pide para texto
+  ///    chico. El header `SET`/`KG`/`REPS` mide 10,5 px: no califica como
+  ///    texto grande ni siendo bold, así que le aplica el mínimo completo.
+  ///
+  /// 2. Al 45% (`0x73`) la cuenta ideal da 4,52:1 y parece alcanzar — pero el
+  ///    píxel que se pinta no es el ideal. La mezcla da 120,49 y el framebuffer
+  ///    de 8 bits la cuantiza a 120 (`#787878`), que mide **4,484:1**: falla
+  ///    por 16 milésimas. Al 46% (`0x75`) la mezcla cuantiza a `#7A7A7A` y
+  ///    llega a 4,61:1, con margen para el redondeo.
+  ///
+  /// La lección, más general que este token: un ratio calculado sobre el color
+  /// compuesto en punto flotante NO es el ratio del color que ve el usuario.
+  /// Cuantizá antes de medir. `routine_editor_tokens_contrast_test.dart` lo
+  /// hace desde que este caso lo demostró.
+  static const Color white46 = Color(0x75FFFFFF);
 
   // ---------------------------------------------------------------------------
   // Negros con alpha (overlays sobre light)
@@ -212,9 +224,9 @@ abstract final class AppColorPrimitives {
 
   /// `0x8C000000` — Negro ~55% alpha, texto TERCIARIO en light.
   ///
-  /// Contraparte clara de [white45], y con MÁS alpha que él: sobre `#FFFFFF`
+  /// Contraparte clara de [white46], y con MÁS alpha que él: sobre `#FFFFFF`
   /// hace falta bajar hasta `#737373` (53,5% de negro) para tocar 4,5:1, así
-  /// que 55% es el primer escalón redondo que cumple. Ver [white45].
+  /// que 55% es el primer escalón redondo que cumple. Ver [white46].
   static const Color black55 = Color(0x8C000000);
 
   // ---------------------------------------------------------------------------

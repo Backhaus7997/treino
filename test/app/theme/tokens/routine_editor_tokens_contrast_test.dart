@@ -33,8 +33,25 @@ double _ratio(Color a, Color b) {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-/// Compone [fg] (posiblemente translúcido) sobre [bg] opaco.
-Color _on(Color fg, Color bg) => Color.alphaBlend(fg, bg);
+/// Compone [fg] (posiblemente translúcido) sobre [bg] opaco **y cuantiza el
+/// resultado a 8 bits por canal**, que es lo que termina en el framebuffer.
+///
+/// ⚠ La cuantización no es un detalle de precisión: es la diferencia entre
+/// medir el color que se pinta y medir uno que no existe. `Color.alphaBlend`
+/// devuelve componentes en punto flotante. Con blanco al 45% sobre `ink950` la
+/// mezcla ideal da 120,49 → 4,515:1 y el test pasaba; el píxel real es 120
+/// (`#787878`) → **4,484:1**, y WCAG falla. Dieciséis milésimas de diferencia,
+/// suficientes para que un token entrara en la paleta creyendo que cumplía.
+Color _on(Color fg, Color bg) {
+  final blended = Color.alphaBlend(fg, bg);
+  double q(double v) => (v * 255).round() / 255;
+  return Color.from(
+    alpha: 1.0,
+    red: q(blended.r),
+    green: q(blended.g),
+    blue: q(blended.b),
+  );
+}
 
 /// Diferencia máxima por canal, en 0-255. Sirve para "¿se ve el borde de esta
 /// superficie?" donde el ratio de contraste todavía no dice nada útil.
@@ -104,7 +121,31 @@ void main() {
         ratio,
         lessThan(_kTextAA),
         reason: 'Si este valor pasara a cumplir AA, la nota de '
-            'AppColorPrimitives.white45 quedó obsoleta y hay que corregirla.',
+            'AppColorPrimitives.white46 quedó obsoleta y hay que corregirla.',
+      );
+    });
+
+    test('el 45% tampoco pasa una vez cuantizado — por qué el token es 46%',
+        () {
+      const p = AppPalette.mintMagenta;
+      const white45 = Color(0x73FFFFFF);
+      final pintado = _ratio(_on(white45, p.bg), p.bg);
+      final ideal = _ratio(Color.alphaBlend(white45, p.bg), p.bg);
+
+      expect(
+        ideal,
+        greaterThanOrEqualTo(_kTextAA),
+        reason: 'La mezcla en punto flotante SÍ da >= 4,5:1 '
+            '(${ideal.toStringAsFixed(3)}). Por eso el 45% parecía alcanzar.',
+      );
+      expect(
+        pintado,
+        lessThan(_kTextAA),
+        reason: 'Pero el píxel cuantizado mide '
+            '${pintado.toStringAsFixed(3)}:1 y NO alcanza. Este test es la '
+            'única razón por la que el token quedó en 46% y no en 45%: si '
+            'algún día pasa, la cuantización cambió y hay que revisar el '
+            'dartdoc de white46.',
       );
     });
   });
@@ -215,8 +256,8 @@ void main() {
   });
 
   group('los primitivos nuevos no se desviaron del valor medido', () {
-    test('white45 y black55 son los alphas que se documentaron', () {
-      expect(AppColorPrimitives.white45, const Color(0x73FFFFFF));
+    test('white46 y black55 son los alphas que se documentaron', () {
+      expect(AppColorPrimitives.white46, const Color(0x75FFFFFF));
       expect(AppColorPrimitives.black55, const Color(0x8C000000));
     });
 
