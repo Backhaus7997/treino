@@ -376,7 +376,8 @@ class _VideoPlayer extends StatelessWidget {
             top: 8,
             right: 8,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: AppSpacing.hairline),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 8, vertical: AppSpacing.hairline),
               decoration: BoxDecoration(
                 color: palette.highlight.withValues(alpha: 0.22),
                 borderRadius: BorderRadius.circular(AppRadius.full),
@@ -531,7 +532,8 @@ class _ExerciseRow extends StatelessWidget {
           if (isOwn) ...[
             const SizedBox(width: 8),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: AppSpacing.hairline),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 8, vertical: AppSpacing.hairline),
               decoration: BoxDecoration(
                 color: palette.accent.withValues(alpha: 0.16),
                 borderRadius: BorderRadius.circular(AppRadius.full),

@@ -203,7 +203,9 @@ void main() {
       overrides: _overrides(repo: repo),
     );
 
-    expect(find.text('Editar plan'), findsOneWidget);
+    // El título del app bar es el NOMBRE del plan desde #866. El modo va en
+    // el subtítulo, que en modo entrenador incluye split y nivel.
+    expect(find.textContaining('Plan asignado'), findsOneWidget);
     expect(find.text('Crear plan'), findsNothing);
   });
 
@@ -337,7 +339,9 @@ void main() {
       overrides: _overrides(repo: repo),
     );
 
-    expect(find.text('Editar plan'), findsOneWidget);
+    // El título del app bar es el NOMBRE del plan desde #866. El modo va en
+    // el subtítulo, que en modo entrenador incluye split y nivel.
+    expect(find.textContaining('Plantilla reusable'), findsOneWidget);
     expect(find.text('Crear plan'), findsNothing);
   });
 

@@ -1846,6 +1846,39 @@ class AppL10nEs extends AppL10n {
   }
 
   @override
+  String get routineEditorPlanSheetTitle => 'DATOS DEL PLAN';
+
+  @override
+  String get routineEditorPlanSheetA11y => 'Datos del plan';
+
+  @override
+  String get routineEditorSubtitleSelfPrivate => 'Tu rutina · solo la ves vos';
+
+  @override
+  String get routineEditorSubtitleSelfShared =>
+      'Tu rutina · compartida en tu perfil';
+
+  @override
+  String get routineEditorSubtitleCustomizing => 'Copia tuya';
+
+  @override
+  String get routineEditorSubtitleAssigned => 'Plan asignado';
+
+  @override
+  String get routineEditorSubtitleTemplate => 'Plantilla reusable';
+
+  @override
+  String routineEditorSubtitleWeeks(int n) {
+    String _temp0 = intl.Intl.pluralLogic(
+      n,
+      locale: localeName,
+      other: '$n semanas',
+      one: '1 semana',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String routineEditorDayName(int n) {
     return 'Día $n';
   }
@@ -5883,6 +5916,39 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String routineEditorDayTabA11y(int n, String estado) {
     return 'Día $n$estado';
+  }
+
+  @override
+  String get routineEditorPlanSheetTitle => 'DATOS DEL PLAN';
+
+  @override
+  String get routineEditorPlanSheetA11y => 'Datos del plan';
+
+  @override
+  String get routineEditorSubtitleSelfPrivate => 'Tu rutina · solo la ves vos';
+
+  @override
+  String get routineEditorSubtitleSelfShared =>
+      'Tu rutina · compartida en tu perfil';
+
+  @override
+  String get routineEditorSubtitleCustomizing => 'Copia tuya';
+
+  @override
+  String get routineEditorSubtitleAssigned => 'Plan asignado';
+
+  @override
+  String get routineEditorSubtitleTemplate => 'Plantilla reusable';
+
+  @override
+  String routineEditorSubtitleWeeks(int n) {
+    String _temp0 = intl.Intl.pluralLogic(
+      n,
+      locale: localeName,
+      other: '$n semanas',
+      one: '1 semana',
+    );
+    return '$_temp0';
   }
 
   @override

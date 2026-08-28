@@ -1796,6 +1796,40 @@ class AppL10nEn extends AppL10n {
   }
 
   @override
+  String get routineEditorPlanSheetTitle => 'PLAN DETAILS';
+
+  @override
+  String get routineEditorPlanSheetA11y => 'Plan details';
+
+  @override
+  String get routineEditorSubtitleSelfPrivate =>
+      'Your routine · only you see it';
+
+  @override
+  String get routineEditorSubtitleSelfShared =>
+      'Your routine · shared on your profile';
+
+  @override
+  String get routineEditorSubtitleCustomizing => 'Your copy';
+
+  @override
+  String get routineEditorSubtitleAssigned => 'Assigned plan';
+
+  @override
+  String get routineEditorSubtitleTemplate => 'Reusable template';
+
+  @override
+  String routineEditorSubtitleWeeks(int n) {
+    String _temp0 = intl.Intl.pluralLogic(
+      n,
+      locale: localeName,
+      other: '$n weeks',
+      one: '1 week',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String routineEditorDayName(int n) {
     return 'Day $n';
   }

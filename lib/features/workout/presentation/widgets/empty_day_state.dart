@@ -23,8 +23,10 @@ class EmptyDayState extends StatelessWidget {
 
     return DottedBorderBox(
       child: Padding(
+        // La escala es CERRADA: 8·12·14·18·20. `s20 + hairline` daba 24, que
+        // es justo el valor que la escala existe para prohibir.
         padding: const EdgeInsets.symmetric(
-          vertical: AppSpacing.s20 + AppSpacing.hairline,
+          vertical: AppSpacing.s20,
           horizontal: AppSpacing.s18,
         ),
         child: Column(
@@ -41,7 +43,7 @@ class EmptyDayState extends StatelessWidget {
                 color: palette.textPrimary,
               ),
             ),
-            const SizedBox(height: AppSpacing.hairline + 2),
+            const SizedBox(height: AppSpacing.hairline),
             Text(
               body,
               textAlign: TextAlign.center,

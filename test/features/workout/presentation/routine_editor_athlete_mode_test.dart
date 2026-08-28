@@ -203,6 +203,7 @@ void main() {
     // DÍAS/SEM selector removed — it was a dead control (never persisted,
     // never created days). Day count is driven only by "DÍAS DEL PLAN".
     expect(find.text('DÍAS/SEM'), findsNothing);
+    await abrirDatosDelPlan(tester);
     expect(find.text('NIVEL'), findsOneWidget);
     expect(find.byType(DayTabBar), findsOneWidget,
         reason: 'la barra de pestañas reemplazó al label DÍAS DEL PLAN');
@@ -224,6 +225,7 @@ void main() {
     // DÍAS/SEM selector removed — it was a dead control (never persisted,
     // never created days). Day count is driven only by "DÍAS DEL PLAN".
     expect(find.text('DÍAS/SEM'), findsNothing);
+    await abrirDatosDelPlan(tester);
     expect(find.text('NIVEL'), findsOneWidget);
 
     // El editor es un ListView: lo que queda bajo el fold no está
@@ -424,7 +426,9 @@ void main() {
       overrides: _overrides(repo: repo),
     );
 
-    expect(find.text('Editar rutina'), findsOneWidget);
+    // El app bar muestra el NOMBRE de la rutina desde #866; el modo lo dice
+    // el subtítulo. "Editar rutina" ya no aparece en ningún lado.
+    expect(find.textContaining('Tu rutina · solo la ves vos'), findsOneWidget);
     expect(find.text('Nueva rutina'), findsNothing);
   });
 
@@ -820,7 +824,8 @@ void main() {
 
     // Título y CTA propios: el atleta tiene que entender que sale con una
     // rutina SUYA, no que está editando la plantilla.
-    expect(find.text('Personalizar rutina'), findsOneWidget);
+    // Ídem: el modo SelfCustomizing se anuncia en el subtítulo.
+    expect(find.textContaining('Copia tuya'), findsOneWidget);
     expect(find.text('GUARDAR COMO MÍA'), findsOneWidget);
     // Abre CARGADO — el punto entero del issue es que no sea una pantalla en
     // blanco.

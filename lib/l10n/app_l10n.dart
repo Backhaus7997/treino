@@ -3392,6 +3392,54 @@ abstract class AppL10n {
   /// **'Día {n}{estado}'**
   String routineEditorDayTabA11y(int n, String estado);
 
+  /// No description provided for @routineEditorPlanSheetTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DATOS DEL PLAN'**
+  String get routineEditorPlanSheetTitle;
+
+  /// No description provided for @routineEditorPlanSheetA11y.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Datos del plan'**
+  String get routineEditorPlanSheetA11y;
+
+  /// No description provided for @routineEditorSubtitleSelfPrivate.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu rutina · solo la ves vos'**
+  String get routineEditorSubtitleSelfPrivate;
+
+  /// No description provided for @routineEditorSubtitleSelfShared.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu rutina · compartida en tu perfil'**
+  String get routineEditorSubtitleSelfShared;
+
+  /// No description provided for @routineEditorSubtitleCustomizing.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Copia tuya'**
+  String get routineEditorSubtitleCustomizing;
+
+  /// No description provided for @routineEditorSubtitleAssigned.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Plan asignado'**
+  String get routineEditorSubtitleAssigned;
+
+  /// No description provided for @routineEditorSubtitleTemplate.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Plantilla reusable'**
+  String get routineEditorSubtitleTemplate;
+
+  /// No description provided for @routineEditorSubtitleWeeks.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{n, plural, =1{1 semana} other{{n} semanas}}'**
+  String routineEditorSubtitleWeeks(int n);
+
   /// No description provided for @routineEditorDayName.
   ///
   /// In es_AR, this message translates to:

@@ -106,7 +106,8 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(AppSpacing.s20, AppSpacing.s14, AppSpacing.s20, 0),
+                padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.s20, AppSpacing.s14, AppSpacing.s20, 0),
                 child: Row(
                   children: [
                     Expanded(
@@ -141,7 +142,8 @@ class _OnboardingFlowState extends State<OnboardingFlow> {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(AppSpacing.s20, AppSpacing.s20, AppSpacing.s20, AppSpacing.s20),
+                padding: const EdgeInsets.fromLTRB(AppSpacing.s20,
+                    AppSpacing.s20, AppSpacing.s20, AppSpacing.s20),
                 child: Column(
                   children: [
                     // No drawn home-indicator bar: the handoff removed it so the
@@ -180,7 +182,8 @@ class _SlideView extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(0, AppSpacing.s18, 0, AppSpacing.s8),
+                padding: const EdgeInsets.fromLTRB(
+                    0, AppSpacing.s18, 0, AppSpacing.s8),
                 child: OnboardingDevicePreview(child: slide.preview),
               ),
               Padding(
@@ -195,7 +198,8 @@ class _SlideView extends StatelessWidget {
                           height: 38,
                           decoration: BoxDecoration(
                             color: palette.accent,
-                            borderRadius: BorderRadius.circular(AppDecorativeRadii.progressSegment),
+                            borderRadius: BorderRadius.circular(
+                                AppDecorativeRadii.progressSegment),
                           ),
                         ),
                         const SizedBox(width: 14),

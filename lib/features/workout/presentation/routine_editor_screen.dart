@@ -559,6 +559,319 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   /// apuntando fuera de la lista.
   int _selectedDayIndex = 0;
 
+  /// Subtítulo del app bar: qué es esta rutina y para quién.
+  ///
+  /// Cubre los CUATRO modos. El handoff de diseño sólo listaba tres — se
+  /// olvidaba de [SelfCustomizing] (#647), el alumno que arranca de una rutina
+  /// existente y termina con una propia.
+  ///
+  /// Para [TrainerAssigning] el diseño pedía "Plan para <Nombre>", pero la
+  /// pantalla sólo conoce el `athleteId`: resolver el nombre significaría leer
+  /// otro provider, y este rediseño no toca la capa de datos. Queda "Plan
+  /// asignado" más el split y el nivel, que sí están.
+  String _subtituloDelPlan(AppL10n l10n) {
+    final partes = <String>[
+      switch (widget.mode) {
+        SelfCreating() => _sharedOnProfile
+            ? l10n.routineEditorSubtitleSelfShared
+            : l10n.routineEditorSubtitleSelfPrivate,
+        SelfCustomizing() => l10n.routineEditorSubtitleCustomizing,
+        TrainerAssigning() => l10n.routineEditorSubtitleAssigned,
+        TrainerTemplating() => l10n.routineEditorSubtitleTemplate,
+      },
+      if (_isTrainerMode && _splitController.text.trim().isNotEmpty)
+        _splitController.text.trim(),
+      // `displayNameEs` es lo que ya usa el dropdown de nivel. No está
+      // localizado —deuda anterior a este PR— pero usar otra cosa acá
+      // haría que el subtítulo y el selector digan distinto.
+      if (_isTrainerMode) _level.displayNameEs,
+      l10n.routineEditorSubtitleWeeks(_numWeeks),
+    ];
+    // El separador es visual, no gramatical: cada parte es una frase completa
+    // por sí sola, así que unirlas no arma una oración en ningún idioma.
+    return partes.join(' · ');
+  }
+
+  /// Referencia al `setState` de la hoja "DATOS DEL PLAN" mientras está
+  /// abierta.
+  ///
+  /// La hoja modal vive en otro `Navigator`, así que el `setState` de esta
+  /// pantalla no la repinta: cambiar el nivel desde la hoja actualizaba el
+  /// estado pero la hoja seguía mostrando el valor viejo hasta cerrarla.
+  StateSetter? _sheetSetState;
+
+  /// Repinta también la hoja, si está abierta.
+  ///
+  /// Se sobrescribe `setState` en vez de llamar a un helper en cada call site
+  /// porque los controles de la hoja disparan métodos de esta clase —
+  /// `_addWeek`, `_removeLastWeek`, `_duplicateWeek`— que ya existían y llaman
+  /// al `setState` común. Con un helper aparte había que acordarse de usarlo
+  /// en cada uno, y el que se olvidara dejaba la hoja mostrando datos viejos:
+  /// agregar semanas actualizaba `_numWeeks` pero la hoja seguía listando las
+  /// de antes.
+  @override
+  void setState(VoidCallback fn) {
+    super.setState(fn);
+    // La hoja vive en otro Navigator: el setState de esta pantalla no la toca.
+    _sheetSetState?.call(() {});
+  }
+
+  /// Los campos del plan: nombre, split, objetivos, compartir, nivel y
+  /// semanas. Antes ocupaban el tercio superior del scroll; ahora viven en la
+  /// hoja del engranaje, en el mismo orden.
+  List<Widget> _camposDelPlan(AppL10n l10n, AppPalette palette) {
+    // Se calculaban en build() cuando estos campos vivían en el scroll; ahora
+    // los necesita la hoja, que se construye en su propio Navigator.
+    final invalidWeeks = _invalidWeekFirstDay;
+    final hiddenInvalidWeeks =
+        invalidWeeks.keys.where((w) => w != _selectedWeek).toList()..sort();
+    return [
+      // ── Resumen en criollo — trainer modes only (#648) ──
+      //
+      // Sits right under SPLIT because SPLIT is the jargon it
+      // exists to translate: the detail screen's badge opens
+      // with "PPL · DÍA 1" and 2 of 5 usability participants
+      // could not say what that meant. Asking for the plain
+      // sentence next to the term that needs it is what makes
+      // the field self-explanatory.
+      //
+      // Absent in SelfCreating: firestore.rules keeps `summary`
+      // out of the athlete UPDATE path's affectedKeys(), so the
+      // athlete cannot change it. A field whose every save is a
+      // permission-denied is worse than no field.
+
+      // ── Para qué sirve — SOLO modo plantilla (#635 PR#1b) ──
+      //
+      // Debajo del RESUMEN porque son la misma pregunta a dos
+      // niveles: el resumen la contesta en prosa para el humano
+      // que lee la card, los objetivos la contestan en enum para
+      // el ranking que ordena la grilla.
+      //
+      // `_isTemplateMode` y no `_isTrainerMode`: en un plan
+      // asignado el guardado sería permission-denied, porque
+      // firestore.rules deja `goals` fuera del affectedKeys de
+      // ese path. Ver el dartdoc del predicado.
+      if (_isTemplateMode) ...[
+        const SizedBox(height: AppSpacing.s12),
+        _SectionLabel(
+          label: l10n.routineEditorGoalsLabel,
+          palette: palette,
+        ),
+        const SizedBox(height: AppSpacing.hairline),
+        Text(
+          l10n.routineEditorGoalsHelp,
+          style: GoogleFonts.barlow(
+            fontWeight: FontWeight.w400,
+            fontSize: 12,
+            height: 1.35,
+            color: palette.textMuted,
+          ),
+        ),
+        // Sin estado vacío explícito: la bajada ya dice
+        // "opcional". Vacío es un estado válido —la plantilla
+        // sigue en la grilla, sin señal para rankear— y una línea
+        // extra sólo para decirlo empujaba DÍAS DEL PLAN fuera
+        // del área construida del ListView.
+        const SizedBox(height: AppSpacing.s8),
+        Wrap(
+          key: const Key('editor_goals_picker'),
+          spacing: AppSpacing.s8,
+          runSpacing: AppSpacing.s8,
+          children: [
+            for (final goal in RoutineGoal.values)
+              _GoalChip(
+                key: Key('editor_goal_${goal.wireKey}'),
+                label: templatesGoalLabel(l10n, goal),
+                selected: _goals.contains(goal),
+                palette: palette,
+                onTap: () {
+                  _markDirty();
+                  setState(() {
+                    // Toggle: volver a tocar deselecciona. Sin
+                    // esto no habría forma de corregir un tap
+                    // equivocado salvo recargando el editor.
+                    if (!_goals.remove(goal)) _goals.add(goal);
+                  });
+                },
+              ),
+          ],
+        ),
+      ],
+
+      // ── Row: Share on public profile — SelfCreating only
+      //
+      // Toggle that flips the routine's `visibility`
+      // between `private` (default) and `public`. When
+      // public, the routine shows in the "RUTINAS
+      // PÚBLICAS" tab of the athlete's public profile.
+      if (!_isTrainerMode) ...[
+        const SizedBox(height: 12),
+        _ShareOnProfileTile(
+          value: _sharedOnProfile,
+          palette: palette,
+          onChanged: (v) {
+            _markDirty();
+            setState(() => _sharedOnProfile = v);
+          },
+        ),
+      ],
+
+      // ── Row: Level — trainer modes only ─────────────────
+      if (_isTrainerMode) ...[
+        const SizedBox(height: 8),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _SectionLabel(
+                      label: l10n.routineEditorLevelSection, palette: palette),
+                  const SizedBox(height: 4),
+                  _LevelDropdown(
+                    value: _level,
+                    palette: palette,
+                    onChanged: (v) {
+                      if (v != null) {
+                        _markDirty();
+                        setState(() => _level = v);
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+      const SizedBox(height: 12),
+
+      // ── Semanas del plan ────────────────────────────────
+      // Week state machine — REQ-PERIOD-010..014. The chips
+      // switch the week every slot editor renders (live-view).
+      _SectionLabel(label: l10n.routineEditorWeeksSection, palette: palette),
+      const SizedBox(height: 6),
+      _WeekTabBar(
+        numWeeks: _numWeeks,
+        selectedWeek: _selectedWeek,
+        maxWeeks: _kMaxWeeks,
+        warningWeeks: hiddenInvalidWeeks.toSet(),
+        palette: palette,
+        onSelectWeek: (w) {
+          // Drop focus BEFORE swapping the week's field tree:
+          // on-device the iOS IME can restore its editing
+          // session into the replacement TextField and bleed
+          // the previous week's value into the new week
+          // (not reproducible in widget tests — no real IME).
+          FocusManager.instance.primaryFocus?.unfocus();
+          setState(() => _selectedWeek = w);
+        },
+        onAddWeek: _addWeek,
+        onRemoveLastWeek: _removeLastWeek,
+        onDuplicateWeek: () => _duplicateWeek(),
+      ),
+      if (hiddenInvalidWeeks.isNotEmpty) ...[
+        const SizedBox(height: 4),
+        Text(
+          '${l10n.routineEditorIncompleteSetsLabel(hiddenInvalidWeeks.first + 1)} · Día '
+          '${invalidWeeks[hiddenInvalidWeeks.first]}',
+          key: const Key('invalid_week_hint'),
+          style: GoogleFonts.barlow(
+            fontSize: 11,
+            color: palette.danger,
+          ),
+        ),
+      ],
+      const SizedBox(height: 12),
+    ];
+  }
+
+  /// Abre la hoja "DATOS DEL PLAN".
+  Future<void> _abrirDatosDelPlan() async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: palette.bgElevated,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) {
+          _sheetSetState = setSheetState;
+          return SafeArea(
+            top: false,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(ctx).size.height * 0.78,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: AppSpacing.s12),
+                  Container(
+                    width: 40,
+                    height: AppSpacing.hairline,
+                    decoration: BoxDecoration(
+                      color: palette.borderStrong,
+                      borderRadius: BorderRadius.circular(AppRadius.full),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.s18,
+                      AppSpacing.s14,
+                      AppSpacing.s8,
+                      0,
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            l10n.routineEditorPlanSheetTitle,
+                            style: GoogleFonts.barlowCondensed(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.8,
+                              color: palette.textPrimary,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          key: const Key('plan_sheet_close'),
+                          icon: Icon(TreinoIcon.close,
+                              size: 18, color: palette.textMuted),
+                          tooltip: l10n.commonClose,
+                          onPressed: () => Navigator.of(ctx).pop(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Flexible(
+                    child: ListView(
+                      shrinkWrap: true,
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.s18,
+                        AppSpacing.s8,
+                        AppSpacing.s18,
+                        AppSpacing.s20,
+                      ),
+                      children: _camposDelPlan(l10n, palette),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+    _sheetSetState = null;
+  }
+
   /// Estado que la pestaña de un día comunica con su punto de color.
   ///
   /// Distingue "vacío" de "inválido" a propósito: un día sin ejercicios es un
@@ -967,6 +1280,29 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             ? l10n.routineEditorIncompleteSetsFeedback(name)
             : l10n.routineEditorMissingReps,
         day: invalid.day,
+      );
+    }
+    // 5) El problema está en OTRA semana.
+    //
+    // `_firstInvalidSlot` mira sólo `_selectedWeek`, pero `_isValid` mira
+    // todas: sin esta rama el guardado quedaba bloqueado y sin mensaje —el
+    // botón parecía muerto—. Antes el chip de semana con warning estaba
+    // siempre a la vista y alcanzaba como explicación; desde #866 vive dentro
+    // de la hoja del engranaje, así que hay que decirlo en voz alta.
+    final semanasRotas = _invalidWeekFirstDay;
+    final otra = semanasRotas.keys.where((w) => w != _selectedWeek).toList()
+      ..sort();
+    if (otra.isNotEmpty) {
+      final semana = otra.first;
+      final dia = semanasRotas[semana]!;
+      // Llevar al usuario al problema, no sólo nombrárselo.
+      if (semana != _selectedWeek) {
+        FocusManager.instance.primaryFocus?.unfocus();
+        setState(() => _selectedWeek = semana);
+      }
+      return (
+        message: l10n.routineEditorInvalidWeekHint(semana + 1, dia),
+        day: null,
       );
     }
     return null;
@@ -2041,9 +2377,6 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       // visible on screen — and with numWeeks == 1 (week 0 always selected)
       // this keeps the single-week editor visually identical to before
       // (REQ-PERIOD-062).
-      final invalidWeeks = _invalidWeekFirstDay;
-      final hiddenInvalidWeeks =
-          invalidWeeks.keys.where((w) => w != _selectedWeek).toList()..sort();
       // Unsaved-changes guard: blocks the iOS edge-swipe / system back gesture
       // while the editor is dirty and routes it through the discard confirm.
       // canPop is recomputed every build, so it stays in sync with _isDirty
@@ -2063,13 +2396,53 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                       tooltip: l10n.commonBack,
                       onPressed: _handleBackButton,
                     ),
-                    const SizedBox(width: 4),
-                    Text(
-                      _titleFor(widget.mode, l10n),
-                      style: GoogleFonts.barlowCondensed(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 20,
-                        color: palette.textPrimary,
+                    // El título es el NOMBRE de la rutina, no el del modo:
+                    // el modo ya se sabe por cómo se llegó, el nombre no.
+                    // Sin nombre todavía, cae al label del modo.
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _nameController.text.trim().isEmpty
+                                ? _titleFor(widget.mode, l10n)
+                                : _nameController.text.trim().toUpperCase(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.barlowCondensed(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 19,
+                              letterSpacing: 0.5,
+                              color: palette.textPrimary,
+                            ),
+                          ),
+                          Text(
+                            _subtituloDelPlan(l10n),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.barlow(
+                              fontWeight: FontWeight.w500,
+                              fontSize: 11.5,
+                              color: palette.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Engranaje: nombre, split, nivel, compartir y semanas se
+                    // setean una vez y después estorbaban en cada scroll.
+                    IconButton(
+                      key: const Key('plan_sheet_button'),
+                      icon: Icon(TreinoIcon.contentSettings,
+                          size: 18, color: palette.textPrimary),
+                      tooltip: l10n.routineEditorPlanSheetA11y,
+                      onPressed: _abrirDatosDelPlan,
+                      constraints:
+                          const BoxConstraints(minWidth: 44, minHeight: 44),
+                      style: IconButton.styleFrom(
+                        backgroundColor: palette.surfaceSubtle,
+                        shape: const CircleBorder(),
                       ),
                     ),
                   ],
@@ -2086,6 +2459,14 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                   controller: _listScrollController,
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                   children: [
+                    // ── Nombre y split ──────────────────────────────────
+                    // NO van a la hoja del engranaje, a diferencia de
+                    // objetivos, nivel, compartir y semanas. El nombre es el
+                    // único campo OBLIGATORIO y lo primero que hacés: detrás
+                    // de un ícono, una rutina nueva se abre en blanco y sin
+                    // ningún lugar visible donde escribirlo. El split viaja con
+                    // él porque comparten fila y son la identidad del plan, no
+                    // su configuración.
                     // ── Name + (Split when trainer mode) ───────────────
                     // T-RER-030: athlete (SelfCreating) form shows only
                     // Name + Days-of-plan. Trainer modes show all fields.
@@ -2150,19 +2531,13 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                       ],
                     ),
 
-                    // ── Resumen en criollo — trainer modes only (#648) ──
-                    //
-                    // Sits right under SPLIT because SPLIT is the jargon it
-                    // exists to translate: the detail screen's badge opens
-                    // with "PPL · DÍA 1" and 2 of 5 usability participants
-                    // could not say what that meant. Asking for the plain
-                    // sentence next to the term that needs it is what makes
-                    // the field self-explanatory.
-                    //
-                    // Absent in SelfCreating: firestore.rules keeps `summary`
-                    // out of the athlete UPDATE path's affectedKeys(), so the
-                    // athlete cannot change it. A field whose every save is a
-                    // permission-denied is worse than no field.
+                    // ── Resumen del plan ────────────────────────────────
+                    // NO se mudó a la hoja del engranaje, a diferencia de
+                    // nombre, split, nivel, compartir y semanas. Esos cinco son
+                    // configuración que se setea una vez; el resumen es algo
+                    // que el PF escribe PARA el alumno, más cerca del contenido
+                    // que de los ajustes. El handoff tampoco lo listaba en
+                    // "DATOS DEL PLAN".
                     if (_isTrainerMode) ...[
                       const SizedBox(height: 12),
                       _SectionLabel(
@@ -2211,155 +2586,6 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                         onChanged: (_) => setState(() {}),
                       ),
                     ],
-
-                    // ── Para qué sirve — SOLO modo plantilla (#635 PR#1b) ──
-                    //
-                    // Debajo del RESUMEN porque son la misma pregunta a dos
-                    // niveles: el resumen la contesta en prosa para el humano
-                    // que lee la card, los objetivos la contestan en enum para
-                    // el ranking que ordena la grilla.
-                    //
-                    // `_isTemplateMode` y no `_isTrainerMode`: en un plan
-                    // asignado el guardado sería permission-denied, porque
-                    // firestore.rules deja `goals` fuera del affectedKeys de
-                    // ese path. Ver el dartdoc del predicado.
-                    if (_isTemplateMode) ...[
-                      const SizedBox(height: AppSpacing.s12),
-                      _SectionLabel(
-                        label: l10n.routineEditorGoalsLabel,
-                        palette: palette,
-                      ),
-                      const SizedBox(height: AppSpacing.hairline),
-                      Text(
-                        l10n.routineEditorGoalsHelp,
-                        style: GoogleFonts.barlow(
-                          fontWeight: FontWeight.w400,
-                          fontSize: 12,
-                          height: 1.35,
-                          color: palette.textMuted,
-                        ),
-                      ),
-                      // Sin estado vacío explícito: la bajada ya dice
-                      // "opcional". Vacío es un estado válido —la plantilla
-                      // sigue en la grilla, sin señal para rankear— y una línea
-                      // extra sólo para decirlo empujaba DÍAS DEL PLAN fuera
-                      // del área construida del ListView.
-                      const SizedBox(height: AppSpacing.s8),
-                      Wrap(
-                        key: const Key('editor_goals_picker'),
-                        spacing: AppSpacing.s8,
-                        runSpacing: AppSpacing.s8,
-                        children: [
-                          for (final goal in RoutineGoal.values)
-                            _GoalChip(
-                              key: Key('editor_goal_${goal.wireKey}'),
-                              label: templatesGoalLabel(l10n, goal),
-                              selected: _goals.contains(goal),
-                              palette: palette,
-                              onTap: () {
-                                _markDirty();
-                                setState(() {
-                                  // Toggle: volver a tocar deselecciona. Sin
-                                  // esto no habría forma de corregir un tap
-                                  // equivocado salvo recargando el editor.
-                                  if (!_goals.remove(goal)) _goals.add(goal);
-                                });
-                              },
-                            ),
-                        ],
-                      ),
-                    ],
-
-                    // ── Row: Share on public profile — SelfCreating only
-                    //
-                    // Toggle that flips the routine's `visibility`
-                    // between `private` (default) and `public`. When
-                    // public, the routine shows in the "RUTINAS
-                    // PÚBLICAS" tab of the athlete's public profile.
-                    if (!_isTrainerMode) ...[
-                      const SizedBox(height: 12),
-                      _ShareOnProfileTile(
-                        value: _sharedOnProfile,
-                        palette: palette,
-                        onChanged: (v) {
-                          _markDirty();
-                          setState(() => _sharedOnProfile = v);
-                        },
-                      ),
-                    ],
-
-                    // ── Row: Level — trainer modes only ─────────────────
-                    if (_isTrainerMode) ...[
-                      const SizedBox(height: 8),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _SectionLabel(
-                                    label: l10n.routineEditorLevelSection,
-                                    palette: palette),
-                                const SizedBox(height: 4),
-                                _LevelDropdown(
-                                  value: _level,
-                                  palette: palette,
-                                  onChanged: (v) {
-                                    if (v != null) {
-                                      _markDirty();
-                                      setState(() => _level = v);
-                                    }
-                                  },
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                    const SizedBox(height: 12),
-
-                    // ── Semanas del plan ────────────────────────────────
-                    // Week state machine — REQ-PERIOD-010..014. The chips
-                    // switch the week every slot editor renders (live-view).
-                    _SectionLabel(
-                        label: l10n.routineEditorWeeksSection,
-                        palette: palette),
-                    const SizedBox(height: 6),
-                    _WeekTabBar(
-                      numWeeks: _numWeeks,
-                      selectedWeek: _selectedWeek,
-                      maxWeeks: _kMaxWeeks,
-                      warningWeeks: hiddenInvalidWeeks.toSet(),
-                      palette: palette,
-                      onSelectWeek: (w) {
-                        // Drop focus BEFORE swapping the week's field tree:
-                        // on-device the iOS IME can restore its editing
-                        // session into the replacement TextField and bleed
-                        // the previous week's value into the new week
-                        // (not reproducible in widget tests — no real IME).
-                        FocusManager.instance.primaryFocus?.unfocus();
-                        setState(() => _selectedWeek = w);
-                      },
-                      onAddWeek: _addWeek,
-                      onRemoveLastWeek: _removeLastWeek,
-                      onDuplicateWeek: () => _duplicateWeek(),
-                    ),
-                    if (hiddenInvalidWeeks.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        '${l10n.routineEditorIncompleteSetsLabel(hiddenInvalidWeeks.first + 1)} · Día '
-                        '${invalidWeeks[hiddenInvalidWeeks.first]}',
-                        key: const Key('invalid_week_hint'),
-                        style: GoogleFonts.barlow(
-                          fontSize: 11,
-                          color: palette.danger,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 12),
-
                     // ── Días del plan ───────────────────────────────────
                     // ── Días del plan ─────────────────────────────────
                     // Pestañas en vez de la pila de acordeones: se renderiza
@@ -2378,6 +2604,13 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                         setState(() => _selectedDayIndex = i);
                       },
                       onAddDay: _days.length < _kMaxDays ? _addDay : null,
+                      addDayLabel: l10n.coachEditorAddDay,
+                      statusLabel: (estado) => switch (estado) {
+                        DayTabStatus.empty =>
+                          l10n.routineEditorEmptyDayTitle.toLowerCase(),
+                        DayTabStatus.invalid => l10n.routineEditorMissingReps,
+                        DayTabStatus.ok => '',
+                      },
                     ),
                     const SizedBox(height: AppSpacing.s12),
 

@@ -134,3 +134,34 @@ void usarViewportAlto(WidgetTester tester) {
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
 }
+
+/// Abre la hoja "DATOS DEL PLAN" si no está abierta ya.
+///
+/// Desde #866 los objetivos, el nivel, el toggle de compartir y las semanas
+/// viven detrás del engranaje del app bar: son ajustes que se setean una vez y
+/// antes ocupaban el tercio superior del scroll. Un test que toque cualquiera
+/// de esos controles tiene que abrir la hoja primero.
+///
+/// El nombre y el split NO están acá: se quedaron en la pantalla porque el
+/// nombre es el único campo obligatorio y esconderlo dejaría una rutina nueva
+/// sin ningún lugar visible donde escribirlo.
+///
+/// Es idempotente: llamarla dos veces no abre dos hojas.
+Future<void> abrirDatosDelPlan(WidgetTester tester) async {
+  if (find.byKey(const Key('plan_sheet_close')).evaluate().isNotEmpty) return;
+  final boton = find.byKey(const Key('plan_sheet_button'));
+  if (boton.evaluate().isEmpty) return;
+  await tester.tap(boton);
+  await tester.pumpAndSettle();
+}
+
+/// Cierra la hoja "DATOS DEL PLAN" si está abierta.
+///
+/// Hace falta cuando el test sigue interactuando con la pantalla: la hoja es
+/// modal y tapa todo lo de abajo.
+Future<void> cerrarDatosDelPlan(WidgetTester tester) async {
+  final cerrar = find.byKey(const Key('plan_sheet_close'));
+  if (cerrar.evaluate().isEmpty) return;
+  await tester.tap(cerrar);
+  await tester.pumpAndSettle();
+}
