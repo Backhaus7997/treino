@@ -41,8 +41,13 @@ import '../domain/set_enums.dart';
 import '../domain/set_limits.dart';
 import '../domain/set_spec.dart';
 import 'routine_editor_mode.dart';
-import 'widgets/bounded_number_formatter.dart';
 import 'widgets/duration_text_field.dart';
+import 'widgets/set_cell_field.dart';
+// `parseEditorWeight` se mudó junto al campo que parsea. Se re-exporta desde
+// acá porque `routine_editor_kg_decimal_test.dart` lo importa por esta ruta
+// desde antes de que la celda fuera un widget propio, y su contrato no cambió.
+export 'widgets/set_cell_field.dart' show parseEditorWeight;
+import 'widgets/set_type_chip.dart';
 
 // ── Presence-aware delete / add scope enums ───────────────────────────────────
 
@@ -3922,10 +3927,10 @@ class _SetTableHeader extends StatelessWidget {
     final isDuration = slot.exerciseMode == ExerciseMode.duration;
 
     TextStyle headerStyle() => GoogleFonts.barlowCondensed(
-          fontSize: 12,
+          fontSize: 10.5,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.8,
-          color: palette.textMuted,
+          color: palette.textFaint,
         );
 
     Widget cell(String label, {bool tappable = false}) {
@@ -3992,20 +3997,21 @@ class _SetTableHeader extends StatelessWidget {
       children: [
         // SET column (fixed narrow width)
         SizedBox(
+          // Acompaña el ancho del SetTypeChip de la fila.
           width: 44,
           child: Center(
             child: Text('SET', style: headerStyle()),
           ),
         ),
-        const SizedBox(width: 6),
+        const SizedBox(width: AppSpacing.s8),
         if (isDuration) ...[
           cell('TIEMPO', tappable: true),
         ] else ...[
           kgCell(),
-          const SizedBox(width: 6),
+          const SizedBox(width: AppSpacing.s8),
           if (slot.repMode == RepMode.range) ...[
             cell('MÍN', tappable: true),
-            const SizedBox(width: 6),
+            const SizedBox(width: AppSpacing.s8),
             cell('MÁX', tappable: true),
           ] else ...[
             cell('REPS', tappable: true),
@@ -4183,40 +4189,25 @@ class _SetRowState extends State<_SetRow> {
     final row = Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // ── Set chip — 44×44 tap target ───────────────────────────────────
+        // ── Set chip ──────────────────────────────────────────────────────
         Builder(
-          builder: (ctx) => Semantics(
-            button: true,
+          builder: (ctx) => SetTypeChip(
+            label: label,
+            type: s.type,
+            palette: palette,
             // Announce the set position, its type (warmup/drop/failure) and
             // whether it is currently invalid — the bare "1"/"C" glyph carries
             // none of that meaning for VoiceOver.
-            label: _chipSemanticsLabel(label, s.type, widget.isInvalid, l10n),
-            child: GestureDetector(
-              onTap: () => _pickSetType(ctx),
-              child: Container(
-                width: 44,
-                height: 44,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: _chipColor(s.type, palette),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  label,
-                  style: GoogleFonts.barlowCondensed(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: _chipTextColor(s.type, palette),
-                  ),
-                ),
-              ),
-            ),
+            semanticsLabel:
+                _chipSemanticsLabel(label, s.type, widget.isInvalid, l10n),
+            onTap: () => _pickSetType(ctx),
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: AppSpacing.s8),
         // ── Input cells ───────────────────────────────────────────────────
         if (widget.isDuration) ...[
           Expanded(
+            // El alto de 48 lo pone DurationTextField, igual que SetCellField.
             child: DurationTextField(
               valueSeconds: s.durationSeconds ?? 0,
               hasError: widget.isInvalid,
@@ -4229,7 +4220,7 @@ class _SetRowState extends State<_SetRow> {
         ] else ...[
           // KG field — always optional, no error highlight
           Expanded(
-            child: _NumberField(
+            child: SetCellField(
               controller: _kgCtrl,
               focusNode: _kgFocus,
               palette: palette,
@@ -4241,11 +4232,11 @@ class _SetRowState extends State<_SetRow> {
               },
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: AppSpacing.s8),
           if (widget.repMode == RepMode.range) ...[
             // REP MIN
             Expanded(
-              child: _NumberField(
+              child: SetCellField(
                 controller: _repsMinCtrl,
                 palette: palette,
                 hint: 'mín',
@@ -4256,10 +4247,10 @@ class _SetRowState extends State<_SetRow> {
                 },
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: AppSpacing.s8),
             // REP MAX
             Expanded(
-              child: _NumberField(
+              child: SetCellField(
                 controller: _repsMaxCtrl,
                 palette: palette,
                 hint: 'máx',
@@ -4273,7 +4264,7 @@ class _SetRowState extends State<_SetRow> {
           ] else ...[
             // REPS
             Expanded(
-              child: _NumberField(
+              child: SetCellField(
                 controller: _repsCtrl,
                 palette: palette,
                 hint: 'reps',
@@ -4286,17 +4277,21 @@ class _SetRowState extends State<_SetRow> {
             ),
           ],
         ],
-        // ── Delete button — 40px wide tap target ──────────────────────────
+        // ── Delete button ─────────────────────────────────────────────────
         SizedBox(
+          // 40, el ancho que ya tenía: los 30 del handoff achicaban el área
+          // táctil de 1760 a 1440 px². El alto sí sube a 48.
           width: 40,
           child: widget.onRemove != null
               ? IconButton(
                   icon: Icon(TreinoIcon.close,
-                      size: 16, color: palette.textMuted),
+                      size: 15, color: palette.textMuted),
                   tooltip: l10n.commonClose,
                   onPressed: widget.onRemove,
-                  constraints:
-                      const BoxConstraints(minWidth: 40, minHeight: 44),
+                  constraints: const BoxConstraints(
+                    minWidth: 40,
+                    minHeight: 48,
+                  ),
                   padding: EdgeInsets.zero,
                 )
               : const SizedBox.shrink(),
@@ -4343,24 +4338,6 @@ class _SetRowState extends State<_SetRow> {
     final parts = [setLabel, typeName];
     if (isInvalid) parts.add(l10n.commonWarning);
     return parts.join(', ');
-  }
-
-  Color _chipColor(SetType type, AppPalette palette) {
-    return switch (type) {
-      SetType.warmup => palette.accent.withAlpha(30),
-      SetType.drop => palette.highlight.withAlpha(30),
-      SetType.failure => palette.danger.withAlpha(30),
-      SetType.normal => palette.bgCard,
-    };
-  }
-
-  Color _chipTextColor(SetType type, AppPalette palette) {
-    return switch (type) {
-      SetType.warmup => palette.accent,
-      SetType.drop => palette.highlight,
-      SetType.failure => palette.danger,
-      SetType.normal => palette.textMuted,
-    };
   }
 }
 
@@ -4473,104 +4450,6 @@ class _KgStepperBar extends StatelessWidget {
   }
 }
 
-// ── Number input field ────────────────────────────────────────────────────────
-
-/// Compact numeric text field without a label (used inside set rows).
-class _NumberField extends StatelessWidget {
-  const _NumberField({
-    required this.controller,
-    required this.palette,
-    this.onChanged,
-    this.onDecimalChanged,
-    this.decimal = false,
-    this.hint,
-    this.hasError = false,
-    this.focusNode,
-  }) : assert(
-          decimal ? onDecimalChanged != null : onChanged != null,
-          'decimal fields need onDecimalChanged; integer fields need onChanged',
-        );
-
-  final TextEditingController controller;
-  final AppPalette palette;
-  final String? hint;
-
-  /// Optional external focus node — the KG field owns one so its row can show
-  /// the stepper bar only while that field is being edited.
-  final FocusNode? focusNode;
-
-  /// Integer callback used when [decimal] is false (reps, etc.).
-  final void Function(int?)? onChanged;
-
-  /// Double callback used when [decimal] is true (weight in kg).
-  final void Function(double?)? onDecimalChanged;
-
-  /// When true the field accepts fractional values (e.g. 17.5 kg).
-  final bool decimal;
-
-  /// When true the field underline turns danger-red to signal the value
-  /// is missing or invalid.
-  final bool hasError;
-
-  @override
-  Widget build(BuildContext context) {
-    final errorBorder = UnderlineInputBorder(
-      borderSide: BorderSide(color: palette.danger, width: 1.5),
-    );
-    return TextField(
-      controller: controller,
-      focusNode: focusNode,
-      keyboardType: decimal
-          ? const TextInputType.numberWithOptions(decimal: true)
-          : TextInputType.number,
-      inputFormatters: [
-        // QA-WKT-003: cap reps/weight at the shared domain ceiling so an
-        // impossible set can't be authored and flow untouched into a SetLog.
-        BoundedNumberFormatter(
-          max: decimal ? kMaxWeightKg : kMaxReps.toDouble(),
-          decimal: decimal,
-        ),
-      ],
-      style: GoogleFonts.barlow(fontSize: 16, color: palette.textPrimary),
-      textAlign: TextAlign.center,
-      decoration: InputDecoration(
-        isDense: true,
-        hintText: hint,
-        hintStyle: GoogleFonts.barlow(
-          fontSize: 13,
-          color: hasError ? palette.danger.withAlpha(180) : palette.textMuted,
-        ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
-        filled: false,
-        border: hasError
-            ? errorBorder
-            : UnderlineInputBorder(
-                borderSide: BorderSide(color: palette.border),
-              ),
-        enabledBorder: hasError
-            ? errorBorder
-            : UnderlineInputBorder(
-                borderSide: BorderSide(color: palette.border),
-              ),
-        focusedBorder: hasError
-            ? UnderlineInputBorder(
-                borderSide: BorderSide(color: palette.danger, width: 2),
-              )
-            : UnderlineInputBorder(
-                borderSide: BorderSide(color: palette.accent, width: 2),
-              ),
-      ),
-      onChanged: (v) {
-        if (decimal) {
-          onDecimalChanged!(parseEditorWeight(v));
-        } else {
-          onChanged!(int.tryParse(v));
-        }
-      },
-    );
-  }
-}
-
 // ── Level dropdown ────────────────────────────────────────────────────────────
 
 class _LevelDropdown extends StatelessWidget {
@@ -4628,7 +4507,6 @@ String formatEditorWeight(double? w) => formatWeightKg(w);
 
 /// Parses KG field text into a nullable double, accepting comma as the decimal
 /// separator (common on iOS numeric keypads). Empty/invalid → null.
-double? parseEditorWeight(String v) => double.tryParse(v.replaceAll(',', '.'));
 
 // ── Test bridge ───────────────────────────────────────────────────────────────
 // Exposes internal helpers for unit tests without making the private types

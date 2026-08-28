@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../app/theme/tokens/tokens.dart';
 
 // ── Formatter ─────────────────────────────────────────────────────────────────
 
@@ -150,25 +151,35 @@ class _DurationTextFieldState extends State<DurationTextField> {
           ),
           decoration: InputDecoration(
             isDense: true,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
-            filled: false,
-            border: UnderlineInputBorder(
+            // Mismo piso de 48 que [SetCellField]: la fila de un set mezcla
+            // los dos, y dos alturas distintas se ven. Va en el decorador
+            // —no en un ConstrainedBox de afuera— para que crezca con
+            // Dynamic Type en vez de recortar el valor.
+            constraints: const BoxConstraints(minHeight: 48),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.hairline,
+            ),
+            filled: true,
+            fillColor: palette.bgCard,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppRadius.sm),
               borderSide: BorderSide(
                 color: widget.hasError ? palette.danger : palette.border,
                 width: widget.hasError ? 1.5 : 1.0,
               ),
             ),
-            enabledBorder: UnderlineInputBorder(
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppRadius.sm),
               borderSide: BorderSide(
                 color: widget.hasError ? palette.danger : palette.border,
                 width: widget.hasError ? 1.5 : 1.0,
               ),
             ),
-            focusedBorder: UnderlineInputBorder(
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppRadius.sm),
               borderSide: BorderSide(
                 color: widget.hasError ? palette.danger : palette.accent,
-                width: 2,
+                width: 1.5,
               ),
             ),
           ),
