@@ -109,6 +109,12 @@ class TreinoIcon {
 
   // Feed / social
   static const IconData dotsThree = PhosphorIconsRegular.dotsThreeVertical;
+
+  /// Agarre de arrastre (⠿). Distinto de [dotsThree] a propósito: el de tres
+  /// puntos abre un menú, éste dice "podés arrastrarme". Usar el mismo glifo
+  /// para las dos cosas —que es lo que pasaba en la card de ejercicio— deja al
+  /// usuario sin forma de saber cuál hace qué.
+  static const IconData dragHandle = PhosphorIconsRegular.dotsSixVertical;
   static const IconData verified = PhosphorIconsFill.sealCheck;
   static const IconData dumbbell = PhosphorIconsRegular.barbell;
   static const IconData chevronLeft = PhosphorIconsRegular.caretLeft;

@@ -1773,6 +1773,17 @@ class AppL10nEn extends AppL10n {
   String get performanceChartMetricSitAndReach => '';
 
   @override
+  String routineEditorSetsMissingReps(int n) {
+    String _temp0 = intl.Intl.pluralLogic(
+      n,
+      locale: localeName,
+      other: '$n sets without reps',
+      one: '1 set without reps',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String routineEditorDayName(int n) {
     return 'Day $n';
   }

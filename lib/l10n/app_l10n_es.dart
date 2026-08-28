@@ -1823,6 +1823,17 @@ class AppL10nEs extends AppL10n {
   String get performanceChartMetricSitAndReach => 'Flexibilidad';
 
   @override
+  String routineEditorSetsMissingReps(int n) {
+    String _temp0 = intl.Intl.pluralLogic(
+      n,
+      locale: localeName,
+      other: '$n sets sin reps',
+      one: '1 set sin reps',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String routineEditorDayName(int n) {
     return 'Día $n';
   }
@@ -5838,6 +5849,17 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get performanceChartMetricSitAndReach => 'Flexibilidad';
+
+  @override
+  String routineEditorSetsMissingReps(int n) {
+    String _temp0 = intl.Intl.pluralLogic(
+      n,
+      locale: localeName,
+      other: '$n sets sin reps',
+      one: '1 set sin reps',
+    );
+    return '$_temp0';
+  }
 
   @override
   String routineEditorDayName(int n) {

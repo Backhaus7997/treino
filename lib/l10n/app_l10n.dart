@@ -3368,6 +3368,12 @@ abstract class AppL10n {
   /// **'Flexibilidad'**
   String get performanceChartMetricSitAndReach;
 
+  /// Resumen de error en la cabecera colapsada de un ejercicio
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{n, plural, =1{1 set sin reps} other{{n} sets sin reps}}'**
+  String routineEditorSetsMissingReps(int n);
+
   /// No description provided for @routineEditorDayName.
   ///
   /// In es_AR, this message translates to:

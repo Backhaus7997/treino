@@ -42,6 +42,8 @@ import '../domain/set_limits.dart';
 import '../domain/set_spec.dart';
 import 'routine_editor_mode.dart';
 import 'widgets/duration_text_field.dart';
+import 'widgets/exercise_card.dart';
+import 'widgets/prescription_chips.dart';
 import 'widgets/set_cell_field.dart';
 // `parseEditorWeight` se mudó junto al campo que parsea. Se re-exporta desde
 // acá porque `routine_editor_kg_decimal_test.dart` lo importa por esta ruta
@@ -3450,8 +3452,27 @@ class _SlotEditor extends StatefulWidget {
 }
 
 class _SlotEditorState extends State<_SlotEditor> {
+  /// Si la tabla de series está desplegada. Presentación local pura: no toca
+  /// el modelo ni sobrevive a la pantalla.
+  ///
+  /// Arranca colapsado, salvo que el slot tenga sets inválidos. Eso cubre solo
+  /// el caso que importa y de paso el que parecía necesitar otra regla: un
+  /// ejercicio recién agregado nace con sus sets vacíos, o sea inválido, así
+  /// que se despliega solo. No hace falta rastrear "cuál fue el último".
+  late bool _expanded = widget.hasSlotError;
+
+  @override
+  void didUpdateWidget(_SlotEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Un error que aparece mientras el usuario mira otra cosa abre la card:
+    // un problema escondido no se puede arreglar.
+    if (!oldWidget.hasSlotError && widget.hasSlotError) {
+      _expanded = true;
+    }
+  }
+
   /// Opens the exercise picker and, if a replacement is chosen, swaps the
-  /// slot's exercise. Shared by the name tap and the ⋮ "Cambiar ejercicio".
+  /// slot's exercise from the ⋮ "Cambiar ejercicio" action.
   Future<void> _replaceExercise() async {
     final picked = await showExercisePicker(context);
     if (!mounted || picked == null || picked.isEmpty) return;
@@ -3466,131 +3487,101 @@ class _SlotEditorState extends State<_SlotEditor> {
     // Active week's list — the same object as weeklySets[week], so in-place
     // mutations below stay visible to the single source of truth.
     final sets = slot.setsForWeek(widget.week);
-    // One light surface per card — no outer border, just a fill + generous
-    // padding. Inner fields are NOT individually boxed.
-    // A red left accent stripe appears when the slot has incomplete sets so
-    // the user can locate the problem at a glance while scrolling.
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: widget.hasSlotError
-            ? Border(
-                left: BorderSide(
-                  color: palette.danger.withAlpha(180),
-                  width: 3,
+    final invalidSetCount = sets
+        .where((set) => !isSetValid(set, slot.exerciseMode, slot.repMode))
+        .length;
+    final hasMissingPrescription = invalidSetCount > 0;
+    final summary = hasMissingPrescription
+        ? l10n.routineEditorSetsMissingReps(invalidSetCount)
+        : _prescriptionSummary(slot, sets, l10n);
+
+    return ExerciseCard(
+      title: slot.exercise?.name ?? l10n.coachExercisePicker,
+      expanded: _expanded,
+      hasError: hasMissingPrescription,
+      // Una card con error TAMBIÉN se puede colapsar: el resumen colapsado ya
+      // dice cuántos sets están mal, en `danger`, y el borde de la card sigue
+      // rojo. Trabar la cabecera para "proteger" al usuario sólo hace que el
+      // tap no responda y parezca rota.
+      onToggle: () => setState(() => _expanded = !_expanded),
+      summary: PrescriptionChips(
+        prescription: summary,
+        rest: hasMissingPrescription ? null : _restSummary(slot.restSeconds),
+        hasError: hasMissingPrescription,
+      ),
+      menu: Transform.translate(
+        offset: const Offset(AppSpacing.s8, -AppSpacing.s8),
+        child: PopupMenuButton<_SlotAction>(
+          key: widget.slotIndex != null
+              ? Key('slot_menu_button_${widget.slotIndex}')
+              : null,
+          icon: Icon(TreinoIcon.dotsThree, size: 20, color: palette.textMuted),
+          tooltip: l10n.workoutRoutineOptionsA11y,
+          color: palette.bgCard,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+          ),
+          onSelected: (action) {
+            switch (action) {
+              case _SlotAction.replace:
+                _replaceExercise();
+              case _SlotAction.moveUp:
+                widget.onMoveUp?.call();
+              case _SlotAction.moveDown:
+                widget.onMoveDown?.call();
+              case _SlotAction.copyPrevious:
+                widget.onCopyPrevious?.call();
+              case _SlotAction.remove:
+                widget.onRemove();
+            }
+          },
+          itemBuilder: (context) {
+            final showMove =
+                widget.onMoveUp != null || widget.onMoveDown != null;
+            return [
+              _slotMenuItem(
+                _SlotAction.replace,
+                TreinoIcon.edit,
+                l10n.routineEditorSlotMenuReplace,
+                palette,
+              ),
+              _slotMenuItem(
+                _SlotAction.copyPrevious,
+                TreinoIcon.copy,
+                l10n.routineEditorSlotMenuCopyPrevious,
+                palette,
+                enabled: widget.onCopyPrevious != null,
+              ),
+              if (showMove)
+                _slotMenuItem(
+                  _SlotAction.moveUp,
+                  TreinoIcon.chevronUp,
+                  l10n.routineEditorSlotMenuMoveUp,
+                  palette,
+                  enabled: widget.canMoveUp,
                 ),
-              )
-            : null,
+              if (showMove)
+                _slotMenuItem(
+                  _SlotAction.moveDown,
+                  TreinoIcon.chevronDown,
+                  l10n.routineEditorSlotMenuMoveDown,
+                  palette,
+                  enabled: widget.canMoveDown,
+                ),
+              _slotMenuItem(
+                _SlotAction.remove,
+                TreinoIcon.trash,
+                l10n.routineEditorSlotMenuRemove,
+                palette,
+                danger: true,
+              ),
+            ];
+          },
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Header row: full-width exercise name + ⋮ overflow menu ────────
-          // The name owns its own row (wraps up to 2 lines) so long names like
-          // "Press de banca con barra" are fully readable — the actions live in
-          // the ⋮ menu instead of competing for width (Hevy-style).
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: InkWell(
-                  onTap: _replaceExercise,
-                  borderRadius: BorderRadius.circular(6),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Text(
-                      slot.exercise?.name ?? l10n.coachExercisePicker,
-                      style: GoogleFonts.barlow(
-                        fontSize: 19,
-                        height: 1.15,
-                        fontWeight: FontWeight.w700,
-                        color: slot.exercise != null
-                            ? palette.textPrimary
-                            : palette.textMuted,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 4),
-              PopupMenuButton<_SlotAction>(
-                key: widget.slotIndex != null
-                    ? Key('slot_menu_button_${widget.slotIndex}')
-                    : null,
-                icon: Icon(TreinoIcon.dotsThree,
-                    size: 20, color: palette.textMuted),
-                tooltip: l10n.workoutRoutineOptionsA11y,
-                color: palette.bgCard,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                onSelected: (action) {
-                  switch (action) {
-                    case _SlotAction.replace:
-                      _replaceExercise();
-                    case _SlotAction.moveUp:
-                      widget.onMoveUp?.call();
-                    case _SlotAction.moveDown:
-                      widget.onMoveDown?.call();
-                    case _SlotAction.copyPrevious:
-                      widget.onCopyPrevious?.call();
-                    case _SlotAction.remove:
-                      widget.onRemove();
-                  }
-                },
-                itemBuilder: (context) {
-                  final showMove =
-                      widget.onMoveUp != null || widget.onMoveDown != null;
-                  return [
-                    _slotMenuItem(
-                      _SlotAction.replace,
-                      TreinoIcon.edit,
-                      l10n.routineEditorSlotMenuReplace,
-                      palette,
-                    ),
-                    // Always listed so the shortcut is discoverable; disabled
-                    // on the day's first exercise (no source to copy from).
-                    _slotMenuItem(
-                      _SlotAction.copyPrevious,
-                      TreinoIcon.copy,
-                      l10n.routineEditorSlotMenuCopyPrevious,
-                      palette,
-                      enabled: widget.onCopyPrevious != null,
-                    ),
-                    if (showMove)
-                      _slotMenuItem(
-                        _SlotAction.moveUp,
-                        TreinoIcon.chevronUp,
-                        l10n.routineEditorSlotMenuMoveUp,
-                        palette,
-                        enabled: widget.canMoveUp,
-                      ),
-                    if (showMove)
-                      _slotMenuItem(
-                        _SlotAction.moveDown,
-                        TreinoIcon.chevronDown,
-                        l10n.routineEditorSlotMenuMoveDown,
-                        palette,
-                        enabled: widget.canMoveDown,
-                      ),
-                    _slotMenuItem(
-                      _SlotAction.remove,
-                      TreinoIcon.trash,
-                      l10n.routineEditorSlotMenuRemove,
-                      palette,
-                      danger: true,
-                    ),
-                  ];
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-
           // ── Rest duration row ─────────────────────────────────────────────
           Row(
             children: [
@@ -3623,6 +3614,24 @@ class _SlotEditorState extends State<_SlotEditor> {
                 labelText: l10n.routineEditorNotesLabel,
                 hintText: l10n.routineEditorNotesHint,
                 counterText: '',
+                filled: true,
+                fillColor: palette.bgCard,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.s14,
+                  vertical: AppSpacing.s12,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  borderSide: BorderSide(color: palette.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  borderSide: BorderSide(color: palette.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  borderSide: BorderSide(color: palette.accent),
+                ),
               ),
               onChanged: (v) {
                 slot.notes = v.isEmpty ? null : v;
@@ -3676,6 +3685,46 @@ class _SlotEditorState extends State<_SlotEditor> {
         ],
       ),
     );
+  }
+
+  String _prescriptionSummary(
+    _EditableSlot slot,
+    List<_EditableSet> sets,
+    AppL10n l10n,
+  ) {
+    final measureValues = slot.exerciseMode == ExerciseMode.duration
+        ? sets.map((set) => set.durationSeconds).toList()
+        : sets.map((set) => set.reps).toList();
+    final measure = _uniform(measureValues);
+    final measureText = measure == null
+        ? '—'
+        : slot.exerciseMode == ExerciseMode.duration
+            ? _restSummary(measure)
+            : '$measure';
+
+    final segments = <String>['${sets.length} × $measureText'];
+    if (slot.exerciseMode != ExerciseMode.duration) {
+      final weight = _uniform(sets.map((set) => set.weightKg).toList());
+      if (weight != null) {
+        segments.add(
+          '${formatWeightKg(weight)} ${l10n.monthlyReportVolumeUnit}',
+        );
+      } else if (sets.any((set) => set.weightKg != null)) {
+        segments.add('— ${l10n.monthlyReportVolumeUnit}');
+      }
+    }
+    return segments.join(' · ');
+  }
+
+  T? _uniform<T>(List<T?> values) {
+    if (values.isEmpty || values.first == null) return null;
+    final first = values.first;
+    return values.every((value) => value == first) ? first : null;
+  }
+
+  String _restSummary(int seconds) {
+    final display = secondsToMmss(seconds);
+    return display.startsWith('0') ? display.substring(1) : display;
   }
 }
 
