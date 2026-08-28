@@ -3917,6 +3917,7 @@ class _SetTableState extends State<_SetTable> {
           // No KG column in duration mode, and nothing to replicate onto with
           // a single set — the affordance stays out of the way in both cases.
           onFillKgColumn: !isDuration && sets.length > 1 ? _fillKgColumn : null,
+          showRemoveColumn: sets.length > 1,
         ),
         const SizedBox(height: 4),
         // ── Set rows ───────────────────────────────────────────────────────
@@ -3959,12 +3960,16 @@ class _SetTableHeader extends StatelessWidget {
     required this.slot,
     required this.palette,
     required this.onPickMeasureMode,
+    required this.showRemoveColumn,
     this.onFillKgColumn,
   });
 
   final _EditableSlot slot;
   final AppPalette palette;
   final Future<void> Function(BuildContext, Offset) onPickMeasureMode;
+
+  /// Si las filas muestran botón de borrar. Ver el comentario en el hueco.
+  final bool showRemoveColumn;
 
   /// Replicates the first row's KG down the column. Null hides the affordance
   /// (duration mode, or a single-set exercise where there is nothing to fill).
@@ -4066,8 +4071,12 @@ class _SetTableHeader extends StatelessWidget {
             cell('REPS', tappable: true),
           ],
         ],
-        // Delete icon placeholder (same width as delete button)
-        const SizedBox(width: 40),
+        // Hueco que alinea los headers con el botón de borrar de cada fila.
+        // Sólo cuando ese botón existe: con un set único no se puede borrar
+        // —quedarías en cero— y reservar los 40 px igual empujaba chip, kg y
+        // reps a la izquierda, con un vacío a la derecha que se lee como un
+        // error de centrado.
+        if (showRemoveColumn) const SizedBox(width: 40),
       ],
     );
   }
@@ -4327,24 +4336,21 @@ class _SetRowState extends State<_SetRow> {
           ],
         ],
         // ── Delete button ─────────────────────────────────────────────────
-        SizedBox(
-          // 40, el ancho que ya tenía: los 30 del handoff achicaban el área
-          // táctil de 1760 a 1440 px². El alto sí sube a 48.
-          width: 40,
-          child: widget.onRemove != null
-              ? IconButton(
-                  icon: Icon(TreinoIcon.close,
-                      size: 15, color: palette.textMuted),
-                  tooltip: l10n.commonClose,
-                  onPressed: widget.onRemove,
-                  constraints: const BoxConstraints(
-                    minWidth: 40,
-                    minHeight: 48,
-                  ),
-                  padding: EdgeInsets.zero,
-                )
-              : const SizedBox.shrink(),
-        ),
+        // Con un set único `onRemove` es null y la columna NO ocupa lugar:
+        // reservar 40 px para un botón ausente descentra la fila entera.
+        if (widget.onRemove != null)
+          SizedBox(
+            // 40, el ancho que ya tenía: los 30 del handoff achicaban el área
+            // táctil de 1760 a 1440 px². El alto sí sube a 48.
+            width: 40,
+            child: IconButton(
+              icon: Icon(TreinoIcon.close, size: 15, color: palette.textMuted),
+              tooltip: l10n.commonClose,
+              onPressed: widget.onRemove,
+              constraints: const BoxConstraints(minWidth: 40, minHeight: 48),
+              padding: EdgeInsets.zero,
+            ),
+          ),
       ],
     );
 
