@@ -17,7 +17,7 @@ name: Security
 #
 #   shellcheck   → BLOQUEA. Es la única cobertura de análisis estático que tiene
 #                  shell en este repo: CodeQL no lo soporta, igual que no
-#                  soporta Dart. Los 12 scripts `.sh` versionados dan cero
+#                  soporta Dart. Los 14 scripts `.sh` versionados dan cero
 #                  hallazgos con `-S warning`, así que también arranca en verde
 #                  y no hay deuda heredada que amnistiar.
 #

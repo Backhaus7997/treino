@@ -46,14 +46,23 @@ detect_agent() {
 
 clean() { printf '%s' "$1" | tr '\t\n' '  ' | sed 's/  *$//'; }
 
-# Igual que clean, pero nunca devuelve vacio. Un campo vacio no deja un hueco:
-# CORRE todas las columnas siguientes, porque `read` con IFS=tab trata al tab
-# como whitespace y colapsa delimitadores consecutivos. Una fila con el agente
-# vacio se lee con la rama en la columna del agente, el worktree en la de la
-# rama, y `check` deja de encontrar el claim.
+# Para los campos de IDENTIDAD (agente, rama, worktree). Dos diferencias con
+# clean, y las dos importan:
+#
+# 1. Nunca devuelve vacio. Un campo vacio no deja un hueco: CORRE todas las
+#    columnas siguientes, porque `read` con IFS=tab trata al tab como
+#    whitespace y colapsa delimitadores consecutivos. Una fila con el agente
+#    vacio se lee con la rama en la columna del agente y `check` pierde el claim.
+#
+# 2. NO recorta los espacios finales, que es lo unico que hace clean de mas.
+#    El path del worktree es una identidad, no un texto para mostrar: si se
+#    normaliza, `/tmp/wt` y `/tmp/wt ` colapsan en el mismo valor y `check`
+#    contesta "libre" a un worktree distinto del que tiene el claim. Dos
+#    agentes en el mismo scope es exactamente lo que este script existe para
+#    evitar. El tab y el newline SI hay que neutralizarlos: rompen el TSV.
 field() {
-  local v; v="$(clean "${1:-}")"
-  if [ -n "$v" ]; then printf '%s' "$v"; else printf '?'; fi
+  local v; v="$(printf '%s' "${1:-}" | tr '\t\n' '  ')"
+  case "$v" in *[![:space:]]*) printf '%s' "$v" ;; *) printf '?' ;; esac
 }
 
 # Sin lock a proposito. Un append de una linea corta es atomico en POSIX, y un
