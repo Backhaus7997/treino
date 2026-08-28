@@ -82,6 +82,8 @@ Future<void> _pumpEditor(
   required RoutineEditorMode mode,
   required List<Override> overrides,
 }) async {
+  usarViewportAlto(tester);
+
   final router = GoRouter(
     initialLocation: '/workout/editor',
     routes: [
@@ -146,8 +148,7 @@ List<Override> _overrides({
 
 /// Adds "Press de Banca" to the first day via the exercise picker.
 Future<void> _addBenchPress(WidgetTester tester) async {
-  await tester.ensureVisible(find.text('Agregar ejercicio'));
-  await tester.pumpAndSettle();
+  await desplazarHastaAgregarEjercicio(tester);
   await tester.tap(find.text('Agregar ejercicio'));
   await tester.pumpAndSettle();
   await tester.tap(find.text('Press de Banca').first);
@@ -169,6 +170,7 @@ Future<void> _fillVisibleReps(WidgetTester tester, String reps) async {
       reason: 'expected an empty reps field on the visible week');
   final repsField = emptyFields.last.widget as TextField;
   await tester.ensureVisible(find.byWidget(repsField));
+  await tester.pumpAndSettle();
   await tester.enterText(find.byWidget(repsField), reps);
   await tester.pumpAndSettle();
 }
@@ -183,6 +185,7 @@ Future<void> _replaceFieldText(
       .widgetList<TextField>(find.byType(TextField))
       .firstWhere((f) => f.controller?.text == from);
   await tester.ensureVisible(find.byWidget(field));
+  await tester.pumpAndSettle();
   await tester.enterText(find.byWidget(field), to);
   await tester.pumpAndSettle();
 }
@@ -497,6 +500,7 @@ void main() {
     );
 
     expect(find.byKey(const Key('week_tab_1')), findsOneWidget);
+    await desplazarHasta(tester, find.text('8'));
     expect(find.text('8'), findsOneWidget); // week 0
 
     // Edit week 2 to 20 and verify isolation after reload.
@@ -644,6 +648,7 @@ void main() {
     );
 
     expect(find.byKey(const Key('week_tab_1')), findsOneWidget);
+    await desplazarHasta(tester, find.text('8'));
     expect(find.text('8'), findsOneWidget); // week 0 on load
     expect(find.text('12'), findsNothing);
 
@@ -746,6 +751,7 @@ void main() {
     );
 
     expect(find.byKey(const Key('week_tab_3')), findsOneWidget);
+    await desplazarHasta(tester, find.text('8'));
     expect(find.text('8'), findsOneWidget); // week 0 selected on load
 
     await _tapByKey(tester, 'week_tab_1');
@@ -938,6 +944,7 @@ void main() {
     // Open the slot menu and tap "Eliminar"
     final menuButton = find.byKey(const Key('slot_menu_button_0'));
     await tester.ensureVisible(menuButton);
+    await tester.pumpAndSettle();
     await tester.tap(menuButton);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Eliminar'));
@@ -969,6 +976,7 @@ void main() {
     // Single-week plan — delete immediately without dialog
     final menuButton = find.byKey(const Key('slot_menu_button_0'));
     await tester.ensureVisible(menuButton);
+    await tester.pumpAndSettle();
     await tester.tap(menuButton);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Eliminar'));
@@ -1013,6 +1021,7 @@ void main() {
 
     final menuButton = find.byKey(const Key('slot_menu_button_0'));
     await tester.ensureVisible(menuButton);
+    await tester.pumpAndSettle();
     await tester.tap(menuButton);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Eliminar'));
@@ -1068,6 +1077,7 @@ void main() {
 
     final menuButton = find.byKey(const Key('slot_menu_button_0'));
     await tester.ensureVisible(menuButton);
+    await tester.pumpAndSettle();
     await tester.tap(menuButton);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Eliminar'));
@@ -1125,6 +1135,7 @@ void main() {
     await _tapByKey(tester, 'week_tab_2');
     final menuButton = find.byKey(const Key('slot_menu_button_0'));
     await tester.ensureVisible(menuButton);
+    await tester.pumpAndSettle();
     await tester.tap(menuButton);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Eliminar'));
@@ -1161,8 +1172,8 @@ void main() {
     await _tapByKey(tester, 'week_tab_1');
 
     // Add an exercise — scope dialog must appear
-    await tester.ensureVisible(find.text('Agregar ejercicio'));
-    await tester.pumpAndSettle();
+    await desplazarHastaAgregarEjercicio(tester);
+    await desplazarHastaAgregarEjercicio(tester);
     await tester.tap(find.text('Agregar ejercicio'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Press de Banca').first);
@@ -1202,8 +1213,8 @@ void main() {
     await _tapByKey(tester, 'week_tab_1');
 
     // Add exercise, choose "solo en esta semana"
-    await tester.ensureVisible(find.text('Agregar ejercicio'));
-    await tester.pumpAndSettle();
+    await desplazarHastaAgregarEjercicio(tester);
+    await desplazarHastaAgregarEjercicio(tester);
     await tester.tap(find.text('Agregar ejercicio'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Press de Banca').first);
@@ -1256,8 +1267,8 @@ void main() {
     await _tapByKey(tester, 'week_tab_1');
 
     // Add exercise, choose "todas las semanas"
-    await tester.ensureVisible(find.text('Agregar ejercicio'));
-    await tester.pumpAndSettle();
+    await desplazarHastaAgregarEjercicio(tester);
+    await desplazarHastaAgregarEjercicio(tester);
     await tester.tap(find.text('Agregar ejercicio'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Press de Banca').first);
@@ -1495,6 +1506,7 @@ void main() {
 Future<void> _deleteSlotThisWeek(WidgetTester tester, int slotIndex) async {
   final menuButton = find.byKey(Key('slot_menu_button_$slotIndex'));
   await tester.ensureVisible(menuButton);
+  await tester.pumpAndSettle();
   await tester.tap(menuButton);
   await tester.pumpAndSettle();
   await tester.tap(find.text('Eliminar'));

@@ -40,6 +40,7 @@ import '../../../helpers/fake_analytics_service.dart';
 import '../../../fixtures/exercises.dart';
 
 import '../../../helpers/onboarding_test_helpers.dart';
+import '../../../fixtures/routine_editor_ui.dart';
 
 class _MockRoutineRepository extends Mock implements RoutineRepository {}
 
@@ -138,6 +139,7 @@ Future<void> _fillForm(WidgetTester tester) async {
       find.byKey(const Key('editor_name_field')), 'TEST BORRAR');
   await tester.pumpAndSettle();
 
+  await desplazarHastaAgregarEjercicio(tester);
   await tester.tap(find.text('Agregar ejercicio'));
   await tester.pumpAndSettle();
 

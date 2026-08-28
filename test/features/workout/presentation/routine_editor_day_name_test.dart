@@ -84,6 +84,14 @@ List<Override> _overrides({String uid = 'athlete-1'}) {
 const _firstDayPencilKey = Key('day_name_edit_button_1');
 const _editingFieldKey = Key('day_name_editing_field');
 
+/// Nombre del día tal como lo muestra la CABECERA.
+///
+/// Desde #865 el nombre aparece dos veces: en la pestaña —que navega y trunca
+/// a 15 caracteres— y en la cabecera, que muestra el nombre completo y es
+/// donde se edita. `find.text` encuentra los dos, así que hay que decir cuál.
+String _nombreEnCabecera(WidgetTester tester) =>
+    tester.widget<Text>(find.byKey(const Key('day_header_name'))).data!;
+
 void main() {
   group('Editable day name (decisión A1 + 2A + E2)', () {
     testWidgets(
@@ -112,7 +120,7 @@ void main() {
         );
 
         // Pre-edit: Text "Día 1" present, TextField absent.
-        expect(find.text('Día 1'), findsOneWidget);
+        expect(_nombreEnCabecera(tester), 'Día 1');
         expect(find.byKey(_editingFieldKey), findsNothing);
 
         await tester.tap(find.byKey(_firstDayPencilKey));
@@ -149,7 +157,7 @@ void main() {
         await tester.pumpAndSettle();
 
         // New custom label visible.
-        expect(find.text('Día 1 - Pecho'), findsOneWidget);
+        expect(_nombreEnCabecera(tester), 'Día 1 - Pecho');
         // Field is gone, pencil is back.
         expect(find.byKey(_editingFieldKey), findsNothing);
         expect(find.byKey(_firstDayPencilKey), findsOneWidget);
@@ -173,7 +181,7 @@ void main() {
         await tester.enterText(find.byKey(_editingFieldKey), 'PUSH');
         await tester.testTextInput.receiveAction(TextInputAction.done);
         await tester.pumpAndSettle();
-        expect(find.text('PUSH'), findsOneWidget);
+        expect(_nombreEnCabecera(tester), 'PUSH');
 
         // Now wipe it.
         await tester.tap(find.byKey(_firstDayPencilKey));
@@ -183,7 +191,7 @@ void main() {
         await tester.pumpAndSettle();
 
         // Localized default is back, no PUSH leftover.
-        expect(find.text('Día 1'), findsOneWidget);
+        expect(_nombreEnCabecera(tester), 'Día 1');
         expect(find.text('PUSH'), findsNothing);
       },
     );
@@ -203,7 +211,7 @@ void main() {
         await tester.testTextInput.receiveAction(TextInputAction.done);
         await tester.pumpAndSettle();
 
-        expect(find.text('Día 1'), findsOneWidget);
+        expect(_nombreEnCabecera(tester), 'Día 1');
       },
     );
   });

@@ -1784,6 +1784,18 @@ class AppL10nEn extends AppL10n {
   }
 
   @override
+  String get routineEditorEmptyDayTitle => 'EMPTY DAY';
+
+  @override
+  String get routineEditorEmptyDayBody =>
+      'Add the first exercise and it is ready to train.';
+
+  @override
+  String routineEditorDayTabA11y(int n, String estado) {
+    return 'Day $n$estado';
+  }
+
+  @override
   String routineEditorDayName(int n) {
     return 'Day $n';
   }

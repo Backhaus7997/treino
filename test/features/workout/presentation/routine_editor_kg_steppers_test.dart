@@ -200,6 +200,8 @@ Future<void> _pumpEditor(
   required RoutineRepository repo,
   String uid = 'athlete-1',
 }) async {
+  usarViewportAlto(tester);
+
   final router = GoRouter(
     initialLocation: '/workout/editor',
     routes: [
@@ -798,6 +800,7 @@ void main() {
 
       // Confirma que estamos en modo entrenador: la nota al alumno sólo se
       // dibuja ahí (REQ-EN-002).
+      await desplazarHasta(tester, find.byKey(const Key('slot_notes_field')));
       expect(find.byKey(const Key('slot_notes_field')), findsOneWidget);
 
       await _tapVisible(tester, _kgField(0));

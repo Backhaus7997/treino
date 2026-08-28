@@ -83,6 +83,8 @@ Future<void> _pumpEditor(
   required RoutineEditorMode mode,
   RoutineRepository? repo,
 }) async {
+  usarViewportAlto(tester);
+
   final router = GoRouter(
     initialLocation: '/workout/editor',
     routes: [
@@ -228,6 +230,7 @@ void main() {
       // una vez que el plan terminó de cargar.
       await expandirEjercicios(tester);
 
+      await desplazarHasta(tester, find.text('RIR 2 · pausa abajo'));
       // The slot notes field must show the hydrated value
       expect(find.text('RIR 2 · pausa abajo'), findsOneWidget);
     });
