@@ -26,6 +26,7 @@ set -euo pipefail
 # Variables:
 #   AGENT_NAME          fuerza el nombre del agente (si no, se detecta)
 #   AGENT_SESSION       fuerza el id de sesión (si no, se detecta; ver session())
+#                       hace falta en toda herramienta que no publique un id propio
 #   LEDGER_STALE_HOURS  horas tras las cuales una entrada se marca vieja (default 8)
 
 STALE_HOURS="${LEDGER_STALE_HOURS:-8}"
@@ -82,9 +83,25 @@ detect_agent() {
 # Que devuelva '?' no es un bug, es el peor caso honesto: dos sesiones de una
 # herramienta que no publica id vuelven a ser indistinguibles entre si — igual
 # que antes de este cambio, ni mejor ni peor. AGENT_SESSION lo arregla.
+#
+# CODEX_THREAD_ID sale de la review de Codex sobre el PR que trajo esta funcion:
+# lo publica el, es estable, y sin el dos sesiones de Codex en el mismo arbol
+# seguian escribiendo '?' las dos — el agujero que este script cierra, abierto
+# justo para la herramienta que detect_agent ya sabe reconocer por CODEX_HOME.
+#
+# CURSOR_TRACE_ID NO esta en esta lista aunque detect_agent lo use. Ahi solo
+# hace falta que exista para saber que es Cursor; aca hace falta que sea el
+# MISMO valor en cada invocacion de la sesion. Un "trace id" que cambie por
+# request seria peor que '?': cada llamada pareceria otra sesion, `release` no
+# encontraria sus propias filas y `check` avisaria sobre tus propios claims.
+# Hasta poder verificar cual de las dos cosas es, se queda afuera.
+#
+# El PID va ultimo a proposito: el SO los reusa, asi que es el mas debil de los
+# identificadores reales.
 session() {
   if   [ -n "${AGENT_SESSION:-}" ];          then field "$AGENT_SESSION"
   elif [ -n "${CLAUDE_CODE_SESSION_ID:-}" ]; then field "$CLAUDE_CODE_SESSION_ID"
+  elif [ -n "${CODEX_THREAD_ID:-}" ];        then field "$CODEX_THREAD_ID"
   elif [ -n "${CLAUDE_PID:-}" ];             then field "claude-pid-$CLAUDE_PID"
   else echo '?'; fi
 }
@@ -314,6 +331,6 @@ case "${1:-list}" in
   check)   shift; cmd_check "$@" ;;
   prune)   cmd_prune ;;
   list|"") cmd_list ;;
-  -h|--help|help) sed -n '3,29p' "$0" | sed 's/^# \{0,1\}//' ;;
+  -h|--help|help) sed -n '3,30p' "$0" | sed 's/^# \{0,1\}//' ;;
   *) die "comando desconocido: $1  (claim|release|check|list|prune)" ;;
 esac

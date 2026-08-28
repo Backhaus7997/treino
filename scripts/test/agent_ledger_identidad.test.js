@@ -133,6 +133,40 @@ test('check NO avisa sobre el claim propio', (t) => {
   assert.match(r.out, /libre: 862/);
 });
 
+test('CODEX_THREAD_ID alcanza como id: dos sesiones de Codex NO se pisan', (t) => {
+  const repo = repoNuevo(t);
+  // Este caso salió de la review de Codex sobre el PR que trajo `session()`:
+  // `detect_agent` ya reconocía a Codex por CODEX_HOME, pero `session()` lo
+  // dejaba en '?', así que dos hilos de Codex en el mismo árbol seguían siendo
+  // el bug original. El id lo publica Codex; acá se prueba que el script lo
+  // LEE, que es lo único que este repo controla.
+  const codex = (hilo, args) =>
+    spawnSync('bash', [LEDGER_SH, ...args], {
+      cwd: repo.dir,
+      env: entorno({ AGENT_NAME: 'codex', CODEX_HOME: '/tmp/codex', CODEX_THREAD_ID: hilo }),
+    });
+
+  codex('hilo-1', ['claim', '862', 'issue del hilo 1']);
+  assert.strictEqual(filas(repo)[0].split('\t')[6], 'hilo-1', 'el id tiene que llegar al TSV');
+
+  assert.notStrictEqual(codex('hilo-2', ['check', '862']).status, 0, 'el hilo 2 tiene que frenar');
+
+  codex('hilo-2', ['release']);
+  assert.deepStrictEqual(scopes(repo), ['862'], 'y no llevarse el claim del hilo 1');
+});
+
+test('AGENT_SESSION le gana a cualquier id detectado', (t) => {
+  const repo = repoNuevo(t);
+  spawnSync('bash', [LEDGER_SH, 'claim', '862', 'x'], {
+    cwd: repo.dir,
+    env: entorno({ AGENT_NAME: 'codex', CODEX_THREAD_ID: 'hilo-1', AGENT_SESSION: 'a-mano' }),
+  });
+
+  // El override manual es la salida documentada para toda herramienta que no
+  // publique un id propio. Si un detectado le ganara, esa salida no existiría.
+  assert.strictEqual(filas(repo)[0].split('\t')[6], 'a-mano');
+});
+
 test('release sin scope se lleva lo propio y deja en pie lo ajeno', (t) => {
   const repo = repoNuevo(t);
   correr(repo, 'A', ['claim', '862', 'issue A']);
