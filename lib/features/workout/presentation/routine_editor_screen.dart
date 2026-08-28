@@ -3997,7 +3997,8 @@ class _SetTableHeader extends StatelessWidget {
       children: [
         // SET column (fixed narrow width)
         SizedBox(
-          width: 34,
+          // Acompaña el ancho del SetTypeChip de la fila.
+          width: 44,
           child: Center(
             child: Text('SET', style: headerStyle()),
           ),
@@ -4017,7 +4018,7 @@ class _SetTableHeader extends StatelessWidget {
           ],
         ],
         // Delete icon placeholder (same width as delete button)
-        const SizedBox(width: 30),
+        const SizedBox(width: 40),
       ],
     );
   }
@@ -4278,17 +4279,18 @@ class _SetRowState extends State<_SetRow> {
         ],
         // ── Delete button ─────────────────────────────────────────────────
         SizedBox(
-          width: 30,
-          height: 48,
+          // 40, el ancho que ya tenía: los 30 del handoff achicaban el área
+          // táctil de 1760 a 1440 px². El alto sí sube a 48.
+          width: 40,
           child: widget.onRemove != null
               ? IconButton(
                   icon: Icon(TreinoIcon.close,
                       size: 15, color: palette.textMuted),
                   tooltip: l10n.commonClose,
                   onPressed: widget.onRemove,
-                  constraints: const BoxConstraints.tightFor(
-                    width: 30,
-                    height: 48,
+                  constraints: const BoxConstraints(
+                    minWidth: 40,
+                    minHeight: 48,
                   ),
                   padding: EdgeInsets.zero,
                 )

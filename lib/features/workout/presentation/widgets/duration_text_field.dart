@@ -138,61 +138,61 @@ class _DurationTextFieldState extends State<DurationTextField> {
           ),
           const SizedBox(height: 2),
         ],
-        // Alto fijo de 48: la fila de un set mezcla este campo con
-        // [SetCellField], y dos alturas distintas en la misma fila se ven.
-        SizedBox(
-          height: 48,
-          child: TextField(
-            controller: _ctrl,
-            keyboardType: TextInputType.number,
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-              _DurationInputFormatter(),
-            ],
-            style: GoogleFonts.barlow(
-              fontSize: 16,
-              color: palette.textPrimary,
-            ),
-            decoration: InputDecoration(
-              isDense: true,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.hairline,
-              ),
-              filled: true,
-              fillColor: palette.bgCard,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-                borderSide: BorderSide(
-                  color: widget.hasError ? palette.danger : palette.border,
-                  width: widget.hasError ? 1.5 : 1.0,
-                ),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-                borderSide: BorderSide(
-                  color: widget.hasError ? palette.danger : palette.border,
-                  width: widget.hasError ? 1.5 : 1.0,
-                ),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-                borderSide: BorderSide(
-                  color: widget.hasError ? palette.danger : palette.accent,
-                  width: 1.5,
-                ),
-              ),
-            ),
-            onChanged: (raw) {
-              // The formatter has already transformed raw into "MM:SS".
-              // Re-parse seconds from the display string.
-              final parts = _ctrl.text.split(':');
-              if (parts.length == 2) {
-                final mm = int.tryParse(parts[0]) ?? 0;
-                final ss = int.tryParse(parts[1]) ?? 0;
-                widget.onChanged(mm * 60 + ss);
-              }
-            },
+        TextField(
+          controller: _ctrl,
+          keyboardType: TextInputType.number,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            _DurationInputFormatter(),
+          ],
+          style: GoogleFonts.barlow(
+            fontSize: 16,
+            color: palette.textPrimary,
           ),
+          decoration: InputDecoration(
+            isDense: true,
+            // Mismo piso de 48 que [SetCellField]: la fila de un set mezcla
+            // los dos, y dos alturas distintas se ven. Va en el decorador
+            // —no en un ConstrainedBox de afuera— para que crezca con
+            // Dynamic Type en vez de recortar el valor.
+            constraints: const BoxConstraints(minHeight: 48),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.hairline,
+            ),
+            filled: true,
+            fillColor: palette.bgCard,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              borderSide: BorderSide(
+                color: widget.hasError ? palette.danger : palette.border,
+                width: widget.hasError ? 1.5 : 1.0,
+              ),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              borderSide: BorderSide(
+                color: widget.hasError ? palette.danger : palette.border,
+                width: widget.hasError ? 1.5 : 1.0,
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              borderSide: BorderSide(
+                color: widget.hasError ? palette.danger : palette.accent,
+                width: 1.5,
+              ),
+            ),
+          ),
+          onChanged: (raw) {
+            // The formatter has already transformed raw into "MM:SS".
+            // Re-parse seconds from the display string.
+            final parts = _ctrl.text.split(':');
+            if (parts.length == 2) {
+              final mm = int.tryParse(parts[0]) ?? 0;
+              final ss = int.tryParse(parts[1]) ?? 0;
+              widget.onChanged(mm * 60 + ss);
+            }
+          },
         ),
       ],
     );

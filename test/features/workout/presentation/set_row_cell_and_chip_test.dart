@@ -30,6 +30,9 @@ int _maxChannelDelta(Color a, Color b) {
   return d.reduce((x, y) => x > y ? x : y);
 }
 
+void _noop() {}
+void _noopInt(int? _) {}
+
 void main() {
   const paletas = <String, AppPalette>{
     'dark': AppPalette.mintMagenta,
@@ -163,7 +166,7 @@ void main() {
       expect(tester.getSize(find.byType(SetCellField)).height, 48.0);
     });
 
-    testWidgets('SetTypeChip mide 48 dp de alto', (tester) async {
+    testWidgets('SetTypeChip mide 48 dp de alto y 44 de ancho', (tester) async {
       const palette = AppPalette.mintMagenta;
       await tester.pumpWidget(_host(
         palette,
@@ -175,7 +178,59 @@ void main() {
           onTap: () {},
         ),
       ));
-      expect(tester.getSize(find.byType(SetTypeChip)).height, 48.0);
+      final size = tester.getSize(find.byType(SetTypeChip));
+      expect(size.height, 48.0);
+      // 44 y no los 34 del handoff: el chip se toca en cada set, y 34 bajaba
+      // el área táctil por debajo de la que ya tenía.
+      expect(size.width, 44.0);
+    });
+
+    testWidgets('con Dynamic Type grande el contenido crece, no se recorta',
+        (tester) async {
+      const palette = AppPalette.mintMagenta;
+      final ctrl = TextEditingController();
+      addTearDown(ctrl.dispose);
+
+      // 2x es el escalón alto de accesibilidad en iOS y Android.
+      await tester.pumpWidget(MaterialApp(
+        theme: ThemeData(extensions: const [palette]),
+        home: MediaQuery(
+          data: const MediaQueryData(textScaler: TextScaler.linear(2.0)),
+          child: Scaffold(
+            body: Row(
+              children: [
+                const SetTypeChip(
+                  label: '1',
+                  type: SetType.normal,
+                  palette: palette,
+                  semanticsLabel: 'set 1',
+                  onTap: _noop,
+                ),
+                Expanded(
+                  child: SetCellField(
+                    controller: ctrl,
+                    palette: palette,
+                    hint: 'reps',
+                    onChanged: _noopInt,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ));
+
+      expect(tester.takeException(), isNull);
+      // El piso de 48 se respeta y el alto CRECE en vez de recortar: con un
+      // `height: 48` rígido el texto escalado quedaba cortado.
+      expect(
+        tester.getSize(find.byType(SetCellField)).height,
+        greaterThanOrEqualTo(48.0),
+      );
+      expect(
+        tester.getSize(find.byType(SetTypeChip)).height,
+        greaterThanOrEqualTo(48.0),
+      );
     });
   });
 
