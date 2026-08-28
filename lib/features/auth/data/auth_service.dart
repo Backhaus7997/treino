@@ -1,3 +1,4 @@
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart' show PlatformException;
 import 'package:google_sign_in/google_sign_in.dart';
@@ -12,12 +13,30 @@ class AuthService {
   AuthService({
     required FirebaseAuth firebaseAuth,
     required UserRepository userRepository,
+    FirebaseFunctions? functions,
     GoogleSignIn? googleSignIn,
     AppleSignInGateway appleGateway = const RealAppleSignInGateway(),
   })  : _auth = firebaseAuth,
         _userRepository = userRepository,
+        _injectedFunctions = functions,
         _googleSignIn = googleSignIn ?? GoogleSignIn.instance,
         _appleGateway = appleGateway;
+
+  /// La misma región de todas las CFs de TREINO. Si no coincide, la llamada
+  /// sale a `us-central1` y devuelve NOT_FOUND.
+  static const _functionsRegion = 'southamerica-east1';
+
+  final FirebaseFunctions? _injectedFunctions;
+
+  /// Perezoso A PROPÓSITO. `FirebaseFunctions.instanceFor` resuelve la app
+  /// `[DEFAULT]` en el acto, así que construirlo en la lista de
+  /// inicialización ataba la CONSTRUCCIÓN de `AuthService` a que
+  /// `Firebase.initializeApp()` ya hubiera terminado — incluso para los
+  /// caminos que nunca mandan un mail (reauth, signOut, cancelOnboarding).
+  /// El provider de Riverpod lo arma eager, así que eso convertía un detalle
+  /// del canal de mails en una precondición de toda la capa de auth.
+  late final FirebaseFunctions _functions = _injectedFunctions ??
+      FirebaseFunctions.instanceFor(region: _functionsRegion);
 
   final FirebaseAuth _auth;
   final UserRepository _userRepository;
@@ -48,12 +67,21 @@ class AuthService {
     final user = cred.user!;
 
     try {
-      // Verification is best-effort: a quota/rate-limit failure here must NOT
-      // orphan the freshly created Auth user. The user can re-send later via
+      // Verification is best-effort: a failure here must NOT orphan the
+      // freshly created Auth user. The user can re-send later via
       // [sendEmailVerification] from the verify-email screen.
+      //
+      // El catch es a TODO a propósito, y el `on FirebaseAuthException` de
+      // antes ya se quedaba corto: el `catch` de rollback vive adentro del
+      // try de `getOrCreate`, así que cualquier excepción que se escape de
+      // acá saltea la creación del perfil Y el rollback. El usuario queda en
+      // Auth, sin doc en Firestore y sin nadie que lo limpie. Con el mail
+      // saliendo por un callable la superficie se ensancha
+      // (FirebaseFunctionsException, AuthFailure, red), así que el catch
+      // tiene que cubrir lo que el comentario ya prometía.
       try {
-        await user.sendEmailVerification();
-      } on FirebaseAuthException catch (_) {
+        await sendEmailVerification();
+      } catch (_) {
         // Swallow — signup continues; verification can be resent.
       }
 
@@ -117,23 +145,50 @@ class AuthService {
     return user;
   }
 
-  /// Throws [AuthFailure]; the screen treats userNotFound as success (REQ-AUTH-011).
+  /// Pide el mail de reseteo a la CF `requestPasswordReset`.
+  ///
+  /// Ya NO llama a `FirebaseAuth.sendPasswordResetEmail`. El servidor manda el
+  /// mail por Resend, con el dominio de TREINO — el de Firebase salía de
+  /// `noreply@treino-dev.firebaseapp.com` y caía en spam.
+  ///
+  /// Y hace algo que el SDK no puede: si la cuenta no tiene contraseña porque
+  /// se creó con Google o Apple, manda un mail distinto explicando cómo entrar,
+  /// en vez de un link de reseteo que no aplica. Antes ese caso no producía
+  /// NADA — ni mail ni error — y el usuario quedaba sin salida ni señal.
+  ///
+  /// La respuesta es uniforme para las tres ramas (existe con contraseña,
+  /// existe federada, no existe), así que la anti-enumeración de REQ-AUTH-011
+  /// se sostiene del lado del servidor y no depende de esta pantalla.
+  ///
+  /// Throws [AuthFailure] sólo si la llamada misma falla (red, backend caído).
+  /// Nunca por el estado de la cuenta.
   Future<void> sendPasswordResetEmail({required String email}) async {
     try {
-      await _auth.sendPasswordResetEmail(email: email);
-    } on FirebaseAuthException catch (e) {
-      throw AuthFailure.fromFirebase(e);
+      final callable = _functions.httpsCallable('requestPasswordReset');
+      await callable.call<Map<String, dynamic>>({'email': email});
+    } on FirebaseFunctionsException catch (e) {
+      throw AuthFailure.unknown(e.code);
+    } catch (e) {
+      throw const AuthFailure.unknown('reset-request-failed');
     }
   }
 
-  /// Sends verification email for the currently signed-in user. No-op if signed out.
+  /// Pide el mail de verificación a la CF `requestEmailVerification`.
+  ///
+  /// No-op si no hay sesión: el callable exige `request.auth`, así que sin
+  /// usuario la llamada moriría con `unauthenticated`. Se corta antes.
+  ///
+  /// Igual que el reseteo, el mail sale por Resend con el dominio propio en
+  /// vez de las plantillas de Firebase.
   Future<void> sendEmailVerification() async {
-    final user = _auth.currentUser;
-    if (user == null) return;
+    if (_auth.currentUser == null) return;
     try {
-      await user.sendEmailVerification();
-    } on FirebaseAuthException catch (e) {
-      throw AuthFailure.fromFirebase(e);
+      final callable = _functions.httpsCallable('requestEmailVerification');
+      await callable.call<Map<String, dynamic>>(<String, dynamic>{});
+    } on FirebaseFunctionsException catch (e) {
+      throw AuthFailure.unknown(e.code);
+    } catch (e) {
+      throw const AuthFailure.unknown('verification-request-failed');
     }
   }
 

@@ -1,3 +1,4 @@
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,6 +12,13 @@ import 'package:treino/features/profile/domain/user_role.dart';
 
 // --- Mocks ---
 class MockFirebaseAuth extends Mock implements FirebaseAuth {}
+
+class MockFirebaseFunctions extends Mock implements FirebaseFunctions {}
+
+class MockHttpsCallable extends Mock implements HttpsCallable {}
+
+class MockCallableResult extends Mock
+    implements HttpsCallableResult<Map<String, dynamic>> {}
 
 class MockUserCredential extends Mock implements UserCredential {}
 
@@ -44,6 +52,8 @@ void main() {
   });
 
   late MockFirebaseAuth fbAuth;
+  late MockFirebaseFunctions functions;
+  late MockHttpsCallable callable;
   late MockUserCredential cred;
   late MockUser user;
   late MockUserRepository mockRepo;
@@ -79,9 +89,22 @@ void main() {
       ),
     ).thenAnswer((_) async {});
 
+    // El mail de verificacion ya no sale por `user.sendEmailVerification()`:
+    // sale por el callable `requestEmailVerification`, que lo encola en el
+    // outbox y lo manda por Resend. El doble tiene que existir aca porque
+    // signUpWithEmail lo llama en el camino feliz.
+    functions = MockFirebaseFunctions();
+    callable = MockHttpsCallable();
+    when(() => functions.httpsCallable(any())).thenReturn(callable);
+    when(() => callable.call<Map<String, dynamic>>(any()))
+        .thenAnswer((_) async => MockCallableResult());
+    // El callable exige auth; despues del alta el usuario YA esta firmado.
+    when(() => fbAuth.currentUser).thenReturn(user);
+
     sut = AuthService(
       firebaseAuth: fbAuth,
       userRepository: mockRepo,
+      functions: functions,
       googleSignIn: googleSignIn,
     );
   });
@@ -99,7 +122,6 @@ void main() {
           password: any(named: 'password'),
         ),
       ).thenAnswer((_) async => cred);
-      when(() => user.sendEmailVerification()).thenAnswer((_) async {});
 
       final result = await sut.signUpWithEmail(
         email: 'a@b.c',
@@ -107,7 +129,8 @@ void main() {
       );
 
       expect(result, user);
-      verify(() => user.sendEmailVerification()).called(1);
+      verify(() => functions.httpsCallable('requestEmailVerification'))
+          .called(1);
     });
 
     test('D03 — signUp never calls updateDisplayName (deferred to Etapa 6)',
@@ -118,7 +141,6 @@ void main() {
           password: any(named: 'password'),
         ),
       ).thenAnswer((_) async => cred);
-      when(() => user.sendEmailVerification()).thenAnswer((_) async {});
 
       await sut.signUpWithEmail(email: 'a@b.c', password: 'Pass1234');
 
@@ -150,12 +172,14 @@ void main() {
           password: any(named: 'password'),
         ),
       ).thenAnswer((_) async => cred);
-      when(() => user.sendEmailVerification()).thenAnswer((_) async {});
 
       await sut.signUpWithEmail(email: 'a@b.c', password: 'Pass1234');
 
       verifyNever(() => user.updateDisplayName(any()));
-      verify(() => user.sendEmailVerification()).called(1);
+      verify(() => functions.httpsCallable('requestEmailVerification'))
+          .called(1);
+      // Y nunca por el camino viejo, que mandaba el mail de Firebase.
+      verifyNever(() => user.sendEmailVerification());
       verify(
         () => mockRepo.getOrCreate(
           uid: any(named: 'uid'),
@@ -178,7 +202,6 @@ void main() {
           password: any(named: 'password'),
         ),
       ).thenAnswer((_) async => cred);
-      when(() => user.sendEmailVerification()).thenAnswer((_) async {});
 
       await sut.signUpWithEmail(email: 'a@b.c', password: 'Pass1234');
 
@@ -202,7 +225,6 @@ void main() {
           password: any(named: 'password'),
         ),
       ).thenAnswer((_) async => cred);
-      when(() => user.sendEmailVerification()).thenAnswer((_) async {});
       when(() => user.delete()).thenAnswer((_) async {});
       when(
         () => mockRepo.getOrCreate(
@@ -252,7 +274,6 @@ void main() {
           password: any(named: 'password'),
         ),
       ).thenAnswer((_) async => cred);
-      when(() => user.sendEmailVerification()).thenAnswer((_) async {});
       when(() => user.delete()).thenThrow(Exception('delete failed'));
       when(
         () => mockRepo.getOrCreate(
@@ -461,24 +482,59 @@ void main() {
   // ---------------------------------------------------------------------------
   group('AuthService.sendPasswordResetEmail', () {
     test('scenario 10.2 — completes without error on happy path', () async {
-      when(
-        () => fbAuth.sendPasswordResetEmail(email: any(named: 'email')),
-      ).thenAnswer((_) async {});
-
       await expectLater(
         sut.sendPasswordResetEmail(email: 'a@b.c'),
         completes,
       );
     });
 
-    test('maps user-not-found to userNotFound (screen masks this)', () async {
-      when(
+    test('el pedido sale por el callable, no por Firebase Auth', () async {
+      await sut.sendPasswordResetEmail(email: 'a@b.c');
+
+      verify(() => functions.httpsCallable('requestPasswordReset')).called(1);
+      // El camino viejo mandaba el mail de Firebase, que cae en spam y no
+      // sabe distinguir una cuenta federada de una con contraseña.
+      verifyNever(
         () => fbAuth.sendPasswordResetEmail(email: any(named: 'email')),
-      ).thenThrow(FirebaseAuthException(code: 'user-not-found'));
+      );
+    });
+
+    test('manda el email tal como se lo pasaron; normalizar es del server',
+        () async {
+      await sut.sendPasswordResetEmail(email: 'a@b.c');
+
+      final params = verify(
+        () => callable.call<Map<String, dynamic>>(captureAny()),
+      ).captured.single as Map<String, dynamic>;
+
+      expect(params['email'], 'a@b.c');
+    });
+
+    // ── REQ-AUTH-011 — anti-enumeración ─────────────────────────────────────
+    //
+    // Antes esto mapeaba `user-not-found` a `AuthFailure.userNotFound`, y la
+    // pantalla tenía que ENMASCARAR ese resultado para no delatar qué mails
+    // están registrados. Una máscara es una defensa que se puede olvidar de
+    // poner: cualquier otro caller del servicio veía la diferencia.
+    //
+    // Ahora el callable devuelve lo MISMO exista o no la cuenta, así que no
+    // hay nada que enmascarar. Este test fija esa propiedad en el cliente: un
+    // mail que no existe no se distingue de uno que sí.
+    test('una cuenta inexistente no se distingue de una existente', () async {
+      await expectLater(
+        sut.sendPasswordResetEmail(email: 'notexist@b.c'),
+        completes,
+      );
+    });
+
+    test('un fallo real del callable sí propaga como AuthFailure', () async {
+      when(() => callable.call<Map<String, dynamic>>(any())).thenThrow(
+        FirebaseFunctionsException(code: 'unavailable', message: 'down'),
+      );
 
       expect(
-        () => sut.sendPasswordResetEmail(email: 'notexist@b.c'),
-        throwsA(const AuthFailure.userNotFound()),
+        () => sut.sendPasswordResetEmail(email: 'a@b.c'),
+        throwsA(const AuthFailure.unknown('unavailable')),
       );
     });
   });
@@ -727,13 +783,24 @@ void main() {
   // sendEmailVerification
   // ---------------------------------------------------------------------------
   group('AuthService.sendEmailVerification', () {
-    test('scenario 14.1 — calls user.sendEmailVerification', () async {
+    test('scenario 14.1 — pide el reenvío por el callable', () async {
       when(() => fbAuth.currentUser).thenReturn(user);
-      when(() => user.sendEmailVerification()).thenAnswer((_) async {});
 
       await sut.sendEmailVerification();
 
-      verify(() => user.sendEmailVerification()).called(1);
+      verify(() => functions.httpsCallable('requestEmailVerification'))
+          .called(1);
+      verifyNever(() => user.sendEmailVerification());
+    });
+
+    // El callable exige `request.auth`: sin sesión la llamada volvería
+    // `unauthenticated`. Cortar acá evita el round-trip y el error inútil.
+    test('sin sesión no llega a llamar al callable', () async {
+      when(() => fbAuth.currentUser).thenReturn(null);
+
+      await sut.sendEmailVerification();
+
+      verifyNever(() => functions.httpsCallable(any()));
     });
 
     test('no-op when no current user', () async {

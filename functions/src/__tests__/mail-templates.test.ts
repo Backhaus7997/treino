@@ -22,6 +22,7 @@ import {
 
 const ALL_KINDS: MailKind[] = [
   "password-reset",
+  "federated-signin-hint",
   "email-verification",
   "appointment-confirmed",
   "appointment-series-created",
@@ -203,6 +204,37 @@ describe("plantillas de auth: el action link llega entero", () => {
       actionLink: "https://x.test/?a=\"><script>alert(1)</script>",
     });
     expect(out.html).not.toContain("<script>");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// El hint para cuentas sin contraseña
+// ---------------------------------------------------------------------------
+describe("plantilla federated-signin-hint", () => {
+  const out = () => renderMail("federated-signin-hint", {});
+
+  // No hay contraseña que restablecer: un link acá sería mentira.
+  it("no lleva ningún link de action", () => {
+    expect(out().html).not.toContain("oobCode");
+    expect(out().html).not.toContain("__/auth/action");
+  });
+
+  it("dice cómo entrar, sin nombrar al usuario", () => {
+    const plano = out().text.toLowerCase();
+
+    expect(plano).toContain("google");
+    // Nunca una dirección: el mail llega al buzón, no hace falta repetirla.
+    expect(plano).not.toContain("@");
+  });
+
+  // Aunque el usuario no pidió esto, reconoce el pedido que sí hizo. Un mail
+  // que ignora lo que la persona acaba de hacer se lee como no relacionado.
+  it("reconoce el pedido de reseteo que lo originó", () => {
+    expect(out().text.toLowerCase()).toContain("contraseña");
+  });
+
+  it("manda a la landing, que sirve para cualquier rol", () => {
+    expect(out().html).toContain("https://gettreino.com");
   });
 });
 
