@@ -148,6 +148,9 @@ List<Override> _overrides({
 
 /// Adds "Press de Banca" to the first day via the exercise picker.
 Future<void> _addBenchPress(WidgetTester tester) async {
+  // Si venimos de una operación de semana, la hoja puede estar abierta y es
+  // modal: taparía el botón de agregar ejercicio.
+  await cerrarDatosDelPlan(tester);
   await desplazarHastaAgregarEjercicio(tester);
   await tester.tap(find.text('Agregar ejercicio'));
   await tester.pumpAndSettle();
@@ -191,6 +194,13 @@ Future<void> _replaceFieldText(
 }
 
 Future<void> _tapByKey(WidgetTester tester, String key) async {
+  // Los controles de semana se mudaron a la hoja "DATOS DEL PLAN" (#866).
+  // Acá NO se cierra: los tests que llegan por este camino siguen con el
+  // diálogo de confirmación, que se abre encima de la hoja.
+  const deLaHoja = ['week_', 'add_week', 'remove_week', 'duplicate_week'];
+  if (deLaHoja.any(key.startsWith)) {
+    await abrirDatosDelPlan(tester);
+  }
   final finder = find.byKey(Key(key));
   if (finder.evaluate().isEmpty) {
     // The editor ListView inflates children lazily — after ensureVisible
@@ -205,18 +215,41 @@ Future<void> _tapByKey(WidgetTester tester, String key) async {
   await tester.pumpAndSettle();
 }
 
+/// Igual que [_tapByKey] pero para los controles de SEMANA, que desde #866
+/// viven en la hoja "DATOS DEL PLAN" detrás del engranaje.
+Future<void> _tapWeekKey(WidgetTester tester, String key) async {
+  await abrirDatosDelPlan(tester);
+  // La hoja tiene su propio ListView: con todos los campos del plan, los
+  // controles de semana quedan abajo del pliegue y no se construyen.
+  await desplazarHasta(tester, find.byKey(Key(key)));
+  await tester.tap(find.byKey(Key(key)));
+  await tester.pumpAndSettle();
+  // Cerrar es parte de la operación: la hoja es modal y tapa la pantalla, así
+  // que dejarla abierta rompe todo lo que el test haga después. Reabrirla en
+  // la siguiente operación de semana cuesta un tap.
+  await cerrarDatosDelPlan(tester);
+}
+
 /// Taps "Duplicar semana" and confirms the dialog that follows.
 /// Replaces every raw `_tapByKey(tester, 'duplicate_week_button')` call so
 /// tests go through the confirmation step (Tarea 3).
 Future<void> _tapDuplicateWeek(WidgetTester tester) async {
-  await _tapByKey(tester, 'duplicate_week_button');
-  // The dialog is now open — tap Confirmar.
+  // No pasa por _tapWeekKey: éste abre un diálogo ENCIMA de la hoja, y hay
+  // que confirmarlo antes de cerrarla.
+  await abrirDatosDelPlan(tester);
+  await tester.tap(find.byKey(const Key('duplicate_week_button')));
+  await tester.pumpAndSettle();
   await tester.tap(find.byKey(const Key('duplicate_week_confirm_button')));
   await tester.pumpAndSettle();
+  await cerrarDatosDelPlan(tester);
 }
 
-bool _textButtonEnabled(WidgetTester tester, String key) =>
-    tester.widget<TextButton>(find.byKey(Key(key))).onPressed != null;
+/// Los botones de semana viven en la hoja: hay que abrirla antes de mirarlos.
+Future<bool> _weekButtonEnabled(WidgetTester tester, String key) async {
+  await abrirDatosDelPlan(tester);
+  await desplazarHasta(tester, find.byKey(Key(key)));
+  return tester.widget<TextButton>(find.byKey(Key(key))).onPressed != null;
+}
 
 // ── Record helper for the weekly bridge ───────────────────────────────────────
 
@@ -263,17 +296,28 @@ void main() {
       overrides: _overrides(),
     );
 
+    await abrirDatosDelPlan(tester);
+
     expect(find.byKey(const Key('week_tab_0')), findsOneWidget);
+
+    await cerrarDatosDelPlan(tester);
+    await abrirDatosDelPlan(tester);
     expect(find.byKey(const Key('week_tab_1')), findsNothing);
-    expect(_textButtonEnabled(tester, 'add_week_button'), isTrue);
+    await cerrarDatosDelPlan(tester);
+    expect(await _weekButtonEnabled(tester, 'add_week_button'), isTrue);
 
     for (var i = 0; i < 15; i++) {
-      await _tapByKey(tester, 'add_week_button');
+      await _tapWeekKey(tester, 'add_week_button');
     }
 
+    await abrirDatosDelPlan(tester);
     expect(find.byKey(const Key('week_tab_15')), findsOneWidget);
+
+    await cerrarDatosDelPlan(tester);
+    await abrirDatosDelPlan(tester);
     expect(find.byKey(const Key('week_tab_16')), findsNothing);
-    expect(_textButtonEnabled(tester, 'add_week_button'), isFalse,
+    await cerrarDatosDelPlan(tester);
+    expect(await _weekButtonEnabled(tester, 'add_week_button'), isFalse,
         reason: '"+ Semana" must be disabled at the 16-week cap');
   });
 
@@ -288,20 +332,28 @@ void main() {
       overrides: _overrides(),
     );
 
-    expect(_textButtonEnabled(tester, 'remove_week_button'), isFalse,
+    expect(await _weekButtonEnabled(tester, 'remove_week_button'), isFalse,
         reason: '"Quitar última" must be disabled at numWeeks == 1');
 
-    await _tapByKey(tester, 'add_week_button');
-    await _tapByKey(tester, 'add_week_button');
+    await _tapWeekKey(tester, 'add_week_button');
+    await _tapWeekKey(tester, 'add_week_button');
+    await abrirDatosDelPlan(tester);
     expect(find.byKey(const Key('week_tab_2')), findsOneWidget);
+    await cerrarDatosDelPlan(tester);
 
-    await _tapByKey(tester, 'remove_week_button');
+    await _tapWeekKey(tester, 'remove_week_button');
+    await abrirDatosDelPlan(tester);
     expect(find.byKey(const Key('week_tab_2')), findsNothing);
+    await cerrarDatosDelPlan(tester);
+    await abrirDatosDelPlan(tester);
     expect(find.byKey(const Key('week_tab_1')), findsOneWidget);
+    await cerrarDatosDelPlan(tester);
 
-    await _tapByKey(tester, 'remove_week_button');
+    await _tapWeekKey(tester, 'remove_week_button');
+    await abrirDatosDelPlan(tester);
     expect(find.byKey(const Key('week_tab_1')), findsNothing);
-    expect(_textButtonEnabled(tester, 'remove_week_button'), isFalse);
+    await cerrarDatosDelPlan(tester);
+    expect(await _weekButtonEnabled(tester, 'remove_week_button'), isFalse);
   });
 
   // ── Task 2.11 — tab switch shows per-week data ────────────────────────────
@@ -319,17 +371,17 @@ void main() {
     await _fillVisibleReps(tester, '8');
 
     // Add week — jumps to the new empty week: week 0 data must not leak in.
-    await _tapByKey(tester, 'add_week_button');
+    await _tapWeekKey(tester, 'add_week_button');
     expect(find.text('8'), findsNothing,
         reason: 'a freshly added week starts empty (ADR-PB-04)');
 
     await _fillVisibleReps(tester, '12');
 
-    await _tapByKey(tester, 'week_tab_0');
+    await _tapWeekKey(tester, 'week_tab_0');
     expect(find.text('8'), findsOneWidget);
     expect(find.text('12'), findsNothing);
 
-    await _tapByKey(tester, 'week_tab_1');
+    await _tapWeekKey(tester, 'week_tab_1');
     expect(find.text('12'), findsOneWidget);
     expect(find.text('8'), findsNothing);
   });
@@ -347,12 +399,12 @@ void main() {
     );
 
     // Disabled on week 0 — there is no previous week to copy.
-    expect(_textButtonEnabled(tester, 'duplicate_week_button'), isFalse);
+    expect(await _weekButtonEnabled(tester, 'duplicate_week_button'), isFalse);
 
     await _addBenchPress(tester);
     await _fillVisibleReps(tester, '8');
 
-    await _tapByKey(tester, 'add_week_button');
+    await _tapWeekKey(tester, 'add_week_button');
     expect(find.text('8'), findsNothing);
 
     await _tapDuplicateWeek(tester);
@@ -361,7 +413,7 @@ void main() {
 
     // Deep-copy independence: editing the copy leaves the source intact.
     await _replaceFieldText(tester, '8', '10');
-    await _tapByKey(tester, 'week_tab_0');
+    await _tapWeekKey(tester, 'week_tab_0');
     expect(find.text('8'), findsOneWidget);
     expect(find.text('10'), findsNothing);
   });
@@ -379,7 +431,7 @@ void main() {
 
     await _addBenchPress(tester);
     await _fillVisibleReps(tester, '8');
-    await _tapByKey(tester, 'add_week_button');
+    await _tapWeekKey(tester, 'add_week_button');
     // At week 2 (0-based index 1): dialog should say "Semana 1 → Semana 2".
     await _tapByKey(tester, 'duplicate_week_button');
 
@@ -404,7 +456,7 @@ void main() {
 
     await _addBenchPress(tester);
     await _fillVisibleReps(tester, '8');
-    await _tapByKey(tester, 'add_week_button');
+    await _tapWeekKey(tester, 'add_week_button');
     // Tap button → dialog → confirm.
     await _tapByKey(tester, 'duplicate_week_button');
     expect(find.text('Se copiará la Semana 1 en la Semana 2.'), findsOneWidget);
@@ -430,28 +482,28 @@ void main() {
     await _fillVisibleReps(tester, '8');
 
     // Add an empty week (jumps to week 2) and duplicate week 1 into it.
-    await _tapByKey(tester, 'add_week_button');
+    await _tapWeekKey(tester, 'add_week_button');
     await _tapDuplicateWeek(tester);
     expect(find.text('8'), findsOneWidget,
         reason: 'duplicate must seed week 2 with week 1\'s reps');
 
     // Bounce between tabs BEFORE editing — this is what the coach does on the
     // device and it exercises the late-final controller + ObjectKey State path.
-    await _tapByKey(tester, 'week_tab_0');
-    await _tapByKey(tester, 'week_tab_1');
+    await _tapWeekKey(tester, 'week_tab_0');
+    await _tapWeekKey(tester, 'week_tab_1');
 
     // Now edit week 2's reps via the actual TextField (enterText), 8 -> 12.
     await _replaceFieldText(tester, '8', '12');
 
     // Week 1 MUST still read 8 — the edit belongs to week 2 only.
-    await _tapByKey(tester, 'week_tab_0');
+    await _tapWeekKey(tester, 'week_tab_0');
     expect(find.text('8'), findsOneWidget,
         reason: 'editing week 2 leaked into week 1 — periodization broken');
     expect(find.text('12'), findsNothing,
         reason: 'week 1 must not show week 2\'s value');
 
     // And week 2 keeps the edit.
-    await _tapByKey(tester, 'week_tab_1');
+    await _tapWeekKey(tester, 'week_tab_1');
     expect(find.text('12'), findsOneWidget);
     expect(find.text('8'), findsNothing);
   });
@@ -479,7 +531,7 @@ void main() {
 
     await _addBenchPress(tester);
     await _fillVisibleReps(tester, '8');
-    await _tapByKey(tester, 'add_week_button');
+    await _tapWeekKey(tester, 'add_week_button');
     await _tapDuplicateWeek(tester);
 
     await tester.tap(find.widgetWithText(ElevatedButton, 'ASIGNAR PLAN'));
@@ -499,14 +551,18 @@ void main() {
       overrides: _overrides(repo: repo, uid: 'trainer-1'),
     );
 
+    await abrirDatosDelPlan(tester);
+
     expect(find.byKey(const Key('week_tab_1')), findsOneWidget);
+
+    await cerrarDatosDelPlan(tester);
     await desplazarHasta(tester, find.text('8'));
     expect(find.text('8'), findsOneWidget); // week 0
 
     // Edit week 2 to 20 and verify isolation after reload.
-    await _tapByKey(tester, 'week_tab_1');
+    await _tapWeekKey(tester, 'week_tab_1');
     await _replaceFieldText(tester, '8', '20');
-    await _tapByKey(tester, 'week_tab_0');
+    await _tapWeekKey(tester, 'week_tab_0');
     expect(find.text('8'), findsOneWidget,
         reason: 'reloaded week 1 must keep 8 after editing week 2');
     expect(find.text('20'), findsNothing);
@@ -527,7 +583,7 @@ void main() {
     await _tapByKey(tester, 'add_set_button');
     expect(find.text('8'), findsNWidgets(2));
 
-    await _tapByKey(tester, 'add_week_button');
+    await _tapWeekKey(tester, 'add_week_button');
     await _tapDuplicateWeek(tester);
     expect(find.text('8'), findsNWidgets(2),
         reason: 'duplicate copies both sets');
@@ -535,7 +591,7 @@ void main() {
     // Change the FIRST set of week 2 to 5.
     await _replaceFieldText(tester, '8', '5');
 
-    await _tapByKey(tester, 'week_tab_0');
+    await _tapWeekKey(tester, 'week_tab_0');
     expect(find.text('8'), findsNWidgets(2),
         reason: 'week 1 keeps both original sets at 8');
     expect(find.text('5'), findsNothing);
@@ -552,15 +608,15 @@ void main() {
 
     await _addBenchPress(tester);
     await _fillVisibleReps(tester, '8');
-    await _tapByKey(tester, 'add_week_button');
+    await _tapWeekKey(tester, 'add_week_button');
     await _tapDuplicateWeek(tester);
 
     // Go back to week 1 and change it to 3.
-    await _tapByKey(tester, 'week_tab_0');
+    await _tapWeekKey(tester, 'week_tab_0');
     await _replaceFieldText(tester, '8', '3');
 
     // Week 2 must still be 8.
-    await _tapByKey(tester, 'week_tab_1');
+    await _tapWeekKey(tester, 'week_tab_1');
     expect(find.text('8'), findsOneWidget,
         reason: 'editing week 1 leaked into the duplicated week 2');
     expect(find.text('3'), findsNothing);
@@ -592,7 +648,7 @@ void main() {
     // edit week 2 to 12 — the exact device flow that produced the bug report.
     await _addBenchPress(tester);
     await _fillVisibleReps(tester, '8');
-    await _tapByKey(tester, 'add_week_button');
+    await _tapWeekKey(tester, 'add_week_button');
     await _tapDuplicateWeek(tester);
     await _replaceFieldText(tester, '8', '12');
 
@@ -647,18 +703,22 @@ void main() {
       overrides: _overrides(repo: repo, uid: 'trainer-1'),
     );
 
+    await abrirDatosDelPlan(tester);
+
     expect(find.byKey(const Key('week_tab_1')), findsOneWidget);
+
+    await cerrarDatosDelPlan(tester);
     await desplazarHasta(tester, find.text('8'));
     expect(find.text('8'), findsOneWidget); // week 0 on load
     expect(find.text('12'), findsNothing);
 
-    await _tapByKey(tester, 'week_tab_1');
+    await _tapWeekKey(tester, 'week_tab_1');
     expect(find.text('12'), findsOneWidget);
     expect(find.text('8'), findsNothing);
 
     // Editing the deserialized week 2 must not leak into week 1.
     await _replaceFieldText(tester, '12', '20');
-    await _tapByKey(tester, 'week_tab_0');
+    await _tapWeekKey(tester, 'week_tab_0');
     expect(find.text('8'), findsOneWidget,
         reason: 'after a real round-trip, editing week 2 leaked into week 1');
     expect(find.text('20'), findsNothing);
@@ -677,14 +737,14 @@ void main() {
     await _addBenchPress(tester);
     await _fillVisibleReps(tester, '8');
 
-    await _tapByKey(tester, 'add_week_button');
+    await _tapWeekKey(tester, 'add_week_button');
     await _fillVisibleReps(tester, '12');
     await _replaceFieldText(tester, '12', '15');
 
-    await _tapByKey(tester, 'week_tab_0');
+    await _tapWeekKey(tester, 'week_tab_0');
     expect(find.text('8'), findsOneWidget);
 
-    await _tapByKey(tester, 'week_tab_1');
+    await _tapWeekKey(tester, 'week_tab_1');
     expect(find.text('15'), findsOneWidget);
   });
 
@@ -714,11 +774,11 @@ void main() {
 
     await _addBenchPress(tester);
     await _fillVisibleReps(tester, '8');
-    await _tapByKey(tester, 'add_week_button');
+    await _tapWeekKey(tester, 'add_week_button');
     await _fillVisibleReps(tester, '10');
-    await _tapByKey(tester, 'add_week_button');
+    await _tapWeekKey(tester, 'add_week_button');
     await _fillVisibleReps(tester, '12');
-    await _tapByKey(tester, 'add_week_button');
+    await _tapWeekKey(tester, 'add_week_button');
     await _fillVisibleReps(tester, '15');
 
     await tester.tap(find.widgetWithText(ElevatedButton, 'ASIGNAR PLAN'));
@@ -750,17 +810,21 @@ void main() {
       overrides: _overrides(repo: repo, uid: 'trainer-1'),
     );
 
+    await abrirDatosDelPlan(tester);
+
     expect(find.byKey(const Key('week_tab_3')), findsOneWidget);
+
+    await cerrarDatosDelPlan(tester);
     await desplazarHasta(tester, find.text('8'));
     expect(find.text('8'), findsOneWidget); // week 0 selected on load
 
-    await _tapByKey(tester, 'week_tab_1');
+    await _tapWeekKey(tester, 'week_tab_1');
     expect(find.text('10'), findsOneWidget);
 
-    await _tapByKey(tester, 'week_tab_2');
+    await _tapWeekKey(tester, 'week_tab_2');
     expect(find.text('12'), findsOneWidget);
 
-    await _tapByKey(tester, 'week_tab_3');
+    await _tapWeekKey(tester, 'week_tab_3');
     expect(find.text('15'), findsOneWidget);
   });
 
@@ -808,15 +872,19 @@ void main() {
     );
 
     // Single week only, prescription intact.
+    await abrirDatosDelPlan(tester);
     expect(find.byKey(const Key('week_tab_0')), findsOneWidget);
+    await cerrarDatosDelPlan(tester);
+    await abrirDatosDelPlan(tester);
     expect(find.byKey(const Key('week_tab_1')), findsNothing);
+    await cerrarDatosDelPlan(tester);
     expect(find.text('8'), findsNWidgets(2),
         reason: 'both legacy sets must hydrate into week 1');
-    expect(_textButtonEnabled(tester, 'remove_week_button'), isFalse);
+    expect(await _weekButtonEnabled(tester, 'remove_week_button'), isFalse);
 
     // Adding a week keeps week 1's original prescription untouched.
-    await _tapByKey(tester, 'add_week_button');
-    await _tapByKey(tester, 'week_tab_0');
+    await _tapWeekKey(tester, 'add_week_button');
+    await _tapWeekKey(tester, 'week_tab_0');
     expect(find.text('8'), findsNWidgets(2));
   });
 
@@ -837,12 +905,12 @@ void main() {
 
     await _addBenchPress(tester);
     await _fillVisibleReps(tester, '8');
-    await _tapByKey(tester, 'add_week_button');
+    await _tapWeekKey(tester, 'add_week_button');
     await _fillVisibleReps(tester, '10');
     // Week 3 stays empty → invalid.
-    await _tapByKey(tester, 'add_week_button');
+    await _tapWeekKey(tester, 'add_week_button');
 
-    await _tapByKey(tester, 'week_tab_0');
+    await _tapWeekKey(tester, 'week_tab_0');
 
     // UX fix: the save button is no longer hard-disabled — it is always
     // tappable and surfaces feedback on tap. The invalid week is instead
@@ -854,15 +922,19 @@ void main() {
             'button always tappable; invalid week surfaced via attribution');
 
     // Attribution: badge on Sem 3's chip + hint naming week and day.
+    await abrirDatosDelPlan(tester);
     expect(find.byKey(const Key('week_tab_warning_2')), findsOneWidget);
+    await abrirDatosDelPlan(tester);
     expect(find.byKey(const Key('week_tab_warning_0')), findsNothing);
+    await abrirDatosDelPlan(tester);
     expect(find.byKey(const Key('week_tab_warning_1')), findsNothing);
     expect(find.text('Sets incompletos en Sem 3 · Día 1'), findsOneWidget);
 
     // Fixing week 3 clears the attribution and unblocks save.
-    await _tapByKey(tester, 'week_tab_2');
+    await _tapWeekKey(tester, 'week_tab_2');
     await _fillVisibleReps(tester, '12');
-    await _tapByKey(tester, 'week_tab_0');
+    await _tapWeekKey(tester, 'week_tab_0');
+    await abrirDatosDelPlan(tester);
     expect(find.byKey(const Key('week_tab_warning_2')), findsNothing);
     final submitAfter =
         tester.widget<ElevatedButton>(find.byType(ElevatedButton));
@@ -933,13 +1005,13 @@ void main() {
     await _addBenchPress(tester);
     await _fillVisibleReps(tester, '8');
     // build a 3-week plan
-    await _tapByKey(tester, 'add_week_button');
+    await _tapWeekKey(tester, 'add_week_button');
     await _fillVisibleReps(tester, '10');
-    await _tapByKey(tester, 'add_week_button');
+    await _tapWeekKey(tester, 'add_week_button');
     await _fillVisibleReps(tester, '12');
 
     // Navigate to week 1 (index 1), then delete the slot
-    await _tapByKey(tester, 'week_tab_1');
+    await _tapWeekKey(tester, 'week_tab_1');
 
     // Open the slot menu and tap "Eliminar"
     final menuButton = find.byKey(const Key('slot_menu_button_0'));
@@ -1011,13 +1083,13 @@ void main() {
 
     await _addBenchPress(tester);
     await _fillVisibleReps(tester, '8');
-    await _tapByKey(tester, 'add_week_button');
+    await _tapWeekKey(tester, 'add_week_button');
     await _fillVisibleReps(tester, '10');
-    await _tapByKey(tester, 'add_week_button');
+    await _tapWeekKey(tester, 'add_week_button');
     await _fillVisibleReps(tester, '12');
 
     // View week 1 (index 1), delete "solo esta semana"
-    await _tapByKey(tester, 'week_tab_1');
+    await _tapWeekKey(tester, 'week_tab_1');
 
     final menuButton = find.byKey(const Key('slot_menu_button_0'));
     await tester.ensureVisible(menuButton);
@@ -1036,7 +1108,7 @@ void main() {
         reason: 'masked-out slot must be hidden in the viewed week');
 
     // ...but it was NOT structurally removed: other weeks still render it.
-    await _tapByKey(tester, 'week_tab_0');
+    await _tapWeekKey(tester, 'week_tab_0');
     expect(find.text('Press de Banca'), findsOneWidget,
         reason: 'slot must remain in the plan for other weeks');
 
@@ -1069,11 +1141,11 @@ void main() {
 
     await _addBenchPress(tester);
     await _fillVisibleReps(tester, '8');
-    await _tapByKey(tester, 'add_week_button');
+    await _tapWeekKey(tester, 'add_week_button');
     await _fillVisibleReps(tester, '10');
 
     // Go to week 1, delete "todas las semanas"
-    await _tapByKey(tester, 'week_tab_1');
+    await _tapWeekKey(tester, 'week_tab_1');
 
     final menuButton = find.byKey(const Key('slot_menu_button_0'));
     await tester.ensureVisible(menuButton);
@@ -1117,22 +1189,22 @@ void main() {
 
     await _addBenchPress(tester);
     await _fillVisibleReps(tester, '8');
-    await _tapByKey(tester, 'add_week_button');
+    await _tapWeekKey(tester, 'add_week_button');
     await _fillVisibleReps(tester, '10');
-    await _tapByKey(tester, 'add_week_button');
+    await _tapWeekKey(tester, 'add_week_button');
     await _fillVisibleReps(tester, '12');
 
     // Delete "solo esta semana" on week 0 → mask becomes [1, 2]
-    await _tapByKey(tester, 'week_tab_0');
+    await _tapWeekKey(tester, 'week_tab_0');
     await _deleteSlotThisWeek(tester, 0);
 
     // Delete "solo esta semana" on week 1 → mask becomes [2]
-    await _tapByKey(tester, 'week_tab_1');
+    await _tapWeekKey(tester, 'week_tab_1');
     await _deleteSlotThisWeek(tester, 0);
 
     // Now on week 2, the slot is present in only this week.
     // "solo esta semana" must auto-route to structural delete.
-    await _tapByKey(tester, 'week_tab_2');
+    await _tapWeekKey(tester, 'week_tab_2');
     final menuButton = find.byKey(const Key('slot_menu_button_0'));
     await tester.ensureVisible(menuButton);
     await tester.pumpAndSettle();
@@ -1165,11 +1237,11 @@ void main() {
     await tester.pumpAndSettle();
 
     // Build a 3-week plan without exercises yet
-    await _tapByKey(tester, 'add_week_button');
-    await _tapByKey(tester, 'add_week_button');
+    await _tapWeekKey(tester, 'add_week_button');
+    await _tapWeekKey(tester, 'add_week_button');
 
     // Navigate to week 2 (index 1)
-    await _tapByKey(tester, 'week_tab_1');
+    await _tapWeekKey(tester, 'week_tab_1');
 
     // Add an exercise — scope dialog must appear
     await desplazarHastaAgregarEjercicio(tester);
@@ -1208,9 +1280,9 @@ void main() {
     await tester.pumpAndSettle();
 
     // 3-week plan, navigate to week 2 (index 1)
-    await _tapByKey(tester, 'add_week_button');
-    await _tapByKey(tester, 'add_week_button');
-    await _tapByKey(tester, 'week_tab_1');
+    await _tapWeekKey(tester, 'add_week_button');
+    await _tapWeekKey(tester, 'add_week_button');
+    await _tapWeekKey(tester, 'week_tab_1');
 
     // Add exercise, choose "solo en esta semana"
     await desplazarHastaAgregarEjercicio(tester);
@@ -1262,9 +1334,9 @@ void main() {
     await tester.pumpAndSettle();
 
     // 3-week plan, navigate to week 2 (index 1)
-    await _tapByKey(tester, 'add_week_button');
-    await _tapByKey(tester, 'add_week_button');
-    await _tapByKey(tester, 'week_tab_1');
+    await _tapWeekKey(tester, 'add_week_button');
+    await _tapWeekKey(tester, 'add_week_button');
+    await _tapWeekKey(tester, 'week_tab_1');
 
     // Add exercise, choose "todas las semanas"
     await desplazarHastaAgregarEjercicio(tester);
@@ -1280,9 +1352,9 @@ void main() {
 
     // Fill reps for all weeks
     await _fillVisibleReps(tester, '10');
-    await _tapByKey(tester, 'week_tab_0');
+    await _tapWeekKey(tester, 'week_tab_0');
     await _fillVisibleReps(tester, '8');
-    await _tapByKey(tester, 'week_tab_2');
+    await _tapWeekKey(tester, 'week_tab_2');
     await _fillVisibleReps(tester, '12');
 
     await tester.tap(find.widgetWithText(ElevatedButton, 'ASIGNAR PLAN'));
@@ -1337,10 +1409,10 @@ void main() {
     await tester.pumpAndSettle();
 
     // Add a week — editor auto-navigates to the new week (index 1).
-    await _tapByKey(tester, 'add_week_button');
+    await _tapWeekKey(tester, 'add_week_button');
 
     // Switch BACK to week 0 (index 0).
-    await _tapByKey(tester, 'week_tab_0');
+    await _tapWeekKey(tester, 'week_tab_0');
 
     // Add exercise on week 0 — _promptAddScope must return allWeeks without
     // showing a dialog (ADR-WPRES-04: week 0 always broadcasts to all weeks).

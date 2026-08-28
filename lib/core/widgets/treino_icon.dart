@@ -165,6 +165,15 @@ class TreinoIcon {
   // Profile settings constant REMOVED 2026-05-28 — gear icon was removed from
   // ProfileHeader as part of the PR#4 pivot. Zero remaining usages.
 
+  /// Ajustes de un CONTENIDO, no de la app.
+  ///
+  /// Deliberadamente NO es un engranaje: el de `ProfileHeader` se sacó del kit
+  /// en 2026-05 y no conviene reintroducirlo con otro significado. Los faders
+  /// dicen "parámetros de esto que estás editando", que es lo que abre la hoja
+  /// "DATOS DEL PLAN".
+  static const IconData contentSettings =
+      PhosphorIconsRegular.slidersHorizontal;
+
   // Appearance / theme settings
   static const IconData appearance = PhosphorIconsRegular.sun;
 

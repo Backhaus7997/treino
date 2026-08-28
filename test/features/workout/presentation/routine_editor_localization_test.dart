@@ -29,6 +29,7 @@ import 'package:treino/features/workout/presentation/routine_editor_screen.dart'
 import '../../../helpers/fake_analytics_service.dart';
 import '../../../fixtures/exercises.dart';
 import 'package:treino/features/workout/presentation/widgets/day_tab_bar.dart';
+import '../../../fixtures/routine_editor_ui.dart';
 
 class _FakeRoutineRepository extends Fake implements RoutineRepository {}
 
@@ -82,6 +83,7 @@ void main() {
       await _pumpEditorEn(tester, mode: const SelfCreating());
 
       // English copy is present.
+      await abrirDatosDelPlan(tester);
       expect(find.text('WEEKS'), findsOneWidget);
       expect(find.byType(DayTabBar), findsOneWidget,
           reason: 'la barra de pestañas reemplazó al label PLAN DAYS');

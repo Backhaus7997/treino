@@ -161,6 +161,24 @@
   "@routineEditorDayTabA11y": {
     "placeholders": { "n": { "type": "int" }, "estado": { "type": "String" } }
   },
+  "routineEditorPlanSheetTitle": "DATOS DEL PLAN",
+  "@routineEditorPlanSheetTitle": {},
+  "routineEditorPlanSheetA11y": "Datos del plan",
+  "@routineEditorPlanSheetA11y": {},
+  "routineEditorSubtitleSelfPrivate": "Tu rutina · solo la ves vos",
+  "@routineEditorSubtitleSelfPrivate": {},
+  "routineEditorSubtitleSelfShared": "Tu rutina · compartida en tu perfil",
+  "@routineEditorSubtitleSelfShared": {},
+  "routineEditorSubtitleCustomizing": "Copia tuya",
+  "@routineEditorSubtitleCustomizing": {},
+  "routineEditorSubtitleAssigned": "Plan asignado",
+  "@routineEditorSubtitleAssigned": {},
+  "routineEditorSubtitleTemplate": "Plantilla reusable",
+  "@routineEditorSubtitleTemplate": {},
+  "routineEditorSubtitleWeeks": "{n, plural, =1{1 semana} other{{n} semanas}}",
+  "@routineEditorSubtitleWeeks": {
+    "placeholders": { "n": { "type": "int" } }
+  },
   "routineEditorDayName": "Día {n}",
   "routineEditorAddExercise": "Agregar ejercicio",
   "routineEditorLevelLabel": "NIVEL",
