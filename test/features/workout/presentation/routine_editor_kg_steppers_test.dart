@@ -61,6 +61,8 @@ import 'package:treino/l10n/app_l10n.dart';
 import '../../../fixtures/exercises.dart';
 import '../../../helpers/fake_analytics_service.dart';
 import '../../../fixtures/routine_editor_ui.dart';
+import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/features/workout/presentation/widgets/set_cell_field.dart';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -359,6 +361,46 @@ void main() {
   });
 
   // ── Widget: visibilidad ligada al foco ─────────────────────────────────────
+
+  group('columna de borrar', () {
+    testWidgets('con un set único no reserva ancho: los campos lo recuperan',
+        (tester) async {
+      // Reportado mirando la app en un iPhone: con un solo set la fila se
+      // veía corrida a la izquierda. La causa era un hueco de 40 px que la
+      // fila reservaba para un botón de borrar que NO existe —con un set
+      // único no se puede borrar, quedarías en cero—, más su placeholder
+      // gemelo en la fila de headers.
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById('r-1'))
+          .thenAnswer((_) async => _singleModeRoutine());
+
+      await _pumpEditor(
+        tester,
+        mode: const SelfCreating(existingRoutineId: 'r-1'),
+        repo: repo,
+      );
+
+      // La rutina viene con 2 sets: la columna existe y ocupa lugar.
+      final borrar = find.byIcon(TreinoIcon.close);
+      expect(borrar, findsNWidgets(2));
+      final anchoConColumna =
+          tester.getSize(find.byType(SetCellField).first).width;
+
+      // Bajar a un set hace desaparecer la columna entera.
+      await _tapVisible(tester, borrar.first);
+      expect(find.byIcon(TreinoIcon.close), findsNothing);
+
+      final anchoSinColumna =
+          tester.getSize(find.byType(SetCellField).first).width;
+
+      expect(
+        anchoSinColumna,
+        greaterThan(anchoConColumna),
+        reason: 'Si los dos anchos son iguales, la fila sigue reservando '
+            'espacio para un botón ausente y queda descentrada.',
+      );
+    });
+  });
 
   group('afordancia', () {
     testWidgets('no se dibuja hasta que el campo KG toma el foco',
