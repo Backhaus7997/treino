@@ -120,14 +120,24 @@ class AppPalette extends ThemeExtension<AppPalette> {
   /// (`SET`/`KG`/`REPS`), hints de campo, ayudas al pie de una sección.
   ///
   /// Sigue siendo TEXTO, así que cumple 4,5:1 contra `bg` en las dos paletas
-  /// —ver `AppColorPrimitives.white45` para la medición. No usarlo para
+  /// —ver `AppColorPrimitives.white46` para la medición. No usarlo para
   /// bordes ni rellenos: para eso están [border] y [surfaceSubtle].
   final Color textFaint;
 
   /// Sage green — secondary cards, subtle outlines.
   final Color sage;
 
-  /// Espresso — elevated surfaces, sheets.
+  /// Espresso — tono cálido de marca.
+  ///
+  /// Su dartdoc decía "elevated surfaces, sheets" hasta que [bgElevated] tomó
+  /// ese rol con un token semántico de la familia `bg`. Cuatro pantallas lo
+  /// siguen usando para superficies elevadas (`athlete_picker_sheet`,
+  /// `exercise_picker_sheet`, `location_permission_rationale_sheet`,
+  /// `exercise_detail_screen`): son anteriores y quedan como están.
+  ///
+  /// Para una superficie elevada NUEVA va [bgElevated], no este. Dos tokens
+  /// para el mismo rol con colores de familias distintas —marrón cálido vs.
+  /// ink frío— es una divergencia que hay que cerrar, no ampliar.
   final Color espresso;
 
   /// Danger red — inline error states, char-limit exceeded indicator.
@@ -167,7 +177,7 @@ class AppPalette extends ThemeExtension<AppPalette> {
     borderStrong: AppColorPrimitives.white35,
     textPrimary: AppColorPrimitives.bone,
     textMuted: AppColorPrimitives.white55,
-    textFaint: AppColorPrimitives.white45,
+    textFaint: AppColorPrimitives.white46,
     sage: AppColorPrimitives.sage500,
     espresso: AppColorPrimitives.espresso500,
     danger: AppColorPrimitives.dangerRed,
