@@ -60,6 +60,7 @@ import 'package:treino/l10n/app_l10n.dart';
 
 import '../../../fixtures/exercises.dart';
 import '../../../helpers/fake_analytics_service.dart';
+import '../../../fixtures/routine_editor_ui.dart';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -236,6 +237,10 @@ Future<void> _pumpEditor(
   await tester.pumpAndSettle();
   // Extra pump: the hydration path flips `_loading` in a post-frame setState.
   await tester.pump();
+
+  // La card de ejercicio arranca colapsada desde #864. Estos tests miran
+  // valores de sets, así que necesitan la tabla en el árbol.
+  await expandirEjercicios(tester);
 }
 
 // ── Finders ───────────────────────────────────────────────────────────────────

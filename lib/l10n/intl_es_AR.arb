@@ -1070,6 +1070,11 @@
   "@performanceChartMetricCooper": {},
   "performanceChartMetricSitAndReach": "Flexibilidad",
   "@performanceChartMetricSitAndReach": {},
+  "routineEditorSetsMissingReps": "{n, plural, =1{1 set sin reps} other{{n} sets sin reps}}",
+  "@routineEditorSetsMissingReps": {
+    "description": "Resumen de error en la cabecera colapsada de un ejercicio",
+    "placeholders": { "n": { "type": "int" } }
+  },
   "routineEditorDayName": "Día {n}",
   "@routineEditorDayName": {
     "placeholders": {

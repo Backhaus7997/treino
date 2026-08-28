@@ -69,6 +69,7 @@ import 'package:treino/features/workout/presentation/routine_editor_screen.dart'
 
 import '../../../fixtures/exercises.dart';
 import '../../../helpers/fake_analytics_service.dart';
+import '../../../fixtures/routine_editor_ui.dart';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -118,6 +119,10 @@ Future<void> _pumpEditor(
     ),
   );
   await tester.pumpAndSettle();
+
+  // La card de ejercicio arranca colapsada desde #864. Estos tests miran
+  // valores de sets, así que necesitan la tabla en el árbol.
+  await expandirEjercicios(tester);
 }
 
 List<Override> _overrides({
