@@ -365,12 +365,21 @@ Dos ramas arreglando el mismo bug es la forma más cara de perder trabajo.
 
 ```bash
 ./scripts/agent-ledger.sh claim 826 "banner de entornos en docs"
-./scripts/agent-ledger.sh release
+./scripts/agent-ledger.sh release          # sólo los claims de ESTA sesión
+./scripts/agent-ledger.sh release --all    # todo lo de este worktree
 ```
 
 El ledger vive en `.git/agent-ledger.tsv` — el único directorio que comparten
 todos los worktrees y que nunca se commitea. No lo edites a mano. Si tu
 herramienta aparece como `unknown`, exportá `AGENT_NAME` (ej. `AGENT_NAME=codex`).
+
+**La identidad de un agente es la SESIÓN, no el worktree.** Varias sesiones
+comparten árbol todo el tiempo, y mientras la identidad fue el worktree eso
+significaba dos cosas: `release` sin scope se llevaba los claims de las sesiones
+hermanas, y `check` contestaba `libre` sobre un scope que ya tenía dueño. Pasó el
+2026-08-28, con tres claims sobre el mismo `wt`. Si tu herramienta no publica un
+id de sesión, exportá `AGENT_SESSION` — sin eso, dos sesiones tuyas en el mismo
+árbol vuelven a ser indistinguibles entre sí.
 
 **c. Lo que tiene que sobrevivir a tu sesión va a un archivo del repo.**
 
