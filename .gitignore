@@ -77,3 +77,13 @@ devtools_options.yaml
 
 # Google Places keys (local, never commit)
 scripts/places.local.json
+
+# Env de Firebase Functions (convención oficial de Firebase):
+#   - `.env` y `.env.<project-id>` SÍ se versionan: son config por entorno,
+#     no secretos. Los secretos reales van a Secret Manager
+#     (`firebase functions:secrets:set`), como RESEND_API_KEY.
+#   - `.env.local` y `.env*.local` NUNCA: son overrides por máquina, y son el
+#     lugar donde termina cayendo una API key en un `git add .` distraído.
+#     Sin barra inicial: aplican en cualquier directorio del repo.
+.env.local
+.env*.local
