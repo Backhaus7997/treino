@@ -14,16 +14,18 @@
  * is left null (videos are sourced separately).
  *
  * Usage:
- *   GOOGLE_APPLICATION_CREDENTIALS=scripts/sa-key.json node scripts/import_exercises_catalog.js          # dry-run (report only)
- *   GOOGLE_APPLICATION_CREDENTIALS=scripts/sa-key.json node scripts/import_exercises_catalog.js --write   # actually write
+ *   TREINO_SA_KEY=~/.config/treino/sa-key.json node scripts/import_exercises_catalog.js          # dry-run (report only)
+ *   TREINO_SA_KEY=~/.config/treino/sa-key.json node scripts/import_exercises_catalog.js --write   # actually write
  */
 
-const admin = require('firebase-admin');
+const { inicializarAdmin } = require('./lib/admin');
 const path = require('path');
 
 const WRITE = process.argv.includes('--write');
 
-admin.initializeApp(); // GOOGLE_APPLICATION_CREDENTIALS
+// Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla cerrado
+// con la migración; contra el emulador no pide nada. Ver scripts/lib/admin.js.
+const { admin } = inicializarAdmin();
 const db = admin.firestore();
 
 const { exercises: SOURCE } = require(path.join(

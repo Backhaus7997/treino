@@ -137,7 +137,12 @@ All 4 locked decisions preserved in this archive. No deviations discovered durin
 - Status transitions validated (pending→active or pending→terminated)
 - Routine read updated for private visibility filtering
 
-**No production deploy**: `treino-prod` not updated (coach features staged to dev only; prod sync scheduled post-Etapa 3).
+~~**No production deploy**: `treino-prod` not updated (coach features staged to dev only; prod sync scheduled post-Etapa 3).~~
+
+> ⚠️ **Corregido por [#845](https://github.com/Backhaus7997/treino/issues/845) — la línea tachada arriba es lo que se registró en su momento, y era falsa.**
+> El deploy documentado tres líneas más arriba, `firebase deploy --only firestore:rules --project treino-dev`, **fue** el deploy a producción: `treino-dev` es el único proyecto Firebase de TREINO y adentro hay usuarios reales. Nunca existió un `treino-prod` al que sincronizar después, así que no hubo ni hay "prod sync post-Etapa 3" pendiente.
+> Se deja el texto original tachado porque esto es un reporte —un registro de lo que se creyó y se hizo—, no un instructivo; borrarlo escondería justamente la creencia que causó el problema (#826).
+> **Lo que sí es cierto:** las rules de `trainer_links` están activas contra usuarios reales desde el 2026-05-20.
 
 ---
 

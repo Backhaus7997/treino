@@ -19,14 +19,20 @@ const { initializeTestEnvironment, assertFails, assertSucceeds } =
 const { readFileSync } = require('fs');
 const path = require('path');
 
-// NOTE: this MUST match the emulator's configured default project
-// (`.firebaserc` -> "treino-dev") rather than an arbitrary test project id.
-// firebase.json sets `emulators.singleProjectMode: true`, which pins the
-// Storage rules' cross-service `firestore.get()` calls to the suite's
-// default project regardless of what projectId this test process requests —
-// using a different id here causes `firestore.get()` to look up the seeded
-// chat doc under the WRONG project and fail with a null-value evaluation
-// error (confirmed against a live emulator; see apply-progress notes).
+// NOTE: this MUST match the emulator's configured default project rather than
+// an arbitrary test project id. firebase.json sets
+// `emulators.singleProjectMode: true`, which pins the Storage rules'
+// cross-service `firestore.get()` calls to the suite's default project
+// regardless of what projectId this test process requests — using a different
+// id here causes `firestore.get()` to look up the seeded chat doc under the
+// WRONG project and fail with a null-value evaluation error (confirmed against
+// a live emulator; see apply-progress notes).
+//
+// De dónde sale ese default hoy (#840): del `--project treino-dev` EXPLÍCITO
+// de `scripts/test_rules.sh`, no del default de `.firebaserc` — que pasó a ser
+// `demo-treino` para que un comando sin `--project` no pueda llegar a
+// producción desde ninguno de los ~27 worktrees del repo. Si alguien saca ese
+// flag del script, esta suite es la que se cae.
 const PROJECT_ID = 'treino-dev';
 const FIRESTORE_RULES_PATH = path.resolve(__dirname, '../../firestore.rules');
 const STORAGE_RULES_PATH = path.resolve(__dirname, '../../storage.rules');

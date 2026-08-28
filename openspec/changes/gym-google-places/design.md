@@ -80,7 +80,7 @@ Split-trust Places integration mirroring the existing `add-alias.ts` pure-handle
 
 ## Migration / Rollout
 
-No data migration. Stale curated `gymId`s resolve to `null` via `_resolveGymName` (graceful). 22 seed docs + `seed_gyms.js` stay dormant. **External prerequisite (BLOCKS e2e):** enable Places API (New), Blaze billing, `firebase functions:secrets:set PLACES_API_KEY`, bundle-restricted client key, budget alert, and provide the `treino-dev` GCP project id.
+No data migration. Stale curated `gymId`s resolve to `null` via `_resolveGymName` (graceful). 22 seed docs + `seed_gyms.js` stay dormant. **External prerequisite (🚨 PRODUCTION — operator only, see proposal.md; BLOCKS e2e):** enable Places API (New), Blaze billing, `firebase functions:secrets:set PLACES_API_KEY --project prod`, bundle-restricted client key, budget alert, and provide the `treino-dev` GCP project id.
 
 ## Chained-PR Slices (each ≤~400 LOC, tests with code)
 

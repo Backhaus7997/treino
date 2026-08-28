@@ -222,7 +222,7 @@ Ninguna. No hay otras feature branches en flight que toquen `UserRepository`, `f
 
 ## Open Questions (surface to design / tasks)
 
-1. **Seeding strategy de trainers de prueba con geohash**: ¿script en `tool/` o documentación manual? Probablemente script idempotente que escribe 5 trainers seed en emulator + opcional en prod-staging. **Diferido a design**.
+1. **Seeding strategy de trainers de prueba con geohash**: ¿script en `tool/` o documentación manual? Probablemente script idempotente que escribe 5 trainers seed en el emulador. **No existe un `prod-staging`** — `treino-dev` es el único proyecto Firebase y es producción, así que sembrar trainers de prueba ahí es meter datos falsos entre usuarios reales (#845). **Diferido a design**.
 2. **Date / distance formatting helper**: ¿se crea `lib/core/utils/formatters.dart` para "X km" o se mantiene inline en el tile? **Diferido a design**.
 3. **`TrainerSpecialty.fromString()` fallback**: ¿retorna `null` o categoría sentinel "otros"? **Diferido a design**.
 4. **Permission rationale UX**: ¿bottom sheet custom o `showDialog`? **Diferido a design** (probablemente bottom sheet siguiendo el design system).

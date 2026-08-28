@@ -140,7 +140,7 @@ allow update: if request.auth != null
 |---|---|---|
 | Unit (jest, emulator) | pure handler | seed `trainer_links`+`athlete_billing`, call `generateDuePaymentsHandler(testApp, fixedNow)` |
 | Integration | idempotency / rules | re-run handler; rules-test that a client `update` setting `dueAt` is denied |
-| Manual | deploy | user runs `firebase deploy --only functions,firestore:rules,firestore:indexes` |
+| Manual | deploy | 🚨 PROD — user runs `firebase deploy --only functions,firestore:rules,firestore:indexes --project prod` (#826) |
 
 jest cases (SCENARIO-style, `functions/src/__tests__/generate-due-payments.test.ts`, mirroring `notify-link-change.test.ts`): (1) mensual active → creates pending w/ periodKey + last-day dueAt; (2) semanal active → creates pending w/ `YYYY-Www` + week-end dueAt; (3) idempotent: second run → `created:0`; (4) skip when a PAID doc exists for the period; (5) skip when a LEGACY auto-id pending doc exists for the period; (6) skip porSesion + suelto cadences; (7) skip when `athlete_billing` absent; (8) non-active link ignored.
 

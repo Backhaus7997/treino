@@ -16,12 +16,21 @@
  * --force is passed. Only touches docs that actually exist in `exercises`.
  *
  * Usage:
- *   GOOGLE_APPLICATION_CREDENTIALS=scripts/sa-key.json node scripts/upload_drive_exercise_videos.js [flags]
+ *   TREINO_SA_KEY=~/.config/treino/sa-key.json node scripts/upload_drive_exercise_videos.js [flags]
  * Flags:
  *   --dry-run        show what would happen, write NOTHING
  *   --limit=N        process at most N exercises (pilot)
  *   --only=id1,id2   process only these exercise ids
  *   --force          overwrite an existing videoUrl
+ *
+ * ⚠️ DESTINO (#838) — el bucket ya no está hardcodeado: sale de
+ * `lib/storage_target.js` (`--bucket=` > `FIREBASE_STORAGE_BUCKET` > derivado
+ * del proyecto activo), y antes de nada se exige que Firestore y Storage
+ * apunten al mismo lado. Este script no está listado en el #838; apareció en el
+ * barrido y es el mismo bug exacto que el caso 2 — `bucket.upload()` +
+ * `ref.update({ videoUrl })` contra producción, sin ningún chequeo. Se arregla
+ * junto con los otros tres porque dejar vivo el cuarto clon del bug hace que el
+ * arreglo dure hasta que alguien elija el script equivocado.
  */
 'use strict';
 
@@ -30,9 +39,8 @@ const os = require('os');
 const path = require('path');
 const { execFileSync } = require('child_process');
 const { randomUUID } = require('crypto');
-const admin = require('firebase-admin');
-
-const BUCKET = 'treino-dev.firebasestorage.app';
+const { exigirDestinoCoherente } = require('./lib/storage_target');
+const { inicializarAdmin } = require('./lib/admin');
 
 const args = process.argv.slice(2);
 const DRY = args.includes('--dry-run');
@@ -42,7 +50,21 @@ const onlyArg = args.find((a) => a.startsWith('--only='));
 const LIMIT = limitArg ? parseInt(limitArg.split('=')[1], 10) : Infinity;
 const ONLY = onlyArg ? new Set(onlyArg.split('=')[1].split(',').map((s) => s.trim())) : null;
 
-admin.initializeApp({ storageBucket: BUCKET });
+// #838 — el guard corre SIEMPRE, también con `--dry-run`: el ensayo es donde el
+// operador decide si después corre en serio.
+const DESTINO = exigirDestinoCoherente({ argv: args });
+const BUCKET = DESTINO.bucket;
+if (DRY) console.log('DRY-RUN: no se escribe nada.');
+
+// Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla cerrado
+// con la migración; contra el emulador no pide nada. Ver scripts/lib/admin.js.
+// El `projectId` sale del DESTINO de #838 y no de la credencial: el guard ya lo
+// validó contra el bucket, y son la misma decisión — dos fuentes serían dos
+// verdades posibles, que es el bug que #838 cerró.
+const { admin } = inicializarAdmin({
+  projectId: DESTINO.projectId,
+  extra: { storageBucket: BUCKET },
+});
 const db = admin.firestore();
 const bucket = admin.storage().bucket();
 

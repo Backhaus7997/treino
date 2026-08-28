@@ -514,7 +514,8 @@ Si en el futuro se quisiera filtrar Firestore-side por `trainerSpecialty` (Decis
 Cuando se agregue un compound index en una etapa futura:
 
 ```bash
-firebase deploy --only firestore:indexes
+# 🚨 PROD — `prod` y `treino-dev` son el mismo y unico proyecto Firebase (#826).
+firebase deploy --only firestore:indexes --project prod
 ```
 
 Y se debe coordinar con la propagación de la rule (eventual consistency hasta 10 minutos en Firestore).

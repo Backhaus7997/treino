@@ -15,17 +15,19 @@
  *
  * USAGE
  *   # Migración estándar (todos los PFs legacy → custom location):
- *   $env:GOOGLE_APPLICATION_CREDENTIALS = "scripts\treino-dev-service-account.json"
+ *   $env:TREINO_SA_KEY = "$HOME\.config\treino\sa-key.json"
  *   node scripts/migrate_trainer_locations.js
  *
  *   # Migración + asignar Mateo a un gym específico:
  *   node scripts/migrate_trainer_locations.js --mateo-email tinchoignacio33@gmail.com --mateo-to-gym megatlon-nueva-cordoba
  */
 
-const admin = require('firebase-admin');
+const { inicializarAdmin } = require('./lib/admin');
 const crypto = require('crypto');
 
-admin.initializeApp();
+// Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla cerrado
+// con la migración; contra el emulador no pide nada. Ver scripts/lib/admin.js.
+const { admin } = inicializarAdmin();
 const db = admin.firestore();
 
 function uuid() {

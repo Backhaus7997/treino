@@ -31,7 +31,7 @@
  * See scripts/README.md (Emulator seed section) for full details.
  */
 
-const admin = require('firebase-admin');
+const { inicializarAdmin } = require('./lib/admin');
 
 // ── Guard: must target the emulator ─────────────────────────────────────────
 
@@ -47,7 +47,10 @@ if (!process.env.FIREBASE_AUTH_EMULATOR_HOST || !process.env.FIRESTORE_EMULATOR_
 }
 
 // Admin SDK with emulator — no service account needed.
-admin.initializeApp({ projectId: 'treino-dev' });
+// Pasa igual por la frontera (#834) aunque el guard de arriba ya garantiza
+// emulador: así no queda NINGÚN `initializeApp` suelto en `scripts/`, y el
+// día que alguien afloje ese guard la credencial sigue sin estar a mano.
+const { admin } = inicializarAdmin();
 
 const auth = admin.auth();
 const db = admin.firestore();

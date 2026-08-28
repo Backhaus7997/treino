@@ -17,9 +17,9 @@
  * paso de subida de videos a Storage). videoUrl se deja para ese paso.
  *
  * Uso:
- *   GOOGLE_APPLICATION_CREDENTIALS=... node scripts/import_enriched_catalog.js          # dry-run
- *   GOOGLE_APPLICATION_CREDENTIALS=... node scripts/import_enriched_catalog.js --write
- *   GOOGLE_APPLICATION_CREDENTIALS=... node scripts/import_enriched_catalog.js --write --replace
+ *   TREINO_SA_KEY=~/.config/treino/sa-key.json node scripts/import_enriched_catalog.js          # dry-run
+ *   TREINO_SA_KEY=~/.config/treino/sa-key.json node scripts/import_enriched_catalog.js --write
+ *   TREINO_SA_KEY=~/.config/treino/sa-key.json node scripts/import_enriched_catalog.js --write --replace
  */
 
 const fs = require('fs');
@@ -47,8 +47,9 @@ async function main() {
     return;
   }
 
-  const admin = require('firebase-admin');
-  admin.initializeApp(); // usa GOOGLE_APPLICATION_CREDENTIALS
+  // Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla
+  // cerrado; contra el emulador no pide nada. Ver scripts/lib/admin.js.
+  const { admin } = require('./lib/admin').inicializarAdmin();
   const db = admin.firestore();
   const col = db.collection('exercises');
 

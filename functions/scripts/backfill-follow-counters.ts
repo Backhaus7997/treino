@@ -41,6 +41,12 @@
  * - Only touches `followersCount` / `followingCount`; no other fields.
  * - Skips edges missing `followerUid` / `followeeUid`.
  *
+ * 🚨 `--apply` ESCRIBE EN PRODUCCIÓN. La credencial que le pasás por
+ * `GOOGLE_APPLICATION_CREDENTIALS` apunta a `treino-dev`, que es el ÚNICO
+ * proyecto Firebase de TREINO: ahí viven los usuarios reales. El proyecto no
+ * aparece en el comando, y `--dry-run` no es el default de nada — el default es
+ * no pasar `--apply`. Ver AGENTS.md → Entornos y #826.
+ *
  * Run with admin credentials, from the functions/ directory:
  *   # dry run (no writes):
  *   GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json \

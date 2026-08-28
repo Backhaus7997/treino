@@ -125,7 +125,7 @@ Chained because PR2 + PR3 both depend on PR1's models + providers. Each PR stays
 - [ ] `flutter analyze` reports 0 issues.
 - [ ] `dart format .` produces no diff.
 - [ ] Firestore rules deployed via `scripts/deploy_rules.js` without errors.
-- [ ] Manual smoke test on staging:
+- [ ] Manual smoke test on the local emulator (`./scripts/emulator.sh` + `flutter run --dart-define=USE_EMULATOR=true`) — **there is no staging environment**; `treino-dev` is the only Firebase project and it is production (#845):
   - Coach defines a rule (e.g., Lunes 9-12, slot 60min). Rule appears in editor and is queryable.
   - Athlete opens `/coach/agenda`, sees Lunes with availability markers, taps a day, sees free slots, books one. Booking is atomic — second attempt on same slot fails with the conflict message.
   - Both coach and athlete see the booking in their respective views.

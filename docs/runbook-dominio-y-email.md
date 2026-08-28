@@ -74,8 +74,13 @@ raíz.**
 ## 2 · Firebase — el secret
 
 ```bash
-firebase functions:secrets:set RESEND_API_KEY
+firebase functions:secrets:set RESEND_API_KEY --project prod
 ```
+
+> `--project prod` no es opcional desde [#840](https://github.com/Backhaus7997/treino/issues/840):
+> el default de `.firebaserc` es `demo-treino` (proyecto offline del emulador), así
+> que el comando pelado **falla** en vez de tocar producción. Vale para todos los
+> comandos de este runbook.
 
 El remitente por defecto ya está en el código
 (`MAIL_FROM = "TREINO <hola@send.gettreino.com>"`,
@@ -129,28 +134,52 @@ siempre en producción.
 
 ---
 
-## 5 · Activar las CFs de auth
+## 5 · Activar las CFs de auth — en tres tramos
 
-Recién **después** de que Resend diga Verified:
+**No se hace de una.** `treino-dev` es producción y el padrón de Auth es uno
+solo: no hay dónde ensayar. Sobre un flujo donde el usuario ya está afuera de su
+cuenta, primero se comprueba y después se migra.
 
-1. Descomentar en `functions/src/index.ts`:
-   ```ts
-   export { requestPasswordReset, requestEmailVerification } from "./auth/request-auth-email";
-   ```
-2. Cambiar `lib/features/auth/data/auth_service.dart` (líneas 121 y 130) para
-   llamar a los callables en vez de a FirebaseAuth directo.
-3. Desplegar:
-   ```bash
-   firebase deploy --only firestore:rules
-   firebase deploy --only functions
-   ```
+### 5A · Publicar los callables (el cliente no cambia)
+
+El export ya está descomentado en `functions/src/index.ts`. Solo falta
+desplegar:
+
+```bash
+firebase deploy --only firestore:rules --project prod
+firebase deploy --only functions --project prod
+```
 
 **Las reglas primero.** `mail_queue` está cerrada en los cuatro verbos y conviene
 que esa protección esté arriba antes de que la colección empiece a existir.
 
-> Hasta el paso 2 los mails de reseteo siguen saliendo por las plantillas
-> default de Firebase, así que el flujo de recuperación **nunca queda sin
-> cobertura**.
+En este tramo **no cambia nada para los usuarios**: `AuthService` sigue yendo a
+FirebaseAuth directo, así que los mails de recuperación siguen saliendo por las
+plantillas default. Si algo sale mal acá, el flujo real nunca se enteró.
+
+### 5B · Probar el callable a mano
+
+Con una cuenta de prueba propia, invocar `requestPasswordReset` y verificar:
+
+| Qué | Esperado |
+|---|---|
+| El mail llega | de `send.gettreino.com`, no de `firebaseapp.com` |
+| No cae en spam | SPF + DKIM alineados |
+| El link del botón | `auth.gettreino.com/__/auth/action` |
+| El link funciona | abre el formulario y permite cambiar la contraseña |
+| La cola | `mail_queue` → el doc queda en `status: "sent"` |
+| El token en reposo | `params.actionLink` **borrado** tras el envío |
+
+Recién con las seis en verde se pasa al 5C.
+
+### 5C · Cambiar el cliente
+
+Editar `lib/features/auth/data/auth_service.dart` (líneas 121 y 130) para llamar
+a los callables en vez de a FirebaseAuth, y publicar la app.
+
+A partir de acá los mails de recuperación de los usuarios reales salen por
+Resend. Es el único tramo sin vuelta atrás rápida: revertirlo exige otra
+publicación de la app.
 
 ---
 

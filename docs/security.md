@@ -90,7 +90,7 @@ son `get` / `list` / `write` / `delete`.
 | `appointments` | — | — | ✅ | ✅ | — |
 | `measurements` | ✅ | ✅ | ✅ | ✅ | 🟡 |
 | `performance_tests` | — | — | ✅ | ✅ | — |
-| `athlete_billing` | ✅ | — | 🟡 | 🟡 | — |
+| `athlete_billing` | ✅ | — | ✅ | ✅ | — |
 | `athlete_notes` | ✅ | — | 🟡 | 🟡 | — |
 | `athlete_files` | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `follow_up_entries` | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -127,6 +127,20 @@ Cinco paths siguen **sin una sola aserción negativa**:
 > no que la operación esté agotada. Cuando una regla tiene un disyunto que
 > cambia el resultado según el estado del documento, el test tiene que
 > recorrer los dos estados o la celda miente por omisión.
+
+> **QA-SEC-017 (#849) tampoco mueve los totales.**
+> `legacy-doc-freeze-rules.test.ts` agregó 18 negativos y 11 positivos sobre
+> `userPublicProfiles`, `measurements`, `performance_tests` y
+> `athlete_billing`, pero las cuatro filas ya estaban marcadas. Lo único que
+> cambia de marca es `athlete_billing` `create`/`update` (🟡 → ✅), por el
+> mismo motivo que `athlete_notes` arriba: su cobertura pasó a vivir también
+> en `functions/`.
+>
+> Y vale la misma lección, en su segunda dirección. Los negativos que había
+> probaban *"escribo un valor inválido → DENY"*. Ninguno probaba *"el valor
+> inválido ya está GUARDADO y no lo toco → ALLOW"*, que es el estado donde
+> vivía el bug: la celda decía ✅ mientras la operación estaba rota para todo
+> documento legacy. Ver §4.14.
 
 ### 1.2 Storage — 7 paths declarados en `storage.rules`
 
@@ -427,6 +441,65 @@ sección en el mismo PR.** Concretamente:
 Un test negativo que pasa por el motivo equivocado es peor que no tenerlo:
 antes de dar por cerrada una celda, aflojá la regla y comprobá que el test se
 pone rojo.
+
+Tres cosas más, que en `appointments` costaron seis pasadas de aprender (§4.9):
+
+1. **Una fila de mutación por GATE, no por FIX.** Aflojar los conjuntos que
+   tocaste sólo mide tu diff. Hay que aflojar **todos** los conjuntos del bloque,
+   uno por uno. En `appointments` eso pasó de 33 filas a 42, y destapó que la
+   cota de 5000 caracteres —el vector con el que empezó el hallazgo— era
+   borrable con la suite entera en verde.
+2. **Un cero no prueba nada por sí solo.** Puede ser un gate SUBSUMIDO (otro
+   conjunto tapa el mismo ataque) o un gate **sin custodia**. Distinguirlos pide
+   una segunda medición: aplicar la mutación y tirarle la escritura hostil que
+   ese gate custodia, y ver si pasa a ALLOW.
+
+   **Y hay una tercera lectura, que #849 pagó (§4.14): un gate cuya custodia
+   distintiva no es una escritura hostil.** El barrido de mutación cuenta filas
+   `assertFails` que se ponen verdes, o sea ataques que dejan de denegarse. Si
+   lo único que un gate deniega y sus vecinos no es una escritura **legítima**
+   —un doc legacy que se re-presenta a sí mismo—, el barrido da cero y **no hay
+   ninguna escritura hostil que se lo saque**, porque no existe. Ahí el cero se
+   lee como "subsumido" y es mentira: el gate deniega algo más, sólo que ese
+   algo más no es un ataque, es una congelación.
+
+   La regla práctica: antes de escribir "subsumido", nombrá la escritura que
+   **sólo** ese gate decide. Si esa escritura es un **ALLOW** y no un DENY, la
+   mutación por negativos es estructuralmente ciega y hay que correr la suite
+   contra el ruleset viejo para verla.
+3. **"El negativo es válido sin el gate" no es una propiedad permanente.** Un fix
+   en un camino VECINO la invalida sin tocar el test: pasó dos veces con el mismo
+   caso. Lo único que lo detecta es re-correr la mutación de esa fila después de
+   cada cambio de regla — no re-leer el test.
+
+Y sobre la regla misma, no sobre su test: **¿esta cota chequea el TIPO, o sólo
+una propiedad que varios tipos comparten?** `size()` en las reglas lo tienen las
+listas, los `String` **y** los `Map`, así que `size() == 0` no dice "lista
+vacía": dice "algo que mide cero".
+
+Y la cuarta, que #849 pagó fuera de `appointments` (§4.14): **¿este chequeo
+valida la ESCRITURA o el DOCUMENTO?** En un `update`, `request.resource.data` es
+el documento resultante, así que una cota de **RANGO** o de **TIPO**
+incondicional rechaza para siempre cualquier doc viejo que la incumpla. Van
+condicionadas a que el campo cambie:
+
+```
+&& (unchanged(d, prior, 'campo') || <la cota>)
+```
+
+Las de **FORMA** (`keys().hasOnly()`, `hasAll()`) sí van incondicionales.
+
+⚠️ Las **cotas de largo de texto NO son chequeos de forma**, aunque se las
+agrupe ahí por costumbre: dependen del valor histórico igual que una cota de
+rango y congelan por el mismo mecanismo. Si se dejan incondicionales tiene que
+ser por una razón escrita —en `measurements` / `performance_tests` es que la
+congelación de `notes` es reparable por el dueño— y no por creer que son
+inmunes. Ver §4.14.
+
+Y ojo con el atajo *"pero este writer manda el modelo
+completo con `set()`, no un merge"*: no cierra nada si el cliente armó ese
+modelo releyendo el doc y prefilleando el formulario, que es justo lo que hacen
+`measurements` y `performance_tests`.
 
 ---
 
@@ -2079,7 +2152,7 @@ Ordenados por lo que me preocuparía primero.
 | ~~**QA-SEC-011**~~ | `isProfilePublic` no existe en las reglas: "Perfil privado" se aplica sólo en el cliente | `:942`, `:894`, `:738`, `:256` | **Media-alta** | **CERRADO** en #806 por Opción B ([#778](https://github.com/Backhaus7997/treino/issues/778)) |
 | **QA-SEC-012** | `visibility: 'shared'` concede lectura y enumeración mundial a una feature que el dominio declara reservada | `:259` | Media | [#779](https://github.com/Backhaus7997/treino/issues/779) |
 | ~~**QA-SEC-013**~~ | El gate de rol de Slice C no llegó a las 3 colecciones que publican al PF | `:1175`, `:2078`, `:2125` | Media | **CERRADO** ([#780](https://github.com/Backhaus7997/treino/issues/780)) |
-| ~~**QA-SEC-014**~~ | `appointments` create sin allowlist de campos ni cap de tamaño: un desconocido escribe en la agenda de cualquier PF | `:2048` | Media | **CERRADO** ([#781](https://github.com/Backhaus7997/treino/issues/781)) |
+| **QA-SEC-014** | `appointments` create sin allowlist de campos ni cap de tamaño: un desconocido escribe en la agenda de cualquier PF | `:2048` | Media | **VECTORES CERRADOS Y MEDIDOS, hallazgo NO cerrado** ([#781](https://github.com/Backhaus7997/treino/issues/781) + [#831](https://github.com/Backhaus7997/treino/issues/831)). Se destachó en la sexta pasada: estuvo marcado *cerrado* tres rondas seguidas mientras el `create` seguía dejando pasar un `cancellationLog` no-lista que rompe la agenda entera del PF. Residuos abiertos con su medición en §4.9 y en #846 / #847 / #848 / #849 / #850 |
 | ~~**QA-SEC-015**~~ | `temp/uploads` es el único write de Storage sin allowlist de content-type ni cap de tamaño | `storage.rules:88` | Baja | **CERRADO** en #804 ([#782](https://github.com/Backhaus7997/treino/issues/782)) |
 | **QA-SEC-016** | El scanner de App Check cubre 2 de los 5 callables desplegados | `appcheck-enforcement.test.ts:18` | Baja | ~~[#783](https://github.com/Backhaus7997/treino/issues/783)~~ cerrado |
 
@@ -2426,9 +2499,10 @@ quedó lleva un día de tolerancia hacia atrás: absorbe cualquier offset de zon
 (±14 h) sin dejar de matar el vector, que es el turno forjado en 1970 o en el
 año 3000.
 
-El `update` usa una variante **sin** el rango, y no es descuido: el Path 3 es el
-PF cargando `noteAfter` DESPUÉS de la sesión, o sea con `startsAt` ya en el
-pasado. Reusar la misma función habría roto todas las notas post-sesión.
+El `update` usa una variante **sin** el rango, y no es descuido: el camino del
+PF es el que carga `noteAfter` DESPUÉS de la sesión, o sea con `startsAt` ya en
+el pasado. Reusar la misma función habría roto todas las notas post-sesión.
+(Era el Path 3; #831 removió el flip de ADR-1 y pasó a ser el Path 2.)
 
 **Verificación de mutación — y lo que encontró sobre mis propios tests.**
 Baseline 14/14. Tres mutaciones:
@@ -2476,16 +2550,684 @@ crecimiento a +1 por escritura. ⚠️ Residuo: las reglas **no pueden** mirar e
 tamaño de un elemento de lista, no hay iteración. El techo real es el límite de
 1 MB por documento de Firestore, no la regla.
 
-**La regla general, que es la tercera variante del mismo problema en este
-épico:** un `assertFails` sobre una operación que **ya está denegada por otro
-motivo** no custodia nada. Verde no es lo mismo que cubierto, y lo único que los
-distingue es la mutación. Las otras dos variantes están en QA-SEC-013.
+---
 
-**Lo que NO arregla este change**, y conviene tenerlo escrito: un turno legítimo
-creado a menos de 24 h tampoco se puede cancelar (el Path 1 exige >24 h) ni
-borrar (`allow delete: if false`). Eso es un hueco de **producto** preexistente
-—el cliente permite reservar más cerca que eso— y apretarlo en las reglas
-rompería reservas válidas. Queda como candidato a ticket propio.
+**QA-SEC-014 residual — el payload se muda de campo y vuelve a `confirmed`
+([#831](https://github.com/Backhaus7997/treino/issues/831)).**
+El párrafo de arriba es cierto pero estaba escrito asumiendo un documento
+**cancelado**, que ninguna query de `lib/` deserializa (`watchForAthlete`,
+`watchForTrainer` y `cancelFutureSeries` filtran las tres `status ==
+'confirmed'`). Lo que faltaba mirar es que el doc puede **volver** a
+`confirmed` conservando el log. Medido contra el emulador, actor = cuenta
+`athlete` sin ninguna relación con el PF víctima:
+
+```
+A1  create {trainerId: victimaPF, athleteId: self, startsAt:+48h}      -> ALLOW
+A2  update Path 1 {status:'cancelled', cancellationLog:[{reason:30 KB}]} -> ALLOW
+A3  update flip ADR-1 {status:'confirmed', athleteId: self}             -> ALLOW
+A4  final: status=confirmed · logEntries=1 · reasonLen=30000
+```
+
+Cada paso pasa las cotas de #781: el `create` exige el log vacío, el `update`
+lo deja crecer de a uno, y el flip no pineaba nada.
+
+**Lo que cerró, y por qué el camino se BORRÓ en vez de endurecerse.**
+El ticket proponía pinear el log en el flip
+(`request.resource.data.get('cancellationLog', []) == resource.data.get(...)`).
+Aplicada sola, **A3 sigue en ALLOW** — medido, no razonado: A3 no toca el log,
+lo hereda, así que la igualdad se cumple. El pin custodia la variante de **una**
+escritura (colgar el payload del propio flip, o vaciarlo), no la cadena.
+
+La primera pasada agregó entonces lo que el flip venía **diciendo en un
+comentario** desde el día uno —*"flip cancelled→confirmed by new athlete
+(ADR-1)"*— y nunca puso en el `&&`: `request.resource.data.athleteId !=
+resource.data.athleteId`.
+
+**Ese gate también se evade, y ahí está la lección del change.** El Path 1 no
+pineaba `athleteId`, así que el atacante lo mueve en la CANCELACIÓN (A2) y llega
+a A3 con un `athleteId` distinto del suyo — el gate se cumple sin tocarlo.
+Blindar un camino cuya variable la escribe el camino de al lado es perseguir el
+vector, no cerrarlo.
+
+Así que el flip **se removió**. No hay Path 2 de ADR-1 en `firestore.rules`. El
+camino estaba muerto, verificado en tres puntos:
+
+- La única implementación del flip es `AppointmentRepository.book()`
+  (`appointment_repository.dart:72-90`).
+- `book()` no tiene **ningún** llamador en `lib/` — sólo dos tests unitarios con
+  mock, que no tocan reglas. El auto-booking quedó legacy en Slice C.
+- Los dos creadores **vivos** —`createByTrainer` y `createRecurringByTrainer`,
+  llamados desde `new_session_sheet.dart` y `new_session_dialog.dart`— usan
+  `_appointments.doc()`, o sea **auto-id**: estrenan documento siempre, nunca
+  caen sobre uno cancelado, y por eso pasan por `allow create`.
+
+Mantener una superficie de ataque abierta para una feature que no existe es peor
+que no tener la feature: el costo es real y el beneficio es cero. Si el
+auto-booking vuelve, la regla se decide para el modelo de ese momento — con
+`trainer_links` o una Cloud Function, no con otro `&&`.
+
+**Consecuencia buscada:** `cancelled` es un estado **terminal** para el cliente.
+Lo que se escriba en un doc cancelado se queda ahí, fuera de las tres queries de
+`lib/`, que filtran las tres `status == 'confirmed'`.
+
+**Y el Path 1 se endureció aparte** — esto no se cae con el borrado, porque
+cuatro de sus cinco pines cierran cosas que el flip nunca tocó. El camino no
+tocaba `athleteId`, `trainerId`, `startsAt`, `durationMin` ni `paymentId`, y **no
+tocar no es prohibir**: `request.resource.data` es el documento MERGEADO, así que
+una cancelación podía reescribir los cinco de paso.
+
+| Pin | Qué cierra |
+|---|---|
+| `startsAt` | El gate de 24 h lee `resource.data.startsAt`, el valor **viejo**. Sin el pin la cancelación pasaba el gate con un horario y guardaba otro; movido al pasado, el turno no se cancela nunca más ni se borra. El **turno imborrable de #781, por otra puerta** |
+| `durationMin` | Sin cota de tipo ni pin quedaba en 100000 y el bloque tapaba el día entero de la agenda del PF |
+| `trainerId` | Sin el pin, un miembro mudaba el turno a la agenda de un **tercer** PF que nunca lo vio |
+| `athleteId` | Es el que hacía evadible el gate del flip. Con el flip borrado ya no hay a qué encadenarlo, pero sin él la cancelación se le atribuye a **otro** atleta, y eso queda fijo |
+| `paymentId` | **Money-critical, y la misma dependencia circular una vuelta más abajo.** El Path 2 tiene un gate **set-once** que impide reapuntar el cobro. Sin este pin ese gate se evadía en **dos pasos sin tocarlo nunca**: cancelar limpiando `paymentId`, y re-linkear después contra el `null` recién fabricado, que el Path 2 lee como primera facturación |
+
+No rompe nada, y sale de leer los escritores: los dos únicos que escriben el
+status `cancelled` —`cancel()` y `cancelFutureSeries()`— mandan updates
+**parciales** de `{status, cancelledAt, cancelledBy, cancellationLog}`. Los
+cinco campos pineados no viajan, el merge los deja idénticos a `resource.data`
+y las igualdades se cumplen solas.
+
+**Los escritores, contados bien (corrección de la pasada anterior).** Acá decía
+*"los **seis** que escriben la colección — `createByTrainer`,
+`createRecurringByTrainer`, `cancel`, `cancelFutureSeries`, `updateNotes`,
+`markBilled`"*. Los dos errores van juntos y son del mismo tipo: la lista
+**incluía** `markBilled()`, que el propio repositorio documenta como helper de
+tests (*"Prefer [billAppointment] for the normal flow"*) y no tiene un solo
+llamador en `lib/`, y **omitía** `billAppointment()` y `billAppointments()`,
+que son los dos escritores **vivos y money-critical** del campo `paymentId`. La
+cuenta correcta:
+
+| Método de `AppointmentRepository` | ¿Escribe la colección? | Llamadores en `lib/` |
+|---|---|---|
+| `createByTrainer` | sí (`set`) | `new_session_sheet.dart`, `new_session_dialog.dart` |
+| `createRecurringByTrainer` | sí (`batch.set`) | `new_session_sheet.dart` |
+| `cancel` | sí (`update`) | `session_detail_sheet`, `appointment_detail_sheet`, `appointment_detail_dialog` |
+| `cancelFutureSeries` | sí (`batch.update`) | `session_detail_sheet`, `appointment_detail_dialog` |
+| `updateNotes` | sí (`update`) | `session_detail_sheet`, `appointment_detail_dialog` |
+| `billAppointment` | sí (`txn.update`) | `appointment_detail_sheet`, `appointment_detail_dialog` |
+| `billAppointments` | sí (`txn.update`) | `batch_cobrar_dialog` |
+| `markBilled` | sí (`update`) | **ninguno** — helper de tests |
+| `book` | sí (`txn.set` + `txn.update`) | **ninguno** — legacy; su rama de ADR-1 la deniegan las reglas |
+
+**Nueve** métodos escriben la colección; **siete** están vivos. Y desde esta
+pasada la verificación dejó de ser una afirmación en este documento: los **13
+mapas literales** que esos escritores mandan —incluidas las dos variantes de
+`updateNotes` (texto y `null`), la cancelación con `reason`, la de un turno **ya
+cobrado** y las dos ocurrencias de una serie— son un bloque de tests contra el
+emulador (`appointments-shape-rules.test.ts`, *"los escritores reales de
+AppointmentRepository siguen pasando"*). Un pin futuro que le pise la cola a un
+escritor vivo se pone rojo acá, no en producción.
+
+De paso, el Path 1 pinea también `cancelledBy` contra `auth.uid`. Sin eso
+cualquiera de los dos miembros firmaba la cancelación con el uid del otro, de
+forma permanente (`delete: if false`, log append-only). Las cuatro superficies
+que llaman a esos métodos sacan el `actorUid` de `currentUidProvider`; el
+cascade de borrado de cuenta usa Admin SDK.
+
+⚠️ **Ese pin, SOLO, no cerraba nada** — y esta frase reemplaza a la que estaba
+acá, que daba el vector por cerrado. Lo reabría el Path 2, que no miraba el
+campo. Está desarrollado abajo, en la matriz.
+
+**`appointmentUpdateShapeOk()` y una premisa falsa que hay que dejar anotada.**
+La función decía: *"`startsAt` no necesita rango en el update porque los **tres**
+caminos ya lo pinean inmutable contra `resource.data`"*. **Era falso desde
+#823** —sólo lo pineaba el camino del PF— y es la premisa que hizo parecer
+suficiente el fix anterior. Hoy la frase es cierta, y lo es porque el Path 1
+pinea desde #831, no porque siempre lo haya hecho. Y son **dos** caminos.
+La función chequea además el tipo de `athleteId`, `trainerId`, `durationMin`,
+`startsAt`, `cancelledAt` y `athleteDisplayName`, que no miraba ninguno:
+`keys().hasOnly()` acota **qué** claves entran, no de qué tipo son.
+
+⚠️ Y **los seis van condicionados a que el campo cambie**, no incondicionales.
+La función corre sobre el documento MERGEADO, así que un chequeo incondicional
+valida el **documento heredado**, no la escritura — y eso deja al doc heredado
+sin poder anotarse **ni** cancelarse, con `delete: if false`: la familia "turno
+imborrable" otra vez, reintroducida por el propio fix. El error se cometió
+**tres veces seguidas en esta misma función**, en pasadas distintas:
+`durationMin` (segunda), `startsAt` y `cancelledAt` (cuarta), y `athleteId` /
+`trainerId` (quinta, ver la matriz). Los tres casos están medidos: un doc con el
+campo guardado con otro tipo daba **DENY** en los dos caminos antes de
+condicionar el chequeo, y **ALLOW** después.
+
+**El rango de `durationMin` va contra el valor que se ESCRIBE, no contra el
+documento heredado.** La primera versión del fix lo puso incondicional, y eso no
+validaba la escritura: validaba el **documento**. Como la función corre sobre el
+doc MERGEADO, un turno viejo con `durationMin` en 900 o guardado como `double`
+quedaba sin poder **cancelarse ni anotarse nunca más** —y `delete: if false`—, o
+sea la misma familia "turno imborrable" que #781 vino a cerrar, **reintroducida
+por el fix**. No se puede saber si esos documentos existen: `treino-dev` ES
+producción (#826) y no se le corren queries, así que se asume que pueden estar.
+Condicionarlo a que el campo **cambie** no pierde nada: el Path 1 lo pinea y el
+Path 2 sólo puede escribirlo dentro del rango, así que el valor **no puede
+empeorar** — que es lo único que una regla puede custodiar. Tres casos lo fijan
+(anotar y cancelar un legacy fuera de rango, y un legacy `double`), y un cuarto
+custodia que el rango siga mordiendo cuando el update **mueve** el valor.
+
+---
+
+#### La MATRIZ campo × camino — y por qué reemplaza a la lista de vectores
+
+**El patrón cayó por QUINTA vez, y las dos últimas las introdujo el fix de la
+anterior.** Las tres primeras pasadas hicieron siempre la misma pregunta:
+*"¿quién más escribe el campo del que depende esta regla?"*. Así se encontró que
+`athleteId` hacía evadible el gate del flip, y que `paymentId` hacía evadible el
+set-once. Es una buena pregunta, pero se recorre **buscando el vector que ya
+tenés en la cabeza**, y por eso deja pasar el de al lado.
+
+La cuarta pasada dio vuelta la pregunta: **para cada campo de la allowlist de
+`hasOnly()`, ¿qué le puede hacer CADA camino?** Eso destapó `cancelledBy` en el
+Path 2. Pero esa matriz **salió una columna corta**: modeló los dos caminos de
+`update` y dejó afuera el `create` — que es justamente **el que siembra el
+estado inicial del que dependen todos los gates de update**. Un gate set-once no
+se evade sólo por su vecino de update; se evade por quien escribe el valor la
+primera vez.
+
+Son **14 campos × 3 caminos = 42 celdas**, y ninguna se puede saltear.
+
+**La quinta instancia: `paymentId` sembrado en el `create`.** Money-critical y
+permanente. El set-once del Path 2 lee `resource.data.paymentId` y sólo escribe
+cuando el valor guardado es `null`. Su vecino no es un update — es el `create`:
+
+```
+un desconocido crea un turno en la agenda de un PF con paymentId ya sembrado
+  → re-linkear al Payment real → DENY (set-once: el valor ya no es null)
+  → limpiarlo a null           → DENY (el Path 1 lo pinea, 4a pasada)
+  → borrar el turno            → DENY (allow delete: if false)
+  → el cobro de ese turno queda MUERTO para siempre
+```
+
+Las tres salidas están **medidas** contra el emulador, no deducidas.
+
+**Y dos más que la columna nueva destapó de paso.** `athleteId` y `trainerId`
+no tenían tipo en el `create`, mientras su variante de `update` los exigía
+`string` de forma **INCONDICIONAL**. Las dos mitades juntas son un turno
+imborrable: el create aceptaba `trainerId: 12345` —el disyunto sólo compara
+**uno** de los dos contra `request.auth.uid`, el otro quedaba libre— y a partir
+de ahí `appointmentUpdateShapeOk()` denegaba **todo** update sobre ese doc. Ni
+anotarlo, ni cancelarlo, y `delete: if false`. Medido: cancelar un doc así daba
+**DENY** antes de esta pasada y da **ALLOW** después.
+
+Eso es exactamente el error que los bloques de `durationMin` y `startsAt` ya
+documentaban dentro de la misma función — cometido dos campos más arriba. Se
+cierra por los dos lados: **tipo en el `create`** (el origen, gratis) y
+**chequeo condicionado a que el campo cambie en el `update`** (para destrabar lo
+que ya nació mal, que puede existir: antes de #781 el create no validaba nada, y
+`treino-dev` ES producción (#826), así que no se le corren queries para saberlo).
+Esto **cierra [#837](https://github.com/Backhaus7997/treino/issues/837)**, que
+estaba anotado como fuera de alcance.
+
+**Estados de una celda:**
+
+- **pineado** — `request.resource.data.X == resource.data.X`: el camino no puede
+  moverlo.
+- **acotado** — el camino lo escribe, pero la regla acota tipo, rango o valor.
+  Cuando dice *pin **o** X*, el chequeo está condicionado a que el campo cambie:
+  valida la **escritura**, no el documento heredado — sin eso, un doc legacy
+  fuera de cota queda imborrable.
+- **libre** — el camino lo escribe sin ninguna cota.
+
+### La matriz 15 × 3
+
+| # | Campo | `create` | Path 1 — cancelación (miembro) | Path 2 — edición del PF |
+|---|---|---|---|---|
+| 1 | `id` | acotado — `string`, 1..1500 | **pineado** | **pineado** |
+| 2 | `trainerId` | acotado — `string`, 1..128 | **pineado** | **pineado** |
+| 3 | `athleteId` | acotado — `string`, 1..128 | **pineado** | **pineado** |
+| 4 | `athleteDisplayName` | acotado — `string`, `<= 200` | **pineado** | acotado — pin **o** `string` `<= 200` |
+| 5 | `startsAt` | acotado — `timestamp`, −1 d..+550 d | **pineado** | **pineado** |
+| 6 | `durationMin` | acotado — `int`, 1..600 | **pineado** | acotado — pin **o** `int` 1..600 |
+| 7 | `status` | acotado — `== 'confirmed'` | acotado — `== 'cancelled'` | **pineado** |
+| 8 | `cancelledAt` | acotado — **`== null`** | acotado — pin **o** `null` **o** `timestamp` | **pineado** |
+| 9 | `cancelledBy` | acotado — **`== null`** | acotado — `== request.auth.uid` | **pineado** |
+| 10 | `cancellationLog` | acotado — **`is list`** y `size() == 0` ⭐ | acotado — `<= 50` y `+1` por escritura | **pineado** |
+| 11 | `noteBefore` | acotado — `<= 5000` | acotado — `<= 5000` | acotado — `<= 5000` |
+| 12 | `noteAfter` | acotado — `<= 5000` | acotado — `<= 5000` | acotado — `<= 5000` |
+| 13 | `recurringId` | acotado — `<= 128` | **pineado** | **pineado** |
+| 14 | `paymentId` | acotado — **`== null`** | **pineado** | acotado — **set-once** |
+| 15 | `reason` ⭐ | acotado — **`== null`** | **pineado** | **pineado** |
+
+⭐ **La fila 15 es nueva de [#846](https://github.com/Backhaus7997/treino/issues/846)**, y es la única del
+documento que **ningún camino de cliente escribe**. `reason` no sale de
+`Appointment.toJson()`: la escribe SÓLO el cascade con Admin SDK y
+`notify-appointment.ts` la lee de GUARD, o sea que es **control de flujo**, no
+un dato. Por eso sus tres celdas están cerradas de entrada —`== null` en el
+`create`, pineada en los DOS caminos— y el `delete` ya era `if false`. Una señal
+CF→CF sólo vale si el cliente no la puede emitir.
+
+**No queda ninguna celda libre.** Las 45 se midieron una por una contra el
+emulador —una escritura hostil por celda— antes y después del fix. Las únicas
+que aceptan la escritura hostil son las seis que la tabla de abajo justifica:
+`status`·P1, `noteBefore`/`noteAfter` en P1 y P2, y `paymentId`·P2 (la primera
+facturación).
+
+⚠️ **Y esa frase fue FALSA una pasada más, por la celda 10.** "Una escritura
+hostil por celda" no dice **cuál**: para el `cancellationLog` del `create` la
+escritura elegida fue un log **inflado**, y la que faltaba era un log de **otro
+tipo**. La celda decía "acotado — `size() == 0`" y no lo estaba. El detalle está
+abajo, en la sexta pasada. La lección operativa: una celda no queda medida por
+haberle tirado *una* escritura hostil, sino por haberle tirado **la que su cota
+no puede distinguir**.
+
+**Las celdas escribibles, justificadas una por una.** Es el ejercicio que hace
+falta para poder dejarlas abiertas: si una no se puede justificar, se pinea.
+
+| Celda | Por qué queda escribible |
+|---|---|
+| `athleteDisplayName` · P2 | El PF es dueño de la agenda donde ese string se muestra, y es una **denormalización** del nombre del propio atleta: refrescarlo cuando el alumno se renombra es una edición legítima. En el **Path 1** no se justifica —el actor puede ser el ATLETA, que renombraba de paso en la agenda del PF, para siempre—, así que ahí **se pinea** |
+| `durationMin` · P2 | Decisión de diseño: el PF corrige la duración de una sesión suya. Acotado a `int` 1..600, que es lo que evita el bloque de 100000 minutos tapando el día |
+| `status` · P1 | Es la transición que define el camino |
+| `cancelledAt` · P1 | Es la escritura del camino. Antes no tenía **ni tipo ni cota** — 30 KB adentro daban ALLOW |
+| `cancelledBy` · P1 | Es la firma del camino, y va contra `request.auth.uid`: sólo podés firmar como vos |
+| `cancellationLog` · P1 | Es el rastro del camino. Acotado a 50 y a **+1 por escritura**. ⚠️ El tamaño de CADA elemento no se puede mirar desde las reglas — residuo abajo |
+| `noteBefore` / `noteAfter` · P1 | Residuo consciente: una cancelación puede escribirlos (acotados a 5000). Pinearlos rompería un futuro *"cancelar con motivo"*, y el daño está cerrado del otro lado — sin el flip ese texto no llega nunca a un doc `confirmed` |
+| `noteBefore` / `noteAfter` · P2 | Son el **propósito** del camino |
+| `paymentId` · P2 | Set-once (`null` → string no vacío, o re-afirmar el MISMO valor). Money-critical. **Su premisa —que el valor nace en `null`— la sostiene el `create`, no este camino**: por eso la columna que faltaba era la que importaba |
+| `reason` · los tres caminos | **Ninguno**, y es el punto: es la única fila cerrada en las tres columnas. Ver ⭐ arriba |
+| todo el `create` | Un turno nuevo nace `confirmed`, sin cancelación, sin log y **sin cobro**. Los tres `== null` (`cancelledAt`, `cancelledBy`, `paymentId`) y el `is list` + `size() == 0` del log son el mismo invariante escrito sobre cuatro campos. ⚠️ El `== null` fija el tipo de paso; el `size() == 0` **no** — ver la sexta pasada |
+
+**Las celdas que estaban abiertas y nadie había decidido.** Medidas contra el
+emulador sobre el HEAD del PR, antes de tocar nada:
+
+| Celda / cota | Antes | Ahora |
+|---|---|---|
+| **`paymentId` en el `create` — el cobro muerto** | **ALLOW** | DENY |
+| **`trainerId` en el `create` — no-string** | **ALLOW** | DENY |
+| **`athleteId` en el `create` — no-string** | **ALLOW** | DENY |
+| **`athleteDisplayName` · P2 puesto en `null`** | **ALLOW** | DENY |
+| **legacy con `trainerId` no-string — cancelarlo** | **DENY** (imborrable) | **ALLOW** |
+| `cancelledBy` · P2 — la cadena de dos pasos | **ALLOW** | DENY |
+| `cancelledAt` · P2 | **ALLOW** | DENY |
+| `cancellationLog` · P2 — entrada forjada por el PF | **ALLOW** | DENY |
+| `id` · P2 | **ALLOW** | DENY |
+| `recurringId` · P2 | **ALLOW** | DENY |
+| `id` · P1 | **ALLOW** | DENY |
+| `athleteDisplayName` · P1 | **ALLOW** | DENY |
+| `recurringId` · P1 | **ALLOW** | DENY |
+| `id` en el `create` — 30 KB adentro del campo | **ALLOW** | DENY |
+| `cancelledAt` en el `create` — 30 KB adentro del campo | **ALLOW** | DENY |
+| `cancelledAt` · P1 — 30 KB en la cancelación | **ALLOW** | DENY |
+
+**El `null` que la matriz documentaba mal.** La fila 4 decía `<= 200` para
+`athleteDisplayName`·P2. La cota REAL era `optStrMaxLen(...)`, o sea
+**`<= 200` O `null` O ausente** — el `opt` del nombre es literal. La diferencia
+importa porque el campo es `required String` en el modelo: con `null` adentro,
+`Appointment.fromJson` explota y **una sola fila rompe el stream entero** de
+`watchForTrainer` y `watchForAthlete`, o sea el de las DOS partes. Y el atleta
+no lo puede reparar —el Path 1 pinea el campo—, así que su única salida es
+cancelar el turno. Se arregló **la regla**, no la documentación: ahora es *pin o
+`string <= 200`*, con lo que la escritura que pone `null` deja de existir y un
+doc legacy que ya lo tenga en `null` se sigue pudiendo cerrar.
+
+Es la misma lección que la columna del `create`, un nivel más abajo: **una cota
+documentada por lo que uno cree que escribió, no por lo que midió**, es una cota
+que no está.
+
+### Sexta pasada — la pregunta que le faltaba a cada celda
+
+La matriz de la quinta pasada preguntaba, celda por celda, **quién puede
+escribir este campo por este camino**. Es la pregunta correcta, y sigue siendo
+la que ordena la tabla. Pero la respuesta que se anota en la celda —*"acotado —
+`<cota>`"*— tiene su propia trampa, y cayó dos veces seguidas en la misma
+columna:
+
+> **¿esta cota chequea el TIPO, o sólo una propiedad que varios tipos
+> comparten?**
+
+La primera vez fue `athleteDisplayName`·P2: la celda decía `<= 200` y la cota
+real era `optStrMaxLen`, o sea *`<= 200` **O** `null`*. La segunda es la celda
+10.
+
+**`cancellationLog` en el `create`.** La cota era `size() == 0`. En las reglas
+de Firestore `size()` **no es un método de las listas**: lo tienen también los
+`String` y los `Map`. Así que la regla no decía *"log vacío"* —que es como se
+leyó al escribirla— sino **"algo que mide cero"**, y eso lo cumplen `[]`, `""` y
+`{}` por igual.
+
+Lo que hace grave al hallazgo no es el inflado, que ya estaba cerrado por
+accidente: un `cancellationLog` de 30 KB **mide 30000**, no 0, y daba DENY. Es
+la deserialización. El documento nace `status: 'confirmed'`, o sea entra al
+stream **vivo** —las tres queries de `appointment_repository.dart` filtran
+`where('status', isEqualTo: 'confirmed')`—, y ahí `Appointment.fromJson` lo
+castea:
+
+```dart
+cancellationLog: (json['cancellationLog'] as List<dynamic>?)
+```
+
+Medido en Dart, las dos variantes tiran `_TypeError`:
+
+| Valor | Error |
+|---|---|
+| `""` | `type 'String' is not a subtype of type 'List<dynamic>?' in type cast` |
+| `{}` | `type '_Map<String, dynamic>' is not a subtype of type 'List<dynamic>?'` |
+
+Una sola fila forjada rompe la deserialización del **snapshot entero**, o sea la
+agenda **completa** del PF. La escribe un desconocido —el disyunto del `create`
+sólo pide `athleteId == request.auth.uid`— y no se puede sacar:
+`allow delete: if false`. Es la familia de #781, sembrada desde el `create`.
+
+**Medición de punta a punta**, sobre el HEAD de la quinta pasada y después del
+`is list`:
+
+| | Antes | Ahora |
+|---|---|---|
+| `create` con `cancellationLog: ""` | **ALLOW** | DENY |
+| `create` con `cancellationLog: {}` | **ALLOW** | DENY |
+| `create` con `cancellationLog: {byUid, at}` | **ALLOW** | DENY |
+| `create` con `cancellationLog: "x"*30000` | DENY (mide 30000) | DENY |
+| `create` con `cancellationLog: 0` | DENY (`size()` no evalúa) | DENY |
+| **query del PF `where status == 'confirmed'`** | **2 docs forjados** | **0** |
+
+**El resto de la columna del `create`, barrida con la misma pregunta.** Las
+otras 13 filas se midieron una por una, tirándoles el tipo alternativo que su
+cota podría no distinguir: `noteBefore` como map y como lista,
+`athleteDisplayName` / `id` / `cancelledAt` como lista, `paymentId` como map,
+`durationMin` como double, `status` como lista. **Las 13 DENIEGAN.** Y se
+entiende por qué: los cuatro `optStrMaxLen` llevan `v is string` adentro,
+`athleteId` / `trainerId` / `id` / `athleteDisplayName` llevan `is string`,
+`durationMin` `is int`, `startsAt` `is timestamp`, `status` se compara contra el
+literal `'confirmed'`, y `cancelledAt` / `cancelledBy` / `paymentId` contra
+`null` — que es la única otra forma de fijar un tipo sin nombrarlo. **La celda
+10 era la única de la columna que chequeaba una propiedad compartida.**
+
+**El mismo hueco en el camino de `update` — abierto, y por qué.** El
+`cancellationLog` del `update` tampoco lleva `is list`: medido, una cancelación
+con `cancellationLog: "x"` da **ALLOW** (mide 1, cumple `<= 50` y
+`<= resource + 1`). Queda abierto a propósito, con el daño acotado por
+construcción:
+
+- El Path 1 exige `status == 'cancelled'`, así que el documento sale del stream.
+- El Path 2 **pinea** el log, así que sobre un doc `confirmed` no se puede tocar.
+- Con el flip removido, un doc `cancelled` no vuelve a `confirmed`.
+- Ninguna de las cuatro deserializaciones de `lib/` lee un doc cancelado:
+  `book()` (sin llamadores) y las tres queries, que filtran `confirmed`.
+
+Ponerle un `is list` **incondicional** ahí sería cometer por quinta vez el error
+que esta misma función documenta tres veces: la función corre sobre el doc
+MERGEADO, así que un doc heredado con el log de otro tipo dejaría de poder
+cancelarse — imborrable. La forma correcta es el condicional *pin **o** `is
+list`*, y eso es superficie nueva sin daño vivo detrás. Va con el resto de los
+residuos.
+
+---
+
+**⚠️ Lo que esta pasada NO cierra, con el alcance exacto.** El bloque de
+`appointments` **no** queda cerrado; queda con las 42 celdas decididas y estos
+residuos, todos medidos:
+
+- **El inflado dentro de un doc `cancelled` sigue posible**, y se sabe por dónde:
+  la entrada del `cancellationLog` es un map cuyo tamaño las reglas no pueden
+  mirar —no hay iteración—, así que UNA sola cancelación puede escribir ~1 MB
+  ahí adentro. Techo real, el límite de 1 MiB por documento de Firestore.
+  Cerrarlo pide una Cloud Function. **ABIERTO.**
+- **El `byUid` de la entrada del `cancellationLog` sigue forjable** — el pin es
+  del escalar `cancelledBy`, no del contenido de la lista. Misma causa, misma
+  salida. Decisión de producto anotada en #831. **ABIERTO.**
+- **El Path 1 sigue disponible sobre un documento YA cancelado.** El
+  `status == 'cancelled'` mira el documento **mergeado**, así que re-cancelar es
+  un update válido: mueve `cancelledAt` y suma una entrada más al log. La
+  atribución **no** se puede forjar y el crecimiento está acotado a +1 y a 50.
+  Cerrarlo es una línea (`resource.data.get('status', null) != 'cancelled'`),
+  pero convertiría un doble submit de `cancel()` en un error visible —ninguna de
+  las tres superficies tiene flag de *busy*— y no cerraría el residuo de arriba.
+  **ABIERTO a propósito**, con test que lo documenta.
+- **Un doc sin `startsAt` está congelado.** Los dos caminos lo pinean con acceso
+  directo (`request.resource.data.startsAt`), que **falla** si el campo no está:
+  medido, DENY en los dos. No lo puede fabricar ningún escritor —`toJson()`
+  siempre lo emite— y el cliente tampoco podría leerlo. **ABIERTO, aceptado.**
+- **`noteBefore` / `noteAfter` no se pinean en el Path 1**: una cancelación puede
+  escribirlos, acotados a 5000. El daño se cierra por el otro lado —sin el flip
+  ese texto no tiene cómo llegar a un doc `confirmed`—, y pinearlos rompería un
+  futuro "cancelar con motivo". **ABIERTO a propósito.**
+- **Un turno legítimo creado a menos de 24 h no se puede cancelar** (el Path 1
+  exige >24 h) ni borrar (`delete: if false`). Hueco de **producto**
+  preexistente: el cliente permite reservar más cerca que eso, y apretarlo en
+  las reglas rompería reservas válidas. **ABIERTO a propósito** — y ahora con
+  custodia: el gate de 24 h tiene por fin sus dos negativos (séptima pasada),
+  así que este hueco de producto es una decisión visible y no un efecto
+  colateral de una regla que nadie mide.
+- ~~**Un turno con `startsAt` de OTRO TIPO se puede anotar pero NO cancelar.**~~
+  **CERRADO** — [#847](https://github.com/Backhaus7997/treino/issues/847),
+  séptima pasada. El gate de 24 h leía `resource.data.startsAt.toMillis()` con
+  acceso **directo** sobre el valor viejo y fallaba cerrado sobre un string, un
+  número o el campo ausente. Ahora el gate se aplica sólo cuando el valor
+  guardado ES un `timestamp` —lo demás no tiene "24 horas antes" que calcular—
+  y los dos pines de `startsAt` pasaron a `.get()`. Medido: las tres variantes
+  pasan de DENY a ALLOW, y la cancelación a 6 h vista sigue en DENY.
+- **El `cancellationLog` del `update` sigue sin `is list`** — medido, una
+  cancelación con `cancellationLog: "x"` da ALLOW. Inerte por construcción (el
+  doc queda `cancelled`, fuera de las cuatro deserializaciones de `lib/`), y
+  cerrarlo pide el condicional, no el chequeo suelto. Ver la sexta pasada.
+  **ABIERTO a propósito.**
+- ~~**La Cloud Function del cascade escribe `reason`, una clave fuera de la
+  allowlist.**~~ **CERRADO, sin residuo de datos** —
+  [#846](https://github.com/Backhaus7997/treino/issues/846), séptima pasada.
+  `reason` **entró** a las dos allowlists y quedó **pineada en los dos caminos
+  de cliente** (`== null` en el `create`, `delete: if false`): es la fila 15 de
+  la matriz, la única que ningún camino de cliente escribe. Los documentos que
+  la CF ya escribió en producción **se destraban con el deploy de las reglas**,
+  sin correr nada. ⚠️ La primera versión de este fix movía el motivo adentro del
+  `cancellationLog` y pedía una migración contra producción; se revirtió porque
+  volvía **forjable** el guard de `notify-appointment.ts` — ver abajo.
+- ~~**Borrar un Payment deja el `paymentId` del turno colgado para siempre.**~~
+  **CERRADO** — [#848](https://github.com/Backhaus7997/treino/issues/848),
+  séptima pasada. El `delete` de `payments` pasó a `if false`: no tenía NINGÚN
+  llamador en `lib/` y contradecía la retención fiscal que el propio cascade
+  declara. El set-once money-critical **no se tocó** — aflojarlo pedía un
+  `exists()`, que lee estado pre-commit y rompe el flujo atómico de
+  `billAppointment`.
+- ~~**10 gates de las dos funciones de forma siguen borrables con la suite
+  entera en verde**~~ **CERRADO** —
+  [#850](https://github.com/Backhaus7997/treino/issues/850), séptima pasada. Un
+  negativo por fila, con el ataque que **sobrevive a la ausencia del gate** (una
+  LISTA, no un número: `12345.size()` tampoco evalúa). Barrido re-corrido sobre
+  las 42: **34 filas con rojo, 8 en cero, y las 8 son exactamente las
+  redundantes**.
+- **El patrón del chequeo INCONDICIONAL vive fuera de `appointments`.** Siete
+  funciones de forma invocadas desde un `allow update` tienen chequeos de tipo
+  sin condicionar (`feedbackShapeOk`, `ruleShapeOk`, `overrideShapeOk`,
+  `measurementShapeOk`, `performanceTestShapeOk`, `ratingPayloadOk`,
+  `reactionPayloadOk`). Candidatos, no bugs confirmados: sólo hace daño donde el
+  update es PARCIAL. **ABIERTO** —
+  [#849](https://github.com/Backhaus7997/treino/issues/849).
+
+**Lo que SÍ queda cerrado**, y sólo eso — la lista es de VECTORES medidos, no
+del hallazgo:
+
+- Las cinco celdas de la columna del `create`: `paymentId`, `athleteId`,
+  `trainerId`, y el `is list` del `cancellationLog` (sexta pasada).
+- El `null` de `athleteDisplayName` en P2.
+- El turno imborrable por id mal tipado — **cierra
+  [#837](https://github.com/Backhaus7997/treino/issues/837)**.
+- Siete gates que existían y **no tenían cobertura de mutación**: los dos de la
+  quinta pasada más `noteAfter` y `recurringId` del `create`, `hasOnly()` y
+  `paymentId` del `update`, y —el que importa— **la cota de 5000 caracteres del
+  camino de `update`, o sea el vector con el que empezó #781**.
+
+⚠️ **Y con eso QA-SEC-014 sigue SIN poder darse por cerrado**, aunque la séptima
+pasada tachó cuatro de los cinco residuos de arriba. Lo que queda, y esto es la
+lista completa, no un resumen optimista:
+
+- el `cancellationLog` del `update` **sin `is list`** (inerte por construcción,
+  pero abierto);
+- el `byUid` y el TAMAÑO de cada entrada del log — las reglas no iteran listas,
+  piden una CF;
+- el inflado dentro de un doc `cancelled` (techo real: el límite de 1 MiB por
+  documento de Firestore);
+- el hueco de PRODUCTO del turno legítimo creado a menos de 24 h;
+- el patrón del chequeo INCONDICIONAL fuera de `appointments`
+  ([#849](https://github.com/Backhaus7997/treino/issues/849));
+- ~~el **residuo de datos** de #846~~ — **ya no existe**: `reason` entró a la
+  allowlist pineada, así que los documentos que la CF escribió en producción se
+  destraban con el deploy de las reglas y no hace falta correr ninguna migración
+  contra `treino-dev`.
+
+Es la cuarta pasada seguida en que se escribió "cerrado" antes de medirlo.
+**Antes de tachar un hallazgo: aflojá cada gate, uno por uno, y mirá qué se pone
+rojo.**
+
+**El camino de dos cuentas coludidas dejó de existir con el flip.** Era el
+residuo más incómodo del fix anterior (A crea y cancela inflando, B toma el
+slot, y ninguna regla puede distinguirlo de un traspaso real). Borrar el camino
+lo cerró de arriba, que es lo que ningún `&&` podía hacer.
+
+**Cómo se mantiene.** La matriz es de este bloque de reglas, no del archivo
+entero: se rehace cuando cambia la allowlist de `hasOnly()` (fila nueva) o
+cuando se agrega o saca un **camino de escritura** (columna nueva). Y *camino*
+incluye el `create`, que es la lección de esta pasada: la matriz anterior tenía
+las dos columnas de `update` y le faltaba la que siembra el estado del que esas
+dos dependen. Una columna nueva obliga a decidir las 14 celdas.
+
+**La pregunta que hay que hacerle a cada celda del `create`:** *¿un valor
+sembrado acá puede envenenar un gate de `update` que dependa de él?* Tres de las
+catorce decían que sí.
+
+---
+
+**Verificación de mutación (#831, quinta pasada).** Baseline **94/94** sobre
+`appointments-shape-rules.test.ts`, contra el emulador (JDK 21). **33**
+mutaciones, cada una aplicada **sola** sobre `firestore.rules` y revertida
+después:
+
+| Mutación | Rojos |
+|---|---|
+| **`create`: sacar `paymentId == null`** | **2** — el cobro sembrado y el ataque completo |
+| **`create`: sacar el tipo de `athleteId` / `trainerId`** | **3** — los dos no-string y el `trainerId` vacío |
+| **`update`: hacer INCONDICIONAL el tipo de `athleteId` / `trainerId`** | **2** — los dos legacy que dejaban de poder cerrarse |
+| **`update`: sacar el chequeo de `athleteDisplayName`** | **3** — el `null`, los 201 caracteres y el no-string |
+| **`update`: `athleteDisplayName` vuelve a `optStrMaxLen` (acepta `null`)** | **1** — el `null` que rompe el stream de las dos partes |
+| **`create`: sacar SÓLO `cancelledBy == null`** | **1** — la firma sembrada al nacer |
+| **`create`: sacar SÓLO `cancelledAt == null`** | **1** |
+| Sacar el pin de `athleteId` (Path 1) | **1** — mover athleteId en la cancelación |
+| Sacar el pin de `trainerId` (Path 1) | **1** — mudar el turno a otro PF |
+| Sacar el pin de `startsAt` (Path 1) | **1** — el turno imborrable |
+| Sacar el pin de `durationMin` (Path 1) | **1** — cambiar la duración de paso |
+| Sacar el pin de `paymentId` (Path 1) | **5** — limpiar / reapuntar / inventar, el bypass de dos pasos del set-once, y la salida cerrada del ataque del `create` |
+| Sacar el pin de `cancelledBy` (Path 1) | **5** — las dos atribuciones falsas, la cadena de dos pasos y la re-firma |
+| Sacar el pin de `id` (Path 1) | **1** |
+| Sacar el pin de `athleteDisplayName` (Path 1) | **1** — renombrar al atleta cancelando |
+| Sacar el pin de `recurringId` (Path 1) | **1** |
+| Sacar el pin de `cancelledBy` (Path 2) | **3** — la firma ajena, la cadena de dos pasos y la re-firma de un doc ya cancelado |
+| Sacar el pin de `cancelledAt` (Path 2) | **1** |
+| Sacar el pin de `cancellationLog` (Path 2) | **1** — la entrada forjada por el PF |
+| Sacar el pin de `id` (Path 2) | **1** |
+| Sacar el pin de `recurringId` (Path 2) | **1** |
+| Sacar el chequeo de `durationMin` del update | **3** — fuera de rango / no-int / mover el legacy fuera de rango |
+| Hacer INCONDICIONAL el rango de `durationMin` | **3** — los tres legacy que dejaban de poder cerrarse |
+| Sacar el tipo de `cancelledAt` del update | **1** — los 30 KB en la cancelación |
+| Hacer INCONDICIONAL el tipo de `cancelledAt` | **1** — el legacy con `cancelledAt` string |
+| Hacer INCONDICIONAL el tipo de `startsAt` | **2** — los dos legacy (string y millis) que dejaban de poder anotarse |
+| Sacar el tope de 50 del `cancellationLog` en el update | **1** — la entrada 51 |
+| Sacar el bound de crecimiento del `cancellationLog` | **1** — dos entradas en una sola escritura |
+| Sacar la cota de `id` del `create` | **2** — los 30 KB y el `id` no-string |
+| Sacar `cancelledAt == null` **y** `cancelledBy == null` del `create` | **3** |
+| Reintroducir el flip de ADR-1 | **6** — los seis casos convertidos |
+| Sacar el chequeo de `athleteId` / `trainerId` del update (entero) | **0** |
+| Sacar el tipo de `startsAt` del update (entero) | **0** |
+
+**Las dos filas de 0 son honestas, no un olvido, y su CONDICIÓN sí se mata.** Los
+dos caminos pinean `athleteId`, `trainerId` y `startsAt` contra `resource.data`,
+así que un valor de tipo equivocado se cae antes por el pin y el chequeo de forma
+nunca se evalúa: **no existe el negativo que mate el chequeo entero**. El único
+test que lo mataría es uno que asserteara que un doc heredado con el campo mal
+tipado ya no se puede tocar — o sea un test que custodia el **bug**, no el
+invariante. Los tres chequeos se quedan por dos motivos: es la convención del
+archivo, y el invariante no debería depender de que todo camino FUTURO se
+acuerde de pinear — que es literalmente cómo se coló la premisa falsa que este
+change vino a corregir. Lo que **sí** se puede matar es que estén condicionados a
+que el campo cambie, y esas tres filas —`startsAt`, `athleteId`/`trainerId`,
+`durationMin`— dan **2**, **2** y **3**. `durationMin` es el único que además
+mata la remoción entera, porque el Path 2 **no** lo pinea.
+
+**La fila del flip da 6, y esos 6 son los tests que se CONVIRTIERON en vez de
+borrarse.** Los casos que asserteaban el flip pasaron de ALLOW a DENY. Si se
+hubieran borrado, reintroducir el camino mataría **0** tests y volvería en
+silencio. Un camino que se remueve necesita tests que custodien la **ausencia**.
+
+**Las siete filas en negrita son de esta pasada, y cinco de ellas daban 0 antes
+de escribir su caso.** Dos por gates que **existían y no tenían cobertura** —el
+`cancelledBy == null` del `create` y el `athleteDisplayName <= 200` del update,
+los dos borrables con la suite entera en verde—; tres por reglas que no existían.
+El caso del `cancelledAt`/`cancelledBy` es el que mejor lo muestra: la fila vieja
+sacaba **los dos** gates a la vez, así que el único test que había —que manda los
+dos campos— la ponía roja por el otro. Separar la mutación es lo que destapa que
+uno de los dos no estaba custodiado.
+
+**La regla general, cuarta variante del mismo problema en este épico:** un
+`assertFails` sobre una operación que **ya está denegada por otro motivo** no
+custodia nada, y una mutación que saca **dos** gates juntos no distingue cuál de
+los dos la mató. Verde no es lo mismo que cubierto; una fila de mutación por
+gate, no por fix, es lo único que los distingue.
+
+**Y la quinta pasada agrega la suya: una matriz a la que le falta una columna es
+una lista con formato de matriz.** La de la cuarta pasada obligaba a recorrer 14
+filas y por eso encontró `cancelledBy`·P2 — pero recorría sólo los caminos que
+uno ya estaba mirando. El eje que faltaba no era un campo más: era **el escritor
+que siembra el estado del que dependen todos los gates de los otros dos**.
+
+---
+
+**Verificación de mutación (#831, sexta pasada) — la corrida EN SERIO.** Baseline
+**111/111**. La regla *"una fila de mutación por GATE, no por FIX"* que escribió
+la quinta pasada es correcta; lo que estaba mal era la aplicación: se corrió
+sobre los campos que el fix tocaba, no sobre **todos** los conjuntos de las dos
+funciones de forma.
+
+Corrida en serio: los **42 conjuntos** de `appointmentShapeOk()` y
+`appointmentUpdateShapeOk()`, cada uno reemplazado por `true` **solo**, con la
+suite entre medio y revertido después. Sobre el HEAD de la quinta pasada:
+**25 filas daban 0 rojos**.
+
+**Un cero por sí solo no prueba nada.** Un gate puede estar SUBSUMIDO —otro
+conjunto tapa el mismo ataque, así que borrarlo no abre nada—. Así que cada cero
+se clasificó con una **segunda** medición: aplicar su mutación y tirarle la
+escritura hostil que ese gate custodia, y anotar si pasaba a ALLOW.
+
+| | Cantidad |
+|---|---|
+| Conjuntos medidos | **42** |
+| Ceros sobre el HEAD anterior | **25** |
+| — de ésos, **subsumidos** (borrarlos no abre nada) | **8** |
+| — de ésos, **borrables en silencio con daño medido** | **17** |
+| Cerrados en esta pasada (con test nuevo) | **7** |
+| **Ceros con daño que quedan abiertos** | **10** → [#850](https://github.com/Backhaus7997/treino/issues/850) — **cerrados en la séptima pasada**, barrido re-corrido abajo |
+
+**Las siete filas que se cerraron**, y lo que pasaba a ALLOW al borrar cada una:
+
+| Conjunto | Rojos antes | Rojos ahora | Qué se colaba sin él |
+|---|---|---|---|
+| `create`: `cancellationLog is list` | — (no existía) | **3** | `""` y `{}` en un doc `confirmed` — rompe el stream del PF |
+| **`update`: `optStrMaxLen(noteBefore, 5000)`** | **0** | **4** | **30 KB en un turno CONFIRMADO — el vector original de #781** |
+| **`update`: `optStrMaxLen(noteAfter, 5000)`** | **0** | **1** | ídem, el campo gemelo |
+| `update`: `keys().hasOnly()` | **0** | **1** | el PF cuelga una clave arbitraria de 30 KB por el Path 2 |
+| `update`: `optStrMaxLen(paymentId, 128)` | **0** | **1** | `paymentId` de 30 KB, y el set-once lo vuelve permanente |
+| `create`: `optStrMaxLen(noteAfter, 5000)` | **0** | **1** | 30 KB en el `create` |
+| `create`: `optStrMaxLen(recurringId, 128)` | **0** | **1** | ídem |
+
+⚠️ **El caso de `noteBefore` en el update es el que más enseña.** Había UN test
+—*"DENIEGA engordar el turno colgándose de una cancelación válida"*—, escrito en
+#781 y **corregido en la pasada anterior** justamente porque estaba verde por el
+motivo equivocado. Volvió a romperse: el pin de `cancelledBy` que agregó **este
+mismo PR** hizo que la cancelación del caso dejara de matchear el Path 1, así
+que el `assertFails` pasó a fallar por la estructura de paths y no por la cota.
+Medido: con los dos `optStrMaxLen` del update en `true`, el caso seguía **verde**
+y el PF podía dejar 30 KB en un turno `confirmed`.
+
+**La lección, y es distinta de la anterior:** *"el negativo tiene que ser una
+operación que SIN el gate sería válida"* no es una propiedad que se verifica una
+vez. **Un fix en un camino vecino la invalida sin tocar el test.** Lo único que
+lo detecta es re-correr la mutación de esa fila después de cada cambio de regla
+— no re-leer el test.
+
+**Los ocho subsumidos, para no escribirles un negativo al pedo:**
+`hasAll(7 no-nullables)` y `startsAt is timestamp` del `create` (los tapa el
+acceso directo `d.campo`, que falla cerrado), `optStrMaxLen(cancelledBy, 128)`
+del `create` (lo tapa `cancelledBy == null`), y del `update` los condicionales
+de `athleteId` / `trainerId` / `startsAt` más las cotas de `cancelledBy` y
+`recurringId` (los tapan los pines de los dos caminos).
 
 ---
 
@@ -2657,6 +3399,416 @@ clave que no distingue definiciones deja que otro se lo apropie.
 
 ---
 
+### Séptima pasada — los tres residuos anotados, y los diez gates sin custodia
+
+Cierra [#846](https://github.com/Backhaus7997/treino/issues/846),
+[#847](https://github.com/Backhaus7997/treino/issues/847),
+[#848](https://github.com/Backhaus7997/treino/issues/848) y
+[#850](https://github.com/Backhaus7997/treino/issues/850). Los cuatro salieron
+de la revisión de #831 / PR #832 y quedaron fuera de alcance a propósito: los
+tres primeros piden **decidir un comportamiento**, no escribir una cota, y el
+cuarto son **tests**, no cambios de regla.
+
+Lo que tienen en común es el mismo daño de siempre —la familia de #781, el turno
+que no se puede sacar de la agenda— por tres puertas distintas: una la abría
+**nuestro propio backend**, otra un **acceso directo que falla cerrado**, y la
+tercera el **choque entre dos bloques de reglas que por separado están bien**.
+
+#### #846 — el `reason` que sembraba la Cloud Function del cascade
+
+`functions/src/cascade/appointments.ts` escribía, con Admin SDK,
+`{ status: 'cancelled', reason: 'athlete-account-deleted' }`. `reason` **no
+existía** en las 14 claves de `hasOnly()` de `appointmentShapeOk()` /
+`appointmentUpdateShapeOk()`.
+
+El Admin SDK saltea las reglas, así que la escritura pasaba. El daño es lo que
+quedaba después: `hasOnly()` corre sobre `request.resource.data`, el documento
+**MERGEADO**, así que cualquier update PARCIAL posterior del cliente arrastraba
+la clave guardada y la allowlist lo rechazaba.
+
+| Escritura sobre un turno que lleva `reason` | Antes | Ahora |
+|---|---|---|
+| el PF lo anota (`noteAfter`) | **DENY** | **ALLOW** |
+| el atleta lo cancela | **DENY** | **ALLOW** |
+| borrarlo | DENY (`allow delete: if false`) | DENY |
+| el cliente AGREGA `reason` (P1 o P2) | DENY *(por `hasOnly()`)* | **DENY** *(por el pin)* |
+| el cliente CAMBIA o BORRA el `reason` | DENY *(por `hasOnly()`)* | **DENY** *(por el pin)* |
+| el cliente CREA un turno con `reason` | DENY *(por `hasOnly()`)* | **DENY** *(por `== null`)* |
+
+**La decisión, y por qué.** `reason` **entra** a las dos allowlists y queda
+**pineada en los DOS caminos de cliente**
+(`request.resource.data.get('reason', null) == resource.data.get('reason', null)`),
+más `== null` en el `create` y el `delete` que ya era `if false`. O sea que la
+clave existe para las reglas —y por eso deja de congelar el documento— pero
+**ningún cliente la puede agregar, cambiar ni borrar por ninguna de las tres
+puertas**. El Admin SDK la escribe porque saltea las reglas: es exactamente una
+señal que sólo el backend puede emitir.
+
+Y no lleva cota de tipo ni de largo, a propósito. Una cota corre sobre el
+documento MERGEADO, o sea validaría el DOCUMENTO y no la escritura: un doc
+heredado con `reason` de otro tipo quedaría sin poder anotarse ni cancelarse
+nunca más. Es el error que #831 y #847 ya pagaron dos veces. Contra el cliente
+no hay nada que acotar —no puede escribir el campo—; contra la CF la cota la
+pone el code review.
+
+> **⚠️ Corrección — dos afirmaciones que quedaron escritas y son FALSAS.**
+>
+> 1. **«`reason` es un dato que nadie lee»**, con el argumento «no está en
+>    `Appointment`, no está en ninguna query de `lib/`». Eso se verificó **sólo
+>    en el cliente Dart**, y ahí es cierto. En `functions/src/` es **falso**:
+>    `notify-appointment.ts` lo lee como **control de flujo** (ADR-PN-006 /
+>    REQ-PN-CF-003), igual que el par hermano intacto `cascade/trainer-links.ts`
+>    ↔ `notify-link-change.ts`.
+> 2. **«Meter `reason` en las allowlists pide una clave nueva escribible por el
+>    cliente»**, con «su cota de texto y su pin en los DOS caminos». También es
+>    **falso**: con el pin en los dos caminos la clave es exactamente lo
+>    contrario —la ÚNICA del documento que el cliente **no** puede tocar—, y la
+>    cota no hace falta justamente porque el cliente no la escribe. La segunda
+>    afirmación es la que descartó la salida correcta, y la primera es la que
+>    hizo parecer inofensivo mover el motivo al log.
+>
+> La decisión **cambió** por eso: la salida que se había descartado es la que se
+> tomó.
+
+**Lo que la primera versión de este fix hacía, y por qué se revirtió.** Movía el
+motivo adentro del `cancellationLog` y sacaba la clave suelta. Dos problemas,
+los dos medidos:
+
+1. **Volvía FORJABLE el guard.** Las reglas **no iteran listas** —lo dice esta
+   misma sección para el `byUid`—, así que el contenido de una entrada del log
+   no se valida. Medido de punta a punta: un atleta autenticado cancela **su**
+   turno por el Path 1 legítimo agregando
+   `{byUid, atMs, reason: 'athlete-account-deleted'}` → **ALLOW**, y el handler
+   real emite **0 push y 0 mail**. El PF nunca se entera de que le cancelaron. Y
+   es simétrico: el PF puede silenciar al atleta. Con la clave suelta eso era
+   **imposible**, justamente porque no estaba en `hasOnly()`.
+2. **Pedía una migración con escritura contra producción** para destrabar los
+   documentos ya escritos. `treino-dev` ES producción
+   ([#826](https://github.com/Backhaus7997/treino/issues/826)) y es el único
+   proyecto que hay.
+
+Cerrarlo en las reglas resuelve las dos cosas de una: la señal vuelve a ser
+CF-only, y los documentos viejos se destraban con el deploy. Las dos primeras
+filas de la tabla pasaron de DENY a **ALLOW**, y están asserteadas así en
+`appointments-shape-rules.test.ts`.
+
+`scripts/migrations/strip_appointment_reason.mjs` **queda escrito y NO se
+corre**: con `reason` en la allowlist ya no destraba nada —no hay nada
+congelado—, y correrlo sería un retroceso, porque cambia una señal CF-only por
+una entrada de log forjable. Su compuerta de escritura sí se arregló, y eso está
+abajo.
+
+#### #846 (secuela) — el guard de notificaciones, y por qué su señal tiene que ser CF-only
+
+`notifications/notify-appointment.ts` lee `reason` para **NO** mandar la
+notificación de cancelación cuando el write viene del cascade. Está documentado
+en el header del archivo y en ADR-PN-006 / REQ-PN-CF-003, y que es un contrato
+CF→CF deliberado lo prueba el par hermano, que quedó intacto:
+`cascade/trainer-links.ts` escribe `reason: 'account-deleted'` y
+`notify-link-change.ts` lo lee igual.
+
+Al mover el motivo adentro del `cancellationLog`, el guard quedó comparando
+contra `undefined`. Medido contra el emulador, con el cascade REAL:
+
+| `confirmed` → `cancelled` por el cascade | Antes de #846 | Con la 1ª versión de #846 | Ahora |
+|---|---|---|---|
+| `sendFcm` | 0 llamadas | **1 por turno** | 0 llamadas |
+| destinatarios | — | **`[athleteId, trainerId]`** | — |
+| mail encolado | 0 | **2 por turno** | 0 |
+
+Y llegaban a **las dos** partes —incluido el atleta que acababa de borrar su
+cuenta— porque el cascade tampoco escribía `cancelledBy`, así que
+`notify-appointment.ts` caía en el fallback de ambos. Un atleta con 12 turnos
+futuros son 12 push al PF y 12 a un fantasma.
+
+**El arreglo, y por qué así.**
+
+1. **La señal es `reason`, que el cliente no puede escribir.** Un guard es
+   control de flujo, así que la pregunta no termina en *"¿el productor y el
+   consumidor coinciden?"*. Sigue en **"¿alguien MÁS puede emitir esa señal?"**.
+   Leer el `cancellationLog` respondía que sí. La tabla es la probe, medida de
+   punta a punta:
+
+   | Cancelación del turno | Rules | `sendFcm` — guard sobre el log | `sendFcm` — guard sobre `reason` |
+   |---|---|---|---|
+   | cascade real (Admin SDK) | *(saltea)* | 0 | **0** ✅ |
+   | atleta, Path 1 legítimo | ALLOW | 0 | **1** ✅ |
+   | atleta, Path 1 + motivo FORJADO en el log | **ALLOW** | **0** ❌ | **1** ✅ |
+   | atleta o PF escribiendo `reason` | **DENY** | — | — |
+
+2. **El guard mira la ESCRITURA, no el estado final**:
+   `after.reason === … && before?.reason !== …`. El motivo queda guardado en el
+   documento para siempre, pero el write que lo puso ocurre una vez. Sin esa
+   mitad, cualquier cambio de estado posterior de un turno que el cascade ya
+   tocó quedaría mudo para siempre.
+3. **El motivo es una constante exportada**, `ATHLETE_ACCOUNT_DELETED_REASON`,
+   que vive en el productor y el consumidor importa. Eran dos literales iguales
+   en dos archivos: un solo símbolo no se desincroniza en silencio.
+4. **El cascade escribe además `cancelledBy: uid`** y la entrada del
+   `cancellationLog`. El log es el **rastro** que la app deserializa
+   (`CancellationEntry.reason`), no la señal. `cancelledBy` es quién canceló:
+   con el guard sano no se llega a la rama de destinatarios, pero sin él el
+   fallback le escribe también al fantasma.
+
+**Y el test que faltaba, que es el verdadero hallazgo.** El único caso que
+custodiaba el guard —SCENARIO-635 en `notify-appointment.test.ts`— le pasa el
+motivo **a mano** al handler: testea al consumidor contra un payload sintético,
+o sea contra la creencia del test sobre lo que el productor escribe. Con el
+contrato productor→consumidor sin cobertura, la regresión pasó la suite entera
+en verde, y `ApptData = Record<string, unknown>` hizo que `tsc` tampoco
+chistara. `functions/src/__tests__/cascade/appointments-notify-contract.test.ts`
+corre el cascade REAL, toma el snapshot de antes y el de después —literalmente
+el par que `onDocumentWritten` le entrega al trigger— y se los da al handler
+REAL. Y trae además la **probe de forja**: contra el guard que leía el log da
+rojo con las cifras de la tabla; con la señal CF-only, verde.
+
+#### #846 (tercera parte) — la compuerta de la migración creía estar en el emulador
+
+`scripts/migrations/strip_appointment_reason.mjs` decidía si escribir con
+`usandoEmulador()` (`scripts/lib/target_project.js`), que hacía **OR** entre
+`FIRESTORE_EMULATOR_HOST` y `FIREBASE_AUTH_EMULATOR_HOST`. **El script escribe
+sólo en Firestore.**
+
+Medido con `--apply` y una service account falsa:
+
+| `FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099`, Firestore **no** | Antes | Ahora |
+|---|---|---|
+| lo que imprime | `emulador: sí` | `emulador: Firestore=no · Auth=sí` |
+| cartel 🚨 de producción | **no sale** | **sale** |
+| puerta "no sé el destino" | **salteada** | aplica |
+| puerta "es producción, confirmá" | **salteada** | aplica |
+| destino real de los `batch.update` | **`treino-dev`** | *(abortó antes)* |
+
+Murió recién en el canje del token, y sólo porque la key era falsa: ya le estaba
+hablando al Firestore de producción. Y no hay que buscar el escenario —esa
+variable queda exportada de una sesión de `emulator.sh` o la hereda una shell—.
+Es literalmente el modo de fallar de #826, en el script cuyo header lo cita como
+motivo de existir.
+
+**Y no es heredado.** En `origin/main` `usandoEmulador()` tiene dos llamadores y
+en los dos alimenta a `bannerDeProduccion({contraEmulador})`: **apaga un cartel,
+no cambia una decisión**, y el peor caso es no gritar. Este script fue el primero
+en ascenderla a **compuerta de escritura** sin ajustar la semántica.
+
+**El arreglo.** `usandoEmulador()` **se borró**. En su lugar,
+`emuladoresActivos(env)` devuelve el estado **por servicio** —`firestore`,
+`auth`, `storage`, `database`, sobre las cinco variables que lee el Admin SDK— y
+`contraEmuladorDe(servicios, env)` exige que estén desviados **todos** los que
+el proceso toca. Es el mismo criterio por servicio que ya aplicaba
+`scripts/lib/storage_target.js`, que hasta aborta el split-brain
+(*"Firestore apunta al EMULADOR pero Storage NO"*). Los dos entrypoints del #826
+pasaron a `contraEmuladorDe(['firestore'])`, que es estrictamente más seguro: el
+cartel sale MÁS veces, nunca menos.
+
+**Y el script pasó de cero tests a tenerlos.** Era el único consumidor del repo
+del que depende que una escritura contra producción ocurra o no.
+`scripts/test/strip_appointment_reason_gate.test.js` corre el script REAL en un
+subproceso sobre **la matriz completa de las cinco variables (32 combinaciones)**
+con `--apply`, y no mide lo que imprime sino **hasta dónde llega**: el stub tira
+`STUB_FIRESTORE_REACHED` en el primer `.collection()`, así que la ausencia del
+marcador con exit 2 es la prueba de que la compuerta frenó antes del primer
+contacto. Mutación: volviendo la compuerta al OR, **11 de 42 casos se ponen
+rojos**.
+
+**Y esa forma de medir tenía un punto ciego que costó una ronda entera.** El
+marcador tampoco aparece cuando el stub **no se aplicó**, así que "ausencia de
+`STUB_FIRESTORE_REACHED`" no distinguía *la compuerta frenó* de *no medí nada*.
+Corriendo la suite en la versión de Node que usa CI aparecieron **dos**
+coberturas que decían estar y no estaban:
+
+| Modo degradado | Dónde pasaba | Qué se creía medir | Qué se medía |
+|---|---|---|---|
+| `module.registerHooks()` no existe antes de Node 22.15 | Node 20 (el job `scripts-test`) | 42 casos de compuerta | el `firebase-admin` REAL: el `import` de un `.mjs` no pasa por `Module._load` |
+| el runner no espera solo a los subtests antes de Node 24 | Node 20 **y** Node 22 | 32 combinaciones | **1**; las otras 31 salían `cancelledByParent` |
+
+Las dos se arreglaron en el harness, no bajando la versión del job — bajarla
+habría tapado el modo de fallar en vez de cerrarlo. La intercepción ESM pasó a
+`module.register()` (existe desde **Node 20.6**, o sea el mismo camino en 20, 22
+y 26) y los subtests de la matriz se `await`ean.
+
+**Lo que impide que vuelva a pasar** es que la intercepción dejó de probarse por
+ausencia: el módulo sintético anuncia `STUB_ESM_INTERCEPTED` al evaluarse, y
+`correr()` lo exige en **cada** corrida. `scripts/test/esm_stub_interception.test.js`
+custodia al harness con **control negativo** —la misma sonda sin el preload
+tiene que decir `ESM=REAL`—, porque un marcador que aparece siempre no prueba
+nada. Mutación, apagando la intercepción ESM en Node 20: **46 casos rojos** en la
+suite —las 44 de la matriz, con el mensaje *"este test NO está midiendo la
+compuerta"*, más 2 del propio harness—. Antes ese mismo mutante dejaba la matriz
+en verde.
+
+#### #847 — el gate de 24 h leía el valor viejo con acceso directo
+
+El Path 1 es el ÚNICO camino de salida de un turno, y su gate temporal es
+`resource.data.startsAt.toMillis() - 86400000 > request.time.toMillis()`, o sea
+el valor **guardado**, leído con acceso **directo**. Sobre un `startsAt` que no
+es `timestamp` —o que no está— `.toMillis()` no evalúa y la regla **falla
+cerrado**.
+
+#831 había arreglado la mitad: condicionar el `is timestamp` de
+`appointmentUpdateShapeOk()` a que el campo CAMBIE volvió **anotable** al doc
+heredado. Medido entonces, y por eso el issue fue aparte:
+
+| Documento heredado | Anotar (Path 2) | Cancelar (Path 1) — antes | Cancelar — ahora |
+|---|---|---|---|
+| `startsAt: "manana"` (string) | ALLOW | **DENY** | **ALLOW** |
+| `startsAt: 1787…` (millis, `int`) | ALLOW | **DENY** | **ALLOW** |
+| sin el campo `startsAt` | ALLOW | **DENY** | **ALLOW** |
+| `startsAt` timestamp a 6 h vista | ALLOW | DENY (REQ-007) | **DENY** (REQ-007) |
+
+**La decisión: un `startsAt` que no es `timestamp` no tiene "24 horas antes" que
+calcular, así que no se le exige el gate temporal.** No es aflojar el único
+freno del camino de cancelación: es no exigir una comparación imposible. Y no
+abre nada, porque ese estado **ya no se puede fabricar** — las dos puertas
+quedaron cerradas en #831 (`create` exige `is timestamp` incondicional; el
+`update` sólo deja escribir un `timestamp` cuando el campo cambia). La rama
+nueva la alcanzan únicamente documentos anteriores a #781, cuando el `create` no
+validaba nada. `treino-dev` ES producción y no se le corren queries, así que se
+asume que están.
+
+Los dos pines de `startsAt` —Path 1 y Path 2— pasaron de acceso directo a
+`.get()` por el mismo motivo, y eso cierra de paso el residuo hermano que estaba
+anotado junto a éste: **un doc SIN `startsAt` estaba congelado** porque las dos
+mitades de la igualdad no evaluaban. El pin no se afloja: si el campo está y la
+escritura lo mueve, `.get()` devuelve valores distintos y sigue dando DENY —
+medido, la mutación del pin mata 3 casos.
+
+**La última fila de la tabla es el caso que faltaba, y no es decoración.** El
+gate de 24 h no tenía **un solo negativo** en toda la suite: sólo el positivo
+*"permite al miembro cancelar con más de 24 h"*, y un positivo no custodia nada.
+Con el conjunto reemplazado por `true`: **0 rojos**. Al condicionar el gate hacía
+falta el doble, porque si no el fix habría cambiado *"gate sin custodia"* por
+*"gate sin custodia, más ancho"*.
+
+#### #848 — borrar un Payment dejaba el `paymentId` del turno colgado
+
+Dos decisiones de diseño que nunca se cruzaron: `payments` permitía **borrar** al
+PF dueño, y `appointments.paymentId` es **set-once** (`null` → string no vacío, o
+re-afirmar el MISMO valor). El set-once existe para que un cliente no pueda
+reapuntar un cobro, y asume que el Payment **no desaparece**.
+
+Medido con el PF dueño de los DOS documentos:
+
+| Escritura | Antes | Ahora |
+|---|---|---|
+| borrar el Payment apuntado | **ALLOW** | **DENY** |
+| limpiar el `paymentId` del turno a `null` | DENY (set-once) | DENY (set-once) |
+| reapuntarlo a otro Payment | DENY (set-once) | DENY (set-once) |
+
+**La decisión: se cierra el `delete`, no se afloja el set-once.** Aflojarlo no se
+puede *escribir*: haría falta un `exists()` sobre el Payment apuntado, y
+`exists()` en reglas lee estado **pre-commit**, mientras `billAppointment` crea
+el Payment y setea el `paymentId` en la MISMA transacción — ya está documentado
+sobre el Path 2 por qué ahí no va un `exists()`. Una CF que limpie el
+`paymentId` al borrarse el Payment resuelve el dato pero deja la ventana
+abierta.
+
+Y es gratis, verificado **leyendo los escritores**, que es el método que dejó sin
+llamadores a `book()` en #831:
+
+- `PaymentRepository` (`lib/features/payments/data/payment_repository.dart`)
+  tiene `add`, `markPaid`, `markManyPaid`, `watchForTrainer`, `watchForAthlete`.
+  **No tiene delete.**
+- Ningún `.delete()` de `lib/` cae sobre `collection('payments')`; los otros dos
+  escritores de la colección son `AppointmentRepository.billAppointment(s)`, que
+  sólo crean.
+- El cascade de borrado de cuenta **RETIENE** los payments a propósito
+  (*"payments — RETAINED for fiscal/accounting"*, `functions/src/cascade/athlete-data.ts:19`)
+  y escribe con Admin SDK, que saltea estas reglas.
+
+O sea: superficie abierta para una capacidad que ningún cliente usa, y que además
+**contradice la retención fiscal que el propio cascade declara**. El caso
+positivo que había —*"allows the owner trainer to delete their own record"*— se
+CONVIRTIÓ a DENY en vez de borrarse, mismo criterio que #831 usó con el flip: un
+camino que se remueve necesita un test que se ponga rojo si alguien lo
+reintroduce.
+
+⚠️ Si algún día el PF necesita anular un cobro cargado por error, la salida es un
+`status: 'void'` —que preserva el rastro contable— y eso es **cambio de
+producto**: valor nuevo en el enum, UI, y filtros de `pagosPorCobrarProvider`. No
+entra en un fix de reglas.
+
+#### #850 — los diez gates que se podían borrar con la suite en verde
+
+Del barrido de mutación en serio de #831: los **42 conjuntos** de
+`appointmentShapeOk()` / `appointmentUpdateShapeOk()`, uno por uno, reemplazados
+por `true` de a UNO SOLO. #831 cerró 7 de las 25 filas que daban 0 rojos;
+quedaban 10 con daño medido y 8 redundantes.
+
+**Las reglas estaban bien escritas** — ninguna de estas escrituras pasaba. Lo que
+faltaba era la **custodia**: borrar el gate no ponía rojo a nadie, así que un
+refactor futuro lo sacaba sin enterarse. Es exactamente lo que le pasó a
+`cancelledBy == null` y a `athleteDisplayName <= 200` antes de #831.
+
+| Gate | Escritura que pasaba a ALLOW sin él | Rojos ahora |
+|---|---|---|
+| `d.athleteId is string` | `athleteId: ['x']` por el disyunto del PF | 1 |
+| `d.athleteId.size() > 0` | `athleteId: ''` por el disyunto del PF | 1 |
+| `d.athleteId.size() <= 128` | `athleteId` de 200 caracteres | 1 |
+| `d.trainerId is string` | `trainerId: ['x']` por el disyunto del atleta | 1 |
+| `d.trainerId.size() <= 128` | `trainerId` de 200 caracteres | 1 |
+| `d.athleteDisplayName is string` | `athleteDisplayName: []` — una lista mide 0 | 1 |
+| `d.id is string` | `id: ['x']` | 1 |
+| `d.id.size() > 0` | `id: ''` | 1 |
+| `d.durationMin is int` | `durationMin: 60.5` (double) | 1 |
+| `d.durationMin > 0` | `durationMin: 0` | 1 |
+
+**Por qué el payload es EXACTAMENTE ése, y no el que la suite ya tenía.** Había
+negativos para varios de estos campos y pasaban **por el motivo equivocado**: con
+`athleteId: 12345` y el `is string` borrado la regla no se afloja, porque
+`12345.size()` tampoco evalúa y falla cerrado igual. El ataque que mide un gate
+es el que **sobrevive a su ausencia**, y para los `is string` eso es una LISTA:
+`['x'].size()` da 1. Misma pregunta que destapó el `cancellationLog` en la sexta
+pasada — *¿esta cota chequea el TIPO, o sólo una propiedad que varios tipos
+comparten?*
+
+`athleteDisplayName: []` es el más interesante de los diez: una lista vacía mide
+0, o sea cumple `<= 200`, y el campo es `required String` en el modelo. Sin el
+`is string`, `Appointment.fromJson` explota y **una sola fila rompe el stream
+entero** de `watchForTrainer` y `watchForAthlete`.
+
+**Y el disyunto importa.** Los ataques sobre `athleteId` van por el camino del PF
+con rol: el disyunto del atleta compara `athleteId == request.auth.uid` y se cae
+AHÍ, antes de llegar a la forma — el *"negativo que no avisa"* de #837. Los de
+`trainerId` van al revés.
+
+#### El barrido re-corrido — las 42 filas, después de estos cambios
+
+§1.8 pide dos cosas que este PR cumple y conviene dejar dichas: **una fila por
+GATE, no por fix** (aflojar sólo los conjuntos que tocaste mide tu diff, no el
+bloque), y que *"el negativo es válido sin el gate"* **no es permanente** — un
+fix en un camino vecino la invalida sin tocar el test, y lo único que lo detecta
+es re-correr la mutación de esa fila.
+
+Barrido completo con los cambios de este PR aplicados: **42 conjuntos, 34 con al
+menos un rojo, 8 en cero**. Y las 8 son **exactamente** las que #850 clasificó
+como redundantes, o sea gates SUBSUMIDOS y no gates sin custodia:
+
+| Fila en cero | Quién tapa el mismo ataque |
+|---|---|
+| `hasAll(...)` de los 7 no-nullables del `create` | el acceso directo `d.campo` de las cotas de abajo, que falla cerrado si el campo falta |
+| `d.startsAt is timestamp` del `create` | ídem — `d.startsAt.toMillis()` no evalúa sobre otro tipo |
+| `optStrMaxLen(cancelledBy, 128)` del `create` | `d.get('cancelledAt'/'cancelledBy', null) == null` |
+| el condicional de `athleteId` del `update` | los pines de `athleteId` de los DOS caminos |
+| el condicional de `trainerId` del `update` | ídem, sobre `trainerId` |
+| el condicional de `startsAt` del `update` | ídem, sobre `startsAt` (ahora por `.get()`) |
+| `optStrMaxLen(cancelledBy, 128)` del `update` | el pin del Path 2 y el `== request.auth.uid` del Path 1 |
+| `optStrMaxLen(recurringId, 128)` del `update` | los pines de `recurringId` de los DOS caminos |
+
+Están bien que existan —convención del archivo, y para que el invariante no
+dependa de que todo camino FUTURO se acuerde de pinear— pero no hace falta
+escribirles un negativo: el cero es *subsumido*, no *sin custodia*, y la
+distinción se midió tirándole a cada uno la escritura hostil que custodia.
+
+Los dos gates de este PR que viven FUERA de las dos funciones de forma se
+midieron igual, porque son los que el fix toca:
+
+| Gate | Rojos con el conjunto en `true` |
+|---|---|
+| el gate de 24 h del Path 1 (condicionado) | **2** — antes de este PR: **0** |
+| el pin de `startsAt` del Path 1 (ahora por `.get()`) | **3** |
+
+---
+
 ### 4.10 Observaciones que no llegan a ticket
 
 No son permisos sin decidir, pero salieron del cruce y conviene que estén
@@ -2788,9 +3940,289 @@ y se tacha acá con la referencia al PR — nunca se borra. Los hallazgos de
 | QA-SEC-011 | `isProfilePublic` no se aplica en las reglas | ~~Cerrado~~ — #806 (issue [#778](https://github.com/Backhaus7997/treino/issues/778)) por **Opción B**: se corrigió el copy, no el gate. Las reglas no filtran por campo, así que el gate real exige partir el doc — queda como feature aparte. `firestore.rules:942`, §4.9 |
 | QA-SEC-012 | `visibility: 'shared'` concede lectura mundial a una feature reservada | Abierto — [#779](https://github.com/Backhaus7997/treino/issues/779), §4.9 |
 | QA-SEC-013 | El gate de rol de trainer no llegó a 3 colecciones | ~~Cerrado~~ — [#780](https://github.com/Backhaus7997/treino/issues/780): gate de rol en las 3 + `keys().hasOnly()` y rangos en las 2 de agenda. `firestore.rules:1175`, `:2078`, `:2125`, `coach-role-gate-rules.test.ts`, §4.9 |
-| QA-SEC-014 | `appointments` create sin allowlist ni cap de tamaño | ~~Cerrado~~ — [#781](https://github.com/Backhaus7997/treino/issues/781): `keys().hasOnly()` + cotas de texto + rango de `startsAt`, y la misma cota en los 3 caminos del update. `firestore.rules:2048`, `appointments-shape-rules.test.ts`, §4.9 |
+| QA-SEC-014 | `appointments` create sin allowlist ni cap de tamaño | **Abierto** — [#781](https://github.com/Backhaus7997/treino/issues/781): `keys().hasOnly()` + cotas de texto + rango de `startsAt`, y la misma cota en todos los caminos del update. Residual **NO cerrado** — [#831](https://github.com/Backhaus7997/treino/issues/831) cerró vectores, no el hallazgo: el payload volvía a `confirmed` por el flip de ADR-1 — **el flip se REMOVIÓ** (su única implementación, `book()`, no tiene llamadores en `lib/`), y el Path 1 pinea ahora `cancelledBy`, `athleteId`, `trainerId`, `startsAt`, `durationMin` y `paymentId` — este último cierra el bypass de dos pasos del set-once money-critical del Path 2. Cuarta pasada: la **matriz campo × camino** (las 14 filas de `hasOnly()` × los 2 caminos) reemplazó a la lista de vectores y destapó 11 celdas que nadie había decidido — entre ellas `cancelledBy` **escribible por el Path 2**, que reabría en dos pasos lo que el pin del Path 1 cerraba, y `id` / `cancelledAt` **sin tipo ni cota en el `create`**, o sea el inflado original de #781 todavía abierto. **Sexta pasada:** el `cancellationLog` del `create` tenía cota de TAMAÑO y no de TIPO —`size()` lo tienen las listas, los String **y** los Map—, así que un `""` o un `{}` daba ALLOW, el doc nacía `confirmed`, entraba al stream y **rompía la deserialización de la agenda entera del PF**, imborrable. Se cierra con `is list`; medido, la query del PF pasa de 2 docs forjados a 0. Y el barrido de mutación en serio —los 42 conjuntos, uno por uno— destapó que **la cota de 5000 del camino de update, o sea el vector con el que empezó #781, era borrable con la suite entera en verde**. Residuos abiertos y acotados: el `byUid` y el tamaño de la entrada del log (piden una CF), el inflado dentro de un doc `cancelled` (techo 1 MiB, inerte), el `is list` que falta en el update, y [#846](https://github.com/Backhaus7997/treino/issues/846) / [#847](https://github.com/Backhaus7997/treino/issues/847) / [#848](https://github.com/Backhaus7997/treino/issues/848) / [#849](https://github.com/Backhaus7997/treino/issues/849) / [#850](https://github.com/Backhaus7997/treino/issues/850). `firestore.rules:2171`, `appointments-shape-rules.test.ts`, §4.9 |
 | QA-SEC-015 | `temp/uploads` sin allowlist de content-type ni cap | ~~Cerrado~~ — #804 (issue [#782](https://github.com/Backhaus7997/treino/issues/782)): bloque cerrado entero, no acotado. `storage.rules:88`, `temp-uploads-storage-rules.test.ts`, §4.9 |
 | QA-SEC-016 | El scanner de App Check cubre 2 de 5 callables | ~~Cerrado~~ — [#783](https://github.com/Backhaus7997/treino/issues/783) / [#805](https://github.com/Backhaus7997/treino/pull/805), `appcheck-enforcement.test.ts` + `helpers/appcheck-audit.ts`, §4.8.1 y §4.9 |
+| QA-SEC-017 | Chequeos de RANGO/TIPO incondicionales en `update` congelan el documento legacy | **Cerrado PARCIAL** — [#849](https://github.com/Backhaus7997/treino/issues/849): condicionados a que el campo CAMBIE en `userPublicProfiles`, `measurements`, `performance_tests` y `athlete_billing`. Los otros 6 candidatos del issue NO se tocaron: se midió que no tienen ventana legacy. **Lo que queda adentro:** las dos cotas de largo de `notes` (`measurements`, `performance_tests`) siguen incondicionales y congelan igual — entraron en el mismo commit que las cotas numéricas y comparten su ventana. Se dejaron porque ahí la congelación es reparable por el dueño (truncar, o `delete`), no porque no exista. Se cierra del todo cuando se decidan esas dos. `firestore.rules:62`, `legacy-doc-freeze-rules.test.ts`, §4.14 |
 | QA-SEC-100 | Android: `allowBackup` | ~~Cerrado~~ — `test/security/android_manifest_backup_test.dart` |
 
-**Próximo id libre: QA-SEC-017** (y `QA-SEC-1xx`: 101).
+**Próximo id libre: QA-SEC-018** (y `QA-SEC-1xx`: 101).
+
+---
+
+### 4.14 QA-SEC-017 — un chequeo de rango en un `update` no valida la escritura: congela el documento
+
+Sale de [#849](https://github.com/Backhaus7997/treino/issues/849), que pide
+barrer el resto de `firestore.rules` con la pregunta que en `appointments` se
+contestó mal cuatro veces (§4.9, QA-SEC-014).
+
+#### El patrón
+
+Una función de forma compartida por `create` y `update` corre sobre
+`request.resource.data`, que en un `update` es el documento **RESULTANTE**, no
+el diff. Entonces:
+
+> Un chequeo de **RANGO** o de **TIPO** incondicional en un `update` no valida
+> la **escritura**: valida el **DOCUMENTO**. Si existe un doc viejo con el valor
+> fuera de rango, ese documento no se puede actualizar **nunca más**.
+
+Y no hace falta que el writer use `set(merge:true)` para que pase. Hay dos
+caminos, y los dos aparecen en este repo:
+
+1. **Merge parcial.** `set(campo, merge:true)` deja que el valor guardado entre
+   al doc resultante sin que el cliente lo mencione.
+   (`userPublicProfiles`, `athlete_billing`.)
+2. **Round-trip del modelo.** Un `set()` del modelo COMPLETO donde el cliente
+   rearmó ese modelo releyendo el doc y prefilleando el formulario. El valor
+   legacy vuelve escrito por el propio cliente.
+   (`measurements`, `performance_tests`.)
+
+El segundo es el que se escapa leyendo la regla sola: el comentario de
+`performanceTestShapeOk` decía *"both `set(t.toJson())` the full model, no
+merge"* como si eso cerrara el tema. No lo cierra. Lo único que decide es si el
+valor legacy vuelve por el merge del servidor o por el prefill del formulario —
+`log_measurement_screen.dart:66` lo dice explícito: *"Edit mode pre-populates
+every field"*.
+
+#### La matriz
+
+Fechada con `git log -S` contra el modelo, que es lo que separa una ventana real
+de una teórica. `delete` importa porque decide si el documento congelado es
+**recuperable**: donde `delete` está permitido el dueño puede borrar y rehacer;
+donde dice `if false`, el documento queda muerto.
+
+| Colección | Chequeo incondicional | `delete` | Writer del update | Ventana legacy | Veredicto |
+|---|---|---|---|---|---|
+| `userPublicProfiles` | 4 cotas de métricas + `rachaUpdatedAt is timestamp` + `isProfilePublic`/`rankingOptIn is bool` | **`if false`** | `set(merge:true)` parcial | **SÍ** — métricas escritas por el cliente sin cota entre 2026-07-03 (`a13f96f9`, el modelo) y 2026-07-06 (`c646376e`, la cota); `isProfilePublic` sin tipo entre 2026-07-06 (`64d8de3f`) y 2026-07-24 (`1f3b9c6c`) | **ARREGLADO — crítico** |
+| `performance_tests` | `optPositiveNum` ×17 + `recordedAt is timestamp` | permitido | `set()` completo con round-trip | **SÍ** — la pantalla no tuvo **ningún** validador entre 2026-06-02 (`b8e919f0`) y 2026-06-17 (`737cb5f3`); la regla llegó el 2026-07-23 (`d1259165`) | **ARREGLADO — alto** |
+| `measurements` | `optNumInRange(…,0,500)` ×20 + `recordedAt is timestamp` | permitido | `set()` completo con round-trip | **SÍ** — misma ventana y mismo commit de validador que arriba | **ARREGLADO — alto** |
+| `athlete_billing` | `amountArs is int` + cota, `cadence in […]`, `updatedAt is timestamp` | permitido | `set(merge:true)` parcial | **SÍ, angosta** — el monto es texto libre **sin tope en el cliente**; modelo desde 2026-06-03 (`76364132`), regla desde 2026-07-21 (`d3ecfb37`) | **ARREGLADO — medio** (sólo `amountArs`) |
+| `coach_availability_rules` | `dayOfWeek`, horas, `slotDurationMin` | permitido | `update(rule.toJson())` | **NO** — `availability_rule.dart` es de **un solo commit** (`eb4069f7`, 2026-05-22) y nunca se volvió a tocar: `git log --follow` y `git log -S` sobre los tres campos devuelven esa única entrada, así que la forma no derivó nunca. Y los valores están **acotados por el widget desde su primer commit** (`36136693`): `_kDurations = [30, 60, 90, 120]` —los mismos 4 de la regla—, `ChoiceChip` sobre `dayOfWeekLabels` (7 entradas, 1..7) y `showTimePicker`, que no puede devolver una hora fuera de 0..23 ni un minuto fuera de 0..59 | **NO SE TOCÓ** |
+| `coach_availability_overrides` | ídem | permitido | **no existe** — `availability_repository.dart` sólo tiene `addOverride`/`deleteOverride` | **NO** | **NO SE TOCÓ** |
+| `posts` (inline) | `privacy in […]`, `text.size() <= 1120`, `workoutSnapshot.exercises <= 30` | permitido | `update({text, privacy, routineTag})` | **NO** — ver abajo | **NO SE TOCÓ** |
+| `ratingPayloadOk` | `rating is int`, `createdAt`/`updatedAt is timestamp` | `if false` | — | **NO** — regla (`e8e8019a`) y modelo (`cc161a5b`) el mismo día, 2026-07-28 | **NO SE TOCÓ** |
+| `reviews` | `rating >= 1 && <= 5` | `if false` | — | **NO** — la regla entró en `8046374f` (2026-06-02), el **mismo commit** que la data layer y antes del flujo de escritura (`207bbcc1`) | **NO SE TOCÓ** |
+| `feedbackShapeOk` | `exerciseId`/`exerciseName is string`, `createdAt is timestamp` | permitido | — | **NO** — la regla entró en #795 (`99644ed3`) **antes** que el modelo, en #797 (`b1822372`); los dos el 2026-08-25 | **NO SE TOCÓ** |
+
+**Seis de los diez candidatos no se tocaron a propósito** (los seis
+`NO SE TOCÓ` de la tabla; una versión anterior de este párrafo decía "cinco" y
+se contradecía con su propia tabla). Cambiar una regla de
+producción sin necesidad es riesgo sin beneficio, y la evidencia de que no hay
+ventana es tan parte del cierre como el fix.
+
+Los tres de `posts` merecen el detalle porque el issue los marcaba como riesgo:
+
+- `privacy`: `PostPrivacy` tiene exactamente los tres valores de wire
+  (`friends`/`gym`/`public`) desde que nació, en `5058cb60` (2026-05-14). El
+  único writer es el enum. Un valor fuera de la lista nunca fue escribible.
+- `text.size() <= 1120`: el composer capea en `kMaxPostChars = 280` desde
+  `739bcc3d` (2026-05-18), o sea desde su primer commit. La cota de la regla es
+  4× esa, que es el margen de expansión UTF-8. (Queda un borde **teórico**: 280
+  grafemas de emoji compuesto pueden pasar de 1120 unidades. No se arregló
+  porque nadie midió un post así, y la regla es idéntica en `create` y `update`
+  desde el mismo commit.)
+- `workoutSnapshot.exercises <= 30`: la cota y el campo entraron en el **mismo
+  commit**, `bd81d4a3` (2026-07-28).
+
+#### Por qué `userPublicProfiles` es la urgente
+
+Es la única que combina las tres cosas:
+
+1. `allow delete: if false` — el dueño no puede borrar y rehacer.
+2. Las cuatro métricas están **pineadas** (sólo se puede reescribir el valor
+   guardado): el dueño tampoco puede reparar el valor que lo bloquea.
+3. Todos sus writers son `set(merge:true)` parciales
+   (`user_public_profile_repository.dart:92,116,131,140,150,160,278`), así que
+   la métrica corrupta se re-presenta en **cada** escritura.
+
+Resultado medido: con `bestSquatKg: 1200` guardado, el dueño no podía cambiarse
+el `displayName`, ni el avatar, ni tocar el toggle de privacidad. **Permanente.**
+
+Y no es un escenario de laboratorio. `bestSquatKg` sale de `familyMaxWeight`
+(`functions/src/ranking-aggregate.ts:95`), que **no acota**, corre con Admin SDK
+—o sea saltea estas reglas— y lee `setLogs` que no tuvieron tope hasta
+`kMaxWeightKg = 500` en `8fa63c35` (2026-07-20). O sea: la CF puede seguir
+escribiendo hoy un valor que la regla de update rechaza para siempre.
+
+#### El fix
+
+Un helper compartido, `unchanged(d, prior, campo)` (`firestore.rules:62`), que
+se suma como disyunto: la cota se exige **sólo cuando el campo cambia**. `prior`
+es `resource.data` en el update y el mapa vacío `{}` en el create, donde todo
+valor es nuevo.
+
+No sirve para chequeos de **presencia obligatoria**: con `prior` vacío y el
+campo ausente los dos lados dan `null` y el requisito se saltearía. `recordedAt`
+usa por eso la forma explícita, que exige `prior` no-nulo.
+
+Los chequeos de **FORMA** —`keys().hasOnly()`, `keys().hasAll()`— siguen
+incondicionales.
+
+##### `notes`: una decisión, no una categoría
+
+La versión anterior de este párrafo metía las **cotas de largo de texto** en la
+bolsa de "forma", con el argumento de que *no dependen del valor histórico de un
+campo*. **Es falso, y hay que sacarlo de la doctrina.** Una cota de largo depende
+del valor histórico exactamente igual que una de rango: un `notes` de 3000
+caracteres guardado se re-presenta en cada `set()` del modelo completo, y la cota
+lo rechaza. Congela el documento por el mismo mecanismo.
+
+Y la ventana es real, medida igual que las otras: `optStrMaxLen(notes, 2000)`
+entró en **el mismo commit** que las 20 cotas numéricas de `measurements` y las
+17 de `performance_tests` (`d1259165`, 2026-07-23), y el campo **nunca** tuvo
+`maxLength` en el cliente — es un `TextFormField` pelado en
+`log_measurement_screen.dart:588` y `log_performance_test_screen.dart:506`. Un
+`notes` legacy largo es tan posible como un `sitAndReachCm: -5`.
+
+**Se dejaron incondicionales igual, y la razón es otra:** acá la congelación es
+**diagnosticable y reparable por el dueño**. El texto es suyo, lo ve prefilleado
+en el formulario, y truncarlo destraba la escritura; si no quiere truncar, las
+dos colecciones permiten `delete` y puede rehacer el doc. Nada de eso valía en
+`userPublicProfiles`, donde el pin le prohibía reparar el valor y
+`allow delete: if false` le prohibía empezar de cero. Y a diferencia de una cota
+numérica, el valor rechazado no puede confundirse con un resultado legítimo: el
+usuario ve que escribió mucho texto.
+
+No es gratis — se le está pidiendo a alguien que borre texto que escribió — así
+que **QA-SEC-017 queda CERRADO PARCIAL** mientras esas dos líneas sigan como
+están. Ver "Lo que queda abierto".
+
+#### La medición
+
+Las 29 filas de `legacy-doc-freeze-rules.test.ts` corren contra el emulador.
+Sembrando el doc legacy con `withSecurityRulesDisabled`, **contra el ruleset
+pre-fix fallan exactamente las 10 filas del caso legacy más la fila del
+tradeoff** (11 rojas) y pasan las 18 de custodia — que es la forma de mostrar
+que el fix arregla el bug sin aflojar ningún gate.
+
+La fila 29 es la del tradeoff, y **muerde**: contra el ruleset pre-fix se pone
+roja como las otras 10, que es lo que prueba que el bit que entrega es real y no
+retórica. Ver abajo.
+
+**Mutación por GATE, no por fix (§1.8, punto 1).** Se aflojó cada conjunto del
+bloque de a uno, reemplazándolo por `true`:
+
+| Gate mutado | Filas rojas |
+|---|---|
+| `upp.rachaUpdatedAt` / `upp.isProfilePublic` / `upp.rankingOptIn` | 1 cada uno |
+| `upp.bestSquatKg` **pin** | 1 |
+| `upp.bestSquatKg` **cota** | **0** |
+| `upp.lifetimeVolumeKg` **cota** | **0** |
+| `upp.bestSquatKg` pin **+** cota, juntos | **3** |
+| `perf.recordedAt` / `perf.sitAndReachCm` / `perf.cmjCm` | 1 cada uno |
+| `meas.recordedAt` / `meas.weightKg` / `meas.waistCm` | 1 cada uno |
+| `bill.amountArs` / `bill.cadence` / `bill.affectedKeys` | 1 cada uno |
+
+La primera pasada dio **cuatro** ceros, y los cuatro decían cosas distintas
+(§1.8, punto 2: *un cero no prueba nada por sí solo*):
+
+- `meas.waistCm` y `bill.affectedKeys` eran **gates sin custodia**: la suite no
+  tenía ninguna fila que los ejercitara. Las 20 métricas de `measurements`
+  comparten `optNumInRange`, pero comparten la **función**, no el conjunto —
+  cada `&&` es su propio gate. Y `affectedKeys()` no custodia el dinero sino la
+  inmutabilidad de `trainerId`/`athleteId`. Se agregó una fila para cada uno.
+- `upp.bestSquatKg` **pin** era un cero **falso**: el pin y la cota se tapaban
+  mutuamente porque los valores del test (1200, 1500) los rechazan los dos. Se
+  agregó la escritura que **sólo** el pin custodia — una métrica forjada pero
+  **dentro** de rango (900) — y el gate pasó a 1.
+- Las dos cotas de rango dan **0 aflojadas de a una y 0 aflojadas juntas**. Ese
+  segundo cero es la mejor evidencia del PR y conviene decirlo entero: **ni
+  siquiera aflojando las dos a la vez se pone roja una sola fila `assertFails`**.
+  O sea que lo que esas cotas custodian de distinto NO es una escritura hostil
+  — y por eso la mutación por negativos es ciega ahí. **La primera lectura de
+  este PR fue que estaban SUBSUMIDAS por el pin. Era incorrecta, y la medición
+  la contradice** — ver abajo.
+
+##### El cero de las cotas de rango no era subsunción
+
+Subsunción significa que el pin deniega **todo** lo que deniega la cota. No es
+el caso, y el contraejemplo es de una línea:
+
+> Una escritura que vuelve a presentar el valor guardado `bestSquatKg: 1200`.
+> **El pin la permite** —iguala lo guardado, disyunto (b)—. **La cota la
+> rechazaba.**
+
+O sea que la cota deniega un conjunto que el pin no toca. Ese conjunto no está
+vacío: es **toda escritura sobre un documento legacy**, que es exactamente la
+congelación que este PR arregla.
+
+Por qué la mutación no lo vio: el barrido cuenta **filas `assertFails` que se
+ponen verdes**, o sea escrituras HOSTILES que dejan de denegarse. La diferencia
+entre el pin y la cota no es una escritura hostil — es una legacy. Una mutación
+por negativos es estructuralmente ciega a eso.
+
+**Es el punto 2 de §1.8 mordiendo a quien lo escribió.** El cero no era
+*subsumido*: era un gate cuya única custodia distintiva la suite no ejercitaba,
+que es la otra rama del mismo diagnóstico. La forma de distinguirlas no es
+mirar el número, es escribir la escritura que **sólo** ese gate decide — y
+cuando esa escritura resulta ser un ALLOW y no un DENY, la mutación por
+negativos ya no alcanza y hay que correr la suite contra el ruleset viejo.
+
+##### El tradeoff que el fix paga
+
+Sacada la subsunción, el fix **no** es gratis, y hay que escribirlo como lo que
+es:
+
+> Con el disyunto, un dueño con una métrica legacy fuera de rango puede volver a
+> poner `rankingOptIn` en `true` y **re-entrar al ranking arrastrando ese
+> valor** — la query filtra por `rankingOptIn == true`
+> (`user_public_profile_repository.dart:195`). Pre-fix esa escritura estaba
+> denegada. **El fix entrega ese bit a cambio de descongelar el documento.**
+
+La honestidad del "pre-fix estaba denegada" importa: no la denegaba un gate, la
+denegaba la **congelación** — la misma que le prohibía cambiarse el
+`displayName`. Descongelar el documento y entregar este bit son el **mismo**
+cambio; no había forma de quedarse con uno solo.
+
+Lo que acota el tradeoff, y por eso se decidió pagarlo:
+
+- **No es un camino de blanqueo.** El pin sigue prohibiendo escribir cualquier
+  **otro** valor: el dueño sólo puede arrastrar el que ya estaba guardado, que
+  no eligió él. Lo mide la fila *"forjar un bestSquatKg dentro de rango"*.
+- **La regla de update nunca fue lo que sostenía ese invariante.** Ese valor lo
+  escribió la CF con Admin SDK, que saltea estas reglas, y el propio flip
+  dispara `rankingAggregateOnOptIn`, que recomputa desde `familyMaxWeight`
+  (`ranking-aggregate.ts:95`) — que **tampoco acota**. Si se quiere cerrar de
+  verdad, el lugar es la CF, no `firestore.rules`.
+
+Queda medido en la fila 29, `"TRADEOFF: el opt-in false→true arrastra al ranking
+una metrica legacy"`, que contra el ruleset pre-fix se pone **roja**.
+
+El comentario que había sobre esas cotas decía que protegían *"contra un valor
+corrupto que algún día se re-afirme para siempre"*. Describía el efecto al
+revés: no protegían contra eso, lo **causaban**.
+
+#### Cómo correr esto
+
+```bash
+export PATH="/opt/homebrew/opt/openjdk@21/bin:$PATH"
+npx -y firebase-tools@13 emulators:exec --only firestore,auth \
+  --project treino-rules-test \
+  "sh -c 'cd functions && node_modules/.bin/jest --runInBand legacy-doc-freeze-rules'"
+```
+
+Verificado además contra las **dos** suites completas, sin regresión:
+1563 tests en `functions/` (97 suites) y 149 en `scripts/rules_test/` (9 suites).
+La corrida completa necesita `--runInBand`: en paralelo hay interferencia entre
+suites que comparten `projectId` en el emulador y salen 41 rojas espurias.
+
+#### Lo que queda abierto
+
+- **Las dos cotas de largo de `notes` siguen incondicionales** y congelan por el
+  mismo mecanismo que las numéricas (`measurementShapeOk`,
+  `performanceTestShapeOk`). Es lo que deja **QA-SEC-017 en cerrado PARCIAL**.
+  La decisión y su razón están arriba, en *"`notes`: una decisión, no una
+  categoría"*: la congelación es reparable por el dueño, no inexistente.
+  Cerrarlo del todo es condicionarlas —una línea cada una— o medir que no queda
+  ningún doc con `notes` > 2000 y dejarlas.
+
+- **`reviews` mide `size()` sin `is string`, y `rating` sin `is int`**
+  (`firestore.rules`, bloque `match /reviews/{reviewId}`). Es la pregunta gemela
+  de #849 —*¿esta cota chequea el TIPO, o sólo una propiedad que varios tipos
+  comparten?*— y es el mismo error que en `appointments` destapó la sexta
+  pasada. No se tocó acá porque **apretar** ese bloque es un cambio de otra
+  naturaleza que **aflojar** un gate que congela, y merece su propia medición.
+- **La CF de rankings no acota lo que escribe.** Mientras `familyMaxWeight` no
+  tenga tope, va a seguir escribiendo métricas por encima del rango que la regla
+  de update considera válido. Hoy eso ya no congela el documento, pero deja el
+  ranking con valores que la propia regla llama imposibles.

@@ -111,10 +111,13 @@ Not touched: `feed_screen.dart`, `profile_screen.dart`, `router.dart`, `firestor
   regardless.
 - **#646 will rebuild the pill.** This change deliberately does not touch it, so there is no
   collision — but #642 cannot be fully closed until #646 lands and the adoption number exists.
-- **The adoption script may return a meaningless number.** `.firebaserc` declares only
-  `treino-dev`; run there it measures seed accounts. The script says so in its header and in its
-  output. If no project with real athletes exists yet, options A/B/C stay blocked and the honest
-  next step is instrumentation, not a guess.
+- **The adoption script reads production.** `.firebaserc` declares only `treino-dev`, and that is
+  TREINO's **only** Firebase project — real athletes live in it, not seed accounts. (Corrected by
+  [#845](https://github.com/Backhaus7997/treino/issues/845): this bullet originally read *"run there
+  it measures seed accounts"*, which invited running an unreviewed script against production on the
+  belief that the data was disposable.) The script is read-only, but point it at the emulator first
+  if you want to check its query shape. There is no second project to promote to; if the number it
+  returns is too small to act on, the honest next step is instrumentation, not a guess.
 
 ## Success Criteria
 

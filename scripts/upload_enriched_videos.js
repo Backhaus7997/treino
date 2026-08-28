@@ -15,9 +15,15 @@
  * Guarda el JSON tras cada subida (sobrevive a una interrupción).
  *
  * Uso:
- *   GOOGLE_APPLICATION_CREDENTIALS=scripts/sa-key.json \
+ *   TREINO_SA_KEY=~/.config/treino/sa-key.json \
  *   NODE_PATH=functions/node_modules \
  *   node scripts/upload_enriched_videos.js [--limit=N] [--only=id1,id2] [--force] [--dry-run]
+ *
+ * ⚠️ DESTINO (#838) — el bucket ya no está hardcodeado: sale de
+ * `lib/storage_target.js` (`--bucket=` > `FIREBASE_STORAGE_BUCKET` > derivado
+ * del proyecto activo), y antes de nada se exige que Firestore y Storage
+ * apunten al mismo lado. Este script no tenía NINGÚN chequeo: la única salida
+ * era acordarse de pasar `--dry-run`.
  */
 'use strict';
 
@@ -26,9 +32,14 @@ const os = require('os');
 const path = require('path');
 const { execFileSync } = require('child_process');
 const { randomUUID } = require('crypto');
-const admin = require('firebase-admin');
+const { exigirDestinoCoherente } = require('./lib/storage_target');
+const { inicializarAdmin } = require('./lib/admin');
 
-const BUCKET = 'treino-dev.firebasestorage.app';
+// #838 — se llena en main() con el bucket resuelto. Era una constante con el
+// bucket de producción adentro; ahora el `let` es a propósito: nadie puede
+// construir una URL de Storage antes de que el guard haya dicho contra qué
+// bucket estamos, porque hasta entonces vale `null`.
+let BUCKET = null;
 const CATALOG = path.resolve(__dirname, '../docs/video-catalog-audit/enriched-catalog.json');
 
 const args = process.argv.slice(2);
@@ -51,9 +62,26 @@ function downloadDrive(fileId, dest) {
 async function main() {
   const catalog = JSON.parse(fs.readFileSync(CATALOG, 'utf8'));
 
+  // El guard corre también en `--dry-run`: el ensayo es donde el operador
+  // decide si después corre en serio, así que el destino real tiene que estar
+  // a la vista ahí (#838, mismo criterio que el cartel de #826).
+  const destino = exigirDestinoCoherente({ argv: args });
+  BUCKET = destino.bucket;
+  if (DRY) console.log('DRY-RUN: no se escribe nada.');
+
   let bucket = null;
   if (!DRY) {
-    admin.initializeApp({ storageBucket: BUCKET });
+    // Credenciales: la única puerta (#834). En `--dry-run` no se inicializa
+    // nada, así que un dry-run sigue andando sin credencial — como antes.
+    //
+    // El `projectId` sale del destino que ya resolvió el guard de #838, no de
+    // la credencial: es el MISMO objeto del que sale la etiqueta que se
+    // imprime, así que no puede haber un proyecto en pantalla y otro en el
+    // write. Que es exactamente el bug que #838 vino a cerrar.
+    const { admin } = inicializarAdmin({
+      projectId: destino.projectId,
+      extra: { storageBucket: BUCKET },
+    });
     bucket = admin.storage().bucket();
   }
 
