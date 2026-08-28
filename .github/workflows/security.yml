@@ -15,6 +15,12 @@ name: Security
 #                  el árbol y los 1545 commits de historia dan cero hallazgos
 #                  con .gitleaks.toml, así que el gate arranca en verde.
 #
+#   shellcheck   → BLOQUEA. Es la única cobertura de análisis estático que tiene
+#                  shell en este repo: CodeQL no lo soporta, igual que no
+#                  soporta Dart. Los 12 scripts `.sh` versionados dan cero
+#                  hallazgos con `-S warning`, así que también arranca en verde
+#                  y no hay deuda heredada que amnistiar.
+#
 #   npm-audit    → NO BLOQUEA (reporta). functions/ tiene HOY 17
 #                  vulnerabilidades heredadas (1 critical, 3 high) que vienen
 #                  de firebase-admin y firebase-functions-test y necesitan
@@ -80,6 +86,49 @@ jobs:
       # --redact: que el secreto NO quede escrito en los logs públicos del run.
       - name: Scan working tree
         run: gitleaks dir . --config .gitleaks.toml --redact --exit-code 1 --verbose
+
+  # ---------------------------------------------------------------------------
+  # Análisis estático de shell con shellcheck.
+  #
+  # Por qué hace falta: `AGENTS.md` regla 10 le dice a TODOS los agentes que
+  # corran `scripts/agent-ledger.sh` de forma rutinaria, y el resto de los
+  # scripts se ejecutan a mano desde una máquina de dev que tiene credenciales
+  # de Firebase encima. Hasta acá shell era el único lenguaje del repo sin NADA
+  # de análisis estático — ni CodeQL (no lo soporta) ni `flutter analyze`.
+  #
+  # BLOQUEA (ver cabecera). El caso que justifica el gate es real y salió de la
+  # security review de agent-ledger.sh: un valor leído de un archivo entrando a
+  # `$(( ))` sin validar es ejecución de comandos, porque bash resuelve command
+  # substitution dentro de subíndices de array en contexto aritmético.
+  #
+  # `-S warning` y no `-S style` a propósito: los checks de nivel style son nits
+  # de legibilidad y son los que más se mueven entre versiones. Lo que tiene que
+  # romper un PR es error y warning — expansiones sin comillas, globbing
+  # accidental, aritmética con input sin validar.
+  #
+  # shellcheck viene preinstalado en la imagen de ubuntu-latest, así que este
+  # job no instala nada. No contradice al pineo de gitleaks de arriba: aquello
+  # evitaba una action de TERCEROS, esto es infra de primera parte de GitHub que
+  # ya estamos confiando para node, curl y sudo. Si una actualización de imagen
+  # algún día mete hallazgos nuevos y ruidosos, la salida es pinear la versión.
+  shellcheck:
+    name: Shellcheck (bloquea)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # `git ls-files` y no `find`: escanea sólo lo versionado, así nada
+      # generado ni vendored (build/, Pods/, node_modules/) entra al gate.
+      - name: Lint shell scripts
+        run: |
+          set -euo pipefail
+          shellcheck --version
+
+          git ls-files '*.sh' | sed 's/^/  /'
+          # -z + -0 para sobrevivir nombres con espacios; -r para no invocar
+          # shellcheck sin argumentos si algún día no queda ningún .sh.
+          git ls-files -z '*.sh' | xargs -0 -r shellcheck -S warning
 
   # ---------------------------------------------------------------------------
   # npm audit sobre los tres package.json del repo.
