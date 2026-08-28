@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../app/theme/tokens/tokens.dart';
 
 // ── Formatter ─────────────────────────────────────────────────────────────────
 
@@ -137,51 +138,61 @@ class _DurationTextFieldState extends State<DurationTextField> {
           ),
           const SizedBox(height: 2),
         ],
-        TextField(
-          controller: _ctrl,
-          keyboardType: TextInputType.number,
-          inputFormatters: [
-            FilteringTextInputFormatter.digitsOnly,
-            _DurationInputFormatter(),
-          ],
-          style: GoogleFonts.barlow(
-            fontSize: 16,
-            color: palette.textPrimary,
+        // Alto fijo de 48: la fila de un set mezcla este campo con
+        // [SetCellField], y dos alturas distintas en la misma fila se ven.
+        SizedBox(
+          height: 48,
+          child: TextField(
+            controller: _ctrl,
+            keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              _DurationInputFormatter(),
+            ],
+            style: GoogleFonts.barlow(
+              fontSize: 16,
+              color: palette.textPrimary,
+            ),
+            decoration: InputDecoration(
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.hairline,
+              ),
+              filled: true,
+              fillColor: palette.bgCard,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+                borderSide: BorderSide(
+                  color: widget.hasError ? palette.danger : palette.border,
+                  width: widget.hasError ? 1.5 : 1.0,
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+                borderSide: BorderSide(
+                  color: widget.hasError ? palette.danger : palette.border,
+                  width: widget.hasError ? 1.5 : 1.0,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+                borderSide: BorderSide(
+                  color: widget.hasError ? palette.danger : palette.accent,
+                  width: 1.5,
+                ),
+              ),
+            ),
+            onChanged: (raw) {
+              // The formatter has already transformed raw into "MM:SS".
+              // Re-parse seconds from the display string.
+              final parts = _ctrl.text.split(':');
+              if (parts.length == 2) {
+                final mm = int.tryParse(parts[0]) ?? 0;
+                final ss = int.tryParse(parts[1]) ?? 0;
+                widget.onChanged(mm * 60 + ss);
+              }
+            },
           ),
-          decoration: InputDecoration(
-            isDense: true,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
-            filled: false,
-            border: UnderlineInputBorder(
-              borderSide: BorderSide(
-                color: widget.hasError ? palette.danger : palette.border,
-                width: widget.hasError ? 1.5 : 1.0,
-              ),
-            ),
-            enabledBorder: UnderlineInputBorder(
-              borderSide: BorderSide(
-                color: widget.hasError ? palette.danger : palette.border,
-                width: widget.hasError ? 1.5 : 1.0,
-              ),
-            ),
-            focusedBorder: UnderlineInputBorder(
-              borderSide: BorderSide(
-                color: widget.hasError ? palette.danger : palette.accent,
-                width: 2,
-              ),
-            ),
-          ),
-          onChanged: (raw) {
-            // The formatter has already transformed raw into "MM:SS".
-            // Re-parse seconds from the display string.
-            final parts = _ctrl.text.split(':');
-            if (parts.length == 2) {
-              final mm = int.tryParse(parts[0]) ?? 0;
-              final ss = int.tryParse(parts[1]) ?? 0;
-              widget.onChanged(mm * 60 + ss);
-            }
-          },
         ),
       ],
     );
