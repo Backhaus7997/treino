@@ -257,7 +257,9 @@ mutación que lo salteaba, y por eso las dos series duplicadas sobrevivían.
   Distinguir por la FORMA de la respuesta: **403 HTML** = el frontend de Google
   bloquea antes del contenedor; **401 JSON `UNAUTHENTICATED`** = contestó la
   función (ese 401 es el resultado CORRECTO sin token de Auth). Se arregla con
-  `gcloud run services update <servicio> --no-invoker-iam-check`.
+  `gcloud run services update <servicio> --no-invoker-iam-check` (🚨 PROD: eso
+  **modifica un servicio vivo** de `treino-dev`, que es el único proyecto de
+  TREINO y tiene usuarios reales adentro — ver [openspec/AGENTS.md](../../AGENTS.md) y #826).
 - **Los servicios de Cloud Run van en MINÚSCULAS** (`addalias`, no `addAlias`), y
   `gcloud run services get-iam-policy <nombreMalEscrito>` **no da 404**: devuelve
   `{"etag":"ACAB"}`, indistinguible de un servicio real sin bindings. Un typo de

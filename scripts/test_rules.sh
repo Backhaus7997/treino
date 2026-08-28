@@ -48,7 +48,28 @@ fi
 # order-dependent false failures with no rule defect involved. `--runInBand`
 # forces serial execution (one file/test at a time) and eliminates the
 # collision. Confirmed via isolated runs during Slice B apply.
+# --- por qué `--project treino-dev` explícito (#840) --------------------------
+#
+# El default de `.firebaserc` pasó a ser `demo-treino` — un id que Firebase
+# trata como proyecto offline del emulador — para que un `deploy` o un
+# `firestore:delete` sin `--project` FALLE en vez de resolver a produccion desde
+# cualquiera de los ~27 worktrees del repo. Este comando resolvía por ese
+# default, así que ahora nombra su proyecto.
+#
+# El id NO es cosmético, y está MEDIDO: correr esta misma suite con
+# `--project demo-treino` deja `chat-media-storage.test.js` en rojo
+# (SCENARIO-CHATMEDIA-05 y 05b, `storage/unauthorized` para un miembro legítimo
+# del chat), mientras que con `treino-dev` da 149/149. La causa está escrita en
+# la cabecera de ese archivo: `firebase.json` tiene
+# `emulators.singleProjectMode: true`, que pinea el `firestore.get()`
+# cross-service de las reglas de Storage al proyecto DEFAULT del emulador. Con
+# otro id, ese `get` busca el doc de chat bajo el proyecto equivocado y la regla
+# deniega. O sea: sin este flag, este gate de CI se ponía rojo.
+#
+# `emulators:exec` además exporta el id resuelto como GCLOUD_PROJECT, que es de
+# donde lo lee el hermano de functions/ (session-feedback-storage-rules.test.ts).
 cd "${SCRIPT_DIR}/.."
 firebase emulators:exec \
   --only firestore,storage \
+  --project treino-dev \
   "cd scripts/rules_test && npx jest --runInBand"

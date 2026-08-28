@@ -21,6 +21,32 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # El fix de #840 vive en UN valor de UN archivo: el `default` de `.firebaserc`.
+  # `treino-dev` es PRODUCCION, y mientras fue el default cualquier `deploy` o
+  # `firestore:delete` sin `--project` llegaba a datos de usuarios reales. Ahora
+  # es `demo-treino`, que Firebase trata como proyecto offline del emulador.
+  #
+  # Un merge mal resuelto, un `firebase use --add` que reescribe el bloque, o un
+  # revert distraido lo deshacen sin que nada chille: el archivo sigue siendo
+  # JSON valido, todo compila, todos los tests pasan, y el sintoma recien aparece
+  # el dia que alguien corre algo destructivo. Este job es el unico lugar donde
+  # ese silencio se vuelve rojo. Va PRIMERO y sin toolchain (solo checkout +
+  # bash) para que falle en segundos.
+  #
+  # Cubre la mitad VERSIONADA del agujero. El pin de `firebase use` vive en
+  # `~/.config/configstore/` de cada maquina, le gana al default y se hereda de
+  # los directorios padre: CI no lo ve. Para esa mitad hay
+  # `scripts/sync_firebaserc_worktrees.sh`.
+  firebaserc-default:
+    name: .firebaserc default no apunta a produccion
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: El default de .firebaserc tiene que ser un proyecto demo-
+        run: bash scripts/check_firebaserc_default.sh
+
   analyze-and-test:
     name: Analyze & Test
     runs-on: ubuntu-latest
@@ -249,10 +275,26 @@ jobs:
   # La corre el job `rules-test` de abajo (#680 Slice B).
   #
   # Una sola pasada `emulators:exec --only firestore,auth "npm test"` replica el
-  # flujo documentado en functions/README.md: emulador con el project default
-  # `treino-dev` (.firebaserc) + `npm test`. Los tests de reglas usan sus propios
-  # projectIds vía @firebase/rules-unit-testing y conviven en el mismo emulador
-  # (mismo esquema que corren los devs en local). El emulador NO necesita login.
+  # flujo documentado en functions/README.md: emulador con el project
+  # `treino-dev` + `npm test`. Los tests de reglas usan sus propios projectIds
+  # vía @firebase/rules-unit-testing y conviven en el mismo emulador (mismo
+  # esquema que corren los devs en local). El emulador NO necesita login.
+  #
+  # El `--project treino-dev` del step es de #840 y antes era implícito: se
+  # resolvía por el default de `.firebaserc`, que ahora es `demo-treino` — un id
+  # que Firebase trata como proyecto offline del emulador, puesto justamente
+  # para que un `deploy` sin `--project` no llegue a producción desde ninguno de
+  # los ~27 worktrees del repo.
+  #
+  # Honestidad sobre cuánto pesa el flag ACÁ, porque se midió en local: sin él
+  # este job igual da verde (95 suites / 1391 tests), porque
+  # `session-feedback-storage-rules.test.ts` lee su projectId de GCLOUD_PROJECT
+  # en vez de hardcodearlo y se adapta solo. Lo que sí cambia es el ruido: 173
+  # warnings de `Multiple projectIds are not recommended in single project mode`
+  # contra 0, uno por cada suite que pide `treino-dev` mientras el emulador está
+  # configurado para otro proyecto. El flag está para que ese desacople no
+  # exista, no para tapar un rojo. Donde el id SÍ decide verde/rojo es en el job
+  # `rules-test` de abajo (ver scripts/test_rules.sh).
   functions-test:
     name: Functions Test
     runs-on: ubuntu-latest
@@ -290,7 +332,7 @@ jobs:
       #     intermitente en tests de transición). Serial las aísla. El script
       #     `test` ya trae --forceExit.
       - name: Run functions tests against the emulator
-        run: firebase emulators:exec --only firestore,auth,storage "npm --prefix functions test -- --runInBand"
+        run: firebase emulators:exec --only firestore,auth,storage --project treino-dev "npm --prefix functions test -- --runInBand"
 
   # La SEGUNDA suite de reglas: scripts/rules_test/*.test.js (#680 Slice B).
   #
@@ -358,3 +400,87 @@ jobs:
       # clearFirestore() en afterEach) y levanta y baja su propio emulador.
       - name: Run rules test suite
         run: bash scripts/test_rules.sh
+
+  # La TERCERA suite de Node del repo: scripts/test/*.test.js (#838).
+  #
+  # Mismo agujero que documenta `rules-test` acá arriba, con otro directorio.
+  # Los tests de `scripts/test/` —los guards que deciden si un script de
+  # `scripts/` puede escribir contra producción— no los corría NINGÚN job:
+  # `analyze-and-test` es Flutter, `functions-*` tiene su testMatch acotado a
+  # `functions/src/__tests__/`, y `rules-test` sólo toca `scripts/rules_test/`,
+  # que es otro paquete con su propio lockfile. La única ejecución era que
+  # alguien se acordara de correr `npm --prefix scripts test` a mano.
+  #
+  # Y lo que hay ahí adentro es exactamente el tipo de cosa que se borra sin
+  # que nadie note: el arreglo del #838 son cuatro líneas de cableado
+  # (`exigirDestinoCoherente(...)` al tope de cada script que sube a Storage).
+  # Borrando una, sin este job, no se pone nada en rojo — y el script vuelve a
+  # subir archivos a producción imprimiendo "destino: EMULADOR".
+  #
+  # Lo mismo vale para el trinquete del #834: `test/frontera.test.js` escanea
+  # `scripts/` y falla si aparece un `initializeApp`, un `credential.cert` o una
+  # lectura de `sa-key.json` fuera de `lib/`. Es un gate sobre archivos que
+  # TODAVÍA NO EXISTEN, así que su valor entero depende de que corra solo: un
+  # trinquete que alguien tiene que acordarse de mirar no es un trinquete. El
+  # #834 llegó a tener el resolutor escrito y sin llamadores — mismo error, una
+  # capa más arriba: un gate que nadie ejecuta y un módulo que nadie llama
+  # fallan igual de silenciosos.
+  #
+  # Corre la suite ENTERA del directorio, no un archivo puntual: el #835 ya
+  # dejó cuatro archivos de test ahí que tampoco corría nadie, y el que venga
+  # después va a hacer lo mismo. `npm test` expande `test/*.test.js` en el
+  # shell, así que cualquier archivo nuevo entra solo — por eso se invoca el
+  # script del package.json y no una línea `run:` con el comando copiado
+  # (misma razón que en `rules-test`).
+  #
+  # SIN `npm ci` a propósito, y no es un olvido: estos tests no importan una
+  # sola dependencia de `scripts/package.json`. Los scripts bajo prueba se
+  # cargan con `--require test/fixtures/stub_firebase_admin.js`, que intercepta
+  # `Module._load` (CJS) y `module.register()` (ESM) y devuelve un
+  # `firebase-admin` falso; el resto es todo `node:` builtin. Verificado
+  # corriendo la suite con `scripts/node_modules` inexistente, con el comando
+  # EXACTO de este job (`npm --prefix scripts test`, o sea
+  # `node --test test/*.test.js` — el glob lo expande la shell, no Node) en
+  # Node 20, 22 y 26: 439/439 en verde, y el MISMO número en las tres —un
+  # conteo que baja con la versión es la firma de los subtests cancelados de
+  # más abajo—. El comando importa para poder comparar: `--test scripts/test/`
+  # a secas cuenta 442 en vez de 439 porque suma las entradas de directorio, y
+  # dos números que no son el mismo experimento no se pueden restar.
+  # Instalar `firebase-admin` acá sería medio minuto por run para nada — y
+  # peor, dejaría que un test toque la red sin que se note.
+  #
+  # Node 20 igual que los otros jobs de Node, y NO se sube. Este job ya se puso
+  # rojo una vez por una API que sólo existe de Node 22.15 para arriba
+  # (`module.registerHooks`), y la tentación fue subir el job. Habría tapado el
+  # problema real: sin el hook, el subproceso carga el `firebase-admin` DE
+  # VERDAD y los tests de compuerta —que prueban la AUSENCIA de un marcador—
+  # quedan verdes midiendo nada. El fix fue `module.register()`, que existe
+  # desde Node 20.6, más un marcador de intercepción que los tests exigen en
+  # cada corrida: `esm_stub_interception.test.js` lo custodia con control
+  # negativo. La versión vieja de Node no es una molestia acá, es el CANARIO.
+  #
+  # Anda en 20 y en 22 también por el glob: el del `npm test` lo expande el
+  # shell. El `--test "test/*.test.js"` entrecomillado que traía el #835 exigía
+  # Node >= 22 —el test runner recién expande globs por su cuenta desde ahí— y
+  # habría roto este job en silencio el día que se agregara; por eso el merge se
+  # quedó con la forma sin comillas.
+  #
+  # Y por la misma razón los subtests de la matriz de 32 combinaciones se
+  # `await`ean: hasta Node 24 el runner no espera solo a los subtests y los
+  # cancela con `cancelledByParent`. Medido acá: en Node 20 y en Node 22 corría
+  # UNA de las 32 y las otras 31 salían canceladas; en Node 26 pasaban todas.
+  # Otra cobertura que decía estar y no estaba.
+  scripts-test:
+    name: Scripts Test (scripts/test)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '20'
+
+      - name: Run scripts test suite
+        run: npm --prefix scripts test

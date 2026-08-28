@@ -34,25 +34,34 @@
  *   # Dry run (default-safe) — reports what WOULD change, writes nothing:
  *   node scripts/backfill_gym_names.js --dry-run
  *
- *   # Real run against treino-dev (sa-key.json's project):
+ *   # ⚠️ REAL RUN — WRITES TO PRODUCTION (#826). `treino-dev` is TREINO's only
+ *   # Firebase project and it holds real users; the name lies. El destino sale
+ *   # de `$TREINO_SA_KEY` (#834). Emulator first, then --dry-run, then this,
+ *   # with maintainer sign-off:
  *   node scripts/backfill_gym_names.js
  *
- *   # Only if you explicitly intend to run against a non-dev project
- *   # (e.g. treino-prod), after dev verification + maintainer sign-off:
+ *   # Only if you intend to run against some OTHER project whose id has no
+ *   # "dev" in it (there is none today — treino-prod does not exist):
  *   node scripts/backfill_gym_names.js --allow-prod
  *
  *   # Against the local emulator — no service-account key needed:
  *   FIRESTORE_EMULATOR_HOST=localhost:8080 node scripts/backfill_gym_names.js
  *
- * Requires `sa-key.json` (Firebase service account, gitignored) in scripts/
- * UNLESS `FIRESTORE_EMULATOR_HOST` is set — see scripts/README.md /
- * backfill_user_public_profiles.js for setup.
+ * Contra un proyecto real necesita `$TREINO_SA_KEY` apuntando a la clave
+ * GUARDADA AFUERA DEL REPO (#834); adentro de un árbol de git se rechaza.
+ * Con `FIRESTORE_EMULATOR_HOST` no hace falta ninguna credencial.
+ * Migración: scripts/README.md → "Credenciales (#834)".
  *
  * ────────────────────────────────────────────────────────────────────────────
  * SAFETY
  * ────────────────────────────────────────────────────────────────────────────
+ * - Prints a loud PRODUCTION banner when the target project is a known
+ *   production id (`lib/firebase_projects.js`). `treino-dev` IS one (#826).
  * - Refuses to run against any Firebase project whose id doesn't contain
  *   "dev" (case-insensitive), unless `--allow-prod` is passed explicitly.
+ *   ⚠️ That name check does NOT stop a run against `treino-dev` — "treino-dev"
+ *   contains "dev", so the guard passes and this writes to production without
+ *   `--allow-prod`. It only ever guarded against an unexpected project.
  * - Prints the target project_id before doing anything.
  * - `--dry-run` performs zero writes; every action is logged as "WOULD".
  * - Only touches `userPublicProfiles/{uid}` (mirrors the Phase 3 dual-write
@@ -60,30 +69,28 @@
  * - Prints a final VERIFIED COUNT of profiles updated.
  */
 
-const admin = require('firebase-admin');
+// Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla cerrado
+// con la migración; contra el emulador no pide nada. Ver scripts/lib/admin.js.
+const { inicializarAdmin, proyectoDe } = require('./lib/admin');
+const { bannerDeProduccion } = require('./lib/firebase_projects');
 
-let PROJECT_ID;
-if (process.env.FIRESTORE_EMULATOR_HOST) {
-  // Admin SDK with emulator — no service account needed.
-  PROJECT_ID = 'treino-dev';
-  admin.initializeApp({ projectId: PROJECT_ID });
-} else {
-  let serviceAccount;
-  try {
-    serviceAccount = require('./sa-key.json');
-  } catch (err) {
-    if (err.code !== 'MODULE_NOT_FOUND') throw err;
-    console.error(
-      '\nERROR: scripts/sa-key.json not found — required to run against production.\n' +
-      'Download a service-account key from the Firebase console and save it as\n' +
-      'scripts/sa-key.json (gitignored), or target the local emulator instead:\n\n' +
-      '  FIRESTORE_EMULATOR_HOST=localhost:8080 node scripts/backfill_gym_names.js\n',
-    );
-    process.exit(1);
-  }
-  PROJECT_ID = serviceAccount.project_id;
-  admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-}
+const { admin, contexto } = inicializarAdmin();
+
+// #826 — el cartel necesita saber el destino y si es el emulador. Los dos salen
+// ahora del contexto que resolvió la frontera, que además mira la identidad
+// EFECTIVA de la credencial y no sólo el project id declarado (#843).
+//
+// `modo === 'emulador'` significa EXACTAMENTE `FIRESTORE_EMULATOR_HOST` puesta
+// — lo mismo que decía el `Boolean(process.env.FIRESTORE_EMULATOR_HOST)` que
+// había acá antes de #834, ni un caso más. La versión intermedia aceptaba
+// cualquiera de cuatro variables de emulador y sólo una desvía Firestore, así
+// que este booleano podía valer `true` mientras el script escribía en
+// producción: apagaba el cartel de abajo y salteaba la credencial. Si algún día
+// se vuelve a tocar la condición, lo que lo agarra es
+// `test/emulador_coherente.test.js`, que corre este script de verdad y mira la
+// salida — el desfasaje no se ve en un diff.
+const PROJECT_ID = proyectoDe(contexto);
+const USANDO_EMULADOR = contexto.modo === 'emulador';
 
 const db = admin.firestore();
 
@@ -97,15 +104,37 @@ function parseArgs() {
   };
 }
 
+/**
+ * Imprime el proyecto destino y decide si seguir.
+ *
+ * ⚠️ #826 — LA DECISIÓN DE ACÁ NO PROTEGE CONTRA `treino-dev`, y nunca lo hizo.
+ * El chequeo es sobre el NOMBRE (`/dev/i`), y `treino-dev` —que es el único
+ * proyecto de TREINO, el que tiene los usuarios reales— contiene "dev". O sea
+ * que la rama que corta (`!looksLikeDev`) jamás se toma contra producción.
+ * Sólo protege contra un proyecto INESPERADO, que es un caso distinto y mucho
+ * menos probable que el que motivó el guard.
+ *
+ * Se deja la decisión intacta a propósito (mismos exit codes que antes) y se
+ * suma el cartel: exigir `--allow-prod` para `treino-dev` rompería la
+ * invocación documentada de este script, y eso es cambio de conducta, no
+ * documentación. Lo que cierra el hueco de verdad es el alcance 2/3 del #826
+ * (renombrar el proyecto o tener un dev real).
+ */
 function assertDevProject(allowProd) {
   console.log(`Target Firebase project: ${PROJECT_ID}`);
+
+  // El cartel primero: si el destino es producción, que se lea ANTES que
+  // cualquier "Running in --dry-run mode" que invite a relajarse.
+  const banner = bannerDeProduccion(PROJECT_ID, { contraEmulador: USANDO_EMULADOR });
+  if (banner) console.warn(banner);
+
   const looksLikeDev = /dev/i.test(PROJECT_ID);
   if (!looksLikeDev && !allowProd) {
     console.error(
       `\nREFUSING TO RUN: project_id "${PROJECT_ID}" does not look like a ` +
         'dev project. This script is dev-first. If you really intend to run ' +
-        'against this project (e.g. treino-prod, after dev verification and ' +
-        'maintainer sign-off), re-run with --allow-prod.',
+        'against this project (after emulator verification and maintainer ' +
+        'sign-off), re-run with --allow-prod.',
     );
     process.exit(1);
   }

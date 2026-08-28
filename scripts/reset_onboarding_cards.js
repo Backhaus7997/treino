@@ -22,7 +22,7 @@
  * and QA could believe an account had been reset when it had not.
  *
  * USAGE
- *   export GOOGLE_APPLICATION_CREDENTIALS="scripts/treino-dev-service-account.json"
+ *   export TREINO_SA_KEY="~/.config/treino/sa-key.json"
  *   node scripts/reset_onboarding_cards.js <email>
  *
  *   # Reset only some surfaces instead of all of them:
@@ -31,8 +31,10 @@
 
 'use strict';
 
-const admin = require('firebase-admin');
-admin.initializeApp();
+const { inicializarAdmin } = require('./lib/admin');
+// Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla cerrado
+// con la migración; contra el emulador no pide nada. Ver scripts/lib/admin.js.
+const { admin } = inicializarAdmin();
 const db = admin.firestore();
 
 async function run() {

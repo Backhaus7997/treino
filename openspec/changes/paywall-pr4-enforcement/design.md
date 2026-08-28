@@ -242,13 +242,19 @@ expect(await loadOf(T)).toBe(7);
 
 ### D-7 — Runbook de deploy (`functions → release → lock de rules`)
 
+> 🚨 **Los pasos 0 y 4 van a PRODUCCIÓN.** `prod` y `treino-dev` son el mismo y
+> único proyecto Firebase: usuarios reales. Un `firebase deploy` pelado, sin
+> `--project`, va ahí igual — `.firebaserc` completa el default en silencio y el
+> destino nunca aparece en pantalla. Runbook humano, con OK explícito; un agente
+> no lo corre. Ver [openspec/AGENTS.md](../../AGENTS.md) · #826.
+
 | # | Paso | Verificación |
 |---|---|---|
-| 0 | `firebase deploy --only functions:linkLoadReconcile,functions:acceptTrainerLink,functions:resumeTrainerLink` — **filtros explícitos**: un `--only functions` pelado **poda** funciones ausentes de `index.ts` (el header de `index.ts` ya advierte esto por `notifyOnFriendship`) | `firebase functions:list` muestra las 3 en `southamerica-east1` |
+| 0 | 🚨 PROD — `firebase deploy --only functions:linkLoadReconcile,functions:acceptTrainerLink,functions:resumeTrainerLink --project prod` — **filtros explícitos**: un `--only functions` pelado **poda** funciones ausentes de `index.ts` (el header de `index.ts` ya advierte esto por `notifyOnFriendship`) | `firebase functions:list --project prod` muestra las 3 en `southamerica-east1` |
 | 1 | Smoke en build debug: aceptar 1 pending, reanudar 1 paused, pausar 1 active | `users/{T}.weightedLoad` se mueve en los 3 casos |
 | 2 | Release de la app con slices 2+3 | Build en stores (iOS: 1-3 días de review) |
 | 3 | **Gate de adopción** (abajo) | 7 días consecutivos |
-| 4 | `firebase deploy --only firestore:rules` — guardar antes `git show HEAD~1:firestore.rules > /tmp/rules.prev` | — |
+| 4 | 🚨 PROD — `firebase deploy --only firestore:rules --project prod` — guardar antes `git show HEAD~1:firestore.rules > /tmp/rules.prev` | — |
 | 5 | Smoke post-deploy (<10 min): accept real por CF OK; write cliente directo a `status:'active'` → denegado | Monitorear tasa de `permission-denied` 24 h |
 | R | Rollback: redeploy de `rules.prev` (un archivo, instantáneo) | Restaura accept/resume cliente |
 

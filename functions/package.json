@@ -4,7 +4,7 @@
   "description": "Firebase Cloud Functions for TREINO",
   "scripts": {
     "build": "tsc",
-    "serve": "npm run build && firebase emulators:start --only functions",
+    "serve": "npm run build && firebase emulators:start --only functions --project treino-dev",
     "test": "jest --forceExit",
     "typecheck:scripts": "tsc --noEmit -p tsconfig.scripts.json",
     "test:rules": "jest --forceExit --runInBand \"[-]rules\\.test\\.ts$\"",

@@ -21,9 +21,10 @@
  *   # Against the local emulator — no service-account key needed:
  *   FIRESTORE_EMULATOR_HOST=localhost:8080 node scripts/seed_trainer_profiles.js
  *
- * Requires `sa-key.json` (Firebase service account) in scripts/ UNLESS
- * `FIRESTORE_EMULATOR_HOST` is set — see backfill_user_public_profiles.js
- * for setup instructions.
+ * Contra un proyecto real necesita `$TREINO_SA_KEY` apuntando a la clave
+ * GUARDADA AFUERA DEL REPO (#834); adentro de un árbol de git se rechaza.
+ * Con `FIRESTORE_EMULATOR_HOST` no hace falta ninguna credencial.
+ * Migración: scripts/README.md → "Credenciales (#834)".
  *
  * ────────────────────────────────────────────────────────────────────────────
  * NOTES
@@ -34,32 +35,28 @@
  *   trainerPublicProfiles which is auth-only-read (any logged-in athlete
  *   can read).
  * - To deploy in prod: do NOT run this. Only for dev/QA emulator or a
- *   throwaway test project.
+ *   throwaway test project. 🚨 Y ojo con el atajo: `npm run seed:trainers:clear`
+ *   corre este mismo archivo con `--clear` y **BORRA** `users/{uid}` +
+ *   `trainerPublicProfiles/{uid}` de los 5 uids sembrados, sin nombrar el
+ *   proyecto en pantalla. Imprime un cartel antes del primer write cuando el
+ *   destino es producción. (#826)
  */
 
 'use strict';
 
-const admin = require('firebase-admin');
+// Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla cerrado
+// con la migración; contra el emulador no pide nada. Ver scripts/lib/admin.js.
+const { inicializarAdmin, proyectoDe } = require('./lib/admin');
+const { bannerDeProduccion } = require('./lib/firebase_projects');
 
-if (process.env.FIRESTORE_EMULATOR_HOST) {
-  // Admin SDK with emulator — no service account needed.
-  admin.initializeApp({ projectId: 'treino-dev' });
-} else {
-  let serviceAccount;
-  try {
-    serviceAccount = require('./sa-key.json');
-  } catch (err) {
-    if (err.code !== 'MODULE_NOT_FOUND') throw err;
-    console.error(
-      '\nERROR: scripts/sa-key.json not found — required to run against production.\n' +
-      'Download a service-account key from the Firebase console and save it as\n' +
-      'scripts/sa-key.json (gitignored), or target the local emulator instead:\n\n' +
-      '  FIRESTORE_EMULATOR_HOST=localhost:8080 node scripts/seed_trainer_profiles.js\n',
-    );
-    process.exit(1);
-  }
-  admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-}
+const { admin, contexto } = inicializarAdmin();
+
+// El cartel, antes del primer write. El destino ya no se lee del key a mano: lo
+// da el contexto que resolvió la frontera, que mira la identidad EFECTIVA de la
+// credencial y no sólo el project id declarado (#843).
+// `npm run seed:trainers:clear` BORRA. (#826)
+const bannerProd = contexto.modo === 'emulador' ? null : bannerDeProduccion(proyectoDe(contexto));
+if (bannerProd) console.warn(bannerProd);
 
 const db = admin.firestore();
 

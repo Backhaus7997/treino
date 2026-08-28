@@ -107,7 +107,7 @@
  *   FIRESTORE_EMULATOR_HOST=localhost:8080 node scripts/backfill_dedupe_setlogs.js --dry-run
  *   FIRESTORE_EMULATOR_HOST=localhost:8080 node scripts/backfill_dedupe_setlogs.js --apply
  *
- *   # Producción (necesita scripts/sa-key.json, gitignored):
+ *   # Producción (necesita $TREINO_SA_KEY, fuera del repo — ver scripts/README.md):
  *   cd scripts && node backfill_dedupe_setlogs.js --dry-run
  *   cd scripts && node backfill_dedupe_setlogs.js --apply
  *
@@ -117,7 +117,6 @@
  * SIN `--apply` NO ESCRIBE. El default es seguro a propósito: este script borra.
  */
 
-const admin = require('firebase-admin');
 const fs = require('fs');
 const path = require('path');
 
@@ -129,25 +128,11 @@ const path = require('path');
 // Acá queda lo único que no se puede evitar: leer, respaldar y escribir.
 const { paraRespaldo, planSesion } = require('./lib/dedupe_setlogs_plan');
 
-if (process.env.FIRESTORE_EMULATOR_HOST) {
-  admin.initializeApp({ projectId: 'treino-dev' });
-} else {
-  let serviceAccount;
-  try {
-    serviceAccount = require('./sa-key.json');
-  } catch (err) {
-    if (err.code !== 'MODULE_NOT_FOUND') throw err;
-    console.error(
-      '\nERROR: scripts/sa-key.json not found — required to run against production.\n' +
-      'Download a service-account key from the Firebase console and save it as\n' +
-      'scripts/sa-key.json (gitignored), or target the local emulator instead:\n\n' +
-      '  FIRESTORE_EMULATOR_HOST=localhost:8080 node scripts/backfill_dedupe_setlogs.js\n',
-    );
-    process.exitCode = 1;
-    return;
-  }
-  admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-}
+// Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla cerrado
+// con la migración; contra el emulador no pide nada. Ver scripts/lib/admin.js.
+const { inicializarAdmin } = require('./lib/admin');
+
+const { admin } = inicializarAdmin();
 const db = admin.firestore();
 
 // Escribir es OPT-IN. Un script que borra no puede tener el borrado por default.

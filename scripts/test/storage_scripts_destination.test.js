@@ -1,0 +1,454 @@
+/**
+ * test/storage_scripts_destination.test.js
+ *
+ * Los tests del CABLEADO: que los cuatro scripts que escriben en Firebase
+ * Storage pasen de verdad por el guard de `lib/storage_target.js` — y que lo
+ * hagan ANTES de tocar un solo dato.
+ *
+ *   node --test scripts/test/
+ *
+ * Por qué existen (#838): `storage_target.test.js` prueba el módulo puro. Eso
+ * no alcanza, y el issue lo dice: el arreglo entero son cuatro líneas de
+ * cableado (`const DESTINO = exigirDestinoCoherente(...)`), y borrándolas los
+ * tests del módulo seguirían todos en verde porque ninguno carga los scripts.
+ * Éstos los cargan: cada test levanta el script REAL en un subproceso con
+ * `firebase-admin` stubbeado por `fixtures/stub_firebase_admin.js` y cero I/O
+ * de red. Credencial hay UNA desde el #834 —la frontera falla cerrado sin
+ * ella— pero es falsa, la finge el stub y no existe en disco: ver el bloque de
+ * CREDENCIALES sobre `ESCRITORES`.
+ *
+ * El stub tira `STUB_STORAGE_REACHED bucket=<nombre>` en el primer `.bucket()`,
+ * así que un script que llega hasta Storage siempre termina en 1. Eso es a
+ * propósito y no se asserta: lo que se mide es QUÉ salió, CONTRA QUÉ BUCKET y
+ * EN QUÉ ORDEN.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * EL #840 LE DIO VUELTA LA PREMISA A ESTE ARCHIVO.
+ *
+ * La versión original tenía UN caso para la nube —`correr(escritor)` sin
+ * ninguna variable— y esperaba el cartel de producción, porque hasta el #840
+ * "sin variables" ERA producción: el default de `.firebaserc` decía
+ * `treino-dev`, `resolverProjectId` caía ahí y de ahí se derivaba el bucket
+ * real. Un `node scripts/upload_enriched_videos.js` a secas subía archivos a
+ * producción; el cartel avisaba, pero el destino era ése.
+ *
+ * Con el #840 el default es `demo-treino`, que no existe en la nube. Ese caso
+ * dejó de ser uno y pasó a ser DOS, y los dos hay que medirlos:
+ *
+ *   1. SIN NADA → resuelve `demo-treino`, NO sale el cartel, y sobre todo: la
+ *      llamada a Storage no apunta al bucket de producción. Éste es el test que
+ *      prueba que el #840 sirvió — antes esta misma corrida aterrizaba en
+ *      `treino-dev.firebasestorage.app`.
+ *
+ *   2. NOMBRANDO PRODUCCIÓN a propósito (`--project=treino-dev` o
+ *      `GCLOUD_PROJECT=treino-dev`) → sale el cartel y sale ANTES de la primera
+ *      escritura. Éste prueba que el guard del #838 sigue vivo: el #840 le sacó
+ *      el default de encima, no la salvaguarda.
+ *
+ * Hacer que el caso 1 volviera a esperar el cartel sería reescribir el test
+ * para que mida el mundo viejo. El cartel que no sale ahí no es una regresión:
+ * es que ya no hay nada contra qué gritar.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * `node:test` + `node:assert` + `node:child_process`, sin dependencias nuevas.
+ */
+
+const test = require('node:test');
+const assert = require('node:assert');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { spawnSync } = require('node:child_process');
+const { RUTA_CREDENCIAL_FALSA } = require('./fixtures/stub_firebase_admin');
+
+const SCRIPTS_DIR = path.join(__dirname, '..');
+const STUB = path.join(__dirname, 'fixtures', 'stub_firebase_admin.js');
+
+/** Un dir vacío para el `--thumbs=` de extract_exercise_thumbnails.js. */
+const THUMBS_VACIO = fs.mkdtempSync(path.join(os.tmpdir(), 'treino-838-'));
+
+/** El proyecto de producción, y el bucket que se le deriva (#826 / #838). */
+const PROD = 'treino-dev';
+const BUCKET_PROD = `${PROD}.firebasestorage.app`;
+/** El default de `.firebaserc` desde el #840: un proyecto que NO existe. */
+const DEMO = 'demo-treino';
+
+/**
+ * Los cuatro scripts que escriben en Storage, con la invocación que llega hasta
+ * el punto de escritura. Los tres primeros son los del #838; el cuarto
+ * (`upload_drive_exercise_videos.js`) apareció en el barrido y es el mismo bug.
+ *
+ * CREDENCIALES (#834). Los cuatro pasan ahora por `lib/admin.js`, que falla
+ * cerrado contra la nube si no hay credencial: sin una, estos tests medirían el
+ * error de #834 en vez de lo que dicen medir — el script moriría ANTES de
+ * llegar a Storage y el marcador nunca aparecería. La inyecta `correr()` para
+ * los cuatro por igual, con la misma `RUTA_CREDENCIAL_FALSA` del stub que usa
+ * el resto de la suite: en `os.tmpdir()`, afuera de todo árbol de git —adentro
+ * la frontera la rechaza— y sin existir en disco, porque la finge el stub.
+ *
+ * ── DONDE EL #834 Y EL #840 SE TOCAN ──────────────────────────────────────
+ *
+ * Vale la pena ser preciso, porque acá es fácil romper el caso "sin nada" sin
+ * que nadie lo note. La credencial que finge el stub es la de `treino-dev`: su
+ * `client_email` es `…@treino-dev.iam.gserviceaccount.com`. O sea que el
+ * proceso AUTENTICA como producción. Lo que NO hace es NOMBRAR producción como
+ * destino, y ésa es la razón por la que el caso 1 del #840 sigue midiendo lo
+ * que dice:
+ *
+ *   `resolverProjectId` (`lib/storage_target.js`) mira, en orden, `--project=`,
+ *   `GOOGLE_CLOUD_PROJECT` / `GCLOUD_PROJECT`, el `project_id` de
+ *   `$GOOGLE_APPLICATION_CREDENTIALS`, y recién después `.firebaserc`.
+ *   `$TREINO_SA_KEY` NO está en esa lista, y no es un olvido: el destino de
+ *   estos cuatro scripts no sale de la credencial sino del plan del #838
+ *   —`projectId: DESTINO.projectId`, `storageBucket: DESTINO.bucket`—, que es
+ *   justamente lo que impide que haya un proyecto en pantalla y otro en el
+ *   write.
+ *
+ * Así que "sin nada, con la credencial exportada" sigue cayendo en el default
+ * de `.firebaserc`, que desde el #840 es `demo-treino`. Y no es un caso de
+ * laboratorio: el mensaje de migración del propio #834 manda a poner
+ * `export TREINO_SA_KEY=…` en el `~/.zshrc`, así que "la credencial exportada y
+ * ninguna otra variable" ES la corrida más común que queda después del #834.
+ * El caso 1 mide exactamente ésa, y por eso mide MÁS que antes: la corrida que
+ * comprueba ya es la que la gente va a tener.
+ *
+ * Lo que sí nombraría producción es `$GOOGLE_APPLICATION_CREDENTIALS` —paso 3
+ * de esa lista—, y por eso el campo `credencial` por escritor que tenía este
+ * archivo se fue. Hoy además ABORTARÍA: con `$TREINO_SA_KEY` puesta, una
+ * segunda variable apuntando a OTRO archivo son dos identidades en el mismo
+ * proceso y `lib/credenciales.js` frena antes que elegir una. No se pierde
+ * nada, y esto importa: los dos casos que apuntan a producción a propósito la
+ * nombran con `--project=` o con `GCLOUD_PROJECT`, que en `resolverProjectId`
+ * le ganan a la credencial de todas formas — o sea que la credencial nunca fue
+ * lo que los hacía disparar.
+ *
+ * `extract_exercise_thumbnails.js` era el único que traía credencial propia
+ * acá, para el chequeo a mano que tenía adentro. Ese chequeo lo reemplazó la
+ * frontera, así que ya no queda nada que lo distinga de los otros tres.
+ */
+const ESCRITORES = [
+  {
+    script: 'extract_exercise_thumbnails.js',
+    argv: ['--upload', `--thumbs=${THUMBS_VACIO}`],
+  },
+  { script: 'apply_catalog_video_fill.js', argv: ['--add-safe'] },
+  { script: 'upload_enriched_videos.js', argv: ['--limit=1'] },
+  { script: 'upload_drive_exercise_videos.js', argv: ['--limit=1'] },
+];
+
+/** Levanta el script con el stub puesto y devuelve salida + exit code. */
+function correr({ script, argv }, extraEnv = {}) {
+  // `TREINO_SA_KEY` va para los CUATRO por igual (#834): sin credencial
+  // `lib/admin.js` falla cerrado contra la nube y el test mediría ese error.
+  // No nombra producción — ver el bloque largo de arriba.
+  const env = { ...process.env, TREINO_SA_KEY: RUTA_CREDENCIAL_FALSA };
+  // Limpieza explícita: si la máquina que corre los tests tiene alguna de estas
+  // exportada, el test mediría otra cosa que la que dice medir.
+  //
+  // `GOOGLE_APPLICATION_CREDENTIALS` entró en la lista con el #840 y no es un
+  // detalle: la credencial real de TREINO vive en `~/.config/treino/sa-key.json`
+  // y hay máquinas que la exportan. El stub intercepta ese nombre de archivo y
+  // devuelve `treino-dev`, así que una credencial heredada convertiría el caso
+  // "sin nada" en el caso "producción" sin que nadie lo note — verde en CI,
+  // rojo en la máquina de quien la tenga, y midiendo el mundo viejo.
+  //
+  // Con el #834 esa misma línea gana un segundo motivo, y hace falta que gane
+  // los dos: como `correr()` pone `$TREINO_SA_KEY`, una
+  // `GOOGLE_APPLICATION_CREDENTIALS` heredada apuntando a OTRO archivo son dos
+  // identidades en el mismo proceso y la frontera ABORTA. El test mediría ese
+  // abort en vez del destino. Borrar la línea rompe las dos cosas a la vez.
+  for (const v of [
+    'FIRESTORE_EMULATOR_HOST',
+    'STORAGE_EMULATOR_HOST',
+    'FIREBASE_STORAGE_EMULATOR_HOST',
+    'GOOGLE_CLOUD_PROJECT',
+    'GCLOUD_PROJECT',
+    'GOOGLE_APPLICATION_CREDENTIALS',
+    'FIREBASE_STORAGE_BUCKET',
+    'STUB_PROJECT_ID',
+  ]) {
+    delete env[v];
+  }
+  Object.assign(env, extraEnv);
+
+  const res = spawnSync(
+    process.execPath,
+    ['--require', STUB, path.join(SCRIPTS_DIR, script), ...argv],
+    { cwd: SCRIPTS_DIR, env, encoding: 'utf8' },
+  );
+  assert.strictEqual(res.error, undefined, `no pude ejecutar ${script}: ${res.error}`);
+  return { stdout: res.stdout, stderr: res.stderr, todo: res.stdout + res.stderr, code: res.status };
+}
+
+for (const escritor of ESCRITORES) {
+  const { script } = escritor;
+
+  test(`${script}: con el emulador de Firestore y Storage sin redirigir, ABORTA`, () => {
+    // ESTE ES EL TEST DEL ISSUE. Es la combinación que en extract_exercise_
+    // thumbnails.js imprimía "destino: EMULADOR" y subía a producción igual.
+    const r = correr(escritor, { FIRESTORE_EMULATOR_HOST: 'localhost:8080' });
+
+    assert.strictEqual(r.code, 1, 'tenía que cortar con exit 1');
+    assert.match(r.stderr, /ABORTADO/, 'esperaba el abort del guard');
+    assert.doesNotMatch(
+      r.todo,
+      /STUB_STORAGE_REACHED/,
+      'llegó a Storage — el guard corre tarde, o no corre',
+    );
+    assert.doesNotMatch(
+      r.todo,
+      /STUB_FIRESTORE_REACHED/,
+      'llegó a Firestore — el guard corre tarde, o no corre',
+    );
+  });
+
+  test(`${script}: en esa corrida NUNCA dice EMULADOR`, () => {
+    // La mentira es el bug, no la escritura. Un script que aborta pero antes
+    // imprime EMULADOR seguiría enseñándole al operador a confiar en la palabra.
+    const r = correr(escritor, { FIRESTORE_EMULATOR_HOST: 'localhost:8080' });
+    assert.doesNotMatch(r.todo, /destino: EMULADOR/);
+    assert.doesNotMatch(r.todo, /EMULADOR \(Firestore \+ Storage\)/);
+  });
+
+  test(`${script}: SIN NADA cae en demo-treino y no llega al Storage de prod`, () => {
+    // ÉSTE ES EL TEST DEL #840, y es el que antes decía lo contrario.
+    //
+    // Sin una sola variable, `resolverProjectId` agota flag, env y credencial y
+    // termina en el default de `.firebaserc`. Hasta el #840 ese default era
+    // `treino-dev` y esta corrida —un `node scripts/<script>` pelado— subía a
+    // producción. Ahora cae en `demo-treino`, que no existe en la nube.
+    const r = correr(escritor);
+
+    assert.match(
+      r.stdout,
+      new RegExp(`Proyecto: ${DEMO} \\(\\.firebaserc\\)`),
+      'sin variables el default de .firebaserc tiene que mandar, y decir de dónde salió',
+    );
+    assert.match(r.stdout, new RegExp(`bucket: ${DEMO}\\.firebasestorage\\.app`));
+
+    // Lo que de verdad prueba el #840: en ninguna parte de la corrida aparece
+    // el proyecto de producción ni su bucket. No es que el cartel no salga —es
+    // que no hay contra qué gritar.
+    assert.doesNotMatch(r.stderr, /IS PRODUCTION/, `${DEMO} no es producción: gritar acá enseña a ignorar el cartel`);
+    assert.doesNotMatch(
+      r.todo,
+      new RegExp(PROD),
+      'apareció el proyecto de producción en una corrida que no lo nombró',
+    );
+    assert.doesNotMatch(
+      r.todo,
+      /bucket=treino-dev/,
+      'el `.bucket()` apuntó al bucket real — el default de .firebaserc no lo desvió',
+    );
+  });
+
+  test(`${script}: SIN NADA, si toca Storage es contra el bucket de demo`, () => {
+    // La otra mitad, y la que no se puede probar mirando sólo el texto: el
+    // marcador del stub dice contra QUÉ bucket iba el `.bucket()`. Que el
+    // script llegue a Storage no es el problema; el problema era a dónde.
+    //
+    // ESTA ASERCIÓN ERA UN `if/else` Y EL #834 LA CERRÓ, que es una mejora y
+    // no una pérdida. La rama `else` existía para `extract_exercise_thumbnails.js`,
+    // que moría antes de Storage en su propio chequeo de
+    // `GOOGLE_APPLICATION_CREDENTIALS`; ese chequeo lo reemplazó la frontera, y
+    // ahora los cuatro llegan igual. Dejar el `else` sería dejar un colador: el
+    // mensaje que la frontera imprime cuando NO hay credencial
+    // (`mensajeSinVariable`) NOMBRA `GOOGLE_APPLICATION_CREDENTIALS`, así que
+    // una regresión que matara los cuatro scripts antes de Storage habría
+    // entrado por esa rama en VERDE. Un test con una salida de escape que la
+    // falla sabe usar no es un test.
+    const r = correr(escritor);
+
+    assert.ok(
+      r.todo.includes('STUB_STORAGE_REACHED'),
+      'no llegó a Storage: sin el marcador no se puede saber contra qué bucket iba',
+    );
+    assert.ok(
+      r.todo.includes(`STUB_STORAGE_REACHED bucket=${DEMO}.firebasestorage.app`),
+      `llegó a Storage con un bucket que no es ${DEMO}.firebasestorage.app`,
+    );
+  });
+
+  test(`${script}: nombrando treino-dev con --project, grita el cartel de PRODUCCIÓN`, () => {
+    // El guard del #838 sigue entero: lo que el #840 le sacó de encima es el
+    // default que lo hacía disparar sin que nadie pidiera producción.
+    const r = correr({ ...escritor, argv: [...escritor.argv, `--project=${PROD}`] });
+
+    assert.match(r.stderr, /IS PRODUCTION/, 'esperaba el cartel de producción en stderr');
+    assert.match(r.stderr, new RegExp(PROD));
+    assert.match(r.stderr, /#826/);
+    // La frase que se asserta es la del #826 sobre STORAGE, no una genérica
+    // sobre backups: el cartel lo escribe `lib/firebase_projects.js`, que es
+    // copia literal del PR #835 y al mergear se reemplaza por la de allá. Si
+    // acá se assertea una frase que sólo existe en la copia del #838, el
+    // merge que el propio PR indica ("quedarse con la del #835") pone estos
+    // cuatro tests en rojo. Ésta vive en las dos, y además es la mitad del
+    // cartel que importa para un script que sube archivos: el backup diario
+    // de Firestore NO cubre Cloud Storage.
+    assert.match(
+      r.stderr,
+      /does NOT cover Cloud Storage/,
+      'el cartel tiene que decir que el backup no cubre Storage — lo que este ' +
+        'script escribe no se recupera',
+    );
+  });
+
+  test(`${script}: GCLOUD_PROJECT=treino-dev también dispara el cartel`, () => {
+    // La otra forma de nombrar producción, y la que más se usa: exportar la
+    // variable que mira el Admin SDK. Si el cartel dependiera del flag, un
+    // `export GCLOUD_PROJECT=treino-dev` sería la puerta de atrás.
+    const r = correr(escritor, { GCLOUD_PROJECT: PROD });
+
+    assert.match(r.stderr, /IS PRODUCTION/);
+    // `includes` y no `new RegExp(...)`: lo que buscamos es un LITERAL, y armar
+    // un regex escapando sólo los puntos deja afuera el resto de los
+    // metacaracteres. CodeQL lo marca como js/double-escaping y tiene razón —
+    // no es explotable con esta constante, pero el patrón invita a que el día
+    // que el bucket cambie de forma el test empiece a matchear cualquier cosa.
+    assert.ok(
+      r.stdout.includes(`bucket: ${BUCKET_PROD}`),
+      `esperaba "bucket: ${BUCKET_PROD}" en stdout`,
+    );
+  });
+
+  test(`${script}: contra producción el cartel sale ANTES de tocar Storage`, () => {
+    // Un cartel que sale después de la primera subida no sirve de nada: para
+    // cuando lo leés, el archivo ya está en el bucket real.
+    const r = correr({ ...escritor, argv: [...escritor.argv, `--project=${PROD}`] });
+
+    const cartel = r.todo.indexOf('IS PRODUCTION');
+    const storage = r.todo.indexOf('STUB_STORAGE_REACHED');
+
+    assert.notStrictEqual(cartel, -1, 'no salió el cartel');
+    assert.notStrictEqual(
+      storage,
+      -1,
+      'el script no llegó a Storage — el stub no se aplicó y el test no mide nada',
+    );
+    assert.ok(cartel < storage, 'el cartel tiene que salir ANTES de la primera escritura');
+    assert.ok(
+      r.todo.includes(`STUB_STORAGE_REACHED bucket=${BUCKET_PROD}`),
+      'y el bucket al que iba tiene que ser el que el cartel nombra',
+    );
+  });
+
+  test(`${script}: --bucket= manda, y sin proyecto de producción no hay cartel`, () => {
+    // La otra mitad del #838: sacar el hardcodeo. Si el bucket no se puede
+    // cambiar sin editar el archivo, el script no tiene salida ninguna.
+    const r = correr(
+      { ...escritor, argv: [...escritor.argv, '--project=treino-otro-dev', '--bucket=bucket-de-prueba'] },
+    );
+
+    assert.match(r.stdout, /bucket: bucket-de-prueba/);
+    assert.doesNotMatch(r.stderr, /IS PRODUCTION/, 'treino-otro-dev no es producción');
+    assert.doesNotMatch(r.todo, /treino-dev\.firebasestorage\.app/, 'quedó un bucket hardcodeado vivo');
+  });
+
+  test(`${script}: INVARIANTE — con el emulador puesto no puede terminar en el bucket de prod`, () => {
+    // El invariante del issue, escrito como tal: con FIRESTORE_EMULATOR_HOST
+    // seteado, o el script muere, o Storage está redirigido. Nunca las dos
+    // cosas juntas, y nunca ninguna.
+    const soloFirestore = correr(escritor, { FIRESTORE_EMULATOR_HOST: 'localhost:8080' });
+    assert.strictEqual(soloFirestore.code, 1, 'sin redirigir Storage tiene que morir');
+
+    const completo = correr(escritor, {
+      FIRESTORE_EMULATOR_HOST: 'localhost:8080',
+      FIREBASE_STORAGE_EMULATOR_HOST: 'localhost:9199',
+    });
+    assert.doesNotMatch(completo.stderr, /ABORTADO/, 'con los dos redirigidos tiene que dejar pasar');
+    assert.doesNotMatch(completo.stderr, /IS PRODUCTION/, 'contra emulador no se grita');
+    assert.match(completo.todo, /EMULADOR \(Firestore \+ Storage\)/, 'esperaba la etiqueta de emulador');
+  });
+}
+
+// ── Los que TODAVÍA hardcodean el bucket de producción ────────────────────
+//
+// La pregunta que abrió el #840: con `demo-treino` como default, el PROYECTO
+// cambia y el bucket hardcodeado NO. ¿Hace falta un caso por script?
+//
+// Se midió, y la respuesta es que no hace falta uno por script — hace falta
+// UNO, estructural, que es éste. Quedan tres archivos con el literal
+// `treino-dev.firebasestorage.app` adentro, y NINGUNO abre Storage:
+//
+//   build_catalog_proposal.js        READ-ONLY (lo dice su encabezado): lee
+//   match_drive_videos_to_catalog.js `exercises` de Firestore y escribe un CSV
+//                                    o un JSON en docs/. El `storageBucket:` de
+//                                    su `initializeApp` es opción MUERTA: no hay
+//                                    un solo `admin.storage()` en el archivo.
+//
+//   _video_map.js                    ni siquiera es un script: es un mapa
+//                                    `exerciseId → videoUrl`. El bucket vive
+//                                    adentro de una URL de DESCARGA que sus dos
+//                                    consumidores (seed_workout_catalog.js,
+//                                    backfill_exercise_videos.js) estampan en
+//                                    Firestore. Leer de producción no es
+//                                    escribir en producción, y con el emulador
+//                                    esas URLs ya apuntaban al bucket real desde
+//                                    antes del #840 — no es una consecuencia de
+//                                    este cambio.
+//
+// O sea: el hardcodeo sobrevive porque hoy es inerte. Lo que hay que fijar no
+// es cada caso sino esa condición — que siga inerte, y que nadie sume un cuarto
+// archivo copiando el literal. Las dos cosas se rompen en silencio: un
+// `admin.storage().bucket()` agregado a build_catalog_proposal.js escribiría en
+// producción sin pasar por `exigirDestinoCoherente` y sin cartel, con el
+// default en `demo-treino` y el operador convencido de que está offline.
+
+/** Los archivos NO-test que pueden llevar el literal, y por qué. */
+const CON_EL_LITERAL = {
+  'build_catalog_proposal.js': 'read-only, el storageBucket es opción muerta',
+  'match_drive_videos_to_catalog.js': 'read-only, el storageBucket es opción muerta',
+  '_video_map.js': 'URL de descarga que se estampa en Firestore, no un destino',
+  // Sólo en prosa: el módulo DERIVA el bucket del proyecto. Está en la lista
+  // para que el barrido de abajo sea exhaustivo de verdad y no tenga excepciones
+  // escondidas.
+  'lib/storage_target.js': 'sólo en comentarios — acá el bucket se deriva',
+};
+
+/** Los que además tienen que seguir sin tocar Storage. */
+const INERTES = ['build_catalog_proposal.js', 'match_drive_videos_to_catalog.js', '_video_map.js'];
+
+const LITERAL = /treino-dev\.(firebasestorage\.app|appspot\.com)/;
+
+test('nadie más copió el literal del bucket de producción', () => {
+  // Un cuarto archivo con el bucket adentro es un cuarto destino que no
+  // responde a `--bucket=`, ni a `FIREBASE_STORAGE_BUCKET`, ni al default de
+  // `.firebaserc`. Este barrido lo agarra el día que aparece, no el día que
+  // alguien lo corre.
+  const archivos = [
+    ...fs.readdirSync(SCRIPTS_DIR).filter((f) => f.endsWith('.js')),
+    ...fs.readdirSync(path.join(SCRIPTS_DIR, 'lib'))
+      .filter((f) => f.endsWith('.js'))
+      .map((f) => path.join('lib', f)),
+  ];
+
+  const encontrados = archivos.filter((f) =>
+    LITERAL.test(fs.readFileSync(path.join(SCRIPTS_DIR, f), 'utf8')),
+  );
+
+  assert.deepStrictEqual(
+    encontrados.sort(),
+    Object.keys(CON_EL_LITERAL).sort(),
+    'la lista de archivos con el bucket de producción hardcodeado cambió: si ' +
+      'sacaste uno, borralo de CON_EL_LITERAL; si apareció uno nuevo, o lo ' +
+      'pasás por exigirDestinoCoherente o justificás acá por qué es inerte',
+  );
+});
+
+for (const archivo of INERTES) {
+  test(`${archivo}: hardcodea el bucket de prod, pero NO abre Storage`, () => {
+    const src = fs.readFileSync(path.join(SCRIPTS_DIR, archivo), 'utf8');
+
+    assert.match(
+      src,
+      LITERAL,
+      'ya no hardcodea el bucket — sacalo de INERTES y de CON_EL_LITERAL',
+    );
+    assert.doesNotMatch(
+      src,
+      /admin\.storage\(\)|\.bucket\(/,
+      'abrió Storage con el bucket de producción hardcodeado, sin pasar por ' +
+        'exigirDestinoCoherente: ni --bucket= lo desvía ni sale cartel (#838/#840)',
+    );
+  });
+}

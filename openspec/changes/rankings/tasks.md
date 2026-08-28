@@ -33,7 +33,7 @@ Chain strategy: pending
 - [x] 1.3 Run `dart run build_runner build --delete-conflicting-outputs` to regen `user_public_profile.freezed.dart` / `.g.dart`.
 - [x] 1.4 Modify `firestore.indexes.json` — add 5 composite indexes: `(gymId ASC, rankingOptIn ASC, racha DESC)`, `(gymId ASC, rankingOptIn ASC, lifetimeVolumeKg DESC)`, `(gymId ASC, rankingOptIn ASC, bestSquatKg DESC)`, `(gymId ASC, rankingOptIn ASC, bestBenchKg DESC)`, `(gymId ASC, rankingOptIn ASC, bestDeadliftKg DESC)`.
 - [x] 1.5 Quality gate: `flutter analyze` 0 issues, `dart format .`, `flutter test test/features/profile/domain/user_public_profile_test.dart` green.
-- [x] 1.6 Operator note: after merge, run `firebase deploy --only firestore:indexes` — indexes build asynchronously; do NOT gate PR merge on index build completion, but Slice 4 queries will fail until they're ready. **NOT YET DEPLOYED — deferred to operator step, tracked in apply-progress.**
+- [x] 1.6 Operator note: 🚨 **PRODUCTION** — after merge, run `firebase deploy --only firestore:indexes --project prod`. `treino-dev` is TREINO's only Firebase project, with real users in it; a bare `firebase deploy` with no `--project` resolves there silently via `.firebaserc`, so the `--project prod` alias (same project ID) is there to make the destination **visible**, not to change it. Human-run, never an agent. See [openspec/AGENTS.md](../../AGENTS.md) · #826. Indexes build asynchronously — indexes build asynchronously; do NOT gate PR merge on index build completion, but Slice 4 queries will fail until they're ready. **NOT YET DEPLOYED — deferred to operator step, tracked in apply-progress.**
 
 ## Phase 2: Family Map + Session-Finish Denormalization (Slice 2 — PR 2, HIGH RISK)
 

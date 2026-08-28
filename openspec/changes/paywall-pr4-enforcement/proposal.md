@@ -142,6 +142,14 @@ Strictly linear. Feature Branch Chain: PR #1 → tracker branch, each child → 
 
 ## Rollback Plan
 
+> 🚨 **Every step below runs against PRODUCTION.** `treino-dev` is TREINO's only
+> Firebase project — real users. Redeploying rules, `functions:delete` and deleting
+> a trigger all take effect on the live app instantly, and a rollback is executed
+> under time pressure, which is exactly when nobody re-reads where the command
+> points. Write `--project prod` so the destination shows up on screen and in the
+> log. Human-run, with explicit sign-off; never an agent.
+> See [openspec/AGENTS.md](../../AGENTS.md) · [#826](https://github.com/Backhaus7997/treino/issues/826).
+
 Per slice, in reverse dependency order:
 1. **Rules lock (slice 4)**: redeploy the previous `firestore.rules` — single-file, instant, restores client `accept`/`resume`. This is why it ships alone.
 2. **Callables (slices 2-3)**: `firebase functions:delete acceptTrainerLink resumeTrainerLink`, or revert the client release. Safe **only while the rules lock is not deployed** — which is exactly why the lock deploys last.

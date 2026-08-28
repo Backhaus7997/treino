@@ -88,7 +88,7 @@ dart format .          # formato consistente
 flutter test           # tests verdes (cuando haya tests)
 ```
 
-Detalles completos en [AGENTS.md](./AGENTS.md#calidad-gates-antes-de-cada-commit).
+Detalles completos en [AGENTS.md](./AGENTS.md#7-calidad-gates-antes-de-cada-commit).
 
 ## Workflow
 
@@ -101,7 +101,7 @@ Detalles completos en [AGENTS.md](./AGENTS.md#calidad-gates-antes-de-cada-commit
   ```
 - Cierre de fase: `git tag -a v0.X.0-fase<N>` (no rama).
 
-Detalles en [AGENTS.md → Branching](./AGENTS.md#branching) y [CONTRIBUTING.md → Workflow diario](./CONTRIBUTING.md#5-workflow-diario).
+Detalles en [AGENTS.md → Branching](./AGENTS.md#8-branching-y-prs) y [CONTRIBUTING.md → Workflow diario](./CONTRIBUTING.md#5-workflow-diario).
 
 ## Roadmap
 

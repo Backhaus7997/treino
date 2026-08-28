@@ -13,8 +13,8 @@
  *       --catalog=/path/docs/video-catalog-audit/enriched-catalog.json \
  *       --out=/path/thumbs
  *
- *   FASE B — upload + patch Firestore (requiere sa-key o emulador):
- *     GOOGLE_APPLICATION_CREDENTIALS=scripts/sa-key.json \
+ *   FASE B — upload + patch Firestore (requiere credencial o emulador):
+ *     TREINO_SA_KEY=~/.config/treino/sa-key.json \
  *       node extract_exercise_thumbnails.js --upload --thumbs=/path/thumbs [--dry-run]
  *
  * Detalles de la fase A:
@@ -26,19 +26,34 @@
  *   - 256x256 JPEG (~8-15 KB). Resumible: saltea los .jpg ya generados.
  *   - Reporta fallas en <out>/failures.csv y resumen al final.
  *
- * Fase B (patrón backfill_athlete_counts.js post-#490: nunca sa-key incondicional):
+ * Fase B (pasa por la frontera de #834, como todo `scripts/`):
  *   - Contra emulador: FIRESTORE_EMULATOR_HOST seteado -> no exige credenciales.
- *   - Contra prod: exige GOOGLE_APPLICATION_CREDENTIALS.
+ *   - Contra prod: exige `$TREINO_SA_KEY` apuntando AFUERA del repo.
  *   - Sube exercises/thumbs/{id}.jpg al bucket con download token (mismo esquema
  *     que upload_enriched_videos.js) y setea `thumbnailUrl` en exercises/{id}.
  *   - La app ignora campos desconocidos en fromJson: escribir thumbnailUrl es
  *     seguro antes de que exista el cambio de UI que lo consuma.
+ *
+ * ⚠️ DESTINO DE LA FASE B (#838) — el bucket ya no está hardcodeado.
+ *   Sale de `lib/storage_target.js`: `--bucket=` > `FIREBASE_STORAGE_BUCKET` >
+ *   derivado del proyecto activo. Y antes de escribir un solo byte se exige que
+ *   Firestore y Storage apunten AL MISMO LADO.
+ *
+ *   Lo que había acá era el bug del #838: el script miraba
+ *   `FIRESTORE_EMULATOR_HOST`, imprimía `destino: EMULADOR`, y subía a
+ *   producción igual porque `initializeApp` traía el bucket real fijo. En una
+ *   máquina con `gcloud auth application-default login` hecho eso FUNCIONA — o
+ *   sea que el mensaje tranquilizador desactivaba la sospecha justo cuando más
+ *   hacía falta. Ahora esa combinación ABORTA (ver el porqué en
+ *   `lib/storage_target.js`).
  */
 
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { execFileSync, execFile } = require('child_process');
+
+const { exigirDestinoCoherente } = require('./lib/storage_target');
 
 const args = process.argv.slice(2);
 const flag = (name) => args.includes(`--${name}`);
@@ -48,7 +63,10 @@ const opt = (name, dflt) => {
 };
 
 const CONCURRENCY = parseInt(opt('concurrency', '4'), 10);
-const BUCKET = 'treino-dev.firebasestorage.app';
+// #838 — el bucket ya NO es una constante de módulo: se resuelve dentro de
+// upload(), que es el único lugar que escribe. Dejarlo acá arriba era lo que
+// permitía que la fase A (que no toca Storage) cargara igual el destino de
+// producción, y que el log de la fase B lo contradijera sin que nada chillara.
 
 // ── Fase A ───────────────────────────────────────────────────────────────────
 
@@ -134,23 +152,33 @@ async function upload() {
     process.exit(1);
   }
   const dryRun = flag('dry-run');
-  const onEmulator = !!process.env.FIRESTORE_EMULATOR_HOST;
 
-  if (!onEmulator && !process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    console.error(
-      'Contra producción hace falta GOOGLE_APPLICATION_CREDENTIALS=scripts/sa-key.json\n' +
-      '(o FIRESTORE_EMULATOR_HOST para correr contra el emulador).',
-    );
-    process.exit(1);
-  }
+  // #838 — PRIMERO el destino, antes de credenciales y antes de leer el dir.
+  // Si Firestore está en el emulador y Storage no (o al revés), esto no vuelve:
+  // aborta. La etiqueta que se imprime más abajo sale de acá, así que ya no
+  // puede desmentir a lo que el script hace — es el mismo objeto.
+  const destino = exigirDestinoCoherente({ argv: args });
+  const { bucket: BUCKET } = destino;
 
-  const admin = require('firebase-admin');
-  admin.initializeApp({ storageBucket: BUCKET });
+  // Credenciales: la única puerta (#834). Reemplaza al guard propio que estaba
+  // acá, que exigía `GOOGLE_APPLICATION_CREDENTIALS` a mano y encima mandaba a
+  // guardar la clave EN `scripts/` — justo la ruta que #834 rechaza. El chequeo
+  // no se pierde: `inicializarAdmin` falla cerrado sin credencial contra la
+  // nube y no pide ninguna contra el emulador, que es lo que aquel `if`
+  // aproximaba leyendo una env var suelta.
+  //
+  // Por eso `contraEmulador` ya no se destructura: existía sólo para ese `if`.
+  // `projectId` sí sigue explícito, por el motivo de #838 — contra el emulador
+  // no hay credencial de donde sacarlo.
+  const { admin } = require('./lib/admin').inicializarAdmin({
+    projectId: destino.projectId,
+    extra: { storageBucket: BUCKET },
+  });
   const db = admin.firestore();
   const bucket = admin.storage().bucket();
 
   const jpgs = fs.readdirSync(thumbsDir).filter((f) => f.endsWith('.jpg'));
-  console.log(`thumbs a subir: ${jpgs.length} · destino: ${onEmulator ? 'EMULADOR' : `prod (${BUCKET})`}${dryRun ? ' · DRY-RUN' : ''}`);
+  console.log(`thumbs a subir: ${jpgs.length} · destino: ${destino.etiquetaDestino}${dryRun ? ' · DRY-RUN' : ''}`);
 
   let ok = 0;
   const failures = [];

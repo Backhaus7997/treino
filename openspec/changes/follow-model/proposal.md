@@ -85,6 +85,17 @@ La asimetría real aparece recién en el paso 3, y **solo para relaciones nuevas
 
 ## Plan de migración de datos
 
+> 🚨 **Todos los pasos `M-*` de esta tabla corren contra PRODUCCIÓN.** `treino-dev`
+> es el único proyecto Firebase de TREINO: ahí viven los usuarios reales, y el
+> nombre "dev" es justamente lo que engaña. Los `--apply` escriben por Admin SDK,
+> que **saltea las Firestore rules**; los `firebase deploy` cambian el
+> comportamiento de la app publicada al instante. La columna "Reversión" acota el
+> daño, **no** lo evita — y el backup diario de Firestore no cubre Cloud Storage
+> ni los usuarios de Auth. El detalle ejecutable, paso por paso y con marca por
+> línea, está en [`tasks.md`](./tasks.md). Ver
+> [openspec/AGENTS.md](../../AGENTS.md) ·
+> [#826](https://github.com/Backhaus7997/treino/issues/826).
+
 Cada paso dice cómo se revierte. **Ningún paso borra `friendships`.**
 
 | # | Paso | Reversión |

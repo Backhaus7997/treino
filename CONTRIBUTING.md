@@ -292,6 +292,22 @@ No hay rama de fase. El tag sirve como punto de referencia para `git diff v0.1.0
 
 ## 7. Trabajar con Firebase (Fase 1+)
 
+> ## 🚨 `treino-dev` es PRODUCCIÓN
+>
+> El proyecto Firebase al que te van a dar acceso se llama `treino-dev`, y ese
+> nombre engaña: es el **único** proyecto de TREINO. No existe `treino-prod`,
+> no existe un entorno de desarrollo separado en la nube, y ahí viven los
+> usuarios reales con sus pagos, turnos, mediciones y chats. No hay backup
+> declarado en ningún lado.
+>
+> Te van a agregar como **Editor**, o sea que vas a poder deployar y borrar.
+> Antes de correr cualquier `firebase deploy`, `firestore:delete` o script de
+> `scripts/`, leé [AGENTS.md → Entornos](./AGENTS.md#-entornos--leer-antes-de-correr-cualquier-comando).
+>
+> Para desarrollar y probar usá el emulador — es el único entorno descartable:
+> `./scripts/emulator.sh` y `flutter run --dart-define=USE_EMULATOR=true`.
+> (Contexto: issue #826.)
+
 Cuando arranquemos Fase 1, cada dev necesita acceso al proyecto Firebase. **No commitear** los archivos de credenciales generados (`google-services.json`, `GoogleService-Info.plist`, `firebase_options.dart`); ya están en `.gitignore`.
 
 Pasos para conectar tu máquina:

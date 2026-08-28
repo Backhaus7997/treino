@@ -8,7 +8,7 @@
  *
  * Usage:
  *   cd treino  (repo root)
- *   $env:GOOGLE_APPLICATION_CREDENTIALS = "scripts\treino-dev-service-account.json"
+ *   $env:TREINO_SA_KEY = "$HOME\.config\treino\sa-key.json"
  *   node scripts/backfill_exercise_equipment.js
  *
  * Idempotent — re-running is safe:
@@ -23,10 +23,12 @@
 
 'use strict';
 
-const admin = require('firebase-admin');
+const { inicializarAdmin } = require('./lib/admin');
 const { equipmentMap } = require('./_equipment_map.js');
 
-admin.initializeApp();
+// Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla cerrado
+// con la migración; contra el emulador no pide nada. Ver scripts/lib/admin.js.
+const { admin } = inicializarAdmin();
 const db = admin.firestore();
 
 async function backfill() {

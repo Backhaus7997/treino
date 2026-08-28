@@ -12,12 +12,14 @@
  *   FIRESTORE_EMULATOR_HOST=localhost:8080 node scripts/seed_posts.js
  *
  * Or point at production (careful!):
- *   GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json node scripts/seed_posts.js
+ *   TREINO_SA_KEY=~/.config/treino/sa-key.json node scripts/seed_posts.js
  */
 
-const admin = require('firebase-admin');
+const { inicializarAdmin } = require('./lib/admin');
 
-admin.initializeApp();
+// Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla cerrado
+// con la migración; contra el emulador no pide nada. Ver scripts/lib/admin.js.
+const { admin } = inicializarAdmin();
 const db = admin.firestore();
 
 // ---------------------------------------------------------------------------

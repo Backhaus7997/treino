@@ -32,8 +32,14 @@ Chain strategy: pending
 
 ## Phase 1: Slice 1 — Cloud Function `resolveGymPlace` (server-side)
 
-- [ ] 1.1 GCP PREREQUISITE (operator, blocks e2e not code): enable Places API (New) on `treino-dev`, confirm Blaze billing, note project id.
-- [ ] 1.2 GCP PREREQUISITE (operator, blocks e2e not code): `firebase functions:secrets:set PLACES_API_KEY` (server-restricted key) + configure budget alert.
+> 🚨 **Tasks 1.1 and 1.2 hit PRODUCTION.** `treino-dev` is TREINO's only Firebase
+> project — real users. Both are billable GCP changes on the live project, and
+> `functions:secrets:set` overwrites the running key. **Operator-only, with
+> explicit human sign-off — an agent does NOT run these.**
+> See [openspec/AGENTS.md](../../AGENTS.md) · #826.
+
+- [ ] 1.1 GCP PREREQUISITE (🚨 PRODUCTION — operator only, do NOT run; blocks e2e not code): enable Places API (New) on `treino-dev`, confirm Blaze billing, note project id.
+- [ ] 1.2 GCP PREREQUISITE (🚨 PRODUCTION — operator only, do NOT run; blocks e2e not code): `firebase functions:secrets:set PLACES_API_KEY --project prod` (server-restricted key) + configure budget alert. Overwriting an existing key breaks gym search in the shipped app.
 - [x] 1.3 RED — `functions/src/__tests__/places-search.test.ts`: write failing tests for `runResolveGymPlace(app, placeId, sessionToken?)` — read-through hit (no `fetch` call), miss→Details→upsert, bad `placeId`→`invalid-argument`, Places non-200→`internal` (no key leak), 429→`resource-exhausted`. Mirror `functions/src/__tests__/add-alias.test.ts` emulator-app harness; `jest.spyOn(global, 'fetch')` mock. DEVIATION: empty/invalid placeId maps to `invalid-argument` (not `not-found` as originally phrased) — consistent with task 1.4's own wording and the guard-order pattern in add-alias.ts (input validation is `invalid-argument`; `not-found`/`internal` are reserved for downstream lookup failures). `not-found` was not applicable since a missing placeId never reaches Firestore/Places lookups.
 - [x] 1.4 RED — same file: failing tests for thin `resolveGymPlace` onCall wrapper — `unauthenticated` guard, `invalid-argument` on empty `placeId`, region `southamerica-east1`, `secrets: ['PLACES_API_KEY']`.
 - [x] 1.5 VERIFY-AT-APPLY: confirmed current Places API (New) Details endpoint/headers/field-mask tokens (`GET /v1/places/{placeId}`, `X-Goog-Api-Key`, `X-Goog-FieldMask`, `displayName.text`, `location.latitude/longitude`, `types`, `sessionToken` query param) — orchestrator supplied these as verified against live Google docs at apply time; used verbatim in implementation.

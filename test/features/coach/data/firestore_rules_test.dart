@@ -125,24 +125,36 @@ void main() {
       skip: 'emulator required — run with firebase emulators:exec',
     );
 
+    // #831: el flip `cancelled → confirmed` de ADR-1 se REMOVIÓ de las reglas.
+    // Su única implementación (`AppointmentRepository.book()`) no tiene
+    // llamadores en `lib/`, y los dos creadores vivos usan auto-id, así que
+    // nunca pasaron por ese camino. Mantener la superficie de ataque de una
+    // feature que no existe es peor que no tener la feature. El escenario se
+    // conserva porque su primera mitad —la cancelación— sigue viva, y su
+    // segunda mitad ahora custodia que el flip NO vuelva.
     test(
-      'SCENARIO-527: appointment update paths — cancellation >24h by member and ADR-1 flip',
+      'SCENARIO-527: appointment update paths — cancellation >24h by member, '
+      'and the removed ADR-1 flip stays denied (#831)',
       () {
-        // Requires emulator. Validates both update paths in the appointments
-        // match block: Path 1 (cancellation by athlete or trainer with >24h),
-        // Path 2 (cancelled → confirmed flip by new athlete per ADR-1).
+        // Requires emulator. Validates the update paths in the appointments
+        // match block: Path 1 (cancellation by athlete or trainer with >24h,
+        // signing with their own uid and without moving athleteId/trainerId/
+        // startsAt/durationMin/paymentId), and that the old cancelled →
+        // confirmed flip is now DENIED for everyone. Cobertura real en
+        // `functions/src/__tests__/appointments-shape-rules.test.ts`.
       },
       skip: 'emulator required — run with firebase emulators:exec',
     );
 
-    // Slice 2a (Agenda→cobro bridge, money-critical): Path 3 of the
-    // appointments update rule now also lets the trainer link a Payment via
+    // Slice 2a (Agenda→cobro bridge, money-critical): Path 2 of the
+    // appointments update rule (era Path 3 hasta que #831 removió el flip de
+    // ADR-1) now also lets the trainer link a Payment via
     // `paymentId`, with a set-once guard. See firestore.rules lines ~935-951.
     test(
       'SCENARIO-841: trainer sets paymentId on own confirmed appointment '
       '(Slice 2a) — null → value permitted',
       () {
-        // Requires emulator. Validates Path 3 permits
+        // Requires emulator. Validates Path 2 permits
         // request.auth.uid == resource.data.trainerId to update ONLY
         // paymentId (null → a Payment id) while status/athleteId/trainerId/
         // startsAt stay pinned equal to resource.data.
@@ -154,11 +166,16 @@ void main() {
       'SCENARIO-842: paymentId is set-once — re-billing with a different id, '
       'or clearing it back to null, is denied',
       () {
-        // Requires emulator. Validates Path 3's set-once clause: once
+        // Requires emulator. Validates Path 2's set-once clause: once
         // resource.data.paymentId is non-null, request.resource.data.paymentId
         // must equal it exactly — a different Payment id or null is denied.
         // MONEY-CRITICAL: closes the "swap which Payment covers this
         // session" / accidental-unbilling vector.
+        //
+        // #831 (segunda pasada): el set-once se evadía en DOS pasos sin
+        // tocarlo, porque el Path 1 no pineaba `paymentId` — cancelar
+        // limpiándolo y re-linkear después contra el `null` recién fabricado.
+        // El pin del Path 1 cierra el paso 1.
       },
       skip: 'emulator required — run with firebase emulators:exec',
     );
@@ -167,7 +184,7 @@ void main() {
       'SCENARIO-843: a non-trainer (athlete or third party) cannot set '
       'paymentId on an appointment they do not own',
       () {
-        // Requires emulator. Validates Path 3's outer
+        // Requires emulator. Validates Path 2's outer
         // `request.auth.uid == resource.data.trainerId` gate — an athlete or
         // unrelated uid attempting to set paymentId is denied.
       },

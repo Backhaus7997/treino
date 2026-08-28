@@ -53,7 +53,13 @@ Sin este bootstrap, Etapa 8 (Excel import) no puede arrancar.
 - Agregar `hosting:` block a `firebase.json` con target `coach-treino-dev` apuntando a `build/web/`.
 - Script `npm run` o doc en `scripts/deploy_coach_hub.md` con comandos:
   - `flutter build web -t lib/main_coach_hub.dart`
-  - `firebase deploy --only hosting:coach-treino-dev`
+  - 🚨 PROD — `firebase deploy --only hosting:coach-treino-dev --project prod`
+
+> 🚨 **Ese deploy va a PRODUCCIÓN.** El target dice "dev" y el sitio se llama
+> `coach-treino-dev`, pero es el Coach Hub que usan los PFs reales: `.firebaserc`
+> resuelve el `--only hosting:` contra `treino-dev`, el único proyecto Firebase
+> de TREINO. Que el comando no nombre `treino-dev` no significa que no le esté
+> pegando. Ver [openspec/AGENTS.md](../../AGENTS.md) · #826.
 
 ### Trabajo manual (vos)
 
@@ -83,7 +89,7 @@ Después de los pasos 1-3, corro `flutterfire configure --platforms=web` (o lo c
 | 2 | **Sin Google Sign-In en web MVP** | `google_sign_in_web` es un paquete separado con setup distinto (clientId via meta tag en index.html + OAuth consent). Agrega scope. MVP: email/password solamente. Si hay demanda, Google Sign-In se agrega en Etapa 7.5 o follow-up. |
 | 3 | **Role gating client-side via router redirect** (NO seguridad real) | Las Firestore rules ya son la fuente de verdad de seguridad. El router redirect es UX (athletes no ven menús que no pueden tocar). Si alguien bypasea el redirect, las rules deniegan al backend. |
 | 4 | **`AppTheme.dark()` sin breakpoints responsivos para MVP** | El Coach Hub se diseña primero para desktop (1200+px). En MVP no tunneamos para mobile/tablet web — usamos el mismo layout que mobile (centrado, max-width 600px). Iteración futura agrega media queries si producto valida que PFs usan el hub desde tablet. |
-| 5 | **Hosting site: `coach-treino-dev` (dev only)**, sin prod en este PR | Prod requiere decisión de naming + DNS de la organización. Para MVP de Etapa 7, dev hosting alcanza. Prod hosting (`coach.treino.app`?) se decide en Fase 6 cuando arme la beta. |
+| 5 | **Hosting site: `coach-treino-dev`**, sin dominio propio en este PR | ⚠️ **Corregido por [#845](https://github.com/Backhaus7997/treino/issues/845): esta fila decía "(dev only)" y eso era falso.** `coach-treino-dev` es un target de hosting de `treino-dev`, que es el **único** proyecto Firebase de TREINO y tiene usuarios reales — desplegarlo ahí es desplegar a producción, no a un entorno de prueba. Lo que este PR difiere no es "prod", es el **dominio propio** (`coach.treino.app`?), que requiere decisión de naming + DNS de la organización y se decide en Fase 6 con la beta. |
 
 ---
 
@@ -123,7 +129,7 @@ Después de los pasos 1-3, corro `flutterfire configure --platforms=web` (o lo c
 - [ ] Trainer autenticado → ve `/dashboard` con su displayName + lista placeholder de alumnos
 - [ ] Sign-out funciona y devuelve a `/login`
 - [ ] `flutter build web -t lib/main_coach_hub.dart` compila sin errores
-- [ ] `firebase deploy --only hosting:coach-treino-dev` despliega correctamente
+- [ ] 🚨 PROD (ver arriba) — `firebase deploy --only hosting:coach-treino-dev --project prod` despliega correctamente
 - [ ] `https://coach-treino-dev.web.app` carga el app
 - [ ] `flutter analyze` 0 issues
 - [ ] Suite full passing (incluyendo tests nuevos del routing/guard)
@@ -160,7 +166,7 @@ Antes de mergear, ejecutar **en este orden** (los manuales del usuario primero, 
 6. ☐ Dev: implementar entry point + router + dashboard + tests
 7. ☐ Smoke local: `flutter run -t lib/main_coach_hub.dart -d chrome` con cuenta athlete + cuenta trainer
 8. ☐ `flutter analyze` 0 + tests passing
-9. ☐ Smoke deploy: `flutter build web -t lib/main_coach_hub.dart && firebase deploy --only hosting:coach-treino-dev`
+9. ☐ Smoke deploy — 🚨 **PROD, publica a los PFs reales** (ver aviso arriba): `flutter build web -t lib/main_coach_hub.dart && firebase deploy --only hosting:coach-treino-dev --project prod`
 10. ☐ Smoke en URL real: `https://coach-treino-dev.web.app` con misma matriz de cuentas
 
 Post-merge: documentar URL en CLAUDE.md o equivalente para que otros devs sepan dónde está la app.
