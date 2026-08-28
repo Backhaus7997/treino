@@ -81,6 +81,37 @@ async function seedUser(opts: {
   });
 }
 
+/**
+ * Siembra una cuenta con contrasena, o sea con el provider `password`.
+ *
+ * ─── Por que esto NO lo cubria `seedUser` ───────────────────────────────────
+ *
+ * `createUser({uid, email})` sin `password` deja `providerData` VACIO. Y
+ * `resetOutcomeFor([])` devuelve "password-reset" por el fallback de lista
+ * vacia, NO por la rama `includes("password")`. O sea que ningun test empujaba
+ * una cuenta con provider `password` por el call site.
+ *
+ * Medido: mutando la linea del call site de `p.providerId` a `p.uid`, la suite
+ * pasaba 31/31. Los dos seeds daban el MISMO resultado mutados que sin mutar
+ * —`[]` seguia siendo `[]`, y `["google.com"]` pasaba a `["<uid>-google"]`, que
+ * tampoco contiene "password"—, asi que el mapeo no estaba atado a nada.
+ *
+ * Con este seed el mutante muere: `["password"]` pasa a `["<email>"]` y la
+ * cuenta cae en la rama federada, que es justo lo que el test prohibe.
+ */
+async function seedPasswordUser(uid: string, email: string): Promise<void> {
+  await admin.auth(testApp).deleteUser(uid).catch(() => undefined);
+  await admin.auth(testApp).createUser({ uid, email, password: "Passw0rd!" });
+
+  // Verificado, no asumido — igual que en el seed federado, porque de esto
+  // depende que el test signifique algo.
+  const u = await admin.auth(testApp).getUser(uid);
+  const ids = u.providerData.map((x) => x.providerId);
+  if (!ids.includes("password")) {
+    throw new Error(`seed roto: la cuenta no quedo con password (${ids})`);
+  }
+}
+
 /** Siembra una cuenta cuyo unico proveedor es Google, sin password hash. */
 async function seedFederatedUser(uid: string, email: string): Promise<void> {
   await admin.auth(testApp).deleteUser(uid).catch(() => undefined);
@@ -468,6 +499,61 @@ describe("cuenta sin contraseña: manda el hint, no un link de reseteo", () => {
 // funciona para cuentas federadas da verde SIN HABER MEDIDO NADA. Por eso la
 // decision vive en una funcion pura y no en un assert de integracion.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// El call site: providerData REAL, no el fallback de lista vacía
+//
+// `resetOutcomeFor` ya está cubierta como función pura. Lo que estos tests
+// cubren es el ESLABÓN: que la llamada le pase los providerId y no otra cosa.
+// Es la única parte del branch de tres vías que un test puro no puede tocar.
+// ---------------------------------------------------------------------------
+describe("una cuenta CON contraseña recibe el link, no el hint", () => {
+  const uid = "auth-mail-conpass";
+  const email = "conpass@example.com";
+
+  beforeEach(async () => {
+    await seedPasswordUser(uid, email);
+  });
+
+  afterEach(async () => {
+    await purgeQueueFor(uid);
+    await admin.auth(testApp).deleteUser(uid).catch(() => undefined);
+  });
+
+  it("el provider `password` la manda por la rama de reseteo", async () => {
+    await runRequestPasswordReset(testApp, email, NOW);
+
+    const scope = `${uid}_${throttleWindow(NOW)}`;
+    const reset = await readQueueDoc(dedupeKey("password-reset", scope, uid));
+    const hint = await readQueueDoc(
+      dedupeKey("federated-signin-hint", scope, uid),
+    );
+
+    // `readQueueDoc` devuelve `undefined` cuando el doc no existe.
+    expect(reset?.kind).toBe("password-reset");
+    expect(hint).toBeUndefined();
+  });
+
+  it("y el mail lleva el action link", async () => {
+    await runRequestPasswordReset(testApp, email, NOW);
+
+    const doc = await readQueueDoc(
+      dedupeKey("password-reset", `${uid}_${throttleWindow(NOW)}`, uid),
+    );
+
+    expect(doc?.params?.actionLink).toContain("oobCode=");
+  });
+
+  // Fija la forma que produce el emulador. Si una version futura empezara a
+  // devolver `providerData` vacio para una cuenta con contrasena, los tests de
+  // arriba seguirian pasando por el fallback y volveriamos a no cubrir nada.
+  // Este test avisa.
+  it("la cuenta sembrada expone el provider `password`", async () => {
+    const u = await admin.auth(testApp).getUser(uid);
+
+    expect(u.providerData.map((p) => p.providerId)).toContain("password");
+  });
+});
+
 describe("el emulador no es oráculo para el caso federado", () => {
   const uid = "auth-mail-emu-miente";
   const email = "emu-miente@example.com";
