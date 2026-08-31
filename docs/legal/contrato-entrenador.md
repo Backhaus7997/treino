@@ -1,3 +1,9 @@
+<!-- treino-legal
+slug: entrenadores
+title: Términos para Entrenadores
+dart: kTrainerTermsSections
+-->
+
 # Términos para Entrenadores de TREINO
 
 **Última actualización:** [[PENDIENTE — fecha de publicación]]

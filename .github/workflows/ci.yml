@@ -203,6 +203,23 @@ jobs:
           echo "shard $SHARD_INDEX/$SHARD_TOTAL: ${#FILES[@]} de $TOTAL_FILES archivos"
           flutter test "${FILES[@]}"
 
+      # Los textos legales de la app se GENERAN desde `docs/legal/*.md`
+      # (scripts/build_legal_content.py). Si alguien edita el markdown y no
+      # regenera, la app y gettreino.com quedan diciendo cosas distintas — y
+      # entonces no hay forma de probar qué aceptó el usuario. Este paso lo
+      # convierte en error de CI en vez de en un bug legal silencioso.
+      # No corre si nunca se generó (mientras queden [[PENDIENTE]] el
+      # generador aborta a propósito y el archivo todavía no existe).
+      - name: Gate de desfasaje legal
+        run: |
+          if [ -f lib/features/auth/presentation/legal/legal_content.dart ] \
+             && head -1 lib/features/auth/presentation/legal/legal_content.dart \
+                | grep -q "GENERADO POR"; then
+            python3 scripts/build_legal_content.py --check
+          else
+            echo "Textos legales todavía no generados — gate omitido."
+          fi
+
   # Gate de regresion visual del Coach Hub (#761).
   #
   # Job APARTE, y no un paso de "Analyze & Test", por dos motivos:

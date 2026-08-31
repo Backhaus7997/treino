@@ -85,6 +85,61 @@ Dos cosas de esa sección que son trabajo de desarrollo:
 - **`/eliminar-cuenta` va en la raíz de `gettreino.com`**, no bajo `/legal`.
   Google exige que sea alcanzable desde un navegador sin instalar la app.
 
+## El texto se GENERA, no se copia
+
+Los `.md` de este directorio son la **fuente única**. El archivo que muestra la
+app y el HTML del sitio se generan desde acá:
+
+```bash
+python3 scripts/build_legal_content.py
+```
+
+Produce:
+
+| Salida | Para |
+|---|---|
+| `lib/features/auth/presentation/legal/legal_content.dart` | La app |
+| `build/legal-web/*.html` + `index.html` | Publicar en `gettreino.com/legal/` |
+
+**No edites `legal_content.dart` a mano.** Lleva un encabezado que lo dice. Es
+el mismo trato que con freezed: se edita la fuente, se corre el generador, la
+salida no se toca.
+
+### Convenciones en cada `.md`
+
+```markdown
+<!-- treino-legal
+slug: privacidad
+title: Política de Privacidad
+dart: kPrivacySections
+-->
+```
+
+- Lo publicable arranca en `<!-- publish:start -->`, o si no hay marcador, en el
+  primer `## `.
+- `<!-- publish:end -->` corta: lo que sigue es interno (anexos, specs de
+  producto).
+- Un `.md` sin bloque `treino-legal` se ignora — así la auditoría y este README
+  nunca se publican.
+
+### El gate de pendientes
+
+Si queda un marcador `[[...]]` dentro del texto publicable, **el generador
+aborta**. Es a propósito: evita que un `[[PENDIENTE: sede social]]` llegue a un
+usuario. Hoy hay 29 y por eso `legal_content.dart` todavía no se generó.
+
+Para previsualizar sin publicar:
+
+```bash
+python3 scripts/build_legal_content.py --preview --allow-pending
+```
+
+### El gate de desfasaje
+
+`ci.yml` corre `--check` en el job `analyze-and-test`: si alguien edita un `.md`
+y no regenera, **el PR falla**. Con eso el drift deja de ser un descuido posible
+y pasa a ser un error de build.
+
 ## Antes de publicar
 
 1. Completar los `[[PENDIENTE]]` restantes. El titular ya está identificado —

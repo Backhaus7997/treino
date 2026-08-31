@@ -1,3 +1,9 @@
+<!-- treino-legal
+slug: comunidad
+title: Normas de Comunidad
+dart: kCommunitySections
+-->
+
 # Normas de Comunidad de TREINO
 
 **Última actualización:** [[PENDIENTE — fecha de publicación]]
@@ -149,6 +155,8 @@ Correo: [[PENDIENTE — casilla bajo `gettreino.com`]]
 
 ---
 ---
+
+<!-- publish:end -->
 
 # Anexo — Especificación de producto (no se publica)
 

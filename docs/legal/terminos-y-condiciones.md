@@ -1,3 +1,9 @@
+<!-- treino-legal
+slug: terminos
+title: Términos y Condiciones
+dart: kTermsSections
+-->
+
 # Términos y Condiciones de TREINO
 
 **Última actualización:** [[PENDIENTE — fecha de publicación]]

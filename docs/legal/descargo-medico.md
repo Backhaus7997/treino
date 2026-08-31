@@ -1,3 +1,9 @@
+<!-- treino-legal
+slug: descargo-medico
+title: Descargo Médico
+dart: kHealthDisclaimerSections
+-->
+
 # Descargo de Responsabilidad Médica y Asunción de Riesgo
 
 **Última actualización:** [[PENDIENTE — fecha de publicación]]
@@ -206,6 +212,8 @@ Correo: [[PENDIENTE — casilla bajo `gettreino.com`]]
 
 ---
 ---
+
+<!-- publish:end -->
 
 # Anexo — Dónde tiene que aparecer esto (no se publica)
 

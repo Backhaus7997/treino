@@ -1,3 +1,9 @@
+<!-- treino-legal
+slug: consentimiento-salud
+title: Consentimiento de datos de salud
+dart: kHealthConsentSections
+-->
+
 # Consentimiento para el tratamiento de datos de salud
 
 **Última actualización:** [[PENDIENTE — fecha de publicación]]
@@ -31,12 +37,14 @@ recolectan datos de salud. Es el hallazgo C1 de la
 
 # Parte A — El texto que ve el usuario
 
+<!-- publish:start -->
+
 ## Tus datos de salud
 
 TREINO puede guardar información sobre tu cuerpo y tu estado físico. Antes de
 que cargues nada, queremos que sepas exactamente qué es y para qué se usa.
 
-### Qué datos son
+## Qué datos son
 
 | Dato | Cuándo se guarda |
 |---|---|
@@ -48,7 +56,7 @@ que cargues nada, queremos que sepas exactamente qué es y para qué se usa.
 | **Plan de alimentación** | Si tu entrenador te arma uno |
 | **Historial de entrenamiento** | Sesiones, ejercicios, series, pesos y repeticiones |
 
-### Para qué los usamos
+## Para qué los usamos
 
 **Sólo para dos cosas:**
 
@@ -59,13 +67,13 @@ que cargues nada, queremos que sepas exactamente qué es y para qué se usa.
 terceros, no se usan para perfilarte ni para tomar decisiones automatizadas
 sobre vos.
 
-### Podés decir que no
+## Podés decir que no
 
 **Podés usar TREINO sin cargar ningún dato de salud.** Vas a perder funciones
 —el seguimiento de progreso, las estadísticas, el trabajo con un entrenador—
 pero la aplicación funciona igual.
 
-### Podés cambiar de opinión
+## Podés cambiar de opinión
 
 - **Revocar este consentimiento** cuando quieras, desde Ajustes.
 - **Dejar de compartir con tu entrenador** sin cortar el vínculo.
@@ -75,13 +83,13 @@ pero la aplicación funciona igual.
 Revocar no borra lo ya cargado: para eso hay que pedir la supresión o
 eliminarlo vos.
 
-### Algo que quizá no imagines
+## Algo que quizá no imagines
 
 Si te vinculás con un entrenador, **él puede llevar notas, un registro de
 seguimiento y archivos sobre vos que no ves en tu aplicación**. Son datos
 tuyos, y tenés derecho a pedirlos. Escribinos y te los entregamos.
 
-### Dónde se guardan
+## Dónde se guardan
 
 En servidores de nuestros proveedores de infraestructura, **fuera de la
 República Argentina**, cifrados en tránsito y con acceso restringido por reglas
@@ -102,6 +110,8 @@ Más detalle en la [Política de Privacidad](./politica-de-privacidad.md).
 
 ---
 ---
+
+<!-- publish:end -->
 
 # Parte B — Especificación del flujo (no se publica)
 

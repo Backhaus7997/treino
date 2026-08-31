@@ -893,7 +893,7 @@ def build_story():
     ], [45, 120]))
 
     sp(10)
-    A(P("9.5 El problema de las tres copias", "h3"))
+    A(P("9.5 El problema de las tres copias — resuelto", "h3"))
     A(P("El mismo texto legal va a existir en tres lugares: el markdown de "
         "<b>docs/legal/</b>, las constantes del código de la aplicación, y el "
         "HTML del sitio — que además vive en otro repositorio. Cambiar una "
@@ -918,8 +918,15 @@ def build_story():
         "falle si el markdown cambió y la salida no se regeneró, el desfasaje "
         "pasa de desaconsejado a imposible."))
     sp(6)
-    A(P("Decisión técnica pendiente: construir el generador, o mantener las "
-        "copias a mano.", "small"))
+    A(callout(
+        "<b>Ya está construido.</b> `scripts/build_legal_content.py` toma los "
+        "markdown de docs/legal/ y produce el archivo de la aplicación y las "
+        "páginas del sitio. Trae dos protecciones: <b>aborta</b> si queda "
+        "algún dato sin resolver en el texto publicable —para que un "
+        "«pendiente» no llegue nunca a un usuario— y un control en integración "
+        "continua que <b>hace fallar el pull request</b> si alguien edita un "
+        "documento y no regenera la salida. El desfasaje pasó de ser un "
+        "descuido posible a un error de build."))
 
     A(PageBreak())
 

@@ -1,3 +1,9 @@
+<!-- treino-legal
+slug: retencion
+title: Retención y eliminación de datos
+dart: kDataRetentionSections
+-->
+
 # Política de Retención y Eliminación de Datos
 
 **Última actualización:** [[PENDIENTE — fecha de publicación]]
@@ -153,6 +159,8 @@ Te entregamos todo lo que consta sobre vos, **incluidos los registros privados
 de tu entrenador**, dentro de los 10 días corridos. Es gratuito.
 
 ---
+
+<!-- publish:end -->
 
 ## 8. Nota de implementación (no se publica)
 

@@ -1,3 +1,9 @@
+<!-- treino-legal
+slug: privacidad
+title: Política de Privacidad
+dart: kPrivacySections
+-->
+
 # Política de Privacidad de TREINO
 
 **Última actualización:** [[PENDIENTE — fecha de publicación]]

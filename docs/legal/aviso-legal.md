@@ -1,3 +1,9 @@
+<!-- treino-legal
+slug: aviso-legal
+title: Aviso Legal
+dart: kLegalNoticeSections
+-->
+
 # Aviso Legal
 
 **Última actualización:** [[PENDIENTE — fecha de publicación]]
