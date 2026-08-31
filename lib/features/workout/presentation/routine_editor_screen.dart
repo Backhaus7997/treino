@@ -1307,7 +1307,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       if (incompletos > 0) {
         out.add((
           mensaje: l10n.routineEditorProblemIncompleteSets(
-              incompletos, day.dayNumber),
+              day.dayNumber, incompletos),
           dia: day,
         ));
       }
@@ -1321,7 +1321,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       ..sort()) {
       out.add((
         mensaje: l10n.routineEditorProblemOtherWeek(
-            rotas[semana]!, semana + 1),
+            semana + 1, rotas[semana]!),
         dia: null,
       ));
     }
@@ -1341,7 +1341,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         sets += slot.setsForWeek(_selectedWeek).length;
       }
     }
-    return l10n.routineEditorFooterSummary(sets, _days.length);
+    return l10n.routineEditorFooterSummary(_days.length, sets);
   }
 
   /// Lleva al usuario al día [dia]: lo selecciona y lo trae a la vista.
@@ -2824,11 +2824,16 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
               // todo el plan y recién al tocar guardar se enteraba, por un
               // SnackBar que además tapaba la pantalla.
               Builder(builder: (context) {
-                final problemas = _problemas(l10n);
                 // Los dos primeros: la línea tiene dos renglones, y una lista
                 // de siete problemas deja de leerse como una lista de tareas.
-                final visibles =
-                    problemas.take(2).map((p) => p.mensaje).toList();
+                final problemas = _problemas(l10n).take(2).toList();
+                final visibles = problemas.map((p) => p.mensaje).toList();
+                // El día sale de los problemas QUE SE VEN, no de la lista
+                // entera: en modo entrenador los dos primeros son "falta el
+                // nombre" y "falta el split", ninguno con día, y buscar más
+                // abajo ponía un IR al lado de dos mensajes que no llevan a
+                // ningún lado — y saltaba a un problema que el usuario no
+                // tiene en pantalla.
                 final primerDia =
                     problemas.map((p) => p.dia).whereType<_EditableDay>();
                 return EditorFooterBar(

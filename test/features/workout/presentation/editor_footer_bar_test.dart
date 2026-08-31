@@ -8,7 +8,9 @@
 // El cableado con la validación real lo cubre `routine_editor_footer_test.dart`.
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/features/workout/presentation/widgets/editor_footer_bar.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
@@ -45,6 +47,21 @@ Future<void> _montar(
   // `pump` y no `pumpAndSettle`: con `enviando` hay un spinner que nunca
   // termina, y settle esperaría a que la animación se detenga hasta el timeout.
   await tester.pump();
+}
+
+/// Compone [fg] sobre [bg] y cuantiza a 8 bits — lo que se pinta de verdad.
+Color _componer(Color fg, Color bg) {
+  final b = Color.alphaBlend(fg, bg);
+  double q(double v) => (v * 255).round() / 255;
+  return Color.from(alpha: 1.0, red: q(b.r), green: q(b.g), blue: q(b.b));
+}
+
+double _contraste(Color a, Color b) {
+  final la = a.computeLuminance();
+  final lb = b.computeLuminance();
+  final hi = la > lb ? la : lb;
+  final lo = la > lb ? lb : la;
+  return (hi + 0.05) / (lo + 0.05);
 }
 
 Finder get _linea => find.byKey(const Key('footer_status_line'));
@@ -149,6 +166,38 @@ void main() {
       await _montar(tester);
       expect(tester.getSize(_cta).height, 52);
     });
+  });
+
+  group('el CTA apagado se lee', () {
+    // El fondo apagado es `accent` al 25%: en dark eso compone un verde oscuro
+    // (#134130) donde el ink del botón encendido mide 1,43:1 — y NO llega a
+    // 4,5:1 ni al 100% de opacidad, porque el problema no es el alpha sino que
+    // los dos colores son oscuros.
+    for (final entry in <String, AppPalette>{
+      'dark': AppPalette.mintMagenta,
+      'light': AppPalette.mintMagentaLight,
+    }.entries) {
+      test('${entry.key}: textPrimary sobre el fondo apagado cumple AA', () {
+        final p = entry.value;
+        final fondo = _componer(p.accent.withAlpha(64), p.bg);
+        final ratio = _contraste(_componer(p.textPrimary, fondo), fondo);
+        expect(ratio, greaterThanOrEqualTo(4.5),
+            reason: '${entry.key}: ${ratio.toStringAsFixed(2)}:1');
+      });
+
+      test('${entry.key}: el ink del botón encendido NO servía acá', () {
+        final p = entry.value;
+        final fondo = _componer(p.accent.withAlpha(64), p.bg);
+        final conInk =
+            _contraste(_componer(AppColorPrimitives.ink950, fondo), fondo);
+        if (entry.key == 'dark') {
+          expect(conInk, lessThan(4.5),
+              reason: 'si esto pasara a cumplir, el fondo apagado cambió y '
+                  'conviene revisar la nota del CTA. Mide '
+                  '${conInk.toStringAsFixed(2)}:1');
+        }
+      });
+    }
   });
 
   group('las dos paletas', () {

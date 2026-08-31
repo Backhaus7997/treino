@@ -89,6 +89,13 @@ Future<void> _agregarPressDeBanca(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+Future<void> _tocar(WidgetTester tester, Finder f) async {
+  await tester.ensureVisible(f);
+  await tester.pumpAndSettle();
+  await tester.tap(f);
+  await tester.pumpAndSettle();
+}
+
 String _lineaDelPie(WidgetTester tester) =>
     tester.widget<Text>(find.byKey(const Key('footer_status_line'))).data!;
 
@@ -174,6 +181,48 @@ void main() {
 
     expect(find.byKey(const Key('footer_go_to_problem')), findsNothing,
         reason: 'sin problemas no hay a dónde ir');
+  });
+
+  testWidgets('el resumen NO confunde días con sets', (tester) async {
+    // Los dos son enteros y viajan juntos a la misma clave l10n. Un test con
+    // 1 día y 1 set no distingue el orden: pasa igual invertido. Por eso acá
+    // los números son distintos — es exactamente el bug que se coló.
+    await _pumpEditor(tester);
+    await tester.enterText(
+        find.byKey(const Key('editor_name_field')), 'Empuje');
+    await tester.pumpAndSettle();
+    await _agregarPressDeBanca(tester);
+    await desplazarHasta(tester, celdasConHint('reps').at(0));
+    await tester.enterText(celdasConHint('reps').at(0), '8');
+    await tester.pumpAndSettle();
+
+    // Tres sets, un día: si los argumentos se invierten dice "3 días · 1 set".
+    await _tocar(tester, find.byKey(const Key('add_set_button')));
+    await _tocar(tester, find.byKey(const Key('add_set_button')));
+    await tester.enterText(celdasConHint('reps').at(1), '8');
+    await tester.pumpAndSettle();
+    await tester.enterText(celdasConHint('reps').at(2), '8');
+    await tester.pumpAndSettle();
+
+    final linea = _lineaDelPie(tester);
+    expect(linea, contains('1 día'));
+    expect(linea, contains('3 sets'));
+    expect(linea, isNot(contains('3 días')));
+  });
+
+  testWidgets('el problema nombra el día correcto, no la cantidad',
+      (tester) async {
+    // Mismo riesgo: `(dia, count)` invertido convierte "1 set sin completar en
+    // el día 3" en "día 1: 3 sets sin completar".
+    await _pumpEditor(tester);
+    await tester.enterText(
+        find.byKey(const Key('editor_name_field')), 'Empuje');
+    await tester.pumpAndSettle();
+    await _agregarPressDeBanca(tester);
+    // Un solo set, sin reps: el día 1 tiene exactamente 1 problema.
+    final linea = _lineaDelPie(tester);
+    expect(linea, contains('Día 1'));
+    expect(linea, contains('1 set sin completar'));
   });
 
   testWidgets('el pie está fuera del scroll', (tester) async {

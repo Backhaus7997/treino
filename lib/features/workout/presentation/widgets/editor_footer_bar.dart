@@ -214,7 +214,13 @@ class _Cta extends StatelessWidget {
       style: ElevatedButton.styleFrom(
         backgroundColor:
             habilitado ? palette.accent : palette.accent.withAlpha(_kApagado),
-        foregroundColor: habilitado ? tinta : tinta.withAlpha(_kTintaApagada),
+        // Apagado la tinta es `textPrimary`, NO el ink del botón encendido.
+        // El ink funciona sobre `accent` pleno —claro en las dos paletas—,
+        // pero el fondo apagado es accent al 25%: en dark eso compone `#134130`
+        // y el ink encima mide 1,43:1, ilegible. Ni al 100% de opacidad llega
+        // a 4,5:1, porque el problema no es el alpha sino que los dos colores
+        // son oscuros. `textPrimary` da 11,50:1 en dark y 16,58:1 en light.
+        foregroundColor: habilitado ? tinta : palette.textPrimary,
         disabledBackgroundColor: palette.accent.withAlpha(_kApagado),
         minimumSize: const Size.fromHeight(EditorFooterBar._kAltoCta),
         shape: RoundedRectangleBorder(
@@ -244,6 +250,3 @@ class _Cta extends StatelessWidget {
 /// Relleno del CTA cuando falta algo, sobre 255. Se lee como apagado sin
 /// desaparecer: el botón sigue siendo el destino de la pantalla.
 const int _kApagado = 64;
-
-/// Tinta del CTA apagado, sobre 255.
-const int _kTintaApagada = 140;
