@@ -1938,6 +1938,28 @@ class AppL10nEn extends AppL10n {
   String get routineEditorFillKgUndo => 'Undo';
 
   @override
+  String get routineEditorFillColumnLabel => 'ALL';
+
+  @override
+  String get routineEditorFillColumnA11y =>
+      'Replicate this value down the column';
+
+  @override
+  String routineEditorAccessoryContext(
+    String ejercicio,
+    int set,
+    String campo,
+  ) {
+    return '$ejercicio · set $set · $campo';
+  }
+
+  @override
+  String get routineEditorFieldKg => 'kg';
+
+  @override
+  String get routineEditorFieldReps => 'reps';
+
+  @override
   String routineEditorKgStepIncreaseA11y(String amount) {
     return 'Add $amount kilos to the weight';
   }

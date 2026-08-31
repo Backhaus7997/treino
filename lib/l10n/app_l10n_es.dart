@@ -1987,6 +1987,28 @@ class AppL10nEs extends AppL10n {
   String get routineEditorFillKgUndo => 'Deshacer';
 
   @override
+  String get routineEditorFillColumnLabel => 'A TODAS';
+
+  @override
+  String get routineEditorFillColumnA11y =>
+      'Replicar este valor en toda la columna';
+
+  @override
+  String routineEditorAccessoryContext(
+    String ejercicio,
+    int set,
+    String campo,
+  ) {
+    return '$ejercicio · set $set · $campo';
+  }
+
+  @override
+  String get routineEditorFieldKg => 'kg';
+
+  @override
+  String get routineEditorFieldReps => 'reps';
+
+  @override
   String routineEditorKgStepIncreaseA11y(String amount) {
     return 'Sumar $amount kilos al peso';
   }
@@ -6076,6 +6098,28 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get routineEditorFillKgUndo => 'Deshacer';
+
+  @override
+  String get routineEditorFillColumnLabel => 'A TODAS';
+
+  @override
+  String get routineEditorFillColumnA11y =>
+      'Replicar este valor en toda la columna';
+
+  @override
+  String routineEditorAccessoryContext(
+    String ejercicio,
+    int set,
+    String campo,
+  ) {
+    return '$ejercicio · set $set · $campo';
+  }
+
+  @override
+  String get routineEditorFieldKg => 'kg';
+
+  @override
+  String get routineEditorFieldReps => 'reps';
 
   @override
   String routineEditorKgStepIncreaseA11y(String amount) {

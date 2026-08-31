@@ -702,6 +702,25 @@
   "@routineEditorFillKgEmpty": {},
   "routineEditorFillKgUndo": "Undo",
   "@routineEditorFillKgUndo": {},
+  "routineEditorFillColumnLabel": "ALL",
+  "@routineEditorFillColumnLabel": {
+    "description": "Keyboard accessory button that replicates the focused cell's value down its column."
+  },
+  "routineEditorFillColumnA11y": "Replicate this value down the column",
+  "@routineEditorFillColumnA11y": {},
+  "routineEditorAccessoryContext": "{ejercicio} · set {set} · {campo}",
+  "@routineEditorAccessoryContext": {
+    "description": "Context line under the shortcuts: which cell they act on.",
+    "placeholders": {
+      "ejercicio": {"type": "String"},
+      "set": {"type": "int"},
+      "campo": {"type": "String"}
+    }
+  },
+  "routineEditorFieldKg": "kg",
+  "@routineEditorFieldKg": {},
+  "routineEditorFieldReps": "reps",
+  "@routineEditorFieldReps": {},
   "routineEditorKgStepIncreaseA11y": "Add {amount} kilos to the weight",
   "@routineEditorKgStepIncreaseA11y": {},
   "routineEditorKgStepDecreaseA11y": "Take {amount} kilos off the weight",

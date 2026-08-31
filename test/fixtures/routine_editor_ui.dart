@@ -165,3 +165,38 @@ Future<void> cerrarDatosDelPlan(WidgetTester tester) async {
   await tester.tap(cerrar);
   await tester.pumpAndSettle();
 }
+
+/// Simula que el teclado del sistema está arriba.
+///
+/// Hace falta desde #867: la barra de accesorio es un accesorio DEL TECLADO y
+/// sólo se monta cuando `viewInsets.bottom > 0`. El foco solo no alcanza —
+/// `enterText` enfoca un campo sin abrir ningún teclado—, y esa distinción es
+/// deliberada: sin ella la barra se dibujaba también en los tests que sólo
+/// tipean, y como el `bottomSheet` se superpone al body en vez de achicarlo,
+/// tapaba el botón de guardar de veinte tests que no tenían nada que ver.
+///
+/// `viewInsets` va en píxeles FÍSICOS, de ahí la multiplicación por el dpr.
+void simularTeclado(WidgetTester tester, {double alto = 300}) {
+  final dpr = tester.view.devicePixelRatio;
+  tester.view.viewInsets = FakeViewPadding(bottom: alto * dpr);
+  addTearDown(tester.view.reset);
+}
+
+/// Enfoca la celda de set [celda] con el teclado simulado, de modo que la
+/// barra de accesorio quede en el árbol.
+///
+/// `tap` y no `enterText`: lo que publica la celda en el scope es el cambio de
+/// foco, y hay que pasar por el gesto para que el `FocusNode` lo reciba.
+Future<void> enfocarCelda(WidgetTester tester, Finder celda) async {
+  simularTeclado(tester);
+  await tester.ensureVisible(celda);
+  await tester.pumpAndSettle();
+  await tester.tap(celda);
+  await tester.pumpAndSettle();
+}
+
+/// Las celdas de la tabla de series que llevan [hint] ('kg', 'reps', 'mín',
+/// 'máx'). Son los únicos campos del editor con esos hints.
+Finder celdasConHint(String hint) => find.byWidgetPredicate(
+      (w) => w is TextField && w.decoration?.hintText == hint,
+    );

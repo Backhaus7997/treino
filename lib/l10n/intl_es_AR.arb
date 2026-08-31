@@ -1207,6 +1207,25 @@
   "@routineEditorFillKgEmpty": {},
   "routineEditorFillKgUndo": "Deshacer",
   "@routineEditorFillKgUndo": {},
+  "routineEditorFillColumnLabel": "A TODAS",
+  "@routineEditorFillColumnLabel": {
+    "description": "Botón de la barra sobre el teclado que replica el valor de la celda enfocada en toda su columna."
+  },
+  "routineEditorFillColumnA11y": "Replicar este valor en toda la columna",
+  "@routineEditorFillColumnA11y": {},
+  "routineEditorAccessoryContext": "{ejercicio} · set {set} · {campo}",
+  "@routineEditorAccessoryContext": {
+    "description": "Contexto debajo de los atajos: sobre qué celda actúan.",
+    "placeholders": {
+      "ejercicio": {"type": "String"},
+      "set": {"type": "int"},
+      "campo": {"type": "String"}
+    }
+  },
+  "routineEditorFieldKg": "kg",
+  "@routineEditorFieldKg": {},
+  "routineEditorFieldReps": "reps",
+  "@routineEditorFieldReps": {},
   "routineEditorKgStepIncreaseA11y": "Sumar {amount} kilos al peso",
   "@routineEditorKgStepIncreaseA11y": {
     "description": "Screen-reader label for a KG stepper button that adds weight to the set being edited.",

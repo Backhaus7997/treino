@@ -3614,6 +3614,36 @@ abstract class AppL10n {
   /// **'Deshacer'**
   String get routineEditorFillKgUndo;
 
+  /// Botón de la barra sobre el teclado que replica el valor de la celda enfocada en toda su columna.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'A TODAS'**
+  String get routineEditorFillColumnLabel;
+
+  /// No description provided for @routineEditorFillColumnA11y.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Replicar este valor en toda la columna'**
+  String get routineEditorFillColumnA11y;
+
+  /// Contexto debajo de los atajos: sobre qué celda actúan.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{ejercicio} · set {set} · {campo}'**
+  String routineEditorAccessoryContext(String ejercicio, int set, String campo);
+
+  /// No description provided for @routineEditorFieldKg.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'kg'**
+  String get routineEditorFieldKg;
+
+  /// No description provided for @routineEditorFieldReps.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'reps'**
+  String get routineEditorFieldReps;
+
   /// Screen-reader label for a KG stepper button that adds weight to the set being edited.
   ///
   /// In es_AR, this message translates to:

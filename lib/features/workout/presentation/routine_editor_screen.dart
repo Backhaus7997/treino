@@ -44,6 +44,7 @@ import 'routine_editor_mode.dart';
 import 'widgets/duration_text_field.dart';
 import 'widgets/day_tab_bar.dart';
 import 'widgets/empty_day_state.dart';
+import 'widgets/keyboard_accessory_bar.dart';
 import 'widgets/exercise_card.dart';
 import 'widgets/prescription_chips.dart';
 import 'widgets/routine_action_buttons.dart';
@@ -531,6 +532,11 @@ String _submitLabelFor(RoutineEditorMode mode, AppL10n l10n) => switch (mode) {
 class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _splitController = TextEditingController();
+
+  /// Qué celda de set se está editando, o null. Lo publican las filas y lo
+  /// consume la barra de accesorio del `bottomSheet` — entre una y otra hay
+  /// cinco niveles de árbol (#867).
+  final FocusedCellNotifier _celdaEnfocada = FocusedCellNotifier();
 
   /// Plain-language resumen of the routine (#648). Written only in the trainer
   /// modes: firestore.rules lists `summary` in the athlete UPDATE path's
@@ -1212,6 +1218,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     _summaryController.removeListener(_markDirty);
     _nameController.dispose();
     _splitController.dispose();
+    _celdaEnfocada.dispose();
     _summaryController.dispose();
     _listScrollController.dispose();
     super.dispose();
@@ -2305,16 +2312,42 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           _leaveEditor();
         }
       },
-      child: Scaffold(
-        // Tapping anywhere outside a field dismisses the keyboard (device UX
-        // 2026-06-11). translucent → child widgets still receive their taps.
-        body: GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-          child: AppBackground(
-            child: TreinoStateSwitcher(
-              childKey: bodyKey,
-              child: body,
+      // El scope envuelve al Scaffold, no al body: la barra vive en el
+      // `bottomSheet` y tiene que poder leer el mismo notifier que publican
+      // las celdas de adentro del body.
+      child: RoutineEditorFocusScope(
+        notifier: _celdaEnfocada,
+        child: ValueListenableBuilder<FocusedSetCell?>(
+          valueListenable: _celdaEnfocada,
+          builder: (context, celda, child) {
+            // La barra es un ACCESORIO DEL TECLADO: sin teclado arriba no hay
+            // nada a lo que acompañar, y como el `bottomSheet` se superpone al
+            // body en vez de achicarlo, dibujarla igual taparía el pie de la
+            // pantalla — el botón de guardar, entre otras cosas.
+            //
+            // El foco solo no alcanza como condición: `enterText` en un test
+            // deja el campo enfocado sin abrir ningún teclado, y ahí la barra
+            // se comía el CTA. En el device el foco y el teclado van juntos,
+            // así que la diferencia no se nota; en el árbol de widgets sí.
+            final hayTeclado = MediaQuery.viewInsetsOf(context).bottom > 0;
+            return Scaffold(
+              // Tapping anywhere outside a field dismisses the keyboard
+              // (device UX 2026-06-11). translucent → child widgets still
+              // receive their taps.
+              body: child,
+              bottomSheet: celda == null || !hayTeclado
+                  ? null
+                  : KeyboardAccessorySlot(cell: celda),
+            );
+          },
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+            child: AppBackground(
+              child: TreinoStateSwitcher(
+                childKey: bodyKey,
+                child: body,
+              ),
             ),
           ),
         ),
@@ -4073,25 +4106,30 @@ class _SetTableState extends State<_SetTable> {
     }
   }
 
-  /// Replicates the FIRST row's KG down every set of the exercise — "cuatro
-  /// sets al mismo peso" is the normal case, not the exception (issue #640).
+  /// Replica el KG de la fila [origen] en todos los sets del ejercicio —
+  /// "cuatro sets al mismo peso" es el caso normal, no la excepción (#640).
   ///
-  /// Gesture decision: this lives on the KG header, the ONLY column header
-  /// without a gesture. REPS / MÍN / MÁX / TIEMPO already open the measure-mode
-  /// picker on tap, and stacking bulk-fill onto that tap would break an
-  /// interaction that already exists.
+  /// Hasta #867 la fuente era SIEMPRE la primera fila, porque el disparador
+  /// vivía en el header de la columna y ahí no hay ninguna fila en particular.
+  /// Ahora el disparador es "A TODAS" en la barra sobre el teclado, y la fuente
+  /// es la celda que se está editando: replicar desde la primera fila cuando el
+  /// usuario está mirando la tercera sería replicar un número que no tiene
+  /// delante.
   ///
-  /// It overwrites whatever each row had, so it ships with an UNDO rather than
-  /// a confirmation: a shortcut that costs a dialog stops being a shortcut, and
-  /// the snapshot restores the exact previous values.
-  void _fillKgColumn() {
+  /// Pisa lo que cada fila tenía, así que viene con DESHACER en vez de una
+  /// confirmación: un atajo que cuesta un diálogo deja de ser un atajo, y el
+  /// snapshot restaura los valores exactos.
+  void _fillKgColumn(int origen) {
     final l10n = AppL10n.of(context);
     final messenger = ScaffoldMessenger.of(context);
     final sets = widget.sets;
-    // Dismiss the IME so the SnackBar isn't hidden behind the keyboard.
+    // Se cierra el IME para que el SnackBar no quede atrás del teclado. La
+    // barra de accesorio se va con él, que es el final correcto: la acción de
+    // columna terminó y lo que hay que poder ver ahora es "Deshacer".
     FocusManager.instance.primaryFocus?.unfocus();
 
-    final source = sets.isNotEmpty ? sets.first.weightKg : null;
+    final source =
+        origen >= 0 && origen < sets.length ? sets[origen].weightKg : null;
     if (source == null) {
       // Nothing to replicate — say so instead of silently clearing the column.
       messenger.showSnackBar(
@@ -4140,9 +4178,6 @@ class _SetTableState extends State<_SetTable> {
           slot: slot,
           palette: palette,
           onPickMeasureMode: _pickMeasureMode,
-          // No KG column in duration mode, and nothing to replicate onto with
-          // a single set — the affordance stays out of the way in both cases.
-          onFillKgColumn: !isDuration && sets.length > 1 ? _fillKgColumn : null,
           showRemoveColumn: sets.length > 1,
         ),
         const SizedBox(height: 4),
@@ -4172,6 +4207,12 @@ class _SetTableState extends State<_SetTable> {
                     }
                   : null,
               onChanged: widget.onChanged,
+              exerciseName: slot.exercise?.name,
+              // Sin KG no hay columna que replicar, y con un solo set no hay
+              // dónde: en los dos casos el botón no se dibuja.
+              onFillColumn: !isDuration && sets.length > 1
+                  ? (_) => _fillKgColumn(i)
+                  : null,
             ),
           ),
       ],
@@ -4187,7 +4228,6 @@ class _SetTableHeader extends StatelessWidget {
     required this.palette,
     required this.onPickMeasureMode,
     required this.showRemoveColumn,
-    this.onFillKgColumn,
   });
 
   final _EditableSlot slot;
@@ -4197,13 +4237,8 @@ class _SetTableHeader extends StatelessWidget {
   /// Si las filas muestran botón de borrar. Ver el comentario en el hueco.
   final bool showRemoveColumn;
 
-  /// Replicates the first row's KG down the column. Null hides the affordance
-  /// (duration mode, or a single-set exercise where there is nothing to fill).
-  final VoidCallback? onFillKgColumn;
-
   @override
   Widget build(BuildContext context) {
-    final l10n = AppL10n.of(context);
     final isDuration = slot.exerciseMode == ExerciseMode.duration;
 
     TextStyle headerStyle() => GoogleFonts.barlowCondensed(
@@ -4238,41 +4273,9 @@ class _SetTableHeader extends StatelessWidget {
       );
     }
 
-    // KG carries its OWN gesture (bulk-fill), deliberately separate from the
-    // `tappable` measure-mode picker the other headers use — see
-    // `_SetTableState._fillKgColumn`.
-    Widget kgCell() {
-      final text = Text('KG', style: headerStyle());
-      if (onFillKgColumn == null) {
-        return Expanded(child: Center(child: text));
-      }
-      return Expanded(
-        child: Semantics(
-          button: true,
-          label: l10n.routineEditorFillKgA11y,
-          child: GestureDetector(
-            key: const Key('fill_kg_column_button'),
-            onTap: onFillKgColumn,
-            behavior: HitTestBehavior.opaque,
-            child: Padding(
-              // The bare 12px label is far too small a target; the padding
-              // grows the hit area without boxing the header.
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  text,
-                  const SizedBox(width: 3),
-                  Icon(TreinoIcon.copy, size: 11, color: palette.textMuted),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
+    // KG ya no lleva gesto propio: el bulk-fill de columna se mudó a "A TODAS"
+    // en la barra sobre el teclado (#867). Acá era un tap sobre un label de
+    // 10,5 px con un ícono de 11 — existía, y no lo encontraba nadie.
     return Row(
       children: [
         // SET column (fixed narrow width)
@@ -4287,7 +4290,7 @@ class _SetTableHeader extends StatelessWidget {
         if (isDuration) ...[
           cell('TIEMPO', tappable: true),
         ] else ...[
-          kgCell(),
+          cell('KG'),
           const SizedBox(width: AppSpacing.s8),
           if (slot.repMode == RepMode.range) ...[
             cell('MÍN', tappable: true),
@@ -4310,6 +4313,10 @@ class _SetTableHeader extends StatelessWidget {
 
 // ── Set row ───────────────────────────────────────────────────────────────────
 
+/// Qué celda de una fila de set tiene el foco. Es lo que decide el paso del
+/// stepper (2,5 en kilos, 1 en repeticiones) y qué columna replica "A TODAS".
+enum _SetField { kg, reps, repsMin, repsMax }
+
 class _SetRow extends StatefulWidget {
   const _SetRow({
     super.key,
@@ -4324,6 +4331,8 @@ class _SetRow extends StatefulWidget {
     required this.onChanged,
     this.onRemove,
     this.isInvalid = false,
+    this.exerciseName,
+    this.onFillColumn,
   });
 
   final _EditableSet editableSet;
@@ -4341,6 +4350,15 @@ class _SetRow extends StatefulWidget {
   /// indicate this set is incomplete and needs to be filled in.
   final bool isInvalid;
 
+  /// Nombre del ejercicio, para la línea de contexto de la barra de accesorio.
+  /// Con el teclado abierto la fila que se edita queda a pocos píxeles del
+  /// borde y no siempre se ve cuál es.
+  final String? exerciseName;
+
+  /// Replica el valor de una celda de esta fila en toda su columna. Null
+  /// cuando no hay dónde replicar (un ejercicio de un solo set).
+  final void Function(_SetField campo)? onFillColumn;
+
   @override
   State<_SetRow> createState() => _SetRowState();
 }
@@ -4351,10 +4369,11 @@ class _SetRowState extends State<_SetRow> {
   late final TextEditingController _repsMinCtrl;
   late final TextEditingController _repsMaxCtrl;
 
-  /// Focus of the KG field. The stepper bar is bound to it: it exists only
-  /// while this row's weight is the one being edited, so the table never
-  /// carries four idle copies of the same four buttons.
-  late final FocusNode _kgFocus;
+  /// Un focus node por celda. Antes sólo lo tenía KG, porque los steppers
+  /// vivían dentro de la fila y sólo servían para el peso; desde #867 la barra
+  /// de accesorio la monta la pantalla y necesita saber CUÁL celda se está
+  /// editando, no sólo si es el peso.
+  final Map<_SetField, FocusNode> _focos = {};
 
   @override
   void initState() {
@@ -4367,22 +4386,108 @@ class _SetRowState extends State<_SetRow> {
         text: s.repsMin != null ? s.repsMin.toString() : '');
     _repsMaxCtrl = TextEditingController(
         text: s.repsMax != null ? s.repsMax.toString() : '');
-    _kgFocus = FocusNode()..addListener(_onKgFocusChanged);
+    for (final campo in _SetField.values) {
+      _focos[campo] = FocusNode()..addListener(() => _onFocoCambiado(campo));
+    }
   }
 
-  void _onKgFocusChanged() {
-    if (mounted) setState(() {});
+  /// Identidad de una celda para el notifier: la instancia del set más el
+  /// campo. Sobrevive a un rebuild de la fila y distingue dos celdas del mismo
+  /// set, que es lo que el notifier necesita para no borrar el foco nuevo con
+  /// el blur del viejo.
+  Object _idDe(_SetField campo) => (widget.editableSet, campo);
+
+  /// El notifier del scope, cacheado. En `dispose()` ya no se puede resolver
+  /// por `context`, y ahí es justamente donde hay que soltar el foco.
+  FocusedCellNotifier? _scope;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _scope = RoutineEditorFocusScope.maybeOf(context);
+  }
+
+  @override
+  void didUpdateWidget(_SetRow old) {
+    super.didUpdateWidget(old);
+    if (old.isDuration != widget.isDuration ||
+        old.repMode != widget.repMode) {
+      _soltarFocosAusentes();
+    }
+  }
+
+  /// Qué celdas renderiza esta fila con la configuración actual del slot.
+  Set<_SetField> get _camposVisibles {
+    if (widget.isDuration) return const {};
+    return widget.repMode == RepMode.range
+        ? const {_SetField.kg, _SetField.repsMin, _SetField.repsMax}
+        : const {_SetField.kg, _SetField.reps};
+  }
+
+  /// Suelta el foco de las celdas que dejaron de existir.
+  ///
+  /// La fila NO se reconstruye cuando el slot cambia de modo —es el mismo
+  /// `ObjectKey(set)`—, sólo cambia qué campos muestra. El `FocusNode` de una
+  /// columna que se fue sigue vivo y con el foco puesto, así que sin esto la
+  /// barra de accesorio quedaba ofreciendo atajos de kilos sobre un ejercicio
+  /// que ya se mide en tiempo.
+  ///
+  /// Va DIFERIDO al frame siguiente: `didUpdateWidget` corre dentro de la fase
+  /// de build, y notificar el scope ahí marca como dirty a un ancestro que ya
+  /// se construyó — el framework lo rechaza con "setState() called during
+  /// build". El foco se suelta cuando el árbol terminó de armarse.
+  void _soltarFocosAusentes() {
+    final ausentes = _SetField.values
+        .where((c) => !_camposVisibles.contains(c))
+        .toList(growable: false);
+    for (final campo in ausentes) {
+      _focos[campo]?.unfocus();
+    }
+    final scope = _scope;
+    if (scope == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      for (final campo in ausentes) {
+        scope.blur(_idDe(campo));
+      }
+    });
+  }
+
+  void _onFocoCambiado(_SetField campo) {
+    if (!mounted) return;
+    final notifier = _scope;
+    if (notifier == null) return;
+    if (_focos[campo]!.hasFocus) {
+      notifier.focus(_celdaEnfocada(campo));
+    } else {
+      notifier.blur(_idDe(campo));
+    }
   }
 
   @override
   void dispose() {
+    // Soltar el foco ANTES de tirar los nodos. Disponer un FocusNode no
+    // dispara su listener, así que sin esto una fila que desaparece con el
+    // foco puesto —cambiar el ejercicio a modo duración borra la columna KG,
+    // borrar un set borra la fila entera— dejaba la barra en pantalla
+    // ofreciendo atajos sobre una celda que ya no existe.
+    final scope = _scope;
+    if (scope != null) {
+      final ids = _SetField.values.map(_idDe).toList(growable: false);
+      // Diferido por la misma razón que [_soltarFocosAusentes]: sacar una fila
+      // del árbol es parte de un build, y ahí no se puede notificar.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        for (final id in ids) {
+          scope.blur(id);
+        }
+      });
+    }
     _kgCtrl.dispose();
     _repsCtrl.dispose();
     _repsMinCtrl.dispose();
     _repsMaxCtrl.dispose();
-    _kgFocus
-      ..removeListener(_onKgFocusChanged)
-      ..dispose();
+    for (final foco in _focos.values) {
+      foco.dispose();
+    }
     super.dispose();
   }
 
@@ -4395,6 +4500,28 @@ class _SetRowState extends State<_SetRow> {
   /// operate on the number the user is looking at.
   double? get _currentKg =>
       parseEditorWeight(_kgCtrl.text) ?? widget.editableSet.weightKg;
+
+  TextEditingController _controllerDe(_SetField campo) => switch (campo) {
+        _SetField.kg => _kgCtrl,
+        _SetField.reps => _repsCtrl,
+        _SetField.repsMin => _repsMinCtrl,
+        _SetField.repsMax => _repsMaxCtrl,
+      };
+
+  /// El valor que la celda muestra AHORA. El controller le gana al modelo: a
+  /// mitad de una edición pueden diferir por un keystroke, y el stepper tiene
+  /// que operar sobre el número que el usuario está mirando.
+  int? _repsActuales(_SetField campo) {
+    final delControl = int.tryParse(_controllerDe(campo).text);
+    if (delControl != null) return delControl;
+    final s = widget.editableSet;
+    return switch (campo) {
+      _SetField.reps => s.reps,
+      _SetField.repsMin => s.repsMin,
+      _SetField.repsMax => s.repsMax,
+      _SetField.kg => null,
+    };
+  }
 
   /// Applies a plate-sized jump to this row's KG (issue #640, PR#3).
   ///
@@ -4422,6 +4549,73 @@ class _SetRowState extends State<_SetRow> {
     // Re-runs the slot's inline validation — a set completed by a stepper must
     // stop being painted red (`_isValid` / `hasSlotError`).
     widget.onChanged();
+    _republicar(_SetField.kg);
+  }
+
+  /// Mismo salto, sobre una celda de repeticiones. Vale la misma advertencia
+  /// que [_stepKg]: se muta la instancia, nunca se la reemplaza.
+  ///
+  /// El piso es 1 y no 0: un set de cero repeticiones no es un set, y a
+  /// diferencia del peso —donde vacío significa "sin peso"— acá vaciar el
+  /// campo lo deja inválido. Restar desde 1 no hace nada en vez de autorear un
+  /// set roto.
+  void _stepReps(_SetField campo, double delta) {
+    final actual = _repsActuales(campo) ?? 0;
+    final next = (actual + delta.round()).clamp(0, kMaxReps);
+    if (next == 0 || next == actual) return;
+
+    final s = widget.editableSet;
+    switch (campo) {
+      case _SetField.reps:
+        s.reps = next;
+      case _SetField.repsMin:
+        s.repsMin = next;
+      case _SetField.repsMax:
+        s.repsMax = next;
+      case _SetField.kg:
+        return;
+    }
+    final text = '$next';
+    _controllerDe(campo).value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+    widget.onChanged();
+    _republicar(campo);
+  }
+
+  /// Vuelve a publicar la celda enfocada después de un paso.
+  ///
+  /// `canDecrease` se calcula sobre el valor actual: sin esto, restar hasta el
+  /// piso dejaría el botón de menos encendido hasta que el usuario tocara otra
+  /// celda.
+  void _republicar(_SetField campo) {
+    if (!mounted || !(_focos[campo]?.hasFocus ?? false)) return;
+    _scope?.focus(_celdaEnfocada(campo));
+  }
+
+  /// Arma lo que la barra de accesorio necesita saber sobre [campo].
+  FocusedSetCell _celdaEnfocada(_SetField campo) {
+    final l10n = AppL10n.of(context);
+    final esKg = campo == _SetField.kg;
+    return FocusedSetCell(
+      cellId: _idDe(campo),
+      contextLabel: l10n.routineEditorAccessoryContext(
+        widget.exerciseName ?? l10n.coachExercisePicker,
+        widget.index + 1,
+        esKg ? l10n.routineEditorFieldKg : l10n.routineEditorFieldReps,
+      ),
+      stepAmount: esKg ? kKgStepsKg.first : 1,
+      stepLabel: esKg ? formatWeightKg(kKgStepsKg.first) : '1',
+      canDecrease: esKg
+          ? (_currentKg ?? 0) > 0
+          : (_repsActuales(campo) ?? 0) > 1,
+      onStep: (delta) =>
+          esKg ? _stepKg(delta) : _stepReps(campo, delta),
+      onFillColumn: esKg && widget.onFillColumn != null
+          ? () => widget.onFillColumn!(campo)
+          : null,
+    );
   }
 
   Future<void> _pickSetType(BuildContext context) async {
@@ -4465,11 +4659,6 @@ class _SetRowState extends State<_SetRow> {
     final l10n = AppL10n.of(context);
     final label = setChipLabel(widget.allSets, widget.index);
 
-    // Duration slots have no KG column at all, so the affordance must not
-    // exist there — the focus node is never attached in that mode, and this
-    // guard says so out loud instead of relying on that side effect.
-    final showKgSteps = !widget.isDuration && _kgFocus.hasFocus;
-
     final row = Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -4506,7 +4695,7 @@ class _SetRowState extends State<_SetRow> {
           Expanded(
             child: SetCellField(
               controller: _kgCtrl,
-              focusNode: _kgFocus,
+              focusNode: _focos[_SetField.kg],
               palette: palette,
               hint: 'kg',
               decimal: true,
@@ -4522,6 +4711,7 @@ class _SetRowState extends State<_SetRow> {
             Expanded(
               child: SetCellField(
                 controller: _repsMinCtrl,
+                focusNode: _focos[_SetField.repsMin],
                 palette: palette,
                 hint: 'mín',
                 hasError: widget.isInvalid,
@@ -4536,6 +4726,7 @@ class _SetRowState extends State<_SetRow> {
             Expanded(
               child: SetCellField(
                 controller: _repsMaxCtrl,
+                focusNode: _focos[_SetField.repsMax],
                 palette: palette,
                 hint: 'máx',
                 hasError: widget.isInvalid,
@@ -4550,6 +4741,7 @@ class _SetRowState extends State<_SetRow> {
             Expanded(
               child: SetCellField(
                 controller: _repsCtrl,
+                focusNode: _focos[_SetField.reps],
                 palette: palette,
                 hint: 'reps',
                 hasError: widget.isInvalid,
@@ -4580,30 +4772,17 @@ class _SetRowState extends State<_SetRow> {
       ],
     );
 
-    // The root is ALWAYS a Column, and the bar goes in as a conditional child.
-    // Returning `row` bare when the bar is hidden and a `Column` when it shows
-    // would flip the runtimeType of the row's root widget on every focus
-    // change, and `Widget.canUpdate` compares runtimeType: Flutter would tear
-    // down and re-inflate this whole subtree — including the KG `EditableText`,
-    // whose `dispose()` closes the IME connection that the focus change had
-    // just opened, and whose replacement never reopens it (only
-    // `_handleFocusChanged` and `requestKeyboard()` do, and neither fires
-    // again). The keyboard would pop up and vanish in the same frame, and the
-    // reps/mín/máx fields — which own their FocusNode internally — would lose
-    // it mid-tap, bouncing focus back to KG.
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        row,
-        if (showKgSteps)
-          _KgStepperBar(
-            palette: palette,
-            canDecrease: (_currentKg ?? 0) > 0,
-            onStep: _stepKg,
-          ),
-      ],
-    );
+    // La raíz es SIEMPRE la misma clase de widget, y desde #867 no hay nada
+    // condicional colgando de ella. La advertencia que dejó #640 sigue en pie
+    // para quien quiera volver a poner algo acá: alternar el root entre `Row`
+    // y `Column` según el foco cambia el runtimeType, y `Widget.canUpdate` lo
+    // compara — Flutter destruye y re-infla todo este subárbol, incluido el
+    // `EditableText` de KG, cuyo `dispose()` cierra la conexión con el IME que
+    // el cambio de foco acababa de abrir, y cuyo reemplazo no la reabre. El
+    // teclado aparecía y desaparecía en el mismo frame. Los atajos se fueron a
+    // la barra de accesorio, que la monta la pantalla, justamente para que
+    // esta fila no tenga que cambiar de forma cuando gana el foco.
+    return row;
   }
 
   /// Builds the VoiceOver label for the set-type chip: the set position, the
@@ -4639,98 +4818,6 @@ class _SetRowState extends State<_SetRow> {
 /// exists to remove. Deloads and top-set back-offs move down, not up.
 /// [steppedWeightKg] clamps at zero, so "abajo" bottoms out at an empty
 /// field and never at a negative load.
-class _KgStepperBar extends StatelessWidget {
-  const _KgStepperBar({
-    required this.palette,
-    required this.canDecrease,
-    required this.onStep,
-  });
-
-  final AppPalette palette;
-
-  /// False when there is no weight left to take away — the two minus buttons
-  /// dim instead of pretending a tap will do something.
-  final bool canDecrease;
-
-  final void Function(double deltaKg) onStep;
-
-  @override
-  Widget build(BuildContext context) {
-    // −5 −2.5 +2.5 +5: the heaviest jump sits at each end, so the two
-    // directions mirror each other and the thumb only learns one map.
-    final deltas = <double>[
-      for (final step in kKgStepsKg.reversed) -step,
-      ...kKgStepsKg,
-    ];
-
-    return TextFieldTapRegion(
-      // Marks the bar as part of the KG field's tap region. Without it the
-      // tap counts as "outside" the field and dismisses the very focus that
-      // put this bar on screen.
-      child: Padding(
-        // left 52 = the 44px set chip + its 8px gap, so the bar starts flush
-        // with the KG field it acts on; right 40 clears the delete column.
-        padding: const EdgeInsets.only(left: 52, right: 40, top: 6, bottom: 2),
-        child: Row(
-          children: [
-            for (final delta in deltas) ...[
-              Expanded(child: _stepButton(context, delta)),
-              if (delta != deltas.last) const SizedBox(width: 6),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _stepButton(BuildContext context, double delta) {
-    final l10n = AppL10n.of(context);
-    final isIncrease = delta > 0;
-    final enabled = isIncrease || canDecrease;
-    // Same formatter as the KG field, so "+2.5" and the value it produces can
-    // never render their decimal differently.
-    final amount = formatWeightKg(delta.abs());
-    final tint = enabled ? palette.accent : palette.textMuted;
-
-    return Semantics(
-      button: true,
-      enabled: enabled,
-      label: isIncrease
-          ? l10n.routineEditorKgStepIncreaseA11y(amount)
-          : l10n.routineEditorKgStepDecreaseA11y(amount),
-      child: GestureDetector(
-        // A GestureDetector on purpose: button widgets are focusable and would
-        // pull focus off the KG field on tap.
-        key: Key(
-          'kg_step_${isIncrease ? 'plus' : 'minus'}_'
-          '${amount.replaceAll('.', '_')}',
-        ),
-        behavior: HitTestBehavior.opaque,
-        onTap: enabled ? () => onStep(delta) : null,
-        child: Container(
-          height: 44,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: palette.bgCard,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: enabled ? palette.accent.withAlpha(90) : palette.border,
-            ),
-          ),
-          child: Text(
-            '${isIncrease ? '+' : '-'}$amount',
-            style: GoogleFonts.barlowCondensed(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: tint,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 // ── Level dropdown ────────────────────────────────────────────────────────────
 
 class _LevelDropdown extends StatelessWidget {
