@@ -19,6 +19,9 @@ export type MailKind =
   // siendo el que genera el Admin SDK (apunta al action handler que Firebase
   // hostea), lo unico que cambia es quien manda el mail y como se ve.
   | "password-reset"
+  // Se manda EN LUGAR de `password-reset` cuando la cuenta no tiene proveedor
+  // de contraseña. No lleva `actionLink`: no hay contraseña que restablecer.
+  | "federated-signin-hint"
   | "email-verification"
   | "appointment-confirmed"
   | "appointment-series-created"

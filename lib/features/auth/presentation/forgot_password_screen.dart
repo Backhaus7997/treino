@@ -126,6 +126,13 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
     } on AuthFailure catch (f) {
       if (!mounted) return;
       // REQ-AUTH-011: userNotFound MUST be treated as success (security).
+      //
+      // Hoy esta rama es INALCANZABLE: el callable `requestPasswordReset`
+      // responde igual exista o no la cuenta, asi que `AuthService` ya no
+      // puede construir `userNotFound` por este camino. Se queda igual, a
+      // proposito. Es defensa en profundidad: si alguien vuelve a filtrar la
+      // existencia desde la capa de datos, esta guarda la tapa igual. Una
+      // linea muerta cuesta menos que un oraculo de enumeracion.
       if (f == const AuthFailure.userNotFound()) {
         _markSent();
       } else {

@@ -138,6 +138,38 @@ export function rewriteActionHost(link: string): string {
   }
 }
 
+/**
+ * Que mail corresponde para una cuenta que pidio reseteo.
+ *
+ * PURA Y EXPORTADA A PROPOSITO — el emulador NO puede validar esta decision.
+ *
+ * El emulador de Auth no gatea por proveedor: sobre una cuenta solo-Google, sin
+ * password hash, `generatePasswordResetLink` devuelve link igual. Verificado en
+ * el fuente de firebase-tools (`emulator/auth/operations.js`, PASSWORD_RESET
+ * solo hace `getUserByEmail`) y reproducido. O sea que un test de emulador
+ * sobre este caso da verde por construccion, sin haber medido nada.
+ *
+ * Por eso la decision vive ACA, en una funcion sin dependencias, con su propia
+ * tabla de casos. Ver el test `resetOutcomeFor` y el guardian que documenta la
+ * no-fidelidad del emulador.
+ *
+ * Nota sobre `providerData` vacio: se elige `password-reset`, o sea el
+ * comportamiento de hoy. Una cuenta sin ningun proveedor listado no es
+ * federada, asi que mandarle un mail que dice "entra con Google" seria peor que
+ * dejarla en el camino actual — que en el peor caso falla en silencio, como ya
+ * lo hace.
+ *
+ * @param providerIds - `user.providerData.map(p => p.providerId)`.
+ */
+export function resetOutcomeFor(
+  providerIds: readonly string[],
+): "password-reset" | "federated-signin-hint" {
+  if (providerIds.length === 0) return "password-reset";
+  return providerIds.includes("password")
+    ? "password-reset"
+    : "federated-signin-hint";
+}
+
 /** Respuesta uniforme. Nunca revela si la cuenta existe. */
 export interface AuthEmailResult {
   status: "ok";
@@ -173,12 +205,23 @@ export async function runRequestPasswordReset(
     // direccion recien al enviar, asi que un cambio de email entre el pedido y
     // el envio sigue llegando a donde tiene que llegar.
     const user = await admin.auth(app).getUserByEmail(normalized);
+    const kind = resetOutcomeFor(user.providerData.map((p) => p.providerId));
+    const scope = `${user.uid}_${throttleWindow(nowMs)}`;
+
+    if (kind === "federated-signin-hint") {
+      // Sin contraseña que restablecer: NO se pide link. Se le dice al dueño
+      // del buzon como entra a su cuenta, y el callable devuelve el mismo
+      // `{status:"ok"}` que las otras dos ramas.
+      await enqueueMail(app, { toUid: user.uid, kind, scope, params: {} });
+      return OK;
+    }
+
     const link = await admin.auth(app).generatePasswordResetLink(normalized);
 
     await enqueueMail(app, {
       toUid: user.uid,
-      kind: "password-reset",
-      scope: `${user.uid}_${throttleWindow(nowMs)}`,
+      kind,
+      scope,
       params: { actionLink: rewriteActionHost(link) },
     });
   } catch (error: unknown) {
