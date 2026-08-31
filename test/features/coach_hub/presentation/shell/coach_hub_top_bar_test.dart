@@ -13,18 +13,29 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/app/theme/theme_mode_provider.dart';
 import 'package:treino/core/persistence/shared_prefs_provider.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/features/coach/domain/subscription_tier.dart';
+import 'package:treino/features/coach/domain/trainer_subscription.dart';
 import 'package:treino/features/coach_hub/presentation/shell/coach_hub_top_bar.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 
-UserProfile _profile(String displayName) => UserProfile(
+UserProfile _profile(String displayName, {SubscriptionTier? tier}) =>
+    UserProfile(
       uid: 'trainer-1',
       email: 'trainer@example.com',
       displayName: displayName,
       role: UserRole.trainer,
       createdAt: DateTime.utc(2026, 1, 1),
       updatedAt: DateTime.utc(2026, 1, 1),
+      // Sin `subscription` el PF es Free por definición (sin backfill).
+      subscription: tier == null
+          ? null
+          : TrainerSubscription(
+              tier: tier,
+              status: SubscriptionStatus.active,
+              weightLimit: tier.weightLimit,
+            ),
     );
 
 /// Devuelve el [ProviderContainer] usado, por si el test necesita leer/
@@ -64,6 +75,13 @@ Future<ProviderContainer> _pumpTopBar(
       GoRoute(
         path: '/alumnos',
         builder: (_, __) => const Scaffold(body: CoachHubTopBar()),
+      ),
+      // Destinos del menú de cuenta: sin estas rutas el tap moriría contra
+      // una ruta inexistente y el test no probaría nada.
+      GoRoute(path: '/ajustes', builder: (_, __) => const Text('page:ajustes')),
+      GoRoute(
+        path: '/facturacion/planes',
+        builder: (_, __) => const Text('page:planes'),
       ),
     ],
   );
@@ -118,6 +136,50 @@ void main() {
       await tester.tap(find.byType(PopupMenuButton<String>));
       await tester.pumpAndSettle();
       expect(find.text('Salir'), findsOneWidget);
+    });
+
+    testWidgets('«Mi cuenta» navega a /ajustes sin perder tema ni Salir',
+        (tester) async {
+      await _pumpTopBar(tester, profile: _profile('Ana'));
+      await tester.tap(find.byType(PopupMenuButton<String>));
+      await tester.pumpAndSettle();
+
+      // El menú sigue siendo el único acceso a tema y logout del hub web:
+      // agregar «Mi cuenta» no puede haberlos desplazado.
+      expect(find.text('Sistema'), findsOneWidget);
+      expect(find.text('Salir'), findsOneWidget);
+
+      await tester.tap(find.text('Mi cuenta'));
+      await tester.pumpAndSettle();
+      expect(find.text('page:ajustes'), findsOneWidget);
+    });
+
+    testWidgets('«Mejorar plan» muestra el tier real y va a la pricing page',
+        (tester) async {
+      await _pumpTopBar(tester, profile: _profile('Ana')); // sin sub → Free
+      await tester.tap(find.byType(PopupMenuButton<String>));
+      await tester.pumpAndSettle();
+
+      final upgrade = find.text('Mejorar plan · Plan Free');
+      expect(upgrade, findsOneWidget);
+
+      await tester.tap(upgrade);
+      await tester.pumpAndSettle();
+      expect(find.text('page:planes'), findsOneWidget);
+    });
+
+    testWidgets('en plan3 no se ofrece mejorar — no hay tier superior',
+        (tester) async {
+      await _pumpTopBar(
+        tester,
+        profile: _profile('Ana', tier: SubscriptionTier.plan3),
+      );
+      await tester.tap(find.byType(PopupMenuButton<String>));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Mejorar plan'), findsNothing);
+      // «Mi cuenta» sí sigue: el entrypoint no depende del tier.
+      expect(find.text('Mi cuenta'), findsOneWidget);
     });
 
     testWidgets(
