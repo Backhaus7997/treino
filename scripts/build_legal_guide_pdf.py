@@ -273,7 +273,7 @@ def build_story():
     A(P("Ninguna de estas la puede tomar un abogado por vos, ni yo. Son "
         "definiciones de negocio. Hasta que no estén, los nueve documentos "
         "pendientes no se pueden escribir sin inventar. "
-        "<b>La primera ya está resuelta; quedan cinco.</b>"))
+        "<b>D1 y D5 ya están resueltas; quedan cuatro.</b>"))
 
     for block in resolved(
         1, "Quién es el titular de TREINO",
@@ -406,39 +406,62 @@ def build_story():
          ["<b>Transferencia manual</b>",
           "Cero integración. Sirve para validar",
           "No escala, y complica el arrepentimiento y la baja automática"]],
-        "Para arrancar, pasarela local en la web — pero <b>consultá el punto "
-        "de Apple antes</b>, no después de construirlo. Es la clase de "
-        "pregunta que conviene hacerle al abogado en la misma reunión.",
+        "Para arrancar, pasarela local en la web — pero <b>resolver el punto "
+        "de Apple antes</b> de construirlo, no después. Y hay un agravante "
+        "que sale de D5: está prevista una <b>suscripción del alumno</b> a "
+        "futuro. Un plan pago de consumidor, dentro de una app de consumo, "
+        "tiene mucho menos margen frente a la regla 3.1.1 que una "
+        "suscripción profesional del entrenador. Conviene decidir el modelo "
+        "de cobro contemplando ese escenario desde ahora, no cuando llegue.",
         "Términos de suscripción (8), arrepentimiento y baja (9), y la "
         "sección de facturación de la Política de Privacidad."):
         A(block)
 
     A(PageBreak())
 
-    for block in decision(
+    for block in resolved(
         5, "Cómo cobra el entrenador a su alumno",
-        "Si esa plata pasa por TREINO o es un asunto entre ellos dos.",
-        "Esto no es una decisión de producto: es lo que define <b>qué sos "
-        "legalmente</b>. Hoy el código registra deuda entre dos usuarios "
-        "—la colección de pagos guarda un monto en pesos, un entrenador, un "
-        "alumno y un estado— y el perfil público del entrenador publica su "
-        "alias de cobro. O sea: TREINO anota la deuda y publica dónde pagarla, "
-        "pero no toca el dinero. Esa distinción tiene que estar escrita, "
-        "porque si no la escribís, alguien va a asumir lo contrario el día que "
-        "un alumno pague y no reciba el servicio.",
-        [["Opción", "A favor", "En contra"],
-         ["<b>Registro solamente</b> (lo actual)",
-          "No sos intermediario financiero. No respondés por el pago",
-          "El alumno no tiene garantía, y hay que decírselo claramente"],
-         ["<b>TREINO intermedia</b>",
-          "Mejor experiencia, y una comisión posible",
-          "Pasás a ser intermediario: régimen de pagos, prevención de lavado, "
-          "responsabilidad por el servicio no prestado. Otro proyecto"]],
-        "Quedate en registro solamente, y <b>decilo explícitamente</b> en los "
-        "Términos y en el contrato del entrenador. Es la decisión correcta "
-        "para esta etapa; lo que falta es que esté escrita.",
-        "Términos (5), contrato del Entrenador (7), y una advertencia visible "
-        "en la pantalla de pagos."):
+        "<b>TREINO no intermedia esa plata.</b> Es sólo la vía de comunicación "
+        "entre las partes. El único dinero que la plataforma maneja es la "
+        "suscripción del entrenador, y a futuro la del alumno.",
+        [["Alumno paga al PF", "<b>Fuera de TREINO.</b> Acuerdo directo entre "
+          "las dos personas. La app registra la deuda y muestra dónde pagar, "
+          "pero no toca el dinero"],
+         ["PF paga a TREINO", "Suscripción por planes. Hoy 12.000 / 22.000 / "
+          "39.000 ARS mensuales"],
+         ["Alumno paga a TREINO", "<b>A futuro.</b> Suscripción del alumno, "
+          "todavía sin definir"]],
+        [["Frente", "Qué hay que hacer"],
+         ["<b>Lo que se evita</b>",
+          "No sos intermediario financiero por el flujo alumno-PF: no entra "
+          "régimen de proveedor de servicios de pago ni las obligaciones de "
+          "prevención de lavado asociadas a mover fondos de terceros. Es la "
+          "decisión correcta para esta etapa"],
+         ["<b>Lo que hay que decir, y hoy no se dice</b>",
+          "La app <b>facilita</b> ese pago aunque no lo procese: registra la "
+          "deuda con monto y estado, y publica el alias de cobro del "
+          "entrenador. Facilitar no es procesar, pero el usuario no tiene por "
+          "qué saberlo. Va escrito en dos lugares: la cláusula de los Términos "
+          "y un aviso <b>visible en la pantalla de pagos</b>"],
+         ["<b>Los reclamos igual van a llegar</b>",
+          "Si un alumno paga y no recibe el servicio, va a reclamarle a "
+          "TREINO, no al PF. No intermediar no te saca del medio a los ojos "
+          "del usuario. La mitigación es divulgación clara más un canal de "
+          "reporte — que es el mismo que exige Apple y que hay que construir "
+          "igual"],
+         ["<b>El contrato del PF</b>",
+          "Tiene que decir que el acuerdo económico con el alumno es "
+          "exclusivamente suyo, que TREINO no garantiza el cobro ni la "
+          "prestación, y que el alias que publica es responsabilidad suya"]],
+        "<b>Ojo con el alias de cobro.</b> Se verificó el 2026-08-31: "
+        "`paymentAlias` vive en `trainerPublicProfiles`, cuya regla de lectura "
+        "es `if request.auth != null` — o sea, <b>cualquier usuario logueado "
+        "puede leer el alias de cobro de cualquier entrenador</b>, esté "
+        "vinculado o no. En Argentina un alias resuelve al nombre del titular "
+        "de la cuenta. Con este modelo de pagos, ese dato es el riel de cobro y "
+        "merece vivir en un documento que sólo lean los alumnos vinculados, "
+        "como ya se hace con los permisos de perfil y de sesiones. No bloquea "
+        "el lanzamiento; es trabajo de producto."):
         A(block)
 
     sp(6)
@@ -725,7 +748,7 @@ def build_story():
     A(table([
         ["Etapa", "Qué pasa", "Quién"],
         ["<b>1. Decidir</b>",
-         "Las cinco decisiones pendientes de la sección 3. D1 ya está",
+         "Las cuatro decisiones pendientes de la sección 3. D1 y D5 ya están",
          "Product Owner"],
         ["<b>1.b Cuentas de tiendas</b>",
          "Tramitar el D-U-N-S ya, dejar renovar Apple el 5/9 y elegir camino "

@@ -33,6 +33,21 @@ los dos caminos posibles en la sección 4 de
 [`guia-legal-treino.pdf`](./guia-legal-treino.pdf). Tiene fecha encima: la
 membresía de Apple renueva el **5 de septiembre de 2026**.
 
+## Decisiones ya tomadas
+
+| # | Decisión | Resuelta |
+|---|---|---|
+| D1 | Titular: **BACKHAUSTIN S.A.S.** | 2026-08-31 |
+| D5 | **TREINO no intermedia la plata entre alumno y PF.** Es sólo vía de comunicación. El único dinero que maneja la plataforma es la suscripción del PF, y a futuro la del alumno | 2026-08-31 |
+
+D5 tiene que quedar escrita en dos lugares cuando se redacten los Términos: la
+cláusula correspondiente y un aviso **visible en la pantalla de pagos**. La app
+registra la deuda y publica el alias de cobro — facilita el pago aunque no lo
+procese, y el usuario no tiene por qué asumir la diferencia.
+
+Las cuatro pendientes (edad mínima, países, cobro de la suscripción,
+reembolsos) están en la sección 3 de la guía.
+
 ## Lo que NO está acá
 
 Los documentos que no salen del código —Términos y Condiciones, contrato del PF,

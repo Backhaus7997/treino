@@ -164,7 +164,7 @@ con contacto `equipo@treino.app`.
 | A4 | **CARTO** recibe tu IP al cargar el mapa | `trainers_map_view.dart` → `https://{s}.basemaps.cartocdn.com/...` |
 | A5 | **Push tokens y Crashlytics** | `firebase_messaging`, `firebase_crashlytics` en `pubspec.yaml` |
 | A6 | **Feed y Rankings publican contenido a otros usuarios** — `PostPrivacy` tiene niveles (amigos / comunidad / público) y Rankings es opt-in por gimnasio | `post_privacy.dart`, `lib/features/gym_rankings/` |
-| A7 | **`paymentAlias` del PF se publica** en el perfil público — es un identificador de cobro | `trainer_public_profile.dart:37` |
+| A7 | **`paymentAlias` del PF lo lee cualquier usuario autenticado** — no sólo sus alumnos vinculados. Ver abajo | `trainer_public_profile.dart:37` + `firestore.rules:1177` |
 
 Ninguno aparece en la política vigente.
 
@@ -180,6 +180,32 @@ Ninguno aparece en la política vigente.
 | M4 | **La suscripción del PF no existe en los Términos** | `TIER_PRICES_ARS` ya define 12.000 / 22.000 / 39.000 ARS mensuales (`functions/src/subscriptions/tier-config.ts:56-58`). Los Términos no dicen que haya nada pago |
 | M5 | **No se aclara que TREINO no intermedia los pagos alumno↔PF** | `payments/{id}` registra `amountArs` adeudado entre dos usuarios. Que TREINO no toque esa plata hay que decirlo, no darlo por obvio |
 | M6 | **Sección 6 prohíbe acoso sin darle al usuario cómo denunciarlo** | Ver abajo |
+
+---
+
+## Sobre el alias de cobro (A7)
+
+`paymentAlias` vive en `trainerPublicProfiles`, y la regla de lectura de esa
+colección es:
+
+```
+allow read: if request.auth != null;   // firestore.rules:1177
+```
+
+Cualquier cuenta logueada puede listar entrenadores y leerles el alias, esté
+vinculada o no. La UI sólo lo muestra al alumno vinculado
+(`athlete_coach_view.dart:690`), pero eso es cosmética: el dato sale igual por
+la API.
+
+Importa más desde que se confirmó el modelo de pagos: **TREINO no intermedia la
+plata entre alumno y PF**, así que ese alias *es* el riel de cobro. Y en
+Argentina un alias resuelve al nombre del titular de la cuenta, con lo cual se
+está exponiendo un identificador financiero asociable a una persona, a escala y
+sin vínculo previo.
+
+Corresponde moverlo a un documento que sólo lean los alumnos vinculados —
+mismo patrón que `profile_shares` y `session_shares`, que ya existe en el
+repo. No bloquea el lanzamiento; es trabajo de producto.
 
 ---
 
