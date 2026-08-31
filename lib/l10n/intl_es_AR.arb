@@ -3584,5 +3584,24 @@
   "routineEditorProblemOtherWeek": "Semana {semana}: día {dia} sin completar",
   "@routineEditorProblemOtherWeek": {
     "placeholders": {"semana": {"type": "int"}, "dia": {"type": "int"}}
-  }
+  },
+  "routineEditorQuickEntryToggle": "RÁPIDO",
+  "@routineEditorQuickEntryToggle": {
+    "description": "Botón de la cabecera del día que abre la entrada rápida."
+  },
+  "routineEditorQuickEntryToggleA11y": "Entrada rápida",
+  "@routineEditorQuickEntryToggleA11y": {},
+  "routineEditorQuickEntryHint": "banca 4x10 60",
+  "@routineEditorQuickEntryHint": {
+    "description": "Placeholder del campo: enseña el formato con un ejemplo en vez de explicarlo."
+  },
+  "routineEditorQuickEntryWillAdd": "Se agrega como {sets, plural, =1{1 set} other{{sets} sets}} × {reps} a {peso}.",
+  "@routineEditorQuickEntryWillAdd": {
+    "description": "Confirma qué se va a agregar, antes de tocar.",
+    "placeholders": {"sets": {"type": "int"}, "reps": {"type": "int"}, "peso": {"type": "String"}}
+  },
+  "routineEditorQuickEntryNoWeight": "sin peso",
+  "@routineEditorQuickEntryNoWeight": {},
+  "routineEditorQuickEntryEmptyHint": "Escribí nombre + 4x10 + peso. Sin números entra con 3 sets vacíos.",
+  "@routineEditorQuickEntryEmptyHint": {}
 }

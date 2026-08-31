@@ -22,6 +22,8 @@ import '../../onboarding/presentation/custom_exercise_onboarding_gate.dart';
 import '../../profile/application/user_providers.dart'
     show userProfileProvider, userRepositoryProvider;
 import '../../profile/domain/experience_level.dart';
+import '../application/exercise_filter.dart' show exerciseMatchesFilters;
+import '../application/exercise_providers.dart' show exercisesProvider;
 import '../application/routine_providers.dart' show routineRepositoryProvider;
 import '../application/session_providers.dart' show currentUidProvider;
 import '../application/user_routines_providers.dart'
@@ -48,6 +50,8 @@ import 'widgets/empty_day_state.dart';
 import 'widgets/keyboard_accessory_bar.dart';
 import 'widgets/exercise_card.dart';
 import 'widgets/prescription_chips.dart';
+import 'widgets/quick_entry_panel.dart';
+import 'widgets/quick_entry_parser.dart';
 import 'widgets/routine_action_buttons.dart';
 import 'widgets/set_cell_field.dart';
 // `parseEditorWeight` se mudó junto al campo que parsea. Se re-exporta desde
@@ -1951,6 +1955,83 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     });
   }
 
+  /// Busca en el catálogo lo que la entrada rápida entendió como nombre.
+  ///
+  /// Devuelve como mucho tres: más que eso deja de ser un atajo y empieza a
+  /// competir con el picker, que sigue estando para eso. Se filtran los que ya
+  /// están en el día — un ejercicio por día es invariante del dominio
+  /// (QA-WKT-004), y ofrecerlo para que el tap no haga nada es peor que no
+  /// ofrecerlo.
+  List<QuickEntryResult> _buscarParaEntradaRapida(String query, int dayIndex) {
+    final texto = query.trim();
+    if (texto.isEmpty) return const [];
+    final yaEstan = _days[dayIndex]
+        .slots
+        .where((s) => s.exercise != null)
+        .map((s) => s.exercise!.id)
+        .toSet();
+    final catalogo = ref.read(exercisesProvider).valueOrNull ?? const [];
+    // El mismo matcher que usa el picker (ADR-BIBW-01), no un `contains`:
+    // busca por tokens y tolera diacríticos, así que "press banca" encuentra
+    // "Press de Banca" —el `de` del medio rompe un contains— y "biceps" llega
+    // a "Bíceps". Dos búsquedas que difieren en la misma pantalla es peor que
+    // una sola imperfecta.
+    return catalogo
+        .where((e) =>
+            !yaEstan.contains(e.id) &&
+            exerciseMatchesFilters(
+              e,
+              query: texto,
+              muscles: const {},
+              equipment: const {},
+            ))
+        .take(QuickEntryPanel.kMaxResultados)
+        .map((e) => QuickEntryResult(
+              id: e.id,
+              name: e.name,
+              muscleGroup: e.muscleGroup,
+            ))
+        .toList();
+  }
+
+  /// Agrega [exerciseId] al día [dayIndex] con la prescripción de [entry].
+  ///
+  /// El slot resultante es INDISTINGUIBLE de uno agregado por el picker: mismo
+  /// `_EditableSlot`, mismo `restSeconds`, misma pregunta de alcance por
+  /// semana (ADR-WPRES-04). Lo único que cambia es que llega con los sets ya
+  /// cargados en vez de vacíos.
+  Future<void> _agregarPorEntradaRapida(
+    BuildContext context,
+    int dayIndex,
+    String exerciseId,
+    QuickEntry entry,
+  ) async {
+    final catalogo = ref.read(exercisesProvider).valueOrNull ?? const [];
+    final ex = catalogo.where((e) => e.id == exerciseId).firstOrNull;
+    if (ex == null) return;
+
+    final scope = await _promptAddScope(context);
+    if (scope == null || !mounted) return;
+
+    _markDirty();
+    setState(() {
+      final slot = _EditableSlot()
+        ..exercise = ex
+        ..restSeconds = 0
+        ..weeklySets = List.generate(
+          _numWeeks,
+          (_) => List.generate(
+            entry.sets,
+            (_) => _EditableSet()
+              ..reps = entry.reps
+              ..weightKg = entry.weightKg,
+          ),
+        )
+        ..activeWeeks = scope == _AddScope.thisWeek ? {_selectedWeek} : <int>{};
+      _days[dayIndex].slots = [..._days[dayIndex].slots, slot];
+    });
+  }
+
   /// Opens the multi-select picker for [dayIndex] and appends all picked
   /// exercises as a new superset block (shared non-null [supersetGroup]).
   /// Available in every editor mode (trainer + athlete SelfCreating).
@@ -2481,6 +2562,13 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
 
+    // El catálogo se OBSERVA acá aunque quien lo use sea `_buscarParaEntradaRapida`
+    // con un `read`. Un `FutureProvider` que nadie mira nunca se resuelve: el
+    // `read` lo inicializa y devuelve `AsyncLoading`, así que la entrada rápida
+    // no encontraba nada hasta que otra cosa —el picker— cargara la lista.
+    // Es un provider cacheado: mirarlo no cuesta un rebuild por frame.
+    ref.watch(exercisesProvider);
+
     // Loading state: hydrating from Firestore.
     if (_loading) {
       return _shell(
@@ -2802,6 +2890,10 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                       allowSuperset: true,
                       onAddSuperset: () =>
                           _addSupersetForDay(context, _selectedDayIndex),
+                      onQuickSearch: (q) =>
+                          _buscarParaEntradaRapida(q, _selectedDayIndex),
+                      onQuickAdd: (id, entry) => _agregarPorEntradaRapida(
+                          context, _selectedDayIndex, id, entry),
                       slotIsValid: (slot) {
                         if (!slot.isPresentInWeek(_selectedWeek)) {
                           return true;
@@ -3153,6 +3245,8 @@ class _DayExpansionTile extends StatefulWidget {
     this.onAddSuperset,
     this.slotIsValid,
     this.isTrainerMode = false,
+    this.onQuickSearch,
+    this.onQuickAdd,
   });
 
   final _EditableDay day;
@@ -3187,11 +3281,22 @@ class _DayExpansionTile extends StatefulWidget {
   /// REQ-EN-002.
   final bool isTrainerMode;
 
+  /// Busca en el catálogo lo que la entrada rápida entendió como nombre. Null
+  /// esconde el atajo — el picker completo sigue estando igual.
+  final List<QuickEntryResult> Function(String query)? onQuickSearch;
+
+  /// Agrega el ejercicio elegido con la prescripción que se tipeó.
+  final void Function(String exerciseId, QuickEntry entry)? onQuickAdd;
+
   @override
   State<_DayExpansionTile> createState() => _DayExpansionTileState();
 }
 
 class _DayExpansionTileState extends State<_DayExpansionTile> {
+  /// Si el panel de entrada rápida está abierto. Presentación local pura: no
+  /// sobrevive a cerrar el día ni viaja al modelo.
+  bool _quickEntryOpen = false;
+  final TextEditingController _quickEntryCtrl = TextEditingController();
   // Reads/writes widget.day.expanded so the collapse survives the ListView
   // recycling the tile off-screen.
 
@@ -3230,6 +3335,7 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
 
   @override
   void dispose() {
+    _quickEntryCtrl.dispose();
     _nameController.dispose();
     _nameFocus.dispose();
     super.dispose();
@@ -3560,6 +3666,41 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
             padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
             child: Column(
               children: [
+                if (widget.onQuickSearch != null &&
+                    widget.onQuickAdd != null) ...[
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: QuickEntryToggle(
+                      active: _quickEntryOpen,
+                      onTap: () => setState(() {
+                        _quickEntryOpen = !_quickEntryOpen;
+                        if (!_quickEntryOpen) _quickEntryCtrl.clear();
+                      }),
+                    ),
+                  ),
+                  if (_quickEntryOpen) ...[
+                    const SizedBox(height: AppSpacing.s8),
+                    ValueListenableBuilder<TextEditingValue>(
+                      valueListenable: _quickEntryCtrl,
+                      builder: (context, value, _) {
+                        final entry = parseQuickEntry(value.text);
+                        return QuickEntryPanel(
+                          controller: _quickEntryCtrl,
+                          entry: entry,
+                          results: widget.onQuickSearch!(entry.query),
+                          onPick: (r) {
+                            widget.onQuickAdd!(r.id, entry);
+                            setState(() {
+                              _quickEntryOpen = false;
+                              _quickEntryCtrl.clear();
+                            });
+                          },
+                        );
+                      },
+                    ),
+                  ],
+                  const SizedBox(height: AppSpacing.s8),
+                ],
                 // Un día sin ejercicios era un acordeón que se abría
                 // y no mostraba nada, sin decir si estaba bien así.
                 if (_slotsVisibles.isEmpty)

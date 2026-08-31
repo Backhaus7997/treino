@@ -1995,10 +1995,7 @@ class AppL10nEs extends AppL10n {
 
   @override
   String routineEditorAccessoryContext(
-    String ejercicio,
-    int set,
-    String campo,
-  ) {
+      String ejercicio, int set, String campo) {
     return '$ejercicio · set $set · $campo';
   }
 
@@ -3135,10 +3132,7 @@ class AppL10nEs extends AppL10n {
 
   @override
   String dashboardAlertBannerSummary(
-    int vencidos,
-    int solicitudes,
-    int inactivos,
-  ) {
+      int vencidos, int solicitudes, int inactivos) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,
@@ -4184,6 +4178,33 @@ class AppL10nEs extends AppL10n {
   String routineEditorProblemOtherWeek(int semana, int dia) {
     return 'Semana $semana: día $dia sin completar';
   }
+
+  @override
+  String get routineEditorQuickEntryToggle => 'RÁPIDO';
+
+  @override
+  String get routineEditorQuickEntryToggleA11y => 'Entrada rápida';
+
+  @override
+  String get routineEditorQuickEntryHint => 'banca 4x10 60';
+
+  @override
+  String routineEditorQuickEntryWillAdd(int sets, int reps, String peso) {
+    String _temp0 = intl.Intl.pluralLogic(
+      sets,
+      locale: localeName,
+      other: '$sets sets',
+      one: '1 set',
+    );
+    return 'Se agrega como $_temp0 × $reps a $peso.';
+  }
+
+  @override
+  String get routineEditorQuickEntryNoWeight => 'sin peso';
+
+  @override
+  String get routineEditorQuickEntryEmptyHint =>
+      'Escribí nombre + 4x10 + peso. Sin números entra con 3 sets vacíos.';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -6177,10 +6198,7 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String routineEditorAccessoryContext(
-    String ejercicio,
-    int set,
-    String campo,
-  ) {
+      String ejercicio, int set, String campo) {
     return '$ejercicio · set $set · $campo';
   }
 
@@ -7315,10 +7333,7 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String dashboardAlertBannerSummary(
-    int vencidos,
-    int solicitudes,
-    int inactivos,
-  ) {
+      int vencidos, int solicitudes, int inactivos) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,
@@ -8363,4 +8378,31 @@ class AppL10nEsAr extends AppL10nEs {
   String routineEditorProblemOtherWeek(int semana, int dia) {
     return 'Semana $semana: día $dia sin completar';
   }
+
+  @override
+  String get routineEditorQuickEntryToggle => 'RÁPIDO';
+
+  @override
+  String get routineEditorQuickEntryToggleA11y => 'Entrada rápida';
+
+  @override
+  String get routineEditorQuickEntryHint => 'banca 4x10 60';
+
+  @override
+  String routineEditorQuickEntryWillAdd(int sets, int reps, String peso) {
+    String _temp0 = intl.Intl.pluralLogic(
+      sets,
+      locale: localeName,
+      other: '$sets sets',
+      one: '1 set',
+    );
+    return 'Se agrega como $_temp0 × $reps a $peso.';
+  }
+
+  @override
+  String get routineEditorQuickEntryNoWeight => 'sin peso';
+
+  @override
+  String get routineEditorQuickEntryEmptyHint =>
+      'Escribí nombre + 4x10 + peso. Sin números entra con 3 sets vacíos.';
 }

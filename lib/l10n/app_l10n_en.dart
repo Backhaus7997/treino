@@ -1946,10 +1946,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String routineEditorAccessoryContext(
-    String ejercicio,
-    int set,
-    String campo,
-  ) {
+      String ejercicio, int set, String campo) {
     return '$ejercicio · set $set · $campo';
   }
 
@@ -3080,10 +3077,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String dashboardAlertBannerSummary(
-    int vencidos,
-    int solicitudes,
-    int inactivos,
-  ) {
+      int vencidos, int solicitudes, int inactivos) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,
@@ -4122,4 +4116,31 @@ class AppL10nEn extends AppL10n {
   String routineEditorProblemOtherWeek(int semana, int dia) {
     return 'Week $semana: day $dia incomplete';
   }
+
+  @override
+  String get routineEditorQuickEntryToggle => 'QUICK';
+
+  @override
+  String get routineEditorQuickEntryToggleA11y => 'Quick entry';
+
+  @override
+  String get routineEditorQuickEntryHint => 'bench 4x10 60';
+
+  @override
+  String routineEditorQuickEntryWillAdd(int sets, int reps, String peso) {
+    String _temp0 = intl.Intl.pluralLogic(
+      sets,
+      locale: localeName,
+      other: '$sets sets',
+      one: '1 set',
+    );
+    return 'Adds $_temp0 × $reps at $peso.';
+  }
+
+  @override
+  String get routineEditorQuickEntryNoWeight => 'no weight';
+
+  @override
+  String get routineEditorQuickEntryEmptyHint =>
+      'Type a name + 4x10 + weight. With no numbers it lands with 3 empty sets.';
 }
