@@ -8,10 +8,25 @@ su reemplazo, y hay que portarlos ahí y publicarlos en `gettreino.com/legal/*`.
 
 | Documento | Qué es | Estado |
 |---|---|---|
-| [AUDITORIA-legal-vigente.md](./AUDITORIA-legal-vigente.md) | Contraste del texto vigente contra el código. 5 críticos, 7 altos, 6 medios | Leer primero |
-| [politica-de-privacidad.md](./politica-de-privacidad.md) | Reemplazo de `kPrivacySections`, escrito contra el mapa de datos real | Borrador, faltan datos del titular |
-| [normas-de-comunidad.md](./normas-de-comunidad.md) | Documento publicable + spec de reporte y bloqueo (Apple 1.2) | Borrador + trabajo de producto pendiente |
-| [retencion-y-borrado.md](./retencion-y-borrado.md) | Respaldo de las secciones 8 y 10 de privacidad. URL para Google Play | Borrador |
+| [AUDITORIA-legal-vigente.md](./AUDITORIA-legal-vigente.md) | Contraste del texto vigente contra el código. 18 hallazgos | Leer primero |
+| [terminos-y-condiciones.md](./terminos-y-condiciones.md) | Reemplazo de `kTermsSections` | Borrador — 3 cláusulas esperan D2, D3, D4/D6 |
+| [politica-de-privacidad.md](./politica-de-privacidad.md) | Reemplazo de `kPrivacySections`, contra el mapa de datos real | Borrador |
+| [descargo-medico.md](./descargo-medico.md) | Asunción de riesgo + dónde mostrarlo | Borrador — **revisión legal obligatoria** |
+| [contrato-entrenador.md](./contrato-entrenador.md) | Términos para PFs: independencia, datos de alumnos, planes | Borrador — **revisión legal obligatoria** |
+| [consentimiento-datos-salud.md](./consentimiento-datos-salud.md) | Texto + spec del flujo de consentimiento expreso | Borrador |
+| [normas-de-comunidad.md](./normas-de-comunidad.md) | Publicable + spec de reporte y bloqueo (Apple 1.2) | Borrador |
+| [retencion-y-borrado.md](./retencion-y-borrado.md) | Qué se borra, qué se conserva. URL para Google Play | Borrador |
+| [aviso-legal.md](./aviso-legal.md) | Identificación del titular | Borrador |
+| [guia-legal-treino.pdf](./guia-legal-treino.pdf) | Guía de decisiones y trámites para el Product Owner | Vigente |
+
+## Lo que falta, y por qué
+
+| Documento | Bloqueado por |
+|---|---|
+| Términos de suscripción | **D4** (medio de cobro) y **D6** (reembolsos) |
+| Botón de arrepentimiento y baja online | **D4** y **D6**. Res. 424/2020 |
+| Política de cookies | **D3** (países) y relevar qué carga la landing, que vive en otro proyecto de Vercel |
+| Licencias de software libre | No es un documento: es cablear `showLicensePage` de Flutter, que hoy no está en el código |
 
 ## Titular
 

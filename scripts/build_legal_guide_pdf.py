@@ -150,7 +150,7 @@ def build_story():
     A(table([
         ["Fecha", "31 de agosto de 2026"],
         ["Verificado contra", "código de la app y reglas de Firestore"],
-        ["Complementa", "docs/legal/ (4 borradores ya redactados)"],
+        ["Complementa", "docs/legal/ (9 documentos redactados)"],
         ["Titular", "BACKHAUSTIN S.A.S. — CUIT 30-71929587-4"],
         ["Destinatario", "Product Owner / titular de la decisión"],
         ["Preparado por", "Equipo de desarrollo"],
@@ -181,7 +181,7 @@ def build_story():
          "Vos, con el contador y el abogado", "Pendiente"],
         ["<b>Documentos</b> — los trece textos",
          "Redacción conjunta; dos exigen revisión legal",
-         "4 de 13 redactados"],
+         "9 de 13 redactados"],
     ], [58, 48, 59]))
     sp(10)
     A(P("Los cuatro documentos ya redactados son los que salían de leer el "
@@ -215,25 +215,30 @@ def build_story():
     ], [26, 84, 55]))
 
     A(P("2. Dónde estás parado", "h1"))
-    A(P("Trece documentos. Cuatro redactados, nueve pendientes. Tres "
-        "bloqueantes duros de publicación que hoy no tienen solución empezada."))
+    A(P("Trece documentos. <b>Nueve redactados, tres bloqueados por decisiones "
+        "pendientes y uno que no es un documento sino una pantalla.</b> Más "
+        "tres bloqueantes duros de publicación que siguen sin solución "
+        "empezada."))
     sp(4)
     A(P("2.1 Los trece documentos", "h3"))
     A(table([
         ["#", "Documento", "Estado", "Depende de"],
-        ["1", "Política de Privacidad", "Borrador listo", "D1, D3"],
-        ["2", "Normas de Comunidad", "Borrador listo", "D1"],
-        ["3", "Retención y borrado", "Borrador listo", "D1"],
-        ["4", "Auditoría del texto vigente", "Entregado", "—"],
-        ["5", "Términos y Condiciones", "Pendiente", "D1, D2, D3, D6"],
-        ["6", "Descargo médico", "Pendiente", "D1 + <b>abogado</b>"],
-        ["7", "Contrato del Entrenador", "Pendiente", "D1, D5 + <b>abogado</b>"],
-        ["8", "Términos de suscripción", "Pendiente", "D4, D6"],
-        ["9", "Botón de arrepentimiento y baja", "Pendiente", "D4, D6"],
-        ["10", "Consentimiento de datos de salud", "Pendiente", "D1"],
-        ["11", "Aviso legal / identificación", "Pendiente", "D1"],
-        ["12", "Política de cookies (web)", "Pendiente", "D3"],
-        ["13", "Licencias de software libre", "Pendiente", "—"],
+        ["1", "Política de Privacidad", "<b>Borrador listo</b>", "—"],
+        ["2", "Normas de Comunidad", "<b>Borrador listo</b>", "—"],
+        ["3", "Retención y borrado", "<b>Borrador listo</b>", "—"],
+        ["4", "Auditoría del texto vigente", "<b>Entregado</b>", "—"],
+        ["5", "Términos y Condiciones",
+         "<b>Borrador listo</b>, con 3 cláusulas marcadas", "D2, D3, D4/D6"],
+        ["6", "Descargo médico",
+         "<b>Borrador listo</b>", "<b>abogado</b>"],
+        ["7", "Contrato del Entrenador",
+         "<b>Borrador listo</b>", "<b>abogado</b>"],
+        ["8", "Términos de suscripción", "Bloqueado", "D4, D6"],
+        ["9", "Botón de arrepentimiento y baja", "Bloqueado", "D4, D6"],
+        ["10", "Consentimiento de datos de salud", "<b>Borrador listo</b>", "—"],
+        ["11", "Aviso legal / identificación", "<b>Borrador listo</b>", "—"],
+        ["12", "Política de cookies (web)", "Bloqueado", "D3 + relevar la landing"],
+        ["13", "Licencias de software libre", "No es documento", "Desarrollo"],
     ], [8, 62, 45, 50]))
     sp(10)
     A(P("2.2 Los tres bloqueantes duros", "h3"))
