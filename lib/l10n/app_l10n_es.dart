@@ -4212,6 +4212,24 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get routineEditorQuickEntryAdd => 'AGREGAR';
+
+  @override
+  String get routineEditorExerciseSheetTitle => 'ACCIONES';
+
+  @override
+  String get routineEditorSlotMenuCollapse => 'Colapsar sets';
+
+  @override
+  String get routineEditorSlotMenuExpand => 'Desplegar sets';
+
+  @override
+  String get coachTemplateEditorTitle => 'Nueva plantilla';
+
+  @override
+  String get coachTemplateEditorEditTitle => 'Editar plantilla';
+
+  @override
+  String get coachTemplateEditorSubmit => 'GUARDAR PLANTILLA';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -8419,4 +8437,22 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get routineEditorQuickEntryAdd => 'AGREGAR';
+
+  @override
+  String get routineEditorExerciseSheetTitle => 'ACCIONES';
+
+  @override
+  String get routineEditorSlotMenuCollapse => 'Colapsar sets';
+
+  @override
+  String get routineEditorSlotMenuExpand => 'Desplegar sets';
+
+  @override
+  String get coachTemplateEditorTitle => 'Nueva plantilla';
+
+  @override
+  String get coachTemplateEditorEditTitle => 'Editar plantilla';
+
+  @override
+  String get coachTemplateEditorSubmit => 'GUARDAR PLANTILLA';
 }

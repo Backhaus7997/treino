@@ -51,6 +51,7 @@ import 'widgets/duration_text_field.dart';
 import 'widgets/day_tab_bar.dart';
 import 'widgets/editor_footer_bar.dart';
 import 'widgets/empty_day_state.dart';
+import 'widgets/exercise_actions_sheet.dart';
 import 'widgets/keyboard_accessory_bar.dart';
 import 'widgets/exercise_card.dart';
 import 'widgets/prescription_chips.dart';
@@ -520,8 +521,13 @@ OnboardingSurface _onboardingSurfaceFor(RoutineEditorMode mode) =>
 String _titleFor(RoutineEditorMode mode, AppL10n l10n) => switch (mode) {
       TrainerAssigning(existingPlanId: null) => l10n.coachEditorTitle,
       TrainerAssigning() => l10n.coachEditorEditTitle,
-      TrainerTemplating(existingTemplateId: null) => l10n.coachEditorTitle,
-      TrainerTemplating() => l10n.coachEditorEditTitle,
+      // Antes reusaban el copy de asignar un plan: crear una PLANTILLA, que
+      // no se asigna a nadie, decía "Crear plan". Es el único cambio de copy
+      // que el rediseño autoriza (#871). No cambia a qué repositorio se
+      // escribe ni cuándo.
+      TrainerTemplating(existingTemplateId: null) =>
+        l10n.coachTemplateEditorTitle,
+      TrainerTemplating() => l10n.coachTemplateEditorEditTitle,
       SelfCreating(existingRoutineId: null) => l10n.workoutSelfEditorTitle,
       SelfCreating() => l10n.workoutSelfEditorEditTitle,
       SelfCustomizing() => l10n.workoutRoutineCustomizeTitle,
@@ -530,8 +536,8 @@ String _titleFor(RoutineEditorMode mode, AppL10n l10n) => switch (mode) {
 String _submitLabelFor(RoutineEditorMode mode, AppL10n l10n) => switch (mode) {
       TrainerAssigning(existingPlanId: null) => l10n.coachEditorSubmit,
       TrainerAssigning() => l10n.coachEditorUpdateLabel,
-      TrainerTemplating(existingTemplateId: null) => l10n.coachEditorSubmit,
-      TrainerTemplating() => l10n.coachEditorUpdateLabel,
+      // El CTA decía "ASIGNAR PLAN" en una plantilla que no se asigna a nadie.
+      TrainerTemplating() => l10n.coachTemplateEditorSubmit,
       SelfCreating(existingRoutineId: null) =>
         l10n.workoutSelfEditorSubmitLabel,
       SelfCreating() => l10n.workoutSelfEditorUpdateLabel,
@@ -4096,6 +4102,83 @@ class _SlotEditorState extends State<_SlotEditor> {
 
   /// Opens the exercise picker and, if a replacement is chosen, swaps the
   /// slot's exercise from the ⋮ "Cambiar ejercicio" action.
+  /// Abre la hoja de acciones del ejercicio y ejecuta la elegida.
+  ///
+  /// Era un `PopupMenuButton`: un menú flotante de ítems de ~40 dp colgado de
+  /// un ícono de 20. Las acciones y su lógica son las MISMAS —`_SlotAction` no
+  /// cambia—; lo que cambia es dónde se muestran y de qué tamaño.
+  ///
+  /// El issue #871 pedía además "Duplicar ejercicio" y "Unir en superserie con
+  /// el anterior", diciendo que las acciones ya existían. Ninguna de las dos
+  /// cosas es cierta: no están en `_SlotAction`, y **duplicar un ejercicio
+  /// dentro del mismo día viola QA-WKT-004** — el session player agrupa el
+  /// progreso por `exerciseId`, así que dos slots con el mismo id colapsan sus
+  /// logs en un solo pool. Unir en superserie es la pieza que #869 dejó afuera
+  /// por ser cambio de comportamiento.
+  Future<void> _abrirAcciones(BuildContext context, AppL10n l10n) async {
+    final hayMovimiento = widget.onMoveUp != null || widget.onMoveDown != null;
+    final elegida = await showExerciseActionsSheet(
+      context,
+      title:
+          widget.slot.exercise?.name ?? l10n.routineEditorExerciseSheetTitle,
+      actions: [
+        ExerciseAction(
+          id: _SlotAction.toggleExpanded,
+          label: _expanded
+              ? l10n.routineEditorSlotMenuCollapse
+              : l10n.routineEditorSlotMenuExpand,
+          icon: _expanded ? TreinoIcon.chevronUp : TreinoIcon.chevronDown,
+        ),
+        ExerciseAction(
+          id: _SlotAction.replace,
+          label: l10n.routineEditorSlotMenuReplace,
+          icon: TreinoIcon.edit,
+        ),
+        ExerciseAction(
+          id: _SlotAction.copyPrevious,
+          label: l10n.routineEditorSlotMenuCopyPrevious,
+          icon: TreinoIcon.copy,
+          enabled: widget.onCopyPrevious != null,
+        ),
+        if (hayMovimiento) ...[
+          ExerciseAction(
+            id: _SlotAction.moveUp,
+            label: l10n.routineEditorSlotMenuMoveUp,
+            icon: TreinoIcon.chevronUp,
+            enabled: widget.canMoveUp,
+          ),
+          ExerciseAction(
+            id: _SlotAction.moveDown,
+            label: l10n.routineEditorSlotMenuMoveDown,
+            icon: TreinoIcon.chevronDown,
+            enabled: widget.canMoveDown,
+          ),
+        ],
+        ExerciseAction(
+          id: _SlotAction.remove,
+          label: l10n.routineEditorSlotMenuRemove,
+          icon: TreinoIcon.trash,
+          danger: true,
+        ),
+      ],
+    );
+    if (elegida == null || !mounted) return;
+    switch (elegida as _SlotAction) {
+      case _SlotAction.toggleExpanded:
+        setState(() => _expanded = !_expanded);
+      case _SlotAction.replace:
+        await _replaceExercise();
+      case _SlotAction.moveUp:
+        widget.onMoveUp?.call();
+      case _SlotAction.moveDown:
+        widget.onMoveDown?.call();
+      case _SlotAction.copyPrevious:
+        widget.onCopyPrevious?.call();
+      case _SlotAction.remove:
+        widget.onRemove();
+    }
+  }
+
   Future<void> _replaceExercise() async {
     final picked = await showExercisePicker(context);
     if (!mounted || picked == null || picked.isEmpty) return;
@@ -4138,72 +4221,15 @@ class _SlotEditorState extends State<_SlotEditor> {
       ),
       menu: Transform.translate(
         offset: const Offset(AppSpacing.s8, -AppSpacing.s8),
-        child: PopupMenuButton<_SlotAction>(
+        child: IconButton(
           key: widget.slotIndex != null
               ? Key('slot_menu_button_${widget.slotIndex}')
               : null,
           icon: Icon(TreinoIcon.dotsThree, size: 20, color: palette.textMuted),
           tooltip: l10n.workoutRoutineOptionsA11y,
-          color: palette.bgCard,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.sm),
-          ),
-          onSelected: (action) {
-            switch (action) {
-              case _SlotAction.replace:
-                _replaceExercise();
-              case _SlotAction.moveUp:
-                widget.onMoveUp?.call();
-              case _SlotAction.moveDown:
-                widget.onMoveDown?.call();
-              case _SlotAction.copyPrevious:
-                widget.onCopyPrevious?.call();
-              case _SlotAction.remove:
-                widget.onRemove();
-            }
-          },
-          itemBuilder: (context) {
-            final showMove =
-                widget.onMoveUp != null || widget.onMoveDown != null;
-            return [
-              _slotMenuItem(
-                _SlotAction.replace,
-                TreinoIcon.edit,
-                l10n.routineEditorSlotMenuReplace,
-                palette,
-              ),
-              _slotMenuItem(
-                _SlotAction.copyPrevious,
-                TreinoIcon.copy,
-                l10n.routineEditorSlotMenuCopyPrevious,
-                palette,
-                enabled: widget.onCopyPrevious != null,
-              ),
-              if (showMove)
-                _slotMenuItem(
-                  _SlotAction.moveUp,
-                  TreinoIcon.chevronUp,
-                  l10n.routineEditorSlotMenuMoveUp,
-                  palette,
-                  enabled: widget.canMoveUp,
-                ),
-              if (showMove)
-                _slotMenuItem(
-                  _SlotAction.moveDown,
-                  TreinoIcon.chevronDown,
-                  l10n.routineEditorSlotMenuMoveDown,
-                  palette,
-                  enabled: widget.canMoveDown,
-                ),
-              _slotMenuItem(
-                _SlotAction.remove,
-                TreinoIcon.trash,
-                l10n.routineEditorSlotMenuRemove,
-                palette,
-                danger: true,
-              ),
-            ];
-          },
+          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          padding: EdgeInsets.zero,
+          onPressed: () => _abrirAcciones(context, l10n),
         ),
       ),
       child: Column(
@@ -4343,41 +4369,17 @@ class _SlotEditorState extends State<_SlotEditor> {
 // ── Slot overflow menu (⋮) ────────────────────────────────────────────────────
 
 /// Actions surfaced from a slot's ⋮ overflow menu.
-enum _SlotAction { replace, copyPrevious, moveUp, moveDown, remove }
-
-/// Builds one styled item for the slot ⋮ menu, matching treino's dark palette.
-/// [enabled] dims the row (used for edge reorder); [danger] tints it red.
-PopupMenuItem<_SlotAction> _slotMenuItem(
-  _SlotAction value,
-  IconData icon,
-  String label,
-  AppPalette palette, {
-  bool enabled = true,
-  bool danger = false,
-}) {
-  final color = !enabled
-      ? palette.border
-      : danger
-          ? palette.danger
-          : palette.textPrimary;
-  return PopupMenuItem<_SlotAction>(
-    value: value,
-    enabled: enabled,
-    height: 44,
-    child: Row(
-      children: [
-        Icon(icon, size: 18, color: color),
-        const SizedBox(width: 12),
-        Flexible(
-          child: Text(
-            label,
-            style: GoogleFonts.barlow(fontSize: 14, color: color),
-          ),
-        ),
-      ],
-    ),
-  );
+enum _SlotAction {
+  /// Desplegar o colapsar la tabla de series. La cabecera de la card ya es el
+  /// toggle; acá está porque con la hoja abierta la cabecera queda tapada.
+  toggleExpanded,
+  replace,
+  copyPrevious,
+  moveUp,
+  moveDown,
+  remove,
 }
+
 
 // ── Set table ─────────────────────────────────────────────────────────────────
 

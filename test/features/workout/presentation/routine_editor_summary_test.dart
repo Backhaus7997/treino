@@ -494,7 +494,9 @@ void main() {
       await tester.enterText(_summaryField, _kResumen);
       await tester.pumpAndSettle();
       await _addOneExercise(tester);
-      await _tapSave(tester, 'ASIGNAR PLAN');
+      // Es una PLANTILLA: desde #871 su CTA dice lo suyo en vez de reusar el
+      // de asignar un plan, que hablaba de asignarle algo a alguien.
+      await _tapSave(tester, 'GUARDAR PLANTILLA');
 
       final draft = verify(() => repo.createTemplate(captureAny()))
           .captured

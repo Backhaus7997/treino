@@ -1745,5 +1745,17 @@
   "routineEditorQuickEntryPickedHint": "4x10 and the weight. Per set with commas: 4x10,8,6,4 · 55,45,35,25. By time: 3x30s or 3x1:30. Decimals with a dot: 62.5",
   "@routineEditorQuickEntryPickedHint": {},
   "routineEditorQuickEntryAdd": "ADD",
-  "@routineEditorQuickEntryAdd": {}
+  "@routineEditorQuickEntryAdd": {},
+  "routineEditorExerciseSheetTitle": "ACTIONS",
+  "@routineEditorExerciseSheetTitle": {},
+  "routineEditorSlotMenuCollapse": "Collapse sets",
+  "@routineEditorSlotMenuCollapse": {},
+  "routineEditorSlotMenuExpand": "Expand sets",
+  "@routineEditorSlotMenuExpand": {},
+  "coachTemplateEditorTitle": "New template",
+  "@coachTemplateEditorTitle": {},
+  "coachTemplateEditorEditTitle": "Edit template",
+  "@coachTemplateEditorEditTitle": {},
+  "coachTemplateEditorSubmit": "SAVE TEMPLATE",
+  "@coachTemplateEditorSubmit": {}
 }
