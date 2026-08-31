@@ -69,6 +69,33 @@ export const LANDING_URL = "https://gettreino.com";
 export const COACH_HUB_URL = "https://app.gettreino.com";
 
 /**
+ * A donde manda el CTA cuando el destinatario NO es el entrenador.
+ *
+ * Antes era `LANDING_URL`, y era un error medido: `gettreino.com` es de OTRO
+ * producto —gimnasios y rankings, en ingles— y dice literalmente "No custom
+ * app". Un atleta que recibia "tu entrenador confirmo la sesion" tocaba el
+ * boton y caia en una pagina sin login, sin descarga, y que le negaba la
+ * existencia de la app que tiene instalada.
+ *
+ * `/abrir/alumno` es un App Link: en un telefono con la app instalada, el
+ * sistema operativo la abre y esta URL nunca llega al navegador. Quien la ve
+ * como pagina es porque abrio el mail en una computadora o no tiene la app.
+ */
+export const APP_ENTRY_ATHLETE = "https://app.gettreino.com/abrir/alumno";
+
+/**
+ * Idem para el entrenador. Es una URL distinta y no un parametro porque el
+ * DESTINO es distinto: el profe tiene la app y ademas el Coach Hub web, asi
+ * que abriendo desde una computadora tiene algo util que hacer. El atleta solo
+ * tiene la app. Mandar a los dos al mismo lado obliga a una de las dos mitades
+ * a leer instrucciones que no le corresponden.
+ *
+ * Reemplaza al viejo `COACH_HUB_URL` como destino de mail: mandaba al profe
+ * derecho a la web incluso desde el telefono, donde la app le sirve mas.
+ */
+export const APP_ENTRY_TRAINER = "https://app.gettreino.com/abrir/profe";
+
+/**
  * La marca TR, servida desde el propio deploy del Coach Hub (`web/email/`).
  *
  * PNG y no SVG porque NINGUN cliente de mail renderiza SVG — el logo del repo
@@ -97,9 +124,13 @@ function layout(
   bodyHtml: string,
   preheader: string,
   ctaLabel?: string,
-  ctaHref: string = LANDING_URL,
+  ctaHref: string = APP_ENTRY_ATHLETE,
 ): string {
-  const cta = ctaLabel
+  // Hace falta la etiqueta Y el destino. Sin destino, `ctaHref` llega como ""
+  // —los mails de auth pasan el `actionLink` crudo, y `sendQueuedMail` lo BORRA
+  // del documento despues de enviar— y se dibujaba un boton con `href=""`, que
+  // en un mail no va a ningun lado. Mejor sin boton que con uno muerto.
+  const cta = ctaLabel && ctaHref
     ? [
       "<tr><td style=\"padding:8px 32px 32px 32px;\">",
       `<a href="${esc(ctaHref)}" style="display:inline-block;`,
@@ -262,7 +293,7 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
   // el entrenador; el resto cae al landing. Se resuelve una sola vez acá para
   // que la URL entre TAMBIEN en la parte de texto plano — un CTA que solo vive
   // dentro de un <a> no existe para quien lee en texto.
-  const ctaUrl = params.ctaUrl ? String(params.ctaUrl) : LANDING_URL;
+  const ctaUrl = params.ctaUrl ? String(params.ctaUrl) : APP_ENTRY_ATHLETE;
 
   switch (kind) {
   // ── Auth ─────────────────────────────────────────────────────────────────

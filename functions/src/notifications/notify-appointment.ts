@@ -31,7 +31,7 @@ import {
   resolveDisplayName,
   resolveTrainerName,
 } from "../mail/format";
-import { COACH_HUB_URL } from "../mail/templates";
+import { APP_ENTRY_TRAINER } from "../mail/templates";
 
 function getApp(): admin.app.App {
   try {
@@ -154,7 +154,7 @@ async function enqueueAppointmentMail(
         timeLabel: formatTimeAR(after.startsAt as never),
         // Mismo criterio que el prefKey: el Coach Hub solo para el PF. Al
         // atleta el dashboard del entrenador no le sirve de nada.
-        ...(toUid === trainerId ? { ctaUrl: COACH_HUB_URL } : {}),
+        ...(toUid === trainerId ? { ctaUrl: APP_ENTRY_TRAINER } : {}),
       },
       // Only the trainer has a settings screen (Coach Hub → Ajustes →
       // Notificaciones, row `sesion_cancelada`). Gating the ATHLETE's mail on a
