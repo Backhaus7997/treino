@@ -50,6 +50,18 @@ Widget _harness({
       child: const MaterialApp(home: Scaffold(body: AjustesScreen())),
     );
 
+/// Enfocar un TextField dispara `ensureVisible` del scroll de Configuración,
+/// y en el viewport de test (800x600) eso se lleva GUARDAR CAMBIOS arriba del
+/// borde. Sin settle + ensureVisible el tap cae en el vacío y el test pasa a
+/// verde/rojo por dónde quedó el scroll, no por lo que hace el botón.
+Future<void> _tapGuardar(WidgetTester tester) async {
+  await tester.pumpAndSettle();
+  await tester.ensureVisible(find.text('GUARDAR CAMBIOS'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('GUARDAR CAMBIOS'));
+  await tester.pump();
+}
+
 void main() {
   setUpAll(() => registerFallbackValue(<String, Object?>{}));
 
@@ -177,9 +189,7 @@ void main() {
 
       // NOMBRE es el primer TextField.
       await tester.enterText(find.byType(TextField).first, 'Mateo');
-      await tester.pump();
-      await tester.tap(find.text('GUARDAR CAMBIOS'));
-      await tester.pump();
+      await _tapGuardar(tester);
 
       final captured = verify(() => repo.update('pf1', captureAny()))
           .captured
@@ -198,9 +208,7 @@ void main() {
       await tester.pump();
 
       await tester.enterText(find.byType(TextField).first, '');
-      await tester.pump();
-      await tester.tap(find.text('GUARDAR CAMBIOS'));
-      await tester.pump();
+      await _tapGuardar(tester);
 
       verifyNever(() => repo.update(any(), any()));
     });
