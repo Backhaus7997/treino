@@ -46,7 +46,7 @@ void main() {
 
   group('pirámide de repeticiones — "4x10, 8, 6, 4"', () {
     test('cada set lleva las suyas', () {
-      final r = parseQuickEntry('sentadilla 4x10, 8, 6, 4');
+      final r = parseQuickEntry('sentadilla 4x10,8,6,4');
       expect(r.query, 'sentadilla');
       expect(r.sets, 4);
       expect(r.reps, [10, 8, 6, 4]);
@@ -73,7 +73,7 @@ void main() {
 
   group('descarga de peso — "4x10 55, 45, 35, 25"', () {
     test('cada set lleva el suyo', () {
-      final r = parseQuickEntry('sentadilla 4x10 55, 45, 35, 25');
+      final r = parseQuickEntry('sentadilla 4x10 55,45,35,25');
       expect(r.query, 'sentadilla');
       expect(r.sets, 4);
       expect(r.reps, [10]);
@@ -92,7 +92,7 @@ void main() {
 
   group('las dos listas juntas', () {
     test('reps y pesos por set, cada uno con su lista', () {
-      final r = parseQuickEntry('sentadilla 4x10, 8, 6, 4 55, 45, 35, 25');
+      final r = parseQuickEntry('sentadilla 4x10,8,6,4 55,45,35,25');
       expect(r.query, 'sentadilla');
       expect(r.sets, 4);
       expect(r.reps, [10, 8, 6, 4]);
@@ -112,25 +112,36 @@ void main() {
     });
   });
 
-  group('la coma es decimal Y separador — el espacio decide', () {
-    test('coma pegada es decimal: "60,5" son sesenta y medio', () {
-      final r = parseQuickEntry('banca 4x10 60,5');
-      expect(r.weights, [60.5]);
+  group('la coma SIEMPRE separa; el decimal es el punto', () {
+    // La primera versión pedía un espacio detrás de la coma para poder
+    // distinguirla del decimal de es-AR. Esa regla se rompió en device apenas
+    // se probó: escribir `55,45,35,25` de un tirón es lo natural en un
+    // teléfono, y el parser lo leía como un único peso de 55,45.
+    test('sin espacios: la forma en que se escribe de verdad', () {
+      final r = parseQuickEntry('banca 4x10 55,45,35,25');
+      expect(r.weights, [55, 45, 35, 25], reason: 'este es EL caso que rompía');
     });
 
-    test('el punto también', () {
-      expect(parseQuickEntry('banca 4x10 60.5').weights, [60.5]);
+    test('con espacios da lo mismo', () {
+      expect(parseQuickEntry('banca 4x10 55, 45, 35, 25').weights,
+          [55, 45, 35, 25]);
     });
 
-    test('coma con espacio es lista: "60, 45" son dos pesos', () {
-      final r = parseQuickEntry('banca 4x10 60, 45');
-      expect(r.weights, [60, 45]);
+    test('la pirámide tampoco necesita espacios', () {
+      final r = parseQuickEntry('banca 4x10,8,6,4');
+      expect(r.reps, [10, 8, 6, 4],
+          reason: 'antes devolvía [10] y perdía el resto en silencio');
     });
 
-    test('y las dos cosas conviven en la misma línea', () {
-      final r = parseQuickEntry('banca 4x10 60,5, 45,5');
-      expect(r.weights, [60.5, 45.5],
-          reason: 'un decimal DENTRO de una lista de decargas');
+    test('el decimal va con PUNTO', () {
+      expect(parseQuickEntry('banca 4x10 62.5').weights, [62.5]);
+    });
+
+    test('y una coma en su lugar abre lista, no decimal', () {
+      // El intercambio, explícito: una descarga por set se escribe seguido, un
+      // peso fraccionario casi nunca. La celda de la tabla sigue aceptando
+      // coma cuando se edita a mano.
+      expect(parseQuickEntry('banca 2x10 62,5').weights, [62, 5]);
     });
   });
 

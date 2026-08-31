@@ -3604,7 +3604,7 @@
   "@routineEditorQuickEntryNoWeight": {},
   "routineEditorQuickEntryEmptyHint": "Buscá el ejercicio y tocalo. Después escribís 4x10 y el peso.",
   "@routineEditorQuickEntryEmptyHint": {},
-  "routineEditorQuickEntryPickedHint": "Escribí 4x10 y el peso. Con comas: 4x10, 8, 6, 4 baja las reps · 55, 45, 35, 25 baja el peso.",
+  "routineEditorQuickEntryPickedHint": "Escribí 4x10 y el peso. Con comas por set: 4x10,8,6,4 baja las reps · 55,45,35,25 baja el peso. Decimales con punto: 62.5",
   "@routineEditorQuickEntryPickedHint": {
     "description": "Ayuda una vez elegido el ejercicio: enseña las dos listas con un ejemplo de cada una."
   },

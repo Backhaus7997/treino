@@ -7326,7 +7326,7 @@ abstract class AppL10n {
   /// Ayuda una vez elegido el ejercicio: enseña las dos listas con un ejemplo de cada una.
   ///
   /// In es_AR, this message translates to:
-  /// **'Escribí 4x10 y el peso. Con comas: 4x10, 8, 6, 4 baja las reps · 55, 45, 35, 25 baja el peso.'**
+  /// **'Escribí 4x10 y el peso. Con comas por set: 4x10,8,6,4 baja las reps · 55,45,35,25 baja el peso. Decimales con punto: 62.5'**
   String get routineEditorQuickEntryPickedHint;
 
   /// Confirma la entrada rápida. Existe porque elegir el ejercicio dejó de agregarlo.

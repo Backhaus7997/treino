@@ -1742,7 +1742,7 @@
   "@routineEditorQuickEntryNoWeight": {},
   "routineEditorQuickEntryEmptyHint": "Search the exercise and tap it. Then type 4x10 and the weight.",
   "@routineEditorQuickEntryEmptyHint": {},
-  "routineEditorQuickEntryPickedHint": "Type 4x10 and the weight. With commas: 4x10, 8, 6, 4 drops the reps · 55, 45, 35, 25 drops the weight.",
+  "routineEditorQuickEntryPickedHint": "Type 4x10 and the weight. Commas per set: 4x10,8,6,4 drops the reps · 55,45,35,25 drops the weight. Decimals with a dot: 62.5",
   "@routineEditorQuickEntryPickedHint": {},
   "routineEditorQuickEntryAdd": "ADD",
   "@routineEditorQuickEntryAdd": {}

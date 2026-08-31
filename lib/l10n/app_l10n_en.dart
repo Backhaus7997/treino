@@ -4146,7 +4146,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get routineEditorQuickEntryPickedHint =>
-      'Type 4x10 and the weight. With commas: 4x10, 8, 6, 4 drops the reps · 55, 45, 35, 25 drops the weight.';
+      'Type 4x10 and the weight. Commas per set: 4x10,8,6,4 drops the reps · 55,45,35,25 drops the weight. Decimals with a dot: 62.5';
 
   @override
   String get routineEditorQuickEntryAdd => 'ADD';

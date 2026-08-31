@@ -101,11 +101,15 @@ class _SetCellFieldState extends State<SetCellField> {
     final palette = widget.palette;
     final tinta = widget.hasError ? palette.danger : palette.textPrimary;
     final enfocado = _foco.hasFocus;
+    // En REPOSO no hay borde. El contorno se leía como una línea oscura que
+    // cortaba la fila en vez de integrarla, y el relleno ya alcanza para que
+    // la celda se vea como una caja. El borde queda para lo que sí es un
+    // estado: la celda que se está editando, y la que está incompleta.
     final colorBorde = widget.hasError
         ? palette.danger
         : enfocado
             ? palette.accent
-            : palette.border;
+            : Colors.transparent;
 
     // MISMA construcción que `SetTypeChip`, no valores que casualmente
     // coinciden: un `Container` con `BoxDecoration` y las mismas

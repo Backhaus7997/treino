@@ -40,7 +40,10 @@ class SetTypeChip extends StatelessWidget {
       SetType.warmup => palette.accent.withAlpha(100),
       SetType.drop => palette.highlight.withAlpha(100),
       SetType.failure => palette.danger.withAlpha(100),
-      SetType.normal => palette.border,
+      // Sin borde en el tipo normal: mismo criterio que la celda de al lado.
+      // Los tipos especiales SÍ lo llevan — ahí el contorno de color es lo que
+      // los distingue de un set común de un vistazo.
+      SetType.normal => Colors.transparent,
     };
 
     return Semantics(

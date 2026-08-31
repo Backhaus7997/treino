@@ -4208,7 +4208,7 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get routineEditorQuickEntryPickedHint =>
-      'Escribí 4x10 y el peso. Con comas: 4x10, 8, 6, 4 baja las reps · 55, 45, 35, 25 baja el peso.';
+      'Escribí 4x10 y el peso. Con comas por set: 4x10,8,6,4 baja las reps · 55,45,35,25 baja el peso. Decimales con punto: 62.5';
 
   @override
   String get routineEditorQuickEntryAdd => 'AGREGAR';
@@ -8415,7 +8415,7 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get routineEditorQuickEntryPickedHint =>
-      'Escribí 4x10 y el peso. Con comas: 4x10, 8, 6, 4 baja las reps · 55, 45, 35, 25 baja el peso.';
+      'Escribí 4x10 y el peso. Con comas por set: 4x10,8,6,4 baja las reps · 55,45,35,25 baja el peso. Decimales con punto: 62.5';
 
   @override
   String get routineEditorQuickEntryAdd => 'AGREGAR';

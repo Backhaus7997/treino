@@ -89,16 +89,21 @@ class QuickEntry {
 /// lugar que la `x`, y una línea escrita con ella no puede fallar en silencio.
 final RegExp _kNumeroPorNumero = RegExp(r'(\d+)\s*[xX×]\s*(\d+)');
 
-/// El siguiente valor de una lista: `, 8` o `, 45`.
+/// El siguiente valor de una lista: `,45`, `, 45`.
 ///
-/// **La coma pide un espacio detrás a propósito.** La coma es a la vez el
-/// separador decimal de es-AR y el separador de esta lista: `60,5` son sesenta
-/// y medio, y `60, 45` son dos pesos. Sin el `\s+` obligatorio, `60,5` se leía
-/// como dos pesos de 60 y 5 — y el decimal, que ya funcionaba, se rompía.
-final RegExp _kResto = RegExp(r'^\s*,\s+(\d+(?:[.,]\d+)?)');
+/// **La coma SIEMPRE separa; el decimal es el punto.** La primera versión pedía
+/// un espacio detrás de la coma para poder distinguirla del decimal de es-AR
+/// —`60,5` contra `60, 45`—, y esa regla se rompió en device apenas se probó:
+/// escribir `55,45,35,25` de un tirón es lo natural en un teléfono, y el
+/// parser lo leía como un único peso de 55,45.
+///
+/// El intercambio está elegido: una descarga por set se escribe seguido, un
+/// peso fraccionario casi nunca. Quien necesite 62 y medio escribe `62.5`, y
+/// la celda de la tabla sigue aceptando coma cuando se edita a mano.
+final RegExp _kResto = RegExp(r'^\s*,\s*(\d+(?:\.\d+)?)');
 
-/// Un número suelto, con coma o punto decimal.
-final RegExp _kNumero = RegExp(r'^\s+(\d+(?:[.,]\d+)?)');
+/// Un número suelto. Decimal con punto — ver [_kResto].
+final RegExp _kNumero = RegExp(r'^\s+(\d+(?:\.\d+)?)');
 
 /// Tope de series que el parser acepta de una línea.
 ///
@@ -115,12 +120,16 @@ const int kMaxSetsEntradaRapida = 20;
 /// abre la siguiente.**
 ///
 /// ```
-/// banca 4x10                       4 sets · 10 reps
-/// banca 4x10 60                    4 sets · 10 reps · 60 kg
-/// banca 4x10, 8, 6, 4              4 sets · 10/8/6/4 reps       (pirámide)
-/// banca 4x10 55, 45, 35, 25        4 sets · 10 reps · descarga
-/// banca 4x10, 8, 6, 4  55, 45      4 sets · 10/8/6/4 · 55/45/45/45
+/// banca 4x10                     4 sets · 10 reps
+/// banca 4x10 60                  4 sets · 10 reps · 60 kg
+/// banca 4x10,8,6,4               4 sets · 10/8/6/4 reps        (pirámide)
+/// banca 4x10 55,45,35,25         4 sets · 10 reps · descarga
+/// banca 4x10,8,6,4 55,45         4 sets · 10/8/6/4 · 55/45/45/45
+/// banca 4x10 62.5                el decimal va con PUNTO
 /// ```
+///
+/// Los espacios después de las comas son opcionales: `55,45` y `55, 45` se
+/// leen igual.
 ///
 /// Nunca tira: una línea que no matchea devuelve la línea entera como búsqueda
 /// y la prescripción por defecto. Los valores se recortan a los topes del
@@ -149,7 +158,7 @@ QuickEntry parseQuickEntry(String input) {
   while (true) {
     final m = _kResto.firstMatch(texto.substring(cursor));
     if (m == null) break;
-    final n = int.tryParse(m.group(1)!.split(RegExp('[.,]')).first);
+    final n = int.tryParse(m.group(1)!.split('.').first);
     if (n == null) break;
     reps.add(n);
     cursor += m.end;
@@ -201,9 +210,8 @@ QuickEntry parseQuickEntry(String input) {
 
 double? _peso(String? raw) {
   if (raw == null) return null;
-  // Coma o punto: el teclado numérico de iOS ofrece coma en es-AR y el de
-  // Android punto. Los dos tienen que llegar al mismo double, igual que en
-  // `parseEditorWeight`.
+  // El `replaceAll` queda por si algún día el patrón vuelve a capturar comas:
+  // hoy no lo hace, porque la coma pasó a separar la lista. Ver [_kResto].
   final n = double.tryParse(raw.replaceAll(',', '.'));
   if (n == null || n <= 0) return null;
   return clampWeightKg(n);
