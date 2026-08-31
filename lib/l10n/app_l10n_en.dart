@@ -1946,7 +1946,10 @@ class AppL10nEn extends AppL10n {
 
   @override
   String routineEditorAccessoryContext(
-      String ejercicio, int set, String campo) {
+    String ejercicio,
+    int set,
+    String campo,
+  ) {
     return '$ejercicio · set $set · $campo';
   }
 
@@ -3077,7 +3080,10 @@ class AppL10nEn extends AppL10n {
 
   @override
   String dashboardAlertBannerSummary(
-      int vencidos, int solicitudes, int inactivos) {
+    int vencidos,
+    int solicitudes,
+    int inactivos,
+  ) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,
@@ -4061,4 +4067,59 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get sessionFeedbackLoadError => 'We could not load your reports.';
+
+  @override
+  String get routineEditorGoToProblem => 'GO';
+
+  @override
+  String get routineEditorGoToProblemA11y => 'Go to the first problem';
+
+  @override
+  String routineEditorFooterSummary(int dias, int sets) {
+    String _temp0 = intl.Intl.pluralLogic(
+      dias,
+      locale: localeName,
+      other: '$dias days',
+      one: '1 day',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      sets,
+      locale: localeName,
+      other: '$sets sets',
+      one: '1 set',
+    );
+    return '$_temp0 · $_temp1 · all set';
+  }
+
+  @override
+  String get routineEditorProblemMissingName => 'The plan needs a name';
+
+  @override
+  String get routineEditorProblemMissingSplit => 'The plan needs a split';
+
+  @override
+  String routineEditorProblemEmptyDay(int dia) {
+    return 'Day $dia: no exercises';
+  }
+
+  @override
+  String routineEditorProblemDuplicate(int dia) {
+    return 'Day $dia: repeated exercise';
+  }
+
+  @override
+  String routineEditorProblemIncompleteSets(int dia, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count incomplete sets',
+      one: '1 incomplete set',
+    );
+    return 'Day $dia: $_temp0';
+  }
+
+  @override
+  String routineEditorProblemOtherWeek(int semana, int dia) {
+    return 'Week $semana: day $dia incomplete';
+  }
 }

@@ -1995,7 +1995,10 @@ class AppL10nEs extends AppL10n {
 
   @override
   String routineEditorAccessoryContext(
-      String ejercicio, int set, String campo) {
+    String ejercicio,
+    int set,
+    String campo,
+  ) {
     return '$ejercicio · set $set · $campo';
   }
 
@@ -3132,7 +3135,10 @@ class AppL10nEs extends AppL10n {
 
   @override
   String dashboardAlertBannerSummary(
-      int vencidos, int solicitudes, int inactivos) {
+    int vencidos,
+    int solicitudes,
+    int inactivos,
+  ) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,
@@ -4123,6 +4129,61 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get sessionFeedbackLoadError => 'No pudimos cargar tus reportes.';
+
+  @override
+  String get routineEditorGoToProblem => 'IR';
+
+  @override
+  String get routineEditorGoToProblemA11y => 'Ir al primer problema';
+
+  @override
+  String routineEditorFooterSummary(int dias, int sets) {
+    String _temp0 = intl.Intl.pluralLogic(
+      dias,
+      locale: localeName,
+      other: '$dias días',
+      one: '1 día',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      sets,
+      locale: localeName,
+      other: '$sets sets',
+      one: '1 set',
+    );
+    return '$_temp0 · $_temp1 · todo listo';
+  }
+
+  @override
+  String get routineEditorProblemMissingName => 'Falta el nombre del plan';
+
+  @override
+  String get routineEditorProblemMissingSplit => 'Falta el split';
+
+  @override
+  String routineEditorProblemEmptyDay(int dia) {
+    return 'Día $dia: sin ejercicios';
+  }
+
+  @override
+  String routineEditorProblemDuplicate(int dia) {
+    return 'Día $dia: ejercicio repetido';
+  }
+
+  @override
+  String routineEditorProblemIncompleteSets(int dia, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sets sin completar',
+      one: '1 set sin completar',
+    );
+    return 'Día $dia: $_temp0';
+  }
+
+  @override
+  String routineEditorProblemOtherWeek(int semana, int dia) {
+    return 'Semana $semana: día $dia sin completar';
+  }
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -6116,7 +6177,10 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String routineEditorAccessoryContext(
-      String ejercicio, int set, String campo) {
+    String ejercicio,
+    int set,
+    String campo,
+  ) {
     return '$ejercicio · set $set · $campo';
   }
 
@@ -7251,7 +7315,10 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String dashboardAlertBannerSummary(
-      int vencidos, int solicitudes, int inactivos) {
+    int vencidos,
+    int solicitudes,
+    int inactivos,
+  ) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,
@@ -8241,4 +8308,59 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get sessionFeedbackLoadError => 'No pudimos cargar tus reportes.';
+
+  @override
+  String get routineEditorGoToProblem => 'IR';
+
+  @override
+  String get routineEditorGoToProblemA11y => 'Ir al primer problema';
+
+  @override
+  String routineEditorFooterSummary(int dias, int sets) {
+    String _temp0 = intl.Intl.pluralLogic(
+      dias,
+      locale: localeName,
+      other: '$dias días',
+      one: '1 día',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      sets,
+      locale: localeName,
+      other: '$sets sets',
+      one: '1 set',
+    );
+    return '$_temp0 · $_temp1 · todo listo';
+  }
+
+  @override
+  String get routineEditorProblemMissingName => 'Falta el nombre del plan';
+
+  @override
+  String get routineEditorProblemMissingSplit => 'Falta el split';
+
+  @override
+  String routineEditorProblemEmptyDay(int dia) {
+    return 'Día $dia: sin ejercicios';
+  }
+
+  @override
+  String routineEditorProblemDuplicate(int dia) {
+    return 'Día $dia: ejercicio repetido';
+  }
+
+  @override
+  String routineEditorProblemIncompleteSets(int dia, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sets sin completar',
+      one: '1 set sin completar',
+    );
+    return 'Día $dia: $_temp0';
+  }
+
+  @override
+  String routineEditorProblemOtherWeek(int semana, int dia) {
+    return 'Semana $semana: día $dia sin completar';
+  }
 }

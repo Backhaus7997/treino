@@ -43,6 +43,7 @@ import '../domain/set_spec.dart';
 import 'routine_editor_mode.dart';
 import 'widgets/duration_text_field.dart';
 import 'widgets/day_tab_bar.dart';
+import 'widgets/editor_footer_bar.dart';
 import 'widgets/empty_day_state.dart';
 import 'widgets/keyboard_accessory_bar.dart';
 import 'widgets/exercise_card.dart';
@@ -1246,6 +1247,126 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       }
     }
     return null;
+  }
+
+  /// TODOS los problemas que impiden guardar, en el orden en que un usuario
+  /// llena el formulario: nombre → un ejercicio por día → sin repetidos → sets
+  /// completos → semanas que no se ven.
+  ///
+  /// Hasta #868 sólo existía [_firstValidationError], porque la validación
+  /// corría al tocar guardar y salía por un `SnackBar`: un mensaje efímero no
+  /// tiene lugar para más de un problema. El pie sí, y decir "faltan dos
+  /// cosas" en vez de descubrirlas de a una es la diferencia entre corregir en
+  /// una pasada o en cuatro.
+  ///
+  /// Es PURO: lo llama `build` en cada frame de tipeo. Recorre los sets con
+  /// aritmética, sin construir widgets ni tocar estado — un plan grande son
+  /// ~240 sets, que es barato comparado con el árbol que ese mismo build arma.
+  List<({String mensaje, _EditableDay? dia})> _problemas(AppL10n l10n) {
+    final out = <({String mensaje, _EditableDay? dia})>[];
+
+    if (_nameController.text.trim().isEmpty) {
+      out.add((mensaje: l10n.routineEditorProblemMissingName, dia: null));
+    }
+    if (_isTrainerMode && _splitController.text.trim().isEmpty) {
+      out.add((mensaje: l10n.routineEditorProblemMissingSplit, dia: null));
+    }
+
+    for (final day in _days) {
+      final tieneEjercicio = day.slots.any((s) => s.exercise != null);
+      if (day.slots.isEmpty || !tieneEjercicio) {
+        out.add((
+          mensaje: l10n.routineEditorProblemEmptyDay(day.dayNumber),
+          dia: day,
+        ));
+        continue;
+      }
+      if (dayHasDuplicateExerciseId(
+        day.slots.where((s) => s.exercise != null).map((s) => s.exercise!.id),
+      )) {
+        out.add((
+          mensaje: l10n.routineEditorProblemDuplicate(day.dayNumber),
+          dia: day,
+        ));
+      }
+      // Sets incompletos de la semana EN CURSO. Los de otras semanas se
+      // cuentan aparte: nombrar "día 2" cuando el problema está en una semana
+      // que no se ve manda al usuario a mirar una tabla que está bien.
+      var incompletos = 0;
+      for (final slot in day.slots) {
+        if (!slot.isPresentInWeek(_selectedWeek)) continue;
+        final sets = slot.setsForWeek(_selectedWeek);
+        if (sets.isEmpty) {
+          incompletos++;
+          continue;
+        }
+        incompletos += sets
+            .where((s) => !isSetValid(s, slot.exerciseMode, slot.repMode))
+            .length;
+      }
+      if (incompletos > 0) {
+        out.add((
+          mensaje: l10n.routineEditorProblemIncompleteSets(
+              incompletos, day.dayNumber),
+          dia: day,
+        ));
+      }
+    }
+
+    // Semanas que no están a la vista. Desde #866 el chip de semana vive
+    // dentro de la hoja del engranaje, así que si no se dice acá el guardado
+    // queda bloqueado sin ninguna explicación en pantalla.
+    final rotas = _invalidWeekFirstDay;
+    for (final semana in rotas.keys.where((w) => w != _selectedWeek).toList()
+      ..sort()) {
+      out.add((
+        mensaje: l10n.routineEditorProblemOtherWeek(
+            rotas[semana]!, semana + 1),
+        dia: null,
+      ));
+    }
+    return out;
+  }
+
+  /// El resumen del pie cuando no falta nada: `2 días · 41 sets · todo listo`.
+  ///
+  /// Cuenta los sets de la semana en curso y sólo de los slots presentes en
+  /// ella (ADR-WPRES): un slot borrado "sólo de esta semana" sigue en el
+  /// modelo y contarlo daría un número que no coincide con lo que se ve.
+  String _resumenPie(AppL10n l10n) {
+    var sets = 0;
+    for (final day in _days) {
+      for (final slot in day.slots) {
+        if (!slot.isPresentInWeek(_selectedWeek)) continue;
+        sets += slot.setsForWeek(_selectedWeek).length;
+      }
+    }
+    return l10n.routineEditorFooterSummary(sets, _days.length);
+  }
+
+  /// Lleva al usuario al día [dia]: lo selecciona y lo trae a la vista.
+  ///
+  /// Con pestañas, "llevar al error" es SELECCIONAR el día, no expandirlo: si
+  /// el día ofensor no es el visible, su contenido ni siquiera está en el
+  /// árbol y el scroll no tiene a dónde ir.
+  void _irAlDia(_EditableDay dia) {
+    final indice = _days.indexOf(dia);
+    if (indice < 0) return;
+    if (indice != _selectedDayIndex) {
+      FocusManager.instance.primaryFocus?.unfocus();
+      setState(() => _selectedDayIndex = indice);
+    }
+    // Esperar un frame a que el día nuevo se monte antes de scrollear.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final key = _keyForDay(dia);
+      if (key.currentContext == null) return;
+      Scrollable.ensureVisible(
+        key.currentContext!,
+        duration: AppMotion.slow,
+        curve: AppMotion.emphasized,
+        alignment: 0.1,
+      );
+    });
   }
 
   /// Resolves the FIRST unmet save requirement into a specific, actionable
@@ -2697,42 +2818,30 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                 ),
               ),
 
-              // ── Submit button — pinned outside ListView ───────────────
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: !_submitting ? () => _submit() : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: palette.accent,
-                      foregroundColor: TreinoButtonTokens.foreground(context),
-                      disabledBackgroundColor: palette.accent.withAlpha(80),
-                      minimumSize: const Size.fromHeight(48),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.full),
-                      ),
-                    ),
-                    child: _submitting
-                        ? SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: TreinoButtonTokens.foreground(context),
-                            ),
-                          )
-                        : Text(
-                            _submitLabelFor(widget.mode, l10n),
-                            style: GoogleFonts.barlowCondensed(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
-                              letterSpacing: 0.8,
-                            ),
-                          ),
-                  ),
-                ),
-              ),
+              // ── Pie fijo: qué falta + guardar ────────────────────────
+              // Fuera del ListView, como estaba el CTA. Lo que se suma es la
+              // línea de validación EN VIVO: hasta #868 el usuario cargaba
+              // todo el plan y recién al tocar guardar se enteraba, por un
+              // SnackBar que además tapaba la pantalla.
+              Builder(builder: (context) {
+                final problemas = _problemas(l10n);
+                // Los dos primeros: la línea tiene dos renglones, y una lista
+                // de siete problemas deja de leerse como una lista de tareas.
+                final visibles =
+                    problemas.take(2).map((p) => p.mensaje).toList();
+                final primerDia =
+                    problemas.map((p) => p.dia).whereType<_EditableDay>();
+                return EditorFooterBar(
+                  summary: _resumenPie(l10n),
+                  problems: visibles,
+                  submitLabel: _submitLabelFor(widget.mode, l10n),
+                  submitting: _submitting,
+                  onSubmit: () => _submit(),
+                  onGoToProblem: primerDia.isEmpty
+                      ? null
+                      : () => _irAlDia(primerDia.first),
+                );
+              }),
             ],
           ),
         ),
@@ -3773,15 +3882,18 @@ class _SlotEditorState extends State<_SlotEditor> {
       expanded: _expanded,
       hasError: hasMissingPrescription,
       supersetPosition: widget.supersetPosition,
-      // Una card con error TAMBIÉN se puede colapsar: el resumen colapsado ya
-      // dice cuántos sets están mal, en `danger`, y el borde de la card sigue
-      // rojo. Trabar la cabecera para "proteger" al usuario sólo hace que el
-      // tap no responda y parezca rota.
+      // Una card con problemas TAMBIÉN se puede colapsar: el resumen colapsado
+      // sigue diciendo cuántos sets están sin completar. Trabar la cabecera
+      // para "proteger" al usuario sólo hace que el tap no responda y parezca
+      // rota.
       onToggle: () => setState(() => _expanded = !_expanded),
       summary: PrescriptionChips(
         prescription: summary,
         rest: hasMissingPrescription ? null : _restSummary(slot.restSeconds),
-        hasError: hasMissingPrescription,
+        // El resumen DICE cuántos sets faltan, pero ya no lo pinta de rojo:
+        // desde #868 las señales de error son tres —celda, punto de la
+        // pestaña, pie— y ésta era la cuarta, a 40 px de la celda que ya lo
+        // marca con más precisión.
       ),
       menu: Transform.translate(
         offset: const Offset(AppSpacing.s8, -AppSpacing.s8),

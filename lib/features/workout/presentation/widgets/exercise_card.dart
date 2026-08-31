@@ -82,10 +82,15 @@ class ExerciseCard extends StatelessWidget {
             decoration: BoxDecoration(
               color: palette.bg,
               borderRadius: BorderRadius.circular(AppRadius.sm),
-              border: Border.all(
-                color:
-                    hasError ? palette.danger.withAlpha(128) : palette.border,
-              ),
+              // El borde NO se pinta de rojo aunque [hasError] sea true. Un
+              // campo vacío llegó a marcar cinco cosas a la vez —celda, card,
+              // meta, punto de la pestaña y ahora el pie—, y con 3 días × 5
+              // ejercicios eso es una pantalla en rojo donde ninguna señal
+              // manda. Quedan tres, una por escala: la CELDA dice qué campo
+              // falta, el PUNTO de la pestaña en qué día está, y el PIE cuántos
+              // quedan y cómo llegar. [hasError] sigue existiendo porque es lo
+              // que hace que una card con problemas nazca desplegada.
+              border: Border.all(color: palette.border),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
