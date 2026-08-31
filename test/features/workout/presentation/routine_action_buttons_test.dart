@@ -10,6 +10,7 @@
 // del componente, y montar la pantalla entera para medir un alto agrega 5.000
 // líneas de superficie a un test que sólo mira una caja.
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/l10n/app_l10n.dart';
@@ -41,6 +42,17 @@ Future<void> _montar(
   );
   await tester.pumpAndSettle();
 }
+
+/// El nodo semántico del botón con [key].
+///
+/// `getSemantics(find.byKey(...))` no sirve acá: la key está en el widget
+/// externo, cuyo `SizedBox` no produce semántica propia, así que el finder sube
+/// hasta la raíz y devuelve el nodo de la pantalla entera. El nodo del botón
+/// cuelga del `MergeSemantics` que junta rol y label.
+Finder _nodoDe(Key key) => find.descendant(
+      of: find.byKey(key),
+      matching: find.byType(MergeSemantics),
+    );
 
 void main() {
   group('DayActionButtons — una sola geometría para las dos acciones', () {
@@ -138,6 +150,97 @@ void main() {
 
       expect(find.byKey(const Key('day_add_exercise_button')), findsOneWidget);
       expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('semántica — los tres se anuncian como BOTÓN', () {
+    // Regresión de #869: al cambiar `TextButton.icon` por `InkWell` se perdió
+    // el rol de botón, y un lector de pantalla los leía como texto que se puede
+    // tocar. El rol lo daba el widget de Material que estos reemplazan, así que
+    // hay que reponerlo a mano.
+    testWidgets('las dos acciones del día', (tester) async {
+      final handle = tester.ensureSemantics();
+      await _montar(
+        tester,
+        DayActionButtons(
+          exerciseLabel: 'Agregar ejercicio',
+          onAddExercise: () {},
+          supersetLabel: '+ Superserie',
+          onAddSuperset: () {},
+        ),
+      );
+
+      expect(
+        tester.getSemantics(_nodoDe(const Key('day_add_exercise_button'))),
+        matchesSemantics(
+          isButton: true,
+          isEnabled: true,
+          hasEnabledState: true,
+          hasTapAction: true,
+          hasFocusAction: true,
+          isFocusable: true,
+          label: 'Agregar ejercicio',
+        ),
+      );
+      expect(
+        tester.getSemantics(_nodoDe(const Key('add_superset_button'))),
+        matchesSemantics(
+          isButton: true,
+          isEnabled: true,
+          hasEnabledState: true,
+          hasTapAction: true,
+          hasFocusAction: true,
+          isFocusable: true,
+          label: '+ Superserie',
+        ),
+      );
+      handle.dispose();
+    });
+
+    testWidgets('+ Agregar set', (tester) async {
+      final handle = tester.ensureSemantics();
+      await _montar(
+        tester,
+        AddSetButton(
+          key: const Key('add_set_button'),
+          label: '+ Agregar set',
+          onPressed: () {},
+        ),
+      );
+
+      expect(
+        tester.getSemantics(_nodoDe(const Key('add_set_button'))),
+        matchesSemantics(
+          isButton: true,
+          isEnabled: true,
+          hasEnabledState: true,
+          hasTapAction: true,
+          hasFocusAction: true,
+          isFocusable: true,
+          label: '+ Agregar set',
+        ),
+      );
+      handle.dispose();
+    });
+
+    testWidgets('un botón sin callback se anuncia deshabilitado',
+        (tester) async {
+      final handle = tester.ensureSemantics();
+      await _montar(
+        tester,
+        const DayActionButtons(
+          exerciseLabel: 'Agregar ejercicio',
+          onAddExercise: null,
+        ),
+      );
+
+      final s =
+          tester.getSemantics(_nodoDe(const Key('day_add_exercise_button')));
+      expect(s.hasFlag(SemanticsFlag.isButton), isTrue);
+      expect(s.hasFlag(SemanticsFlag.isEnabled), isFalse,
+          reason: 'sin callback el botón no hace nada: decirlo es la mitad '
+              'del trabajo de la semántica');
+      handle.dispose();
     });
   });
 

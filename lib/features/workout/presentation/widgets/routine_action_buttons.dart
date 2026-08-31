@@ -137,29 +137,40 @@ class AddSetButton extends StatelessWidget {
         painter: _ContornoPunteado(
           color: palette.accentText.withAlpha(_kContornoPunteado),
         ),
-        child: Material(
-          type: MaterialType.transparency,
-          child: InkWell(
-            onTap: onPressed,
-            borderRadius: BorderRadius.circular(AppRadius.sm),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(TreinoIcon.plus, size: 14, color: palette.accentText),
-                const SizedBox(width: AppSpacing.hairline),
-                Flexible(
-                  child: Text(
-                    label,
-                    style: GoogleFonts.barlowCondensed(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                      color: palette.accentText,
+        // Un `InkWell` pelado se anuncia como texto que se puede tocar, no como
+        // botón: el rol venía del `TextButton.icon` que este widget reemplaza,
+        // y sin él un lector de pantalla pierde que esto es una acción. El
+        // `MergeSemantics` junta rol y label en un nodo, como hace un botón de
+        // Material. Lo encontró el bot de review en el PR de #869.
+        child: MergeSemantics(
+          child: Semantics(
+            button: true,
+            enabled: onPressed != null,
+            child: Material(
+              type: MaterialType.transparency,
+              child: InkWell(
+                onTap: onPressed,
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(TreinoIcon.plus, size: 14, color: palette.accentText),
+                    const SizedBox(width: AppSpacing.hairline),
+                    Flexible(
+                      child: Text(
+                        label,
+                        style: GoogleFonts.barlowCondensed(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          color: palette.accentText,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),
@@ -192,32 +203,40 @@ class _BotonAccion extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       height: _kAltoAccion,
-      child: Material(
-        color: relleno,
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        child: InkWell(
-          onTap: onPressed,
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(icon, size: 14, color: colorIcono),
-                const SizedBox(width: AppSpacing.hairline),
-                Flexible(
-                  child: Text(
-                    label,
-                    style: GoogleFonts.barlowCondensed(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                      color: tinta,
+      // Ver la nota de [AddSetButton]: el rol de botón lo daba el
+      // `TextButton.icon` anterior y hay que reponerlo a mano.
+      child: MergeSemantics(
+        child: Semantics(
+          button: true,
+          enabled: onPressed != null,
+          child: Material(
+            color: relleno,
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            child: InkWell(
+              onTap: onPressed,
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(icon, size: 14, color: colorIcono),
+                    const SizedBox(width: AppSpacing.hairline),
+                    Flexible(
+                      child: Text(
+                        label,
+                        style: GoogleFonts.barlowCondensed(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          color: tinta,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),
