@@ -3552,5 +3552,37 @@
   "coachSessionFeedbackLoadError": "No pudimos cargar los reportes del alumno.",
   "@coachSessionFeedbackLoadError": {"description": "Error al cargar el feedback por ejercicio en las superficies del PF."},
   "sessionFeedbackLoadError": "No pudimos cargar tus reportes.",
-  "@sessionFeedbackLoadError": {"description": "Mismo fallo que coachSessionFeedbackLoadError pero en la superficie del PROPIO alumno: ahi los reportes son suyos, no 'del alumno'."}
+  "@sessionFeedbackLoadError": {"description": "Mismo fallo que coachSessionFeedbackLoadError pero en la superficie del PROPIO alumno: ahi los reportes son suyos, no 'del alumno'."},
+  "routineEditorGoToProblem": "IR",
+  "@routineEditorGoToProblem": {
+    "description": "Botón del pie que salta al primer día con un problema."
+  },
+  "routineEditorGoToProblemA11y": "Ir al primer problema",
+  "@routineEditorGoToProblemA11y": {},
+  "routineEditorFooterSummary": "{dias, plural, =1{1 día} other{{dias} días}} · {sets, plural, =1{1 set} other{{sets} sets}} · todo listo",
+  "@routineEditorFooterSummary": {
+    "description": "Resumen del pie cuando el plan está completo.",
+    "placeholders": {"dias": {"type": "int"}, "sets": {"type": "int"}}
+  },
+  "routineEditorProblemMissingName": "Falta el nombre del plan",
+  "@routineEditorProblemMissingName": {},
+  "routineEditorProblemMissingSplit": "Falta el split",
+  "@routineEditorProblemMissingSplit": {},
+  "routineEditorProblemEmptyDay": "Día {dia}: sin ejercicios",
+  "@routineEditorProblemEmptyDay": {
+    "placeholders": {"dia": {"type": "int"}}
+  },
+  "routineEditorProblemDuplicate": "Día {dia}: ejercicio repetido",
+  "@routineEditorProblemDuplicate": {
+    "placeholders": {"dia": {"type": "int"}}
+  },
+  "routineEditorProblemIncompleteSets": "Día {dia}: {count, plural, =1{1 set sin completar} other{{count} sets sin completar}}",
+  "@routineEditorProblemIncompleteSets": {
+    "description": "Un set incompleto es uno sin repeticiones (o sin tiempo, en modo duración).",
+    "placeholders": {"dia": {"type": "int"}, "count": {"type": "int"}}
+  },
+  "routineEditorProblemOtherWeek": "Semana {semana}: día {dia} sin completar",
+  "@routineEditorProblemOtherWeek": {
+    "placeholders": {"semana": {"type": "int"}, "dia": {"type": "int"}}
+  }
 }

@@ -84,8 +84,9 @@ void main() {
     'dark': AppPalette.mintMagenta,
     'light': AppPalette.mintMagentaLight,
   }.entries) {
-    testWidgets('${entry.key}: con error el borde de la card es danger',
-        (tester) async {
+    testWidgets(
+        '${entry.key}: el borde de la card NO cambia con error — #868 dejó '
+        'tres señales, no cinco', (tester) async {
       final palette = entry.value;
       Future<BoxDecoration> bordeCon({required bool hasError}) async {
         await tester.pumpWidget(
@@ -107,13 +108,24 @@ void main() {
       final conError = await bordeCon(hasError: true);
       final sinError = await bordeCon(hasError: false);
 
+      // Este test afirmaba lo contrario hasta #868. Un campo de reps vacío
+      // llegó a marcar CINCO cosas a la vez —celda, borde de la card, texto de
+      // su meta, punto de la pestaña y el pie—, y con 3 días × 5 ejercicios eso
+      // es una pantalla en rojo donde ninguna señal manda. Quedan tres, una por
+      // escala: la CELDA dice qué campo falta, el PUNTO de la pestaña en qué
+      // día está, y el PIE cuántos quedan y cómo llegar.
       expect(
         (conError.border! as Border).top.color,
-        palette.danger.withAlpha(128),
-        reason: 'Un ejercicio con sets sin reps tiene que verse desde el '
-            'scroll, sin abrir la card.',
+        palette.border,
+        reason: 'la card ya no se pinta: quien marca el campo es la celda, a '
+            '40 px de acá y con más precisión',
       );
       expect((sinError.border! as Border).top.color, palette.border);
+      expect(
+        (conError.border! as Border).top.color,
+        (sinError.border! as Border).top.color,
+        reason: 'con y sin error el borde es el mismo',
+      );
     });
   }
 }

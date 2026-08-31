@@ -63,7 +63,7 @@ import 'app_l10n_es.dart';
 /// property.
 abstract class AppL10n {
   AppL10n(String locale)
-      : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+    : localeName = intl.Intl.canonicalizedLocale(locale.toString());
 
   final String localeName;
 
@@ -85,17 +85,17 @@ abstract class AppL10n {
   /// of delegates is preferred or required.
   static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
       <LocalizationsDelegate<dynamic>>[
-    delegate,
-    GlobalMaterialLocalizations.delegate,
-    GlobalCupertinoLocalizations.delegate,
-    GlobalWidgetsLocalizations.delegate,
-  ];
+        delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ];
 
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[
     Locale('en'),
     Locale('es'),
-    Locale('es', 'AR')
+    Locale('es', 'AR'),
   ];
 
   /// No description provided for @notFoundTitle.
@@ -5593,7 +5593,10 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'{vencidos, plural, =1{1 vencido} other{{vencidos} vencidos}} · {solicitudes, plural, =1{1 solicitud} other{{solicitudes} solicitudes}} · {inactivos, plural, =1{1 inactivo} other{{inactivos} inactivos}}'**
   String dashboardAlertBannerSummary(
-      int vencidos, int solicitudes, int inactivos);
+    int vencidos,
+    int solicitudes,
+    int inactivos,
+  );
 
   /// Formatted adherencia percentage value shown in the adherencia ring and KPI tile once the aggregate provider has data.
   ///
@@ -7232,6 +7235,60 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'No pudimos cargar tus reportes.'**
   String get sessionFeedbackLoadError;
+
+  /// Botón del pie que salta al primer día con un problema.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'IR'**
+  String get routineEditorGoToProblem;
+
+  /// No description provided for @routineEditorGoToProblemA11y.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ir al primer problema'**
+  String get routineEditorGoToProblemA11y;
+
+  /// Resumen del pie cuando el plan está completo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{dias, plural, =1{1 día} other{{dias} días}} · {sets, plural, =1{1 set} other{{sets} sets}} · todo listo'**
+  String routineEditorFooterSummary(int dias, int sets);
+
+  /// No description provided for @routineEditorProblemMissingName.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Falta el nombre del plan'**
+  String get routineEditorProblemMissingName;
+
+  /// No description provided for @routineEditorProblemMissingSplit.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Falta el split'**
+  String get routineEditorProblemMissingSplit;
+
+  /// No description provided for @routineEditorProblemEmptyDay.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Día {dia}: sin ejercicios'**
+  String routineEditorProblemEmptyDay(int dia);
+
+  /// No description provided for @routineEditorProblemDuplicate.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Día {dia}: ejercicio repetido'**
+  String routineEditorProblemDuplicate(int dia);
+
+  /// Un set incompleto es uno sin repeticiones (o sin tiempo, en modo duración).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Día {dia}: {count, plural, =1{1 set sin completar} other{{count} sets sin completar}}'**
+  String routineEditorProblemIncompleteSets(int dia, int count);
+
+  /// No description provided for @routineEditorProblemOtherWeek.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Semana {semana}: día {dia} sin completar'**
+  String routineEditorProblemOtherWeek(int semana, int dia);
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {
@@ -7272,8 +7329,9 @@ AppL10n lookupAppL10n(Locale locale) {
   }
 
   throw FlutterError(
-      'AppL10n.delegate failed to load unsupported locale "$locale". This is likely '
-      'an issue with the localizations generation tool. Please file an issue '
-      'on GitHub with a reproducible sample app and the gen-l10n configuration '
-      'that was used.');
+    'AppL10n.delegate failed to load unsupported locale "$locale". This is likely '
+    'an issue with the localizations generation tool. Please file an issue '
+    'on GitHub with a reproducible sample app and the gen-l10n configuration '
+    'that was used.',
+  );
 }
