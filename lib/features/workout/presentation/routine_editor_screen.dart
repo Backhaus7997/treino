@@ -46,12 +46,14 @@ import 'widgets/day_tab_bar.dart';
 import 'widgets/empty_day_state.dart';
 import 'widgets/exercise_card.dart';
 import 'widgets/prescription_chips.dart';
+import 'widgets/routine_action_buttons.dart';
 import 'widgets/set_cell_field.dart';
 // `parseEditorWeight` se mudó junto al campo que parsea. Se re-exporta desde
 // acá porque `routine_editor_kg_decimal_test.dart` lo importa por esta ruta
 // desde antes de que la celda fuera un widget propio, y su contrato no cambió.
 export 'widgets/set_cell_field.dart' show parseEditorWeight;
 import 'widgets/set_type_chip.dart';
+import 'widgets/superset_block.dart';
 
 // ── Presence-aware delete / add scope enums ───────────────────────────────────
 
@@ -3423,50 +3425,30 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
                   )
                 else
                   ..._buildSlotRows(palette),
-                // Add slot button
-                SizedBox(
-                  width: double.infinity,
-                  child: TextButton.icon(
-                    onPressed: widget.onAddSlot,
-                    icon:
-                        Icon(TreinoIcon.plus, size: 14, color: palette.accent),
-                    label: Text(
-                      l10n.routineEditorAddExercise,
-                      style: GoogleFonts.barlowCondensed(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                        color: palette.accent,
-                      ),
-                    ),
-                    style: TextButton.styleFrom(
-                      minimumSize: const Size.fromHeight(44),
-                      alignment: Alignment.centerLeft,
-                    ),
-                  ),
+                // Acciones del día. Eran dos TextButton apilados a ancho
+                // completo, cada uno con su padding heredado; ahora comparten
+                // fila, alto y radio.
+                DayActionButtons(
+                  exerciseLabel: l10n.routineEditorAddExercise,
+                  onAddExercise: widget.onAddSlot,
+                  supersetLabel:
+                      widget.allowSuperset ? l10n.coachEditorAddSuperset : null,
+                  onAddSuperset: widget.onAddSuperset,
                 ),
-                // "+ Superserie" button — trainer mode only
-                if (widget.allowSuperset)
-                  SizedBox(
-                    width: double.infinity,
-                    child: TextButton.icon(
-                      key: const Key('add_superset_button'),
-                      onPressed: widget.onAddSuperset,
-                      icon: Icon(TreinoIcon.streak,
-                          size: 14, color: palette.highlight),
-                      label: Text(
-                        l10n.coachEditorAddSuperset,
-                        style: GoogleFonts.barlowCondensed(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                          color: palette.highlight,
-                        ),
-                      ),
-                      style: TextButton.styleFrom(
-                        minimumSize: const Size.fromHeight(44),
-                        alignment: Alignment.centerLeft,
-                      ),
+                // Los atajos del ⋮ no los descubría nadie: el menú no se ve
+                // hasta que se toca.
+                if (_slotsVisibles.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.s8),
+                  Text(
+                    l10n.routineEditorSlotMenuHint,
+                    key: const Key('slot_menu_hint'),
+                    style: GoogleFonts.barlow(
+                      fontWeight: FontWeight.w400,
+                      fontSize: 11,
+                      color: palette.textFaint,
                     ),
                   ),
+                ],
               ],
             ),
           ),
@@ -3532,92 +3514,65 @@ class _SupersetGroupCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-      decoration: BoxDecoration(
-        color: palette.highlight.withAlpha(12),
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: Border.all(color: palette.highlight.withAlpha(120)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header row
-          Row(
-            children: [
-              Icon(TreinoIcon.streak, size: 15, color: palette.highlight),
-              const SizedBox(width: 6),
-              Text(
-                'SUPERSERIE',
-                style: GoogleFonts.barlowCondensed(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                  letterSpacing: 1.2,
-                  color: palette.highlight,
-                ),
-              ),
-              if (onMoveUp != null || onMoveDown != null) ...[
-                const Spacer(),
-                _MoveButtons(
-                  palette: palette,
-                  canMoveUp: canMoveUp,
-                  canMoveDown: canMoveDown,
-                  onMoveUp: onMoveUp,
-                  onMoveDown: onMoveDown,
-                ),
-              ],
-            ],
-          ),
-          const SizedBox(height: 10),
-          // Slot editors stacked
-          for (var mi = 0; mi < groupSlots.length; mi++) ...[
-            _SlotEditor(
-              key: ObjectKey(groupSlots[mi].slot),
-              slot: groupSlots[mi].slot,
-              week: week,
+    return SupersetBlock(
+      count: groupSlots.length,
+      trailing: (onMoveUp != null || onMoveDown != null)
+          ? _MoveButtons(
               palette: palette,
-              onRemove: () => onRemoveSlot(groupSlots[mi].index),
-              onChanged: onChanged,
-              onReplaceExercise: (ex) =>
-                  onReplaceExercise(groupSlots[mi].slot, ex),
-              canMoveUp: mi > 0,
-              canMoveDown: mi < groupSlots.length - 1,
-              // Each record carries its ORIGINAL flat index — required now
-              // that absent-in-week members are filtered out of groupSlots.
-              onMoveUp: mi > 0
-                  ? () => onMoveSlotInGroup(groupSlots[mi].index, -1)
-                  : null,
-              onMoveDown: mi < groupSlots.length - 1
-                  ? () => onMoveSlotInGroup(groupSlots[mi].index, 1)
-                  : null,
-              onCopyPrevious: onCopyPreviousFor?.call(groupSlots[mi].index),
-              hasSlotError: slotIsValid != null
-                  ? !slotIsValid!(groupSlots[mi].slot)
-                  : false,
-              isTrainerMode: isTrainerMode,
-            ),
-            if (mi < groupSlots.length - 1) const SizedBox(height: 8),
-          ],
-          const SizedBox(height: 4),
-          // Add another exercise into THIS superset block.
-          TextButton.icon(
-            onPressed: onAddExercise,
-            icon: Icon(TreinoIcon.plus, size: 14, color: palette.highlight),
-            label: Text(
-              AppL10n.of(context).routineEditorAddExercise,
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-                color: palette.highlight,
-              ),
-            ),
-            style: TextButton.styleFrom(
-              minimumSize: const Size.fromHeight(44),
-              alignment: Alignment.centerLeft,
-            ),
+              canMoveUp: canMoveUp,
+              canMoveDown: canMoveDown,
+              onMoveUp: onMoveUp,
+              onMoveDown: onMoveDown,
+            )
+          : null,
+      footer: TextButton.icon(
+        onPressed: onAddExercise,
+        icon: Icon(TreinoIcon.plus, size: 14, color: palette.accentText),
+        label: Text(
+          AppL10n.of(context).routineEditorAddExercise,
+          style: GoogleFonts.barlowCondensed(
+            fontWeight: FontWeight.w600,
+            fontSize: 14,
+            color: palette.accentText,
           ),
-        ],
+        ),
+        style: TextButton.styleFrom(
+          minimumSize: const Size.fromHeight(48),
+          alignment: Alignment.centerLeft,
+        ),
       ),
+      children: [
+        for (var mi = 0; mi < groupSlots.length; mi++) ...[
+          _SlotEditor(
+            key: ObjectKey(groupSlots[mi].slot),
+            slot: groupSlots[mi].slot,
+            week: week,
+            palette: palette,
+            supersetPosition: mi,
+            onRemove: () => onRemoveSlot(groupSlots[mi].index),
+            onChanged: onChanged,
+            onReplaceExercise: (ex) =>
+                onReplaceExercise(groupSlots[mi].slot, ex),
+            canMoveUp: mi > 0,
+            canMoveDown: mi < groupSlots.length - 1,
+            // Each record carries its ORIGINAL flat index — required now
+            // that absent-in-week members are filtered out of groupSlots.
+            onMoveUp: mi > 0
+                ? () => onMoveSlotInGroup(groupSlots[mi].index, -1)
+                : null,
+            onMoveDown: mi < groupSlots.length - 1
+                ? () => onMoveSlotInGroup(groupSlots[mi].index, 1)
+                : null,
+            onCopyPrevious: onCopyPreviousFor?.call(groupSlots[mi].index),
+            hasSlotError: slotIsValid != null
+                ? !slotIsValid!(groupSlots[mi].slot)
+                : false,
+            isTrainerMode: isTrainerMode,
+          ),
+          if (mi < groupSlots.length - 1)
+            const SizedBox(height: AppSpacing.s8),
+        ],
+      ],
     );
   }
 }
@@ -3690,6 +3645,7 @@ class _SlotEditor extends StatefulWidget {
     this.onCopyPrevious,
     this.hasSlotError = false,
     this.isTrainerMode = false,
+    this.supersetPosition,
   });
 
   final _EditableSlot slot;
@@ -3725,6 +3681,11 @@ class _SlotEditor extends StatefulWidget {
   /// When true, shows trainer-only fields (e.g. coaching note).
   /// Defaults to false (fail-closed). REQ-EN-002.
   final bool isTrainerMode;
+
+  /// Posición 0-based dentro de la superserie que lo contiene, o null si el
+  /// ejercicio es suelto. La card lo usa para el badge A1/A2 y para teñir el
+  /// agarre.
+  final int? supersetPosition;
 
   @override
   State<_SlotEditor> createState() => _SlotEditorState();
@@ -3778,6 +3739,7 @@ class _SlotEditorState extends State<_SlotEditor> {
       title: slot.exercise?.name ?? l10n.coachExercisePicker,
       expanded: _expanded,
       hasError: hasMissingPrescription,
+      supersetPosition: widget.supersetPosition,
       // Una card con error TAMBIÉN se puede colapsar: el resumen colapsado ya
       // dice cuántos sets están mal, en `danger`, y el borde de la card sigue
       // rojo. Trabar la cabecera para "proteger" al usuario sólo hace que el
@@ -3934,32 +3896,17 @@ class _SlotEditorState extends State<_SlotEditor> {
 
           // ── "+ Agregar set" button ─────────────────────────────────────────
           const SizedBox(height: 6),
-          SizedBox(
-            width: double.infinity,
-            child: TextButton.icon(
-              key: const Key('add_set_button'),
-              onPressed: () {
-                setState(() {
-                  final template =
-                      sets.isNotEmpty ? sets.last.clone() : _EditableSet();
-                  sets.add(template);
-                });
-                widget.onChanged();
-              },
-              icon: Icon(TreinoIcon.plus, size: 14, color: palette.accent),
-              label: Text(
-                l10n.routineEditorAddSet,
-                style: GoogleFonts.barlowCondensed(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                  color: palette.accent,
-                ),
-              ),
-              style: TextButton.styleFrom(
-                minimumSize: const Size.fromHeight(44),
-                alignment: Alignment.centerLeft,
-              ),
-            ),
+          AddSetButton(
+            key: const Key('add_set_button'),
+            label: l10n.routineEditorAddSet,
+            onPressed: () {
+              setState(() {
+                final template =
+                    sets.isNotEmpty ? sets.last.clone() : _EditableSet();
+                sets.add(template);
+              });
+              widget.onChanged();
+            },
           ),
         ],
       ),

@@ -677,6 +677,19 @@
   "@routineEditorSlotMenuMoveDown": {},
   "routineEditorSlotMenuRemove": "Remove",
   "@routineEditorSlotMenuRemove": {},
+  "routineEditorSupersetHeader": "SUPERSET · {count} {count, plural, =1{EXERCISE} other{EXERCISES}}",
+  "@routineEditorSupersetHeader": {
+    "description": "Header of the superset block in the routine editor, with how many exercises it groups.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "routineEditorSlotMenuHint": "The ⋮ on each exercise has replace, copy sets and move.",
+  "@routineEditorSlotMenuHint": {
+    "description": "Helper line below the day actions: surfaces the shortcuts living in each exercise's overflow menu."
+  },
   "routineEditorRestLabel": "Rest",
   "@routineEditorRestLabel": {},
   "routineEditorAddSet": "+ Add set",
