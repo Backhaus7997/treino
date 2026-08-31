@@ -1,0 +1,655 @@
+#!/usr/bin/env python3
+"""Genera docs/legal/guia-legal-treino.pdf — la guia de decisiones y tramites.
+
+Uso:
+    python3 scripts/build_legal_guide_pdf.py
+
+Requiere reportlab. El contenido vive en CONTENT, abajo: para actualizar la
+guia se edita esa lista, no el codigo de layout.
+
+IMPORTANTE: las fuentes Type1 de reportlab codifican en WinAnsi (CP1252). No
+metas flechas, tildes de verificacion ni emoji: salen como cuadrados negros.
+Usa "->", "[OK]", "[!]" y el bullet "•", que si estan en CP1252.
+"""
+
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_JUSTIFY
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import mm
+from reportlab.platypus import (
+    BaseDocTemplate, Frame, KeepTogether, NextPageTemplate, PageBreak,
+    PageTemplate, Paragraph, Spacer, Table, TableStyle,
+)
+
+OUT = "docs/legal/guia-legal-treino.pdf"
+
+INK = colors.HexColor("#0A0A0A")
+MUTED = colors.HexColor("#5A5A5A")
+RULE = colors.HexColor("#D8D8D8")
+ACCENT = colors.HexColor("#0F9C6B")   # mint oscurecido: legible sobre blanco
+MAGENTA = colors.HexColor("#8B1A9E")
+BAND = colors.HexColor("#F4F4F4")
+WARNBG = colors.HexColor("#FDF3F6")
+
+_ss = getSampleStyleSheet()
+
+
+def _s(name, **kw):
+    base = dict(fontName="Helvetica", fontSize=9.5, leading=14, textColor=INK)
+    base.update(kw)
+    return ParagraphStyle(name, parent=_ss["Normal"], **base)
+
+
+ST = {
+    "h1": _s("h1", fontName="Helvetica-Bold", fontSize=17, leading=21,
+             spaceBefore=6, spaceAfter=10, textColor=INK),
+    "h2": _s("h2", fontName="Helvetica-Bold", fontSize=12.5, leading=16,
+             spaceBefore=14, spaceAfter=6, textColor=MAGENTA),
+    "h3": _s("h3", fontName="Helvetica-Bold", fontSize=10.5, leading=14,
+             spaceBefore=10, spaceAfter=4, textColor=INK),
+    "p": _s("p", alignment=TA_JUSTIFY, spaceAfter=6),
+    "small": _s("small", fontSize=8.5, leading=12, textColor=MUTED,
+                spaceAfter=4),
+    "bullet": _s("bullet", alignment=TA_JUSTIFY, leftIndent=11,
+                 bulletIndent=2, spaceAfter=3),
+    "callout": _s("callout", fontSize=9.5, leading=14, alignment=TA_JUSTIFY),
+    "cell": _s("cell", fontSize=8.5, leading=11.5),
+    "cellb": _s("cellb", fontName="Helvetica-Bold", fontSize=8.5, leading=11.5),
+    "cover_t": _s("cover_t", fontName="Helvetica-Bold", fontSize=34,
+                  leading=38, textColor=INK),
+    "cover_s": _s("cover_s", fontSize=13, leading=19, textColor=MUTED),
+}
+
+
+def P(t, s="p"):
+    return Paragraph(t, ST[s])
+
+
+def bullets(items):
+    return [Paragraph(f"•&nbsp;&nbsp;{i}", ST["bullet"]) for i in items]
+
+
+def table(rows, widths, header=True):
+    data = [[Paragraph(c, ST["cellb"] if (header and r == 0) else ST["cell"])
+             for c in row] for r, row in enumerate(rows)]
+    t = Table(data, colWidths=[w * mm for w in widths], repeatRows=1 if header else 0)
+    style = [
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LINEBELOW", (0, 0), (-1, -1), 0.4, RULE),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+    ]
+    if header:
+        style += [("BACKGROUND", (0, 0), (-1, 0), BAND),
+                  ("LINEBELOW", (0, 0), (-1, 0), 0.9, ACCENT)]
+    t.setStyle(TableStyle(style))
+    return t
+
+
+def callout(text, warn=False):
+    t = Table([[Paragraph(text, ST["callout"])]], colWidths=[165 * mm])
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), WARNBG if warn else BAND),
+        ("LINEBEFORE", (0, 0), (0, -1), 2.2, MAGENTA if warn else ACCENT),
+        ("LEFTPADDING", (0, 0), (-1, -1), 10),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+    ]))
+    return t
+
+
+def decision(num, titulo, que, importa, opciones, reco, desbloquea):
+    """Bloque de una decision. Se mantiene junto en la misma pagina."""
+    parts = [Paragraph(f"D{num}. {titulo}", ST["h2"]),
+             P(f"<b>Qué hay que definir.</b> {que}"),
+             P(f"<b>Por qué importa.</b> {importa}")]
+    if opciones:
+        parts.append(Paragraph("Opciones", ST["h3"]))
+        parts.append(table(opciones, [42, 62, 61]))
+        parts.append(Spacer(1, 6))
+    parts.append(callout(f"<b>Recomendación.</b> {reco}"))
+    parts.append(Spacer(1, 5))
+    parts.append(P(f"<b>Qué desbloquea.</b> {desbloquea}", "small"))
+    return parts
+
+
+# ---------------------------------------------------------------- contenido
+def build_story():
+    S = []
+    A = S.append
+    sp = lambda h=8: S.append(Spacer(1, h))
+
+    # ---- portada
+    A(Spacer(1, 45 * mm))
+    A(P("TREINO", "cover_t"))
+    A(P("Guía legal de lanzamiento", "cover_t"))
+    sp(14)
+    A(P("Decisiones que dependen de vos, trámites a iniciar y documentos "
+        "pendientes, para publicar en App Store y Google Play.", "cover_s"))
+    sp(28)
+    A(table([
+        ["Fecha", "31 de agosto de 2026"],
+        ["Verificado contra", "código de la app y reglas de Firestore"],
+        ["Complementa", "docs/legal/ (4 borradores ya redactados)"],
+        ["Estado", "Ningún documento publicado todavía"],
+    ], [40, 125], header=False))
+    sp(24)
+    A(callout(
+        "<b>Esto no es asesoramiento legal.</b> Es un relevamiento técnico de qué "
+        "hace tu aplicación y qué exige publicarla. Las referencias a normativa "
+        "argentina requieren verificación de vigencia por un profesional: hay "
+        "reforma de la ley de datos personales en trámite.", warn=True))
+
+    A(NextPageTemplate("body"))
+    A(PageBreak())
+
+    # ---- 1
+    A(P("1. Cómo se lee esta guía", "h1"))
+    A(P("El trabajo legal de TREINO se parte en tres, y el orden no es "
+        "opcional: cada capa depende de la anterior."))
+    sp(4)
+    A(table([
+        ["Capa", "Quién la resuelve", "Estado"],
+        ["<b>Decisiones</b> — quién sos, a quién le vendés, "
+         "desde qué edad, cómo cobrás",
+         "Vos, y sólo vos", "Pendiente. Bloquea todo lo demás"],
+        ["<b>Trámites</b> — inscripciones, contratos con proveedores, "
+         "casillas, URLs",
+         "Vos, con el contador y el abogado", "Pendiente"],
+        ["<b>Documentos</b> — los trece textos",
+         "Redacción conjunta; dos exigen revisión legal",
+         "4 de 13 redactados"],
+    ], [58, 48, 59]))
+    sp(10)
+    A(P("Los cuatro documentos ya redactados son los que salían de leer el "
+        "código: se escribieron contra el modelo de datos y las reglas de "
+        "Firestore, no contra una plantilla. Viven en <b>docs/legal/</b>. "
+        "Los otros nueve esperan las decisiones de la sección 3."))
+
+    A(P("2. Dónde estás parado", "h1"))
+    A(P("Trece documentos. Cuatro redactados, nueve pendientes. Tres "
+        "bloqueantes duros de publicación que hoy no tienen solución empezada."))
+    sp(4)
+    A(P("2.1 Los trece documentos", "h3"))
+    A(table([
+        ["#", "Documento", "Estado", "Depende de"],
+        ["1", "Política de Privacidad", "Borrador listo", "D1, D3"],
+        ["2", "Normas de Comunidad", "Borrador listo", "D1"],
+        ["3", "Retención y borrado", "Borrador listo", "D1"],
+        ["4", "Auditoría del texto vigente", "Entregado", "—"],
+        ["5", "Términos y Condiciones", "Pendiente", "D1, D2, D3, D6"],
+        ["6", "Descargo médico", "Pendiente", "D1 + <b>abogado</b>"],
+        ["7", "Contrato del Entrenador", "Pendiente", "D1, D5 + <b>abogado</b>"],
+        ["8", "Términos de suscripción", "Pendiente", "D4, D6"],
+        ["9", "Botón de arrepentimiento y baja", "Pendiente", "D4, D6"],
+        ["10", "Consentimiento de datos de salud", "Pendiente", "D1"],
+        ["11", "Aviso legal / identificación", "Pendiente", "D1"],
+        ["12", "Política de cookies (web)", "Pendiente", "D3"],
+        ["13", "Licencias de software libre", "Pendiente", "—"],
+    ], [8, 62, 45, 50]))
+    sp(10)
+    A(P("2.2 Los tres bloqueantes duros", "h3"))
+    A(P("Sin estos tres, la app no se publica. No es una cuestión de "
+        "prolijidad: son rechazo en revisión."))
+    sp(4)
+    A(table([
+        ["Bloqueante", "Quién lo exige", "Por qué falta hoy"],
+        ["<b>Política de privacidad en URL pública</b>",
+         "Apple y Google", "No existe publicada. El texto in-app está y es "
+         "un borrador con errores materiales"],
+        ["<b>Reportar contenido y bloquear usuarios</b>",
+         "Apple, Guideline 1.2",
+         "No existe nada en el código. La app tiene feed, chat y reseñas: "
+         "tres superficies de contenido de usuarios, cero moderación"],
+        ["<b>URL web de eliminación de cuenta</b>",
+         "Google Play",
+         "El borrado in-app funciona bien. Falta la página accesible sin "
+         "instalar la app"],
+    ], [45, 35, 85]))
+    sp(10)
+    A(callout(
+        "El segundo no se arregla escribiendo. Es desarrollo: dos features "
+        "nuevas, reglas de servidor y una vista de revisión. Está "
+        "especificado en <b>docs/legal/normas-de-comunidad.md</b>, en el anexo."))
+
+    A(PageBreak())
+
+    # ---- 3 decisiones
+    A(P("3. Las seis decisiones que sólo podés tomar vos", "h1"))
+    A(P("Ninguna de estas la puede tomar un abogado por vos, ni yo. Son "
+        "definiciones de negocio. Hasta que no estén, los nueve documentos "
+        "pendientes no se pueden escribir sin inventar."))
+
+    for block in decision(
+        1, "Quién es el titular de TREINO",
+        "Si TREINO opera como vos —persona humana— o como una sociedad. Y en "
+        "cualquier caso: CUIT, domicilio legal y una casilla de contacto real.",
+        "Es el bloqueante de los trece documentos. Todos empiezan "
+        "identificando al responsable, y la Ley 25.326 lo exige en su artículo "
+        "6. Hoy la política publicada dice que el responsable es «TREINO», que "
+        "no es un sujeto de derecho, y da una casilla en un dominio "
+        "(treino.app) que no aparece en ninguna configuración del proyecto: el "
+        "dominio real es gettreino.com. Es decir, el canal para ejercer "
+        "derechos probablemente no existe.",
+        [["Opción", "A favor", "En contra"],
+         ["<b>Persona humana</b> (monotributo o responsable inscripto)",
+          "Inmediato, sin costo de constitución ni de mantenimiento",
+          "Respondés con tu patrimonio personal. En una app que da rutinas de "
+          "entrenamiento y aloja datos de salud, eso es exposición real"],
+         ["<b>S.A.S. o S.R.L.</b>",
+          "Separa tu patrimonio del de la empresa. Necesario si en algún "
+          "momento entra un socio o inversión",
+          "Semanas de trámite, costo de constitución y contable mensual"]],
+        "Si vas a lanzar público y cobrar suscripciones, sociedad. La "
+        "responsabilidad civil por lesión no es un riesgo teórico en una app "
+        "de entrenamiento. Si el lanzamiento es acotado y de prueba, persona "
+        "humana alcanza para empezar — pero decidilo a conciencia, no por "
+        "inercia. Y en cualquiera de los dos casos: <b>la casilla de contacto "
+        "tiene que existir y estar atendida el día uno.</b>",
+        "Los trece documentos. Es literalmente la primera línea de cada uno."):
+        A(block)
+
+    A(PageBreak())
+
+    for block in decision(
+        2, "Edad mínima",
+        "Desde qué edad se puede crear una cuenta, y qué pasa con los menores.",
+        "Los términos vigentes dicen 16 años. El código no lo verifica en "
+        "ningún lado: la fecha de nacimiento es un campo opcional del editor "
+        "de perfil, no del alta, y ninguna regla la compara contra un mínimo. "
+        "Es una cláusula que el propio sistema no hace cumplir — frente a un "
+        "reclamo eso no sostiene nada.",
+        [["Opción", "A favor", "En contra"],
+         ["<b>18 años</b>",
+          "Limpio. Sin consentimiento parental, sin régimen especial de "
+          "menores, coherente con vender suscripciones y tratar datos de salud",
+          "Perdés el segmento adolescente, que en fitness existe"],
+         ["<b>16 con consentimiento parental</b>",
+          "Mantenés el segmento",
+          "Exige un flujo de verificación parental que hoy no existe y que no "
+          "es trivial de construir bien"],
+         ["<b>13-15</b>",
+          "Máximo alcance",
+          "Entrás en régimen reforzado de protección de menores en varias "
+          "jurisdicciones. Con datos de salud, no lo haría"]],
+        "18 años. Y con gate real en el alta, no una cláusula decorativa: "
+        "fecha de nacimiento obligatoria al registrarse y validación en "
+        "servidor. Un menor cargando medidas corporales y fotos de lesiones en "
+        "tu base es un problema que no querés tener.",
+        "Términos y Condiciones (5), sección de menores de la Política de "
+        "Privacidad (1), y una tarea de desarrollo en el alta."):
+        A(block)
+
+    sp(6)
+
+    for block in decision(
+        3, "En qué países operás",
+        "Si el servicio se ofrece sólo en Argentina, en Latinoamérica, o "
+        "también en Europa o Estados Unidos.",
+        "Define qué normativa se te aplica encima de la argentina. La ficha de "
+        "Play ya tiene metadata en es-419, que es Latinoamérica entera. Si "
+        "entra un usuario europeo, entra el RGPD: encargado de tratamiento, "
+        "base legal por finalidad, portabilidad, y posiblemente representante "
+        "en la Unión. Es un salto de escala en el trabajo, no un párrafo más.",
+        [["Opción", "A favor", "En contra"],
+         ["<b>Sólo Argentina</b>",
+          "Un solo marco: Ley 25.326 y Defensa del Consumidor. La mitad del "
+          "trabajo",
+          "Techo de mercado. Ampliar después obliga a rehacer los documentos"],
+         ["<b>Latinoamérica</b>",
+          "Mercado natural del producto y del idioma",
+          "Cada país tiene su ley de datos. Brasil tiene LGPD, que es exigente"],
+         ["<b>Global, incluida la UE</b>",
+          "Sin límite",
+          "RGPD completo. No lo haría en el lanzamiento"]],
+        "Lanzá en Argentina y redactá pensando en Latinoamérica: mismo "
+        "esfuerzo, y no te obliga a rehacer todo cuando crezcas. Dejá la UE "
+        "explícitamente afuera en los Términos por ahora — se puede sumar "
+        "después, con trabajo dedicado.",
+        "Política de Privacidad (1), Términos (5), cookies (12), y el alcance "
+        "de la revisión del abogado."):
+        A(block)
+
+    A(PageBreak())
+
+    for block in decision(
+        4, "Cómo cobrás la suscripción del entrenador",
+        "Qué medio de pago procesa los 12.000, 22.000 o 39.000 pesos mensuales "
+        "que ya están definidos en el código.",
+        "Hoy no hay ningún procesador integrado: la tabla de precios existe en "
+        "el servidor, el cobro no. Y hay un tema de plataforma que conviene "
+        "mirar antes de decidir: el paywall vive en el Coach Hub web, no en el "
+        "binario móvil, lo cual hoy te esquiva la comisión de las tiendas. "
+        "Pero si esa suscripción amplía límites que el entrenador experimenta "
+        "<i>dentro</i> de la app de iOS, Apple puede exigir compra integrada "
+        "igual, por su regla 3.1.1. Es una pregunta abierta que hay que "
+        "resolver antes de descongelar ese trabajo.",
+        [["Opción", "A favor", "En contra"],
+         ["<b>Pasarela local en la web</b> (Mercado Pago u otra)",
+          "Sin comisión de tiendas. Cobro en pesos, medios locales",
+          "Hay que revisar el riesgo de la regla 3.1.1 de Apple"],
+         ["<b>Compra integrada en la app</b>",
+          "Sin fricción y sin riesgo de rechazo",
+          "Comisión de tienda, y hay que construir todo el flujo"],
+         ["<b>Transferencia manual</b>",
+          "Cero integración. Sirve para validar",
+          "No escala, y complica el arrepentimiento y la baja automática"]],
+        "Para arrancar, pasarela local en la web — pero <b>consultá el punto "
+        "de Apple antes</b>, no después de construirlo. Es la clase de "
+        "pregunta que conviene hacerle al abogado en la misma reunión.",
+        "Términos de suscripción (8), arrepentimiento y baja (9), y la "
+        "sección de facturación de la Política de Privacidad."):
+        A(block)
+
+    A(PageBreak())
+
+    for block in decision(
+        5, "Cómo cobra el entrenador a su alumno",
+        "Si esa plata pasa por TREINO o es un asunto entre ellos dos.",
+        "Esto no es una decisión de producto: es lo que define <b>qué sos "
+        "legalmente</b>. Hoy el código registra deuda entre dos usuarios "
+        "—la colección de pagos guarda un monto en pesos, un entrenador, un "
+        "alumno y un estado— y el perfil público del entrenador publica su "
+        "alias de cobro. O sea: TREINO anota la deuda y publica dónde pagarla, "
+        "pero no toca el dinero. Esa distinción tiene que estar escrita, "
+        "porque si no la escribís, alguien va a asumir lo contrario el día que "
+        "un alumno pague y no reciba el servicio.",
+        [["Opción", "A favor", "En contra"],
+         ["<b>Registro solamente</b> (lo actual)",
+          "No sos intermediario financiero. No respondés por el pago",
+          "El alumno no tiene garantía, y hay que decírselo claramente"],
+         ["<b>TREINO intermedia</b>",
+          "Mejor experiencia, y una comisión posible",
+          "Pasás a ser intermediario: régimen de pagos, prevención de lavado, "
+          "responsabilidad por el servicio no prestado. Otro proyecto"]],
+        "Quedate en registro solamente, y <b>decilo explícitamente</b> en los "
+        "Términos y en el contrato del entrenador. Es la decisión correcta "
+        "para esta etapa; lo que falta es que esté escrita.",
+        "Términos (5), contrato del Entrenador (7), y una advertencia visible "
+        "en la pantalla de pagos."):
+        A(block)
+
+    sp(6)
+
+    for block in decision(
+        6, "Reembolsos y baja",
+        "Qué pasa si un entrenador se arrepiente, quiere la baja, o pide "
+        "devolución.",
+        "En Argentina esto no es del todo negociable. La Ley de Defensa del "
+        "Consumidor es de orden público —lo que pactes por debajo del piso "
+        "legal se tiene por no escrito— y la Resolución 424/2020 obliga a "
+        "tener botón de arrepentimiento y baja en línea, visibles, en el sitio "
+        "que vende. No es una cláusula: es un botón que tiene que existir.",
+        None,
+        "Definí el plazo de arrepentimiento respetando el mínimo legal, baja "
+        "en línea sin llamada ni mail, y proporcionalidad en el reembolso. "
+        "Escribilo simple: si el texto es simple y generoso, no hay conflicto "
+        "que gestionar. Este es un caso donde ser prolijo sale más barato que "
+        "ser astuto.",
+        "Términos de suscripción (8), arrepentimiento y baja (9), y "
+        "desarrollo en el Coach Hub web."):
+        A(block)
+
+    A(PageBreak())
+
+    # ---- 4 tramites
+    A(P("4. Trámites a iniciar", "h1"))
+    A(P("Ninguno es difícil. Varios tienen demora, así que conviene "
+        "arrancarlos en paralelo mientras se redactan los documentos."))
+    sp(4)
+    A(table([
+        ["Trámite", "Ante quién", "Nota"],
+        ["<b>Constitución de la sociedad</b>, si elegís esa vía",
+         "Escribano o IGJ / Registro provincial",
+         "Es el de mayor demora. Si va, arrancá por acá"],
+        ["<b>Inscripción de la base de datos</b>",
+         "AAIP — Registro Nacional de Bases de Datos",
+         "Formulario en línea. Obligatorio para quien trata datos personales. "
+         "No requiere abogado"],
+        ["<b>Casilla de contacto real</b>",
+         "Vos", "Bajo gettreino.com. Tiene que estar atendida: es el canal de "
+         "ejercicio de derechos y el contacto que exige Apple"],
+        ["<b>Aceptar el acuerdo de tratamiento de datos de Google</b>",
+         "Consola de Google Cloud",
+         "No se redacta, se acepta. Es el respaldo de que Firebase es "
+         "encargado del tratamiento"],
+        ["<b>Ídem con Resend y con Vercel</b>",
+         "Sus paneles", "Mismo trámite, dos minutos cada uno"],
+        ["<b>Publicar las URLs legales</b>",
+         "Vercel, proyecto de la landing",
+         "gettreino.com/legal/privacidad, /terminos, /comunidad, "
+         "/eliminar-cuenta. Después cargarlas en las dos tiendas"],
+        ["<b>Contratar abogado</b>",
+         "Especialista en consumo y protección de datos",
+         "Con los borradores en la mano es una revisión, no una redacción. "
+         "Ver la sección siguiente"],
+    ], [45, 45, 75]))
+
+    sp(10)
+    A(P("5. Qué llevarle al abogado", "h1"))
+    A(P("Acá es donde se ahorra plata de verdad. Un abogado cobrando por hora "
+        "para descubrir qué hace tu app es el peor uso posible del "
+        "presupuesto. Llevale esto y la conversación arranca en el minuto "
+        "cero."))
+    sp(4)
+    A(P("5.1 El material", "h3"))
+    S.extend(bullets([
+        "Los cuatro documentos de <b>docs/legal/</b>, empezando por la "
+        "auditoría — le muestra en dos páginas qué recolecta la app y dónde el "
+        "texto vigente miente.",
+        "Las declaraciones de privacidad de las tiendas, en "
+        "<b>store/privacy/</b>: son el inventario de datos ya verificado "
+        "contra el binario.",
+        "Esta guía, con las seis decisiones ya tomadas.",
+    ]))
+    sp(6)
+    A(P("5.2 Las preguntas concretas", "h3"))
+    A(P("No le pidas «que revise todo». Pedile esto:"))
+    sp(4)
+    A(table([
+        ["#", "Pregunta", "Por qué"],
+        ["1", "<b>¿El descargo médico resiste?</b> Alguien se lesiona "
+         "siguiendo una rutina que generó la IA de la app, o el plan de un "
+         "entrenador de la plataforma. ¿Qué texto y qué flujo de aceptación "
+         "necesito?",
+         "Es el riesgo más grande del producto y el documento que no se "
+         "corrige después"],
+        ["2", "<b>¿Cómo evito que un entrenador reclame relación de "
+         "dependencia?</b> No quiero el texto del contrato: quiero saber qué "
+         "puedo y qué no puedo hacer operativamente.",
+         "Rige la primacía de la realidad: el contrato pesa poco, la conducta "
+         "pesa todo. Lo que necesitás es el manual de operación, no la "
+         "cláusula"],
+        ["3", "<b>¿Qué puedo conservar tras un pedido de supresión?</b> Hoy "
+         "retengo el registro de pagos, la puntuación de las reseñas y el hilo "
+         "de chat del otro participante.",
+         "Es la decisión de retención ya tomada en el código. Necesita "
+         "validación, no rediseño"],
+        ["4", "<b>¿La suscripción del entrenador puede cobrarse fuera de las "
+         "tiendas?</b> El paywall vive en la web, pero amplía límites que se "
+         "usan dentro de la app de iOS.",
+         "Define si se puede seguir con pasarela local o hay que integrar "
+         "compra en la app"],
+    ], [8, 82, 75]))
+
+    A(PageBreak())
+
+    # ---- 6 producto
+    A(P("6. El trabajo de producto que se dispara", "h1"))
+    A(P("Buena parte del cumplimiento no se escribe: se programa. Un documento "
+        "que promete algo que la app no hace es peor que no tenerlo, porque "
+        "queda registrado que lo prometiste."))
+    sp(4)
+    A(table([
+        ["Tarea", "Por qué", "Bloquea"],
+        ["<b>Reportar contenido</b> en feed, chat, reseñas y perfiles",
+         "Apple 1.2. Hoy no existe", "Sí"],
+        ["<b>Bloquear usuarios</b>, con filtrado en reglas de servidor",
+         "Apple 1.2. Un bloqueo que se esquiva leyendo la base no es un bloqueo",
+         "Sí"],
+        ["<b>Página pública de eliminación de cuenta</b>",
+         "Google Play la exige accesible sin instalar la app", "Sí"],
+        ["<b>Consentimiento de datos de salud</b>, separado del checkbox de "
+         "términos",
+         "Los datos de salud son categoría sensible y exigen consentimiento "
+         "expreso. Hoy van dentro del consentimiento genérico", "Sí"],
+        ["<b>Gate de edad en el alta</b>",
+         "Hoy la edad no se pide ni se valida al registrarse", "Sí"],
+        ["<b>Descargo médico visible</b> en el onboarding y antes de la "
+         "primera rutina generada por IA",
+         "Un descargo enterrado en la sección 3 de los términos protege menos "
+         "que uno que el usuario ve y acepta", "Sí"],
+        ["<b>Botón de arrepentimiento y baja en línea</b> en el Coach Hub",
+         "Resolución 424/2020. Aplica al sitio que vende",
+         "Sí, cuando cobres"],
+        ["<b>Opción de desactivar la analítica</b>",
+         "Hoy se activa incondicionalmente al arrancar la app, sin salida",
+         "No, pero conviene"],
+        ["<b>Aviso de qué se conserva</b> en la confirmación de borrado",
+         "Se retienen tres cosas y el usuario no se entera", "No"],
+        ["<b>Filtrado de términos vetados</b> en textos publicables",
+         "Es el mínimo de filtrado que pide Apple 1.2", "Sí"],
+    ], [62, 78, 25]))
+
+    sp(10)
+    A(P("7. Orden de trabajo", "h1"))
+    A(P("Las dependencias reales, en orden. Nada de lo de abajo se puede "
+        "hacer antes de lo de arriba."))
+    sp(4)
+    A(table([
+        ["Etapa", "Qué pasa", "Quién"],
+        ["<b>1. Decidir</b>",
+         "Las seis decisiones de la sección 3. Sin esto no se escribe nada más",
+         "Vos"],
+        ["<b>2. Constituir e identificar</b>",
+         "Sociedad si va, CUIT, domicilio, casilla real atendida",
+         "Vos + escribano"],
+        ["<b>3. Completar los borradores</b>",
+         "Rellenar los pendientes de los cuatro documentos ya escritos",
+         "Nosotros"],
+        ["<b>4. Redactar los nueve restantes</b>",
+         "Términos, descargo, contrato del PF, suscripción, arrepentimiento, "
+         "consentimiento de salud, aviso legal, cookies, licencias",
+         "Nosotros"],
+        ["<b>5. Revisión legal</b>",
+         "Con las cuatro preguntas de la sección 5.2",
+         "Abogado"],
+        ["<b>6. Construir</b>",
+         "Reporte, bloqueo, consentimiento de salud, gate de edad, URL de "
+         "borrado, descargo visible",
+         "Nosotros"],
+        ["<b>7. Publicar</b>",
+         "URLs en gettreino.com, texto portado a la app, enlaces cargados en "
+         "las dos tiendas",
+         "Nosotros"],
+        ["<b>8. Inscribir</b>",
+         "Base de datos ante la AAIP, acuerdos de tratamiento aceptados",
+         "Vos"],
+    ], [32, 88, 45]))
+    sp(10)
+    A(callout(
+        "<b>Lo que se puede arrancar hoy, sin esperar nada:</b> la casilla de "
+        "contacto bajo gettreino.com, los acuerdos de tratamiento en las tres "
+        "consolas, y el desarrollo de reporte y bloqueo — esa feature no "
+        "depende de ninguna decisión legal y es el bloqueante de mayor plazo."))
+
+    A(PageBreak())
+
+    # ---- anexo
+    A(P("Anexo. Los cinco hallazgos críticos", "h1"))
+    A(P("Resumen de la auditoría del texto legal vigente, que hoy se muestra "
+        "in-app. Detalle completo, con evidencia de código, en "
+        "<b>docs/legal/AUDITORIA-legal-vigente.md</b>."))
+    sp(4)
+    A(table([
+        ["#", "Hallazgo"],
+        ["C1", "<b>La política no menciona datos de salud, y la app recolecta "
+         "siete tipos.</b> Más de veinte medidas corporales, dolores "
+         "reportados con foto, check-in diario de ánimo y dolor, planes de "
+         "alimentación, tests de rendimiento. Son categoría sensible y exigen "
+         "consentimiento expreso. El equipo ya se lo declaró a Google en la "
+         "ficha de Play — y no se lo dijo al usuario"],
+        ["C2", "<b>«Tu ubicación no es visible para otros usuarios» es "
+         "falso.</b> Para el entrenador, la ubicación precisa de trabajo se "
+         "publica en su perfil y se dibuja en el mapa. Es a propósito, es el "
+         "modelo de negocio — pero el documento dice lo contrario"],
+        ["C3", "<b>El entrenador lleva registros privados sobre el alumno que "
+         "el alumno nunca ve.</b> Notas, seguimiento y archivos. Son datos "
+         "personales del alumno y el derecho de acceso los alcanza. No están "
+         "declarados en ningún lado, y ni el alumno ni el entrenador lo saben"],
+        ["C4", "<b>La cláusula de edad no se puede cumplir.</b> Dice 16 años; "
+         "el sistema nunca verifica la edad. Un chico de doce crea cuenta sin "
+         "fricción"],
+        ["C5", "<b>El responsable del tratamiento no está identificado.</b> "
+         "«TREINO» no es un sujeto de derecho, y la casilla de contacto "
+         "publicada está en un dominio que el proyecto no usa"],
+    ], [10, 155]))
+    sp(10)
+    A(P("Además: siete omisiones de tratamiento no declarado —chat, Resend, "
+        "Google Places, el proveedor del mapa, notificaciones, feed y "
+        "rankings, alias de cobro— y seis puntos medios. Y un hallazgo que no "
+        "es un documento: no existe forma de reportar contenido ni de bloquear "
+        "usuarios."))
+
+    sp(14)
+    A(P("Qué quedó entregado", "h2"))
+    A(table([
+        ["Archivo", "Qué es"],
+        ["docs/legal/AUDITORIA-legal-vigente.md",
+         "18 hallazgos con evidencia de código, ordenados por severidad"],
+        ["docs/legal/politica-de-privacidad.md",
+         "Reemplazo completo, escrito contra el modelo de datos real"],
+        ["docs/legal/normas-de-comunidad.md",
+         "Documento publicable, más la especificación de reporte y bloqueo"],
+        ["docs/legal/retencion-y-borrado.md",
+         "Qué se borra, qué se conserva y por qué. URL de referencia para Play"],
+        ["docs/legal/README.md", "Índice y pasos previos a publicar"],
+    ], [62, 103]))
+    sp(10)
+    A(P("Los cuatro son borradores y tienen marcados sus pendientes. Ninguno "
+        "está publicado.", "small"))
+
+    return S
+
+
+# ------------------------------------------------------------------ layout
+def on_page(canvas, doc):
+    canvas.saveState()
+    if doc.page > 1:
+        canvas.setStrokeColor(RULE)
+        canvas.setLineWidth(0.4)
+        canvas.line(22 * mm, 282 * mm, 187 * mm, 282 * mm)
+        canvas.setFont("Helvetica", 7.5)
+        canvas.setFillColor(MUTED)
+        canvas.drawString(22 * mm, 285 * mm, "TREINO — Guía legal de lanzamiento")
+        canvas.drawRightString(187 * mm, 285 * mm, "31 de agosto de 2026")
+        canvas.drawCentredString(104.5 * mm, 12 * mm, str(doc.page))
+    canvas.restoreState()
+
+
+def main():
+    doc = BaseDocTemplate(
+        OUT, pagesize=A4,
+        title="TREINO — Guía legal de lanzamiento",
+        author="Equipo TREINO", subject="Decisiones, trámites y documentos legales",
+    )
+    frame_cover = Frame(22 * mm, 20 * mm, 165 * mm, 250 * mm, id="cover",
+                        leftPadding=0, rightPadding=0,
+                        topPadding=0, bottomPadding=0)
+    frame_body = Frame(22 * mm, 20 * mm, 165 * mm, 255 * mm, id="body",
+                       leftPadding=0, rightPadding=0,
+                       topPadding=0, bottomPadding=0)
+    doc.addPageTemplates([
+        PageTemplate(id="cover", frames=[frame_cover], onPage=on_page),
+        PageTemplate(id="body", frames=[frame_body], onPage=on_page),
+    ])
+    doc.build(build_story())
+    print(f"OK -> {OUT}")
+
+
+if __name__ == "__main__":
+    main()
