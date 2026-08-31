@@ -4127,7 +4127,7 @@ class AppL10nEn extends AppL10n {
   String get routineEditorQuickEntryHint => 'bench 4x10 60';
 
   @override
-  String routineEditorQuickEntryWillAdd(int sets, int reps, String peso) {
+  String routineEditorQuickEntryWillAdd(int sets, String reps, String peso) {
     String _temp0 = intl.Intl.pluralLogic(
       sets,
       locale: localeName,
@@ -4142,5 +4142,12 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get routineEditorQuickEntryEmptyHint =>
-      'Type a name + 4x10 + weight. With no numbers it lands with 3 empty sets.';
+      'Search the exercise and tap it. Then type 4x10 and the weight.';
+
+  @override
+  String get routineEditorQuickEntryPickedHint =>
+      '4x10 and the weight. Per set with commas: 4x10,8,6,4 · 55,45,35,25. By time: 3x30s or 3x1:30. Decimals with a dot: 62.5';
+
+  @override
+  String get routineEditorQuickEntryAdd => 'ADD';
 }

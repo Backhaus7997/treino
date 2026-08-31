@@ -832,9 +832,9 @@ void main() {
     // Abre CARGADO — el punto entero del issue es que no sea una pantalla en
     // blanco.
     expect(
-      tester.widget<Text>(find.byKey(const Key('day_header_name'))).data,
+      tester.widget<DayTabBar>(find.byType(DayTabBar)).labels.first,
       'Empuje',
-      reason: 'el nombre también aparece en la pestaña: mirar la cabecera',
+      reason: 'la cabecera del día se fue en la revisión del 31/08: el nombre vive sólo en la pestaña',
     );
     // Y sigue siendo un modo de atleta: la plantilla trae split 'PPL', pero el
     // campo es trainer-only (ADR-RER-04).

@@ -22,7 +22,11 @@ import '../../onboarding/presentation/custom_exercise_onboarding_gate.dart';
 import '../../profile/application/user_providers.dart'
     show userProfileProvider, userRepositoryProvider;
 import '../../profile/domain/experience_level.dart';
-import '../application/exercise_filter.dart' show exerciseMatchesFilters;
+import '../application/custom_exercise_providers.dart'
+    show customExercisesForTrainerStreamProvider;
+import '../domain/custom_exercise.dart' show CustomExercise;
+import '../application/exercise_filter.dart'
+    show customToExercise, exerciseMatchesFilters;
 import '../application/exercise_providers.dart' show exercisesProvider;
 import '../application/routine_providers.dart' show routineRepositoryProvider;
 import '../application/session_providers.dart' show currentUidProvider;
@@ -1970,12 +1974,25 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         .where((s) => s.exercise != null)
         .map((s) => s.exercise!.id)
         .toSet();
-    final catalogo = ref.read(exercisesProvider).valueOrNull ?? const [];
+    // Catálogo del sistema MÁS los ejercicios propios. Buscar "sentadilla" y
+    // no encontrar la variante que uno mismo cargó es peor que no tener el
+    // atajo: el picker sí los muestra, y dos búsquedas que difieren en la
+    // misma pantalla confunden más de lo que ayudan.
+    final uid = ref.read(currentUidProvider) ?? '';
+    final propios = uid.isEmpty
+        ? const <CustomExercise>[]
+        : (ref
+                .read(customExercisesForTrainerStreamProvider(uid))
+                .valueOrNull ??
+            const <CustomExercise>[]);
+    final catalogo = <Exercise>[
+      ...?ref.read(exercisesProvider).valueOrNull,
+      ...propios.map(customToExercise),
+    ];
     // El mismo matcher que usa el picker (ADR-BIBW-01), no un `contains`:
     // busca por tokens y tolera diacríticos, así que "press banca" encuentra
     // "Press de Banca" —el `de` del medio rompe un contains— y "biceps" llega
-    // a "Bíceps". Dos búsquedas que difieren en la misma pantalla es peor que
-    // una sola imperfecta.
+    // a "Bíceps".
     return catalogo
         .where((e) =>
             !yaEstan.contains(e.id) &&
@@ -2006,7 +2023,17 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     String exerciseId,
     QuickEntry entry,
   ) async {
-    final catalogo = ref.read(exercisesProvider).valueOrNull ?? const [];
+    final uid = ref.read(currentUidProvider) ?? '';
+    final propios = uid.isEmpty
+        ? const <CustomExercise>[]
+        : (ref
+                .read(customExercisesForTrainerStreamProvider(uid))
+                .valueOrNull ??
+            const <CustomExercise>[]);
+    final catalogo = <Exercise>[
+      ...?ref.read(exercisesProvider).valueOrNull,
+      ...propios.map(customToExercise),
+    ];
     final ex = catalogo.where((e) => e.id == exerciseId).firstOrNull;
     if (ex == null) return;
 
@@ -2018,13 +2045,23 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       final slot = _EditableSlot()
         ..exercise = ex
         ..restSeconds = 0
+        // `3x30s` prescribe TIEMPO, no repeticiones: el slot entra derecho en
+        // modo duración en vez de obligar a cambiarlo después desde el header
+        // de la columna.
+        ..exerciseMode =
+            entry.esDuracion ? ExerciseMode.duration : ExerciseMode.reps
         ..weeklySets = List.generate(
           _numWeeks,
+          // Cada set lleva LO SUYO: `4x10,8,6,4` es una pirámide y
+          // `4x10 55,45,35,25` una descarga. Una lista más corta que la
+          // cantidad de sets repite su último valor, que es como lo lee
+          // cualquiera al escribirlo.
           (_) => List.generate(
             entry.sets,
-            (_) => _EditableSet()
-              ..reps = entry.reps
-              ..weightKg = entry.weightKg,
+            (i) => _EditableSet()
+              ..reps = entry.repsDeSet(i)
+              ..weightKg = entry.pesoDeSet(i)
+              ..durationSeconds = entry.duracionDeSet(i),
           ),
         )
         ..activeWeeks = scope == _AddScope.thisWeek ? {_selectedWeek} : <int>{};
@@ -2830,11 +2867,16 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                         onChanged: (_) => setState(() {}),
                       ),
                     ],
-                    // ── Días del plan ───────────────────────────────────
                     // ── Días del plan ─────────────────────────────────
                     // Pestañas en vez de la pila de acordeones: se renderiza
                     // UN día a la vez, así el scroll vertical es el de un día
                     // y no el de la rutina entera.
+                    //
+                    // El aire de arriba no es decorativo: las pestañas nacían
+                    // pegadas al campo del nombre y las dos cosas se leían como
+                    // un solo bloque, cuando una nombra el plan y la otra
+                    // navega entre sus días. Revisión en device del 31/08.
+                    const SizedBox(height: AppSpacing.s14),
                     DayTabBar(
                       labels: [for (final d in _days) d.name],
                       statuses: [for (final d in _days) _dayStatus(d)],
@@ -3297,6 +3339,26 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
   /// sobrevive a cerrar el día ni viaja al modelo.
   bool _quickEntryOpen = false;
   final TextEditingController _quickEntryCtrl = TextEditingController();
+
+  /// El foco del campo de entrada rápida. Vive acá porque elegir un resultado
+  /// tiene que DEVOLVERLO con el cursor al final: el tap sobre la lista lo
+  /// suelta, y sin recuperarlo el teclado se cierra justo cuando el usuario va
+  /// a escribir la prescripción.
+  final FocusNode _quickEntryFocus = FocusNode();
+
+  /// El ejercicio ya elegido en la entrada rápida, o null mientras se busca.
+  ///
+  /// Elegir un candidato AUTOCOMPLETA el nombre y guarda esto; recién el botón
+  /// AGREGAR suma el ejercicio. Hasta la revisión en device del 31/08 el tap
+  /// agregaba en el acto, y como el nombre se escribe primero, el atajo se
+  /// cerraba justo antes de poder decir `4x10 55`.
+  QuickEntryResult? _quickEntryElegido;
+
+  void _cerrarEntradaRapida() {
+    _quickEntryOpen = false;
+    _quickEntryElegido = null;
+    _quickEntryCtrl.clear();
+  }
   // Reads/writes widget.day.expanded so the collapse survives the ListView
   // recycling the tile off-screen.
 
@@ -3335,6 +3397,7 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
 
   @override
   void dispose() {
+    _quickEntryFocus.dispose();
     _quickEntryCtrl.dispose();
     _nameController.dispose();
     _nameFocus.dispose();
@@ -3555,145 +3618,177 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
   Widget build(BuildContext context) {
     final l10n = AppL10n.of(context);
     final palette = widget.palette;
-    // Day-level error: at least one visible slot has incomplete sets.
-    final hasDayError = widget.slotIsValid != null &&
-        widget.day.slots.any((slot) =>
-            slot.isPresentInWeek(widget.week) && !widget.slotIsValid!(slot));
     return Container(
       decoration: BoxDecoration(
         color: palette.bgCard,
         borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: Border.all(
-          color: hasDayError ? palette.danger.withAlpha(180) : palette.border,
-          width: hasDayError ? 1.5 : 1.0,
-        ),
+        // Sin borde de error: las señales quedaron en tres —celda, punto de la
+        // pestaña, pie— y ésta era una cuarta que pintaba la pantalla entera.
+        border: Border.all(color: palette.border),
       ),
       child: Column(
         children: [
-          // Header row
-          // Ya no es un toggle: con pestañas de día el día visible está
-          // siempre abierto, y colapsarlo dejaría la pantalla vacía.
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _editingName
-                      ? TextField(
-                          key: const Key('day_name_editing_field'),
-                          controller: _nameController,
-                          focusNode: _nameFocus,
-                          textInputAction: TextInputAction.done,
-                          onSubmitted: (_) => _commitName(),
-                          // Keep the tile expanded during edit so the tap on
-                          // an inner area (slot rows, etc.) doesn't collapse
-                          // the day under the user.
-                          onTap: () {},
-                          style: GoogleFonts.barlowCondensed(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 15,
-                            color: palette.textPrimary,
-                          ),
-                          decoration: InputDecoration(
-                            isDense: true,
-                            contentPadding: EdgeInsets.zero,
-                            border: InputBorder.none,
-                            hintText:
-                                l10n.routineEditorDayName(widget.day.dayNumber),
-                            hintStyle: GoogleFonts.barlowCondensed(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 15,
-                              color: palette.textMuted,
-                            ),
-                          ),
-                        )
-                      : Text(
-                          widget.day.name,
-                          // El nombre también vive en la pestaña de arriba: la
-                          // pestaña navega y trunca a 15 caracteres, la
-                          // cabecera muestra el nombre completo y es donde se
-                          // edita. La key desambigua a los tests.
-                          key: const Key('day_header_name'),
-                          style: GoogleFonts.barlowCondensed(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 15,
-                            color: palette.textPrimary,
-                          ),
-                        ),
-                ),
-                if (!_editingName)
-                  IconButton(
-                    key: Key('day_name_edit_button_${widget.day.dayNumber}'),
-                    icon: Icon(
-                      TreinoIcon.edit,
-                      size: 16,
-                      color: palette.textMuted,
-                    ),
-                    tooltip: l10n.routineEditorEditDayNameA11y,
-                    onPressed: _startEditing,
-                    constraints:
-                        const BoxConstraints(minWidth: 44, minHeight: 44),
-                    padding: EdgeInsets.zero,
-                  ),
-                if (hasDayError) ...[
-                  Container(
-                    width: 7,
-                    height: 7,
-                    margin: const EdgeInsets.only(right: 8),
-                    decoration: BoxDecoration(
-                      color: palette.danger,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ],
-                if (widget.onRemoveDay != null)
-                  IconButton(
-                    icon: Icon(TreinoIcon.trash,
-                        size: 18, color: palette.textMuted),
-                    tooltip: l10n.routineEditorDeleteDayA11y,
-                    onPressed: widget.onRemoveDay,
-                    constraints:
-                        const BoxConstraints(minWidth: 44, minHeight: 44),
-                    padding: EdgeInsets.zero,
-                  ),
-              ],
-            ),
-          ),
-
+          // La cabecera del día se fue (revisión en device del 31/08).
+          //
+          // Era el último resto del acordeón: un contenedor con borde que
+          // repetía el nombre del día a 200 px de la pestaña que ya lo dice,
+          // más el lápiz, el punto de error y el tacho. Entre el borde, sus
+          // 12 px de padding vertical, el nombre duplicado y el divisor se
+          // comía ~70 px de alto en la única pantalla donde el alto es el
+          // recurso escaso — la de configurar sets.
+          //
+          // Renombrar y borrar el día se mudaron a la fila del botón RÁPIDO,
+          // que ya ocupaba ese renglón. El punto de error no se mudó a ningún
+          // lado: vive en la pestaña desde #865.
           // Body
           const Divider(height: 1),
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
             child: Column(
               children: [
+                // Fila de acciones del día: el atajo a la izquierda, y
+                // renombrar/borrar a la derecha, donde antes había una
+                // cabecera entera para lo mismo.
+                if (_editingName)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.s8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            key: const Key('day_name_editing_field'),
+                            controller: _nameController,
+                            focusNode: _nameFocus,
+                            textInputAction: TextInputAction.done,
+                            onSubmitted: (_) => _commitName(),
+                            onTap: () {},
+                            style: GoogleFonts.barlowCondensed(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 15,
+                              color: palette.textPrimary,
+                            ),
+                            decoration: InputDecoration(
+                              isDense: true,
+                              contentPadding: EdgeInsets.zero,
+                              border: InputBorder.none,
+                              hintText: l10n
+                                  .routineEditorDayName(widget.day.dayNumber),
+                              hintStyle: GoogleFonts.barlowCondensed(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 15,
+                                color: palette.textMuted,
+                              ),
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          key: Key(
+                              'day_name_commit_button_${widget.day.dayNumber}'),
+                          icon: Icon(TreinoIcon.check,
+                              size: 18, color: palette.accentText),
+                          tooltip: l10n.routineEditorEditDayNameA11y,
+                          onPressed: _commitName,
+                          constraints: const BoxConstraints(
+                              minWidth: 48, minHeight: 48),
+                          padding: EdgeInsets.zero,
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  Row(
+                    children: [
+                      if (widget.onQuickSearch != null &&
+                          widget.onQuickAdd != null)
+                        QuickEntryToggle(
+                          active: _quickEntryOpen,
+                          onTap: () => setState(() {
+                            if (_quickEntryOpen) {
+                              _cerrarEntradaRapida();
+                            } else {
+                              _quickEntryOpen = true;
+                            }
+                          }),
+                        ),
+                      const Spacer(),
+                      IconButton(
+                        key: Key(
+                            'day_name_edit_button_${widget.day.dayNumber}'),
+                        icon: Icon(TreinoIcon.edit,
+                            size: 16, color: palette.textMuted),
+                        tooltip: l10n.routineEditorEditDayNameA11y,
+                        onPressed: _startEditing,
+                        constraints:
+                            const BoxConstraints(minWidth: 48, minHeight: 48),
+                        padding: EdgeInsets.zero,
+                      ),
+                      if (widget.onRemoveDay != null)
+                        IconButton(
+                          key: Key(
+                              'day_remove_button_${widget.day.dayNumber}'),
+                          icon: Icon(TreinoIcon.trash,
+                              size: 18, color: palette.textMuted),
+                          tooltip: l10n.routineEditorDeleteDayA11y,
+                          onPressed: widget.onRemoveDay,
+                          constraints: const BoxConstraints(
+                              minWidth: 48, minHeight: 48),
+                          padding: EdgeInsets.zero,
+                        ),
+                    ],
+                  ),
                 if (widget.onQuickSearch != null &&
                     widget.onQuickAdd != null) ...[
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: QuickEntryToggle(
-                      active: _quickEntryOpen,
-                      onTap: () => setState(() {
-                        _quickEntryOpen = !_quickEntryOpen;
-                        if (!_quickEntryOpen) _quickEntryCtrl.clear();
-                      }),
-                    ),
-                  ),
                   if (_quickEntryOpen) ...[
                     const SizedBox(height: AppSpacing.s8),
                     ValueListenableBuilder<TextEditingValue>(
                       valueListenable: _quickEntryCtrl,
                       builder: (context, value, _) {
                         final entry = parseQuickEntry(value.text);
+                        // El elegido se suelta si el nombre dejó de estar en
+                        // el texto: borrar el ejercicio para buscar otro tiene
+                        // que devolver la lista sin cerrar el panel.
+                        final elegido = _quickEntryElegido;
+                        final sigueElegido = elegido != null &&
+                            value.text
+                                .toLowerCase()
+                                .contains(elegido.name.toLowerCase());
+                        if (elegido != null && !sigueElegido) {
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (mounted) {
+                              setState(() => _quickEntryElegido = null);
+                            }
+                          });
+                        }
                         return QuickEntryPanel(
                           controller: _quickEntryCtrl,
+                          focusNode: _quickEntryFocus,
                           entry: entry,
-                          results: widget.onQuickSearch!(entry.query),
-                          onPick: (r) {
+                          selected: sigueElegido ? elegido : null,
+                          results: sigueElegido
+                              ? const []
+                              : widget.onQuickSearch!(entry.query),
+                          onSelect: (r) {
+                            // Autocompletar, NO agregar: el usuario viene a
+                            // escribir la prescripción después del nombre.
+                            final texto = '${r.name} ';
+                            _quickEntryCtrl.value = TextEditingValue(
+                              text: texto,
+                              // Cursor AL FINAL, listo para seguir. Sin esto
+                              // el usuario tenía que volver a tocar el campo y
+                              // recolocar el cursor a mano.
+                              selection: TextSelection.collapsed(
+                                  offset: texto.length),
+                            );
+                            setState(() => _quickEntryElegido = r);
+                            // Y el foco de vuelta al campo: el tap sobre la
+                            // lista lo soltó, y con él se fue el teclado.
+                            _quickEntryFocus.requestFocus();
+                          },
+                          onConfirm: () {
+                            final r = _quickEntryElegido;
+                            if (r == null) return;
                             widget.onQuickAdd!(r.id, entry);
-                            setState(() {
-                              _quickEntryOpen = false;
-                              _quickEntryCtrl.clear();
-                            });
+                            setState(_cerrarEntradaRapida);
                           },
                         );
                       },

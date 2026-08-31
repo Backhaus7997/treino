@@ -1736,10 +1736,14 @@
   },
   "routineEditorQuickEntryWillAdd": "Adds {sets, plural, =1{1 set} other{{sets} sets}} × {reps} at {peso}.",
   "@routineEditorQuickEntryWillAdd": {
-    "placeholders": {"sets": {"type": "int"}, "reps": {"type": "int"}, "peso": {"type": "String"}}
+    "placeholders": {"sets": {"type": "int"}, "reps": {"type": "String"}, "peso": {"type": "String"}}
   },
   "routineEditorQuickEntryNoWeight": "no weight",
   "@routineEditorQuickEntryNoWeight": {},
-  "routineEditorQuickEntryEmptyHint": "Type a name + 4x10 + weight. With no numbers it lands with 3 empty sets.",
-  "@routineEditorQuickEntryEmptyHint": {}
+  "routineEditorQuickEntryEmptyHint": "Search the exercise and tap it. Then type 4x10 and the weight.",
+  "@routineEditorQuickEntryEmptyHint": {},
+  "routineEditorQuickEntryPickedHint": "4x10 and the weight. Per set with commas: 4x10,8,6,4 · 55,45,35,25. By time: 3x30s or 3x1:30. Decimals with a dot: 62.5",
+  "@routineEditorQuickEntryPickedHint": {},
+  "routineEditorQuickEntryAdd": "ADD",
+  "@routineEditorQuickEntryAdd": {}
 }

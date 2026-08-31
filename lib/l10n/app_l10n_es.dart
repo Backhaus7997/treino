@@ -4189,7 +4189,7 @@ class AppL10nEs extends AppL10n {
   String get routineEditorQuickEntryHint => 'banca 4x10 60';
 
   @override
-  String routineEditorQuickEntryWillAdd(int sets, int reps, String peso) {
+  String routineEditorQuickEntryWillAdd(int sets, String reps, String peso) {
     String _temp0 = intl.Intl.pluralLogic(
       sets,
       locale: localeName,
@@ -4204,7 +4204,14 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get routineEditorQuickEntryEmptyHint =>
-      'Escribí nombre + 4x10 + peso. Sin números entra con 3 sets vacíos.';
+      'Buscá el ejercicio y tocalo. Después escribís 4x10 y el peso.';
+
+  @override
+  String get routineEditorQuickEntryPickedHint =>
+      '4x10 y el peso. Por set con comas: 4x10,8,6,4 · 55,45,35,25. Por tiempo: 3x30s o 3x1:30. Decimales con punto: 62.5';
+
+  @override
+  String get routineEditorQuickEntryAdd => 'AGREGAR';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -8389,7 +8396,7 @@ class AppL10nEsAr extends AppL10nEs {
   String get routineEditorQuickEntryHint => 'banca 4x10 60';
 
   @override
-  String routineEditorQuickEntryWillAdd(int sets, int reps, String peso) {
+  String routineEditorQuickEntryWillAdd(int sets, String reps, String peso) {
     String _temp0 = intl.Intl.pluralLogic(
       sets,
       locale: localeName,
@@ -8404,5 +8411,12 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get routineEditorQuickEntryEmptyHint =>
-      'Escribí nombre + 4x10 + peso. Sin números entra con 3 sets vacíos.';
+      'Buscá el ejercicio y tocalo. Después escribís 4x10 y el peso.';
+
+  @override
+  String get routineEditorQuickEntryPickedHint =>
+      '4x10 y el peso. Por set con comas: 4x10,8,6,4 · 55,45,35,25. Por tiempo: 3x30s o 3x1:30. Decimales con punto: 62.5';
+
+  @override
+  String get routineEditorQuickEntryAdd => 'AGREGAR';
 }

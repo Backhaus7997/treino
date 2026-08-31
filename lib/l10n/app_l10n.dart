@@ -7309,7 +7309,7 @@ abstract class AppL10n {
   ///
   /// In es_AR, this message translates to:
   /// **'Se agrega como {sets, plural, =1{1 set} other{{sets} sets}} × {reps} a {peso}.'**
-  String routineEditorQuickEntryWillAdd(int sets, int reps, String peso);
+  String routineEditorQuickEntryWillAdd(int sets, String reps, String peso);
 
   /// No description provided for @routineEditorQuickEntryNoWeight.
   ///
@@ -7320,8 +7320,20 @@ abstract class AppL10n {
   /// No description provided for @routineEditorQuickEntryEmptyHint.
   ///
   /// In es_AR, this message translates to:
-  /// **'Escribí nombre + 4x10 + peso. Sin números entra con 3 sets vacíos.'**
+  /// **'Buscá el ejercicio y tocalo. Después escribís 4x10 y el peso.'**
   String get routineEditorQuickEntryEmptyHint;
+
+  /// Ayuda una vez elegido el ejercicio: enseña las dos listas con un ejemplo de cada una.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'4x10 y el peso. Por set con comas: 4x10,8,6,4 · 55,45,35,25. Por tiempo: 3x30s o 3x1:30. Decimales con punto: 62.5'**
+  String get routineEditorQuickEntryPickedHint;
+
+  /// Confirma la entrada rápida. Existe porque elegir el ejercicio dejó de agregarlo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'AGREGAR'**
+  String get routineEditorQuickEntryAdd;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

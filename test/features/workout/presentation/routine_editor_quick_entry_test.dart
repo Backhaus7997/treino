@@ -25,6 +25,8 @@ import 'package:treino/features/workout/presentation/routine_editor_mode.dart';
 import 'package:treino/features/workout/presentation/routine_editor_screen.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
+import 'package:treino/features/workout/presentation/widgets/exercise_card.dart';
+
 import '../../../fixtures/exercises.dart';
 import '../../../fixtures/routine_editor_ui.dart';
 import '../../../helpers/fake_analytics_service.dart';
@@ -86,29 +88,34 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('el atajo agrega el ejercicio con sets, reps y peso cargados',
-      (tester) async {
-    await _pumpEditor(tester);
-    await abrirRapido(tester);
-
+  /// El flujo completo: buscar, ELEGIR (que sólo autocompleta), escribir la
+  /// prescripción, y recién ahí confirmar.
+  Future<void> elegirYAgregar(
+    WidgetTester tester, {
+    required String busqueda,
+    required String prescripcion,
+  }) async {
     await tester.enterText(
-        find.byKey(const Key('quick_entry_field')), 'banca 3x8 60');
+        find.byKey(const Key('quick_entry_field')), busqueda);
     await tester.pumpAndSettle();
-
-    expect(find.text('Press de Banca'), findsWidgets,
-        reason: 'el catálogo real responde a "banca"');
     await tester.tap(find.byKey(const Key('quick_entry_result_0')));
     await tester.pumpAndSettle();
 
-    // El ejercicio quedó en el día, con su prescripción ya cargada.
-    await expandirEjercicios(tester);
-    expect(celdasConHint('reps'), findsNWidgets(3),
-        reason: '3x8 tiene que dejar TRES filas de set');
-    expect(find.text('8'), findsWidgets);
-    expect(find.text('60'), findsWidgets);
-  });
+    final campo =
+        tester.widget<TextField>(find.byKey(const Key('quick_entry_field')));
+    await tester.enterText(
+      find.byKey(const Key('quick_entry_field')),
+      '${campo.controller!.text}$prescripcion',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('quick_entry_confirm')));
+    await tester.pumpAndSettle();
+  }
 
-  testWidgets('sin números entra con 3 sets vacíos', (tester) async {
+  testWidgets('elegir un resultado autocompleta, NO agrega', (tester) async {
+    // El hallazgo de la revisión del 31/08: el tap agregaba el ejercicio en el
+    // acto con lo que hubiera escrito. Como el nombre se escribe primero, el
+    // atajo se cerraba justo antes de poder decir "4x10 55".
     await _pumpEditor(tester);
     await abrirRapido(tester);
 
@@ -116,6 +123,76 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('quick_entry_result_0')));
     await tester.pumpAndSettle();
+
+    // El panel sigue abierto, con el nombre puesto y listo para seguir.
+    expect(find.byKey(const Key('quick_entry_field')), findsOneWidget);
+    final campo =
+        tester.widget<TextField>(find.byKey(const Key('quick_entry_field')));
+    expect(campo.controller!.text, startsWith('Press de Banca'));
+    expect(campo.controller!.text, endsWith(' '),
+        reason: 'con el espacio puesto, para escribir la prescripción');
+    expect(find.byKey(const Key('quick_entry_confirm')), findsOneWidget);
+    // Y el ejercicio NO entró todavía.
+    expect(find.byType(ExerciseCard), findsNothing);
+  });
+
+  testWidgets('el flujo completo agrega con la prescripción tipeada',
+      (tester) async {
+    await _pumpEditor(tester);
+    await abrirRapido(tester);
+    await elegirYAgregar(tester, busqueda: 'banca', prescripcion: '3x8 60');
+
+    await expandirEjercicios(tester);
+    expect(celdasConHint('reps'), findsNWidgets(3));
+    expect(find.text('8'), findsWidgets);
+    expect(find.text('60'), findsWidgets);
+  });
+
+  testWidgets('una pirámide deja cada set con SUS reps', (tester) async {
+    await _pumpEditor(tester);
+    await abrirRapido(tester);
+    await elegirYAgregar(tester,
+        busqueda: 'banca', prescripcion: '4x10, 8, 6, 4');
+
+    await expandirEjercicios(tester);
+    expect(celdasConHint('reps'), findsNWidgets(4));
+    for (final valor in ['10', '8', '6', '4']) {
+      expect(find.text(valor), findsWidgets, reason: 'falta la rep $valor');
+    }
+  });
+
+  testWidgets('una descarga deja cada set con SU peso', (tester) async {
+    await _pumpEditor(tester);
+    await abrirRapido(tester);
+    await elegirYAgregar(tester,
+        busqueda: 'banca', prescripcion: '4x10 55, 45, 35, 25');
+
+    await expandirEjercicios(tester);
+    expect(celdasConHint('kg'), findsNWidgets(4));
+    for (final valor in ['55', '45', '35', '25']) {
+      expect(find.text(valor), findsWidgets, reason: 'falta el peso $valor');
+    }
+  });
+
+  testWidgets('por tiempo el ejercicio entra en modo duración', (tester) async {
+    // `3x30s` no es "30 repeticiones": el slot tiene que quedar midiendo
+    // tiempo, sin obligar a cambiarlo después desde el header de la columna.
+    await _pumpEditor(tester);
+    await abrirRapido(tester);
+    await elegirYAgregar(tester, busqueda: 'banca', prescripcion: '3x30s');
+
+    await expandirEjercicios(tester);
+    expect(find.text('TIEMPO'), findsOneWidget,
+        reason: 'la columna de REPS pasó a TIEMPO');
+    expect(celdasConHint('reps'), findsNothing);
+    expect(find.text('00:30'), findsWidgets,
+        reason: 'treinta segundos, en el formato del campo de duración');
+  });
+
+  testWidgets('sin números entra con 3 sets vacíos', (tester) async {
+    await _pumpEditor(tester);
+    await abrirRapido(tester);
+    await elegirYAgregar(tester, busqueda: 'banca', prescripcion: '');
 
     await expandirEjercicios(tester);
     expect(celdasConHint('reps'), findsNWidgets(3));
@@ -125,27 +202,36 @@ void main() {
             'de un ejercicio agregado por el picker');
   });
 
-  testWidgets('el panel se cierra al elegir', (tester) async {
+  testWidgets('el panel se cierra al confirmar', (tester) async {
     await _pumpEditor(tester);
     await abrirRapido(tester);
-    expect(find.byKey(const Key('quick_entry_field')), findsOneWidget);
+    await elegirYAgregar(tester, busqueda: 'banca', prescripcion: '3x8');
 
+    expect(find.byKey(const Key('quick_entry_field')), findsNothing);
+  });
+
+  testWidgets('borrar el nombre elegido devuelve la lista', (tester) async {
+    await _pumpEditor(tester);
+    await abrirRapido(tester);
     await tester.enterText(find.byKey(const Key('quick_entry_field')), 'banca');
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('quick_entry_result_0')));
     await tester.pumpAndSettle();
+    expect(find.byKey(const Key('quick_entry_results')), findsNothing);
 
-    expect(find.byKey(const Key('quick_entry_field')), findsNothing,
-        reason: 'el atajo termina cuando el ejercicio entró');
+    // Se equivocó de ejercicio: vuelve a buscar sin cerrar el panel.
+    await tester.enterText(find.byKey(const Key('quick_entry_field')), 'press');
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('quick_entry_results')), findsOneWidget,
+        reason: 'soltar el nombre tiene que devolver la búsqueda');
+    expect(find.byKey(const Key('quick_entry_confirm')), findsNothing);
   });
 
   testWidgets('no ofrece un ejercicio que ya está en el día', (tester) async {
     await _pumpEditor(tester);
     await abrirRapido(tester);
-    await tester.enterText(find.byKey(const Key('quick_entry_field')), 'banca');
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('quick_entry_result_0')));
-    await tester.pumpAndSettle();
+    await elegirYAgregar(tester, busqueda: 'banca', prescripcion: '3x8');
 
     await abrirRapido(tester);
     await tester.enterText(
@@ -160,13 +246,10 @@ void main() {
 
   testWidgets('busca por tokens: "press banca" llega a "Press de Banca"',
       (tester) async {
-    // Un `contains` no sirve: el `de` del medio lo rompe. La búsqueda usa el
-    // mismo matcher que el picker (ADR-BIBW-01) — dos búsquedas que difieren
-    // en la misma pantalla es peor que una sola imperfecta.
     await _pumpEditor(tester);
     await abrirRapido(tester);
     await tester.enterText(
-        find.byKey(const Key('quick_entry_field')), 'press banca 4x10');
+        find.byKey(const Key('quick_entry_field')), 'press banca');
     await tester.pumpAndSettle();
 
     expect(find.text('Press de Banca'), findsWidgets);
@@ -181,23 +264,5 @@ void main() {
     await tester.tap(find.text('Agregar ejercicio'));
     await tester.pumpAndSettle();
     expect(find.text('Press de Banca'), findsWidgets);
-  });
-
-  testWidgets('cerrar el panel limpia lo tipeado', (tester) async {
-    await _pumpEditor(tester);
-    await abrirRapido(tester);
-    await tester.enterText(
-        find.byKey(const Key('quick_entry_field')), 'banca 4x10');
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(const Key('quick_entry_toggle')));
-    await tester.pumpAndSettle();
-    await abrirRapido(tester);
-
-    final campo =
-        tester.widget<TextField>(find.byKey(const Key('quick_entry_field')));
-    expect(campo.controller!.text, '',
-        reason: 'volver a abrir el atajo empieza de cero, no retoma una '
-            'búsqueda vieja');
   });
 }
