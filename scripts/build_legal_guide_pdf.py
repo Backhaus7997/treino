@@ -117,6 +117,22 @@ def decision(num, titulo, que, importa, opciones, reco, desbloquea):
     return parts
 
 
+def resolved(num, titulo, respuesta, datos, consecuencias, pendiente=None):
+    """Bloque de una decision ya tomada."""
+    parts = [Paragraph(f"D{num}. {titulo}  —  RESUELTA", ST["h2"]),
+             callout(f"<b>Respuesta.</b> {respuesta}")]
+    parts.append(Spacer(1, 7))
+    parts.append(Paragraph("Datos para los documentos", ST["h3"]))
+    parts.append(table(datos, [45, 120], header=False))
+    parts.append(Spacer(1, 8))
+    parts.append(Paragraph("Qué se dispara a partir de esto", ST["h3"]))
+    parts.append(table(consecuencias, [50, 115]))
+    if pendiente:
+        parts.append(Spacer(1, 7))
+        parts.append(callout(pendiente, warn=True))
+    return parts
+
+
 # ---------------------------------------------------------------- contenido
 def build_story():
     S = []
@@ -135,6 +151,7 @@ def build_story():
         ["Fecha", "31 de agosto de 2026"],
         ["Verificado contra", "código de la app y reglas de Firestore"],
         ["Complementa", "docs/legal/ (4 borradores ya redactados)"],
+        ["Titular", "BACKHAUSTIN S.A.S. — CUIT 30-71929587-4"],
         ["Estado", "Ningún documento publicado todavía"],
     ], [40, 125], header=False))
     sp(24)
@@ -219,38 +236,60 @@ def build_story():
     A(PageBreak())
 
     # ---- 3 decisiones
-    A(P("3. Las seis decisiones que sólo podés tomar vos", "h1"))
+    A(P("3. Las seis decisiones", "h1"))
     A(P("Ninguna de estas la puede tomar un abogado por vos, ni yo. Son "
         "definiciones de negocio. Hasta que no estén, los nueve documentos "
-        "pendientes no se pueden escribir sin inventar."))
+        "pendientes no se pueden escribir sin inventar. "
+        "<b>La primera ya está resuelta; quedan cinco.</b>"))
 
-    for block in decision(
+    for block in resolved(
         1, "Quién es el titular de TREINO",
-        "Si TREINO opera como vos —persona humana— o como una sociedad. Y en "
-        "cualquier caso: CUIT, domicilio legal y una casilla de contacto real.",
-        "Es el bloqueante de los trece documentos. Todos empiezan "
-        "identificando al responsable, y la Ley 25.326 lo exige en su artículo "
-        "6. Hoy la política publicada dice que el responsable es «TREINO», que "
-        "no es un sujeto de derecho, y da una casilla en un dominio "
-        "(treino.app) que no aparece en ninguna configuración del proyecto: el "
-        "dominio real es gettreino.com. Es decir, el canal para ejercer "
-        "derechos probablemente no existe.",
-        [["Opción", "A favor", "En contra"],
-         ["<b>Persona humana</b> (monotributo o responsable inscripto)",
-          "Inmediato, sin costo de constitución ni de mantenimiento",
-          "Respondés con tu patrimonio personal. En una app que da rutinas de "
-          "entrenamiento y aloja datos de salud, eso es exposición real"],
-         ["<b>S.A.S. o S.R.L.</b>",
-          "Separa tu patrimonio del de la empresa. Necesario si en algún "
-          "momento entra un socio o inversión",
-          "Semanas de trámite, costo de constitución y contable mensual"]],
-        "Si vas a lanzar público y cobrar suscripciones, sociedad. La "
-        "responsabilidad civil por lesión no es un riesgo teórico en una app "
-        "de entrenamiento. Si el lanzamiento es acotado y de prueba, persona "
-        "humana alcanza para empezar — pero decidilo a conciencia, no por "
-        "inercia. Y en cualquiera de los dos casos: <b>la casilla de contacto "
-        "tiene que existir y estar atendida el día uno.</b>",
-        "Los trece documentos. Es literalmente la primera línea de cada uno."):
+        "Hay sociedad constituida: <b>BACKHAUSTIN S.A.S.</b>, inscripta en el "
+        "Registro Público de Córdoba. Era la opción recomendada — con datos de "
+        "salud y suscripciones de por medio, la separación patrimonial no es un "
+        "lujo.",
+        [["Razón social", "<b>BACKHAUSTIN S.A.S.</b>"],
+         ["CUIT", "30-71929587-4"],
+         ["Constitución", "23 de enero de 2026, bajo Ley 27.349"],
+         ["Inscripción", "Resolución de la Dirección General de Inspección de "
+          "Personas Jurídicas de Córdoba, 5 de febrero de 2026. "
+          "Expte. 0007-288597/2026"],
+         ["Matrícula", "N° 46468-A — Protocolo de Contratos y Disoluciones"],
+         ["Jurisdicción", "Provincia de Córdoba, República Argentina"]],
+        [["Frente", "Qué hay que hacer"],
+         ["<b>Los trece documentos</b>",
+          "Todos identifican ahora a BACKHAUSTIN S.A.S. con su CUIT y "
+          "matrícula. Los cuatro borradores ya están actualizados. La fórmula "
+          "es: «TREINO es un servicio prestado por BACKHAUSTIN S.A.S.»"],
+         ["<b>Cuentas de las tiendas</b>",
+          "Apple Developer Program y Google Play Console tienen que estar a "
+          "nombre de la <b>sociedad</b>, no tuyo. Si hoy son personales, hay "
+          "un desfasaje entre quién publica la app y quién dice ser "
+          "responsable en los documentos. La cuenta de organización de Apple "
+          "además exige número D-U-N-S, que se tramita aparte y demora. "
+          "<b>Verificalo antes de seguir</b>: migrar después es doloroso"],
+         ["<b>Acuerdos con proveedores</b>",
+          "Los de Google Cloud, Resend y Vercel se aceptan a nombre de "
+          "BACKHAUSTIN S.A.S. Si ya los aceptaste como persona, hay que "
+          "rehacerlos"],
+         ["<b>Inscripción ante la AAIP</b>",
+          "Ya se puede hacer: la base se registra a nombre de la sociedad, con "
+          "su CUIT"],
+         ["<b>Marca TREINO</b>",
+          "Los Términos afirman que la marca y el diseño son propiedad de "
+          "TREINO. Conviene que eso tenga respaldo: registro de la marca ante "
+          "el INPI a nombre de la sociedad. No bloquea el lanzamiento, pero "
+          "sostiene la cláusula"],
+         ["<b>Libros digitales</b>",
+          "El artículo 2 de la resolución de IPJ remite a la Resolución 58/18 "
+          "«G». Es cumplimiento societario, no de la app — pero es tuyo y "
+          "conviene que lo lleve el contador desde el arranque"]],
+        "<b>Ojo con la jurisdicción en los Términos.</b> Tener la sociedad en "
+        "Córdoba no significa que puedas mandar todos los conflictos a "
+        "tribunales cordobeses. En relaciones de consumo, la competencia se fija "
+        "en el domicilio del consumidor, y una cláusula que lo desplace se tiene "
+        "por no escrita. Es una de las cosas puntuales que tiene que resolver el "
+        "abogado, no una plantilla."):
         A(block)
 
     A(PageBreak())
@@ -444,7 +483,7 @@ def build_story():
         "Las declaraciones de privacidad de las tiendas, en "
         "<b>store/privacy/</b>: son el inventario de datos ya verificado "
         "contra el binario.",
-        "Esta guía, con las seis decisiones ya tomadas.",
+        "Esta guía, con las decisiones ya tomadas.",
     ]))
     sp(6)
     A(P("5.2 Las preguntas concretas", "h3"))
@@ -523,11 +562,11 @@ def build_story():
     A(table([
         ["Etapa", "Qué pasa", "Quién"],
         ["<b>1. Decidir</b>",
-         "Las seis decisiones de la sección 3. Sin esto no se escribe nada más",
+         "Las cinco decisiones pendientes de la sección 3. D1 ya está",
          "Vos"],
-        ["<b>2. Constituir e identificar</b>",
-         "Sociedad si va, CUIT, domicilio, casilla real atendida",
-         "Vos + escribano"],
+        ["<b>2. Identificar</b>",
+         "[OK] Sociedad constituida e inscripta. Falta el domicilio de la sede social, la casilla atendida y verificar a nombre de quién están las cuentas de las tiendas",
+         "Vos"],
         ["<b>3. Completar los borradores</b>",
          "Rellenar los pendientes de los cuatro documentos ya escritos",
          "Nosotros"],

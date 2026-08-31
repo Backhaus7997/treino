@@ -112,7 +112,7 @@ Si ves algo que viola estas normas:
 1. **Reportá el contenido** desde el menú de la publicación, mensaje o reseña.
 2. **Bloqueá al usuario** desde su perfil. Al bloquearlo dejás de ver su
    contenido y él el tuyo, y no puede volver a contactarte.
-3. **Escribinos** a [[PENDIENTE — casilla de contacto]] si es grave o urgente.
+3. **Escribinos** a [[PENDIENTE — casilla bajo `gettreino.com`]] si es grave o urgente.
 
 **Nos comprometemos a revisar todo reporte dentro de las 24 horas.**
 
@@ -144,7 +144,8 @@ respondemos.
 
 ## 5. Contacto
 
-[[PENDIENTE — nombre del titular y casilla de contacto]]
+**BACKHAUSTIN S.A.S.** — CUIT 30-71929587-4
+Correo: [[PENDIENTE — casilla bajo `gettreino.com`]]
 
 ---
 ---
