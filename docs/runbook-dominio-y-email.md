@@ -83,7 +83,7 @@ firebase functions:secrets:set RESEND_API_KEY --project prod
 > comandos de este runbook.
 
 El remitente por defecto ya está en el código
-(`MAIL_FROM = "TREINO <hola@send.gettreino.com>"`,
+(`MAIL_FROM = "TREINO <equipo@send.gettreino.com>"`,
 `functions/src/mail/send-queued-mail.ts`). Si querés otro, se sobrescribe con la
 variable de entorno `MAIL_FROM` — no hace falta tocar código.
 
