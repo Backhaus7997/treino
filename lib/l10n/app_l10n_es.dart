@@ -1952,6 +1952,21 @@ class AppL10nEs extends AppL10n {
   String get routineEditorSlotMenuRemove => 'Eliminar';
 
   @override
+  String routineEditorSupersetHeader(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'EJERCICIOS',
+      one: 'EJERCICIO',
+    );
+    return 'SUPERSERIE · $count $_temp0';
+  }
+
+  @override
+  String get routineEditorSlotMenuHint =>
+      'El ⋮ de cada ejercicio tiene cambiar, copiar sets y mover.';
+
+  @override
   String get routineEditorRestLabel => 'Descanso';
 
   @override
@@ -3084,7 +3099,10 @@ class AppL10nEs extends AppL10n {
 
   @override
   String dashboardAlertBannerSummary(
-      int vencidos, int solicitudes, int inactivos) {
+    int vencidos,
+    int solicitudes,
+    int inactivos,
+  ) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,
@@ -6025,6 +6043,21 @@ class AppL10nEsAr extends AppL10nEs {
   String get routineEditorSlotMenuRemove => 'Eliminar';
 
   @override
+  String routineEditorSupersetHeader(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'EJERCICIOS',
+      one: 'EJERCICIO',
+    );
+    return 'SUPERSERIE · $count $_temp0';
+  }
+
+  @override
+  String get routineEditorSlotMenuHint =>
+      'El ⋮ de cada ejercicio tiene cambiar, copiar sets y mover.';
+
+  @override
   String get routineEditorRestLabel => 'Descanso';
 
   @override
@@ -7155,7 +7188,10 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String dashboardAlertBannerSummary(
-      int vencidos, int solicitudes, int inactivos) {
+    int vencidos,
+    int solicitudes,
+    int inactivos,
+  ) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,

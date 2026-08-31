@@ -1903,6 +1903,21 @@ class AppL10nEn extends AppL10n {
   String get routineEditorSlotMenuRemove => 'Remove';
 
   @override
+  String routineEditorSupersetHeader(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'EXERCISES',
+      one: 'EXERCISE',
+    );
+    return 'SUPERSET · $count $_temp0';
+  }
+
+  @override
+  String get routineEditorSlotMenuHint =>
+      'The ⋮ on each exercise has replace, copy sets and move.';
+
+  @override
   String get routineEditorRestLabel => 'Rest';
 
   @override
@@ -3029,7 +3044,10 @@ class AppL10nEn extends AppL10n {
 
   @override
   String dashboardAlertBannerSummary(
-      int vencidos, int solicitudes, int inactivos) {
+    int vencidos,
+    int solicitudes,
+    int inactivos,
+  ) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,

@@ -1180,6 +1180,19 @@
   "@routineEditorSlotMenuMoveDown": {},
   "routineEditorSlotMenuRemove": "Eliminar",
   "@routineEditorSlotMenuRemove": {},
+  "routineEditorSupersetHeader": "SUPERSERIE · {count} {count, plural, =1{EJERCICIO} other{EJERCICIOS}}",
+  "@routineEditorSupersetHeader": {
+    "description": "Encabezado del bloque de superserie en el editor de rutina, con cuántos ejercicios agrupa.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "routineEditorSlotMenuHint": "El ⋮ de cada ejercicio tiene cambiar, copiar sets y mover.",
+  "@routineEditorSlotMenuHint": {
+    "description": "Línea de ayuda debajo de las acciones del día: descubre los atajos que viven en el menú de tres puntos de cada ejercicio."
+  },
   "routineEditorRestLabel": "Descanso",
   "@routineEditorRestLabel": {},
   "routineEditorAddSet": "+ Agregar set",

@@ -4,6 +4,10 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/treino_icon.dart';
+import 'superset_block.dart';
+
+/// Relleno del agarre cuando la card es miembro de una superserie, sobre 255.
+const int _kAgarreSuperserie = 40;
 
 /// Collapsible presentation shell for one exercise in the routine editor.
 class ExerciseCard extends StatelessWidget {
@@ -15,6 +19,7 @@ class ExerciseCard extends StatelessWidget {
     required this.menu,
     required this.child,
     this.hasError = false,
+    this.supersetPosition,
     super.key,
   });
 
@@ -26,9 +31,17 @@ class ExerciseCard extends StatelessWidget {
   final Widget child;
   final bool hasError;
 
+  /// Posición 0-based dentro de una superserie, o null si el ejercicio es
+  /// suelto. Cuando está, el agarre se tiñe de `highlight` y muestra el badge
+  /// `A1`/`A2`: son las dos marcas que dicen "esta card es parte de un grupo"
+  /// desde afuera del bloque que la envuelve.
+  final int? supersetPosition;
+
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+
+    final enSuperserie = supersetPosition != null;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -37,11 +50,25 @@ class ExerciseCard extends StatelessWidget {
           width: 26,
           padding: const EdgeInsets.symmetric(vertical: AppSpacing.s12),
           decoration: BoxDecoration(
-            color: palette.surfaceSubtle,
+            color: enSuperserie
+                ? palette.highlight.withAlpha(_kAgarreSuperserie)
+                : palette.surfaceSubtle,
             borderRadius: BorderRadius.circular(AppRadius.sm),
           ),
-          child:
-              Icon(TreinoIcon.dragHandle, size: 18, color: palette.textFaint),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (enSuperserie) ...[
+                SupersetBadge(position: supersetPosition!),
+                const SizedBox(height: AppSpacing.hairline),
+              ],
+              Icon(
+                TreinoIcon.dragHandle,
+                size: 18,
+                color: enSuperserie ? palette.highlight : palette.textFaint,
+              ),
+            ],
+          ),
         ),
         const SizedBox(width: AppSpacing.s8),
         Expanded(
