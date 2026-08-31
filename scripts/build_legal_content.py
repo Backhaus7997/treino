@@ -69,10 +69,21 @@ BANNER_DART = (
 
 # ----------------------------------------------------------------- parsing
 FM_RE = re.compile(r"<!--\s*treino-legal\s*(.*?)-->", re.S)
+FENCE_RE = re.compile(r"^```.*?^```", re.S | re.M)
+
+
+def strip_fences(text: str) -> str:
+    """Saca los bloques de codigo.
+
+    Sin esto, documentar la convencion en un README —con un bloque de ejemplo
+    que muestra el front matter— hace que el parser lo lea como front matter
+    de verdad. Paso exactamente eso.
+    """
+    return FENCE_RE.sub("", text)
 
 
 def front_matter(text: str) -> dict[str, str] | None:
-    m = FM_RE.search(text)
+    m = FM_RE.search(strip_fences(text))
     if not m:
         return None
     out: dict[str, str] = {}
@@ -149,6 +160,7 @@ def to_sections(md: str) -> list[tuple[str, str]]:
     blocks: list[str] = []    # bloques ya cerrados, ya en texto plano
     cur: list[str] = []       # lineas crudas del bloque en curso
     bullet = False            # el bloque en curso es un item de lista
+    fenced = False            # dentro de un bloque de codigo
     table: list[str] = []
 
     def close_block():
@@ -179,7 +191,7 @@ def to_sections(md: str) -> list[tuple[str, str]]:
     for raw in md.splitlines():
         line = raw.rstrip()
 
-        if line.startswith("## "):
+        if line.startswith("## ") and not fenced:
             close_section()
             heading = inline(line[3:]).upper()
             continue
@@ -197,6 +209,12 @@ def to_sections(md: str) -> list[tuple[str, str]]:
             continue
         if line.startswith("---") or line.startswith("<!--"):
             close_block()
+            continue
+        if line.startswith("```"):
+            close_block()
+            fenced = not fenced
+            continue
+        if fenced:
             continue
         if line.startswith("### ") or line.startswith("#### "):
             close_block()
