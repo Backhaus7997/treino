@@ -102,7 +102,11 @@ class SetCellField extends StatelessWidget {
           horizontal: AppSpacing.hairline,
         ),
         filled: true,
-        fillColor: palette.bgCard,
+        // `surfaceSubtle`, el mismo relleno que el chip de SET de la misma
+        // fila. Con `bgCard` las tres celdas de una fila se leían como dos
+        // familias distintas: el chip sólido y los campos hundidos. Revisión
+        // en device del 31/08.
+        fillColor: palette.surfaceSubtle,
         border: _border(restingColor, restingWidth),
         enabledBorder: _border(restingColor, restingWidth),
         focusedBorder: _border(focusedColor, 1.5),

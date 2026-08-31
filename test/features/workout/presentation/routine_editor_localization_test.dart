@@ -88,7 +88,7 @@ void main() {
       expect(find.byType(DayTabBar), findsOneWidget,
           reason: 'la barra de pestañas reemplazó al label PLAN DAYS');
       expect(
-        tester.widget<Text>(find.byKey(const Key('day_header_name'))).data,
+        tester.widget<DayTabBar>(find.byType(DayTabBar)).labels.first,
         'Day 1',
         reason: 'el nombre del día también sale en su pestaña',
       );

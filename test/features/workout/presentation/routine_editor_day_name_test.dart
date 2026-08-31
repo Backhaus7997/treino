@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/features/workout/presentation/widgets/day_tab_bar.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
@@ -84,13 +85,17 @@ List<Override> _overrides({String uid = 'athlete-1'}) {
 const _firstDayPencilKey = Key('day_name_edit_button_1');
 const _editingFieldKey = Key('day_name_editing_field');
 
-/// Nombre del día tal como lo muestra la CABECERA.
+/// Nombre del día, leído de la PESTAÑA.
 ///
-/// Desde #865 el nombre aparece dos veces: en la pestaña —que navega y trunca
-/// a 15 caracteres— y en la cabecera, que muestra el nombre completo y es
-/// donde se edita. `find.text` encuentra los dos, así que hay que decir cuál.
+/// Hasta la revisión en device del 31/08 el nombre aparecía dos veces: en la
+/// pestaña y en una cabecera 200 px más abajo. La cabecera se fue —entre el
+/// borde, el padding y el divisor se comía ~70 px en la única pantalla donde
+/// el alto es el recurso escaso—, así que ahora hay una sola fuente.
+///
+/// Se lee del widget y no con `find.text` porque la pestaña trunca a 15
+/// caracteres para mostrar: `labels` tiene el nombre entero.
 String _nombreEnCabecera(WidgetTester tester) =>
-    tester.widget<Text>(find.byKey(const Key('day_header_name'))).data!;
+    tester.widget<DayTabBar>(find.byType(DayTabBar)).labels.first;
 
 void main() {
   group('Editable day name (decisión A1 + 2A + E2)', () {

@@ -2830,11 +2830,16 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                         onChanged: (_) => setState(() {}),
                       ),
                     ],
-                    // ── Días del plan ───────────────────────────────────
                     // ── Días del plan ─────────────────────────────────
                     // Pestañas en vez de la pila de acordeones: se renderiza
                     // UN día a la vez, así el scroll vertical es el de un día
                     // y no el de la rutina entera.
+                    //
+                    // El aire de arriba no es decorativo: las pestañas nacían
+                    // pegadas al campo del nombre y las dos cosas se leían como
+                    // un solo bloque, cuando una nombra el plan y la otra
+                    // navega entre sus días. Revisión en device del 31/08.
+                    const SizedBox(height: AppSpacing.s14),
                     DayTabBar(
                       labels: [for (final d in _days) d.name],
                       statuses: [for (final d in _days) _dayStatus(d)],
@@ -3555,129 +3560,123 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
   Widget build(BuildContext context) {
     final l10n = AppL10n.of(context);
     final palette = widget.palette;
-    // Day-level error: at least one visible slot has incomplete sets.
-    final hasDayError = widget.slotIsValid != null &&
-        widget.day.slots.any((slot) =>
-            slot.isPresentInWeek(widget.week) && !widget.slotIsValid!(slot));
     return Container(
       decoration: BoxDecoration(
         color: palette.bgCard,
         borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: Border.all(
-          color: hasDayError ? palette.danger.withAlpha(180) : palette.border,
-          width: hasDayError ? 1.5 : 1.0,
-        ),
+        // Sin borde de error: las señales quedaron en tres —celda, punto de la
+        // pestaña, pie— y ésta era una cuarta que pintaba la pantalla entera.
+        border: Border.all(color: palette.border),
       ),
       child: Column(
         children: [
-          // Header row
-          // Ya no es un toggle: con pestañas de día el día visible está
-          // siempre abierto, y colapsarlo dejaría la pantalla vacía.
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _editingName
-                      ? TextField(
-                          key: const Key('day_name_editing_field'),
-                          controller: _nameController,
-                          focusNode: _nameFocus,
-                          textInputAction: TextInputAction.done,
-                          onSubmitted: (_) => _commitName(),
-                          // Keep the tile expanded during edit so the tap on
-                          // an inner area (slot rows, etc.) doesn't collapse
-                          // the day under the user.
-                          onTap: () {},
-                          style: GoogleFonts.barlowCondensed(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 15,
-                            color: palette.textPrimary,
-                          ),
-                          decoration: InputDecoration(
-                            isDense: true,
-                            contentPadding: EdgeInsets.zero,
-                            border: InputBorder.none,
-                            hintText:
-                                l10n.routineEditorDayName(widget.day.dayNumber),
-                            hintStyle: GoogleFonts.barlowCondensed(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 15,
-                              color: palette.textMuted,
-                            ),
-                          ),
-                        )
-                      : Text(
-                          widget.day.name,
-                          // El nombre también vive en la pestaña de arriba: la
-                          // pestaña navega y trunca a 15 caracteres, la
-                          // cabecera muestra el nombre completo y es donde se
-                          // edita. La key desambigua a los tests.
-                          key: const Key('day_header_name'),
-                          style: GoogleFonts.barlowCondensed(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 15,
-                            color: palette.textPrimary,
-                          ),
-                        ),
-                ),
-                if (!_editingName)
-                  IconButton(
-                    key: Key('day_name_edit_button_${widget.day.dayNumber}'),
-                    icon: Icon(
-                      TreinoIcon.edit,
-                      size: 16,
-                      color: palette.textMuted,
-                    ),
-                    tooltip: l10n.routineEditorEditDayNameA11y,
-                    onPressed: _startEditing,
-                    constraints:
-                        const BoxConstraints(minWidth: 44, minHeight: 44),
-                    padding: EdgeInsets.zero,
-                  ),
-                if (hasDayError) ...[
-                  Container(
-                    width: 7,
-                    height: 7,
-                    margin: const EdgeInsets.only(right: 8),
-                    decoration: BoxDecoration(
-                      color: palette.danger,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ],
-                if (widget.onRemoveDay != null)
-                  IconButton(
-                    icon: Icon(TreinoIcon.trash,
-                        size: 18, color: palette.textMuted),
-                    tooltip: l10n.routineEditorDeleteDayA11y,
-                    onPressed: widget.onRemoveDay,
-                    constraints:
-                        const BoxConstraints(minWidth: 44, minHeight: 44),
-                    padding: EdgeInsets.zero,
-                  ),
-              ],
-            ),
-          ),
-
+          // La cabecera del día se fue (revisión en device del 31/08).
+          //
+          // Era el último resto del acordeón: un contenedor con borde que
+          // repetía el nombre del día a 200 px de la pestaña que ya lo dice,
+          // más el lápiz, el punto de error y el tacho. Entre el borde, sus
+          // 12 px de padding vertical, el nombre duplicado y el divisor se
+          // comía ~70 px de alto en la única pantalla donde el alto es el
+          // recurso escaso — la de configurar sets.
+          //
+          // Renombrar y borrar el día se mudaron a la fila del botón RÁPIDO,
+          // que ya ocupaba ese renglón. El punto de error no se mudó a ningún
+          // lado: vive en la pestaña desde #865.
           // Body
           const Divider(height: 1),
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
             child: Column(
               children: [
+                // Fila de acciones del día: el atajo a la izquierda, y
+                // renombrar/borrar a la derecha, donde antes había una
+                // cabecera entera para lo mismo.
+                if (_editingName)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.s8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            key: const Key('day_name_editing_field'),
+                            controller: _nameController,
+                            focusNode: _nameFocus,
+                            textInputAction: TextInputAction.done,
+                            onSubmitted: (_) => _commitName(),
+                            onTap: () {},
+                            style: GoogleFonts.barlowCondensed(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 15,
+                              color: palette.textPrimary,
+                            ),
+                            decoration: InputDecoration(
+                              isDense: true,
+                              contentPadding: EdgeInsets.zero,
+                              border: InputBorder.none,
+                              hintText: l10n
+                                  .routineEditorDayName(widget.day.dayNumber),
+                              hintStyle: GoogleFonts.barlowCondensed(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 15,
+                                color: palette.textMuted,
+                              ),
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          key: Key(
+                              'day_name_commit_button_${widget.day.dayNumber}'),
+                          icon: Icon(TreinoIcon.check,
+                              size: 18, color: palette.accentText),
+                          tooltip: l10n.routineEditorEditDayNameA11y,
+                          onPressed: _commitName,
+                          constraints: const BoxConstraints(
+                              minWidth: 48, minHeight: 48),
+                          padding: EdgeInsets.zero,
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  Row(
+                    children: [
+                      if (widget.onQuickSearch != null &&
+                          widget.onQuickAdd != null)
+                        QuickEntryToggle(
+                          active: _quickEntryOpen,
+                          onTap: () => setState(() {
+                            _quickEntryOpen = !_quickEntryOpen;
+                            if (!_quickEntryOpen) _quickEntryCtrl.clear();
+                          }),
+                        ),
+                      const Spacer(),
+                      IconButton(
+                        key: Key(
+                            'day_name_edit_button_${widget.day.dayNumber}'),
+                        icon: Icon(TreinoIcon.edit,
+                            size: 16, color: palette.textMuted),
+                        tooltip: l10n.routineEditorEditDayNameA11y,
+                        onPressed: _startEditing,
+                        constraints:
+                            const BoxConstraints(minWidth: 48, minHeight: 48),
+                        padding: EdgeInsets.zero,
+                      ),
+                      if (widget.onRemoveDay != null)
+                        IconButton(
+                          key: Key(
+                              'day_remove_button_${widget.day.dayNumber}'),
+                          icon: Icon(TreinoIcon.trash,
+                              size: 18, color: palette.textMuted),
+                          tooltip: l10n.routineEditorDeleteDayA11y,
+                          onPressed: widget.onRemoveDay,
+                          constraints: const BoxConstraints(
+                              minWidth: 48, minHeight: 48),
+                          padding: EdgeInsets.zero,
+                        ),
+                    ],
+                  ),
                 if (widget.onQuickSearch != null &&
                     widget.onQuickAdd != null) ...[
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: QuickEntryToggle(
-                      active: _quickEntryOpen,
-                      onTap: () => setState(() {
-                        _quickEntryOpen = !_quickEntryOpen;
-                        if (!_quickEntryOpen) _quickEntryCtrl.clear();
-                      }),
-                    ),
-                  ),
                   if (_quickEntryOpen) ...[
                     const SizedBox(height: AppSpacing.s8),
                     ValueListenableBuilder<TextEditingValue>(
