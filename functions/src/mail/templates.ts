@@ -143,7 +143,7 @@ function layout(
     // encuentre las dos cosas leeria "TREINO TREINO".
     `<img src="${esc(LOGO_URL)}" width="28" height="44" alt=""`,
     " style=\"display:block;border:0;\"></td>",
-    `<td valign="middle"><div style="font-size:13px;letter-spacing:2px;`,
+    "<td valign=\"middle\"><div style=\"font-size:13px;letter-spacing:2px;",
     `color:${MINT};font-weight:700;font-family:${FONT};">TREINO</div>`,
     "</td></tr></table></td></tr>",
     "<tr><td style=\"padding:20px 32px 0 32px;\">",
