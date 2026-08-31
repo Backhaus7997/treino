@@ -156,11 +156,22 @@ class _SetCellFieldState extends State<SetCellField> {
           textAlign: TextAlign.center,
           decoration: InputDecoration(
             isDense: true,
+            // `filled: false` EXPLÍCITO. El tema de la app pone `filled: true`
+            // con `fillColor: bgCard` para todos los `InputDecoration`, y sin
+            // apagarlo el campo pintaba esa banda OSCURA encima del Container
+            // claro. Como el campo mide menos que los 48 dp de la caja, la
+            // banda se veía como una línea negra horizontal a la altura del
+            // texto — la "línea negra" de la revisión en device, que no era un
+            // borde sino un relleno heredado.
+            filled: false,
             // El borde y el relleno los pone el Container de afuera: acá
             // cualquier decoración volvería a meter una segunda caja.
             border: InputBorder.none,
             enabledBorder: InputBorder.none,
             focusedBorder: InputBorder.none,
+            errorBorder: InputBorder.none,
+            focusedErrorBorder: InputBorder.none,
+            disabledBorder: InputBorder.none,
             // Padding vertical CERO: el alto lo pone el `minHeight` del
             // Container de afuera, igual que en el chip. Sumarle padding acá
             // llevaba la celda a 52 y volvía a desalinearla del chip, que es

@@ -2045,17 +2045,23 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       final slot = _EditableSlot()
         ..exercise = ex
         ..restSeconds = 0
+        // `3x30s` prescribe TIEMPO, no repeticiones: el slot entra derecho en
+        // modo duración en vez de obligar a cambiarlo después desde el header
+        // de la columna.
+        ..exerciseMode =
+            entry.esDuracion ? ExerciseMode.duration : ExerciseMode.reps
         ..weeklySets = List.generate(
           _numWeeks,
-          // Cada set lleva LO SUYO: `4x10, 8, 6, 4` es una pirámide y
-          // `4x10 55, 45, 35, 25` una descarga. Una lista más corta que la
+          // Cada set lleva LO SUYO: `4x10,8,6,4` es una pirámide y
+          // `4x10 55,45,35,25` una descarga. Una lista más corta que la
           // cantidad de sets repite su último valor, que es como lo lee
           // cualquiera al escribirlo.
           (_) => List.generate(
             entry.sets,
             (i) => _EditableSet()
               ..reps = entry.repsDeSet(i)
-              ..weightKg = entry.pesoDeSet(i),
+              ..weightKg = entry.pesoDeSet(i)
+              ..durationSeconds = entry.duracionDeSet(i),
           ),
         )
         ..activeWeeks = scope == _AddScope.thisWeek ? {_selectedWeek} : <int>{};

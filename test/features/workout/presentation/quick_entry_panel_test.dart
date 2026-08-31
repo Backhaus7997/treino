@@ -188,6 +188,34 @@ void main() {
       expect(_hint(tester), contains('55 · 45 · 35 · 25'));
     });
 
+    testWidgets('por tiempo lo dice en segundos', (tester) async {
+      await _montarPanel(
+        tester,
+        texto: 'plancha 3x30s',
+        elegido: _kResultados.first,
+      );
+      expect(_hint(tester), contains('30s'));
+    });
+
+    testWidgets('y en m:ss cuando pasa el minuto', (tester) async {
+      await _montarPanel(
+        tester,
+        texto: 'plancha 3x1:30',
+        elegido: _kResultados.first,
+      );
+      expect(_hint(tester), contains('1:30'),
+          reason: 'noventa segundos se leen como un cronómetro, no como 90s');
+    });
+
+    testWidgets('una pirámide de tiempo se lista set por set', (tester) async {
+      await _montarPanel(
+        tester,
+        texto: 'plancha 3x45s,30s,20s',
+        elegido: _kResultados.first,
+      );
+      expect(_hint(tester), contains('45s · 30s · 20s'));
+    });
+
     testWidgets('sin peso lo dice, en vez de callarlo', (tester) async {
       await _montarPanel(
         tester,
@@ -204,7 +232,8 @@ void main() {
         elegido: _kResultados.first,
       );
       expect(_hint(tester), contains('4x10'));
-      expect(_hint(tester), contains('baja las reps'));
+      expect(_hint(tester), contains('3x30s'),
+          reason: 'el hint enseña también la forma por tiempo');
     });
 
     testWidgets('sin elegir, dice que hay que elegir', (tester) async {

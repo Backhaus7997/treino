@@ -12,6 +12,7 @@ class QuickEntry {
     required this.sets,
     this.reps = const [],
     this.weights = const [],
+    this.durations = const [],
   });
 
   /// Lo que queda fuera del patrón: la búsqueda contra el catálogo.
@@ -29,15 +30,26 @@ class QuickEntry {
   /// Peso POR SET, en kilos. Vacía cuando la línea no lo dice — y vacío es un
   /// estado legítimo: peso corporal se prescribe así.
   ///
-  /// `4x10 55, 45, 35, 25` es una descarga.
+  /// `4x10 55,45,35,25` es una descarga.
   final List<double> weights;
+
+  /// Segundos POR SET, cuando el ejercicio se mide en TIEMPO. Vacía cuando se
+  /// mide en repeticiones, que es el caso normal.
+  ///
+  /// `plancha 3x30s` son tres series de treinta segundos, y `3x1:30` una de
+  /// minuto y medio. Un ejercicio con esto entra en `ExerciseMode.duration`.
+  final List<int> durations;
+
+  /// True cuando la línea prescribe TIEMPO en vez de repeticiones.
+  bool get esDuracion => durations.isNotEmpty;
 
   /// Series cuando la línea no las dice. Tres es lo que trae un ejercicio
   /// agregado por el picker.
   static const int kDefaultSets = 3;
 
   /// True cuando la línea trae alguna prescripción, no sólo un nombre.
-  bool get tienePrescripcion => reps.isNotEmpty || weights.isNotEmpty;
+  bool get tienePrescripcion =>
+      reps.isNotEmpty || weights.isNotEmpty || durations.isNotEmpty;
 
   /// Las repeticiones del set [i], o null si la línea no las dice.
   ///
@@ -49,14 +61,17 @@ class QuickEntry {
   /// El peso del set [i], o null. Misma regla de repetición que [repsDeSet].
   double? pesoDeSet(int i) => _enPosicion(weights, i);
 
+  /// Los segundos del set [i], o null. Misma regla de repetición.
+  int? duracionDeSet(int i) => _enPosicion(durations, i);
+
   static T? _enPosicion<T>(List<T> valores, int i) {
     if (valores.isEmpty) return null;
     return i < valores.length ? valores[i] : valores.last;
   }
 
   @override
-  String toString() =>
-      'QuickEntry(query: $query, sets: $sets, reps: $reps, kg: $weights)';
+  String toString() => 'QuickEntry(query: $query, sets: $sets, reps: $reps, '
+      'kg: $weights, seg: $durations)';
 
   @override
   bool operator ==(Object other) =>
@@ -64,7 +79,8 @@ class QuickEntry {
       other.query == query &&
       other.sets == sets &&
       _mismaLista(other.reps, reps) &&
-      _mismaLista(other.weights, weights);
+      _mismaLista(other.weights, weights) &&
+      _mismaLista(other.durations, durations);
 
   static bool _mismaLista<T>(List<T> a, List<T> b) {
     if (a.length != b.length) return false;
@@ -80,14 +96,29 @@ class QuickEntry {
         sets,
         Object.hashAll(reps),
         Object.hashAll(weights),
+        Object.hashAll(durations),
       );
 }
 
-/// `4x10`, `4 X 10`, `4×10`: cuántas series por cuántas repeticiones.
+/// `4x10`, `4 X 10`, `4×10`: cuántas series por cuántas repeticiones — o por
+/// cuánto TIEMPO, si lo que sigue lleva `s` o `m:ss`.
 ///
 /// La `×` tipográfica entra porque el teclado de iOS la ofrece en el mismo
 /// lugar que la `x`, y una línea escrita con ella no puede fallar en silencio.
-final RegExp _kNumeroPorNumero = RegExp(r'(\d+)\s*[xX×]\s*(\d+)');
+///
+/// - grupo 2: el número (repeticiones, segundos, o los minutos de `m:ss`)
+/// - grupo 3: los segundos de `m:ss`, si vino en ese formato
+/// - grupo 4: la `s` que marca segundos
+///
+/// El espacio antes de la `s` va DENTRO del grupo opcional: suelto, un `\s*`
+/// se comía el espacio que separa el peso —`4x10 60` dejaba de tener peso—
+/// porque el patrón avanzaba el cursor aunque no hubiera `s` que capturar.
+final RegExp _kNumeroPorNumero =
+    RegExp(r'(\d+)\s*[xX×]\s*(\d+)(?::(\d{1,2}))?(?:\s*([sS]))?');
+
+/// El siguiente valor de una lista de TIEMPO: `,20s`, `, 1:15`.
+final RegExp _kRestoTiempo =
+    RegExp(r'^\s*,\s*(\d+)(?::(\d{1,2}))?(?:\s*([sS]))?');
 
 /// El siguiente valor de una lista: `,45`, `, 45`.
 ///
@@ -147,25 +178,43 @@ QuickEntry parseQuickEntry(String input) {
   }
 
   final declarados = int.tryParse(match.group(1)!) ?? QuickEntry.kDefaultSets;
-  final primeraRep = int.tryParse(match.group(2)!);
+  // Es TIEMPO si vino con `s` (`30s`) o con dos partes (`1:30`). Sin ninguna
+  // de las dos marcas, un número suelto son repeticiones — que es el caso
+  // normal y no debería pedir sintaxis extra.
+  final esTiempo = match.group(3) != null || match.group(4) != null;
 
-  // Todo lo que sigue al `NxM` se lee como listas; lo que sobra al final, más
-  // lo que había antes, es el nombre.
   var cursor = match.end;
-  final reps = <int>[if (primeraRep != null) primeraRep];
+  final reps = <int>[];
+  final durations = <int>[];
 
-  // Las comas inmediatas siguen la lista de REPETICIONES.
-  while (true) {
-    final m = _kResto.firstMatch(texto.substring(cursor));
-    if (m == null) break;
-    final n = int.tryParse(m.group(1)!.split('.').first);
-    if (n == null) break;
-    reps.add(n);
-    cursor += m.end;
+  if (esTiempo) {
+    final primero = _segundos(match.group(2), match.group(3));
+    if (primero != null) durations.add(primero);
+    // Las comas inmediatas siguen la lista de TIEMPOS.
+    while (true) {
+      final m = _kRestoTiempo.firstMatch(texto.substring(cursor));
+      if (m == null) break;
+      final s = _segundos(m.group(1), m.group(2));
+      if (s == null) break;
+      durations.add(s);
+      cursor += m.end;
+    }
+  } else {
+    final primera = int.tryParse(match.group(2)!);
+    if (primera != null) reps.add(primera);
+    // Las comas inmediatas siguen la lista de REPETICIONES.
+    while (true) {
+      final m = _kResto.firstMatch(texto.substring(cursor));
+      if (m == null) break;
+      final n = int.tryParse(m.group(1)!.split('.').first);
+      if (n == null) break;
+      reps.add(n);
+      cursor += m.end;
+    }
   }
 
   // Un número separado por ESPACIO abre la lista de PESOS, que a su vez puede
-  // encadenar con comas.
+  // encadenar con comas. Vale también en tiempo: una plancha con lastre.
   final weights = <double>[];
   final primerPeso = _kNumero.firstMatch(texto.substring(cursor));
   if (primerPeso != null) {
@@ -192,12 +241,13 @@ QuickEntry parseQuickEntry(String input) {
       .replaceAll(RegExp(r'\s+'), ' ');
 
   // Cuántos sets: lo declarado, pero nunca menos que la lista más larga. Quien
-  // escribe `3x10, 8, 6, 4` está pidiendo cuatro series aunque haya tecleado
-  // un 3 — la lista es más específica que el número.
+  // escribe `3x10,8,6,4` está pidiendo cuatro series aunque haya tecleado un
+  // 3 — la lista es más específica que el número.
   final sets = [
     declarados,
     reps.length,
     weights.length,
+    durations.length,
   ].reduce((a, b) => a > b ? a : b).clamp(1, kMaxSetsEntradaRapida);
 
   return QuickEntry(
@@ -205,7 +255,18 @@ QuickEntry parseQuickEntry(String input) {
     sets: sets,
     reps: [for (final r in reps) r.clamp(1, kMaxReps)],
     weights: weights,
+    durations: durations,
   );
+}
+
+/// `30` + null → 30 s. `1` + `30` → 90 s. Se acota a una hora: más que eso en
+/// un set de rutina es un tipeo, no una prescripción.
+int? _segundos(String? uno, String? dos) {
+  final a = int.tryParse(uno ?? '');
+  if (a == null) return null;
+  final total = dos == null ? a : a * 60 + (int.tryParse(dos) ?? 0);
+  if (total <= 0) return null;
+  return total.clamp(1, 3600);
 }
 
 double? _peso(String? raw) {

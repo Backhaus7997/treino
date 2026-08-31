@@ -200,6 +200,53 @@ void main() {
     });
   });
 
+  group('por tiempo — "3x30s" y "3x1:30"', () {
+    test('segundos sueltos', () {
+      final r = parseQuickEntry('plancha 3x30s');
+      expect(r.query, 'plancha');
+      expect(r.sets, 3);
+      expect(r.esDuracion, isTrue);
+      expect(r.durations, [30]);
+      expect(r.reps, isEmpty, reason: 'es tiempo, no repeticiones');
+      expect(r.duracionDeSet(2), 30);
+    });
+
+    test('formato m:ss', () {
+      expect(parseQuickEntry('plancha 3x1:30').durations, [90]);
+      expect(parseQuickEntry('plancha 3x0:45').durations, [45]);
+    });
+
+    test('sin la marca de tiempo son repeticiones — el caso normal', () {
+      final r = parseQuickEntry('banca 3x30');
+      expect(r.esDuracion, isFalse);
+      expect(r.reps, [30]);
+      expect(r.durations, isEmpty,
+          reason: 'un número suelto no puede pedir sintaxis extra para ser '
+              'lo que es el 95% de las veces');
+    });
+
+    test('una pirámide de tiempo', () {
+      final r = parseQuickEntry('plancha 3x45s,30s,20s');
+      expect(r.durations, [45, 30, 20]);
+      expect(r.sets, 3);
+    });
+
+    test('con lastre: el peso sigue funcionando', () {
+      final r = parseQuickEntry('plancha 3x30s 10');
+      expect(r.durations, [30]);
+      expect(r.weights, [10]);
+      expect(r.query, 'plancha');
+    });
+
+    test('la S mayúscula también', () {
+      expect(parseQuickEntry('plancha 3x30S').durations, [30]);
+    });
+
+    test('se acota a una hora', () {
+      expect(parseQuickEntry('plancha 3x99999s').durations, [3600]);
+    });
+  });
+
   group('igualdad', () {
     test('dos lecturas de la misma línea son iguales', () {
       expect(parseQuickEntry('banca 4x10, 8 60, 55'),

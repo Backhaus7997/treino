@@ -151,16 +151,25 @@ class _DurationTextFieldState extends State<DurationTextField> {
           ),
           decoration: InputDecoration(
             isDense: true,
-            // Mismo piso de 48 que [SetCellField]: la fila de un set mezcla
-            // los dos, y dos alturas distintas se ven. Va en el decorador
-            // —no en un ConstrainedBox de afuera— para que crezca con
-            // Dynamic Type en vez de recortar el valor.
-            constraints: const BoxConstraints(minHeight: 48),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.hairline,
+            // Dos usos, dos geometrías. CON label es el campo de "Descanso",
+            // que ocupa el ancho entero: a 48 dp con el texto pegado al borde
+            // se leía apretado, así que va a 56 con padding de verdad. SIN
+            // label es una celda de la tabla de series, y ahí manda la
+            // alineación con [SetCellField] — 48 y el gutter mínimo.
+            //
+            // El piso va en el decorador —no en un ConstrainedBox de afuera—
+            // para que crezca con Dynamic Type en vez de recortar el valor.
+            constraints: BoxConstraints(
+              minHeight: widget.label != null ? 56 : 48,
+            ),
+            contentPadding: EdgeInsets.symmetric(
+              horizontal:
+                  widget.label != null ? AppSpacing.s12 : AppSpacing.hairline,
             ),
             filled: true,
-            fillColor: palette.bgCard,
+            // `surfaceSubtle`, el mismo relleno que el chip de SET y las
+            // celdas: en la fila de un set conviven los tres.
+            fillColor: palette.surfaceSubtle,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppRadius.sm),
               borderSide: BorderSide(

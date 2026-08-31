@@ -174,6 +174,21 @@ void main() {
     }
   });
 
+  testWidgets('por tiempo el ejercicio entra en modo duración', (tester) async {
+    // `3x30s` no es "30 repeticiones": el slot tiene que quedar midiendo
+    // tiempo, sin obligar a cambiarlo después desde el header de la columna.
+    await _pumpEditor(tester);
+    await abrirRapido(tester);
+    await elegirYAgregar(tester, busqueda: 'banca', prescripcion: '3x30s');
+
+    await expandirEjercicios(tester);
+    expect(find.text('TIEMPO'), findsOneWidget,
+        reason: 'la columna de REPS pasó a TIEMPO');
+    expect(celdasConHint('reps'), findsNothing);
+    expect(find.text('00:30'), findsWidgets,
+        reason: 'treinta segundos, en el formato del campo de duración');
+  });
+
   testWidgets('sin números entra con 3 sets vacíos', (tester) async {
     await _pumpEditor(tester);
     await abrirRapido(tester);

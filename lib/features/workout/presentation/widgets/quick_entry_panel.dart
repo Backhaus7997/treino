@@ -198,7 +198,9 @@ class QuickEntryPanel extends StatelessWidget {
     if (!e.tienePrescripcion) return l10n.routineEditorQuickEntryPickedHint;
     return l10n.routineEditorQuickEntryWillAdd(
       e.sets,
-      _listaTexto(e.sets, e.repsDeSet, (v) => '$v'),
+      e.esDuracion
+          ? _listaTexto(e.sets, e.duracionDeSet, _tiempo)
+          : _listaTexto(e.sets, e.repsDeSet, (v) => '$v'),
       _pesoTexto(e, l10n),
     );
   }
@@ -221,8 +223,10 @@ class QuickEntryPanel extends StatelessWidget {
   /// nada — un nombre solo no tiene qué mostrar a la derecha.
   static String _prescripcion(QuickEntry e, AppL10n l10n) {
     if (!e.tienePrescripcion) return '';
-    final reps = _listaTexto(e.sets, e.repsDeSet, (v) => '$v');
-    final base = '${e.sets}×$reps';
+    final medida = e.esDuracion
+        ? _listaTexto(e.sets, e.duracionDeSet, _tiempo)
+        : _listaTexto(e.sets, e.repsDeSet, (v) => '$v');
+    final base = '${e.sets}×$medida';
     if (e.weights.isEmpty) return base;
     final pesos = _listaTexto(e.sets, e.pesoDeSet, _kg);
     return '$base · $pesos${l10n.monthlyReportVolumeUnit}';
@@ -232,6 +236,15 @@ class QuickEntryPanel extends StatelessWidget {
       ? l10n.routineEditorQuickEntryNoWeight
       : '${_listaTexto(e.sets, e.pesoDeSet, _kg)} '
           '${l10n.monthlyReportVolumeUnit}';
+
+  /// `30s` o `1:30`: segundos sueltos hasta el minuto, y `m:ss` de ahí para
+  /// arriba. Es como se lee un cronómetro.
+  static String _tiempo(int segundos) {
+    if (segundos < 60) return '${segundos}s';
+    final m = segundos ~/ 60;
+    final s = segundos % 60;
+    return '$m:${s.toString().padLeft(2, '0')}';
+  }
 
   /// Sin decimal cuando es entero: `60`, no `60.0`.
   static String _kg(double v) => v == v.roundToDouble() ? '${v.round()}' : '$v';
