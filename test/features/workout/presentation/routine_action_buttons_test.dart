@@ -10,7 +10,6 @@
 // del componente, y montar la pantalla entera para medir un alto agrega 5.000
 // líneas de superficie a un test que sólo mira una caja.
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/l10n/app_l10n.dart';
@@ -234,12 +233,17 @@ void main() {
         ),
       );
 
-      final s =
-          tester.getSemantics(_nodoDe(const Key('day_add_exercise_button')));
-      expect(s.hasFlag(SemanticsFlag.isButton), isTrue);
-      expect(s.hasFlag(SemanticsFlag.isEnabled), isFalse,
-          reason: 'sin callback el botón no hace nada: decirlo es la mitad '
-              'del trabajo de la semántica');
+      expect(
+        tester.getSemantics(_nodoDe(const Key('day_add_exercise_button'))),
+        matchesSemantics(
+          isButton: true,
+          hasEnabledState: true,
+          label: 'Agregar ejercicio',
+        ),
+        reason: 'Sin callback sigue siendo un botón, pero deshabilitado: no '
+            'expone tap ni foco. Decirlo es la mitad del trabajo de la '
+            'semántica.',
+      );
       handle.dispose();
     });
   });
