@@ -22,6 +22,7 @@ import '../../onboarding/presentation/custom_exercise_onboarding_gate.dart';
 import '../../profile/application/user_providers.dart'
     show userProfileProvider, userRepositoryProvider;
 import '../../profile/domain/experience_level.dart';
+import '../application/exercise_filter.dart' show exerciseMatchesFilters;
 import '../application/exercise_providers.dart' show exercisesProvider;
 import '../application/routine_providers.dart' show routineRepositoryProvider;
 import '../application/session_providers.dart' show currentUidProvider;
@@ -1962,7 +1963,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   /// (QA-WKT-004), y ofrecerlo para que el tap no haga nada es peor que no
   /// ofrecerlo.
   List<QuickEntryResult> _buscarParaEntradaRapida(String query, int dayIndex) {
-    final texto = query.trim().toLowerCase();
+    final texto = query.trim();
     if (texto.isEmpty) return const [];
     final yaEstan = _days[dayIndex]
         .slots
@@ -1970,9 +1971,20 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         .map((s) => s.exercise!.id)
         .toSet();
     final catalogo = ref.read(exercisesProvider).valueOrNull ?? const [];
+    // El mismo matcher que usa el picker (ADR-BIBW-01), no un `contains`:
+    // busca por tokens y tolera diacríticos, así que "press banca" encuentra
+    // "Press de Banca" —el `de` del medio rompe un contains— y "biceps" llega
+    // a "Bíceps". Dos búsquedas que difieren en la misma pantalla es peor que
+    // una sola imperfecta.
     return catalogo
         .where((e) =>
-            !yaEstan.contains(e.id) && e.name.toLowerCase().contains(texto))
+            !yaEstan.contains(e.id) &&
+            exerciseMatchesFilters(
+              e,
+              query: texto,
+              muscles: const {},
+              equipment: const {},
+            ))
         .take(QuickEntryPanel.kMaxResultados)
         .map((e) => QuickEntryResult(
               id: e.id,

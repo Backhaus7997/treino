@@ -158,6 +158,20 @@ void main() {
             'que no ofrecerlo');
   });
 
+  testWidgets('busca por tokens: "press banca" llega a "Press de Banca"',
+      (tester) async {
+    // Un `contains` no sirve: el `de` del medio lo rompe. La búsqueda usa el
+    // mismo matcher que el picker (ADR-BIBW-01) — dos búsquedas que difieren
+    // en la misma pantalla es peor que una sola imperfecta.
+    await _pumpEditor(tester);
+    await abrirRapido(tester);
+    await tester.enterText(
+        find.byKey(const Key('quick_entry_field')), 'press banca 4x10');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Press de Banca'), findsWidgets);
+  });
+
   testWidgets('el picker completo sigue estando, sin cambios', (tester) async {
     await _pumpEditor(tester);
     await desplazarHastaAgregarEjercicio(tester);
