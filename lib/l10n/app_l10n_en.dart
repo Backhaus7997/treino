@@ -4150,4 +4150,22 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get routineEditorQuickEntryAdd => 'ADD';
+
+  @override
+  String get routineEditorExerciseSheetTitle => 'ACTIONS';
+
+  @override
+  String get routineEditorSlotMenuCollapse => 'Collapse sets';
+
+  @override
+  String get routineEditorSlotMenuExpand => 'Expand sets';
+
+  @override
+  String get coachTemplateEditorTitle => 'New template';
+
+  @override
+  String get coachTemplateEditorEditTitle => 'Edit template';
+
+  @override
+  String get coachTemplateEditorSubmit => 'SAVE TEMPLATE';
 }

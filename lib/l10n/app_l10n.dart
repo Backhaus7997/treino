@@ -7334,6 +7334,42 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'AGREGAR'**
   String get routineEditorQuickEntryAdd;
+
+  /// Título de la hoja de acciones cuando todavía no se eligió un ejercicio; normalmente se muestra el nombre del ejercicio.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ACCIONES'**
+  String get routineEditorExerciseSheetTitle;
+
+  /// No description provided for @routineEditorSlotMenuCollapse.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Colapsar sets'**
+  String get routineEditorSlotMenuCollapse;
+
+  /// No description provided for @routineEditorSlotMenuExpand.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Desplegar sets'**
+  String get routineEditorSlotMenuExpand;
+
+  /// Título del editor al CREAR una plantilla. Antes reusaba el de asignar un plan y decía 'Crear plan'.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Nueva plantilla'**
+  String get coachTemplateEditorTitle;
+
+  /// No description provided for @coachTemplateEditorEditTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Editar plantilla'**
+  String get coachTemplateEditorEditTitle;
+
+  /// CTA del editor de plantillas. Antes reusaba el de asignar y decía 'ASIGNAR PLAN' en una plantilla que no se asigna a nadie.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'GUARDAR PLANTILLA'**
+  String get coachTemplateEditorSubmit;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

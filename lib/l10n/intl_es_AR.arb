@@ -3611,5 +3611,23 @@
   "routineEditorQuickEntryAdd": "AGREGAR",
   "@routineEditorQuickEntryAdd": {
     "description": "Confirma la entrada rápida. Existe porque elegir el ejercicio dejó de agregarlo."
+  },
+  "routineEditorExerciseSheetTitle": "ACCIONES",
+  "@routineEditorExerciseSheetTitle": {
+    "description": "Título de la hoja de acciones cuando todavía no se eligió un ejercicio; normalmente se muestra el nombre del ejercicio."
+  },
+  "routineEditorSlotMenuCollapse": "Colapsar sets",
+  "@routineEditorSlotMenuCollapse": {},
+  "routineEditorSlotMenuExpand": "Desplegar sets",
+  "@routineEditorSlotMenuExpand": {},
+  "coachTemplateEditorTitle": "Nueva plantilla",
+  "@coachTemplateEditorTitle": {
+    "description": "Título del editor al CREAR una plantilla. Antes reusaba el de asignar un plan y decía 'Crear plan'."
+  },
+  "coachTemplateEditorEditTitle": "Editar plantilla",
+  "@coachTemplateEditorEditTitle": {},
+  "coachTemplateEditorSubmit": "GUARDAR PLANTILLA",
+  "@coachTemplateEditorSubmit": {
+    "description": "CTA del editor de plantillas. Antes reusaba el de asignar y decía 'ASIGNAR PLAN' en una plantilla que no se asigna a nadie."
   }
 }
