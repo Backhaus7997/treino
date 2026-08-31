@@ -69,6 +69,20 @@ export const LANDING_URL = "https://gettreino.com";
 export const COACH_HUB_URL = "https://app.gettreino.com";
 
 /**
+ * La marca TR, servida desde el propio deploy del Coach Hub (`web/email/`).
+ *
+ * PNG y no SVG porque NINGUN cliente de mail renderiza SVG — el logo del repo
+ * (`assets/logo/treino_logo.svg`) no sirve para esto. Sale del foreground del
+ * adaptive icon, que ya viene con fondo transparente, recortado a la marca:
+ * un cuadrado negro sobre la tarjeta `#0F1513` dibujaria un recuadro visible,
+ * porque los dos negros no son el mismo.
+ *
+ * Se sirve desde `app.gettreino.com` y no desde los `web/icons/` que ya
+ * existian: esos siguen siendo los del template de Flutter.
+ */
+export const LOGO_URL = "https://app.gettreino.com/email/logo.png";
+
+/**
  * Wraps body markup in the branded shell.
  *
  * @param heading  - Large headline, already escaped.
@@ -81,6 +95,7 @@ export const COACH_HUB_URL = "https://app.gettreino.com";
 function layout(
   heading: string,
   bodyHtml: string,
+  preheader: string,
   ctaLabel?: string,
   ctaHref: string = LANDING_URL,
 ): string {
@@ -99,15 +114,38 @@ function layout(
     "<!doctype html>",
     "<html lang=\"es-AR\"><head><meta charset=\"utf-8\">",
     "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">",
+    "<meta name=\"color-scheme\" content=\"dark\">",
     "<title>TREINO</title></head>",
     `<body style="margin:0;padding:0;background:${INK};">`,
+    // Preheader: la linea gris que la bandeja muestra al lado del asunto. Sin
+    // esto el cliente agarra lo primero que encuentre en el HTML.
+    "<div style=\"display:none;max-height:0;overflow:hidden;opacity:0;\">",
+    esc(preheader),
+    // Relleno invisible: sin el, el cliente sigue leyendo el cuerpo y pega el
+    // resto del mail atras del preheader en la vista previa.
+    "&#8199;&#65279;&zwnj;".repeat(60),
+    "</div>",
     "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"",
     ` style="background:${INK};padding:32px 16px;"><tr><td align="center">`,
     "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"",
     ` style="max-width:520px;background:${INK_CARD};border-radius:16px;">`,
+    // Lockup: marca + palabra. La palabra NO es decorativa — es el fallback.
+    // Outlook y Gmail-sin-imagenes no cargan el <img>, y un header que es solo
+    // logo desaparece entero para esa gente.
     "<tr><td style=\"padding:32px 32px 0 32px;\">",
-    `<div style="font-size:13px;letter-spacing:2px;color:${MINT};`,
-    `font-weight:700;font-family:${FONT};">TREINO</div></td></tr>`,
+    "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\"><tr>",
+    "<td style=\"padding-right:10px;\" valign=\"middle\">",
+    // `alt=""` A PROPOSITO, y no `alt="TREINO"`. Medido sobre el render con
+    // imagenes bloqueadas: el alt se dibuja DENTRO de la caja de 28px del
+    // <img>, asi que "TREINO" se recorta a "TRE" y queda "TRE TREINO" al lado
+    // del wordmark. Un fallback que se ve roto es peor que no tenerlo. La
+    // marca de al lado ES el fallback, y ademas un lector de pantalla que
+    // encuentre las dos cosas leeria "TREINO TREINO".
+    `<img src="${esc(LOGO_URL)}" width="28" height="44" alt=""`,
+    " style=\"display:block;border:0;\"></td>",
+    `<td valign="middle"><div style="font-size:13px;letter-spacing:2px;`,
+    `color:${MINT};font-weight:700;font-family:${FONT};">TREINO</div>`,
+    "</td></tr></table></td></tr>",
     "<tr><td style=\"padding:20px 32px 0 32px;\">",
     `<h1 style="margin:0;font-size:24px;line-height:1.25;color:${BONE};`,
     `font-family:${FONT};">${heading}</h1></td></tr>`,
@@ -116,8 +154,10 @@ function layout(
     cta,
     "</table>",
     "<div style=\"max-width:520px;padding:20px 8px;font-size:12px;",
-    `color:${MUTED};font-family:${FONT};">`,
-    "Recibís este mail porque tenés una cuenta en TREINO.</div>",
+    `line-height:1.6;color:${MUTED};font-family:${FONT};">`,
+    "Recibís este mail porque tenés una cuenta en TREINO.<br>",
+    `<a href="${esc(LANDING_URL)}" style="color:${MUTED};">gettreino.com</a>`,
+    "</div>",
     "</td></tr></table></body></html>",
   ].join("");
 }
@@ -193,9 +233,17 @@ function build(
   const textLines = [heading, "", ...lines.map(lineToText)];
   if (ctaHref) textLines.push("", ctaHref);
 
+  // El preheader se DERIVA de la primera linea del cuerpo, no es un parametro
+  // por template. Un campo mas que cada `case` tiene que acordarse de pasar es
+  // un campo que el proximo MailKind va a olvidar, y el sintoma —una vista
+  // previa con basura en la bandeja— no lo agarra ningun test que no lo busque
+  // a proposito. Derivarlo lo hace imposible de olvidar, y la primera linea ES
+  // el resumen del mail: si no lo fuera, el problema seria el copy.
+  const preheader = lines.length > 0 ? lineToText(lines[0]) : heading;
+
   return {
     subject,
-    html: layout(heading, bodyHtml, ctaLabel, ctaHref),
+    html: layout(heading, bodyHtml, preheader, ctaLabel, ctaHref),
     text: textLines.join("\n"),
   };
 }
