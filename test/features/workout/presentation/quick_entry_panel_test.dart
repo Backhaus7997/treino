@@ -25,7 +25,9 @@ Future<TextEditingController> _montarPanel(
   WidgetTester tester, {
   String texto = 'banca 4x10 60',
   List<QuickEntryResult> resultados = _kResultados,
-  void Function(QuickEntryResult)? onPick,
+  void Function(QuickEntryResult)? onSelect,
+  VoidCallback? onConfirm,
+  QuickEntryResult? elegido,
   ThemeData? tema,
 }) async {
   final ctrl = TextEditingController(text: texto);
@@ -41,7 +43,9 @@ Future<TextEditingController> _montarPanel(
           controller: ctrl,
           entry: parseQuickEntry(texto),
           results: resultados,
-          onPick: onPick ?? (_) {},
+          selected: elegido,
+          onSelect: onSelect ?? (_) {},
+          onConfirm: onConfirm ?? () {},
         ),
       ),
     ),
@@ -55,13 +59,15 @@ String _hint(WidgetTester tester) =>
 
 void main() {
   group('resultados', () {
-    testWidgets('muestra hasta tres, no cuatro', (tester) async {
+    testWidgets('los muestra todos, con scroll si no entran', (tester) async {
+      // Cortaba en tres y sin scroll: buscar "sentadilla" en un catálogo real
+      // devuelve más variantes que eso, y las que no entraban eran justo las
+      // que se buscaban. Revisión en device del 31/08.
       await _montarPanel(tester);
       expect(find.text('Press de Banca'), findsOneWidget);
-      expect(find.text('Press Militar'), findsOneWidget);
-      expect(find.text('Press Inclinado'), findsOneWidget);
-      expect(find.text('Press Declinado'), findsNothing,
-          reason: 'más de tres deja de ser un atajo y compite con el picker');
+      expect(find.text('Press Declinado'), findsOneWidget,
+          reason: 'el cuarto ya no se pierde');
+      expect(find.byKey(const Key('quick_entry_results')), findsOneWidget);
     });
 
     testWidgets('cada fila lleva su músculo', (tester) async {
@@ -80,12 +86,22 @@ void main() {
       expect(find.textContaining('×'), findsNothing);
     });
 
-    testWidgets('tocar una fila la devuelve', (tester) async {
+    testWidgets('tocar una fila la ELIGE, no la agrega', (tester) async {
+      // El cambio central de la revisión del 31/08: el tap seleccionaba y
+      // agregaba en el mismo gesto. Como el nombre se escribe primero, el
+      // atajo se cerraba justo antes de poder decir "4x10 55".
       QuickEntryResult? elegido;
-      await _montarPanel(tester, onPick: (r) => elegido = r);
+      var confirmaciones = 0;
+      await _montarPanel(
+        tester,
+        onSelect: (r) => elegido = r,
+        onConfirm: () => confirmaciones++,
+      );
 
       await tester.tap(find.byKey(const Key('quick_entry_result_1')));
       expect(elegido?.id, 'ohp');
+      expect(confirmaciones, 0,
+          reason: 'elegir NO agrega: para eso está AGREGAR');
     });
 
     testWidgets('la fila entera es el target y llega a 48', (tester) async {
@@ -104,30 +120,101 @@ void main() {
     });
   });
 
+  group('una vez elegido', () {
+    testWidgets('la lista desaparece y aparece AGREGAR', (tester) async {
+      await _montarPanel(tester, elegido: _kResultados.first);
+
+      expect(find.byKey(const Key('quick_entry_results')), findsNothing,
+          reason: 'ya elegiste: lo que se escribe ahora es la prescripción');
+      expect(find.byKey(const Key('quick_entry_confirm')), findsOneWidget);
+    });
+
+    testWidgets('AGREGAR confirma', (tester) async {
+      var confirmaciones = 0;
+      await _montarPanel(
+        tester,
+        elegido: _kResultados.first,
+        onConfirm: () => confirmaciones++,
+      );
+
+      await tester.tap(find.byKey(const Key('quick_entry_confirm')));
+      expect(confirmaciones, 1);
+    });
+
+    testWidgets('sin elegir todavía no hay AGREGAR', (tester) async {
+      await _montarPanel(tester);
+      expect(find.byKey(const Key('quick_entry_confirm')), findsNothing);
+    });
+
+    testWidgets('AGREGAR llega al mínimo táctil', (tester) async {
+      await _montarPanel(tester, elegido: _kResultados.first);
+      expect(
+        tester.getSize(find.byKey(const Key('quick_entry_confirm'))).height,
+        greaterThanOrEqualTo(48),
+      );
+    });
+  });
+
   group('el hint dice qué va a pasar', () {
     testWidgets('con prescripción, la anuncia antes de tocar', (tester) async {
-      await _montarPanel(tester, texto: 'banca 4x10 60');
+      await _montarPanel(
+        tester,
+        texto: 'banca 4x10 60',
+        elegido: _kResultados.first,
+      );
       expect(_hint(tester), 'Se agrega como 4 sets × 10 a 60 kg.');
     });
 
+    testWidgets('una pirámide se lista set por set', (tester) async {
+      await _montarPanel(
+        tester,
+        texto: 'banca 4x10, 8, 6, 4',
+        elegido: _kResultados.first,
+      );
+      expect(_hint(tester), contains('10 · 8 · 6 · 4'),
+          reason: 'repetir cuatro veces el mismo número no informa; una '
+              'pirámide sí');
+    });
+
+    testWidgets('una descarga también', (tester) async {
+      await _montarPanel(
+        tester,
+        texto: 'banca 4x10 55, 45, 35, 25',
+        elegido: _kResultados.first,
+      );
+      expect(_hint(tester), contains('55 · 45 · 35 · 25'));
+    });
+
     testWidgets('sin peso lo dice, en vez de callarlo', (tester) async {
-      await _montarPanel(tester, texto: 'dominadas 4x8');
+      await _montarPanel(
+        tester,
+        texto: 'dominadas 4x8',
+        elegido: _kResultados.first,
+      );
       expect(_hint(tester), contains('sin peso'));
     });
 
-    testWidgets('sin números explica el formato', (tester) async {
-      await _montarPanel(tester, texto: 'banca');
-      expect(_hint(tester), contains('3 sets vacíos'),
-          reason: 'un nombre solo entra igual: el atajo nunca falla');
+    testWidgets('elegido pero sin números, enseña la sintaxis', (tester) async {
+      await _montarPanel(
+        tester,
+        texto: 'banca ',
+        elegido: _kResultados.first,
+      );
+      expect(_hint(tester), contains('4x10'));
+      expect(_hint(tester), contains('baja las reps'));
     });
 
-    testWidgets('vacío también', (tester) async {
+    testWidgets('sin elegir, dice que hay que elegir', (tester) async {
       await _montarPanel(tester, texto: '');
-      expect(_hint(tester), contains('Escribí nombre'));
+      expect(_hint(tester), contains('tocalo'));
     });
 
     testWidgets('un set solo no dice "1 sets"', (tester) async {
-      await _montarPanel(tester, texto: 'banca 1x10 60');
+      await _montarPanel(
+        tester,
+        texto: 'banca 1x10 60',
+        elegido: _kResultados.first,
+      );
       expect(_hint(tester), 'Se agrega como 1 set × 10 a 60 kg.');
     });
   });

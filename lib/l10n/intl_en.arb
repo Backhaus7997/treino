@@ -1736,10 +1736,14 @@
   },
   "routineEditorQuickEntryWillAdd": "Adds {sets, plural, =1{1 set} other{{sets} sets}} × {reps} at {peso}.",
   "@routineEditorQuickEntryWillAdd": {
-    "placeholders": {"sets": {"type": "int"}, "reps": {"type": "int"}, "peso": {"type": "String"}}
+    "placeholders": {"sets": {"type": "int"}, "reps": {"type": "String"}, "peso": {"type": "String"}}
   },
   "routineEditorQuickEntryNoWeight": "no weight",
   "@routineEditorQuickEntryNoWeight": {},
-  "routineEditorQuickEntryEmptyHint": "Type a name + 4x10 + weight. With no numbers it lands with 3 empty sets.",
-  "@routineEditorQuickEntryEmptyHint": {}
+  "routineEditorQuickEntryEmptyHint": "Search the exercise and tap it. Then type 4x10 and the weight.",
+  "@routineEditorQuickEntryEmptyHint": {},
+  "routineEditorQuickEntryPickedHint": "Type 4x10 and the weight. With commas: 4x10, 8, 6, 4 drops the reps · 55, 45, 35, 25 drops the weight.",
+  "@routineEditorQuickEntryPickedHint": {},
+  "routineEditorQuickEntryAdd": "ADD",
+  "@routineEditorQuickEntryAdd": {}
 }

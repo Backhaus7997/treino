@@ -22,7 +22,11 @@ import '../../onboarding/presentation/custom_exercise_onboarding_gate.dart';
 import '../../profile/application/user_providers.dart'
     show userProfileProvider, userRepositoryProvider;
 import '../../profile/domain/experience_level.dart';
-import '../application/exercise_filter.dart' show exerciseMatchesFilters;
+import '../application/custom_exercise_providers.dart'
+    show customExercisesForTrainerStreamProvider;
+import '../domain/custom_exercise.dart' show CustomExercise;
+import '../application/exercise_filter.dart'
+    show customToExercise, exerciseMatchesFilters;
 import '../application/exercise_providers.dart' show exercisesProvider;
 import '../application/routine_providers.dart' show routineRepositoryProvider;
 import '../application/session_providers.dart' show currentUidProvider;
@@ -1970,12 +1974,25 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         .where((s) => s.exercise != null)
         .map((s) => s.exercise!.id)
         .toSet();
-    final catalogo = ref.read(exercisesProvider).valueOrNull ?? const [];
+    // Catálogo del sistema MÁS los ejercicios propios. Buscar "sentadilla" y
+    // no encontrar la variante que uno mismo cargó es peor que no tener el
+    // atajo: el picker sí los muestra, y dos búsquedas que difieren en la
+    // misma pantalla confunden más de lo que ayudan.
+    final uid = ref.read(currentUidProvider) ?? '';
+    final propios = uid.isEmpty
+        ? const <CustomExercise>[]
+        : (ref
+                .read(customExercisesForTrainerStreamProvider(uid))
+                .valueOrNull ??
+            const <CustomExercise>[]);
+    final catalogo = <Exercise>[
+      ...?ref.read(exercisesProvider).valueOrNull,
+      ...propios.map(customToExercise),
+    ];
     // El mismo matcher que usa el picker (ADR-BIBW-01), no un `contains`:
     // busca por tokens y tolera diacríticos, así que "press banca" encuentra
     // "Press de Banca" —el `de` del medio rompe un contains— y "biceps" llega
-    // a "Bíceps". Dos búsquedas que difieren en la misma pantalla es peor que
-    // una sola imperfecta.
+    // a "Bíceps".
     return catalogo
         .where((e) =>
             !yaEstan.contains(e.id) &&
@@ -2006,7 +2023,17 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     String exerciseId,
     QuickEntry entry,
   ) async {
-    final catalogo = ref.read(exercisesProvider).valueOrNull ?? const [];
+    final uid = ref.read(currentUidProvider) ?? '';
+    final propios = uid.isEmpty
+        ? const <CustomExercise>[]
+        : (ref
+                .read(customExercisesForTrainerStreamProvider(uid))
+                .valueOrNull ??
+            const <CustomExercise>[]);
+    final catalogo = <Exercise>[
+      ...?ref.read(exercisesProvider).valueOrNull,
+      ...propios.map(customToExercise),
+    ];
     final ex = catalogo.where((e) => e.id == exerciseId).firstOrNull;
     if (ex == null) return;
 
@@ -2020,11 +2047,15 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         ..restSeconds = 0
         ..weeklySets = List.generate(
           _numWeeks,
+          // Cada set lleva LO SUYO: `4x10, 8, 6, 4` es una pirámide y
+          // `4x10 55, 45, 35, 25` una descarga. Una lista más corta que la
+          // cantidad de sets repite su último valor, que es como lo lee
+          // cualquiera al escribirlo.
           (_) => List.generate(
             entry.sets,
-            (_) => _EditableSet()
-              ..reps = entry.reps
-              ..weightKg = entry.weightKg,
+            (i) => _EditableSet()
+              ..reps = entry.repsDeSet(i)
+              ..weightKg = entry.pesoDeSet(i),
           ),
         )
         ..activeWeeks = scope == _AddScope.thisWeek ? {_selectedWeek} : <int>{};
@@ -3302,6 +3333,20 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
   /// sobrevive a cerrar el día ni viaja al modelo.
   bool _quickEntryOpen = false;
   final TextEditingController _quickEntryCtrl = TextEditingController();
+
+  /// El ejercicio ya elegido en la entrada rápida, o null mientras se busca.
+  ///
+  /// Elegir un candidato AUTOCOMPLETA el nombre y guarda esto; recién el botón
+  /// AGREGAR suma el ejercicio. Hasta la revisión en device del 31/08 el tap
+  /// agregaba en el acto, y como el nombre se escribe primero, el atajo se
+  /// cerraba justo antes de poder decir `4x10 55`.
+  QuickEntryResult? _quickEntryElegido;
+
+  void _cerrarEntradaRapida() {
+    _quickEntryOpen = false;
+    _quickEntryElegido = null;
+    _quickEntryCtrl.clear();
+  }
   // Reads/writes widget.day.expanded so the collapse survives the ListView
   // recycling the tile off-screen.
 
@@ -3645,8 +3690,11 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
                         QuickEntryToggle(
                           active: _quickEntryOpen,
                           onTap: () => setState(() {
-                            _quickEntryOpen = !_quickEntryOpen;
-                            if (!_quickEntryOpen) _quickEntryCtrl.clear();
+                            if (_quickEntryOpen) {
+                              _cerrarEntradaRapida();
+                            } else {
+                              _quickEntryOpen = true;
+                            }
                           }),
                         ),
                       const Spacer(),
@@ -3683,16 +3731,44 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
                       valueListenable: _quickEntryCtrl,
                       builder: (context, value, _) {
                         final entry = parseQuickEntry(value.text);
+                        // El elegido se suelta si el nombre dejó de estar en
+                        // el texto: borrar el ejercicio para buscar otro tiene
+                        // que devolver la lista sin cerrar el panel.
+                        final elegido = _quickEntryElegido;
+                        final sigueElegido = elegido != null &&
+                            value.text
+                                .toLowerCase()
+                                .contains(elegido.name.toLowerCase());
+                        if (elegido != null && !sigueElegido) {
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (mounted) {
+                              setState(() => _quickEntryElegido = null);
+                            }
+                          });
+                        }
                         return QuickEntryPanel(
                           controller: _quickEntryCtrl,
                           entry: entry,
-                          results: widget.onQuickSearch!(entry.query),
-                          onPick: (r) {
+                          selected: sigueElegido ? elegido : null,
+                          results: sigueElegido
+                              ? const []
+                              : widget.onQuickSearch!(entry.query),
+                          onSelect: (r) {
+                            // Autocompletar, NO agregar: el usuario viene a
+                            // escribir la prescripción después del nombre.
+                            final texto = '${r.name} ';
+                            _quickEntryCtrl.value = TextEditingValue(
+                              text: texto,
+                              selection: TextSelection.collapsed(
+                                  offset: texto.length),
+                            );
+                            setState(() => _quickEntryElegido = r);
+                          },
+                          onConfirm: () {
+                            final r = _quickEntryElegido;
+                            if (r == null) return;
                             widget.onQuickAdd!(r.id, entry);
-                            setState(() {
-                              _quickEntryOpen = false;
-                              _quickEntryCtrl.clear();
-                            });
+                            setState(_cerrarEntradaRapida);
                           },
                         );
                       },
