@@ -70,6 +70,21 @@ descargo médico, términos de suscripción, arrepentimiento— dependen de
 decisiones del titular. Están relevados en la guía de tareas que acompaña a este
 directorio.
 
+## Dónde se publica cada documento
+
+Mapa completo en la **sección 9** de [`guia-legal-treino.pdf`](./guia-legal-treino.pdf):
+direcciones de `gettreino.com`, campos de las dos consolas, puntos de acceso en
+la app y en el Coach Hub.
+
+Dos cosas de esa sección que son trabajo de desarrollo:
+
+- **Hoy los legales sólo se alcanzan desde el registro y el login**
+  (`Navigator.push` desde `TermsCheckbox` / `TermsNoticeText`). No hay ruta ni
+  entrada desde Perfil: con la cuenta ya creada, nadie puede releer lo que
+  aceptó. Hay que agregar **Perfil → Legales**.
+- **`/eliminar-cuenta` va en la raíz de `gettreino.com`**, no bajo `/legal`.
+  Google exige que sea alcanzable desde un navegador sin instalar la app.
+
 ## Antes de publicar
 
 1. Completar los `[[PENDIENTE]]` restantes. El titular ya está identificado —

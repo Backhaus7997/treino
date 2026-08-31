@@ -4,6 +4,11 @@
 Uso:
     python3 scripts/build_legal_guide_pdf.py
 
+Requiere reportlab, que no viene con el sistema. Si falta:
+    python3 -m venv ~/.cache/treino-legal-venv
+    ~/.cache/treino-legal-venv/bin/pip install reportlab
+    ~/.cache/treino-legal-venv/bin/python scripts/build_legal_guide_pdf.py
+
 Requiere reportlab. El contenido vive en CONTENT, abajo: para actualizar la
 guia se edita esa lista, no el codigo de layout.
 
@@ -778,8 +783,8 @@ def build_story():
          "borrado, descargo visible",
          "Desarrollo"],
         ["<b>7. Publicar</b>",
-         "URLs en gettreino.com, texto portado a la app, enlaces cargados en "
-         "las dos tiendas",
+         "URLs en gettreino.com, entrada desde Perfil en la app, enlaces "
+         "cargados en las dos consolas. Mapa completo en la sección 9",
          "Desarrollo"],
         ["<b>8. Inscribir</b>",
          "Base de datos ante la AAIP, acuerdos de tratamiento aceptados",
@@ -792,6 +797,129 @@ def build_story():
         "acuerdos de tratamiento en las tres consolas, y el desarrollo de "
         "reporte y bloqueo. Esas cuatro cosas no dependen de nada de lo que "
         "queda por decidir, y son las de mayor plazo."))
+
+    A(PageBreak())
+
+    # ---- 9 publicacion
+    A(P("9. Dónde se publica cada documento", "h1"))
+    A(P("Los documentos existen pero no están publicados en ningún lado. Esta "
+        "sección es el mapa de dónde tiene que quedar cada uno, en la web y en "
+        "la aplicación, y qué falta construir para que se pueda llegar a ellos."))
+
+    A(P("9.1 Web — gettreino.com", "h3"))
+    A(P("El sitio vive en un proyecto de Vercel aparte, con su propio "
+        "repositorio: no está en el repo de la aplicación."))
+    sp(4)
+    A(table([
+        ["Dirección", "Documento", "¿Obligatoria?"],
+        ["/legal", "Índice de los nueve", "—"],
+        ["/legal/privacidad", "Política de Privacidad",
+         "<b>Sí — Apple y Google</b>"],
+        ["/legal/terminos", "Términos y Condiciones",
+         "Play, por crear cuentas"],
+        ["/legal/comunidad", "Normas de Comunidad",
+         "Apple 1.2 — contacto publicado"],
+        ["/legal/descargo-medico", "Descargo Médico",
+         "Referenciado desde Términos"],
+        ["/legal/entrenadores", "Términos para Entrenadores",
+         "Se acepta al habilitar la cuenta"],
+        ["/legal/retencion", "Retención y borrado", "Respaldo de privacidad"],
+        ["/aviso-legal", "Identificación del titular", "Consumidor"],
+        ["<b>/eliminar-cuenta</b>", "Solicitud de borrado de cuenta",
+         "<b>Sí — Google Play</b>"],
+    ], [42, 66, 57]))
+    sp(8)
+    A(callout(
+        "<b>La dirección de borrado va en la raíz, no dentro de /legal.</b> "
+        "Google exige que sea accesible desde un navegador sin instalar la "
+        "aplicación, y enterrarla tres niveles adentro es motivo de rechazo. "
+        "Enlace en el pie de todas las páginas."))
+
+    sp(10)
+    A(P("9.2 Qué se carga en cada consola", "h3"))
+    A(table([
+        ["Consola", "Campo", "Apunta a"],
+        ["App Store Connect", "Privacy Policy URL", "/legal/privacidad"],
+        ["App Store Connect", "Support URL / contacto",
+         "La casilla bajo gettreino.com"],
+        ["Play Console", "Política de privacidad", "/legal/privacidad"],
+        ["Play Console", "Eliminación de datos", "<b>/eliminar-cuenta</b>"],
+        ["Play Console", "Correo de contacto",
+         "La casilla bajo gettreino.com, no una personal"],
+    ], [38, 52, 75]))
+
+    A(PageBreak())
+
+    A(P("9.3 Aplicación móvil", "h3"))
+    A(callout(
+        "<b>Hallazgo.</b> Hoy los documentos legales sólo se alcanzan desde el "
+        "registro y el login, por `Navigator.push` desde el checkbox de "
+        "términos. No hay ruta declarada ni entrada desde Perfil. Es decir: "
+        "<b>una vez que la persona tiene cuenta, no puede volver a leer lo que "
+        "aceptó.</b> Eso hay que corregirlo — el usuario tiene derecho a "
+        "consultarlo y las dos tiendas esperan que esté accesible.", warn=True))
+    sp(8)
+    A(table([
+        ["Dónde", "Qué se muestra", "¿Se acepta?"],
+        ["<b>Perfil -> Legales</b> (hay que crearlo)",
+         "Índice de los nueve documentos, siempre accesible", "No"],
+        ["Registro y login (ya existe)", "Términos y Privacidad",
+         "Sí — checkbox"],
+        ["Onboarding", "Descargo Médico", "Sí — checkbox propio"],
+        ["Primera carga de un dato de salud",
+         "Consentimiento de datos de salud", "Sí — propio"],
+        ["Al vincularse con un entrenador",
+         "Que el entrenador es independiente y no se verifican credenciales",
+         "Sí"],
+        ["Al habilitar una cuenta de entrenador",
+         "Términos para Entrenadores", "Sí"],
+        ["Flujo de reporte de contenido", "Normas de Comunidad", "No"],
+        ["Ajustes -> Eliminar cuenta", "Qué se conserva y por qué", "No"],
+    ], [46, 78, 41]))
+    sp(8)
+    A(P("La pantalla que renderiza los documentos ya existe y sirve tal cual: "
+        "recibe un título y una lista de secciones, y funciona durante el "
+        "registro porque no pasa por la redirección de autenticación. La "
+        "arquitectura está bien; lo que falta es alcance."))
+
+    sp(10)
+    A(P("9.4 Coach Hub web — app.gettreino.com", "h3"))
+    A(table([
+        ["Dónde", "Qué"],
+        ["Pie de página", "Los mismos enlaces que la web pública"],
+        ["Al contratar la suscripción", "Términos para Entrenadores, con aceptación"],
+        ["Sección de cuenta",
+         "Botón de arrepentimiento y baja en línea, cuando se definan D4 y D6"],
+    ], [45, 120]))
+
+    sp(10)
+    A(P("9.5 El problema de las tres copias", "h3"))
+    A(P("El mismo texto legal va a existir en tres lugares: el markdown de "
+        "<b>docs/legal/</b>, las constantes del código de la aplicación, y el "
+        "HTML del sitio — que además vive en otro repositorio. Cambiar una "
+        "cláusula obliga hoy a editar tres archivos en dos repos, a mano."))
+    sp(4)
+    A(callout(
+        "<b>A este proyecto ya le pasó.</b> AGENTS.md documenta que el «Quick "
+        "reference» de CLAUDE.md se desincronizó y terminó con dos agentes "
+        "leyendo reglas distintas; por eso hoy ese archivo es un puntero "
+        "vacío a propósito. Con documentación técnica eso cuesta una tarde. "
+        "Con texto legal cuesta otra cosa: si la aplicación dice una edad "
+        "mínima y el sitio dice otra, <b>no hay forma de probar qué aceptó el "
+        "usuario</b>, y la fecha de aceptación que se guarda deja de "
+        "significar algo.", warn=True))
+    sp(8)
+    A(P("<b>Propuesta:</b> una sola fuente y el resto generado. El markdown "
+        "como origen, y un script que produzca el archivo de la aplicación y "
+        "el HTML del sitio, marcados como «no editar a mano». Es el mismo "
+        "patrón que el proyecto ya usa con freezed —se escribe el modelo, se "
+        "corre el generador, no se tocan los archivos generados— y el mismo "
+        "que produce este PDF. Con un control en integración continua que "
+        "falle si el markdown cambió y la salida no se regeneró, el desfasaje "
+        "pasa de desaconsejado a imposible."))
+    sp(6)
+    A(P("Decisión técnica pendiente: construir el generador, o mantener las "
+        "copias a mano.", "small"))
 
     A(PageBreak())
 
