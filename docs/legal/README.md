@@ -20,6 +20,19 @@ su reemplazo, y hay que portarlos ahí y publicarlos en `gettreino.com/legal/*`.
 Personas Jurídicas de Córdoba del 5 de febrero de 2026, matrícula N° 46468-A.
 TREINO es un servicio prestado por esa sociedad.
 
+## Cuentas de las tiendas — pendiente de decisión
+
+Verificado el 2026-08-31: **Apple está enrolada como Individual** (Team ID
+J66AQRRM96) y **Play como Personal** (nombre público «Code assurance dev»,
+sitio `code-assurance.com`). Ninguna de las dos está a nombre de la sociedad, y
+el nombre que ve el usuario en Play no coincide con el titular de los
+documentos.
+
+Es decisión del Product Owner, no del equipo de desarrollo. Detalle, riesgos y
+los dos caminos posibles en la sección 4 de
+[`guia-legal-treino.pdf`](./guia-legal-treino.pdf). Tiene fecha encima: la
+membresía de Apple renueva el **5 de septiembre de 2026**.
+
 ## Lo que NO está acá
 
 Los documentos que no salen del código —Términos y Condiciones, contrato del PF,

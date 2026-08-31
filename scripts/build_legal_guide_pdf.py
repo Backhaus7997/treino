@@ -152,6 +152,8 @@ def build_story():
         ["Verificado contra", "código de la app y reglas de Firestore"],
         ["Complementa", "docs/legal/ (4 borradores ya redactados)"],
         ["Titular", "BACKHAUSTIN S.A.S. — CUIT 30-71929587-4"],
+        ["Destinatario", "Product Owner / titular de la decisión"],
+        ["Preparado por", "Equipo de desarrollo"],
         ["Estado", "Ningún documento publicado todavía"],
     ], [40, 125], header=False))
     sp(24)
@@ -186,6 +188,31 @@ def build_story():
         "código: se escribieron contra el modelo de datos y las reglas de "
         "Firestore, no contra una plantilla. Viven en <b>docs/legal/</b>. "
         "Los otros nueve esperan las decisiones de la sección 3."))
+
+    A(P("1.1 Quién resuelve qué", "h3"))
+    A(P("La separación importa, porque buena parte de lo que sigue no se puede "
+        "resolver desde el rol técnico aunque se tenga el acceso."))
+    sp(4)
+    A(table([
+        ["Tipo", "Qué incluye", "Quién"],
+        ["<b>Decisión</b>",
+         "Edad mínima, países de operación, cómo se cobra, si la plataforma "
+         "intermedia dinero, política de reembolsos, titularidad de las "
+         "cuentas de las tiendas",
+         "<b>Product Owner</b> o titular. No es del desarrollador, aunque "
+         "tenga las credenciales"],
+        ["<b>Trámite</b>",
+         "Inscripción ante la AAIP, D-U-N-S, conversión de cuentas, acuerdos "
+         "con proveedores, contratación del abogado, registro de marca",
+         "Titular, con contador y escribano"],
+        ["<b>Redacción</b>",
+         "Los trece documentos legales",
+         "Equipo de desarrollo, con revisión legal en dos de ellos"],
+        ["<b>Implementación</b>",
+         "Reporte y bloqueo, consentimiento de salud, control de edad, página "
+         "de borrado, descargo visible, arrepentimiento",
+         "Equipo de desarrollo"],
+    ], [26, 84, 55]))
 
     A(P("2. Dónde estás parado", "h1"))
     A(P("Trece documentos. Cuatro redactados, nueve pendientes. Tres "
@@ -227,7 +254,13 @@ def build_story():
          "El borrado in-app funciona bien. Falta la página accesible sin "
          "instalar la app"],
     ], [45, 35, 85]))
-    sp(10)
+    sp(8)
+    A(P("Y un cuarto, que no es de las tiendas sino de coherencia legal: "
+        "<b>las cuentas de Apple y de Play están a nombre personal, y el "
+        "nombre público de Play es una tercera empresa distinta del titular.</b> "
+        "Tiene sección propia — la 4 — porque es la más urgente y la única con "
+        "una fecha encima."))
+    sp(8)
     A(callout(
         "El segundo no se arregla escribiendo. Es desarrollo: dos features "
         "nuevas, reglas de servidor y una vista de revisión. Está "
@@ -261,24 +294,9 @@ def build_story():
           "Todos identifican ahora a BACKHAUSTIN S.A.S. con su CUIT y "
           "matrícula. Los cuatro borradores ya están actualizados. La fórmula "
           "es: «TREINO es un servicio prestado por BACKHAUSTIN S.A.S.»"],
-         ["<b>Cuenta de Apple</b><br/><b>[VERIFICADO]</b>",
-          "<b>Está enrolada como Individual</b>, a nombre de Martin Backhaus "
-          "(Team ID J66AQRRM96), verificado el 2026-08-31. Hay que convertirla "
-          "a Organization a nombre de BACKHAUSTIN S.A.S. <b>Renovación: 5 de "
-          "septiembre de 2026, US$99 — dejá que se renueve.</b> Una membresía "
-          "vencida saca las apps de la tienda y complica el trámite. "
-          "A favor: la app todavía no está publicada, así que es conversión de "
-          "cuenta y no transferencia de app. Es el momento más barato"],
-         ["<b>Cuenta de Play</b>",
-          "<b>Sin verificar.</b> Play Console -> Configuración -> Cuenta de "
-          "desarrollador -> Detalles. Mismo criterio que Apple"],
-         ["<b>Número D-U-N-S</b>",
-          "<b>Es el paso de plazo más largo: arrancalo primero.</b> Lo exigen "
-          "Apple y Google para cuentas de organización. Lo emite Dun &amp; "
-          "Bradstreet, es gratis, y puede demorar semanas — más aún si la "
-          "sociedad es nueva y todavía no tiene registro. Apple tiene un "
-          "buscador para ver si ya existe uno. Datos a mano: CUIT "
-          "30-71929587-4, matrícula 46468-A"],
+         ["<b>Cuentas de las tiendas</b>",
+          "<b>Verificado: las dos están a nombre personal.</b> Es el punto más "
+          "urgente y tiene sección propia — ver la 4"],
          ["<b>Acuerdos con proveedores</b>",
           "Los de Google Cloud, Resend y Vercel se aceptan a nombre de "
           "BACKHAUSTIN S.A.S. Si ya los aceptaste como persona, hay que "
@@ -446,8 +464,134 @@ def build_story():
 
     A(PageBreak())
 
-    # ---- 4 tramites
-    A(P("4. Trámites a iniciar", "h1"))
+    # ---- 4 cuentas de tiendas
+    A(P("4. Cuentas de las tiendas", "h1"))
+    A(callout(
+        "<b>Decisión del Product Owner, y la más urgente del documento.</b> El "
+        "equipo de desarrollo tiene acceso a las dos consolas, pero cambiar la "
+        "titularidad de una cuenta de desarrollador no es una tarea técnica: "
+        "compromete a la sociedad, define a quién le paga la tienda y quién "
+        "responde ante el usuario.", warn=True))
+    sp(8)
+
+    A(P("4.1 Estado verificado", "h3"))
+    A(P("Ambas consolas se revisaron el 31 de agosto de 2026. Las dos están a "
+        "nombre personal."))
+    sp(4)
+    A(table([
+        ["", "Apple Developer Program", "Google Play Console"],
+        ["<b>Tipo de cuenta</b>", "<b>Individual</b>", "<b>Personal</b>"],
+        ["Identificador", "Team ID J66AQRRM96",
+         "Developer account ID 6318906944253642995"],
+        ["Nombre legal", "Martin Backhaus", "Martin Backhaus"],
+        ["Nombre público", "Martin Backhaus",
+         "<b>Code assurance dev</b>"],
+        ["Domicilio cargado", "Cordoba, Córdoba 5000, Argentina "
+         "(incompleto: «Cordoba» figura como calle)",
+         "MZA 9 LOTE 21 S/N, Córdoba 5021, Argentina"],
+        ["Sitio declarado", "—", "code-assurance.com"],
+        ["Correo de la cuenta", "—", "martin.backhaus@code-assurance.com"],
+        ["Vencimiento", "<b>5 de septiembre de 2026, US$99</b>", "—"],
+    ], [30, 67, 68]))
+
+    sp(10)
+    A(P("4.2 El problema no es sólo el tipo de cuenta", "h3"))
+    A(P("Hay <b>tres identidades distintas</b> declarando ser responsables del "
+        "mismo producto:"))
+    sp(4)
+    A(table([
+        ["Dónde", "Qué dice"],
+        ["Documentos legales", "BACKHAUSTIN S.A.S. — CUIT 30-71929587-4"],
+        ["Play, nombre público en la ficha", "<b>Code assurance dev</b>"],
+        ["Play y Apple, nombre legal", "Martin Backhaus"],
+        ["Sitio declarado en Play", "code-assurance.com, no gettreino.com"],
+        ["La aplicación", "TREINO"],
+    ], [55, 110]))
+    sp(8)
+    A(P("Un usuario que abra TREINO en Play va a ver que la publica «Code "
+        "assurance dev», una empresa que no figura en ninguno de los trece "
+        "documentos legales — y que tampoco es la titular. Eso deja de ser una "
+        "cuestión de prolijidad: es identificación defectuosa del proveedor "
+        "frente al consumidor, que es justamente lo que la normativa de "
+        "defensa del consumidor exige que esté claro."))
+
+    sp(8)
+    A(P("4.3 El domicilio publicado", "h3"))
+    A(P("La cuenta de Play tiene cargado <b>MZA 9 LOTE 21 S/N, Córdoba 5021</b> "
+        "como domicilio legal de una persona humana. Play publica el domicilio "
+        "del desarrollador en la ficha para las cuentas que monetizan."))
+    sp(4)
+    A(callout(
+        "<b>Verificar antes de publicar.</b> Si esa condición aplica al caso, "
+        "queda expuesto en la tienda un domicilio particular. Con cuenta de "
+        "organización se publica la sede social de BACKHAUSTIN S.A.S. en su "
+        "lugar. Es una razón adicional, e independiente de las legales, para "
+        "hacer el cambio antes del lanzamiento."))
+
+    A(PageBreak())
+
+    A(P("4.4 La bifurcación", "h3"))
+    A(P("Para Apple el camino es uno solo: convertir la cuenta existente de "
+        "Individual a Organization. Para Play hay dos, y cuál conviene depende "
+        "de un dato que el equipo de desarrollo no puede determinar."))
+    sp(4)
+    A(table([
+        ["Camino", "Cuándo conviene", "Costo"],
+        ["<b>Convertir</b> la cuenta actual a organización = BACKHAUSTIN "
+         "S.A.S., y cambiarle el nombre público a TREINO o Backhaustin",
+         "Si TREINO es lo único publicado en esa cuenta",
+         "Sin costo adicional. Sin transferencia de app"],
+        ["<b>Crear una cuenta nueva</b> para la sociedad y mover TREINO con "
+         "App transfers",
+         "Si «Code assurance dev» es una cuenta en uso para otros productos, "
+         "que convertirla arrastraría entera",
+         "US$25 y tiempos de espera de la transferencia"],
+    ], [55, 65, 45]))
+    sp(8)
+    A(callout(
+        "<b>Pregunta abierta para el Product Owner:</b> ¿la cuenta de Play "
+        "tiene otras aplicaciones además de TREINO, o «Code assurance dev» se "
+        "usa para otros productos? De esa respuesta sale cuál de los dos "
+        "caminos se toma.", warn=True))
+
+    sp(10)
+    A(P("4.5 Qué hay que hacer, y en qué orden", "h3"))
+    A(table([
+        ["#", "Paso", "Plazo"],
+        ["1", "<b>Tramitar el número D-U-N-S</b> para BACKHAUSTIN S.A.S. Lo "
+         "exigen Apple y Google para cuentas de organización. Lo emite Dun "
+         "&amp; Bradstreet, es gratis. Apple tiene un buscador para ver si ya "
+         "existe uno emitido. Datos: CUIT 30-71929587-4, matrícula 46468-A",
+         "<b>Es el paso más largo: puede demorar semanas, más aún si la "
+         "sociedad es nueva y no tiene registro previo. Arranca primero</b>"],
+        ["2", "<b>Dejar que la membresía de Apple se renueve</b> el 5 de "
+         "septiembre",
+         "Una membresía vencida saca las apps de la tienda y complica el "
+         "trámite. Los US$99 son irrelevantes frente a eso"],
+        ["3", "Responder la pregunta de 4.4 y elegir camino para Play",
+         "Product Owner"],
+        ["4", "Pedir la conversión a Apple. Piden el D-U-N-S y acreditar "
+         "facultades para obligar a la sociedad",
+         "Después del D-U-N-S"],
+        ["5", "Ejecutar el camino elegido en Play, y corregir el nombre "
+         "público y el sitio declarado",
+         "Después del D-U-N-S"],
+        ["6", "Cargar en ambas la <b>sede social real</b> de la sociedad",
+         "Es además el dato que falta para cerrar los documentos legales"],
+    ], [8, 82, 75]))
+    sp(8)
+    A(callout(
+        "<b>El momento es ahora, y es barato.</b> La aplicación todavía no "
+        "está publicada — el registro de cambios dice «Primera versión pública "
+        "de TREINO». Sin app publicada no hay reseñas, calificaciones ni "
+        "instalaciones atadas a la ficha, así que en Apple es conversión de "
+        "cuenta y no transferencia. Una vez publicada, lo mismo se convierte "
+        "en un trámite con soporte, esperas y riesgo sobre la ficha viva."))
+
+    A(PageBreak())
+
+    # ---- 5 tramites
+    A(P("5. Trámites a iniciar", "h1"))
     A(P("Ninguno es difícil. Varios tienen demora, así que conviene "
         "arrancarlos en paralelo mientras se redactan los documentos."))
     sp(4)
@@ -469,6 +613,14 @@ def build_story():
          "encargado del tratamiento"],
         ["<b>Ídem con Resend y con Vercel</b>",
          "Sus paneles", "Mismo trámite, dos minutos cada uno"],
+        ["<b>Conversión de las cuentas de las tiendas</b>",
+         "Apple y Google",
+         "Ver la sección 4. Incluye el trámite del D-U-N-S, que es el de mayor "
+         "plazo de todo este documento"],
+        ["<b>Registro de la marca TREINO</b>",
+         "INPI",
+         "A nombre de la sociedad. No bloquea el lanzamiento, pero da respaldo "
+         "a la cláusula de propiedad intelectual de los Términos"],
         ["<b>Publicar las URLs legales</b>",
          "Vercel, proyecto de la landing",
          "gettreino.com/legal/privacidad, /terminos, /comunidad, "
@@ -480,13 +632,13 @@ def build_story():
     ], [45, 45, 75]))
 
     sp(10)
-    A(P("5. Qué llevarle al abogado", "h1"))
+    A(P("6. Qué llevarle al abogado", "h1"))
     A(P("Acá es donde se ahorra plata de verdad. Un abogado cobrando por hora "
         "para descubrir qué hace tu app es el peor uso posible del "
         "presupuesto. Llevale esto y la conversación arranca en el minuto "
         "cero."))
     sp(4)
-    A(P("5.1 El material", "h3"))
+    A(P("6.1 El material", "h3"))
     S.extend(bullets([
         "Los cuatro documentos de <b>docs/legal/</b>, empezando por la "
         "auditoría — le muestra en dos páginas qué recolecta la app y dónde el "
@@ -497,7 +649,7 @@ def build_story():
         "Esta guía, con las decisiones ya tomadas.",
     ]))
     sp(6)
-    A(P("5.2 Las preguntas concretas", "h3"))
+    A(P("6.2 Las preguntas concretas", "h3"))
     A(P("No le pidas «que revise todo». Pedile esto:"))
     sp(4)
     A(table([
@@ -529,7 +681,7 @@ def build_story():
     A(PageBreak())
 
     # ---- 6 producto
-    A(P("6. El trabajo de producto que se dispara", "h1"))
+    A(P("7. El trabajo de producto que se dispara", "h1"))
     A(P("Buena parte del cumplimiento no se escribe: se programa. Un documento "
         "que promete algo que la app no hace es peor que no tenerlo, porque "
         "queda registrado que lo prometiste."))
@@ -566,7 +718,7 @@ def build_story():
     ], [62, 78, 25]))
 
     sp(10)
-    A(P("7. Orden de trabajo", "h1"))
+    A(P("8. Orden de trabajo", "h1"))
     A(P("Las dependencias reales, en orden. Nada de lo de abajo se puede "
         "hacer antes de lo de arriba."))
     sp(4)
@@ -574,38 +726,44 @@ def build_story():
         ["Etapa", "Qué pasa", "Quién"],
         ["<b>1. Decidir</b>",
          "Las cinco decisiones pendientes de la sección 3. D1 ya está",
-         "Vos"],
+         "Product Owner"],
+        ["<b>1.b Cuentas de tiendas</b>",
+         "Tramitar el D-U-N-S ya, dejar renovar Apple el 5/9 y elegir camino "
+         "para Play. Corre en paralelo con todo lo demás y es lo de mayor "
+         "plazo. Ver sección 4",
+         "Product Owner"],
         ["<b>2. Identificar</b>",
          "[OK] Sociedad constituida e inscripta. Falta el domicilio de la sede social, la casilla atendida y verificar a nombre de quién están las cuentas de las tiendas",
          "Vos"],
         ["<b>3. Completar los borradores</b>",
          "Rellenar los pendientes de los cuatro documentos ya escritos",
-         "Nosotros"],
+         "Desarrollo"],
         ["<b>4. Redactar los nueve restantes</b>",
          "Términos, descargo, contrato del PF, suscripción, arrepentimiento, "
          "consentimiento de salud, aviso legal, cookies, licencias",
-         "Nosotros"],
+         "Desarrollo"],
         ["<b>5. Revisión legal</b>",
-         "Con las cuatro preguntas de la sección 5.2",
+         "Con las cuatro preguntas de la sección 6.2",
          "Abogado"],
         ["<b>6. Construir</b>",
          "Reporte, bloqueo, consentimiento de salud, gate de edad, URL de "
          "borrado, descargo visible",
-         "Nosotros"],
+         "Desarrollo"],
         ["<b>7. Publicar</b>",
          "URLs en gettreino.com, texto portado a la app, enlaces cargados en "
          "las dos tiendas",
-         "Nosotros"],
+         "Desarrollo"],
         ["<b>8. Inscribir</b>",
          "Base de datos ante la AAIP, acuerdos de tratamiento aceptados",
-         "Vos"],
+         "Titular"],
     ], [32, 88, 45]))
     sp(10)
     A(callout(
-        "<b>Lo que se puede arrancar hoy, sin esperar nada:</b> la casilla de "
-        "contacto bajo gettreino.com, los acuerdos de tratamiento en las tres "
-        "consolas, y el desarrollo de reporte y bloqueo — esa feature no "
-        "depende de ninguna decisión legal y es el bloqueante de mayor plazo."))
+        "<b>Lo que se puede arrancar hoy, sin esperar ninguna decisión:</b> el "
+        "trámite del D-U-N-S, la casilla de contacto bajo gettreino.com, los "
+        "acuerdos de tratamiento en las tres consolas, y el desarrollo de "
+        "reporte y bloqueo. Esas cuatro cosas no dependen de nada de lo que "
+        "queda por decidir, y son las de mayor plazo."))
 
     A(PageBreak())
 
