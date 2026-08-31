@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
-import '../../../../app/theme/tokens/tokens.dart';
 import '../../domain/set_limits.dart';
 import 'bounded_number_formatter.dart';
+import 'set_cell_box.dart';
 
 /// Parsea el peso tal como lo tipea el atleta, aceptando coma o punto.
 ///
@@ -99,102 +99,50 @@ class _SetCellFieldState extends State<SetCellField> {
   @override
   Widget build(BuildContext context) {
     final palette = widget.palette;
-    final tinta = widget.hasError ? palette.danger : palette.textPrimary;
-    final enfocado = _foco.hasFocus;
-    // En REPOSO no hay borde. El contorno se leía como una línea oscura que
-    // cortaba la fila en vez de integrarla, y el relleno ya alcanza para que
-    // la celda se vea como una caja. El borde queda para lo que sí es un
-    // estado: la celda que se está editando, y la que está incompleta.
-    final colorBorde = widget.hasError
-        ? palette.danger
-        : enfocado
-            ? palette.accent
-            : Colors.transparent;
 
-    // MISMA construcción que `SetTypeChip`, no valores que casualmente
-    // coinciden: un `Container` con `BoxDecoration` y las mismas
-    // `constraints`. Antes la celda se dibujaba con `InputDecoration` +
-    // `OutlineInputBorder` y el chip con un `Container`, dos caminos que
-    // llegaban a alturas iguales en test y se veían distintos en el device —
-    // el chip sólido, los campos hundidos. Revisión del 31/08.
-    return Container(
-      constraints: const BoxConstraints(minWidth: 44, minHeight: 48),
-      decoration: BoxDecoration(
-        color: palette.surfaceSubtle,
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: Border.all(
-          color: colorBorde,
-          width: widget.hasError || enfocado ? 1.5 : 1.0,
-        ),
-      ),
-      // Center con factores en 1 por el mismo motivo que el chip: `alignment`
-      // mete un Align, y un Align con constraints acotadas se estira a
-      // llenarlas.
-      child: Center(
-        widthFactor: 1,
-        heightFactor: 1,
-        child: TextField(
-          controller: widget.controller,
-          focusNode: _foco,
-          keyboardType: widget.decimal
-              ? const TextInputType.numberWithOptions(decimal: true)
-              : TextInputType.number,
-          inputFormatters: [
-            // QA-WKT-003: tope de dominio compartido, para que no se pueda
-            // autorear un set imposible y que ese set fluya sin tocar hasta un
-            // SetLog.
-            BoundedNumberFormatter(
-              max: widget.decimal ? kMaxWeightKg : kMaxReps.toDouble(),
-              decimal: widget.decimal,
-            ),
-          ],
-          style: GoogleFonts.barlow(
-            fontSize: 17,
-            fontWeight: FontWeight.w600,
-            color: tinta,
+    return SetCellBox(
+      focused: _foco.hasFocus,
+      hasError: widget.hasError,
+      child: TextField(
+        controller: widget.controller,
+        focusNode: _foco,
+        keyboardType: widget.decimal
+            ? const TextInputType.numberWithOptions(decimal: true)
+            : TextInputType.number,
+        inputFormatters: [
+          // QA-WKT-003: tope de dominio compartido, para que no se pueda
+          // autorear un set imposible y que ese set fluya sin tocar hasta un
+          // SetLog.
+          BoundedNumberFormatter(
+            max: widget.decimal ? kMaxWeightKg : kMaxReps.toDouble(),
+            decimal: widget.decimal,
           ),
-          textAlign: TextAlign.center,
-          decoration: InputDecoration(
-            isDense: true,
-            // `filled: false` EXPLÍCITO. El tema de la app pone `filled: true`
-            // con `fillColor: bgCard` para todos los `InputDecoration`, y sin
-            // apagarlo el campo pintaba esa banda OSCURA encima del Container
-            // claro. Como el campo mide menos que los 48 dp de la caja, la
-            // banda se veía como una línea negra horizontal a la altura del
-            // texto — la "línea negra" de la revisión en device, que no era un
-            // borde sino un relleno heredado.
-            filled: false,
-            // El borde y el relleno los pone el Container de afuera: acá
-            // cualquier decoración volvería a meter una segunda caja.
-            border: InputBorder.none,
-            enabledBorder: InputBorder.none,
-            focusedBorder: InputBorder.none,
-            errorBorder: InputBorder.none,
-            focusedErrorBorder: InputBorder.none,
-            disabledBorder: InputBorder.none,
-            // Padding vertical CERO: el alto lo pone el `minHeight` del
-            // Container de afuera, igual que en el chip. Sumarle padding acá
-            // llevaba la celda a 52 y volvía a desalinearla del chip, que es
-            // justo lo que este cambio vino a arreglar.
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.hairline,
-            ),
-            hintText: widget.hint,
-            hintStyle: GoogleFonts.barlow(
-              fontSize: 13,
-              color: widget.hasError
-                  ? palette.danger.withAlpha(180)
-                  : palette.textMuted,
-            ),
-          ),
-          onChanged: (value) {
-            if (widget.decimal) {
-              widget.onDecimalChanged!(parseEditorWeight(value));
-            } else {
-              widget.onChanged!(int.tryParse(value));
-            }
-          },
+        ],
+        style: GoogleFonts.barlow(
+          fontSize: 17,
+          fontWeight: FontWeight.w600,
+          color: widget.hasError ? palette.danger : palette.textPrimary,
         ),
+        textAlign: TextAlign.center,
+        decoration: setCellDecoration(
+          palette: palette,
+          hint: widget.hint,
+          hasError: widget.hasError,
+        ).copyWith(
+          hintStyle: GoogleFonts.barlow(
+            fontSize: 13,
+            color: widget.hasError
+                ? palette.danger.withAlpha(180)
+                : palette.textMuted,
+          ),
+        ),
+        onChanged: (value) {
+          if (widget.decimal) {
+            widget.onDecimalChanged!(parseEditorWeight(value));
+          } else {
+            widget.onChanged!(int.tryParse(value));
+          }
+        },
       ),
     );
   }
