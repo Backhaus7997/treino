@@ -35,6 +35,7 @@ class QuickEntryResult {
 class QuickEntryPanel extends StatelessWidget {
   const QuickEntryPanel({
     required this.controller,
+    required this.focusNode,
     required this.entry,
     required this.results,
     required this.onSelect,
@@ -44,6 +45,12 @@ class QuickEntryPanel extends StatelessWidget {
   });
 
   final TextEditingController controller;
+
+  /// El foco del campo. Lo maneja el llamador porque elegir un resultado tiene
+  /// que DEVOLVERLO con el cursor al final: el tap sobre la lista lo suelta, y
+  /// sin recuperarlo el teclado se cierra justo cuando el usuario va a
+  /// escribir la prescripción.
+  final FocusNode focusNode;
 
   /// Lo que se entendió del texto actual. Alimenta el hint del pie y la
   /// prescripción que se muestra a la derecha de cada resultado.
@@ -109,6 +116,7 @@ class QuickEntryPanel extends StatelessWidget {
                 child: TextField(
                   key: const Key('quick_entry_field'),
                   controller: controller,
+                  focusNode: focusNode,
                   autofocus: true,
                   textInputAction: TextInputAction.done,
                   onSubmitted: (_) {
@@ -143,18 +151,27 @@ class QuickEntryPanel extends StatelessWidget {
             const SizedBox(height: AppSpacing.s8),
             ConstrainedBox(
               constraints: const BoxConstraints(maxHeight: _kAltoLista),
-              child: ListView.separated(
-                key: const Key('quick_entry_results'),
-                shrinkWrap: true,
-                padding: EdgeInsets.zero,
-                itemCount: visibles.length,
-                separatorBuilder: (_, __) =>
-                    const SizedBox(height: AppSpacing.hairline),
-                itemBuilder: (context, i) => _FilaResultado(
-                  indice: i,
-                  result: visibles[i],
-                  prescripcion: _prescripcion(entry, l10n),
-                  onTap: () => onSelect(visibles[i]),
+              // TapRegion para que tocar un resultado NO cuente como "afuera"
+              // del campo: sin esto el tap cierra el teclado que el usuario
+              // necesita abierto para seguir escribiendo la prescripción.
+              child: TextFieldTapRegion(
+                child: ListView.separated(
+                  key: const Key('quick_entry_results'),
+                  shrinkWrap: true,
+                  // Scrollear la lista SÍ baja el teclado, que es lo que deja
+                  // ver más opciones sin que estorbe.
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: EdgeInsets.zero,
+                  itemCount: visibles.length,
+                  separatorBuilder: (_, __) =>
+                      const SizedBox(height: AppSpacing.hairline),
+                  itemBuilder: (context, i) => _FilaResultado(
+                    indice: i,
+                    result: visibles[i],
+                    prescripcion: _prescripcion(entry, l10n),
+                    onTap: () => onSelect(visibles[i]),
+                  ),
                 ),
               ),
             ),
@@ -285,68 +302,73 @@ class _FilaResultado extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
 
-    return Material(
-      color: palette.surfaceSubtle,
-      borderRadius: BorderRadius.circular(AppRadius.sm),
-      child: InkWell(
+    // `GestureDetector` y no un `InkWell`: los widgets de botón de Material son
+    // ENFOCABLES, y al tocar un resultado se llevaban el foco del campo. El
+    // teclado se cerraba, y al volver a tocar el cursor quedaba donde cayó el
+    // dedo en vez de al final del texto. Mismo motivo por el que los steppers
+    // de la barra de accesorio tampoco son botones.
+    return Semantics(
+      button: true,
+      label: result.name,
+      excludeSemantics: true,
+      child: GestureDetector(
         key: Key('quick_entry_result_$indice'),
+        behavior: HitTestBehavior.opaque,
         onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        child: ConstrainedBox(
-          // El piso va acá y no en un `ConstrainedBox` suelto alrededor del
-          // contenido: con `minHeight` el hijo crece si el texto lo pide, que
-          // es lo que hace falta con Dynamic Type grande.
+        child: Container(
           constraints: const BoxConstraints(minHeight: 48),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.s8,
-              vertical: AppSpacing.hairline,
-            ),
-            child: Row(
-              children: [
-                Icon(TreinoIcon.dumbbell, size: 17, color: palette.accentText),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.s8,
+            vertical: AppSpacing.hairline,
+          ),
+          decoration: BoxDecoration(
+            color: palette.surfaceSubtle,
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+          ),
+          child: Row(
+            children: [
+              Icon(TreinoIcon.dumbbell, size: 17, color: palette.accentText),
+              const SizedBox(width: AppSpacing.s8),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      result.name,
+                      style: GoogleFonts.barlow(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w600,
+                        color: palette.textPrimary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      result.muscleGroup,
+                      style: GoogleFonts.barlow(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w400,
+                        color: palette.textMuted,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              if (prescripcion.isNotEmpty) ...[
                 const SizedBox(width: AppSpacing.s8),
-                Expanded(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        result.name,
-                        style: GoogleFonts.barlow(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w600,
-                          color: palette.textPrimary,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(
-                        result.muscleGroup,
-                        style: GoogleFonts.barlow(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w400,
-                          color: palette.textMuted,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
+                Text(
+                  prescripcion,
+                  style: GoogleFonts.barlowCondensed(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: palette.accentText,
                   ),
                 ),
-                if (prescripcion.isNotEmpty) ...[
-                  const SizedBox(width: AppSpacing.s8),
-                  Text(
-                    prescripcion,
-                    style: GoogleFonts.barlowCondensed(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: palette.accentText,
-                    ),
-                  ),
-                ],
               ],
-            ),
+            ],
           ),
         ),
       ),

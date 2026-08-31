@@ -3334,6 +3334,12 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
   bool _quickEntryOpen = false;
   final TextEditingController _quickEntryCtrl = TextEditingController();
 
+  /// El foco del campo de entrada rápida. Vive acá porque elegir un resultado
+  /// tiene que DEVOLVERLO con el cursor al final: el tap sobre la lista lo
+  /// suelta, y sin recuperarlo el teclado se cierra justo cuando el usuario va
+  /// a escribir la prescripción.
+  final FocusNode _quickEntryFocus = FocusNode();
+
   /// El ejercicio ya elegido en la entrada rápida, o null mientras se busca.
   ///
   /// Elegir un candidato AUTOCOMPLETA el nombre y guarda esto; recién el botón
@@ -3385,6 +3391,7 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
 
   @override
   void dispose() {
+    _quickEntryFocus.dispose();
     _quickEntryCtrl.dispose();
     _nameController.dispose();
     _nameFocus.dispose();
@@ -3748,6 +3755,7 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
                         }
                         return QuickEntryPanel(
                           controller: _quickEntryCtrl,
+                          focusNode: _quickEntryFocus,
                           entry: entry,
                           selected: sigueElegido ? elegido : null,
                           results: sigueElegido
@@ -3759,10 +3767,16 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
                             final texto = '${r.name} ';
                             _quickEntryCtrl.value = TextEditingValue(
                               text: texto,
+                              // Cursor AL FINAL, listo para seguir. Sin esto
+                              // el usuario tenía que volver a tocar el campo y
+                              // recolocar el cursor a mano.
                               selection: TextSelection.collapsed(
                                   offset: texto.length),
                             );
                             setState(() => _quickEntryElegido = r);
+                            // Y el foco de vuelta al campo: el tap sobre la
+                            // lista lo soltó, y con él se fue el teclado.
+                            _quickEntryFocus.requestFocus();
                           },
                           onConfirm: () {
                             final r = _quickEntryElegido;

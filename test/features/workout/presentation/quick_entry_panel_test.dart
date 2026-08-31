@@ -32,6 +32,8 @@ Future<TextEditingController> _montarPanel(
 }) async {
   final ctrl = TextEditingController(text: texto);
   addTearDown(ctrl.dispose);
+  final foco = FocusNode();
+  addTearDown(foco.dispose);
   await tester.pumpWidget(
     MaterialApp(
       theme: tema ?? AppTheme.dark(),
@@ -41,6 +43,7 @@ Future<TextEditingController> _montarPanel(
       home: Scaffold(
         body: QuickEntryPanel(
           controller: ctrl,
+          focusNode: foco,
           entry: parseQuickEntry(texto),
           results: resultados,
           selected: elegido,
