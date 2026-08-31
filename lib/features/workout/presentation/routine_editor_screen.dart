@@ -4132,8 +4132,11 @@ class _SetTableState extends State<_SetTable> {
         origen >= 0 && origen < sets.length ? sets[origen].weightKg : null;
     if (source == null) {
       // Nothing to replicate — say so instead of silently clearing the column.
+      // El texto dice "este set" y no "el primer set": desde #867 la fuente es
+      // la celda enfocada, y mandar al usuario a cargar la primera fila lo
+      // dejaba corrigiendo un valor que no es el que se va a replicar.
       messenger.showSnackBar(
-        SnackBar(content: Text(l10n.routineEditorFillKgEmpty)),
+        SnackBar(content: Text(l10n.routineEditorFillColumnEmpty)),
       );
       return;
     }
@@ -4537,7 +4540,12 @@ class _SetRowState extends State<_SetRow> {
   void _stepKg(double deltaKg) {
     final next = steppedWeightKg(_currentKg, deltaKg);
     final text = formatEditorWeight(next);
-    if (next == widget.editableSet.weightKg && text == _kgCtrl.text) return;
+    if (next == widget.editableSet.weightKg && text == _kgCtrl.text) {
+      // Sin valor nuevo no hay nada que escribir, pero sí que republicar: es
+      // el camino por el que el botón de menos se apaga al llegar al piso.
+      _republicar(_SetField.kg);
+      return;
+    }
 
     widget.editableSet.weightKg = next;
     _kgCtrl.value = TextEditingValue(
@@ -4562,7 +4570,10 @@ class _SetRowState extends State<_SetRow> {
   void _stepReps(_SetField campo, double delta) {
     final actual = _repsActuales(campo) ?? 0;
     final next = (actual + delta.round()).clamp(0, kMaxReps);
-    if (next == 0 || next == actual) return;
+    if (next == 0 || next == actual) {
+      _republicar(campo);
+      return;
+    }
 
     final s = widget.editableSet;
     switch (campo) {
@@ -4610,8 +4621,15 @@ class _SetRowState extends State<_SetRow> {
       canDecrease: esKg
           ? (_currentKg ?? 0) > 0
           : (_repsActuales(campo) ?? 0) > 1,
-      onStep: (delta) =>
-          esKg ? _stepKg(delta) : _stepReps(campo, delta),
+      onStep: (delta) => esKg ? _stepKg(delta) : _stepReps(campo, delta),
+      stepIncreaseLabel: esKg
+          ? l10n.routineEditorKgStepIncreaseA11y(
+              formatWeightKg(kKgStepsKg.first))
+          : l10n.routineEditorRepsStepIncreaseA11y('1'),
+      stepDecreaseLabel: esKg
+          ? l10n.routineEditorKgStepDecreaseA11y(
+              formatWeightKg(kKgStepsKg.first))
+          : l10n.routineEditorRepsStepDecreaseA11y('1'),
       onFillColumn: esKg && widget.onFillColumn != null
           ? () => widget.onFillColumn!(campo)
           : null,
@@ -4702,6 +4720,11 @@ class _SetRowState extends State<_SetRow> {
               onDecimalChanged: (v) {
                 s.weightKg = v;
                 widget.onChanged();
+                // `canDecrease` se calcula sobre el valor: tipear el primer
+                // número tiene que habilitar el botón de menos sin esperar a
+                // que el foco se vaya y vuelva, y vaciar el campo tiene que
+                // apagarlo en vez de dejar un no-op encendido.
+                _republicar(_SetField.kg);
               },
             ),
           ),
@@ -4718,6 +4741,7 @@ class _SetRowState extends State<_SetRow> {
                 onChanged: (v) {
                   s.repsMin = v;
                   widget.onChanged();
+                  _republicar(_SetField.repsMin);
                 },
               ),
             ),
@@ -4733,6 +4757,7 @@ class _SetRowState extends State<_SetRow> {
                 onChanged: (v) {
                   s.repsMax = v;
                   widget.onChanged();
+                  _republicar(_SetField.repsMax);
                 },
               ),
             ),
@@ -4748,6 +4773,7 @@ class _SetRowState extends State<_SetRow> {
                 onChanged: (v) {
                   s.reps = v;
                   widget.onChanged();
+                  _republicar(_SetField.reps);
                 },
               ),
             ),

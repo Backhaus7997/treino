@@ -436,8 +436,11 @@ void main() {
       await _tapVisible(tester, _fillButton);
 
       expect(
-        find.text('Cargá el peso del primer set para poder replicarlo.'),
+        find.text('Cargá el peso de este set para poder replicarlo.'),
         findsOneWidget,
+        reason: 'dice "este set" y no "el primer set": la fuente es la celda '
+            'enfocada, y mandar al usuario a la primera fila lo dejaba '
+            'corrigiendo un valor que no se va a replicar',
       );
       expect(find.text('60'), findsOneWidget,
           reason: 'el peso ya cargado no se pisa con un vacío');

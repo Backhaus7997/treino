@@ -872,6 +872,38 @@ void main() {
       expect(_kgText(tester, 1), '2.5', reason: 'las demás filas no se tocan');
     });
 
+    testWidgets('tipear habilita bajar sin tener que cambiar de foco',
+        (tester) async {
+      // El botón de menos se calcula sobre el valor de la celda. Si sólo se
+      // recalculara al enfocar o al dar un paso, cargar el primer número
+      // dejaría el menos apagado hasta salir y volver al campo — y vaciar un
+      // campo cargado lo dejaría encendido como un no-op permanente.
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById('r-1'))
+          .thenAnswer((_) async => _singleModeRoutine(weightKg: null));
+
+      await _pumpEditor(
+        tester,
+        mode: const SelfCreating(existingRoutineId: 'r-1'),
+        repo: repo,
+      );
+
+      await _tapVisible(tester, _kgField(0));
+      expect(tester.widget<GestureDetector>(_minus25).onTap, isNull,
+          reason: 'arranca vacío');
+
+      await tester.enterText(_kgField(0), '40');
+      await tester.pumpAndSettle();
+      expect(tester.widget<GestureDetector>(_minus25).onTap, isNotNull,
+          reason: 'con 40 cargados ya hay algo que restar');
+
+      await tester.enterText(_kgField(0), '');
+      await tester.pumpAndSettle();
+      expect(tester.widget<GestureDetector>(_minus25).onTap, isNull,
+          reason: 'y al vaciarlo vuelve a apagarse, en vez de quedar como un '
+              'botón que no hace nada');
+    });
+
     testWidgets('sin peso cargado los botones de bajar quedan deshabilitados',
         (tester) async {
       final repo = _MockRoutineRepository();

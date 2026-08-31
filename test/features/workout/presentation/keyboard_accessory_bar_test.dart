@@ -21,6 +21,8 @@ FocusedSetCell _celda({
   bool puedeBajar = true,
   void Function(double)? onStep,
   VoidCallback? onFill,
+  String subir = 'Sumar 2.5 kilos al peso',
+  String bajar = 'Restar 2.5 kilos al peso',
 }) =>
     FocusedSetCell(
       cellId: cellId,
@@ -29,6 +31,8 @@ FocusedSetCell _celda({
       stepLabel: etiqueta,
       canDecrease: puedeBajar,
       onStep: onStep ?? (_) {},
+      stepIncreaseLabel: subir,
+      stepDecreaseLabel: bajar,
       onFillColumn: onFill,
     );
 
@@ -93,6 +97,29 @@ void main() {
 
       await tester.tap(_menos, warnIfMissed: false);
       expect(saltos, isEmpty);
+    });
+
+    testWidgets('se anuncian con qué mueven, no con el glifo', (tester) async {
+      // Regresión: el nodo de Semantics expone sólo su texto —"−2.5", "+1"— y
+      // el contexto vive en otro nodo más abajo. Sin label propio, un lector
+      // de pantalla no distingue si el control mueve kilos, reps, el mínimo o
+      // el máximo. Los steppers de peso ya traían estos labels.
+      final handle = tester.ensureSemantics();
+      await _montar(
+        tester,
+        KeyboardAccessoryBar(
+          cell: _celda(
+            paso: 1,
+            etiqueta: '1',
+            subir: 'Sumar 1 repeticiones',
+            bajar: 'Restar 1 repeticiones',
+          ),
+        ),
+      );
+
+      expect(tester.getSemantics(_mas).label, 'Sumar 1 repeticiones');
+      expect(tester.getSemantics(_menos).label, 'Restar 1 repeticiones');
+      handle.dispose();
     });
 
     testWidgets('los dos miden 44 de alto', (tester) async {

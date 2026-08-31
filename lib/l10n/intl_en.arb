@@ -721,6 +721,18 @@
   "@routineEditorFieldKg": {},
   "routineEditorFieldReps": "reps",
   "@routineEditorFieldReps": {},
+  "routineEditorRepsStepIncreaseA11y": "Add {amount} reps",
+  "@routineEditorRepsStepIncreaseA11y": {
+    "placeholders": {"amount": {"type": "String"}}
+  },
+  "routineEditorRepsStepDecreaseA11y": "Subtract {amount} reps",
+  "@routineEditorRepsStepDecreaseA11y": {
+    "placeholders": {"amount": {"type": "String"}}
+  },
+  "routineEditorFillColumnEmpty": "Enter this set's weight to replicate it.",
+  "@routineEditorFillColumnEmpty": {
+    "description": "The cell the replication was requested from is empty."
+  },
   "routineEditorKgStepIncreaseA11y": "Add {amount} kilos to the weight",
   "@routineEditorKgStepIncreaseA11y": {},
   "routineEditorKgStepDecreaseA11y": "Take {amount} kilos off the weight",

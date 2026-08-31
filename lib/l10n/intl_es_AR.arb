@@ -1226,6 +1226,18 @@
   "@routineEditorFieldKg": {},
   "routineEditorFieldReps": "reps",
   "@routineEditorFieldReps": {},
+  "routineEditorRepsStepIncreaseA11y": "Sumar {amount} repeticiones",
+  "@routineEditorRepsStepIncreaseA11y": {
+    "placeholders": {"amount": {"type": "String"}}
+  },
+  "routineEditorRepsStepDecreaseA11y": "Restar {amount} repeticiones",
+  "@routineEditorRepsStepDecreaseA11y": {
+    "placeholders": {"amount": {"type": "String"}}
+  },
+  "routineEditorFillColumnEmpty": "Cargá el peso de este set para poder replicarlo.",
+  "@routineEditorFillColumnEmpty": {
+    "description": "La celda desde la que se pidió replicar está vacía. Reemplaza a routineEditorFillKgEmpty, que hablaba del primer set porque el disparador vivía en el header."
+  },
   "routineEditorKgStepIncreaseA11y": "Sumar {amount} kilos al peso",
   "@routineEditorKgStepIncreaseA11y": {
     "description": "Screen-reader label for a KG stepper button that adds weight to the set being edited.",

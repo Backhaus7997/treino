@@ -23,6 +23,8 @@ class FocusedSetCell {
     required this.stepLabel,
     required this.canDecrease,
     required this.onStep,
+    required this.stepIncreaseLabel,
+    required this.stepDecreaseLabel,
     this.onFillColumn,
   });
 
@@ -49,6 +51,13 @@ class FocusedSetCell {
 
   final void Function(double delta) onStep;
 
+  /// Qué anuncia un lector de pantalla en cada stepper. El nodo de Semantics
+  /// sólo expone su texto —`−2.5`, `+1`—, y el contexto vive en otro nodo más
+  /// abajo: sin estos labels no hay forma de saber si el control mueve kilos,
+  /// repeticiones, el mínimo o el máximo. Los steppers de peso ya los tenían.
+  final String stepIncreaseLabel;
+  final String stepDecreaseLabel;
+
   /// Replica el valor de esta celda en toda su columna. Null cuando no aplica
   /// —un ejercicio de un solo set no tiene dónde replicar—, y entonces el
   /// botón no se dibuja.
@@ -74,8 +83,15 @@ class RoutineEditorFocusScope extends InheritedNotifier<FocusedCellNotifier> {
   /// Devuelve null en vez de tirar a propósito: la tabla de series se monta
   /// también desde el editor web del Coach Hub, donde no hay teclado del
   /// sistema ni barra que mostrar. Una fila sin scope simplemente no publica.
+  ///
+  /// **`getInheritedWidgetOfExactType`, no `dependOn`.** La fila sólo quiere
+  /// una referencia para PUBLICAR; suscribirse convertiría a cada `_SetRow` en
+  /// dependiente del notifier, y entonces cada foco, blur o paso reconstruiría
+  /// TODAS las filas del plan — un plan de 3 días × 5 ejercicios × 4 sets son
+  /// 60 filas rearmándose por cada tecla. Regla 6 de AGENTS.md. Quien sí
+  /// escucha es el `ValueListenableBuilder` de la pantalla, que es uno solo.
   static FocusedCellNotifier? maybeOf(BuildContext context) => context
-      .dependOnInheritedWidgetOfExactType<RoutineEditorFocusScope>()
+      .getInheritedWidgetOfExactType<RoutineEditorFocusScope>()
       ?.notifier;
 }
 
@@ -160,6 +176,7 @@ class KeyboardAccessoryBar extends StatelessWidget {
                         child: _BotonPaso(
                           claveGesto: const Key('accessory_step_minus'),
                           label: '−${cell.stepLabel}',
+                          semantica: cell.stepDecreaseLabel,
                           enabled: cell.canDecrease,
                           onTap: () => cell.onStep(-cell.stepAmount),
                         ),
@@ -169,6 +186,7 @@ class KeyboardAccessoryBar extends StatelessWidget {
                         child: _BotonPaso(
                           claveGesto: const Key('accessory_step_plus'),
                           label: '+${cell.stepLabel}',
+                          semantica: cell.stepIncreaseLabel,
                           enabled: true,
                           onTap: () => cell.onStep(cell.stepAmount),
                         ),
@@ -210,6 +228,7 @@ class _BotonPaso extends StatelessWidget {
   const _BotonPaso({
     required this.claveGesto,
     required this.label,
+    required this.semantica,
     required this.enabled,
     required this.onTap,
   });
@@ -219,6 +238,9 @@ class _BotonPaso extends StatelessWidget {
   /// steppers existen.
   final Key claveGesto;
   final String label;
+
+  /// Lo que se anuncia en vez del glifo. Ver [FocusedSetCell.stepIncreaseLabel].
+  final String semantica;
   final bool enabled;
   final VoidCallback onTap;
 
@@ -229,6 +251,10 @@ class _BotonPaso extends StatelessWidget {
     return Semantics(
       button: true,
       enabled: enabled,
+      label: semantica,
+      // El glifo del botón —"+1", "−2.5"— es redundante con el label y sin
+      // esto se anuncian los dos: "Sumar 1 repeticiones, +1".
+      excludeSemantics: true,
       child: GestureDetector(
         key: claveGesto,
         behavior: HitTestBehavior.opaque,
