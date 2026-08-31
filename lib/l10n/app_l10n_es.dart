@@ -1987,6 +1987,39 @@ class AppL10nEs extends AppL10n {
   String get routineEditorFillKgUndo => 'Deshacer';
 
   @override
+  String get routineEditorFillColumnLabel => 'A TODAS';
+
+  @override
+  String get routineEditorFillColumnA11y =>
+      'Replicar este valor en toda la columna';
+
+  @override
+  String routineEditorAccessoryContext(
+      String ejercicio, int set, String campo) {
+    return '$ejercicio · set $set · $campo';
+  }
+
+  @override
+  String get routineEditorFieldKg => 'kg';
+
+  @override
+  String get routineEditorFieldReps => 'reps';
+
+  @override
+  String routineEditorRepsStepIncreaseA11y(String amount) {
+    return 'Sumar $amount repeticiones';
+  }
+
+  @override
+  String routineEditorRepsStepDecreaseA11y(String amount) {
+    return 'Restar $amount repeticiones';
+  }
+
+  @override
+  String get routineEditorFillColumnEmpty =>
+      'Cargá el peso de este set para poder replicarlo.';
+
+  @override
   String routineEditorKgStepIncreaseA11y(String amount) {
     return 'Sumar $amount kilos al peso';
   }
@@ -3099,10 +3132,7 @@ class AppL10nEs extends AppL10n {
 
   @override
   String dashboardAlertBannerSummary(
-    int vencidos,
-    int solicitudes,
-    int inactivos,
-  ) {
+      int vencidos, int solicitudes, int inactivos) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,
@@ -6078,6 +6108,39 @@ class AppL10nEsAr extends AppL10nEs {
   String get routineEditorFillKgUndo => 'Deshacer';
 
   @override
+  String get routineEditorFillColumnLabel => 'A TODAS';
+
+  @override
+  String get routineEditorFillColumnA11y =>
+      'Replicar este valor en toda la columna';
+
+  @override
+  String routineEditorAccessoryContext(
+      String ejercicio, int set, String campo) {
+    return '$ejercicio · set $set · $campo';
+  }
+
+  @override
+  String get routineEditorFieldKg => 'kg';
+
+  @override
+  String get routineEditorFieldReps => 'reps';
+
+  @override
+  String routineEditorRepsStepIncreaseA11y(String amount) {
+    return 'Sumar $amount repeticiones';
+  }
+
+  @override
+  String routineEditorRepsStepDecreaseA11y(String amount) {
+    return 'Restar $amount repeticiones';
+  }
+
+  @override
+  String get routineEditorFillColumnEmpty =>
+      'Cargá el peso de este set para poder replicarlo.';
+
+  @override
   String routineEditorKgStepIncreaseA11y(String amount) {
     return 'Sumar $amount kilos al peso';
   }
@@ -7188,10 +7251,7 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String dashboardAlertBannerSummary(
-    int vencidos,
-    int solicitudes,
-    int inactivos,
-  ) {
+      int vencidos, int solicitudes, int inactivos) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,

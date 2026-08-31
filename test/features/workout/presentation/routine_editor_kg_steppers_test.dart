@@ -194,6 +194,11 @@ List<Override> _overrides(RoutineRepository repo, String uid) => [
       ),
     ];
 
+/// Monta el editor con el teclado del sistema simulado.
+///
+/// Desde #867 la barra de steppers es un accesorio DEL TECLADO: se monta en el
+/// `bottomSheet` sólo cuando `viewInsets.bottom > 0`. Sin el inset simulado los
+/// atajos no existen para el árbol de widgets, aunque el campo esté enfocado.
 Future<void> _pumpEditor(
   WidgetTester tester, {
   required RoutineEditorMode mode,
@@ -255,22 +260,41 @@ Finder _fieldsWithHint(String hint) => find.byWidgetPredicate(
 
 Finder _kgField(int index) => _fieldsWithHint('kg').at(index);
 
-Finder get _plus25 => find.byKey(const Key('kg_step_plus_2_5'));
-Finder get _plus5 => find.byKey(const Key('kg_step_plus_5'));
-Finder get _minus25 => find.byKey(const Key('kg_step_minus_2_5'));
-Finder get _minus5 => find.byKey(const Key('kg_step_minus_5'));
+// Desde #867 los steppers viven en la barra sobre el teclado y son DOS, no
+// cuatro: el handoff especifica −2,5 / +2,5. Los saltos de 5 se perdieron —
+// subir 10 kg pasó de dos taps a cuatro—, y la razón es de espacio: la barra
+// comparte fila con "A TODAS".
+Finder get _plus25 => find.byKey(const Key('accessory_step_plus'));
+Finder get _minus25 => find.byKey(const Key('accessory_step_minus'));
 
 Finder get _anyStepper => find.byWidgetPredicate(
       (w) =>
           w is GestureDetector &&
           w.key is ValueKey<String> &&
-          (w.key as ValueKey<String>).value.startsWith('kg_step_'),
+          (w.key as ValueKey<String>).value.startsWith('accessory_step_'),
     );
 
 Future<void> _tapVisible(WidgetTester tester, Finder finder) async {
+  // El teclado se simula acá y no en `_pumpEditor` porque `pumpWidget` pisa
+  // los insets de la vista. Desde #867 los steppers viven en el `bottomSheet`
+  // y sólo se montan con `viewInsets.bottom > 0`: sin esto no existen para el
+  // árbol de widgets por más que el campo tenga el foco.
+  simularTeclado(tester);
   await tester.ensureVisible(finder);
   await tester.pumpAndSettle();
   await tester.tap(finder);
+  await tester.pumpAndSettle();
+}
+
+/// Cierra el teclado y con él la barra de accesorio.
+///
+/// Hace falta antes de tocar el CTA del pie: el `bottomSheet` se superpone al
+/// body, así que con el teclado arriba la barra tapa "GUARDAR CAMBIOS". En el
+/// device pasa igual — y ahí el usuario cierra el teclado, que es exactamente
+/// lo que esto simula.
+Future<void> _cerrarTeclado(WidgetTester tester) async {
+  FocusManager.instance.primaryFocus?.unfocus();
+  tester.view.viewInsets = FakeViewPadding.zero;
   await tester.pumpAndSettle();
 }
 
@@ -418,17 +442,15 @@ void main() {
       );
 
       expect(_anyStepper, findsNothing,
-          reason: 'sin foco no hay barra: la tabla no carga cuatro copias '
-              'ociosas de los mismos cuatro botones');
+          reason: 'sin una celda en edición no hay barra');
 
       await _tapVisible(tester, _kgField(0));
 
       expect(_plus25, findsOneWidget);
-      expect(_plus5, findsOneWidget);
       expect(_minus25, findsOneWidget);
-      expect(_minus5, findsOneWidget);
-      expect(_anyStepper, findsNWidgets(4),
-          reason: 'una sola barra, la de la fila enfocada');
+      expect(_anyStepper, findsNWidgets(2),
+          reason: 'una sola barra en toda la pantalla, la de la celda '
+              'enfocada — antes había una copia por fila con foco');
     });
 
     testWidgets('modo duración: no existe (no hay columna KG)', (tester) async {
@@ -456,7 +478,7 @@ void main() {
   // ── Widget: incremento ─────────────────────────────────────────────────────
 
   group('incremento', () {
-    testWidgets('+5 sube el peso y se ve en el campo', (tester) async {
+    testWidgets('+2.5 sube el peso y se ve en el campo', (tester) async {
       final repo = _MockRoutineRepository();
       when(() => repo.getById('r-1'))
           .thenAnswer((_) async => _singleModeRoutine());
@@ -470,9 +492,9 @@ void main() {
       await _tapVisible(tester, _kgField(0));
       expect(_kgText(tester, 0), '60');
 
-      await _tapVisible(tester, _plus5);
+      await _tapVisible(tester, _plus25);
 
-      expect(_kgText(tester, 0), '65');
+      expect(_kgText(tester, 0), '62.5');
       // Sólo toca la fila enfocada.
       expect(_kgText(tester, 1), '60');
     });
@@ -517,10 +539,11 @@ void main() {
       );
 
       await _tapVisible(tester, _kgField(0));
-      await _tapVisible(tester, _plus5);
       await _tapVisible(tester, _plus25);
-      expect(_kgText(tester, 0), '67.5');
+      await _tapVisible(tester, _plus25);
+      expect(_kgText(tester, 0), '65');
 
+      await _cerrarTeclado(tester);
       await _tapVisible(
           tester, find.widgetWithText(ElevatedButton, 'GUARDAR CAMBIOS'));
 
@@ -528,7 +551,7 @@ void main() {
           reason: 'el botón de guardar tiene que estar habilitado: el stepper '
               'dispara onChanged y la validación inline se recalcula');
       final sets = captured!.days.first.slots.first.sets;
-      expect(sets[0].weightKg, 67.5,
+      expect(sets[0].weightKg, 65,
           reason: 'el modelo tiene que llevar el valor que muestra el campo');
       expect(sets[1].weightKg, 60, reason: 'las demás filas no se tocan');
       expect(sets[0].reps, 10, reason: 'el stepper mueve SÓLO el peso');
@@ -555,7 +578,7 @@ void main() {
       final before = tester.widget<TextField>(_kgField(0));
       expect(before.focusNode?.hasFocus, isTrue);
 
-      await _tapVisible(tester, _plus5);
+      await _tapVisible(tester, _plus25);
 
       final after = tester.widget<TextField>(_kgField(0));
       expect(after.focusNode?.hasFocus, isTrue,
@@ -575,7 +598,7 @@ void main() {
           reason: 'mismo TextEditingController ⇒ el stepper no reemplazó la '
               'instancia de _EditableSet');
       // Y la barra sigue en pantalla para el siguiente salto.
-      expect(_plus5, findsOneWidget);
+      expect(_plus25, findsOneWidget);
     });
 
     // ── Regresión: el teclado del sistema ────────────────────────────────────
@@ -606,7 +629,7 @@ void main() {
           _editableStateOf(tester, _fieldsWithHint('reps').at(0));
 
       await _tapVisible(tester, _kgField(0));
-      expect(_anyStepper, findsNWidgets(4), reason: 'la barra sí apareció');
+      expect(_anyStepper, findsNWidgets(2), reason: 'la barra sí apareció');
 
       // Ésta es la aserción que muerde: el State del EditableText vive en el
       // ÁRBOL, no en `_SetRowState`. Si la raíz de la fila cambia de tipo, éste
@@ -663,9 +686,9 @@ void main() {
       );
 
       await _tapVisible(tester, _kgField(0));
-      await _tapVisible(tester, _plus5);
+      await _tapVisible(tester, _plus25);
 
-      expect(_kgText(tester, 0), '65');
+      expect(_kgText(tester, 0), '62.5');
       expect(tester.testTextInput.isVisible, isTrue,
           reason: 'el salto no puede tirarte el teclado: la barra existe para '
               'ahorrarte tipear, no para obligarte a reabrirlo');
@@ -690,7 +713,7 @@ void main() {
       );
 
       await _tapVisible(tester, _kgField(0));
-      expect(_anyStepper, findsNWidgets(4));
+      expect(_anyStepper, findsNWidgets(2));
 
       await _tapVisible(tester, _fieldsWithHint('reps').at(0));
 
@@ -700,8 +723,16 @@ void main() {
               'el foco rebota al KG');
       expect(
           tester.widget<TextField>(_kgField(0)).focusNode?.hasFocus, isFalse);
-      expect(_anyStepper, findsNothing,
-          reason: 'la barra se va con el foco del KG');
+      // Hasta #867 la barra desaparecía al salir de KG: los steppers eran de
+      // peso y nada más. Ahora sigue, con el paso en 1 y el contexto en reps —
+      // que es el punto del slice: la barra acompaña a la celda en edición,
+      // sea cual sea.
+      expect(_anyStepper, findsNWidgets(2),
+          reason: 'la barra sigue: ahora también sirve para repeticiones');
+      expect(find.text('+1'), findsOneWidget,
+          reason: 'en reps el salto es de a 1, no de a 2,5');
+      expect(find.textContaining('reps'), findsWidgets,
+          reason: 'la línea de contexto dice sobre qué celda actúa');
       expect(tester.testTextInput.isVisible, isTrue,
           reason: 'el teclado sigue arriba para escribir las repeticiones');
     });
@@ -719,7 +750,7 @@ void main() {
       );
 
       await _tapVisible(tester, _kgField(0));
-      expect(_anyStepper, findsNWidgets(4));
+      expect(_anyStepper, findsNWidgets(2));
 
       await _tapVisible(tester, _fieldsWithHint('mín').at(0));
 
@@ -727,7 +758,9 @@ void main() {
           reason: 'MÍN y MÁX son el mismo _NumberField sin focusNode externa: '
               'les pega el mismo defecto que a REPS');
       expect(tester.testTextInput.isVisible, isTrue);
-      expect(_anyStepper, findsNothing);
+      expect(_anyStepper, findsNWidgets(2),
+          reason: 'MÍN también es una celda editable: la barra la acompaña');
+      expect(find.text('+1'), findsOneWidget);
     });
   });
 
@@ -762,6 +795,7 @@ void main() {
 
       expect(_kgText(tester, 0), '22.5');
 
+      await _cerrarTeclado(tester);
       await _tapVisible(
           tester, find.widgetWithText(ElevatedButton, 'GUARDAR CAMBIOS'));
 
@@ -804,12 +838,12 @@ void main() {
       expect(find.byKey(const Key('slot_notes_field')), findsOneWidget);
 
       await _tapVisible(tester, _kgField(0));
-      expect(_plus5, findsOneWidget,
+      expect(_plus25, findsOneWidget,
           reason: 'el editor es compartido: o funciona en los dos modos, o '
               'queda explícitamente gateado — acá funciona en los dos');
 
-      await _tapVisible(tester, _plus5);
-      expect(_kgText(tester, 0), '65');
+      await _tapVisible(tester, _plus25);
+      expect(_kgText(tester, 0), '62.5');
     });
   });
 
@@ -831,11 +865,43 @@ void main() {
       await _tapVisible(tester, _kgField(0));
       expect(_kgText(tester, 0), '2.5');
 
-      await _tapVisible(tester, _minus5);
+      await _tapVisible(tester, _minus25);
 
       expect(_kgText(tester, 0), '',
           reason: 'el piso es "sin peso", no un 0 kg prescripto ni un -2.5');
       expect(_kgText(tester, 1), '2.5', reason: 'las demás filas no se tocan');
+    });
+
+    testWidgets('tipear habilita bajar sin tener que cambiar de foco',
+        (tester) async {
+      // El botón de menos se calcula sobre el valor de la celda. Si sólo se
+      // recalculara al enfocar o al dar un paso, cargar el primer número
+      // dejaría el menos apagado hasta salir y volver al campo — y vaciar un
+      // campo cargado lo dejaría encendido como un no-op permanente.
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById('r-1'))
+          .thenAnswer((_) async => _singleModeRoutine(weightKg: null));
+
+      await _pumpEditor(
+        tester,
+        mode: const SelfCreating(existingRoutineId: 'r-1'),
+        repo: repo,
+      );
+
+      await _tapVisible(tester, _kgField(0));
+      expect(tester.widget<GestureDetector>(_minus25).onTap, isNull,
+          reason: 'arranca vacío');
+
+      await tester.enterText(_kgField(0), '40');
+      await tester.pumpAndSettle();
+      expect(tester.widget<GestureDetector>(_minus25).onTap, isNotNull,
+          reason: 'con 40 cargados ya hay algo que restar');
+
+      await tester.enterText(_kgField(0), '');
+      await tester.pumpAndSettle();
+      expect(tester.widget<GestureDetector>(_minus25).onTap, isNull,
+          reason: 'y al vaciarlo vuelve a apagarse, en vez de quedar como un '
+              'botón que no hace nada');
     });
 
     testWidgets('sin peso cargado los botones de bajar quedan deshabilitados',
@@ -853,7 +919,6 @@ void main() {
       await _tapVisible(tester, _kgField(0));
       expect(_kgText(tester, 0), '');
 
-      expect(tester.widget<GestureDetector>(_minus5).onTap, isNull);
       expect(tester.widget<GestureDetector>(_minus25).onTap, isNull);
       expect(tester.widget<GestureDetector>(_plus25).onTap, isNotNull,
           reason: 'sumar sobre vacío sí tiene sentido: parte de 0');
@@ -861,7 +926,7 @@ void main() {
       // Y sumar desde vacío arranca en el salto elegido.
       await _tapVisible(tester, _plus25);
       expect(_kgText(tester, 0), '2.5');
-      expect(tester.widget<GestureDetector>(_minus5).onTap, isNotNull,
+      expect(tester.widget<GestureDetector>(_minus25).onTap, isNotNull,
           reason: 'con peso cargado bajar vuelve a habilitarse');
     });
   });

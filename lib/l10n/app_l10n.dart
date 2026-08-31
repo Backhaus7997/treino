@@ -63,7 +63,7 @@ import 'app_l10n_es.dart';
 /// property.
 abstract class AppL10n {
   AppL10n(String locale)
-    : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+      : localeName = intl.Intl.canonicalizedLocale(locale.toString());
 
   final String localeName;
 
@@ -85,17 +85,17 @@ abstract class AppL10n {
   /// of delegates is preferred or required.
   static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
       <LocalizationsDelegate<dynamic>>[
-        delegate,
-        GlobalMaterialLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-      ];
+    delegate,
+    GlobalMaterialLocalizations.delegate,
+    GlobalCupertinoLocalizations.delegate,
+    GlobalWidgetsLocalizations.delegate,
+  ];
 
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[
     Locale('en'),
     Locale('es'),
-    Locale('es', 'AR'),
+    Locale('es', 'AR')
   ];
 
   /// No description provided for @notFoundTitle.
@@ -3614,6 +3614,54 @@ abstract class AppL10n {
   /// **'Deshacer'**
   String get routineEditorFillKgUndo;
 
+  /// Botón de la barra sobre el teclado que replica el valor de la celda enfocada en toda su columna.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'A TODAS'**
+  String get routineEditorFillColumnLabel;
+
+  /// No description provided for @routineEditorFillColumnA11y.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Replicar este valor en toda la columna'**
+  String get routineEditorFillColumnA11y;
+
+  /// Contexto debajo de los atajos: sobre qué celda actúan.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{ejercicio} · set {set} · {campo}'**
+  String routineEditorAccessoryContext(String ejercicio, int set, String campo);
+
+  /// No description provided for @routineEditorFieldKg.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'kg'**
+  String get routineEditorFieldKg;
+
+  /// No description provided for @routineEditorFieldReps.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'reps'**
+  String get routineEditorFieldReps;
+
+  /// No description provided for @routineEditorRepsStepIncreaseA11y.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sumar {amount} repeticiones'**
+  String routineEditorRepsStepIncreaseA11y(String amount);
+
+  /// No description provided for @routineEditorRepsStepDecreaseA11y.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Restar {amount} repeticiones'**
+  String routineEditorRepsStepDecreaseA11y(String amount);
+
+  /// La celda desde la que se pidió replicar está vacía. Reemplaza a routineEditorFillKgEmpty, que hablaba del primer set porque el disparador vivía en el header.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cargá el peso de este set para poder replicarlo.'**
+  String get routineEditorFillColumnEmpty;
+
   /// Screen-reader label for a KG stepper button that adds weight to the set being edited.
   ///
   /// In es_AR, this message translates to:
@@ -5545,10 +5593,7 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'{vencidos, plural, =1{1 vencido} other{{vencidos} vencidos}} · {solicitudes, plural, =1{1 solicitud} other{{solicitudes} solicitudes}} · {inactivos, plural, =1{1 inactivo} other{{inactivos} inactivos}}'**
   String dashboardAlertBannerSummary(
-    int vencidos,
-    int solicitudes,
-    int inactivos,
-  );
+      int vencidos, int solicitudes, int inactivos);
 
   /// Formatted adherencia percentage value shown in the adherencia ring and KPI tile once the aggregate provider has data.
   ///
@@ -7227,9 +7272,8 @@ AppL10n lookupAppL10n(Locale locale) {
   }
 
   throw FlutterError(
-    'AppL10n.delegate failed to load unsupported locale "$locale". This is likely '
-    'an issue with the localizations generation tool. Please file an issue '
-    'on GitHub with a reproducible sample app and the gen-l10n configuration '
-    'that was used.',
-  );
+      'AppL10n.delegate failed to load unsupported locale "$locale". This is likely '
+      'an issue with the localizations generation tool. Please file an issue '
+      'on GitHub with a reproducible sample app and the gen-l10n configuration '
+      'that was used.');
 }
