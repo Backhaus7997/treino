@@ -261,13 +261,24 @@ def build_story():
           "Todos identifican ahora a BACKHAUSTIN S.A.S. con su CUIT y "
           "matrícula. Los cuatro borradores ya están actualizados. La fórmula "
           "es: «TREINO es un servicio prestado por BACKHAUSTIN S.A.S.»"],
-         ["<b>Cuentas de las tiendas</b>",
-          "Apple Developer Program y Google Play Console tienen que estar a "
-          "nombre de la <b>sociedad</b>, no tuyo. Si hoy son personales, hay "
-          "un desfasaje entre quién publica la app y quién dice ser "
-          "responsable en los documentos. La cuenta de organización de Apple "
-          "además exige número D-U-N-S, que se tramita aparte y demora. "
-          "<b>Verificalo antes de seguir</b>: migrar después es doloroso"],
+         ["<b>Cuenta de Apple</b><br/><b>[VERIFICADO]</b>",
+          "<b>Está enrolada como Individual</b>, a nombre de Martin Backhaus "
+          "(Team ID J66AQRRM96), verificado el 2026-08-31. Hay que convertirla "
+          "a Organization a nombre de BACKHAUSTIN S.A.S. <b>Renovación: 5 de "
+          "septiembre de 2026, US$99 — dejá que se renueve.</b> Una membresía "
+          "vencida saca las apps de la tienda y complica el trámite. "
+          "A favor: la app todavía no está publicada, así que es conversión de "
+          "cuenta y no transferencia de app. Es el momento más barato"],
+         ["<b>Cuenta de Play</b>",
+          "<b>Sin verificar.</b> Play Console -> Configuración -> Cuenta de "
+          "desarrollador -> Detalles. Mismo criterio que Apple"],
+         ["<b>Número D-U-N-S</b>",
+          "<b>Es el paso de plazo más largo: arrancalo primero.</b> Lo exigen "
+          "Apple y Google para cuentas de organización. Lo emite Dun &amp; "
+          "Bradstreet, es gratis, y puede demorar semanas — más aún si la "
+          "sociedad es nueva y todavía no tiene registro. Apple tiene un "
+          "buscador para ver si ya existe uno. Datos a mano: CUIT "
+          "30-71929587-4, matrícula 46468-A"],
          ["<b>Acuerdos con proveedores</b>",
           "Los de Google Cloud, Resend y Vercel se aceptan a nombre de "
           "BACKHAUSTIN S.A.S. Si ya los aceptaste como persona, hay que "
