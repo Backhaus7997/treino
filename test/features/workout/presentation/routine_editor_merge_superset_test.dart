@@ -269,6 +269,37 @@ void main() {
     expect(tester.widget<InkWell>(item).onTap, isNull);
   });
 
+  testWidgets('sacar al del MEDIO deja a los otros dos juntos, no partidos',
+      (tester) async {
+    // Lo encontró el bot de review. `_blocks()` agrupa CORRIDAS CONSECUTIVAS:
+    // limpiar el grupo del slot del medio dejaba a los de los costados con el
+    // mismo id y ya no contiguos, así que se renderizaban como DOS bloques —
+    // y `supersetBlockIndices` del dominio los partía igual al guardar.
+    await _pumpEditor(tester);
+    await _agregarVarios(
+        tester, ['Press de Banca', 'Press Militar', 'Aperturas con Cable']);
+
+    await _abrirMenu(tester, 1);
+    await tester.tap(find.text('Unir con el de arriba'));
+    await tester.pumpAndSettle();
+    await _abrirMenu(tester, 2);
+    await tester.tap(find.text('Unir con el de arriba'));
+    await tester.pumpAndSettle();
+    expect(find.text('A3'), findsOneWidget, reason: 'los tres agrupados');
+
+    // Saco al del medio.
+    await _abrirMenu(tester, 1);
+    await tester.tap(find.text('Sacar de la superserie'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SupersetBlock), findsOneWidget,
+        reason: 'UN bloque con los dos que quedan, no dos bloques de uno');
+    expect(find.text('A2'), findsOneWidget);
+    expect(find.text('A3'), findsNothing);
+    expect(find.byType(ExerciseCard), findsNWidgets(3),
+        reason: 'el que salió sigue en el día, suelto');
+  });
+
   testWidgets('un ejercicio suelto no ofrece "sacar de la superserie"',
       (tester) async {
     await _pumpEditor(tester);

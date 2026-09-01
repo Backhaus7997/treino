@@ -1943,7 +1943,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     // Ver la nota de `_addSupersetForDay`: el picker pre-marca lo que el día
     // ya tiene, así el usuario no elige un repetido sin darse cuenta.
     final picked =
-        await showExercisePicker(context, alreadySelectedIds: existingIds);
+        await showExercisePicker(context,
+            alreadySelectedIds: _resolublesPorElPicker(existingIds));
     if (picked == null || picked.isEmpty || !mounted) return;
 
     final nuevos = picked.where((e) => !existingIds.contains(e.id)).toList();
@@ -1974,6 +1975,34 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         _days[dayIndex].slots = [..._days[dayIndex].slots, slot];
       }
     });
+  }
+
+  /// El catálogo que el usuario puede ver: el del sistema más sus ejercicios
+  /// propios. Es el mismo que alimenta al picker.
+  List<Exercise> get _catalogoVisible {
+    final uid = ref.read(currentUidProvider) ?? '';
+    final propios = uid.isEmpty
+        ? const <CustomExercise>[]
+        : (ref
+                .read(customExercisesForTrainerStreamProvider(uid))
+                .valueOrNull ??
+            const <CustomExercise>[]);
+    return [
+      ...?ref.read(exercisesProvider).valueOrNull,
+      ...propios.map(customToExercise),
+    ];
+  }
+
+  /// De [ids], los que el picker puede efectivamente mostrar.
+  ///
+  /// Un slot puede referenciar un ejercicio que este usuario NO ve — el caso
+  /// concreto es `SelfCustomizing` sobre una plantilla que usa un ejercicio
+  /// propio del entrenador. Pasarle ese id al picker como "ya seleccionado" lo
+  /// hace contar algo que no puede mostrar ni desmarcar: el botón diría
+  /// "Agregar 3" con dos tildados en pantalla.
+  Set<String> _resolublesPorElPicker(Set<String> ids) {
+    final conocidos = _catalogoVisible.map((e) => e.id).toSet();
+    return ids.where(conocidos.contains).toSet();
   }
 
   /// Busca en el catálogo lo que la entrada rápida entendió como nombre.
@@ -2102,7 +2131,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     // editor lo pasaba: el usuario elegía un ejercicio repetido sin saberlo,
     // el editor lo filtraba, y no pasaba nada.
     final picked =
-        await showExercisePicker(context, alreadySelectedIds: existingIds);
+        await showExercisePicker(context,
+            alreadySelectedIds: _resolublesPorElPicker(existingIds));
     if (picked == null || picked.isEmpty || !mounted) return;
 
     final nuevos =
@@ -2177,14 +2207,51 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     _markDirty();
     setState(() {
       // Si el vecino ya está en un grupo, éste se suma a ESE en vez de
-      // estrenar uno. Y queda consecutivo en las dos direcciones: hacia arriba
-      // porque está justo después del último del grupo, hacia abajo porque
-      // está justo antes del primero.
+      // estrenar uno.
       final grupo = vecino.supersetGroup ??
           (day.slots.map((s) => s.supersetGroup ?? 0).fold(0, max)) + 1;
       vecino.supersetGroup = grupo;
       actual.supersetGroup = grupo;
+      // Escribir el mismo id NO alcanza para unirlos: `_blocks()` agrupa
+      // corridas CONSECUTIVAS de `day.slots`, y entre dos vecinos VISIBLES
+      // puede haber slots ocultos —ausentes en la semana en curso, ADR-WPRES—
+      // que los separan en la lista real. Sin compactar, el usuario ve dos
+      // bloques después de pedir uno.
+      day.slots = _conGruposContiguos(day.slots);
     });
+  }
+
+  /// Devuelve [slots] reordenada para que cada superserie sea una corrida
+  /// CONSECUTIVA, que es la única forma en que `_blocks()` la ve como un solo
+  /// bloque.
+  ///
+  /// Preserva el orden relativo: cada grupo se ancla donde aparece su PRIMER
+  /// miembro y los demás se traen ahí. Los slots sueltos no se mueven entre sí.
+  ///
+  /// Hace falta en las dos operaciones que tocan `supersetGroup`: al unir, por
+  /// los slots ocultos que pueden separar a dos vecinos visibles; al separar,
+  /// porque sacar a un miembro del MEDIO de un grupo de tres deja a los de los
+  /// costados con el mismo id y ya no contiguos.
+  static List<_EditableSlot> _conGruposContiguos(List<_EditableSlot> slots) {
+    final out = <_EditableSlot>[];
+    final yaPuestos = <_EditableSlot>{};
+    for (final s in slots) {
+      if (yaPuestos.contains(s)) continue;
+      final grupo = s.supersetGroup;
+      if (grupo == null) {
+        out.add(s);
+        yaPuestos.add(s);
+        continue;
+      }
+      // Primer miembro del grupo: se trae a TODO el grupo acá, en su orden.
+      for (final m in slots) {
+        if (m.supersetGroup == grupo && !yaPuestos.contains(m)) {
+          out.add(m);
+          yaPuestos.add(m);
+        }
+      }
+    }
+    return out;
   }
 
   /// Saca el slot [absIndex] de su superserie.
@@ -2205,6 +2272,11 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           if (s.supersetGroup == grupo) s,
       ];
       if (quedan.length == 1) quedan.first.supersetGroup = null;
+      // Sacar a un miembro del MEDIO de un grupo de tres deja a los de los
+      // costados con el mismo id y ya NO contiguos: `_blocks()` los parte en
+      // dos bloques, y `supersetBlockIndices` del dominio hace lo mismo al
+      // guardar. Compactar los vuelve a juntar, con el que salió detrás.
+      day.slots = _conGruposContiguos(day.slots);
     });
   }
 
@@ -2222,7 +2294,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     final l10n = AppL10n.of(context);
     final messenger = ScaffoldMessenger.of(context);
     final picked =
-        await showExercisePicker(context, alreadySelectedIds: existingIds);
+        await showExercisePicker(context,
+            alreadySelectedIds: _resolublesPorElPicker(existingIds));
     if (picked == null || picked.isEmpty || !mounted) return;
 
     final nuevos = picked.where((e) => !existingIds.contains(e.id)).toList();
@@ -3635,6 +3708,14 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
 
   List<Widget> _buildSlotRows(AppPalette palette) {
     final blocks = _blocks();
+    // Qué bloques tienen ALGO que mostrar en la semana en curso. Los flags de
+    // mover y de unir se calculan sobre ESTOS, no sobre el índice crudo: con
+    // bloques ocultos delante, el primer bloque VISIBLE tenía `canMoveUp` en
+    // true y ofrecía "Subir" y "Unir con el de arriba" para no hacer nada.
+    final visiblesIdx = [
+      for (var i = 0; i < blocks.length; i++)
+        if (blocks[i].any((r) => r.slot.isPresentInWeek(widget.week))) i,
+    ];
     final rows = <Widget>[];
     for (var b = 0; b < blocks.length; b++) {
       final block = blocks[b];
@@ -3648,8 +3729,9 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
           if (r.slot.isPresentInWeek(widget.week)) r,
       ];
       if (visible.isEmpty) continue;
-      final canUp = b > 0;
-      final canDown = b < blocks.length - 1;
+      final posVisible = visiblesIdx.indexOf(b);
+      final canUp = posVisible > 0;
+      final canDown = posVisible < visiblesIdx.length - 1;
       if (block.length == 1 && block.first.slot.supersetGroup == null) {
         // Standalone slot. ObjectKey keeps each row's State bound to its slot
         // so the int fields don't show stale values after the list shifts.
@@ -5468,6 +5550,21 @@ String formatEditorWeight(double? w) => formatWeightKg(w);
 /// instances internally and returning plain Dart values.
 class RoutineEditorTestBridge {
   RoutineEditorTestBridge._();
+
+  /// Corre `_conGruposContiguos` sobre una lista descrita por sus ids de
+  /// grupo, y devuelve el resultado en la misma forma.
+  ///
+  /// `null` es un slot suelto. Existe como bridge porque los casos que
+  /// importan —un slot OCULTO en la semana en curso separando a dos miembros—
+  /// son caros de montar por UI y triviales de expresar acá.
+  static List<int?> gruposContiguosBridge(List<int?> grupos) {
+    final slots = [
+      for (final g in grupos) _EditableSlot()..supersetGroup = g,
+    ];
+    return _RoutineEditorScreenState._conGruposContiguos(slots)
+        .map((s) => s.supersetGroup)
+        .toList();
+  }
 
   /// Delegates to [isSetValid] after constructing a minimal [_EditableSet].
   static bool isSetValidBridge({
