@@ -4238,6 +4238,12 @@ class AppL10nEs extends AppL10n {
   @override
   String get routineEditorSupersetNeedsTwo =>
       'Una superserie necesita dos ejercicios. Se agregó uno solo, suelto.';
+
+  @override
+  String get routineEditorSlotMenuMergeUp => 'Unir con el de arriba';
+
+  @override
+  String get routineEditorSlotMenuUngroup => 'Sacar de la superserie';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -8471,4 +8477,10 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get routineEditorSupersetNeedsTwo =>
       'Una superserie necesita dos ejercicios. Se agregó uno solo, suelto.';
+
+  @override
+  String get routineEditorSlotMenuMergeUp => 'Unir con el de arriba';
+
+  @override
+  String get routineEditorSlotMenuUngroup => 'Sacar de la superserie';
 }

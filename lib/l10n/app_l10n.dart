@@ -7382,6 +7382,18 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Una superserie necesita dos ejercicios. Se agregó uno solo, suelto.'**
   String get routineEditorSupersetNeedsTwo;
+
+  /// Agrupa este ejercicio con el anterior en una superserie. Es el camino que faltaba para ejercicios YA cargados: el botón + Superserie sólo agrega ejercicios nuevos agrupados.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Unir con el de arriba'**
+  String get routineEditorSlotMenuMergeUp;
+
+  /// No description provided for @routineEditorSlotMenuUngroup.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sacar de la superserie'**
+  String get routineEditorSlotMenuUngroup;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {
