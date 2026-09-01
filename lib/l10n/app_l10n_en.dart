@@ -4176,4 +4176,13 @@ class AppL10nEn extends AppL10n {
   @override
   String get routineEditorSupersetNeedsTwo =>
       'A superset needs two exercises. Only one was added, on its own.';
+
+  @override
+  String get routineEditorSlotMenuMergeUp => 'Merge with the one above';
+
+  @override
+  String get routineEditorSlotMenuUngroup => 'Remove from superset';
+
+  @override
+  String get routineEditorSlotMenuMergeDown => 'Merge with the one below';
 }

@@ -1943,7 +1943,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     // Ver la nota de `_addSupersetForDay`: el picker pre-marca lo que el día
     // ya tiene, así el usuario no elige un repetido sin darse cuenta.
     final picked =
-        await showExercisePicker(context, alreadySelectedIds: existingIds);
+        await showExercisePicker(context,
+            alreadySelectedIds: _resolublesPorElPicker(existingIds));
     if (picked == null || picked.isEmpty || !mounted) return;
 
     final nuevos = picked.where((e) => !existingIds.contains(e.id)).toList();
@@ -1974,6 +1975,34 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         _days[dayIndex].slots = [..._days[dayIndex].slots, slot];
       }
     });
+  }
+
+  /// El catálogo que el usuario puede ver: el del sistema más sus ejercicios
+  /// propios. Es el mismo que alimenta al picker.
+  List<Exercise> get _catalogoVisible {
+    final uid = ref.read(currentUidProvider) ?? '';
+    final propios = uid.isEmpty
+        ? const <CustomExercise>[]
+        : (ref
+                .read(customExercisesForTrainerStreamProvider(uid))
+                .valueOrNull ??
+            const <CustomExercise>[]);
+    return [
+      ...?ref.read(exercisesProvider).valueOrNull,
+      ...propios.map(customToExercise),
+    ];
+  }
+
+  /// De [ids], los que el picker puede efectivamente mostrar.
+  ///
+  /// Un slot puede referenciar un ejercicio que este usuario NO ve — el caso
+  /// concreto es `SelfCustomizing` sobre una plantilla que usa un ejercicio
+  /// propio del entrenador. Pasarle ese id al picker como "ya seleccionado" lo
+  /// hace contar algo que no puede mostrar ni desmarcar: el botón diría
+  /// "Agregar 3" con dos tildados en pantalla.
+  Set<String> _resolublesPorElPicker(Set<String> ids) {
+    final conocidos = _catalogoVisible.map((e) => e.id).toSet();
+    return ids.where(conocidos.contains).toSet();
   }
 
   /// Busca en el catálogo lo que la entrada rápida entendió como nombre.
@@ -2102,7 +2131,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     // editor lo pasaba: el usuario elegía un ejercicio repetido sin saberlo,
     // el editor lo filtraba, y no pasaba nada.
     final picked =
-        await showExercisePicker(context, alreadySelectedIds: existingIds);
+        await showExercisePicker(context,
+            alreadySelectedIds: _resolublesPorElPicker(existingIds));
     if (picked == null || picked.isEmpty || !mounted) return;
 
     final nuevos =
@@ -2150,6 +2180,106 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     });
   }
 
+  /// Une el slot [absIndex] con su vecino en la lista VISIBLE: el de arriba
+  /// con `dir: -1`, el de abajo con `dir: 1`.
+  ///
+  /// Las dos direcciones hacen falta y no son la misma cosa desde el lugar del
+  /// usuario: unir hacia abajo es cómo se suma un ejercicio a una superserie
+  /// que YA existe más abajo, sin tener que reordenar nada primero.
+  ///
+  /// El vecino es el VISIBLE, no el del modelo: un slot borrado "sólo de esta
+  /// semana" sigue en `day.slots` y no se renderiza (ADR-WPRES), así que unir
+  /// por índice crudo agruparía con un ejercicio que el usuario no tiene
+  /// delante.
+  void _unirConVecino(int dayIndex, int absIndex, {required int dir}) {
+    final day = _days[dayIndex];
+    final visibles = [
+      for (var i = 0; i < day.slots.length; i++)
+        if (day.slots[i].isPresentInWeek(_selectedWeek)) i,
+    ];
+    final pos = visibles.indexOf(absIndex);
+    final destino = pos + dir;
+    if (pos < 0 || destino < 0 || destino >= visibles.length) return;
+
+    final vecino = day.slots[visibles[destino]];
+    final actual = day.slots[absIndex];
+
+    _markDirty();
+    setState(() {
+      // Si el vecino ya está en un grupo, éste se suma a ESE en vez de
+      // estrenar uno.
+      final grupo = vecino.supersetGroup ??
+          (day.slots.map((s) => s.supersetGroup ?? 0).fold(0, max)) + 1;
+      vecino.supersetGroup = grupo;
+      actual.supersetGroup = grupo;
+      // Escribir el mismo id NO alcanza para unirlos: `_blocks()` agrupa
+      // corridas CONSECUTIVAS de `day.slots`, y entre dos vecinos VISIBLES
+      // puede haber slots ocultos —ausentes en la semana en curso, ADR-WPRES—
+      // que los separan en la lista real. Sin compactar, el usuario ve dos
+      // bloques después de pedir uno.
+      day.slots = _conGruposContiguos(day.slots);
+    });
+  }
+
+  /// Devuelve [slots] reordenada para que cada superserie sea una corrida
+  /// CONSECUTIVA, que es la única forma en que `_blocks()` la ve como un solo
+  /// bloque.
+  ///
+  /// Preserva el orden relativo: cada grupo se ancla donde aparece su PRIMER
+  /// miembro y los demás se traen ahí. Los slots sueltos no se mueven entre sí.
+  ///
+  /// Hace falta en las dos operaciones que tocan `supersetGroup`: al unir, por
+  /// los slots ocultos que pueden separar a dos vecinos visibles; al separar,
+  /// porque sacar a un miembro del MEDIO de un grupo de tres deja a los de los
+  /// costados con el mismo id y ya no contiguos.
+  static List<_EditableSlot> _conGruposContiguos(List<_EditableSlot> slots) {
+    final out = <_EditableSlot>[];
+    final yaPuestos = <_EditableSlot>{};
+    for (final s in slots) {
+      if (yaPuestos.contains(s)) continue;
+      final grupo = s.supersetGroup;
+      if (grupo == null) {
+        out.add(s);
+        yaPuestos.add(s);
+        continue;
+      }
+      // Primer miembro del grupo: se trae a TODO el grupo acá, en su orden.
+      for (final m in slots) {
+        if (m.supersetGroup == grupo && !yaPuestos.contains(m)) {
+          out.add(m);
+          yaPuestos.add(m);
+        }
+      }
+    }
+    return out;
+  }
+
+  /// Saca el slot [absIndex] de su superserie.
+  ///
+  /// Si el grupo queda con UN solo miembro, ese también sale: un grupo de uno
+  /// no es una superserie, y `buildRoutineSlot` lo descartaría igual al
+  /// guardar.
+  void _separarDeGrupo(int dayIndex, int absIndex) {
+    final day = _days[dayIndex];
+    final grupo = day.slots[absIndex].supersetGroup;
+    if (grupo == null) return;
+
+    _markDirty();
+    setState(() {
+      day.slots[absIndex].supersetGroup = null;
+      final quedan = [
+        for (final s in day.slots)
+          if (s.supersetGroup == grupo) s,
+      ];
+      if (quedan.length == 1) quedan.first.supersetGroup = null;
+      // Sacar a un miembro del MEDIO de un grupo de tres deja a los de los
+      // costados con el mismo id y ya NO contiguos: `_blocks()` los parte en
+      // dos bloques, y `supersetBlockIndices` del dominio hace lo mismo al
+      // guardar. Compactar los vuelve a juntar, con el que salió detrás.
+      day.slots = _conGruposContiguos(day.slots);
+    });
+  }
+
   /// Opens the picker and adds the picked exercise(s) into the existing
   /// superset [groupId] of [dayIndex], inserted right after that group's last
   /// slot so the superset stays a consecutive run.
@@ -2164,7 +2294,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     final l10n = AppL10n.of(context);
     final messenger = ScaffoldMessenger.of(context);
     final picked =
-        await showExercisePicker(context, alreadySelectedIds: existingIds);
+        await showExercisePicker(context,
+            alreadySelectedIds: _resolublesPorElPicker(existingIds));
     if (picked == null || picked.isEmpty || !mounted) return;
 
     final nuevos = picked.where((e) => !existingIds.contains(e.id)).toList();
@@ -2990,6 +3121,12 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                           _buscarParaEntradaRapida(q, _selectedDayIndex),
                       onQuickAdd: (id, entry) => _agregarPorEntradaRapida(
                           context, _selectedDayIndex, id, entry),
+                      onMergeSlotWithPrevious: (i) =>
+                          _unirConVecino(_selectedDayIndex, i, dir: -1),
+                      onMergeSlotWithNext: (i) =>
+                          _unirConVecino(_selectedDayIndex, i, dir: 1),
+                      onUngroupSlot: (i) =>
+                          _separarDeGrupo(_selectedDayIndex, i),
                       slotIsValid: (slot) {
                         if (!slot.isPresentInWeek(_selectedWeek)) {
                           return true;
@@ -3343,6 +3480,9 @@ class _DayExpansionTile extends StatefulWidget {
     this.isTrainerMode = false,
     this.onQuickSearch,
     this.onQuickAdd,
+    this.onMergeSlotWithPrevious,
+    this.onMergeSlotWithNext,
+    this.onUngroupSlot,
   });
 
   final _EditableDay day;
@@ -3383,6 +3523,12 @@ class _DayExpansionTile extends StatefulWidget {
 
   /// Agrega el ejercicio elegido con la prescripción que se tipeó.
   final void Function(String exerciseId, QuickEntry entry)? onQuickAdd;
+
+  /// Une el slot con el de arriba en una superserie, y lo saca de ella. Null
+  /// esconde las dos acciones — el editor web del Coach Hub no las ofrece.
+  final void Function(int absIndex)? onMergeSlotWithPrevious;
+  final void Function(int absIndex)? onMergeSlotWithNext;
+  final void Function(int absIndex)? onUngroupSlot;
 
   @override
   State<_DayExpansionTile> createState() => _DayExpansionTileState();
@@ -3562,6 +3708,14 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
 
   List<Widget> _buildSlotRows(AppPalette palette) {
     final blocks = _blocks();
+    // Qué bloques tienen ALGO que mostrar en la semana en curso. Los flags de
+    // mover y de unir se calculan sobre ESTOS, no sobre el índice crudo: con
+    // bloques ocultos delante, el primer bloque VISIBLE tenía `canMoveUp` en
+    // true y ofrecía "Subir" y "Unir con el de arriba" para no hacer nada.
+    final visiblesIdx = [
+      for (var i = 0; i < blocks.length; i++)
+        if (blocks[i].any((r) => r.slot.isPresentInWeek(widget.week))) i,
+    ];
     final rows = <Widget>[];
     for (var b = 0; b < blocks.length; b++) {
       final block = blocks[b];
@@ -3575,8 +3729,9 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
           if (r.slot.isPresentInWeek(widget.week)) r,
       ];
       if (visible.isEmpty) continue;
-      final canUp = b > 0;
-      final canDown = b < blocks.length - 1;
+      final posVisible = visiblesIdx.indexOf(b);
+      final canUp = posVisible > 0;
+      final canDown = posVisible < visiblesIdx.length - 1;
       if (block.length == 1 && block.first.slot.supersetGroup == null) {
         // Standalone slot. ObjectKey keeps each row's State bound to its slot
         // so the int fields don't show stale values after the list shifts.
@@ -3599,6 +3754,12 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
           hasSlotError:
               widget.slotIsValid != null ? !widget.slotIsValid!(slot) : false,
           isTrainerMode: widget.isTrainerMode,
+          onMergeWithPrevious: widget.onMergeSlotWithPrevious == null
+              ? null
+              : () => widget.onMergeSlotWithPrevious!(idx),
+          onMergeWithNext: widget.onMergeSlotWithNext == null
+              ? null
+              : () => widget.onMergeSlotWithNext!(idx),
         ));
       } else {
         // Superset block — the whole block moves as one unit. Only the
@@ -3620,6 +3781,7 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
           onCopyPreviousFor: _copyPreviousCallback,
           slotIsValid: widget.slotIsValid,
           isTrainerMode: widget.isTrainerMode,
+          onUngroupSlot: widget.onUngroupSlot,
         ));
       }
       rows.add(const SizedBox(height: 8));
@@ -3917,6 +4079,7 @@ class _SupersetGroupCard extends StatelessWidget {
     this.onCopyPreviousFor,
     this.slotIsValid,
     this.isTrainerMode = false,
+    this.onUngroupSlot,
   });
 
   final List<({int index, _EditableSlot slot})> groupSlots;
@@ -3948,6 +4111,9 @@ class _SupersetGroupCard extends StatelessWidget {
 
   /// When true, slot editors show trainer-only fields (e.g. coaching note).
   final bool isTrainerMode;
+
+  /// Saca un miembro del grupo.
+  final void Function(int absIndex)? onUngroupSlot;
 
   @override
   Widget build(BuildContext context) {
@@ -3986,6 +4152,10 @@ class _SupersetGroupCard extends StatelessWidget {
             week: week,
             palette: palette,
             supersetPosition: mi,
+            // El índice ORIGINAL, que es lo que da la key del menú. Sin esto
+            // el ⋮ de un miembro de superserie no tenía key y no se podía
+            // alcanzar desde un test — ni referenciar desde ningún lado.
+            slotIndex: groupSlots[mi].index,
             onRemove: () => onRemoveSlot(groupSlots[mi].index),
             onChanged: onChanged,
             onReplaceExercise: (ex) =>
@@ -4005,6 +4175,9 @@ class _SupersetGroupCard extends StatelessWidget {
                 ? !slotIsValid!(groupSlots[mi].slot)
                 : false,
             isTrainerMode: isTrainerMode,
+            onUngroup: onUngroupSlot == null
+                ? null
+                : () => onUngroupSlot!(groupSlots[mi].index),
           ),
           if (mi < groupSlots.length - 1)
             const SizedBox(height: AppSpacing.s8),
@@ -4083,6 +4256,9 @@ class _SlotEditor extends StatefulWidget {
     this.hasSlotError = false,
     this.isTrainerMode = false,
     this.supersetPosition,
+    this.onMergeWithPrevious,
+    this.onMergeWithNext,
+    this.onUngroup,
   });
 
   final _EditableSlot slot;
@@ -4123,6 +4299,18 @@ class _SlotEditor extends StatefulWidget {
   /// ejercicio es suelto. La card lo usa para el badge A1/A2 y para teñir el
   /// agarre.
   final int? supersetPosition;
+
+  /// Une este ejercicio con el de arriba o con el de abajo, en una superserie.
+  /// Null cuando no aplica — el editor web del Coach Hub no ofrece el gesto.
+  ///
+  /// Las dos direcciones no son la misma cosa desde el lugar del usuario: unir
+  /// hacia abajo es cómo se suma un ejercicio a una superserie que YA existe
+  /// más abajo, sin reordenar nada primero.
+  final VoidCallback? onMergeWithPrevious;
+  final VoidCallback? onMergeWithNext;
+
+  /// Lo saca de su superserie.
+  final VoidCallback? onUngroup;
 
   @override
   State<_SlotEditor> createState() => _SlotEditorState();
@@ -4202,6 +4390,31 @@ class _SlotEditorState extends State<_SlotEditor> {
             enabled: widget.canMoveDown,
           ),
         ],
+        // Unir / separar. El botón `+ Superserie` del día sigue haciendo lo
+        // suyo —abrir el picker y agregar ejercicios NUEVOS agrupados—; esto
+        // es el camino que faltaba, para ejercicios que ya están cargados.
+        if (widget.supersetPosition == null) ...[
+          ExerciseAction(
+            id: _SlotAction.mergeWithPrevious,
+            label: l10n.routineEditorSlotMenuMergeUp,
+            icon: TreinoIcon.streak,
+            // Deshabilitada en el primero: no hay con quién unirse hacia
+            // arriba. `canMoveUp` ya sabe si hay un bloque antes.
+            enabled: widget.onMergeWithPrevious != null && widget.canMoveUp,
+          ),
+          ExerciseAction(
+            id: _SlotAction.mergeWithNext,
+            label: l10n.routineEditorSlotMenuMergeDown,
+            icon: TreinoIcon.streak,
+            enabled: widget.onMergeWithNext != null && widget.canMoveDown,
+          ),
+        ] else
+          ExerciseAction(
+            id: _SlotAction.ungroup,
+            label: l10n.routineEditorSlotMenuUngroup,
+            icon: TreinoIcon.close,
+            enabled: widget.onUngroup != null,
+          ),
         ExerciseAction(
           id: _SlotAction.remove,
           label: l10n.routineEditorSlotMenuRemove,
@@ -4222,6 +4435,12 @@ class _SlotEditorState extends State<_SlotEditor> {
         widget.onMoveDown?.call();
       case _SlotAction.copyPrevious:
         widget.onCopyPrevious?.call();
+      case _SlotAction.mergeWithPrevious:
+        widget.onMergeWithPrevious?.call();
+      case _SlotAction.mergeWithNext:
+        widget.onMergeWithNext?.call();
+      case _SlotAction.ungroup:
+        widget.onUngroup?.call();
       case _SlotAction.remove:
         widget.onRemove();
     }
@@ -4425,6 +4644,22 @@ enum _SlotAction {
   copyPrevious,
   moveUp,
   moveDown,
+
+  /// Unir este ejercicio con el de arriba, en una superserie.
+  ///
+  /// Hasta acá NO existía forma de agrupar dos ejercicios YA cargados: el
+  /// botón `+ Superserie` abre el picker y agrega ejercicios NUEVOS agrupados,
+  /// así que el caso normal —cargás dos por separado y después decidís hacerlos
+  /// juntos— obligaba a borrarlos y volver a agregarlos.
+  mergeWithPrevious,
+
+  /// Unir con el de abajo. Es cómo se suma un ejercicio a una superserie que
+  /// ya existe más abajo, sin reordenar nada primero.
+  mergeWithNext,
+
+  /// Sacar este ejercicio de su superserie.
+  ungroup,
+
   remove,
 }
 
@@ -5315,6 +5550,21 @@ String formatEditorWeight(double? w) => formatWeightKg(w);
 /// instances internally and returning plain Dart values.
 class RoutineEditorTestBridge {
   RoutineEditorTestBridge._();
+
+  /// Corre `_conGruposContiguos` sobre una lista descrita por sus ids de
+  /// grupo, y devuelve el resultado en la misma forma.
+  ///
+  /// `null` es un slot suelto. Existe como bridge porque los casos que
+  /// importan —un slot OCULTO en la semana en curso separando a dos miembros—
+  /// son caros de montar por UI y triviales de expresar acá.
+  static List<int?> gruposContiguosBridge(List<int?> grupos) {
+    final slots = [
+      for (final g in grupos) _EditableSlot()..supersetGroup = g,
+    ];
+    return _RoutineEditorScreenState._conGruposContiguos(slots)
+        .map((s) => s.supersetGroup)
+        .toList();
+  }
 
   /// Delegates to [isSetValid] after constructing a minimal [_EditableSet].
   static bool isSetValidBridge({

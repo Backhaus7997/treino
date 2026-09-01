@@ -1761,5 +1761,11 @@
   "routineEditorAddNothingNew": "Those exercises were already in the day.",
   "@routineEditorAddNothingNew": {},
   "routineEditorSupersetNeedsTwo": "A superset needs two exercises. Only one was added, on its own.",
-  "@routineEditorSupersetNeedsTwo": {}
+  "@routineEditorSupersetNeedsTwo": {},
+  "routineEditorSlotMenuMergeUp": "Merge with the one above",
+  "@routineEditorSlotMenuMergeUp": {},
+  "routineEditorSlotMenuUngroup": "Remove from superset",
+  "@routineEditorSlotMenuUngroup": {},
+  "routineEditorSlotMenuMergeDown": "Merge with the one below",
+  "@routineEditorSlotMenuMergeDown": {}
 }

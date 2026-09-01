@@ -3637,5 +3637,15 @@
   "routineEditorSupersetNeedsTwo": "Una superserie necesita dos ejercicios. Se agregó uno solo, suelto.",
   "@routineEditorSupersetNeedsTwo": {
     "description": "Se pidió una superserie pero sólo entró un ejercicio nuevo: el resto ya estaba en el día."
+  },
+  "routineEditorSlotMenuMergeUp": "Unir con el de arriba",
+  "@routineEditorSlotMenuMergeUp": {
+    "description": "Agrupa este ejercicio con el anterior en una superserie. Es el camino que faltaba para ejercicios YA cargados: el botón + Superserie sólo agrega ejercicios nuevos agrupados."
+  },
+  "routineEditorSlotMenuUngroup": "Sacar de la superserie",
+  "@routineEditorSlotMenuUngroup": {},
+  "routineEditorSlotMenuMergeDown": "Unir con el de abajo",
+  "@routineEditorSlotMenuMergeDown": {
+    "description": "Agrupa este ejercicio con el siguiente. Sirve sobre todo para sumarse a una superserie que ya existe más abajo."
   }
 }
