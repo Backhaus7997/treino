@@ -51,7 +51,15 @@ const RESEND_API_KEY = defineSecret("RESEND_API_KEY");
  * domain makes every send return 403.
  */
 const MAIL_FROM = defineString("MAIL_FROM", {
-  default: "TREINO <hola@send.gettreino.com>",
+  // `equipo@` y no `soporte@` a proposito. El nombre del remitente es una
+  // promesa sobre quien esta del otro lado, y hoy NADIE lee las respuestas:
+  // `send.gettreino.com` no tiene buzon —su MX es el de rebotes de SES— y el
+  // payload que se le manda a Resend todavia no lleva `reply_to`.
+  //
+  // `soporte@` es el peor nombre posible con esa deuda abierta: la persona que
+  // no puede entrar a su cuenta le responde pidiendo ayuda y nadie la lee.
+  // Cuanto mas explicita la promesa, mas caro incumplirla.
+  default: "TREINO <equipo@send.gettreino.com>",
 });
 
 /** Past this many attempts a document is declared permanently failed. */

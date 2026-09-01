@@ -22,6 +22,7 @@ import {
 
 const ALL_KINDS: MailKind[] = [
   "password-reset",
+  "federated-signin-hint",
   "email-verification",
   "appointment-confirmed",
   "appointment-series-created",
@@ -31,6 +32,21 @@ const ALL_KINDS: MailKind[] = [
   "link-accepted",
   "payment-overdue",
 ];
+
+/**
+ * El href del BOTON del CTA.
+ *
+ * El documento tiene mas de un `<a>` —el boton y el link del footer— y desde
+ * que el header trae el logo, tambien aparece `app.gettreino.com` como origen
+ * de una imagen. Un `expect(html).not.toContain("app.gettreino.com")` mezcla
+ * las tres cosas: prohibe un string en todo el documento cuando lo que importa
+ * es a donde APUNTA el boton. Se identifica por `display:inline-block`, que es
+ * lo que lo hace boton.
+ */
+function ctaHref(html: string): string {
+  const m = html.match(/<a href="([^"]+)"[^>]*display:inline-block/);
+  return m ? m[1] : "";
+}
 
 // ---------------------------------------------------------------------------
 // Escaping — display names are user-controlled free text
@@ -128,8 +144,7 @@ describe("destino del CTA", () => {
   it("por defecto va a la landing, no al Coach Hub", () => {
     const out = renderMail("appointment-confirmed", { trainerName: "Jose" });
 
-    expect(out.html).toContain("https://gettreino.com");
-    expect(out.html).not.toContain("app.gettreino.com");
+    expect(ctaHref(out.html)).toBe("https://gettreino.com");
   });
 
   it("respeta el ctaUrl que pasa el productor", () => {
@@ -138,7 +153,7 @@ describe("destino del CTA", () => {
       ctaUrl: "https://app.gettreino.com",
     });
 
-    expect(out.html).toContain("https://app.gettreino.com");
+    expect(ctaHref(out.html)).toBe("https://app.gettreino.com");
   });
 
   // Un CTA que solo vive dentro de un <a> no existe para quien lee en texto.
@@ -203,6 +218,125 @@ describe("plantillas de auth: el action link llega entero", () => {
       actionLink: "https://x.test/?a=\"><script>alert(1)</script>",
     });
     expect(out.html).not.toContain("<script>");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// El hint para cuentas sin contraseña
+// ---------------------------------------------------------------------------
+describe("plantilla federated-signin-hint", () => {
+  const out = () => renderMail("federated-signin-hint", {});
+
+  // No hay contraseña que restablecer: un link acá sería mentira.
+  it("no lleva ningún link de action", () => {
+    expect(out().html).not.toContain("oobCode");
+    expect(out().html).not.toContain("__/auth/action");
+  });
+
+  it("dice cómo entrar, sin nombrar al usuario", () => {
+    const plano = out().text.toLowerCase();
+
+    expect(plano).toContain("google");
+    // Nunca una dirección: el mail llega al buzón, no hace falta repetirla.
+    expect(plano).not.toContain("@");
+  });
+
+  // Aunque el usuario no pidió esto, reconoce el pedido que sí hizo. Un mail
+  // que ignora lo que la persona acaba de hacer se lee como no relacionado.
+  it("reconoce el pedido de reseteo que lo originó", () => {
+    expect(out().text.toLowerCase()).toContain("contraseña");
+  });
+
+  it("manda a la landing, que sirve para cualquier rol", () => {
+    expect(out().html).toContain("https://gettreino.com");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Marca: el header y su degradacion
+// ---------------------------------------------------------------------------
+describe("header de marca", () => {
+  const out = () => renderMail("appointment-confirmed", { trainerName: "Jose" });
+
+  it("trae la marca TR como imagen", () => {
+    expect(out().html).toContain("https://app.gettreino.com/email/logo.png");
+  });
+
+  // Outlook y Gmail-sin-imagenes no cargan el <img>. Si el header fuera solo
+  // logo, para esa gente el mail empieza en blanco. Estas dos aserciones son la
+  // red: el alt dice la marca, y la palabra TREINO esta escrita aparte.
+  // Outlook y Gmail-sin-imagenes no cargan el <img>. El wordmark de al lado no
+  // es decorativo: ES el fallback, y por eso el logo va con `alt=""`.
+  //
+  // Medido sobre el render real con la imagen rota: con `alt="TREINO"` el
+  // texto se dibuja dentro de la caja de 28px del <img> y sale "TRE TREINO".
+  it("degrada al wordmark cuando el cliente bloquea imagenes", () => {
+    const html = out().html;
+
+    expect(html).toContain(">TREINO</div>");
+    expect(html).toContain("alt=\"\"");
+  });
+
+  it("el logo no repite la marca en el alt: la diria dos veces", () => {
+    // Un lector de pantalla que encuentre alt="TREINO" y el wordmark leeria
+    // "TREINO TREINO". La imagen es decorativa PORQUE la palabra esta al lado.
+    expect(out().html).not.toContain("alt=\"TREINO\"");
+  });
+
+  it("no usa SVG, que ningun cliente de mail renderiza", () => {
+    expect(out().html).not.toContain(".svg");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Preheader — la linea gris de la bandeja de entrada
+// ---------------------------------------------------------------------------
+describe("preheader", () => {
+  it("cada kind produce uno, sin excepcion", () => {
+    for (const kind of ALL_KINDS) {
+      const html = renderMail(kind, { trainerName: "Jose" }).html;
+      const m = html.match(/opacity:0;">([^&<]*)/);
+
+      expect(m).not.toBeNull();
+      expect((m?.[1] ?? "").trim().length).toBeGreaterThan(0);
+    }
+  });
+
+  // Se deriva de la primera linea del cuerpo (ver `build`), asi que decir algo
+  // util en la bandeja y decirlo en el mail son el MISMO trabajo.
+  it("dice lo mismo que la primera linea del cuerpo", () => {
+    const out = renderMail("appointment-confirmed", { trainerName: "Jose" });
+
+    expect(out.html).toMatch(/opacity:0;">Jose confirmó tu sesión\./);
+  });
+
+  it("va oculto: no se ve dentro del mail abierto", () => {
+    const out = renderMail("password-reset", { actionLink: "https://x.test" });
+
+    expect(out.html).toContain("display:none;max-height:0;overflow:hidden;opacity:0;");
+  });
+
+  // Sin relleno el cliente sigue leyendo el cuerpo y lo pega atras del
+  // preheader en la vista previa.
+  it("lleva relleno invisible para que no se cuele el cuerpo", () => {
+    expect(renderMail("link-accepted", {}).html).toContain("&#8199;&#65279;&zwnj;");
+  });
+
+  // El preheader es HTML oculto, no texto plano: si un nombre hostil entrara
+  // crudo ahi, seria una inyeccion con la misma superficie que el cuerpo.
+  it("escapa lo que viene del usuario", () => {
+    const out = renderMail("link-requested", {
+      athleteName: "<script>alert(1)</script>",
+    });
+
+    expect(out.html).not.toContain("<script>");
+  });
+
+  it("no ensucia la parte de texto plano", () => {
+    const out = renderMail("appointment-confirmed", { trainerName: "Jose" });
+
+    expect(out.text).not.toContain("&#8199;");
+    expect(out.text).not.toContain("zwnj");
   });
 });
 

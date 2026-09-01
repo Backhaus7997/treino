@@ -13,6 +13,7 @@ import * as admin from "firebase-admin";
 import {
   runRequestPasswordReset,
   runRequestEmailVerification,
+  resetOutcomeFor,
   rewriteActionHost,
   throttleWindow,
 } from "../auth/request-auth-email";
@@ -79,6 +80,92 @@ async function seedUser(opts: {
     emailVerified: opts.emailVerified ?? false,
   });
 }
+
+/**
+ * Siembra una cuenta con contrasena, o sea con el provider `password`.
+ *
+ * ─── Por que esto NO lo cubria `seedUser` ───────────────────────────────────
+ *
+ * `createUser({uid, email})` sin `password` deja `providerData` VACIO. Y
+ * `resetOutcomeFor([])` devuelve "password-reset" por el fallback de lista
+ * vacia, NO por la rama `includes("password")`. O sea que ningun test empujaba
+ * una cuenta con provider `password` por el call site.
+ *
+ * Medido: mutando la linea del call site de `p.providerId` a `p.uid`, la suite
+ * pasaba 31/31. Los dos seeds daban el MISMO resultado mutados que sin mutar
+ * —`[]` seguia siendo `[]`, y `["google.com"]` pasaba a `["<uid>-google"]`, que
+ * tampoco contiene "password"—, asi que el mapeo no estaba atado a nada.
+ *
+ * Con este seed el mutante muere: `["password"]` pasa a `["<email>"]` y la
+ * cuenta cae en la rama federada, que es justo lo que el test prohibe.
+ */
+async function seedPasswordUser(uid: string, email: string): Promise<void> {
+  await admin.auth(testApp).deleteUser(uid).catch(() => undefined);
+  await admin.auth(testApp).createUser({ uid, email, password: "Passw0rd!" });
+
+  // Verificado, no asumido — igual que en el seed federado, porque de esto
+  // depende que el test signifique algo.
+  const u = await admin.auth(testApp).getUser(uid);
+  const ids = u.providerData.map((x) => x.providerId);
+  if (!ids.includes("password")) {
+    throw new Error(`seed roto: la cuenta no quedo con password (${ids})`);
+  }
+}
+
+/** Siembra una cuenta cuyo unico proveedor es Google, sin password hash. */
+async function seedFederatedUser(uid: string, email: string): Promise<void> {
+  await admin.auth(testApp).deleteUser(uid).catch(() => undefined);
+  await admin.auth(testApp).createUser({ uid, email });
+  await admin.auth(testApp).updateUser(uid, {
+    providerToLink: {
+      providerId: "google.com",
+      uid: `${uid}-google`,
+      email,
+    },
+  });
+  // `createUser` sin password deja providerData con solo el federado — pero se
+  // verifica en vez de asumirlo, porque de eso depende todo el bloque.
+  const u = await admin.auth(testApp).getUser(uid);
+  const ids = u.providerData.map((x) => x.providerId);
+  if (ids.includes("password")) {
+    throw new Error(`seed roto: la cuenta quedo con password (${ids})`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// resetOutcomeFor — la decisión que el emulador NO puede validar
+//
+// Es una función pura y vive fuera del emulador a propósito. Ver el guardián
+// del final de este archivo.
+// ---------------------------------------------------------------------------
+describe("resetOutcomeFor", () => {
+  it.each([
+    [["password"], "password-reset"],
+    [["password", "google.com"], "password-reset"],
+    [["google.com", "password"], "password-reset"],
+    [["google.com"], "federated-signin-hint"],
+    [["apple.com"], "federated-signin-hint"],
+    [["google.com", "apple.com"], "federated-signin-hint"],
+  ] as const)("%j → %s", (providers, expected) => {
+    expect(resetOutcomeFor(providers)).toBe(expected);
+  });
+
+  // Una cuenta sin proveedores listados NO es federada, así que mandarle un
+  // mail que dice "entrá con Google" sería peor que dejarla en el camino de
+  // hoy — que en el peor caso falla en silencio, como ya lo hace.
+  it("providerData vacío cae al camino de hoy, no al hint", () => {
+    expect(resetOutcomeFor([])).toBe("password-reset");
+  });
+
+  // El discriminador es la PRESENCIA de `password`, no la ausencia de
+  // federados. Un proveedor nuevo que Firebase agregue mañana cae solo del
+  // lado correcto sin tocar esta función.
+  it("un proveedor desconocido se trata como federado", () => {
+    expect(resetOutcomeFor(["algo-que-no-existe.com"])).toBe(
+      "federated-signin-hint",
+    );
+  });
+});
 
 // ---------------------------------------------------------------------------
 // rewriteActionHost — el link lleva NUESTRO dominio
@@ -337,5 +424,149 @@ describe("requestEmailVerification", () => {
     await expect(
       runRequestEmailVerification(testApp, "no-existe-este-uid", NOW),
     ).resolves.toEqual({ status: "ok" });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// La rama federada, extremo a extremo contra el emulador
+// ---------------------------------------------------------------------------
+describe("cuenta sin contraseña: manda el hint, no un link de reseteo", () => {
+  const uid = "auth-mail-federada";
+  const email = "federada@example.com";
+  const hintId = dedupeKey(
+    "federated-signin-hint",
+    `${uid}_${throttleWindow(NOW)}`,
+    uid,
+  );
+
+  beforeEach(() => seedFederatedUser(uid, email));
+
+  afterEach(async () => {
+    await purgeQueueFor(uid);
+    await admin.auth(testApp).deleteUser(uid).catch(() => undefined);
+  });
+
+  it("encola `federated-signin-hint` y NO `password-reset`", async () => {
+    await runRequestPasswordReset(testApp, email, NOW);
+
+    const doc = await readQueueDoc(hintId);
+    expect(doc?.kind).toBe("federated-signin-hint");
+    expect(await queueCountFor(uid)).toBe(1);
+  });
+
+  // Sin contraseña que restablecer no hay link que mandar. Si esto se rompe,
+  // le estariamos mandando a un usuario de Google un link que no le sirve.
+  it("el doc NO lleva actionLink", async () => {
+    await runRequestPasswordReset(testApp, email, NOW);
+
+    const doc = await readQueueDoc(hintId);
+    expect(doc?.params?.actionLink).toBeUndefined();
+  });
+
+  it("es transaccional: no lleva prefKey", async () => {
+    await runRequestPasswordReset(testApp, email, NOW);
+    expect((await readQueueDoc(hintId))?.prefKey).toBeUndefined();
+  });
+
+  // REQ-AUTH-011 sobre la rama nueva: la respuesta tiene que ser identica a la
+  // de una cuenta con contraseña y a la de una que no existe. Si esta rama
+  // devolviera algo distinto, seria un oraculo de proveedores.
+  it("devuelve exactamente la misma respuesta que las otras dos ramas", async () => {
+    const federada = await runRequestPasswordReset(testApp, email, NOW);
+    const inexistente = await runRequestPasswordReset(
+      testApp,
+      "no-existe-nadie@example.com",
+      NOW,
+    );
+
+    expect(federada).toEqual({ status: "ok" });
+    expect(federada).toEqual(inexistente);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GUARDIAN — el emulador MIENTE sobre este caso
+//
+// No prueba nuestro codigo: prueba una propiedad del EMULADOR, y existe para
+// que nadie borre `resetOutcomeFor` pensando que sobra.
+//
+// El emulador de Auth no gatea por proveedor. En su fuente
+// (firebase-tools, `emulator/auth/operations.js`), la rama PASSWORD_RESET solo
+// hace `getUserByEmail` y afirma `EMAIL_NOT_FOUND` — no mira `providerUserInfo`
+// ni `passwordHash`. Asi que sobre una cuenta solo-Google genera link igual.
+//
+// Corolario: cualquier test que "compruebe" contra el emulador que el reseteo
+// funciona para cuentas federadas da verde SIN HABER MEDIDO NADA. Por eso la
+// decision vive en una funcion pura y no en un assert de integracion.
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// El call site: providerData REAL, no el fallback de lista vacía
+//
+// `resetOutcomeFor` ya está cubierta como función pura. Lo que estos tests
+// cubren es el ESLABÓN: que la llamada le pase los providerId y no otra cosa.
+// Es la única parte del branch de tres vías que un test puro no puede tocar.
+// ---------------------------------------------------------------------------
+describe("una cuenta CON contraseña recibe el link, no el hint", () => {
+  const uid = "auth-mail-conpass";
+  const email = "conpass@example.com";
+
+  beforeEach(async () => {
+    await seedPasswordUser(uid, email);
+  });
+
+  afterEach(async () => {
+    await purgeQueueFor(uid);
+    await admin.auth(testApp).deleteUser(uid).catch(() => undefined);
+  });
+
+  it("el provider `password` la manda por la rama de reseteo", async () => {
+    await runRequestPasswordReset(testApp, email, NOW);
+
+    const scope = `${uid}_${throttleWindow(NOW)}`;
+    const reset = await readQueueDoc(dedupeKey("password-reset", scope, uid));
+    const hint = await readQueueDoc(
+      dedupeKey("federated-signin-hint", scope, uid),
+    );
+
+    // `readQueueDoc` devuelve `undefined` cuando el doc no existe.
+    expect(reset?.kind).toBe("password-reset");
+    expect(hint).toBeUndefined();
+  });
+
+  it("y el mail lleva el action link", async () => {
+    await runRequestPasswordReset(testApp, email, NOW);
+
+    const doc = await readQueueDoc(
+      dedupeKey("password-reset", `${uid}_${throttleWindow(NOW)}`, uid),
+    );
+
+    expect(doc?.params?.actionLink).toContain("oobCode=");
+  });
+
+  // Fija la forma que produce el emulador. Si una version futura empezara a
+  // devolver `providerData` vacio para una cuenta con contrasena, los tests de
+  // arriba seguirian pasando por el fallback y volveriamos a no cubrir nada.
+  // Este test avisa.
+  it("la cuenta sembrada expone el provider `password`", async () => {
+    const u = await admin.auth(testApp).getUser(uid);
+
+    expect(u.providerData.map((p) => p.providerId)).toContain("password");
+  });
+});
+
+describe("el emulador no es oráculo para el caso federado", () => {
+  const uid = "auth-mail-emu-miente";
+  const email = "emu-miente@example.com";
+
+  beforeEach(() => seedFederatedUser(uid, email));
+  afterEach(() => admin.auth(testApp).deleteUser(uid).catch(() => undefined));
+
+  it("genera link para una cuenta SIN contraseña — por eso no alcanza", async () => {
+    const link = await admin.auth(testApp).generatePasswordResetLink(email);
+
+    // Si esto algun dia se pone ROJO, es una buena noticia: el emulador
+    // empezo a gatear por proveedor y se volvio fiel. Recien ahi tendria
+    // sentido discutir si `resetOutcomeFor` sigue haciendo falta.
+    expect(link).toContain("oobCode=");
   });
 });
