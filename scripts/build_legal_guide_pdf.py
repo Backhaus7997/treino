@@ -153,7 +153,7 @@ def build_story():
         "pendientes, para publicar en App Store y Google Play.", "cover_s"))
     sp(28)
     A(table([
-        ["Fecha", "31 de agosto de 2026"],
+        ["Fecha", "1 de septiembre de 2026"],
         ["Verificado contra", "código de la app y reglas de Firestore"],
         ["Complementa", "docs/legal/ (9 documentos redactados)"],
         ["Titular", "BACKHAUSTIN S.A.S. — CUIT 30-71929587-4"],
@@ -510,7 +510,7 @@ def build_story():
     sp(8)
 
     A(P("4.1 Estado verificado", "h3"))
-    A(P("Ambas consolas se revisaron el 31 de agosto de 2026. Las dos están a "
+    A(P("Ambas consolas se revisaron el 1 de septiembre de 2026. Las dos están a "
         "nombre personal."))
     sp(4)
     A(table([
@@ -1023,7 +1023,7 @@ def on_page(canvas, doc):
         canvas.setFont("Helvetica", 7.5)
         canvas.setFillColor(MUTED)
         canvas.drawString(22 * mm, 285 * mm, "TREINO — Guía legal de lanzamiento")
-        canvas.drawRightString(187 * mm, 285 * mm, "31 de agosto de 2026")
+        canvas.drawRightString(187 * mm, 285 * mm, "1 de septiembre de 2026")
         canvas.drawCentredString(104.5 * mm, 12 * mm, str(doc.page))
     canvas.restoreState()
 
