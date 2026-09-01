@@ -19,11 +19,36 @@
   ],
   "rewrites": [
     {
+      "source": "/.well-known/assetlinks.json",
+      "destination": "/well-known/assetlinks.json"
+    },
+    {
+      "source": "/.well-known/apple-app-site-association",
+      "destination": "/well-known/apple-app-site-association"
+    },
+    {
+      "source": "/abrir/alumno",
+      "destination": "/abrir/alumno.html"
+    },
+    {
+      "source": "/abrir/profe",
+      "destination": "/abrir/profe.html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
   ],
   "headers": [
+    {
+      "source": "/.well-known/apple-app-site-association",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    },
     {
       "source": "/",
       "headers": [

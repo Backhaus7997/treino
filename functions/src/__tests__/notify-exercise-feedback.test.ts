@@ -16,6 +16,13 @@
  *   - GRANT FORJADO: `session_shares` apunta a un uid con el que NO hay
  *     `trainer_links` activo → NO despacha. Es el bloqueante de seguridad,
  *     abajo tiene su propio describe con el porqué.
+ *   - EL MAIL al PF (`kind: "discomfort-reported"`): se encola con el push,
+ *     dedupea por SESIÓN (cinco ejercicios → un mail), no lleva `prefKey` y no
+ *     guarda dato de salud en el doc de la cola. Su propio describe al final.
+ *
+ * ⚠️ Toda guarda que corta el push tiene que cortar el MAIL también, y el mail
+ * es el canal que más dura: no se borra apagando el teléfono. Por eso los casos
+ * de `comment` y de grant forjado assertean los dos canales, no solo el push.
  *
  * ⚠️ TODO escenario que ESPERA un despacho tiene que sembrar `trainer_links`
  * además de `session_shares`. El grant solo ya no alcanza — es exactamente el
@@ -27,6 +34,8 @@
 
 import * as admin from "firebase-admin";
 import { notifyOnExerciseFeedbackHandler } from "../notifications/notify-exercise-feedback";
+import { dedupeKey } from "../mail/enqueue-mail";
+import { MAIL_QUEUE_COLLECTION, MailQueueDoc } from "../mail/types";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
@@ -102,8 +111,35 @@ async function cleanupLinks(athleteUid: string, ...trainerIds: string[]): Promis
   );
 }
 
+/**
+ * Docs del outbox dirigidos a un uid.
+ *
+ * El mail es la contraparte del push, así que toda guarda que corta el push
+ * tiene que cortarlo también. Se consulta por `toUid` y no por el id derivado
+ * para que un caso que espera CERO mails no dependa de adivinar bien la clave.
+ */
+async function queuedMailFor(uid: string): Promise<MailQueueDoc[]> {
+  const snap = await db()
+    .collection(MAIL_QUEUE_COLLECTION)
+    .where("toUid", "==", uid)
+    .get();
+  return snap.docs.map((d) => d.data() as MailQueueDoc);
+}
+
 async function cleanup(...uids: string[]): Promise<void> {
   for (const uid of uids) {
+    // El outbox NO se limpia solo, y `enqueueMail` usa `create()`: un doc que
+    // sobrevive a la corrida anterior hace que el enqueue de esta devuelva
+    // null, y un caso que espera mail terminaría leyendo el doc VIEJO — verde
+    // sobre una rama que no corrió.
+    const queued = await db()
+      .collection(MAIL_QUEUE_COLLECTION)
+      .where("toUid", "==", uid)
+      .get()
+      .catch(() => null);
+    if (queued) {
+      await Promise.all(queued.docs.map((d) => d.ref.delete()));
+    }
     // El inbox es una SUBCOLECCIÓN: borrar `users/{uid}` no se la lleva. Sin
     // esto, el historial se acumula entre tests y el de privacidad de abajo
     // podría estar mirando el de la corrida anterior.
@@ -227,6 +263,23 @@ describe("kind: comment → does NOT notify (the feature's whole point)", () => 
     );
 
     expect(mock.sendEachForMulticast as jest.Mock).not.toHaveBeenCalled();
+  });
+
+  // La distinción comment/discomfort tiene que valer para los DOS canales. Un
+  // mail por cada comentario de sesión es peor que el push que este feature ya
+  // decidió no mandar: el push se descarta, el mail queda en la bandeja y
+  // entrena al PF a filtrar al remitente. El día que llegue el de molestia
+  // —el que sí importa— no lo va a ver.
+  it("tampoco encola mail para un comentario común", async () => {
+    await notifyOnExerciseFeedbackHandler(
+      testApp,
+      athleteUid,
+      sessionId,
+      makeFeedback({ kind: "comment", text: "Se sintió liviano hoy" }),
+      makeMockMessaging(),
+    );
+
+    expect(await queuedMailFor(trainerId)).toHaveLength(0);
   });
 });
 
@@ -448,6 +501,22 @@ describe("forged session_shares grant (no active trainer_link) → does NOT disp
     expect(inbox.empty).toBe(true);
   });
 
+  // Tercer canal del mismo ataque, y el que MÁS dura: un mail a la casilla de
+  // la víctima no se borra apagando el teléfono ni cerrando la cuenta, y le
+  // llega desde nuestro dominio verificado. Si la guarda cubriera el push y no
+  // el outbox, el vector seguiría abierto por el peor lado.
+  it("tampoco le encola un mail a la víctima", async () => {
+    await notifyOnExerciseFeedbackHandler(
+      testApp,
+      attackerUid,
+      sessionId,
+      makeFeedback(),
+      makeMockMessaging(),
+    );
+
+    expect(await queuedMailFor(victimUid)).toHaveLength(0);
+  });
+
   it("tampoco despacha con texto controlado por el atacante en exerciseName", async () => {
     // `exerciseName` va VERBATIM al cuerpo del push y firestore.rules ~1885
     // solo le mira el largo. Era el payload del ataque: elegís a quién le
@@ -634,5 +703,162 @@ describe("athlete WITH a real link, grant forged at a third party → does NOT d
         .get();
       expect(inbox.empty).toBe(true);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// EL MAIL AL PF — la contraparte de este push.
+//
+// De los eventos que tienen push y no tenían mail, este es el único con
+// consecuencia FÍSICA: el alumno avisa que algo le duele mientras entrena. El
+// push se pierde en la pantalla de bloqueo de un teléfono que nadie mira; el
+// mail no.
+//
+// Lo que se pinea acá es el par de decisiones que definieron el feature —
+// dedupe por SESIÓN y transaccional sin `prefKey`— más el invariante de
+// privacidad, que en mail pesa más que en push: el mail queda en la bandeja
+// para siempre y además pasa por Resend, que es un tercero.
+// ---------------------------------------------------------------------------
+describe("mail al PF: se encola junto con el push", () => {
+  const athleteUid = "athlete-mail";
+  const trainerId = "trainer-mail";
+  const sessionId = "session-mail";
+  const otherSessionId = "session-mail-2";
+
+  beforeEach(async () => {
+    await seedUser(trainerId, ["trainer-token"]);
+    await seedUserPublicProfile(athleteUid, "Ana Atleta");
+    await seedSessionShare(athleteUid, trainerId);
+    await seedTrainerLink(athleteUid, trainerId);
+  });
+
+  afterEach(async () => {
+    await cleanup(athleteUid, trainerId);
+    await cleanupLinks(athleteUid, trainerId);
+  });
+
+  it("encola un mail dirigido al PF, con la clave derivada de (alumno, sesión)", async () => {
+    await notifyOnExerciseFeedbackHandler(
+      testApp,
+      athleteUid,
+      sessionId,
+      makeFeedback(),
+      makeMockMessaging(),
+    );
+
+    const snap = await db()
+      .collection(MAIL_QUEUE_COLLECTION)
+      .doc(dedupeKey("discomfort-reported", `${athleteUid}_${sessionId}`, trainerId))
+      .get();
+
+    expect(snap.exists).toBe(true);
+    const doc = snap.data() as MailQueueDoc;
+    expect(doc.toUid).toBe(trainerId);
+    expect(doc.kind).toBe("discomfort-reported");
+    expect(doc.status).toBe("pending");
+    expect(doc.params.athleteName).toBe("Ana Atleta");
+  });
+
+  // El CTA del template cae por defecto en la entrada del ATLETA. Acá el
+  // destinatario es el profe: sin este parámetro el mail lo deja mirando la
+  // pantalla equivocada. Mismo patrón que `link-requested`.
+  it("manda el CTA a la entrada del PF, no a la del atleta", async () => {
+    await notifyOnExerciseFeedbackHandler(
+      testApp,
+      athleteUid,
+      sessionId,
+      makeFeedback(),
+      makeMockMessaging(),
+    );
+
+    const [doc] = await queuedMailFor(trainerId);
+    expect(doc.params.ctaUrl).toBe("https://app.gettreino.com/abrir/profe");
+  });
+
+  // Decisión 1: transaccional. No existe un ajuste razonable que diga "no me
+  // avises cuando a mi alumno le duele algo", y ofrecerlo en `kNotifTypes`
+  // sería darle al PF una forma silenciosa de fallarle a su cliente. Si alguien
+  // le agrega un `prefKey`, tiene que agregar la fila en el Coach Hub en el
+  // mismo commit — si no, el opt-out existe y el usuario no lo puede ver.
+  it("no lleva prefKey: es transaccional, como payment-overdue", async () => {
+    await notifyOnExerciseFeedbackHandler(
+      testApp,
+      athleteUid,
+      sessionId,
+      makeFeedback(),
+      makeMockMessaging(),
+    );
+
+    const [doc] = await queuedMailFor(trainerId);
+    expect(doc.prefKey).toBeUndefined();
+  });
+
+  // El doc de la cola es Firestore, y de ahí lo lee `sendQueuedMail` para
+  // renderizar. Guardar el dato de salud acá lo filtraría igual aunque el
+  // template no lo imprima — y encima lo dejaría en una colección con otro
+  // ciclo de vida. Se corta en el productor, no solo en la plantilla.
+  it("el doc de la cola no guarda el texto, la foto ni el ejercicio", async () => {
+    const secretText = "Me tiró la rodilla derecha en la última serie";
+    const secretPhotoUrl =
+      "https://firebasestorage.googleapis.com/v0/b/x/o/sessionFeedback%2Fsecret?alt=media&token=abc123";
+
+    await notifyOnExerciseFeedbackHandler(
+      testApp,
+      athleteUid,
+      sessionId,
+      makeFeedback({ text: secretText, photoUrl: secretPhotoUrl }),
+      makeMockMessaging(),
+    );
+
+    const serialized = JSON.stringify(await queuedMailFor(trainerId));
+    expect(serialized).not.toContain(secretText);
+    expect(serialized).not.toContain(secretPhotoUrl);
+    expect(serialized).not.toContain("token=abc123");
+    expect(serialized).not.toContain("Sentadilla");
+  });
+
+  // Decisión 2, y la mitad cara: cinco ejercicios con molestia en la MISMA
+  // sesión son UN evento ("esta sesión le dolió"), no cinco. Cinco mails a la
+  // misma persona por la misma sesión entrenan al PF a filtrar el remitente, y
+  // el que se pierde después es el que importa. El detalle está a un toque, en
+  // la app, detrás del read gateado.
+  it("cinco ejercicios de la misma sesión producen UN solo mail", async () => {
+    for (let i = 0; i < 5; i++) {
+      await notifyOnExerciseFeedbackHandler(
+        testApp,
+        athleteUid,
+        sessionId,
+        makeFeedback({ exerciseId: `ex-${i}`, exerciseName: `Ejercicio ${i}` }),
+        makeMockMessaging(),
+      );
+    }
+
+    expect(await queuedMailFor(trainerId)).toHaveLength(1);
+  });
+
+  // La otra mitad: colapsar por sesión NO puede volverse "un mail y listo". La
+  // sesión del martes es un evento nuevo y merece su propio aviso.
+  it("otra sesión del mismo alumno sí produce un mail nuevo", async () => {
+    await notifyOnExerciseFeedbackHandler(
+      testApp, athleteUid, sessionId, makeFeedback(), makeMockMessaging(),
+    );
+    await notifyOnExerciseFeedbackHandler(
+      testApp, athleteUid, otherSessionId, makeFeedback(), makeMockMessaging(),
+    );
+
+    expect(await queuedMailFor(trainerId)).toHaveLength(2);
+  });
+
+  // Los eventos de Cloud Functions son at-least-once. El mismo reporte
+  // redisparado tiene que resolver al MISMO doc — es la razón de ser del
+  // outbox, y se verifica en el camino real, no solo en `mail-outbox.test.ts`.
+  it("un trigger redisparado no produce un segundo mail", async () => {
+    for (let i = 0; i < 3; i++) {
+      await notifyOnExerciseFeedbackHandler(
+        testApp, athleteUid, sessionId, makeFeedback(), makeMockMessaging(),
+      );
+    }
+
+    expect(await queuedMailFor(trainerId)).toHaveLength(1);
   });
 });

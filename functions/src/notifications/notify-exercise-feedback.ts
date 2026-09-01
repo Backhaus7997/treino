@@ -75,6 +75,38 @@
  * molestia, no qué dijo la persona ni dónde le dolía. Si algún día se
  * enriquece este body, hay que cerrar QA-CMP-008 ANTES.
  *
+ * ── MAIL ────────────────────────────────────────────────────────────────────
+ *
+ * Ademas del push, encola un mail al PF (`kind: "discomfort-reported"`). De los
+ * eventos que hoy tienen push y no tienen mail, este es el unico con
+ * consecuencia FISICA: el alumno esta avisando que algo le duele mientras
+ * entrena. Si el PF no tiene la app abierta, el push se pierde en la pantalla
+ * de bloqueo y se entera tarde. Los demas —chat, reacciones, seguidores,
+ * reseñas— aguantan hasta que abra la app.
+ *
+ * DEDUPE POR SESION, no por ejercicio. El `scope` es `{athleteUid}_{sessionId}`,
+ * asi que una sesion en la que el alumno reporta molestia en cinco ejercicios
+ * produce UN mail, no cinco. La eleccion es a proposito y tiene costo: el mail
+ * lo produce el PRIMER reporte de esa sesion en dispararse, asi que no puede
+ * nombrar un ejercicio sin arriesgarse a nombrar uno de tres. Por eso el
+ * template no nombra ninguno — es el mismo problema de lote parcial que
+ * `appointment-series-created` documenta en `templates.ts`.
+ *
+ * Se elige asi porque el mail no es el registro, es el empujon para que abra la
+ * app; el detalle vive ahi, detras del read gateado. Y cinco mails por sesion a
+ * la misma persona es la receta para que este mail —el que SI importa— termine
+ * filtrado el dia que haga falta.
+ *
+ * SIN `prefKey`: es transaccional. No existe un ajuste razonable que diga "no
+ * me avises cuando a mi alumno le duele algo", y ofrecerlo en `kNotifTypes`
+ * seria darle al PF una forma silenciosa de fallarle a su cliente. Mismo
+ * criterio que `payment-overdue` y `appointment-confirmed`.
+ *
+ * El cuerpo del mail hereda TODA la regla de privacidad de arriba y la aprieta:
+ * sin `text`, sin `photoUrl`, y tampoco `exerciseName`. Un push se descarta; un
+ * mail se queda en la bandeja para siempre y ademas pasa por Resend, que es un
+ * tercero. Todo lo que dice QA-CMP-008 sobre retencion vale mas fuerte aca.
+ *
  * #628.
  */
 
@@ -82,6 +114,8 @@ import * as admin from "firebase-admin";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 import { sendFcm } from "./send-fcm";
+import { enqueueMail } from "../mail/enqueue-mail";
+import { APP_ENTRY_TRAINER } from "../mail/templates";
 
 function getApp(): admin.app.App {
   try {
@@ -228,6 +262,32 @@ export async function notifyOnExerciseFeedbackHandler(
     },
     messaging,
   );
+
+  // Contraparte por mail — ver el bloque MAIL del header de este archivo.
+  //
+  // Va DESPUES del push y en `catch`: la garantia de "no tira" vive en OTRO
+  // modulo (`enqueueMail`), y un cambio alla no puede poder tumbar un despacho
+  // que ya salio de acá. Mismo criterio que `notify-link-change.ts`.
+  //
+  // `athleteName` ya esta resuelto para el cuerpo del push, asi que el mail no
+  // cuesta ni una lectura extra.
+  await enqueueMail(app, {
+    toUid: trainerId,
+    kind: "discomfort-reported",
+    // (alumno, sesion) y NO el feedbackId: un mail por SESION. Ver el header.
+    scope: `${athleteUid}_${sessionId}`,
+    // El destinatario es el PF, asi que el CTA va a SU entrada. El default del
+    // template es la del atleta, que aca dejaria al profe mirando la pantalla
+    // equivocada. Mismo patron que `link-requested`.
+    params: { athleteName, ctaUrl: APP_ENTRY_TRAINER },
+    // Sin `prefKey` A PROPOSITO: es transaccional. Ver el header.
+  }).catch((error: unknown) => {
+    logger.warn("notifyOnExerciseFeedback: mail enqueue failed", {
+      athleteUid,
+      sessionId,
+      error,
+    });
+  });
 }
 
 /**

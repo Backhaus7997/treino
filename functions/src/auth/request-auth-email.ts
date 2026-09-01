@@ -47,6 +47,7 @@ import * as functions from "firebase-functions/v2/https";
 import { HttpsError } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions";
 
+import { APP_ENTRY_ATHLETE, APP_ENTRY_TRAINER } from "../mail/templates";
 import { enqueueMail } from "../mail/enqueue-mail";
 
 function getApp(): admin.app.App {
@@ -170,6 +171,35 @@ export function resetOutcomeFor(
     : "federated-signin-hint";
 }
 
+/**
+ * A donde mandar a esta persona cuando toque el boton del mail.
+ *
+ * El destino depende del ROL, y a diferencia de los otros mails —donde el
+ * productor ya sabe si le escribe al profe o al atleta— aca no hay contexto:
+ * alguien pidio recuperar su cuenta y lo unico que tenemos es el uid.
+ *
+ * Ante la duda, `alumno`: es el rol mayoritario, y su pagina no le promete al
+ * profe nada que no pueda hacer — al reves si, mandar a un atleta al Coach Hub
+ * lo deja contra el gate de rol.
+ *
+ * No es un canal de enumeracion: solo se llega aca con una cuenta que EXISTE y
+ * es federada, y la respuesta del callable no cambia.
+ */
+async function entradaSegunRol(
+  app: admin.app.App,
+  uid: string,
+): Promise<string> {
+  try {
+    const snap = await admin.firestore(app).collection("users").doc(uid).get();
+    return snap.data()?.role === "trainer"
+      ? APP_ENTRY_TRAINER
+      : APP_ENTRY_ATHLETE;
+  } catch (error) {
+    logger.warn("requestPasswordReset: no se pudo leer el rol", { uid, error });
+    return APP_ENTRY_ATHLETE;
+  }
+}
+
 /** Respuesta uniforme. Nunca revela si la cuenta existe. */
 export interface AuthEmailResult {
   status: "ok";
@@ -212,7 +242,12 @@ export async function runRequestPasswordReset(
       // Sin contraseña que restablecer: NO se pide link. Se le dice al dueño
       // del buzon como entra a su cuenta, y el callable devuelve el mismo
       // `{status:"ok"}` que las otras dos ramas.
-      await enqueueMail(app, { toUid: user.uid, kind, scope, params: {} });
+      await enqueueMail(app, {
+        toUid: user.uid,
+        kind,
+        scope,
+        params: { ctaUrl: await entradaSegunRol(app, user.uid) },
+      });
       return OK;
     }
 
