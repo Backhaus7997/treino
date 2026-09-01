@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="robots" content="noindex">
+<title>Abrí TREINO</title>
+<link rel="stylesheet" href="/abrir/_estilo.css">
+<!--
+  Destino de los mails que van a ENTRENADORES: solicitud de vínculo,
+  cancelación de un turno hecha por el atleta.
+
+  ─── Por qué esta página sí tiene botón y la del alumno no ─────────────────
+
+  El profe tiene DOS lugares donde hacer su trabajo: la app y el Coach Hub web.
+  El atleta tiene uno solo, la app. Así que acá el fallback es real —si llegaste
+  desde una computadora, el Coach Hub te sirve— y para el atleta no lo es.
+
+  Esa asimetría es la razón de que sean dos páginas y no una con dos tarjetas:
+  cada rol ve la única acción que puede hacer, no un menú donde la mitad no le
+  corresponde.
+
+  Con los App Links configurados, el profe que abre el mail en el teléfono ni
+  ve esta página: se le abre la app.
+-->
+</head>
+<body>
+<main>
+  <div class="brand">
+    <img src="/email/logo.png" alt="" width="19" height="30">
+    <span>TREINO</span>
+  </div>
+
+  <h1>Entrá al Coach Hub</h1>
+  <p>
+    Desde el navegador tenés tu agenda, tus alumnos, las rutinas y los pagos.
+  </p>
+
+  <a class="cta" href="https://app.gettreino.com">IR AL COACH HUB</a>
+
+  <div class="hint">
+    <strong>¿Estás en el teléfono?</strong><br>
+    La app de TREINO tiene lo mismo, más el chat con tus alumnos. Si no se
+    abrió sola, abrila a mano.
+  </div>
+
+  <footer>
+    Recibiste un mail de TREINO porque tenés una cuenta.<br>
+    <a href="https://gettreino.com">gettreino.com</a>
+  </footer>
+</main>
+</body>
+</html>

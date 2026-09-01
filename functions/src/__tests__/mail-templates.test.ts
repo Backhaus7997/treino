@@ -141,26 +141,83 @@ describe("renderMail: every MailKind produces a complete message", () => {
 // Coach Hub se pide explícitamente.
 // ---------------------------------------------------------------------------
 describe("destino del CTA", () => {
-  it("por defecto va a la landing, no al Coach Hub", () => {
+  // El default es la pagina puente, NO `gettreino.com`. Esa landing es de otro
+  // producto —gimnasios, en ingles, "No custom app"— asi que un atleta que
+  // tocaba el boton caia en una pagina sin login ni descarga que ademas le
+  // negaba la app que tiene instalada.
+  it("por defecto manda al destino del ATLETA, no a la landing", () => {
     const out = renderMail("appointment-confirmed", { trainerName: "Jose" });
 
-    expect(ctaHref(out.html)).toBe("https://gettreino.com");
+    expect(ctaHref(out.html)).toBe("https://app.gettreino.com/abrir/alumno");
+  });
+
+  it("ningun CTA cae en la landing de gimnasios", () => {
+    for (const kind of ALL_KINDS) {
+      const href = ctaHref(renderMail(kind, {}).html);
+
+      expect(href).not.toBe("https://gettreino.com");
+    }
+  });
+
+  // Los de auth reciben su destino en `actionLink`, y `sendQueuedMail` lo BORRA
+  // del documento al enviar. Si ese doc se volviera a renderizar, el boton
+  // quedaria sin destino: antes salia `href=""`, que no lleva a ningun lado.
+  it("sin destino no se dibuja boton, en vez de uno muerto", () => {
+    const html = renderMail("password-reset", {}).html;
+
+    expect(html).not.toContain("href=\"\"");
+    expect(html).not.toContain("CAMBIAR MI CONTRASEÑA");
+  });
+
+  it("con destino, el boton sí aparece", () => {
+    const html = renderMail("password-reset", {
+      actionLink: "https://auth.gettreino.com/__/auth/action?oobCode=X",
+    }).html;
+
+    expect(html).toContain("CAMBIAR MI CONTRASEÑA");
+  });
+
+  // El footer SI sigue apuntando a la landing: es el link de marca del pie, no
+  // una accion. Distinguirlos es el punto de todo esto.
+  it("el link de marca del footer sigue siendo la landing", () => {
+    const out = renderMail("appointment-confirmed", { trainerName: "Jose" });
+
+    expect(out.html).toContain(">gettreino.com</a>");
   });
 
   it("respeta el ctaUrl que pasa el productor", () => {
     const out = renderMail("link-requested", {
       athleteName: "Marta",
-      ctaUrl: "https://app.gettreino.com",
+      ctaUrl: "https://app.gettreino.com/abrir/profe",
     });
 
-    expect(ctaHref(out.html)).toBe("https://app.gettreino.com");
+    expect(ctaHref(out.html)).toBe("https://app.gettreino.com/abrir/profe");
+  });
+
+  // Los destinos son App Links bajo /abrir: si alguno se escribiera distinto,
+  // el sistema operativo no lo reconoceria y abriria el navegador — sin error,
+  // sin log, igual que si no existiera nada de esto.
+  //
+  // `password-reset` y `email-verification` quedan afuera A PROPOSITO: su CTA
+  // no es un destino nuestro, es el `actionLink` de un solo uso que minta el
+  // Admin SDK y que apunta al action handler de Firebase.
+  it("todo CTA que no sea un action link vive bajo /abrir", () => {
+    const conActionLink = ["password-reset", "email-verification"];
+    const resto = ALL_KINDS.filter((k) => !conActionLink.includes(k));
+
+    expect(resto).toHaveLength(8);
+    for (const kind of resto) {
+      const href = ctaHref(renderMail(kind, {}).html);
+
+      expect(href).toMatch(/^https:\/\/app\.gettreino\.com\/abrir\/(alumno|profe)$/);
+    }
   });
 
   // Un CTA que solo vive dentro de un <a> no existe para quien lee en texto.
   it("la URL del CTA también entra en la parte de texto plano", () => {
     const out = renderMail("payment-overdue", { trainerName: "Jose" });
 
-    expect(out.text).toContain("https://gettreino.com");
+    expect(out.text).toContain("https://app.gettreino.com/abrir/alumno");
   });
 
   it("ningún template apunta a un dominio que no es nuestro", () => {
