@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:intl/intl.dart' as intl;
+import 'package:treino/core/utils/date_labels.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:treino/app/theme/app_theme.dart';
@@ -390,8 +390,18 @@ void main() {
     expect(find.text('DISTRIBUCIÓN MUSCULAR'), findsOneWidget);
     // Legend shows the selected month's short name, not the generic
     // "Actual"/"Anterior" labels used by the athlete-insights radar.
+    // `monthAbbrev` y NO `DateFormat('MMM yyyy')`: es la misma función que usa
+    // la pantalla, y usa otra cosa a propósito. El CLDR de es-AR devuelve
+    // 'sept' (4 chars) para septiembre, y con eso el label quedaba desalineado
+    // con el eje del chart de al lado — está escrito en el dartdoc de
+    // `_monthLegendLabel`.
+    //
+    // El test replicaba justo el formato que la pantalla evita. Once meses del
+    // año coinciden por casualidad en tres caracteres; septiembre no, así que
+    // este test se rompía UNA VEZ AL AÑO y sólo si alguien corría CI en
+    // septiembre. Pasó el 01/09/2026 y bloqueó el CI de todo el repo.
     final expectedCurrentLabel =
-        intl.DateFormat('MMM yyyy', 'es_AR').format(currentMonthStart);
+        '${monthAbbrev(currentMonthStart, 'es_AR')} ${currentMonthStart.year}';
     expect(
       find.text(_capitalize(expectedCurrentLabel)),
       findsOneWidget,
@@ -436,8 +446,9 @@ void main() {
     chartState.debugSelectMonth(olderMonth);
     await tester.pumpAndSettle();
 
+    // Ver la nota de `expectedCurrentLabel`.
     final expectedLabel =
-        intl.DateFormat('MMM yyyy', 'es_AR').format(olderMonth);
+        '${monthAbbrev(olderMonth, 'es_AR')} ${olderMonth.year}';
 
     await tester.scrollUntilVisible(
       find.text(_capitalize(expectedLabel)),
