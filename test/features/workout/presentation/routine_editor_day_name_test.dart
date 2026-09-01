@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/features/workout/presentation/widgets/day_tab_bar.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
@@ -84,6 +85,18 @@ List<Override> _overrides({String uid = 'athlete-1'}) {
 const _firstDayPencilKey = Key('day_name_edit_button_1');
 const _editingFieldKey = Key('day_name_editing_field');
 
+/// Nombre del día, leído de la PESTAÑA.
+///
+/// Hasta la revisión en device del 31/08 el nombre aparecía dos veces: en la
+/// pestaña y en una cabecera 200 px más abajo. La cabecera se fue —entre el
+/// borde, el padding y el divisor se comía ~70 px en la única pantalla donde
+/// el alto es el recurso escaso—, así que ahora hay una sola fuente.
+///
+/// Se lee del widget y no con `find.text` porque la pestaña trunca a 15
+/// caracteres para mostrar: `labels` tiene el nombre entero.
+String _nombreEnCabecera(WidgetTester tester) =>
+    tester.widget<DayTabBar>(find.byType(DayTabBar)).labels.first;
+
 void main() {
   group('Editable day name (decisión A1 + 2A + E2)', () {
     testWidgets(
@@ -112,7 +125,7 @@ void main() {
         );
 
         // Pre-edit: Text "Día 1" present, TextField absent.
-        expect(find.text('Día 1'), findsOneWidget);
+        expect(_nombreEnCabecera(tester), 'Día 1');
         expect(find.byKey(_editingFieldKey), findsNothing);
 
         await tester.tap(find.byKey(_firstDayPencilKey));
@@ -149,7 +162,7 @@ void main() {
         await tester.pumpAndSettle();
 
         // New custom label visible.
-        expect(find.text('Día 1 - Pecho'), findsOneWidget);
+        expect(_nombreEnCabecera(tester), 'Día 1 - Pecho');
         // Field is gone, pencil is back.
         expect(find.byKey(_editingFieldKey), findsNothing);
         expect(find.byKey(_firstDayPencilKey), findsOneWidget);
@@ -173,7 +186,7 @@ void main() {
         await tester.enterText(find.byKey(_editingFieldKey), 'PUSH');
         await tester.testTextInput.receiveAction(TextInputAction.done);
         await tester.pumpAndSettle();
-        expect(find.text('PUSH'), findsOneWidget);
+        expect(_nombreEnCabecera(tester), 'PUSH');
 
         // Now wipe it.
         await tester.tap(find.byKey(_firstDayPencilKey));
@@ -183,7 +196,7 @@ void main() {
         await tester.pumpAndSettle();
 
         // Localized default is back, no PUSH leftover.
-        expect(find.text('Día 1'), findsOneWidget);
+        expect(_nombreEnCabecera(tester), 'Día 1');
         expect(find.text('PUSH'), findsNothing);
       },
     );
@@ -203,7 +216,7 @@ void main() {
         await tester.testTextInput.receiveAction(TextInputAction.done);
         await tester.pumpAndSettle();
 
-        expect(find.text('Día 1'), findsOneWidget);
+        expect(_nombreEnCabecera(tester), 'Día 1');
       },
     );
   });

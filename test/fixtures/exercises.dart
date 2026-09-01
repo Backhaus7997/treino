@@ -40,6 +40,17 @@ const kExerciseSeed = [
     category: 'compound',
     equipment: EquipmentType.mancuerna,
   ),
+  // Un ejercicio con un NÚMERO en el nombre. El catálogo real los tiene
+  // ("Landmine 180"), y son el caso donde el nombre y la prescripción pueden
+  // compartir token: `landmine 180 3x10 180`. Sin uno acá, ese camino de la
+  // entrada rápida no se puede probar.
+  Exercise(
+    id: 'landmine-180',
+    name: 'Landmine 180',
+    muscleGroup: 'chest',
+    category: 'compound',
+    equipment: EquipmentType.barra,
+  ),
   Exercise(
     id: 'cable-fly',
     name: 'Aperturas con Cable',

@@ -22,6 +22,12 @@ import '../../onboarding/presentation/custom_exercise_onboarding_gate.dart';
 import '../../profile/application/user_providers.dart'
     show userProfileProvider, userRepositoryProvider;
 import '../../profile/domain/experience_level.dart';
+import '../application/custom_exercise_providers.dart'
+    show customExercisesForTrainerStreamProvider;
+import '../domain/custom_exercise.dart' show CustomExercise;
+import '../application/exercise_filter.dart'
+    show customToExercise, exerciseMatchesFilters;
+import '../application/exercise_providers.dart' show exercisesProvider;
 import '../application/routine_providers.dart' show routineRepositoryProvider;
 import '../application/session_providers.dart' show currentUidProvider;
 import '../application/user_routines_providers.dart'
@@ -41,8 +47,24 @@ import '../domain/set_enums.dart';
 import '../domain/set_limits.dart';
 import '../domain/set_spec.dart';
 import 'routine_editor_mode.dart';
-import 'widgets/bounded_number_formatter.dart';
 import 'widgets/duration_text_field.dart';
+import 'widgets/day_tab_bar.dart';
+import 'widgets/editor_footer_bar.dart';
+import 'widgets/empty_day_state.dart';
+import 'widgets/exercise_actions_sheet.dart';
+import 'widgets/keyboard_accessory_bar.dart';
+import 'widgets/exercise_card.dart';
+import 'widgets/prescription_chips.dart';
+import 'widgets/quick_entry_panel.dart';
+import 'widgets/quick_entry_parser.dart';
+import 'widgets/routine_action_buttons.dart';
+import 'widgets/set_cell_field.dart';
+// `parseEditorWeight` se mudó junto al campo que parsea. Se re-exporta desde
+// acá porque `routine_editor_kg_decimal_test.dart` lo importa por esta ruta
+// desde antes de que la celda fuera un widget propio, y su contrato no cambió.
+export 'widgets/set_cell_field.dart' show parseEditorWeight;
+import 'widgets/set_type_chip.dart';
+import 'widgets/superset_block.dart';
 
 // ── Presence-aware delete / add scope enums ───────────────────────────────────
 
@@ -499,8 +521,13 @@ OnboardingSurface _onboardingSurfaceFor(RoutineEditorMode mode) =>
 String _titleFor(RoutineEditorMode mode, AppL10n l10n) => switch (mode) {
       TrainerAssigning(existingPlanId: null) => l10n.coachEditorTitle,
       TrainerAssigning() => l10n.coachEditorEditTitle,
-      TrainerTemplating(existingTemplateId: null) => l10n.coachEditorTitle,
-      TrainerTemplating() => l10n.coachEditorEditTitle,
+      // Antes reusaban el copy de asignar un plan: crear una PLANTILLA, que
+      // no se asigna a nadie, decía "Crear plan". Es el único cambio de copy
+      // que el rediseño autoriza (#871). No cambia a qué repositorio se
+      // escribe ni cuándo.
+      TrainerTemplating(existingTemplateId: null) =>
+        l10n.coachTemplateEditorTitle,
+      TrainerTemplating() => l10n.coachTemplateEditorEditTitle,
       SelfCreating(existingRoutineId: null) => l10n.workoutSelfEditorTitle,
       SelfCreating() => l10n.workoutSelfEditorEditTitle,
       SelfCustomizing() => l10n.workoutRoutineCustomizeTitle,
@@ -509,8 +536,8 @@ String _titleFor(RoutineEditorMode mode, AppL10n l10n) => switch (mode) {
 String _submitLabelFor(RoutineEditorMode mode, AppL10n l10n) => switch (mode) {
       TrainerAssigning(existingPlanId: null) => l10n.coachEditorSubmit,
       TrainerAssigning() => l10n.coachEditorUpdateLabel,
-      TrainerTemplating(existingTemplateId: null) => l10n.coachEditorSubmit,
-      TrainerTemplating() => l10n.coachEditorUpdateLabel,
+      // El CTA decía "ASIGNAR PLAN" en una plantilla que no se asigna a nadie.
+      TrainerTemplating() => l10n.coachTemplateEditorSubmit,
       SelfCreating(existingRoutineId: null) =>
         l10n.workoutSelfEditorSubmitLabel,
       SelfCreating() => l10n.workoutSelfEditorUpdateLabel,
@@ -520,6 +547,11 @@ String _submitLabelFor(RoutineEditorMode mode, AppL10n l10n) => switch (mode) {
 class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _splitController = TextEditingController();
+
+  /// Qué celda de set se está editando, o null. Lo publican las filas y lo
+  /// consume la barra de accesorio del `bottomSheet` — entre una y otra hay
+  /// cinco niveles de árbol (#867).
+  final FocusedCellNotifier _celdaEnfocada = FocusedCellNotifier();
 
   /// Plain-language resumen of the routine (#648). Written only in the trainer
   /// modes: firestore.rules lists `summary` in the athlete UPDATE path's
@@ -543,6 +575,344 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   List<_EditableDay> _days = [
     _EditableDay(dayNumber: 1, name: '', isDefaultName: true),
   ];
+
+  /// Día visible en las pestañas. Presentación pura: no viaja al modelo.
+  ///
+  /// Se acota en [_removeDay]: borrar el último día dejaría el índice
+  /// apuntando fuera de la lista.
+  int _selectedDayIndex = 0;
+
+  /// Subtítulo del app bar: qué es esta rutina y para quién.
+  ///
+  /// Cubre los CUATRO modos. El handoff de diseño sólo listaba tres — se
+  /// olvidaba de [SelfCustomizing] (#647), el alumno que arranca de una rutina
+  /// existente y termina con una propia.
+  ///
+  /// Para [TrainerAssigning] el diseño pedía "Plan para <Nombre>", pero la
+  /// pantalla sólo conoce el `athleteId`: resolver el nombre significaría leer
+  /// otro provider, y este rediseño no toca la capa de datos. Queda "Plan
+  /// asignado" más el split y el nivel, que sí están.
+  String _subtituloDelPlan(AppL10n l10n) {
+    final partes = <String>[
+      switch (widget.mode) {
+        SelfCreating() => _sharedOnProfile
+            ? l10n.routineEditorSubtitleSelfShared
+            : l10n.routineEditorSubtitleSelfPrivate,
+        SelfCustomizing() => l10n.routineEditorSubtitleCustomizing,
+        TrainerAssigning() => l10n.routineEditorSubtitleAssigned,
+        TrainerTemplating() => l10n.routineEditorSubtitleTemplate,
+      },
+      if (_isTrainerMode && _splitController.text.trim().isNotEmpty)
+        _splitController.text.trim(),
+      // `displayNameEs` es lo que ya usa el dropdown de nivel. No está
+      // localizado —deuda anterior a este PR— pero usar otra cosa acá
+      // haría que el subtítulo y el selector digan distinto.
+      if (_isTrainerMode) _level.displayNameEs,
+      l10n.routineEditorSubtitleWeeks(_numWeeks),
+    ];
+    // El separador es visual, no gramatical: cada parte es una frase completa
+    // por sí sola, así que unirlas no arma una oración en ningún idioma.
+    return partes.join(' · ');
+  }
+
+  /// Referencia al `setState` de la hoja "DATOS DEL PLAN" mientras está
+  /// abierta.
+  ///
+  /// La hoja modal vive en otro `Navigator`, así que el `setState` de esta
+  /// pantalla no la repinta: cambiar el nivel desde la hoja actualizaba el
+  /// estado pero la hoja seguía mostrando el valor viejo hasta cerrarla.
+  StateSetter? _sheetSetState;
+
+  /// Repinta también la hoja, si está abierta.
+  ///
+  /// Se sobrescribe `setState` en vez de llamar a un helper en cada call site
+  /// porque los controles de la hoja disparan métodos de esta clase —
+  /// `_addWeek`, `_removeLastWeek`, `_duplicateWeek`— que ya existían y llaman
+  /// al `setState` común. Con un helper aparte había que acordarse de usarlo
+  /// en cada uno, y el que se olvidara dejaba la hoja mostrando datos viejos:
+  /// agregar semanas actualizaba `_numWeeks` pero la hoja seguía listando las
+  /// de antes.
+  @override
+  void setState(VoidCallback fn) {
+    super.setState(fn);
+    // La hoja vive en otro Navigator: el setState de esta pantalla no la toca.
+    _sheetSetState?.call(() {});
+  }
+
+  /// Los campos del plan: nombre, split, objetivos, compartir, nivel y
+  /// semanas. Antes ocupaban el tercio superior del scroll; ahora viven en la
+  /// hoja del engranaje, en el mismo orden.
+  List<Widget> _camposDelPlan(AppL10n l10n, AppPalette palette) {
+    // Se calculaban en build() cuando estos campos vivían en el scroll; ahora
+    // los necesita la hoja, que se construye en su propio Navigator.
+    final invalidWeeks = _invalidWeekFirstDay;
+    final hiddenInvalidWeeks =
+        invalidWeeks.keys.where((w) => w != _selectedWeek).toList()..sort();
+    return [
+      // ── Resumen en criollo — trainer modes only (#648) ──
+      //
+      // Sits right under SPLIT because SPLIT is the jargon it
+      // exists to translate: the detail screen's badge opens
+      // with "PPL · DÍA 1" and 2 of 5 usability participants
+      // could not say what that meant. Asking for the plain
+      // sentence next to the term that needs it is what makes
+      // the field self-explanatory.
+      //
+      // Absent in SelfCreating: firestore.rules keeps `summary`
+      // out of the athlete UPDATE path's affectedKeys(), so the
+      // athlete cannot change it. A field whose every save is a
+      // permission-denied is worse than no field.
+
+      // ── Para qué sirve — SOLO modo plantilla (#635 PR#1b) ──
+      //
+      // Debajo del RESUMEN porque son la misma pregunta a dos
+      // niveles: el resumen la contesta en prosa para el humano
+      // que lee la card, los objetivos la contestan en enum para
+      // el ranking que ordena la grilla.
+      //
+      // `_isTemplateMode` y no `_isTrainerMode`: en un plan
+      // asignado el guardado sería permission-denied, porque
+      // firestore.rules deja `goals` fuera del affectedKeys de
+      // ese path. Ver el dartdoc del predicado.
+      if (_isTemplateMode) ...[
+        const SizedBox(height: AppSpacing.s12),
+        _SectionLabel(
+          label: l10n.routineEditorGoalsLabel,
+          palette: palette,
+        ),
+        const SizedBox(height: AppSpacing.hairline),
+        Text(
+          l10n.routineEditorGoalsHelp,
+          style: GoogleFonts.barlow(
+            fontWeight: FontWeight.w400,
+            fontSize: 12,
+            height: 1.35,
+            color: palette.textMuted,
+          ),
+        ),
+        // Sin estado vacío explícito: la bajada ya dice
+        // "opcional". Vacío es un estado válido —la plantilla
+        // sigue en la grilla, sin señal para rankear— y una línea
+        // extra sólo para decirlo empujaba DÍAS DEL PLAN fuera
+        // del área construida del ListView.
+        const SizedBox(height: AppSpacing.s8),
+        Wrap(
+          key: const Key('editor_goals_picker'),
+          spacing: AppSpacing.s8,
+          runSpacing: AppSpacing.s8,
+          children: [
+            for (final goal in RoutineGoal.values)
+              _GoalChip(
+                key: Key('editor_goal_${goal.wireKey}'),
+                label: templatesGoalLabel(l10n, goal),
+                selected: _goals.contains(goal),
+                palette: palette,
+                onTap: () {
+                  _markDirty();
+                  setState(() {
+                    // Toggle: volver a tocar deselecciona. Sin
+                    // esto no habría forma de corregir un tap
+                    // equivocado salvo recargando el editor.
+                    if (!_goals.remove(goal)) _goals.add(goal);
+                  });
+                },
+              ),
+          ],
+        ),
+      ],
+
+      // ── Row: Share on public profile — SelfCreating only
+      //
+      // Toggle that flips the routine's `visibility`
+      // between `private` (default) and `public`. When
+      // public, the routine shows in the "RUTINAS
+      // PÚBLICAS" tab of the athlete's public profile.
+      if (!_isTrainerMode) ...[
+        const SizedBox(height: 12),
+        _ShareOnProfileTile(
+          value: _sharedOnProfile,
+          palette: palette,
+          onChanged: (v) {
+            _markDirty();
+            setState(() => _sharedOnProfile = v);
+          },
+        ),
+      ],
+
+      // ── Row: Level — trainer modes only ─────────────────
+      if (_isTrainerMode) ...[
+        const SizedBox(height: 8),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _SectionLabel(
+                      label: l10n.routineEditorLevelSection, palette: palette),
+                  const SizedBox(height: 4),
+                  _LevelDropdown(
+                    value: _level,
+                    palette: palette,
+                    onChanged: (v) {
+                      if (v != null) {
+                        _markDirty();
+                        setState(() => _level = v);
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+      const SizedBox(height: 12),
+
+      // ── Semanas del plan ────────────────────────────────
+      // Week state machine — REQ-PERIOD-010..014. The chips
+      // switch the week every slot editor renders (live-view).
+      _SectionLabel(label: l10n.routineEditorWeeksSection, palette: palette),
+      const SizedBox(height: 6),
+      _WeekTabBar(
+        numWeeks: _numWeeks,
+        selectedWeek: _selectedWeek,
+        maxWeeks: _kMaxWeeks,
+        warningWeeks: hiddenInvalidWeeks.toSet(),
+        palette: palette,
+        onSelectWeek: (w) {
+          // Drop focus BEFORE swapping the week's field tree:
+          // on-device the iOS IME can restore its editing
+          // session into the replacement TextField and bleed
+          // the previous week's value into the new week
+          // (not reproducible in widget tests — no real IME).
+          FocusManager.instance.primaryFocus?.unfocus();
+          setState(() => _selectedWeek = w);
+        },
+        onAddWeek: _addWeek,
+        onRemoveLastWeek: _removeLastWeek,
+        onDuplicateWeek: () => _duplicateWeek(),
+      ),
+      if (hiddenInvalidWeeks.isNotEmpty) ...[
+        const SizedBox(height: 4),
+        Text(
+          '${l10n.routineEditorIncompleteSetsLabel(hiddenInvalidWeeks.first + 1)} · Día '
+          '${invalidWeeks[hiddenInvalidWeeks.first]}',
+          key: const Key('invalid_week_hint'),
+          style: GoogleFonts.barlow(
+            fontSize: 11,
+            color: palette.danger,
+          ),
+        ),
+      ],
+      const SizedBox(height: 12),
+    ];
+  }
+
+  /// Abre la hoja "DATOS DEL PLAN".
+  Future<void> _abrirDatosDelPlan() async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: palette.bgElevated,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) {
+          _sheetSetState = setSheetState;
+          return SafeArea(
+            top: false,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(ctx).size.height * 0.78,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: AppSpacing.s12),
+                  Container(
+                    width: 40,
+                    height: AppSpacing.hairline,
+                    decoration: BoxDecoration(
+                      color: palette.borderStrong,
+                      borderRadius: BorderRadius.circular(AppRadius.full),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.s18,
+                      AppSpacing.s14,
+                      AppSpacing.s8,
+                      0,
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            l10n.routineEditorPlanSheetTitle,
+                            style: GoogleFonts.barlowCondensed(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.8,
+                              color: palette.textPrimary,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          key: const Key('plan_sheet_close'),
+                          icon: Icon(TreinoIcon.close,
+                              size: 18, color: palette.textMuted),
+                          tooltip: l10n.commonClose,
+                          onPressed: () => Navigator.of(ctx).pop(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Flexible(
+                    child: ListView(
+                      shrinkWrap: true,
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.s18,
+                        AppSpacing.s8,
+                        AppSpacing.s18,
+                        AppSpacing.s20,
+                      ),
+                      children: _camposDelPlan(l10n, palette),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+    _sheetSetState = null;
+  }
+
+  /// Estado que la pestaña de un día comunica con su punto de color.
+  ///
+  /// Distingue "vacío" de "inválido" a propósito: un día sin ejercicios es un
+  /// estado intermedio legítimo mientras se arma la rutina (warning), y un día
+  /// con sets sin completar bloquea el guardado (danger).
+  DayTabStatus _dayStatus(_EditableDay day) {
+    final visibles =
+        day.slots.where((s) => s.isPresentInWeek(_selectedWeek)).toList();
+    if (visibles.isEmpty) return DayTabStatus.empty;
+    for (final slot in visibles) {
+      final sets = slot.setsForWeek(_selectedWeek);
+      if (sets.isEmpty ||
+          !sets.every((s) => isSetValid(s, slot.exerciseMode, slot.repMode))) {
+        return DayTabStatus.invalid;
+      }
+    }
+    return DayTabStatus.ok;
+  }
 
   /// 0-based week shown in the editor. Display is 1-based ("Sem 1").
   int _selectedWeek = 0;
@@ -863,6 +1233,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     _summaryController.removeListener(_markDirty);
     _nameController.dispose();
     _splitController.dispose();
+    _celdaEnfocada.dispose();
     _summaryController.dispose();
     _listScrollController.dispose();
     super.dispose();
@@ -890,6 +1261,125 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       }
     }
     return null;
+  }
+
+  /// TODOS los problemas que impiden guardar, en el orden en que un usuario
+  /// llena el formulario: nombre → un ejercicio por día → sin repetidos → sets
+  /// completos → semanas que no se ven.
+  ///
+  /// Hasta #868 sólo existía [_firstValidationError], porque la validación
+  /// corría al tocar guardar y salía por un `SnackBar`: un mensaje efímero no
+  /// tiene lugar para más de un problema. El pie sí, y decir "faltan dos
+  /// cosas" en vez de descubrirlas de a una es la diferencia entre corregir en
+  /// una pasada o en cuatro.
+  ///
+  /// Es PURO: lo llama `build` en cada frame de tipeo. Recorre los sets con
+  /// aritmética, sin construir widgets ni tocar estado — un plan grande son
+  /// ~240 sets, que es barato comparado con el árbol que ese mismo build arma.
+  List<({String mensaje, _EditableDay? dia})> _problemas(AppL10n l10n) {
+    final out = <({String mensaje, _EditableDay? dia})>[];
+
+    if (_nameController.text.trim().isEmpty) {
+      out.add((mensaje: l10n.routineEditorProblemMissingName, dia: null));
+    }
+    if (_isTrainerMode && _splitController.text.trim().isEmpty) {
+      out.add((mensaje: l10n.routineEditorProblemMissingSplit, dia: null));
+    }
+
+    for (final day in _days) {
+      final tieneEjercicio = day.slots.any((s) => s.exercise != null);
+      if (day.slots.isEmpty || !tieneEjercicio) {
+        out.add((
+          mensaje: l10n.routineEditorProblemEmptyDay(day.dayNumber),
+          dia: day,
+        ));
+        continue;
+      }
+      if (dayHasDuplicateExerciseId(
+        day.slots.where((s) => s.exercise != null).map((s) => s.exercise!.id),
+      )) {
+        out.add((
+          mensaje: l10n.routineEditorProblemDuplicate(day.dayNumber),
+          dia: day,
+        ));
+      }
+      // Sets incompletos de la semana EN CURSO. Los de otras semanas se
+      // cuentan aparte: nombrar "día 2" cuando el problema está en una semana
+      // que no se ve manda al usuario a mirar una tabla que está bien.
+      var incompletos = 0;
+      for (final slot in day.slots) {
+        if (!slot.isPresentInWeek(_selectedWeek)) continue;
+        final sets = slot.setsForWeek(_selectedWeek);
+        if (sets.isEmpty) {
+          incompletos++;
+          continue;
+        }
+        incompletos += sets
+            .where((s) => !isSetValid(s, slot.exerciseMode, slot.repMode))
+            .length;
+      }
+      if (incompletos > 0) {
+        out.add((
+          mensaje: l10n.routineEditorProblemIncompleteSets(
+              day.dayNumber, incompletos),
+          dia: day,
+        ));
+      }
+    }
+
+    // Semanas que no están a la vista. Desde #866 el chip de semana vive
+    // dentro de la hoja del engranaje, así que si no se dice acá el guardado
+    // queda bloqueado sin ninguna explicación en pantalla.
+    final rotas = _invalidWeekFirstDay;
+    for (final semana in rotas.keys.where((w) => w != _selectedWeek).toList()
+      ..sort()) {
+      out.add((
+        mensaje: l10n.routineEditorProblemOtherWeek(semana + 1, rotas[semana]!),
+        dia: null,
+      ));
+    }
+    return out;
+  }
+
+  /// El resumen del pie cuando no falta nada: `2 días · 41 sets · todo listo`.
+  ///
+  /// Cuenta los sets de la semana en curso y sólo de los slots presentes en
+  /// ella (ADR-WPRES): un slot borrado "sólo de esta semana" sigue en el
+  /// modelo y contarlo daría un número que no coincide con lo que se ve.
+  String _resumenPie(AppL10n l10n) {
+    var sets = 0;
+    for (final day in _days) {
+      for (final slot in day.slots) {
+        if (!slot.isPresentInWeek(_selectedWeek)) continue;
+        sets += slot.setsForWeek(_selectedWeek).length;
+      }
+    }
+    return l10n.routineEditorFooterSummary(_days.length, sets);
+  }
+
+  /// Lleva al usuario al día [dia]: lo selecciona y lo trae a la vista.
+  ///
+  /// Con pestañas, "llevar al error" es SELECCIONAR el día, no expandirlo: si
+  /// el día ofensor no es el visible, su contenido ni siquiera está en el
+  /// árbol y el scroll no tiene a dónde ir.
+  void _irAlDia(_EditableDay dia) {
+    final indice = _days.indexOf(dia);
+    if (indice < 0) return;
+    if (indice != _selectedDayIndex) {
+      FocusManager.instance.primaryFocus?.unfocus();
+      setState(() => _selectedDayIndex = indice);
+    }
+    // Esperar un frame a que el día nuevo se monte antes de scrollear.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final key = _keyForDay(dia);
+      if (key.currentContext == null) return;
+      Scrollable.ensureVisible(
+        key.currentContext!,
+        duration: AppMotion.slow,
+        curve: AppMotion.emphasized,
+        alignment: 0.1,
+      );
+    });
   }
 
   /// Resolves the FIRST unmet save requirement into a specific, actionable
@@ -933,6 +1423,29 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             ? l10n.routineEditorIncompleteSetsFeedback(name)
             : l10n.routineEditorMissingReps,
         day: invalid.day,
+      );
+    }
+    // 5) El problema está en OTRA semana.
+    //
+    // `_firstInvalidSlot` mira sólo `_selectedWeek`, pero `_isValid` mira
+    // todas: sin esta rama el guardado quedaba bloqueado y sin mensaje —el
+    // botón parecía muerto—. Antes el chip de semana con warning estaba
+    // siempre a la vista y alcanzaba como explicación; desde #866 vive dentro
+    // de la hoja del engranaje, así que hay que decirlo en voz alta.
+    final semanasRotas = _invalidWeekFirstDay;
+    final otra = semanasRotas.keys.where((w) => w != _selectedWeek).toList()
+      ..sort();
+    if (otra.isNotEmpty) {
+      final semana = otra.first;
+      final dia = semanasRotas[semana]!;
+      // Llevar al usuario al problema, no sólo nombrárselo.
+      if (semana != _selectedWeek) {
+        FocusManager.instance.primaryFocus?.unfocus();
+        setState(() => _selectedWeek = semana);
+      }
+      return (
+        message: l10n.routineEditorInvalidWeekHint(semana + 1, dia),
+        day: null,
       );
     }
     return null;
@@ -1199,6 +1712,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           isDefaultName: true,
         ),
       ];
+      // Agregar un día y quedarse mirando el anterior no tiene sentido.
+      _selectedDayIndex = _days.length - 1;
     });
   }
 
@@ -1206,6 +1721,13 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     final l10n = AppL10n.of(context);
     _markDirty();
     setState(() {
+      // Acotar la pestaña activa ANTES de tocar la lista: borrar el último día
+      // dejaría _selectedDayIndex apuntando a un índice que ya no existe.
+      if (_selectedDayIndex >= _days.length - 1) {
+        _selectedDayIndex = (_days.length - 2).clamp(0, _days.length - 1);
+      } else if (index < _selectedDayIndex) {
+        _selectedDayIndex--;
+      }
       _days = [
         for (int i = 0; i < _days.length; i++)
           if (i != index) _days[i],
@@ -1417,8 +1939,21 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         .where((s) => s.exercise != null)
         .map((s) => s.exercise!.id)
         .toSet();
-    final picked = await showExercisePicker(context);
+    // Ver la nota de `_addSupersetForDay`: el picker pre-marca lo que el día
+    // ya tiene, así el usuario no elige un repetido sin darse cuenta.
+    final picked = await showExercisePicker(context,
+        alreadySelectedIds: _resolublesPorElPicker(existingIds));
     if (picked == null || picked.isEmpty || !mounted) return;
+
+    final nuevos = picked.where((e) => !existingIds.contains(e.id)).toList();
+    if (nuevos.isEmpty) {
+      // ignore: use_build_context_synchronously
+      ScaffoldMessenger.of(context).showSnackBar(
+        // ignore: use_build_context_synchronously
+        SnackBar(content: Text(AppL10n.of(context).routineEditorAddNothingNew)),
+      );
+      return;
+    }
 
     // Determine presence scope for the new slots (ADR-WPRES-04).
     // Prompt only when multi-week AND viewing week ≥ 2 (index ≥ 1).
@@ -1428,9 +1963,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
 
     _markDirty();
     setState(() {
-      // Only add exercises not already in this day (one instance per day) —
-      // avoids the duplicate-on-reopen issue.
-      for (final ex in picked.where((e) => !existingIds.contains(e.id))) {
+      for (final ex in nuevos) {
         final slot = _EditableSlot()
           ..exercise = ex
           ..restSeconds = 0
@@ -1442,28 +1975,185 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     });
   }
 
+  /// El catálogo que el usuario puede ver: el del sistema más sus ejercicios
+  /// propios. Es el mismo que alimenta al picker.
+  List<Exercise> get _catalogoVisible {
+    final uid = ref.read(currentUidProvider) ?? '';
+    final propios = uid.isEmpty
+        ? const <CustomExercise>[]
+        : (ref.read(customExercisesForTrainerStreamProvider(uid)).valueOrNull ??
+            const <CustomExercise>[]);
+    return [
+      ...?ref.read(exercisesProvider).valueOrNull,
+      ...propios.map(customToExercise),
+    ];
+  }
+
+  /// De [ids], los que el picker puede efectivamente mostrar.
+  ///
+  /// Un slot puede referenciar un ejercicio que este usuario NO ve — el caso
+  /// concreto es `SelfCustomizing` sobre una plantilla que usa un ejercicio
+  /// propio del entrenador. Pasarle ese id al picker como "ya seleccionado" lo
+  /// hace contar algo que no puede mostrar ni desmarcar: el botón diría
+  /// "Agregar 3" con dos tildados en pantalla.
+  Set<String> _resolublesPorElPicker(Set<String> ids) {
+    final conocidos = _catalogoVisible.map((e) => e.id).toSet();
+    return ids.where(conocidos.contains).toSet();
+  }
+
+  /// Busca en el catálogo lo que la entrada rápida entendió como nombre.
+  ///
+  /// Devuelve como mucho tres: más que eso deja de ser un atajo y empieza a
+  /// competir con el picker, que sigue estando para eso. Se filtran los que ya
+  /// están en el día — un ejercicio por día es invariante del dominio
+  /// (QA-WKT-004), y ofrecerlo para que el tap no haga nada es peor que no
+  /// ofrecerlo.
+  List<QuickEntryResult> _buscarParaEntradaRapida(String query, int dayIndex) {
+    final texto = query.trim();
+    if (texto.isEmpty) return const [];
+    final yaEstan = _days[dayIndex]
+        .slots
+        .where((s) => s.exercise != null)
+        .map((s) => s.exercise!.id)
+        .toSet();
+    // Catálogo del sistema MÁS los ejercicios propios. Buscar "sentadilla" y
+    // no encontrar la variante que uno mismo cargó es peor que no tener el
+    // atajo: el picker sí los muestra, y dos búsquedas que difieren en la
+    // misma pantalla confunden más de lo que ayudan.
+    final uid = ref.read(currentUidProvider) ?? '';
+    final propios = uid.isEmpty
+        ? const <CustomExercise>[]
+        : (ref.read(customExercisesForTrainerStreamProvider(uid)).valueOrNull ??
+            const <CustomExercise>[]);
+    final catalogo = <Exercise>[
+      ...?ref.read(exercisesProvider).valueOrNull,
+      ...propios.map(customToExercise),
+    ];
+    // El mismo matcher que usa el picker (ADR-BIBW-01), no un `contains`:
+    // busca por tokens y tolera diacríticos, así que "press banca" encuentra
+    // "Press de Banca" —el `de` del medio rompe un contains— y "biceps" llega
+    // a "Bíceps".
+    return catalogo
+        .where((e) =>
+            !yaEstan.contains(e.id) &&
+            exerciseMatchesFilters(
+              e,
+              query: texto,
+              muscles: const {},
+              equipment: const {},
+            ))
+        .take(QuickEntryPanel.kMaxResultados)
+        .map((e) => QuickEntryResult(
+              id: e.id,
+              name: e.name,
+              muscleGroup: e.muscleGroup,
+            ))
+        .toList();
+  }
+
+  /// Agrega [exerciseId] al día [dayIndex] con la prescripción de [entry].
+  ///
+  /// El slot resultante es INDISTINGUIBLE de uno agregado por el picker: mismo
+  /// `_EditableSlot`, mismo `restSeconds`, misma pregunta de alcance por
+  /// semana (ADR-WPRES-04). Lo único que cambia es que llega con los sets ya
+  /// cargados en vez de vacíos.
+  Future<void> _agregarPorEntradaRapida(
+    BuildContext context,
+    int dayIndex,
+    String exerciseId,
+    QuickEntry entry,
+  ) async {
+    final uid = ref.read(currentUidProvider) ?? '';
+    final propios = uid.isEmpty
+        ? const <CustomExercise>[]
+        : (ref.read(customExercisesForTrainerStreamProvider(uid)).valueOrNull ??
+            const <CustomExercise>[]);
+    final catalogo = <Exercise>[
+      ...?ref.read(exercisesProvider).valueOrNull,
+      ...propios.map(customToExercise),
+    ];
+    final ex = catalogo.where((e) => e.id == exerciseId).firstOrNull;
+    if (ex == null) return;
+
+    final scope = await _promptAddScope(context);
+    if (scope == null || !mounted) return;
+
+    _markDirty();
+    setState(() {
+      final slot = _EditableSlot()
+        ..exercise = ex
+        ..restSeconds = 0
+        // `3x30s` prescribe TIEMPO, no repeticiones: el slot entra derecho en
+        // modo duración en vez de obligar a cambiarlo después desde el header
+        // de la columna.
+        ..exerciseMode =
+            entry.esDuracion ? ExerciseMode.duration : ExerciseMode.reps
+        ..weeklySets = List.generate(
+          _numWeeks,
+          // Cada set lleva LO SUYO: `4x10,8,6,4` es una pirámide y
+          // `4x10 55,45,35,25` una descarga. Una lista más corta que la
+          // cantidad de sets repite su último valor, que es como lo lee
+          // cualquiera al escribirlo.
+          (_) => List.generate(
+            entry.sets,
+            (i) => _EditableSet()
+              ..reps = entry.repsDeSet(i)
+              ..weightKg = entry.pesoDeSet(i)
+              ..durationSeconds = entry.duracionDeSet(i),
+          ),
+        )
+        ..activeWeeks = scope == _AddScope.thisWeek ? {_selectedWeek} : <int>{};
+      _days[dayIndex].slots = [..._days[dayIndex].slots, slot];
+    });
+  }
+
   /// Opens the multi-select picker for [dayIndex] and appends all picked
   /// exercises as a new superset block (shared non-null [supersetGroup]).
   /// Available in every editor mode (trainer + athlete SelfCreating).
   Future<void> _addSupersetForDay(BuildContext context, int dayIndex) async {
+    final l10n = AppL10n.of(context);
+    final messenger = ScaffoldMessenger.of(context);
     final existingIds = _days[dayIndex]
         .slots
         .where((s) => s.exercise != null)
         .map((s) => s.exercise!.id)
         .toSet();
-    final picked = await showExercisePicker(context);
+    // `alreadySelectedIds` pre-marca en el picker lo que el día ya tiene
+    // (ADR-RER-01). El parámetro existía y ninguna de las tres llamadas del
+    // editor lo pasaba: el usuario elegía un ejercicio repetido sin saberlo,
+    // el editor lo filtraba, y no pasaba nada.
+    final picked = await showExercisePicker(context,
+        alreadySelectedIds: _resolublesPorElPicker(existingIds));
     if (picked == null || picked.isEmpty || !mounted) return;
+
+    final nuevos = picked.where((e) => !existingIds.contains(e.id)).toList();
+    // Ninguno era nuevo: decirlo. Antes esto era un `return` mudo adentro del
+    // setState y el botón parecía roto.
+    if (nuevos.isEmpty) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.routineEditorAddNothingNew)),
+      );
+      return;
+    }
 
     // Determine presence scope for the new slots (ADR-WPRES-04).
     // ignore: use_build_context_synchronously
     final scope = await _promptAddScope(context);
     if (scope == null || !mounted) return;
 
+    // Un solo ejercicio nuevo no es una superserie. Entra igual —el usuario lo
+    // quería— pero suelto, y se dice por qué: un bloque magenta con un
+    // ejercicio adentro miente sobre lo que es.
+    final esSuperserie = nuevos.length >= 2;
+    if (!esSuperserie) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.routineEditorSupersetNeedsTwo)),
+      );
+    }
+
     setState(() {
       final day = _days[dayIndex];
-      // Skip exercises already in this day (one instance per day).
-      final newOnes = picked.where((e) => !existingIds.contains(e.id)).toList();
-      if (newOnes.isEmpty) return;
+      final newOnes = nuevos;
       _markDirty();
       final nextGroup =
           (day.slots.map((s) => s.supersetGroup ?? 0).fold(0, max)) + 1;
@@ -1471,12 +2161,112 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           .map((ex) => _EditableSlot()
             ..exercise = ex
             ..restSeconds = 0
-            ..supersetGroup = nextGroup
+            ..supersetGroup = esSuperserie ? nextGroup : null
             ..weeklySets = List.generate(_numWeeks, (_) => [_EditableSet()])
             ..activeWeeks =
                 scope == _AddScope.thisWeek ? {_selectedWeek} : <int>{})
           .toList();
       day.slots = [...day.slots, ...newSlots];
+    });
+  }
+
+  /// Une el slot [absIndex] con su vecino en la lista VISIBLE: el de arriba
+  /// con `dir: -1`, el de abajo con `dir: 1`.
+  ///
+  /// Las dos direcciones hacen falta y no son la misma cosa desde el lugar del
+  /// usuario: unir hacia abajo es cómo se suma un ejercicio a una superserie
+  /// que YA existe más abajo, sin tener que reordenar nada primero.
+  ///
+  /// El vecino es el VISIBLE, no el del modelo: un slot borrado "sólo de esta
+  /// semana" sigue en `day.slots` y no se renderiza (ADR-WPRES), así que unir
+  /// por índice crudo agruparía con un ejercicio que el usuario no tiene
+  /// delante.
+  void _unirConVecino(int dayIndex, int absIndex, {required int dir}) {
+    final day = _days[dayIndex];
+    final visibles = [
+      for (var i = 0; i < day.slots.length; i++)
+        if (day.slots[i].isPresentInWeek(_selectedWeek)) i,
+    ];
+    final pos = visibles.indexOf(absIndex);
+    final destino = pos + dir;
+    if (pos < 0 || destino < 0 || destino >= visibles.length) return;
+
+    final vecino = day.slots[visibles[destino]];
+    final actual = day.slots[absIndex];
+
+    _markDirty();
+    setState(() {
+      // Si el vecino ya está en un grupo, éste se suma a ESE en vez de
+      // estrenar uno.
+      final grupo = vecino.supersetGroup ??
+          (day.slots.map((s) => s.supersetGroup ?? 0).fold(0, max)) + 1;
+      vecino.supersetGroup = grupo;
+      actual.supersetGroup = grupo;
+      // Escribir el mismo id NO alcanza para unirlos: `_blocks()` agrupa
+      // corridas CONSECUTIVAS de `day.slots`, y entre dos vecinos VISIBLES
+      // puede haber slots ocultos —ausentes en la semana en curso, ADR-WPRES—
+      // que los separan en la lista real. Sin compactar, el usuario ve dos
+      // bloques después de pedir uno.
+      day.slots = _conGruposContiguos(day.slots);
+    });
+  }
+
+  /// Devuelve [slots] reordenada para que cada superserie sea una corrida
+  /// CONSECUTIVA, que es la única forma en que `_blocks()` la ve como un solo
+  /// bloque.
+  ///
+  /// Preserva el orden relativo: cada grupo se ancla donde aparece su PRIMER
+  /// miembro y los demás se traen ahí. Los slots sueltos no se mueven entre sí.
+  ///
+  /// Hace falta en las dos operaciones que tocan `supersetGroup`: al unir, por
+  /// los slots ocultos que pueden separar a dos vecinos visibles; al separar,
+  /// porque sacar a un miembro del MEDIO de un grupo de tres deja a los de los
+  /// costados con el mismo id y ya no contiguos.
+  static List<_EditableSlot> _conGruposContiguos(List<_EditableSlot> slots) {
+    final out = <_EditableSlot>[];
+    final yaPuestos = <_EditableSlot>{};
+    for (final s in slots) {
+      if (yaPuestos.contains(s)) continue;
+      final grupo = s.supersetGroup;
+      if (grupo == null) {
+        out.add(s);
+        yaPuestos.add(s);
+        continue;
+      }
+      // Primer miembro del grupo: se trae a TODO el grupo acá, en su orden.
+      for (final m in slots) {
+        if (m.supersetGroup == grupo && !yaPuestos.contains(m)) {
+          out.add(m);
+          yaPuestos.add(m);
+        }
+      }
+    }
+    return out;
+  }
+
+  /// Saca el slot [absIndex] de su superserie.
+  ///
+  /// Si el grupo queda con UN solo miembro, ese también sale: un grupo de uno
+  /// no es una superserie, y `buildRoutineSlot` lo descartaría igual al
+  /// guardar.
+  void _separarDeGrupo(int dayIndex, int absIndex) {
+    final day = _days[dayIndex];
+    final grupo = day.slots[absIndex].supersetGroup;
+    if (grupo == null) return;
+
+    _markDirty();
+    setState(() {
+      day.slots[absIndex].supersetGroup = null;
+      final quedan = [
+        for (final s in day.slots)
+          if (s.supersetGroup == grupo) s,
+      ];
+      if (quedan.length == 1) quedan.first.supersetGroup = null;
+      // Sacar a un miembro del MEDIO de un grupo de tres deja a los de los
+      // costados con el mismo id y ya NO contiguos: `_blocks()` los parte en
+      // dos bloques, y `supersetBlockIndices` del dominio hace lo mismo al
+      // guardar. Compactar los vuelve a juntar, con el que salió detrás.
+      day.slots = _conGruposContiguos(day.slots);
     });
   }
 
@@ -1490,8 +2280,20 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         .where((s) => s.exercise != null)
         .map((s) => s.exercise!.id)
         .toSet();
-    final picked = await showExercisePicker(context);
+    // Ver la nota de `_addSupersetForDay`.
+    final l10n = AppL10n.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final picked = await showExercisePicker(context,
+        alreadySelectedIds: _resolublesPorElPicker(existingIds));
     if (picked == null || picked.isEmpty || !mounted) return;
+
+    final nuevos = picked.where((e) => !existingIds.contains(e.id)).toList();
+    if (nuevos.isEmpty) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.routineEditorAddNothingNew)),
+      );
+      return;
+    }
 
     // Determine presence scope for the new slots (ADR-WPRES-04).
     // ignore: use_build_context_synchronously
@@ -1499,8 +2301,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     if (scope == null || !mounted) return;
 
     setState(() {
-      final newOnes = picked.where((e) => !existingIds.contains(e.id)).toList();
-      if (newOnes.isEmpty) return;
+      final newOnes = nuevos;
       _markDirty();
       final newSlots = newOnes
           .map((ex) => _EditableSlot()
@@ -1567,11 +2368,15 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         // no day — nothing to scroll to).
         final day = error.day;
         if (day != null) {
-          // Ensure the day is expanded so the user can see the offending sets.
-          if (!day.expanded) {
-            setState(() => day.expanded = true);
+          // Con pestañas, "llevar al usuario al error" es SELECCIONAR el día,
+          // no expandirlo: si el día ofensor no es el visible, el scroll no
+          // tenía a dónde llevarlo porque su contenido ni está en el árbol.
+          final indice = _days.indexOf(day);
+          if (indice >= 0 && indice != _selectedDayIndex) {
+            FocusManager.instance.primaryFocus?.unfocus();
+            setState(() => _selectedDayIndex = indice);
           }
-          // Wait one frame for the expansion to apply before scrolling.
+          // Esperar un frame a que el día nuevo se monte antes de scrollear.
           WidgetsBinding.instance.addPostFrameCallback((_) {
             final key = _keyForDay(day);
             if (key.currentContext != null) {
@@ -1920,16 +2725,42 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           _leaveEditor();
         }
       },
-      child: Scaffold(
-        // Tapping anywhere outside a field dismisses the keyboard (device UX
-        // 2026-06-11). translucent → child widgets still receive their taps.
-        body: GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-          child: AppBackground(
-            child: TreinoStateSwitcher(
-              childKey: bodyKey,
-              child: body,
+      // El scope envuelve al Scaffold, no al body: la barra vive en el
+      // `bottomSheet` y tiene que poder leer el mismo notifier que publican
+      // las celdas de adentro del body.
+      child: RoutineEditorFocusScope(
+        notifier: _celdaEnfocada,
+        child: ValueListenableBuilder<FocusedSetCell?>(
+          valueListenable: _celdaEnfocada,
+          builder: (context, celda, child) {
+            // La barra es un ACCESORIO DEL TECLADO: sin teclado arriba no hay
+            // nada a lo que acompañar, y como el `bottomSheet` se superpone al
+            // body en vez de achicarlo, dibujarla igual taparía el pie de la
+            // pantalla — el botón de guardar, entre otras cosas.
+            //
+            // El foco solo no alcanza como condición: `enterText` en un test
+            // deja el campo enfocado sin abrir ningún teclado, y ahí la barra
+            // se comía el CTA. En el device el foco y el teclado van juntos,
+            // así que la diferencia no se nota; en el árbol de widgets sí.
+            final hayTeclado = MediaQuery.viewInsetsOf(context).bottom > 0;
+            return Scaffold(
+              // Tapping anywhere outside a field dismisses the keyboard
+              // (device UX 2026-06-11). translucent → child widgets still
+              // receive their taps.
+              body: child,
+              bottomSheet: celda == null || !hayTeclado
+                  ? null
+                  : KeyboardAccessorySlot(cell: celda),
+            );
+          },
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+            child: AppBackground(
+              child: TreinoStateSwitcher(
+                childKey: bodyKey,
+                child: body,
+              ),
             ),
           ),
         ),
@@ -1941,6 +2772,22 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
+
+    // Los dos catálogos se OBSERVAN acá aunque quien los use sea
+    // `_catalogoVisible` con un `read`.
+    //
+    // Un `FutureProvider` que nadie mira nunca se resuelve: el `read` lo
+    // inicializa y devuelve `AsyncLoading`. Y el de ejercicios propios es
+    // `autoDispose`: sin nadie suscripto se descarta apenas se lee, así que
+    // `valueOrNull` vuelve a dar null y los ejercicios que el usuario cargó no
+    // aparecían nunca en la búsqueda rápida — aunque el picker sí los muestre.
+    //
+    // Son providers cacheados: mirarlos no cuesta un rebuild por frame.
+    ref.watch(exercisesProvider);
+    final uidCatalogo = ref.watch(currentUidProvider) ?? '';
+    if (uidCatalogo.isNotEmpty) {
+      ref.watch(customExercisesForTrainerStreamProvider(uidCatalogo));
+    }
 
     // Loading state: hydrating from Firestore.
     if (_loading) {
@@ -1994,9 +2841,6 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       // visible on screen — and with numWeeks == 1 (week 0 always selected)
       // this keeps the single-week editor visually identical to before
       // (REQ-PERIOD-062).
-      final invalidWeeks = _invalidWeekFirstDay;
-      final hiddenInvalidWeeks =
-          invalidWeeks.keys.where((w) => w != _selectedWeek).toList()..sort();
       // Unsaved-changes guard: blocks the iOS edge-swipe / system back gesture
       // while the editor is dirty and routes it through the discard confirm.
       // canPop is recomputed every build, so it stays in sync with _isDirty
@@ -2016,13 +2860,53 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                       tooltip: l10n.commonBack,
                       onPressed: _handleBackButton,
                     ),
-                    const SizedBox(width: 4),
-                    Text(
-                      _titleFor(widget.mode, l10n),
-                      style: GoogleFonts.barlowCondensed(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 20,
-                        color: palette.textPrimary,
+                    // El título es el NOMBRE de la rutina, no el del modo:
+                    // el modo ya se sabe por cómo se llegó, el nombre no.
+                    // Sin nombre todavía, cae al label del modo.
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _nameController.text.trim().isEmpty
+                                ? _titleFor(widget.mode, l10n)
+                                : _nameController.text.trim().toUpperCase(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.barlowCondensed(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 19,
+                              letterSpacing: 0.5,
+                              color: palette.textPrimary,
+                            ),
+                          ),
+                          Text(
+                            _subtituloDelPlan(l10n),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.barlow(
+                              fontWeight: FontWeight.w500,
+                              fontSize: 11.5,
+                              color: palette.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Engranaje: nombre, split, nivel, compartir y semanas se
+                    // setean una vez y después estorbaban en cada scroll.
+                    IconButton(
+                      key: const Key('plan_sheet_button'),
+                      icon: Icon(TreinoIcon.contentSettings,
+                          size: 18, color: palette.textPrimary),
+                      tooltip: l10n.routineEditorPlanSheetA11y,
+                      onPressed: _abrirDatosDelPlan,
+                      constraints:
+                          const BoxConstraints(minWidth: 44, minHeight: 44),
+                      style: IconButton.styleFrom(
+                        backgroundColor: palette.surfaceSubtle,
+                        shape: const CircleBorder(),
                       ),
                     ),
                   ],
@@ -2037,8 +2921,25 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                   keyboardDismissBehavior:
                       ScrollViewKeyboardDismissBehavior.onDrag,
                   controller: _listScrollController,
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                  // `s18` y no 16: la escala de spacing de AGENTS.md es
+                  // cerrada (8·12·14·18·20) y el 16 no está en ella. Su
+                  // dartdoc describe s18 como el padding horizontal de
+                  // pantallas, que es exactamente lo que este gutter es.
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.s18,
+                    AppSpacing.s8,
+                    AppSpacing.s18,
+                    AppSpacing.s8,
+                  ),
                   children: [
+                    // ── Nombre y split ──────────────────────────────────
+                    // NO van a la hoja del engranaje, a diferencia de
+                    // objetivos, nivel, compartir y semanas. El nombre es el
+                    // único campo OBLIGATORIO y lo primero que hacés: detrás
+                    // de un ícono, una rutina nueva se abre en blanco y sin
+                    // ningún lugar visible donde escribirlo. El split viaja con
+                    // él porque comparten fila y son la identidad del plan, no
+                    // su configuración.
                     // ── Name + (Split when trainer mode) ───────────────
                     // T-RER-030: athlete (SelfCreating) form shows only
                     // Name + Days-of-plan. Trainer modes show all fields.
@@ -2103,19 +3004,13 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                       ],
                     ),
 
-                    // ── Resumen en criollo — trainer modes only (#648) ──
-                    //
-                    // Sits right under SPLIT because SPLIT is the jargon it
-                    // exists to translate: the detail screen's badge opens
-                    // with "PPL · DÍA 1" and 2 of 5 usability participants
-                    // could not say what that meant. Asking for the plain
-                    // sentence next to the term that needs it is what makes
-                    // the field self-explanatory.
-                    //
-                    // Absent in SelfCreating: firestore.rules keeps `summary`
-                    // out of the athlete UPDATE path's affectedKeys(), so the
-                    // athlete cannot change it. A field whose every save is a
-                    // permission-denied is worse than no field.
+                    // ── Resumen del plan ────────────────────────────────
+                    // NO se mudó a la hoja del engranaje, a diferencia de
+                    // nombre, split, nivel, compartir y semanas. Esos cinco son
+                    // configuración que se setea una vez; el resumen es algo
+                    // que el PF escribe PARA el alumno, más cerca del contenido
+                    // que de los ajustes. El handoff tampoco lo listaba en
+                    // "DATOS DEL PLAN".
                     if (_isTrainerMode) ...[
                       const SizedBox(height: 12),
                       _SectionLabel(
@@ -2164,262 +3059,126 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                         onChanged: (_) => setState(() {}),
                       ),
                     ],
-
-                    // ── Para qué sirve — SOLO modo plantilla (#635 PR#1b) ──
+                    // ── Días del plan ─────────────────────────────────
+                    // Pestañas en vez de la pila de acordeones: se renderiza
+                    // UN día a la vez, así el scroll vertical es el de un día
+                    // y no el de la rutina entera.
                     //
-                    // Debajo del RESUMEN porque son la misma pregunta a dos
-                    // niveles: el resumen la contesta en prosa para el humano
-                    // que lee la card, los objetivos la contestan en enum para
-                    // el ranking que ordena la grilla.
-                    //
-                    // `_isTemplateMode` y no `_isTrainerMode`: en un plan
-                    // asignado el guardado sería permission-denied, porque
-                    // firestore.rules deja `goals` fuera del affectedKeys de
-                    // ese path. Ver el dartdoc del predicado.
-                    if (_isTemplateMode) ...[
-                      const SizedBox(height: AppSpacing.s12),
-                      _SectionLabel(
-                        label: l10n.routineEditorGoalsLabel,
-                        palette: palette,
-                      ),
-                      const SizedBox(height: AppSpacing.hairline),
-                      Text(
-                        l10n.routineEditorGoalsHelp,
-                        style: GoogleFonts.barlow(
-                          fontWeight: FontWeight.w400,
-                          fontSize: 12,
-                          height: 1.35,
-                          color: palette.textMuted,
-                        ),
-                      ),
-                      // Sin estado vacío explícito: la bajada ya dice
-                      // "opcional". Vacío es un estado válido —la plantilla
-                      // sigue en la grilla, sin señal para rankear— y una línea
-                      // extra sólo para decirlo empujaba DÍAS DEL PLAN fuera
-                      // del área construida del ListView.
-                      const SizedBox(height: AppSpacing.s8),
-                      Wrap(
-                        key: const Key('editor_goals_picker'),
-                        spacing: AppSpacing.s8,
-                        runSpacing: AppSpacing.s8,
-                        children: [
-                          for (final goal in RoutineGoal.values)
-                            _GoalChip(
-                              key: Key('editor_goal_${goal.wireKey}'),
-                              label: templatesGoalLabel(l10n, goal),
-                              selected: _goals.contains(goal),
-                              palette: palette,
-                              onTap: () {
-                                _markDirty();
-                                setState(() {
-                                  // Toggle: volver a tocar deselecciona. Sin
-                                  // esto no habría forma de corregir un tap
-                                  // equivocado salvo recargando el editor.
-                                  if (!_goals.remove(goal)) _goals.add(goal);
-                                });
-                              },
-                            ),
-                        ],
-                      ),
-                    ],
-
-                    // ── Row: Share on public profile — SelfCreating only
-                    //
-                    // Toggle that flips the routine's `visibility`
-                    // between `private` (default) and `public`. When
-                    // public, the routine shows in the "RUTINAS
-                    // PÚBLICAS" tab of the athlete's public profile.
-                    if (!_isTrainerMode) ...[
-                      const SizedBox(height: 12),
-                      _ShareOnProfileTile(
-                        value: _sharedOnProfile,
-                        palette: palette,
-                        onChanged: (v) {
-                          _markDirty();
-                          setState(() => _sharedOnProfile = v);
-                        },
-                      ),
-                    ],
-
-                    // ── Row: Level — trainer modes only ─────────────────
-                    if (_isTrainerMode) ...[
-                      const SizedBox(height: 8),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _SectionLabel(
-                                    label: l10n.routineEditorLevelSection,
-                                    palette: palette),
-                                const SizedBox(height: 4),
-                                _LevelDropdown(
-                                  value: _level,
-                                  palette: palette,
-                                  onChanged: (v) {
-                                    if (v != null) {
-                                      _markDirty();
-                                      setState(() => _level = v);
-                                    }
-                                  },
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                    const SizedBox(height: 12),
-
-                    // ── Semanas del plan ────────────────────────────────
-                    // Week state machine — REQ-PERIOD-010..014. The chips
-                    // switch the week every slot editor renders (live-view).
-                    _SectionLabel(
-                        label: l10n.routineEditorWeeksSection,
-                        palette: palette),
-                    const SizedBox(height: 6),
-                    _WeekTabBar(
-                      numWeeks: _numWeeks,
-                      selectedWeek: _selectedWeek,
-                      maxWeeks: _kMaxWeeks,
-                      warningWeeks: hiddenInvalidWeeks.toSet(),
-                      palette: palette,
-                      onSelectWeek: (w) {
-                        // Drop focus BEFORE swapping the week's field tree:
-                        // on-device the iOS IME can restore its editing
-                        // session into the replacement TextField and bleed
-                        // the previous week's value into the new week
-                        // (not reproducible in widget tests — no real IME).
+                    // El aire de arriba no es decorativo: las pestañas nacían
+                    // pegadas al campo del nombre y las dos cosas se leían como
+                    // un solo bloque, cuando una nombra el plan y la otra
+                    // navega entre sus días. Revisión en device del 31/08.
+                    const SizedBox(height: AppSpacing.s14),
+                    DayTabBar(
+                      labels: [for (final d in _days) d.name],
+                      statuses: [for (final d in _days) _dayStatus(d)],
+                      selectedIndex: _selectedDayIndex,
+                      onSelect: (i) {
+                        // Soltar el foco ANTES de cambiar el árbol de campos:
+                        // el IME de iOS puede restaurar su sesión de edición
+                        // dentro del TextField de reemplazo y filtrar el valor
+                        // del día anterior. Mismo motivo que en onSelectWeek.
                         FocusManager.instance.primaryFocus?.unfocus();
-                        setState(() => _selectedWeek = w);
+                        setState(() => _selectedDayIndex = i);
                       },
-                      onAddWeek: _addWeek,
-                      onRemoveLastWeek: _removeLastWeek,
-                      onDuplicateWeek: () => _duplicateWeek(),
+                      onAddDay: _days.length < _kMaxDays ? _addDay : null,
+                      addDayLabel: l10n.coachEditorAddDay,
+                      statusLabel: (estado) => switch (estado) {
+                        DayTabStatus.empty =>
+                          l10n.routineEditorEmptyDayTitle.toLowerCase(),
+                        DayTabStatus.invalid => l10n.routineEditorMissingReps,
+                        DayTabStatus.ok => '',
+                      },
                     ),
-                    if (hiddenInvalidWeeks.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        '${l10n.routineEditorIncompleteSetsLabel(hiddenInvalidWeeks.first + 1)} · Día '
-                        '${invalidWeeks[hiddenInvalidWeeks.first]}',
-                        key: const Key('invalid_week_hint'),
-                        style: GoogleFonts.barlow(
-                          fontSize: 11,
-                          color: palette.danger,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 12),
+                    const SizedBox(height: AppSpacing.s12),
 
-                    // ── Días del plan ───────────────────────────────────
-                    _SectionLabel(
-                        label: l10n.routineEditorDaysSection, palette: palette),
-                    const SizedBox(height: 6),
-
-                    for (int di = 0; di < _days.length; di++) ...[
-                      _DayExpansionTile(
-                        key: _keyForDay(_days[di]),
-                        day: _days[di],
-                        week: _selectedWeek,
-                        palette: palette,
-                        onAddSlot: () => _pickExercisesForDay(context, di),
-                        onRemoveSlot: (si) => _onDeleteSlot(context, di, si),
-                        onReorderSlots: (newOrder) =>
-                            _reorderSlots(di, newOrder),
-                        onRemoveDay:
-                            _days.length > 1 ? () => _removeDay(di) : null,
-                        onSlotChanged: () {
-                          _markDirty();
-                          setState(() {});
-                        },
-                        onAddToGroup: (g) =>
-                            _addExerciseToGroup(context, di, g),
-                        onReplaceExercise: (slot, ex) =>
-                            _replaceExercise(slot, ex),
-                        onMoveSlotInGroup: (absIndex, dir) =>
-                            _moveSlotWithinGroup(di, absIndex, dir),
-                        onNameChanged: (newName) =>
-                            _onDayNameChanged(di, newName),
-                        // Supersets available in every mode, including the
-                        // athlete's SelfCreating editor.
-                        allowSuperset: true,
-                        onAddSuperset: () => _addSupersetForDay(context, di),
-                        slotIsValid: (slot) {
-                          if (!slot.isPresentInWeek(_selectedWeek)) {
-                            return true;
-                          }
-                          final weekSets = slot.setsForWeek(_selectedWeek);
-                          return weekSets.isNotEmpty &&
-                              weekSets.every((s) => isSetValid(
-                                  s, slot.exerciseMode, slot.repMode));
-                        },
-                        isTrainerMode: _isTrainerMode,
-                      ),
-                      const SizedBox(height: 6),
-                    ],
-
-                    // Add day button — disabled at the 7-day cap.
-                    TextButton.icon(
-                      onPressed: _days.length < _kMaxDays ? _addDay : null,
-                      icon: Icon(TreinoIcon.plus,
-                          size: 14,
-                          color: _days.length < _kMaxDays
-                              ? palette.accent
-                              : palette.textMuted),
-                      label: Text(
-                        l10n.coachEditorAddDay,
-                        style: GoogleFonts.barlowCondensed(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
-                          color: _days.length < _kMaxDays
-                              ? palette.accent
-                              : palette.textMuted,
-                        ),
-                      ),
+                    _DayExpansionTile(
+                      key: _keyForDay(_days[_selectedDayIndex]),
+                      day: _days[_selectedDayIndex],
+                      week: _selectedWeek,
+                      palette: palette,
+                      onAddSlot: () =>
+                          _pickExercisesForDay(context, _selectedDayIndex),
+                      onRemoveSlot: (si) =>
+                          _onDeleteSlot(context, _selectedDayIndex, si),
+                      onReorderSlots: (newOrder) =>
+                          _reorderSlots(_selectedDayIndex, newOrder),
+                      onRemoveDay: _days.length > 1
+                          ? () => _removeDay(_selectedDayIndex)
+                          : null,
+                      onSlotChanged: () {
+                        _markDirty();
+                        setState(() {});
+                      },
+                      onAddToGroup: (g) =>
+                          _addExerciseToGroup(context, _selectedDayIndex, g),
+                      onReplaceExercise: (slot, ex) =>
+                          _replaceExercise(slot, ex),
+                      onMoveSlotInGroup: (absIndex, dir) =>
+                          _moveSlotWithinGroup(
+                              _selectedDayIndex, absIndex, dir),
+                      onNameChanged: (newName) =>
+                          _onDayNameChanged(_selectedDayIndex, newName),
+                      // Supersets available in every mode, including the
+                      // athlete's SelfCreating editor.
+                      allowSuperset: true,
+                      onAddSuperset: () =>
+                          _addSupersetForDay(context, _selectedDayIndex),
+                      onQuickSearch: (q) =>
+                          _buscarParaEntradaRapida(q, _selectedDayIndex),
+                      onQuickAdd: (id, entry) => _agregarPorEntradaRapida(
+                          context, _selectedDayIndex, id, entry),
+                      onMergeSlotWithPrevious: (i) =>
+                          _unirConVecino(_selectedDayIndex, i, dir: -1),
+                      onMergeSlotWithNext: (i) =>
+                          _unirConVecino(_selectedDayIndex, i, dir: 1),
+                      onUngroupSlot: (i) =>
+                          _separarDeGrupo(_selectedDayIndex, i),
+                      slotIsValid: (slot) {
+                        if (!slot.isPresentInWeek(_selectedWeek)) {
+                          return true;
+                        }
+                        final weekSets = slot.setsForWeek(_selectedWeek);
+                        return weekSets.isNotEmpty &&
+                            weekSets.every((s) =>
+                                isSetValid(s, slot.exerciseMode, slot.repMode));
+                      },
+                      isTrainerMode: _isTrainerMode,
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: AppSpacing.s8),
                   ],
                 ),
               ),
 
-              // ── Submit button — pinned outside ListView ───────────────
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: !_submitting ? () => _submit() : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: palette.accent,
-                      foregroundColor: TreinoButtonTokens.foreground(context),
-                      disabledBackgroundColor: palette.accent.withAlpha(80),
-                      minimumSize: const Size.fromHeight(48),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.full),
-                      ),
-                    ),
-                    child: _submitting
-                        ? SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: TreinoButtonTokens.foreground(context),
-                            ),
-                          )
-                        : Text(
-                            _submitLabelFor(widget.mode, l10n),
-                            style: GoogleFonts.barlowCondensed(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
-                              letterSpacing: 0.8,
-                            ),
-                          ),
-                  ),
-                ),
-              ),
+              // ── Pie fijo: qué falta + guardar ────────────────────────
+              // Fuera del ListView, como estaba el CTA. Lo que se suma es la
+              // línea de validación EN VIVO: hasta #868 el usuario cargaba
+              // todo el plan y recién al tocar guardar se enteraba, por un
+              // SnackBar que además tapaba la pantalla.
+              Builder(builder: (context) {
+                // Los dos primeros: la línea tiene dos renglones, y una lista
+                // de siete problemas deja de leerse como una lista de tareas.
+                final problemas = _problemas(l10n).take(2).toList();
+                final visibles = problemas.map((p) => p.mensaje).toList();
+                // El día sale de los problemas QUE SE VEN, no de la lista
+                // entera: en modo entrenador los dos primeros son "falta el
+                // nombre" y "falta el split", ninguno con día, y buscar más
+                // abajo ponía un IR al lado de dos mensajes que no llevan a
+                // ningún lado — y saltaba a un problema que el usuario no
+                // tiene en pantalla.
+                final primerDia =
+                    problemas.map((p) => p.dia).whereType<_EditableDay>();
+                return EditorFooterBar(
+                  summary: _resumenPie(l10n),
+                  problems: visibles,
+                  submitLabel: _submitLabelFor(widget.mode, l10n),
+                  submitting: _submitting,
+                  onSubmit: () => _submit(),
+                  onGoToProblem: primerDia.isEmpty
+                      ? null
+                      : () => _irAlDia(primerDia.first),
+                );
+              }),
             ],
           ),
         ),
@@ -2726,6 +3485,11 @@ class _DayExpansionTile extends StatefulWidget {
     this.onAddSuperset,
     this.slotIsValid,
     this.isTrainerMode = false,
+    this.onQuickSearch,
+    this.onQuickAdd,
+    this.onMergeSlotWithPrevious,
+    this.onMergeSlotWithNext,
+    this.onUngroupSlot,
   });
 
   final _EditableDay day;
@@ -2760,15 +3524,50 @@ class _DayExpansionTile extends StatefulWidget {
   /// REQ-EN-002.
   final bool isTrainerMode;
 
+  /// Busca en el catálogo lo que la entrada rápida entendió como nombre. Null
+  /// esconde el atajo — el picker completo sigue estando igual.
+  final List<QuickEntryResult> Function(String query)? onQuickSearch;
+
+  /// Agrega el ejercicio elegido con la prescripción que se tipeó.
+  final void Function(String exerciseId, QuickEntry entry)? onQuickAdd;
+
+  /// Une el slot con el de arriba en una superserie, y lo saca de ella. Null
+  /// esconde las dos acciones — el editor web del Coach Hub no las ofrece.
+  final void Function(int absIndex)? onMergeSlotWithPrevious;
+  final void Function(int absIndex)? onMergeSlotWithNext;
+  final void Function(int absIndex)? onUngroupSlot;
+
   @override
   State<_DayExpansionTile> createState() => _DayExpansionTileState();
 }
 
 class _DayExpansionTileState extends State<_DayExpansionTile> {
+  /// Si el panel de entrada rápida está abierto. Presentación local pura: no
+  /// sobrevive a cerrar el día ni viaja al modelo.
+  bool _quickEntryOpen = false;
+  final TextEditingController _quickEntryCtrl = TextEditingController();
+
+  /// El foco del campo de entrada rápida. Vive acá porque elegir un resultado
+  /// tiene que DEVOLVERLO con el cursor al final: el tap sobre la lista lo
+  /// suelta, y sin recuperarlo el teclado se cierra justo cuando el usuario va
+  /// a escribir la prescripción.
+  final FocusNode _quickEntryFocus = FocusNode();
+
+  /// El ejercicio ya elegido en la entrada rápida, o null mientras se busca.
+  ///
+  /// Elegir un candidato AUTOCOMPLETA el nombre y guarda esto; recién el botón
+  /// AGREGAR suma el ejercicio. Hasta la revisión en device del 31/08 el tap
+  /// agregaba en el acto, y como el nombre se escribe primero, el atajo se
+  /// cerraba justo antes de poder decir `4x10 55`.
+  QuickEntryResult? _quickEntryElegido;
+
+  void _cerrarEntradaRapida() {
+    _quickEntryOpen = false;
+    _quickEntryElegido = null;
+    _quickEntryCtrl.clear();
+  }
   // Reads/writes widget.day.expanded so the collapse survives the ListView
   // recycling the tile off-screen.
-  bool get _expanded => widget.day.expanded;
-  set _expanded(bool v) => widget.day.expanded = v;
 
   /// True while the inline TextField is replacing the Text label. Local to the
   /// tile — does NOT survive the tile being recycled off-screen by the
@@ -2805,6 +3604,8 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
 
   @override
   void dispose() {
+    _quickEntryFocus.dispose();
+    _quickEntryCtrl.dispose();
     _nameController.dispose();
     _nameFocus.dispose();
     super.dispose();
@@ -2905,8 +3706,23 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
 
   /// Walks the slot list and emits either a standalone [_SlotEditor] or a
   /// "SUPERSERIE" wrapper card for consecutive slots sharing a non-null group.
+  /// Slots que se ven en la semana en curso. Un slot borrado "sólo de esta
+  /// semana" sigue en el modelo pero no se renderiza (ADR-WPRES), así que un
+  /// día puede tener slots y verse vacío.
+  List<_EditableSlot> get _slotsVisibles => widget.day.slots
+      .where((s) => s.isPresentInWeek(widget.week))
+      .toList(growable: false);
+
   List<Widget> _buildSlotRows(AppPalette palette) {
     final blocks = _blocks();
+    // Qué bloques tienen ALGO que mostrar en la semana en curso. Los flags de
+    // mover y de unir se calculan sobre ESTOS, no sobre el índice crudo: con
+    // bloques ocultos delante, el primer bloque VISIBLE tenía `canMoveUp` en
+    // true y ofrecía "Subir" y "Unir con el de arriba" para no hacer nada.
+    final visiblesIdx = [
+      for (var i = 0; i < blocks.length; i++)
+        if (blocks[i].any((r) => r.slot.isPresentInWeek(widget.week))) i,
+    ];
     final rows = <Widget>[];
     for (var b = 0; b < blocks.length; b++) {
       final block = blocks[b];
@@ -2920,8 +3736,9 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
           if (r.slot.isPresentInWeek(widget.week)) r,
       ];
       if (visible.isEmpty) continue;
-      final canUp = b > 0;
-      final canDown = b < blocks.length - 1;
+      final posVisible = visiblesIdx.indexOf(b);
+      final canUp = posVisible > 0;
+      final canDown = posVisible < visiblesIdx.length - 1;
       if (block.length == 1 && block.first.slot.supersetGroup == null) {
         // Standalone slot. ObjectKey keeps each row's State bound to its slot
         // so the int fields don't show stale values after the list shifts.
@@ -2944,6 +3761,12 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
           hasSlotError:
               widget.slotIsValid != null ? !widget.slotIsValid!(slot) : false,
           isTrainerMode: widget.isTrainerMode,
+          onMergeWithPrevious: widget.onMergeSlotWithPrevious == null
+              ? null
+              : () => widget.onMergeSlotWithPrevious!(idx),
+          onMergeWithNext: widget.onMergeSlotWithNext == null
+              ? null
+              : () => widget.onMergeSlotWithNext!(idx),
         ));
       } else {
         // Superset block — the whole block moves as one unit. Only the
@@ -2965,6 +3788,7 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
           onCopyPreviousFor: _copyPreviousCallback,
           slotIsValid: widget.slotIsValid,
           isTrainerMode: widget.isTrainerMode,
+          onUngroupSlot: widget.onUngroupSlot,
         ));
       }
       rows.add(const SizedBox(height: 8));
@@ -3017,49 +3841,49 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
   Widget build(BuildContext context) {
     final l10n = AppL10n.of(context);
     final palette = widget.palette;
-    // Day-level error: at least one visible slot has incomplete sets.
-    final hasDayError = widget.slotIsValid != null &&
-        widget.day.slots.any((slot) =>
-            slot.isPresentInWeek(widget.week) && !widget.slotIsValid!(slot));
     return Container(
       decoration: BoxDecoration(
         color: palette.bgCard,
         borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: Border.all(
-          color: hasDayError ? palette.danger.withAlpha(180) : palette.border,
-          width: hasDayError ? 1.5 : 1.0,
-        ),
+        // Sin borde de error: las señales quedaron en tres —celda, punto de la
+        // pestaña, pie— y ésta era una cuarta que pintaba la pantalla entera.
+        border: Border.all(color: palette.border),
       ),
       child: Column(
         children: [
-          // Header row
-          InkWell(
-            onTap: () => setState(() => _expanded = !_expanded),
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(AppRadius.sm)),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              child: Row(
-                children: [
-                  Icon(
-                    _expanded
-                        ? TreinoIcon.chevronDown
-                        : TreinoIcon.chevronRight,
-                    size: 16,
-                    color: hasDayError ? palette.danger : palette.textMuted,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _editingName
-                        ? TextField(
+          // La cabecera del día se fue (revisión en device del 31/08).
+          //
+          // Era el último resto del acordeón: un contenedor con borde que
+          // repetía el nombre del día a 200 px de la pestaña que ya lo dice,
+          // más el lápiz, el punto de error y el tacho. Entre el borde, sus
+          // 12 px de padding vertical, el nombre duplicado y el divisor se
+          // comía ~70 px de alto en la única pantalla donde el alto es el
+          // recurso escaso — la de configurar sets.
+          //
+          // Renombrar y borrar el día se mudaron a la fila del botón RÁPIDO,
+          // que ya ocupaba ese renglón. El punto de error no se mudó a ningún
+          // lado: vive en la pestaña desde #865.
+          // Body
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
+            child: Column(
+              children: [
+                // Fila de acciones del día: el atajo a la izquierda, y
+                // renombrar/borrar a la derecha, donde antes había una
+                // cabecera entera para lo mismo.
+                if (_editingName)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.s8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
                             key: const Key('day_name_editing_field'),
                             controller: _nameController,
                             focusNode: _nameFocus,
                             textInputAction: TextInputAction.done,
                             onSubmitted: (_) => _commitName(),
-                            // Keep the tile expanded during edit so the tap on
-                            // an inner area (slot rows, etc.) doesn't collapse
-                            // the day under the user.
                             onTap: () {},
                             style: GoogleFonts.barlowCondensed(
                               fontWeight: FontWeight.w600,
@@ -3078,112 +3902,193 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
                                 color: palette.textMuted,
                               ),
                             ),
-                          )
-                        : Text(
-                            widget.day.name,
-                            style: GoogleFonts.barlowCondensed(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 15,
-                              color: palette.textPrimary,
-                            ),
                           ),
-                  ),
-                  if (!_editingName)
-                    IconButton(
-                      key: Key('day_name_edit_button_${widget.day.dayNumber}'),
-                      icon: Icon(
-                        TreinoIcon.edit,
-                        size: 16,
-                        color: palette.textMuted,
-                      ),
-                      tooltip: l10n.routineEditorEditDayNameA11y,
-                      onPressed: _startEditing,
-                      constraints:
-                          const BoxConstraints(minWidth: 44, minHeight: 44),
-                      padding: EdgeInsets.zero,
+                        ),
+                        IconButton(
+                          key: Key(
+                              'day_name_commit_button_${widget.day.dayNumber}'),
+                          icon: Icon(TreinoIcon.check,
+                              size: 18, color: palette.accentText),
+                          tooltip: l10n.routineEditorEditDayNameA11y,
+                          onPressed: _commitName,
+                          constraints:
+                              const BoxConstraints(minWidth: 48, minHeight: 48),
+                          padding: EdgeInsets.zero,
+                        ),
+                      ],
                     ),
-                  if (hasDayError) ...[
-                    Container(
-                      width: 7,
-                      height: 7,
-                      margin: const EdgeInsets.only(right: 8),
-                      decoration: BoxDecoration(
-                        color: palette.danger,
-                        shape: BoxShape.circle,
+                  )
+                else
+                  Row(
+                    children: [
+                      if (widget.onQuickSearch != null &&
+                          widget.onQuickAdd != null)
+                        QuickEntryToggle(
+                          active: _quickEntryOpen,
+                          onTap: () => setState(() {
+                            if (_quickEntryOpen) {
+                              _cerrarEntradaRapida();
+                            } else {
+                              _quickEntryOpen = true;
+                            }
+                          }),
+                        ),
+                      const Spacer(),
+                      IconButton(
+                        key:
+                            Key('day_name_edit_button_${widget.day.dayNumber}'),
+                        icon: Icon(TreinoIcon.edit,
+                            size: 16, color: palette.textMuted),
+                        tooltip: l10n.routineEditorEditDayNameA11y,
+                        onPressed: _startEditing,
+                        constraints:
+                            const BoxConstraints(minWidth: 48, minHeight: 48),
+                        padding: EdgeInsets.zero,
                       ),
+                      if (widget.onRemoveDay != null)
+                        IconButton(
+                          key: Key('day_remove_button_${widget.day.dayNumber}'),
+                          icon: Icon(TreinoIcon.trash,
+                              size: 18, color: palette.textMuted),
+                          tooltip: l10n.routineEditorDeleteDayA11y,
+                          onPressed: widget.onRemoveDay,
+                          constraints:
+                              const BoxConstraints(minWidth: 48, minHeight: 48),
+                          padding: EdgeInsets.zero,
+                        ),
+                    ],
+                  ),
+                if (widget.onQuickSearch != null &&
+                    widget.onQuickAdd != null) ...[
+                  if (_quickEntryOpen) ...[
+                    const SizedBox(height: AppSpacing.s8),
+                    ValueListenableBuilder<TextEditingValue>(
+                      valueListenable: _quickEntryCtrl,
+                      builder: (context, value, _) {
+                        final entry = parseQuickEntry(value.text);
+                        // El elegido se suelta si el nombre dejó de estar en
+                        // el texto: borrar el ejercicio para buscar otro tiene
+                        // que devolver la lista sin cerrar el panel.
+                        final elegido = _quickEntryElegido;
+                        final sigueElegido = elegido != null &&
+                            value.text
+                                .toLowerCase()
+                                .contains(elegido.name.toLowerCase());
+                        if (elegido != null && !sigueElegido) {
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (mounted) {
+                              setState(() => _quickEntryElegido = null);
+                            }
+                          });
+                        }
+                        return QuickEntryPanel(
+                          controller: _quickEntryCtrl,
+                          focusNode: _quickEntryFocus,
+                          entry: entry,
+                          selected: sigueElegido ? elegido : null,
+                          results: sigueElegido
+                              ? const []
+                              : widget.onQuickSearch!(entry.query),
+                          onSelect: (r) {
+                            // Autocompletar, NO agregar: el usuario viene a
+                            // escribir la prescripción después del nombre.
+                            //
+                            // Y se CONSERVA lo que ya escribió. El placeholder
+                            // del campo enseña `banca 4x10 60`: quien lo sigue
+                            // tipea todo junto y después toca el ejercicio, y
+                            // reemplazar el texto entero por el nombre le
+                            // borraba el `4x10 60` que acababa de escribir.
+                            //
+                            // Se quitan sólo las palabras que el parser
+                            // entendió como BÚSQUEDA; el resto —los números—
+                            // queda tal como se tipeó, sin normalizar.
+                            // Se quita UNA ocurrencia por palabra del nombre,
+                            // no todas: hay ejercicios del catálogo con
+                            // números adentro —"Landmine 180"— y escribir
+                            // `landmine 180 3x10 180` tiene el mismo token dos
+                            // veces, una como nombre y otra como peso. Con un
+                            // Set se borraban las dos y la prescripción perdía
+                            // el kilaje.
+                            final pendientes = entry.query
+                                .toLowerCase()
+                                .split(RegExp(r'\s+'))
+                                .where((p) => p.isNotEmpty)
+                                .toList();
+                            final resto =
+                                value.text.split(RegExp(r'\s+')).where((p) {
+                              if (p.isEmpty) return false;
+                              final i = pendientes.indexOf(p.toLowerCase());
+                              if (i < 0) return true;
+                              pendientes.removeAt(i);
+                              return false;
+                            }).join(' ');
+                            final texto = resto.isEmpty
+                                ? '${r.name} '
+                                : '${r.name} $resto';
+                            _quickEntryCtrl.value = TextEditingValue(
+                              text: texto,
+                              // Cursor AL FINAL, listo para seguir. Sin esto
+                              // el usuario tenía que volver a tocar el campo y
+                              // recolocar el cursor a mano.
+                              selection:
+                                  TextSelection.collapsed(offset: texto.length),
+                            );
+                            setState(() => _quickEntryElegido = r);
+                            // Y el foco de vuelta al campo: el tap sobre la
+                            // lista lo soltó, y con él se fue el teclado.
+                            _quickEntryFocus.requestFocus();
+                          },
+                          onConfirm: () {
+                            final r = _quickEntryElegido;
+                            if (r == null) return;
+                            widget.onQuickAdd!(r.id, entry);
+                            setState(_cerrarEntradaRapida);
+                          },
+                        );
+                      },
                     ),
                   ],
-                  if (widget.onRemoveDay != null)
-                    IconButton(
-                      icon: Icon(TreinoIcon.trash,
-                          size: 18, color: palette.textMuted),
-                      tooltip: l10n.routineEditorDeleteDayA11y,
-                      onPressed: widget.onRemoveDay,
-                      constraints:
-                          const BoxConstraints(minWidth: 44, minHeight: 44),
-                      padding: EdgeInsets.zero,
-                    ),
+                  const SizedBox(height: AppSpacing.s8),
                 ],
-              ),
-            ),
-          ),
-
-          // Body
-          if (_expanded) ...[
-            const Divider(height: 1),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
-              child: Column(
-                children: [
+                // Un día sin ejercicios era un acordeón que se abría
+                // y no mostraba nada, sin decir si estaba bien así.
+                if (_slotsVisibles.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.s12),
+                    child: EmptyDayState(
+                      title: l10n.routineEditorEmptyDayTitle,
+                      body: l10n.routineEditorEmptyDayBody,
+                    ),
+                  )
+                else
                   ..._buildSlotRows(palette),
-                  // Add slot button
-                  SizedBox(
-                    width: double.infinity,
-                    child: TextButton.icon(
-                      onPressed: widget.onAddSlot,
-                      icon: Icon(TreinoIcon.plus,
-                          size: 14, color: palette.accent),
-                      label: Text(
-                        l10n.routineEditorAddExercise,
-                        style: GoogleFonts.barlowCondensed(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                          color: palette.accent,
-                        ),
-                      ),
-                      style: TextButton.styleFrom(
-                        minimumSize: const Size.fromHeight(44),
-                        alignment: Alignment.centerLeft,
-                      ),
+                // Acciones del día. Eran dos TextButton apilados a ancho
+                // completo, cada uno con su padding heredado; ahora comparten
+                // fila, alto y radio.
+                DayActionButtons(
+                  exerciseLabel: l10n.routineEditorAddExercise,
+                  onAddExercise: widget.onAddSlot,
+                  supersetLabel:
+                      widget.allowSuperset ? l10n.coachEditorAddSuperset : null,
+                  onAddSuperset: widget.onAddSuperset,
+                ),
+                // Los atajos del ⋮ no los descubría nadie: el menú no se ve
+                // hasta que se toca.
+                if (_slotsVisibles.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.s8),
+                  Text(
+                    l10n.routineEditorSlotMenuHint,
+                    key: const Key('slot_menu_hint'),
+                    style: GoogleFonts.barlow(
+                      fontWeight: FontWeight.w400,
+                      fontSize: 11,
+                      color: palette.textFaint,
                     ),
                   ),
-                  // "+ Superserie" button — trainer mode only
-                  if (widget.allowSuperset)
-                    SizedBox(
-                      width: double.infinity,
-                      child: TextButton.icon(
-                        key: const Key('add_superset_button'),
-                        onPressed: widget.onAddSuperset,
-                        icon: Icon(TreinoIcon.streak,
-                            size: 14, color: palette.highlight),
-                        label: Text(
-                          l10n.coachEditorAddSuperset,
-                          style: GoogleFonts.barlowCondensed(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                            color: palette.highlight,
-                          ),
-                        ),
-                        style: TextButton.styleFrom(
-                          minimumSize: const Size.fromHeight(44),
-                          alignment: Alignment.centerLeft,
-                        ),
-                      ),
-                    ),
                 ],
-              ),
+              ],
             ),
-          ],
+          ),
         ],
       ),
     );
@@ -3212,6 +4117,7 @@ class _SupersetGroupCard extends StatelessWidget {
     this.onCopyPreviousFor,
     this.slotIsValid,
     this.isTrainerMode = false,
+    this.onUngroupSlot,
   });
 
   final List<({int index, _EditableSlot slot})> groupSlots;
@@ -3244,94 +4150,76 @@ class _SupersetGroupCard extends StatelessWidget {
   /// When true, slot editors show trainer-only fields (e.g. coaching note).
   final bool isTrainerMode;
 
+  /// Saca un miembro del grupo.
+  final void Function(int absIndex)? onUngroupSlot;
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-      decoration: BoxDecoration(
-        color: palette.highlight.withAlpha(12),
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: Border.all(color: palette.highlight.withAlpha(120)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header row
-          Row(
-            children: [
-              Icon(TreinoIcon.streak, size: 15, color: palette.highlight),
-              const SizedBox(width: 6),
-              Text(
-                'SUPERSERIE',
-                style: GoogleFonts.barlowCondensed(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                  letterSpacing: 1.2,
-                  color: palette.highlight,
-                ),
-              ),
-              if (onMoveUp != null || onMoveDown != null) ...[
-                const Spacer(),
-                _MoveButtons(
-                  palette: palette,
-                  canMoveUp: canMoveUp,
-                  canMoveDown: canMoveDown,
-                  onMoveUp: onMoveUp,
-                  onMoveDown: onMoveDown,
-                ),
-              ],
-            ],
-          ),
-          const SizedBox(height: 10),
-          // Slot editors stacked
-          for (var mi = 0; mi < groupSlots.length; mi++) ...[
-            _SlotEditor(
-              key: ObjectKey(groupSlots[mi].slot),
-              slot: groupSlots[mi].slot,
-              week: week,
+    return SupersetBlock(
+      count: groupSlots.length,
+      trailing: (onMoveUp != null || onMoveDown != null)
+          ? _MoveButtons(
               palette: palette,
-              onRemove: () => onRemoveSlot(groupSlots[mi].index),
-              onChanged: onChanged,
-              onReplaceExercise: (ex) =>
-                  onReplaceExercise(groupSlots[mi].slot, ex),
-              canMoveUp: mi > 0,
-              canMoveDown: mi < groupSlots.length - 1,
-              // Each record carries its ORIGINAL flat index — required now
-              // that absent-in-week members are filtered out of groupSlots.
-              onMoveUp: mi > 0
-                  ? () => onMoveSlotInGroup(groupSlots[mi].index, -1)
-                  : null,
-              onMoveDown: mi < groupSlots.length - 1
-                  ? () => onMoveSlotInGroup(groupSlots[mi].index, 1)
-                  : null,
-              onCopyPrevious: onCopyPreviousFor?.call(groupSlots[mi].index),
-              hasSlotError: slotIsValid != null
-                  ? !slotIsValid!(groupSlots[mi].slot)
-                  : false,
-              isTrainerMode: isTrainerMode,
-            ),
-            if (mi < groupSlots.length - 1) const SizedBox(height: 8),
-          ],
-          const SizedBox(height: 4),
-          // Add another exercise into THIS superset block.
-          TextButton.icon(
-            onPressed: onAddExercise,
-            icon: Icon(TreinoIcon.plus, size: 14, color: palette.highlight),
-            label: Text(
-              AppL10n.of(context).routineEditorAddExercise,
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-                color: palette.highlight,
-              ),
-            ),
-            style: TextButton.styleFrom(
-              minimumSize: const Size.fromHeight(44),
-              alignment: Alignment.centerLeft,
-            ),
+              canMoveUp: canMoveUp,
+              canMoveDown: canMoveDown,
+              onMoveUp: onMoveUp,
+              onMoveDown: onMoveDown,
+            )
+          : null,
+      footer: TextButton.icon(
+        onPressed: onAddExercise,
+        icon: Icon(TreinoIcon.plus, size: 14, color: palette.accentText),
+        label: Text(
+          AppL10n.of(context).routineEditorAddExercise,
+          style: GoogleFonts.barlowCondensed(
+            fontWeight: FontWeight.w600,
+            fontSize: 14,
+            color: palette.accentText,
           ),
-        ],
+        ),
+        style: TextButton.styleFrom(
+          minimumSize: const Size.fromHeight(48),
+          alignment: Alignment.centerLeft,
+        ),
       ),
+      children: [
+        for (var mi = 0; mi < groupSlots.length; mi++) ...[
+          _SlotEditor(
+            key: ObjectKey(groupSlots[mi].slot),
+            slot: groupSlots[mi].slot,
+            week: week,
+            palette: palette,
+            supersetPosition: mi,
+            // El índice ORIGINAL, que es lo que da la key del menú. Sin esto
+            // el ⋮ de un miembro de superserie no tenía key y no se podía
+            // alcanzar desde un test — ni referenciar desde ningún lado.
+            slotIndex: groupSlots[mi].index,
+            onRemove: () => onRemoveSlot(groupSlots[mi].index),
+            onChanged: onChanged,
+            onReplaceExercise: (ex) =>
+                onReplaceExercise(groupSlots[mi].slot, ex),
+            canMoveUp: mi > 0,
+            canMoveDown: mi < groupSlots.length - 1,
+            // Each record carries its ORIGINAL flat index — required now
+            // that absent-in-week members are filtered out of groupSlots.
+            onMoveUp: mi > 0
+                ? () => onMoveSlotInGroup(groupSlots[mi].index, -1)
+                : null,
+            onMoveDown: mi < groupSlots.length - 1
+                ? () => onMoveSlotInGroup(groupSlots[mi].index, 1)
+                : null,
+            onCopyPrevious: onCopyPreviousFor?.call(groupSlots[mi].index),
+            hasSlotError: slotIsValid != null
+                ? !slotIsValid!(groupSlots[mi].slot)
+                : false,
+            isTrainerMode: isTrainerMode,
+            onUngroup: onUngroupSlot == null
+                ? null
+                : () => onUngroupSlot!(groupSlots[mi].index),
+          ),
+          if (mi < groupSlots.length - 1) const SizedBox(height: AppSpacing.s8),
+        ],
+      ],
     );
   }
 }
@@ -3404,6 +4292,10 @@ class _SlotEditor extends StatefulWidget {
     this.onCopyPrevious,
     this.hasSlotError = false,
     this.isTrainerMode = false,
+    this.supersetPosition,
+    this.onMergeWithPrevious,
+    this.onMergeWithNext,
+    this.onUngroup,
   });
 
   final _EditableSlot slot;
@@ -3440,13 +4332,156 @@ class _SlotEditor extends StatefulWidget {
   /// Defaults to false (fail-closed). REQ-EN-002.
   final bool isTrainerMode;
 
+  /// Posición 0-based dentro de la superserie que lo contiene, o null si el
+  /// ejercicio es suelto. La card lo usa para el badge A1/A2 y para teñir el
+  /// agarre.
+  final int? supersetPosition;
+
+  /// Une este ejercicio con el de arriba o con el de abajo, en una superserie.
+  /// Null cuando no aplica — el editor web del Coach Hub no ofrece el gesto.
+  ///
+  /// Las dos direcciones no son la misma cosa desde el lugar del usuario: unir
+  /// hacia abajo es cómo se suma un ejercicio a una superserie que YA existe
+  /// más abajo, sin reordenar nada primero.
+  final VoidCallback? onMergeWithPrevious;
+  final VoidCallback? onMergeWithNext;
+
+  /// Lo saca de su superserie.
+  final VoidCallback? onUngroup;
+
   @override
   State<_SlotEditor> createState() => _SlotEditorState();
 }
 
 class _SlotEditorState extends State<_SlotEditor> {
+  /// Si la tabla de series está desplegada. Presentación local pura: no toca
+  /// el modelo ni sobrevive a la pantalla.
+  ///
+  /// Arranca colapsado, salvo que el slot tenga sets inválidos. Eso cubre solo
+  /// el caso que importa y de paso el que parecía necesitar otra regla: un
+  /// ejercicio recién agregado nace con sus sets vacíos, o sea inválido, así
+  /// que se despliega solo. No hace falta rastrear "cuál fue el último".
+  late bool _expanded = widget.hasSlotError;
+
+  @override
+  void didUpdateWidget(_SlotEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Un error que aparece mientras el usuario mira otra cosa abre la card:
+    // un problema escondido no se puede arreglar.
+    if (!oldWidget.hasSlotError && widget.hasSlotError) {
+      _expanded = true;
+    }
+  }
+
   /// Opens the exercise picker and, if a replacement is chosen, swaps the
-  /// slot's exercise. Shared by the name tap and the ⋮ "Cambiar ejercicio".
+  /// slot's exercise from the ⋮ "Cambiar ejercicio" action.
+  /// Abre la hoja de acciones del ejercicio y ejecuta la elegida.
+  ///
+  /// Era un `PopupMenuButton`: un menú flotante de ítems de ~40 dp colgado de
+  /// un ícono de 20. Las acciones y su lógica son las MISMAS —`_SlotAction` no
+  /// cambia—; lo que cambia es dónde se muestran y de qué tamaño.
+  ///
+  /// El issue #871 pedía además "Duplicar ejercicio" y "Unir en superserie con
+  /// el anterior", diciendo que las acciones ya existían. Ninguna de las dos
+  /// cosas es cierta: no están en `_SlotAction`, y **duplicar un ejercicio
+  /// dentro del mismo día viola QA-WKT-004** — el session player agrupa el
+  /// progreso por `exerciseId`, así que dos slots con el mismo id colapsan sus
+  /// logs en un solo pool. Unir en superserie es la pieza que #869 dejó afuera
+  /// por ser cambio de comportamiento.
+  Future<void> _abrirAcciones(BuildContext context, AppL10n l10n) async {
+    final hayMovimiento = widget.onMoveUp != null || widget.onMoveDown != null;
+    final elegida = await showExerciseActionsSheet(
+      context,
+      title: widget.slot.exercise?.name ?? l10n.routineEditorExerciseSheetTitle,
+      actions: [
+        ExerciseAction(
+          id: _SlotAction.toggleExpanded,
+          label: _expanded
+              ? l10n.routineEditorSlotMenuCollapse
+              : l10n.routineEditorSlotMenuExpand,
+          icon: _expanded ? TreinoIcon.chevronUp : TreinoIcon.chevronDown,
+        ),
+        ExerciseAction(
+          id: _SlotAction.replace,
+          label: l10n.routineEditorSlotMenuReplace,
+          icon: TreinoIcon.edit,
+        ),
+        ExerciseAction(
+          id: _SlotAction.copyPrevious,
+          label: l10n.routineEditorSlotMenuCopyPrevious,
+          icon: TreinoIcon.copy,
+          enabled: widget.onCopyPrevious != null,
+        ),
+        if (hayMovimiento) ...[
+          ExerciseAction(
+            id: _SlotAction.moveUp,
+            label: l10n.routineEditorSlotMenuMoveUp,
+            icon: TreinoIcon.chevronUp,
+            enabled: widget.canMoveUp,
+          ),
+          ExerciseAction(
+            id: _SlotAction.moveDown,
+            label: l10n.routineEditorSlotMenuMoveDown,
+            icon: TreinoIcon.chevronDown,
+            enabled: widget.canMoveDown,
+          ),
+        ],
+        // Unir / separar. El botón `+ Superserie` del día sigue haciendo lo
+        // suyo —abrir el picker y agregar ejercicios NUEVOS agrupados—; esto
+        // es el camino que faltaba, para ejercicios que ya están cargados.
+        if (widget.supersetPosition == null) ...[
+          ExerciseAction(
+            id: _SlotAction.mergeWithPrevious,
+            label: l10n.routineEditorSlotMenuMergeUp,
+            icon: TreinoIcon.streak,
+            // Deshabilitada en el primero: no hay con quién unirse hacia
+            // arriba. `canMoveUp` ya sabe si hay un bloque antes.
+            enabled: widget.onMergeWithPrevious != null && widget.canMoveUp,
+          ),
+          ExerciseAction(
+            id: _SlotAction.mergeWithNext,
+            label: l10n.routineEditorSlotMenuMergeDown,
+            icon: TreinoIcon.streak,
+            enabled: widget.onMergeWithNext != null && widget.canMoveDown,
+          ),
+        ] else
+          ExerciseAction(
+            id: _SlotAction.ungroup,
+            label: l10n.routineEditorSlotMenuUngroup,
+            icon: TreinoIcon.close,
+            enabled: widget.onUngroup != null,
+          ),
+        ExerciseAction(
+          id: _SlotAction.remove,
+          label: l10n.routineEditorSlotMenuRemove,
+          icon: TreinoIcon.trash,
+          danger: true,
+        ),
+      ],
+    );
+    if (elegida == null || !mounted) return;
+    switch (elegida as _SlotAction) {
+      case _SlotAction.toggleExpanded:
+        setState(() => _expanded = !_expanded);
+      case _SlotAction.replace:
+        await _replaceExercise();
+      case _SlotAction.moveUp:
+        widget.onMoveUp?.call();
+      case _SlotAction.moveDown:
+        widget.onMoveDown?.call();
+      case _SlotAction.copyPrevious:
+        widget.onCopyPrevious?.call();
+      case _SlotAction.mergeWithPrevious:
+        widget.onMergeWithPrevious?.call();
+      case _SlotAction.mergeWithNext:
+        widget.onMergeWithNext?.call();
+      case _SlotAction.ungroup:
+        widget.onUngroup?.call();
+      case _SlotAction.remove:
+        widget.onRemove();
+    }
+  }
+
   Future<void> _replaceExercise() async {
     final picked = await showExercisePicker(context);
     if (!mounted || picked == null || picked.isEmpty) return;
@@ -3461,131 +4496,48 @@ class _SlotEditorState extends State<_SlotEditor> {
     // Active week's list — the same object as weeklySets[week], so in-place
     // mutations below stay visible to the single source of truth.
     final sets = slot.setsForWeek(widget.week);
-    // One light surface per card — no outer border, just a fill + generous
-    // padding. Inner fields are NOT individually boxed.
-    // A red left accent stripe appears when the slot has incomplete sets so
-    // the user can locate the problem at a glance while scrolling.
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: widget.hasSlotError
-            ? Border(
-                left: BorderSide(
-                  color: palette.danger.withAlpha(180),
-                  width: 3,
-                ),
-              )
-            : null,
+    final invalidSetCount = sets
+        .where((set) => !isSetValid(set, slot.exerciseMode, slot.repMode))
+        .length;
+    final hasMissingPrescription = invalidSetCount > 0;
+    final summary = hasMissingPrescription
+        ? l10n.routineEditorSetsMissingReps(invalidSetCount)
+        : _prescriptionSummary(slot, sets, l10n);
+
+    return ExerciseCard(
+      title: slot.exercise?.name ?? l10n.coachExercisePicker,
+      expanded: _expanded,
+      hasError: hasMissingPrescription,
+      supersetPosition: widget.supersetPosition,
+      // Una card con problemas TAMBIÉN se puede colapsar: el resumen colapsado
+      // sigue diciendo cuántos sets están sin completar. Trabar la cabecera
+      // para "proteger" al usuario sólo hace que el tap no responda y parezca
+      // rota.
+      onToggle: () => setState(() => _expanded = !_expanded),
+      summary: PrescriptionChips(
+        prescription: summary,
+        rest: hasMissingPrescription ? null : _restSummary(slot.restSeconds),
+        // El resumen DICE cuántos sets faltan, pero ya no lo pinta de rojo:
+        // desde #868 las señales de error son tres —celda, punto de la
+        // pestaña, pie— y ésta era la cuarta, a 40 px de la celda que ya lo
+        // marca con más precisión.
+      ),
+      menu: Transform.translate(
+        offset: const Offset(AppSpacing.s8, -AppSpacing.s8),
+        child: IconButton(
+          key: widget.slotIndex != null
+              ? Key('slot_menu_button_${widget.slotIndex}')
+              : null,
+          icon: Icon(TreinoIcon.dotsThree, size: 20, color: palette.textMuted),
+          tooltip: l10n.workoutRoutineOptionsA11y,
+          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          padding: EdgeInsets.zero,
+          onPressed: () => _abrirAcciones(context, l10n),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Header row: full-width exercise name + ⋮ overflow menu ────────
-          // The name owns its own row (wraps up to 2 lines) so long names like
-          // "Press de banca con barra" are fully readable — the actions live in
-          // the ⋮ menu instead of competing for width (Hevy-style).
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: InkWell(
-                  onTap: _replaceExercise,
-                  borderRadius: BorderRadius.circular(6),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Text(
-                      slot.exercise?.name ?? l10n.coachExercisePicker,
-                      style: GoogleFonts.barlow(
-                        fontSize: 19,
-                        height: 1.15,
-                        fontWeight: FontWeight.w700,
-                        color: slot.exercise != null
-                            ? palette.textPrimary
-                            : palette.textMuted,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 4),
-              PopupMenuButton<_SlotAction>(
-                key: widget.slotIndex != null
-                    ? Key('slot_menu_button_${widget.slotIndex}')
-                    : null,
-                icon: Icon(TreinoIcon.dotsThree,
-                    size: 20, color: palette.textMuted),
-                tooltip: l10n.workoutRoutineOptionsA11y,
-                color: palette.bgCard,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                onSelected: (action) {
-                  switch (action) {
-                    case _SlotAction.replace:
-                      _replaceExercise();
-                    case _SlotAction.moveUp:
-                      widget.onMoveUp?.call();
-                    case _SlotAction.moveDown:
-                      widget.onMoveDown?.call();
-                    case _SlotAction.copyPrevious:
-                      widget.onCopyPrevious?.call();
-                    case _SlotAction.remove:
-                      widget.onRemove();
-                  }
-                },
-                itemBuilder: (context) {
-                  final showMove =
-                      widget.onMoveUp != null || widget.onMoveDown != null;
-                  return [
-                    _slotMenuItem(
-                      _SlotAction.replace,
-                      TreinoIcon.edit,
-                      l10n.routineEditorSlotMenuReplace,
-                      palette,
-                    ),
-                    // Always listed so the shortcut is discoverable; disabled
-                    // on the day's first exercise (no source to copy from).
-                    _slotMenuItem(
-                      _SlotAction.copyPrevious,
-                      TreinoIcon.copy,
-                      l10n.routineEditorSlotMenuCopyPrevious,
-                      palette,
-                      enabled: widget.onCopyPrevious != null,
-                    ),
-                    if (showMove)
-                      _slotMenuItem(
-                        _SlotAction.moveUp,
-                        TreinoIcon.chevronUp,
-                        l10n.routineEditorSlotMenuMoveUp,
-                        palette,
-                        enabled: widget.canMoveUp,
-                      ),
-                    if (showMove)
-                      _slotMenuItem(
-                        _SlotAction.moveDown,
-                        TreinoIcon.chevronDown,
-                        l10n.routineEditorSlotMenuMoveDown,
-                        palette,
-                        enabled: widget.canMoveDown,
-                      ),
-                    _slotMenuItem(
-                      _SlotAction.remove,
-                      TreinoIcon.trash,
-                      l10n.routineEditorSlotMenuRemove,
-                      palette,
-                      danger: true,
-                    ),
-                  ];
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-
           // ── Rest duration row ─────────────────────────────────────────────
           Row(
             children: [
@@ -3618,6 +4570,24 @@ class _SlotEditorState extends State<_SlotEditor> {
                 labelText: l10n.routineEditorNotesLabel,
                 hintText: l10n.routineEditorNotesHint,
                 counterText: '',
+                filled: true,
+                fillColor: palette.bgCard,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.s14,
+                  vertical: AppSpacing.s12,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  borderSide: BorderSide(color: palette.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  borderSide: BorderSide(color: palette.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  borderSide: BorderSide(color: palette.accent),
+                ),
               ),
               onChanged: (v) {
                 slot.notes = v.isEmpty ? null : v;
@@ -3641,76 +4611,92 @@ class _SlotEditorState extends State<_SlotEditor> {
 
           // ── "+ Agregar set" button ─────────────────────────────────────────
           const SizedBox(height: 6),
-          SizedBox(
-            width: double.infinity,
-            child: TextButton.icon(
-              key: const Key('add_set_button'),
-              onPressed: () {
-                setState(() {
-                  final template =
-                      sets.isNotEmpty ? sets.last.clone() : _EditableSet();
-                  sets.add(template);
-                });
-                widget.onChanged();
-              },
-              icon: Icon(TreinoIcon.plus, size: 14, color: palette.accent),
-              label: Text(
-                l10n.routineEditorAddSet,
-                style: GoogleFonts.barlowCondensed(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                  color: palette.accent,
-                ),
-              ),
-              style: TextButton.styleFrom(
-                minimumSize: const Size.fromHeight(44),
-                alignment: Alignment.centerLeft,
-              ),
-            ),
+          AddSetButton(
+            key: const Key('add_set_button'),
+            label: l10n.routineEditorAddSet,
+            onPressed: () {
+              setState(() {
+                final template =
+                    sets.isNotEmpty ? sets.last.clone() : _EditableSet();
+                sets.add(template);
+              });
+              widget.onChanged();
+            },
           ),
         ],
       ),
     );
+  }
+
+  String _prescriptionSummary(
+    _EditableSlot slot,
+    List<_EditableSet> sets,
+    AppL10n l10n,
+  ) {
+    final measureValues = slot.exerciseMode == ExerciseMode.duration
+        ? sets.map((set) => set.durationSeconds).toList()
+        : sets.map((set) => set.reps).toList();
+    final measure = _uniform(measureValues);
+    final measureText = measure == null
+        ? '—'
+        : slot.exerciseMode == ExerciseMode.duration
+            ? _restSummary(measure)
+            : '$measure';
+
+    final segments = <String>['${sets.length} × $measureText'];
+    if (slot.exerciseMode != ExerciseMode.duration) {
+      final weight = _uniform(sets.map((set) => set.weightKg).toList());
+      if (weight != null) {
+        segments.add(
+          '${formatWeightKg(weight)} ${l10n.monthlyReportVolumeUnit}',
+        );
+      } else if (sets.any((set) => set.weightKg != null)) {
+        segments.add('— ${l10n.monthlyReportVolumeUnit}');
+      }
+    }
+    return segments.join(' · ');
+  }
+
+  T? _uniform<T>(List<T?> values) {
+    if (values.isEmpty || values.first == null) return null;
+    final first = values.first;
+    return values.every((value) => value == first) ? first : null;
+  }
+
+  String _restSummary(int seconds) {
+    final display = secondsToMmss(seconds);
+    return display.startsWith('0') ? display.substring(1) : display;
   }
 }
 
 // ── Slot overflow menu (⋮) ────────────────────────────────────────────────────
 
 /// Actions surfaced from a slot's ⋮ overflow menu.
-enum _SlotAction { replace, copyPrevious, moveUp, moveDown, remove }
+enum _SlotAction {
+  /// Desplegar o colapsar la tabla de series. La cabecera de la card ya es el
+  /// toggle; acá está porque con la hoja abierta la cabecera queda tapada.
+  toggleExpanded,
+  replace,
+  copyPrevious,
+  moveUp,
+  moveDown,
 
-/// Builds one styled item for the slot ⋮ menu, matching treino's dark palette.
-/// [enabled] dims the row (used for edge reorder); [danger] tints it red.
-PopupMenuItem<_SlotAction> _slotMenuItem(
-  _SlotAction value,
-  IconData icon,
-  String label,
-  AppPalette palette, {
-  bool enabled = true,
-  bool danger = false,
-}) {
-  final color = !enabled
-      ? palette.border
-      : danger
-          ? palette.danger
-          : palette.textPrimary;
-  return PopupMenuItem<_SlotAction>(
-    value: value,
-    enabled: enabled,
-    height: 44,
-    child: Row(
-      children: [
-        Icon(icon, size: 18, color: color),
-        const SizedBox(width: 12),
-        Flexible(
-          child: Text(
-            label,
-            style: GoogleFonts.barlow(fontSize: 14, color: color),
-          ),
-        ),
-      ],
-    ),
-  );
+  /// Unir este ejercicio con el de arriba, en una superserie.
+  ///
+  /// Hasta acá NO existía forma de agrupar dos ejercicios YA cargados: el
+  /// botón `+ Superserie` abre el picker y agrega ejercicios NUEVOS agrupados,
+  /// así que el caso normal —cargás dos por separado y después decidís hacerlos
+  /// juntos— obligaba a borrarlos y volver a agregarlos.
+  mergeWithPrevious,
+
+  /// Unir con el de abajo. Es cómo se suma un ejercicio a una superserie que
+  /// ya existe más abajo, sin reordenar nada primero.
+  mergeWithNext,
+
+  /// Sacar este ejercicio de su superserie.
+  ungroup,
+
+  remove,
 }
 
 // ── Set table ─────────────────────────────────────────────────────────────────
@@ -3793,29 +4779,37 @@ class _SetTableState extends State<_SetTable> {
     }
   }
 
-  /// Replicates the FIRST row's KG down every set of the exercise — "cuatro
-  /// sets al mismo peso" is the normal case, not the exception (issue #640).
+  /// Replica el KG de la fila [origen] en todos los sets del ejercicio —
+  /// "cuatro sets al mismo peso" es el caso normal, no la excepción (#640).
   ///
-  /// Gesture decision: this lives on the KG header, the ONLY column header
-  /// without a gesture. REPS / MÍN / MÁX / TIEMPO already open the measure-mode
-  /// picker on tap, and stacking bulk-fill onto that tap would break an
-  /// interaction that already exists.
+  /// Hasta #867 la fuente era SIEMPRE la primera fila, porque el disparador
+  /// vivía en el header de la columna y ahí no hay ninguna fila en particular.
+  /// Ahora el disparador es "A TODAS" en la barra sobre el teclado, y la fuente
+  /// es la celda que se está editando: replicar desde la primera fila cuando el
+  /// usuario está mirando la tercera sería replicar un número que no tiene
+  /// delante.
   ///
-  /// It overwrites whatever each row had, so it ships with an UNDO rather than
-  /// a confirmation: a shortcut that costs a dialog stops being a shortcut, and
-  /// the snapshot restores the exact previous values.
-  void _fillKgColumn() {
+  /// Pisa lo que cada fila tenía, así que viene con DESHACER en vez de una
+  /// confirmación: un atajo que cuesta un diálogo deja de ser un atajo, y el
+  /// snapshot restaura los valores exactos.
+  void _fillKgColumn(int origen) {
     final l10n = AppL10n.of(context);
     final messenger = ScaffoldMessenger.of(context);
     final sets = widget.sets;
-    // Dismiss the IME so the SnackBar isn't hidden behind the keyboard.
+    // Se cierra el IME para que el SnackBar no quede atrás del teclado. La
+    // barra de accesorio se va con él, que es el final correcto: la acción de
+    // columna terminó y lo que hay que poder ver ahora es "Deshacer".
     FocusManager.instance.primaryFocus?.unfocus();
 
-    final source = sets.isNotEmpty ? sets.first.weightKg : null;
+    final source =
+        origen >= 0 && origen < sets.length ? sets[origen].weightKg : null;
     if (source == null) {
       // Nothing to replicate — say so instead of silently clearing the column.
+      // El texto dice "este set" y no "el primer set": desde #867 la fuente es
+      // la celda enfocada, y mandar al usuario a cargar la primera fila lo
+      // dejaba corrigiendo un valor que no es el que se va a replicar.
       messenger.showSnackBar(
-        SnackBar(content: Text(l10n.routineEditorFillKgEmpty)),
+        SnackBar(content: Text(l10n.routineEditorFillColumnEmpty)),
       );
       return;
     }
@@ -3860,9 +4854,7 @@ class _SetTableState extends State<_SetTable> {
           slot: slot,
           palette: palette,
           onPickMeasureMode: _pickMeasureMode,
-          // No KG column in duration mode, and nothing to replicate onto with
-          // a single set — the affordance stays out of the way in both cases.
-          onFillKgColumn: !isDuration && sets.length > 1 ? _fillKgColumn : null,
+          showRemoveColumn: sets.length > 1,
         ),
         const SizedBox(height: 4),
         // ── Set rows ───────────────────────────────────────────────────────
@@ -3891,6 +4883,12 @@ class _SetTableState extends State<_SetTable> {
                     }
                   : null,
               onChanged: widget.onChanged,
+              exerciseName: slot.exercise?.name,
+              // Sin KG no hay columna que replicar, y con un solo set no hay
+              // dónde: en los dos casos el botón no se dibuja.
+              onFillColumn: !isDuration && sets.length > 1
+                  ? (_) => _fillKgColumn(i)
+                  : null,
             ),
           ),
       ],
@@ -3905,27 +4903,25 @@ class _SetTableHeader extends StatelessWidget {
     required this.slot,
     required this.palette,
     required this.onPickMeasureMode,
-    this.onFillKgColumn,
+    required this.showRemoveColumn,
   });
 
   final _EditableSlot slot;
   final AppPalette palette;
   final Future<void> Function(BuildContext, Offset) onPickMeasureMode;
 
-  /// Replicates the first row's KG down the column. Null hides the affordance
-  /// (duration mode, or a single-set exercise where there is nothing to fill).
-  final VoidCallback? onFillKgColumn;
+  /// Si las filas muestran botón de borrar. Ver el comentario en el hueco.
+  final bool showRemoveColumn;
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppL10n.of(context);
     final isDuration = slot.exerciseMode == ExerciseMode.duration;
 
     TextStyle headerStyle() => GoogleFonts.barlowCondensed(
-          fontSize: 12,
+          fontSize: 10.5,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.8,
-          color: palette.textMuted,
+          color: palette.textFaint,
         );
 
     Widget cell(String label, {bool tappable = false}) {
@@ -3953,72 +4949,49 @@ class _SetTableHeader extends StatelessWidget {
       );
     }
 
-    // KG carries its OWN gesture (bulk-fill), deliberately separate from the
-    // `tappable` measure-mode picker the other headers use — see
-    // `_SetTableState._fillKgColumn`.
-    Widget kgCell() {
-      final text = Text('KG', style: headerStyle());
-      if (onFillKgColumn == null) {
-        return Expanded(child: Center(child: text));
-      }
-      return Expanded(
-        child: Semantics(
-          button: true,
-          label: l10n.routineEditorFillKgA11y,
-          child: GestureDetector(
-            key: const Key('fill_kg_column_button'),
-            onTap: onFillKgColumn,
-            behavior: HitTestBehavior.opaque,
-            child: Padding(
-              // The bare 12px label is far too small a target; the padding
-              // grows the hit area without boxing the header.
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  text,
-                  const SizedBox(width: 3),
-                  Icon(TreinoIcon.copy, size: 11, color: palette.textMuted),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
+    // KG ya no lleva gesto propio: el bulk-fill de columna se mudó a "A TODAS"
+    // en la barra sobre el teclado (#867). Acá era un tap sobre un label de
+    // 10,5 px con un ícono de 11 — existía, y no lo encontraba nadie.
     return Row(
       children: [
         // SET column (fixed narrow width)
         SizedBox(
+          // Acompaña el ancho del SetTypeChip de la fila.
           width: 44,
           child: Center(
             child: Text('SET', style: headerStyle()),
           ),
         ),
-        const SizedBox(width: 6),
+        const SizedBox(width: AppSpacing.s8),
         if (isDuration) ...[
           cell('TIEMPO', tappable: true),
         ] else ...[
-          kgCell(),
-          const SizedBox(width: 6),
+          cell('KG'),
+          const SizedBox(width: AppSpacing.s8),
           if (slot.repMode == RepMode.range) ...[
             cell('MÍN', tappable: true),
-            const SizedBox(width: 6),
+            const SizedBox(width: AppSpacing.s8),
             cell('MÁX', tappable: true),
           ] else ...[
             cell('REPS', tappable: true),
           ],
         ],
-        // Delete icon placeholder (same width as delete button)
-        const SizedBox(width: 40),
+        // Hueco que alinea los headers con el botón de borrar de cada fila.
+        // Sólo cuando ese botón existe: con un set único no se puede borrar
+        // —quedarías en cero— y reservar los 40 px igual empujaba chip, kg y
+        // reps a la izquierda, con un vacío a la derecha que se lee como un
+        // error de centrado.
+        if (showRemoveColumn) const SizedBox(width: 40),
       ],
     );
   }
 }
 
 // ── Set row ───────────────────────────────────────────────────────────────────
+
+/// Qué celda de una fila de set tiene el foco. Es lo que decide el paso del
+/// stepper (2,5 en kilos, 1 en repeticiones) y qué columna replica "A TODAS".
+enum _SetField { kg, reps, repsMin, repsMax }
 
 class _SetRow extends StatefulWidget {
   const _SetRow({
@@ -4034,6 +5007,8 @@ class _SetRow extends StatefulWidget {
     required this.onChanged,
     this.onRemove,
     this.isInvalid = false,
+    this.exerciseName,
+    this.onFillColumn,
   });
 
   final _EditableSet editableSet;
@@ -4051,6 +5026,15 @@ class _SetRow extends StatefulWidget {
   /// indicate this set is incomplete and needs to be filled in.
   final bool isInvalid;
 
+  /// Nombre del ejercicio, para la línea de contexto de la barra de accesorio.
+  /// Con el teclado abierto la fila que se edita queda a pocos píxeles del
+  /// borde y no siempre se ve cuál es.
+  final String? exerciseName;
+
+  /// Replica el valor de una celda de esta fila en toda su columna. Null
+  /// cuando no hay dónde replicar (un ejercicio de un solo set).
+  final void Function(_SetField campo)? onFillColumn;
+
   @override
   State<_SetRow> createState() => _SetRowState();
 }
@@ -4061,10 +5045,11 @@ class _SetRowState extends State<_SetRow> {
   late final TextEditingController _repsMinCtrl;
   late final TextEditingController _repsMaxCtrl;
 
-  /// Focus of the KG field. The stepper bar is bound to it: it exists only
-  /// while this row's weight is the one being edited, so the table never
-  /// carries four idle copies of the same four buttons.
-  late final FocusNode _kgFocus;
+  /// Un focus node por celda. Antes sólo lo tenía KG, porque los steppers
+  /// vivían dentro de la fila y sólo servían para el peso; desde #867 la barra
+  /// de accesorio la monta la pantalla y necesita saber CUÁL celda se está
+  /// editando, no sólo si es el peso.
+  final Map<_SetField, FocusNode> _focos = {};
 
   @override
   void initState() {
@@ -4077,22 +5062,107 @@ class _SetRowState extends State<_SetRow> {
         text: s.repsMin != null ? s.repsMin.toString() : '');
     _repsMaxCtrl = TextEditingController(
         text: s.repsMax != null ? s.repsMax.toString() : '');
-    _kgFocus = FocusNode()..addListener(_onKgFocusChanged);
+    for (final campo in _SetField.values) {
+      _focos[campo] = FocusNode()..addListener(() => _onFocoCambiado(campo));
+    }
   }
 
-  void _onKgFocusChanged() {
-    if (mounted) setState(() {});
+  /// Identidad de una celda para el notifier: la instancia del set más el
+  /// campo. Sobrevive a un rebuild de la fila y distingue dos celdas del mismo
+  /// set, que es lo que el notifier necesita para no borrar el foco nuevo con
+  /// el blur del viejo.
+  Object _idDe(_SetField campo) => (widget.editableSet, campo);
+
+  /// El notifier del scope, cacheado. En `dispose()` ya no se puede resolver
+  /// por `context`, y ahí es justamente donde hay que soltar el foco.
+  FocusedCellNotifier? _scope;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _scope = RoutineEditorFocusScope.maybeOf(context);
+  }
+
+  @override
+  void didUpdateWidget(_SetRow old) {
+    super.didUpdateWidget(old);
+    if (old.isDuration != widget.isDuration || old.repMode != widget.repMode) {
+      _soltarFocosAusentes();
+    }
+  }
+
+  /// Qué celdas renderiza esta fila con la configuración actual del slot.
+  Set<_SetField> get _camposVisibles {
+    if (widget.isDuration) return const {};
+    return widget.repMode == RepMode.range
+        ? const {_SetField.kg, _SetField.repsMin, _SetField.repsMax}
+        : const {_SetField.kg, _SetField.reps};
+  }
+
+  /// Suelta el foco de las celdas que dejaron de existir.
+  ///
+  /// La fila NO se reconstruye cuando el slot cambia de modo —es el mismo
+  /// `ObjectKey(set)`—, sólo cambia qué campos muestra. El `FocusNode` de una
+  /// columna que se fue sigue vivo y con el foco puesto, así que sin esto la
+  /// barra de accesorio quedaba ofreciendo atajos de kilos sobre un ejercicio
+  /// que ya se mide en tiempo.
+  ///
+  /// Va DIFERIDO al frame siguiente: `didUpdateWidget` corre dentro de la fase
+  /// de build, y notificar el scope ahí marca como dirty a un ancestro que ya
+  /// se construyó — el framework lo rechaza con "setState() called during
+  /// build". El foco se suelta cuando el árbol terminó de armarse.
+  void _soltarFocosAusentes() {
+    final ausentes = _SetField.values
+        .where((c) => !_camposVisibles.contains(c))
+        .toList(growable: false);
+    for (final campo in ausentes) {
+      _focos[campo]?.unfocus();
+    }
+    final scope = _scope;
+    if (scope == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      for (final campo in ausentes) {
+        scope.blur(_idDe(campo));
+      }
+    });
+  }
+
+  void _onFocoCambiado(_SetField campo) {
+    if (!mounted) return;
+    final notifier = _scope;
+    if (notifier == null) return;
+    if (_focos[campo]!.hasFocus) {
+      notifier.focus(_celdaEnfocada(campo));
+    } else {
+      notifier.blur(_idDe(campo));
+    }
   }
 
   @override
   void dispose() {
+    // Soltar el foco ANTES de tirar los nodos. Disponer un FocusNode no
+    // dispara su listener, así que sin esto una fila que desaparece con el
+    // foco puesto —cambiar el ejercicio a modo duración borra la columna KG,
+    // borrar un set borra la fila entera— dejaba la barra en pantalla
+    // ofreciendo atajos sobre una celda que ya no existe.
+    final scope = _scope;
+    if (scope != null) {
+      final ids = _SetField.values.map(_idDe).toList(growable: false);
+      // Diferido por la misma razón que [_soltarFocosAusentes]: sacar una fila
+      // del árbol es parte de un build, y ahí no se puede notificar.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        for (final id in ids) {
+          scope.blur(id);
+        }
+      });
+    }
     _kgCtrl.dispose();
     _repsCtrl.dispose();
     _repsMinCtrl.dispose();
     _repsMaxCtrl.dispose();
-    _kgFocus
-      ..removeListener(_onKgFocusChanged)
-      ..dispose();
+    for (final foco in _focos.values) {
+      foco.dispose();
+    }
     super.dispose();
   }
 
@@ -4105,6 +5175,28 @@ class _SetRowState extends State<_SetRow> {
   /// operate on the number the user is looking at.
   double? get _currentKg =>
       parseEditorWeight(_kgCtrl.text) ?? widget.editableSet.weightKg;
+
+  TextEditingController _controllerDe(_SetField campo) => switch (campo) {
+        _SetField.kg => _kgCtrl,
+        _SetField.reps => _repsCtrl,
+        _SetField.repsMin => _repsMinCtrl,
+        _SetField.repsMax => _repsMaxCtrl,
+      };
+
+  /// El valor que la celda muestra AHORA. El controller le gana al modelo: a
+  /// mitad de una edición pueden diferir por un keystroke, y el stepper tiene
+  /// que operar sobre el número que el usuario está mirando.
+  int? _repsActuales(_SetField campo) {
+    final delControl = int.tryParse(_controllerDe(campo).text);
+    if (delControl != null) return delControl;
+    final s = widget.editableSet;
+    return switch (campo) {
+      _SetField.reps => s.reps,
+      _SetField.repsMin => s.repsMin,
+      _SetField.repsMax => s.repsMax,
+      _SetField.kg => null,
+    };
+  }
 
   /// Applies a plate-sized jump to this row's KG (issue #640, PR#3).
   ///
@@ -4120,7 +5212,12 @@ class _SetRowState extends State<_SetRow> {
   void _stepKg(double deltaKg) {
     final next = steppedWeightKg(_currentKg, deltaKg);
     final text = formatEditorWeight(next);
-    if (next == widget.editableSet.weightKg && text == _kgCtrl.text) return;
+    if (next == widget.editableSet.weightKg && text == _kgCtrl.text) {
+      // Sin valor nuevo no hay nada que escribir, pero sí que republicar: es
+      // el camino por el que el botón de menos se apaga al llegar al piso.
+      _republicar(_SetField.kg);
+      return;
+    }
 
     widget.editableSet.weightKg = next;
     _kgCtrl.value = TextEditingValue(
@@ -4132,6 +5229,82 @@ class _SetRowState extends State<_SetRow> {
     // Re-runs the slot's inline validation — a set completed by a stepper must
     // stop being painted red (`_isValid` / `hasSlotError`).
     widget.onChanged();
+    _republicar(_SetField.kg);
+  }
+
+  /// Mismo salto, sobre una celda de repeticiones. Vale la misma advertencia
+  /// que [_stepKg]: se muta la instancia, nunca se la reemplaza.
+  ///
+  /// El piso es 1 y no 0: un set de cero repeticiones no es un set, y a
+  /// diferencia del peso —donde vacío significa "sin peso"— acá vaciar el
+  /// campo lo deja inválido. Restar desde 1 no hace nada en vez de autorear un
+  /// set roto.
+  void _stepReps(_SetField campo, double delta) {
+    final actual = _repsActuales(campo) ?? 0;
+    final next = (actual + delta.round()).clamp(0, kMaxReps);
+    if (next == 0 || next == actual) {
+      _republicar(campo);
+      return;
+    }
+
+    final s = widget.editableSet;
+    switch (campo) {
+      case _SetField.reps:
+        s.reps = next;
+      case _SetField.repsMin:
+        s.repsMin = next;
+      case _SetField.repsMax:
+        s.repsMax = next;
+      case _SetField.kg:
+        return;
+    }
+    final text = '$next';
+    _controllerDe(campo).value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+    widget.onChanged();
+    _republicar(campo);
+  }
+
+  /// Vuelve a publicar la celda enfocada después de un paso.
+  ///
+  /// `canDecrease` se calcula sobre el valor actual: sin esto, restar hasta el
+  /// piso dejaría el botón de menos encendido hasta que el usuario tocara otra
+  /// celda.
+  void _republicar(_SetField campo) {
+    if (!mounted || !(_focos[campo]?.hasFocus ?? false)) return;
+    _scope?.focus(_celdaEnfocada(campo));
+  }
+
+  /// Arma lo que la barra de accesorio necesita saber sobre [campo].
+  FocusedSetCell _celdaEnfocada(_SetField campo) {
+    final l10n = AppL10n.of(context);
+    final esKg = campo == _SetField.kg;
+    return FocusedSetCell(
+      cellId: _idDe(campo),
+      contextLabel: l10n.routineEditorAccessoryContext(
+        widget.exerciseName ?? l10n.coachExercisePicker,
+        widget.index + 1,
+        esKg ? l10n.routineEditorFieldKg : l10n.routineEditorFieldReps,
+      ),
+      stepAmount: esKg ? kKgStepsKg.first : 1,
+      stepLabel: esKg ? formatWeightKg(kKgStepsKg.first) : '1',
+      canDecrease:
+          esKg ? (_currentKg ?? 0) > 0 : (_repsActuales(campo) ?? 0) > 1,
+      onStep: (delta) => esKg ? _stepKg(delta) : _stepReps(campo, delta),
+      stepIncreaseLabel: esKg
+          ? l10n
+              .routineEditorKgStepIncreaseA11y(formatWeightKg(kKgStepsKg.first))
+          : l10n.routineEditorRepsStepIncreaseA11y('1'),
+      stepDecreaseLabel: esKg
+          ? l10n
+              .routineEditorKgStepDecreaseA11y(formatWeightKg(kKgStepsKg.first))
+          : l10n.routineEditorRepsStepDecreaseA11y('1'),
+      onFillColumn: esKg && widget.onFillColumn != null
+          ? () => widget.onFillColumn!(campo)
+          : null,
+    );
   }
 
   Future<void> _pickSetType(BuildContext context) async {
@@ -4175,48 +5348,28 @@ class _SetRowState extends State<_SetRow> {
     final l10n = AppL10n.of(context);
     final label = setChipLabel(widget.allSets, widget.index);
 
-    // Duration slots have no KG column at all, so the affordance must not
-    // exist there — the focus node is never attached in that mode, and this
-    // guard says so out loud instead of relying on that side effect.
-    final showKgSteps = !widget.isDuration && _kgFocus.hasFocus;
-
     final row = Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // ── Set chip — 44×44 tap target ───────────────────────────────────
+        // ── Set chip ──────────────────────────────────────────────────────
         Builder(
-          builder: (ctx) => Semantics(
-            button: true,
+          builder: (ctx) => SetTypeChip(
+            label: label,
+            type: s.type,
+            palette: palette,
             // Announce the set position, its type (warmup/drop/failure) and
             // whether it is currently invalid — the bare "1"/"C" glyph carries
             // none of that meaning for VoiceOver.
-            label: _chipSemanticsLabel(label, s.type, widget.isInvalid, l10n),
-            child: GestureDetector(
-              onTap: () => _pickSetType(ctx),
-              child: Container(
-                width: 44,
-                height: 44,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: _chipColor(s.type, palette),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  label,
-                  style: GoogleFonts.barlowCondensed(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: _chipTextColor(s.type, palette),
-                  ),
-                ),
-              ),
-            ),
+            semanticsLabel:
+                _chipSemanticsLabel(label, s.type, widget.isInvalid, l10n),
+            onTap: () => _pickSetType(ctx),
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: AppSpacing.s8),
         // ── Input cells ───────────────────────────────────────────────────
         if (widget.isDuration) ...[
           Expanded(
+            // El alto de 48 lo pone DurationTextField, igual que SetCellField.
             child: DurationTextField(
               valueSeconds: s.durationSeconds ?? 0,
               hasError: widget.isInvalid,
@@ -4229,105 +5382,104 @@ class _SetRowState extends State<_SetRow> {
         ] else ...[
           // KG field — always optional, no error highlight
           Expanded(
-            child: _NumberField(
+            child: SetCellField(
               controller: _kgCtrl,
-              focusNode: _kgFocus,
+              focusNode: _focos[_SetField.kg],
               palette: palette,
               hint: 'kg',
               decimal: true,
               onDecimalChanged: (v) {
                 s.weightKg = v;
                 widget.onChanged();
+                // `canDecrease` se calcula sobre el valor: tipear el primer
+                // número tiene que habilitar el botón de menos sin esperar a
+                // que el foco se vaya y vuelva, y vaciar el campo tiene que
+                // apagarlo en vez de dejar un no-op encendido.
+                _republicar(_SetField.kg);
               },
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: AppSpacing.s8),
           if (widget.repMode == RepMode.range) ...[
             // REP MIN
             Expanded(
-              child: _NumberField(
+              child: SetCellField(
                 controller: _repsMinCtrl,
+                focusNode: _focos[_SetField.repsMin],
                 palette: palette,
                 hint: 'mín',
                 hasError: widget.isInvalid,
                 onChanged: (v) {
                   s.repsMin = v;
                   widget.onChanged();
+                  _republicar(_SetField.repsMin);
                 },
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: AppSpacing.s8),
             // REP MAX
             Expanded(
-              child: _NumberField(
+              child: SetCellField(
                 controller: _repsMaxCtrl,
+                focusNode: _focos[_SetField.repsMax],
                 palette: palette,
                 hint: 'máx',
                 hasError: widget.isInvalid,
                 onChanged: (v) {
                   s.repsMax = v;
                   widget.onChanged();
+                  _republicar(_SetField.repsMax);
                 },
               ),
             ),
           ] else ...[
             // REPS
             Expanded(
-              child: _NumberField(
+              child: SetCellField(
                 controller: _repsCtrl,
+                focusNode: _focos[_SetField.reps],
                 palette: palette,
                 hint: 'reps',
                 hasError: widget.isInvalid,
                 onChanged: (v) {
                   s.reps = v;
                   widget.onChanged();
+                  _republicar(_SetField.reps);
                 },
               ),
             ),
           ],
         ],
-        // ── Delete button — 40px wide tap target ──────────────────────────
-        SizedBox(
-          width: 40,
-          child: widget.onRemove != null
-              ? IconButton(
-                  icon: Icon(TreinoIcon.close,
-                      size: 16, color: palette.textMuted),
-                  tooltip: l10n.commonClose,
-                  onPressed: widget.onRemove,
-                  constraints:
-                      const BoxConstraints(minWidth: 40, minHeight: 44),
-                  padding: EdgeInsets.zero,
-                )
-              : const SizedBox.shrink(),
-        ),
-      ],
-    );
-
-    // The root is ALWAYS a Column, and the bar goes in as a conditional child.
-    // Returning `row` bare when the bar is hidden and a `Column` when it shows
-    // would flip the runtimeType of the row's root widget on every focus
-    // change, and `Widget.canUpdate` compares runtimeType: Flutter would tear
-    // down and re-inflate this whole subtree — including the KG `EditableText`,
-    // whose `dispose()` closes the IME connection that the focus change had
-    // just opened, and whose replacement never reopens it (only
-    // `_handleFocusChanged` and `requestKeyboard()` do, and neither fires
-    // again). The keyboard would pop up and vanish in the same frame, and the
-    // reps/mín/máx fields — which own their FocusNode internally — would lose
-    // it mid-tap, bouncing focus back to KG.
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        row,
-        if (showKgSteps)
-          _KgStepperBar(
-            palette: palette,
-            canDecrease: (_currentKg ?? 0) > 0,
-            onStep: _stepKg,
+        // ── Delete button ─────────────────────────────────────────────────
+        // Con un set único `onRemove` es null y la columna NO ocupa lugar:
+        // reservar 40 px para un botón ausente descentra la fila entera.
+        if (widget.onRemove != null)
+          SizedBox(
+            // 40, el ancho que ya tenía: los 30 del handoff achicaban el área
+            // táctil de 1760 a 1440 px². El alto sí sube a 48.
+            width: 40,
+            child: IconButton(
+              icon: Icon(TreinoIcon.close, size: 15, color: palette.textMuted),
+              tooltip: l10n.commonClose,
+              onPressed: widget.onRemove,
+              constraints: const BoxConstraints(minWidth: 40, minHeight: 48),
+              padding: EdgeInsets.zero,
+            ),
           ),
       ],
     );
+
+    // La raíz es SIEMPRE la misma clase de widget, y desde #867 no hay nada
+    // condicional colgando de ella. La advertencia que dejó #640 sigue en pie
+    // para quien quiera volver a poner algo acá: alternar el root entre `Row`
+    // y `Column` según el foco cambia el runtimeType, y `Widget.canUpdate` lo
+    // compara — Flutter destruye y re-infla todo este subárbol, incluido el
+    // `EditableText` de KG, cuyo `dispose()` cierra la conexión con el IME que
+    // el cambio de foco acababa de abrir, y cuyo reemplazo no la reabre. El
+    // teclado aparecía y desaparecía en el mismo frame. Los atajos se fueron a
+    // la barra de accesorio, que la monta la pantalla, justamente para que
+    // esta fila no tenga que cambiar de forma cuando gana el foco.
+    return row;
   }
 
   /// Builds the VoiceOver label for the set-type chip: the set position, the
@@ -4343,24 +5495,6 @@ class _SetRowState extends State<_SetRow> {
     final parts = [setLabel, typeName];
     if (isInvalid) parts.add(l10n.commonWarning);
     return parts.join(', ');
-  }
-
-  Color _chipColor(SetType type, AppPalette palette) {
-    return switch (type) {
-      SetType.warmup => palette.accent.withAlpha(30),
-      SetType.drop => palette.highlight.withAlpha(30),
-      SetType.failure => palette.danger.withAlpha(30),
-      SetType.normal => palette.bgCard,
-    };
-  }
-
-  Color _chipTextColor(SetType type, AppPalette palette) {
-    return switch (type) {
-      SetType.warmup => palette.accent,
-      SetType.drop => palette.highlight,
-      SetType.failure => palette.danger,
-      SetType.normal => palette.textMuted,
-    };
   }
 }
 
@@ -4381,196 +5515,6 @@ class _SetRowState extends State<_SetRow> {
 /// exists to remove. Deloads and top-set back-offs move down, not up.
 /// [steppedWeightKg] clamps at zero, so "abajo" bottoms out at an empty
 /// field and never at a negative load.
-class _KgStepperBar extends StatelessWidget {
-  const _KgStepperBar({
-    required this.palette,
-    required this.canDecrease,
-    required this.onStep,
-  });
-
-  final AppPalette palette;
-
-  /// False when there is no weight left to take away — the two minus buttons
-  /// dim instead of pretending a tap will do something.
-  final bool canDecrease;
-
-  final void Function(double deltaKg) onStep;
-
-  @override
-  Widget build(BuildContext context) {
-    // −5 −2.5 +2.5 +5: the heaviest jump sits at each end, so the two
-    // directions mirror each other and the thumb only learns one map.
-    final deltas = <double>[
-      for (final step in kKgStepsKg.reversed) -step,
-      ...kKgStepsKg,
-    ];
-
-    return TextFieldTapRegion(
-      // Marks the bar as part of the KG field's tap region. Without it the
-      // tap counts as "outside" the field and dismisses the very focus that
-      // put this bar on screen.
-      child: Padding(
-        // left 52 = the 44px set chip + its 8px gap, so the bar starts flush
-        // with the KG field it acts on; right 40 clears the delete column.
-        padding: const EdgeInsets.only(left: 52, right: 40, top: 6, bottom: 2),
-        child: Row(
-          children: [
-            for (final delta in deltas) ...[
-              Expanded(child: _stepButton(context, delta)),
-              if (delta != deltas.last) const SizedBox(width: 6),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _stepButton(BuildContext context, double delta) {
-    final l10n = AppL10n.of(context);
-    final isIncrease = delta > 0;
-    final enabled = isIncrease || canDecrease;
-    // Same formatter as the KG field, so "+2.5" and the value it produces can
-    // never render their decimal differently.
-    final amount = formatWeightKg(delta.abs());
-    final tint = enabled ? palette.accent : palette.textMuted;
-
-    return Semantics(
-      button: true,
-      enabled: enabled,
-      label: isIncrease
-          ? l10n.routineEditorKgStepIncreaseA11y(amount)
-          : l10n.routineEditorKgStepDecreaseA11y(amount),
-      child: GestureDetector(
-        // A GestureDetector on purpose: button widgets are focusable and would
-        // pull focus off the KG field on tap.
-        key: Key(
-          'kg_step_${isIncrease ? 'plus' : 'minus'}_'
-          '${amount.replaceAll('.', '_')}',
-        ),
-        behavior: HitTestBehavior.opaque,
-        onTap: enabled ? () => onStep(delta) : null,
-        child: Container(
-          height: 44,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: palette.bgCard,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: enabled ? palette.accent.withAlpha(90) : palette.border,
-            ),
-          ),
-          child: Text(
-            '${isIncrease ? '+' : '-'}$amount',
-            style: GoogleFonts.barlowCondensed(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: tint,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Number input field ────────────────────────────────────────────────────────
-
-/// Compact numeric text field without a label (used inside set rows).
-class _NumberField extends StatelessWidget {
-  const _NumberField({
-    required this.controller,
-    required this.palette,
-    this.onChanged,
-    this.onDecimalChanged,
-    this.decimal = false,
-    this.hint,
-    this.hasError = false,
-    this.focusNode,
-  }) : assert(
-          decimal ? onDecimalChanged != null : onChanged != null,
-          'decimal fields need onDecimalChanged; integer fields need onChanged',
-        );
-
-  final TextEditingController controller;
-  final AppPalette palette;
-  final String? hint;
-
-  /// Optional external focus node — the KG field owns one so its row can show
-  /// the stepper bar only while that field is being edited.
-  final FocusNode? focusNode;
-
-  /// Integer callback used when [decimal] is false (reps, etc.).
-  final void Function(int?)? onChanged;
-
-  /// Double callback used when [decimal] is true (weight in kg).
-  final void Function(double?)? onDecimalChanged;
-
-  /// When true the field accepts fractional values (e.g. 17.5 kg).
-  final bool decimal;
-
-  /// When true the field underline turns danger-red to signal the value
-  /// is missing or invalid.
-  final bool hasError;
-
-  @override
-  Widget build(BuildContext context) {
-    final errorBorder = UnderlineInputBorder(
-      borderSide: BorderSide(color: palette.danger, width: 1.5),
-    );
-    return TextField(
-      controller: controller,
-      focusNode: focusNode,
-      keyboardType: decimal
-          ? const TextInputType.numberWithOptions(decimal: true)
-          : TextInputType.number,
-      inputFormatters: [
-        // QA-WKT-003: cap reps/weight at the shared domain ceiling so an
-        // impossible set can't be authored and flow untouched into a SetLog.
-        BoundedNumberFormatter(
-          max: decimal ? kMaxWeightKg : kMaxReps.toDouble(),
-          decimal: decimal,
-        ),
-      ],
-      style: GoogleFonts.barlow(fontSize: 16, color: palette.textPrimary),
-      textAlign: TextAlign.center,
-      decoration: InputDecoration(
-        isDense: true,
-        hintText: hint,
-        hintStyle: GoogleFonts.barlow(
-          fontSize: 13,
-          color: hasError ? palette.danger.withAlpha(180) : palette.textMuted,
-        ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
-        filled: false,
-        border: hasError
-            ? errorBorder
-            : UnderlineInputBorder(
-                borderSide: BorderSide(color: palette.border),
-              ),
-        enabledBorder: hasError
-            ? errorBorder
-            : UnderlineInputBorder(
-                borderSide: BorderSide(color: palette.border),
-              ),
-        focusedBorder: hasError
-            ? UnderlineInputBorder(
-                borderSide: BorderSide(color: palette.danger, width: 2),
-              )
-            : UnderlineInputBorder(
-                borderSide: BorderSide(color: palette.accent, width: 2),
-              ),
-      ),
-      onChanged: (v) {
-        if (decimal) {
-          onDecimalChanged!(parseEditorWeight(v));
-        } else {
-          onChanged!(int.tryParse(v));
-        }
-      },
-    );
-  }
-}
-
 // ── Level dropdown ────────────────────────────────────────────────────────────
 
 class _LevelDropdown extends StatelessWidget {
@@ -4628,7 +5572,6 @@ String formatEditorWeight(double? w) => formatWeightKg(w);
 
 /// Parses KG field text into a nullable double, accepting comma as the decimal
 /// separator (common on iOS numeric keypads). Empty/invalid → null.
-double? parseEditorWeight(String v) => double.tryParse(v.replaceAll(',', '.'));
 
 // ── Test bridge ───────────────────────────────────────────────────────────────
 // Exposes internal helpers for unit tests without making the private types
@@ -4640,6 +5583,21 @@ double? parseEditorWeight(String v) => double.tryParse(v.replaceAll(',', '.'));
 /// instances internally and returning plain Dart values.
 class RoutineEditorTestBridge {
   RoutineEditorTestBridge._();
+
+  /// Corre `_conGruposContiguos` sobre una lista descrita por sus ids de
+  /// grupo, y devuelve el resultado en la misma forma.
+  ///
+  /// `null` es un slot suelto. Existe como bridge porque los casos que
+  /// importan —un slot OCULTO en la semana en curso separando a dos miembros—
+  /// son caros de montar por UI y triviales de expresar acá.
+  static List<int?> gruposContiguosBridge(List<int?> grupos) {
+    final slots = [
+      for (final g in grupos) _EditableSlot()..supersetGroup = g,
+    ];
+    return _RoutineEditorScreenState._conGruposContiguos(slots)
+        .map((s) => s.supersetGroup)
+        .toList();
+  }
 
   /// Delegates to [isSetValid] after constructing a minimal [_EditableSet].
   static bool isSetValidBridge({

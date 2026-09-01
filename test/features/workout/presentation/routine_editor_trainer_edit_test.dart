@@ -40,6 +40,7 @@ import 'package:treino/features/workout/presentation/routine_editor_screen.dart'
 
 import '../../../helpers/fake_analytics_service.dart';
 import '../../../fixtures/exercises.dart';
+import '../../../fixtures/routine_editor_ui.dart';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -202,7 +203,9 @@ void main() {
       overrides: _overrides(repo: repo),
     );
 
-    expect(find.text('Editar plan'), findsOneWidget);
+    // El título del app bar es el NOMBRE del plan desde #866. El modo va en
+    // el subtítulo, que en modo entrenador incluye split y nivel.
+    expect(find.textContaining('Plan asignado'), findsOneWidget);
     expect(find.text('Crear plan'), findsNothing);
   });
 
@@ -246,6 +249,7 @@ void main() {
       scrollable: find.byType(Scrollable).first,
     );
     await tester.pumpAndSettle();
+    await desplazarHastaAgregarEjercicio(tester);
     await tester.tap(find.text('Agregar ejercicio'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Press de Banca').first);
@@ -335,7 +339,9 @@ void main() {
       overrides: _overrides(repo: repo),
     );
 
-    expect(find.text('Editar plan'), findsOneWidget);
+    // El título del app bar es el NOMBRE del plan desde #866. El modo va en
+    // el subtítulo, que en modo entrenador incluye split y nivel.
+    expect(find.textContaining('Plantilla reusable'), findsOneWidget);
     expect(find.text('Crear plan'), findsNothing);
   });
 
@@ -374,6 +380,7 @@ void main() {
       scrollable: find.byType(Scrollable).first,
     );
     await tester.pumpAndSettle();
+    await desplazarHastaAgregarEjercicio(tester);
     await tester.tap(find.text('Agregar ejercicio'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Press de Banca').first);
@@ -390,7 +397,10 @@ void main() {
     await tester.enterText(find.byWidget(repsField), '10');
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(ElevatedButton, 'GUARDAR CAMBIOS'));
+    // "GUARDAR PLANTILLA" y no "GUARDAR CAMBIOS": desde #871 el editor de
+    // PLANTILLAS tiene copy propio. Antes reusaba el de asignar un plan.
+    await tester
+        .tap(find.widgetWithText(ElevatedButton, 'GUARDAR PLANTILLA'));
     await tester.pumpAndSettle();
 
     verify(() => repo.updateTemplate(
@@ -435,6 +445,7 @@ void main() {
       scrollable: find.byType(Scrollable).first,
     );
     await tester.pumpAndSettle();
+    await desplazarHastaAgregarEjercicio(tester);
     await tester.tap(find.text('Agregar ejercicio'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Press de Banca').first);

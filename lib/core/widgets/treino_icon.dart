@@ -109,6 +109,12 @@ class TreinoIcon {
 
   // Feed / social
   static const IconData dotsThree = PhosphorIconsRegular.dotsThreeVertical;
+
+  /// Agarre de arrastre (⠿). Distinto de [dotsThree] a propósito: el de tres
+  /// puntos abre un menú, éste dice "podés arrastrarme". Usar el mismo glifo
+  /// para las dos cosas —que es lo que pasaba en la card de ejercicio— deja al
+  /// usuario sin forma de saber cuál hace qué.
+  static const IconData dragHandle = PhosphorIconsRegular.dotsSixVertical;
   static const IconData verified = PhosphorIconsFill.sealCheck;
   static const IconData dumbbell = PhosphorIconsRegular.barbell;
   static const IconData chevronLeft = PhosphorIconsRegular.caretLeft;
@@ -158,6 +164,15 @@ class TreinoIcon {
 
   // Profile settings constant REMOVED 2026-05-28 — gear icon was removed from
   // ProfileHeader as part of the PR#4 pivot. Zero remaining usages.
+
+  /// Ajustes de un CONTENIDO, no de la app.
+  ///
+  /// Deliberadamente NO es un engranaje: el de `ProfileHeader` se sacó del kit
+  /// en 2026-05 y no conviene reintroducirlo con otro significado. Los faders
+  /// dicen "parámetros de esto que estás editando", que es lo que abre la hoja
+  /// "DATOS DEL PLAN".
+  static const IconData contentSettings =
+      PhosphorIconsRegular.slidersHorizontal;
 
   // Appearance / theme settings
   static const IconData appearance = PhosphorIconsRegular.sun;

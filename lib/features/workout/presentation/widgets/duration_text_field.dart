@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import 'set_cell_box.dart';
+import '../../../../app/theme/tokens/tokens.dart';
 
 // ── Formatter ─────────────────────────────────────────────────────────────────
 
@@ -118,70 +120,81 @@ class _DurationTextFieldState extends State<DurationTextField> {
 
   @override
   void dispose() {
+    _foco
+      ..removeListener(_alCambiarFoco)
+      ..dispose();
     _ctrl.dispose();
     super.dispose();
+  }
+
+  /// El nodo propio: la caja necesita saber si el campo tiene el foco para
+  /// pintar su borde, igual que [SetCellField].
+  late final FocusNode _foco = FocusNode()..addListener(_alCambiarFoco);
+
+  void _alCambiarFoco() {
+    if (mounted) setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    final esCampoAncho = widget.label != null;
+
     // NOTE: does NOT wrap itself in Expanded — callers that need flex
     // expansion (e.g. inside a Row) must provide their own Expanded wrapper.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (widget.label != null) ...[
+        if (esCampoAncho) ...[
           Text(
             widget.label!,
             style: GoogleFonts.barlow(fontSize: 13, color: palette.textMuted),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: AppSpacing.hairline),
         ],
-        TextField(
-          controller: _ctrl,
-          keyboardType: TextInputType.number,
-          inputFormatters: [
-            FilteringTextInputFormatter.digitsOnly,
-            _DurationInputFormatter(),
-          ],
-          style: GoogleFonts.barlow(
-            fontSize: 16,
-            color: palette.textPrimary,
+        // La MISMA caja que el chip de SET y las celdas de KG/REPS. Este campo
+        // era el último que se dibujaba por su cuenta —con `InputDecoration` y
+        // `OutlineInputBorder`— y por eso seguía viéndose distinto en la fila
+        // aunque los otros dos ya coincidieran.
+        SetCellBox(
+          focused: _foco.hasFocus,
+          hasError: widget.hasError,
+          // El de "Descanso" ocupa el ancho entero: a 48 dp con el texto
+          // pegado al borde se leía apretado. Las celdas de la tabla se quedan
+          // en 48, porque ahí manda la alineación con el resto de la fila.
+          minHeight: esCampoAncho ? 56 : SetCellBox.kMinHeight,
+          child: TextField(
+            controller: _ctrl,
+            focusNode: _foco,
+            keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              _DurationInputFormatter(),
+            ],
+            textAlign: esCampoAncho ? TextAlign.start : TextAlign.center,
+            style: GoogleFonts.barlow(
+              fontSize: esCampoAncho ? 16 : 17,
+              fontWeight: FontWeight.w600,
+              color: widget.hasError ? palette.danger : palette.textPrimary,
+            ),
+            decoration: setCellDecoration(
+              palette: palette,
+              hasError: widget.hasError,
+              padding: EdgeInsets.symmetric(
+                horizontal: esCampoAncho ? AppSpacing.s12 : AppSpacing.hairline,
+              ),
+            ),
+            onChanged: (raw) {
+              // The formatter has already transformed raw into "MM:SS".
+              // Re-parse seconds from the display string.
+              final parts = _ctrl.text.split(':');
+              if (parts.length == 2) {
+                final mm = int.tryParse(parts[0]) ?? 0;
+                final ss = int.tryParse(parts[1]) ?? 0;
+                widget.onChanged(mm * 60 + ss);
+              }
+            },
           ),
-          decoration: InputDecoration(
-            isDense: true,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
-            filled: false,
-            border: UnderlineInputBorder(
-              borderSide: BorderSide(
-                color: widget.hasError ? palette.danger : palette.border,
-                width: widget.hasError ? 1.5 : 1.0,
-              ),
-            ),
-            enabledBorder: UnderlineInputBorder(
-              borderSide: BorderSide(
-                color: widget.hasError ? palette.danger : palette.border,
-                width: widget.hasError ? 1.5 : 1.0,
-              ),
-            ),
-            focusedBorder: UnderlineInputBorder(
-              borderSide: BorderSide(
-                color: widget.hasError ? palette.danger : palette.accent,
-                width: 2,
-              ),
-            ),
-          ),
-          onChanged: (raw) {
-            // The formatter has already transformed raw into "MM:SS".
-            // Re-parse seconds from the display string.
-            final parts = _ctrl.text.split(':');
-            if (parts.length == 2) {
-              final mm = int.tryParse(parts[0]) ?? 0;
-              final ss = int.tryParse(parts[1]) ?? 0;
-              widget.onChanged(mm * 60 + ss);
-            }
-          },
         ),
       ],
     );

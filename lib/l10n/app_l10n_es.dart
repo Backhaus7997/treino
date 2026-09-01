@@ -1823,6 +1823,62 @@ class AppL10nEs extends AppL10n {
   String get performanceChartMetricSitAndReach => 'Flexibilidad';
 
   @override
+  String routineEditorSetsMissingReps(int n) {
+    String _temp0 = intl.Intl.pluralLogic(
+      n,
+      locale: localeName,
+      other: '$n sets sin reps',
+      one: '1 set sin reps',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get routineEditorEmptyDayTitle => 'DÍA VACÍO';
+
+  @override
+  String get routineEditorEmptyDayBody =>
+      'Agregá el primer ejercicio y ya queda listo para entrenar.';
+
+  @override
+  String routineEditorDayTabA11y(int n, String estado) {
+    return 'Día $n$estado';
+  }
+
+  @override
+  String get routineEditorPlanSheetTitle => 'DATOS DEL PLAN';
+
+  @override
+  String get routineEditorPlanSheetA11y => 'Datos del plan';
+
+  @override
+  String get routineEditorSubtitleSelfPrivate => 'Tu rutina · solo la ves vos';
+
+  @override
+  String get routineEditorSubtitleSelfShared =>
+      'Tu rutina · compartida en tu perfil';
+
+  @override
+  String get routineEditorSubtitleCustomizing => 'Copia tuya';
+
+  @override
+  String get routineEditorSubtitleAssigned => 'Plan asignado';
+
+  @override
+  String get routineEditorSubtitleTemplate => 'Plantilla reusable';
+
+  @override
+  String routineEditorSubtitleWeeks(int n) {
+    String _temp0 = intl.Intl.pluralLogic(
+      n,
+      locale: localeName,
+      other: '$n semanas',
+      one: '1 semana',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String routineEditorDayName(int n) {
     return 'Día $n';
   }
@@ -1896,6 +1952,21 @@ class AppL10nEs extends AppL10n {
   String get routineEditorSlotMenuRemove => 'Eliminar';
 
   @override
+  String routineEditorSupersetHeader(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'EJERCICIOS',
+      one: 'EJERCICIO',
+    );
+    return 'SUPERSERIE · $count $_temp0';
+  }
+
+  @override
+  String get routineEditorSlotMenuHint =>
+      'El ⋮ de cada ejercicio tiene cambiar, copiar sets y mover.';
+
+  @override
   String get routineEditorRestLabel => 'Descanso';
 
   @override
@@ -1914,6 +1985,39 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get routineEditorFillKgUndo => 'Deshacer';
+
+  @override
+  String get routineEditorFillColumnLabel => 'A TODAS';
+
+  @override
+  String get routineEditorFillColumnA11y =>
+      'Replicar este valor en toda la columna';
+
+  @override
+  String routineEditorAccessoryContext(
+      String ejercicio, int set, String campo) {
+    return '$ejercicio · set $set · $campo';
+  }
+
+  @override
+  String get routineEditorFieldKg => 'kg';
+
+  @override
+  String get routineEditorFieldReps => 'reps';
+
+  @override
+  String routineEditorRepsStepIncreaseA11y(String amount) {
+    return 'Sumar $amount repeticiones';
+  }
+
+  @override
+  String routineEditorRepsStepDecreaseA11y(String amount) {
+    return 'Restar $amount repeticiones';
+  }
+
+  @override
+  String get routineEditorFillColumnEmpty =>
+      'Cargá el peso de este set para poder replicarlo.';
 
   @override
   String routineEditorKgStepIncreaseA11y(String amount) {
@@ -4019,6 +4123,130 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get sessionFeedbackLoadError => 'No pudimos cargar tus reportes.';
+
+  @override
+  String get routineEditorGoToProblem => 'IR';
+
+  @override
+  String get routineEditorGoToProblemA11y => 'Ir al primer problema';
+
+  @override
+  String routineEditorFooterSummary(int dias, int sets) {
+    String _temp0 = intl.Intl.pluralLogic(
+      dias,
+      locale: localeName,
+      other: '$dias días',
+      one: '1 día',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      sets,
+      locale: localeName,
+      other: '$sets sets',
+      one: '1 set',
+    );
+    return '$_temp0 · $_temp1 · todo listo';
+  }
+
+  @override
+  String get routineEditorProblemMissingName => 'Falta el nombre del plan';
+
+  @override
+  String get routineEditorProblemMissingSplit => 'Falta el split';
+
+  @override
+  String routineEditorProblemEmptyDay(int dia) {
+    return 'Día $dia: sin ejercicios';
+  }
+
+  @override
+  String routineEditorProblemDuplicate(int dia) {
+    return 'Día $dia: ejercicio repetido';
+  }
+
+  @override
+  String routineEditorProblemIncompleteSets(int dia, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sets sin completar',
+      one: '1 set sin completar',
+    );
+    return 'Día $dia: $_temp0';
+  }
+
+  @override
+  String routineEditorProblemOtherWeek(int semana, int dia) {
+    return 'Semana $semana: día $dia sin completar';
+  }
+
+  @override
+  String get routineEditorQuickEntryToggle => 'RÁPIDO';
+
+  @override
+  String get routineEditorQuickEntryToggleA11y => 'Entrada rápida';
+
+  @override
+  String get routineEditorQuickEntryHint => 'banca 4x10 60';
+
+  @override
+  String routineEditorQuickEntryWillAdd(int sets, String reps, String peso) {
+    String _temp0 = intl.Intl.pluralLogic(
+      sets,
+      locale: localeName,
+      other: '$sets sets',
+      one: '1 set',
+    );
+    return 'Se agrega como $_temp0 × $reps a $peso.';
+  }
+
+  @override
+  String get routineEditorQuickEntryNoWeight => 'sin peso';
+
+  @override
+  String get routineEditorQuickEntryEmptyHint =>
+      'Buscá el ejercicio y tocalo. Después escribís 4x10 y el peso.';
+
+  @override
+  String get routineEditorQuickEntryPickedHint =>
+      '4x10 y el peso. Por set con comas: 4x10,8,6,4 · 55,45,35,25. Por tiempo: 3x30s o 3x1:30. Decimales con punto: 62.5';
+
+  @override
+  String get routineEditorQuickEntryAdd => 'AGREGAR';
+
+  @override
+  String get routineEditorExerciseSheetTitle => 'ACCIONES';
+
+  @override
+  String get routineEditorSlotMenuCollapse => 'Colapsar sets';
+
+  @override
+  String get routineEditorSlotMenuExpand => 'Desplegar sets';
+
+  @override
+  String get coachTemplateEditorTitle => 'Nueva plantilla';
+
+  @override
+  String get coachTemplateEditorEditTitle => 'Editar plantilla';
+
+  @override
+  String get coachTemplateEditorSubmit => 'GUARDAR PLANTILLA';
+
+  @override
+  String get routineEditorAddNothingNew =>
+      'Esos ejercicios ya estaban en el día.';
+
+  @override
+  String get routineEditorSupersetNeedsTwo =>
+      'Una superserie necesita dos ejercicios. Se agregó uno solo, suelto.';
+
+  @override
+  String get routineEditorSlotMenuMergeUp => 'Unir con el de arriba';
+
+  @override
+  String get routineEditorSlotMenuUngroup => 'Sacar de la superserie';
+
+  @override
+  String get routineEditorSlotMenuMergeDown => 'Unir con el de abajo';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -5840,6 +6068,62 @@ class AppL10nEsAr extends AppL10nEs {
   String get performanceChartMetricSitAndReach => 'Flexibilidad';
 
   @override
+  String routineEditorSetsMissingReps(int n) {
+    String _temp0 = intl.Intl.pluralLogic(
+      n,
+      locale: localeName,
+      other: '$n sets sin reps',
+      one: '1 set sin reps',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get routineEditorEmptyDayTitle => 'DÍA VACÍO';
+
+  @override
+  String get routineEditorEmptyDayBody =>
+      'Agregá el primer ejercicio y ya queda listo para entrenar.';
+
+  @override
+  String routineEditorDayTabA11y(int n, String estado) {
+    return 'Día $n$estado';
+  }
+
+  @override
+  String get routineEditorPlanSheetTitle => 'DATOS DEL PLAN';
+
+  @override
+  String get routineEditorPlanSheetA11y => 'Datos del plan';
+
+  @override
+  String get routineEditorSubtitleSelfPrivate => 'Tu rutina · solo la ves vos';
+
+  @override
+  String get routineEditorSubtitleSelfShared =>
+      'Tu rutina · compartida en tu perfil';
+
+  @override
+  String get routineEditorSubtitleCustomizing => 'Copia tuya';
+
+  @override
+  String get routineEditorSubtitleAssigned => 'Plan asignado';
+
+  @override
+  String get routineEditorSubtitleTemplate => 'Plantilla reusable';
+
+  @override
+  String routineEditorSubtitleWeeks(int n) {
+    String _temp0 = intl.Intl.pluralLogic(
+      n,
+      locale: localeName,
+      other: '$n semanas',
+      one: '1 semana',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String routineEditorDayName(int n) {
     return 'Día $n';
   }
@@ -5913,6 +6197,21 @@ class AppL10nEsAr extends AppL10nEs {
   String get routineEditorSlotMenuRemove => 'Eliminar';
 
   @override
+  String routineEditorSupersetHeader(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'EJERCICIOS',
+      one: 'EJERCICIO',
+    );
+    return 'SUPERSERIE · $count $_temp0';
+  }
+
+  @override
+  String get routineEditorSlotMenuHint =>
+      'El ⋮ de cada ejercicio tiene cambiar, copiar sets y mover.';
+
+  @override
   String get routineEditorRestLabel => 'Descanso';
 
   @override
@@ -5931,6 +6230,39 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get routineEditorFillKgUndo => 'Deshacer';
+
+  @override
+  String get routineEditorFillColumnLabel => 'A TODAS';
+
+  @override
+  String get routineEditorFillColumnA11y =>
+      'Replicar este valor en toda la columna';
+
+  @override
+  String routineEditorAccessoryContext(
+      String ejercicio, int set, String campo) {
+    return '$ejercicio · set $set · $campo';
+  }
+
+  @override
+  String get routineEditorFieldKg => 'kg';
+
+  @override
+  String get routineEditorFieldReps => 'reps';
+
+  @override
+  String routineEditorRepsStepIncreaseA11y(String amount) {
+    return 'Sumar $amount repeticiones';
+  }
+
+  @override
+  String routineEditorRepsStepDecreaseA11y(String amount) {
+    return 'Restar $amount repeticiones';
+  }
+
+  @override
+  String get routineEditorFillColumnEmpty =>
+      'Cargá el peso de este set para poder replicarlo.';
 
   @override
   String routineEditorKgStepIncreaseA11y(String amount) {
@@ -8033,4 +8365,128 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get sessionFeedbackLoadError => 'No pudimos cargar tus reportes.';
+
+  @override
+  String get routineEditorGoToProblem => 'IR';
+
+  @override
+  String get routineEditorGoToProblemA11y => 'Ir al primer problema';
+
+  @override
+  String routineEditorFooterSummary(int dias, int sets) {
+    String _temp0 = intl.Intl.pluralLogic(
+      dias,
+      locale: localeName,
+      other: '$dias días',
+      one: '1 día',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      sets,
+      locale: localeName,
+      other: '$sets sets',
+      one: '1 set',
+    );
+    return '$_temp0 · $_temp1 · todo listo';
+  }
+
+  @override
+  String get routineEditorProblemMissingName => 'Falta el nombre del plan';
+
+  @override
+  String get routineEditorProblemMissingSplit => 'Falta el split';
+
+  @override
+  String routineEditorProblemEmptyDay(int dia) {
+    return 'Día $dia: sin ejercicios';
+  }
+
+  @override
+  String routineEditorProblemDuplicate(int dia) {
+    return 'Día $dia: ejercicio repetido';
+  }
+
+  @override
+  String routineEditorProblemIncompleteSets(int dia, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count sets sin completar',
+      one: '1 set sin completar',
+    );
+    return 'Día $dia: $_temp0';
+  }
+
+  @override
+  String routineEditorProblemOtherWeek(int semana, int dia) {
+    return 'Semana $semana: día $dia sin completar';
+  }
+
+  @override
+  String get routineEditorQuickEntryToggle => 'RÁPIDO';
+
+  @override
+  String get routineEditorQuickEntryToggleA11y => 'Entrada rápida';
+
+  @override
+  String get routineEditorQuickEntryHint => 'banca 4x10 60';
+
+  @override
+  String routineEditorQuickEntryWillAdd(int sets, String reps, String peso) {
+    String _temp0 = intl.Intl.pluralLogic(
+      sets,
+      locale: localeName,
+      other: '$sets sets',
+      one: '1 set',
+    );
+    return 'Se agrega como $_temp0 × $reps a $peso.';
+  }
+
+  @override
+  String get routineEditorQuickEntryNoWeight => 'sin peso';
+
+  @override
+  String get routineEditorQuickEntryEmptyHint =>
+      'Buscá el ejercicio y tocalo. Después escribís 4x10 y el peso.';
+
+  @override
+  String get routineEditorQuickEntryPickedHint =>
+      '4x10 y el peso. Por set con comas: 4x10,8,6,4 · 55,45,35,25. Por tiempo: 3x30s o 3x1:30. Decimales con punto: 62.5';
+
+  @override
+  String get routineEditorQuickEntryAdd => 'AGREGAR';
+
+  @override
+  String get routineEditorExerciseSheetTitle => 'ACCIONES';
+
+  @override
+  String get routineEditorSlotMenuCollapse => 'Colapsar sets';
+
+  @override
+  String get routineEditorSlotMenuExpand => 'Desplegar sets';
+
+  @override
+  String get coachTemplateEditorTitle => 'Nueva plantilla';
+
+  @override
+  String get coachTemplateEditorEditTitle => 'Editar plantilla';
+
+  @override
+  String get coachTemplateEditorSubmit => 'GUARDAR PLANTILLA';
+
+  @override
+  String get routineEditorAddNothingNew =>
+      'Esos ejercicios ya estaban en el día.';
+
+  @override
+  String get routineEditorSupersetNeedsTwo =>
+      'Una superserie necesita dos ejercicios. Se agregó uno solo, suelto.';
+
+  @override
+  String get routineEditorSlotMenuMergeUp => 'Unir con el de arriba';
+
+  @override
+  String get routineEditorSlotMenuUngroup => 'Sacar de la superserie';
+
+  @override
+  String get routineEditorSlotMenuMergeDown => 'Unir con el de abajo';
 }
