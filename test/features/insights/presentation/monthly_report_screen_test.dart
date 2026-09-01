@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/core/utils/date_labels.dart';
 import 'package:intl/intl.dart' as intl;
 import 'package:mocktail/mocktail.dart';
 
@@ -390,10 +391,9 @@ void main() {
     expect(find.text('DISTRIBUCIÓN MUSCULAR'), findsOneWidget);
     // Legend shows the selected month's short name, not the generic
     // "Actual"/"Anterior" labels used by the athlete-insights radar.
-    final expectedCurrentLabel =
-        intl.DateFormat('MMM yyyy', 'es_AR').format(currentMonthStart);
+    final expectedCurrentLabel = _legendLabel(currentMonthStart);
     expect(
-      find.text(_capitalize(expectedCurrentLabel)),
+      find.text(expectedCurrentLabel),
       findsOneWidget,
     );
   });
@@ -436,18 +436,38 @@ void main() {
     chartState.debugSelectMonth(olderMonth);
     await tester.pumpAndSettle();
 
-    final expectedLabel =
-        intl.DateFormat('MMM yyyy', 'es_AR').format(olderMonth);
+    final expectedLabel = _legendLabel(olderMonth);
 
     await tester.scrollUntilVisible(
-      find.text(_capitalize(expectedLabel)),
+      find.text(expectedLabel),
       300,
       scrollable: find.byType(Scrollable).first,
     );
     await tester.pumpAndSettle();
 
-    expect(find.text(_capitalize(expectedLabel)), findsOneWidget);
+    expect(find.text(expectedLabel), findsOneWidget);
   });
+}
+
+/// La etiqueta de la leyenda, armada desde la MISMA fuente que la pantalla.
+///
+/// Antes esto era `DateFormat('MMM yyyy', 'es_AR')`, o sea una segunda
+/// implementación del formato que ya vive en `_monthLegendLabel`. Coincidían
+/// once meses al año.
+///
+/// El doceavo es septiembre: el CLDR de es-AR lo abrevia **`sept`**, cuatro
+/// letras contra las tres del resto. La pantalla usa `monthAbbrev`, que trunca
+/// a 3 a propósito —el comentario de `monthLegendLabel` lo explica: con 4 el
+/// label quedaba desalineado del eje del chart— así que dibuja `Sep 2026`
+/// mientras el test buscaba `Sept 2026`.
+///
+/// Un test que reimplementa lo que verifica no verifica nada: verifica que dos
+/// copias coincidan, y el día que dejan de coincidir no señala al error, se
+/// rompe él. Este se rompió solo el 1 de septiembre, en `main`, sin que nadie
+/// tocara nada.
+String _legendLabel(DateTime month) {
+  final abbrev = monthAbbrev(month, 'es_AR');
+  return '${_capitalize(abbrev)} ${month.year}';
 }
 
 String _capitalize(String s) =>
