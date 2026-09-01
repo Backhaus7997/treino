@@ -47,8 +47,49 @@ jobs:
       - name: El default de .firebaserc tiene que ser un proyecto demo-
         run: bash scripts/check_firebaserc_default.sh
 
-  analyze-and-test:
-    name: Analyze & Test
+  # `Analyze & Test` era UN job con dos pasos, y el segundo paso ERA el CI:
+  # medido sobre `main` en el run 33527262247, el paso `Run tests` tarda 820 s
+  # (13:40) sobre un job de 908 s (15:08), mientras que los otros OCHO jobs del
+  # workflow cierran todos juntos en menos de 4 minutos. Nadie espera por
+  # `analyze` (47 s) ni por las reglas de Firestore: se espera por los tests.
+  #
+  # Partido en dos: `analyze` solo —meterlo adentro de la matrix lo haría correr
+  # 4 veces para decir lo mismo 4 veces— y `test` repartido en shards.
+  #
+  # `fail-fast: false` es deliberado: con el default de GitHub, el primer shard
+  # en rojo cancela los otros tres y el reporte queda contando media suite. Un
+  # PR que rompe dos áreas tiene que mostrar las dos en la misma corrida, o el
+  # fix se hace de a una y se pagan dos vueltas de CI.
+  #
+  # ── POR QUÉ SE REPARTEN ARCHIVOS Y NO TESTS ─────────────────────────────────
+  #
+  # `flutter test --total-shards/--shard-index` existe y es más corto de
+  # escribir. Se probó primero, se midió en CI, y se descartó por DOS motivos.
+  #
+  # 1. No divide lo que hay que dividir. Esos flags reparten los TESTS, pero
+  #    cada shard igual tiene que CARGAR los 720 archivos, porque cualquiera
+  #    puede tener un test que le tocó. Con dos puntos medidos —820 s la suite
+  #    entera, 619 s el shard más lento de cuatro— se despeja el modelo:
+  #
+  #        F + V = 820   ;   F + V/4 = 619   ->   F = 552 s
+  #
+  #    El 67% del costo es compilar, y ese piso no se perfora: con 8 shards da
+  #    586 s, con infinitos da 552. El techo era ~11 min. Repartiendo ARCHIVOS
+  #    se divide también la compilación: medido sobre test/features/workout,
+  #    164 archivos tardan 108 s y 41 tardan 16 s — 6,75x, mejor que la división
+  #    perfecta, porque un set chico de compilación también tiene menos overhead.
+  #
+  # 2. Cambia la semántica de la suite EN SILENCIO. Repartir por test separa
+  #    tests que viven en el mismo archivo, y ahí aparecen los que nunca fueron
+  #    independientes. `test/app/router_navbar_collapse_test.dart` tiene 4
+  #    tests: juntos pasan, el cuarto SOLO explota con `debugSize == size` en
+  #    text_painter. La causa está documentada en test/visual_gate/gate_fonts.dart
+  #    —`google_fonts` registra cada variante recién cuando alguien la pide, y de
+  #    forma asincrónica—: el primer test del archivo se come la carrera y los
+  #    demás heredan el registro tibio. Repartiendo archivos enteros eso no puede
+  #    pasar: nadie se separa de sus hermanos de archivo.
+  analyze:
+    name: Analyze
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -73,10 +114,94 @@ jobs:
       - name: Analyze
         run: flutter analyze --no-fatal-warnings --no-fatal-infos
 
+  test:
+    name: Test (shard ${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Esta lista es el NÚMERO de shards. Los valores son 0-based a propósito:
+        # coinciden con el `--shard-index` de cada job, así que un
+        # "Test (shard 2)" en rojo se reproduce local con el mismo 2.
+        #
+        # Los valores NO alimentan el reparto: eso sale de `strategy.job-*`, que
+        # GitHub deriva del largo de esta lista. Agregar una entrada reparte la
+        # suite sola, sin ningún total escrito a mano que se pueda desincronizar.
+        shard: [0, 1, 2, 3]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Flutter
+        # MISMA versión que `analyze` y que `visual-gate`. Ver el comentario del
+        # gate visual acá abajo: los goldens están atados a esta rasterización.
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.9'
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
       # El gate duro: si el código no compila o falla algún test, el job falla
       # y (con branch protection activada) el PR NO se puede mergear.
+      #
+      # Acá nos hacemos cargo del descubrimiento de tests, que es la parte cara
+      # de este enfoque: si la lista sale corta, hay tests que no corren y el
+      # job igual da VERDE. Ese es el peor modo de falla que puede tener un
+      # gate, así que la lista se arma dos veces por caminos independientes
+      # —el filesystem y el índice de git— y tienen que coincidir exactamente.
+      # Un `*_test.dart` sin trackear, o un patrón mal escrito, separa las dos
+      # listas y el job frena acá en vez de mentir en verde.
+      #
+      # El reparto en sí no necesita guard: `NR % total == index` le asigna a
+      # cada línea exactamente un residuo, así que los shards son una partición
+      # por construcción. Lo único que puede estar mal es la lista de entrada,
+      # y de eso se ocupa el diff de arriba.
       - name: Run tests
-        run: flutter test
+        # Los índices entran por `env:` y no interpolados adentro del script.
+        # `${{ }}` dentro de un `run:` lo sustituye GitHub ANTES de que bash vea
+        # la línea: acá los valores son enteros del propio contexto `strategy`,
+        # pero el patrón es el mismo que convierte el título de un PR en código
+        # ejecutable, y no vale la pena tenerlo escrito como ejemplo a copiar.
+        env:
+          SHARD_TOTAL: ${{ strategy.job-total }}
+          SHARD_INDEX: ${{ strategy.job-index }}
+        run: |
+          set -euo pipefail
+
+          find test -name '*_test.dart' -type f | sort > /tmp/tests-fs.txt
+          git ls-files 'test/**/*_test.dart' | sort > /tmp/tests-git.txt
+
+          if ! diff -q /tmp/tests-fs.txt /tmp/tests-git.txt > /dev/null; then
+            echo "::error::La lista de tests no coincide entre el filesystem y git."
+            echo "::error::Con listas distintas no se puede garantizar que la suite corra entera."
+            diff /tmp/tests-git.txt /tmp/tests-fs.txt || true
+            exit 1
+          fi
+
+          TOTAL_FILES=$(wc -l < /tmp/tests-fs.txt)
+          if [ "$TOTAL_FILES" -eq 0 ]; then
+            echo "::error::No se encontró ningún archivo *_test.dart. Falla en vez de pasar en verde vacío."
+            exit 1
+          fi
+
+          # Lectura portable a array. NO se usa `mapfile`: el runner tiene bash 5
+          # y lo soportaría, pero macOS sigue trayendo bash 3.2.57 y ahí no
+          # existe. Con `mapfile` el comando de este job no se puede pegar en la
+          # terminal de un dev para reproducir un shard rojo, que es medio punto
+          # de que el índice del shard esté en el nombre del job.
+          FILES=()
+          while IFS= read -r f; do FILES+=("$f"); done \
+            < <(awk -v t="$SHARD_TOTAL" -v i="$SHARD_INDEX" 'NR % t == i' /tmp/tests-fs.txt)
+          if [ "${#FILES[@]}" -eq 0 ]; then
+            echo "::error::Este shard quedó sin archivos. Hay más shards que tests, o la lista se rompió."
+            exit 1
+          fi
+
+          echo "shard $SHARD_INDEX/$SHARD_TOTAL: ${#FILES[@]} de $TOTAL_FILES archivos"
+          flutter test "${FILES[@]}"
 
   # Gate de regresion visual del Coach Hub (#761).
   #
@@ -115,8 +240,8 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Set up Flutter
-        # MISMA version que analyze-and-test. Si se mueve una, se mueve la
-        # otra: los goldens estan atados a esta rasterizacion.
+        # MISMA versión que `analyze` y `test`. Si se mueve una, se mueven
+        # las otras: los goldens están atados a esta rasterización.
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.41.9'
@@ -406,7 +531,7 @@ jobs:
   # Mismo agujero que documenta `rules-test` acá arriba, con otro directorio.
   # Los tests de `scripts/test/` —los guards que deciden si un script de
   # `scripts/` puede escribir contra producción— no los corría NINGÚN job:
-  # `analyze-and-test` es Flutter, `functions-*` tiene su testMatch acotado a
+  # `analyze`/`test` son Flutter, `functions-*` tiene su testMatch acotado a
   # `functions/src/__tests__/`, y `rules-test` sólo toca `scripts/rules_test/`,
   # que es otro paquete con su propio lockfile. La única ejecución era que
   # alguien se acordara de correr `npm --prefix scripts test` a mano.
