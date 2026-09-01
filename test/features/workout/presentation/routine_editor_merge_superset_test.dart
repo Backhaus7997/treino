@@ -217,6 +217,58 @@ void main() {
     expect(find.text('A3'), findsOneWidget);
   });
 
+  testWidgets('unir con el de ABAJO también agrupa', (tester) async {
+    await _pumpEditor(tester);
+    await _agregarVarios(tester, ['Press de Banca', 'Press Militar']);
+
+    await _abrirMenu(tester, 0);
+    await tester.tap(find.text('Unir con el de abajo'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SupersetBlock), findsOneWidget);
+    expect(find.text('A1'), findsOneWidget);
+    expect(find.text('A2'), findsOneWidget);
+  });
+
+  testWidgets('unir hacia abajo SUMA a una superserie que ya existe',
+      (tester) async {
+    // El caso que pidió el uso: la superserie está abajo y querés meterte en
+    // ella, sin reordenar nada primero.
+    await _pumpEditor(tester);
+    await _agregarVarios(
+        tester, ['Press de Banca', 'Press Militar', 'Aperturas con Cable']);
+
+    // Armo la superserie con los DOS ÚLTIMOS.
+    await _abrirMenu(tester, 2);
+    await tester.tap(find.text('Unir con el de arriba'));
+    await tester.pumpAndSettle();
+    expect(find.byType(SupersetBlock), findsOneWidget);
+    expect(find.text('A3'), findsNothing, reason: 'todavía son dos');
+
+    // Ahora el PRIMERO se suma a esa superserie, hacia abajo.
+    await _abrirMenu(tester, 0);
+    await tester.tap(find.text('Unir con el de abajo'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SupersetBlock), findsOneWidget,
+        reason: 'UN bloque de tres, no dos: se sumó al grupo existente en vez '
+            'de estrenar uno');
+    expect(find.text('A3'), findsOneWidget);
+  });
+
+  testWidgets('el último no tiene con quién unirse hacia abajo',
+      (tester) async {
+    await _pumpEditor(tester);
+    await _agregarVarios(tester, ['Press de Banca', 'Press Militar']);
+
+    await _abrirMenu(tester, 1);
+    final item = find.byKey(
+      const Key('exercise_sheet_action__SlotAction.mergeWithNext'),
+    );
+    expect(item, findsOneWidget);
+    expect(tester.widget<InkWell>(item).onTap, isNull);
+  });
+
   testWidgets('un ejercicio suelto no ofrece "sacar de la superserie"',
       (tester) async {
     await _pumpEditor(tester);

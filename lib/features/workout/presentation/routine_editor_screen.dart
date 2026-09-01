@@ -2150,32 +2150,39 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     });
   }
 
-  /// Une el slot [absIndex] con el que tiene ARRIBA en la lista visible, en
-  /// una superserie.
+  /// Une el slot [absIndex] con su vecino en la lista VISIBLE: el de arriba
+  /// con `dir: -1`, el de abajo con `dir: 1`.
   ///
-  /// "El de arriba" es el anterior VISIBLE, no el anterior del modelo: un slot
-  /// borrado "sólo de esta semana" sigue en `day.slots` y no se renderiza
-  /// (ADR-WPRES), así que unir con el índice crudo agruparía con un ejercicio
-  /// que el usuario no tiene delante.
+  /// Las dos direcciones hacen falta y no son la misma cosa desde el lugar del
+  /// usuario: unir hacia abajo es cómo se suma un ejercicio a una superserie
+  /// que YA existe más abajo, sin tener que reordenar nada primero.
   ///
-  /// Si el de arriba ya está en un grupo, este se suma a ese —y queda
-  /// consecutivo, porque está justo después—. Si no, los dos estrenan uno.
-  void _unirConAnterior(int dayIndex, int absIndex) {
+  /// El vecino es el VISIBLE, no el del modelo: un slot borrado "sólo de esta
+  /// semana" sigue en `day.slots` y no se renderiza (ADR-WPRES), así que unir
+  /// por índice crudo agruparía con un ejercicio que el usuario no tiene
+  /// delante.
+  void _unirConVecino(int dayIndex, int absIndex, {required int dir}) {
     final day = _days[dayIndex];
     final visibles = [
       for (var i = 0; i < day.slots.length; i++)
         if (day.slots[i].isPresentInWeek(_selectedWeek)) i,
     ];
     final pos = visibles.indexOf(absIndex);
-    if (pos <= 0) return;
-    final anterior = day.slots[visibles[pos - 1]];
+    final destino = pos + dir;
+    if (pos < 0 || destino < 0 || destino >= visibles.length) return;
+
+    final vecino = day.slots[visibles[destino]];
     final actual = day.slots[absIndex];
 
     _markDirty();
     setState(() {
-      final grupo = anterior.supersetGroup ??
+      // Si el vecino ya está en un grupo, éste se suma a ESE en vez de
+      // estrenar uno. Y queda consecutivo en las dos direcciones: hacia arriba
+      // porque está justo después del último del grupo, hacia abajo porque
+      // está justo antes del primero.
+      final grupo = vecino.supersetGroup ??
           (day.slots.map((s) => s.supersetGroup ?? 0).fold(0, max)) + 1;
-      anterior.supersetGroup = grupo;
+      vecino.supersetGroup = grupo;
       actual.supersetGroup = grupo;
     });
   }
@@ -3042,7 +3049,9 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                       onQuickAdd: (id, entry) => _agregarPorEntradaRapida(
                           context, _selectedDayIndex, id, entry),
                       onMergeSlotWithPrevious: (i) =>
-                          _unirConAnterior(_selectedDayIndex, i),
+                          _unirConVecino(_selectedDayIndex, i, dir: -1),
+                      onMergeSlotWithNext: (i) =>
+                          _unirConVecino(_selectedDayIndex, i, dir: 1),
                       onUngroupSlot: (i) =>
                           _separarDeGrupo(_selectedDayIndex, i),
                       slotIsValid: (slot) {
@@ -3399,6 +3408,7 @@ class _DayExpansionTile extends StatefulWidget {
     this.onQuickSearch,
     this.onQuickAdd,
     this.onMergeSlotWithPrevious,
+    this.onMergeSlotWithNext,
     this.onUngroupSlot,
   });
 
@@ -3444,6 +3454,7 @@ class _DayExpansionTile extends StatefulWidget {
   /// Une el slot con el de arriba en una superserie, y lo saca de ella. Null
   /// esconde las dos acciones — el editor web del Coach Hub no las ofrece.
   final void Function(int absIndex)? onMergeSlotWithPrevious;
+  final void Function(int absIndex)? onMergeSlotWithNext;
   final void Function(int absIndex)? onUngroupSlot;
 
   @override
@@ -3664,6 +3675,9 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
           onMergeWithPrevious: widget.onMergeSlotWithPrevious == null
               ? null
               : () => widget.onMergeSlotWithPrevious!(idx),
+          onMergeWithNext: widget.onMergeSlotWithNext == null
+              ? null
+              : () => widget.onMergeSlotWithNext!(idx),
         ));
       } else {
         // Superset block — the whole block moves as one unit. Only the
@@ -4161,6 +4175,7 @@ class _SlotEditor extends StatefulWidget {
     this.isTrainerMode = false,
     this.supersetPosition,
     this.onMergeWithPrevious,
+    this.onMergeWithNext,
     this.onUngroup,
   });
 
@@ -4203,9 +4218,14 @@ class _SlotEditor extends StatefulWidget {
   /// agarre.
   final int? supersetPosition;
 
-  /// Une este ejercicio con el de arriba, en una superserie. Null cuando no
-  /// aplica — el editor web del Coach Hub no ofrece el gesto.
+  /// Une este ejercicio con el de arriba o con el de abajo, en una superserie.
+  /// Null cuando no aplica — el editor web del Coach Hub no ofrece el gesto.
+  ///
+  /// Las dos direcciones no son la misma cosa desde el lugar del usuario: unir
+  /// hacia abajo es cómo se suma un ejercicio a una superserie que YA existe
+  /// más abajo, sin reordenar nada primero.
   final VoidCallback? onMergeWithPrevious;
+  final VoidCallback? onMergeWithNext;
 
   /// Lo saca de su superserie.
   final VoidCallback? onUngroup;
@@ -4291,16 +4311,22 @@ class _SlotEditorState extends State<_SlotEditor> {
         // Unir / separar. El botón `+ Superserie` del día sigue haciendo lo
         // suyo —abrir el picker y agregar ejercicios NUEVOS agrupados—; esto
         // es el camino que faltaba, para ejercicios que ya están cargados.
-        if (widget.supersetPosition == null)
+        if (widget.supersetPosition == null) ...[
           ExerciseAction(
             id: _SlotAction.mergeWithPrevious,
             label: l10n.routineEditorSlotMenuMergeUp,
             icon: TreinoIcon.streak,
             // Deshabilitada en el primero: no hay con quién unirse hacia
-            // arriba.
+            // arriba. `canMoveUp` ya sabe si hay un bloque antes.
             enabled: widget.onMergeWithPrevious != null && widget.canMoveUp,
-          )
-        else
+          ),
+          ExerciseAction(
+            id: _SlotAction.mergeWithNext,
+            label: l10n.routineEditorSlotMenuMergeDown,
+            icon: TreinoIcon.streak,
+            enabled: widget.onMergeWithNext != null && widget.canMoveDown,
+          ),
+        ] else
           ExerciseAction(
             id: _SlotAction.ungroup,
             label: l10n.routineEditorSlotMenuUngroup,
@@ -4329,6 +4355,8 @@ class _SlotEditorState extends State<_SlotEditor> {
         widget.onCopyPrevious?.call();
       case _SlotAction.mergeWithPrevious:
         widget.onMergeWithPrevious?.call();
+      case _SlotAction.mergeWithNext:
+        widget.onMergeWithNext?.call();
       case _SlotAction.ungroup:
         widget.onUngroup?.call();
       case _SlotAction.remove:
@@ -4542,6 +4570,10 @@ enum _SlotAction {
   /// así que el caso normal —cargás dos por separado y después decidís hacerlos
   /// juntos— obligaba a borrarlos y volver a agregarlos.
   mergeWithPrevious,
+
+  /// Unir con el de abajo. Es cómo se suma un ejercicio a una superserie que
+  /// ya existe más abajo, sin reordenar nada primero.
+  mergeWithNext,
 
   /// Sacar este ejercicio de su superserie.
   ungroup,

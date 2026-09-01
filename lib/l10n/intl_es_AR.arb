@@ -3643,5 +3643,9 @@
     "description": "Agrupa este ejercicio con el anterior en una superserie. Es el camino que faltaba para ejercicios YA cargados: el botón + Superserie sólo agrega ejercicios nuevos agrupados."
   },
   "routineEditorSlotMenuUngroup": "Sacar de la superserie",
-  "@routineEditorSlotMenuUngroup": {}
+  "@routineEditorSlotMenuUngroup": {},
+  "routineEditorSlotMenuMergeDown": "Unir con el de abajo",
+  "@routineEditorSlotMenuMergeDown": {
+    "description": "Agrupa este ejercicio con el siguiente. Sirve sobre todo para sumarse a una superserie que ya existe más abajo."
+  }
 }

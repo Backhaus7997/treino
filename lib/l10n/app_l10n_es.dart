@@ -4244,6 +4244,9 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get routineEditorSlotMenuUngroup => 'Sacar de la superserie';
+
+  @override
+  String get routineEditorSlotMenuMergeDown => 'Unir con el de abajo';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -8483,4 +8486,7 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get routineEditorSlotMenuUngroup => 'Sacar de la superserie';
+
+  @override
+  String get routineEditorSlotMenuMergeDown => 'Unir con el de abajo';
 }

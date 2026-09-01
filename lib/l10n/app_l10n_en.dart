@@ -4182,4 +4182,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get routineEditorSlotMenuUngroup => 'Remove from superset';
+
+  @override
+  String get routineEditorSlotMenuMergeDown => 'Merge with the one below';
 }

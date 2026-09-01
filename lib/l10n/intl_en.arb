@@ -1765,5 +1765,7 @@
   "routineEditorSlotMenuMergeUp": "Merge with the one above",
   "@routineEditorSlotMenuMergeUp": {},
   "routineEditorSlotMenuUngroup": "Remove from superset",
-  "@routineEditorSlotMenuUngroup": {}
+  "@routineEditorSlotMenuUngroup": {},
+  "routineEditorSlotMenuMergeDown": "Merge with the one below",
+  "@routineEditorSlotMenuMergeDown": {}
 }

@@ -7394,6 +7394,12 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Sacar de la superserie'**
   String get routineEditorSlotMenuUngroup;
+
+  /// Agrupa este ejercicio con el siguiente. Sirve sobre todo para sumarse a una superserie que ya existe más abajo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Unir con el de abajo'**
+  String get routineEditorSlotMenuMergeDown;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {
