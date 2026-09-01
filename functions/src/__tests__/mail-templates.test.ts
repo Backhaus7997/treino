@@ -585,6 +585,54 @@ describe("mails del paywall del PF", () => {
     expect(frase("loquesea")).toContain("Cambió tu suscripción.");
   });
 
+  // Los tres salieron de LEER el mail renderizado, no el codigo. Ninguno
+  // rompia un test ni el compilador.
+  it("plan3 no dice 'seguís con alumnos sin límite'", () => {
+    const out = renderMail("subscription-grace", { tier: "plan3", limit: "sin-tope" });
+
+    expect(out.text).not.toContain("seguís con alumnos sin límite");
+    expect(out.text).toContain("seguís sin límite de alumnos");
+  });
+
+  // "Ampliá tu plan" sobre una pausa manda a comprar mas de algo que el PF ya
+  // pago: el problema ahi no es el tamaño del plan, es que no esta al dia.
+  it("solo pide ampliar el plan cuando la causa ES el plan", () => {
+    const pausa = renderMail("subscription-downgraded", {
+      limit: 2, blockedCount: 3, reason: "paused",
+    });
+    const bajada = renderMail("subscription-downgraded", {
+      limit: 7, blockedCount: 3, reason: "tier-change",
+    });
+
+    expect(pausa.text).toContain("poné tu suscripción al día");
+    expect(pausa.text).not.toContain("ampliá tu plan");
+    expect(pausa.html).toContain("REGULARIZAR MI SUSCRIPCIÓN");
+
+    expect(bajada.text).toContain("ampliá tu plan");
+    expect(bajada.html).toContain("AMPLIAR MI PLAN");
+  });
+
+  it("una causa desconocida pide regularizar, no ampliar", () => {
+    const out = renderMail("subscription-downgraded", {
+      limit: 2, blockedCount: 1, reason: "loquesea",
+    });
+
+    expect(out.html).toContain("REGULARIZAR MI SUSCRIPCIÓN");
+  });
+
+  // Le decia "para volver a trabajar con todos, ampliá tu plan" a alguien que
+  // YA esta trabajando con todos: un pedido de plata sobre un problema que no
+  // existe. Y "tus alumnos no pierden nada" inventaba una preocupacion.
+  it("sin bloqueados no pide plata ni inventa una preocupacion", () => {
+    const out = renderMail("subscription-downgraded", {
+      tier: "plan1", limit: 7, blockedCount: 0, reason: "tier-change",
+    });
+
+    expect(out.text).toContain("Ninguno de tus alumnos quedó fuera de tu cupo.");
+    expect(out.text).not.toContain("ampliá tu plan");
+    expect(out.text).not.toContain("no pierden nada");
+  });
+
   it("con 0 bloqueados no dibuja la linea de solo lectura", () => {
     const out = renderMail("subscription-downgraded", {
       tier: "plan1", limit: 7, blockedCount: 0, reason: "tier-change",
@@ -617,10 +665,15 @@ describe("mails del paywall del PF", () => {
     }
   });
 
-  it("el centinela de plan3 si se anuncia como sin limite", () => {
+  // El centinela se distingue de un limite ilegible: uno dice "sin límite", el
+  // otro "más bajo". Lo que se prueba acá es que se RECONOCE, no la redaccion
+  // exacta — de eso se ocupa el test de la frase de arriba.
+  it("el centinela de plan3 se reconoce como sin tope", () => {
     const out = renderMail("subscription-grace", { tier: "plan3", limit: "sin-tope" });
 
-    expect(out.text).toContain("alumnos sin límite");
+    expect(out.text).toContain("sin límite");
+    expect(out.text).not.toContain("sin-tope");
+    expect(out.text).not.toContain("NaN");
   });
 
   it("un conteo roto no imprime NaN", () => {

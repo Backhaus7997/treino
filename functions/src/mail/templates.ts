@@ -657,10 +657,19 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
         // El limite solo se nombra si se conoce. Sin el, la frase sigue siendo
         // cierta y completa: lo que el PF necesita saber acá es que TODAVIA no
         // cambio nada.
+        //
+        // El plan3 NO puede usar `cupoLabel` acá. Esa funcion devuelve un
+        // SUSTANTIVO ("alumnos sin límite"), que encaja en "tu plan incluye ___"
+        // y en "el plan Free (___)" pero no despues de "seguís con": salia
+        // "seguís con alumnos sin límite". Se ve leyendo el mail renderizado y
+        // no leyendo el codigo, que es por lo que esta frase esta partida.
         limit === undefined
           ? ["Por ahora no cambia nada y tus alumnos no pierden nada."]
-          : ["Por ahora no cambia nada: seguís con ", strong(cupoLabel(limit)),
-            " y tus alumnos no pierden nada."],
+          : limit === null
+            ? ["Por ahora no cambia nada: seguís ", strong("sin límite de alumnos"),
+              " y tus alumnos no pierden nada."]
+            : ["Por ahora no cambia nada: seguís con ", strong(cupoLabel(limit)),
+              " y tus alumnos no pierden nada."],
         [
           "Si el cobro no entra, tu cuenta pasa al límite del plan Free (",
           strong(FREE_CUPO_LABEL),
@@ -701,18 +710,44 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
         : [downgradeReason(params.reason), " Tu cuenta pasa a un límite de ",
           strong(cupoLabel(limit)), "."],
     ];
+    // "Ampliá tu plan" es el pedido correcto SOLO cuando el PF bajo de plan a
+    // proposito. En una pausa, un `pending` o un vencimiento el problema no es
+    // que el plan sea chico —puede ser el mas caro— sino que la suscripcion no
+    // esta al dia, y mandarlo a comprar mas de algo que ya pago es el consejo
+    // equivocado con la plata de otro. Es la misma bifurcacion que hace el PR
+    // #758 en el boton de `blocked_students_screen.dart`.
+    //
+    // Una causa DESCONOCIDA cae del lado de "regularizar": es el pedido mas
+    // neutro de los dos y no le atribuye al PF una decision que no sabemos si
+    // tomo.
+    const esBajadaDePlan = String(params.reason ?? "") === "tier-change";
+
     if (blocked > 0) {
-      lines.push([
-        blocked === 1
-          ? "1 alumno quedó en solo lectura: "
-          : `${blocked} alumnos quedaron en solo lectura: `,
-        "los podés ver, pero no editarles rutinas ni notas.",
-      ]);
+      lines.push(
+        [
+          blocked === 1
+            ? "1 alumno quedó en solo lectura: "
+            : `${blocked} alumnos quedaron en solo lectura: `,
+          "los podés ver, pero no editarles rutinas ni notas.",
+        ],
+        ["Tus alumnos no pierden nada: conservan sus rutinas, su historial y el chat."],
+        [
+          esBajadaDePlan
+            ? "Para volver a trabajar con todos, ampliá tu plan."
+            : "Para volver a trabajar con todos, poné tu suscripción al día.",
+        ],
+      );
+    } else {
+      // SIN BLOQUEADOS EL MAIL CAMBIA DE SENTIDO, no solo de largo.
+      //
+      // Con la lista fija decia "Para volver a trabajar con todos, ampliá tu
+      // plan" a un PF que YA esta trabajando con todos: un pedido de plata
+      // sobre un problema que no existe. Y "tus alumnos no pierden nada"
+      // introduce una preocupacion que nadie tenia. Lo unico cierto y util acá
+      // es que el limite cambio y que no lo toco — la misma frase que usa la
+      // pantalla del PR #758 para este estado.
+      lines.push(["Ninguno de tus alumnos quedó fuera de tu cupo."]);
     }
-    lines.push(
-      ["Tus alumnos no pierden nada: conservan sus rutinas, su historial y el chat."],
-      ["Para volver a trabajar con todos, ampliá tu plan."],
-    );
 
     return build(
       blocked > 0
@@ -720,7 +755,7 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
         : "Cambió tu límite de alumnos en TREINO",
       blocked > 0 ? "Alumnos en solo lectura" : "Cambió tu límite",
       lines,
-      "AMPLIAR MI PLAN",
+      esBajadaDePlan ? "AMPLIAR MI PLAN" : "REGULARIZAR MI SUSCRIPCIÓN",
       ctaUrl,
     );
   }
