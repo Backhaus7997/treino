@@ -154,7 +154,7 @@ proporcional.
 
 ## 7. Cómo pedir tus datos
 
-Escribinos a [[PENDIENTE — casilla bajo `gettreino.com`]] con el correo de tu cuenta.
+Escribinos a treino@gettreino.com con el correo de tu cuenta.
 Te entregamos todo lo que consta sobre vos, **incluidos los registros privados
 de tu entrenador**, dentro de los 10 días corridos. Es gratuito.
 

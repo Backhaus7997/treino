@@ -208,7 +208,7 @@ caiga entera.]]
 ## 11. Contacto
 
 **BACKHAUSTIN S.A.S.** — CUIT 30-71929587-4
-Correo: [[PENDIENTE — casilla bajo `gettreino.com`]]
+Correo: treino@gettreino.com
 
 ---
 ---

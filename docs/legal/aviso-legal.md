@@ -20,7 +20,7 @@ TREINO es un servicio prestado por:
 | **Inscripción** | Registro Público de Córdoba, Protocolo de Contratos y Disoluciones, Matrícula N° 46468-A |
 | **Constitución** | 23 de enero de 2026, régimen de la Ley 27.349 |
 | **Resolución** | Dirección General de Inspección de Personas Jurídicas de la Provincia de Córdoba, 5 de febrero de 2026 — Expte. 0007-288597/2026 |
-| **Correo de contacto** | [[PENDIENTE — casilla bajo `gettreino.com`]] |
+| **Correo de contacto** | treino@gettreino.com |
 | **Sitio** | gettreino.com |
 
 ## Naturaleza del servicio

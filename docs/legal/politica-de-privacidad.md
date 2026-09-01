@@ -11,8 +11,8 @@ dart: kPrivacySections
 
 > ⚠️ **BORRADOR — NO PUBLICAR TODAVÍA.**
 > Redactado contra el código y las reglas de Firestore, verificado el 2026-08-31.
-> Titular identificado el 2026-08-31. Los `[[PENDIENTE]]` restantes son el
-> domicilio y la casilla. Requiere revisión de un
+> Titular, sede social y casilla de contacto resueltos. Lo que queda pendiente
+> son las decisiones D2/D3/D4/D6 y la fecha de publicación. Requiere revisión de un
 > profesional legal antes de publicarse. Ver
 > [`AUDITORIA-legal-vigente.md`](./AUDITORIA-legal-vigente.md).
 
@@ -30,8 +30,7 @@ El responsable del tratamiento de tus datos personales es:
   de 2026 (Expte. 0007-288597/2026). Constituida el 23 de enero de 2026 bajo el
   régimen de la Ley 27.349.
 - **Domicilio legal:** Molino de Torres 5301, Córdoba Capital, Provincia de Córdoba (CP 5021), República Argentina
-- **Correo de contacto y ejercicio de derechos:** [[PENDIENTE — casilla real
-  bajo `gettreino.com`]]
+- **Correo de contacto y ejercicio de derechos:** treino@gettreino.com
 
 **TREINO es un servicio prestado por BACKHAUSTIN S.A.S.** En esta política,
 «TREINO», «nosotros» y «la app» refieren a esa sociedad.
@@ -360,7 +359,7 @@ La fecha del encabezado indica la última actualización.
 
 **BACKHAUSTIN S.A.S.** — CUIT 30-71929587-4
 Domicilio: Molino de Torres 5301, Córdoba Capital, Provincia de Córdoba (CP 5021), República Argentina
-Correo: [[PENDIENTE — casilla bajo `gettreino.com`]]
+Correo: treino@gettreino.com
 
 **Autoridad de control:** Agencia de Acceso a la Información Pública (AAIP),
 República Argentina.

@@ -144,8 +144,9 @@ y pasa a ser un error de build.
 
 1. Completar los `[[PENDIENTE]]` restantes. El titular ya está identificado —
    **BACKHAUSTIN S.A.S.**, CUIT 30-71929587-4, matrícula 46468-A del Registro
-   Público de Córdoba, con sede en Molino de Torres 5301, Córdoba Capital.
-   **Falta sólo la casilla de contacto bajo `gettreino.com`.**
+   Público de Córdoba, con sede en Molino de Torres 5301, Córdoba Capital, y
+   casilla `treino@gettreino.com`. **Los datos del titular están completos.**
+   Lo que queda es la fecha de publicación y las cuatro decisiones pendientes.
 2. Revisión de un profesional legal. Obligatoria para el descargo médico y el
    contrato del PF; recomendable para el resto.
 3. Portar el texto a `legal_content.dart` y publicar en `gettreino.com/legal/*`.

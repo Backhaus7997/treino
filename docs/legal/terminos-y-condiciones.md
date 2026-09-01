@@ -272,4 +272,4 @@ ser la misma. Ver la pregunta correspondiente en la sección 6.2 de
 
 **BACKHAUSTIN S.A.S.** — CUIT 30-71929587-4
 Domicilio: Molino de Torres 5301, Córdoba Capital, Provincia de Córdoba (CP 5021), República Argentina
-Correo: [[PENDIENTE — casilla bajo `gettreino.com`]]
+Correo: treino@gettreino.com
