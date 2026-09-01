@@ -135,6 +135,37 @@ test('entitlements: el associated domain apunta al mismo host', () => {
   assert.ok(ent.includes(`applinks:${HOST}`));
 });
 
+// ── Las paginas de fallback ───────────────────────────────────────────────
+
+test('la pagina del PROFE redirige sola al Coach Hub', () => {
+  const html = leer('web/abrir/profe.html');
+
+  // Si esta pagina se ve, el App Link no intercepto: no hay app, o el mail se
+  // abrio en una computadora. El profe SI tiene a donde ir, asi que un segundo
+  // click es peaje.
+  assert.match(html, /http-equiv="refresh"[^>]*app\.gettreino\.com/);
+});
+
+test('la pagina del ALUMNO no redirige a ningun lado', () => {
+  const html = leer('web/abrir/alumno.html');
+
+  // El atleta no tiene equivalente web: el Coach Hub lo rebota contra el gate
+  // de rol de `coach_hub_router.dart`. Mandarlo ahi seria cambiar una pantalla
+  // que explica por una que lo expulsa. Esta asimetria es deliberada y es la
+  // razon de que sean dos paginas y no una.
+  assert.ok(!html.includes('http-equiv="refresh"'));
+});
+
+test('el redirect del profe no apunta adentro de /abrir', () => {
+  const html = leer('web/abrir/profe.html');
+  const m = html.match(/http-equiv="refresh" content="0;url=([^"]+)"/);
+
+  assert.ok(m, 'No se encontro el meta-refresh');
+  // Apuntar a /abrir/* haria que el App Link lo re-interceptara: un bucle
+  // entre el navegador y la app.
+  assert.ok(!m[1].includes(PREFIJO), `El redirect entra en ${PREFIJO}: ${m[1]}`);
+});
+
 // ── El servidor ───────────────────────────────────────────────────────────
 
 test('vercel: los .well-known se sirven antes del catch-all del SPA', () => {

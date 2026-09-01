@@ -8,6 +8,26 @@
 <title>Abrí TREINO</title>
 <link rel="stylesheet" href="/abrir/_estilo.css">
 <!--
+  Redirect inmediato al Coach Hub.
+
+  Esta pagina es el FALLBACK de un App Link: si se esta viendo es porque el
+  sistema operativo NO intercepto la URL — no hay app instalada, o el mail se
+  abrio en una computadora. En los dos casos el profe SI tiene a donde ir, asi
+  que hacerle tocar un segundo boton es puro peaje.
+
+  El alumno NO lleva esto porque no tiene equivalente web: el Coach Hub lo
+  rebota contra el gate de rol. Su pagina tiene que explicar, no redirigir.
+  Esa asimetria es la misma que separo las dos paginas.
+
+  No hay loop: el App Link cubre solo `/abrir/*` —pathPrefix en el manifest,
+  paths en el AASA— asi que la raiz de app.gettreino.com nunca se
+  re-intercepta.
+
+  Meta-refresh y no JS: funciona con scripts bloqueados, que es exactamente el
+  escenario de alguien abriendo un link desde un cliente de mail.
+-->
+<meta http-equiv="refresh" content="0;url=https://app.gettreino.com">
+<!--
   Destino de los mails que van a ENTRENADORES: solicitud de vínculo,
   cancelación de un turno hecha por el atleta.
 
@@ -32,9 +52,10 @@
     <span>TREINO</span>
   </div>
 
-  <h1>Entrá al Coach Hub</h1>
+  <h1>Te llevamos al Coach Hub</h1>
   <p>
-    Desde el navegador tenés tu agenda, tus alumnos, las rutinas y los pagos.
+    Ahí tenés tu agenda, tus alumnos, las rutinas y los pagos.
+    Si no se abrió solo, tocá el botón.
   </p>
 
   <a class="cta" href="https://app.gettreino.com">IR AL COACH HUB</a>
