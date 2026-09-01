@@ -76,9 +76,14 @@ test('assetlinks: el package coincide con el applicationId de Gradle', () => {
 test('manifest: hay un intent-filter con autoVerify para el host', () => {
   const manifest = leer('android/app/src/main/AndroidManifest.xml');
 
-  assert.match(manifest, /android:autoVerify="true"/);
-  assert.match(manifest, new RegExp(`android:host="${HOST}"`));
-  assert.match(manifest, new RegExp(`android:pathPrefix="${PREFIJO}"`));
+  // `includes` y no `match`: interpolar el host en un RegExp deja los puntos
+  // como comodines, asi que `app.gettreino.com` matchearia tambien
+  // `appXgettreinoYcom`. En una guarda cuyo unico trabajo es cazar un host
+  // equivocado, eso es justo lo que no puede pasar. Lo marco CodeQL
+  // (js/incomplete-hostname-regexp) y tenia razon.
+  assert.ok(manifest.includes('android:autoVerify="true"'));
+  assert.ok(manifest.includes(`android:host="${HOST}"`));
+  assert.ok(manifest.includes(`android:pathPrefix="${PREFIJO}"`));
 });
 
 test('manifest: el intent-filter acota por path, no se come todo el host', () => {
@@ -126,8 +131,8 @@ test('AASA: acota a /abrir/*, igual que Android', () => {
 test('entitlements: el associated domain apunta al mismo host', () => {
   const ent = leer('ios/Runner/Runner.entitlements');
 
-  assert.match(ent, /com\.apple\.developer\.associated-domains/);
-  assert.match(ent, new RegExp(`applinks:${HOST}`));
+  assert.ok(ent.includes('com.apple.developer.associated-domains'));
+  assert.ok(ent.includes(`applinks:${HOST}`));
 });
 
 // ── El servidor ───────────────────────────────────────────────────────────
