@@ -29,8 +29,7 @@ El responsable del tratamiento de tus datos personales es:
   Inspección de Personas Jurídicas de la Provincia de Córdoba del 5 de febrero
   de 2026 (Expte. 0007-288597/2026). Constituida el 23 de enero de 2026 bajo el
   régimen de la Ley 27.349.
-- **Domicilio legal:** [[PENDIENTE — sede social inscripta. Está en el
-  Instrumento Constitutivo, no en la resolución de IPJ]]
+- **Domicilio legal:** Molino de Torres 5301, Córdoba Capital, Provincia de Córdoba (CP 5021), República Argentina
 - **Correo de contacto y ejercicio de derechos:** [[PENDIENTE — casilla real
   bajo `gettreino.com`]]
 
@@ -360,7 +359,7 @@ La fecha del encabezado indica la última actualización.
 ## 14. Contacto
 
 **BACKHAUSTIN S.A.S.** — CUIT 30-71929587-4
-Domicilio: [[PENDIENTE — sede social inscripta]]
+Domicilio: Molino de Torres 5301, Córdoba Capital, Provincia de Córdoba (CP 5021), República Argentina
 Correo: [[PENDIENTE — casilla bajo `gettreino.com`]]
 
 **Autoridad de control:** Agencia de Acceso a la Información Pública (AAIP),

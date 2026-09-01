@@ -33,7 +33,7 @@ su reemplazo, y hay que portarlos ahí y publicarlos en `gettreino.com/legal/*`.
 **BACKHAUSTIN S.A.S.** — CUIT 30-71929587-4. Constituida el 23 de enero de 2026
 (Ley 27.349), inscripta por resolución de la Dirección General de Inspección de
 Personas Jurídicas de Córdoba del 5 de febrero de 2026, matrícula N° 46468-A.
-TREINO es un servicio prestado por esa sociedad.
+Sede social: Molino de Torres 5301, Córdoba Capital, Provincia de Córdoba (CP 5021), República Argentina. TREINO es un servicio prestado por esa sociedad.
 
 ## Cuentas de las tiendas — pendiente de decisión
 
@@ -144,8 +144,8 @@ y pasa a ser un error de build.
 
 1. Completar los `[[PENDIENTE]]` restantes. El titular ya está identificado —
    **BACKHAUSTIN S.A.S.**, CUIT 30-71929587-4, matrícula 46468-A del Registro
-   Público de Córdoba. Faltan el domicilio de la sede social y la casilla de
-   contacto bajo `gettreino.com`.
+   Público de Córdoba, con sede en Molino de Torres 5301, Córdoba Capital.
+   **Falta sólo la casilla de contacto bajo `gettreino.com`.**
 2. Revisión de un profesional legal. Obligatoria para el descargo médico y el
    contrato del PF; recomendable para el resto.
 3. Portar el texto a `legal_content.dart` y publicar en `gettreino.com/legal/*`.

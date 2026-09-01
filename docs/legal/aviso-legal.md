@@ -16,7 +16,7 @@ TREINO es un servicio prestado por:
 |---|---|
 | **Razón social** | BACKHAUSTIN S.A.S. |
 | **CUIT** | 30-71929587-4 |
-| **Domicilio legal** | [[PENDIENTE — sede social inscripta]] |
+| **Domicilio legal** | Molino de Torres 5301, Córdoba Capital, Provincia de Córdoba (CP 5021), República Argentina |
 | **Inscripción** | Registro Público de Córdoba, Protocolo de Contratos y Disoluciones, Matrícula N° 46468-A |
 | **Constitución** | 23 de enero de 2026, régimen de la Ley 27.349 |
 | **Resolución** | Dirección General de Inspección de Personas Jurídicas de la Provincia de Córdoba, 5 de febrero de 2026 — Expte. 0007-288597/2026 |

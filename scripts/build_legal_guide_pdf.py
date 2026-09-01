@@ -298,6 +298,8 @@ def build_story():
           "Personas Jurídicas de Córdoba, 5 de febrero de 2026. "
           "Expte. 0007-288597/2026"],
          ["Matrícula", "N° 46468-A — Protocolo de Contratos y Disoluciones"],
+         ["Sede social", "Molino de Torres 5301, Córdoba Capital, "
+          "Provincia de Córdoba (CP 5021)"],
          ["Jurisdicción", "Provincia de Córdoba, República Argentina"]],
         [["Frente", "Qué hay que hacer"],
          ["<b>Los trece documentos</b>",
@@ -528,38 +530,61 @@ def build_story():
     ], [30, 67, 68]))
 
     sp(10)
-    A(P("4.2 El problema no es sólo el tipo de cuenta", "h3"))
-    A(P("Hay <b>tres identidades distintas</b> declarando ser responsables del "
-        "mismo producto:"))
+    A(P("4.2 Qué publica Play, y qué está mal hoy", "h3"))
+    A(P("Publicar bajo un nombre de fantasía es práctica estándar y no tiene "
+        "nada de irregular: Play tiene un campo de «nombre de desarrollador» "
+        "separado de la identidad legal, público y modificable cuando se "
+        "quiera. Lo que Play hace por su cuenta es <b>mostrar la identidad "
+        "legal al lado</b>, y ahí es donde está el problema."))
     sp(4)
     A(table([
-        ["Dónde", "Qué dice"],
-        ["Documentos legales", "BACKHAUSTIN S.A.S. — CUIT 30-71929587-4"],
-        ["Play, nombre público en la ficha", "<b>Code assurance dev</b>"],
-        ["Play y Apple, nombre legal", "Martin Backhaus"],
-        ["Sitio declarado en Play", "code-assurance.com, no gettreino.com"],
-        ["La aplicación", "TREINO"],
-    ], [55, 110]))
+        ["Tipo de cuenta", "Qué publica Play en la ficha"],
+        ["<b>Personal</b>",
+         "Nombre legal, país y correo del desarrollador. "
+         "<b>Si la cuenta monetiza, además el domicilio completo</b>"],
+        ["<b>Organización</b>",
+         "Nombre legal, domicilio legal, correo y teléfono"],
+    ], [35, 130]))
     sp(8)
-    A(P("Un usuario que abra TREINO en Play va a ver que la publica «Code "
-        "assurance dev», una empresa que no figura en ninguno de los trece "
-        "documentos legales — y que tampoco es la titular. Eso deja de ser una "
-        "cuestión de prolijidad: es identificación defectuosa del proveedor "
-        "frente al consumidor, que es justamente lo que la normativa de "
-        "defensa del consumidor exige que esté claro."))
+    A(P("Con la cuenta como está, el nombre de fantasía «Code assurance dev» "
+        "queda respaldado por <b>Martin Backhaus, persona física</b> — no por "
+        "BACKHAUSTIN S.A.S., que es quien firma los trece documentos legales. "
+        "El nombre comercial no hay por qué tocarlo; lo que hay que corregir "
+        "es la identidad legal que aparece detrás."))
+    sp(6)
+    A(callout(
+        "<b>No hay un campo suelto de «razón social» que se edite.</b> En Play "
+        "la identidad legal la determina el tipo de cuenta, así que conectar "
+        "el nombre comercial con la sociedad ES la conversión a cuenta de "
+        "organización. Hecha eso, la ficha queda «Code assurance dev» con "
+        "BACKHAUSTIN S.A.S. y su sede detrás. Si el nombre comercial conviene "
+        "o no junto a TREINO es una decisión de marca, no de cumplimiento."))
 
     sp(8)
-    A(P("4.3 El domicilio publicado", "h3"))
-    A(P("La cuenta de Play tiene cargado <b>MZA 9 LOTE 21 S/N, Córdoba 5021</b> "
-        "como domicilio legal de una persona humana. Play publica el domicilio "
-        "del desarrollador en la ficha para las cuentas que monetizan."))
+    A(P("4.3 El domicilio se publica en los dos casos", "h3"))
+    A(P("La sede social inscripta de BACKHAUSTIN S.A.S. y el domicilio "
+        "particular del titular <b>son el mismo</b>: Molino de Torres 5301. "
+        "Eso tiene una consecuencia que conviene tener clara antes de decidir."))
     sp(4)
     A(callout(
-        "<b>Verificar antes de publicar.</b> Si esa condición aplica al caso, "
-        "queda expuesto en la tienda un domicilio particular. Con cuenta de "
-        "organización se publica la sede social de BACKHAUSTIN S.A.S. en su "
-        "lugar. Es una razón adicional, e independiente de las legales, para "
-        "hacer el cambio antes del lanzamiento."))
+        "<b>Convertir a cuenta de organización NO evita que se publique esa "
+        "dirección.</b> Play publica el domicilio legal de la organización, y "
+        "acá el domicilio legal de la organización es la casa. Con cuenta "
+        "personal que monetiza pasa lo mismo. Es decir: proteger la dirección "
+        "particular <b>no</b> es un argumento válido para la conversión en "
+        "este caso, y no debe usarse como tal.", warn=True))
+    sp(8)
+    A(P("Si que la dirección no sea pública importa, se resuelve por otro "
+        "lado: cambiando la sede social inscripta ante IPJ a otro domicilio "
+        "—estudio contable, espacio de trabajo, servicio de domicilio legal—. "
+        "Es un trámite societario independiente de las tiendas, y es decisión "
+        "del titular."))
+    sp(6)
+    A(P("Aparte: la cuenta de Play tiene cargado hoy «MZA 9 LOTE 21 S/N, "
+        "Córdoba 5021», que probablemente sea el mismo lugar escrito de otra "
+        "forma. Para los trámites hay que usar <b>una sola</b> y tiene que ser "
+        "la inscripta, porque el D-U-N-S y la verificación de las tiendas "
+        "comparan contra el registro.", "small"))
 
     A(PageBreak())
 
@@ -595,8 +620,9 @@ def build_story():
          "exigen Apple y Google para cuentas de organización. Lo emite Dun "
          "&amp; Bradstreet, es gratis. Apple tiene un buscador para ver si ya "
          "existe uno emitido. Datos: CUIT 30-71929587-4, matrícula 46468-A",
-         "<b>Es el paso más largo: puede demorar semanas, más aún si la "
-         "sociedad es nueva y no tiene registro previo. Arranca primero</b>"],
+         "<b>Hasta 5 días hábiles</b> que D&amp;B lo crea, más hasta 2 que "
+         "Apple lo reciba: <b>unos 7 días hábiles</b>. Acelerarlo no acorta "
+         "el plazo. Arranca primero igual, porque todo lo demás lo espera"],
         ["2", "<b>Dejar que la membresía de Apple se renueve</b> el 5 de "
          "septiembre",
          "Una membresía vencida saca las apps de la tienda y complica el "
