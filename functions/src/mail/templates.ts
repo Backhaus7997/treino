@@ -17,6 +17,11 @@
  */
 
 import { MailKind, MailParams } from "./types";
+// El unico import de `subscriptions/` que hace esta capa, y es a una constante
+// PURA (un mapa de tier→numero, sin Firestore ni admin adentro). Se prefiere a
+// escribir el 2 a mano: el limite Free lo lee tambien `effective-limit.ts`, y
+// dos copias del mismo numero se separan el dia que alguien mueva el plan.
+import { SubscriptionTier, TIER_WEIGHT_LIMITS } from "../subscriptions/tier-config";
 
 // Mirrored from AppColorPrimitives — see header note.
 const INK = "#0A0A0A";
@@ -277,6 +282,133 @@ function build(
 }
 
 /**
+ * "2 alumnos" · "1 alumno" · "alumnos sin límite".
+ *
+ * Espejo de `cupoTexto()` en
+ * `lib/features/coach_hub/.../facturacion_planes/plan_copy.dart`. Es una copia
+ * a proposito y por el mismo motivo que la paleta del encabezado: un mail no
+ * puede importar Dart. Si el texto cambia alla, cambia aca.
+ *
+ * `null` = SIN LIMITE (plan3), no un dato faltante. Interpolarlo directo
+ * renderiza la palabra «null», que es exactamente el bug que en la app publico
+ * un upsell diciendo «Hasta null alumnos». El tipo obliga a decidir; esta
+ * funcion es donde se decide para el mail.
+ *
+ * El singular no es cosmetico: el limite Free es 2 hoy, pero un tier de 1 haria
+ * que TODO mail del paywall dijera "1 alumnos".
+ */
+export function cupoLabel(limit: number | null): string {
+  if (limit === null) return "alumnos sin límite"; // i18n: email transaccional
+  return limit === 1 ? "1 alumno" : `${limit} alumnos`;
+}
+
+/**
+ * El cupo del plan Free, ya escrito. Se DERIVA de `TIER_WEIGHT_LIMITS` en vez
+ * de llegar por params: es una constante del producto, no un dato del PF, y un
+ * param mas es un param que el proximo productor se olvida de pasar — con el
+ * agravante de que `renderMail` degrada los faltantes a vacio, asi que el
+ * sintoma seria un mail que dice "pasa al límite del plan Free ()".
+ */
+const FREE_CUPO_LABEL = cupoLabel(TIER_WEIGHT_LIMITS.free);
+
+/**
+ * Nombre visible del plan. Espejo de `tierName()` en `plan_copy.dart`.
+ *
+ * El productor manda el CODIGO (`plan2`), no la etiqueta: misma regla que
+ * `reason`. Un tier que no reconocemos cae a vacio y la oracion sigue leyendose
+ * ("No pudimos cobrar tu suscripción."), en vez de imprimir el codigo crudo.
+ */
+const TIER_LABELS: Record<SubscriptionTier, string> = {
+  free: "Free",
+  plan1: "Plan 1",
+  plan2: "Plan 2",
+  plan3: "Plan 3",
+};
+
+function tierLabel(tier: string | number | undefined): string {
+  const key = String(tier ?? "");
+  return Object.prototype.hasOwnProperty.call(TIER_LABELS, key)
+    ? TIER_LABELS[key as SubscriptionTier]
+    : "";
+}
+
+/**
+ * Centinela del "sin límite" al cruzar Firestore.
+ *
+ * `MailParams` es `Record<string, string | number>`: no hay lugar para `null`,
+ * que es como `tier-config.ts` codifica "plan3, sin tope". La alternativa —
+ * OMITIR el param cuando no hay tope— colapsa dos casos que significan lo
+ * contrario: "sin límite" y "el productor se olvidó de mandarlo". El test que
+ * renderiza todo kind con `{}` caeria en el segundo y dibujaria el primero.
+ * Un centinela explicito los mantiene separados.
+ */
+const NO_LIMIT_PARAM = "sin-tope";
+
+/**
+ * `limit` tal como lo persiste el productor → el `number | null` del dominio,
+ * o `undefined` cuando no se pudo leer.
+ *
+ * SON TRES ESTADOS Y HACEN FALTA LOS TRES. La version de dos —"si no es un
+ * numero, devolve null"— hacia que un param ausente o roto renderizara
+ * «alumnos sin límite»: el mail del paywall diciendole al PF que NO tiene tope,
+ * que es la mentira mas cara que este canal puede contar y encima en la
+ * direccion que le hace tomar la decision equivocada. Un limite que no sabemos
+ * NO es un limite infinito. Quien consume `undefined` no escribe el numero.
+ */
+function limitParam(
+  value: string | number | undefined,
+): number | null | undefined {
+  if (value === NO_LIMIT_PARAM) return null;
+  const n = typeof value === "number" ? value : Number(value);
+  if (value === undefined || value === "" || !Number.isFinite(n) || n < 0) {
+    return undefined;
+  }
+  return Math.floor(n);
+}
+
+/**
+ * Cuenta de alumnos bloqueados, saneada.
+ *
+ * Viaja por Firestore como `string | number` (`MailParams` es un mapa plano),
+ * y el test de plantillas renderiza TODO kind con params vacios. Sin esto,
+ * `undefined` entra como NaN y el mail dice "NaN alumnos quedaron en solo
+ * lectura" — el peor render posible justo en el mail que habla de plata.
+ */
+function countParam(value: string | number | undefined): number {
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+}
+
+/**
+ * La frase que explica POR QUE bajo el limite.
+ *
+ * Recibe un CODIGO (`paused`, `cancelled-expired`, …), no la frase ya armada.
+ * Es la regla del outbox: la cola guarda QUE paso, nunca prosa renderizada, asi
+ * que un arreglo de copy alcanza a los mails que ya estan encolados sin
+ * re-encolar nada. Mandar la oracion desde el productor rompia esa propiedad y
+ * ademas repartia el copy en dos archivos.
+ *
+ * Un codigo desconocido cae en una frase neutra y CIERTA en vez de tirar: el
+ * mail sigue siendo util —el limite nuevo y los bloqueados son los datos que
+ * importan— y no inventa una causa. Mismo criterio que el estado "denegado sin
+ * explicación" del PR #758: no afirmar una causa que no se puede probar.
+ */
+function downgradeReason(reason: string | number | undefined): string {
+  switch (String(reason ?? "")) {
+  case "paused":
+    return "Pausaste tu suscripción."; // i18n: email transaccional
+  case "cancelled-expired":
+    return "Se terminó el período que tenías pagado.";
+  case "pending":
+    return "Tu suscripción todavía no está confirmada.";
+  case "tier-change":
+    return "Cambiaste de plan.";
+  default:
+    return "Cambió tu suscripción.";
+  }
+}
+
+/**
  * Renders a queued mail.
  *
  * Missing params degrade to an empty string rather than throwing: a template
@@ -489,6 +621,109 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
       "VER AL ALUMNO",
       ctaUrl,
     );
+
+    // ── Suscripcion del PF: el cobro fallo, hay ventana ─────────────────────
+    //
+    // NO LLEVA FECHA DE CORTE, y es la decision mas importante de este copy.
+    //
+    // La tentacion es escribir "si no se cobra antes del <fecha>, pasas a Free".
+    // El unico instante que tenemos en el documento es `currentPeriodEnd`, que
+    // es el PAGADO-HASTA — no la fecha del corte. El corte llega cuando MP
+    // termina de reintentar y el status deja de ser `grace`, y esa ventana la
+    // decide MP, no nosotros: hoy ni siquiera existe la integracion (ninguna CF
+    // escribe `subscription`). Poner `currentPeriodEnd` ahi seria dar por cierta
+    // una fecha que no controlamos, en el mail donde el PF va a basar cuando
+    // mover la plata.
+    //
+    // Es exactamente la regla 11.1 de AGENTS.md aplicada al copy: si no lo
+    // podes verificar, escribi lo que SI sabes. Y lo que sabemos es completo sin
+    // la fecha: que fallo, que todavia no cambio nada, que pasa si no entra, y
+    // que hacer. El dato que falta es el unico que no cambia la accion.
+    //
+    // `currentPeriodEnd` SI se usa — como scope de dedupe, donde una fecha que
+    // se corre unos dias no miente nadie. Ver `subscription-mail.ts`.
+  case "subscription-grace": {
+    const tier = tierLabel(params.tier);
+    const limit = limitParam(params.limit);
+
+    return build(
+      "No pudimos cobrar tu suscripción de TREINO", // i18n: email transaccional
+      "No pudimos cobrar tu suscripción",
+      [
+        tier
+          ? ["No pudimos cobrar tu suscripción ", strong(tier),
+            ". Vamos a reintentar los próximos días."]
+          : ["No pudimos cobrar tu suscripción. Vamos a reintentar los próximos días."],
+        // El limite solo se nombra si se conoce. Sin el, la frase sigue siendo
+        // cierta y completa: lo que el PF necesita saber acá es que TODAVIA no
+        // cambio nada.
+        limit === undefined
+          ? ["Por ahora no cambia nada y tus alumnos no pierden nada."]
+          : ["Por ahora no cambia nada: seguís con ", strong(cupoLabel(limit)),
+            " y tus alumnos no pierden nada."],
+        [
+          "Si el cobro no entra, tu cuenta pasa al límite del plan Free (",
+          strong(FREE_CUPO_LABEL),
+          "). Sobre los alumnos que queden fuera de ese cupo vas a poder verlos, ",
+          "pero no editarles rutinas ni notas.",
+        ],
+        ["Revisá tu medio de pago para que no se corte."],
+      ],
+      "REGULARIZAR MI SUSCRIPCIÓN",
+      ctaUrl,
+    );
+  }
+
+  // ── Suscripcion del PF: el limite ya bajo ───────────────────────────────
+  //
+  // La linea de "tus alumnos no pierden nada" NO ES RELLENO. El PR #758 la
+  // nombra como el peor error posible de todo este trabajo: sugerir que el
+  // alumno perdio algo es falso —conserva rutinas, historial y chat— y ademas
+  // le mueve la presion a quien no decide. Lo que se frena es que el PF
+  // trabaje sobre el. Si alguna vez hay que recortar este mail, esta linea es
+  // la ultima que se va.
+  //
+  // El vocabulario ("en solo lectura", "verlos pero no editarles rutinas ni
+  // notas") esta copiado LITERAL de `blocked_students_screen.dart`. Son el
+  // mismo hecho contado por dos canales: si divergen, el PF cree que son dos
+  // problemas distintos.
+  //
+  // `blockedCount` puede ser 0 legitimamente — una bajada de tier con pocos
+  // alumnos baja el limite sin dejar a nadie afuera. En ese caso la linea NO
+  // se dibuja: "0 alumnos quedaron en solo lectura" es ruido que hace dudar
+  // de todo el resto del mail.
+  case "subscription-downgraded": {
+    const blocked = countParam(params.blockedCount);
+    const limit = limitParam(params.limit);
+    const lines: Line[] = [
+      limit === undefined
+        ? [downgradeReason(params.reason), " Tu cuenta pasa a un límite más bajo."]
+        : [downgradeReason(params.reason), " Tu cuenta pasa a un límite de ",
+          strong(cupoLabel(limit)), "."],
+    ];
+    if (blocked > 0) {
+      lines.push([
+        blocked === 1
+          ? "1 alumno quedó en solo lectura: "
+          : `${blocked} alumnos quedaron en solo lectura: `,
+        "los podés ver, pero no editarles rutinas ni notas.",
+      ]);
+    }
+    lines.push(
+      ["Tus alumnos no pierden nada: conservan sus rutinas, su historial y el chat."],
+      ["Para volver a trabajar con todos, ampliá tu plan."],
+    );
+
+    return build(
+      blocked > 0
+        ? "Algunos de tus alumnos quedaron en solo lectura" // i18n: transaccional
+        : "Cambió tu límite de alumnos en TREINO",
+      blocked > 0 ? "Alumnos en solo lectura" : "Cambió tu límite",
+      lines,
+      "AMPLIAR MI PLAN",
+      ctaUrl,
+    );
+  }
 
   default: {
     // Exhaustiveness guard: adding a MailKind without a template fails to
