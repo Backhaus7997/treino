@@ -29,7 +29,11 @@ export type MailKind =
   | "appointment-series-cancelled"
   | "link-requested"
   | "link-accepted"
-  | "payment-overdue";
+  | "payment-overdue"
+  // El unico de estos mails con consecuencia FISICA: el alumno avisa que algo
+  // le duele MIENTRAS entrena, y si el PF no tiene la app abierta se entera
+  // tarde. Destinatario: el PF. Sin `prefKey` a proposito — ver `templates.ts`.
+  | "discomfort-reported";
 
 /**
  * Per-kind template parameters.

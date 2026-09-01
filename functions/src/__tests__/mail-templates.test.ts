@@ -31,6 +31,7 @@ const ALL_KINDS: MailKind[] = [
   "link-requested",
   "link-accepted",
   "payment-overdue",
+  "discomfort-reported",
 ];
 
 /**
@@ -205,7 +206,7 @@ describe("destino del CTA", () => {
     const conActionLink = ["password-reset", "email-verification"];
     const resto = ALL_KINDS.filter((k) => !conActionLink.includes(k));
 
-    expect(resto).toHaveLength(8);
+    expect(resto).toHaveLength(9);
     for (const kind of resto) {
       const href = ctaHref(renderMail(kind, {}).html);
 
@@ -306,6 +307,69 @@ describe("plantilla federated-signin-hint", () => {
 
   it("manda a la landing, que sirve para cualquier rol", () => {
     expect(out().html).toContain("https://gettreino.com");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Molestia reportada — el único mail del set con consecuencia física
+// ---------------------------------------------------------------------------
+describe("plantilla discomfort-reported", () => {
+  it("nombra al alumno y manda a abrir la app", () => {
+    const out = renderMail("discomfort-reported", {
+      athleteName: "Ana Atleta",
+      ctaUrl: "https://app.gettreino.com/abrir/profe",
+    });
+
+    expect(out.text).toContain("Ana Atleta");
+    expect(out.text.toLowerCase()).toContain("molestia");
+    expect(ctaHref(out.html)).toBe("https://app.gettreino.com/abrir/profe");
+  });
+
+  // EL invariante de este mail. El push ya excluye `text` y `photoUrl` porque
+  // son dato de salud; por mail pesa MÁS —queda en la bandeja para siempre y
+  // pasa por Resend, que es un tercero—, así que la plantilla no los renderiza
+  // ni aunque un productor se los pase. Si mañana alguien "enriquece" el cuerpo
+  // con el detalle del reporte, esto se pone rojo, y el rojo tiene razón:
+  // primero hay que cerrar QA-CMP-008.
+  it("no renderiza el texto ni la foto del reporte aunque se los pasen", () => {
+    const secretText = "Me tiró la rodilla derecha en la última serie";
+    const secretPhoto = "https://firebasestorage.googleapis.com/x?token=abc123";
+
+    const out = renderMail("discomfort-reported", {
+      athleteName: "Ana Atleta",
+      text: secretText,
+      photoUrl: secretPhoto,
+    });
+
+    for (const part of [out.html, out.text, out.subject]) {
+      expect(part).not.toContain(secretText);
+      expect(part).not.toContain(secretPhoto);
+      expect(part).not.toContain("token=abc123");
+    }
+  });
+
+  // Deliberado, y por una razón distinta a la privacidad: el mail está
+  // deduplicado POR SESIÓN, así que lo produce el PRIMER reporte en dispararse.
+  // Nombrar "Sentadilla" cuando el alumno reportó molestia en tres ejercicios
+  // le arma al PF un modelo mental falso del alcance — el mismo problema de
+  // lote parcial que `appointment-series-created` documenta.
+  it("no nombra un ejercicio: el mail cubre la sesión entera", () => {
+    const out = renderMail("discomfort-reported", {
+      athleteName: "Ana Atleta",
+      exerciseName: "Sentadilla",
+    });
+
+    expect(out.html).not.toContain("Sentadilla");
+    expect(out.text).not.toContain("Sentadilla");
+  });
+
+  it("escapa el nombre del alumno, que es texto libre del usuario", () => {
+    const out = renderMail("discomfort-reported", {
+      athleteName: "<script>alert(1)</script>",
+    });
+
+    expect(out.html).not.toContain("<script>");
+    expect(out.html).toContain("&lt;script&gt;");
   });
 });
 
