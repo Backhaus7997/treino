@@ -36,10 +36,14 @@ se lastima la reputación de envío, no se lleva puesta la web.
 El dominio raíz tiene hoy:
 
 ```
-gettreino.com  TXT  "v=spf1 include:mailgun.org ~all"
+gettreino.com  TXT  "v=spf1 include:mailgun.org include:_spf.google.com ~all"
 ```
 
-Algo tuyo ya manda mail desde ahí (probablemente el formulario de la landing).
+Ese registro **ya está mergeado**: lleva Mailgun *y* Google Workspace. Ver
+[§ Google Workspace](#google-workspace) más abajo.
+
+Mailgun está en uso de verdad — hay un DKIM `mg-tidio._domainkey` de hace meses,
+así que ese include **no se saca**.
 
 **No se pueden tener dos registros SPF en el mismo dominio.** Si agregás el de
 Resend en la raíz y queda un segundo `v=spf1`, SPF no falla para el nuevo:
@@ -47,8 +51,48 @@ Resend en la raíz y queda un segundo `v=spf1`, SPF no falla para el nuevo:
 de Mailgun.
 
 Mandar desde `send.gettreino.com` esquiva esto por completo — el subdominio
-tiene su propio SPF, independiente del de la raíz. **No toques el TXT de la
-raíz.**
+tiene su propio SPF, independiente del de la raíz. **Para Resend no toques el
+TXT de la raíz.**
+
+> **Si algún día agregás otro emisor en la raíz**, la regla es *editar* ese único
+> registro y sumarle su `include:`, nunca crear un segundo `v=spf1`. En Vercel:
+>
+> ```bash
+> vercel dns ls gettreino.com --limit 100     # buscar el id del TXT con v=spf1
+> vercel dns update <rec_id> --value "v=spf1 include:... include:... ~all"
+> ```
+>
+> `vercel dns update` pide confirmación interactiva porque sobrescribe un
+> registro vivo — no se puede automatizar, y está bien que así sea. Después
+> verificá que quede **uno solo**:
+>
+> ```bash
+> dig +short TXT gettreino.com | grep -c 'v=spf1'   # tiene que dar 1
+> ```
+
+---
+
+## Google Workspace — casilla de contacto
+
+Configurado el **2026-09-01**. Es el canal de contacto y de ejercicio de
+derechos que citan los documentos de [`docs/legal/`](./legal/README.md).
+
+| Qué | Valor |
+|---|---|
+| Casilla | `treino@gettreino.com` |
+| MX | `1 smtp.google.com` |
+| DKIM | `google._domainkey` |
+| SPF | mergeado en el TXT de la raíz (ver arriba) |
+| DMARC | `v=DMARC1; p=none; rua=mailto:treino@gettreino.com` |
+
+**El SPF se mergeó, no se duplicó.** El registro de la raíz pasó de
+`include:mailgun.org ~all` a incluir también `include:_spf.google.com`. Si
+alguien lo "limpia" sacando el include de Google, todo lo que responda esa
+casilla se va a spam — y ahí adentro viajan las respuestas a pedidos de habeas
+data, que tienen plazo legal.
+
+Pendiente: la prueba de punta a punta (enviar desde afuera, responder, y
+confirmar `SPF/DKIM/DMARC: PASS` en las cabeceras del mensaje recibido).
 
 ---
 
