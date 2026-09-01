@@ -18,6 +18,7 @@ su reemplazo, y hay que portarlos ahí y publicarlos en `gettreino.com/legal/*`.
 | [retencion-y-borrado.md](./retencion-y-borrado.md) | Qué se borra, qué se conserva. URL para Google Play | Borrador |
 | [aviso-legal.md](./aviso-legal.md) | Identificación del titular | Borrador |
 | [guia-legal-treino.pdf](./guia-legal-treino.pdf) | Guía de decisiones y trámites para el Product Owner | Vigente |
+| [documentos-legales-treino.pdf](./documentos-legales-treino.pdf) | Los nueve documentos compilados en un PDF, con los pendientes resaltados. Para que el PO y el abogado lean sin abrir el repo | Generado |
 
 ## Lo que falta, y por qué
 
@@ -133,6 +134,18 @@ Para previsualizar sin publicar:
 ```bash
 python3 scripts/build_legal_content.py --preview --allow-pending
 ```
+
+### El PDF de revisión
+
+Para que el PO y el abogado lean sin abrir el repositorio:
+
+```bash
+python3 scripts/build_legal_docs_pdf.py
+```
+
+Compila los nueve documentos en `documentos-legales-treino.pdf`, con los
+marcadores `[[...]]` resaltados como checklist en contexto. Lee los mismos
+`.md`, así que tampoco duplica contenido.
 
 ### El gate de desfasaje
 
