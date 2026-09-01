@@ -2784,12 +2784,21 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
 
-    // El catálogo se OBSERVA acá aunque quien lo use sea `_buscarParaEntradaRapida`
-    // con un `read`. Un `FutureProvider` que nadie mira nunca se resuelve: el
-    // `read` lo inicializa y devuelve `AsyncLoading`, así que la entrada rápida
-    // no encontraba nada hasta que otra cosa —el picker— cargara la lista.
-    // Es un provider cacheado: mirarlo no cuesta un rebuild por frame.
+    // Los dos catálogos se OBSERVAN acá aunque quien los use sea
+    // `_catalogoVisible` con un `read`.
+    //
+    // Un `FutureProvider` que nadie mira nunca se resuelve: el `read` lo
+    // inicializa y devuelve `AsyncLoading`. Y el de ejercicios propios es
+    // `autoDispose`: sin nadie suscripto se descarta apenas se lee, así que
+    // `valueOrNull` vuelve a dar null y los ejercicios que el usuario cargó no
+    // aparecían nunca en la búsqueda rápida — aunque el picker sí los muestre.
+    //
+    // Son providers cacheados: mirarlos no cuesta un rebuild por frame.
     ref.watch(exercisesProvider);
+    final uidCatalogo = ref.watch(currentUidProvider) ?? '';
+    if (uidCatalogo.isNotEmpty) {
+      ref.watch(customExercisesForTrainerStreamProvider(uidCatalogo));
+    }
 
     // Loading state: hydrating from Firestore.
     if (_loading) {
@@ -2923,7 +2932,16 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                   keyboardDismissBehavior:
                       ScrollViewKeyboardDismissBehavior.onDrag,
                   controller: _listScrollController,
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                  // `s18` y no 16: la escala de spacing de AGENTS.md es
+                  // cerrada (8·12·14·18·20) y el 16 no está en ella. Su
+                  // dartdoc describe s18 como el padding horizontal de
+                  // pantallas, que es exactamente lo que este gutter es.
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.s18,
+                    AppSpacing.s8,
+                    AppSpacing.s18,
+                    AppSpacing.s8,
+                  ),
                   children: [
                     // ── Nombre y split ──────────────────────────────────
                     // NO van a la hoja del engranaje, a diferencia de
@@ -3986,7 +4004,29 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
                           onSelect: (r) {
                             // Autocompletar, NO agregar: el usuario viene a
                             // escribir la prescripción después del nombre.
-                            final texto = '${r.name} ';
+                            //
+                            // Y se CONSERVA lo que ya escribió. El placeholder
+                            // del campo enseña `banca 4x10 60`: quien lo sigue
+                            // tipea todo junto y después toca el ejercicio, y
+                            // reemplazar el texto entero por el nombre le
+                            // borraba el `4x10 60` que acababa de escribir.
+                            //
+                            // Se quitan sólo las palabras que el parser
+                            // entendió como BÚSQUEDA; el resto —los números—
+                            // queda tal como se tipeó, sin normalizar.
+                            final palabrasDelNombre = entry.query
+                                .toLowerCase()
+                                .split(RegExp(r'\s+'))
+                                .where((p) => p.isNotEmpty)
+                                .toSet();
+                            final resto = value.text
+                                .split(RegExp(r'\s+'))
+                                .where((p) =>
+                                    p.isNotEmpty &&
+                                    !palabrasDelNombre.contains(p.toLowerCase()))
+                                .join(' ');
+                            final texto =
+                                resto.isEmpty ? '${r.name} ' : '${r.name} $resto';
                             _quickEntryCtrl.value = TextEditingValue(
                               text: texto,
                               // Cursor AL FINAL, listo para seguir. Sin esto

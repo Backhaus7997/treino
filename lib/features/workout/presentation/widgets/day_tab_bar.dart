@@ -75,7 +75,10 @@ class DayTabBar extends StatelessWidget {
     final palette = AppPalette.of(context);
 
     return SizedBox(
-      height: 44,
+      // 48 y no 44: este `SizedBox` capa el alto de CADA pestaña y del control
+      // de agregar día, así que con 44 ninguno llegaba al mínimo táctil que la
+      // épica #862 fija para todo target interactivo.
+      height: 48,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s14),
