@@ -24,9 +24,9 @@ import '../../../../fixtures/exercises.dart';
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 final _kExercises = [
-  kExerciseSeed[0], // bench-press (chest/barra)
-  kExerciseSeed[1], // incline-dumbbell-press (chest/mancuerna)
-  kExerciseSeed[6], // back-squat (quads/barra)
+  seedExercise('bench-press'), // chest / barra
+  seedExercise('incline-dumbbell-press'), // chest / mancuerna
+  seedExercise('back-squat'), // quads / barra
 ];
 
 /// One custom exercise owned by 'u1' — used by the edit/delete tests.
