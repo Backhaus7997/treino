@@ -3629,5 +3629,13 @@
   "coachTemplateEditorSubmit": "GUARDAR PLANTILLA",
   "@coachTemplateEditorSubmit": {
     "description": "CTA del editor de plantillas. Antes reusaba el de asignar y decía 'ASIGNAR PLAN' en una plantilla que no se asigna a nadie."
+  },
+  "routineEditorAddNothingNew": "Esos ejercicios ya estaban en el día.",
+  "@routineEditorAddNothingNew": {
+    "description": "El picker devolvió sólo ejercicios que el día ya tenía. Sin este aviso la pantalla no cambiaba y el tap parecía roto."
+  },
+  "routineEditorSupersetNeedsTwo": "Una superserie necesita dos ejercicios. Se agregó uno solo, suelto.",
+  "@routineEditorSupersetNeedsTwo": {
+    "description": "Se pidió una superserie pero sólo entró un ejercicio nuevo: el resto ya estaba en el día."
   }
 }

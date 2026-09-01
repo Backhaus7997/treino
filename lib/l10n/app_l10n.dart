@@ -7370,6 +7370,18 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'GUARDAR PLANTILLA'**
   String get coachTemplateEditorSubmit;
+
+  /// El picker devolvió sólo ejercicios que el día ya tenía. Sin este aviso la pantalla no cambiaba y el tap parecía roto.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esos ejercicios ya estaban en el día.'**
+  String get routineEditorAddNothingNew;
+
+  /// Se pidió una superserie pero sólo entró un ejercicio nuevo: el resto ya estaba en el día.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Una superserie necesita dos ejercicios. Se agregó uno solo, suelto.'**
+  String get routineEditorSupersetNeedsTwo;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

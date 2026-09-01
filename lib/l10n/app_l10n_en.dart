@@ -4168,4 +4168,12 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get coachTemplateEditorSubmit => 'SAVE TEMPLATE';
+
+  @override
+  String get routineEditorAddNothingNew =>
+      'Those exercises were already in the day.';
+
+  @override
+  String get routineEditorSupersetNeedsTwo =>
+      'A superset needs two exercises. Only one was added, on its own.';
 }
