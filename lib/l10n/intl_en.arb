@@ -1757,5 +1757,9 @@
   "coachTemplateEditorEditTitle": "Edit template",
   "@coachTemplateEditorEditTitle": {},
   "coachTemplateEditorSubmit": "SAVE TEMPLATE",
-  "@coachTemplateEditorSubmit": {}
+  "@coachTemplateEditorSubmit": {},
+  "routineEditorAddNothingNew": "Those exercises were already in the day.",
+  "@routineEditorAddNothingNew": {},
+  "routineEditorSupersetNeedsTwo": "A superset needs two exercises. Only one was added, on its own.",
+  "@routineEditorSupersetNeedsTwo": {}
 }

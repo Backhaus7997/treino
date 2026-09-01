@@ -4230,6 +4230,14 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get coachTemplateEditorSubmit => 'GUARDAR PLANTILLA';
+
+  @override
+  String get routineEditorAddNothingNew =>
+      'Esos ejercicios ya estaban en el día.';
+
+  @override
+  String get routineEditorSupersetNeedsTwo =>
+      'Una superserie necesita dos ejercicios. Se agregó uno solo, suelto.';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -8455,4 +8463,12 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get coachTemplateEditorSubmit => 'GUARDAR PLANTILLA';
+
+  @override
+  String get routineEditorAddNothingNew =>
+      'Esos ejercicios ya estaban en el día.';
+
+  @override
+  String get routineEditorSupersetNeedsTwo =>
+      'Una superserie necesita dos ejercicios. Se agregó uno solo, suelto.';
 }

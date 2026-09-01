@@ -1940,8 +1940,21 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         .where((s) => s.exercise != null)
         .map((s) => s.exercise!.id)
         .toSet();
-    final picked = await showExercisePicker(context);
+    // Ver la nota de `_addSupersetForDay`: el picker pre-marca lo que el día
+    // ya tiene, así el usuario no elige un repetido sin darse cuenta.
+    final picked =
+        await showExercisePicker(context, alreadySelectedIds: existingIds);
     if (picked == null || picked.isEmpty || !mounted) return;
+
+    final nuevos = picked.where((e) => !existingIds.contains(e.id)).toList();
+    if (nuevos.isEmpty) {
+      // ignore: use_build_context_synchronously
+      ScaffoldMessenger.of(context).showSnackBar(
+        // ignore: use_build_context_synchronously
+        SnackBar(content: Text(AppL10n.of(context).routineEditorAddNothingNew)),
+      );
+      return;
+    }
 
     // Determine presence scope for the new slots (ADR-WPRES-04).
     // Prompt only when multi-week AND viewing week ≥ 2 (index ≥ 1).
@@ -1951,9 +1964,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
 
     _markDirty();
     setState(() {
-      // Only add exercises not already in this day (one instance per day) —
-      // avoids the duplicate-on-reopen issue.
-      for (final ex in picked.where((e) => !existingIds.contains(e.id))) {
+      for (final ex in nuevos) {
         final slot = _EditableSlot()
           ..exercise = ex
           ..restSeconds = 0
@@ -2079,24 +2090,50 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   /// exercises as a new superset block (shared non-null [supersetGroup]).
   /// Available in every editor mode (trainer + athlete SelfCreating).
   Future<void> _addSupersetForDay(BuildContext context, int dayIndex) async {
+    final l10n = AppL10n.of(context);
+    final messenger = ScaffoldMessenger.of(context);
     final existingIds = _days[dayIndex]
         .slots
         .where((s) => s.exercise != null)
         .map((s) => s.exercise!.id)
         .toSet();
-    final picked = await showExercisePicker(context);
+    // `alreadySelectedIds` pre-marca en el picker lo que el día ya tiene
+    // (ADR-RER-01). El parámetro existía y ninguna de las tres llamadas del
+    // editor lo pasaba: el usuario elegía un ejercicio repetido sin saberlo,
+    // el editor lo filtraba, y no pasaba nada.
+    final picked =
+        await showExercisePicker(context, alreadySelectedIds: existingIds);
     if (picked == null || picked.isEmpty || !mounted) return;
+
+    final nuevos =
+        picked.where((e) => !existingIds.contains(e.id)).toList();
+    // Ninguno era nuevo: decirlo. Antes esto era un `return` mudo adentro del
+    // setState y el botón parecía roto.
+    if (nuevos.isEmpty) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.routineEditorAddNothingNew)),
+      );
+      return;
+    }
 
     // Determine presence scope for the new slots (ADR-WPRES-04).
     // ignore: use_build_context_synchronously
     final scope = await _promptAddScope(context);
     if (scope == null || !mounted) return;
 
+    // Un solo ejercicio nuevo no es una superserie. Entra igual —el usuario lo
+    // quería— pero suelto, y se dice por qué: un bloque magenta con un
+    // ejercicio adentro miente sobre lo que es.
+    final esSuperserie = nuevos.length >= 2;
+    if (!esSuperserie) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.routineEditorSupersetNeedsTwo)),
+      );
+    }
+
     setState(() {
       final day = _days[dayIndex];
-      // Skip exercises already in this day (one instance per day).
-      final newOnes = picked.where((e) => !existingIds.contains(e.id)).toList();
-      if (newOnes.isEmpty) return;
+      final newOnes = nuevos;
       _markDirty();
       final nextGroup =
           (day.slots.map((s) => s.supersetGroup ?? 0).fold(0, max)) + 1;
@@ -2104,7 +2141,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           .map((ex) => _EditableSlot()
             ..exercise = ex
             ..restSeconds = 0
-            ..supersetGroup = nextGroup
+            ..supersetGroup = esSuperserie ? nextGroup : null
             ..weeklySets = List.generate(_numWeeks, (_) => [_EditableSet()])
             ..activeWeeks =
                 scope == _AddScope.thisWeek ? {_selectedWeek} : <int>{})
@@ -2123,8 +2160,20 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         .where((s) => s.exercise != null)
         .map((s) => s.exercise!.id)
         .toSet();
-    final picked = await showExercisePicker(context);
+    // Ver la nota de `_addSupersetForDay`.
+    final l10n = AppL10n.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final picked =
+        await showExercisePicker(context, alreadySelectedIds: existingIds);
     if (picked == null || picked.isEmpty || !mounted) return;
+
+    final nuevos = picked.where((e) => !existingIds.contains(e.id)).toList();
+    if (nuevos.isEmpty) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.routineEditorAddNothingNew)),
+      );
+      return;
+    }
 
     // Determine presence scope for the new slots (ADR-WPRES-04).
     // ignore: use_build_context_synchronously
@@ -2132,8 +2181,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     if (scope == null || !mounted) return;
 
     setState(() {
-      final newOnes = picked.where((e) => !existingIds.contains(e.id)).toList();
-      if (newOnes.isEmpty) return;
+      final newOnes = nuevos;
       _markDirty();
       final newSlots = newOnes
           .map((ex) => _EditableSlot()
