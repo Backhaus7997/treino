@@ -459,6 +459,40 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
       ctaUrl,
     );
 
+    // ── Molestia reportada durante la sesion ────────────────────────────────
+    //
+    // NO NOMBRA EL EJERCICIO, y es deliberado — mismo razonamiento de
+    // `appointment-series-created`. Este mail esta deduplicado POR SESION (ver
+    // `notify-exercise-feedback.ts`), asi que lo produce el PRIMER reporte de
+    // la sesion en dispararse. Si el alumno reporta molestia en tres
+    // ejercicios, escribir "una molestia en Sentadilla" es peor que no nombrar
+    // ninguno: el PF se arma un modelo mental del alcance que es falso, y este
+    // mail existe justamente para que abra la app YA.
+    //
+    // TAMPOCO lleva `text` ni `photoUrl` del reporte. Es la misma regla que ya
+    // aplica el push (dato de salud, ver el header de
+    // `notify-exercise-feedback.ts`), y por mail pesa MAS: un push se descarta,
+    // un mail se queda en la bandeja para siempre y ademas pasa por Resend, que
+    // es un tercero. El detalle vive en la app, detras del read gateado de
+    // `firestore.rules`. Si algun dia alguien quiere enriquecer este cuerpo,
+    // el problema a resolver primero es ese, no el copy.
+    //
+    // Sin `prefKey`: no hay un ajuste razonable que diga "no me avises cuando a
+    // mi alumno le duele algo". Las otras filas de `kNotifTypes` son negocio o
+    // social y se pueden querer menos; esta no.
+  case "discomfort-reported":
+    return build(
+      "Un alumno reportó una molestia", // i18n: email transaccional
+      "Molestia reportada",
+      [
+        [strong(params.athleteName), " reportó una molestia durante su sesión."],
+        ["El detalle queda en la app: es información de salud y no viaja por mail."],
+        ["Entrá a su ficha para ver qué ejercicio fue y qué escribió."],
+      ],
+      "VER AL ALUMNO",
+      ctaUrl,
+    );
+
   default: {
     // Exhaustiveness guard: adding a MailKind without a template fails to
     // compile here rather than shipping a blank email.
