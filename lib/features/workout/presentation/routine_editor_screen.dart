@@ -1334,8 +1334,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     for (final semana in rotas.keys.where((w) => w != _selectedWeek).toList()
       ..sort()) {
       out.add((
-        mensaje: l10n.routineEditorProblemOtherWeek(
-            semana + 1, rotas[semana]!),
+        mensaje: l10n.routineEditorProblemOtherWeek(semana + 1, rotas[semana]!),
         dia: null,
       ));
     }
@@ -1942,9 +1941,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         .toSet();
     // Ver la nota de `_addSupersetForDay`: el picker pre-marca lo que el día
     // ya tiene, así el usuario no elige un repetido sin darse cuenta.
-    final picked =
-        await showExercisePicker(context,
-            alreadySelectedIds: _resolublesPorElPicker(existingIds));
+    final picked = await showExercisePicker(context,
+        alreadySelectedIds: _resolublesPorElPicker(existingIds));
     if (picked == null || picked.isEmpty || !mounted) return;
 
     final nuevos = picked.where((e) => !existingIds.contains(e.id)).toList();
@@ -1983,9 +1981,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     final uid = ref.read(currentUidProvider) ?? '';
     final propios = uid.isEmpty
         ? const <CustomExercise>[]
-        : (ref
-                .read(customExercisesForTrainerStreamProvider(uid))
-                .valueOrNull ??
+        : (ref.read(customExercisesForTrainerStreamProvider(uid)).valueOrNull ??
             const <CustomExercise>[]);
     return [
       ...?ref.read(exercisesProvider).valueOrNull,
@@ -2027,9 +2023,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     final uid = ref.read(currentUidProvider) ?? '';
     final propios = uid.isEmpty
         ? const <CustomExercise>[]
-        : (ref
-                .read(customExercisesForTrainerStreamProvider(uid))
-                .valueOrNull ??
+        : (ref.read(customExercisesForTrainerStreamProvider(uid)).valueOrNull ??
             const <CustomExercise>[]);
     final catalogo = <Exercise>[
       ...?ref.read(exercisesProvider).valueOrNull,
@@ -2072,9 +2066,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     final uid = ref.read(currentUidProvider) ?? '';
     final propios = uid.isEmpty
         ? const <CustomExercise>[]
-        : (ref
-                .read(customExercisesForTrainerStreamProvider(uid))
-                .valueOrNull ??
+        : (ref.read(customExercisesForTrainerStreamProvider(uid)).valueOrNull ??
             const <CustomExercise>[]);
     final catalogo = <Exercise>[
       ...?ref.read(exercisesProvider).valueOrNull,
@@ -2130,13 +2122,11 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     // (ADR-RER-01). El parámetro existía y ninguna de las tres llamadas del
     // editor lo pasaba: el usuario elegía un ejercicio repetido sin saberlo,
     // el editor lo filtraba, y no pasaba nada.
-    final picked =
-        await showExercisePicker(context,
-            alreadySelectedIds: _resolublesPorElPicker(existingIds));
+    final picked = await showExercisePicker(context,
+        alreadySelectedIds: _resolublesPorElPicker(existingIds));
     if (picked == null || picked.isEmpty || !mounted) return;
 
-    final nuevos =
-        picked.where((e) => !existingIds.contains(e.id)).toList();
+    final nuevos = picked.where((e) => !existingIds.contains(e.id)).toList();
     // Ninguno era nuevo: decirlo. Antes esto era un `return` mudo adentro del
     // setState y el botón parecía roto.
     if (nuevos.isEmpty) {
@@ -2293,9 +2283,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     // Ver la nota de `_addSupersetForDay`.
     final l10n = AppL10n.of(context);
     final messenger = ScaffoldMessenger.of(context);
-    final picked =
-        await showExercisePicker(context,
-            alreadySelectedIds: _resolublesPorElPicker(existingIds));
+    final picked = await showExercisePicker(context,
+        alreadySelectedIds: _resolublesPorElPicker(existingIds));
     if (picked == null || picked.isEmpty || !mounted) return;
 
     final nuevos = picked.where((e) => !existingIds.contains(e.id)).toList();
@@ -2784,12 +2773,21 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
 
-    // El catálogo se OBSERVA acá aunque quien lo use sea `_buscarParaEntradaRapida`
-    // con un `read`. Un `FutureProvider` que nadie mira nunca se resuelve: el
-    // `read` lo inicializa y devuelve `AsyncLoading`, así que la entrada rápida
-    // no encontraba nada hasta que otra cosa —el picker— cargara la lista.
-    // Es un provider cacheado: mirarlo no cuesta un rebuild por frame.
+    // Los dos catálogos se OBSERVAN acá aunque quien los use sea
+    // `_catalogoVisible` con un `read`.
+    //
+    // Un `FutureProvider` que nadie mira nunca se resuelve: el `read` lo
+    // inicializa y devuelve `AsyncLoading`. Y el de ejercicios propios es
+    // `autoDispose`: sin nadie suscripto se descarta apenas se lee, así que
+    // `valueOrNull` vuelve a dar null y los ejercicios que el usuario cargó no
+    // aparecían nunca en la búsqueda rápida — aunque el picker sí los muestre.
+    //
+    // Son providers cacheados: mirarlos no cuesta un rebuild por frame.
     ref.watch(exercisesProvider);
+    final uidCatalogo = ref.watch(currentUidProvider) ?? '';
+    if (uidCatalogo.isNotEmpty) {
+      ref.watch(customExercisesForTrainerStreamProvider(uidCatalogo));
+    }
 
     // Loading state: hydrating from Firestore.
     if (_loading) {
@@ -2923,7 +2921,16 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                   keyboardDismissBehavior:
                       ScrollViewKeyboardDismissBehavior.onDrag,
                   controller: _listScrollController,
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                  // `s18` y no 16: la escala de spacing de AGENTS.md es
+                  // cerrada (8·12·14·18·20) y el 16 no está en ella. Su
+                  // dartdoc describe s18 como el padding horizontal de
+                  // pantallas, que es exactamente lo que este gutter es.
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.s18,
+                    AppSpacing.s8,
+                    AppSpacing.s18,
+                    AppSpacing.s8,
+                  ),
                   children: [
                     // ── Nombre y split ──────────────────────────────────
                     // NO van a la hoja del engranaje, a diferencia de
@@ -3904,8 +3911,8 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
                               size: 18, color: palette.accentText),
                           tooltip: l10n.routineEditorEditDayNameA11y,
                           onPressed: _commitName,
-                          constraints: const BoxConstraints(
-                              minWidth: 48, minHeight: 48),
+                          constraints:
+                              const BoxConstraints(minWidth: 48, minHeight: 48),
                           padding: EdgeInsets.zero,
                         ),
                       ],
@@ -3928,8 +3935,8 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
                         ),
                       const Spacer(),
                       IconButton(
-                        key: Key(
-                            'day_name_edit_button_${widget.day.dayNumber}'),
+                        key:
+                            Key('day_name_edit_button_${widget.day.dayNumber}'),
                         icon: Icon(TreinoIcon.edit,
                             size: 16, color: palette.textMuted),
                         tooltip: l10n.routineEditorEditDayNameA11y,
@@ -3940,14 +3947,13 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
                       ),
                       if (widget.onRemoveDay != null)
                         IconButton(
-                          key: Key(
-                              'day_remove_button_${widget.day.dayNumber}'),
+                          key: Key('day_remove_button_${widget.day.dayNumber}'),
                           icon: Icon(TreinoIcon.trash,
                               size: 18, color: palette.textMuted),
                           tooltip: l10n.routineEditorDeleteDayA11y,
                           onPressed: widget.onRemoveDay,
-                          constraints: const BoxConstraints(
-                              minWidth: 48, minHeight: 48),
+                          constraints:
+                              const BoxConstraints(minWidth: 48, minHeight: 48),
                           padding: EdgeInsets.zero,
                         ),
                     ],
@@ -3986,14 +3992,46 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
                           onSelect: (r) {
                             // Autocompletar, NO agregar: el usuario viene a
                             // escribir la prescripción después del nombre.
-                            final texto = '${r.name} ';
+                            //
+                            // Y se CONSERVA lo que ya escribió. El placeholder
+                            // del campo enseña `banca 4x10 60`: quien lo sigue
+                            // tipea todo junto y después toca el ejercicio, y
+                            // reemplazar el texto entero por el nombre le
+                            // borraba el `4x10 60` que acababa de escribir.
+                            //
+                            // Se quitan sólo las palabras que el parser
+                            // entendió como BÚSQUEDA; el resto —los números—
+                            // queda tal como se tipeó, sin normalizar.
+                            // Se quita UNA ocurrencia por palabra del nombre,
+                            // no todas: hay ejercicios del catálogo con
+                            // números adentro —"Landmine 180"— y escribir
+                            // `landmine 180 3x10 180` tiene el mismo token dos
+                            // veces, una como nombre y otra como peso. Con un
+                            // Set se borraban las dos y la prescripción perdía
+                            // el kilaje.
+                            final pendientes = entry.query
+                                .toLowerCase()
+                                .split(RegExp(r'\s+'))
+                                .where((p) => p.isNotEmpty)
+                                .toList();
+                            final resto =
+                                value.text.split(RegExp(r'\s+')).where((p) {
+                              if (p.isEmpty) return false;
+                              final i = pendientes.indexOf(p.toLowerCase());
+                              if (i < 0) return true;
+                              pendientes.removeAt(i);
+                              return false;
+                            }).join(' ');
+                            final texto = resto.isEmpty
+                                ? '${r.name} '
+                                : '${r.name} $resto';
                             _quickEntryCtrl.value = TextEditingValue(
                               text: texto,
                               // Cursor AL FINAL, listo para seguir. Sin esto
                               // el usuario tenía que volver a tocar el campo y
                               // recolocar el cursor a mano.
-                              selection: TextSelection.collapsed(
-                                  offset: texto.length),
+                              selection:
+                                  TextSelection.collapsed(offset: texto.length),
                             );
                             setState(() => _quickEntryElegido = r);
                             // Y el foco de vuelta al campo: el tap sobre la
@@ -4179,8 +4217,7 @@ class _SupersetGroupCard extends StatelessWidget {
                 ? null
                 : () => onUngroupSlot!(groupSlots[mi].index),
           ),
-          if (mi < groupSlots.length - 1)
-            const SizedBox(height: AppSpacing.s8),
+          if (mi < groupSlots.length - 1) const SizedBox(height: AppSpacing.s8),
         ],
       ],
     );
@@ -4355,8 +4392,7 @@ class _SlotEditorState extends State<_SlotEditor> {
     final hayMovimiento = widget.onMoveUp != null || widget.onMoveDown != null;
     final elegida = await showExerciseActionsSheet(
       context,
-      title:
-          widget.slot.exercise?.name ?? l10n.routineEditorExerciseSheetTitle,
+      title: widget.slot.exercise?.name ?? l10n.routineEditorExerciseSheetTitle,
       actions: [
         ExerciseAction(
           id: _SlotAction.toggleExpanded,
@@ -4662,7 +4698,6 @@ enum _SlotAction {
 
   remove,
 }
-
 
 // ── Set table ─────────────────────────────────────────────────────────────────
 
@@ -5051,8 +5086,7 @@ class _SetRowState extends State<_SetRow> {
   @override
   void didUpdateWidget(_SetRow old) {
     super.didUpdateWidget(old);
-    if (old.isDuration != widget.isDuration ||
-        old.repMode != widget.repMode) {
+    if (old.isDuration != widget.isDuration || old.repMode != widget.repMode) {
       _soltarFocosAusentes();
     }
   }
@@ -5256,17 +5290,16 @@ class _SetRowState extends State<_SetRow> {
       ),
       stepAmount: esKg ? kKgStepsKg.first : 1,
       stepLabel: esKg ? formatWeightKg(kKgStepsKg.first) : '1',
-      canDecrease: esKg
-          ? (_currentKg ?? 0) > 0
-          : (_repsActuales(campo) ?? 0) > 1,
+      canDecrease:
+          esKg ? (_currentKg ?? 0) > 0 : (_repsActuales(campo) ?? 0) > 1,
       onStep: (delta) => esKg ? _stepKg(delta) : _stepReps(campo, delta),
       stepIncreaseLabel: esKg
-          ? l10n.routineEditorKgStepIncreaseA11y(
-              formatWeightKg(kKgStepsKg.first))
+          ? l10n
+              .routineEditorKgStepIncreaseA11y(formatWeightKg(kKgStepsKg.first))
           : l10n.routineEditorRepsStepIncreaseA11y('1'),
       stepDecreaseLabel: esKg
-          ? l10n.routineEditorKgStepDecreaseA11y(
-              formatWeightKg(kKgStepsKg.first))
+          ? l10n
+              .routineEditorKgStepDecreaseA11y(formatWeightKg(kKgStepsKg.first))
           : l10n.routineEditorRepsStepDecreaseA11y('1'),
       onFillColumn: esKg && widget.onFillColumn != null
           ? () => widget.onFillColumn!(campo)

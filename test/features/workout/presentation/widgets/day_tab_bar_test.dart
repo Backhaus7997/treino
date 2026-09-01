@@ -201,4 +201,35 @@ void main() {
     // La elipsis es una limitación de ancho, no información.
     expect(_labels(tester), contains('Pecho, hombro y tríceps completo'));
   });
+
+  testWidgets('las pestañas llegan al mínimo táctil de 48', (tester) async {
+    // El `SizedBox` de la barra capa el alto de CADA pestaña y del control de
+    // agregar día: con 44 ninguno llegaba al mínimo que fija la épica #862
+    // para todo target interactivo. Lo encontró el bot de review.
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData(extensions: const [AppPalette.mintMagenta]),
+        home: Scaffold(
+          body: DayTabBar(
+            labels: const ['Día 1', 'Día 2'],
+            statuses: const [DayTabStatus.ok, DayTabStatus.ok],
+            selectedIndex: 0,
+            onSelect: (_) {},
+            onAddDay: () {},
+            addDayLabel: 'Día',
+            statusLabel: (_) => '',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.getSize(find.byType(DayTabBar)).height,
+        greaterThanOrEqualTo(48));
+    for (var i = 0; i < 2; i++) {
+      expect(tester.getSize(find.byKey(Key('day_tab_$i'))).height,
+          greaterThanOrEqualTo(48),
+          reason: 'pestaña $i');
+    }
+  });
 }
