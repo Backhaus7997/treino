@@ -32,6 +32,8 @@ const ALL_KINDS: MailKind[] = [
   "link-accepted",
   "payment-overdue",
   "discomfort-reported",
+  "subscription-grace",
+  "subscription-downgraded",
 ];
 
 /**
@@ -206,7 +208,7 @@ describe("destino del CTA", () => {
     const conActionLink = ["password-reset", "email-verification"];
     const resto = ALL_KINDS.filter((k) => !conActionLink.includes(k));
 
-    expect(resto).toHaveLength(9);
+    expect(resto).toHaveLength(11);
     for (const kind of resto) {
       const href = ctaHref(renderMail(kind, {}).html);
 
@@ -511,5 +513,183 @@ describe("formatArs", () => {
   it("returns an empty string for a missing amount", () => {
     expect(formatArs(undefined)).toBe("");
     expect(formatArs(Number.NaN)).toBe("");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Los dos mails del paywall del PF
+//
+// Acá el copy ES el entregable. Son mails sobre plata y sobre un servicio que
+// puede cortarse, y el PR #758 dejó pineadas dos frases que no se pueden
+// romper. Estos tests existen para que no se rompan en silencio.
+// ---------------------------------------------------------------------------
+describe("mails del paywall del PF", () => {
+  // La invariante mas importante de todo el slice, segun el propio PR #758:
+  // "si alguna frase te da a entender que el alumno perdió acceso, es un bug —
+  // y es el peor error posible". El alumno conserva rutinas, historial y chat;
+  // lo que se frena es que el PF trabaje sobre el.
+  it("nunca sugiere que el alumno perdio algo", () => {
+    for (const kind of ["subscription-grace", "subscription-downgraded"] as const) {
+      const out = renderMail(kind, {
+        tier: "plan2", limit: 2, blockedCount: 4, reason: "paused",
+      });
+
+      expect(out.text).toContain("no pierden nada");
+      expect(out.text).not.toMatch(/perd[ií](ó|eron|o)\s+(el\s+)?acceso/i);
+      expect(out.text).not.toMatch(/se (le|les) (quit|sac)/i);
+    }
+  });
+
+  it("el mail de grace dice que TODAVIA no cambio nada, y que pasa si no entra", () => {
+    const out = renderMail("subscription-grace", { tier: "plan2", limit: 15 });
+
+    expect(out.text).toContain("Por ahora no cambia nada");
+    expect(out.text).toContain("15 alumnos");
+    expect(out.text).toContain("plan Free (2 alumnos)");
+    expect(out.text).toContain("Revisá tu medio de pago");
+  });
+
+  // NO LLEVA FECHA DE CORTE. El unico instante del documento es
+  // `currentPeriodEnd`, que es el pagado-hasta, no el corte: el corte lo decide
+  // MP. Escribir una fecha ahi seria dar por cierto algo que no controlamos, en
+  // el mail donde el PF decide cuando mover la plata (regla 11.1 de AGENTS.md).
+  it("el mail de grace no promete una fecha de corte", () => {
+    const out = renderMail("subscription-grace", {
+      tier: "plan2", limit: 15, currentPeriodEnd: "2027-02-01",
+    });
+
+    expect(out.text).not.toMatch(/\d{1,2}\/\d{1,2}\/\d{2,4}/);
+    expect(out.text).not.toMatch(/antes del/i);
+  });
+
+  it("el downgrade nombra la causa, el limite nuevo y cuantos quedan en solo lectura", () => {
+    const out = renderMail("subscription-downgraded", {
+      tier: "plan1", limit: 2, blockedCount: 5, reason: "paused",
+    });
+
+    expect(out.text).toContain("Pausaste tu suscripción.");
+    expect(out.text).toContain("límite de 2 alumnos");
+    expect(out.text).toContain("5 alumnos quedaron en solo lectura");
+    // Vocabulario copiado literal de blocked_students_screen.dart: es el mismo
+    // hecho contado por dos canales, y si divergen el PF cree que son dos.
+    expect(out.text).toContain("no editarles rutinas ni notas");
+  });
+
+  it("cada causa tiene su frase, y una desconocida no inventa ninguna", () => {
+    const frase = (reason: string) =>
+      renderMail("subscription-downgraded", { limit: 2, reason }).text;
+
+    expect(frase("cancelled-expired")).toContain("Se terminó el período que tenías pagado.");
+    expect(frase("pending")).toContain("Tu suscripción todavía no está confirmada.");
+    expect(frase("tier-change")).toContain("Cambiaste de plan.");
+    expect(frase("loquesea")).toContain("Cambió tu suscripción.");
+  });
+
+  // Los tres salieron de LEER el mail renderizado, no el codigo. Ninguno
+  // rompia un test ni el compilador.
+  it("plan3 no dice 'seguís con alumnos sin límite'", () => {
+    const out = renderMail("subscription-grace", { tier: "plan3", limit: "sin-tope" });
+
+    expect(out.text).not.toContain("seguís con alumnos sin límite");
+    expect(out.text).toContain("seguís sin límite de alumnos");
+  });
+
+  // "Ampliá tu plan" sobre una pausa manda a comprar mas de algo que el PF ya
+  // pago: el problema ahi no es el tamaño del plan, es que no esta al dia.
+  it("solo pide ampliar el plan cuando la causa ES el plan", () => {
+    const pausa = renderMail("subscription-downgraded", {
+      limit: 2, blockedCount: 3, reason: "paused",
+    });
+    const bajada = renderMail("subscription-downgraded", {
+      limit: 7, blockedCount: 3, reason: "tier-change",
+    });
+
+    expect(pausa.text).toContain("poné tu suscripción al día");
+    expect(pausa.text).not.toContain("ampliá tu plan");
+    expect(pausa.html).toContain("REGULARIZAR MI SUSCRIPCIÓN");
+
+    expect(bajada.text).toContain("ampliá tu plan");
+    expect(bajada.html).toContain("AMPLIAR MI PLAN");
+  });
+
+  it("una causa desconocida pide regularizar, no ampliar", () => {
+    const out = renderMail("subscription-downgraded", {
+      limit: 2, blockedCount: 1, reason: "loquesea",
+    });
+
+    expect(out.html).toContain("REGULARIZAR MI SUSCRIPCIÓN");
+  });
+
+  // Le decia "para volver a trabajar con todos, ampliá tu plan" a alguien que
+  // YA esta trabajando con todos: un pedido de plata sobre un problema que no
+  // existe. Y "tus alumnos no pierden nada" inventaba una preocupacion.
+  it("sin bloqueados no pide plata ni inventa una preocupacion", () => {
+    const out = renderMail("subscription-downgraded", {
+      tier: "plan1", limit: 7, blockedCount: 0, reason: "tier-change",
+    });
+
+    expect(out.text).toContain("Ninguno de tus alumnos quedó fuera de tu cupo.");
+    expect(out.text).not.toContain("ampliá tu plan");
+    expect(out.text).not.toContain("no pierden nada");
+  });
+
+  it("con 0 bloqueados no dibuja la linea de solo lectura", () => {
+    const out = renderMail("subscription-downgraded", {
+      tier: "plan1", limit: 7, blockedCount: 0, reason: "tier-change",
+    });
+
+    expect(out.text).not.toContain("solo lectura");
+    expect(out.subject).not.toContain("solo lectura");
+  });
+
+  it("un solo alumno se dice en singular", () => {
+    const out = renderMail("subscription-downgraded", {
+      limit: 2, blockedCount: 1, reason: "paused",
+    });
+
+    expect(out.text).toContain("1 alumno quedó en solo lectura");
+  });
+
+  // El render mas caro posible: decirle al PF que NO tiene tope justo cuando no
+  // pudimos leer su limite. Un limite que no sabemos no es un limite infinito.
+  it("un limite ilegible no se anuncia como 'sin límite'", () => {
+    // El `undefined` va con cast a proposito: el tipo lo prohibe, pero un
+    // param que el productor se olvida de mandar llega exactamente asi, y ese
+    // es el caso que este test cubre.
+    for (const limit of [undefined as unknown as string, "", "ochenta"]) {
+      const out = renderMail("subscription-downgraded", { limit, reason: "paused" });
+
+      expect(out.text).not.toContain("sin límite");
+      expect(out.text).not.toContain("NaN");
+      expect(out.text).toContain("un límite más bajo");
+    }
+  });
+
+  // El centinela se distingue de un limite ilegible: uno dice "sin límite", el
+  // otro "más bajo". Lo que se prueba acá es que se RECONOCE, no la redaccion
+  // exacta — de eso se ocupa el test de la frase de arriba.
+  it("el centinela de plan3 se reconoce como sin tope", () => {
+    const out = renderMail("subscription-grace", { tier: "plan3", limit: "sin-tope" });
+
+    expect(out.text).toContain("sin límite");
+    expect(out.text).not.toContain("sin-tope");
+    expect(out.text).not.toContain("NaN");
+  });
+
+  it("un conteo roto no imprime NaN", () => {
+    const out = renderMail("subscription-downgraded", {
+      limit: 2, blockedCount: "muchos", reason: "paused",
+    });
+
+    expect(out.text).not.toContain("NaN");
+    expect(out.text).not.toContain("solo lectura");
+  });
+
+  it("los dos van al destino del ENTRENADOR cuando el productor lo pasa", () => {
+    for (const kind of ["subscription-grace", "subscription-downgraded"] as const) {
+      const html = renderMail(kind, { ctaUrl: "https://app.gettreino.com/abrir/profe" }).html;
+
+      expect(ctaHref(html)).toBe("https://app.gettreino.com/abrir/profe");
+    }
   });
 });
