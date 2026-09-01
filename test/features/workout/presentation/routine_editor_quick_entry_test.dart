@@ -155,6 +155,26 @@ void main() {
             'búsqueda; los números quedan como se tipearon');
   });
 
+  testWidgets('un número del NOMBRE no se lleva puesto el del peso',
+      (tester) async {
+    // Hay ejercicios del catálogo con números adentro. Si el nombre y la
+    // prescripción comparten token —"landmine 180" con 180 kg— filtrar por
+    // conjunto borraba los dos. Lo encontró el bot de review.
+    await _pumpEditor(tester);
+    await abrirRapido(tester);
+    await tester.enterText(
+        find.byKey(const Key('quick_entry_field')), 'landmine 180 3x10 180');
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('quick_entry_result_0')));
+    await tester.pumpAndSettle();
+
+    final campo =
+        tester.widget<TextField>(find.byKey(const Key('quick_entry_field')));
+    expect(campo.controller!.text, 'Landmine 180 3x10 180',
+        reason: 'el 180 del NOMBRE se va con el nombre; el 180 del PESO se '
+            'queda. Filtrando por conjunto se borraban los dos.');
+  });
+
   testWidgets('y el AGREGAR que sigue usa esa prescripción', (tester) async {
     await _pumpEditor(tester);
     await abrirRapido(tester);
