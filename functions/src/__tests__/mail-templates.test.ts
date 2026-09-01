@@ -315,29 +315,33 @@ describe("plantilla federated-signin-hint", () => {
 describe("header de marca", () => {
   const out = () => renderMail("appointment-confirmed", { trainerName: "Jose" });
 
-  it("trae la marca TR como imagen", () => {
-    expect(out().html).toContain("https://app.gettreino.com/email/logo.png");
+  it("trae el wordmark como imagen", () => {
+    expect(out().html).toContain("https://app.gettreino.com/email/wordmark.png");
   });
 
   // Outlook y Gmail-sin-imagenes no cargan el <img>. Si el header fuera solo
   // logo, para esa gente el mail empieza en blanco. Estas dos aserciones son la
   // red: el alt dice la marca, y la palabra TREINO esta escrita aparte.
-  // Outlook y Gmail-sin-imagenes no cargan el <img>. El wordmark de al lado no
-  // es decorativo: ES el fallback, y por eso el logo va con `alt=""`.
+  // Outlook y Gmail-sin-imagenes no cargan el <img>, y ahora el header es SOLO
+  // la imagen: sin alt, para esa gente el mail empieza en blanco.
   //
-  // Medido sobre el render real con la imagen rota: con `alt="TREINO"` el
-  // texto se dibuja dentro de la caja de 28px del <img> y sale "TRE TREINO".
-  it("degrada al wordmark cuando el cliente bloquea imagenes", () => {
-    const html = out().html;
-
-    expect(html).toContain(">TREINO</div>");
-    expect(html).toContain("alt=\"\"");
+  // El alt estuvo VACIO mientras el header era marca TR + la palabra escrita
+  // al lado. Ahi era correcto: la palabra ya era el fallback, el alt la habria
+  // dicho dos veces en un lector de pantalla, y ademas se recortaba a "TRE"
+  // dentro de la caja de 28px del <img>. Sacada esa palabra, las dos razones
+  // desaparecen — y en los 110px del wordmark el texto entra entero.
+  it("lleva alt, que ahora es la unica red si se bloquean imagenes", () => {
+    expect(out().html).toContain("alt=\"TREINO\"");
   });
 
-  it("el logo no repite la marca en el alt: la diria dos veces", () => {
-    // Un lector de pantalla que encuentre alt="TREINO" y el wordmark leeria
-    // "TREINO TREINO". La imagen es decorativa PORQUE la palabra esta al lado.
-    expect(out().html).not.toContain("alt=\"TREINO\"");
+  it("el alt hereda el color de marca, para que se lea al bloquearse", () => {
+    // Sin `color` en el style del <img>, el alt de una imagen rota sale en el
+    // color de texto por defecto del cliente.
+    expect(out().html).toMatch(/<img[^>]+alt="TREINO"[^>]+color:#2CE5A2/);
+  });
+
+  it("la palabra ya no se escribe aparte: la imagen ES la palabra", () => {
+    expect(out().html).not.toContain(">TREINO</div>");
   });
 
   it("no usa SVG, que ningun cliente de mail renderiza", () => {

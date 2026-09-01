@@ -96,18 +96,19 @@ export const APP_ENTRY_ATHLETE = "https://app.gettreino.com/abrir/alumno";
 export const APP_ENTRY_TRAINER = "https://app.gettreino.com/abrir/profe";
 
 /**
- * La marca TR, servida desde el propio deploy del Coach Hub (`web/email/`).
+ * El wordmark de TREINO, servido desde el propio deploy del Coach Hub.
  *
- * PNG y no SVG porque NINGUN cliente de mail renderiza SVG — el logo del repo
- * (`assets/logo/treino_logo.svg`) no sirve para esto. Sale del foreground del
- * adaptive icon, que ya viene con fondo transparente, recortado a la marca:
- * un cuadrado negro sobre la tarjeta `#0F1513` dibujaria un recuadro visible,
- * porque los dos negros no son el mismo.
+ * PNG y no SVG porque NINGUN cliente de mail renderiza SVG — el
+ * `assets/logo/treino_logo.svg` del repo no sirve para esto. Se rasterizo con
+ * Chrome headless y fondo transparente, en el mint de marca: el mismo
+ * `#2CE5A2` del acento, que es la variante de la grilla de marca pensada para
+ * fondos oscuros y la unica que ya vimos renderizar legible cuando Gmail
+ * invierte el mail a claro.
  *
- * Se sirve desde `app.gettreino.com` y no desde los `web/icons/` que ya
- * existian: esos siguen siendo los del template de Flutter.
+ * Reemplaza al lockup de marca TR + la palabra escrita aparte. El wordmark ES
+ * la palabra, asi que tenerlos juntos la decia dos veces.
  */
-export const LOGO_URL = "https://app.gettreino.com/email/logo.png";
+export const LOGO_URL = "https://app.gettreino.com/email/wordmark.png";
 
 /**
  * Wraps body markup in the branded shell.
@@ -160,23 +161,19 @@ function layout(
     ` style="background:${INK};padding:32px 16px;"><tr><td align="center">`,
     "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"",
     ` style="max-width:520px;background:${INK_CARD};border-radius:16px;">`,
-    // Lockup: marca + palabra. La palabra NO es decorativa — es el fallback.
-    // Outlook y Gmail-sin-imagenes no cargan el <img>, y un header que es solo
-    // logo desaparece entero para esa gente.
+    // Solo el wordmark. Antes iba la marca TR con la palabra TREINO escrita al
+    // lado; ahora la imagen ES la palabra, y tenerlas juntas la decia dos veces.
+    //
+    // Vuelve el `alt="TREINO"`, que en el lockup anterior estaba VACIO a
+    // proposito: ahi la palabra de al lado era el fallback para los clientes
+    // que bloquean imagenes, asi que el alt habria sonado dos veces en un
+    // lector de pantalla y ademas se recortaba dentro de la caja de 28px del
+    // <img>. Sin esa palabra, el alt vuelve a ser la unica red — y en 110px
+    // entra entero.
     "<tr><td style=\"padding:32px 32px 0 32px;\">",
-    "<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\"><tr>",
-    "<td style=\"padding-right:10px;\" valign=\"middle\">",
-    // `alt=""` A PROPOSITO, y no `alt="TREINO"`. Medido sobre el render con
-    // imagenes bloqueadas: el alt se dibuja DENTRO de la caja de 28px del
-    // <img>, asi que "TREINO" se recorta a "TRE" y queda "TRE TREINO" al lado
-    // del wordmark. Un fallback que se ve roto es peor que no tenerlo. La
-    // marca de al lado ES el fallback, y ademas un lector de pantalla que
-    // encuentre las dos cosas leeria "TREINO TREINO".
-    `<img src="${esc(LOGO_URL)}" width="28" height="44" alt=""`,
-    " style=\"display:block;border:0;\"></td>",
-    "<td valign=\"middle\"><div style=\"font-size:13px;letter-spacing:2px;",
-    `color:${MINT};font-weight:700;font-family:${FONT};">TREINO</div>`,
-    "</td></tr></table></td></tr>",
+    `<img src="${esc(LOGO_URL)}" width="110" height="56" alt="TREINO"`,
+    ` style="display:block;border:0;color:${MINT};font-family:${FONT};`,
+    "font-size:15px;font-weight:700;letter-spacing:2px;\"></td></tr>",
     "<tr><td style=\"padding:20px 32px 0 32px;\">",
     `<h1 style="margin:0;font-size:24px;line-height:1.25;color:${BONE};`,
     `font-family:${FONT};">${heading}</h1></td></tr>`,
