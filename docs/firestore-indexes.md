@@ -82,12 +82,15 @@ rg -n 'scheduledAt' lib functions/src functions/scripts scripts -g '!**/__tests_
 Al escribir esto devuelve **1 línea**: `functions/src/cascade/appointments.ts:113`,
 dentro del comentario del fix.
 
-> **Resto pendiente, fuera del alcance de esta auditoría:**
-> `functions/src/__tests__/notify-appointment.test.ts` todavía siembra
-> `scheduledAt` en sus fixtures (5 veces), mientras el código bajo test lee
-> `after.startsAt` (`notify-appointment.ts:131,132,153,154`). Los fixtures
-> escriben un campo que nadie lee — la misma clase de desincronización que causó
-> QA-API-001.
+> **Resto que dejó el bug, fuera del alcance de esta auditoría — se arregla en
+> [#933](https://github.com/Backhaus7997/treino/pull/933):**
+> `functions/src/__tests__/notify-appointment.test.ts` sembraba `scheduledAt` en
+> sus 5 fixtures mientras el código bajo test lee `after.startsAt`
+> (`notify-appointment.ts:131,132,153,154`), así que el handler recibía
+> `undefined` y el mail encolado salía con fecha y hora vacías — verde, porque
+> ningún test asserteaba los params del mail. La misma clase de
+> desincronización que causó QA-API-001, sobrevivida en los tests del propio
+> fix.
 
 ---
 
@@ -289,10 +292,13 @@ no decir nada (AGENTS.md §11.1):
   (follow*Uid, status, createdAt DESC)`, que ADR-FOLLOW-003 declaró por
   adelantado para `follow-lists` y que hoy ninguna query usa con `orderBy`
   (`follow_repository.dart:111-119` explica por qué el orden no se adoptó).
-- **`routines (assignedBy, source, createdAt DESC)` está declarado DOS veces** en
-  `firestore.indexes.json`. Es inocuo (Firebase deduplica specs idénticos) pero
-  es un defecto de fuente de verdad en el mismo archivo. No se toca acá para no
-  mezclar scopes:
+- **`routines (assignedBy, source, createdAt DESC)` estaba declarado DOS veces**
+  en `firestore.indexes.json` (37 declarados, 36 únicos). Lo metió `63635ad3`,
+  el commit que declaró índices huérfanos de prod: uno de los dos ya estaba.
+  Es inocuo —Firebase deduplica specs idénticos— pero es un defecto de fuente de
+  verdad en el mismo archivo. **Se arregla en
+  [#933](https://github.com/Backhaus7997/treino/pull/933)**, aparte de esta
+  auditoría para no mezclar scopes. El comando que lo detecta:
 
   ```bash
   python3 -c "
