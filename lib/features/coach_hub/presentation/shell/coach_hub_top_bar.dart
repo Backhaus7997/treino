@@ -7,6 +7,8 @@ import 'package:treino/app/theme/theme_mode_provider.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/persistence/shared_prefs_provider.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/features/coach/domain/subscription_tier.dart';
+import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_upsell_banner.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 
 import 'sidebar_registry.dart';
@@ -29,11 +31,15 @@ class CoachHubTopBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
 
-    final displayName =
-        ref.watch(userProfileProvider).valueOrNull?.displayName?.trim();
+    final profile = ref.watch(userProfileProvider).valueOrNull;
+    final displayName = profile?.displayName?.trim();
     final initial = (displayName != null && displayName.isNotEmpty)
         ? displayName.substring(0, 1).toUpperCase()
         : '?';
+    // Sin `subscription` en el doc → Free (sin backfill). `nextTier == null`
+    // sólo en plan3: ahí no hay nada que ofrecer y el item no se arma.
+    final tier = profile?.subscription?.tier ?? SubscriptionTier.free;
+    final canUpgrade = tier.nextTier != null;
 
     final location = GoRouterState.of(context).uri.toString();
     final title = activeSidebarItem(location)?.label.toUpperCase() ?? '';
@@ -84,6 +90,38 @@ class CoachHubTopBar extends ConsumerWidget {
             tooltip: 'Cuenta', // i18n: Fase W1
             onSelected: (value) => _onSelected(context, ref, value),
             itemBuilder: (context) => [
+              // «Mi cuenta» primero: es la acción que la gente busca al tocar
+              // su avatar. El menú se mantiene (no se reemplaza por navegación
+              // directa) porque es el único acceso a tema y Salir del hub web.
+              PopupMenuItem<String>(
+                value: 'account',
+                child: Row(
+                  children: [
+                    Icon(TreinoIcon.users,
+                        size: 18, color: palette.textPrimary),
+                    const SizedBox(width: AppSpacing.s8),
+                    const Text('Mi cuenta'), // i18n: Fase W1
+                  ],
+                ),
+              ),
+              if (canUpgrade)
+                PopupMenuItem<String>(
+                  value: 'upgrade',
+                  child: Row(
+                    children: [
+                      Icon(TreinoIcon.sparkle, size: 18, color: palette.accent),
+                      const SizedBox(width: AppSpacing.s8),
+                      Text(
+                        'Mejorar plan · ${tierPlanLabel(tier)}', // i18n: W1
+                        style: TextStyle(
+                          color: palette.accent,
+                          fontWeight: AppFonts.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              const PopupMenuDivider(),
               _ThemeMenuItem(
                 value: 'theme_system',
                 label: 'Sistema', // i18n: Fase W1
@@ -146,6 +184,13 @@ class CoachHubTopBar extends ConsumerWidget {
 
   void _onSelected(BuildContext context, WidgetRef ref, String value) {
     switch (value) {
+      // `go` para Ajustes (sección del shell) y `push` para la pricing page
+      // (sub-flujo: se abre encima y vuelve con atrás) — mismo criterio que
+      // «CAMBIAR PLAN» en Facturación.
+      case 'account':
+        context.go('/ajustes');
+      case 'upgrade':
+        context.push('/facturacion/planes');
       case 'theme_system':
         ref.read(themeModeProvider.notifier).setMode(ThemeMode.system);
       case 'theme_light':

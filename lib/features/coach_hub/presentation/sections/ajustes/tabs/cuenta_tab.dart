@@ -11,6 +11,7 @@ import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/avatar_web_uploader.dart';
+import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_upsell_banner.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
@@ -256,11 +257,19 @@ class _CuentaFormState extends ConsumerState<_CuentaForm> {
           ),
         ),
         const SizedBox(height: 16),
-        // Tarjeta «INFORMACIÓN PERSONAL» — primera en el stagger eager
-        // (ADR-F12-04, PROHIBIDO dentro de ListView.builder; acá es un
-        // Column fijo, no aplica el riesgo).
+        // Invitación a plan pago — primera en el stagger eager (ADR-F12-04,
+        // PROHIBIDO dentro de ListView.builder; acá es un Column fijo, no
+        // aplica el riesgo). Va arriba de todo porque Cuenta es el aterrizaje
+        // de los dos símbolos de usuario del shell (sidebar y top bar), y es
+        // el único lugar del hub donde el upsell no interrumpe una tarea.
+        // Se auto-oculta en plan3 (no hay tier superior que vender).
         TreinoFadeSlideIn(
           delay: AppMotion.stagger(0),
+          child: const PlanUpsellBanner(),
+        ),
+        // Tarjeta «INFORMACIÓN PERSONAL».
+        TreinoFadeSlideIn(
+          delay: AppMotion.stagger(1),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -325,7 +334,7 @@ class _CuentaFormState extends ConsumerState<_CuentaForm> {
         ),
         const SizedBox(height: 28),
         TreinoFadeSlideIn(
-          delay: AppMotion.stagger(1),
+          delay: AppMotion.stagger(2),
           child: const _DangerZone(),
         ),
       ],
