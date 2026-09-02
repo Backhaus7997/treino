@@ -27,7 +27,7 @@ Lectura obligatoria antes de tu primer PR:
 1. [`../AGENTS.md`](../AGENTS.md) — índice de reglas críticas.
 2. [`../CONTRIBUTING.md`](../CONTRIBUTING.md) — onboarding técnico paso a paso.
 3. Este archivo (`docs/workflow.md`).
-4. [`../.atl/skill-registry.md`](../.atl/skill-registry.md) — catálogo de skills de IA.
+4. `.atl/skill-registry.md` — catálogo de skills de IA. **Generado local**: `gentle-ai skill-registry refresh --force`.
 
 ## Calidad gates (antes de cada commit)
 
