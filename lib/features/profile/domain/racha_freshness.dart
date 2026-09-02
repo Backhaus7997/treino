@@ -1,51 +1,70 @@
 import '../../../core/utils/argentina_time.dart';
 
-/// Read-time decay for the denormalized `racha` on `userPublicProfiles` (#552).
+/// Decay en lectura para la `rachaSemanas` denormalizada de
+/// `userPublicProfiles` (#552, migrado a semanas 2026-09-02).
 ///
-/// SEMANTIC DECISION (#552): everywhere the app shows a "racha" it means the
-/// CURRENT streak as of today in the Argentina calendar frame — the same value
-/// `computeStreak` returns. The stored `racha` field is a snapshot taken the
-/// last time the athlete finished a workout: it is exact while the athlete's
-/// streak is alive, but it never decays on its own — an athlete who stopped
-/// training keeps their last value forever, which is how PERFIL (live
-/// `computeStreak` → 0) and RANKINGS (stale stored 1) came to disagree.
+/// SEMÁNTICA: en todos lados donde la app muestra una "racha" quiere decir la
+/// racha ACTUAL de hoy — el mismo valor que devuelve `computeWeeklyStreak`. El
+/// campo guardado es una foto tomada la última vez que el atleta terminó un
+/// entrenamiento: es exacto mientras la racha está viva, pero no decae solo.
+/// Un atleta que dejó de entrenar se queda con su último valor para siempre, y
+/// así fue como PERFIL (cálculo en vivo → 0) y RANKINGS (guardado, viejo → 1)
+/// llegaron a contradecirse.
 ///
-/// A stored streak written on day D remains the correct CURRENT streak on day
-/// D and on day D+1 (computeStreak's yesterday-grace: a streak whose last
-/// workout was yesterday is still alive). From D+2 onward, with no new
-/// workout — and therefore no new stamp — the current streak is 0 by
-/// definition. So freshness collapses to: is [rachaUpdatedAt]'s ART calendar
-/// date today or yesterday?
+/// EL CAMBIO A SEMANAS MUEVE LA TOLERANCIA. Con la racha por día la ventana
+/// era {hoy, ayer}: `computeStreak` tenía día de gracia, así que un valor
+/// escrito ayer todavía era correcto hoy. Con la racha por semana la
+/// contraparte exacta es {semana en curso, semana anterior}, porque
+/// `computeWeeklyStreak` no deja que la semana en curso corte la racha:
 ///
-/// [rachaUpdatedAt] is the instant `racha` was last recomputed from a
-/// qualifying workout (stamped by `UserPublicProfileRepository.updateCounters`
-/// at finish time, or by the backfill script from the newest completed
-/// session's `startedAt`). A `null` stamp is a legacy doc written before this
-/// field existed: we pass the raw value through unchanged (pre-#552 behavior)
-/// instead of mass-zeroing every board until `backfill_racha_freshness.js`
-/// runs. A session that starts before ART midnight and finishes after it
-/// stamps one day late — the {today, yesterday} tolerance absorbs exactly
-/// that one-day skew.
+/// - Sello de ESTA semana → el valor es de esta semana. Correcto.
+/// - Sello de la semana PASADA → el atleta todavía no entrenó esta semana,
+///   pero la semana en curso no rompe nada. El valor sigue siendo el correcto.
+/// - Sello de 2+ semanas atrás → hubo al menos UNA semana completa cerrada sin
+///   una sola sesión. Ninguna rutina tiene objetivo 0, así que esa semana no
+///   se cumplió y la racha está muerta: 0.
 ///
-/// [now] is a REAL instant (any flag) — normalized with `.toUtc()` internally,
-/// same contract as `computeStreak`. Do NOT pass `argentinaNow()`.
-int effectiveRacha({
-  required int? racha,
-  required DateTime? rachaUpdatedAt,
+/// Mantener la ventana en días acá habría puesto en cero, cada martes, la
+/// racha de todo el que entrena lunes y jueves — el número correcto es el que
+/// sobrevive el fin de semana.
+///
+/// [rachaSemanasUpdatedAt] es el instante en que se recalculó
+/// [rachaSemanas], estampado por `UserPublicProfileRepository.updateCounters`
+/// al terminar la sesión. Un sello `null` es un doc que nunca escribió el
+/// campo nuevo: devolvemos 0, NO el valor crudo. Acá el default cambió a
+/// propósito respecto de la versión por días — un `racha` viejo son DÍAS, y
+/// dejarlo pasar como si fueran semanas pondría un 23 donde corresponde un 3.
+/// Preferimos un cero honesto que se corrige solo la próxima vez que el
+/// atleta entrena, antes que un número inflado en un board público. AGENTS.md
+/// §11.1: una advertencia falsa es peor que ninguna.
+///
+/// NO hay backfill, y es a propósito. Recalcular esto server-side exige el
+/// objetivo semanal del atleta, y ese sale de resolver cuál es su rutina
+/// activa — una cadena de prioridad que ya vive dos veces (Dart y Swift,
+/// fijada por `conformance/routine_selection.json`). Una tercera copia en un
+/// script de Node, corriendo contra producción y escribiendo a un board
+/// público, es más riesgo del que compra: el board converge solo dentro de la
+/// semana para todo el que entrena, que es exactamente quién debería estar en
+/// un board de rachas. Quien dejó de entrenar muestra 0, que bajo esta
+/// semántica ES su valor correcto.
+///
+/// [now] es un instante REAL (cualquier flag) — se normaliza con `.toUtc()`
+/// adentro, mismo contrato que `computeWeeklyStreak`. NO le pases
+/// `argentinaNow()`.
+int effectiveRachaSemanas({
+  required int? rachaSemanas,
+  required DateTime? rachaSemanasUpdatedAt,
   required DateTime now,
 }) {
-  final raw = racha ?? 0;
-  if (rachaUpdatedAt == null) return raw;
+  if (rachaSemanas == null || rachaSemanasUpdatedAt == null) return 0;
 
-  final todayArt = toArgentina(now.toUtc());
-  final today = DateTime.utc(todayArt.year, todayArt.month, todayArt.day);
-  final stampArt = toArgentina(rachaUpdatedAt.toUtc());
-  final stampDay = DateTime.utc(stampArt.year, stampArt.month, stampArt.day);
+  final currentWeek = mondayOfWeekArt(toArgentina(now.toUtc()));
+  final stampWeek = mondayOfWeekArt(toArgentina(rachaSemanasUpdatedAt.toUtc()));
 
-  final daysOld = today.difference(stampDay).inDays;
-  // 0 = stamped today, 1 = stamped yesterday (grace day). Negative = the
-  // stamp reads as "future" (device clock behind the server timestamp that
-  // wrote it) — it was just written, so it is fresh by construction. Only a
-  // stamp 2+ ART days old means the streak is no longer current.
-  return daysOld <= 1 ? raw : 0;
+  final weeksOld = currentWeek.difference(stampWeek).inDays ~/ 7;
+  // 0 = sellado esta semana, 1 = la semana pasada (la de gracia). Negativo =
+  // el sello lee como "futuro" (el reloj del dispositivo atrasado respecto del
+  // server timestamp que lo escribió) — se acaba de escribir, así que es
+  // fresco por construcción.
+  return weeksOld <= 1 ? rachaSemanas : 0;
 }

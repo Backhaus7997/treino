@@ -720,7 +720,7 @@ void main() {
   // Uses repoWithProfile for BOTH create() and finish() to ensure
   // fake_cloud_firestore's sub-collection index is consistent.
   test(
-      'SCENARIO-321: finish() updates userPublicProfiles/{uid} with workoutsCount and racha',
+      'SCENARIO-321: finish() updates userPublicProfiles/{uid} with workoutsCount and rachaSemanas',
       () async {
     final repoWithProfile = SessionRepository(
       firestore: firestore,
@@ -752,12 +752,12 @@ void main() {
     final data = profileSnap.data()!;
     // 1 fully completed session
     expect(data['workoutsCount'], equals(1));
-    // racha is computed by computeStreak using DateTime.now(), bucketed by the
+    // rachaSemanas is computed by computeWeeklyStreak using DateTime.now(), bucketed by the
     // Argentina calendar day (#411). Its value depends on the real "today" in
     // ART relative to the fixed 2026-05-15 session, so we only assert it is a
     // non-negative integer (TZ-independent). startedAt is UTC-flagged, as real
     // data always is.
-    expect(data['racha'], isA<int>());
+    expect(data['rachaSemanas'], isA<int>());
   });
 
   // SCENARIO-321 failure: when public profile write fails, finish() still
@@ -905,7 +905,7 @@ void main() {
 
   test(
       'SCENARIO-RANK-3h (sdd/rankings-integrity Phase 1): finish() still '
-      'writes workoutsCount/racha exactly as before, independent of the '
+      'writes workoutsCount/rachaSemanas exactly as before, independent of the '
       'ranking-metric server-side recompute', () async {
     await publicProfileRepo.set(
       const UserPublicProfile(uid: uid, rankingOptIn: true),
@@ -932,7 +932,7 @@ void main() {
 
     final profile = await publicProfileRepo.get(uid);
     expect(profile!.workoutsCount, equals(1));
-    expect(profile.racha, isA<int>());
+    expect(profile.rachaSemanas, isA<int>());
   });
 }
 

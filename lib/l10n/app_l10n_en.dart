@@ -3151,7 +3151,26 @@ class AppL10nEn extends AppL10n {
       'We couldn\'t load your monthly report. Try again.';
 
   @override
+  String get monthlyVolumeByGroupEmpty => 'No sets by group in this month.';
+
+  @override
+  String monthlyVolumeByGroupSets(int n) {
+    String _temp0 = intl.Intl.pluralLogic(
+      n,
+      locale: localeName,
+      other: '$n sets',
+      one: '1 set',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String workoutDaysCalendarStreak(int n) {
+    return '';
+  }
+
+  @override
+  String workoutDaysCalendarStreakHint(int n) {
     return '';
   }
 

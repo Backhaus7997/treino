@@ -11,7 +11,7 @@ import 'package:cloud_firestore/cloud_firestore.dart'
         Timestamp;
 
 import '../../../core/utils/argentina_time.dart';
-import '../../../core/utils/streak_calculator.dart';
+import '../../../core/utils/weekly_streak_calculator.dart';
 import '../../profile/data/user_public_profile_repository.dart';
 import '../domain/duration_timer.dart';
 import '../domain/duration_timer_owner.dart';
@@ -132,6 +132,7 @@ class SessionRepository {
     required double totalVolumeKg,
     required int durationMin,
     bool wasFullyCompleted = false,
+    int weeklyTarget = weeklyStreakFallbackTarget,
   }) async {
     // finishedAt MUST be Timestamp.fromDate, not a raw DateTime — real Firestore
     // serializes a raw DateTime as an ISO string, but the @TimestampConverter
@@ -158,16 +159,26 @@ class SessionRepository {
     // denormalization now lives server-side in `recomputeMetrics`
     // (`functions/src/ranking-aggregate.ts`), triggered by
     // `rankingAggregateOnSession` on this very `sessions/{id}` write. Only
-    // `workoutsCount`/`racha` remain client-written here.
+    // `workoutsCount`/`rachaSemanas` remain client-written here.
+    //
+    // [weeklyTarget] llega del caller (que sí tiene `ref` y puede leer
+    // `weeklyStreakTargetProvider`) en vez de resolverse acá: el repositorio
+    // es capa de datos y no debería aprender a resolver cuál es la rutina
+    // activa del atleta. El default es el fallback, así que un caller que no
+    // lo pase escribe una racha de "al menos una sesión por semana" — bajo,
+    // nunca inflado.
     final pubRepo = _publicProfileRepository;
     if (pubRepo == null) return;
 
     try {
       final completedList = await listRecentCompletedByUid(uid);
-      final racha = computeStreak(completedList);
+      final rachaSemanas = computeWeeklyStreak(
+        sessions: completedList,
+        weeklyTarget: weeklyTarget,
+      );
       final counters = <String, Object?>{
         'workoutsCount': completedList.length,
-        'racha': racha,
+        'rachaSemanas': rachaSemanas,
       };
 
       await pubRepo.updateCounters(uid, counters);

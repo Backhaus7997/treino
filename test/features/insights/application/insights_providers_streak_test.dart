@@ -36,74 +36,57 @@ void main() {
     ]);
   }
 
-  group('weeklyInsightsProvider — streak (SCENARIO-300..303)', () {
-    // SCENARIO-300: trained today → streak includes today + preceding consecutive days
-    test('SCENARIO-300: trained today → streak ≥ 1', () async {
-      final repo = MockSessionRepository();
-      // computeStreak buckets by the Argentina calendar day (#411). Anchor
-      // fixtures to `argentinaNow()` and make them UTC-flagged at noon UTC
-      // (= 09:00 ART, same ART day under any runner, never crosses midnight),
-      // mirroring real data (always UTC-flagged via TimestampConverter). A
-      // device-local fixture would flake near the ART midnight boundary.
-      final nowArt = argentinaNow();
-      final today = DateTime.utc(nowArt.year, nowArt.month, nowArt.day, 12);
-      final yesterday = today.subtract(const Duration(days: 1));
+  // SCENARIO-300..303 se releyeron cuando la racha pasó de días a SEMANAS.
+  // El comportamiento fino (qué cuenta una semana, por qué la semana en curso
+  // no corta) está cubierto en `test/core/utils/weekly_streak_calculator_test`;
+  // acá se prueba el CABLEADO: que el provider alimente el cálculo con la
+  // lista completa de sesiones y que sólo cuenten las que califican.
+  //
+  // Todos los fixtures se anclan al LUNES de la semana en curso, no a "hoy".
+  // Un fixture de hoy/ayer daría un resultado distinto según el día en que
+  // corra la suite: si hoy es lunes, "ayer" cae en la semana anterior.
+  //
+  // El container no tiene rutina activa, así que el objetivo cae al fallback
+  // de 1 sesión por semana. Es lo correcto para estos tests: miden bucketeo,
+  // no umbral.
+  group('weeklyInsightsProvider — racha semanal (SCENARIO-300..303)', () {
+    /// Mediodía UTC (= 09:00 ART) del lunes de hace [weeksAgo] semanas.
+    DateTime weekAt(int weeksAgo) {
+      final monday = mondayOfWeekArt(argentinaNow());
+      return DateTime.utc(
+        monday.year,
+        monday.month,
+        monday.day - (7 * weeksAgo),
+        12,
+      );
+    }
 
-      when(() => repo.listByUid('u1')).thenAnswer((_) async => [
-            makeSession(
-              id: 's1',
-              startedAt: today,
-              status: SessionStatus.finished,
-              wasFullyCompleted: true,
-            ),
-            makeSession(
-              id: 's2',
-              startedAt: yesterday,
-              status: SessionStatus.finished,
-              wasFullyCompleted: true,
-            ),
-          ]);
+    void stubNoSetLogs(MockSessionRepository repo) {
       when(() => repo.listSetLogs(
             uid: any(named: 'uid'),
             sessionId: any(named: 'sessionId'),
           )).thenAnswer((_) async => []);
+    }
 
-      final container = makeContainer(repo: repo);
-      addTearDown(container.dispose);
-
-      final result = await container.read(weeklyInsightsProvider.future);
-      // Trained today + yesterday = streak of at least 2
-      expect(result!.streak, greaterThanOrEqualTo(2));
-    });
-
-    // SCENARIO-301: not trained today → streak counts from yesterday backwards
-    test('SCENARIO-301: not trained today → streak counts from yesterday',
+    // SCENARIO-300: la semana en curso ya cumplida entra en la racha.
+    test('SCENARIO-300: semanas consecutivas cumplidas → racha completa',
         () async {
       final repo = MockSessionRepository();
-      // UTC-flagged noon anchors on consecutive ART days (see SCENARIO-300).
-      final nowArt = argentinaNow();
-      final today = DateTime.utc(nowArt.year, nowArt.month, nowArt.day, 12);
-      final yesterday = today.subtract(const Duration(days: 1));
-      final dayBefore = today.subtract(const Duration(days: 2));
-
       when(() => repo.listByUid('u1')).thenAnswer((_) async => [
             makeSession(
-              id: 's1',
-              startedAt: yesterday,
+              id: 's0',
+              startedAt: weekAt(0),
               status: SessionStatus.finished,
               wasFullyCompleted: true,
             ),
             makeSession(
-              id: 's2',
-              startedAt: dayBefore,
+              id: 's1',
+              startedAt: weekAt(1),
               status: SessionStatus.finished,
               wasFullyCompleted: true,
             ),
           ]);
-      when(() => repo.listSetLogs(
-            uid: any(named: 'uid'),
-            sessionId: any(named: 'sessionId'),
-          )).thenAnswer((_) async => []);
+      stubNoSetLogs(repo);
 
       final container = makeContainer(repo: repo);
       addTearDown(container.dispose);
@@ -112,43 +95,64 @@ void main() {
       expect(result!.streak, 2);
     });
 
-    // SCENARIO-302: gap breaks the streak
-    test('SCENARIO-302: gap in consecutive days → shorter streak', () async {
+    // SCENARIO-301: la semana en curso vacía NO corta — es la contraparte
+    // del día de gracia que tenía la racha por día.
+    test('SCENARIO-301: semana en curso sin entrenar → no corta la racha',
+        () async {
       final repo = MockSessionRepository();
-      // UTC-flagged noon anchors on ART days (see SCENARIO-300).
-      final nowArt = argentinaNow();
-      final today = DateTime.utc(nowArt.year, nowArt.month, nowArt.day, 12);
-      // Skip one day — yesterday is missing
-      final twoDaysAgo = today.subtract(const Duration(days: 2));
-
       when(() => repo.listByUid('u1')).thenAnswer((_) async => [
             makeSession(
               id: 's1',
-              startedAt: today,
+              startedAt: weekAt(1),
               status: SessionStatus.finished,
               wasFullyCompleted: true,
             ),
             makeSession(
               id: 's2',
-              startedAt: twoDaysAgo,
+              startedAt: weekAt(2),
               status: SessionStatus.finished,
               wasFullyCompleted: true,
             ),
           ]);
-      when(() => repo.listSetLogs(
-            uid: any(named: 'uid'),
-            sessionId: any(named: 'sessionId'),
-          )).thenAnswer((_) async => []);
+      stubNoSetLogs(repo);
 
       final container = makeContainer(repo: repo);
       addTearDown(container.dispose);
 
       final result = await container.read(weeklyInsightsProvider.future);
-      expect(result!.streak, 1); // only today; gap breaks the chain
+      expect(result!.streak, 2);
     });
 
-    // SCENARIO-303: no finished sessions → streak is 0
-    test('SCENARIO-303: no finished sessions → streak is 0', () async {
+    // SCENARIO-302: una semana CERRADA sin sesiones sí corta.
+    test('SCENARIO-302: hueco de una semana cerrada → racha más corta',
+        () async {
+      final repo = MockSessionRepository();
+      when(() => repo.listByUid('u1')).thenAnswer((_) async => [
+            makeSession(
+              id: 's0',
+              startedAt: weekAt(0),
+              status: SessionStatus.finished,
+              wasFullyCompleted: true,
+            ),
+            // weekAt(1) vacía → corta acá. La de hace 2 semanas no se cuenta.
+            makeSession(
+              id: 's2',
+              startedAt: weekAt(2),
+              status: SessionStatus.finished,
+              wasFullyCompleted: true,
+            ),
+          ]);
+      stubNoSetLogs(repo);
+
+      final container = makeContainer(repo: repo);
+      addTearDown(container.dispose);
+
+      final result = await container.read(weeklyInsightsProvider.future);
+      expect(result!.streak, 1);
+    });
+
+    // SCENARIO-303: sin sesiones terminadas → 0.
+    test('SCENARIO-303: sin sesiones terminadas → racha 0', () async {
       final repo = MockSessionRepository();
       when(() => repo.listByUid('u1')).thenAnswer((_) async => []);
 
@@ -159,18 +163,14 @@ void main() {
       expect(result!.streak, 0);
     });
 
-    // Extra: active sessions are excluded from streak
-    test('active sessions not counted in streak', () async {
+    // Extra: una sesión en curso no cuenta para la racha.
+    test('las sesiones activas no cuentan para la racha', () async {
       final repo = MockSessionRepository();
-      // UTC-flagged noon anchor on today's ART day (see SCENARIO-300).
-      final nowArt = argentinaNow();
-      final today = DateTime.utc(nowArt.year, nowArt.month, nowArt.day, 12);
-
       when(() => repo.listByUid('u1')).thenAnswer((_) async => [
             makeSession(
               id: 's1',
-              startedAt: today,
-              status: SessionStatus.active, // NOT finished — excluded
+              startedAt: weekAt(0),
+              status: SessionStatus.active, // NO finished — excluida
             ),
           ]);
 

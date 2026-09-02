@@ -1,7 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/utils/streak_calculator.dart';
+import '../../../core/utils/weekly_streak_calculator.dart';
 import '../../workout/application/session_providers.dart';
+import '../../workout/application/weekly_streak_providers.dart';
 import '../domain/workout_days_month.dart';
 import 'workout_days_aggregator.dart';
 
@@ -16,8 +17,11 @@ typedef AthleteWorkoutDaysKey = ({String uid, DateTime month});
 ///
 /// Reads the FULL session list via [sessionRepositoryProvider] (`listByUid`)
 /// — same convention as `athleteMonthlyReportProvider` — since both
-/// `trainedDaysInMonth` and `computeStreak` need the complete history, not a
-/// capped/paged scan.
+/// `trainedDaysInMonth` and `computeWeeklyStreak` need the complete history,
+/// not a capped/paged scan.
+///
+/// `trainedDays` sigue siendo por DÍA — es el pintado del calendario, un día
+/// entrenado es un día entrenado. Lo que pasó a semanas es `streak`.
 ///
 /// autoDispose: refreshes when the calendar section is re-mounted or the
 /// selected month changes (family key includes [AthleteWorkoutDaysKey.month]).
@@ -31,12 +35,19 @@ final athleteWorkoutDaysProvider = FutureProvider.autoDispose
     );
   }
 
+  // Antes del await: usar `ref` después de un async gap es inseguro cuando el
+  // provider se recomputa a mitad de vuelo.
+  final weeklyTarget = ref.watch(weeklyStreakTargetProvider);
+
   final repo = ref.watch(sessionRepositoryProvider);
   final sessions = await repo.listByUid(key.uid);
 
   return WorkoutDaysMonth(
     month: DateTime(key.month.year, key.month.month),
     trainedDays: trainedDaysInMonth(sessions, key.month),
-    streak: computeStreak(sessions),
+    streak: computeWeeklyStreak(
+      sessions: sessions,
+      weeklyTarget: weeklyTarget,
+    ),
   );
 });

@@ -15,6 +15,8 @@
 
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'
+    show SetOptions, Timestamp;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/gym_rankings/application/ranking_providers.dart';
 import 'package:treino/features/gym_rankings/domain/ranking_dimension.dart';
@@ -43,38 +45,52 @@ void main() {
     return container;
   }
 
-  Future<void> seed(UserPublicProfile profile) => repo.set(profile);
+  /// Siembra el perfil y, si trae `rachaSemanas`, le estampa la frescura de
+  /// ESTA semana.
+  ///
+  /// Sin `rachaSemanasUpdatedAt` el decay de lectura pone toda racha en 0 y el
+  /// board queda ordenado por uid: el test pasaría a medir el desempate en vez
+  /// del orden por métrica. El sello no es parte del modelo (lo deriva
+  /// `updateCounters` con serverTimestamp), así que va con un write aparte,
+  /// igual que en `racha_parity_test.dart`.
+  Future<void> seed(UserPublicProfile profile) async {
+    await repo.set(profile);
+    if (profile.rachaSemanas != null) {
+      await firestore.collection('userPublicProfiles').doc(profile.uid).set(
+          {'rachaSemanasUpdatedAt': Timestamp.now()}, SetOptions(merge: true));
+    }
+  }
 
   // ──────────────────────────────────────────────────────────────────────────
-  // SCENARIO-RANK-6a: streak leaderboard orders desc by racha, gym-scoped
+  // SCENARIO-RANK-6a: streak leaderboard orders desc by rachaSemanas, gym-scoped
   // ──────────────────────────────────────────────────────────────────────────
   test(
       'SCENARIO-RANK-6a: streakLeaderboardProvider orders opted-in athletes '
-      'desc by racha, scoped to gymId', () async {
+      'desc by rachaSemanas, scoped to gymId', () async {
     await seed(const UserPublicProfile(
       uid: 'u1',
       gymId: gymA,
       rankingOptIn: true,
-      racha: 5,
+      rachaSemanas: 5,
     ));
     await seed(const UserPublicProfile(
       uid: 'u2',
       gymId: gymA,
       rankingOptIn: true,
-      racha: 12,
+      rachaSemanas: 12,
     ));
     await seed(const UserPublicProfile(
       uid: 'u3',
       gymId: gymA,
       rankingOptIn: true,
-      racha: 8,
+      rachaSemanas: 8,
     ));
     // Different gym — must be excluded from gymA's leaderboard.
     await seed(const UserPublicProfile(
       uid: 'u4',
       gymId: gymB,
       rankingOptIn: true,
-      racha: 99,
+      rachaSemanas: 99,
     ));
 
     final container = buildContainer();
@@ -93,13 +109,13 @@ void main() {
       uid: 'opted-in',
       gymId: gymA,
       rankingOptIn: true,
-      racha: 3,
+      rachaSemanas: 3,
     ));
     await seed(const UserPublicProfile(
       uid: 'opted-out',
       gymId: gymA,
       rankingOptIn: false,
-      racha: 50,
+      rachaSemanas: 50,
     ));
 
     final container = buildContainer();
@@ -239,7 +255,7 @@ void main() {
       uid: 'other-gym-athlete',
       gymId: gymB,
       rankingOptIn: true,
-      racha: 10,
+      rachaSemanas: 10,
     ));
 
     final container = buildContainer();

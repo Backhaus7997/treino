@@ -80,28 +80,42 @@ void main() {
       });
     });
 
-    test('streak value comes from computeStreak over the FULL session list',
+    test('la racha cuenta SEMANAS sobre la lista completa de sesiones',
         () async {
       final repo = MockSessionRepository();
-      // computeStreak buckets by the Argentina calendar day (#411). Anchor to
-      // `argentinaNow()` and build UTC-flagged noon instants (= 09:00 ART, same
-      // ART day under any runner, never crosses midnight) — mirroring real data
-      // (always UTC-flagged via TimestampConverter). A device-local midnight
-      // fixture would flake near the ART day boundary.
-      final nowArt = argentinaNow();
-      final today = DateTime.utc(nowArt.year, nowArt.month, nowArt.day, 12);
+      // Anclado al LUNES de la semana en curso, no a "hoy". Con la racha por
+      // día un fixture de hoy+ayer daba 2 siempre; con la racha por semana
+      // daría 1 o 2 según el día en que corra la suite (si hoy es lunes,
+      // "ayer" cae en la semana anterior). Tres semanas consecutivas con una
+      // sesión cada una dan 3 corra el día que corra.
+      //
+      // Sin rutina activa en el container, el objetivo cae al fallback de 1
+      // sesión por semana — que es justamente lo que este test quiere medir:
+      // el bucketeo semanal, no el umbral.
+      final monday = mondayOfWeekArt(argentinaNow());
+      DateTime weekAt(int weeksAgo) => DateTime.utc(
+            monday.year,
+            monday.month,
+            monday.day - (7 * weeksAgo),
+            12, // mediodía UTC = 09:00 ART, mismo día bajo cualquier runner
+          );
+
       when(() => repo.listByUid('u1')).thenAnswer((_) async => [
             makeSession(
-                id: 's1',
-                startedAt: today,
+                id: 's0',
+                startedAt: weekAt(0),
                 status: SessionStatus.finished,
                 wasFullyCompleted: true),
             makeSession(
-              id: 's2',
-              startedAt: today.subtract(const Duration(days: 1)),
-              status: SessionStatus.finished,
-              wasFullyCompleted: true,
-            ),
+                id: 's1',
+                startedAt: weekAt(1),
+                status: SessionStatus.finished,
+                wasFullyCompleted: true),
+            makeSession(
+                id: 's2',
+                startedAt: weekAt(2),
+                status: SessionStatus.finished,
+                wasFullyCompleted: true),
           ]);
 
       final container = ProviderContainer(overrides: [
@@ -109,13 +123,14 @@ void main() {
       ]);
       addTearDown(container.dispose);
 
+      final nowArt = argentinaNow();
       final result = await container.read(
         athleteWorkoutDaysProvider(
           (uid: 'u1', month: DateTime(nowArt.year, nowArt.month)),
         ).future,
       );
 
-      expect(result.streak, 2);
+      expect(result.streak, 3);
     });
   });
 }

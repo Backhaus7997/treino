@@ -547,6 +547,24 @@
           "order": "ASCENDING"
         },
         {
+          "fieldPath": "rachaSemanas",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "userPublicProfiles",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "gymId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "rankingOptIn",
+          "order": "ASCENDING"
+        },
+        {
           "fieldPath": "lifetimeVolumeKg",
           "order": "DESCENDING"
         }
@@ -607,5 +625,16 @@
       ]
     }
   ],
-  "fieldOverrides": []
+  "fieldOverrides": [
+    {
+      "collectionGroup": "sessions",
+      "fieldPath": "startedAt",
+      "indexes": [
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        }
+      ]
+    }
+  ]
 }

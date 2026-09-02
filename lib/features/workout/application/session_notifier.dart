@@ -17,6 +17,7 @@ import 'session_init.dart';
 import 'session_duration.dart';
 import 'session_providers.dart';
 import 'session_state.dart';
+import 'weekly_streak_providers.dart';
 import '../../watch/application/watch_bridge_provider.dart';
 import '../../watch/data/treino_link.dart';
 
@@ -762,6 +763,10 @@ class SessionNotifier
         wasFullyCompleted: false,
         totalVolumeKg: current.totalVolumeKg,
         durationMin: _durationMin(current.elapsedSeconds),
+        // Leído acá y no adentro del repositorio: la racha semanal se mide
+        // contra el objetivo de la rutina activa, y quien sabe resolver eso
+        // es la capa de aplicación.
+        weeklyTarget: ref.read(weeklyStreakTargetProvider),
       );
     } catch (_) {
       _finalized = false;
@@ -805,6 +810,10 @@ class SessionNotifier
         wasFullyCompleted: true,
         totalVolumeKg: current.totalVolumeKg,
         durationMin: _durationMin(current.elapsedSeconds),
+        // Leído acá y no adentro del repositorio: la racha semanal se mide
+        // contra el objetivo de la rutina activa, y quien sabe resolver eso
+        // es la capa de aplicación.
+        weeklyTarget: ref.read(weeklyStreakTargetProvider),
       );
     } catch (_) {
       _finalized = false;

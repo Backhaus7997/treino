@@ -95,7 +95,7 @@ class PublicProfileViewNotifier
       incomingFollow: incomingFollow,
       isSelf: isSelf,
       workoutsCount: profile?.workoutsCount,
-      racha: profile?.racha,
+      racha: profile?.rachaSemanas,
       followersCount: profile?.followersCount,
       followingCount: profile?.followingCount,
       // Missing profile → default true (matches UserPublicProfile default);

@@ -52,6 +52,8 @@ MuscleDistributionInsights aggregateMuscleDistribution({
 
   final currentSetsByAxis = <RadarAxis, int>{};
   final previousSetsByAxis = <RadarAxis, int>{};
+  final currentSetsByGroup = <MuscleGroupDisplay, int>{};
+  final previousSetsByGroup = <MuscleGroupDisplay, int>{};
   var currentDurationMin = 0;
   var previousDurationMin = 0;
   var currentVolumeKg = 0.0;
@@ -62,6 +64,7 @@ MuscleDistributionInsights aggregateMuscleDistribution({
   void tally({
     required Session session,
     required Map<RadarAxis, int> setsByAxis,
+    required Map<MuscleGroupDisplay, int> setsByGroup,
     required void Function(int deltaDuration, double deltaVolume, int deltaSets)
         accumulate,
   }) {
@@ -70,6 +73,7 @@ MuscleDistributionInsights aggregateMuscleDistribution({
       final groupRaw = muscleGroupByExerciseId[log.exerciseId];
       final displayGroup = groupRaw?.toDisplayGroup();
       if (displayGroup != null) {
+        setsByGroup[displayGroup] = (setsByGroup[displayGroup] ?? 0) + 1;
         final axis = RadarAxis.fromDisplayGroup(displayGroup);
         setsByAxis[axis] = (setsByAxis[axis] ?? 0) + 1;
       }
@@ -81,6 +85,7 @@ MuscleDistributionInsights aggregateMuscleDistribution({
     tally(
       session: session,
       setsByAxis: currentSetsByAxis,
+      setsByGroup: currentSetsByGroup,
       accumulate: (duration, volume, sets) {
         currentDurationMin += duration;
         currentVolumeKg += volume;
@@ -93,6 +98,7 @@ MuscleDistributionInsights aggregateMuscleDistribution({
     tally(
       session: session,
       setsByAxis: previousSetsByAxis,
+      setsByGroup: previousSetsByGroup,
       accumulate: (duration, volume, sets) {
         previousDurationMin += duration;
         previousVolumeKg += volume;
@@ -104,6 +110,8 @@ MuscleDistributionInsights aggregateMuscleDistribution({
   return MuscleDistributionInsights(
     currentSetsByAxis: currentSetsByAxis,
     previousSetsByAxis: previousSetsByAxis,
+    currentSetsByGroup: currentSetsByGroup,
+    previousSetsByGroup: previousSetsByGroup,
     currentWorkouts: currentSessions.length,
     previousWorkouts: previousSessions.length,
     currentDurationMin: currentDurationMin,

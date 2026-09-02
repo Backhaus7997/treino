@@ -6,13 +6,15 @@ import '../../workout/domain/session.dart';
 /// [SessionStatus.finished] session, backing [WorkoutDaysCalendar]'s
 /// trained-day marks.
 ///
-/// Same day-bucketing convention as `computeStreak`
-/// (`lib/core/utils/streak_calculator.dart`): dedup by local calendar date
-/// (year/month/day, time-of-day truncated), only `finished` sessions count.
-/// This function does NOT reuse `computeStreak` itself (that function
-/// answers a different question — "how many consecutive days ending today",
-/// not "which days in this specific month were trained") — the streak value
-/// itself is computed by calling `computeStreak` directly, unchanged.
+/// Dedup por fecha calendario ART (año/mes/día, hora truncada); sólo cuentan
+/// las sesiones que califican como entrenamiento.
+///
+/// Esta función sigue siendo por DÍA aunque la racha ya no lo sea: son dos
+/// preguntas distintas. Acá se pinta la grilla del calendario —"qué días de
+/// este mes entrenó"— y un día entrenado es un día entrenado. La racha
+/// responde "cuántas semanas seguidas cumplió su rutina" y la calcula
+/// `computeWeeklyStreak` (`lib/core/utils/weekly_streak_calculator.dart`) por
+/// separado, sobre la lista completa de sesiones.
 ///
 /// [month] may be any [DateTime] within the target calendar month — only
 /// its `year`/`month` fields are used.

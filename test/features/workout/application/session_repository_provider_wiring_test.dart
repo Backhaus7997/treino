@@ -8,7 +8,7 @@ import 'package:treino/features/workout/application/session_providers.dart'
 
 void main() {
   // REGRESSION: sessionRepositoryProvider MUST wire publicProfileRepository so
-  // SessionRepository.finish() can recompute the public workoutsCount/racha
+  // SessionRepository.finish() can recompute the public workoutsCount/rachaSemanas
   // counters. The provider previously omitted it, so finish() hit
   // `if (pubRepo == null) return;` and the counters silently never updated —
   // the Coach header showed "Sesiones 0" even after the athlete completed a
@@ -51,15 +51,15 @@ void main() {
             'if this fails, the provider is not wiring publicProfileRepository',
       );
       expect(profileSnap.data()!['workoutsCount'], equals(1));
-      // `racha` is computed by computeStreak() using DateTime.now() — finish()
+      // `rachaSemanas` is computed by computeWeeklyStreak() using DateTime.now() — finish()
       // exposes no injectable clock — so its exact value depends on how many
       // days ago the hardcoded session date is relative to the wall clock
       // (1 only when run on the session's local day). Asserting equals(1) made
       // this test pass only on the day #199 merged (2026-06-29) and rot the
       // next day. Mirror the canonical SCENARIO-321 contract
       // (session_repository_test.dart): the wiring is proven by the counter
-      // write above; for racha we only assert it round-tripped as an int.
-      expect(profileSnap.data()!['racha'], isA<int>());
+      // write above; for rachaSemanas we only assert it round-tripped as an int.
+      expect(profileSnap.data()!['rachaSemanas'], isA<int>());
     },
   );
 }

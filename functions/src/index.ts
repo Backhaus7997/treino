@@ -56,6 +56,7 @@ export { syncSessionShareOnTrainerLink } from "./sync-session-share";
 // prod`) prunes this function from the deployed set — ⚠️ en PRODUCCIÓN, y la
 // poda es inmediata para los usuarios reales.
 export { notifyOverduePayments } from "./payments/notify-overdue-payments";
+export { notifyMonthlyReport } from "./notifications/notify-monthly-report";
 // Email transaccional (Resend): consumer del outbox `mail_queue`. Los triggers
 // de dominio NUNCA llaman a Resend — escriben una fila de cola con ID
 // determinístico y esta función es la única que envía. Ver

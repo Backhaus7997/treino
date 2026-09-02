@@ -22,7 +22,7 @@ void main() {
   });
 
   // BUGFIX: abandoned sessions (status=finished, wasFullyCompleted=false) must
-  // NOT inflate the public workoutsCount/racha counters. Only sessions with
+  // NOT inflate the public workoutsCount/rachaSemanas counters. Only sessions with
   // wasFullyCompleted=true count, matching the display filter in
   // historial_section.dart and planProgressProvider.
   test(
@@ -52,7 +52,7 @@ void main() {
     // Abandoned session must NOT count as a workout.
     expect(data['workoutsCount'], equals(0));
     // Abandoned session must NOT extend the streak.
-    expect(data['racha'], equals(0));
+    expect(data['rachaSemanas'], equals(0));
   });
 
   test(

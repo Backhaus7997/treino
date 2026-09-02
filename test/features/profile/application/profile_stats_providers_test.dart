@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/core/utils/argentina_time.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/features/profile/application/profile_stats_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
@@ -38,21 +39,29 @@ void main() {
     test(
         'SCENARIO-311: finished sessions → correct totalSessions, totalVolumeKg, streak',
         () async {
-      final now = DateTime.now().toLocal();
-      final today = DateTime(now.year, now.month, now.day, 10);
-      final yesterday = today.subtract(const Duration(days: 1));
+      // Anclado al LUNES de la semana en curso: la racha se cuenta por
+      // SEMANAS, así que un fixture de hoy+ayer daría 1 o 2 según el día en
+      // que corra la suite. Dos semanas consecutivas con una sesión cada una
+      // dan 2 siempre. Sin rutina activa el objetivo cae al fallback de 1.
+      final monday = mondayOfWeekArt(argentinaNow());
+      DateTime weekAt(int weeksAgo) => DateTime.utc(
+            monday.year,
+            monday.month,
+            monday.day - (7 * weeksAgo),
+            12,
+          );
 
       when(() => repo.listByUid('u1')).thenAnswer((_) async => [
             makeSession(
               id: 's1',
-              startedAt: today,
+              startedAt: weekAt(0),
               status: SessionStatus.finished,
               wasFullyCompleted: true,
               totalVolumeKg: 1200.0,
             ),
             makeSession(
               id: 's2',
-              startedAt: yesterday,
+              startedAt: weekAt(1),
               status: SessionStatus.finished,
               wasFullyCompleted: true,
               totalVolumeKg: 800.0,
@@ -66,7 +75,7 @@ void main() {
 
       expect(result.totalSessions, 2);
       expect(result.totalVolumeKg, 2000.0);
-      expect(result.streak, 2); // today + yesterday = 2-day streak
+      expect(result.streak, 2); // dos semanas seguidas cumplidas
     });
 
     // SCENARIO-311 extension: only finished sessions count
