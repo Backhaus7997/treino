@@ -158,6 +158,9 @@ Future<void> _addBenchPress(WidgetTester tester) async {
   await tester.pumpAndSettle();
   await tester.tap(find.text('Agregar 1 ejercicio'));
   await tester.pumpAndSettle();
+  // Desde este cambio el ejercicio agregado nace PLEGADO: quien avisa
+  // que le falta completar sets es el borde rojo, no la card abierta.
+  await expandirEjercicios(tester);
 }
 
 /// Fills the visible (selected week's) empty REPS field with [reps].
@@ -1252,6 +1255,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Agregar 1 ejercicio'));
     await tester.pumpAndSettle();
+    // Desde este cambio el ejercicio agregado nace PLEGADO: quien avisa
+    // que le falta completar sets es el borde rojo, no la card abierta.
+    await expandirEjercicios(tester);
 
     expect(find.text('Agregar solo en esta semana'), findsOneWidget,
         reason: 'SCENARIO-WPRES-016: scope dialog must appear on week ≥ 2');
@@ -1295,6 +1301,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Agregar solo en esta semana'));
     await tester.pumpAndSettle();
+    // Desde este cambio el ejercicio agregado nace PLEGADO: quien avisa
+    // que le falta completar sets es el borde rojo, no la card abierta.
+    await expandirEjercicios(tester);
 
     // Fill reps for week 1 only (the slot is present only in week 1;
     // other weeks are skipped by _invalidWeekFirstDay for absent slots).
@@ -1349,6 +1358,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Agregar en todas las semanas'));
     await tester.pumpAndSettle();
+    // Desde este cambio el ejercicio agregado nace PLEGADO: quien avisa
+    // que le falta completar sets es el borde rojo, no la card abierta.
+    await expandirEjercicios(tester);
 
     // Fill reps for all weeks
     await _fillVisibleReps(tester, '10');

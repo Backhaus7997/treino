@@ -555,4 +555,52 @@ void main() {
     );
     expect(saved.days.single.slots.map((s) => s.supersetGroup), [7, 7, null]);
   });
+
+  testWidgets('sostener el arrastre contra el borde scrollea la pantalla',
+      (tester) async {
+    // Rutina larga: sin contenido que sobre, no hay scroll que probar.
+    await _pump(
+      tester,
+      _routine('largo', [for (var i = 0; i < 16; i++) _slot('e$i')]),
+    );
+
+    final vertical = find.byWidgetPredicate(
+      (w) => w is Scrollable && w.axisDirection == AxisDirection.down,
+    );
+    final posicion = tester.state<ScrollableState>(vertical.first).position;
+    final antes = posicion.pixels;
+    expect(posicion.maxScrollExtent, greaterThan(0),
+        reason: 'el fixture tiene que dar para scrollear');
+
+    final agarre = find.byKey(const Key('slot_drag_handle_0'));
+    final gesto = await tester.startGesture(tester.getCenter(agarre));
+    await tester.pump(kPressTimeout);
+
+    // Hasta la franja de abajo, y ahí el dedo se QUEDA QUIETO. Ése es el caso
+    // que importa: el `ReorderableListView` trae auto-scroll propio pero acá
+    // está en shrinkWrap dentro del ListView del editor y no conoce el scroll
+    // de afuera, así que sin esto sostener el dedo en el borde no hace nada.
+    final viewport = tester.getRect(vertical.first);
+    await gesto.moveTo(Offset(viewport.center.dx, viewport.bottom - 20));
+    await tester.pump(const Duration(milliseconds: 16));
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(
+      tester.state<ScrollableState>(vertical.first).position.pixels,
+      greaterThan(antes),
+      reason: 'el dedo quieto contra el borde tiene que mover la lista',
+    );
+
+    await gesto.up();
+    await tester.pumpAndSettle();
+
+    // Y al soltar el timer se frena: si quedara vivo seguiría scrolleando sola.
+    final alSoltar = tester.state<ScrollableState>(vertical.first).position.pixels;
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(
+      tester.state<ScrollableState>(vertical.first).position.pixels,
+      alSoltar,
+      reason: 'soltar tiene que frenar el auto-scroll',
+    );
+  });
 }

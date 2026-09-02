@@ -1,4 +1,5 @@
 // ignore_for_file: library_private_types_in_public_api
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -176,11 +177,21 @@ class _EditableSlot {
   /// `hasSlotError`, eso significaba que **reacomodar ejercicios desplegaba
   /// solos a los que tenían campos sin completar** — reportado en device.
   ///
-  /// Arranca en `true` porque un ejercicio recién agregado nace con sus sets
-  /// vacíos y hay que poder llenarlos sin un tap extra. La hidratación de una
-  /// rutina existente lo pone en `false`: ahí todo nace plegado, y los que
-  /// tienen algo sin completar se marcan con el borde rojo de [ExerciseCard]
-  /// en vez de abrirse.
+  /// **Los cinco caminos por los que un slot llega a la pantalla lo ponen en
+  /// `false` explícitamente**: hidratar una rutina y los cuatro flujos de alta
+  /// (picker, entrada rápida, superserie nueva, sumar a un grupo). Todo lo que
+  /// el usuario ve nace PLEGADO, y lo que le falta completar se distingue por
+  /// el borde rojo de [ExerciseCard] — eso es lo que hace innecesario abrirlo.
+  ///
+  /// El default queda en `true` para los slots que construyen los seams
+  /// `*Bridge` de más abajo, que existen para los tests y arman `RoutineSlot`s
+  /// sin pasar por la UI: ahí esta bandera no significa nada y cambiarla sólo
+  /// movería lo que esos tests ven.
+  ///
+  /// Una versión anterior tenía el default en `true` también para el alta, para
+  /// ahorrar un tap en el flujo más común. En device ganó la coherencia: si la
+  /// regla es "plegado y marcado", la excepción es justo lo que hace que el
+  /// usuario no sepa qué esperar.
   bool expandido = true;
 
   /// The active week's set list — same object as `weeklySets[w]`, so in-place
@@ -1181,11 +1192,6 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         );
         editableDay.slots = day.slots.map((slot) {
           final editableSlot = _EditableSlot()
-            // Una rutina que se abre nace TODA plegada, incluidos los
-            // ejercicios a los que les falta completar sets: ésos se marcan
-            // con el borde rojo de la card. Abrir cinco cards de golpe al
-            // entrar es la pantalla de scroll infinito que el rediseño vino a
-            // sacar.
             ..expandido = false
             ..exercise = Exercise(
               id: slot.exerciseId,
@@ -1987,6 +1993,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     setState(() {
       for (final ex in nuevos) {
         final slot = _EditableSlot()
+          ..expandido = false
           ..exercise = ex
           ..restSeconds = 0
           ..weeklySets = List.generate(_numWeeks, (_) => [_EditableSet()])
@@ -2103,6 +2110,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     _markDirty();
     setState(() {
       final slot = _EditableSlot()
+        ..expandido = false
         ..exercise = ex
         ..restSeconds = 0
         // `3x30s` prescribe TIEMPO, no repeticiones: el slot entra derecho en
@@ -2181,6 +2189,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
           (day.slots.map((s) => s.supersetGroup ?? 0).fold(0, max)) + 1;
       final newSlots = newOnes
           .map((ex) => _EditableSlot()
+            ..expandido = false
             ..exercise = ex
             ..restSeconds = 0
             ..supersetGroup = esSuperserie ? nextGroup : null
@@ -2376,6 +2385,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       _markDirty();
       final newSlots = newOnes
           .map((ex) => _EditableSlot()
+            ..expandido = false
             ..exercise = ex
             ..restSeconds = 0
             ..supersetGroup = groupId
@@ -3659,6 +3669,93 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
   /// hacia arriba lo mandaba abajo, que es lo contrario de lo que el gesto pide.
   bool _salidaHaciaArriba = false;
 
+  // ── Auto-scroll durante el arrastre ────────────────────────────────────────
+  //
+  // El `ReorderableListView` trae auto-scroll propio, pero acá no sirve: está
+  // en `shrinkWrap` con `NeverScrollableScrollPhysics` adentro del `ListView`
+  // del editor, así que el que tiene que moverse es el scroll de AFUERA y él no
+  // lo conoce. Sin esto, arrastrar un ejercicio hasta el borde de la pantalla
+  // no lleva a ningún lado: en un día largo no hay forma de moverlo lejos.
+
+  /// Franja desde cada borde del viewport que dispara el auto-scroll, en dp.
+  static const double _kZonaAutoScroll = 88;
+
+  /// Cuánto scrollea por tick. A 60 fps son ~600 dp/s en el borde mismo, y
+  /// menos cerca del límite de la franja: la velocidad es proporcional a lo
+  /// adentro que esté el dedo, porque a velocidad fija el arranque se siente
+  /// un salto y el final no alcanza.
+  static const double _kVelocidadAutoScroll = 10;
+
+  Timer? _autoScroll;
+
+  /// Última posición conocida del dedo. El tick la reusa: mientras la lista se
+  /// mueve sola el dedo puede estar quieto y no llegan más eventos.
+  Offset? _ultimaPosicion;
+
+  bool get _hayArrastre =>
+      _draggedStandaloneAbsIndex != null || _draggedMemberGroup != null;
+
+  /// Arranca el motor del auto-scroll. Lo llaman los DOS inicios de arrastre.
+  ///
+  /// El timer corre mientras dura el gesto y decide en cada tick, en vez de
+  /// encenderse desde el evento de movimiento. Ésa fue la primera versión y no
+  /// funcionaba justo en el caso que importa: el dedo QUIETO contra el borde no
+  /// genera más eventos, así que el auto-scroll no llegaba a arrancar nunca —
+  /// y si el primer movimiento llega antes de que el reorderable avise que
+  /// empezó, tampoco.
+  void _arrancarAutoScroll() {
+    _autoScroll ??= Timer.periodic(
+      const Duration(milliseconds: 16),
+      (_) => _tickAutoScroll(),
+    );
+  }
+
+  /// Cuánto y para dónde scrollear con el dedo en [posicion]: 0 fuera de las
+  /// franjas, ±1 en el borde exacto. Proporcional y no fijo porque a velocidad
+  /// constante el arranque se siente un salto y el final no alcanza.
+  double _factorDeAutoScroll(Offset posicion, Rect viewport) {
+    if (posicion.dy < viewport.top + _kZonaAutoScroll) {
+      return (-(viewport.top + _kZonaAutoScroll - posicion.dy) /
+              _kZonaAutoScroll)
+          .clamp(-1.0, 0.0);
+    }
+    if (posicion.dy > viewport.bottom - _kZonaAutoScroll) {
+      return ((posicion.dy - (viewport.bottom - _kZonaAutoScroll)) /
+              _kZonaAutoScroll)
+          .clamp(0.0, 1.0);
+    }
+    return 0;
+  }
+
+  void _tickAutoScroll() {
+    final posicion = _ultimaPosicion;
+    if (posicion == null || !_hayArrastre) {
+      _detenerAutoScroll();
+      return;
+    }
+    final scrollable = Scrollable.maybeOf(context);
+    final box = scrollable?.context.findRenderObject();
+    if (scrollable == null || box is! RenderBox || !box.hasSize) return;
+
+    final viewport = box.localToGlobal(Offset.zero) & box.size;
+    final factor = _factorDeAutoScroll(posicion, viewport);
+    if (factor == 0) return;
+
+    final p = scrollable.position;
+    final destino = (p.pixels + factor * _kVelocidadAutoScroll)
+        .clamp(p.minScrollExtent, p.maxScrollExtent);
+    if (destino == p.pixels) return; // tope: nada que hacer, pero el gesto sigue
+    p.jumpTo(destino);
+    // La lista se movió debajo de un dedo quieto: los rects de los bloques
+    // cambiaron y el resaltado hay que recalcularlo con la posición vieja.
+    _actualizarDestino(posicion);
+  }
+
+  void _detenerAutoScroll() {
+    _autoScroll?.cancel();
+    _autoScroll = null;
+  }
+
   /// Gemelo de [_unionAplicada] para la separación. Misma razón: el `onReorder`
   /// del reorderable ANIDADO puede no llegar nunca.
   bool _separacionAplicada = false;
@@ -3725,6 +3822,9 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
 
   @override
   void dispose() {
+    // Un Timer.periodic que sobrevive al State llama a `setState` sobre un
+    // widget desmontado en el siguiente tick.
+    _detenerAutoScroll();
     _quickEntryFocus.dispose();
     _quickEntryCtrl.dispose();
     _nameController.dispose();
@@ -3837,16 +3937,27 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
   }
 
   void _actualizarDestinoDeUnion(PointerMoveEvent event) {
+    _ultimaPosicion = event.position;
+    _actualizarDestino(event.position);
+  }
+
+  /// El hit-test, separado del evento que lo dispara.
+  ///
+  /// Lo llaman DOS cosas: el `Listener`, cuando el dedo se mueve, y el tick del
+  /// auto-scroll, cuando el dedo está quieto y lo que se mueve es la lista.
+  /// Sin lo segundo, sostener el dedo en el borde scrollea la pantalla pero el
+  /// resaltado se queda pegado al bloque que ya no está debajo.
+  void _actualizarDestino(Offset posicion) {
     // Rama de SALIDA: hay un miembro en arrastre dentro de su grupo.
     final memberGroup = _draggedMemberGroup;
     if (memberGroup != null) {
       final rect = _rectDelBloque(memberGroup);
       final fuera =
-          rect == null || !rect.inflate(_kMargenParaSacar).contains(event.position);
+          rect == null || !rect.inflate(_kMargenParaSacar).contains(posicion);
       // El lado se recuerda mientras está afuera: al levantar el dedo ya no hay
       // más eventos de movimiento que consultar.
       if (fuera && rect != null) {
-        _salidaHaciaArriba = event.position.dy < rect.center.dy;
+        _salidaHaciaArriba = posicion.dy < rect.center.dy;
       }
       if (fuera != _miembroFueraDelBloque) {
         setState(() => _miembroFueraDelBloque = fuera);
@@ -3868,7 +3979,7 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
         rect.right,
         rect.bottom - margen,
       );
-      if (zonaCentral.contains(event.position)) {
+      if (zonaCentral.contains(posicion)) {
         targetGroup = entry.key.supersetGroup;
         break;
       }
@@ -3887,6 +3998,7 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
     final standalone = block.length == 1 &&
         block.first.slot.supersetGroup == null &&
         block.first.slot.isPresentInWeek(widget.week);
+    _arrancarAutoScroll();
     setState(() {
       _draggedStandaloneAbsIndex = standalone ? block.first.index : null;
       _highlightedSupersetGroup = null;
@@ -3908,6 +4020,7 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
   /// `onReorderEnd` se llama SIEMPRE (`_dragEnd`), así que es el único lugar
   /// donde la promesa se puede cumplir.
   void _terminarReorder(int _) {
+    _detenerAutoScroll();
     final absIndex = _draggedStandaloneAbsIndex;
     final targetGroup = _highlightedSupersetGroup;
     if (absIndex == null && targetGroup == null) return;
@@ -3928,6 +4041,7 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
   }
 
   void _cancelarReorder(PointerCancelEvent _) {
+    _detenerAutoScroll();
     if (_draggedStandaloneAbsIndex == null &&
         _highlightedSupersetGroup == null &&
         _draggedMemberGroup == null &&
@@ -3945,6 +4059,7 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
 
   /// Arranca el arrastre de un MIEMBRO dentro de su superserie.
   void _iniciarArrastreDeMiembro(int absIndex, int group) {
+    _arrancarAutoScroll();
     setState(() {
       _draggedMemberAbsIndex = absIndex;
       _draggedMemberGroup = group;
@@ -3962,6 +4077,7 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
   /// descubre nadie. Igual que la unión, se aplica en `onReorderEnd` porque
   /// `onReorder` no llega cuando el índice no cambió.
   void _terminarArrastreDeMiembro(int _) {
+    _detenerAutoScroll();
     final absIndex = _draggedMemberAbsIndex;
     final fuera = _miembroFueraDelBloque;
     if (absIndex == null) return;
