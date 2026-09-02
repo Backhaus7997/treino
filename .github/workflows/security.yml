@@ -2,8 +2,8 @@ name: Security
 
 # Gates de seguridad — slice B de #680.
 #
-# Va SEPARADO de ci.yml a propósito. `Analyze & Test` tarda ~13 minutos (5800+
-# tests) y estos jobs tardan segundos: metidos en el mismo archivo comparten
+# Va SEPARADO de ci.yml a propósito. `Test` corre 5800+ tests repartidos en 4
+# shards y estos jobs tardan segundos: metidos en el mismo archivo comparten
 # `concurrency` group y el feedback de seguridad queda enterrado detrás de la
 # suite. Además CodeQL necesita `security-events: write`, un permiso que ci.yml
 # no tiene y que no queremos darle a los jobs que corren código de tests.

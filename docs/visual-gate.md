@@ -83,7 +83,7 @@ La respuesta acá es no pretender que los píxeles sean portables:
 |---|---|---|
 | SO | `ubuntu-latest` (job `visual-gate`) | La suite **se saltea con motivo**. Nunca falla fuera del runner. |
 | Zona horaria | `TZ=UTC` (env del job) | Test rojo **con nombre**: *"el entorno del gate está pinneado"*. |
-| Flutter | `3.41.9` (mismo pin que `analyze-and-test`) | Diffs de píxeles sin causa aparente. Por eso los dos jobs y el workflow de regeneración leen el mismo número. |
+| Flutter | `3.41.9` (mismo pin que `analyze` y `test`) | Diffs de píxeles sin causa aparente. Por eso los dos jobs y el workflow de regeneración leen el mismo número. |
 | Reloj | `AppClock.freeze()` en 17/03/2026 10:30 | Ver §5. |
 
 El interruptor es la variable de entorno `TREINO_VISUAL_GATE=1`, que sólo pone
