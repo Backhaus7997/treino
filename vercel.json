@@ -6,6 +6,11 @@
   "outputDirectory": "build/web",
   "redirects": [
     {
+      "source": "/abrir/profe",
+      "destination": "https://app.gettreino.com/",
+      "permanent": false
+    },
+    {
       "source": "/:path*",
       "has": [
         {
