@@ -2211,6 +2211,28 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     });
   }
 
+  /// Une el slot suelto [absIndex] a la superserie [groupId].
+  ///
+  /// A diferencia de [_unirConVecino], el destino viene del hit-test del drag:
+  /// puede estar a más de un bloque de distancia y la adyacencia no expresa la
+  /// intención del usuario. La compactación sigue siendo la misma para que un
+  /// slot oculto en la semana actual no parta el grupo resultante.
+  void _unirAGrupo(int dayIndex, int absIndex, int groupId) {
+    final day = _days[dayIndex];
+    if (absIndex < 0 || absIndex >= day.slots.length) return;
+    final actual = day.slots[absIndex];
+    if (actual.supersetGroup != null ||
+        !day.slots.any((slot) => slot.supersetGroup == groupId)) {
+      return;
+    }
+
+    _markDirty();
+    setState(() {
+      actual.supersetGroup = groupId;
+      day.slots = _conGruposContiguos(day.slots);
+    });
+  }
+
   /// Devuelve [slots] reordenada para que cada superserie sea una corrida
   /// CONSECUTIVA, que es la única forma en que `_blocks()` la ve como un solo
   /// bloque.
@@ -3132,6 +3154,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                           _unirConVecino(_selectedDayIndex, i, dir: -1),
                       onMergeSlotWithNext: (i) =>
                           _unirConVecino(_selectedDayIndex, i, dir: 1),
+                      onMergeSlotIntoGroup: (i, groupId) =>
+                          _unirAGrupo(_selectedDayIndex, i, groupId),
                       onUngroupSlot: (i) =>
                           _separarDeGrupo(_selectedDayIndex, i),
                       slotIsValid: (slot) {
@@ -3480,6 +3504,7 @@ class _DayExpansionTile extends StatefulWidget {
     required this.onAddToGroup,
     required this.onReplaceExercise,
     required this.onMoveSlotInGroup,
+    required this.onMergeSlotIntoGroup,
     required this.onNameChanged,
     this.allowSuperset = false,
     this.onAddSuperset,
@@ -3535,6 +3560,7 @@ class _DayExpansionTile extends StatefulWidget {
   /// esconde las dos acciones — el editor web del Coach Hub no las ofrece.
   final void Function(int absIndex)? onMergeSlotWithPrevious;
   final void Function(int absIndex)? onMergeSlotWithNext;
+  final void Function(int absIndex, int groupId) onMergeSlotIntoGroup;
   final void Function(int absIndex)? onUngroupSlot;
 
   @override
@@ -3542,6 +3568,23 @@ class _DayExpansionTile extends StatefulWidget {
 }
 
 class _DayExpansionTileState extends State<_DayExpansionTile> {
+  /// Fracción vertical CENTRAL que absorbe un ejercicio suelto al soltarlo.
+  ///
+  /// El 40% restante (20% por borde) conserva el reorder normal: rozar una
+  /// superserie camino a otra posición no debe convertirse en una unión.
+  static const double _kFraccionVerticalParaUnir = 0.6;
+
+  final Map<_EditableSlot, GlobalKey> _supersetHitTestKeys = {};
+  int? _draggedStandaloneAbsIndex;
+  int? _highlightedSupersetGroup;
+
+  /// Que este arrastre ya terminó en unión, y por lo tanto el `onReorder` que
+  /// puede llegar después no tiene que mover nada. Se resetea en
+  /// `onReorderStart` y no al consumirlo: cuando hay unión sin cambio de
+  /// índice, `onReorder` nunca llega, y el flag quedaría trabado tragándose el
+  /// reorder SIGUIENTE.
+  bool _unionAplicada = false;
+
   /// Si el panel de entrada rápida está abierto. Presentación local pura: no
   /// sobrevive a cerrar el día ni viaja al modelo.
   bool _quickEntryOpen = false;
@@ -3704,6 +3747,91 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
           ? null
           : () => _copyPrescriptionFromPrevious(absIndex);
 
+  void _actualizarDestinoDeUnion(PointerMoveEvent event) {
+    if (_draggedStandaloneAbsIndex == null) return;
+
+    int? targetGroup;
+    for (final entry in _supersetHitTestKeys.entries) {
+      final renderObject = entry.value.currentContext?.findRenderObject();
+      if (renderObject is! RenderBox || !renderObject.hasSize) continue;
+      final rect = renderObject.localToGlobal(Offset.zero) & renderObject.size;
+      final margen = rect.height * (1 - _kFraccionVerticalParaUnir) / 2;
+      final zonaCentral = Rect.fromLTRB(
+        rect.left,
+        rect.top + margen,
+        rect.right,
+        rect.bottom - margen,
+      );
+      if (zonaCentral.contains(event.position)) {
+        targetGroup = entry.key.supersetGroup;
+        break;
+      }
+    }
+
+    if (targetGroup == _highlightedSupersetGroup) return;
+    setState(() => _highlightedSupersetGroup = targetGroup);
+  }
+
+  void _iniciarReorder(
+    int visibleBlockIndex,
+    List<List<({int index, _EditableSlot slot})>> blocks,
+    List<int> visiblesIdx,
+  ) {
+    final block = blocks[visiblesIdx[visibleBlockIndex]];
+    final standalone = block.length == 1 &&
+        block.first.slot.supersetGroup == null &&
+        block.first.slot.isPresentInWeek(widget.week);
+    setState(() {
+      _draggedStandaloneAbsIndex = standalone ? block.first.index : null;
+      _highlightedSupersetGroup = null;
+      _unionAplicada = false;
+    });
+  }
+
+  /// Aplica la unión pendiente, si la hay, al levantar el dedo.
+  ///
+  /// La unión NO puede colgar de `onReorder`: Flutter sólo lo llama cuando el
+  /// índice cambió — `SliverReorderableListState._dropCompleted` hace
+  /// `if (fromIndex != toIndex) widget.onReorder(...)`. Y los dos umbrales no
+  /// coinciden: el resaltado arranca al 20% del alto del bloque
+  /// ([_kFraccionVerticalParaUnir]), mientras que el reorderable recién mueve
+  /// el índice cuando el proxy cruza el punto medio del vecino. En la franja
+  /// entre ambos, el bloque prometía absorber y no absorbía nada — medido en
+  /// `routine_editor_drop_superserie_test.dart`.
+  ///
+  /// `onReorderEnd` se llama SIEMPRE (`_dragEnd`), así que es el único lugar
+  /// donde la promesa se puede cumplir.
+  void _terminarReorder(int _) {
+    final absIndex = _draggedStandaloneAbsIndex;
+    final targetGroup = _highlightedSupersetGroup;
+    if (absIndex == null && targetGroup == null) return;
+
+    setState(() {
+      _draggedStandaloneAbsIndex = null;
+      _highlightedSupersetGroup = null;
+    });
+
+    if (absIndex != null && targetGroup != null) {
+      // El reorder que el usuario "pidió" con el gesto queda anulado: soltar
+      // adentro es unir, no mover. `onReorder` puede llegar igual después de la
+      // animación del proxy, y [_unionAplicada] es lo que le dice que ya no hay
+      // nada que mover.
+      _unionAplicada = true;
+      widget.onMergeSlotIntoGroup(absIndex, targetGroup);
+    }
+  }
+
+  void _cancelarReorder(PointerCancelEvent _) {
+    if (_draggedStandaloneAbsIndex == null &&
+        _highlightedSupersetGroup == null) {
+      return;
+    }
+    setState(() {
+      _draggedStandaloneAbsIndex = null;
+      _highlightedSupersetGroup = null;
+    });
+  }
+
   /// Walks the slot list and emits either a standalone [_SlotEditor] or a
   /// "SUPERSERIE" wrapper card for consecutive slots sharing a non-null group.
   /// Slots que se ven en la semana en curso. Un slot borrado "sólo de esta
@@ -3779,6 +3907,10 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
           key: ObjectKey(block.first.slot),
           padding: const EdgeInsets.only(bottom: AppSpacing.s8),
           child: _SupersetGroupCard(
+            hitTestKey: _supersetHitTestKeys.putIfAbsent(
+              block.first.slot,
+              GlobalKey.new,
+            ),
             groupSlots: visible,
             reorderIndex: posVisible,
             week: widget.week,
@@ -3797,24 +3929,35 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
             slotIsValid: widget.slotIsValid,
             isTrainerMode: widget.isTrainerMode,
             onUngroupSlot: widget.onUngroupSlot,
+            resaltadoParaUnir:
+                _highlightedSupersetGroup == block.first.slot.supersetGroup,
           ),
         ));
       }
     }
-    return ReorderableListView(
-      shrinkWrap: true,
-      primary: false,
-      physics: const NeverScrollableScrollPhysics(),
-      buildDefaultDragHandles: false,
-      onReorder: (oldIndex, newIndex) {
-        if (newIndex > oldIndex) newIndex--;
-        if (oldIndex == newIndex) return;
-        _moveBlock(
-          visiblesIdx[oldIndex],
-          visiblesIdx[newIndex] - visiblesIdx[oldIndex],
-        );
-      },
-      children: rows,
+    return Listener(
+      onPointerMove: _actualizarDestinoDeUnion,
+      onPointerCancel: _cancelarReorder,
+      child: ReorderableListView(
+        shrinkWrap: true,
+        primary: false,
+        physics: const NeverScrollableScrollPhysics(),
+        buildDefaultDragHandles: false,
+        onReorderStart: (index) => _iniciarReorder(index, blocks, visiblesIdx),
+        onReorderEnd: _terminarReorder,
+        onReorder: (oldIndex, newIndex) {
+          // La unión ya la aplicó `_terminarReorder`. Soltar adentro es unir,
+          // no mover: el reorder queda anulado.
+          if (_unionAplicada) return;
+          if (newIndex > oldIndex) newIndex--;
+          if (oldIndex == newIndex) return;
+          _moveBlock(
+            visiblesIdx[oldIndex],
+            visiblesIdx[newIndex] - visiblesIdx[oldIndex],
+          );
+        },
+        children: rows,
+      ),
     );
   }
 
@@ -4109,6 +4252,7 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
 /// then stacks each slot's [_SlotEditor].
 class _SupersetGroupCard extends StatelessWidget {
   const _SupersetGroupCard({
+    required this.hitTestKey,
     required this.groupSlots,
     required this.week,
     required this.palette,
@@ -4126,8 +4270,10 @@ class _SupersetGroupCard extends StatelessWidget {
     this.slotIsValid,
     this.isTrainerMode = false,
     this.onUngroupSlot,
+    this.resaltadoParaUnir = false,
   });
 
+  final GlobalKey hitTestKey;
   final List<({int index, _EditableSlot slot})> groupSlots;
 
   /// 0-based week whose sets the member slot editors render.
@@ -4162,10 +4308,15 @@ class _SupersetGroupCard extends StatelessWidget {
   /// Saca un miembro del grupo.
   final void Function(int absIndex)? onUngroupSlot;
 
+  /// Indica que el puntero está en la zona central de absorción del bloque.
+  final bool resaltadoParaUnir;
+
   @override
   Widget build(BuildContext context) {
     return SupersetBlock(
+      key: hitTestKey,
       count: groupSlots.length,
+      resaltadoParaUnir: resaltadoParaUnir,
       reorderIndex: reorderIndex,
       trailing: (onMoveUp != null || onMoveDown != null)
           ? _MoveButtons(
