@@ -492,4 +492,67 @@ void main() {
       reason: 'reacomodar no puede desplegar nada',
     );
   });
+
+  testWidgets('sacar un miembro hacia ARRIBA lo deja delante de la superserie',
+      (tester) async {
+    final repo = await _pump(
+      tester,
+      _routine('salir-arriba', [
+        _slot('a', group: 7),
+        _slot('b', group: 7),
+        _slot('c', group: 7),
+      ]),
+    );
+    final rect = tester.getRect(find.byType(SupersetBlock));
+
+    // El ÚLTIMO miembro, arrastrado por encima del bloque. Es el caso que
+    // fallaba: `_conGruposContiguos` deja al que sale del medio o del final
+    // siempre detrás, así que el gesto hacia arriba terminaba abajo.
+    final gesto = await _arrastrarHasta(
+      tester,
+      find.byKey(const Key('slot_drag_handle_2')),
+      () => Offset(rect.center.dx, rect.top - 60),
+    );
+    await gesto.up();
+    await tester.pumpAndSettle();
+
+    final saved = await _guardar(tester, repo);
+    expect(
+      saved.days.single.slots.map((s) => s.exerciseId),
+      ['c', 'a', 'b'],
+      reason: 'lo arrastré hacia arriba: tiene que quedar arriba',
+    );
+    expect(saved.days.single.slots.map((s) => s.supersetGroup), [null, 7, 7]);
+  });
+
+  testWidgets('sacar un miembro hacia ABAJO lo deja detrás de la superserie',
+      (tester) async {
+    final repo = await _pump(
+      tester,
+      _routine('salir-abajo', [
+        _slot('a', group: 7),
+        _slot('b', group: 7),
+        _slot('c', group: 7),
+      ]),
+    );
+    final rect = tester.getRect(find.byType(SupersetBlock));
+
+    // El PRIMER miembro, arrastrado por debajo. Simétrico del anterior: sin
+    // mirar el lado, compactar lo dejaría primero por ser el primero del grupo.
+    final gesto = await _arrastrarHasta(
+      tester,
+      find.byKey(const Key('slot_drag_handle_0')),
+      () => Offset(rect.center.dx, rect.bottom + 60),
+    );
+    await gesto.up();
+    await tester.pumpAndSettle();
+
+    final saved = await _guardar(tester, repo);
+    expect(
+      saved.days.single.slots.map((s) => s.exerciseId),
+      ['b', 'c', 'a'],
+      reason: 'lo arrastré hacia abajo: tiene que quedar abajo',
+    );
+    expect(saved.days.single.slots.map((s) => s.supersetGroup), [7, 7, null]);
+  });
 }

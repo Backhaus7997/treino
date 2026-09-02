@@ -2293,24 +2293,51 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   /// Si el grupo queda con UN solo miembro, ese también sale: un grupo de uno
   /// no es una superserie, y `buildRoutineSlot` lo descartaría igual al
   /// guardar.
-  void _separarDeGrupo(int dayIndex, int absIndex) {
+  /// [arriba] reubica al que sale: `true` delante del grupo, `false` detrás.
+  /// **`null` = sin dirección** y conserva el orden que deja la compactación —
+  /// es lo que usa el ⋮, que es un ítem de menú y no un gesto: reubicar ahí
+  /// movería el ejercicio sin que nadie lo haya arrastrado a ningún lado.
+  void _separarDeGrupo(int dayIndex, int absIndex, {bool? arriba}) {
     final day = _days[dayIndex];
-    final grupo = day.slots[absIndex].supersetGroup;
+    final libre = day.slots[absIndex];
+    final grupo = libre.supersetGroup;
     if (grupo == null) return;
 
     _markDirty();
     setState(() {
-      day.slots[absIndex].supersetGroup = null;
-      final quedan = [
+      // Los compañeros se capturan ANTES de disolver nada: si el grupo queda
+      // en uno, ese también sale y después ya no hay a quién referenciar para
+      // saber dónde estaba el bloque.
+      final companeros = [
         for (final s in day.slots)
-          if (s.supersetGroup == grupo) s,
+          if (!identical(s, libre) && s.supersetGroup == grupo) s,
       ];
-      if (quedan.length == 1) quedan.first.supersetGroup = null;
+      libre.supersetGroup = null;
+      if (companeros.length == 1) companeros.first.supersetGroup = null;
       // Sacar a un miembro del MEDIO de un grupo de tres deja a los de los
       // costados con el mismo id y ya NO contiguos: `_blocks()` los parte en
       // dos bloques, y `supersetBlockIndices` del dominio hace lo mismo al
       // guardar. Compactar los vuelve a juntar, con el que salió detrás.
       day.slots = _conGruposContiguos(day.slots);
+
+      // ...y dónde queda "detrás" lo decide la iteración, no la intención.
+      // Compactar deja al primer miembro del grupo ARRIBA y a cualquier otro
+      // ABAJO — o sea que el resultado depende de a QUIÉN sacaste, no de hacia
+      // dónde lo arrastraste. Los dos casos se veían mal en device: el último
+      // miembro llevado hacia arriba terminaba abajo, y el primero llevado
+      // hacia abajo se quedaba arriba.
+      //
+      // Con un gesto direccional hay que reubicarlo explícitamente. El ⋮ no
+      // tiene dirección y conserva el comportamiento de siempre.
+      if (arriba == null || companeros.isEmpty) return;
+      final actual = day.slots.indexOf(libre);
+      if (actual < 0) return;
+      final sinLibre = [...day.slots]..removeAt(actual);
+      final primero = sinLibre.indexOf(companeros.first);
+      final ultimo = sinLibre.lastIndexOf(companeros.last);
+      if (primero < 0 || ultimo < 0) return;
+      sinLibre.insert(arriba ? primero : ultimo + 1, libre);
+      day.slots = sinLibre;
     });
   }
 
@@ -3178,8 +3205,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                           _unirConVecino(_selectedDayIndex, i, dir: 1),
                       onMergeSlotIntoGroup: (i, groupId) =>
                           _unirAGrupo(_selectedDayIndex, i, groupId),
-                      onUngroupSlot: (i) =>
-                          _separarDeGrupo(_selectedDayIndex, i),
+                      onUngroupSlot: (i, {bool? arriba}) =>
+                          _separarDeGrupo(_selectedDayIndex, i, arriba: arriba),
                       slotIsValid: (slot) {
                         if (!slot.isPresentInWeek(_selectedWeek)) {
                           return true;
@@ -3583,7 +3610,10 @@ class _DayExpansionTile extends StatefulWidget {
   final void Function(int absIndex)? onMergeSlotWithPrevious;
   final void Function(int absIndex)? onMergeSlotWithNext;
   final void Function(int absIndex, int groupId) onMergeSlotIntoGroup;
-  final void Function(int absIndex)? onUngroupSlot;
+  /// Saca un miembro del grupo. `arriba` dice de qué lado aterriza el que
+  /// sale: lo usa el drag, que sí tiene dirección. El ⋮ no la tiene y usa
+  /// el default.
+  final void Function(int absIndex, {bool? arriba})? onUngroupSlot;
 
   @override
   State<_DayExpansionTile> createState() => _DayExpansionTileState();
@@ -3623,6 +3653,11 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
 
   /// Que el dedo salió del bloque con margen suficiente: al soltar, se separa.
   bool _miembroFueraDelBloque = false;
+
+  /// Por qué lado salió: arriba del bloque o abajo. Decide dónde ATERRIZA el
+  /// ejercicio liberado, y sin esto siempre caía debajo del grupo — arrastrarlo
+  /// hacia arriba lo mandaba abajo, que es lo contrario de lo que el gesto pide.
+  bool _salidaHaciaArriba = false;
 
   /// Gemelo de [_unionAplicada] para la separación. Misma razón: el `onReorder`
   /// del reorderable ANIDADO puede no llegar nunca.
@@ -3806,7 +3841,13 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
     final memberGroup = _draggedMemberGroup;
     if (memberGroup != null) {
       final rect = _rectDelBloque(memberGroup);
-      final fuera = rect == null || !rect.inflate(_kMargenParaSacar).contains(event.position);
+      final fuera =
+          rect == null || !rect.inflate(_kMargenParaSacar).contains(event.position);
+      // El lado se recuerda mientras está afuera: al levantar el dedo ya no hay
+      // más eventos de movimiento que consultar.
+      if (fuera && rect != null) {
+        _salidaHaciaArriba = event.position.dy < rect.center.dy;
+      }
       if (fuera != _miembroFueraDelBloque) {
         setState(() => _miembroFueraDelBloque = fuera);
       }
@@ -3933,7 +3974,7 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
 
     if (fuera) {
       _separacionAplicada = true;
-      widget.onUngroupSlot?.call(absIndex);
+      widget.onUngroupSlot?.call(absIndex, arriba: _salidaHaciaArriba);
     }
   }
 
@@ -4033,7 +4074,9 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
             onCopyPreviousFor: _copyPreviousCallback,
             slotIsValid: widget.slotIsValid,
             isTrainerMode: widget.isTrainerMode,
-            onUngroupSlot: widget.onUngroupSlot,
+            onUngroupSlot: widget.onUngroupSlot == null
+                ? null
+                : (i) => widget.onUngroupSlot!(i),
             resaltadoParaUnir:
                 _highlightedSupersetGroup == block.first.slot.supersetGroup,
             onMemberDragStart: _iniciarArrastreDeMiembro,
