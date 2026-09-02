@@ -3,7 +3,7 @@ import '../domain/onboarding_surface.dart';
 import 'custom_exercise_onboarding_art.dart';
 import 'onboarding_card_content.dart';
 
-/// The three slides of the "Creá tus propios ejercicios" onboarding.
+/// The slides of the routine-editor onboarding.
 ///
 /// Copy is verbatim from the design handoff — it was written against these
 /// exact screens, so paraphrasing here would quietly desync the words from the
@@ -14,10 +14,40 @@ import 'onboarding_card_content.dart';
 /// The chrome around the slides (SALTAR / SIGUIENTE / the step label) is NOT
 /// here — it already lives in `AppL10n` and is shared with the welcome tour.
 ///
-/// The two decks differ in body copy and in the third title only. That is not
-/// duplication to factor out: the athlete builds a personal library, the
-/// trainer builds one to assign, and the last slide is the whole point of the
-/// difference.
+/// The role-specific introductions differ in body copy and in the third title.
+/// That is not duplication to factor out: the athlete builds a personal
+/// library, the trainer builds one to assign, and the last slide is the whole
+/// point of the difference.
+
+/// The routine editor gestures are identical for athletes and trainers: they
+/// depend on the mobile screen, not on the user's role. The Coach Hub editor is
+/// a different screen and deliberately does not receive these slides.
+const editorGestureSlides = <OnboardingCardContent>[
+  OnboardingCardContent(
+    icon: TreinoIcon.specialty,
+    title: 'ESCRIBILO EN UNA LÍNEA', // i18n
+    body: 'Tocá RÁPIDO y escribí «press de banca 4x10 55»: entra con 4 series '
+        'de 10 y 55 kg. Para una pirámide, «4x10, 8, 6, 4». Para tiempo, '
+        '«plancha 3x30s».', // i18n
+    illustration: CustomExerciseOnboardingArt.quickEntry(),
+  ),
+  OnboardingCardContent(
+    icon: TreinoIcon.dragHandle,
+    title: 'ORDENÁ ARRASTRANDO', // i18n
+    body: 'El agarre de la izquierda mueve el ejercicio. Soltalo en el centro '
+        'de una superserie para meterlo adentro, o llevalo afuera para '
+        'sacarlo.', // i18n
+    illustration: CustomExerciseOnboardingArt.drag(),
+  ),
+  OnboardingCardContent(
+    icon: TreinoIcon.dotsThree,
+    title: 'EL RESTO ESTÁ EN EL ⋮', // i18n
+    body: 'Cambiar el ejercicio, copiar los sets del anterior, subir, bajar, '
+        'unir con el de arriba o el de abajo en superserie, y separarlo del '
+        'grupo.', // i18n
+    illustration: CustomExerciseOnboardingArt.menu(),
+  ),
+];
 
 /// Athlete deck — a library for their own routines.
 const athleteCustomExerciseSlides = <OnboardingCardContent>[
@@ -49,10 +79,11 @@ const athleteCustomExerciseSlides = <OnboardingCardContent>[
         'cualquier día de cualquier rutina con un toque.', // i18n
     illustration: CustomExerciseOnboardingArt.library(),
   ),
+  ...editorGestureSlides,
 ];
 
-/// Trainer deck — a library to assign. Used on mobile AND on the Coach Hub.
-const trainerCustomExerciseSlides = <OnboardingCardContent>[
+/// Trainer introduction — shared by mobile and the Coach Hub.
+const _trainerCustomExerciseIntroduction = <OnboardingCardContent>[
   OnboardingCardContent(
     icon: TreinoIcon.plus,
     title: '¿FALTA UN EJERCICIO? CREÁLO VOS', // i18n
@@ -77,6 +108,21 @@ const trainerCustomExerciseSlides = <OnboardingCardContent>[
   ),
 ];
 
+/// Trainer mobile deck — the introduction plus mobile editor gestures.
+const trainerCustomExerciseSlides = <OnboardingCardContent>[
+  ..._trainerCustomExerciseIntroduction,
+  ...editorGestureSlides,
+];
+
+/// Coach Hub deck — introduction only.
+///
+/// It is intentionally separate from the trainer mobile deck: Coach Hub has no
+/// RÁPIDO entry or drag handle, so teaching those gestures on web would be a
+/// false promise.
+const trainerWebCustomExerciseSlides = <OnboardingCardContent>[
+  ..._trainerCustomExerciseIntroduction,
+];
+
 /// The deck for [surface], or `null` if it is not a custom-exercise surface.
 ///
 /// Returning null rather than throwing keeps a wrong caller silent instead of
@@ -87,9 +133,10 @@ List<OnboardingCardContent>? customExerciseSlidesFor(
     switch (surface) {
       OnboardingSurface.customExerciseAthleteMobile =>
         athleteCustomExerciseSlides,
-      OnboardingSurface.customExerciseTrainerMobile ||
-      OnboardingSurface.customExerciseTrainerWeb =>
+      OnboardingSurface.customExerciseTrainerMobile =>
         trainerCustomExerciseSlides,
+      OnboardingSurface.customExerciseTrainerWeb =>
+        trainerWebCustomExerciseSlides,
       OnboardingSurface.athleteMobile ||
       OnboardingSurface.trainerMobile ||
       OnboardingSurface.trainerWeb ||

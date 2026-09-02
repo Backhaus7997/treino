@@ -55,26 +55,39 @@ Future<void> _next(WidgetTester tester) async {
 
 void main() {
   group('CustomExerciseOnboardingView', () {
-    testWidgets('shows three slides and walks through all of them',
+    testWidgets('shows six slides and walks through all of them',
         (tester) async {
       await _pump(tester, onFinish: () {}, onSkip: () {});
 
-      // The deck itself is the source of truth for "three".
-      expect(athleteCustomExerciseSlides, hasLength(3));
+      // The deck itself is the source of truth for "six".
+      expect(athleteCustomExerciseSlides, hasLength(6));
 
       final pager = tester.widget<PageView>(find.byKey(_pagerKey));
-      expect(pager.childrenDelegate.estimatedChildCount, 3);
+      expect(pager.childrenDelegate.estimatedChildCount, 6);
 
       expect(find.text('¿FALTA UN EJERCICIO? CREÁLO VOS'), findsOneWidget);
-      expect(find.text('PASO 1 DE 3'), findsOneWidget);
+      expect(find.text('PASO 1 DE 6'), findsOneWidget);
 
       await _next(tester);
       expect(find.text('SUMALE UN VIDEO'), findsOneWidget);
-      expect(find.text('PASO 2 DE 3'), findsOneWidget);
+      expect(find.text('PASO 2 DE 6'), findsOneWidget);
 
       await _next(tester);
       expect(find.text('USALO EN CUALQUIER RUTINA'), findsOneWidget);
-      expect(find.text('PASO 3 DE 3'), findsOneWidget);
+      expect(find.text('PASO 3 DE 6'), findsOneWidget);
+
+      await _next(tester);
+      expect(find.text('ESCRIBILO EN UNA LÍNEA'), findsOneWidget);
+      expect(find.text('PASO 4 DE 6'), findsOneWidget);
+
+      await _next(tester);
+      expect(find.text('ORDENÁ ARRASTRANDO'), findsOneWidget);
+      expect(find.text('PASO 5 DE 6'), findsOneWidget);
+
+      await _next(tester);
+      expect(find.text('EL RESTO ESTÁ EN EL ⋮'), findsOneWidget);
+      expect(find.text('PASO 6 DE 6'), findsOneWidget);
+      expect(drainLayoutFailure(tester), isNull);
     });
 
     testWidgets(
@@ -84,6 +97,15 @@ void main() {
 
       expect(find.text('SIGUIENTE'), findsOneWidget);
       expect(find.text('CREAR MI EJERCICIO'), findsNothing);
+
+      await _next(tester);
+      expect(find.text('SIGUIENTE'), findsOneWidget);
+
+      await _next(tester);
+      expect(find.text('SIGUIENTE'), findsOneWidget);
+
+      await _next(tester);
+      expect(find.text('SIGUIENTE'), findsOneWidget);
 
       await _next(tester);
       expect(find.text('SIGUIENTE'), findsOneWidget);
@@ -100,6 +122,9 @@ void main() {
 
       await _next(tester);
       await _next(tester);
+      await _next(tester);
+      await _next(tester);
+      await _next(tester);
       expect(finished, 0, reason: 'must not fire while advancing');
 
       await tester.tap(find.byKey(_ctaKey));
@@ -113,6 +138,15 @@ void main() {
       await _pump(tester, onFinish: () {}, onSkip: () => skipped++);
 
       expect(find.byKey(_skipKey), findsOneWidget);
+      await _next(tester);
+      expect(find.byKey(_skipKey), findsOneWidget);
+
+      await _next(tester);
+      expect(find.byKey(_skipKey), findsOneWidget);
+
+      await _next(tester);
+      expect(find.byKey(_skipKey), findsOneWidget);
+
       await _next(tester);
       expect(find.byKey(_skipKey), findsOneWidget);
 
@@ -147,11 +181,11 @@ void main() {
         (tester) async {
       await _pump(tester, onFinish: () {}, onSkip: () {});
 
-      expect(find.bySemanticsLabel('Paso 1 de 3'), findsOneWidget);
+      expect(find.bySemanticsLabel('Paso 1 de 6'), findsOneWidget);
 
       await _next(tester);
-      expect(find.bySemanticsLabel('Paso 2 de 3'), findsOneWidget);
-      expect(find.bySemanticsLabel('Paso 1 de 3'), findsNothing);
+      expect(find.bySemanticsLabel('Paso 2 de 6'), findsOneWidget);
+      expect(find.bySemanticsLabel('Paso 1 de 6'), findsNothing);
     });
 
     testWidgets('survives a 320x568 screen at 2x text scale', (tester) async {
@@ -217,7 +251,7 @@ void main() {
 
     testWidgets('the trainer deck differs from the athlete one on slide 3',
         (tester) async {
-      expect(trainerCustomExerciseSlides, hasLength(3));
+      expect(trainerCustomExerciseSlides, hasLength(6));
       expect(
         trainerCustomExerciseSlides[2].title,
         'ASIGNALO A TUS ALUMNOS',
