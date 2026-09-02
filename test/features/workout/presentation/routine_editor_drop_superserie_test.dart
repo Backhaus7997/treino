@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
@@ -25,6 +26,7 @@ import 'package:treino/features/workout/domain/set_spec.dart';
 import 'package:treino/features/workout/presentation/routine_editor_mode.dart';
 import 'package:treino/features/workout/presentation/routine_editor_screen.dart';
 import 'package:treino/features/workout/presentation/widgets/superset_block.dart';
+import 'package:treino/features/workout/presentation/widgets/exercise_card.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 import '../../../fixtures/routine_editor_ui.dart';
@@ -44,6 +46,7 @@ RoutineSlot _slot(
   int? group,
   List<int> activeWeeks = const [],
   int semanas = 1,
+  bool sinReps = false,
 }) =>
     RoutineSlot(
       exerciseId: id,
@@ -55,11 +58,14 @@ RoutineSlot _slot(
       restSeconds: 60,
       supersetGroup: group,
       activeWeeks: activeWeeks,
-      sets: const [SetSpec(reps: 10)],
+      sets: sinReps ? const [SetSpec()] : const [SetSpec(reps: 10)],
       // Con `numWeeks > 1` el editor valida CADA semana. Sin `weeklySets`, la
       // semana 2 nace vacia y el pie bloquea el guardado: el test fallaba en
       // `updateUserOwned` sin haber llegado a ejercitar la union.
-      weeklySets: List.filled(semanas, const [SetSpec(reps: 10)]),
+      weeklySets: List.filled(
+        semanas,
+        sinReps ? const [SetSpec()] : const [SetSpec(reps: 10)],
+      ),
     );
 
 Routine _routine(String id, List<RoutineSlot> slots, {int numWeeks = 1}) =>
@@ -422,6 +428,68 @@ void main() {
       saved.days.single.slots.map((s) => s.supersetGroup),
       [7, 7, 7],
       reason: 'reordenar dentro del grupo no puede desarmarlo',
+    );
+  });
+
+  testWidgets('una rutina con ejercicios sin completar abre TODA plegada',
+      (tester) async {
+    await _pump(
+      tester,
+      _routine('sin-reps', [_slot('a', sinReps: true), _slot('b')]),
+    );
+
+    // Antes, una card con `hasSlotError` nacía desplegada. Con cinco
+    // ejercicios eso era entrar a la pantalla con todo abierto.
+    expect(find.byKey(const Key('exercise_card_body')), findsNothing);
+
+    // Y la que falta completar se distingue igual, por el borde.
+    const palette = AppPalette.mintMagenta;
+    final bordes = tester
+        .widgetList<Container>(find.descendant(
+          of: find.byType(ExerciseCard),
+          matching: find.byType(Container),
+        ))
+        .map((c) => c.decoration)
+        .whereType<BoxDecoration>()
+        .where((d) => d.border != null && d.color == palette.bg)
+        .map((d) => (d.border! as Border).top.color)
+        .toList();
+    expect(bordes, contains(palette.danger),
+        reason: 'la que no está completa tiene que verse desde afuera');
+    expect(bordes, contains(palette.border),
+        reason: 'la que sí está completa NO se pinta');
+  });
+
+  testWidgets('reacomodar no despliega las cards sin completar',
+      (tester) async {
+    await _pump(
+      tester,
+      _routine('reacomodo', [
+        _slot('a', group: 7),
+        _slot('b', group: 7),
+        _slot('c', sinReps: true),
+      ]),
+    );
+    expect(find.byKey(const Key('exercise_card_body')), findsNothing);
+
+    final superset = find.byType(SupersetBlock);
+    final gesto = await _arrastrarHasta(
+      tester,
+      find.byKey(const Key('slot_drag_handle_2')),
+      () => tester.getCenter(superset),
+    );
+    await gesto.up();
+    await tester.pumpAndSettle();
+
+    // Mover el slot a la lista ANIDADA del grupo lo cambia de lugar en el
+    // árbol y Flutter recrea su State. Mientras `_expanded` era una variable
+    // local inicializada con `hasSlotError`, ese inicializador volvía a correr
+    // y la card se abría sola — reportado en device. Ahora el estado vive en
+    // el modelo, que se mueve con el slot.
+    expect(
+      find.byKey(const Key('exercise_card_body')),
+      findsNothing,
+      reason: 'reacomodar no puede desplegar nada',
     );
   });
 }

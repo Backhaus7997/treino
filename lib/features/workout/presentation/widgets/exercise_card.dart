@@ -103,15 +103,26 @@ class ExerciseCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: palette.bg,
         borderRadius: BorderRadius.circular(AppRadius.sm),
-        // El borde NO se pinta de rojo aunque [hasError] sea true. Un
-        // campo vacío llegó a marcar cinco cosas a la vez —celda, card,
-        // meta, punto de la pestaña y ahora el pie—, y con 3 días × 5
-        // ejercicios eso es una pantalla en rojo donde ninguna señal
-        // manda. Quedan tres, una por escala: la CELDA dice qué campo
-        // falta, el PUNTO de la pestaña en qué día está, y el PIE cuántos
-        // quedan y cómo llegar. [hasError] sigue existiendo porque es lo
-        // que hace que una card con problemas nazca desplegada.
-        border: Border.all(color: palette.border),
+        // El borde SÍ se pinta de rojo, pero SÓLO con la card cerrada.
+        //
+        // #868 lo había sacado del todo, y por una buena razón: un campo vacío
+        // llegó a marcar cinco cosas a la vez —celda, card, meta, punto de la
+        // pestaña y pie—, y con 3 días × 5 ejercicios eso es una pantalla en
+        // rojo donde ninguna señal manda.
+        //
+        // Lo que aquella versión no cubría es el estado CERRADO. Ahí la celda
+        // —la señal precisa, la que dice qué campo falta— no está en pantalla,
+        // y desde afuera una card sin completar se ve igual que una completa.
+        // La solución de entonces fue abrirla sola; en device eso resultó peor
+        // que el problema, porque reacomodar ejercicios desplegaba media
+        // pantalla de golpe.
+        //
+        // Así que la señal no se suma: se MUEVE con el estado. Cerrada, manda
+        // el borde y dice "acá falta algo". Abierta, el borde se apaga y manda
+        // la celda, que dice qué. Nunca las dos, que era el problema del #868.
+        border: Border.all(
+          color: hasError && !expanded ? palette.danger : palette.border,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

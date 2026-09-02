@@ -167,6 +167,22 @@ class _EditableSlot {
   int restSeconds = 0;
   int? supersetGroup;
 
+  /// Si la card se ve desplegada. Vive en el MODELO y no en el `State` del
+  /// editor a propósito.
+  ///
+  /// Mover un slot entre la lista externa y la de una superserie lo cambia de
+  /// lugar en el árbol, y ahí Flutter destruye y recrea su `State`: cualquier
+  /// bandera local vuelve a su valor inicial. Con la bandera atada a
+  /// `hasSlotError`, eso significaba que **reacomodar ejercicios desplegaba
+  /// solos a los que tenían campos sin completar** — reportado en device.
+  ///
+  /// Arranca en `true` porque un ejercicio recién agregado nace con sus sets
+  /// vacíos y hay que poder llenarlos sin un tap extra. La hidratación de una
+  /// rutina existente lo pone en `false`: ahí todo nace plegado, y los que
+  /// tienen algo sin completar se marcan con el borde rojo de [ExerciseCard]
+  /// en vez de abrirse.
+  bool expandido = true;
+
   /// The active week's set list — same object as `weeklySets[w]`, so in-place
   /// mutations are visible to the single source of truth (ADR-PB-02).
   List<_EditableSet> setsForWeek(int w) => weeklySets[w];
@@ -1165,6 +1181,12 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         );
         editableDay.slots = day.slots.map((slot) {
           final editableSlot = _EditableSlot()
+            // Una rutina que se abre nace TODA plegada, incluidos los
+            // ejercicios a los que les falta completar sets: ésos se marcan
+            // con el borde rojo de la card. Abrir cinco cards de golpe al
+            // entrar es la pantalla de scroll infinito que el rediseño vino a
+            // sacar.
+            ..expandido = false
             ..exercise = Exercise(
               id: slot.exerciseId,
               name: slot.exerciseName,
@@ -4655,17 +4677,19 @@ class _SlotEditorState extends State<_SlotEditor> {
   /// el caso que importa y de paso el que parecía necesitar otra regla: un
   /// ejercicio recién agregado nace con sus sets vacíos, o sea inválido, así
   /// que se despliega solo. No hace falta rastrear "cuál fue el último".
-  late bool _expanded = widget.hasSlotError;
+  /// Delegado al modelo — ver el dartdoc de [_EditableSlot.expandido]. Acá
+  /// vivía un `late bool _expanded = widget.hasSlotError` y ése era el bug:
+  /// el `State` se recrea al mover un slot entre la lista externa y la de una
+  /// superserie, y el inicializador volvía a correr desplegando la card.
+  bool get _expanded => widget.slot.expandido;
+  set _expanded(bool v) => widget.slot.expandido = v;
 
-  @override
-  void didUpdateWidget(_SlotEditor oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // Un error que aparece mientras el usuario mira otra cosa abre la card:
-    // un problema escondido no se puede arreglar.
-    if (!oldWidget.hasSlotError && widget.hasSlotError) {
-      _expanded = true;
-    }
-  }
+  // Antes había acá un `didUpdateWidget` que forzaba la apertura cuando
+  // aparecía un error, con el argumento de que "un problema escondido no se
+  // puede arreglar". Ya no hace falta y era la otra mitad del mismo problema:
+  // el error ahora se ve con la card CERRADA, enmarcada en rojo, que es
+  // justamente lo que deja al usuario elegir cuál abrir en vez de abrírselas
+  // todas encima.
 
   /// Opens the exercise picker and, if a replacement is chosen, swaps the
   /// slot's exercise from the ⋮ "Cambiar ejercicio" action.
