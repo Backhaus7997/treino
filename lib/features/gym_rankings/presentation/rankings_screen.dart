@@ -607,6 +607,31 @@ List<int> competitionRanks(List<num> descValues) {
   return ranks;
 }
 
+/// Metálico del numeral de puesto para el podio: 1º oro, 2º plata, 3º bronce.
+/// `null` del 4º en adelante — ahí el puesto se sigue pintando en
+/// [AppPalette.textMuted], como toda la vida.
+///
+/// Mapea por PUESTO y no por índice de fila, así que hereda los empates de
+/// [competitionRanks] en vez de pelearse con ellos: un board `1, 1, 3` pinta
+/// DOS oros y un bronce, sin plata. Es lo correcto para ranking de
+/// competencia — si dos atletas comparten el 1º, el 2º puesto no existe, y
+/// darle la plata al tercero sería contarle una posición que no ganó.
+///
+/// El color es refuerzo REDUNDANTE, nunca el único indicador: el numeral del
+/// puesto se lee al lado. WCAG 1.4.1.
+Color? podiumColor(int rank, AppPalette palette) {
+  switch (rank) {
+    case 1:
+      return palette.podiumGold;
+    case 2:
+      return palette.podiumSilver;
+    case 3:
+      return palette.podiumBronze;
+    default:
+      return null;
+  }
+}
+
 /// QA-GYM-506: the value [profile] is ranked by on [dimension], or `null` when
 /// the athlete has NO value to rank there at all.
 ///
@@ -766,10 +791,15 @@ class _LeaderboardRow extends StatelessWidget {
                 width: 28,
                 child: Text(
                   '$rank',
+                  // El numeral y la métrica de la misma fila pueden ser el
+                  // MISMO string (puesto 4 con una racha de 4 semanas), así
+                  // que buscar por texto adentro de la fila es ambiguo. Mismo
+                  // criterio que la key de la fila.
+                  key: Key('rankings_rank_${profile.uid}'),
                   style: GoogleFonts.barlowCondensed(
                     fontWeight: FontWeight.w700,
                     fontSize: 15,
-                    color: palette.textMuted,
+                    color: podiumColor(rank, palette) ?? palette.textMuted,
                   ),
                 ),
               ),

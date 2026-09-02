@@ -133,6 +133,48 @@ abstract final class AppColorPrimitives {
   static const Color reactionClapDark = Color(0xFFD99000);
 
   // ---------------------------------------------------------------------------
+  // Familia Podium (top 3 del leaderboard)
+  // ---------------------------------------------------------------------------
+  //
+  // Metálicos de podio para el numeral de puesto de las 3 primeras filas de
+  // Rankings. Son expresivos, como la familia Reactions: NO son estados
+  // semánticos y no se reusan fuera del podio.
+  //
+  // Los seis salen medidos contra `bgCard` de su propia paleta Y contra la
+  // fila propia (`bgCard` + accent al 8%), que es la variante más exigente.
+  // El numeral es texto de 15 px, o sea texto chico: la barra es 4,5:1 (WCAG
+  // AA 1.4.3), no el 3:1 de gráficos. Lo fija `podium_contrast_test.dart`.
+
+  /// `#FFCE45` — Oro del 1er puesto, estado dark.
+  static const Color podiumGold = Color(0xFFFFCE45);
+
+  /// `#8A6100` — Oro del 1er puesto, estado light.
+  ///
+  /// El candidato obvio era `#9A6B00`, un tono más brillante y más "oro". Da
+  /// 4,69:1 sobre `bgCard` —pasa— y **4,48:1 sobre la fila propia**, donde el
+  /// overlay de accent al 8% aclara el fondo y se come el margen. Por 0,02 de
+  /// ratio el token habría entrado a la paleta incumpliendo justo en la fila
+  /// que el atleta más mira: la suya.
+  static const Color podiumGoldDark = Color(0xFF8A6100);
+
+  /// `#C7CBD1` — Plata del 2do puesto, estado dark.
+  static const Color podiumSilver = Color(0xFFC7CBD1);
+
+  /// `#677079` — Plata del 2do puesto, estado light.
+  static const Color podiumSilverDark = Color(0xFF677079);
+
+  /// `#D9915A` — Bronce del 3er puesto, estado dark.
+  static const Color podiumBronze = Color(0xFFD9915A);
+
+  /// `#A05A1E` — Bronce del 3er puesto, estado light.
+  ///
+  /// Más rojizo que el `#8C5A2B` clásico: en light los tres metálicos caen
+  /// todos en la franja marrón y el bronce necesita separarse en tono del oro
+  /// oliva. Aun así el color NO es el único indicador — el numeral del puesto
+  /// se sigue leyendo al lado, así que un daltónico nunca depende del tono.
+  static const Color podiumBronzeDark = Color(0xFFA05A1E);
+
+  // ---------------------------------------------------------------------------
   // Colores neutros absolutos
   // ---------------------------------------------------------------------------
 
