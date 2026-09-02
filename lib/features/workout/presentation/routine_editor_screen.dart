@@ -3713,7 +3713,7 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
       .where((s) => s.isPresentInWeek(widget.week))
       .toList(growable: false);
 
-  List<Widget> _buildSlotRows(AppPalette palette) {
+  Widget _buildSlotRows(AppPalette palette) {
     final blocks = _blocks();
     // Qué bloques tienen ALGO que mostrar en la semana en curso. Los flags de
     // mover y de unir se calculan sobre ESTOS, no sobre el índice crudo: con
@@ -3744,56 +3744,78 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
         // so the int fields don't show stale values after the list shifts.
         final idx = visible.first.index;
         final slot = visible.first.slot;
-        rows.add(_SlotEditor(
+        rows.add(Padding(
           key: ObjectKey(slot),
-          slot: slot,
-          week: widget.week,
-          palette: palette,
-          onRemove: () => widget.onRemoveSlot(idx),
-          onChanged: widget.onSlotChanged,
-          onReplaceExercise: (ex) => widget.onReplaceExercise(slot, ex),
-          slotIndex: idx,
-          canMoveUp: canUp,
-          canMoveDown: canDown,
-          onMoveUp: () => _moveBlock(b, -1),
-          onMoveDown: () => _moveBlock(b, 1),
-          onCopyPrevious: _copyPreviousCallback(idx),
-          hasSlotError:
-              widget.slotIsValid != null ? !widget.slotIsValid!(slot) : false,
-          isTrainerMode: widget.isTrainerMode,
-          onMergeWithPrevious: widget.onMergeSlotWithPrevious == null
-              ? null
-              : () => widget.onMergeSlotWithPrevious!(idx),
-          onMergeWithNext: widget.onMergeSlotWithNext == null
-              ? null
-              : () => widget.onMergeSlotWithNext!(idx),
+          padding: const EdgeInsets.only(bottom: AppSpacing.s8),
+          child: _SlotEditor(
+            slot: slot,
+            week: widget.week,
+            palette: palette,
+            reorderIndex: posVisible,
+            onRemove: () => widget.onRemoveSlot(idx),
+            onChanged: widget.onSlotChanged,
+            onReplaceExercise: (ex) => widget.onReplaceExercise(slot, ex),
+            slotIndex: idx,
+            canMoveUp: canUp,
+            canMoveDown: canDown,
+            onMoveUp: () => _moveBlock(b, -1),
+            onMoveDown: () => _moveBlock(b, 1),
+            onCopyPrevious: _copyPreviousCallback(idx),
+            hasSlotError:
+                widget.slotIsValid != null ? !widget.slotIsValid!(slot) : false,
+            isTrainerMode: widget.isTrainerMode,
+            onMergeWithPrevious: widget.onMergeSlotWithPrevious == null
+                ? null
+                : () => widget.onMergeSlotWithPrevious!(idx),
+            onMergeWithNext: widget.onMergeSlotWithNext == null
+                ? null
+                : () => widget.onMergeSlotWithNext!(idx),
+          ),
         ));
       } else {
         // Superset block — the whole block moves as one unit. Only the
         // members present in the viewed week are rendered.
-        rows.add(_SupersetGroupCard(
-          groupSlots: visible,
-          week: widget.week,
-          palette: palette,
-          onRemoveSlot: widget.onRemoveSlot,
-          onChanged: widget.onSlotChanged,
-          onAddExercise: () =>
-              widget.onAddToGroup(block.first.slot.supersetGroup!),
-          onReplaceExercise: widget.onReplaceExercise,
-          onMoveSlotInGroup: widget.onMoveSlotInGroup,
-          canMoveUp: canUp,
-          canMoveDown: canDown,
-          onMoveUp: () => _moveBlock(b, -1),
-          onMoveDown: () => _moveBlock(b, 1),
-          onCopyPreviousFor: _copyPreviousCallback,
-          slotIsValid: widget.slotIsValid,
-          isTrainerMode: widget.isTrainerMode,
-          onUngroupSlot: widget.onUngroupSlot,
+        rows.add(Padding(
+          key: ObjectKey(block.first.slot),
+          padding: const EdgeInsets.only(bottom: AppSpacing.s8),
+          child: _SupersetGroupCard(
+            groupSlots: visible,
+            reorderIndex: posVisible,
+            week: widget.week,
+            palette: palette,
+            onRemoveSlot: widget.onRemoveSlot,
+            onChanged: widget.onSlotChanged,
+            onAddExercise: () =>
+                widget.onAddToGroup(block.first.slot.supersetGroup!),
+            onReplaceExercise: widget.onReplaceExercise,
+            onMoveSlotInGroup: widget.onMoveSlotInGroup,
+            canMoveUp: canUp,
+            canMoveDown: canDown,
+            onMoveUp: () => _moveBlock(b, -1),
+            onMoveDown: () => _moveBlock(b, 1),
+            onCopyPreviousFor: _copyPreviousCallback,
+            slotIsValid: widget.slotIsValid,
+            isTrainerMode: widget.isTrainerMode,
+            onUngroupSlot: widget.onUngroupSlot,
+          ),
         ));
       }
-      rows.add(const SizedBox(height: 8));
     }
-    return rows;
+    return ReorderableListView(
+      shrinkWrap: true,
+      primary: false,
+      physics: const NeverScrollableScrollPhysics(),
+      buildDefaultDragHandles: false,
+      onReorder: (oldIndex, newIndex) {
+        if (newIndex > oldIndex) newIndex--;
+        if (oldIndex == newIndex) return;
+        _moveBlock(
+          visiblesIdx[oldIndex],
+          visiblesIdx[newIndex] - visiblesIdx[oldIndex],
+        );
+      },
+      children: rows,
+    );
   }
 
   /// Groups the flat slot list into ordered blocks: a standalone slot is its
@@ -3821,9 +3843,9 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
     return blocks;
   }
 
-  /// Swaps block [blockIndex] with its neighbour in [dir] (-1 up / +1 down) and
-  /// flattens back to a slot list. No-op at the edges. A whole superset moves
-  /// as a single unit, so a reorder never splits a block.
+  /// Moves block [blockIndex] by [dir] positions and flattens back to a slot
+  /// list. The chevrons pass -1/+1; drag can cross several blocks at once.
+  /// A whole superset moves as a single unit, so a reorder never splits it.
   void _moveBlock(int blockIndex, int dir) {
     // Operates on the UNFILTERED block list — flattening a presence-filtered
     // list would silently drop the slots absent in the viewed week.
@@ -3841,14 +3863,8 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
   Widget build(BuildContext context) {
     final l10n = AppL10n.of(context);
     final palette = widget.palette;
-    return Container(
-      decoration: BoxDecoration(
-        color: palette.bgCard,
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-        // Sin borde de error: las señales quedaron en tres —celda, punto de la
-        // pestaña, pie— y ésta era una cuarta que pintaba la pantalla entera.
-        border: Border.all(color: palette.border),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.s8),
       child: Column(
         children: [
           // La cabecera del día se fue (revisión en device del 31/08).
@@ -3863,232 +3879,223 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
           // Renombrar y borrar el día se mudaron a la fila del botón RÁPIDO,
           // que ya ocupaba ese renglón. El punto de error no se mudó a ningún
           // lado: vive en la pestaña desde #865.
-          // Body
-          const Divider(height: 1),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
-            child: Column(
-              children: [
-                // Fila de acciones del día: el atajo a la izquierda, y
-                // renombrar/borrar a la derecha, donde antes había una
-                // cabecera entera para lo mismo.
-                if (_editingName)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.s8),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            key: const Key('day_name_editing_field'),
-                            controller: _nameController,
-                            focusNode: _nameFocus,
-                            textInputAction: TextInputAction.done,
-                            onSubmitted: (_) => _commitName(),
-                            onTap: () {},
-                            style: GoogleFonts.barlowCondensed(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 15,
-                              color: palette.textPrimary,
-                            ),
-                            decoration: InputDecoration(
-                              isDense: true,
-                              contentPadding: EdgeInsets.zero,
-                              border: InputBorder.none,
-                              hintText: l10n
-                                  .routineEditorDayName(widget.day.dayNumber),
-                              hintStyle: GoogleFonts.barlowCondensed(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 15,
-                                color: palette.textMuted,
-                              ),
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          key: Key(
-                              'day_name_commit_button_${widget.day.dayNumber}'),
-                          icon: Icon(TreinoIcon.check,
-                              size: 18, color: palette.accentText),
-                          tooltip: l10n.routineEditorEditDayNameA11y,
-                          onPressed: _commitName,
-                          constraints:
-                              const BoxConstraints(minWidth: 48, minHeight: 48),
-                          padding: EdgeInsets.zero,
-                        ),
-                      ],
-                    ),
-                  )
-                else
-                  Row(
-                    children: [
-                      if (widget.onQuickSearch != null &&
-                          widget.onQuickAdd != null)
-                        QuickEntryToggle(
-                          active: _quickEntryOpen,
-                          onTap: () => setState(() {
-                            if (_quickEntryOpen) {
-                              _cerrarEntradaRapida();
-                            } else {
-                              _quickEntryOpen = true;
-                            }
-                          }),
-                        ),
-                      const Spacer(),
-                      IconButton(
-                        key:
-                            Key('day_name_edit_button_${widget.day.dayNumber}'),
-                        icon: Icon(TreinoIcon.edit,
-                            size: 16, color: palette.textMuted),
-                        tooltip: l10n.routineEditorEditDayNameA11y,
-                        onPressed: _startEditing,
-                        constraints:
-                            const BoxConstraints(minWidth: 48, minHeight: 48),
-                        padding: EdgeInsets.zero,
+          // Fila de acciones del día: el atajo a la izquierda, y
+          // renombrar/borrar a la derecha, donde antes había una
+          // cabecera entera para lo mismo.
+          if (_editingName)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.s8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      key: const Key('day_name_editing_field'),
+                      controller: _nameController,
+                      focusNode: _nameFocus,
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) => _commitName(),
+                      onTap: () {},
+                      style: GoogleFonts.barlowCondensed(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                        color: palette.textPrimary,
                       ),
-                      if (widget.onRemoveDay != null)
-                        IconButton(
-                          key: Key('day_remove_button_${widget.day.dayNumber}'),
-                          icon: Icon(TreinoIcon.trash,
-                              size: 18, color: palette.textMuted),
-                          tooltip: l10n.routineEditorDeleteDayA11y,
-                          onPressed: widget.onRemoveDay,
-                          constraints:
-                              const BoxConstraints(minWidth: 48, minHeight: 48),
-                          padding: EdgeInsets.zero,
+                      decoration: InputDecoration(
+                        isDense: true,
+                        contentPadding: EdgeInsets.zero,
+                        border: InputBorder.none,
+                        hintText: l10n
+                            .routineEditorDayName(widget.day.dayNumber),
+                        hintStyle: GoogleFonts.barlowCondensed(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                          color: palette.textMuted,
                         ),
-                    ],
+                      ),
+                    ),
                   ),
+                  IconButton(
+                    key: Key(
+                        'day_name_commit_button_${widget.day.dayNumber}'),
+                    icon: Icon(TreinoIcon.check,
+                        size: 18, color: palette.accentText),
+                    tooltip: l10n.routineEditorEditDayNameA11y,
+                    onPressed: _commitName,
+                    constraints:
+                        const BoxConstraints(minWidth: 48, minHeight: 48),
+                    padding: EdgeInsets.zero,
+                  ),
+                ],
+              ),
+            )
+          else
+            Row(
+              children: [
                 if (widget.onQuickSearch != null &&
-                    widget.onQuickAdd != null) ...[
-                  if (_quickEntryOpen) ...[
-                    const SizedBox(height: AppSpacing.s8),
-                    ValueListenableBuilder<TextEditingValue>(
-                      valueListenable: _quickEntryCtrl,
-                      builder: (context, value, _) {
-                        final entry = parseQuickEntry(value.text);
-                        // El elegido se suelta si el nombre dejó de estar en
-                        // el texto: borrar el ejercicio para buscar otro tiene
-                        // que devolver la lista sin cerrar el panel.
-                        final elegido = _quickEntryElegido;
-                        final sigueElegido = elegido != null &&
-                            value.text
-                                .toLowerCase()
-                                .contains(elegido.name.toLowerCase());
-                        if (elegido != null && !sigueElegido) {
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            if (mounted) {
-                              setState(() => _quickEntryElegido = null);
-                            }
-                          });
-                        }
-                        return QuickEntryPanel(
-                          controller: _quickEntryCtrl,
-                          focusNode: _quickEntryFocus,
-                          entry: entry,
-                          selected: sigueElegido ? elegido : null,
-                          results: sigueElegido
-                              ? const []
-                              : widget.onQuickSearch!(entry.query),
-                          onSelect: (r) {
-                            // Autocompletar, NO agregar: el usuario viene a
-                            // escribir la prescripción después del nombre.
-                            //
-                            // Y se CONSERVA lo que ya escribió. El placeholder
-                            // del campo enseña `banca 4x10 60`: quien lo sigue
-                            // tipea todo junto y después toca el ejercicio, y
-                            // reemplazar el texto entero por el nombre le
-                            // borraba el `4x10 60` que acababa de escribir.
-                            //
-                            // Se quitan sólo las palabras que el parser
-                            // entendió como BÚSQUEDA; el resto —los números—
-                            // queda tal como se tipeó, sin normalizar.
-                            // Se quita UNA ocurrencia por palabra del nombre,
-                            // no todas: hay ejercicios del catálogo con
-                            // números adentro —"Landmine 180"— y escribir
-                            // `landmine 180 3x10 180` tiene el mismo token dos
-                            // veces, una como nombre y otra como peso. Con un
-                            // Set se borraban las dos y la prescripción perdía
-                            // el kilaje.
-                            final pendientes = entry.query
-                                .toLowerCase()
-                                .split(RegExp(r'\s+'))
-                                .where((p) => p.isNotEmpty)
-                                .toList();
-                            final resto =
-                                value.text.split(RegExp(r'\s+')).where((p) {
-                              if (p.isEmpty) return false;
-                              final i = pendientes.indexOf(p.toLowerCase());
-                              if (i < 0) return true;
-                              pendientes.removeAt(i);
-                              return false;
-                            }).join(' ');
-                            final texto = resto.isEmpty
-                                ? '${r.name} '
-                                : '${r.name} $resto';
-                            _quickEntryCtrl.value = TextEditingValue(
-                              text: texto,
-                              // Cursor AL FINAL, listo para seguir. Sin esto
-                              // el usuario tenía que volver a tocar el campo y
-                              // recolocar el cursor a mano.
-                              selection:
-                                  TextSelection.collapsed(offset: texto.length),
-                            );
-                            setState(() => _quickEntryElegido = r);
-                            // Y el foco de vuelta al campo: el tap sobre la
-                            // lista lo soltó, y con él se fue el teclado.
-                            _quickEntryFocus.requestFocus();
-                          },
-                          onConfirm: () {
-                            final r = _quickEntryElegido;
-                            if (r == null) return;
-                            widget.onQuickAdd!(r.id, entry);
-                            setState(_cerrarEntradaRapida);
-                          },
-                        );
-                      },
-                    ),
-                  ],
-                  const SizedBox(height: AppSpacing.s8),
-                ],
-                // Un día sin ejercicios era un acordeón que se abría
-                // y no mostraba nada, sin decir si estaba bien así.
-                if (_slotsVisibles.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.s12),
-                    child: EmptyDayState(
-                      title: l10n.routineEditorEmptyDayTitle,
-                      body: l10n.routineEditorEmptyDayBody,
-                    ),
-                  )
-                else
-                  ..._buildSlotRows(palette),
-                // Acciones del día. Eran dos TextButton apilados a ancho
-                // completo, cada uno con su padding heredado; ahora comparten
-                // fila, alto y radio.
-                DayActionButtons(
-                  exerciseLabel: l10n.routineEditorAddExercise,
-                  onAddExercise: widget.onAddSlot,
-                  supersetLabel:
-                      widget.allowSuperset ? l10n.coachEditorAddSuperset : null,
-                  onAddSuperset: widget.onAddSuperset,
-                ),
-                // Los atajos del ⋮ no los descubría nadie: el menú no se ve
-                // hasta que se toca.
-                if (_slotsVisibles.isNotEmpty) ...[
-                  const SizedBox(height: AppSpacing.s8),
-                  Text(
-                    l10n.routineEditorSlotMenuHint,
-                    key: const Key('slot_menu_hint'),
-                    style: GoogleFonts.barlow(
-                      fontWeight: FontWeight.w400,
-                      fontSize: 11,
-                      color: palette.textFaint,
-                    ),
+                    widget.onQuickAdd != null)
+                  QuickEntryToggle(
+                    active: _quickEntryOpen,
+                    onTap: () => setState(() {
+                      if (_quickEntryOpen) {
+                        _cerrarEntradaRapida();
+                      } else {
+                        _quickEntryOpen = true;
+                      }
+                    }),
                   ),
-                ],
+                const Spacer(),
+                IconButton(
+                  key:
+                      Key('day_name_edit_button_${widget.day.dayNumber}'),
+                  icon: Icon(TreinoIcon.edit,
+                      size: 16, color: palette.textMuted),
+                  tooltip: l10n.routineEditorEditDayNameA11y,
+                  onPressed: _startEditing,
+                  constraints:
+                      const BoxConstraints(minWidth: 48, minHeight: 48),
+                  padding: EdgeInsets.zero,
+                ),
+                if (widget.onRemoveDay != null)
+                  IconButton(
+                    key: Key('day_remove_button_${widget.day.dayNumber}'),
+                    icon: Icon(TreinoIcon.trash,
+                        size: 18, color: palette.textMuted),
+                    tooltip: l10n.routineEditorDeleteDayA11y,
+                    onPressed: widget.onRemoveDay,
+                    constraints:
+                        const BoxConstraints(minWidth: 48, minHeight: 48),
+                    padding: EdgeInsets.zero,
+                  ),
               ],
             ),
+          if (widget.onQuickSearch != null &&
+              widget.onQuickAdd != null) ...[
+            if (_quickEntryOpen) ...[
+              const SizedBox(height: AppSpacing.s8),
+              ValueListenableBuilder<TextEditingValue>(
+                valueListenable: _quickEntryCtrl,
+                builder: (context, value, _) {
+                  final entry = parseQuickEntry(value.text);
+                  // El elegido se suelta si el nombre dejó de estar en
+                  // el texto: borrar el ejercicio para buscar otro tiene
+                  // que devolver la lista sin cerrar el panel.
+                  final elegido = _quickEntryElegido;
+                  final sigueElegido = elegido != null &&
+                      value.text
+                          .toLowerCase()
+                          .contains(elegido.name.toLowerCase());
+                  if (elegido != null && !sigueElegido) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) {
+                        setState(() => _quickEntryElegido = null);
+                      }
+                    });
+                  }
+                  return QuickEntryPanel(
+                    controller: _quickEntryCtrl,
+                    focusNode: _quickEntryFocus,
+                    entry: entry,
+                    selected: sigueElegido ? elegido : null,
+                    results: sigueElegido
+                        ? const []
+                        : widget.onQuickSearch!(entry.query),
+                    onSelect: (r) {
+                      // Autocompletar, NO agregar: el usuario viene a
+                      // escribir la prescripción después del nombre.
+                      //
+                      // Y se CONSERVA lo que ya escribió. El placeholder
+                      // del campo enseña `banca 4x10 60`: quien lo sigue
+                      // tipea todo junto y después toca el ejercicio, y
+                      // reemplazar el texto entero por el nombre le
+                      // borraba el `4x10 60` que acababa de escribir.
+                      //
+                      // Se quitan sólo las palabras que el parser
+                      // entendió como BÚSQUEDA; el resto —los números—
+                      // queda tal como se tipeó, sin normalizar.
+                      // Se quita UNA ocurrencia por palabra del nombre,
+                      // no todas: hay ejercicios del catálogo con
+                      // números adentro —"Landmine 180"— y escribir
+                      // `landmine 180 3x10 180` tiene el mismo token dos
+                      // veces, una como nombre y otra como peso. Con un
+                      // Set se borraban las dos y la prescripción perdía
+                      // el kilaje.
+                      final pendientes = entry.query
+                          .toLowerCase()
+                          .split(RegExp(r'\s+'))
+                          .where((p) => p.isNotEmpty)
+                          .toList();
+                      final resto =
+                          value.text.split(RegExp(r'\s+')).where((p) {
+                        if (p.isEmpty) return false;
+                        final i = pendientes.indexOf(p.toLowerCase());
+                        if (i < 0) return true;
+                        pendientes.removeAt(i);
+                        return false;
+                      }).join(' ');
+                      final texto = resto.isEmpty
+                          ? '${r.name} '
+                          : '${r.name} $resto';
+                      _quickEntryCtrl.value = TextEditingValue(
+                        text: texto,
+                        // Cursor AL FINAL, listo para seguir. Sin esto
+                        // el usuario tenía que volver a tocar el campo y
+                        // recolocar el cursor a mano.
+                        selection:
+                            TextSelection.collapsed(offset: texto.length),
+                      );
+                      setState(() => _quickEntryElegido = r);
+                      // Y el foco de vuelta al campo: el tap sobre la
+                      // lista lo soltó, y con él se fue el teclado.
+                      _quickEntryFocus.requestFocus();
+                    },
+                    onConfirm: () {
+                      final r = _quickEntryElegido;
+                      if (r == null) return;
+                      widget.onQuickAdd!(r.id, entry);
+                      setState(_cerrarEntradaRapida);
+                    },
+                  );
+                },
+              ),
+            ],
+            const SizedBox(height: AppSpacing.s8),
+          ],
+          // Un día sin ejercicios era un acordeón que se abría
+          // y no mostraba nada, sin decir si estaba bien así.
+          if (_slotsVisibles.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.s12),
+              child: EmptyDayState(
+                title: l10n.routineEditorEmptyDayTitle,
+                body: l10n.routineEditorEmptyDayBody,
+              ),
+            )
+          else
+            _buildSlotRows(palette),
+          // Acciones del día. Eran dos TextButton apilados a ancho
+          // completo, cada uno con su padding heredado; ahora comparten
+          // fila, alto y radio.
+          DayActionButtons(
+            exerciseLabel: l10n.routineEditorAddExercise,
+            onAddExercise: widget.onAddSlot,
+            supersetLabel:
+                widget.allowSuperset ? l10n.coachEditorAddSuperset : null,
+            onAddSuperset: widget.onAddSuperset,
           ),
+          // Los atajos del ⋮ no los descubría nadie: el menú no se ve
+          // hasta que se toca.
+          if (_slotsVisibles.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.s8),
+            Text(
+              l10n.routineEditorSlotMenuHint,
+              key: const Key('slot_menu_hint'),
+              style: GoogleFonts.barlow(
+                fontWeight: FontWeight.w400,
+                fontSize: 11,
+                color: palette.textFaint,
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -4110,6 +4117,7 @@ class _SupersetGroupCard extends StatelessWidget {
     required this.onAddExercise,
     required this.onReplaceExercise,
     required this.onMoveSlotInGroup,
+    required this.reorderIndex,
     this.canMoveUp = false,
     this.canMoveDown = false,
     this.onMoveUp,
@@ -4131,6 +4139,7 @@ class _SupersetGroupCard extends StatelessWidget {
   final void Function(_EditableSlot slot, Exercise newExercise)
       onReplaceExercise;
   final void Function(int absIndex, int dir) onMoveSlotInGroup;
+  final int reorderIndex;
 
   /// Block-level reorder controls — the whole superset moves as one unit.
   final bool canMoveUp;
@@ -4157,6 +4166,7 @@ class _SupersetGroupCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return SupersetBlock(
       count: groupSlots.length,
+      reorderIndex: reorderIndex,
       trailing: (onMoveUp != null || onMoveDown != null)
           ? _MoveButtons(
               palette: palette,
@@ -4183,42 +4193,65 @@ class _SupersetGroupCard extends StatelessWidget {
         ),
       ),
       children: [
-        for (var mi = 0; mi < groupSlots.length; mi++) ...[
-          _SlotEditor(
-            key: ObjectKey(groupSlots[mi].slot),
-            slot: groupSlots[mi].slot,
-            week: week,
-            palette: palette,
-            supersetPosition: mi,
-            // El índice ORIGINAL, que es lo que da la key del menú. Sin esto
-            // el ⋮ de un miembro de superserie no tenía key y no se podía
-            // alcanzar desde un test — ni referenciar desde ningún lado.
-            slotIndex: groupSlots[mi].index,
-            onRemove: () => onRemoveSlot(groupSlots[mi].index),
-            onChanged: onChanged,
-            onReplaceExercise: (ex) =>
-                onReplaceExercise(groupSlots[mi].slot, ex),
-            canMoveUp: mi > 0,
-            canMoveDown: mi < groupSlots.length - 1,
-            // Each record carries its ORIGINAL flat index — required now
-            // that absent-in-week members are filtered out of groupSlots.
-            onMoveUp: mi > 0
-                ? () => onMoveSlotInGroup(groupSlots[mi].index, -1)
-                : null,
-            onMoveDown: mi < groupSlots.length - 1
-                ? () => onMoveSlotInGroup(groupSlots[mi].index, 1)
-                : null,
-            onCopyPrevious: onCopyPreviousFor?.call(groupSlots[mi].index),
-            hasSlotError: slotIsValid != null
-                ? !slotIsValid!(groupSlots[mi].slot)
-                : false,
-            isTrainerMode: isTrainerMode,
-            onUngroup: onUngroupSlot == null
-                ? null
-                : () => onUngroupSlot!(groupSlots[mi].index),
-          ),
-          if (mi < groupSlots.length - 1) const SizedBox(height: AppSpacing.s8),
-        ],
+        ReorderableListView(
+          shrinkWrap: true,
+          primary: false,
+          physics: const NeverScrollableScrollPhysics(),
+          buildDefaultDragHandles: false,
+          onReorder: (oldIndex, newIndex) {
+            if (newIndex > oldIndex) newIndex--;
+            if (oldIndex == newIndex) return;
+            final direction = newIndex > oldIndex ? 1 : -1;
+            var absoluteIndex = groupSlots[oldIndex].index;
+            final targetIndex = groupSlots[newIndex].index;
+            while (absoluteIndex != targetIndex) {
+              onMoveSlotInGroup(absoluteIndex, direction);
+              absoluteIndex += direction;
+            }
+          },
+          children: [
+            for (var mi = 0; mi < groupSlots.length; mi++)
+              Padding(
+                key: ObjectKey(groupSlots[mi].slot),
+                padding: EdgeInsets.only(
+                  bottom: mi < groupSlots.length - 1 ? AppSpacing.s8 : 0,
+                ),
+                child: _SlotEditor(
+                  slot: groupSlots[mi].slot,
+                  week: week,
+                  palette: palette,
+                  reorderIndex: mi,
+                  supersetPosition: mi,
+                  // El índice ORIGINAL, que es lo que da la key del menú. Sin esto
+                  // el ⋮ de un miembro de superserie no tenía key y no se podía
+                  // alcanzar desde un test — ni referenciar desde ningún lado.
+                  slotIndex: groupSlots[mi].index,
+                  onRemove: () => onRemoveSlot(groupSlots[mi].index),
+                  onChanged: onChanged,
+                  onReplaceExercise: (ex) =>
+                      onReplaceExercise(groupSlots[mi].slot, ex),
+                  canMoveUp: mi > 0,
+                  canMoveDown: mi < groupSlots.length - 1,
+                  // Each record carries its ORIGINAL flat index — required now
+                  // that absent-in-week members are filtered out of groupSlots.
+                  onMoveUp: mi > 0
+                      ? () => onMoveSlotInGroup(groupSlots[mi].index, -1)
+                      : null,
+                  onMoveDown: mi < groupSlots.length - 1
+                      ? () => onMoveSlotInGroup(groupSlots[mi].index, 1)
+                      : null,
+                  onCopyPrevious: onCopyPreviousFor?.call(groupSlots[mi].index),
+                  hasSlotError: slotIsValid != null
+                      ? !slotIsValid!(groupSlots[mi].slot)
+                      : false,
+                  isTrainerMode: isTrainerMode,
+                  onUngroup: onUngroupSlot == null
+                      ? null
+                      : () => onUngroupSlot!(groupSlots[mi].index),
+                ),
+              ),
+          ],
+        ),
       ],
     );
   }
@@ -4277,7 +4310,6 @@ class _MoveButtons extends StatelessWidget {
 
 class _SlotEditor extends StatefulWidget {
   const _SlotEditor({
-    super.key,
     required this.slot,
     required this.week,
     required this.palette,
@@ -4296,6 +4328,7 @@ class _SlotEditor extends StatefulWidget {
     this.onMergeWithPrevious,
     this.onMergeWithNext,
     this.onUngroup,
+    this.reorderIndex,
   });
 
   final _EditableSlot slot;
@@ -4312,6 +4345,9 @@ class _SlotEditor extends StatefulWidget {
   /// Flat index of this slot in its day — used to key the menu button so
   /// tests can find it via `Key('slot_menu_button_$slotIndex')`.
   final int? slotIndex;
+
+  /// Posición en el reorderable exterior (suelto) o interior (superserie).
+  final int? reorderIndex;
 
   /// Reorder controls. When both callbacks are null no move buttons render.
   final bool canMoveUp;
@@ -4509,6 +4545,10 @@ class _SlotEditorState extends State<_SlotEditor> {
       expanded: _expanded,
       hasError: hasMissingPrescription,
       supersetPosition: widget.supersetPosition,
+      reorderIndex: widget.reorderIndex,
+      dragHandleKey: widget.slotIndex == null
+          ? null
+          : Key('slot_drag_handle_${widget.slotIndex}'),
       // Una card con problemas TAMBIÉN se puede colapsar: el resumen colapsado
       // sigue diciendo cuántos sets están sin completar. Trabar la cabecera
       // para "proteger" al usuario sólo hace que el tap no responda y parezca
