@@ -256,7 +256,7 @@ jobs:
 
       - name: Subir los diffs de imagen si el gate rompio
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: visual-gate-failures
           path: test/visual_gate/failures/
@@ -286,7 +286,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Set up Swift
-        uses: swift-actions/setup-swift@v2
+        uses: swift-actions/setup-swift@v3
 
       - name: Run Swift conformance
         run: bash conformance/run_swift.sh
@@ -311,7 +311,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Set up Swift
-        uses: swift-actions/setup-swift@v2
+        uses: swift-actions/setup-swift@v3
 
       # Que el entitlement de HealthKit, su enganche a las TRES configuraciones
       # del target y los textos de permiso sigan en su lugar.
@@ -436,7 +436,7 @@ jobs:
 
       # El Emulator Suite de firebase-tools 15+ no arranca sin Java 21+.
       - name: Set up Java 21
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '21'
@@ -506,7 +506,7 @@ jobs:
 
       # El Emulator Suite de firebase-tools 15+ no arranca sin Java 21+.
       - name: Set up Java 21
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '21'

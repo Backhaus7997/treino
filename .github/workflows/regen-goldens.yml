@@ -130,7 +130,7 @@ jobs:
         # También cuando el commit no cambió nada: sirve para mirar el
         # resultado sin clonar la rama.
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: goldens-coach-hub
           path: test/visual_gate/goldens/
