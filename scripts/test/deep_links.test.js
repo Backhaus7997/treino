@@ -166,6 +166,44 @@ test('el redirect del profe no apunta adentro de /abrir', () => {
   assert.ok(!m[1].includes(PREFIJO), `El redirect entra en ${PREFIJO}: ${m[1]}`);
 });
 
+// ── El redirect del profe, en el servidor ─────────────────────────────────
+
+test('vercel: /abrir/profe redirige desde el SERVIDOR', () => {
+  const vercel = leerJson('vercel.json');
+  const r = (vercel.redirects || []).find((x) => x.source === `${PREFIJO}/profe`);
+
+  // El meta-refresh de la pagina redirige DESPUES de que el navegador la
+  // dibuja, asi que se ve un parpadeo del boton antes de irse. Un redirect de
+  // servidor evita que el HTML llegue siquiera a cargarse.
+  //
+  // No rompe el App Link: el sistema operativo matchea la URL que el usuario
+  // TOCA contra el intent-filter, antes de que salga ningun pedido HTTP. Esto
+  // solo lo ve quien no tiene la app instalada.
+  assert.ok(r, `Falta el redirect de ${PREFIJO}/profe en vercel.json`);
+  assert.ok(!r.destination.includes(PREFIJO),
+    `El redirect entra en ${PREFIJO} y armaria un bucle: ${r.destination}`);
+});
+
+test('vercel: el redirect del profe no se come el del dominio viejo', () => {
+  const vercel = leerJson('vercel.json');
+  const viejo = (vercel.redirects || []).find((x) => x.source === '/:path*');
+
+  // Ese redirect manda `treino-coach-hub.vercel.app` al dominio propio, y su
+  // `has` de host es lo unico que lo separa de un bucle infinito sobre TODO el
+  // sitio. Agregar redirects arriba no puede haberlo tocado.
+  assert.ok(viejo, 'Desaparecio el redirect del .vercel.app');
+  assert.ok(Array.isArray(viejo.has) && viejo.has[0].type === 'host',
+    'El redirect del .vercel.app perdio su condicion de host: es un bucle');
+});
+
+test('vercel: el ALUMNO no tiene redirect de servidor', () => {
+  const vercel = leerJson('vercel.json');
+  const r = (vercel.redirects || []).find((x) => x.source === `${PREFIJO}/alumno`);
+
+  // Misma asimetria que en el HTML: el atleta no tiene equivalente web.
+  assert.strictEqual(r, undefined);
+});
+
 // ── El servidor ───────────────────────────────────────────────────────────
 
 test('vercel: los .well-known se sirven antes del catch-all del SPA', () => {
