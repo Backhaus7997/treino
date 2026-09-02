@@ -9,6 +9,24 @@ import 'superset_block.dart';
 /// Relleno del agarre cuando la card es miembro de una superserie, sobre 255.
 const int _kAgarreSuperserie = 40;
 
+/// Ancho del área que agarra el ejercicio para arrastrarlo, en dp.
+///
+/// Bien por encima del mínimo de 44: el agarre se toca en movimiento, con el
+/// pulgar, mirando otra parte de la pantalla. El ancho es lo BARATO de agrandar
+/// —desde el rediseño de ancho completo sobran ~62 dp— así que el target crece
+/// por acá y no por el alto.
+const double _kLadoAgarre = 56;
+
+/// Alto del agarre, en dp.
+///
+/// **48 y no más**, y no es una elección estética: la fila de la cabecera mide
+/// exactamente el alto de su hijo más alto, que es el botón ⋮ con su
+/// `minHeight: 48`. Un agarre más alto pasa a ser él el que manda y CADA card
+/// engorda, en la única pantalla donde el alto es el recurso escaso (ver la
+/// nota de la cabecera del día). La primera versión de esto puso 52 "porque el
+/// header ya era más alto" — no lo era, medía 44. Lo fija un test.
+const double _kAltoAgarre = 48;
+
 /// Collapsible presentation shell for one exercise in the routine editor.
 class ExerciseCard extends StatelessWidget {
   const ExerciseCard({
@@ -51,10 +69,13 @@ class ExerciseCard extends StatelessWidget {
 
     final enSuperserie = supersetPosition != null;
 
+    // El target crece a lo ANCHO y no a lo alto. Por qué, en los dartdocs de
+    // [_kLadoAgarre] y [_kAltoAgarre] — el alto está atado al del ⋮ y no es
+    // negociable sin engordar cada card de la pantalla.
     final handle = SizedBox(
       key: dragHandleKey,
-      width: 44,
-      height: 44,
+      width: _kLadoAgarre,
+      height: _kAltoAgarre,
       child: Center(
         child: Container(
           decoration: BoxDecoration(

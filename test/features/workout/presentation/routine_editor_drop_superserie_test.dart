@@ -340,4 +340,88 @@ void main() {
       [7, 7, 7, 7],
     );
   });
+
+  testWidgets('el agarre es un target grande y NO define el alto de la card',
+      (tester) async {
+    await _pump(tester, _routine('target', [_slot('a')]));
+
+    final agarre = tester.getSize(find.byKey(const Key('slot_drag_handle_0')));
+
+    // Ancho: bien arriba del mínimo de 44. Es lo barato de agrandar.
+    expect(agarre.width, greaterThanOrEqualTo(56));
+
+    // Alto: clavado al del ⋮. La fila mide lo que mide su hijo más alto, así
+    // que un agarre más alto que 48 engorda CADA card de la pantalla. La
+    // primera versión de esto puso 52 creyendo que la cabecera ya era más
+    // alta; medía 44, y la card crecía. De ahí este test.
+    expect(
+      agarre.height,
+      lessThanOrEqualTo(48),
+      reason: 'el agarre pasó a ser lo más alto de la fila y engorda la card',
+    );
+
+    // Y el target igual es sustancialmente más grande que el mínimo.
+    expect(agarre.width * agarre.height, greaterThan(44 * 44 * 1.3));
+  });
+
+  testWidgets('arrastrar un miembro FUERA del bloque lo saca de la superserie',
+      (tester) async {
+    final repo = await _pump(
+      tester,
+      _routine('sacar', [
+        _slot('a', group: 7),
+        _slot('b', group: 7),
+        _slot('c', group: 7),
+        _slot('d'),
+      ]),
+    );
+    final superset = find.byType(SupersetBlock);
+    final rect = tester.getRect(superset);
+
+    final gesto = await _arrastrarHasta(
+      tester,
+      find.byKey(const Key('slot_drag_handle_0')),
+      () => Offset(rect.center.dx, rect.bottom + 80),
+    );
+    await gesto.up();
+    await tester.pumpAndSettle();
+
+    final saved = await _guardar(tester, repo);
+    // 'a' sale del grupo; los otros dos siguen juntos.
+    final porId = {
+      for (final s in saved.days.single.slots) s.exerciseId: s.supersetGroup,
+    };
+    expect(porId['a'], isNull, reason: 'salió del grupo');
+    expect(porId['b'], 7);
+    expect(porId['c'], 7);
+  });
+
+  testWidgets('arrastrar un miembro DENTRO del bloque sigue reordenando',
+      (tester) async {
+    final repo = await _pump(
+      tester,
+      _routine('adentro', [
+        _slot('a', group: 7),
+        _slot('b', group: 7),
+        _slot('c', group: 7),
+      ]),
+    );
+
+    // Del primer miembro al último, sin salir nunca del bloque.
+    final gesto = await _arrastrarHasta(
+      tester,
+      find.byKey(const Key('slot_drag_handle_0')),
+      () => tester.getCenter(find.byKey(const Key('slot_drag_handle_2'))),
+    );
+    await gesto.up();
+    await tester.pumpAndSettle();
+
+    final saved = await _guardar(tester, repo);
+    // Nadie se separó: moverse adentro no es salirse.
+    expect(
+      saved.days.single.slots.map((s) => s.supersetGroup),
+      [7, 7, 7],
+      reason: 'reordenar dentro del grupo no puede desarmarlo',
+    );
+  });
 }

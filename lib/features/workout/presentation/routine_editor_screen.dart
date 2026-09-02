@@ -3585,6 +3585,27 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
   /// reorder SIGUIENTE.
   bool _unionAplicada = false;
 
+  /// Cuánto tiene que salirse el dedo del bloque para que soltar signifique
+  /// SACAR al miembro del grupo, en dp.
+  ///
+  /// No es cero: en el borde exacto el dedo tiembla y el gesto quedaría a
+  /// suerte. Es el mismo criterio que el 60% central de la unión — entrar y
+  /// salir tienen que ser intenciones, no accidentes de un píxel.
+  static const double _kMargenParaSacar = 16;
+
+  /// Miembro de superserie en arrastre dentro de su grupo, o null.
+  int? _draggedMemberAbsIndex;
+
+  /// El grupo del que ese miembro saldría. Necesario para ubicar el bloque.
+  int? _draggedMemberGroup;
+
+  /// Que el dedo salió del bloque con margen suficiente: al soltar, se separa.
+  bool _miembroFueraDelBloque = false;
+
+  /// Gemelo de [_unionAplicada] para la separación. Misma razón: el `onReorder`
+  /// del reorderable ANIDADO puede no llegar nunca.
+  bool _separacionAplicada = false;
+
   /// Si el panel de entrada rápida está abierto. Presentación local pura: no
   /// sobrevive a cerrar el día ni viaja al modelo.
   bool _quickEntryOpen = false;
@@ -3747,7 +3768,29 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
           ? null
           : () => _copyPrescriptionFromPrevious(absIndex);
 
+  /// Rect global del bloque de la superserie [group], o null si no está montado.
+  Rect? _rectDelBloque(int group) {
+    for (final entry in _supersetHitTestKeys.entries) {
+      if (entry.key.supersetGroup != group) continue;
+      final ro = entry.value.currentContext?.findRenderObject();
+      if (ro is! RenderBox || !ro.hasSize) continue;
+      return ro.localToGlobal(Offset.zero) & ro.size;
+    }
+    return null;
+  }
+
   void _actualizarDestinoDeUnion(PointerMoveEvent event) {
+    // Rama de SALIDA: hay un miembro en arrastre dentro de su grupo.
+    final memberGroup = _draggedMemberGroup;
+    if (memberGroup != null) {
+      final rect = _rectDelBloque(memberGroup);
+      final fuera = rect == null || !rect.inflate(_kMargenParaSacar).contains(event.position);
+      if (fuera != _miembroFueraDelBloque) {
+        setState(() => _miembroFueraDelBloque = fuera);
+      }
+      return;
+    }
+
     if (_draggedStandaloneAbsIndex == null) return;
 
     int? targetGroup;
@@ -3823,13 +3866,53 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
 
   void _cancelarReorder(PointerCancelEvent _) {
     if (_draggedStandaloneAbsIndex == null &&
-        _highlightedSupersetGroup == null) {
+        _highlightedSupersetGroup == null &&
+        _draggedMemberGroup == null &&
+        !_miembroFueraDelBloque) {
       return;
     }
     setState(() {
       _draggedStandaloneAbsIndex = null;
       _highlightedSupersetGroup = null;
+      _draggedMemberAbsIndex = null;
+      _draggedMemberGroup = null;
+      _miembroFueraDelBloque = false;
     });
+  }
+
+  /// Arranca el arrastre de un MIEMBRO dentro de su superserie.
+  void _iniciarArrastreDeMiembro(int absIndex, int group) {
+    setState(() {
+      _draggedMemberAbsIndex = absIndex;
+      _draggedMemberGroup = group;
+      _miembroFueraDelBloque = false;
+      _separacionAplicada = false;
+    });
+  }
+
+  /// Al soltar un miembro: si el dedo quedó fuera del bloque, lo SACA del grupo
+  /// en vez de reordenarlo adentro.
+  ///
+  /// La simetría con la unión es deliberada. Sin esto, arrastrar servía para
+  /// meter un ejercicio en una superserie y no para sacarlo: una puerta de
+  /// entrada sin puerta de salida, y el único camino afuera era el ⋮, que no
+  /// descubre nadie. Igual que la unión, se aplica en `onReorderEnd` porque
+  /// `onReorder` no llega cuando el índice no cambió.
+  void _terminarArrastreDeMiembro(int _) {
+    final absIndex = _draggedMemberAbsIndex;
+    final fuera = _miembroFueraDelBloque;
+    if (absIndex == null) return;
+
+    setState(() {
+      _draggedMemberAbsIndex = null;
+      _draggedMemberGroup = null;
+      _miembroFueraDelBloque = false;
+    });
+
+    if (fuera) {
+      _separacionAplicada = true;
+      widget.onUngroupSlot?.call(absIndex);
+    }
   }
 
   /// Walks the slot list and emits either a standalone [_SlotEditor] or a
@@ -3931,6 +4014,9 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
             onUngroupSlot: widget.onUngroupSlot,
             resaltadoParaUnir:
                 _highlightedSupersetGroup == block.first.slot.supersetGroup,
+            onMemberDragStart: _iniciarArrastreDeMiembro,
+            onMemberDragEnd: _terminarArrastreDeMiembro,
+            separacionAplicada: () => _separacionAplicada,
           ),
         ));
       }
@@ -4271,6 +4357,9 @@ class _SupersetGroupCard extends StatelessWidget {
     this.isTrainerMode = false,
     this.onUngroupSlot,
     this.resaltadoParaUnir = false,
+    required this.onMemberDragStart,
+    required this.onMemberDragEnd,
+    required this.separacionAplicada,
   });
 
   final GlobalKey hitTestKey;
@@ -4311,6 +4400,16 @@ class _SupersetGroupCard extends StatelessWidget {
   /// Indica que el puntero está en la zona central de absorción del bloque.
   final bool resaltadoParaUnir;
 
+  /// Avisan al día que arrancó/terminó el arrastre de un MIEMBRO, para que
+  /// pueda decidir si al soltar hay que sacarlo del grupo. El hit-test contra
+  /// el rect del bloque vive arriba, que es donde están las GlobalKeys.
+  final void Function(int absIndex, int group) onMemberDragStart;
+  final void Function(int mi) onMemberDragEnd;
+
+  /// True cuando el drop ya se resolvió como separación: el reorder interno
+  /// queda anulado.
+  final bool Function() separacionAplicada;
+
   @override
   Widget build(BuildContext context) {
     return SupersetBlock(
@@ -4349,7 +4448,15 @@ class _SupersetGroupCard extends StatelessWidget {
           primary: false,
           physics: const NeverScrollableScrollPhysics(),
           buildDefaultDragHandles: false,
+          onReorderStart: (mi) => onMemberDragStart(
+            groupSlots[mi].index,
+            groupSlots[mi].slot.supersetGroup!,
+          ),
+          onReorderEnd: onMemberDragEnd,
           onReorder: (oldIndex, newIndex) {
+            // Si el miembro salió del bloque, ya lo separó `onReorderEnd`: no
+            // hay nada que reordenar adentro de un grupo que este slot dejó.
+            if (separacionAplicada()) return;
             if (newIndex > oldIndex) newIndex--;
             if (oldIndex == newIndex) return;
             final direction = newIndex > oldIndex ? 1 : -1;
