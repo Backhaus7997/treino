@@ -107,24 +107,6 @@
       ]
     },
     {
-      "collectionGroup": "routines",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "assignedBy",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "source",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
       "collectionGroup": "commercialPlans",
       "queryScope": "COLLECTION",
       "fields": [
