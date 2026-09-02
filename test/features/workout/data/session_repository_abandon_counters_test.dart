@@ -43,6 +43,7 @@ void main() {
       totalVolumeKg: 0.0,
       durationMin: 0,
       wasFullyCompleted: false,
+      weeklyTarget: 1,
     );
 
     final profileSnap =
@@ -51,8 +52,10 @@ void main() {
     final data = profileSnap.data()!;
     // Abandoned session must NOT count as a workout.
     expect(data['workoutsCount'], equals(0));
-    // Abandoned session must NOT extend the streak.
-    expect(data['rachaSemanas'], equals(0));
+    // La sesión abandonada no puede hacer que la semana cumpla el objetivo,
+    // así que `finish` ni siquiera escribe el campo — la racha del atleta
+    // queda intacta en vez de pisarse con un valor recalculado.
+    expect(data.containsKey('rachaSemanas'), isFalse);
   });
 
   test(
@@ -72,6 +75,7 @@ void main() {
       totalVolumeKg: 100.0,
       durationMin: 60,
       wasFullyCompleted: true,
+      weeklyTarget: 1,
     );
 
     // One abandoned session.
@@ -88,6 +92,7 @@ void main() {
       totalVolumeKg: 0.0,
       durationMin: 0,
       wasFullyCompleted: false,
+      weeklyTarget: 1,
     );
 
     final profileSnap =

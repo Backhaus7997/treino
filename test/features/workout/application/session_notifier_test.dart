@@ -465,6 +465,7 @@ void main() {
             sessionId: any(named: 'sessionId'),
             finishedAt: any(named: 'finishedAt'),
             wasFullyCompleted: any(named: 'wasFullyCompleted'),
+            weeklyTarget: any(named: 'weeklyTarget'),
             totalVolumeKg: any(named: 'totalVolumeKg'),
             durationMin: any(named: 'durationMin'),
           )).thenAnswer((_) async {});
@@ -492,6 +493,7 @@ void main() {
             wasFullyCompleted: true,
             totalVolumeKg: any(named: 'totalVolumeKg'),
             durationMin: 40,
+            weeklyTarget: any(named: 'weeklyTarget'),
           )).called(1);
     });
   });
@@ -611,6 +613,7 @@ void main() {
             totalVolumeKg: any(named: 'totalVolumeKg'),
             durationMin: any(named: 'durationMin'),
             wasFullyCompleted: any(named: 'wasFullyCompleted'),
+            weeklyTarget: any(named: 'weeklyTarget'),
           )).thenAnswer((_) async {});
 
       final (:container, :init) = await setupFresh(repo: repo);
@@ -713,6 +716,7 @@ void main() {
             totalVolumeKg: any(named: 'totalVolumeKg'),
             durationMin: any(named: 'durationMin'),
             wasFullyCompleted: any(named: 'wasFullyCompleted'),
+            weeklyTarget: any(named: 'weeklyTarget'),
           )).thenAnswer((_) async {});
 
       final routine = makeRoutine();
@@ -733,6 +737,7 @@ void main() {
             totalVolumeKg: any(named: 'totalVolumeKg'),
             durationMin: any(named: 'durationMin'),
             wasFullyCompleted: captureAny(named: 'wasFullyCompleted'),
+            weeklyTarget: any(named: 'weeklyTarget'),
           )).captured;
       expect(captured.first, isFalse);
     });
@@ -755,6 +760,7 @@ void main() {
             totalVolumeKg: any(named: 'totalVolumeKg'),
             durationMin: any(named: 'durationMin'),
             wasFullyCompleted: any(named: 'wasFullyCompleted'),
+            weeklyTarget: any(named: 'weeklyTarget'),
           )).thenAnswer((_) async {});
 
       final routine = makeRoutine();
@@ -775,6 +781,7 @@ void main() {
             totalVolumeKg: any(named: 'totalVolumeKg'),
             durationMin: any(named: 'durationMin'),
             wasFullyCompleted: any(named: 'wasFullyCompleted'),
+            weeklyTarget: any(named: 'weeklyTarget'),
           )).called(1);
     });
 
@@ -798,6 +805,7 @@ void main() {
             totalVolumeKg: any(named: 'totalVolumeKg'),
             durationMin: any(named: 'durationMin'),
             wasFullyCompleted: any(named: 'wasFullyCompleted'),
+            weeklyTarget: any(named: 'weeklyTarget'),
           )).thenAnswer((_) async {});
       when(() => repo.listByUid('u1', limit: any(named: 'limit')))
           .thenAnswer((_) async => <Session>[]);
@@ -856,6 +864,7 @@ void main() {
             totalVolumeKg: any(named: 'totalVolumeKg'),
             durationMin: any(named: 'durationMin'),
             wasFullyCompleted: any(named: 'wasFullyCompleted'),
+            weeklyTarget: any(named: 'weeklyTarget'),
           )).thenAnswer((_) async {});
 
       final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
@@ -876,6 +885,7 @@ void main() {
             totalVolumeKg: any(named: 'totalVolumeKg'),
             durationMin: any(named: 'durationMin'),
             wasFullyCompleted: captureAny(named: 'wasFullyCompleted'),
+            weeklyTarget: any(named: 'weeklyTarget'),
           )).captured;
       expect(captured.first, isTrue);
     });
@@ -941,6 +951,7 @@ void main() {
             totalVolumeKg: any(named: 'totalVolumeKg'),
             durationMin: any(named: 'durationMin'),
             wasFullyCompleted: any(named: 'wasFullyCompleted'),
+            weeklyTarget: any(named: 'weeklyTarget'),
           )).thenAnswer((_) async {});
       // sessionsByUidProvider's fetch — counted to prove the invalidation
       // forces a re-fetch.

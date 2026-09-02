@@ -20,6 +20,16 @@ import '../../../core/utils/argentina_time.dart';
 /// - Sello de ESTA semana → el valor es de esta semana. Correcto.
 /// - Sello de la semana PASADA → el atleta todavía no entrenó esta semana,
 ///   pero la semana en curso no rompe nada. El valor sigue siendo el correcto.
+///
+///   ⚠️ Esto vale por UN INVARIANTE del camino de escritura, no por sí solo:
+///   `SessionRepository.finish` persiste `rachaSemanas` **sólo cuando la
+///   semana en curso ya cumplió el objetivo**, así que un sello de la semana
+///   pasada garantiza que esa semana CONTÓ. Sin el invariante el filtro
+///   miente: un atleta con objetivo 3 que hace una sola sesión en la semana W
+///   sellaría un valor heredado de W-1, y en W+1 ese sello pasaría por fresco
+///   aunque W ya cerró incumplida — Rankings 5 contra un Perfil que dice 0,
+///   que es el #552 de vuelta. Si algún día alguien hace que `finish` escriba
+///   la racha incondicionalmente, ESTE filtro se rompe con él.
 /// - Sello de 2+ semanas atrás → hubo al menos UNA semana completa cerrada sin
 ///   una sola sesión. Ninguna rutina tiene objetivo 0, así que esa semana no
 ///   se cumplió y la racha está muerta: 0.
@@ -38,15 +48,23 @@ import '../../../core/utils/argentina_time.dart';
 /// atleta entrena, antes que un número inflado en un board público. AGENTS.md
 /// §11.1: una advertencia falsa es peor que ninguna.
 ///
-/// NO hay backfill, y es a propósito. Recalcular esto server-side exige el
-/// objetivo semanal del atleta, y ese sale de resolver cuál es su rutina
-/// activa — una cadena de prioridad que ya vive dos veces (Dart y Swift,
-/// fijada por `conformance/routine_selection.json`). Una tercera copia en un
-/// script de Node, corriendo contra producción y escribiendo a un board
-/// público, es más riesgo del que compra: el board converge solo dentro de la
-/// semana para todo el que entrena, que es exactamente quién debería estar en
-/// un board de rachas. Quien dejó de entrenar muestra 0, que bajo esta
-/// semántica ES su valor correcto.
+/// NO se recalcula la racha vieja en un backfill, y es a propósito: eso exige
+/// el objetivo semanal del atleta, o sea resolver cuál es su rutina activa —
+/// una cadena de prioridad que ya vive dos veces (Dart y Swift, fijada por
+/// `conformance/routine_selection.json`). Una tercera copia en Node,
+/// escribiendo a un board público, es más riesgo del que compra.
+///
+/// Lo que SÍ hace falta es `scripts/seed_racha_semanas.js`, que escribe el
+/// literal 0 y nada más. Sin él el board no muestra 0: **no los muestra**.
+/// Firestore excluye de un `orderBy` los documentos donde el campo está
+/// AUSENTE (misma semántica que documenta `_presenceRequiredMetrics` en
+/// `UserPublicProfileRepository`), así que los perfiles anteriores a la
+/// migración desaparecerían del ranking en vez de aparecer con 0. La semilla
+/// los devuelve al board; el valor real llega en su próximo finish.
+///
+/// El costo es sub-reportar durante a lo sumo una semana, y se elige a
+/// conciencia: en un ranking, un número inflado es una mentira y un 0
+/// temprano es sólo un dato que todavía no llegó.
 ///
 /// [now] es un instante REAL (cualquier flag) — se normaliza con `.toUtc()`
 /// adentro, mismo contrato que `computeWeeklyStreak`. NO le pases

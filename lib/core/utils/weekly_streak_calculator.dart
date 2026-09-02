@@ -69,6 +69,30 @@ int computeWeeklyStreak({
   required List<Session> sessions,
   required int weeklyTarget,
   DateTime? now,
+}) =>
+    weeklyStreakOf(
+      sessions: sessions,
+      weeklyTarget: weeklyTarget,
+      now: now,
+    ).streak;
+
+/// La racha semanal + si la semana EN CURSO ya cumplió el objetivo.
+///
+/// El segundo dato existe para el camino de ESCRITURA. La `rachaSemanas`
+/// denormalizada sólo se persiste cuando la semana en curso cumplió, y así el
+/// sello de frescura pasa a significar "la semana sellada CONTÓ para la
+/// racha" — que es lo que el decay de [effectiveRachaSemanas] necesita poder
+/// asumir para juzgar con una semana de gracia.
+///
+/// Sin esa regla el decay miente: un atleta con objetivo 3 que hace UNA sesión
+/// en la semana W sella un valor que viene de W-1, y al llegar W+1 el sello
+/// tiene una semana de antigüedad y pasa el filtro de gracia — aunque W ya
+/// cerró incumplida y la racha en vivo es 0. Rankings mostrando 5 contra un
+/// Perfil que dice 0 es exactamente el #552 otra vez.
+({int streak, bool currentWeekMet}) weeklyStreakOf({
+  required List<Session> sessions,
+  required int weeklyTarget,
+  DateTime? now,
 }) {
   // Un objetivo de 0 haría que `>=` diera verdadero para toda semana vacía y
   // la racha se volvería "semanas desde que existe el mundo".
@@ -92,7 +116,8 @@ int computeWeeklyStreak({
   var streak = 0;
 
   // La semana en curso suma sólo si ya cumplió; si no, se saltea sin cortar.
-  if (met(currentWeek)) streak++;
+  final currentWeekMet = met(currentWeek);
+  if (currentWeekMet) streak++;
 
   var cursor = _previousWeek(currentWeek);
   while (met(cursor)) {
@@ -100,7 +125,7 @@ int computeWeeklyStreak({
     cursor = _previousWeek(cursor);
   }
 
-  return streak;
+  return (streak: streak, currentWeekMet: currentWeekMet);
 }
 
 /// Lunes de la semana anterior a [weekStart]. Vía constructor de calendario

@@ -147,36 +147,64 @@ export async function notifyMonthlyReportHandler(
   for (const uid of athleteUids) {
     try {
       const userRef = db.collection("users").doc(uid);
-      const userSnap = await userRef.get();
-      const user = userSnap.data();
 
-      if (!userSnap.exists || user?.role !== "athlete") {
+      // Se RESERVA el mes en una transacción ANTES de despachar, no después.
+      //
+      // Con el marcador escrito al final, dos corridas solapadas —el scheduler
+      // reintenta ante un timeout parcial— podían leer las dos el marcador
+      // viejo, mandar las dos el push y recién ahí escribirlo: dos
+      // notificaciones y dos filas de historial por el mismo mes. La
+      // transacción hace que sólo una lo gane.
+      //
+      // El riesgo se invierte: si el envío falla DESPUÉS de reservar, el mes
+      // queda marcado sin push. Por eso el catch de abajo suelta la reserva —
+      // así el reintento lo vuelve a intentar en vez de tragárselo.
+      const claimed = await db.runTransaction(async (tx) => {
+        const snap = await tx.get(userRef);
+        const data = snap.data();
+        if (!snap.exists || data?.role !== "athlete") return "not-athlete";
+        if (data.lastMonthlyReportNotifiedMonth === month.key) return "already";
+        tx.update(userRef, { lastMonthlyReportNotifiedMonth: month.key });
+        return "claimed";
+      });
+
+      if (claimed === "not-athlete") {
         skipped++;
         logger.info("notifyMonthlyReport: session owner is not an athlete — skipping", { uid });
         continue;
       }
-      if (user.lastMonthlyReportNotifiedMonth === month.key) {
+      if (claimed === "already") {
         skipped++;
         continue;
       }
 
-      await sendFcm(
-        app,
-        {
-          uids: [uid],
-          kind: "monthly-report",
-          notification: {
-            title: `Tu reporte de ${month.name} está listo`,
-            body: "Mirá cuánto entrenaste, tu volumen y tu distribución muscular del mes.",
+      try {
+        await sendFcm(
+          app,
+          {
+            uids: [uid],
+            kind: "monthly-report",
+            notification: {
+              title: `Tu reporte de ${month.name} está listo`,
+              body: "Mirá cuánto entrenaste, tu volumen y tu distribución muscular del mes.",
+            },
+            data: {
+              deepLink: `/home/insights/monthly?month=${month.key}`,
+            },
           },
-          data: {
-            deepLink: `/home/insights/monthly?month=${month.key}`,
-          },
-        },
-        messaging,
-      );
-
-      await userRef.update({ lastMonthlyReportNotifiedMonth: month.key });
+          messaging,
+        );
+      } catch (sendError: unknown) {
+        // Soltar la reserva: sin esto el mes queda marcado y el atleta nunca
+        // recibe el aviso, ni en el reintento.
+        await userRef
+          .update({
+            lastMonthlyReportNotifiedMonth:
+              admin.firestore.FieldValue.delete(),
+          })
+          .catch(() => undefined);
+        throw sendError;
+      }
       notified++;
     } catch (error: unknown) {
       failed++;

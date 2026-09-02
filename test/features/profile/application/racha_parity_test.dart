@@ -6,6 +6,7 @@ import 'package:treino/core/utils/argentina_time.dart';
 import 'package:treino/features/profile/application/profile_stats_providers.dart';
 import 'package:treino/features/profile/data/user_public_profile_repository.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
+import 'package:treino/features/workout/application/weekly_streak_providers.dart';
 import 'package:treino/features/workout/data/session_repository.dart';
 
 // [#552, migrado a semanas] Paridad de la racha: PERFIL (fila de stats,
@@ -95,7 +96,12 @@ void main() {
     addTearDown(container.dispose);
   });
 
-  Future<void> trainOn({required int weeksAgo, double volumeKg = 100}) async {
+  Future<void> trainOn({
+    required int weeksAgo,
+    double volumeKg = 100,
+    int weeklyTarget = 1,
+    String suffix = '',
+  }) async {
     final startedAt = _artNoonWeeksAgo(weeksAgo);
     final session = await sessionRepo.create(
       uid: 'u1',
@@ -110,6 +116,7 @@ void main() {
       totalVolumeKg: volumeKg,
       durationMin: 60,
       wasFullyCompleted: true,
+      weeklyTarget: weeklyTarget,
     );
   }
 
@@ -227,6 +234,52 @@ void main() {
         reason: 'el valor guardado 5 está muerto — decae a 0 y baja');
     expect(board.first.rachaSemanas, 2);
     expect(board.last.rachaSemanas, 0);
+  });
+
+  test(
+      'regresión: una semana a medias NO deja el valor viejo pasando por '
+      'fresco una semana de más', () async {
+    // El caso que rompía el decay antes del invariante de escritura.
+    //
+    // Objetivo 3. El atleta cumple la semana -2 completa (racha 1) y en la
+    // semana -1 hace UNA sola sesión: esa semana cerró incumplida, así que
+    // hoy la racha en vivo es 0.
+    //
+    // Con la escritura incondicional, esa única sesión de la semana -1
+    // sellaba el valor heredado (1) con fecha de la semana -1 — y el filtro
+    // de gracia lo daba por fresco esta semana. Rankings 1 contra Perfil 0:
+    // el #552 otra vez. Ahora `finish` sólo persiste cuando la semana en
+    // curso cumplió, así que el sello sigue siendo el de la semana -2 y el
+    // decay lo baja bien.
+    await _seedPublicProfile(firestore, 'u1');
+
+    for (var i = 0; i < 3; i++) {
+      await trainOn(weeksAgo: 2, weeklyTarget: 3);
+    }
+    await trainOn(weeksAgo: 1, weeklyTarget: 3); // 1 de 3 — no alcanza
+
+    // El lado PERFIL calcula en vivo y saca el objetivo de
+    // `weeklyStreakTargetProvider`. Sin este override caería al fallback de 1
+    // y los dos lados de la paridad estarían midiendo contra varas distintas
+    // — el test daría 2 y no probaría nada de lo que dice probar.
+    final conObjetivo3 = ProviderContainer(
+      overrides: [
+        currentUidProvider.overrideWithValue('u1'),
+        sessionRepositoryProvider.overrideWithValue(sessionRepo),
+        weeklyStreakTargetProvider.overrideWithValue(3),
+      ],
+    );
+    addTearDown(conObjetivo3.dispose);
+
+    final perfil =
+        (await conObjetivo3.read(userSessionStatsProvider.future)).streak;
+    final rankings = await boardRachaOf('u1');
+
+    expect(perfil, 0,
+        reason: 'la semana -1 cerró con 1 de 3: la racha está cortada');
+    expect(rankings, 0,
+        reason: 'el board no puede seguir mostrando el 1 heredado');
+    expect(rankings, perfil);
   });
 
   test('doc de la era en DÍAS: el board muestra 0, NO el valor viejo',

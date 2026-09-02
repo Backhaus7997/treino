@@ -195,6 +195,48 @@ void main() {
     });
   });
 
+  group('weeklyStreakOf — currentWeekMet (el invariante de la escritura)', () {
+    // `SessionRepository.finish` persiste la racha SÓLO cuando este flag es
+    // true, y de eso depende que el sello de frescura signifique "la semana
+    // sellada CONTÓ". Ver `effectiveRachaSemanas`.
+    test('semana en curso cumplida → true', () {
+      final r = weeklyStreakOf(
+        sessions: _weekWith(week0, 3, prefix: 'w0'),
+        weeklyTarget: 3,
+        now: wednesday,
+      );
+      expect(r.currentWeekMet, isTrue);
+      expect(r.streak, 1);
+    });
+
+    test('semana en curso a medias → false, aunque la racha sea > 0', () {
+      // Éste es el caso que rompía el decay: la racha vale 2 (viene de las dos
+      // semanas anteriores) pero la semana en curso NO cumplió. Persistir acá
+      // sellaba un valor heredado y lo hacía pasar por fresco una semana de
+      // más.
+      final r = weeklyStreakOf(
+        sessions: [
+          ..._weekWith(week0, 1, prefix: 'w0'),
+          ..._weekWith(week1, 3, prefix: 'w1'),
+          ..._weekWith(week2, 3, prefix: 'w2'),
+        ],
+        weeklyTarget: 3,
+        now: wednesday,
+      );
+      expect(r.streak, 2);
+      expect(r.currentWeekMet, isFalse);
+    });
+
+    test('semana en curso vacía → false', () {
+      final r = weeklyStreakOf(
+        sessions: _weekWith(week1, 3, prefix: 'w1'),
+        weeklyTarget: 3,
+        now: wednesday,
+      );
+      expect(r.currentWeekMet, isFalse);
+    });
+  });
+
   group('weeklyTargetFromRoutine', () {
     test('sin rutina activa → fallback 1', () {
       expect(weeklyTargetFromRoutine(null), weeklyStreakFallbackTarget);

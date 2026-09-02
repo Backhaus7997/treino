@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../workout/application/routine_providers.dart';
+import '../../workout/application/weekly_streak_providers.dart';
 import '../../workout/application/session_providers.dart'
     show currentUidProvider, sessionRepositoryProvider, sessionsByUidProvider;
 import '../../workout/data/session_repository.dart';
@@ -656,6 +657,11 @@ class WearSessionNotifier extends Notifier<WearSessionState> {
             totalVolumeKg: sesion.totalVolumeKg,
             durationMin: _duracionMin(sesion.startedAt, ahora),
             wasFullyCompleted: completo,
+            // El cierre desde el RELOJ escribe la misma racha pública que el
+            // del teléfono: sin el objetivo real, un atleta con plan de 4
+            // días terminaba con la racha calculada contra 1 sesión por
+            // semana — inflada — cada vez que cerraba desde el reloj.
+            weeklyTarget: ref.read(weeklyStreakTargetProvider),
           );
     } catch (e) {
       debugPrint('[wear-session] no se pudo cerrar el entreno — $e');

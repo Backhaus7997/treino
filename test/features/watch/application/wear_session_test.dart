@@ -101,6 +101,7 @@ dynamic reflectDelegate(SessionRepository real, Invocation i) {
       totalVolumeKg: i.namedArguments[#totalVolumeKg] as double,
       durationMin: i.namedArguments[#durationMin] as int,
       wasFullyCompleted: i.namedArguments[#wasFullyCompleted] as bool,
+      weeklyTarget: i.namedArguments[#weeklyTarget] as int,
     );
   }
   if (n.contains('watchSetLogs')) {
@@ -383,6 +384,7 @@ void main() {
         totalVolumeKg: 100,
         durationMin: 30,
         wasFullyCompleted: true,
+        weeklyTarget: 1,
       );
 
       final c = contenedor();
@@ -818,6 +820,7 @@ void main() {
         totalVolumeKg: 0,
         durationMin: 5,
         wasFullyCompleted: false,
+        weeklyTarget: 1,
       );
       await pumpEventQueue();
       await pumpEventQueue();

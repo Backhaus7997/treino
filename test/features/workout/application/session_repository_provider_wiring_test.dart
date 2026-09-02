@@ -8,7 +8,7 @@ import 'package:treino/features/workout/application/session_providers.dart'
 
 void main() {
   // REGRESSION: sessionRepositoryProvider MUST wire publicProfileRepository so
-  // SessionRepository.finish() can recompute the public workoutsCount/rachaSemanas
+  // SessionRepository.finish() can recompute the public workoutsCount
   // counters. The provider previously omitted it, so finish() hit
   // `if (pubRepo == null) return;` and the counters silently never updated —
   // the Coach header showed "Sesiones 0" even after the athlete completed a
@@ -40,6 +40,7 @@ void main() {
         totalVolumeKg: 1100.0,
         durationMin: 60,
         wasFullyCompleted: true,
+        weeklyTarget: 1,
       );
 
       final profileSnap =
@@ -51,15 +52,10 @@ void main() {
             'if this fails, the provider is not wiring publicProfileRepository',
       );
       expect(profileSnap.data()!['workoutsCount'], equals(1));
-      // `rachaSemanas` is computed by computeWeeklyStreak() using DateTime.now() — finish()
-      // exposes no injectable clock — so its exact value depends on how many
-      // days ago the hardcoded session date is relative to the wall clock
-      // (1 only when run on the session's local day). Asserting equals(1) made
-      // this test pass only on the day #199 merged (2026-06-29) and rot the
-      // next day. Mirror the canonical SCENARIO-321 contract
-      // (session_repository_test.dart): the wiring is proven by the counter
-      // write above; for rachaSemanas we only assert it round-tripped as an int.
-      expect(profileSnap.data()!['rachaSemanas'], isA<int>());
+      // Lo que este test prueba es el CABLEADO del provider, y eso ya lo
+      // demuestra el `workoutsCount` de arriba. `rachaSemanas` no se escribe
+      // porque la sesión del fixture es de una semana pasada — ver la nota de
+      // SCENARIO-321 en session_repository_test.dart.
     },
   );
 }

@@ -10,8 +10,12 @@ jest.mock("firebase-admin", () => {
       return this.date;
     }
   }
+  const DELETE = Symbol("FieldValue.delete");
   const firestore = jest.fn();
-  Object.assign(firestore, { Timestamp });
+  Object.assign(firestore, {
+    Timestamp,
+    FieldValue: { delete: () => DELETE, __DELETE: DELETE },
+  });
   return {
     firestore,
     app: jest.fn(),
@@ -42,6 +46,17 @@ type UserSeed = {
   lastMonthlyReportNotifiedMonth?: string;
 };
 
+type FakeUserRef = {
+  __uid: string;
+  get: jest.Mock;
+  update: jest.Mock;
+};
+
+type FakeTx = {
+  get: (ref: FakeUserRef) => Promise<{ exists: boolean; data: () => unknown }>;
+  update: (ref: FakeUserRef, update: Record<string, unknown>) => void;
+};
+
 type FakeSessionDoc = {
   __index: number;
   data: () => Record<string, unknown>;
@@ -69,6 +84,31 @@ function installFirestore(
         parent: { parent: { id: session.uid } },
       },
     }));
+
+  const DELETE = (
+    admin.firestore as unknown as { __DELETE?: symbol; FieldValue: { __DELETE: symbol } }
+  ).FieldValue.__DELETE;
+
+  function applyUpdate(uid: string, update: Record<string, unknown>): void {
+    if (!users[uid]) throw new Error(`missing user ${uid}`);
+    for (const [k, v] of Object.entries(update)) {
+      if (v === DELETE) delete (users[uid] as Record<string, unknown>)[k];
+      else (users[uid] as Record<string, unknown>)[k] = v;
+    }
+  }
+
+  function userRef(uid: string): FakeUserRef {
+    return {
+      __uid: uid,
+      get: jest.fn(async () => ({
+        exists: users[uid] !== undefined,
+        data: () => users[uid],
+      })),
+      update: jest.fn(async (update: Record<string, unknown>) => {
+        applyUpdate(uid, update);
+      }),
+    };
+  }
 
   const firestore = {
     collectionGroup: jest.fn(() => {
@@ -105,19 +145,21 @@ function installFirestore(
     }),
     collection: jest.fn((name: string) => {
       if (name !== "users") throw new Error(`unexpected collection ${name}`);
-      return {
-        doc: (uid: string) => ({
-          get: jest.fn(async () => ({
-            exists: users[uid] !== undefined,
-            data: () => users[uid],
-          })),
-          update: jest.fn(async (update: Partial<UserSeed>) => {
-            if (!users[uid]) throw new Error(`missing user ${uid}`);
-            Object.assign(users[uid], update);
-          }),
-        }),
-      };
+      return { doc: (uid: string) => userRef(uid) };
     }),
+    // La reserva del mes va en transacción, así que el fake la necesita.
+    // Opera sobre el MISMO `users` para que el efecto sea observable.
+    runTransaction: jest.fn(
+      async <T>(fn: (tx: FakeTx) => Promise<T>): Promise<T> =>
+        fn({
+          get: async (ref: FakeUserRef) => ({
+            exists: users[ref.__uid] !== undefined,
+            data: () => users[ref.__uid],
+          }),
+          update: (ref: FakeUserRef, update: Record<string, unknown>) =>
+            applyUpdate(ref.__uid, update),
+        }),
+    ),
   };
 
   (admin.firestore as unknown as jest.Mock).mockReturnValue(firestore);
@@ -232,4 +274,37 @@ it("paginates the collectionGroup query", async () => {
 
   expect(result.scannedSessions).toBe(501);
   expect(result.notified).toBe(1);
+});
+
+it("releases the month claim when the push fails, so a retry can resend", async () => {
+  // La reserva ocurre ANTES del envío para que dos corridas solapadas no
+  // manden el push dos veces. El precio de eso es que un envío fallido dejaría
+  // el mes marcado y al atleta sin aviso — para siempre, porque el reintento
+  // vería el marcador y se saltearía. Por eso el catch suelta la reserva.
+  const users: Record<string, UserSeed> = { u1: { role: "athlete" } };
+  installFirestore(
+    [{ uid: "u1", startedAt: new Date(Date.UTC(2026, 7, 10, 12)) }],
+    users,
+  );
+  mockedSendFcm.mockRejectedValueOnce(new Error("FCM caído"));
+
+  const primera = await notifyMonthlyReportHandler(
+    app,
+    new Date(Date.UTC(2026, 8, 1, 13)),
+    messaging,
+  );
+
+  expect(primera.notified).toBe(0);
+  expect(primera.failed).toBe(1);
+  expect(users.u1.lastMonthlyReportNotifiedMonth).toBeUndefined();
+
+  // El reintento tiene que volver a intentarlo, no saltearlo.
+  const segunda = await notifyMonthlyReportHandler(
+    app,
+    new Date(Date.UTC(2026, 8, 1, 13)),
+    messaging,
+  );
+
+  expect(segunda.notified).toBe(1);
+  expect(users.u1.lastMonthlyReportNotifiedMonth).toBe("2026-08");
 });

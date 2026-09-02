@@ -224,7 +224,9 @@ class UserPublicProfileRepository {
   /// than `limit` opted-in athletes a stale-but-high racha can crowd a
   /// fresh-but-low one out of the page; within the page, order and values
   /// are correct. Los docs sin sello leen 0 —no passthrough— hasta que el
-  /// atleta vuelva a entrenar; no hay backfill, y el porqué está en
+  /// atleta vuelva a entrenar. Ojo: para siquiera LLEGAR acá el doc tiene que
+  /// tener el campo, porque el `orderBy` de arriba excluye los ausentes — de
+  /// eso se ocupa `scripts/seed_racha_semanas.js`. Detalle en
   /// [effectiveRachaSemanas].
   List<UserPublicProfile> _decayedStreakBoard(
     List<DocumentSnapshot<Map<String, Object?>>> docs,
