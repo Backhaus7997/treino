@@ -24,6 +24,7 @@ class SupersetBlock extends StatelessWidget {
   const SupersetBlock({
     required this.count,
     required this.children,
+    this.reorderIndex,
     this.trailing,
     this.footer,
     super.key,
@@ -35,6 +36,10 @@ class SupersetBlock extends StatelessWidget {
 
   /// Los editores de cada miembro, en orden.
   final List<Widget> children;
+
+  /// Posición del bloque en el reorderable exterior. Null deja el header sin
+  /// gesto de drag, pero conserva los controles accesibles de subir/bajar.
+  final int? reorderIndex;
 
   /// Control opcional a la derecha del encabezado (los chevrons de reordenar).
   final Widget? trailing;
@@ -73,6 +78,22 @@ class SupersetBlock extends StatelessWidget {
         children: [
           Row(
             children: [
+              if (reorderIndex case final index?)
+                ReorderableDragStartListener(
+                  key: const Key('superset_drag_handle'),
+                  index: index,
+                  child: SizedBox(
+                    width: 44,
+                    height: 44,
+                    child: Center(
+                      child: Icon(
+                        TreinoIcon.dragHandle,
+                        size: 18,
+                        color: palette.highlight,
+                      ),
+                    ),
+                  ),
+                ),
               Icon(TreinoIcon.streak, size: 15, color: palette.highlight),
               const SizedBox(width: AppSpacing.hairline),
               Expanded(
