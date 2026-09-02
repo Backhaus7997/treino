@@ -14,7 +14,10 @@ extension RankingDimensionMetricField on RankingDimension {
   String get metricField {
     switch (this) {
       case RankingDimension.streak:
-        return 'racha';
+        // `rachaSemanas`, no el `racha` legacy en días: el board ordena por
+        // semanas desde la migración. Exige su propio índice compuesto
+        // (gymId ASC, rankingOptIn ASC, rachaSemanas DESC).
+        return 'rachaSemanas';
       case RankingDimension.volume:
         return 'lifetimeVolumeKg';
       case RankingDimension.squat:

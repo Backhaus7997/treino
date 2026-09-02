@@ -8,8 +8,8 @@
  *
  * POR QUÉ ESTE TEST Y NO UNO POR SCRIPT.
  *
- * Un test por script probaría 43 veces lo mismo y no probaría lo único que
- * importa: que no exista el 44°. La primera versión de #834 escribió el
+ * Un test por script probaría 44 veces lo mismo y no probaría lo único que
+ * importa: que no exista el 45°. La primera versión de #834 escribió el
  * resolutor con 24 tests verdes y CERO llamadores — el módulo estaba bien y la
  * frontera no existía, porque nadie la cruzaba. Lo que impide que eso vuelva a
  * pasar no es cobertura sobre el módulo: es un escaneo que falla cuando aparece
@@ -155,8 +155,8 @@ test('todo script que habla con Firebase importa la frontera', () => {
   );
 });
 
-test('los 44 scripts que inicializan Firebase pasan por la frontera', () => {
-  // 43 tocaban credenciales de verdad + `seed_emulator_full.js`, que es
+test('los 45 scripts que inicializan Firebase pasan por la frontera', () => {
+  // 44 tocaban credenciales de verdad + `seed_emulator_full.js`, que es
   // emulator-only y entra igual para que no quede NINGÚN `initializeApp` suelto.
   //
   // El número está clavado a propósito: si alguien agrega un script que entra
@@ -165,7 +165,7 @@ test('los 44 scripts que inicializan Firebase pasan por la frontera', () => {
   const cableados = ARCHIVOS.filter(({ codigo }) => IMPORTA_LA_FRONTERA.test(codigo));
   assert.strictEqual(
     cableados.length,
-    44,
+    45,
     `cableados: ${cableados.length}. Si agregaste o sacaste un script, actualizá ` +
       'este número Y confirmá que el nuevo entra por lib/:\n  ' +
       cableados.map((a) => a.nombre).join('\n  '),

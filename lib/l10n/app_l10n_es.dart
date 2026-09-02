@@ -3207,8 +3207,42 @@ class AppL10nEs extends AppL10n {
       'No pudimos cargar tu reporte mensual. Probá de nuevo.';
 
   @override
+  String get monthlyVolumeByGroupEmpty => 'No hay sets por grupo en este mes.';
+
+  @override
+  String monthlyVolumeByGroupSets(int n) {
+    String _temp0 = intl.Intl.pluralLogic(
+      n,
+      locale: localeName,
+      other: '$n sets',
+      one: '1 set',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String workoutDaysCalendarStreak(int n) {
-    return 'Racha de $n días';
+    String _temp0 = intl.Intl.pluralLogic(
+      n,
+      locale: localeName,
+      other: 'Racha de $n semanas',
+      one: 'Racha de 1 semana',
+      zero: 'Sin racha',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String workoutDaysCalendarStreakHint(int n) {
+    String _temp0 = intl.Intl.pluralLogic(
+      n,
+      locale: localeName,
+      other: 'Completaste el objetivo de tu rutina $n semanas seguidas.',
+      one: 'Completaste el objetivo de tu rutina 1 semana seguida.',
+      zero:
+          'Cumplí el objetivo de días de tu rutina esta semana y arrancás una racha.',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -7450,8 +7484,42 @@ class AppL10nEsAr extends AppL10nEs {
       'No pudimos cargar tu reporte mensual. Probá de nuevo.';
 
   @override
+  String get monthlyVolumeByGroupEmpty => 'No hay sets por grupo en este mes.';
+
+  @override
+  String monthlyVolumeByGroupSets(int n) {
+    String _temp0 = intl.Intl.pluralLogic(
+      n,
+      locale: localeName,
+      other: '$n sets',
+      one: '1 set',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String workoutDaysCalendarStreak(int n) {
-    return 'Racha de $n días';
+    String _temp0 = intl.Intl.pluralLogic(
+      n,
+      locale: localeName,
+      other: 'Racha de $n semanas',
+      one: 'Racha de 1 semana',
+      zero: 'Sin racha',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String workoutDaysCalendarStreakHint(int n) {
+    String _temp0 = intl.Intl.pluralLogic(
+      n,
+      locale: localeName,
+      other: 'Completaste el objetivo de tu rutina $n semanas seguidas.',
+      one: 'Completaste el objetivo de tu rutina 1 semana seguida.',
+      zero:
+          'Cumplí el objetivo de días de tu rutina esta semana y arrancás una racha.',
+    );
+    return '$_temp0';
   }
 
   @override

@@ -18,13 +18,23 @@ import '../../domain/workout_days_month.dart';
 class WorkoutDaysCalendarLabels {
   const WorkoutDaysCalendarLabels({
     required this.streakLabelBuilder,
+    required this.streakHintBuilder,
     required this.weekdayLetters,
   });
 
   /// Builds the streak line's full text from the current streak value, e.g.
-  /// `(n) => 'Racha de $n días'`. Zero is a valid input — must be rendered,
-  /// not treated as a signal to hide the row.
+  /// `(n) => 'Racha de $n semanas'`. Zero is a valid input — must be
+  /// rendered, not treated as a signal to hide the row.
   final String Function(int streak) streakLabelBuilder;
+
+  /// Builds the caption under the streak line: qué está contando ese número.
+  ///
+  /// "Racha de 3 semanas" no dice, solo, TRES SEMANAS DE QUÉ — y desde que la
+  /// racha se mide contra el objetivo de días de la rutina, la respuesta ya no
+  /// es adivinable ("entrené 3 semanas seguidas" y "cumplí mi plan 3 semanas
+  /// seguidas" son cosas distintas). En 0 el texto pasa a ser la invitación a
+  /// arrancar una, no un hueco.
+  final String Function(int streak) streakHintBuilder;
 
   /// Mon..Sun single-letter column headers. This widget is AppL10n-free
   /// (R3) — the caller must compute the letters (e.g. via
@@ -39,8 +49,10 @@ class WorkoutDaysCalendarLabels {
 /// one row per week) marking trained days, plus a week-streak indicator row
 /// (flame icon + streak text) — Hevy "Workout Days Log" parity (PR5b).
 ///
-/// Pure layout from [data] — day-bucketing itself happens upstream in
-/// `trainedDaysInMonth`/`computeStreak` (via `athleteWorkoutDaysProvider`),
+/// Pure layout from [data] — el bucketeo pasa aguas arriba en
+/// `trainedDaysInMonth` (por día, para pintar la grilla) y
+/// `computeWeeklyStreak` (por semana, para la racha), vía
+/// `athleteWorkoutDaysProvider`;
 /// this widget only renders the grid. Days outside [data.month] (leading/
 /// trailing blanks needed to complete the first/last week row) render as
 /// empty cells — never a day number from an adjacent month, to avoid
@@ -132,17 +144,38 @@ class _StreakRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(TreinoIcon.streak, size: 20, color: palette.highlight),
-        const SizedBox(width: 8),
-        Text(
-          labels.streakLabelBuilder(streak),
-          style: GoogleFonts.barlowCondensed(
-            fontWeight: FontWeight.w700,
-            fontSize: 16,
-            letterSpacing: 0.4,
-            color: palette.textPrimary,
+        Row(
+          children: [
+            Icon(TreinoIcon.streak, size: 20, color: palette.highlight),
+            const SizedBox(width: 8),
+            Text(
+              labels.streakLabelBuilder(streak),
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
+                letterSpacing: 0.4,
+                color: palette.textPrimary,
+              ),
+            ),
+          ],
+        ),
+        // Sangría de 28 = 20 del ícono + 8 del gutter: la explicación arranca
+        // alineada con el número que explica, no con la llama.
+        Padding(
+          padding: const EdgeInsets.only(top: AppSpacing.hairline, left: 28),
+          child: Text(
+            labels.streakHintBuilder(streak),
+            // 12 sobre textMuted: chico, pero es el piso legible del sistema
+            // (mismo tamaño que los subtítulos de card), no letra chica.
+            style: GoogleFonts.barlow(
+              fontWeight: FontWeight.w400,
+              fontSize: 12,
+              height: 1.3,
+              color: palette.textMuted,
+            ),
           ),
         ),
       ],

@@ -18,6 +18,7 @@ import '../profile/domain/user_role.dart';
 import '../workout/application/assigned_routine_providers.dart';
 import '../workout/application/session_duration.dart';
 import '../workout/application/session_providers.dart';
+import '../workout/application/weekly_streak_providers.dart';
 import '../workout/application/user_routines_providers.dart';
 import '../workout/domain/session.dart';
 import '../watch/application/watch_credential_providers.dart'
@@ -422,6 +423,9 @@ Widget _resumeModal(
               finishedAt: DateTime.now(),
               totalVolumeKg: _sumVolume(record.setLogs),
               durationMin: durationMin,
+              // Sin esto la racha se recalculaba contra el fallback de 1
+              // sesión por semana y le pisaba el valor correcto al atleta.
+              weeklyTarget: ref.read(weeklyStreakTargetProvider),
             )
             .timeout(const Duration(seconds: 15));
       } catch (_) {

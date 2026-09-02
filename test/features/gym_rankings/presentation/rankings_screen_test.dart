@@ -76,7 +76,9 @@ UserPublicProfile _rankedProfile({
       displayName: displayName,
       gymId: _gymId,
       rankingOptIn: true,
-      racha: racha,
+      // El parámetro se sigue llamando `racha` porque es como se lee en los
+      // call sites; el CAMPO es el nuevo, en semanas.
+      rachaSemanas: racha,
       lifetimeVolumeKg: lifetimeVolumeKg ?? 0,
       bestSquatKg: bestSquatKg,
       bestBenchKg: bestBenchKg,
@@ -750,6 +752,24 @@ void main() {
       expect(rankingMetricValue(RankingDimension.streak, profile), 0);
       expect(rankingMetricValue(RankingDimension.volume, profile), 0);
     });
+
+    test('la racha sale de rachaSemanas, NO del `racha` legacy en días', () {
+      // Regresión: la pantalla leía `racha` mientras el repositorio ya
+      // ordenaba y decaía por `rachaSemanas`. El board habría quedado
+      // ordenado por semanas y mostrando días — cada fila con un número que
+      // no explica su propia posición. Ningún test lo agarró porque todos
+      // sembraban el campo viejo.
+      const migrated = UserPublicProfile(
+        uid: 'u1',
+        racha: 23, // legacy, en días
+        rachaSemanas: 3,
+      );
+      expect(rankingMetricValue(RankingDimension.streak, migrated), 3);
+
+      // Doc que nunca escribió el campo nuevo: 0, no el valor en días.
+      const legacyOnly = UserPublicProfile(uid: 'u2', racha: 23);
+      expect(rankingMetricValue(RankingDimension.streak, legacyOnly), 0);
+    });
   });
 
   group('rankableEntries (QA-GYM-506)', () {
@@ -766,7 +786,7 @@ void main() {
     });
 
     test('keeps everyone on a dimension with a legitimate 0 floor', () {
-      const withStreak = UserPublicProfile(uid: 'u1', racha: 5);
+      const withStreak = UserPublicProfile(uid: 'u1', rachaSemanas: 5);
       const withoutStreak = UserPublicProfile(uid: 'u2');
 
       expect(

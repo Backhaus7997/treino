@@ -11,7 +11,7 @@ import 'package:cloud_firestore/cloud_firestore.dart'
         Timestamp;
 
 import '../../../core/utils/argentina_time.dart';
-import '../../../core/utils/streak_calculator.dart';
+import '../../../core/utils/weekly_streak_calculator.dart';
 import '../../profile/data/user_public_profile_repository.dart';
 import '../domain/duration_timer.dart';
 import '../domain/duration_timer_owner.dart';
@@ -132,6 +132,7 @@ class SessionRepository {
     required double totalVolumeKg,
     required int durationMin,
     bool wasFullyCompleted = false,
+    required int weeklyTarget,
   }) async {
     // finishedAt MUST be Timestamp.fromDate, not a raw DateTime — real Firestore
     // serializes a raw DateTime as an ISO string, but the @TimestampConverter
@@ -158,16 +159,43 @@ class SessionRepository {
     // denormalization now lives server-side in `recomputeMetrics`
     // (`functions/src/ranking-aggregate.ts`), triggered by
     // `rankingAggregateOnSession` on this very `sessions/{id}` write. Only
-    // `workoutsCount`/`racha` remain client-written here.
+    // `workoutsCount`/`rachaSemanas` remain client-written here.
+    //
+    // [weeklyTarget] llega del caller (que sí tiene `ref` y puede leer
+    // `weeklyStreakTargetProvider`) en vez de resolverse acá: el repositorio
+    // es capa de datos y no debería aprender a resolver cuál es la rutina
+    // activa del atleta.
+    //
+    // Es REQUIRED y no tiene default a propósito. Con un default al fallback
+    // de 1, los callers que se olvidaran de pasarlo —el cierre desde el reloj
+    // y el descarte del Home lo hacían— recalculaban la racha contra "una
+    // sesión por semana" y le PISABAN el valor correcto a un atleta con plan
+    // de 4 días, inflándole el board público. Un default silencioso convierte
+    // un olvido en dato corrupto; sin default, el compilador lo caza.
     final pubRepo = _publicProfileRepository;
     if (pubRepo == null) return;
 
     try {
       final completedList = await listRecentCompletedByUid(uid);
-      final racha = computeStreak(completedList);
+      final racha = weeklyStreakOf(
+        sessions: completedList,
+        weeklyTarget: weeklyTarget,
+      );
       final counters = <String, Object?>{
         'workoutsCount': completedList.length,
-        'racha': racha,
+        // `rachaSemanas` SÓLO se escribe cuando la semana en curso ya cumplió
+        // el objetivo, y con eso el sello que deriva `updateCounters` pasa a
+        // significar "la semana sellada CONTÓ" — el supuesto sobre el que
+        // `effectiveRachaSemanas` apoya su semana de gracia.
+        //
+        // Escribirla siempre rompía el decay: un atleta con objetivo 3 que
+        // hace UNA sesión en la semana W sellaba un valor heredado de W-1, y
+        // en W+1 ese sello todavía pasaba por fresco aunque W ya hubiera
+        // cerrado incumplida — Rankings 5 contra Perfil 0, el #552 de vuelta.
+        //
+        // No escribirla no congela nada: el valor viejo envejece solo y el
+        // decay lo baja a 0 cuando corresponde.
+        if (racha.currentWeekMet) 'rachaSemanas': racha.streak,
       };
 
       await pubRepo.updateCounters(uid, counters);

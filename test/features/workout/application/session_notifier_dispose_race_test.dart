@@ -120,6 +120,7 @@ Completer<void> _gateFinish(MockSessionRepository repo) {
         totalVolumeKg: any(named: 'totalVolumeKg'),
         durationMin: any(named: 'durationMin'),
         wasFullyCompleted: any(named: 'wasFullyCompleted'),
+        weeklyTarget: any(named: 'weeklyTarget'),
       )).thenAnswer((_) => gate.future);
   return gate;
 }

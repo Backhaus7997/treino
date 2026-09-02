@@ -618,7 +618,11 @@ List<int> competitionRanks(List<num> descValues) {
 num? rankingMetricValue(RankingDimension dimension, UserPublicProfile profile) {
   switch (dimension) {
     case RankingDimension.streak:
-      return profile.racha ?? 0;
+      // `rachaSemanas`, NO el `racha` legacy en días. El repositorio ordena y
+      // decae por el campo nuevo; leer el viejo acá ordenaría por semanas y
+      // MOSTRARÍA días — un número que no se corresponde ni con el orden de
+      // su propia fila ni con lo que el atleta ve en su perfil.
+      return profile.rachaSemanas ?? 0;
     case RankingDimension.volume:
       return profile.lifetimeVolumeKg;
     case RankingDimension.squat:

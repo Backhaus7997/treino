@@ -21,6 +21,7 @@ import '../application/workout_days_providers.dart';
 import '../domain/monthly_report.dart';
 import 'widgets/monthly_report_chart.dart';
 import 'widgets/monthly_report_summary_cards.dart';
+import 'widgets/monthly_volume_by_group_card.dart';
 import 'widgets/muscle_distribution_radar.dart';
 import 'widgets/workout_days_calendar.dart';
 
@@ -33,9 +34,20 @@ import 'widgets/workout_days_calendar.dart';
 /// later be reused for coach-side surfacing without change, same pattern as
 /// [athleteMonthlyReportProvider].
 class MonthlyReportScreen extends ConsumerStatefulWidget {
-  const MonthlyReportScreen({super.key, required this.uid});
+  const MonthlyReportScreen({super.key, required this.uid, this.initialMonth});
 
   final String uid;
+
+  /// Mes que la pantalla tiene que abrir seleccionado, en vez del más reciente.
+  ///
+  /// Lo usa el push de "tu reporte de <mes> está listo": la notificación llega
+  /// el día 1 y tiene que abrir el mes que CERRÓ, no el que recién arranca —
+  /// que además está vacío. Sólo se leen año y mes.
+  ///
+  /// Se aplica una sola vez, al primer emisión del reporte. Después manda lo
+  /// que el usuario haya tocado: si abrió por la notificación y desde ahí
+  /// navegó a otro mes, un rebuild no lo devuelve al mes del deep link.
+  final DateTime? initialMonth;
 
   @override
   ConsumerState<MonthlyReportScreen> createState() =>
@@ -212,6 +224,18 @@ class _MonthlyReportScreenState extends ConsumerState<MonthlyReportScreen> {
     if (selected != null && report.points.any((p) => p.month == selected)) {
       return selected;
     }
+
+    // Deep link de la notificación mensual. Se compara contra los puntos del
+    // reporte en vez de confiar en el parámetro: la ventana son 12 meses, y un
+    // link viejo (o uno armado a mano) puede apuntar afuera. En ese caso cae al
+    // mes más reciente, que es el comportamiento de siempre — nunca a una
+    // pantalla vacía.
+    final requested = widget.initialMonth;
+    if (requested != null) {
+      final anchor = DateTime(requested.year, requested.month);
+      if (report.points.any((p) => p.month == anchor)) return anchor;
+    }
+
     return report.points.last.month;
   }
 
@@ -401,6 +425,7 @@ class _WorkoutDaysSection extends ConsumerWidget {
         data: data,
         labels: WorkoutDaysCalendarLabels(
           streakLabelBuilder: l10n.workoutDaysCalendarStreak,
+          streakHintBuilder: l10n.workoutDaysCalendarStreakHint,
           weekdayLetters: weekdayInitials(l10n.localeName),
         ),
       ),
@@ -532,6 +557,13 @@ class _MonthRadarSection extends ConsumerWidget {
               durationUnit: l10n.monthlyReportDurationUnit,
               volumeUnit: l10n.monthlyReportVolumeUnit,
             ),
+          ),
+          const SizedBox(height: 14),
+          // Reuses THIS provider emission: the granular group map is collected
+          // in the same SetLog pass as the six radar axes, so this card adds no
+          // repository read when the selected month changes.
+          MonthlyVolumeByGroupCard(
+            setsByGroup: insights.currentSetsByGroup,
           ),
         ],
       ),

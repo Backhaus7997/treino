@@ -53,6 +53,7 @@ import '../features/insights/presentation/exercise_progression_screen.dart';
 import '../features/insights/presentation/frequent_exercises_screen.dart';
 import '../features/insights/presentation/insights_screen.dart';
 import '../features/insights/presentation/measurements_screen.dart';
+import '../features/insights/domain/monthly_report_deep_link.dart';
 import '../features/insights/presentation/monthly_report_screen.dart';
 import '../features/insights/presentation/muscle_distribution_screen.dart';
 import '../features/insights/presentation/volume_by_group_screen.dart';
@@ -533,8 +534,20 @@ GoRouter buildRouter({
         // Statistics hub detail screens — fullscreen, no bottom nav. They are
         // bare Columns, so wrap them in _immersive instead of shell _withBg.
         path: '/home/insights/monthly',
-        pageBuilder: (_, state) =>
-            _report(state.pageKey, _immersive(const _MonthlyReportRouteHost())),
+        // `?month=YYYY-MM` abre el reporte con ese mes ya seleccionado. Es el
+        // deep link del push "tu reporte de <mes> está listo" (la Cloud
+        // Function `notifyMonthlyReport` lo arma con ese formato exacto). Sin
+        // el parámetro, la pantalla abre en el mes más reciente, como siempre.
+        pageBuilder: (_, state) => _report(
+          state.pageKey,
+          _immersive(
+            _MonthlyReportRouteHost(
+              initialMonth: parseMonthlyReportMonthParam(
+                state.uri.queryParameters['month'],
+              ),
+            ),
+          ),
+        ),
       ),
       GoRoute(
         path: '/home/insights/muscle-distribution',
@@ -958,12 +971,14 @@ Widget _immersive(Widget child) => Scaffold(
 /// uid explícito (no currentUidProvider directo en el screen) para que la
 /// misma pantalla pueda reusarse desde una vista de coach sin cambios.
 class _MonthlyReportRouteHost extends ConsumerWidget {
-  const _MonthlyReportRouteHost();
+  const _MonthlyReportRouteHost({this.initialMonth});
+
+  final DateTime? initialMonth;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final uid = ref.watch(currentUidProvider) ?? '';
-    return MonthlyReportScreen(uid: uid);
+    return MonthlyReportScreen(uid: uid, initialMonth: initialMonth);
   }
 }
 

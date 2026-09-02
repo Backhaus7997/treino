@@ -17,6 +17,7 @@ _$UserPublicProfileImpl _$$UserPublicProfileImplFromJson(
       gymName: json['gymName'] as String?,
       workoutsCount: (json['workoutsCount'] as num?)?.toInt(),
       racha: (json['racha'] as num?)?.toInt(),
+      rachaSemanas: (json['rachaSemanas'] as num?)?.toInt(),
       followersCount:
           _nonNegativeCount((json['followersCount'] as num?)?.toInt()),
       followingCount:
@@ -42,6 +43,7 @@ Map<String, dynamic> _$$UserPublicProfileImplToJson(
       'gymName': instance.gymName,
       'workoutsCount': instance.workoutsCount,
       'racha': instance.racha,
+      'rachaSemanas': instance.rachaSemanas,
       'followersCount': instance.followersCount,
       'followingCount': instance.followingCount,
       'sharedTemplatesWithAthletes': instance.sharedTemplatesWithAthletes,

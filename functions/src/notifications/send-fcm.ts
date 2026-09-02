@@ -37,6 +37,7 @@ export type NotificationKind =
   | "friend-follow"
   | "friend-request"
   | "link-change"
+  | "monthly-report"
   | "overdue-payment"
   | "reaction"
   | "review";

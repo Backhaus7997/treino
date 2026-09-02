@@ -1,11 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/utils/argentina_time.dart';
-import '../../../core/utils/streak_calculator.dart';
+import '../../../core/utils/weekly_streak_calculator.dart';
 import '../../workout/application/exercise_providers.dart';
 import '../../workout/application/plan_progress.dart';
 import '../../workout/application/routine_providers.dart';
 import '../../workout/application/session_providers.dart';
+import '../../workout/application/weekly_streak_providers.dart';
 import '../../workout/domain/routine.dart';
 import '../../workout/domain/session.dart';
 import '../../workout/domain/session_status.dart';
@@ -29,6 +30,11 @@ typedef AthleteWeekInsightsKey = ({String uid, DateTime weekStart});
 final athleteWeekInsightsProvider = FutureProvider.autoDispose
     .family<WeeklyInsights?, AthleteWeekInsightsKey>((ref, key) async {
   if (key.uid.isEmpty) return null;
+
+  // Antes de cualquier await: usar `ref` después de un async gap es inseguro
+  // cuando el provider se recomputa a mitad de vuelo (misma regla que
+  // `unifiedRoutinesProvider`).
+  final weeklyTarget = ref.watch(weeklyStreakTargetProvider);
 
   final repo = ref.read(sessionRepositoryProvider);
 
@@ -155,16 +161,18 @@ final athleteWeekInsightsProvider = FutureProvider.autoDispose
     }
   }
 
-  // streak — días consecutivos entrenados (incluye hoy si entrenó, sino
-  // cuenta desde ayer). ADR-WRS-08: lifted to lib/core/utils/streak_calculator.dart
-  // in PR#2.
-  // NB: computeStreak now buckets in the Argentina calendar frame internally
-  // (#411), consistent with the rest of Insights. Its `now` param is a REAL
-  // instant (normalized with `.toUtc()` inside) — passing the ART-framed `now`
-  // above would double-shift and corrupt the day math, so we deliberately let
-  // it default to `DateTime.now()`, same as every other computeStreak caller
-  // (workout_days_providers / profile_stats / session_repository).
-  final streak = computeStreak(allSessions);
+  // streak — SEMANAS consecutivas en las que el atleta cumplió el objetivo de
+  // días de su rutina activa. Reemplaza a la racha por día de `computeStreak`
+  // (ADR-WRS-08); la semántica y por qué la semana en curso no corta están en
+  // `computeWeeklyStreak`.
+  // NB: bucketea en el frame ART internamente (#411). Su `now` es un instante
+  // REAL (se normaliza con `.toUtc()` adentro) — pasarle el `now` ya framed en
+  // ART de más arriba sería doble corrimiento, así que lo dejamos caer a
+  // `DateTime.now()`, igual que el resto de los callers.
+  final streak = computeWeeklyStreak(
+    sessions: allSessions,
+    weeklyTarget: weeklyTarget,
+  );
 
   // monthSessionsCount — sesiones finished en el mes calendario actual.
   // ADR-WRS-03: mes calendario ARGENTINA (mismo frame que el resto de Insights),
@@ -218,14 +226,13 @@ final weeklyInsightsProvider =
 /// Public (was `_mondayOfWeek`) so the SEMANA card's paging logic
 /// (`insights_screen.dart`) can compute prior/next week boundaries with the
 /// same calendar-arithmetic, DST-safe rule.
-DateTime mondayOfWeek(DateTime now) {
-  final daysFromMonday = now.weekday - DateTime.monday;
-  // Resta de días vía constructor de calendario para normalizar el borde a
-  // medianoche. UTC-flagged para vivir en el frame ART (mismo que las
-  // comparaciones de sesión vía toArgentina); pasarle argentinaNow() da el
-  // lunes calendario de Argentina.
-  return DateTime.utc(now.year, now.month, now.day - daysFromMonday);
-}
+/// La implementación vive en `core/utils/argentina_time.dart` como
+/// [mondayOfWeekArt] — `computeWeeklyStreak` la necesita y `core/` no puede
+/// importar una feature. Este alias se queda porque es el punto de import de
+/// todo lo que ya lo usaba (`insights_screen`, `session_recognition`,
+/// `volume_by_group_screen`): mover la definición no tiene por qué mover los
+/// imports.
+DateTime mondayOfWeek(DateTime now) => mondayOfWeekArt(now);
 
 /// QA #373: qué semana del PLAN representa la semana calendario pedida.
 ///

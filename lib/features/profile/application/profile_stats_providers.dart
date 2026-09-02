@@ -1,7 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/utils/streak_calculator.dart';
+import '../../../core/utils/weekly_streak_calculator.dart';
 import '../../workout/application/session_providers.dart';
+import '../../workout/application/weekly_streak_providers.dart';
 import '../../workout/domain/session.dart';
 import '../domain/user_session_stats.dart';
 
@@ -20,6 +21,10 @@ final userSessionStatsProvider =
     );
   }
 
+  // El objetivo se lee ANTES del await: usar `ref` después de un async gap
+  // es inseguro cuando el provider se recomputa a mitad de vuelo.
+  final weeklyTarget = ref.watch(weeklyStreakTargetProvider);
+
   final repo = ref.watch(sessionRepositoryProvider);
   final sessions = await repo.listByUid(uid);
 
@@ -28,6 +33,9 @@ final userSessionStatsProvider =
   return UserSessionStats(
     totalSessions: finished.length,
     totalVolumeKg: finished.fold<double>(0, (sum, s) => sum + s.totalVolumeKg),
-    streak: computeStreak(sessions),
+    streak: computeWeeklyStreak(
+      sessions: sessions,
+      weeklyTarget: weeklyTarget,
+    ),
   );
 });
