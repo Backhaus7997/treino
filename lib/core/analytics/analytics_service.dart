@@ -54,11 +54,24 @@ abstract class AnalyticsService {
     required String senderId,
   });
 
-  /// `AppointmentRepository.book` — cita propuesta/confirmada.
+  /// El PF agendó sesión(es) con un alumno.
+  ///
+  /// El docstring anterior decía `AppointmentRepository.book`, y eso apuntaba
+  /// a un método MUERTO: `book()` es el auto-booking del atleta, sin
+  /// llamadores en `lib/` desde #831 y con su rama de reactivación ya cerrada
+  /// por reglas. Los dos creadores vivos son `createByTrainer` y
+  /// `createRecurringByTrainer`.
+  ///
+  /// [appointmentId] es `null` para una serie recurrente: ahí no hay UNA cita,
+  /// y `createRecurringByTrainer` devuelve sólo cuántas creó. Ese es también
+  /// el motivo de [occurrences]: una serie de 8 semanas son 8 sesiones
+  /// agendadas, y contarlas como 1 subreporta la adopción de la feature
+  /// justo en el caso donde más se usa.
   Future<void> logAppointmentCreated({
-    required String appointmentId,
+    String? appointmentId,
     required String trainerId,
     required String athleteId,
+    int occurrences = 1,
   });
 
   /// Una ruta quedó visible. Lo dispara `RouteAnalytics` en cada navegación.
@@ -167,16 +180,22 @@ class FirebaseAnalyticsService implements AnalyticsService {
 
   @override
   Future<void> logAppointmentCreated({
-    required String appointmentId,
+    String? appointmentId,
     required String trainerId,
     required String athleteId,
+    int occurrences = 1,
   }) =>
       _analytics.logEvent(
         name: 'appointment_created',
         parameters: {
-          'appointment_id': appointmentId,
+          if (appointmentId != null) 'appointment_id': appointmentId,
           'trainer_id': trainerId,
           'athlete_id': athleteId,
+          'occurrences': occurrences,
+          // Deriva de `occurrences`, pero se manda explícito: segmentar por un
+          // booleano en la consola es un filtro, y por un entero es una
+          // fórmula.
+          'recurring': occurrences > 1,
         },
       );
 
@@ -244,9 +263,10 @@ class NoopAnalyticsService implements AnalyticsService {
 
   @override
   Future<void> logAppointmentCreated({
-    required String appointmentId,
+    String? appointmentId,
     required String trainerId,
     required String athleteId,
+    int occurrences = 1,
   }) async {}
 
   @override

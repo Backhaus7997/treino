@@ -9,6 +9,8 @@
 //         ADR-AGW-5 (athlete picker = trainerLinksStreamProvider active).
 //         ADR-AGW-6 (duration free 5..480 + preset chips {30,45,60,90,120}).
 //         Recurring DEFERRED (fuera de scope PR2).
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,6 +19,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../../app/theme/app_motion.dart';
 import '../../../../../app/theme/app_palette.dart';
+import '../../../../../core/analytics/analytics_service.dart';
 import '../../../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../../../core/widgets/motion/treino_success_check.dart';
 import '../../../../../core/widgets/motion/treino_tappable.dart';
@@ -195,7 +198,11 @@ class _NewSessionDialogState extends ConsumerState<NewSessionDialog> {
 
       final note = _noteController.text.trim();
 
-      await ref.read(appointmentRepositoryProvider).createByTrainer(
+      // Ver la nota en `new_session_sheet.dart`: el servicio se lee antes del
+      // await porque después el `ref` puede estar disposeado.
+      final analytics = ref.read(analyticsServiceProvider);
+
+      final appt = await ref.read(appointmentRepositoryProvider).createByTrainer(
             trainerId: trainerId,
             athleteId: athleteId,
             athleteDisplayName: athleteDisplayName,
@@ -203,6 +210,16 @@ class _NewSessionDialogState extends ConsumerState<NewSessionDialog> {
             durationMin: dur,
             noteBefore: note.isEmpty ? null : note,
           );
+
+      // Ver la nota del mismo evento en `new_session_sheet.dart`: va antes del
+      // guard de `mounted` porque la cita ya está escrita.
+      unawaited(
+        analytics.logAppointmentCreated(
+          appointmentId: appt.id,
+          trainerId: trainerId,
+          athleteId: athleteId,
+        ),
+      );
 
       if (!mounted) return;
       Navigator.of(context).pop(true);

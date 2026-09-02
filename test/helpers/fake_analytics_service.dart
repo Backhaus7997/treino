@@ -111,17 +111,20 @@ class FakeAnalyticsService implements AnalyticsService {
 
   @override
   Future<void> logAppointmentCreated({
-    required String appointmentId,
+    String? appointmentId,
     required String trainerId,
     required String athleteId,
+    int occurrences = 1,
   }) async {
     events.add('appointment_created');
     calls.add((
       name: 'appointment_created',
       params: {
-        'appointment_id': appointmentId,
+        if (appointmentId != null) 'appointment_id': appointmentId,
         'trainer_id': trainerId,
         'athlete_id': athleteId,
+        'occurrences': occurrences,
+        'recurring': occurrences > 1,
       }
     ));
   }

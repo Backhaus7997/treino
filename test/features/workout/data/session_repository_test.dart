@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart'
     show QueryDocumentSnapshot, Timestamp;
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/core/telemetry/non_fatal.dart';
 import 'package:treino/core/utils/argentina_time.dart';
 import 'package:treino/features/profile/data/user_public_profile_repository.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
@@ -815,6 +816,102 @@ void main() {
     expect(data.containsKey('rachaSemanas'), isFalse);
   });
 
+  // ── Fase 6 etapa 6: el write best-effort que fallaba en silencio ──────────
+  //
+  // ADR-WRS-10 dice que este write NO relanza, y eso sigue igual. Lo que
+  // cambia es que dejó de ser invisible: antes sólo iba a `developer.log`,
+  // que en el teléfono de un usuario real no lo lee nadie.
+  group('contadores públicos: la falla se reporta como non-fatal', () {
+    test('cuando updateCounters tira, el error sale por el reporter', () async {
+      final reporter = _RecordingNonFatalReporter();
+      final repoQueFalla = SessionRepository(
+        firestore: firestore,
+        publicProfileRepository: _ThrowingPublicProfileRepository(),
+        nonFatalReporter: reporter.call,
+      );
+
+      final sessionId = await createActiveSession();
+      await repoQueFalla.finish(
+        uid: uid,
+        sessionId: sessionId,
+        finishedAt: DateTime.utc(2026, 5, 18, 10, 45, 0),
+        totalVolumeKg: 75.0,
+        durationMin: 40,
+        weeklyTarget: 1,
+      );
+
+      expect(reporter.reports, hasLength(1));
+      expect(
+        reporter.reports.single.error.toString(),
+        contains('Simulated public profile write failure'),
+      );
+      // El reason es lo que se lee en la consola de Crashlytics: tiene que
+      // decir qué operación se perdió y de quién, no sólo el tipo de error.
+      expect(reporter.reports.single.reason, contains('SessionRepository.finish'));
+      expect(reporter.reports.single.reason, contains(uid));
+    });
+
+    test('cuando el write anda bien, no se reporta nada', () async {
+      final reporter = _RecordingNonFatalReporter();
+      final repoOk = SessionRepository(
+        firestore: firestore,
+        publicProfileRepository: publicProfileRepo,
+        nonFatalReporter: reporter.call,
+      );
+
+      final sessionId = await createActiveSession();
+      await repoOk.finish(
+        uid: uid,
+        sessionId: sessionId,
+        finishedAt: DateTime.utc(2026, 5, 18, 10, 45, 0),
+        totalVolumeKg: 75.0,
+        durationMin: 40,
+        weeklyTarget: 1,
+      );
+
+      expect(reporter.reports, isEmpty);
+    });
+
+    test('reportar el error NO puede romper el cierre de sesión', () async {
+      // Un reporter roto es telemetría rota, no un entrenamiento roto. Si esto
+      // se cae, la prioridad quedó invertida otra vez y el atleta pierde la
+      // sesión por un contador.
+      final repoConReporterRoto = SessionRepository(
+        firestore: firestore,
+        publicProfileRepository: _ThrowingPublicProfileRepository(),
+        nonFatalReporter: (_, __, {required String reason}) async =>
+            throw StateError('el reporter explotó'),
+      );
+
+      final sessionId = await createActiveSession();
+      await expectLater(
+        repoConReporterRoto.finish(
+          uid: uid,
+          sessionId: sessionId,
+          finishedAt: DateTime.utc(2026, 5, 18, 10, 45, 0),
+          totalVolumeKg: 75.0,
+          durationMin: 40,
+          weeklyTarget: 1,
+        ),
+        completes,
+      );
+    });
+
+    test('el reporter real no explota sin Firebase inicializado', () async {
+      // Es el entorno de `flutter test`. Si `reportNonFatal` no tuviera el
+      // guard de `Firebase.apps.isEmpty`, cualquier test que ejerza este
+      // camino comería un `[core/no-app]`.
+      await expectLater(
+        reportNonFatal(
+          Exception('x'),
+          StackTrace.current,
+          reason: 'prueba del guard',
+        ),
+        completes,
+      );
+    });
+  });
+
   // SCENARIO-321 failure: when public profile write fails, finish() still
   // completes and the primary session update is not affected
   test(
@@ -998,6 +1095,19 @@ void main() {
 }
 
 // ─── Test helpers ─────────────────────────────────────────────────────────────
+
+/// Captura lo que [SessionRepository] reporta como NO FATAL.
+class _RecordingNonFatalReporter {
+  final List<({Object error, String reason})> reports = [];
+
+  Future<void> call(
+    Object error,
+    StackTrace stack, {
+    required String reason,
+  }) async {
+    reports.add((error: error, reason: reason));
+  }
+}
 
 class _ThrowingPublicProfileRepository extends UserPublicProfileRepository {
   _ThrowingPublicProfileRepository()

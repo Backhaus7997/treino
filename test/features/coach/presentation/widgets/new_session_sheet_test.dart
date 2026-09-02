@@ -24,6 +24,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:treino/core/analytics/analytics_service.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/utils/firestore_write.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
@@ -40,6 +41,8 @@ import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
 import 'package:treino/l10n/app_l10n.dart';
+
+import '../../../../helpers/fake_analytics_service.dart';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -174,9 +177,11 @@ List<Override> _overrides({
   _MockAppointmentRepository? appointmentRepo,
   AvailabilityRepository? availabilityRepo,
   bool errorLinks = false,
+  FakeAnalyticsService? analytics,
 }) {
   return [
     currentUidProvider.overrideWithValue(_kTrainerId),
+    if (analytics != null) analyticsServiceProvider.overrideWithValue(analytics),
     trainerLinksStreamProvider.overrideWith(
       (ref) => errorLinks
           ? Stream<List<TrainerLink>>.error(Exception('links failed'))
@@ -517,6 +522,7 @@ void main() {
       WidgetTester tester, {
       required _FakeAvailabilityRepository availabilityRepo,
       required String weekdayLabel,
+      FakeAnalyticsService? analytics,
     }) async {
       await tester.pumpWidget(_wrap(
         overrides: _overrides(
@@ -524,6 +530,7 @@ void main() {
           profiles: {_kAthleteId1: _pub(_kAthleteId1, 'Carlos Pérez')},
           appointmentRepo: mockAppointmentRepo,
           availabilityRepo: availabilityRepo,
+          analytics: analytics,
         ),
       ));
       await tester.pumpAndSettle();
@@ -586,6 +593,88 @@ void main() {
         ),
       ).captured;
       expect(captured.single, equals({picked.weekday}));
+    });
+
+    // Fase 6 etapa 6: una serie de N sesiones tiene que contar N, no 1.
+    // `createRecurringByTrainer` devuelve sólo el conteo —no hay UN id de
+    // cita— y por eso el evento viaja sin `appointment_id` y con
+    // `occurrences`.
+    testWidgets('la serie emite appointment_created con occurrences = N',
+        (tester) async {
+      _useTallViewport(tester);
+      final analytics = FakeAnalyticsService();
+      final picked = pickWeekday();
+
+      when(
+        () => mockAppointmentRepo.createRecurringByTrainer(
+          trainerId: any(named: 'trainerId'),
+          athleteId: any(named: 'athleteId'),
+          athleteDisplayName: any(named: 'athleteDisplayName'),
+          weekdays: any(named: 'weekdays'),
+          startHour: any(named: 'startHour'),
+          startMinute: any(named: 'startMinute'),
+          durationMin: any(named: 'durationMin'),
+          fromDate: any(named: 'fromDate'),
+          untilDate: any(named: 'untilDate'),
+          noteBefore: any(named: 'noteBefore'),
+        ),
+      ).thenAnswer((_) async => 3);
+
+      await setUpRecurring(
+        tester,
+        availabilityRepo: _FakeAvailabilityRepository(),
+        weekdayLabel: picked.label,
+        analytics: analytics,
+      );
+
+      await tester.tap(find.text('REGISTRAR SERIE'));
+      await tester.pumpAndSettle();
+
+      final call = analytics.calls
+          .firstWhere((c) => c.name == 'appointment_created')
+          .params;
+      expect(call['occurrences'], 3);
+      expect(call['recurring'], isTrue);
+      expect(call['trainer_id'], _kTrainerId);
+      expect(call['athlete_id'], _kAthleteId1);
+      // No hay UNA cita: mandar un id acá sería inventar cuál de las 3.
+      expect(call.containsKey('appointment_id'), isFalse);
+    });
+
+    testWidgets('si no se creó ninguna sesión, NO se emite el evento',
+        (tester) async {
+      // `count == 0` = todas las ocurrencias caían en el pasado. La UI ya
+      // avisa que no se creó nada; analytics no puede contar lo contrario.
+      _useTallViewport(tester);
+      final analytics = FakeAnalyticsService();
+      final picked = pickWeekday();
+
+      when(
+        () => mockAppointmentRepo.createRecurringByTrainer(
+          trainerId: any(named: 'trainerId'),
+          athleteId: any(named: 'athleteId'),
+          athleteDisplayName: any(named: 'athleteDisplayName'),
+          weekdays: any(named: 'weekdays'),
+          startHour: any(named: 'startHour'),
+          startMinute: any(named: 'startMinute'),
+          durationMin: any(named: 'durationMin'),
+          fromDate: any(named: 'fromDate'),
+          untilDate: any(named: 'untilDate'),
+          noteBefore: any(named: 'noteBefore'),
+        ),
+      ).thenAnswer((_) async => 0);
+
+      await setUpRecurring(
+        tester,
+        availabilityRepo: _FakeAvailabilityRepository(),
+        weekdayLabel: picked.label,
+        analytics: analytics,
+      );
+
+      await tester.tap(find.text('REGISTRAR SERIE'));
+      await tester.pumpAndSettle();
+
+      expect(analytics.events, isNot(contains('appointment_created')));
     });
 
     testWidgets('cancelar en el aviso NO llama a createRecurringByTrainer',
