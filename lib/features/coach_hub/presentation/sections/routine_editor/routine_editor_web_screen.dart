@@ -20,7 +20,7 @@ import '../../../../profile/application/user_public_profile_providers.dart';
 import '../../../../profile/domain/experience_level.dart';
 import '../../../../workout/application/assigned_routine_providers.dart';
 import '../../../../workout/application/routine_providers.dart'
-    show routineRepositoryProvider;
+    show invalidateRoutineById, routineRepositoryProvider;
 import '../../../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../../../../workout/domain/exercise.dart';
@@ -1423,6 +1423,10 @@ class _RoutineEditorWebScreenState
     }).toList();
 
     final repo = ref.read(routineRepositoryProvider);
+    // Captured before the write's async gap: the post-save cache invalidation
+    // must land even if this screen is disposed mid-save, and a WidgetRef
+    // touched after dispose throws. See [invalidateRoutineById].
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
       if (_isEditing) {
         // Preserve the loaded routine's identity (id, assignedBy/To, source,
@@ -1447,6 +1451,10 @@ class _RoutineEditorWebScreenState
         } else {
           await repo.updateAssigned(uid: trainerUid, draft: draft);
         }
+        // The one-shot single-doc caches keep the PRE-edit routine alive for
+        // the whole process otherwise — the mobile athlete would start a
+        // session from the plan as it was before the trainer touched it.
+        invalidateRoutineById(container, draft.id);
       } else if (widget.isTemplate) {
         // A template has no athlete. createTemplate forces
         // source=trainer-template / assignedTo=null / visibility=private to

@@ -9,6 +9,7 @@ import 'package:treino/features/coach_hub/presentation/sections/rutinas/routine_
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
 import 'package:treino/features/workout/data/routine_repository.dart';
+import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 
 class _MockRoutineRepository extends Mock implements RoutineRepository {}
@@ -63,6 +64,39 @@ void main() {
       expect(listCalls, 2);
     });
 
+    test(
+        'invalida también routineByIdProvider — la rutina archivada dejaba de '
+        'aparecer en el listado pero seguía siendo arrancable', () async {
+      when(() => mockRepo.archive(any())).thenAnswer((_) async {});
+
+      // El doc "vivo" antes de archivar, y el archivado después. Sin la
+      // invalidación, `routineByIdProvider` sigue devolviendo el primero para
+      // toda la vida del proceso: su keepAlive sólo se suelta si el fetch tira.
+      var archived = false;
+      var getByIdCalls = 0;
+      when(() => mockRepo.getById('r1')).thenAnswer((_) async {
+        getByIdCalls++;
+        return archived ? null : _makeRoutine('r1');
+      });
+
+      final container = makeContainer();
+      addTearDown(container.dispose);
+
+      final before = await container.read(routineByIdProvider('r1').future);
+      expect(before, isNotNull);
+      expect(getByIdCalls, 1);
+
+      archived = true;
+      await container
+          .read(routineActionsProvider.notifier)
+          .archive(routineId: 'r1', athleteId: _athleteId);
+
+      final after = await container.read(routineByIdProvider('r1').future);
+      expect(after, isNull);
+      expect(getByIdCalls, 2,
+          reason: 'la caché single-doc tiene que refetchear tras el archive');
+    });
+
     test('devuelve false y no propaga la excepción cuando repo.archive falla',
         () async {
       when(() => mockRepo.archive(any())).thenThrow(Exception('boom'));
@@ -77,3 +111,10 @@ void main() {
     });
   });
 }
+
+Routine _makeRoutine(String id) => Routine(
+      id: id,
+      name: 'Plan',
+      level: ExperienceLevel.intermediate,
+      days: const [],
+    );
