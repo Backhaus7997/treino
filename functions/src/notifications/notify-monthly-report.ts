@@ -6,6 +6,20 @@
  * las sesiones del mes; filtrar status/wasFullyCompleted en memoria evita un
  * índice compuesto y, sobre todo, evita una query por cada usuario.
  *
+ * ⚠️  ÍNDICE: la collectionGroup query de abajo exige un single-field index de
+ * scope COLLECTION_GROUP sobre `sessions.startedAt`, que NO es automático —
+ * los automáticos son sólo de scope COLLECTION. Se declara como
+ * `fieldOverrides` en `firestore.indexes.json`.
+ *
+ * Y ahí está la trampa: un fieldOverride REEMPLAZA la configuración automática
+ * del campo, no la extiende. Declarar sólo el COLLECTION_GROUP le borra a
+ * `startedAt` los índices de scope COLLECTION, y con eso se caen las SEIS
+ * queries que ordenan por ese campo — todo el historial de entrenamientos
+ * (`SessionRepository.listByUid`), los contadores del finish y
+ * `ranking-aggregate.ts`. Por eso el override lista los tres: COLLECTION
+ * ASC + DESC (los que replican el default) y COLLECTION_GROUP ASC (el nuevo).
+ * `firestore.indexes.json` no admite comentarios; la razón vive acá.
+ *
  * Sólo se notifican atletas con al menos una sesión realmente completada. El
  * marcador `lastMonthlyReportNotifiedMonth` guarda el mes REPORTADO (YYYY-MM),
  * por lo que los reintentos secuenciales del scheduler no vuelven a enviar.
