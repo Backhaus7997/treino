@@ -104,7 +104,8 @@ class OnboardingVolumeCard extends StatelessWidget {
                           color: i >= _bars.length - 2
                               ? palette.accent
                               : palette.textMuted.withValues(alpha: 0.18),
-                          borderRadius: BorderRadius.circular(AppDecorativeRadii.previewChartBar),
+                          borderRadius: BorderRadius.circular(
+                              AppDecorativeRadii.previewChartBar),
                         ),
                       ),
                     ),
@@ -470,7 +471,8 @@ class OnboardingPhotoPost extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 18),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(AppDecorativeRadii.previewPhoto),
+              borderRadius:
+                  BorderRadius.circular(AppDecorativeRadii.previewPhoto),
               child: SizedBox(
                 height: 190,
                 width: double.infinity,

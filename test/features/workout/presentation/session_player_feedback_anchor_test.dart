@@ -366,8 +366,7 @@ void main() {
 
     testWidgets(
         'sin PF vinculado la superserie completa vuelve a la línea unida — el '
-        'resumen no crece a N filas para nadie',
-        (tester) async {
+        'resumen no crece a N filas para nadie', (tester) async {
       // El desglose por miembro existe SOLO para que cada botón sepa a qué
       // ejercicio apunta. El atleta sin PF nunca ve el botón, así que pagarle
       // N líneas en un resumen COLAPSADO sería empeorarle la pantalla a cambio

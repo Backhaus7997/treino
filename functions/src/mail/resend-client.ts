@@ -60,7 +60,7 @@ export class MailSendError extends Error {
  * Builds a MailSender bound to an API key and a verified sender address.
  *
  * @param apiKey - Resend API key. Injected from the RESEND_API_KEY secret.
- * @param from   - Verified sender, e.g. "TREINO <hola@send.gettreino.com>". The domain
+ * @param from   - Verified sender, e.g. "TREINO <equipo@send.gettreino.com>". The domain
  *                 MUST be DNS-verified in Resend or every send returns 403.
  */
 export function createResendSender(apiKey: string, from: string): MailSender {

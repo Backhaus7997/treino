@@ -1070,6 +1070,37 @@
   "@performanceChartMetricCooper": {},
   "performanceChartMetricSitAndReach": "Flexibilidad",
   "@performanceChartMetricSitAndReach": {},
+  "routineEditorSetsMissingReps": "{n, plural, =1{1 set sin reps} other{{n} sets sin reps}}",
+  "@routineEditorSetsMissingReps": {
+    "description": "Resumen de error en la cabecera colapsada de un ejercicio",
+    "placeholders": { "n": { "type": "int" } }
+  },
+  "routineEditorEmptyDayTitle": "DÍA VACÍO",
+  "@routineEditorEmptyDayTitle": {},
+  "routineEditorEmptyDayBody": "Agregá el primer ejercicio y ya queda listo para entrenar.",
+  "@routineEditorEmptyDayBody": {},
+  "routineEditorDayTabA11y": "Día {n}{estado}",
+  "@routineEditorDayTabA11y": {
+    "placeholders": { "n": { "type": "int" }, "estado": { "type": "String" } }
+  },
+  "routineEditorPlanSheetTitle": "DATOS DEL PLAN",
+  "@routineEditorPlanSheetTitle": {},
+  "routineEditorPlanSheetA11y": "Datos del plan",
+  "@routineEditorPlanSheetA11y": {},
+  "routineEditorSubtitleSelfPrivate": "Tu rutina · solo la ves vos",
+  "@routineEditorSubtitleSelfPrivate": {},
+  "routineEditorSubtitleSelfShared": "Tu rutina · compartida en tu perfil",
+  "@routineEditorSubtitleSelfShared": {},
+  "routineEditorSubtitleCustomizing": "Copia tuya",
+  "@routineEditorSubtitleCustomizing": {},
+  "routineEditorSubtitleAssigned": "Plan asignado",
+  "@routineEditorSubtitleAssigned": {},
+  "routineEditorSubtitleTemplate": "Plantilla reusable",
+  "@routineEditorSubtitleTemplate": {},
+  "routineEditorSubtitleWeeks": "{n, plural, =1{1 semana} other{{n} semanas}}",
+  "@routineEditorSubtitleWeeks": {
+    "placeholders": { "n": { "type": "int" } }
+  },
   "routineEditorDayName": "Día {n}",
   "@routineEditorDayName": {
     "placeholders": {
@@ -1149,6 +1180,19 @@
   "@routineEditorSlotMenuMoveDown": {},
   "routineEditorSlotMenuRemove": "Eliminar",
   "@routineEditorSlotMenuRemove": {},
+  "routineEditorSupersetHeader": "SUPERSERIE · {count} {count, plural, =1{EJERCICIO} other{EJERCICIOS}}",
+  "@routineEditorSupersetHeader": {
+    "description": "Encabezado del bloque de superserie en el editor de rutina, con cuántos ejercicios agrupa.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "routineEditorSlotMenuHint": "El ⋮ de cada ejercicio tiene cambiar, copiar sets y mover.",
+  "@routineEditorSlotMenuHint": {
+    "description": "Línea de ayuda debajo de las acciones del día: descubre los atajos que viven en el menú de tres puntos de cada ejercicio."
+  },
   "routineEditorRestLabel": "Descanso",
   "@routineEditorRestLabel": {},
   "routineEditorAddSet": "+ Agregar set",
@@ -1163,6 +1207,37 @@
   "@routineEditorFillKgEmpty": {},
   "routineEditorFillKgUndo": "Deshacer",
   "@routineEditorFillKgUndo": {},
+  "routineEditorFillColumnLabel": "A TODAS",
+  "@routineEditorFillColumnLabel": {
+    "description": "Botón de la barra sobre el teclado que replica el valor de la celda enfocada en toda su columna."
+  },
+  "routineEditorFillColumnA11y": "Replicar este valor en toda la columna",
+  "@routineEditorFillColumnA11y": {},
+  "routineEditorAccessoryContext": "{ejercicio} · set {set} · {campo}",
+  "@routineEditorAccessoryContext": {
+    "description": "Contexto debajo de los atajos: sobre qué celda actúan.",
+    "placeholders": {
+      "ejercicio": {"type": "String"},
+      "set": {"type": "int"},
+      "campo": {"type": "String"}
+    }
+  },
+  "routineEditorFieldKg": "kg",
+  "@routineEditorFieldKg": {},
+  "routineEditorFieldReps": "reps",
+  "@routineEditorFieldReps": {},
+  "routineEditorRepsStepIncreaseA11y": "Sumar {amount} repeticiones",
+  "@routineEditorRepsStepIncreaseA11y": {
+    "placeholders": {"amount": {"type": "String"}}
+  },
+  "routineEditorRepsStepDecreaseA11y": "Restar {amount} repeticiones",
+  "@routineEditorRepsStepDecreaseA11y": {
+    "placeholders": {"amount": {"type": "String"}}
+  },
+  "routineEditorFillColumnEmpty": "Cargá el peso de este set para poder replicarlo.",
+  "@routineEditorFillColumnEmpty": {
+    "description": "La celda desde la que se pidió replicar está vacía. Reemplaza a routineEditorFillKgEmpty, que hablaba del primer set porque el disparador vivía en el header."
+  },
   "routineEditorKgStepIncreaseA11y": "Sumar {amount} kilos al peso",
   "@routineEditorKgStepIncreaseA11y": {
     "description": "Screen-reader label for a KG stepper button that adds weight to the set being edited.",
@@ -3477,5 +3552,100 @@
   "coachSessionFeedbackLoadError": "No pudimos cargar los reportes del alumno.",
   "@coachSessionFeedbackLoadError": {"description": "Error al cargar el feedback por ejercicio en las superficies del PF."},
   "sessionFeedbackLoadError": "No pudimos cargar tus reportes.",
-  "@sessionFeedbackLoadError": {"description": "Mismo fallo que coachSessionFeedbackLoadError pero en la superficie del PROPIO alumno: ahi los reportes son suyos, no 'del alumno'."}
+  "@sessionFeedbackLoadError": {"description": "Mismo fallo que coachSessionFeedbackLoadError pero en la superficie del PROPIO alumno: ahi los reportes son suyos, no 'del alumno'."},
+  "routineEditorGoToProblem": "IR",
+  "@routineEditorGoToProblem": {
+    "description": "Botón del pie que salta al primer día con un problema."
+  },
+  "routineEditorGoToProblemA11y": "Ir al primer problema",
+  "@routineEditorGoToProblemA11y": {},
+  "routineEditorFooterSummary": "{dias, plural, =1{1 día} other{{dias} días}} · {sets, plural, =1{1 set} other{{sets} sets}} · todo listo",
+  "@routineEditorFooterSummary": {
+    "description": "Resumen del pie cuando el plan está completo.",
+    "placeholders": {"dias": {"type": "int"}, "sets": {"type": "int"}}
+  },
+  "routineEditorProblemMissingName": "Falta el nombre del plan",
+  "@routineEditorProblemMissingName": {},
+  "routineEditorProblemMissingSplit": "Falta el split",
+  "@routineEditorProblemMissingSplit": {},
+  "routineEditorProblemEmptyDay": "Día {dia}: sin ejercicios",
+  "@routineEditorProblemEmptyDay": {
+    "placeholders": {"dia": {"type": "int"}}
+  },
+  "routineEditorProblemDuplicate": "Día {dia}: ejercicio repetido",
+  "@routineEditorProblemDuplicate": {
+    "placeholders": {"dia": {"type": "int"}}
+  },
+  "routineEditorProblemIncompleteSets": "Día {dia}: {count, plural, =1{1 set sin completar} other{{count} sets sin completar}}",
+  "@routineEditorProblemIncompleteSets": {
+    "description": "Un set incompleto es uno sin repeticiones (o sin tiempo, en modo duración).",
+    "placeholders": {"dia": {"type": "int"}, "count": {"type": "int"}}
+  },
+  "routineEditorProblemOtherWeek": "Semana {semana}: día {dia} sin completar",
+  "@routineEditorProblemOtherWeek": {
+    "placeholders": {"semana": {"type": "int"}, "dia": {"type": "int"}}
+  },
+  "routineEditorQuickEntryToggle": "RÁPIDO",
+  "@routineEditorQuickEntryToggle": {
+    "description": "Botón de la cabecera del día que abre la entrada rápida."
+  },
+  "routineEditorQuickEntryToggleA11y": "Entrada rápida",
+  "@routineEditorQuickEntryToggleA11y": {},
+  "routineEditorQuickEntryHint": "banca 4x10 60",
+  "@routineEditorQuickEntryHint": {
+    "description": "Placeholder del campo: enseña el formato con un ejemplo en vez de explicarlo."
+  },
+  "routineEditorQuickEntryWillAdd": "Se agrega como {sets, plural, =1{1 set} other{{sets} sets}} × {reps} a {peso}.",
+  "@routineEditorQuickEntryWillAdd": {
+    "description": "Confirma qué se va a agregar, antes de tocar.",
+    "placeholders": {"sets": {"type": "int"}, "reps": {"type": "String"}, "peso": {"type": "String"}}
+  },
+  "routineEditorQuickEntryNoWeight": "sin peso",
+  "@routineEditorQuickEntryNoWeight": {},
+  "routineEditorQuickEntryEmptyHint": "Buscá el ejercicio y tocalo. Después escribís 4x10 y el peso.",
+  "@routineEditorQuickEntryEmptyHint": {},
+  "routineEditorQuickEntryPickedHint": "4x10 y el peso. Por set con comas: 4x10,8,6,4 · 55,45,35,25. Por tiempo: 3x30s o 3x1:30. Decimales con punto: 62.5",
+  "@routineEditorQuickEntryPickedHint": {
+    "description": "Ayuda una vez elegido el ejercicio: enseña las dos listas con un ejemplo de cada una."
+  },
+  "routineEditorQuickEntryAdd": "AGREGAR",
+  "@routineEditorQuickEntryAdd": {
+    "description": "Confirma la entrada rápida. Existe porque elegir el ejercicio dejó de agregarlo."
+  },
+  "routineEditorExerciseSheetTitle": "ACCIONES",
+  "@routineEditorExerciseSheetTitle": {
+    "description": "Título de la hoja de acciones cuando todavía no se eligió un ejercicio; normalmente se muestra el nombre del ejercicio."
+  },
+  "routineEditorSlotMenuCollapse": "Colapsar sets",
+  "@routineEditorSlotMenuCollapse": {},
+  "routineEditorSlotMenuExpand": "Desplegar sets",
+  "@routineEditorSlotMenuExpand": {},
+  "coachTemplateEditorTitle": "Nueva plantilla",
+  "@coachTemplateEditorTitle": {
+    "description": "Título del editor al CREAR una plantilla. Antes reusaba el de asignar un plan y decía 'Crear plan'."
+  },
+  "coachTemplateEditorEditTitle": "Editar plantilla",
+  "@coachTemplateEditorEditTitle": {},
+  "coachTemplateEditorSubmit": "GUARDAR PLANTILLA",
+  "@coachTemplateEditorSubmit": {
+    "description": "CTA del editor de plantillas. Antes reusaba el de asignar y decía 'ASIGNAR PLAN' en una plantilla que no se asigna a nadie."
+  },
+  "routineEditorAddNothingNew": "Esos ejercicios ya estaban en el día.",
+  "@routineEditorAddNothingNew": {
+    "description": "El picker devolvió sólo ejercicios que el día ya tenía. Sin este aviso la pantalla no cambiaba y el tap parecía roto."
+  },
+  "routineEditorSupersetNeedsTwo": "Una superserie necesita dos ejercicios. Se agregó uno solo, suelto.",
+  "@routineEditorSupersetNeedsTwo": {
+    "description": "Se pidió una superserie pero sólo entró un ejercicio nuevo: el resto ya estaba en el día."
+  },
+  "routineEditorSlotMenuMergeUp": "Unir con el de arriba",
+  "@routineEditorSlotMenuMergeUp": {
+    "description": "Agrupa este ejercicio con el anterior en una superserie. Es el camino que faltaba para ejercicios YA cargados: el botón + Superserie sólo agrega ejercicios nuevos agrupados."
+  },
+  "routineEditorSlotMenuUngroup": "Sacar de la superserie",
+  "@routineEditorSlotMenuUngroup": {},
+  "routineEditorSlotMenuMergeDown": "Unir con el de abajo",
+  "@routineEditorSlotMenuMergeDown": {
+    "description": "Agrupa este ejercicio con el siguiente. Sirve sobre todo para sumarse a una superserie que ya existe más abajo."
+  }
 }

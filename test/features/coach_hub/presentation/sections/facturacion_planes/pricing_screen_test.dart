@@ -103,6 +103,52 @@ void main() {
     expect(find.text('POR AÑO'), findsNWidgets(3));
   });
 
+  testWidgets('en mensual no hay tachado ni chip de descuento — no hay oferta',
+      (tester) async {
+    await pumpDesktop(tester);
+
+    expect(find.textContaining('%'), findsNothing);
+    expect(find.text('\$144.000'), findsNothing);
+  });
+
+  testWidgets('en anual cada plan muestra su precio de lista tachado y el %',
+      (tester) async {
+    await pumpDesktop(tester);
+    await tester.tap(find.text('Anual'));
+    await tester.pumpAndSettle();
+
+    // 12 meses al precio mensual — contra eso se compara el anual.
+    expect(find.text('\$144.000'), findsOneWidget); // Plan 1: 12.000 x 12
+    expect(find.text('\$264.000'), findsOneWidget); // Plan 2: 22.000 x 12
+    expect(find.text('\$468.000'), findsOneWidget); // Plan 3: 39.000 x 12
+
+    // El % se CALCULA (2 meses gratis sobre 12 = 17%), no está hardcodeado.
+    // Free no tiene oferta: son 3 chips, no 4.
+    expect(find.text('-17%'), findsNWidgets(3));
+  });
+
+  testWidgets(
+      'FREE reserva el alto de la fila de oferta: pasar a anual no descalza '
+      'la grilla', (tester) async {
+    await pumpDesktop(tester);
+
+    // NO se comparan las dos `y` en crudo: PLAN 1 ya arranca 14px más abajo
+    // que FREE por la cinta «MÁS POPULAR», y siempre fue así. Lo que tiene
+    // que quedar invariante es la DISTANCIA entre los dos precios-héroe: si
+    // FREE no reservara el alto de la fila de oferta, al pasar a anual PLAN 1
+    // bajaría y FREE no, y la separación crecería.
+    double separacion(String free, String plan1) =>
+        tester.getTopLeft(find.text(plan1)).dy -
+        tester.getTopLeft(find.text(free)).dy;
+
+    final mensual = separacion('0', '12.000');
+    await tester.tap(find.text('Anual'));
+    await tester.pumpAndSettle();
+    final anual = separacion('0', '120.000');
+
+    expect(anual, mensual);
+  });
+
   testWidgets('Plan 1 marcado como MÁS POPULAR', (tester) async {
     await pumpDesktop(tester);
 

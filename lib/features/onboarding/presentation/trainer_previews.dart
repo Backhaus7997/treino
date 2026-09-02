@@ -672,7 +672,8 @@ class TrainerFeedPreview extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               ClipRRect(
-                borderRadius: BorderRadius.circular(AppDecorativeRadii.previewPhoto),
+                borderRadius:
+                    BorderRadius.circular(AppDecorativeRadii.previewPhoto),
                 child: const SizedBox(
                   height: 180,
                   width: double.infinity,
@@ -989,7 +990,8 @@ class _SegmentedPill extends StatelessWidget {
       decoration: BoxDecoration(
         color: palette.bgCard,
         border: Border.all(color: palette.border),
-        borderRadius: BorderRadius.circular(AppDecorativeRadii.previewCardFrame),
+        borderRadius:
+            BorderRadius.circular(AppDecorativeRadii.previewCardFrame),
       ),
       child: Row(
         children: [

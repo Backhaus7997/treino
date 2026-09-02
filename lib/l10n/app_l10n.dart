@@ -3368,6 +3368,78 @@ abstract class AppL10n {
   /// **'Flexibilidad'**
   String get performanceChartMetricSitAndReach;
 
+  /// Resumen de error en la cabecera colapsada de un ejercicio
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{n, plural, =1{1 set sin reps} other{{n} sets sin reps}}'**
+  String routineEditorSetsMissingReps(int n);
+
+  /// No description provided for @routineEditorEmptyDayTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DÍA VACÍO'**
+  String get routineEditorEmptyDayTitle;
+
+  /// No description provided for @routineEditorEmptyDayBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Agregá el primer ejercicio y ya queda listo para entrenar.'**
+  String get routineEditorEmptyDayBody;
+
+  /// No description provided for @routineEditorDayTabA11y.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Día {n}{estado}'**
+  String routineEditorDayTabA11y(int n, String estado);
+
+  /// No description provided for @routineEditorPlanSheetTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DATOS DEL PLAN'**
+  String get routineEditorPlanSheetTitle;
+
+  /// No description provided for @routineEditorPlanSheetA11y.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Datos del plan'**
+  String get routineEditorPlanSheetA11y;
+
+  /// No description provided for @routineEditorSubtitleSelfPrivate.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu rutina · solo la ves vos'**
+  String get routineEditorSubtitleSelfPrivate;
+
+  /// No description provided for @routineEditorSubtitleSelfShared.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu rutina · compartida en tu perfil'**
+  String get routineEditorSubtitleSelfShared;
+
+  /// No description provided for @routineEditorSubtitleCustomizing.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Copia tuya'**
+  String get routineEditorSubtitleCustomizing;
+
+  /// No description provided for @routineEditorSubtitleAssigned.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Plan asignado'**
+  String get routineEditorSubtitleAssigned;
+
+  /// No description provided for @routineEditorSubtitleTemplate.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Plantilla reusable'**
+  String get routineEditorSubtitleTemplate;
+
+  /// No description provided for @routineEditorSubtitleWeeks.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{n, plural, =1{1 semana} other{{n} semanas}}'**
+  String routineEditorSubtitleWeeks(int n);
+
   /// No description provided for @routineEditorDayName.
   ///
   /// In es_AR, this message translates to:
@@ -3494,6 +3566,18 @@ abstract class AppL10n {
   /// **'Eliminar'**
   String get routineEditorSlotMenuRemove;
 
+  /// Encabezado del bloque de superserie en el editor de rutina, con cuántos ejercicios agrupa.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SUPERSERIE · {count} {count, plural, =1{EJERCICIO} other{EJERCICIOS}}'**
+  String routineEditorSupersetHeader(int count);
+
+  /// Línea de ayuda debajo de las acciones del día: descubre los atajos que viven en el menú de tres puntos de cada ejercicio.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'El ⋮ de cada ejercicio tiene cambiar, copiar sets y mover.'**
+  String get routineEditorSlotMenuHint;
+
   /// No description provided for @routineEditorRestLabel.
   ///
   /// In es_AR, this message translates to:
@@ -3529,6 +3613,54 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Deshacer'**
   String get routineEditorFillKgUndo;
+
+  /// Botón de la barra sobre el teclado que replica el valor de la celda enfocada en toda su columna.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'A TODAS'**
+  String get routineEditorFillColumnLabel;
+
+  /// No description provided for @routineEditorFillColumnA11y.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Replicar este valor en toda la columna'**
+  String get routineEditorFillColumnA11y;
+
+  /// Contexto debajo de los atajos: sobre qué celda actúan.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{ejercicio} · set {set} · {campo}'**
+  String routineEditorAccessoryContext(String ejercicio, int set, String campo);
+
+  /// No description provided for @routineEditorFieldKg.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'kg'**
+  String get routineEditorFieldKg;
+
+  /// No description provided for @routineEditorFieldReps.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'reps'**
+  String get routineEditorFieldReps;
+
+  /// No description provided for @routineEditorRepsStepIncreaseA11y.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sumar {amount} repeticiones'**
+  String routineEditorRepsStepIncreaseA11y(String amount);
+
+  /// No description provided for @routineEditorRepsStepDecreaseA11y.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Restar {amount} repeticiones'**
+  String routineEditorRepsStepDecreaseA11y(String amount);
+
+  /// La celda desde la que se pidió replicar está vacía. Reemplaza a routineEditorFillKgEmpty, que hablaba del primer set porque el disparador vivía en el header.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cargá el peso de este set para poder replicarlo.'**
+  String get routineEditorFillColumnEmpty;
 
   /// Screen-reader label for a KG stepper button that adds weight to the set being edited.
   ///
@@ -7100,6 +7232,174 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'No pudimos cargar tus reportes.'**
   String get sessionFeedbackLoadError;
+
+  /// Botón del pie que salta al primer día con un problema.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'IR'**
+  String get routineEditorGoToProblem;
+
+  /// No description provided for @routineEditorGoToProblemA11y.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ir al primer problema'**
+  String get routineEditorGoToProblemA11y;
+
+  /// Resumen del pie cuando el plan está completo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{dias, plural, =1{1 día} other{{dias} días}} · {sets, plural, =1{1 set} other{{sets} sets}} · todo listo'**
+  String routineEditorFooterSummary(int dias, int sets);
+
+  /// No description provided for @routineEditorProblemMissingName.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Falta el nombre del plan'**
+  String get routineEditorProblemMissingName;
+
+  /// No description provided for @routineEditorProblemMissingSplit.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Falta el split'**
+  String get routineEditorProblemMissingSplit;
+
+  /// No description provided for @routineEditorProblemEmptyDay.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Día {dia}: sin ejercicios'**
+  String routineEditorProblemEmptyDay(int dia);
+
+  /// No description provided for @routineEditorProblemDuplicate.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Día {dia}: ejercicio repetido'**
+  String routineEditorProblemDuplicate(int dia);
+
+  /// Un set incompleto es uno sin repeticiones (o sin tiempo, en modo duración).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Día {dia}: {count, plural, =1{1 set sin completar} other{{count} sets sin completar}}'**
+  String routineEditorProblemIncompleteSets(int dia, int count);
+
+  /// No description provided for @routineEditorProblemOtherWeek.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Semana {semana}: día {dia} sin completar'**
+  String routineEditorProblemOtherWeek(int semana, int dia);
+
+  /// Botón de la cabecera del día que abre la entrada rápida.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'RÁPIDO'**
+  String get routineEditorQuickEntryToggle;
+
+  /// No description provided for @routineEditorQuickEntryToggleA11y.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Entrada rápida'**
+  String get routineEditorQuickEntryToggleA11y;
+
+  /// Placeholder del campo: enseña el formato con un ejemplo en vez de explicarlo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'banca 4x10 60'**
+  String get routineEditorQuickEntryHint;
+
+  /// Confirma qué se va a agregar, antes de tocar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Se agrega como {sets, plural, =1{1 set} other{{sets} sets}} × {reps} a {peso}.'**
+  String routineEditorQuickEntryWillAdd(int sets, String reps, String peso);
+
+  /// No description provided for @routineEditorQuickEntryNoWeight.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'sin peso'**
+  String get routineEditorQuickEntryNoWeight;
+
+  /// No description provided for @routineEditorQuickEntryEmptyHint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Buscá el ejercicio y tocalo. Después escribís 4x10 y el peso.'**
+  String get routineEditorQuickEntryEmptyHint;
+
+  /// Ayuda una vez elegido el ejercicio: enseña las dos listas con un ejemplo de cada una.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'4x10 y el peso. Por set con comas: 4x10,8,6,4 · 55,45,35,25. Por tiempo: 3x30s o 3x1:30. Decimales con punto: 62.5'**
+  String get routineEditorQuickEntryPickedHint;
+
+  /// Confirma la entrada rápida. Existe porque elegir el ejercicio dejó de agregarlo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'AGREGAR'**
+  String get routineEditorQuickEntryAdd;
+
+  /// Título de la hoja de acciones cuando todavía no se eligió un ejercicio; normalmente se muestra el nombre del ejercicio.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ACCIONES'**
+  String get routineEditorExerciseSheetTitle;
+
+  /// No description provided for @routineEditorSlotMenuCollapse.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Colapsar sets'**
+  String get routineEditorSlotMenuCollapse;
+
+  /// No description provided for @routineEditorSlotMenuExpand.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Desplegar sets'**
+  String get routineEditorSlotMenuExpand;
+
+  /// Título del editor al CREAR una plantilla. Antes reusaba el de asignar un plan y decía 'Crear plan'.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Nueva plantilla'**
+  String get coachTemplateEditorTitle;
+
+  /// No description provided for @coachTemplateEditorEditTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Editar plantilla'**
+  String get coachTemplateEditorEditTitle;
+
+  /// CTA del editor de plantillas. Antes reusaba el de asignar y decía 'ASIGNAR PLAN' en una plantilla que no se asigna a nadie.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'GUARDAR PLANTILLA'**
+  String get coachTemplateEditorSubmit;
+
+  /// El picker devolvió sólo ejercicios que el día ya tenía. Sin este aviso la pantalla no cambiaba y el tap parecía roto.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esos ejercicios ya estaban en el día.'**
+  String get routineEditorAddNothingNew;
+
+  /// Se pidió una superserie pero sólo entró un ejercicio nuevo: el resto ya estaba en el día.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Una superserie necesita dos ejercicios. Se agregó uno solo, suelto.'**
+  String get routineEditorSupersetNeedsTwo;
+
+  /// Agrupa este ejercicio con el anterior en una superserie. Es el camino que faltaba para ejercicios YA cargados: el botón + Superserie sólo agrega ejercicios nuevos agrupados.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Unir con el de arriba'**
+  String get routineEditorSlotMenuMergeUp;
+
+  /// No description provided for @routineEditorSlotMenuUngroup.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sacar de la superserie'**
+  String get routineEditorSlotMenuUngroup;
+
+  /// Agrupa este ejercicio con el siguiente. Sirve sobre todo para sumarse a una superserie que ya existe más abajo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Unir con el de abajo'**
+  String get routineEditorSlotMenuMergeDown;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

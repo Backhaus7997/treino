@@ -92,7 +92,7 @@ una descripción del comportamiento actual, no una red.
 
 | Lado | Cómo | Dónde |
 |---|---|---|
-| Dart | `flutter test` | job *Analyze & Test* |
+| Dart | `flutter test` | job *Test* (4 shards) |
 | Swift | `bash conformance/run_swift.sh` | job *Conformance (Swift)* |
 
 El corredor Swift **compila el archivo real del reloj**

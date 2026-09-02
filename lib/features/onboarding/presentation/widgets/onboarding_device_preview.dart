@@ -81,7 +81,8 @@ class OnboardingDevicePreview extends StatelessWidget {
           alignment: Alignment.topCenter,
           children: [
             ClipRRect(
-              borderRadius: BorderRadius.circular(AppDecorativeRadii.deviceScreen),
+              borderRadius:
+                  BorderRadius.circular(AppDecorativeRadii.deviceScreen),
               child: SizedBox(
                 width: kScreenSize.width,
                 height: kScreenSize.height,

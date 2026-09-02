@@ -31,7 +31,25 @@ const ALL_KINDS: MailKind[] = [
   "link-requested",
   "link-accepted",
   "payment-overdue",
+  "discomfort-reported",
+  "subscription-grace",
+  "subscription-downgraded",
 ];
+
+/**
+ * El href del BOTON del CTA.
+ *
+ * El documento tiene mas de un `<a>` —el boton y el link del footer— y desde
+ * que el header trae el logo, tambien aparece `app.gettreino.com` como origen
+ * de una imagen. Un `expect(html).not.toContain("app.gettreino.com")` mezcla
+ * las tres cosas: prohibe un string en todo el documento cuando lo que importa
+ * es a donde APUNTA el boton. Se identifica por `display:inline-block`, que es
+ * lo que lo hace boton.
+ */
+function ctaHref(html: string): string {
+  const m = html.match(/<a href="([^"]+)"[^>]*display:inline-block/);
+  return m ? m[1] : "";
+}
 
 // ---------------------------------------------------------------------------
 // Escaping — display names are user-controlled free text
@@ -126,27 +144,83 @@ describe("renderMail: every MailKind produces a complete message", () => {
 // Coach Hub se pide explícitamente.
 // ---------------------------------------------------------------------------
 describe("destino del CTA", () => {
-  it("por defecto va a la landing, no al Coach Hub", () => {
+  // El default es la pagina puente, NO `gettreino.com`. Esa landing es de otro
+  // producto —gimnasios, en ingles, "No custom app"— asi que un atleta que
+  // tocaba el boton caia en una pagina sin login ni descarga que ademas le
+  // negaba la app que tiene instalada.
+  it("por defecto manda al destino del ATLETA, no a la landing", () => {
     const out = renderMail("appointment-confirmed", { trainerName: "Jose" });
 
-    expect(out.html).toContain("https://gettreino.com");
-    expect(out.html).not.toContain("app.gettreino.com");
+    expect(ctaHref(out.html)).toBe("https://app.gettreino.com/abrir/alumno");
+  });
+
+  it("ningun CTA cae en la landing de gimnasios", () => {
+    for (const kind of ALL_KINDS) {
+      const href = ctaHref(renderMail(kind, {}).html);
+
+      expect(href).not.toBe("https://gettreino.com");
+    }
+  });
+
+  // Los de auth reciben su destino en `actionLink`, y `sendQueuedMail` lo BORRA
+  // del documento al enviar. Si ese doc se volviera a renderizar, el boton
+  // quedaria sin destino: antes salia `href=""`, que no lleva a ningun lado.
+  it("sin destino no se dibuja boton, en vez de uno muerto", () => {
+    const html = renderMail("password-reset", {}).html;
+
+    expect(html).not.toContain("href=\"\"");
+    expect(html).not.toContain("CAMBIAR MI CONTRASEÑA");
+  });
+
+  it("con destino, el boton sí aparece", () => {
+    const html = renderMail("password-reset", {
+      actionLink: "https://auth.gettreino.com/__/auth/action?oobCode=X",
+    }).html;
+
+    expect(html).toContain("CAMBIAR MI CONTRASEÑA");
+  });
+
+  // El footer SI sigue apuntando a la landing: es el link de marca del pie, no
+  // una accion. Distinguirlos es el punto de todo esto.
+  it("el link de marca del footer sigue siendo la landing", () => {
+    const out = renderMail("appointment-confirmed", { trainerName: "Jose" });
+
+    expect(out.html).toContain(">gettreino.com</a>");
   });
 
   it("respeta el ctaUrl que pasa el productor", () => {
     const out = renderMail("link-requested", {
       athleteName: "Marta",
-      ctaUrl: "https://app.gettreino.com",
+      ctaUrl: "https://app.gettreino.com/abrir/profe",
     });
 
-    expect(out.html).toContain("https://app.gettreino.com");
+    expect(ctaHref(out.html)).toBe("https://app.gettreino.com/abrir/profe");
+  });
+
+  // Los destinos son App Links bajo /abrir: si alguno se escribiera distinto,
+  // el sistema operativo no lo reconoceria y abriria el navegador — sin error,
+  // sin log, igual que si no existiera nada de esto.
+  //
+  // `password-reset` y `email-verification` quedan afuera A PROPOSITO: su CTA
+  // no es un destino nuestro, es el `actionLink` de un solo uso que minta el
+  // Admin SDK y que apunta al action handler de Firebase.
+  it("todo CTA que no sea un action link vive bajo /abrir", () => {
+    const conActionLink = ["password-reset", "email-verification"];
+    const resto = ALL_KINDS.filter((k) => !conActionLink.includes(k));
+
+    expect(resto).toHaveLength(11);
+    for (const kind of resto) {
+      const href = ctaHref(renderMail(kind, {}).html);
+
+      expect(href).toMatch(/^https:\/\/app\.gettreino\.com\/abrir\/(alumno|profe)$/);
+    }
   });
 
   // Un CTA que solo vive dentro de un <a> no existe para quien lee en texto.
   it("la URL del CTA también entra en la parte de texto plano", () => {
     const out = renderMail("payment-overdue", { trainerName: "Jose" });
 
-    expect(out.text).toContain("https://gettreino.com");
+    expect(out.text).toContain("https://app.gettreino.com/abrir/alumno");
   });
 
   it("ningún template apunta a un dominio que no es nuestro", () => {
@@ -239,6 +313,161 @@ describe("plantilla federated-signin-hint", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Molestia reportada — el único mail del set con consecuencia física
+// ---------------------------------------------------------------------------
+describe("plantilla discomfort-reported", () => {
+  it("nombra al alumno y manda a abrir la app", () => {
+    const out = renderMail("discomfort-reported", {
+      athleteName: "Ana Atleta",
+      ctaUrl: "https://app.gettreino.com/abrir/profe",
+    });
+
+    expect(out.text).toContain("Ana Atleta");
+    expect(out.text.toLowerCase()).toContain("molestia");
+    expect(ctaHref(out.html)).toBe("https://app.gettreino.com/abrir/profe");
+  });
+
+  // EL invariante de este mail. El push ya excluye `text` y `photoUrl` porque
+  // son dato de salud; por mail pesa MÁS —queda en la bandeja para siempre y
+  // pasa por Resend, que es un tercero—, así que la plantilla no los renderiza
+  // ni aunque un productor se los pase. Si mañana alguien "enriquece" el cuerpo
+  // con el detalle del reporte, esto se pone rojo, y el rojo tiene razón:
+  // primero hay que cerrar QA-CMP-008.
+  it("no renderiza el texto ni la foto del reporte aunque se los pasen", () => {
+    const secretText = "Me tiró la rodilla derecha en la última serie";
+    const secretPhoto = "https://firebasestorage.googleapis.com/x?token=abc123";
+
+    const out = renderMail("discomfort-reported", {
+      athleteName: "Ana Atleta",
+      text: secretText,
+      photoUrl: secretPhoto,
+    });
+
+    for (const part of [out.html, out.text, out.subject]) {
+      expect(part).not.toContain(secretText);
+      expect(part).not.toContain(secretPhoto);
+      expect(part).not.toContain("token=abc123");
+    }
+  });
+
+  // Deliberado, y por una razón distinta a la privacidad: el mail está
+  // deduplicado POR SESIÓN, así que lo produce el PRIMER reporte en dispararse.
+  // Nombrar "Sentadilla" cuando el alumno reportó molestia en tres ejercicios
+  // le arma al PF un modelo mental falso del alcance — el mismo problema de
+  // lote parcial que `appointment-series-created` documenta.
+  it("no nombra un ejercicio: el mail cubre la sesión entera", () => {
+    const out = renderMail("discomfort-reported", {
+      athleteName: "Ana Atleta",
+      exerciseName: "Sentadilla",
+    });
+
+    expect(out.html).not.toContain("Sentadilla");
+    expect(out.text).not.toContain("Sentadilla");
+  });
+
+  it("escapa el nombre del alumno, que es texto libre del usuario", () => {
+    const out = renderMail("discomfort-reported", {
+      athleteName: "<script>alert(1)</script>",
+    });
+
+    expect(out.html).not.toContain("<script>");
+    expect(out.html).toContain("&lt;script&gt;");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Marca: el header y su degradacion
+// ---------------------------------------------------------------------------
+describe("header de marca", () => {
+  const out = () => renderMail("appointment-confirmed", { trainerName: "Jose" });
+
+  it("trae el wordmark como imagen", () => {
+    expect(out().html).toContain("https://app.gettreino.com/email/wordmark.png");
+  });
+
+  // Outlook y Gmail-sin-imagenes no cargan el <img>. Si el header fuera solo
+  // logo, para esa gente el mail empieza en blanco. Estas dos aserciones son la
+  // red: el alt dice la marca, y la palabra TREINO esta escrita aparte.
+  // Outlook y Gmail-sin-imagenes no cargan el <img>, y ahora el header es SOLO
+  // la imagen: sin alt, para esa gente el mail empieza en blanco.
+  //
+  // El alt estuvo VACIO mientras el header era marca TR + la palabra escrita
+  // al lado. Ahi era correcto: la palabra ya era el fallback, el alt la habria
+  // dicho dos veces en un lector de pantalla, y ademas se recortaba a "TRE"
+  // dentro de la caja de 28px del <img>. Sacada esa palabra, las dos razones
+  // desaparecen — y en los 110px del wordmark el texto entra entero.
+  it("lleva alt, que ahora es la unica red si se bloquean imagenes", () => {
+    expect(out().html).toContain("alt=\"TREINO\"");
+  });
+
+  it("el alt hereda el color de marca, para que se lea al bloquearse", () => {
+    // Sin `color` en el style del <img>, el alt de una imagen rota sale en el
+    // color de texto por defecto del cliente.
+    expect(out().html).toMatch(/<img[^>]+alt="TREINO"[^>]+color:#2CE5A2/);
+  });
+
+  it("la palabra ya no se escribe aparte: la imagen ES la palabra", () => {
+    expect(out().html).not.toContain(">TREINO</div>");
+  });
+
+  it("no usa SVG, que ningun cliente de mail renderiza", () => {
+    expect(out().html).not.toContain(".svg");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Preheader — la linea gris de la bandeja de entrada
+// ---------------------------------------------------------------------------
+describe("preheader", () => {
+  it("cada kind produce uno, sin excepcion", () => {
+    for (const kind of ALL_KINDS) {
+      const html = renderMail(kind, { trainerName: "Jose" }).html;
+      const m = html.match(/opacity:0;">([^&<]*)/);
+
+      expect(m).not.toBeNull();
+      expect((m?.[1] ?? "").trim().length).toBeGreaterThan(0);
+    }
+  });
+
+  // Se deriva de la primera linea del cuerpo (ver `build`), asi que decir algo
+  // util en la bandeja y decirlo en el mail son el MISMO trabajo.
+  it("dice lo mismo que la primera linea del cuerpo", () => {
+    const out = renderMail("appointment-confirmed", { trainerName: "Jose" });
+
+    expect(out.html).toMatch(/opacity:0;">Jose confirmó tu sesión\./);
+  });
+
+  it("va oculto: no se ve dentro del mail abierto", () => {
+    const out = renderMail("password-reset", { actionLink: "https://x.test" });
+
+    expect(out.html).toContain("display:none;max-height:0;overflow:hidden;opacity:0;");
+  });
+
+  // Sin relleno el cliente sigue leyendo el cuerpo y lo pega atras del
+  // preheader en la vista previa.
+  it("lleva relleno invisible para que no se cuele el cuerpo", () => {
+    expect(renderMail("link-accepted", {}).html).toContain("&#8199;&#65279;&zwnj;");
+  });
+
+  // El preheader es HTML oculto, no texto plano: si un nombre hostil entrara
+  // crudo ahi, seria una inyeccion con la misma superficie que el cuerpo.
+  it("escapa lo que viene del usuario", () => {
+    const out = renderMail("link-requested", {
+      athleteName: "<script>alert(1)</script>",
+    });
+
+    expect(out.html).not.toContain("<script>");
+  });
+
+  it("no ensucia la parte de texto plano", () => {
+    const out = renderMail("appointment-confirmed", { trainerName: "Jose" });
+
+    expect(out.text).not.toContain("&#8199;");
+    expect(out.text).not.toContain("zwnj");
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Formatters — ART, not UTC
 // ---------------------------------------------------------------------------
 describe("format: renders in America/Argentina/Buenos_Aires", () => {
@@ -284,5 +513,183 @@ describe("formatArs", () => {
   it("returns an empty string for a missing amount", () => {
     expect(formatArs(undefined)).toBe("");
     expect(formatArs(Number.NaN)).toBe("");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Los dos mails del paywall del PF
+//
+// Acá el copy ES el entregable. Son mails sobre plata y sobre un servicio que
+// puede cortarse, y el PR #758 dejó pineadas dos frases que no se pueden
+// romper. Estos tests existen para que no se rompan en silencio.
+// ---------------------------------------------------------------------------
+describe("mails del paywall del PF", () => {
+  // La invariante mas importante de todo el slice, segun el propio PR #758:
+  // "si alguna frase te da a entender que el alumno perdió acceso, es un bug —
+  // y es el peor error posible". El alumno conserva rutinas, historial y chat;
+  // lo que se frena es que el PF trabaje sobre el.
+  it("nunca sugiere que el alumno perdio algo", () => {
+    for (const kind of ["subscription-grace", "subscription-downgraded"] as const) {
+      const out = renderMail(kind, {
+        tier: "plan2", limit: 2, blockedCount: 4, reason: "paused",
+      });
+
+      expect(out.text).toContain("no pierden nada");
+      expect(out.text).not.toMatch(/perd[ií](ó|eron|o)\s+(el\s+)?acceso/i);
+      expect(out.text).not.toMatch(/se (le|les) (quit|sac)/i);
+    }
+  });
+
+  it("el mail de grace dice que TODAVIA no cambio nada, y que pasa si no entra", () => {
+    const out = renderMail("subscription-grace", { tier: "plan2", limit: 15 });
+
+    expect(out.text).toContain("Por ahora no cambia nada");
+    expect(out.text).toContain("15 alumnos");
+    expect(out.text).toContain("plan Free (2 alumnos)");
+    expect(out.text).toContain("Revisá tu medio de pago");
+  });
+
+  // NO LLEVA FECHA DE CORTE. El unico instante del documento es
+  // `currentPeriodEnd`, que es el pagado-hasta, no el corte: el corte lo decide
+  // MP. Escribir una fecha ahi seria dar por cierto algo que no controlamos, en
+  // el mail donde el PF decide cuando mover la plata (regla 11.1 de AGENTS.md).
+  it("el mail de grace no promete una fecha de corte", () => {
+    const out = renderMail("subscription-grace", {
+      tier: "plan2", limit: 15, currentPeriodEnd: "2027-02-01",
+    });
+
+    expect(out.text).not.toMatch(/\d{1,2}\/\d{1,2}\/\d{2,4}/);
+    expect(out.text).not.toMatch(/antes del/i);
+  });
+
+  it("el downgrade nombra la causa, el limite nuevo y cuantos quedan en solo lectura", () => {
+    const out = renderMail("subscription-downgraded", {
+      tier: "plan1", limit: 2, blockedCount: 5, reason: "paused",
+    });
+
+    expect(out.text).toContain("Pausaste tu suscripción.");
+    expect(out.text).toContain("límite de 2 alumnos");
+    expect(out.text).toContain("5 alumnos quedaron en solo lectura");
+    // Vocabulario copiado literal de blocked_students_screen.dart: es el mismo
+    // hecho contado por dos canales, y si divergen el PF cree que son dos.
+    expect(out.text).toContain("no editarles rutinas ni notas");
+  });
+
+  it("cada causa tiene su frase, y una desconocida no inventa ninguna", () => {
+    const frase = (reason: string) =>
+      renderMail("subscription-downgraded", { limit: 2, reason }).text;
+
+    expect(frase("cancelled-expired")).toContain("Se terminó el período que tenías pagado.");
+    expect(frase("pending")).toContain("Tu suscripción todavía no está confirmada.");
+    expect(frase("tier-change")).toContain("Cambiaste de plan.");
+    expect(frase("loquesea")).toContain("Cambió tu suscripción.");
+  });
+
+  // Los tres salieron de LEER el mail renderizado, no el codigo. Ninguno
+  // rompia un test ni el compilador.
+  it("plan3 no dice 'seguís con alumnos sin límite'", () => {
+    const out = renderMail("subscription-grace", { tier: "plan3", limit: "sin-tope" });
+
+    expect(out.text).not.toContain("seguís con alumnos sin límite");
+    expect(out.text).toContain("seguís sin límite de alumnos");
+  });
+
+  // "Ampliá tu plan" sobre una pausa manda a comprar mas de algo que el PF ya
+  // pago: el problema ahi no es el tamaño del plan, es que no esta al dia.
+  it("solo pide ampliar el plan cuando la causa ES el plan", () => {
+    const pausa = renderMail("subscription-downgraded", {
+      limit: 2, blockedCount: 3, reason: "paused",
+    });
+    const bajada = renderMail("subscription-downgraded", {
+      limit: 7, blockedCount: 3, reason: "tier-change",
+    });
+
+    expect(pausa.text).toContain("poné tu suscripción al día");
+    expect(pausa.text).not.toContain("ampliá tu plan");
+    expect(pausa.html).toContain("REGULARIZAR MI SUSCRIPCIÓN");
+
+    expect(bajada.text).toContain("ampliá tu plan");
+    expect(bajada.html).toContain("AMPLIAR MI PLAN");
+  });
+
+  it("una causa desconocida pide regularizar, no ampliar", () => {
+    const out = renderMail("subscription-downgraded", {
+      limit: 2, blockedCount: 1, reason: "loquesea",
+    });
+
+    expect(out.html).toContain("REGULARIZAR MI SUSCRIPCIÓN");
+  });
+
+  // Le decia "para volver a trabajar con todos, ampliá tu plan" a alguien que
+  // YA esta trabajando con todos: un pedido de plata sobre un problema que no
+  // existe. Y "tus alumnos no pierden nada" inventaba una preocupacion.
+  it("sin bloqueados no pide plata ni inventa una preocupacion", () => {
+    const out = renderMail("subscription-downgraded", {
+      tier: "plan1", limit: 7, blockedCount: 0, reason: "tier-change",
+    });
+
+    expect(out.text).toContain("Ninguno de tus alumnos quedó fuera de tu cupo.");
+    expect(out.text).not.toContain("ampliá tu plan");
+    expect(out.text).not.toContain("no pierden nada");
+  });
+
+  it("con 0 bloqueados no dibuja la linea de solo lectura", () => {
+    const out = renderMail("subscription-downgraded", {
+      tier: "plan1", limit: 7, blockedCount: 0, reason: "tier-change",
+    });
+
+    expect(out.text).not.toContain("solo lectura");
+    expect(out.subject).not.toContain("solo lectura");
+  });
+
+  it("un solo alumno se dice en singular", () => {
+    const out = renderMail("subscription-downgraded", {
+      limit: 2, blockedCount: 1, reason: "paused",
+    });
+
+    expect(out.text).toContain("1 alumno quedó en solo lectura");
+  });
+
+  // El render mas caro posible: decirle al PF que NO tiene tope justo cuando no
+  // pudimos leer su limite. Un limite que no sabemos no es un limite infinito.
+  it("un limite ilegible no se anuncia como 'sin límite'", () => {
+    // El `undefined` va con cast a proposito: el tipo lo prohibe, pero un
+    // param que el productor se olvida de mandar llega exactamente asi, y ese
+    // es el caso que este test cubre.
+    for (const limit of [undefined as unknown as string, "", "ochenta"]) {
+      const out = renderMail("subscription-downgraded", { limit, reason: "paused" });
+
+      expect(out.text).not.toContain("sin límite");
+      expect(out.text).not.toContain("NaN");
+      expect(out.text).toContain("un límite más bajo");
+    }
+  });
+
+  // El centinela se distingue de un limite ilegible: uno dice "sin límite", el
+  // otro "más bajo". Lo que se prueba acá es que se RECONOCE, no la redaccion
+  // exacta — de eso se ocupa el test de la frase de arriba.
+  it("el centinela de plan3 se reconoce como sin tope", () => {
+    const out = renderMail("subscription-grace", { tier: "plan3", limit: "sin-tope" });
+
+    expect(out.text).toContain("sin límite");
+    expect(out.text).not.toContain("sin-tope");
+    expect(out.text).not.toContain("NaN");
+  });
+
+  it("un conteo roto no imprime NaN", () => {
+    const out = renderMail("subscription-downgraded", {
+      limit: 2, blockedCount: "muchos", reason: "paused",
+    });
+
+    expect(out.text).not.toContain("NaN");
+    expect(out.text).not.toContain("solo lectura");
+  });
+
+  it("los dos van al destino del ENTRENADOR cuando el productor lo pasa", () => {
+    for (const kind of ["subscription-grace", "subscription-downgraded"] as const) {
+      const html = renderMail(kind, { ctaUrl: "https://app.gettreino.com/abrir/profe" }).html;
+
+      expect(ctaHref(html)).toBe("https://app.gettreino.com/abrir/profe");
+    }
   });
 });

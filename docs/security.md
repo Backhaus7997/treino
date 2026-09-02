@@ -48,7 +48,7 @@ dónde tocar, no un nivel de confianza menor. Ver §1.4.
 
 > ⚠️ **`main` no tiene branch protection** (`GET /repos/.../branches/main/protection`
 > → 404, verificado 2026-08-24). Ningún job de CI **impide** mergear hoy — ni
-> éstos ni `Analyze & Test`: fallan en rojo y el botón de merge sigue
+> éstos ni `Analyze`/`Test`: fallan en rojo y el botón de merge sigue
 > disponible. `ci.yml` ya lo dice entre paréntesis ("con branch protection
 > activada"), pero conviene que esté acá: mientras eso siga así, todo ✅ de
 > esta matriz garantiza *"esto se ejecuta y alguien ve el rojo"*, no *"esto no

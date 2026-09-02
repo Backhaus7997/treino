@@ -18,6 +18,7 @@ Documentación viva del proyecto. **Cualquier cambio acá entra por PR como cual
 
 - **Reglas siempre activas para agentes IA**: ver [`../AGENTS.md`](../AGENTS.md) (índice mínimo + reglas críticas).
 - **Onboarding técnico para devs nuevos**: ver [`../CONTRIBUTING.md`](../CONTRIBUTING.md).
-- **Skills de IA disponibles**: ver [`../.atl/skill-registry.md`](../.atl/skill-registry.md).
+- **Skills de IA disponibles**: `.atl/skill-registry.md` — **generado local**, no viene en el
+  clone: `gentle-ai skill-registry refresh --force`.
 - **Decisiones históricas queryables**: `engram search "<query>" --project treino` (memoria persistente local por dev).
 - **Spec de producto completa con mocks** (fuera del repo): `~/Desktop/TREINO-Documentacion-Flutter.md`.

@@ -41,6 +41,7 @@ import 'package:treino/l10n/app_l10n.dart';
 
 import '../../../fixtures/exercises.dart';
 import '../../../helpers/fake_analytics_service.dart';
+import '../../../fixtures/routine_editor_ui.dart';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -156,6 +157,7 @@ Future<void> _addOneExercise(WidgetTester tester) async {
     scrollable: find.byType(Scrollable).first,
   );
   await tester.pumpAndSettle();
+  await desplazarHastaAgregarEjercicio(tester);
   await tester.tap(find.text('Agregar ejercicio'));
   await tester.pumpAndSettle();
   await tester.tap(find.text('Press de Banca').first);
@@ -492,7 +494,9 @@ void main() {
       await tester.enterText(_summaryField, _kResumen);
       await tester.pumpAndSettle();
       await _addOneExercise(tester);
-      await _tapSave(tester, 'ASIGNAR PLAN');
+      // Es una PLANTILLA: desde #871 su CTA dice lo suyo en vez de reusar el
+      // de asignar un plan, que hablaba de asignarle algo a alguien.
+      await _tapSave(tester, 'GUARDAR PLANTILLA');
 
       final draft = verify(() => repo.createTemplate(captureAny()))
           .captured

@@ -31,6 +31,7 @@ import 'package:treino/l10n/app_l10n.dart';
 
 import '../../../fixtures/exercises.dart';
 import '../../../helpers/fake_analytics_service.dart';
+import '../../../fixtures/routine_editor_ui.dart';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -114,7 +115,8 @@ Future<void> _pumpEditor(WidgetTester tester) async {
 
 /// Adds two chest exercises to Día 1 in a single picker session.
 Future<void> _addTwoExercises(WidgetTester tester) async {
-  await tester.ensureVisible(find.text('Agregar ejercicio'));
+  await desplazarHastaAgregarEjercicio(tester);
+  await desplazarHastaAgregarEjercicio(tester);
   await tester.tap(find.text('Agregar ejercicio'));
   await tester.pumpAndSettle();
   await tester.tap(find.text('Press de Banca').first);

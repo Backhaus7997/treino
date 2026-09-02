@@ -61,8 +61,8 @@ void main() {
 
     test('sin preferencias todas empatan y el orden queda intacto', () {
       const prefs = TemplatePreferences();
-      expect(TemplateAffinity.score(_routine(), prefs),
-          TemplateAffinity.neutral);
+      expect(
+          TemplateAffinity.score(_routine(), prefs), TemplateAffinity.neutral);
       expect(
         TemplateAffinity.score(_routine(days: 6, minutes: 120), prefs),
         TemplateAffinity.neutral,

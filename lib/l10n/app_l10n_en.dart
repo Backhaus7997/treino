@@ -1773,6 +1773,63 @@ class AppL10nEn extends AppL10n {
   String get performanceChartMetricSitAndReach => '';
 
   @override
+  String routineEditorSetsMissingReps(int n) {
+    String _temp0 = intl.Intl.pluralLogic(
+      n,
+      locale: localeName,
+      other: '$n sets without reps',
+      one: '1 set without reps',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get routineEditorEmptyDayTitle => 'EMPTY DAY';
+
+  @override
+  String get routineEditorEmptyDayBody =>
+      'Add the first exercise and it is ready to train.';
+
+  @override
+  String routineEditorDayTabA11y(int n, String estado) {
+    return 'Day $n$estado';
+  }
+
+  @override
+  String get routineEditorPlanSheetTitle => 'PLAN DETAILS';
+
+  @override
+  String get routineEditorPlanSheetA11y => 'Plan details';
+
+  @override
+  String get routineEditorSubtitleSelfPrivate =>
+      'Your routine · only you see it';
+
+  @override
+  String get routineEditorSubtitleSelfShared =>
+      'Your routine · shared on your profile';
+
+  @override
+  String get routineEditorSubtitleCustomizing => 'Your copy';
+
+  @override
+  String get routineEditorSubtitleAssigned => 'Assigned plan';
+
+  @override
+  String get routineEditorSubtitleTemplate => 'Reusable template';
+
+  @override
+  String routineEditorSubtitleWeeks(int n) {
+    String _temp0 = intl.Intl.pluralLogic(
+      n,
+      locale: localeName,
+      other: '$n weeks',
+      one: '1 week',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String routineEditorDayName(int n) {
     return 'Day $n';
   }
@@ -1846,6 +1903,21 @@ class AppL10nEn extends AppL10n {
   String get routineEditorSlotMenuRemove => 'Remove';
 
   @override
+  String routineEditorSupersetHeader(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'EXERCISES',
+      one: 'EXERCISE',
+    );
+    return 'SUPERSET · $count $_temp0';
+  }
+
+  @override
+  String get routineEditorSlotMenuHint =>
+      'The ⋮ on each exercise has replace, copy sets and move.';
+
+  @override
   String get routineEditorRestLabel => 'Rest';
 
   @override
@@ -1864,6 +1936,39 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get routineEditorFillKgUndo => 'Undo';
+
+  @override
+  String get routineEditorFillColumnLabel => 'ALL';
+
+  @override
+  String get routineEditorFillColumnA11y =>
+      'Replicate this value down the column';
+
+  @override
+  String routineEditorAccessoryContext(
+      String ejercicio, int set, String campo) {
+    return '$ejercicio · set $set · $campo';
+  }
+
+  @override
+  String get routineEditorFieldKg => 'kg';
+
+  @override
+  String get routineEditorFieldReps => 'reps';
+
+  @override
+  String routineEditorRepsStepIncreaseA11y(String amount) {
+    return 'Add $amount reps';
+  }
+
+  @override
+  String routineEditorRepsStepDecreaseA11y(String amount) {
+    return 'Subtract $amount reps';
+  }
+
+  @override
+  String get routineEditorFillColumnEmpty =>
+      'Enter this set\'s weight to replicate it.';
 
   @override
   String routineEditorKgStepIncreaseA11y(String amount) {
@@ -3956,4 +4061,128 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get sessionFeedbackLoadError => 'We could not load your reports.';
+
+  @override
+  String get routineEditorGoToProblem => 'GO';
+
+  @override
+  String get routineEditorGoToProblemA11y => 'Go to the first problem';
+
+  @override
+  String routineEditorFooterSummary(int dias, int sets) {
+    String _temp0 = intl.Intl.pluralLogic(
+      dias,
+      locale: localeName,
+      other: '$dias days',
+      one: '1 day',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      sets,
+      locale: localeName,
+      other: '$sets sets',
+      one: '1 set',
+    );
+    return '$_temp0 · $_temp1 · all set';
+  }
+
+  @override
+  String get routineEditorProblemMissingName => 'The plan needs a name';
+
+  @override
+  String get routineEditorProblemMissingSplit => 'The plan needs a split';
+
+  @override
+  String routineEditorProblemEmptyDay(int dia) {
+    return 'Day $dia: no exercises';
+  }
+
+  @override
+  String routineEditorProblemDuplicate(int dia) {
+    return 'Day $dia: repeated exercise';
+  }
+
+  @override
+  String routineEditorProblemIncompleteSets(int dia, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count incomplete sets',
+      one: '1 incomplete set',
+    );
+    return 'Day $dia: $_temp0';
+  }
+
+  @override
+  String routineEditorProblemOtherWeek(int semana, int dia) {
+    return 'Week $semana: day $dia incomplete';
+  }
+
+  @override
+  String get routineEditorQuickEntryToggle => 'QUICK';
+
+  @override
+  String get routineEditorQuickEntryToggleA11y => 'Quick entry';
+
+  @override
+  String get routineEditorQuickEntryHint => 'bench 4x10 60';
+
+  @override
+  String routineEditorQuickEntryWillAdd(int sets, String reps, String peso) {
+    String _temp0 = intl.Intl.pluralLogic(
+      sets,
+      locale: localeName,
+      other: '$sets sets',
+      one: '1 set',
+    );
+    return 'Adds $_temp0 × $reps at $peso.';
+  }
+
+  @override
+  String get routineEditorQuickEntryNoWeight => 'no weight';
+
+  @override
+  String get routineEditorQuickEntryEmptyHint =>
+      'Search the exercise and tap it. Then type 4x10 and the weight.';
+
+  @override
+  String get routineEditorQuickEntryPickedHint =>
+      '4x10 and the weight. Per set with commas: 4x10,8,6,4 · 55,45,35,25. By time: 3x30s or 3x1:30. Decimals with a dot: 62.5';
+
+  @override
+  String get routineEditorQuickEntryAdd => 'ADD';
+
+  @override
+  String get routineEditorExerciseSheetTitle => 'ACTIONS';
+
+  @override
+  String get routineEditorSlotMenuCollapse => 'Collapse sets';
+
+  @override
+  String get routineEditorSlotMenuExpand => 'Expand sets';
+
+  @override
+  String get coachTemplateEditorTitle => 'New template';
+
+  @override
+  String get coachTemplateEditorEditTitle => 'Edit template';
+
+  @override
+  String get coachTemplateEditorSubmit => 'SAVE TEMPLATE';
+
+  @override
+  String get routineEditorAddNothingNew =>
+      'Those exercises were already in the day.';
+
+  @override
+  String get routineEditorSupersetNeedsTwo =>
+      'A superset needs two exercises. Only one was added, on its own.';
+
+  @override
+  String get routineEditorSlotMenuMergeUp => 'Merge with the one above';
+
+  @override
+  String get routineEditorSlotMenuUngroup => 'Remove from superset';
+
+  @override
+  String get routineEditorSlotMenuMergeDown => 'Merge with the one below';
 }

@@ -568,6 +568,37 @@
   "@performanceChartMetricCooper": {},
   "performanceChartMetricSitAndReach": "",
   "@performanceChartMetricSitAndReach": {},
+  "routineEditorSetsMissingReps": "{n, plural, =1{1 set without reps} other{{n} sets without reps}}",
+  "@routineEditorSetsMissingReps": {
+    "description": "Resumen de error en la cabecera colapsada de un ejercicio",
+    "placeholders": { "n": { "type": "int" } }
+  },
+  "routineEditorEmptyDayTitle": "EMPTY DAY",
+  "@routineEditorEmptyDayTitle": {},
+  "routineEditorEmptyDayBody": "Add the first exercise and it is ready to train.",
+  "@routineEditorEmptyDayBody": {},
+  "routineEditorDayTabA11y": "Day {n}{estado}",
+  "@routineEditorDayTabA11y": {
+    "placeholders": { "n": { "type": "int" }, "estado": { "type": "String" } }
+  },
+  "routineEditorPlanSheetTitle": "PLAN DETAILS",
+  "@routineEditorPlanSheetTitle": {},
+  "routineEditorPlanSheetA11y": "Plan details",
+  "@routineEditorPlanSheetA11y": {},
+  "routineEditorSubtitleSelfPrivate": "Your routine · only you see it",
+  "@routineEditorSubtitleSelfPrivate": {},
+  "routineEditorSubtitleSelfShared": "Your routine · shared on your profile",
+  "@routineEditorSubtitleSelfShared": {},
+  "routineEditorSubtitleCustomizing": "Your copy",
+  "@routineEditorSubtitleCustomizing": {},
+  "routineEditorSubtitleAssigned": "Assigned plan",
+  "@routineEditorSubtitleAssigned": {},
+  "routineEditorSubtitleTemplate": "Reusable template",
+  "@routineEditorSubtitleTemplate": {},
+  "routineEditorSubtitleWeeks": "{n, plural, =1{1 week} other{{n} weeks}}",
+  "@routineEditorSubtitleWeeks": {
+    "placeholders": { "n": { "type": "int" } }
+  },
   "routineEditorDayName": "Day {n}",
   "@routineEditorDayName": {
     "placeholders": {
@@ -646,6 +677,19 @@
   "@routineEditorSlotMenuMoveDown": {},
   "routineEditorSlotMenuRemove": "Remove",
   "@routineEditorSlotMenuRemove": {},
+  "routineEditorSupersetHeader": "SUPERSET · {count} {count, plural, =1{EXERCISE} other{EXERCISES}}",
+  "@routineEditorSupersetHeader": {
+    "description": "Header of the superset block in the routine editor, with how many exercises it groups.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "routineEditorSlotMenuHint": "The ⋮ on each exercise has replace, copy sets and move.",
+  "@routineEditorSlotMenuHint": {
+    "description": "Helper line below the day actions: surfaces the shortcuts living in each exercise's overflow menu."
+  },
   "routineEditorRestLabel": "Rest",
   "@routineEditorRestLabel": {},
   "routineEditorAddSet": "+ Add set",
@@ -658,6 +702,37 @@
   "@routineEditorFillKgEmpty": {},
   "routineEditorFillKgUndo": "Undo",
   "@routineEditorFillKgUndo": {},
+  "routineEditorFillColumnLabel": "ALL",
+  "@routineEditorFillColumnLabel": {
+    "description": "Keyboard accessory button that replicates the focused cell's value down its column."
+  },
+  "routineEditorFillColumnA11y": "Replicate this value down the column",
+  "@routineEditorFillColumnA11y": {},
+  "routineEditorAccessoryContext": "{ejercicio} · set {set} · {campo}",
+  "@routineEditorAccessoryContext": {
+    "description": "Context line under the shortcuts: which cell they act on.",
+    "placeholders": {
+      "ejercicio": {"type": "String"},
+      "set": {"type": "int"},
+      "campo": {"type": "String"}
+    }
+  },
+  "routineEditorFieldKg": "kg",
+  "@routineEditorFieldKg": {},
+  "routineEditorFieldReps": "reps",
+  "@routineEditorFieldReps": {},
+  "routineEditorRepsStepIncreaseA11y": "Add {amount} reps",
+  "@routineEditorRepsStepIncreaseA11y": {
+    "placeholders": {"amount": {"type": "String"}}
+  },
+  "routineEditorRepsStepDecreaseA11y": "Subtract {amount} reps",
+  "@routineEditorRepsStepDecreaseA11y": {
+    "placeholders": {"amount": {"type": "String"}}
+  },
+  "routineEditorFillColumnEmpty": "Enter this set's weight to replicate it.",
+  "@routineEditorFillColumnEmpty": {
+    "description": "The cell the replication was requested from is empty."
+  },
   "routineEditorKgStepIncreaseA11y": "Add {amount} kilos to the weight",
   "@routineEditorKgStepIncreaseA11y": {},
   "routineEditorKgStepDecreaseA11y": "Take {amount} kilos off the weight",
@@ -1617,5 +1692,80 @@
   "coachSessionFeedbackLoadError": "We could not load the athlete's reports.",
   "@coachSessionFeedbackLoadError": {},
   "sessionFeedbackLoadError": "We could not load your reports.",
-  "@sessionFeedbackLoadError": {}
+  "@sessionFeedbackLoadError": {},
+  "routineEditorGoToProblem": "GO",
+  "@routineEditorGoToProblem": {
+    "description": "Footer button that jumps to the first day with a problem."
+  },
+  "routineEditorGoToProblemA11y": "Go to the first problem",
+  "@routineEditorGoToProblemA11y": {},
+  "routineEditorFooterSummary": "{dias, plural, =1{1 day} other{{dias} days}} · {sets, plural, =1{1 set} other{{sets} sets}} · all set",
+  "@routineEditorFooterSummary": {
+    "description": "Footer summary when the plan is complete.",
+    "placeholders": {"dias": {"type": "int"}, "sets": {"type": "int"}}
+  },
+  "routineEditorProblemMissingName": "The plan needs a name",
+  "@routineEditorProblemMissingName": {},
+  "routineEditorProblemMissingSplit": "The plan needs a split",
+  "@routineEditorProblemMissingSplit": {},
+  "routineEditorProblemEmptyDay": "Day {dia}: no exercises",
+  "@routineEditorProblemEmptyDay": {
+    "placeholders": {"dia": {"type": "int"}}
+  },
+  "routineEditorProblemDuplicate": "Day {dia}: repeated exercise",
+  "@routineEditorProblemDuplicate": {
+    "placeholders": {"dia": {"type": "int"}}
+  },
+  "routineEditorProblemIncompleteSets": "Day {dia}: {count, plural, =1{1 incomplete set} other{{count} incomplete sets}}",
+  "@routineEditorProblemIncompleteSets": {
+    "placeholders": {"dia": {"type": "int"}, "count": {"type": "int"}}
+  },
+  "routineEditorProblemOtherWeek": "Week {semana}: day {dia} incomplete",
+  "@routineEditorProblemOtherWeek": {
+    "placeholders": {"semana": {"type": "int"}, "dia": {"type": "int"}}
+  },
+  "routineEditorQuickEntryToggle": "QUICK",
+  "@routineEditorQuickEntryToggle": {
+    "description": "Day header button that opens quick entry."
+  },
+  "routineEditorQuickEntryToggleA11y": "Quick entry",
+  "@routineEditorQuickEntryToggleA11y": {},
+  "routineEditorQuickEntryHint": "bench 4x10 60",
+  "@routineEditorQuickEntryHint": {
+    "description": "Field placeholder: teaches the format by example."
+  },
+  "routineEditorQuickEntryWillAdd": "Adds {sets, plural, =1{1 set} other{{sets} sets}} × {reps} at {peso}.",
+  "@routineEditorQuickEntryWillAdd": {
+    "placeholders": {"sets": {"type": "int"}, "reps": {"type": "String"}, "peso": {"type": "String"}}
+  },
+  "routineEditorQuickEntryNoWeight": "no weight",
+  "@routineEditorQuickEntryNoWeight": {},
+  "routineEditorQuickEntryEmptyHint": "Search the exercise and tap it. Then type 4x10 and the weight.",
+  "@routineEditorQuickEntryEmptyHint": {},
+  "routineEditorQuickEntryPickedHint": "4x10 and the weight. Per set with commas: 4x10,8,6,4 · 55,45,35,25. By time: 3x30s or 3x1:30. Decimals with a dot: 62.5",
+  "@routineEditorQuickEntryPickedHint": {},
+  "routineEditorQuickEntryAdd": "ADD",
+  "@routineEditorQuickEntryAdd": {},
+  "routineEditorExerciseSheetTitle": "ACTIONS",
+  "@routineEditorExerciseSheetTitle": {},
+  "routineEditorSlotMenuCollapse": "Collapse sets",
+  "@routineEditorSlotMenuCollapse": {},
+  "routineEditorSlotMenuExpand": "Expand sets",
+  "@routineEditorSlotMenuExpand": {},
+  "coachTemplateEditorTitle": "New template",
+  "@coachTemplateEditorTitle": {},
+  "coachTemplateEditorEditTitle": "Edit template",
+  "@coachTemplateEditorEditTitle": {},
+  "coachTemplateEditorSubmit": "SAVE TEMPLATE",
+  "@coachTemplateEditorSubmit": {},
+  "routineEditorAddNothingNew": "Those exercises were already in the day.",
+  "@routineEditorAddNothingNew": {},
+  "routineEditorSupersetNeedsTwo": "A superset needs two exercises. Only one was added, on its own.",
+  "@routineEditorSupersetNeedsTwo": {},
+  "routineEditorSlotMenuMergeUp": "Merge with the one above",
+  "@routineEditorSlotMenuMergeUp": {},
+  "routineEditorSlotMenuUngroup": "Remove from superset",
+  "@routineEditorSlotMenuUngroup": {},
+  "routineEditorSlotMenuMergeDown": "Merge with the one below",
+  "@routineEditorSlotMenuMergeDown": {}
 }

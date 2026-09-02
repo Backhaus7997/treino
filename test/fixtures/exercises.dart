@@ -40,6 +40,17 @@ const kExerciseSeed = [
     category: 'compound',
     equipment: EquipmentType.mancuerna,
   ),
+  // Un ejercicio con un NÚMERO en el nombre. El catálogo real los tiene
+  // ("Landmine 180"), y son el caso donde el nombre y la prescripción pueden
+  // compartir token: `landmine 180 3x10 180`. Sin uno acá, ese camino de la
+  // entrada rápida no se puede probar.
+  Exercise(
+    id: 'landmine-180',
+    name: 'Landmine 180',
+    muscleGroup: 'chest',
+    category: 'compound',
+    equipment: EquipmentType.barra,
+  ),
   Exercise(
     id: 'cable-fly',
     name: 'Aperturas con Cable',
@@ -149,3 +160,15 @@ const kExerciseSeed = [
     equipment: EquipmentType.cable,
   ),
 ];
+
+/// Busca un ejercicio del seed por su `id`.
+///
+/// Los tests que arman su propia lista tienen que usar ESTO, nunca
+/// `kExerciseSeed[n]`. El índice posicional se rompe en silencio: cuando #918
+/// insertó `lat-pulldown` en el medio del seed, `[6]` dejó de ser `back-squat`
+/// y los dos pickers se cayeron con ocho "Found 0 widgets with text ..." que
+/// no decían una palabra de la causa real.
+///
+/// Tira si el id no existe, que es exactamente lo que querés: un id mal escrito
+/// falla con el nombre adentro del mensaje, no con una lista vacía.
+Exercise seedExercise(String id) => kExerciseSeed.firstWhere((e) => e.id == id);

@@ -134,5 +134,6 @@ Para que el agente lo haga automático, se invoca el tool MCP `mem_save`. Está 
 ## Documentación adicional
 
 - **Especificación completa de producto y diseño** (paletas, módulos, roadmap, mocks): `~/Desktop/TREINO-Documentacion-Flutter.{md,html}` (también en el repo gymrankiOS de planning).
-- **Skills disponibles** en este proyecto: [`../.atl/skill-registry.md`](../.atl/skill-registry.md) (24 skills indexadas).
+- **Skills disponibles** en este proyecto: `.atl/skill-registry.md` — **generado local** y
+  específico de cada máquina: `gentle-ai skill-registry refresh --force`.
 - **Brand assets**: paleta y logos del PDF `brand_palette_v2.pdf`.

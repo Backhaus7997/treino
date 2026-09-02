@@ -87,3 +87,20 @@ scripts/places.local.json
 #     Sin barra inicial: aplican en cualquier directorio del repo.
 .env.local
 .env*.local
+
+# Registro de skills de IA (`.atl/`) — GENERADO y específico de cada máquina.
+#
+# `skill-registry.md` lista en su sección "Sources scanned" rutas ABSOLUTAS del
+# home de quien lo generó (`/Users/<vos>/.claude/skills`, `.gemini`, `.codex`,
+# `.cursor`…). Somos tres devs: para los otros dos, cada una de esas líneas es
+# falsa. El archivo no puede ser correcto para más de una persona a la vez, así
+# que versionarlo garantiza que esté mal para alguien.
+#
+# Y salía caro en silencio. De los 27 stashes que tenía el repo el 2026-09-02,
+# TRECE eran este archivo: "atl noise", "atl-noise", "atl files",
+# "atl-cache-drift", "atl + ios podfile drift"… Cada sesión lo regeneraba
+# distinto, ensuciaba el working tree, y alguien lo stasheaba para poder
+# trabajar. Trece veces. Nadie leyó nunca uno de esos stashes.
+#
+# Se regenera en segundos:  gentle-ai skill-registry refresh --force
+.atl/

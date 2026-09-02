@@ -48,7 +48,8 @@ void main() {
 
       expect(routine.goals, [RoutineGoal.health, RoutineGoal.sport],
           reason: 'lo desconocido se descarta, lo conocido sobrevive');
-      expect(routine.name, 'R', reason: 'el resto de la rutina se parsea igual');
+      expect(routine.name, 'R',
+          reason: 'el resto de la rutina se parsea igual');
     });
 
     test('goals ausente decodifica como lista vacía, no como null', () {

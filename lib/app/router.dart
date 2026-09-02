@@ -221,6 +221,29 @@ GoRouter buildRouter({
     // de en la pantalla de error roja default de go_router.
     errorBuilder: (context, state) => const NotFoundScreen(),
     routes: [
+      // ── Deep links de los mails (App Links / Universal Links) ───────────
+      //
+      // `app.gettreino.com/abrir/...` abre la app en vez del navegador. No
+      // son pantallas: son REDIRECTS al lugar donde de verdad está lo que el
+      // mail vino a avisar.
+      //
+      // Existen dos y no una porque el rol cambia el destino, y esa misma
+      // asimetría es la que separa las dos páginas web de fallback: el atleta
+      // sólo tiene la app; el profe además tiene el Coach Hub.
+      //
+      // Si la sesión está cerrada, `authRedirect` gana antes que esto y manda
+      // a `/welcome` — correcto: primero entrar, después ver. Se pierde el
+      // destino puntual, que es aceptable mientras los dos destinos sean la
+      // home de cada rol.
+      GoRoute(
+        path: '/abrir/alumno',
+        redirect: (_, __) => '/home',
+      ),
+      GoRoute(
+        path: '/abrir/profe',
+        redirect: (_, __) => '/coach?tab=agenda',
+      ),
+
       // Entry routes — full screen, NO bottom bar
       GoRoute(
         path: '/splash',
