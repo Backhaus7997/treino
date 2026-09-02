@@ -8,7 +8,8 @@ Guía paso a paso para que cualquier dev del equipo pueda clonar el repo en su m
 
 1. [AGENTS.md](./AGENTS.md) — reglas y convenciones del proyecto. Es la "constitución".
 2. Este archivo (CONTRIBUTING.md) — onboarding técnico.
-3. [.atl/skill-registry.md](./.atl/skill-registry.md) — catálogo de skills de IA disponibles.
+3. `.atl/skill-registry.md` — catálogo de skills de IA. **Se genera local**, no viene en el
+   clone porque lista rutas de tu propio home: `gentle-ai skill-registry refresh --force`.
 
 Toda PR que viole reglas de AGENTS.md se devuelve sin merge.
 

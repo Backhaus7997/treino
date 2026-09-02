@@ -18,7 +18,7 @@ App fitness multiplataforma (Flutter). Personal Trainers + comunidad + workout t
 | [AGENTS.md](./AGENTS.md) | **Constitución** del proyecto: índice + reglas críticas mínimas. Cargado automáticamente por Claude Code, Cursor, Codex, etc. |
 | [CONTRIBUTING.md](./CONTRIBUTING.md) | Onboarding técnico paso a paso para devs nuevos. |
 | [docs/](./docs/) | Documentación detallada por dominio: producto, design system, arquitectura, performance, workflow, roadmap. |
-| [.atl/skill-registry.md](./.atl/skill-registry.md) | Catálogo de las 24 skills de IA disponibles (11 Flutter + 13 SDD/ops). |
+| `.atl/skill-registry.md` | Catálogo de skills de IA. **Generado local**, no viene en el clone: `gentle-ai skill-registry refresh --force`. |
 
 ## Setup rápido
 

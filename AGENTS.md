@@ -251,7 +251,7 @@ pagos, turnos, mediciones, chats y perfiles comerciales publicados.
 | [docs/workflow.md](./docs/workflow.md) | Setup, equipo, commits, branching, PRs, ciclo SDD, gates de calidad |
 | [docs/roadmap.md](./docs/roadmap.md) | Fases 0-6, Fase 1 desglosada en 7 etapas con owner sugerido |
 | [CONTRIBUTING.md](./CONTRIBUTING.md) | Onboarding técnico paso a paso para devs nuevos |
-| [.atl/skill-registry.md](./.atl/skill-registry.md) | Catálogo de las 24 skills de IA disponibles |
+| `.atl/skill-registry.md` | Catálogo de skills de IA. **Generado local**, no viene en el clone: `gentle-ai skill-registry refresh --force` |
 
 ---
 
