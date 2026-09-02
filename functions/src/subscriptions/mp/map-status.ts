@@ -123,3 +123,40 @@ export function mapMpStatus(input: MapStatusInput): MappedStatus {
     return { status: "cancelled", degraded: false };
   }
 }
+
+/**
+ * La OTRA mitad de `grace`: si MP tiene una cuota sin cobrar en este momento.
+ *
+ * Vive al lado de [mapMpStatus] a proposito, porque juntas son una sola
+ * decision tomada con dos fuentes distintas. Separarlas en archivos distintos
+ * habria escondido justamente eso.
+ *
+ * Sale de `summarized.pending_charge_quantity` — cuantos cobros quedaron
+ * pendientes — verificado en los tipos del SDK oficial
+ * (`sdk-nodejs/src/clients/preApproval/commonTypes.ts`, 2026-09-02):
+ *
+ *   pending_charge_amount?: number | null
+ *   pending_charge_quantity?: number | null
+ *   semaphore?: string | null
+ *
+ * **Se elige `quantity` y no `amount`**: un monto pendiente de 0 es ambiguo
+ * (¿no hay nada, o hay una cuota de importe cero?), mientras que la cantidad
+ * responde exactamente lo que se pregunta. Y NO se usa `semaphore`, que es el
+ * indicador de salud propio de MP: no encontramos documentados sus valores, y
+ * un campo cuyo dominio no conocemos no puede decidir si alguien conserva sus
+ * alumnos.
+ *
+ * TOTAL y conservadora: ante cualquier duda devuelve `false`, o sea `active`
+ * en vez de `grace`. Puede parecer al reves —¿no seria mas prudente asumir que
+ * debe?— pero no: `grace` da el limite PAGADO. Concederlo por un dato que no
+ * entendimos seria regalar cupo. El que no pago de verdad lo agarra igual el
+ * barrido cuando MP mueva el status a `cancelled`.
+ */
+export function hayCobroPendiente(summarized: unknown): boolean {
+  if (summarized === null || typeof summarized !== "object") return false;
+
+  const q = (summarized as { pending_charge_quantity?: unknown })
+    .pending_charge_quantity;
+
+  return typeof q === "number" && Number.isFinite(q) && q > 0;
+}

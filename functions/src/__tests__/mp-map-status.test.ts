@@ -14,6 +14,7 @@ jest.mock("firebase-functions", () => ({
 
 import {
   MP_PREAPPROVAL_STATUSES,
+  hayCobroPendiente,
   mapMpStatus,
 } from "../subscriptions/mp/map-status";
 import { SUBSCRIPTION_STATUSES } from "../subscriptions/effective-limit";
@@ -139,5 +140,69 @@ describe("mapMpStatus — entradas que no entendemos", () => {
       status: "pending",
       degraded: true,
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// `hayCobroPendiente` — la otra mitad de grace.
+//
+// Sin esto, la rama de `grace` de arriba nunca se activa en produccion: es la
+// unica fuente que sabe si MP esta reintentando un cobro.
+// ---------------------------------------------------------------------------
+
+describe("hayCobroPendiente", () => {
+  it("una cuota pendiente da true", () => {
+    expect(hayCobroPendiente({ pending_charge_quantity: 1 })).toBe(true);
+    expect(hayCobroPendiente({ pending_charge_quantity: 3 })).toBe(true);
+  });
+
+  it("cero pendientes da false", () => {
+    expect(hayCobroPendiente({ pending_charge_quantity: 0 })).toBe(false);
+  });
+
+  it("mira la CANTIDAD, no el monto", () => {
+    // Un monto de 0 es ambiguo: puede ser "no hay nada" o "hay una cuota de
+    // importe cero". La cantidad contesta exactamente lo que se pregunta.
+    expect(
+      hayCobroPendiente({
+        pending_charge_amount: 22000,
+        pending_charge_quantity: 0,
+      }),
+    ).toBe(false);
+  });
+
+  it("NO usa `semaphore`, cuyo dominio no conocemos", () => {
+    // Un campo cuyos valores no estan documentados no puede decidir si alguien
+    // conserva sus alumnos.
+    expect(hayCobroPendiente({ semaphore: "red" })).toBe(false);
+  });
+
+  const basura: [string, unknown][] = [
+    ["undefined", undefined],
+    ["null", null],
+    ["un string", "1"],
+    ["un numero", 1],
+    ["objeto vacio", {}],
+    ["cantidad como string", { pending_charge_quantity: "2" }],
+    ["cantidad null", { pending_charge_quantity: null }],
+    ["cantidad NaN", { pending_charge_quantity: Number.NaN }],
+    ["cantidad negativa", { pending_charge_quantity: -1 }],
+  ];
+
+  for (const [caso, entrada] of basura) {
+    it(`es conservadora con ${caso}: false, o sea active y no grace`, () => {
+      expect(hayCobroPendiente(entrada)).toBe(false);
+    });
+  }
+
+  it("las dos mitades se combinan: authorized + pendiente = grace", () => {
+    // El unico test que ejercita el camino COMPLETO, que es como lo va a usar
+    // el reconciliador.
+    const summarized = { pending_charge_quantity: 1 };
+    const r = mapMpStatus({
+      raw: "authorized",
+      cobroPendiente: hayCobroPendiente(summarized),
+    });
+    expect(r.status).toBe("grace");
   });
 });
