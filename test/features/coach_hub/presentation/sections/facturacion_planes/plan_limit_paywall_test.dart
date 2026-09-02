@@ -15,6 +15,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/features/coach/domain/subscription_tier.dart';
+import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_checkout.dart';
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_limit_paywall.dart';
 
 /// iPhone 14/15 en puntos logicos.
@@ -278,6 +279,13 @@ void main() {
   });
 
   testWidgets('REGULARIZAR con billingRoute navega ahi', (tester) async {
+    // Fija la superficie que SI cobra. La combinacion «app movil + ruta de
+    // facturacion» no existe en produccion —los tres callsites que pasan
+    // `billingRoute` son del Coach Hub— y antes este test la ejercitaba sin
+    // querer, porque bajo `flutter test` la superficie real es movil.
+    debugPlanCheckout = planCheckoutFor(isWeb: true);
+    addTearDown(() => debugPlanCheckout = null);
+
     await tester.pumpWidget(_harness(
       SubscriptionTier.plan1,
       reason: PlanLimitReason.subscriptionInactive,
@@ -290,6 +298,43 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('AJUSTES'), findsOneWidget);
+  });
+
+  // EL OTRO PUNTO DE ENTRADA AL COBRO.
+  //
+  // El guard de superficie vivia SOLO en la pricing page, y este CTA es el que
+  // ve el PF con la suscripcion pausada cuando acepta una solicitud DESDE EL
+  // TELEFONO (`trainer_dashboard_tab`, `trainer_coach_view`). Es exactamente
+  // donde alguien va a cablear la reactivacion con Mercado Pago: reactivar es
+  // la mitad del negocio de una suscripcion.
+  //
+  // Antes lo unico que decidia era `billingRoute == null` — un string. Este
+  // test pinea que lo decide la SUPERFICIE: aunque le pases una ruta de
+  // facturacion, en la app no se llega a pagar. Sin el guard en `_PrimaryCta`
+  // este test navega y se pone rojo.
+  testWidgets('en la app REGULARIZAR no navega ni con billingRoute',
+      (tester) async {
+    // Sin override: la superficie REAL de `flutter test` es la movil.
+    expect(debugPlanCheckout, isNull, reason: 'un test anterior no limpio');
+
+    await tester.pumpWidget(_harness(
+      SubscriptionTier.plan1,
+      reason: PlanLimitReason.subscriptionInactive,
+      billingRoute: '/ajustes',
+    ));
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('REGULARIZAR'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('AJUSTES'),
+      findsNothing,
+      reason: 'la app movil llego a una vista de facturacion: es el camino por '
+          'el que entra el cobro de reactivacion',
+    );
+    expect(find.byType(SnackBar), findsOneWidget);
   });
 
   testWidgets('reason por defecto es plan-limit — comportamiento intacto',
