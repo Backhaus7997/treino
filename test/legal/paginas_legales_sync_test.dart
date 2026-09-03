@@ -20,6 +20,21 @@ import 'package:treino/features/auth/presentation/legal/legal_content.dart';
 /// a un solo espacio, así que el Dart y el HTML no coinciden byte a byte.
 String _norm(String s) => s.replaceAll(RegExp(r'\s+'), ' ').trim();
 
+/// Parte un cuerpo en párrafos con el MISMO criterio que el generador
+/// (`_cuerpo` en `tool/build_legal_pages.dart`): los saltos dobles separan
+/// párrafos, los simples son wrapping del código fuente.
+///
+/// Comparar el cuerpo entero de una sola vez no sirve: el generador emite un
+/// `<p>` por párrafo, así que en el HTML el texto de una sección con varios
+/// párrafos NO es contiguo. La primera versión de este test lo comparaba
+/// entero y pasaba sólo por casualidad — porque hasta que la sección
+/// "4. Ubicación" creció, ninguna sección tenía más de un párrafo.
+List<String> _parrafos(String body) => body
+    .split(RegExp(r'\n\s*\n'))
+    .map(_norm)
+    .where((p) => p.isNotEmpty)
+    .toList();
+
 String _hex(Color c) {
   String ch(double v) =>
       (v * 255).round().toRadixString(16).padLeft(2, '0').toUpperCase();
@@ -50,9 +65,11 @@ void main() {
         expect(html, contains(_norm(s.heading)),
             reason: 'falta el título "${s.heading}" — '
                 'corré `dart run tool/build_legal_pages.dart`');
-        expect(html, contains(_norm(s.body)),
-            reason: 'el cuerpo de "${s.heading}" no coincide con el Dart — '
-                'corré `dart run tool/build_legal_pages.dart`');
+        for (final parrafo in _parrafos(s.body)) {
+          expect(html, contains(parrafo),
+              reason: 'un párrafo de "${s.heading}" no coincide con el Dart '
+                  '— corré `dart run tool/build_legal_pages.dart`');
+        }
       }
     });
 
@@ -62,9 +79,11 @@ void main() {
         expect(html, contains(_norm(s.heading)),
             reason: 'falta el título "${s.heading}" — '
                 'corré `dart run tool/build_legal_pages.dart`');
-        expect(html, contains(_norm(s.body)),
-            reason: 'el cuerpo de "${s.heading}" no coincide con el Dart — '
-                'corré `dart run tool/build_legal_pages.dart`');
+        for (final parrafo in _parrafos(s.body)) {
+          expect(html, contains(parrafo),
+              reason: 'un párrafo de "${s.heading}" no coincide con el Dart '
+                  '— corré `dart run tool/build_legal_pages.dart`');
+        }
       }
     });
 

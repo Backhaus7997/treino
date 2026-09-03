@@ -119,7 +119,8 @@ const List<LegalSection> kPrivacySections = <LegalSection>[
     '1. Qué datos recolectamos',
     'Recolectamos: datos de tu cuenta (email, nombre de usuario y foto/avatar si '
         'la cargás); tus datos de entrenamiento (rutinas, sesiones, pesos, '
-        'progreso); tu ubicación aproximada solo si la activás; datos de uso y '
+        'progreso); tu ubicación, solo si la activás y con el alcance que '
+        'explica la sección Ubicación; datos de uso y '
         'analítica para mejorar la app; y datos técnicos básicos de tu '
         'dispositivo.',
   ),
@@ -137,9 +138,21 @@ const List<LegalSection> kPrivacySections = <LegalSection>[
   ),
   LegalSection(
     '4. Ubicación',
-    'Solo accedemos a tu ubicación si la activás expresamente, y únicamente para '
-        'mostrarte entrenadores cerca tuyo. Tu ubicación no es visible para otros '
-        'usuarios y podés revocar el permiso cuando quieras desde tu dispositivo.',
+    'Nunca leemos tu ubicación sin que la actives. Lo que hacemos después '
+        'depende de si sos atleta o entrenador, y no es lo mismo.\n\n'
+        'Si sos atleta, la usamos en el momento y no la guardamos: sirve para '
+        'calcular a qué distancia te queda cada entrenador y para orientar la '
+        'búsqueda de gimnasios cerca tuyo. Tus coordenadas exactas no salen de '
+        'tu teléfono — para buscar gimnasios le mandamos a nuestro proveedor de '
+        'mapas una zona aproximada de unos 5 km, no tu punto. Tu ubicación no '
+        'queda en tu perfil y no la ve ningún otro usuario.\n\n'
+        'Si sos entrenador y cargás dónde trabajás, esa ubicación es otra cosa: '
+        'la guardamos y SÍ es visible para los atletas, con su punto en el mapa '
+        'y la distancia hasta ellos. Es lo que te vuelve encontrable, así que es '
+        'información que publicás vos a propósito: podés editarla, borrarla, o '
+        'no cargar ninguna y no aparecer en el mapa.\n\n'
+        'En los dos casos podés revocar el permiso cuando quieras desde tu '
+        'dispositivo.',
   ),
   LegalSection(
     '5. Con quién compartimos tus datos',
