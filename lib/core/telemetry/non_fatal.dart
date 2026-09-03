@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:developer' as developer;
 
 import 'package:firebase_core/firebase_core.dart';
@@ -82,4 +83,27 @@ Future<void> reportNonFatal(
     // Ver el contrato del typedef: silencio deliberado. Si Crashlytics no
     // puede reportar, el llamador no se tiene que enterar.
   }
+}
+
+/// Dispara [operacion] sin esperarla, y **sin dejar que su falla escale**.
+///
+/// `unawaited(future)` a secas no alcanza: no engancha ningún handler, así que
+/// si el future falla el error async no lo agarra el `try` de alrededor —
+/// sube hasta el `runZonedGuarded` de `main.dart`, que lo registra como
+/// **FATAL**. O sea: una llamada de telemetría que falla se convierte en un
+/// crash reportado, después de que la operación de negocio ya salió bien.
+///
+/// Pasó exactamente así con `appointment_created`: el evento mandaba un `bool`
+/// —que `firebase_analytics` no acepta—, el assert tiraba, y el `unawaited`
+/// lo mandaba derecho al reporte de crashes. La cita quedaba creada y el
+/// usuario veía la app "crashear".
+///
+/// Esto lo baja a lo que es: un non-fatal.
+void fireAndForget(Future<void> operacion, {required String reason}) {
+  unawaited(
+    operacion.catchError(
+      (Object error, StackTrace stack) =>
+          reportNonFatal(error, stack, reason: reason),
+    ),
+  );
 }

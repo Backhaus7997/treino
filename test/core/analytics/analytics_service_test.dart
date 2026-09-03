@@ -88,7 +88,7 @@ void main() {
         'trainer_id': 't1',
         'athlete_id': 'al1',
         'occurrences': 1,
-        'recurring': false,
+        'booking_type': 'single',
       });
     });
 
@@ -107,7 +107,7 @@ void main() {
         'trainer_id': 't1',
         'athlete_id': 'al1',
         'occurrences': 8,
-        'recurring': true,
+        'booking_type': 'series',
       });
       expect(f.calls.single.params.containsKey('appointment_id'), isFalse);
     });

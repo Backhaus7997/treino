@@ -634,7 +634,7 @@ void main() {
           .firstWhere((c) => c.name == 'appointment_created')
           .params;
       expect(call['occurrences'], 3);
-      expect(call['recurring'], isTrue);
+      expect(call['booking_type'], 'series');
       expect(call['trainer_id'], _kTrainerId);
       expect(call['athlete_id'], _kAthleteId1);
       // No hay UNA cita: mandar un id acá sería inventar cuál de las 3.

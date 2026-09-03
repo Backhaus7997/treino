@@ -357,7 +357,7 @@ void main() {
       expect(call['athlete_id'], _kAthleteId1);
       // Una cita suelta es una sola ocurrencia y no es serie.
       expect(call['occurrences'], 1);
-      expect(call['recurring'], isFalse);
+      expect(call['booking_type'], 'single');
     });
 
     testWidgets('si el repo falla, NO se emite appointment_created',

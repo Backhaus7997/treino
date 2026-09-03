@@ -244,10 +244,15 @@ class FirebaseAnalyticsService implements AnalyticsService {
           'trainer_id': trainerId,
           'athlete_id': athleteId,
           'occurrences': occurrences,
-          // Deriva de `occurrences`, pero se manda explícito: segmentar por un
-          // booleano en la consola es un filtro, y por un entero es una
-          // fórmula.
-          'recurring': occurrences > 1,
+          // Deriva de `occurrences`, pero se manda explícito para que
+          // segmentar en la consola sea un filtro y no una fórmula.
+          //
+          // Y va como STRING, no como bool: `firebase_analytics` sólo acepta
+          // `String` o `num` como valor de parámetro
+          // (`_assertParameterTypesAreCorrect`, firebase_analytics 11.6.0).
+          // Un bool rompía el evento entero — en debug por el assert, y en
+          // release en silencio, porque los asserts se strippean.
+          'booking_type': occurrences > 1 ? 'series' : 'single',
         },
       );
 

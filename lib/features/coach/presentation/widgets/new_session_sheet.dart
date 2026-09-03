@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +7,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import '../../../../app/theme/app_motion.dart';
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/analytics/analytics_service.dart';
+import '../../../../core/telemetry/non_fatal.dart';
 import '../../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../core/widgets/treino_icon.dart';
@@ -683,12 +682,13 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
       // Antes del guard de `mounted`: la cita YA existe en Firestore. Que el
       // sheet se haya cerrado no la des-crea, y saltear el evento por eso
       // subreportaría justo los casos donde el PF cierra rápido.
-      unawaited(
+      fireAndForget(
         analytics.logAppointmentCreated(
           appointmentId: appt.id,
           trainerId: trainerId,
           athleteId: athleteId,
         ),
+        reason: 'analytics: appointment_created (sesión suelta) falló',
       );
 
       if (!mounted) return;
@@ -815,12 +815,13 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
       // Sólo si se creó algo: con `count == 0` todas las ocurrencias caían en
       // el pasado y no hay ninguna cita nueva que reportar.
       if (count > 0) {
-        unawaited(
+        fireAndForget(
           analytics.logAppointmentCreated(
             trainerId: trainerId,
             athleteId: athleteId,
             occurrences: count,
           ),
+          reason: 'analytics: appointment_created (serie) falló',
         );
       }
 
