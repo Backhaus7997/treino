@@ -5,9 +5,6 @@ library;
 
 import 'dart:async';
 
-import '../../../../workout/presentation/widgets/exercise_card.dart';
-import '../../../../workout/presentation/widgets/prescription_chips.dart';
-import '../../../../workout/presentation/widgets/prescription_summary.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,6 +13,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/features/workout/domain/routine_goal.dart';
 
+import '../../../../workout/presentation/widgets/empty_day_state.dart';
+import '../../../../workout/presentation/widgets/exercise_card.dart';
+import '../../../../workout/presentation/widgets/prescription_chips.dart';
+import '../../../../workout/presentation/widgets/prescription_summary.dart';
+import '../../../../workout/presentation/widgets/routine_action_buttons.dart';
 import '../../../../../app/theme/app_palette.dart';
 import '../../../../../core/analytics/analytics_service.dart';
 import '../../../../../core/utils/firestore_error.dart';
@@ -2735,22 +2737,30 @@ class _DayCard extends StatelessWidget {
               onTogglePresence: (w) => onTogglePresence(i, w),
             ),
           ],
+          // Un día sin ejercicios no dibujaba NADA entre el nombre y el botón:
+          // desde afuera no se distinguía de uno que no cargó todavía. El
+          // editor del teléfono ya tenía esta pieza.
+          if (day.slots.isEmpty) ...[
+            const SizedBox(height: AppSpacing.s12),
+            // Copy duplicado respecto de `routineEditorEmptyDayTitle/Body` a
+            // propósito: este archivo tiene PROHIBIDO llamar a `AppL10n`
+            // (constraint C-6, ver el header). Mismo criterio que `_goalLabel`
+            // más abajo — si cambia el copy, cambia en los DOS lados, hasta
+            // que el Coach Hub entre a la pasada de i18n.
+            const EmptyDayState(
+              title: 'DÍA VACÍO', // i18n
+              body: 'Agregá el primer ejercicio y ya queda listo para '
+                  'entrenar.', // i18n
+            ),
+          ],
           const SizedBox(height: 10),
-          OutlinedButton.icon(
-            onPressed: onAddExercises,
-            icon: Icon(TreinoIcon.plus, size: 16, color: palette.accent),
-            label: Text(
-              'Agregar ejercicio', // i18n
-              style: GoogleFonts.barlowCondensed(
-                color: palette.accent,
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-              ),
-            ),
-            style: OutlinedButton.styleFrom(
-              side: BorderSide(color: palette.border),
-              padding: const EdgeInsets.symmetric(vertical: 10),
-            ),
+          // El botón compartido, el mismo del teléfono. `supersetLabel` va en
+          // null a propósito: en la web una superserie se arma con el toggle
+          // "unir con el siguiente" de cada ejercicio, no con un botón de alta,
+          // y `DayActionButtons` con un solo label ocupa la fila entera.
+          DayActionButtons(
+            exerciseLabel: 'Agregar ejercicio', // i18n
+            onAddExercise: onAddExercises,
           ),
         ],
       ),
