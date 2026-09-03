@@ -3,6 +3,8 @@
 // No se usa AppL10n (constraint C-6).
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,8 +14,14 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/features/workout/domain/routine_goal.dart';
 
 import '../../../../../app/theme/app_palette.dart';
+import '../../../../../core/analytics/analytics_service.dart';
+import '../../../../../core/utils/firestore_error.dart';
 import '../../../../../core/widgets/motion/treino_state_switcher.dart';
+import '../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../../core/widgets/treino_icon.dart';
+import '../../../../coach/application/blocked_athletes_providers.dart';
+import '../facturacion_planes/blocked_students_screen.dart'
+    show kBlockedStudentsRoutePath;
 import '../../../../onboarding/domain/onboarding_surface.dart';
 import '../../../../onboarding/presentation/custom_exercise_onboarding_gate.dart';
 import '../../../../profile/application/user_public_profile_providers.dart';
@@ -249,6 +257,17 @@ class _RoutineEditorWebScreenState
   bool _isDirty = false;
   String? _errorMessage;
 
+  /// True cuando [_errorMessage] describe una DENEGACIÓN de permiso y no un
+  /// fallo transitorio.
+  ///
+  /// Cambia dos cosas y las dos importan: el banner deja de ofrecer
+  /// «probá de nuevo» (sería falso — `permission-denied` no se arregla
+  /// reintentando) y suma la salida a la pantalla que puede explicarlo.
+  /// Cualquier `setState` que escriba [_errorMessage] tiene que fijar también
+  /// esta bandera, o un error de validación posterior arrastra el CTA de una
+  /// denegación que ya no existe.
+  bool _errorIsDenial = false;
+
   // ── Edit mode ─────────────────────────────────────────────────────────────
   bool get _isEditing => widget.routineId != null;
 
@@ -332,11 +351,23 @@ class _RoutineEditorWebScreenState
         _populate(routine);
         _loading = false;
       });
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _fatalMessage = 'No pudimos cargar la $_noun. Probá de nuevo.'; // i18n
+        // Una denegación de permiso NO se arregla reintentando, así que el
+        // mensaje genérico le pediría al PF repetir algo que va a fallar
+        // siempre.
+        //
+        // Ojo con la simetría falsa: esta rama es una LECTURA, y el
+        // enforcement del paywall frena ESCRITURAS — el PF sigue pudiendo ver
+        // a un alumno que quedó fuera de su cupo. Por eso acá no se nombra el
+        // plan ni se ofrece la salida a facturación: sería inventarle una
+        // causa. Lo único que se sabe es que el permiso no está.
+        _fatalMessage = isPermissionDenied(error)
+            ? 'No podés abrir esta $_noun: tu cuenta no tiene permiso para '
+                'verla. Reintentar no lo va a cambiar.' // i18n
+            : 'No pudimos cargar la $_noun. Probá de nuevo.'; // i18n
       });
     }
   }
@@ -1396,7 +1427,10 @@ class _RoutineEditorWebScreenState
     if (_submitting) return;
     final error = _firstValidationError();
     if (error != null) {
-      setState(() => _errorMessage = error);
+      setState(() {
+        _errorMessage = error;
+        _errorIsDenial = false;
+      });
       return;
     }
     final trainerUid = ref.read(currentUidProvider);
@@ -1405,6 +1439,7 @@ class _RoutineEditorWebScreenState
     setState(() {
       _submitting = true;
       _errorMessage = null;
+      _errorIsDenial = false;
     });
 
     final days = _days.map((d) {
@@ -1492,15 +1527,105 @@ class _RoutineEditorWebScreenState
         ref.invalidate(assignedRoutinesProvider(widget.athleteId!));
       }
       if (mounted) context.pop();
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          _submitting = false;
-          _errorMessage =
-              'No pudimos guardar la $_noun. Probá de nuevo.'; // i18n
-        });
+    } catch (error) {
+      if (!mounted) return;
+      if (isPermissionDenied(error)) {
+        _onWriteDenied(trainerUid: trainerUid);
+        return;
       }
+      setState(() {
+        _submitting = false;
+        _errorMessage = 'No pudimos guardar la $_noun. Probá de nuevo.'; // i18n
+        _errorIsDenial = false;
+      });
     }
+  }
+
+  /// El servidor rechazó la escritura por permisos.
+  ///
+  /// Dos salidas, y ninguna miente:
+  ///
+  /// 1. **Analytics.** `paywall_write_denied` es la ÚNICA señal
+  ///    server-visible de esto: Firestore no loguea las denegaciones de reglas
+  ///    en ningún lado consultable y el Coach Hub web no inicializa
+  ///    Crashlytics. Si no se emite acá, el incidente es invisible.
+  /// 2. **Copy.** El mensaje genérico («probá de nuevo») es ACTIVAMENTE falso
+  ///    en este caso: le pide al PF repetir algo que va a fallar siempre. Y la
+  ///    causa sólo se afirma cuando se puede probar — ver [_deniedMessage].
+  void _onWriteDenied({required String trainerUid}) {
+    final athleteId = widget.athleteId;
+    // Una plantilla no es de nadie: el paywall es por-alumno, así que el campo
+    // no aplica en vez de valer «desconocido». Y no se lee el provider en ese
+    // caso: en modo plantilla el build NO lo observa, así que un `read` suelto
+    // sobre un autoDispose lo crearía y lo tiraría en el mismo tick — el
+    // arranque de listener que el comentario del build declara que hay que
+    // evitar.
+    final String entitlement;
+    if (athleteId == null) {
+      entitlement = 'not_applicable';
+    } else {
+      final blocked = ref.read(blockedAthletesProvider).valueOrNull;
+      // `unknown` cubre las DOS formas de no saber: el read falló, o el
+      // backend nunca publicó la lista para este PF. Colapsarlas en
+      // `entitled` sería decir «el paywall no explica esta denegación» sin
+      // haberlo mirado — y `entitled` es la señal que manda al on-call a
+      // buscar una regla rota en vez de mirar facturación.
+      entitlement = blocked == null || !blocked.isPublished
+          ? 'unknown'
+          : (blocked.ids.contains(athleteId) ? 'blocked' : 'entitled');
+    }
+
+    unawaited(
+      ref.read(analyticsServiceProvider).logPaywallWriteDenied(
+            trainerId: trainerUid,
+            athleteId: athleteId ?? 'none',
+            collection: 'routines',
+            operation: _isEditing ? 'update' : 'create',
+            surface: 'routine_editor_web',
+            athleteEntitlement: entitlement,
+          ),
+    );
+
+    setState(() {
+      _submitting = false;
+      _errorMessage = _deniedMessage(entitlement == 'blocked');
+      // La salida a la pantalla de solo-lectura se ofrece también cuando la
+      // causa NO está probada: ahí es justamente donde el PF necesita poder
+      // MIRAR si su cupo lo explica o no.
+      _errorIsDenial = athleteId != null;
+    });
+  }
+
+  /// El copy de la denegación.
+  ///
+  /// [athleteIsOutOfPlan] viene de `users/{uid}.blockedAthleteIds`, que es la
+  /// lista que el propio backend publicó. Cuando el alumno figura ahí, la
+  /// causa está PROBADA y se nombra. Cuando no figura —o el doc todavía no
+  /// cargó— la denegación puede ser cualquier otra cosa
+  /// (`isPermissionDenied` no es exclusivo del paywall), así que el mensaje
+  /// describe el estado y manda a verificarlo, sin afirmar el motivo.
+  ///
+  /// Las dos variantes comparten lo que sí es cierto siempre: reintentar no
+  /// sirve, y del lado del ALUMNO no se pierde nada. El PF pasa a solo lectura
+  /// sobre él; el alumno conserva rutinas, historial y chat. Decirlo al revés
+  /// («este alumno quedó sin acceso») sería falso y encima le cobraría al
+  /// alumno una fricción que es del entrenador.
+  String _deniedMessage(bool athleteIsOutOfPlan) {
+    if (widget.isTemplate) {
+      // Sin alumno de por medio el cupo no puede ser la causa; nombrarlo sería
+      // inventar.
+      return 'No pudimos guardar la $_noun: tu cuenta no tiene permiso para '
+          'escribirla. Reintentar no lo va a cambiar.'; // i18n
+    }
+    if (athleteIsOutOfPlan) {
+      return 'Este alumno quedó fuera del cupo de tu plan, así que sobre él '
+          'tu cuenta está en solo lectura y no pudimos guardar la $_noun. '
+          'Reintentar no lo va a cambiar. Él sigue con sus rutinas, su '
+          'historial y el chat.'; // i18n
+    }
+    return 'No pudimos guardar la $_noun: tu cuenta no tiene permiso para '
+        'escribir sobre este alumno. Reintentar no lo va a cambiar. '
+        'Fijate si quedó fuera del cupo de tu plan.'; // i18n
   }
 
   // ── Discard guard ────────────────────────────────────────────────────────
@@ -1565,6 +1690,17 @@ class _RoutineEditorWebScreenState
                 .valueOrNull
                 ?.displayName ??
             'el alumno'; // i18n
+
+    // Se OBSERVA acá aunque el build no lo pinte: `blockedAthletesProvider`
+    // es autoDispose, y un `ref.read` suelto desde el catch de _submit lo
+    // crearía y lo tiraría en el mismo tick — devolvería `loading` siempre y
+    // el evento de analytics saldría con `athlete_entitlement: unknown` en el
+    // 100% de los casos, que es justo el campo que decide si el paywall
+    // explica la denegación. Observarlo lo mantiene vivo mientras el editor
+    // esté abierto, al costo de un listener sobre el doc propio del PF. El
+    // `.distinct()` del provider es lo que evita que las reescrituras del
+    // barrido (que corren con los mismos valores) reconstruyan este árbol.
+    if (!widget.isTemplate) ref.watch(blockedAthletesProvider);
 
     return PopScope(
       canPop: !_isDirty,
@@ -1640,6 +1776,7 @@ class _RoutineEditorWebScreenState
                                     _ErrorBanner(
                                       message: _errorMessage!,
                                       palette: palette,
+                                      showBlockedStudentsLink: _errorIsDenial,
                                     ),
                                     const SizedBox(height: 16),
                                   ],
@@ -2119,13 +2256,23 @@ class _FieldLabel extends StatelessWidget {
 }
 
 class _ErrorBanner extends StatelessWidget {
-  const _ErrorBanner({required this.message, required this.palette});
+  const _ErrorBanner({
+    required this.message,
+    required this.palette,
+    this.showBlockedStudentsLink = false,
+  });
   final String message;
   final AppPalette palette;
+
+  /// Suma la salida a `/facturacion/alumnos-solo-lectura`. Sólo para las
+  /// denegaciones de permiso: un error de validación o un fallo de red no se
+  /// resuelven ahí, y un link que no lleva a la respuesta es ruido.
+  final bool showBlockedStudentsLink;
 
   @override
   Widget build(BuildContext context) {
     return Container(
+      key: const Key('routine_editor_error_banner'),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: palette.danger.withValues(alpha: 0.1),
@@ -2133,13 +2280,46 @@ class _ErrorBanner extends StatelessWidget {
         border: Border.all(color: palette.danger.withValues(alpha: 0.4)),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(TreinoIcon.warning, color: palette.danger, size: 18),
           const SizedBox(width: 8),
+          // Column dentro de Expanded, no un Row con el link al costado: el
+          // mensaje de una denegación son tres frases, y con textScale alto
+          // un link lateral le come el ancho hasta desbordar.
           Expanded(
-            child: Text(
-              message,
-              style: GoogleFonts.barlow(color: palette.danger, fontSize: 13),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  message,
+                  // Key propia para que los tests de copy puedan assertear
+                  // sobre el MENSAJE y no sobre «todos los Text del banner».
+                  // Con el conjunto aplanado, el texto del link
+                  // («Ver mis alumnos en solo lectura») satisfacia solo un
+                  // `contains('solo lectura')` y el test pasaba con la rama
+                  // del mensaje borrada entera.
+                  key: const Key('routine_editor_error_message'),
+                  style:
+                      GoogleFonts.barlow(color: palette.danger, fontSize: 13),
+                ),
+                if (showBlockedStudentsLink) ...[
+                  const SizedBox(height: 8),
+                  TreinoTappable(
+                    onTap: () => context.push(kBlockedStudentsRoutePath),
+                    child: Text(
+                      'Ver mis alumnos en solo lectura', // i18n
+                      style: GoogleFonts.barlow(
+                        color: palette.danger,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        decoration: TextDecoration.underline,
+                        decorationColor: palette.danger,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
         ],
