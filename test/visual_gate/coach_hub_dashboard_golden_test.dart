@@ -10,7 +10,7 @@
 ///
 /// ## Y por qué es la que EXIGE el reloj congelado
 ///
-/// La columna derecha filtra los turnos con `startsAt.isAfter(now)`. Sin el
+/// La card de próximas sesiones filtra los turnos con `startsAt.isAfter(now)`. Sin el
 /// seam de `AppClock`, este golden pasa a la mañana y falla a la tarde: el
 /// turno de las 11:30 del seed entra o no entra según la hora del runner. Es
 /// el caso que justificó tocar `lib/` en este cambio — está sembrado a
@@ -22,6 +22,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/coach_hub/presentation/sections/dashboard/coach_hub_dashboard_screen.dart';
 import 'package:treino/features/coach_hub/presentation/sections/dashboard/widgets/dashboard_kpi_strip.dart';
+import 'package:treino/features/coach_hub/presentation/sections/dashboard/widgets/dashboard_pending.dart';
 import 'package:treino/features/coach_hub/presentation/sections/dashboard/widgets/dashboard_right_column.dart';
 
 import 'gate_environment.dart';
@@ -55,7 +56,17 @@ void main() {
           // porque quisimos" de "se rompió".
           expect(find.byType(CoachHubDashboardScreen), findsOneWidget);
           expect(find.byType(DashboardKpiStrip), findsOneWidget);
-          expect(find.byType(DashboardRightColumn), findsOneWidget);
+          // Las CUATRO cards de la grilla, una por una.
+          //
+          // Antes acá iba `DashboardRightColumn`, que en desktop ya no se
+          // renderiza: sus tres cards van de a pares en filas junto con
+          // pendientes. Y pedir las cuatro por separado es más fuerte que
+          // pedir el contenedor — el contenedor podía estar y tener adentro
+          // una card rendida a medias.
+          expect(find.byType(DashboardPendingSection), findsOneWidget);
+          expect(find.byType(DashboardProximasSesionesCard), findsOneWidget);
+          expect(find.byType(DashboardVencimientos7dCard), findsOneWidget);
+          expect(find.byType(DashboardInactivosCard), findsOneWidget);
 
           expect(
             find.text(kGateTrainerName),
