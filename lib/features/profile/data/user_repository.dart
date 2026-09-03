@@ -173,10 +173,19 @@ class UserRepository {
   /// card in sync. `displayNameLowercase` is always derived when `displayName`
   /// is present.
   ///
+  /// [hasLocationConsent] (consentimiento-legal-versionado, R6): gates the
+  /// CURRENT multi-location keys (`trainerLocations`, `trainerGeohashes`) —
+  /// when `false`, a partial carrying either is silently withheld from the
+  /// public mirror instead of republishing a location the trainer never
+  /// consented to. `trainerOffersOnline` is NOT a location key and always
+  /// flows regardless of this gate. See [update] for how the caller resolves
+  /// the effective consent value it passes in here.
+  ///
   /// REQ-COACH-DISC-DUAL-001.
   Map<String, Object?>? _trainerPublicSubsetFromPartial(
     Map<String, Object?> partial, {
     required String uid,
+    required bool hasLocationConsent,
   }) {
     final hasTrainerField =
         partial.keys.any((k) => _trainerPublicFields.contains(k));
@@ -216,11 +225,16 @@ class UserRepository {
       result['trainerExperienceYears'] = partial['trainerExperienceYears'];
     }
     // ── Multi-location (Fase 6 Etapa 0) ──────────────────────────────────
-    if (partial.containsKey('trainerLocations')) {
-      result['trainerLocations'] = partial['trainerLocations'];
-    }
-    if (partial.containsKey('trainerGeohashes')) {
-      result['trainerGeohashes'] = partial['trainerGeohashes'];
+    // R6: withheld entirely when there is no effective consent — this is
+    // the choke point that makes the anti-republish guarantee a property of
+    // the repo, not an assumption about the caller.
+    if (hasLocationConsent) {
+      if (partial.containsKey('trainerLocations')) {
+        result['trainerLocations'] = partial['trainerLocations'];
+      }
+      if (partial.containsKey('trainerGeohashes')) {
+        result['trainerGeohashes'] = partial['trainerGeohashes'];
+      }
     }
     if (partial.containsKey('trainerOffersOnline')) {
       result['trainerOffersOnline'] = partial['trainerOffersOnline'];
@@ -229,6 +243,37 @@ class UserRepository {
     // the first-ever write. SetOptions(merge:true) makes this idempotent.
     result['uid'] = uid;
     return result;
+  }
+
+  /// Resolves whether the trainer has EFFECTIVE location-publication consent
+  /// at write time, for [_trainerPublicSubsetFromPartial]'s [hasLocationConsent]
+  /// gate (R6).
+  ///
+  /// The partial WINS over what is stored — if [partial] itself carries
+  /// `trainerLocationConsentAt`, its non-null-ness settles the answer with no
+  /// read. `update()` never sets that key on the hot path (consent state only
+  /// changes via [grantTrainerLocationConsent] / [revokeTrainerLocationConsent]),
+  /// so in practice this branch matters for those two callers, not for an
+  /// ordinary form save.
+  ///
+  /// Otherwise, a `get()` on `users/{uid}` is performed ONLY when [partial]
+  /// is actually touching the current multi-location fields
+  /// (`trainerLocations` / `trainerGeohashes`) — never on the hot path of an
+  /// unrelated save (e.g. a bio-only edit never pays this read).
+  Future<bool> _resolveEffectiveLocationConsent(
+    String uid,
+    Map<String, Object?> partial,
+  ) async {
+    if (partial.containsKey('trainerLocationConsentAt')) {
+      return partial['trainerLocationConsentAt'] != null;
+    }
+    final touchesLocationData = partial.containsKey('trainerLocations') ||
+        partial.containsKey('trainerGeohashes');
+    if (!touchesLocationData) return false;
+
+    final snap = await _users.doc(uid).get();
+    final data = snap.data();
+    return data != null && data['trainerLocationConsentAt'] != null;
   }
 
   /// Valida que el partial NO deje al PF en estado inválido. Combinación
@@ -353,8 +398,13 @@ class UserRepository {
     )..['updatedAt'] = Timestamp.fromDate(DateTime.now().toUtc());
 
     final publicSubset = await _publicSubsetFromPartial(partial, uid: uid);
-    final trainerPublicSubset =
-        _trainerPublicSubsetFromPartial(partial, uid: uid);
+    final hasLocationConsent =
+        await _resolveEffectiveLocationConsent(uid, partial);
+    final trainerPublicSubset = _trainerPublicSubsetFromPartial(
+      partial,
+      uid: uid,
+      hasLocationConsent: hasLocationConsent,
+    );
 
     if (publicSubset == null && trainerPublicSubset == null) {
       // No public-relevant fields — single write to users only.
