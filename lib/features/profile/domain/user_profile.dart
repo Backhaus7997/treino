@@ -53,6 +53,42 @@ class UserProfile with _$UserProfile {
     // OAuth: escrito por el submit de ProfileSetup (checkbox obligatorio para
     // cuentas nuevas). Null ⇒ cuenta legacy pre-feature (sin evidencia).
     @TimestampConverter() DateTime? termsAcceptedAt,
+    // ── Consentimiento legal versionado (consentimiento-legal-versionado) ─
+    // `acceptedTermsVersion` / `acceptedPrivacyVersion`: qué VERSIÓN de cada
+    // documento aceptó, sellada en la misma escritura que `termsAcceptedAt`
+    // en cada uno de los 3 caminos de aceptación (signup email, submit de
+    // ProfileSetup, `UserRepository.getOrCreate`). `null` ⇒ cuenta legacy
+    // sin evidencia versionada — NUNCA se trata como "aceptó la versión 0"
+    // ni "aceptó la vigente".
+    //
+    // `trainerLocationConsentAt` / `trainerLocationConsentPromptedAt` son un
+    // consentimiento DISTINTO e independiente del gate de versión de arriba:
+    // habilitan la publicación de la ubicación del PF en el mapa. Se
+    // disparan recién en la promoción a `trainer`, nunca en signup ni en
+    // ninguna escritura de aceptación de T&C/Privacidad — un atleta que
+    // aceptó la Política vigente y es promovido después IGUAL necesita este
+    // consentimiento aparte (spec: comparar sólo versiones no cubre ese
+    // caso).
+    //
+    // Tabla de estados (el contrato — cualquier gate que lea estos 2 campos
+    // debe resolver exactamente esto):
+    //
+    // | consentAt | promptedAt | Significado                        | ¿Sheet? | Ubicación publicada |
+    // |-----------|------------|-------------------------------------|---------|----------------------|
+    // | null      | null       | nunca preguntado / legacy            | sí      | sí (status quo)      |
+    // | set       | set        | otorgado                             | no      | sí                   |
+    // | null      | set        | preguntado y no otorgado (cerró/apagó)| no     | según el espejo      |
+    // | set       | null       | imposible por construcción — tratar como otorgado | no | sí |
+    //
+    // `promptedAt` es el campo anti-loop: responde "¿ya se lo preguntamos?",
+    // no "¿consintió?". Es lo único que gatea el re-display del sheet —
+    // NUNCA `trainerLocations.isNotEmpty` (ese es sólo un filtro de
+    // relevancia: revocar no vacía `trainerLocations` en `users/`, así que
+    // gatear por ahí reabriría el sheet en cada arranque).
+    int? acceptedTermsVersion,
+    int? acceptedPrivacyVersion,
+    @TimestampConverter() DateTime? trainerLocationConsentAt,
+    @TimestampConverter() DateTime? trainerLocationConsentPromptedAt,
     // ── Trainer-specific (Fase 5 Etapa 1 foundations) ───────────────────
     String? trainerBio,
     String? trainerSpecialty,

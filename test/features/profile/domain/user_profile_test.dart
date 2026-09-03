@@ -258,5 +258,105 @@ void main() {
         expect(profile.termsAcceptedAt, isNull);
       });
     });
+
+    // ── consentimiento-legal-versionado — R2 (4 campos nuevos) ────────────
+    group('legal consent versioning fields', () {
+      test('all 4 fields default to null when omitted', () {
+        final profile = UserProfile(
+          uid: 'uid-1',
+          email: 'a@b.com',
+          displayName: null,
+          role: UserRole.athlete,
+          createdAt: fixedDt,
+          updatedAt: fixedDt,
+        );
+        expect(profile.acceptedTermsVersion, isNull);
+        expect(profile.acceptedPrivacyVersion, isNull);
+        expect(profile.trainerLocationConsentAt, isNull);
+        expect(profile.trainerLocationConsentPromptedAt, isNull);
+
+        final decoded = UserProfile.fromJson(profile.toJson());
+        expect(decoded.acceptedTermsVersion, isNull);
+        expect(decoded.acceptedPrivacyVersion, isNull);
+        expect(decoded.trainerLocationConsentAt, isNull);
+        expect(decoded.trainerLocationConsentPromptedAt, isNull);
+      });
+
+      test('acceptedTermsVersion and acceptedPrivacyVersion round-trip as int',
+          () {
+        final profile = UserProfile(
+          uid: 'uid-2',
+          email: 'b@c.com',
+          displayName: null,
+          role: UserRole.athlete,
+          createdAt: fixedDt,
+          updatedAt: fixedDt,
+          acceptedTermsVersion: 1,
+          acceptedPrivacyVersion: 2,
+        );
+        final decoded = UserProfile.fromJson(profile.toJson());
+        expect(decoded.acceptedTermsVersion, equals(1));
+        expect(decoded.acceptedPrivacyVersion, equals(2));
+      });
+
+      test(
+          'trainerLocationConsentAt and trainerLocationConsentPromptedAt '
+          'round-trip through toJson/fromJson', () {
+        final consentAt = DateTime.utc(2026, 9, 1, 10, 0);
+        final promptedAt = DateTime.utc(2026, 9, 1, 9, 55);
+        final profile = UserProfile(
+          uid: 'uid-3',
+          email: 'c@d.com',
+          displayName: null,
+          role: UserRole.trainer,
+          createdAt: fixedDt,
+          updatedAt: fixedDt,
+          trainerLocationConsentAt: consentAt,
+          trainerLocationConsentPromptedAt: promptedAt,
+        );
+        final decoded = UserProfile.fromJson(profile.toJson());
+        expect(decoded.trainerLocationConsentAt, equals(consentAt));
+        expect(
+          decoded.trainerLocationConsentPromptedAt,
+          equals(promptedAt),
+        );
+      });
+
+      test(
+          'raw Firestore map with Timestamp for both consent dates decodes '
+          'to DateTime', () {
+        final consentAt = DateTime.utc(2026, 9, 1, 10, 0);
+        final promptedAt = DateTime.utc(2026, 9, 1, 9, 55);
+        final raw = <String, Object?>{
+          'uid': 'uid-4',
+          'email': 'd@e.com',
+          'displayName': null,
+          'role': 'trainer',
+          'createdAt': Timestamp.fromDate(fixedDt),
+          'updatedAt': Timestamp.fromDate(fixedDt),
+          'trainerLocationConsentAt': Timestamp.fromDate(consentAt),
+          'trainerLocationConsentPromptedAt': Timestamp.fromDate(promptedAt),
+        };
+        final profile = UserProfile.fromJson(raw);
+        expect(profile.trainerLocationConsentAt, equals(consentAt));
+        expect(profile.trainerLocationConsentPromptedAt, equals(promptedAt));
+      });
+
+      test('legacy doc with none of the 4 keys deserializes all to null', () {
+        final raw = <String, dynamic>{
+          'uid': 'uid-legacy-2',
+          'email': 'a@b.com',
+          'displayName': null,
+          'role': 'athlete',
+          'createdAt': Timestamp.fromDate(fixedDt),
+          'updatedAt': Timestamp.fromDate(fixedDt),
+        };
+        final profile = UserProfile.fromJson(raw);
+        expect(profile.acceptedTermsVersion, isNull);
+        expect(profile.acceptedPrivacyVersion, isNull);
+        expect(profile.trainerLocationConsentAt, isNull);
+        expect(profile.trainerLocationConsentPromptedAt, isNull);
+      });
+    });
   });
 }
