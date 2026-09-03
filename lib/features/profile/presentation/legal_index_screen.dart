@@ -86,12 +86,15 @@ class LegalIndexScreen extends StatelessWidget {
                           child: ProfileSectionTile(
                             icon: TreinoIcon.file,
                             title: kLegalDocuments[i].title,
+                            subtitle: 'Actualizado el '
+                                '${kLegalDocuments[i].lastUpdated}',
                             inGroup: true,
                             onTap: () => Navigator.of(context).push(
                               MaterialPageRoute<void>(
                                 builder: (_) => LegalDocumentScreen(
                                   title: kLegalDocuments[i].title,
                                   sections: kLegalDocuments[i].sections,
+                                  lastUpdated: kLegalDocuments[i].lastUpdated,
                                 ),
                               ),
                             ),
@@ -103,8 +106,7 @@ class LegalIndexScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 18),
                 Text(
-                  'Última actualización: $kLegalLastUpdated.\n'
-                  'Consultas: $kLegalContactEmail',
+                  'Consultas sobre estos documentos: $kLegalContactEmail',
                   style: GoogleFonts.barlow(
                     fontSize: 12,
                     height: 1.5,

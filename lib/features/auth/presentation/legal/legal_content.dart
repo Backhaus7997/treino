@@ -224,8 +224,21 @@ const List<LegalSection> kPrivacySections = <LegalSection>[
 /// pendientes de `docs/legal/` y corra `scripts/build_legal_content.py`, este
 /// archivo entero se regenera y esta lista pasa a tener los nueve documentos
 /// sin tocar la pantalla que la consume.
-const List<({String title, List<LegalSection> sections})> kLegalDocuments =
-    <({String title, List<LegalSection> sections})>[
-  (title: 'Términos y Condiciones', sections: kTermsSections),
-  (title: 'Política de Privacidad', sections: kPrivacySections),
+typedef LegalDocumentEntry = ({
+  String title,
+  List<LegalSection> sections,
+  String lastUpdated,
+});
+
+const List<LegalDocumentEntry> kLegalDocuments = <LegalDocumentEntry>[
+  (
+    title: 'Términos y Condiciones',
+    sections: kTermsSections,
+    lastUpdated: kTermsLastUpdated,
+  ),
+  (
+    title: 'Política de Privacidad',
+    sections: kPrivacySections,
+    lastUpdated: kPrivacyLastUpdated,
+  ),
 ];

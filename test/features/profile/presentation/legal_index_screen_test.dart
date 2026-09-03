@@ -49,20 +49,33 @@ void main() {
     );
     expect(screen.title, first.title);
     expect(screen.sections, same(first.sections));
+    expect(screen.lastUpdated, first.lastUpdated);
     // El encabezado de la primera sección confirma que se renderizó el
     // documento correcto, no sólo que se montó la pantalla.
     expect(find.text(first.sections.first.heading), findsOneWidget);
   });
 
-  testWidgets('muestra el pie con fecha de actualización y contacto',
+  testWidgets('cada documento muestra su propia fecha de actualización',
       (tester) async {
     await tester.pumpWidget(wrap(const LegalIndexScreen()));
     await tester.pumpAndSettle();
 
-    expect(
-      find.textContaining(kLegalLastUpdated),
-      findsOneWidget,
-    );
+    // Las fechas son POR DOCUMENTO (los Términos y la Política se revisan por
+    // separado), así que se verifica que la de cada uno esté en su fila y no
+    // una sola al pie.
+    for (final doc in kLegalDocuments) {
+      expect(
+        find.textContaining(doc.lastUpdated),
+        findsWidgets,
+        reason: 'falta la fecha de "${doc.title}"',
+      );
+    }
+  });
+
+  testWidgets('muestra el contacto al pie', (tester) async {
+    await tester.pumpWidget(wrap(const LegalIndexScreen()));
+    await tester.pumpAndSettle();
+
     expect(find.textContaining(kLegalContactEmail), findsOneWidget);
   });
 }
