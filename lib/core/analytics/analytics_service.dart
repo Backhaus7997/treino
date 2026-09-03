@@ -32,6 +32,44 @@ abstract class AnalyticsService {
     required int durationSeconds,
   });
 
+  /// Se guardó una rutina NUEVA en `routines` — desde cualquier editor y por
+  /// cualquier actor. Es el evento que dice qué FORMA tienen las rutinas que
+  /// la gente arma de verdad; sin él, "¿cuánta gente querría un segundo día?"
+  /// no se puede responder.
+  ///
+  /// [source] separa al alumno suelto (el único segmento que un paywall
+  /// tocaría) del ruido del PF. Las asignadas por un profe se cuentan igual y
+  /// se filtran en el reporte — omitirlas dejaría el evento ciego a la mitad
+  /// de las rutinas y sesgaría la comparación.
+  ///
+  /// Solo contadores y un enum: nada que identifique a una persona.
+  Future<void> logRoutineCreated({
+    required RoutineCreationSource source,
+    required int daysCount,
+    required int weeksCount,
+  });
+
+  /// "Agregar día" en el editor — la rutina pasó de N a N+1 días.
+  ///
+  /// [daysCount] es el total DESPUÉS de agregar. Es el instante exacto en que
+  /// un tope de días mordería, por eso se mide antes de que exista ninguno.
+  /// Se emite también mientras la rutina todavía no se guardó: la fricción
+  /// ocurre al agregar, no al guardar.
+  Future<void> logRoutineDayAdded({
+    required RoutineCreationSource source,
+    required int daysCount,
+  });
+
+  /// Lo mismo que [logRoutineDayAdded], sobre el eje de semanas.
+  ///
+  /// [weeksCount] es el total DESPUÉS de agregar. En el editor web las semanas
+  /// son un stepper numérico, así que un salto de 1 a 4 es UN evento con
+  /// `weeks_count: 4`, no tres.
+  Future<void> logRoutineWeekAdded({
+    required RoutineCreationSource source,
+    required int weeksCount,
+  });
+
   /// `RoutineRepository.createAssigned` — un PF asignó un plan a un atleta.
   Future<void> logPlanAssigned({
     required String routineId,
@@ -137,6 +175,36 @@ abstract class AnalyticsService {
   });
 }
 
+/// Quién creó la rutina y desde dónde — la dimensión `source` de los tres
+/// eventos de forma de rutina (`routine_created`, `routine_day_added`,
+/// `routine_week_added`).
+///
+/// No es `RoutineSource`: ese enum es el contrato del DOCUMENTO en Firestore y
+/// colapsa "armada de cero" y "usar como base" en un mismo `user-created`.
+/// Acá esa diferencia ES el dato: un alumno que copia una plantilla de 4 días
+/// no chocaría contra un límite igual que uno que armó 4 días a mano.
+///
+/// Los valores van en snake_case como todo parámetro de este archivo.
+enum RoutineCreationSource {
+  /// Alumno, editor en blanco (`SelfCreating`).
+  self('self'),
+
+  /// Alumno, "Usar como base" sobre una plantilla (`SelfCustomizing`, #647).
+  selfFromTemplate('self_from_template'),
+
+  /// PF asignando a un alumno: editor móvil o web, preview de Excel, o
+  /// "Asignar a alumno" sobre una plantilla propia.
+  trainerAssigned('trainer_assigned'),
+
+  /// PF guardando una plantilla propia sin alumno (`TrainerTemplating`).
+  trainerTemplate('trainer_template');
+
+  const RoutineCreationSource(this.wireName);
+
+  /// Valor que viaja en el parámetro `source`.
+  final String wireName;
+}
+
 /// El nombre del evento, en UN solo lugar.
 ///
 /// El resto de los eventos de este archivo tiene el string escrito dos veces
@@ -180,6 +248,47 @@ class FirebaseAnalyticsService implements AnalyticsService {
           'routine_id': routineId,
           'session_id': sessionId,
           'duration_seconds': durationSeconds,
+        },
+      );
+
+  @override
+  Future<void> logRoutineCreated({
+    required RoutineCreationSource source,
+    required int daysCount,
+    required int weeksCount,
+  }) =>
+      _analytics.logEvent(
+        name: 'routine_created',
+        parameters: {
+          'source': source.wireName,
+          'days_count': daysCount,
+          'weeks_count': weeksCount,
+        },
+      );
+
+  @override
+  Future<void> logRoutineDayAdded({
+    required RoutineCreationSource source,
+    required int daysCount,
+  }) =>
+      _analytics.logEvent(
+        name: 'routine_day_added',
+        parameters: {
+          'source': source.wireName,
+          'days_count': daysCount,
+        },
+      );
+
+  @override
+  Future<void> logRoutineWeekAdded({
+    required RoutineCreationSource source,
+    required int weeksCount,
+  }) =>
+      _analytics.logEvent(
+        name: 'routine_week_added',
+        parameters: {
+          'source': source.wireName,
+          'weeks_count': weeksCount,
         },
       );
 
@@ -315,6 +424,25 @@ class NoopAnalyticsService implements AnalyticsService {
     required String routineId,
     required String sessionId,
     required int durationSeconds,
+  }) async {}
+
+  @override
+  Future<void> logRoutineCreated({
+    required RoutineCreationSource source,
+    required int daysCount,
+    required int weeksCount,
+  }) async {}
+
+  @override
+  Future<void> logRoutineDayAdded({
+    required RoutineCreationSource source,
+    required int daysCount,
+  }) async {}
+
+  @override
+  Future<void> logRoutineWeekAdded({
+    required RoutineCreationSource source,
+    required int weeksCount,
   }) async {}
 
   @override
