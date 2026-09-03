@@ -37,7 +37,7 @@ async function errorDe(fn: () => Promise<unknown>): Promise<MpApiError> {
   } catch (e) {
     return e as MpApiError;
   }
-  throw new Error('se esperaba un MpApiError y la llamada resolvio bien');
+  throw new Error("se esperaba un MpApiError y la llamada resolvio bien");
 }
 
 describe("createMpClient — el camino feliz", () => {
