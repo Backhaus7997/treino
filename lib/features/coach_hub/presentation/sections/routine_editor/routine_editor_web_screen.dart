@@ -3423,20 +3423,16 @@ class _SlotCard extends StatelessWidget {
               chipLabel: _setChipLabel(weekSets, i),
               onTypeChanged: (t) => onSetTypeChanged(i, t),
             ),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: onAddSet,
-              icon: Icon(TreinoIcon.plus, size: 14, color: palette.accent),
-              label: Text(
-                'Agregar set', // i18n
-                style: GoogleFonts.barlowCondensed(
-                  color: palette.accent,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 12,
-                ),
-              ),
-            ),
+          // `AddSetButton`, el MISMO del teléfono, en vez de un `TextButton`
+          // de 12 px con un ícono de 14. Acá era un texto chico pegado a la
+          // izquierda: se leía como un link, no como el botón que se toca una
+          // vez por serie. El compartido ocupa el ancho, tiene alto de acción
+          // y contorno punteado — y trae el rol de botón para lectores de
+          // pantalla, que el `TextButton` daba y un `InkWell` pelado pierde.
+          const SizedBox(height: AppSpacing.hairline),
+          AddSetButton(
+            label: 'Agregar set', // i18n
+            onPressed: onAddSet,
           ),
           // Coaching note for this exercise (optional). Located in tests via
           // its hint, not a Key — a Key would collide across slots.
