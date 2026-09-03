@@ -51,6 +51,7 @@ import '../../../../workout/domain/routine_source.dart';
 import '../../../../workout/domain/routine_visibility.dart';
 import '../../../../workout/domain/set_enums.dart';
 import '../../../../workout/domain/set_spec.dart';
+import '../../shell/responsive.dart' as rsp;
 import '../../widgets/create_custom_exercise_dialog.dart';
 import '../../widgets/exercise_picker_dialog.dart';
 
@@ -502,6 +503,22 @@ class _RoutineEditorWebScreenState
   /// El día que tiene el panel abierto, o null si está cerrado.
   int? _quickEntryDia;
 
+  /// El día al que el PANEL LATERAL de ejercicios está atado (#860).
+  ///
+  /// Arranca en 0 y **no se cierra**: en desktop el panel es la superficie
+  /// principal para cargar ejercicios, no un modo que se enciende. Por eso los
+  /// botones "Agregar ejercicio" / "+ Superserie" del día desaparecen ahí — el
+  /// panel los reemplaza — y por eso tampoco tiene X: cerrarlo dejaría al PF
+  /// sin ninguna forma de agregar.
+  ///
+  /// Abajo de 1280 no hay panel, así que allá los botones del día SIGUEN
+  /// estando. Sin ellos no habría cómo agregar nada.
+  ///
+  /// Uno solo para toda la pantalla, con selector de día en su encabezado: con
+  /// los días apilados hay que decir explícitamente a cuál cae lo que se
+  /// agrega, y un panel POR día multiplicaría paneles.
+  int _pickerDia = 0;
+
   /// El ejercicio ya elegido de la lista, o null mientras se busca.
   QuickEntryResult? _quickEntryElegido;
 
@@ -580,13 +597,47 @@ class _RoutineEditorWebScreenState
           results: sigueElegido
               ? const []
               : _buscarParaEntradaRapida(entry.query, dayIndex, catalogo),
-          onSelect: (r) => setState(() {
-            _quickEntryElegido = r;
-            // Devolver el foco: el tap sobre la lista lo suelta, y sin
-            // recuperarlo el usuario pierde el cursor justo cuando va a
-            // escribir la prescripción.
-            _quickEntryFocus.requestFocus();
-          }),
+          onSelect: (r) {
+            // Autocompletar, NO agregar: el usuario viene a escribir la
+            // prescripción DESPUÉS del nombre.
+            //
+            // Y hay que reescribir el texto, no sólo guardar el elegido. La
+            // primera versión hacía sólo lo segundo y el bug era inmediato:
+            // `sigueElegido` exige que el texto CONTENGA el nombre, así que
+            // elegir "Press de Banca con Mancuernas" habiendo escrito "press
+            // de banca" se auto-deseleccionaba en el frame siguiente. Con
+            // muchas variantes del mismo ejercicio, NINGUNA se podía elegir.
+            //
+            // Se CONSERVA lo que ya se tipeó: quien sigue el placeholder
+            // escribe `banca 4x10 60` de una y después toca el ejercicio, y
+            // reemplazar todo por el nombre le borraría el `4x10 60`. Se
+            // quitan sólo las palabras que el parser entendió como BÚSQUEDA, y
+            // UNA ocurrencia por palabra: hay ejercicios del catálogo con
+            // palabras repetidas.
+            final pendientes = entry.query
+                .toLowerCase()
+                .split(RegExp(r'\s+'))
+                .where((p) => p.isNotEmpty)
+                .toList();
+            final resto = value.text.split(RegExp(r'\s+')).where((p) {
+              if (p.isEmpty) return false;
+              final i = pendientes.indexOf(p.toLowerCase());
+              if (i < 0) return true;
+              pendientes.removeAt(i);
+              return false;
+            }).join(' ');
+            final texto = resto.isEmpty ? '${r.name} ' : '${r.name} $resto';
+            _quickEntryCtrl.value = TextEditingValue(
+              text: texto,
+              selection: TextSelection.collapsed(offset: texto.length),
+            );
+            setState(() {
+              _quickEntryElegido = r;
+              // El tap sobre la lista suelta el foco; sin recuperarlo se
+              // pierde el cursor justo cuando va a escribir la prescripción.
+              _quickEntryFocus.requestFocus();
+            });
+          },
           onConfirm: () {
             final r = _quickEntryElegido;
             if (r == null) return;
@@ -887,6 +938,16 @@ class _RoutineEditorWebScreenState
   // ── Slot operations ──────────────────────────────────────────────────────
 
   Future<void> _addExercisesToDay(int dayIndex) async {
+    // En desktop abre el PANEL LATERAL y no un modal: el panel no tapa la
+    // plantilla, así que el loop "miro qué puse → elijo el que sigue → miro
+    // cómo quedó" no se rompe en cada iteración (#860). Abajo de 1280 sigue el
+    // modal, que ahí es lo correcto.
+    if (rsp.viewportFor(MediaQuery.sizeOf(context).width) ==
+            rsp.Viewport.desktop) {
+      setState(() => _pickerDia = dayIndex);
+      return;
+    }
+
     final day = _days[dayIndex];
     final alreadyIds = day.slots
         .where((s) => s.exercise != null)
@@ -897,9 +958,92 @@ class _RoutineEditorWebScreenState
       alreadySelectedIds: alreadyIds,
     );
     if (picked == null || picked.isEmpty || !mounted) return;
+    _agregarAlDia(dayIndex, picked);
+  }
+
+  /// Agrega varios ejercicios al día [dayIndex] YA ENLAZADOS como superserie.
+  ///
+  /// Esto faltaba en la web y no era un detalle: acá una superserie se formaba
+  /// agregando los ejercicios de a uno y después tildando "Superserie con el
+  /// siguiente" en cada uno. En el teléfono elegís tres y entran como grupo de
+  /// una. Para un PF que arma planes todo el día, esa diferencia es la mitad
+  /// del trabajo.
+  ///
+  /// `linkedToNext` va en TODOS menos el último: la corrida la define el
+  /// enlace del anterior, así que marcar el último también dejaría enganchado
+  /// al ejercicio que venga después.
+  Future<void> _addSupersetToDay(int dayIndex) async {
+    final day = _days[dayIndex];
+    final alreadyIds = day.slots
+        .where((s) => s.exercise != null)
+        .map((s) => s.exercise!.id)
+        .toSet();
+    final picked = await showExercisePickerDialog(
+      context,
+      alreadySelectedIds: alreadyIds,
+    );
+    if (picked == null || !mounted) return;
+
+    final nuevos =
+        picked.where((e) => !alreadyIds.contains(e.id)).toList();
+    // Una superserie de uno no es una superserie. Y decirlo, en vez de un
+    // `return` mudo que deja el botón pareciendo roto.
+    if (nuevos.length < 2) {
+      if (!mounted) return;
+      setState(() => _errorMessage = nuevos.isEmpty
+          ? 'Esos ejercicios ya están en el día.' // i18n
+          : 'Una superserie necesita al menos dos ejercicios.'); // i18n
+      return;
+    }
+
     _markDirty();
     setState(() {
-      for (final exercise in picked) {
+      _errorMessage = null;
+      final desde = day.slots.length;
+      for (final exercise in nuevos) {
+        day.slots.add(
+          _EditorSlot()
+            ..exercise = exercise
+            ..weeklySets = List.generate(_numWeeks, (_) => [_EditorSet()]),
+        );
+      }
+      for (var i = desde; i < day.slots.length - 1; i++) {
+        day.slots[i].linkedToNext = true;
+      }
+    });
+  }
+
+  /// Agrega [elegidos] al día [dayIndex] YA ENLAZADOS como superserie.
+  ///
+  /// Reusa [_agregarAlDia] y después enlaza la corrida nueva: así el alta —qué
+  /// se saltea, cómo nacen los sets— no puede divergir entre agregar sueltos y
+  /// agregar agrupados.
+  ///
+  /// `linkedToNext` va en todos menos el último: la corrida la define el
+  /// enlace del anterior, así que marcar el último dejaría enganchado al
+  /// ejercicio que venga después.
+  void _agregarSuperserieAlDia(int dayIndex, List<Exercise> elegidos) {
+    if (elegidos.length < 2) return;
+    final desde = _days[dayIndex].slots.length;
+    _agregarAlDia(dayIndex, elegidos);
+    setState(() {
+      final slots = _days[dayIndex].slots;
+      for (var i = desde; i < slots.length - 1; i++) {
+        slots[i].linkedToNext = true;
+      }
+    });
+  }
+
+  /// Suma [elegidos] al día [dayIndex], salteando los que ya están.
+  ///
+  /// La comparten los dos caminos —modal y panel— justamente para que agregar
+  /// desde uno u otro no pueda divergir.
+  void _agregarAlDia(int dayIndex, List<Exercise> elegidos) {
+    if (elegidos.isEmpty) return;
+    final day = _days[dayIndex];
+    _markDirty();
+    setState(() {
+      for (final exercise in elegidos) {
         if (day.slots.any((s) => s.exercise?.id == exercise.id)) continue;
         day.slots.add(
           _EditorSlot()
@@ -1964,7 +2108,7 @@ class _RoutineEditorWebScreenState
     // barrido (que corren con los mismos valores) reconstruyan este árbol.
     if (!widget.isTemplate) ref.watch(blockedAthletesProvider);
 
-    return PopScope(
+    final arbol = PopScope(
       canPop: !_isDirty,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _onBackTap();
@@ -2032,6 +2176,12 @@ class _RoutineEditorWebScreenState
                             child: ConstrainedBox(
                               constraints: const BoxConstraints(maxWidth: 720),
                               child: Column(
+                                // El panel lateral vive AL LADO de esto y
+                                // lista el catálogo entero: sin un scope, un
+                                // finder por texto en los tests no distingue
+                                // "Press de Banca en el día" de "Press de
+                                // Banca en la lista del panel".
+                                key: const Key('routine_editor_form'),
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
                                   if (_errorMessage != null) ...[
@@ -2291,6 +2441,12 @@ class _RoutineEditorWebScreenState
                                             !_days[i].slots[s].expandido,
                                       ),
                                       quickEntryAbierto: _quickEntryDia == i,
+                                      onAddSuperset: () =>
+                                          _addSupersetToDay(i),
+                                      panelPresente: rsp.viewportFor(
+                                            MediaQuery.sizeOf(context).width,
+                                          ) ==
+                                          rsp.Viewport.desktop,
                                       onToggleQuickEntry: () => setState(() {
                                         if (_quickEntryDia == i) {
                                           _cerrarEntradaRapida();
@@ -2418,6 +2574,39 @@ class _RoutineEditorWebScreenState
             ),
         ],
       ),
+    );
+
+    // El panel lateral, sólo en desktop. No es un número nuevo: `>= 1280` es
+    // `Viewport.desktop` de `responsive.dart` (ADR-CHW-004). En `compact`
+    // (768-1279) el sidebar ya está forzado a colapsar, y meterle un panel de
+    // 400 px sería el mismo error que ese ADR decidió evitar — ahí sigue el
+    // modal, que es lo que el propio #860 propone.
+    if (rsp.viewportFor(MediaQuery.sizeOf(context).width) !=
+        rsp.Viewport.desktop) {
+      return arbol;
+    }
+    // El día puede haber desaparecido (se borró mientras el panel apuntaba a
+    // él): sin este clamp el panel leería un índice fuera de rango.
+    final dia = _pickerDia.clamp(0, _days.length - 1);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(child: arbol),
+        ExercisePickerPanel(
+          dias: [for (final d in _days) d.name],
+          diaElegido: dia,
+          onElegirDia: (i) => setState(() => _pickerDia = i),
+          alreadySelectedIds: _days[dia]
+              .slots
+              .where((s) => s.exercise != null)
+              .map((s) => s.exercise!.id)
+              .toSet(),
+          onAgregar: (elegidos) => _agregarAlDia(dia, elegidos),
+          onAgregarEnSuperserie: (elegidos) =>
+              _agregarSuperserieAlDia(dia, elegidos),
+        ),
+      ],
     );
   }
 }
@@ -2825,6 +3014,8 @@ class _DayCard extends StatelessWidget {
     required this.onToggleSlotExpanded,
     required this.quickEntryAbierto,
     required this.onToggleQuickEntry,
+    required this.onAddSuperset,
+    required this.panelPresente,
     this.quickEntryPanel,
     required this.onReplaceSlot,
     required this.onMoveSlot,
@@ -2878,6 +3069,13 @@ class _DayCard extends StatelessWidget {
   /// pertenece lo que se escribe.
   final bool quickEntryAbierto;
   final VoidCallback onToggleQuickEntry;
+
+  /// Abre el picker y agrega los elegidos YA enlazados como superserie.
+  final VoidCallback onAddSuperset;
+
+  /// Si el panel lateral está en pantalla. Cuando está, este día no dibuja sus
+  /// botones de alta: el panel los reemplaza.
+  final bool panelPresente;
 
   /// El panel ya construido, o null cuando este día lo tiene cerrado. Lo arma
   /// el `State` porque el controller y el foco viven allá.
@@ -3016,10 +3214,22 @@ class _DayCard extends StatelessWidget {
           // null a propósito: en la web una superserie se arma con el toggle
           // "unir con el siguiente" de cada ejercicio, no con un botón de alta,
           // y `DayActionButtons` con un solo label ocupa la fila entera.
-          DayActionButtons(
-            exerciseLabel: 'Agregar ejercicio', // i18n
-            onAddExercise: onAddExercises,
-          ),
+          // Los botones del día SÓLO abajo de 1280.
+          //
+          // En desktop el panel lateral está siempre abierto y es la
+          // superficie para cargar ejercicios: dos entradas para lo mismo, una
+          // al lado de la otra, es ruido. Y la de superserie sobra del todo —
+          // ahí la decisión se toma en el panel, donde se hace la selección.
+          //
+          // Abajo de 1280 NO hay panel, así que acá siguen: sin ellos no
+          // habría forma de agregar nada.
+          if (!panelPresente)
+            DayActionButtons(
+              exerciseLabel: 'Agregar ejercicio', // i18n
+              onAddExercise: onAddExercises,
+              supersetLabel: '+ Superserie', // i18n
+              onAddSuperset: onAddSuperset,
+            ),
         ],
       ),
     );
@@ -3434,6 +3644,9 @@ class _SlotCard extends StatelessWidget {
             label: 'Agregar set', // i18n
             onPressed: onAddSet,
           ),
+          // El botón y el campo de notas se tocaban: dos bordes pegados se
+          // leen como UN control partido, no como dos cosas distintas.
+          const SizedBox(height: AppSpacing.s12),
           // Coaching note for this exercise (optional). Located in tests via
           // its hint, not a Key — a Key would collide across slots.
           TextFormField(

@@ -223,6 +223,11 @@ void main() {
         expect(find.text('Press de Banca'), findsOneWidget);
         expect(find.text('Sentadilla con Barra'), findsOneWidget);
 
+        // Los chips arrancan COLAPSADOS desde el #860: desplegados eran 4
+        // filas y dejaban 3 ejercicios visibles. Hay que abrirlos primero.
+        await tester.tap(find.byKey(const Key('picker_filtros_toggle')));
+        await tester.pumpAndSettle();
+
         // Tap the PECHO muscle chip — filters to chest-only.
         await tester.tap(find.text('PECHO'));
         await tester.pumpAndSettle();

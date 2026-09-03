@@ -14,6 +14,7 @@ import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
 import 'package:treino/features/coach/application/blocked_athletes_providers.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/exercise_picker_dialog.dart';
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/blocked_students_screen.dart'
     show kBlockedStudentsRoutePath;
 import 'package:treino/features/coach_hub/presentation/sections/routine_editor/routine_editor_web_screen.dart';
@@ -81,6 +82,33 @@ List<Override> _overrides({
 
 /// Pumps the editor. With [routineId] the edit route is pushed (edit mode);
 /// without it, the create route (as before).
+/// [f] pero SÓLO dentro del formulario del editor, nunca en el panel lateral.
+///
+/// Desde el #860 el panel está siempre abierto en desktop y lista el catálogo
+/// completo, así que `find.text('Press de Banca')` matchea dos veces: la fila
+/// del panel y la card del día. Lo mismo con los nombres de día, que el panel
+/// repite como chips de destino. Todo lo que mire LA RUTINA scopea acá.
+Finder enElEditor(Finder f) => find.descendant(
+      of: find.byKey(const Key('routine_editor_form')),
+      matching: f,
+    );
+
+/// Tilda [nombre] en la lista del panel lateral.
+///
+/// El panel es de alto fijo y la fila puede caer abajo del pliegue: el
+/// hit-test sólo AVISA cuando el tap le pega al aire, así que sin el
+/// `ensureVisible` la selección no pasa y el test muere más adelante.
+Future<void> _elegirEnPanel(WidgetTester tester, String nombre) async {
+  final fila = find.descendant(
+    of: find.byType(ExercisePickerPanel),
+    matching: find.text(nombre),
+  );
+  await tester.ensureVisible(fila);
+  await tester.pumpAndSettle();
+  await tester.tap(fila);
+  await tester.pumpAndSettle();
+}
+
 Future<void> _pumpEditor(
   WidgetTester tester, {
   RoutineRepository? repo,
@@ -974,18 +1002,14 @@ Future<void> _fillMinimalValidForm(WidgetTester tester) async {
     'Push/Pull/Legs',
   );
 
-  // El botón RÁPIDO agregó alto arriba de éste y lo empuja abajo del pliegue.
-  // Sin traerlo a la vista, el tap "encuentra" el widget y le pega al aire —
-  // el hit-test sólo AVISA, no falla, así que el test seguía y explotaba
-  // después, en el picker que nunca se abrió.
-  await tester.ensureVisible(find.text('Agregar ejercicio'));
-  await tester.pumpAndSettle();
-  await tester.tap(find.text('Agregar ejercicio'));
-  await tester.pumpAndSettle();
+  // El panel lateral está SIEMPRE abierto en desktop (#860): el botón
+  // "Agregar ejercicio" del día no existe ahí, lo reemplaza el panel.
   await tester.tap(find.text('Press de Banca'));
   await tester.pumpAndSettle();
   await tester.tap(find.text('Agregar (1)'));
   await tester.pumpAndSettle();
+      // El panel NO se cierra: es el punto del #860 y ya no tiene con qué.
+      // Lo que sigue mira el EDITOR, así que scopea con [enElEditor].
   // La card nace PLEGADA desde que la web usa `ExerciseCard`: los campos
   // de sets no están en el árbol hasta abrirla.
   await expandirEjercicios(tester);
@@ -1084,12 +1108,14 @@ void main() {
         find.byKey(const Key('routine_editor_split_field')),
         'PPL',
       );
-      await tester.tap(find.text('Agregar ejercicio'));
-      await tester.pumpAndSettle();
+      // El panel lateral está SIEMPRE abierto en desktop (#860): el botón
+      // "Agregar ejercicio" del día no existe ahí, lo reemplaza el panel.
       await tester.tap(find.text('Press de Banca'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Agregar (1)'));
       await tester.pumpAndSettle();
+      // El panel NO se cierra: es el punto del #860 y ya no tiene con qué.
+      // Lo que sigue mira el EDITOR, así que scopea con [enElEditor].
       // La card nace PLEGADA desde que la web usa `ExerciseCard`: los campos
       // de sets no están en el árbol hasta abrirla.
       await expandirEjercicios(tester);
@@ -1107,7 +1133,7 @@ void main() {
     testWidgets('agregar día adds a new day card', (tester) async {
       await _pumpEditor(tester);
 
-      expect(find.text('Día 1'), findsOneWidget);
+      expect(enElEditor(find.text('Día 1')), findsOneWidget);
       // Cada día es más alto desde que trae RÁPIDO y el estado vacío, así que
       // este botón cae abajo del pliegue. El hit-test sólo AVISA cuando el tap
       // le pega al aire: sin esto el día no se creaba y el test fallaba después
@@ -1118,37 +1144,54 @@ void main() {
       await tester.tap(agregarDia);
       await tester.pumpAndSettle();
 
-      await tester.ensureVisible(find.text('Día 2'));
+      await tester.ensureVisible(enElEditor(find.text('Día 2')));
       await tester.pumpAndSettle();
-      expect(find.text('Día 2'), findsOneWidget);
+      expect(enElEditor(find.text('Día 2')), findsOneWidget);
     });
   });
 
   group('RoutineEditorWebScreen — reemplazar ejercicio (in-place)', () {
-    // Picks [name] inside the open picker dialog. [query] is a SUBSTRING of the
+    // Picks [name] inside the open picker. [query] is a SUBSTRING of the
     // name typed into the search field so the row is on-screen regardless of
     // seed size — it must differ from the full name, otherwise find.text([name])
-    // would also match the text the search field now holds. The tap is scoped
-    // to the Dialog so it never hits the slot card behind it.
+    // would also match the text the search field now holds.
+    //
+    // El scope es el HOSPEDAJE, y desde el #860 hay dos: panel lateral en
+    // desktop (>= 1280, que es el ancho de estos tests) y `Dialog` abajo de
+    // eso. Buscar sólo dentro de `Dialog` dejaba de encontrar cualquier cosa
+    // con el panel abierto. Scopearlo sigue siendo necesario: sin eso el tap
+    // le pega a la card del ejercicio que está DETRÁS.
     Future<void> pickInDialog(
       WidgetTester tester,
       String name,
       String query,
     ) async {
+      // El `Dialog` primero: cuando hay uno abierto (el flujo "Cambiar
+      // ejercicio" lo usa) está ENCIMA del panel con un AbsorbPointer, así
+      // que tapear la fila del panel de abajo le pega al aire. Sin panel
+      // —abajo de 1280— el modal es igual el único hospedaje.
+      final modal = find.byType(Dialog);
+      final host = modal.evaluate().isNotEmpty
+          ? modal
+          : find.byType(ExercisePickerPanel);
       await tester.enterText(
-        find.descendant(
-          of: find.byType(Dialog),
-          matching: find.byType(TextField),
-        ),
+        find.descendant(of: host, matching: find.byType(TextField)),
         query,
       );
       await tester.pumpAndSettle();
-      await tester.tap(
-        find.descendant(of: find.byType(Dialog), matching: find.text(name)),
-      );
+      final fila = find.descendant(of: host, matching: find.text(name));
+      // El panel es alto fijo y la fila puede caer abajo del pliegue. El
+      // hit-test sólo AVISA cuando el tap le pega al aire: sin esto no se
+      // seleccionaba nada y el test moría tres pasos después buscando
+      // "Agregar (1)", que era el síntoma y no la causa.
+      await tester.ensureVisible(fila);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Agregar (1)'));
+      await tester.tap(fila);
       await tester.pumpAndSettle();
+      await tester.tap(find.descendant(of: host, matching: find.text('Agregar (1)')));
+      await tester.pumpAndSettle();
+      // El panel NO se cierra: es el punto del #860 y ya no tiene con qué.
+      // Lo que sigue mira el EDITOR, así que scopea con [enElEditor].
       // La card nace PLEGADA desde que la web usa `ExerciseCard`: los campos
       // de sets no están en el árbol hasta abrirla.
       await expandirEjercicios(tester);
@@ -1160,8 +1203,8 @@ void main() {
       await _pumpEditor(tester);
 
       // Agrega "Press de Banca" y le carga reps 10.
-      await tester.tap(find.text('Agregar ejercicio'));
-      await tester.pumpAndSettle();
+      // El panel lateral está SIEMPRE abierto en desktop (#860): el botón
+      // "Agregar ejercicio" del día no existe ahí, lo reemplaza el panel.
       await pickInDialog(tester, 'Press de Banca', 'Banca');
       await tester.enterText(
         find.ancestor(
@@ -1172,7 +1215,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Press de Banca'), findsOneWidget);
+      expect(enElEditor(find.text('Press de Banca')), findsOneWidget);
       expect(find.text('10'), findsOneWidget);
 
       // "Cambiar ejercicio" → elegir "Sentadilla con Barra".
@@ -1182,16 +1225,16 @@ void main() {
 
       // El ejercicio cambió en el mismo slot (no se agregó otro) y las reps
       // siguen cargadas: la config sobrevive al swap.
-      expect(find.text('Sentadilla con Barra'), findsOneWidget);
-      expect(find.text('Press de Banca'), findsNothing);
+      expect(enElEditor(find.text('Sentadilla con Barra')), findsOneWidget);
+      expect(enElEditor(find.text('Press de Banca')), findsNothing);
       expect(find.text('10'), findsOneWidget);
     });
 
     testWidgets('elegir el mismo ejercicio es un no-op', (tester) async {
       await _pumpEditor(tester);
 
-      await tester.tap(find.text('Agregar ejercicio'));
-      await tester.pumpAndSettle();
+      // El panel lateral está SIEMPRE abierto en desktop (#860): el botón
+      // "Agregar ejercicio" del día no existe ahí, lo reemplaza el panel.
       await pickInDialog(tester, 'Press de Banca', 'Banca');
 
       await tester.tap(find.byTooltip('Cambiar ejercicio'));
@@ -1199,18 +1242,20 @@ void main() {
       await pickInDialog(tester, 'Press de Banca', 'Banca');
 
       // Sigue habiendo un único slot con el mismo ejercicio.
-      expect(find.text('Press de Banca'), findsOneWidget);
+      expect(enElEditor(find.text('Press de Banca')), findsOneWidget);
     });
   });
 
   group('RoutineEditorWebScreen — borrar ejercicio con scope (Fase 6)', () {
     Future<void> addPressDeBanca(WidgetTester tester) async {
-      await tester.tap(find.text('Agregar ejercicio'));
-      await tester.pumpAndSettle();
+      // El panel lateral está SIEMPRE abierto en desktop (#860): el botón
+      // "Agregar ejercicio" del día no existe ahí, lo reemplaza el panel.
       await tester.tap(find.text('Press de Banca'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Agregar (1)'));
       await tester.pumpAndSettle();
+      // El panel NO se cierra: es el punto del #860 y ya no tiene con qué.
+      // Lo que sigue mira el EDITOR, así que scopea con [enElEditor].
       // La card nace PLEGADA desde que la web usa `ExerciseCard`: los campos
       // de sets no están en el árbol hasta abrirla.
       await expandirEjercicios(tester);
@@ -1221,13 +1266,13 @@ void main() {
     ) async {
       await _pumpEditor(tester);
       await addPressDeBanca(tester);
-      expect(find.text('Press de Banca'), findsOneWidget);
+      expect(enElEditor(find.text('Press de Banca')), findsOneWidget);
 
       await tester.tap(find.byTooltip('Quitar ejercicio'));
       await tester.pumpAndSettle();
 
       expect(find.text('¿Eliminar ejercicio?'), findsNothing);
-      expect(find.text('Press de Banca'), findsNothing);
+      expect(enElEditor(find.text('Press de Banca')), findsNothing);
     });
 
     testWidgets('en multi-semana el tacho abre el diálogo de scope', (
@@ -1259,7 +1304,7 @@ void main() {
       await tester.tap(find.text('Todas las semanas'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Press de Banca'), findsNothing);
+      expect(enElEditor(find.text('Press de Banca')), findsNothing);
     });
 
     testWidgets(
@@ -1284,7 +1329,7 @@ void main() {
         await tester.pumpAndSettle();
 
         // Sigue estando (ahora solo en la semana 2).
-        expect(find.text('Press de Banca'), findsOneWidget);
+        expect(enElEditor(find.text('Press de Banca')), findsOneWidget);
 
         await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
         await tester.pumpAndSettle();
@@ -1315,19 +1360,21 @@ void main() {
         await tester.tap(find.text('Solo esta semana'));
         await tester.pumpAndSettle();
 
-        expect(find.text('Press de Banca'), findsNothing);
+        expect(enElEditor(find.text('Press de Banca')), findsNothing);
       },
     );
   });
 
   group('RoutineEditorWebScreen — validación en vivo (Fase 6)', () {
     Future<void> addPressDeBanca(WidgetTester tester) async {
-      await tester.tap(find.text('Agregar ejercicio'));
-      await tester.pumpAndSettle();
+      // El panel lateral está SIEMPRE abierto en desktop (#860): el botón
+      // "Agregar ejercicio" del día no existe ahí, lo reemplaza el panel.
       await tester.tap(find.text('Press de Banca'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Agregar (1)'));
       await tester.pumpAndSettle();
+      // El panel NO se cierra: es el punto del #860 y ya no tiene con qué.
+      // Lo que sigue mira el EDITOR, así que scopea con [enElEditor].
       // La card nace PLEGADA desde que la web usa `ExerciseCard`: los campos
       // de sets no están en el árbol hasta abrirla.
       await expandirEjercicios(tester);
@@ -1886,8 +1933,8 @@ void main() {
 
       expect(find.text('Editar rutina'), findsOneWidget); // header
       expect(find.text('Fuerza base'), findsOneWidget); // name field
-      expect(find.text('Día A'), findsOneWidget); // day name
-      expect(find.text('Press de Banca'), findsOneWidget); // slot
+      expect(enElEditor(find.text('Día A')), findsOneWidget); // day name
+      expect(enElEditor(find.text('Press de Banca')), findsOneWidget); // slot
       expect(find.text('Guardar cambios'), findsOneWidget); // submit label
     });
 
@@ -1956,12 +2003,14 @@ void main() {
         find.byKey(const Key('routine_editor_split_field')),
         'PPL',
       );
-      await tester.tap(find.text('Agregar ejercicio'));
-      await tester.pumpAndSettle();
+      // El panel lateral está SIEMPRE abierto en desktop (#860): el botón
+      // "Agregar ejercicio" del día no existe ahí, lo reemplaza el panel.
       await tester.tap(find.text('Press de Banca'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Agregar (1)'));
       await tester.pumpAndSettle();
+      // El panel NO se cierra: es el punto del #860 y ya no tiene con qué.
+      // Lo que sigue mira el EDITOR, así que scopea con [enElEditor].
       // La card nace PLEGADA desde que la web usa `ExerciseCard`: los campos
       // de sets no están en el árbol hasta abrirla.
       await expandirEjercicios(tester);
@@ -2035,12 +2084,14 @@ void main() {
         find.byKey(const Key('routine_editor_split_field')),
         'PPL',
       );
-      await tester.tap(find.text('Agregar ejercicio'));
-      await tester.pumpAndSettle();
+      // El panel lateral está SIEMPRE abierto en desktop (#860): el botón
+      // "Agregar ejercicio" del día no existe ahí, lo reemplaza el panel.
       await tester.tap(find.text('Press de Banca'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Agregar (1)'));
       await tester.pumpAndSettle();
+      // El panel NO se cierra: es el punto del #860 y ya no tiene con qué.
+      // Lo que sigue mira el EDITOR, así que scopea con [enElEditor].
       // La card nace PLEGADA desde que la web usa `ExerciseCard`: los campos
       // de sets no están en el árbol hasta abrirla.
       await expandirEjercicios(tester);
@@ -2120,12 +2171,14 @@ void main() {
         find.byKey(const Key('routine_editor_split_field')),
         'Full Body',
       );
-      await tester.tap(find.text('Agregar ejercicio'));
-      await tester.pumpAndSettle();
+      // El panel lateral está SIEMPRE abierto en desktop (#860): el botón
+      // "Agregar ejercicio" del día no existe ahí, lo reemplaza el panel.
       await tester.tap(find.text('Press de Banca'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Agregar (1)'));
       await tester.pumpAndSettle();
+      // El panel NO se cierra: es el punto del #860 y ya no tiene con qué.
+      // Lo que sigue mira el EDITOR, así que scopea con [enElEditor].
       // La card nace PLEGADA desde que la web usa `ExerciseCard`: los campos
       // de sets no están en el árbol hasta abrirla.
       await expandirEjercicios(tester);
@@ -2167,12 +2220,14 @@ void main() {
         find.byKey(const Key('routine_editor_split_field')),
         'Full Body',
       );
-      await tester.tap(find.text('Agregar ejercicio'));
-      await tester.pumpAndSettle();
+      // El panel lateral está SIEMPRE abierto en desktop (#860): el botón
+      // "Agregar ejercicio" del día no existe ahí, lo reemplaza el panel.
       await tester.tap(find.text('Press de Banca'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Agregar (1)'));
       await tester.pumpAndSettle();
+      // El panel NO se cierra: es el punto del #860 y ya no tiene con qué.
+      // Lo que sigue mira el EDITOR, así que scopea con [enElEditor].
       // La card nace PLEGADA desde que la web usa `ExerciseCard`: los campos
       // de sets no están en el árbol hasta abrirla.
       await expandirEjercicios(tester);
@@ -2274,8 +2329,8 @@ void main() {
       ).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
       await _pumpEditor(tester, repo: repo, routineId: 'r4');
 
-      expect(find.text('Press de Banca'), findsOneWidget);
-      expect(find.text('Aperturas con Cable'), findsOneWidget);
+      expect(enElEditor(find.text('Press de Banca')), findsOneWidget);
+      expect(enElEditor(find.text('Aperturas con Cable')), findsOneWidget);
       // The link is reconstructed and shown as active on the first slot.
       expect(find.text('En superserie con el siguiente'), findsOneWidget);
 
@@ -3588,7 +3643,16 @@ void main() {
         'Press de Banca 4x10 55',
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Press de Banca').last);
+      // La sugerencia de RÁPIDO, no la fila del panel lateral: `.last` a
+      // secas agarraba el panel y la elección nunca llegaba al parser.
+      await tester.tap(
+        find
+            .descendant(
+              of: find.byKey(const Key('quick_entry_results')),
+              matching: find.text('Press de Banca'),
+            )
+            .last,
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('quick_entry_confirm')));
       await tester.pumpAndSettle();
@@ -3645,6 +3709,255 @@ void main() {
 
       expect(find.byType(SupersetBlock), findsNothing);
       expect(find.text('A1'), findsNothing);
+    });
+  });
+
+  group('RoutineEditorWebScreen — picker como panel lateral (#860)', () {
+    testWidgets('en desktop abre el PANEL y no un modal', (tester) async {
+      await _pumpEditor(tester);
+
+      // Sin tocar NADA: el panel ya está abierto al entrar al editor. Eso es
+      // el pedido — el PF entra a armar la rutina y la plantilla de
+      // ejercicios ya está ahí.
+      expect(find.byType(ExercisePickerPanel), findsOneWidget);
+      expect(find.byType(Dialog), findsNothing,
+          reason: 'el modal es justo lo que este issue viene a sacar');
+    });
+
+    testWidgets('el panel NO se cierra al agregar', (tester) async {
+      await _pumpEditor(tester);
+
+      final panel = find.byType(ExercisePickerPanel);
+      final fila = find.descendant(of: panel, matching: find.text('Press de Banca'));
+      await tester.ensureVisible(fila);
+      await tester.pumpAndSettle();
+      await tester.tap(fila);
+      await tester.pumpAndSettle();
+      await tester.tap(find.descendant(of: panel, matching: find.text('Agregar (1)')));
+      await tester.pumpAndSettle();
+
+      // El corazón del #860: el loop "miro qué puse → elijo el que sigue →
+      // miro cómo quedó" no se rompe porque el panel sigue abierto y la
+      // plantilla sigue visible.
+      expect(panel, findsOneWidget, reason: 'sigue abierto para el siguiente');
+      expect(
+        enElEditor(find.text('Press de Banca')),
+        findsOneWidget,
+        reason: 'y lo agregado aterrizó en el día',
+      );
+    });
+
+    testWidgets('abajo de 1280 no hay panel: el día conserva sus botones y el modal',
+        (tester) async {
+      await _pumpEditor(tester);
+      // `compact`: 768-1279. Ahí el sidebar ya está forzado a colapsar
+      // (ADR-CHW-004) y un panel de 400 px sería el mismo error.
+      tester.view.physicalSize = const Size(1100, 1100);
+      addTearDown(tester.view.reset);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ExercisePickerPanel), findsNothing);
+      // Y por eso mismo los botones del día NO se pueden sacar acá: sin panel
+      // y sin ellos no habría forma de cargar un ejercicio.
+      final agregar = find.text('Agregar ejercicio');
+      expect(agregar, findsWidgets, reason: 'única entrada que queda abajo de 1280');
+
+      await tester.ensureVisible(agregar.first);
+      await tester.pumpAndSettle();
+      await tester.tap(agregar.first);
+      await tester.pumpAndSettle();
+      expect(find.byType(Dialog), findsOneWidget);
+    });
+
+    testWidgets('"En superserie" sólo aparece con 2 o más elegidos',
+        (tester) async {
+      await _pumpEditor(tester);
+      final panel = find.byType(ExercisePickerPanel);
+      final boton = find.byKey(const Key('picker_agregar_superserie'));
+
+      // Con cero y con uno no hay superserie posible: una superserie de un
+      // ejercicio no es una superserie.
+      expect(boton, findsNothing);
+      await _elegirEnPanel(tester, 'Press de Banca');
+      expect(boton, findsNothing, reason: 'uno solo no agrupa nada');
+
+      await _elegirEnPanel(tester, 'Aperturas con Cable');
+      expect(boton, findsOneWidget);
+
+      await tester.tap(boton);
+      await tester.pumpAndSettle();
+      expect(panel, findsOneWidget, reason: 'sigue abierto, como cualquier alta');
+    });
+
+    testWidgets('"En superserie" los agrega YA enlazados', (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any())).thenAnswer((_) async => null);
+      when(() => repo.createAssigned(any()))
+          .thenAnswer((i) async => i.positionalArguments.first as Routine);
+      await _pumpEditor(tester, repo: repo);
+
+      await tester.enterText(
+        find.byKey(const Key('routine_editor_name_field')),
+        'Plan superserie',
+      );
+      await tester.enterText(
+        find.byKey(const Key('routine_editor_split_field')),
+        'Full body',
+      );
+      await _elegirEnPanel(tester, 'Press de Banca');
+      await _elegirEnPanel(tester, 'Aperturas con Cable');
+      await tester.tap(find.byKey(const Key('picker_agregar_superserie')));
+      await tester.pumpAndSettle();
+      await expandirEjercicios(tester);
+      // Los dos slots necesitan reps o el submit no pasa la validación. El
+      // campo se ubica por su hint 'reps': `.first` sobre TextFormField vacío
+      // agarraría también el 'kg' de al lado.
+      for (var i = 0; i < 2; i++) {
+        await tester.enterText(
+          find
+              .ancestor(
+                of: find.text('reps'),
+                matching: find.byType(TextFormField),
+              )
+              .at(i),
+          '10',
+        );
+      }
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      final draft = verify(() => repo.createAssigned(captureAny()))
+          .captured
+          .single as Routine;
+      final slots = draft.days.single.slots;
+      expect(slots, hasLength(2));
+      // El enlace va en todos MENOS el último: la corrida la define el enlace
+      // del anterior, así que marcar el último engancharía al que venga
+      // después. Y el grupo se reconstruye igual que si se hubiera tildado a
+      // mano — el alta agrupada no es una segunda forma de armar superseries.
+      expect(slots[0].supersetGroup, isNotNull);
+      expect(slots[1].supersetGroup, slots[0].supersetGroup);
+    });
+
+    testWidgets('en desktop el día NO repite los botones de alta', (tester) async {
+      await _pumpEditor(tester);
+
+      // Dos entradas para lo mismo, una al lado de la otra, es ruido: el panel
+      // ya es la superficie para cargar. Y "+ Superserie" sobra del todo — esa
+      // decisión ahora se toma en el panel, donde se hace la selección.
+      expect(find.text('Agregar ejercicio'), findsNothing);
+      expect(find.text('+ Superserie'), findsNothing);
+    });
+
+    testWidgets('el panel NO ofrece "Cancelar"', (tester) async {
+      await _pumpEditor(tester);
+
+      // En el panel no hay ruta que cerrar: `Navigator.pop()` saldría del
+      // editor entero, o sea lo contrario de lo que el botón promete. El
+      // modal sí lo tiene, y ahí está bien.
+      expect(
+        find.descendant(
+          of: find.byType(ExercisePickerPanel),
+          matching: find.text('Cancelar'),
+        ),
+        findsNothing,
+      );
+    });
+
+    testWidgets('"Crear ejercicio nuevo" está al pie, debajo de la lista',
+        (tester) async {
+      await _pumpEditor(tester);
+
+      // Arriba de la lista competía por el alto con lo único que importa acá.
+      // Al pie es alto fijo: no se scrollea y sigue siempre visible.
+      final crear = find.text('Crear ejercicio nuevo');
+      final unEjercicio = find.text('Press de Banca');
+      expect(crear, findsOneWidget);
+      expect(
+        tester.getCenter(crear).dy,
+        greaterThan(tester.getCenter(unEjercicio.last).dy),
+        reason: 'tiene que estar DEBAJO de la lista, no arriba',
+      );
+    });
+
+    testWidgets('los filtros arrancan colapsados', (tester) async {
+      await _pumpEditor(tester);
+
+      // 23 chips desplegados eran 4 filas y dejaban 3 ejercicios visibles
+      // sobre un catálogo de cientos: la mitad del problema de alto del #860.
+      expect(find.text('PECHO'), findsNothing);
+      expect(find.byKey(const Key('picker_filtros_toggle')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('picker_filtros_toggle')));
+      await tester.pumpAndSettle();
+      expect(find.text('PECHO'), findsOneWidget);
+    });
+  });
+
+  group('RoutineEditorWebScreen — entrada rápida: elegir una variante', () {
+    testWidgets('elegir un ejercicio de nombre MÁS LARGO que lo tipeado queda '
+        'seleccionado', (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any())).thenAnswer((_) async => null);
+      when(() => repo.createAssigned(any()))
+          .thenAnswer((i) async => i.positionalArguments.first as Routine);
+      await _pumpEditor(tester, repo: repo);
+
+      await tester.enterText(
+        find.byKey(const Key('routine_editor_name_field')),
+        'Plan',
+      );
+      await tester.enterText(
+        find.byKey(const Key('routine_editor_split_field')),
+        'Full body',
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('RÁPIDO'));
+      await tester.pumpAndSettle();
+
+      // "press" trae varias variantes. Reportado en device: NINGUNA se podía
+      // elegir.
+      //
+      // La causa: `sigueElegido` exige que el texto CONTENGA el nombre, y
+      // "press" no contiene "Press Inclinado con Mancuerna" — el elegido se
+      // limpiaba en el frame siguiente. El `onSelect` tiene que REESCRIBIR el
+      // texto con el nombre completo, que es lo que el editor mobile ya hacía
+      // y esta versión no había copiado.
+      await tester.enterText(
+        find.byKey(const Key('quick_entry_field')),
+        'press 3x12 40',
+      );
+      await tester.pumpAndSettle();
+      // La sugerencia de RÁPIDO, no la fila del panel lateral.
+      await tester.tap(
+        find
+            .descendant(
+              of: find.byKey(const Key('quick_entry_results')),
+              matching: find.text('Press Inclinado con Mancuerna'),
+            )
+            .last,
+      );
+      await tester.pumpAndSettle();
+
+      // Sigue elegido: el confirmar está disponible y agrega ESE ejercicio.
+      await tester.tap(find.byKey(const Key('quick_entry_confirm')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+      final draft = verify(() => repo.createAssigned(captureAny()))
+          .captured
+          .single as Routine;
+      final slot = draft.days.single.slots.single;
+      expect(slot.exerciseName, 'Press Inclinado con Mancuerna');
+      // Y la prescripción que se tipeó ANTES de elegir no se perdió: el
+      // `onSelect` conserva los números y sólo saca las palabras de búsqueda.
+      expect(slot.sets, hasLength(3));
+      expect(slot.sets.every((s) => s.reps == 12), isTrue);
+      expect(slot.sets.every((s) => s.weightKg == 40), isTrue);
     });
   });
 }
