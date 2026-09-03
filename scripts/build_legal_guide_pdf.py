@@ -283,7 +283,7 @@ def build_story():
     A(P("Ninguna de estas la puede tomar un abogado por vos, ni yo. Son "
         "definiciones de negocio. Hasta que no estén, los nueve documentos "
         "pendientes no se pueden escribir sin inventar. "
-        "<b>D1 y D5 ya están resueltas; quedan cuatro.</b>"))
+        "<b>Cinco están resueltas; queda D6.</b>"))
 
     for block in resolved(
         1, "Quién es el titular de TREINO",
@@ -335,98 +335,105 @@ def build_story():
 
     A(PageBreak())
 
-    for block in decision(
+    for block in resolved(
         2, "Edad mínima",
-        "Desde qué edad se puede crear una cuenta, y qué pasa con los menores.",
-        "Los términos vigentes dicen 16 años. El código no lo verifica en "
-        "ningún lado: la fecha de nacimiento es un campo opcional del editor "
-        "de perfil, no del alta, y ninguna regla la compara contra un mínimo. "
-        "Es una cláusula que el propio sistema no hace cumplir — frente a un "
-        "reclamo eso no sostiene nada.",
-        [["Opción", "A favor", "En contra"],
-         ["<b>18 años</b>",
-          "Limpio. Sin consentimiento parental, sin régimen especial de "
-          "menores, coherente con vender suscripciones y tratar datos de salud",
-          "Perdés el segmento adolescente, que en fitness existe"],
-         ["<b>16 con consentimiento parental</b>",
-          "Mantenés el segmento",
-          "Exige un flujo de verificación parental que hoy no existe y que no "
-          "es trivial de construir bien"],
-         ["<b>13-15</b>",
-          "Máximo alcance",
-          "Entrás en régimen reforzado de protección de menores en varias "
-          "jurisdicciones. Con datos de salud, no lo haría"]],
-        "18 años. Y con gate real en el alta, no una cláusula decorativa: "
-        "fecha de nacimiento obligatoria al registrarse y validación en "
-        "servidor. Un menor cargando medidas corporales y fotos de lesiones en "
-        "tu base es un problema que no querés tener.",
-        "Términos y Condiciones (5), sección de menores de la Política de "
-        "Privacidad (1), y una tarea de desarrollo en el alta."):
+        "<b>9 años cumplidos para crear cuenta</b>, con consentimiento del "
+        "representante legal para toda persona menor de 18.",
+        [["Piso de cuenta", "<b>9 años</b>"],
+         ["Menores de 18", "Requieren consentimiento del representante legal"],
+         ["Estado en el código", "<b>No existe control de edad ni flujo de "
+          "consentimiento parental.</b> La fecha de nacimiento es un campo "
+          "opcional del editor de perfil, no del alta"]],
+        [["Frente", "Qué exige ahora"],
+         ["<b>COPPA (Estados Unidos)</b>",
+          "Menores de 13. Consentimiento parental <b>verificable</b> —no "
+          "declarativo— ANTES de recolectar el primer dato, aviso directo al "
+          "progenitor, y derecho de revisión y supresión. Verificable significa "
+          "tarjeta, documento o videollamada: no es un casillero"],
+         ["<b>RGPD art. 8 (Europa)</b>",
+          "Umbral de 13 a 16 según el Estado miembro. Y los datos de salud son "
+          "categoría especial del art. 9: menores más categoría especial es la "
+          "combinación de mayor escrutinio que existe"],
+         ["<b>Tiendas</b>",
+          "Declarar audiencia bajo 13 activa la política de familias de Play y "
+          "las reglas de la categoría Kids de Apple: restricciones de SDKs, de "
+          "analítica y de enlaces externos"],
+         ["<b>Producto</b>",
+          "Control de edad en el alta y flujo de consentimiento parental "
+          "verificable. Los dos pasan a ser <b>bloqueantes de publicación</b>"],
+         ["<b>Documentos</b>",
+          "Ya aplicado en Términos, Política de Privacidad, Descargo Médico y "
+          "Términos para Entrenadores"]],
+        "<b>La recomendación técnica había sido 18 años</b>, por un motivo "
+        "que conviene que el abogado tenga presente: la plataforma habilita "
+        "mensajería privada y acceso a datos corporales entre alumnos y "
+        "entrenadores independientes <b>cuyas credenciales TREINO no "
+        "verifica</b>. Con el piso en 9, ese canal existe entre adultos no "
+        "verificados y niños. La decisión es del titular y está implementada; "
+        "lo que corresponde ahora es que el dictamen legal defina si el vínculo "
+        "con entrenadores debe restringirse por edad o exigir participación del "
+        "representante legal."):
         A(block)
 
     sp(6)
 
-    for block in decision(
+    for block in resolved(
         3, "En qué países operás",
-        "Si el servicio se ofrece sólo en Argentina, en Latinoamérica, o "
-        "también en Europa o Estados Unidos.",
-        "Define qué normativa se te aplica encima de la argentina. La ficha de "
-        "Play ya tiene metadata en es-419, que es Latinoamérica entera. Si "
-        "entra un usuario europeo, entra el RGPD: encargado de tratamiento, "
-        "base legal por finalidad, portabilidad, y posiblemente representante "
-        "en la Unión. Es un salto de escala en el trabajo, no un párrafo más.",
-        [["Opción", "A favor", "En contra"],
-         ["<b>Sólo Argentina</b>",
-          "Un solo marco: Ley 25.326 y Defensa del Consumidor. La mitad del "
-          "trabajo",
-          "Techo de mercado. Ampliar después obliga a rehacer los documentos"],
-         ["<b>Latinoamérica</b>",
-          "Mercado natural del producto y del idioma",
-          "Cada país tiene su ley de datos. Brasil tiene LGPD, que es exigente"],
-         ["<b>Global, incluida la UE</b>",
-          "Sin límite",
-          "RGPD completo. No lo haría en el lanzamiento"]],
-        "Lanzá en Argentina y redactá pensando en Latinoamérica: mismo "
-        "esfuerzo, y no te obliga a rehacer todo cuando crezcas. Dejá la UE "
-        "explícitamente afuera en los Términos por ahora — se puede sumar "
-        "después, con trabajo dedicado.",
-        "Política de Privacidad (1), Términos (5), cookies (12), y el alcance "
-        "de la revisión del abogado."):
+        "<b>Alcance mundial.</b>",
+        [["Territorio", "Todo el mundo"],
+         ["Marco base", "Ley 25.326 (Argentina), más el régimen de cada país"],
+         ["Estado de los documentos",
+          "Términos ya actualizados. <b>La Política de Privacidad necesita "
+          "reescritura estructural</b>"]],
+        [["Frente", "Qué exige ahora"],
+         ["<b>Base legal</b>",
+          "El RGPD no admite el consentimiento genérico como base única: hay "
+          "que declarar base legal por finalidad (art. 6) y tratamiento de "
+          "categorías especiales (art. 9) para los datos de salud"],
+         ["<b>Transferencias</b>",
+          "Mecanismo con cláusulas contractuales tipo, no sólo consentimiento"],
+         ["<b>Representación</b>",
+          "Evaluar la figura de representante en la Unión Europea (art. 27), "
+          "que aplica a quien ofrece servicios en la UE sin establecimiento allí"],
+         ["<b>Derechos</b>",
+          "Sumar portabilidad y oposición a los ya previstos"],
+         ["<b>Incidentes</b>", "Notificación en 72 horas"],
+         ["<b>Cookies</b>",
+          "Consentimiento previo en el sitio y en el Coach Hub web"]],
+        "<b>Esto no es un párrafo más: es una reescritura estructural de la "
+        "Política de Privacidad</b>, que hoy está armada sobre la ley "
+        "argentina. Está marcado en el documento y es trabajo pendiente."):
         A(block)
 
     A(PageBreak())
 
-    for block in decision(
-        4, "Cómo cobrás la suscripción del entrenador",
-        "Qué medio de pago procesa los 12.000, 22.000 o 39.000 pesos mensuales "
-        "que ya están definidos en el código.",
-        "Hoy no hay ningún procesador integrado: la tabla de precios existe en "
-        "el servidor, el cobro no. Y hay un tema de plataforma que conviene "
-        "mirar antes de decidir: el paywall vive en el Coach Hub web, no en el "
-        "binario móvil, lo cual hoy te esquiva la comisión de las tiendas. "
-        "Pero si esa suscripción amplía límites que el entrenador experimenta "
-        "<i>dentro</i> de la app de iOS, Apple puede exigir compra integrada "
-        "igual, por su regla 3.1.1. Es una pregunta abierta que hay que "
-        "resolver antes de descongelar ese trabajo.",
-        [["Opción", "A favor", "En contra"],
-         ["<b>Pasarela local en la web</b> (Mercado Pago u otra)",
-          "Sin comisión de tiendas. Cobro en pesos, medios locales",
-          "Hay que revisar el riesgo de la regla 3.1.1 de Apple"],
-         ["<b>Compra integrada en la app</b>",
-          "Sin fricción y sin riesgo de rechazo",
-          "Comisión de tienda, y hay que construir todo el flujo"],
-         ["<b>Transferencia manual</b>",
-          "Cero integración. Sirve para validar",
-          "No escala, y complica el arrepentimiento y la baja automática"]],
-        "Para arrancar, pasarela local en la web — pero <b>resolver el punto "
-        "de Apple antes</b> de construirlo, no después. Y hay un agravante "
-        "que sale de D5: está prevista una <b>suscripción del alumno</b> a "
-        "futuro. Un plan pago de consumidor, dentro de una app de consumo, "
-        "tiene mucho menos margen frente a la regla 3.1.1 que una "
-        "suscripción profesional del entrenador. Conviene decidir el modelo "
-        "de cobro contemplando ese escenario desde ahora, no cuando llegue.",
-        "Términos de suscripción (8), arrepentimiento y baja (9), y la "
-        "sección de facturación de la Política de Privacidad."):
+    for block in resolved(
+        4, "Cómo se cobran las suscripciones",
+        "<b>Pasarela de pago externa</b>, que captura el medio de pago y liquida "
+        "los fondos a la cuenta bancaria de BACKHAUSTIN S.A.S.",
+        [["Quién procesa", "Un proveedor de servicios de pago externo"],
+         ["Quién recibe", "BACKHAUSTIN S.A.S., en su cuenta bancaria"],
+         ["Qué guarda TREINO",
+          "Nada del medio de pago: queda en poder del procesador"],
+         ["Alcance", "Suscripción del entrenador, y a futuro la del alumno"],
+         ["Sin cambios", "TREINO sigue sin intermediar la plata alumno-PF (D5)"]],
+        [["Frente", "Qué falta"],
+         ["<b>Regla 3.1.1 de Apple y facturación de Google</b>",
+          "Los bienes digitales consumidos dentro de la app deben pasar por el "
+          "sistema de pago de la tienda. Cobrar por pasarela externa una "
+          "suscripción de consumidor usada dentro de la app es exactamente el "
+          "supuesto que esas reglas alcanzan. <b>Resolver antes de construir la "
+          "integración</b>, no después"],
+         ["<b>Decisión D6</b>",
+          "Sigue pendiente: arrepentimiento, reembolsos, renovación automática "
+          "y baja. Sin eso no se pueden escribir los términos de suscripción "
+          "ni el botón de arrepentimiento"],
+         ["<b>Alcance mundial</b>",
+          "Derecho de desistimiento por jurisdicción y tratamiento fiscal de "
+          "servicios digitales en cada mercado"]],
+        "Con alcance mundial y una suscripción de alumno prevista, el punto de "
+        "Apple deja de ser discutible por analogía y conviene llevarlo al "
+        "abogado como pregunta concreta, con el modelo de cobro ya definido."):
         A(block)
 
     A(PageBreak())
@@ -784,7 +791,7 @@ def build_story():
     A(table([
         ["Etapa", "Qué pasa", "Quién"],
         ["<b>1. Decidir</b>",
-         "Las cuatro decisiones pendientes de la sección 3. D1 y D5 ya están",
+         "Queda D6: reembolsos y baja. Las otras cinco ya están",
          "Product Owner"],
         ["<b>1.b Cuentas de tiendas</b>",
          "Tramitar el D-U-N-S ya, dejar renovar Apple el 5/9 y elegir camino "
