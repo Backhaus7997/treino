@@ -3640,12 +3640,6 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
   int? _draggedStandaloneAbsIndex;
   int? _highlightedSupersetGroup;
 
-  /// Que este arrastre ya terminó en unión, y por lo tanto el `onReorder` que
-  /// puede llegar después no tiene que mover nada. Se resetea en
-  /// `onReorderStart` y no al consumirlo: cuando hay unión sin cambio de
-  /// índice, `onReorder` nunca llega, y el flag quedaría trabado tragándose el
-  /// reorder SIGUIENTE.
-  bool _unionAplicada = false;
 
   /// Cuánto tiene que salirse el dedo del bloque para que soltar signifique
   /// SACAR al miembro del grupo, en dp.
@@ -3756,9 +3750,6 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
     _autoScroll = null;
   }
 
-  /// Gemelo de [_unionAplicada] para la separación. Misma razón: el `onReorder`
-  /// del reorderable ANIDADO puede no llegar nunca.
-  bool _separacionAplicada = false;
 
   /// Si el panel de entrada rápida está abierto. Presentación local pura: no
   /// sobrevive a cerrar el día ni viaja al modelo.
@@ -3822,9 +3813,10 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
 
   @override
   void dispose() {
-    // Un Timer.periodic que sobrevive al State llama a `setState` sobre un
-    // widget desmontado en el siguiente tick.
+    // Un Timer que sobrevive al State llama a `setState` sobre un widget
+    // desmontado en el siguiente tick.
     _detenerAutoScroll();
+    _pendienteTardio?.cancel();
     _quickEntryFocus.dispose();
     _quickEntryCtrl.dispose();
     _nameController.dispose();
@@ -4002,7 +3994,6 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
     setState(() {
       _draggedStandaloneAbsIndex = standalone ? block.first.index : null;
       _highlightedSupersetGroup = null;
-      _unionAplicada = false;
     });
   }
 
@@ -4031,12 +4022,9 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
     });
 
     if (absIndex != null && targetGroup != null) {
-      // El reorder que el usuario "pidió" con el gesto queda anulado: soltar
-      // adentro es unir, no mover. `onReorder` puede llegar igual después de la
-      // animación del proxy, y [_unionAplicada] es lo que le dice que ya no hay
-      // nada que mover.
-      _unionAplicada = true;
-      widget.onMergeSlotIntoGroup(absIndex, targetGroup);
+      // NO se muta acá. Ver [_aplicarPendiente].
+      _unionPendiente = (absIndex: absIndex, grupo: targetGroup);
+      _agendarPendiente();
     }
   }
 
@@ -4064,7 +4052,6 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
       _draggedMemberAbsIndex = absIndex;
       _draggedMemberGroup = group;
       _miembroFueraDelBloque = false;
-      _separacionAplicada = false;
     });
   }
 
@@ -4089,9 +4076,65 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
     });
 
     if (fuera) {
-      _separacionAplicada = true;
-      widget.onUngroupSlot?.call(absIndex, arriba: _salidaHaciaArriba);
+      // Tampoco acá. Ver [_aplicarPendiente].
+      _separacionPendiente = (absIndex: absIndex, arriba: _salidaHaciaArriba);
+      _agendarPendiente();
     }
+  }
+
+  /// La mutación que dejó pendiente el final del arrastre, si la hay.
+  ///
+  /// **Por qué no se muta en `onReorderEnd`.** El orden real del framework es:
+  ///
+  /// ```
+  /// _dragEnd()       → onReorderEnd      ← acá se llamaba a unir/separar
+  ///                  → animación de drop (~300 ms); el ítem arrastrado se
+  ///                    sigue dibujando como un HUECO en la lista
+  /// _dropCompleted() → onReorder         ← el punto que el widget documenta
+  ///                  → _dragReset()      ← recién acá se limpia el hueco
+  /// ```
+  ///
+  /// `_dragReset` busca el ítem arrastrado por ÍNDICE (`_items[_dragIndex]`).
+  /// Cambiar la lista de hijos durante la animación mueve ese índice a otro
+  /// ítem, y el original queda con `dragging = true` para siempre: un hueco
+  /// vacío del alto de una card, permanente, adentro del bloque. Reportado en
+  /// device con una superserie que anunciaba 2 ejercicios y mostraba uno.
+  ///
+  /// `onReorder` sí es seguro —el framework lo llama JUSTO antes de
+  /// `_dragReset`, contando con que ahí se cambie el modelo—, pero **no siempre
+  /// llega**: `_dropCompleted` sólo lo invoca `if (fromIndex != toIndex)`. De
+  /// ahí el respaldo con delay: cubre el caso en que el índice no cambió, y
+  /// espera a que la animación termine en vez de pisarla.
+  ({int absIndex, int grupo})? _unionPendiente;
+  ({int absIndex, bool arriba})? _separacionPendiente;
+  Timer? _pendienteTardio;
+
+  void _agendarPendiente() {
+    _pendienteTardio?.cancel();
+    // 350 > los ~300 de la animación de drop. Si `onReorder` llega antes —el
+    // caso normal— consume el pendiente y este timer no encuentra nada.
+    _pendienteTardio = Timer(
+      const Duration(milliseconds: 350),
+      () => mounted ? _aplicarPendiente() : null,
+    );
+  }
+
+  /// Aplica lo que haya quedado pendiente. Idempotente: el primero que llega
+  /// —`onReorder` o el timer— se lo lleva.
+  bool _aplicarPendiente() {
+    final union = _unionPendiente;
+    final separacion = _separacionPendiente;
+    _unionPendiente = null;
+    _separacionPendiente = null;
+    if (union != null) {
+      widget.onMergeSlotIntoGroup(union.absIndex, union.grupo);
+      return true;
+    }
+    if (separacion != null) {
+      widget.onUngroupSlot?.call(separacion.absIndex, arriba: separacion.arriba);
+      return true;
+    }
+    return false;
   }
 
   /// Walks the slot list and emits either a standalone [_SlotEditor] or a
@@ -4197,7 +4240,7 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
                 _highlightedSupersetGroup == block.first.slot.supersetGroup,
             onMemberDragStart: _iniciarArrastreDeMiembro,
             onMemberDragEnd: _terminarArrastreDeMiembro,
-            separacionAplicada: () => _separacionAplicada,
+            separacionAplicada: _aplicarPendiente,
           ),
         ));
       }
@@ -4215,7 +4258,10 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
         onReorder: (oldIndex, newIndex) {
           // La unión ya la aplicó `_terminarReorder`. Soltar adentro es unir,
           // no mover: el reorder queda anulado.
-          if (_unionAplicada) return;
+          // Punto seguro para mutar: el framework lo llama justo antes de
+          // `_dragReset`. Si había algo pendiente, se aplica acá y el
+          // reorder queda anulado — soltar adentro es unir, no mover.
+          if (_aplicarPendiente()) return;
           if (newIndex > oldIndex) newIndex--;
           if (oldIndex == newIndex) return;
           _moveBlock(
