@@ -63,11 +63,10 @@ médico te habilite.**
 
 ## 3. Asumís el riesgo
 
-El entrenamiento físico —especialmente el entrenamiento de fuerza con
-sobrecarga, que es el foco de esta aplicación— **conlleva riesgos inherentes
-que no pueden eliminarse**: lesiones musculares y articulares, desgarros,
-hernias, fracturas, mareos, desmayos, eventos cardiovasculares y, en casos
-extremos, la muerte.
+El entrenamiento físico —especialmente el de fuerza con sobrecarga, que es el
+foco de esta aplicación— **conlleva riesgos inherentes que no pueden
+eliminarse**: lesiones musculares y articulares, desgarros, hernias, fracturas,
+mareos, desmayos, eventos cardiovasculares y, en casos extremos, la muerte.
 
 Al usar TREINO reconocés y aceptás que:
 
@@ -81,7 +80,22 @@ Al usar TREINO reconocés y aceptás que:
 5. **Vas a detenerte inmediatamente** ante dolor, mareo, falta de aire, dolor
    en el pecho o cualquier síntoma anormal, y vas a consultar a un profesional.
 
----
+### 3.1 Si quien entrena es una persona menor de edad
+
+**Una persona menor no puede asumir estos riesgos por sí misma.** Los asume su
+madre, padre o representante legal, que es quien acepta este descargo en su
+nombre.
+
+Si sos representante legal de una persona menor que usa TREINO, al aceptar
+declarás que:
+
+- **La habilitó un profesional de la salud** para hacer actividad física, y en
+  particular entrenamiento de fuerza.
+- **Vas a supervisar su entrenamiento**, o va a estar supervisado
+  presencialmente por una persona adulta idónea.
+- Entendés que **TREINO no adapta sus contenidos por edad**: las rutinas, las
+  cargas sugeridas y las estadísticas son las mismas para toda persona usuaria.
+- Asumís los riesgos descriptos **en su nombre**.
 
 ## 4. Los números que te muestra la app son referencias, no indicaciones
 
@@ -165,22 +179,61 @@ localidad o acudí a una guardia. No uses la aplicación para eso.
 
 ---
 
-## 9. Menores y situaciones especiales
+## 9. Menores de edad
 
-[[PENDIENTE — depende de D2, edad mínima. Redactado provisionalmente para 18.]]
+**La edad mínima para usar TREINO es de 9 años**, y toda persona menor de 18
+necesita el consentimiento de su representante legal.
 
-TREINO no está dirigido a menores de 18 años.
+Si vas a consentir por una persona menor, leé esto antes.
+
+### 9.1 TREINO no está diseñada para entrenar niños
+
+Es importante que sea explícito: **la aplicación no diferencia por edad.** Las
+rutinas, las progresiones de carga, los ejercicios y las métricas son idénticos
+para una persona de 9 años y para una de 40.
+
+El entrenamiento de fuerza en personas en desarrollo tiene consideraciones
+propias —maduración esquelética, técnica, volumen, intensidad, supervisión— que
+**esta aplicación no contempla**. Antes de que una persona menor use TREINO para
+entrenar, consultá a su pediatra o a un profesional del deporte infantil.
+
+### 9.2 Sobre el registro del cuerpo
+
+TREINO registra **peso, medidas corporales y porcentaje de grasa**, y grafica su
+evolución en el tiempo.
+
+Tenelo presente: ese tipo de seguimiento, en niñas, niños y adolescentes, puede
+favorecer una relación problemática con el cuerpo y con la alimentación. Es una
+función opcional. **Se puede usar la aplicación sin cargar ninguno de esos
+datos**, y en el caso de una persona menor conviene evaluarlo con criterio, o
+consultarlo con su profesional tratante.
+
+### 9.3 Sobre los entrenadores
+
+La aplicación permite vincularse con entrenadores personales independientes.
+**TREINO no verifica sus títulos, sus matrículas ni sus antecedentes**, y ese
+vínculo habilita mensajería privada y acceso a las medidas y fotos que la
+persona comparta.
+
+Si vas a consentir el uso por una persona menor, **la decisión de vincularla con
+un entrenador es tuya**, y te corresponde verificar sus credenciales y supervisar
+esa relación.
+
+### 9.4 Otras situaciones
 
 Si estás **embarazada o en posparto**, no uses las rutinas ni las
 recomendaciones de la aplicación sin indicación expresa de tu médico: el
 contenido no está adaptado a esa situación.
 
 Si tenés o tuviste un **trastorno de la conducta alimentaria**, tené en cuenta
-que esta aplicación registra peso, medidas corporales y composición física, y
-muestra su evolución en gráficos. Ese tipo de seguimiento puede ser
-contraproducente. Consultalo con tu equipo tratante antes de usarla.
+lo de la sección 9.2 y consultalo con tu equipo tratante antes de usarla.
 
----
+[[PENDIENTE — REVISIÓN LEGAL PRIORITARIA. Con edad mínima de 9 años y alcance
+mundial, el abogado tiene que dictaminar: (a) si el descargo aceptado por el
+representante legal es oponible y con qué forma de aceptación, (b) si
+corresponde restringir por edad el vínculo con entrenadores y el registro de
+composición corporal, y (c) qué exige cada jurisdicción relevante para servicios
+de actividad física dirigidos a menores.]]
 
 ## 10. Limitación de responsabilidad
 
@@ -232,6 +285,23 @@ advertencia, no si estaba disponible en algún lado.
 | 4 | **Al vincularse con un entrenador** | Sección 6: es independiente, TREINO no verifica credenciales | **Sí — checkbox** |
 | 5 | **Al reportar una molestia** | Sección 7, una línea: «esto no es una consulta médica» | No |
 | 6 | **En Perfil → Legales**, siempre accesible | Documento completo | No |
+
+### A.1 Si la cuenta es de una persona menor
+
+Con la edad mínima en 9 años, los puntos 1, 3 y 4 **no los puede aceptar quien
+usa la aplicación**: los tiene que aceptar su representante legal, y hay que
+poder probar que fue así.
+
+| Punto | Cambio |
+|---|---|
+| 1 — Onboarding | Se muestra además la sección 9 completa, y acepta el representante legal |
+| 3 — Rutina automática | Ídem |
+| 4 — Vínculo con entrenador | **Lo autoriza el representante legal, no la persona menor.** Es el punto de mayor exposición: habilita chat privado con un adulto no verificado |
+
+Eso implica que el flujo de consentimiento parental **tiene que existir antes**
+que estos puntos, no después. Ver
+[`consentimiento-datos-salud.md`](./consentimiento-datos-salud.md) y la sección
+de menores de los Términos.
 
 ## B. Persistencia
 

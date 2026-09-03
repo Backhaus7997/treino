@@ -113,6 +113,46 @@ el abogado.]]
 
 ---
 
+## 5.bis Si trabajás con personas menores de edad
+
+**La edad mínima para tener una cuenta en TREINO es de 9 años.** Eso significa
+que tus alumnos pueden ser menores, y que ahí tus obligaciones son distintas.
+
+Al aceptar un vínculo con una persona menor te obligás a:
+
+1. **Estar habilitado para hacerlo.** Declarás que cumplís los requisitos que tu
+   jurisdicción exija para trabajar con menores — certificaciones,
+   antecedentes, registros, lo que corresponda. **TREINO no verifica nada de
+   eso**, y su cumplimiento es exclusivamente tuyo.
+2. **Verificar que su representante legal lo autorizó**, y mantenerlo informado
+   del plan de trabajo.
+3. **No trasladar la comunicación fuera de la plataforma.** El chat de TREINO
+   deja registro. Pasar a un canal privado sin registro no está permitido.
+4. **No solicitar fotografías** más allá de lo que los flujos de la aplicación
+   contemplen, ni pedirle a la persona menor material que no haya pedido su
+   representante.
+5. **Adecuar el trabajo a una persona en desarrollo.** La aplicación no
+   diferencia por edad: las cargas y progresiones que muestra son las mismas
+   para todo el mundo. Adaptarlas es parte de tu criterio profesional, y de tu
+   responsabilidad.
+6. **Extremar el cuidado con el registro corporal.** Peso, medidas y porcentaje
+   de grasa en niñas, niños y adolescentes son datos sensibles con implicancias
+   propias. Usalos con criterio o no los uses.
+7. **Avisarnos** si detectás una situación que ponga en riesgo a una persona
+   menor.
+
+**El incumplimiento de esta sección es causal de baja inmediata**, sin aviso
+previo y sin perjuicio de las acciones legales que correspondan.
+
+[[PENDIENTE — REVISIÓN LEGAL PRIORITARIA. Admitir alumnos desde los 9 años en una
+plataforma que habilita mensajería privada con adultos no verificados exige
+dictamen sobre: (a) si corresponde exigir verificación de antecedentes al
+entrenador, (b) si el vínculo con menores debe requerir participación activa del
+representante legal en el canal, y (c) qué obligaciones impone cada jurisdicción
+relevante. Es la exposición más alta del producto.]]
+
+---
+
 ## 6. El dinero de tus alumnos es asunto tuyo
 
 **TREINO no intermedia el pago entre vos y tu alumno.** Ni lo procesa, ni lo
@@ -165,6 +205,12 @@ información que sobre él conste en nuestra base. Si un alumno ejerce ese
 derecho, **estamos obligados a entregarle también ese contenido.**
 
 Escribí sabiendo eso. No es un cuaderno privado: es un registro reclamable.
+
+### 7.1.bis Si el alumno es menor de edad
+
+Su representante legal tiene los mismos derechos que él sobre esos datos:
+acceder, rectificar y pedir su supresión. Eso **incluye tus notas privadas, tu
+registro de seguimiento y los archivos que hayas subido** sobre esa persona.
 
 ### 7.2 Cuando se corta el vínculo
 
