@@ -46,6 +46,9 @@ class AppPalette extends ThemeExtension<AppPalette> {
     required this.reactionLike,
     required this.reactionFire,
     required this.reactionClap,
+    required this.podiumGold,
+    required this.podiumSilver,
+    required this.podiumBronze,
     required this.onDanger,
     required this.scrimDark,
   });
@@ -154,6 +157,18 @@ class AppPalette extends ThemeExtension<AppPalette> {
   final Color reactionFire;
   final Color reactionClap;
 
+  /// Metálicos del podio — numeral de puesto de las 3 primeras filas de
+  /// Rankings (1º oro, 2º plata, 3º bronce). Expresivos como los `reaction*`,
+  /// no semánticos: fuera del podio no se usan.
+  ///
+  /// Los tres se miden como TEXTO CHICO (4,5:1) contra `bgCard` y contra la
+  /// fila propia (`bgCard` + `accent` al 8%), en las DOS paletas —
+  /// `podium_contrast_test.dart`. El color es refuerzo redundante: el numeral
+  /// del puesto ya dice la posición, así que nadie depende del tono.
+  final Color podiumGold;
+  final Color podiumSilver;
+  final Color podiumBronze;
+
   /// Foreground (text/icon) rendered on top of [danger] backgrounds.
   /// Achieves ≥ 4.5:1 contrast ratio against [danger] (WCAG AA).
   final Color onDanger;
@@ -185,6 +200,9 @@ class AppPalette extends ThemeExtension<AppPalette> {
     reactionLike: AppColorPrimitives.reactionLike,
     reactionFire: AppColorPrimitives.reactionFire,
     reactionClap: AppColorPrimitives.reactionClap,
+    podiumGold: AppColorPrimitives.podiumGold,
+    podiumSilver: AppColorPrimitives.podiumSilver,
+    podiumBronze: AppColorPrimitives.podiumBronze,
     onDanger: AppColorPrimitives.white,
     scrimDark: AppColorPrimitives.black,
   );
@@ -211,6 +229,9 @@ class AppPalette extends ThemeExtension<AppPalette> {
     reactionLike: AppColorPrimitives.reactionLikeDark,
     reactionFire: AppColorPrimitives.reactionFireDark,
     reactionClap: AppColorPrimitives.reactionClapDark,
+    podiumGold: AppColorPrimitives.podiumGoldDark,
+    podiumSilver: AppColorPrimitives.podiumSilverDark,
+    podiumBronze: AppColorPrimitives.podiumBronzeDark,
     onDanger: AppColorPrimitives.white,
     scrimDark: AppColorPrimitives.black,
   );
@@ -240,6 +261,9 @@ class AppPalette extends ThemeExtension<AppPalette> {
     Color? reactionLike,
     Color? reactionFire,
     Color? reactionClap,
+    Color? podiumGold,
+    Color? podiumSilver,
+    Color? podiumBronze,
     Color? onDanger,
     Color? scrimDark,
   }) =>
@@ -264,6 +288,9 @@ class AppPalette extends ThemeExtension<AppPalette> {
         reactionLike: reactionLike ?? this.reactionLike,
         reactionFire: reactionFire ?? this.reactionFire,
         reactionClap: reactionClap ?? this.reactionClap,
+        podiumGold: podiumGold ?? this.podiumGold,
+        podiumSilver: podiumSilver ?? this.podiumSilver,
+        podiumBronze: podiumBronze ?? this.podiumBronze,
         onDanger: onDanger ?? this.onDanger,
         scrimDark: scrimDark ?? this.scrimDark,
       );
@@ -292,6 +319,9 @@ class AppPalette extends ThemeExtension<AppPalette> {
       reactionLike: Color.lerp(reactionLike, other.reactionLike, t)!,
       reactionFire: Color.lerp(reactionFire, other.reactionFire, t)!,
       reactionClap: Color.lerp(reactionClap, other.reactionClap, t)!,
+      podiumGold: Color.lerp(podiumGold, other.podiumGold, t)!,
+      podiumSilver: Color.lerp(podiumSilver, other.podiumSilver, t)!,
+      podiumBronze: Color.lerp(podiumBronze, other.podiumBronze, t)!,
       onDanger: Color.lerp(onDanger, other.onDanger, t)!,
       scrimDark: Color.lerp(scrimDark, other.scrimDark, t)!,
     );

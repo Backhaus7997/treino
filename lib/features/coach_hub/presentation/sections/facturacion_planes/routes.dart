@@ -1,4 +1,5 @@
 import 'package:go_router/go_router.dart';
+import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/blocked_students_screen.dart';
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/paywall_preview_screen.dart';
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/pricing_screen.dart';
 import 'package:treino/features/coach_hub/presentation/shell/coach_hub_page.dart';
@@ -17,6 +18,15 @@ final List<RouteBase> facturacionPlanesRoutes = [
   GoRoute(
     path: '/facturacion/planes',
     pageBuilder: (_, __) => coachHubPage(const PricingScreen()),
+  ),
+  // Autoservicio del PF cuando el enforcement le frena una escritura: qué
+  // alumnos quedaron fuera de su cupo y qué significa. Sin item de sidebar a
+  // propósito — no es una sección del día a día, se llega desde el error que
+  // la motiva (`routine_editor_web_screen`) o por URL. Ponerla en el menú
+  // permanente instalaría en TODO PF la idea de que tiene alumnos frenados.
+  GoRoute(
+    path: kBlockedStudentsRoutePath,
+    pageBuilder: (_, __) => coachHubPage(const BlockedStudentsScreen()),
   ),
   GoRoute(
     path: '/facturacion/preview',

@@ -166,3 +166,41 @@ final filteredRoutinesProvider = Provider<AsyncValue<List<Routine>>>((ref) {
     return list.where((r) => r.level == filter).toList();
   });
 });
+
+/// Drops the cached single-doc answers for [routineId] after a WRITE to it.
+///
+/// [routineByIdProvider] and [visibleRoutineByIdProvider] hold a
+/// [Ref.keepAlive] link for as long as the fetch succeeded (see
+/// [_cacheOnlyOnSuccess]), so their `autoDispose` never fires and nothing
+/// re-reads Firestore on its own. That is the point for READS — but it means
+/// an EDIT is invisible to every one-shot consumer until the process dies.
+///
+/// The bug that forced this (#: "agrego un ejercicio y al EMPEZAR no está"):
+/// `RoutineDetailScreen` watches [routineByIdStreamProvider], so the added
+/// exercise appeared there immediately, while `SessionNotifier._buildFresh`
+/// reads [routineByIdProvider] and built the session from the PRE-edit copy.
+/// Same routine, two sources of truth, and only an app restart reconciled them.
+///
+/// Every write path that mutates an EXISTING routine doc must call this right
+/// after the write resolves — edits, archives, deletes, publish/unpublish. The
+/// stream-backed LISTS heal themselves from the Firestore snapshot, which is
+/// what makes the omission so easy to miss: the grid updates, the single-doc
+/// readers do not.
+///
+/// Creates are the one exception: nothing can be cached under an id that did
+/// not exist yet. `assignTemplateToAthlete` counts as a create — it writes a
+/// NEW athlete-owned doc via `createAssigned` and never touches the template.
+///
+/// Rating aggregates (`ratingAvg`/`ratingsCount`) are written server-side on
+/// the parent doc and are therefore NOT covered here; a cached copy can show a
+/// stale average until the container is rebuilt.
+///
+/// Takes the [ProviderContainer] and not a `WidgetRef` ON PURPOSE: the editor
+/// captures it BEFORE the save's async gap, so a back gesture that disposes the
+/// screen mid-write still drops the stale cache. A `WidgetRef` touched after
+/// unmount throws, and the branch that swallowed the invalidation would be
+/// exactly the one that leaves a pre-edit routine cached for the whole process.
+void invalidateRoutineById(ProviderContainer container, String routineId) {
+  container.invalidate(routineByIdProvider(routineId));
+  container.invalidate(visibleRoutineByIdProvider(routineId));
+}

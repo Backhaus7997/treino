@@ -165,4 +165,39 @@ class FakeAnalyticsService implements AnalyticsService {
           (c) => c.name == 'sub_tab_viewed' && c.params['surface'] == surface)
       .map((c) => c.params['tab']! as String)
       .toList();
+
+  @override
+  Future<void> logPaywallWriteDenied({
+    required String trainerId,
+    required String athleteId,
+    required String collection,
+    required String operation,
+    required String surface,
+    required String athleteEntitlement,
+  }) async {
+    events.add(kPaywallWriteDeniedEvent);
+    calls.add((
+      name: kPaywallWriteDeniedEvent,
+      params: {
+        'trainer_id': trainerId,
+        'athlete_id': athleteId,
+        'collection': collection,
+        'operation': operation,
+        'surface': surface,
+        'athlete_entitlement': athleteEntitlement,
+      }
+    ));
+  }
+
+  /// Los params del ÚLTIMO `paywall_write_denied`, o null si no hubo ninguno.
+  ///
+  /// Este evento es la única señal server-visible del enforcement, así que los
+  /// tests assertean sobre los CAMPOS y no solo sobre el nombre: un evento que
+  /// llega sin `trainer_id` no sirve para nada el día del incidente, y un
+  /// `expect(events, contains('paywall_write_denied'))` pasaría igual.
+  Map<String, Object?>? get lastPaywallWriteDenied {
+    final matches =
+        calls.where((c) => c.name == kPaywallWriteDeniedEvent).toList();
+    return matches.isEmpty ? null : matches.last.params;
+  }
 }

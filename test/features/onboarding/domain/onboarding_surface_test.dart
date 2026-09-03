@@ -2,6 +2,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/onboarding/domain/onboarding_module.dart';
 import 'package:treino/features/onboarding/domain/onboarding_surface.dart';
 
+import '../../../helpers/onboarding_test_helpers.dart';
+
 /// Pure domain tests — no widget tree, no providers, no Firestore. The
 /// versioning algebra is where an off-by-one would hide, so it is verified in
 /// isolation and in milliseconds.
@@ -94,6 +96,24 @@ void main() {
         isFalse,
       );
     });
+
+    test('re-shows version 1 only on the changed mobile feature decks', () {
+      const athlete = OnboardingSurface.customExerciseAthleteMobile;
+      const trainer = OnboardingSurface.customExerciseTrainerMobile;
+      const web = OnboardingSurface.customExerciseTrainerWeb;
+
+      expect(athlete.shouldShow({athlete.wireKey: 1}), isTrue);
+      expect(trainer.shouldShow({trainer.wireKey: 1}), isTrue);
+      expect(web.shouldShow({web.wireKey: 1}), isFalse);
+    });
+
+    test('does NOT re-show mobile feature decks already seen at version 2', () {
+      const athlete = OnboardingSurface.customExerciseAthleteMobile;
+      const trainer = OnboardingSurface.customExerciseTrainerMobile;
+
+      expect(athlete.shouldShow({athlete.wireKey: 2}), isFalse);
+      expect(trainer.shouldShow({trainer.wireKey: 2}), isFalse);
+    });
   });
 
   group('markedIn', () {
@@ -121,5 +141,17 @@ void main() {
         expect(surface.shouldShow(surface.markedIn(const {})), isFalse);
       }
     });
+  });
+
+  test('allSurfacesSeen suppresses every surface at its current version', () {
+    final seen = allSurfacesSeen();
+
+    for (final surface in OnboardingSurface.values) {
+      expect(
+        surface.shouldShow(seen),
+        isFalse,
+        reason: '${surface.name} was not marked at its current version',
+      );
+    }
   });
 }

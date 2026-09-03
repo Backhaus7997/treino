@@ -198,8 +198,14 @@ Future<void> _deleteTemplate(
   if (confirmed != true || !context.mounted) return;
   // Capture the messenger before the async gap — context may unmount.
   final messenger = ScaffoldMessenger.of(context);
+  // Same reason for the container: the cache drop must land even if this tab
+  // is gone by the time the delete resolves.
+  final container = ProviderScope.containerOf(context, listen: false);
   try {
     await ref.read(routineRepositoryProvider).deleteRoutine(template.id);
+    // The stream-backed grid heals itself; the one-shot single-doc caches
+    // would keep serving the deleted template for the rest of the process.
+    invalidateRoutineById(container, template.id);
     messenger.showSnackBar(
       const SnackBar(content: Text('Plantilla eliminada.')), // i18n
     );

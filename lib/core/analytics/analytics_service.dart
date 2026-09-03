@@ -95,7 +95,59 @@ abstract class AnalyticsService {
     required String surface,
     required String tab,
   });
+
+  /// Una escritura del PF rebotó con `permission-denied`.
+  ///
+  /// **Es la única señal server-visible que va a existir de esto.** Firestore
+  /// no loguea en ningún lado consultable las denegaciones de reglas, y el
+  /// Coach Hub web no inicializa Crashlytics (`main_coach_hub.dart`). Si este
+  /// evento no lo cuenta, el primer incidente del enforcement es invisible y
+  /// nos enteramos por WhatsApp.
+  ///
+  /// Por eso los campos son los que responden las preguntas del día del
+  /// incidente, no los que salían gratis:
+  ///
+  /// - [trainerId] — CUÁNTOS PF distintos y CUÁLES. Va explícito porque la app
+  ///   nunca llama a `setUserId`: el `user_pseudo_id` que Firebase agrega solo
+  ///   identifica la INSTALACIÓN, así que sin este campo no se pueden contar
+  ///   PF únicos ni cruzar el rebote contra su `subscription` en Firestore.
+  /// - [athleteId] — sobre qué alumno rebotó. Distingue "un alumno puntual"
+  ///   de "todos los del PF".
+  /// - [collection] — qué se estaba escribiendo (`routines`, …). Separa "una
+  ///   cláusula puntual quedó mal" de "el PF está frenado entero".
+  /// - [operation] — `create` o `update`. No es lo mismo no poder tomar
+  ///   trabajo nuevo que no poder tocar lo que ya tenía; lo segundo es mucho
+  ///   más grave y la respuesta operativa es otra.
+  /// - [surface] — desde dónde (`routine_editor_web`, …). La misma colección
+  ///   se escribe desde web y desde móvil, y el arreglo no es el mismo.
+  /// - [athleteEntitlement] — `blocked` si el alumno figuraba en
+  ///   `users/{trainerId}.blockedAthleteIds` cuando rebotó, `entitled` si no,
+  ///   `unknown` si ese doc todavía no había cargado, `not_applicable` si la
+  ///   escritura no era sobre ningún alumno (una plantilla del PF). Es el
+  ///   campo que dice si el paywall EXPLICA la denegación: un pico de
+  ///   `entitled` no es un problema de cobro, es una regla rota, y ahí mirar
+  ///   facturación es perder el día.
+  Future<void> logPaywallWriteDenied({
+    required String trainerId,
+    required String athleteId,
+    required String collection,
+    required String operation,
+    required String surface,
+    required String athleteEntitlement,
+  });
 }
+
+/// El nombre del evento, en UN solo lugar.
+///
+/// El resto de los eventos de este archivo tiene el string escrito dos veces
+/// —en [FirebaseAnalyticsService] y en el `FakeAnalyticsService` de los
+/// tests— y sólo la copia del fake queda asserteada. Para los demás eso es un
+/// riesgo tolerable; para éste no: es la ÚNICA señal server-visible del
+/// enforcement, así que un typo en la copia que shipea lo deja fuera de
+/// BigQuery con la suite entera en verde, y nadie se entera hasta el día del
+/// incidente. Con la constante compartida, el test que pinea el literal pinea
+/// también lo que se manda de verdad.
+const String kPaywallWriteDeniedEvent = 'paywall_write_denied';
 
 /// Implementación real basada en Firebase Analytics.
 class FirebaseAnalyticsService implements AnalyticsService {
@@ -217,6 +269,27 @@ class FirebaseAnalyticsService implements AnalyticsService {
           'tab': tab,
         },
       );
+
+  @override
+  Future<void> logPaywallWriteDenied({
+    required String trainerId,
+    required String athleteId,
+    required String collection,
+    required String operation,
+    required String surface,
+    required String athleteEntitlement,
+  }) =>
+      _analytics.logEvent(
+        name: kPaywallWriteDeniedEvent,
+        parameters: {
+          'trainer_id': trainerId,
+          'athlete_id': athleteId,
+          'collection': collection,
+          'operation': operation,
+          'surface': surface,
+          'athlete_entitlement': athleteEntitlement,
+        },
+      );
 }
 
 /// [AnalyticsService] que no hace nada.
@@ -276,6 +349,16 @@ class NoopAnalyticsService implements AnalyticsService {
   Future<void> logSubTabViewed({
     required String surface,
     required String tab,
+  }) async {}
+
+  @override
+  Future<void> logPaywallWriteDenied({
+    required String trainerId,
+    required String athleteId,
+    required String collection,
+    required String operation,
+    required String surface,
+    required String athleteEntitlement,
   }) async {}
 }
 

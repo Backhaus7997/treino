@@ -69,6 +69,8 @@ const double _kGraficoAA = 3.0;
 const int _kBloqueRelleno = 20;
 const int _kBloqueBorde = 140;
 const int _kBadgeRelleno = 46;
+const int _kBloqueRellenoResaltado = 46;
+const int _kBloqueBordeResaltado = 255;
 const int _kAgarreSuperserie = 40;
 const int _kBotonPrimario = 30;
 const int _kBotonSecundario = 36;
@@ -79,6 +81,48 @@ void main() {
     'dark': AppPalette.mintMagenta,
     'light': AppPalette.mintMagentaLight,
   };
+
+  // El estado RESALTADO: el bloque como destino explícito del drop durante el
+  // drag. Su dartdoc afirmaba que el borde supera 3:1 y esa afirmación llegó
+  // sin medir — que es justo lo que este archivo existe para impedir.
+  group('bloque resaltado como destino del drop', () {
+    for (final entry in paletas.entries) {
+      final nombre = entry.key;
+      final p = entry.value;
+
+      test('$nombre: el borde resaltado cumple el 3:1 de SC 1.4.11', () {
+        final relleno =
+            _on(p.highlight.withAlpha(_kBloqueRellenoResaltado), p.bgCard);
+        final borde =
+            _on(p.highlight.withAlpha(_kBloqueBordeResaltado), relleno);
+        final ratio = _ratio(borde, relleno);
+        expect(ratio, greaterThanOrEqualTo(_kGraficoAA),
+            reason: 'El borde es lo que dice "acá cae". $nombre: '
+                '${ratio.toStringAsFixed(2)}:1');
+      });
+
+      test('$nombre: el resaltado se despega del bloque en reposo', () {
+        final reposo = _on(p.highlight.withAlpha(_kBloqueRelleno), p.bgCard);
+        final activo =
+            _on(p.highlight.withAlpha(_kBloqueRellenoResaltado), p.bgCard);
+        final delta = _maxChannelDelta(activo, reposo);
+        expect(delta, greaterThanOrEqualTo(16),
+            reason: 'Si el resaltado no se distingue del reposo, el usuario '
+                'arrastra sin saber si va a unir o a reordenar. $nombre: '
+                '$delta sobre 255 por canal.');
+      });
+
+      test('$nombre: el título sigue en AA sobre el relleno resaltado', () {
+        final activo =
+            _on(p.highlight.withAlpha(_kBloqueRellenoResaltado), p.bgCard);
+        final ratio = _ratio(_on(p.textPrimary, activo), activo);
+        expect(ratio, greaterThanOrEqualTo(_kTextAA),
+            reason: 'El relleno sube al resaltarse y el texto no se mueve: '
+                'hay que medirlo de nuevo. $nombre: '
+                '${ratio.toStringAsFixed(2)}:1');
+      });
+    }
+  });
 
   group('bloque de superserie — el relleno que lo hace existir', () {
     for (final entry in paletas.entries) {
