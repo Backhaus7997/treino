@@ -34,10 +34,20 @@ import '../../../app/theme/tokens/primitives.dart';
 /// Everything is `ref.read`, never `watch`: this runs once, imperatively, from
 /// a post-frame callback. A `watch` here would rebuild nothing and only risk
 /// re-entry when `userProfileProvider` re-emits.
+/// [alCrearEjercicio] es lo que hace el CTA "CREAR MI EJERCICIO" al cerrar.
+///
+/// Lo inyecta el llamador porque el destino NO es el mismo en las dos
+/// superficies: en el teléfono es una ruta (`/profile/my-exercises/new`), y en
+/// el Coach Hub es un diálogo (`showCreateCustomExerciseDialog`) porque el
+/// editor de ejercicios propios no está ruteado ahí. Resolverlo adentro del
+/// gate obligaría a que `onboarding` importe `coach_hub`.
+///
+/// Cuando es null, el móvil usa su ruta por default.
 Future<void> maybeShowCustomExerciseOnboarding({
   required BuildContext context,
   required WidgetRef ref,
   required OnboardingSurface surface,
+  Future<void> Function()? alCrearEjercicio,
 }) async {
   // Wait for the profile before deciding anything. `userProfileProvider` is a
   // STREAM: on the first post-frame it is usually still `AsyncLoading`, so
@@ -156,11 +166,14 @@ Future<void> maybeShowCustomExerciseOnboarding({
 
   // Después del `finally`: el flag se persiste igual, se navegue o no.
   if (cerroPorCta != true || !context.mounted) return;
+  if (alCrearEjercicio != null) {
+    await alCrearEjercicio();
+    return;
+  }
   if (isWeb) {
-    // La web NO tiene el editor de ejercicios ruteado
-    // (`coach_hub_router.dart` no lo declara): ahí se crea desde el diálogo
-    // del picker, adentro del editor de rutina. Navegar no es posible todavía
-    // y mandarlo a una ruta inexistente sería peor que no hacer nada.
+    // Sin callback y en web no hay a dónde ir: `coach_hub_router.dart` no
+    // rutea el editor de ejercicios propios. Antes esto era el único camino;
+    // ahora el llamador web inyecta el diálogo.
     return;
   }
   // `/profile/my-exercises/new` — `'new'` es el centinela que abre el editor

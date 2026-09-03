@@ -45,10 +45,14 @@ import 'package:treino/l10n/app_l10n.dart';
 
 /// Columna derecha: Próximas sesiones + Vencimientos 7 días + Alumnos
 /// inactivos. REQ-HOY-07, REQ-HOY-08, REQ-HOY-09.
+///
+/// Se usa en el layout ANGOSTO (< 900), donde todo apila en una sola columna.
+/// En wide el screen arma una grilla y toma las tres cards por separado — por
+/// eso son públicas.
 class DashboardRightColumn extends StatelessWidget {
   const DashboardRightColumn({super.key, this.startIndex = 0});
 
-  /// Índice de stagger del primer card (`_ProximasSesiones`) — las otras dos
+  /// Índice de stagger del primer card (`DashboardProximasSesionesCard`) — las otras dos
   /// cards continúan en `startIndex + 1` y `startIndex + 2`. Permite que el
   /// screen raíz encadene el stagger tras sus propias secciones (WU-06).
   final int startIndex;
@@ -60,17 +64,17 @@ class DashboardRightColumn extends StatelessWidget {
       children: [
         TreinoFadeSlideIn(
           delay: AppMotion.stagger(startIndex),
-          child: const _ProximasSesiones(),
+          child: const DashboardProximasSesionesCard(),
         ),
         const SizedBox(height: AppSpacing.s18),
         TreinoFadeSlideIn(
           delay: AppMotion.stagger(startIndex + 1),
-          child: const _Vencimientos7d(),
+          child: const DashboardVencimientos7dCard(),
         ),
         const SizedBox(height: AppSpacing.s18),
         TreinoFadeSlideIn(
           delay: AppMotion.stagger(startIndex + 2),
-          child: const _InactivosSection(),
+          child: const DashboardInactivosCard(),
         ),
       ],
     );
@@ -151,8 +155,8 @@ class _SectionError extends StatelessWidget {
 // ─── Próximas sesiones (REAL) ───────────────────────────────────────────────
 
 /// Muestra hasta 4 próximas citas confirmadas. REQ-HOY-07.
-class _ProximasSesiones extends ConsumerWidget {
-  const _ProximasSesiones();
+class DashboardProximasSesionesCard extends ConsumerWidget {
+  const DashboardProximasSesionesCard({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -324,8 +328,8 @@ class _SesionRow extends StatelessWidget {
 // ─── Vencimientos 7 días (REAL) ─────────────────────────────────────────────
 
 /// Muestra vencidos de [pagosBucketsProvider] + link "Ver todos". REQ-HOY-08.
-class _Vencimientos7d extends ConsumerWidget {
-  const _Vencimientos7d();
+class DashboardVencimientos7dCard extends ConsumerWidget {
+  const DashboardVencimientos7dCard({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -476,8 +480,8 @@ class _VencimientoRow extends ConsumerWidget {
 // ─── Alumnos inactivos (REAL — driven by inactivosProvider) ────────────────
 
 /// Alumnos inactivos — REQ-HOY-09.
-class _InactivosSection extends ConsumerWidget {
-  const _InactivosSection();
+class DashboardInactivosCard extends ConsumerWidget {
+  const DashboardInactivosCard({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

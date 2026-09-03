@@ -92,18 +92,40 @@ class _DashboardContent extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Sin `Column` intermedia: una `Column` reparte alto LIBRE a sus hijos, así
+    // que se comía el stretch de la fila y la card volvía a su alto natural —
+    // justo lo que la grilla viene a evitar. El wrapper de motion sí pasa las
+    // constraints de largo.
     final leftColumn = TreinoFadeSlideIn(
       delay: AppMotion.stagger(_leftColumnIndex),
-      child: const Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          DashboardPendingSection(),
-        ],
-      ),
+      child: const DashboardPendingSection(),
     );
     const rightColumn = DashboardRightColumn(
       startIndex: _rightColumnStartIndex,
     );
+
+    // El stagger sigue el orden de LECTURA de la grilla —izquierda a derecha,
+    // arriba a abajo—, que es el mismo orden en el que estaban las cards
+    // cuando eran dos columnas apiladas.
+    final filas = <(Widget, Widget)>[
+      (
+        leftColumn,
+        TreinoFadeSlideIn(
+          delay: AppMotion.stagger(_rightColumnStartIndex),
+          child: const DashboardProximasSesionesCard(),
+        ),
+      ),
+      (
+        TreinoFadeSlideIn(
+          delay: AppMotion.stagger(_rightColumnStartIndex + 1),
+          child: const DashboardVencimientos7dCard(),
+        ),
+        TreinoFadeSlideIn(
+          delay: AppMotion.stagger(_rightColumnStartIndex + 2),
+          child: const DashboardInactivosCard(),
+        ),
+      ),
+    ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -124,7 +146,7 @@ class _DashboardContent extends ConsumerWidget {
         ),
         const SizedBox(height: AppSpacing.s20),
         if (wide) ...[
-          _TwoColumnLayout(left: leftColumn, right: rightColumn),
+          _CardGrid(filas: filas),
         ] else ...[
           leftColumn,
           const SizedBox(height: AppSpacing.s18),
@@ -135,24 +157,49 @@ class _DashboardContent extends ConsumerWidget {
   }
 }
 
-// ── Two-column layout ──────────────────────────────────────────────────────────
+// ── Grilla de cards ───────────────────────────────────────────────────────────
 
-class _TwoColumnLayout extends StatelessWidget {
-  const _TwoColumnLayout({required this.left, required this.right});
-  final Widget left;
-  final Widget right;
+/// Las cards de a pares, una fila por par.
+///
+/// Antes eran DOS COLUMNAS INDEPENDIENTES: una card a la izquierda y tres
+/// apiladas a la derecha. Como cada columna crecía por su cuenta, la izquierda
+/// terminaba a un tercio del alto de la derecha y abajo quedaba un agujero del
+/// tamaño de dos cards.
+///
+/// En una grilla ese agujero no puede existir: cada fila mide lo que mide su
+/// par y la siguiente arranca ahí nomás. Y el par no es arbitrario — arriba va
+/// lo de HOY (pendientes + próximas sesiones), abajo lo que pide atención
+/// (vencimientos + inactivos).
+///
+/// `stretch` dentro del `IntrinsicHeight` iguala el alto de las dos cards de
+/// cada fila: dos cards de distinto alto lado a lado leen como desalineadas,
+/// que es la mitad del desprolijo que esto viene a arreglar.
+class _CardGrid extends StatelessWidget {
+  const _CardGrid({required this.filas});
+
+  /// Cada fila es (card ancha 55, card angosta 45). La proporción viene del
+  /// layout anterior: la izquierda era la columna principal.
+  final List<(Widget, Widget)> filas;
 
   @override
   Widget build(BuildContext context) {
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(flex: 55, child: left),
-          const SizedBox(width: AppSpacing.s20),
-          Expanded(flex: 45, child: right),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var i = 0; i < filas.length; i++) ...[
+          if (i > 0) const SizedBox(height: AppSpacing.s18),
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(flex: 55, child: filas[i].$1),
+                const SizedBox(width: AppSpacing.s20),
+                Expanded(flex: 45, child: filas[i].$2),
+              ],
+            ),
+          ),
         ],
-      ),
+      ],
     );
   }
 }

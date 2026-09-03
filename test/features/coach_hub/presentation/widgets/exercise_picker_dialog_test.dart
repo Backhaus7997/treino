@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/widgets/exercise_asset_image.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/custom_exercise_video_web_uploader.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/exercise_picker_dialog.dart';
 import 'package:treino/features/workout/application/custom_exercise_providers.dart';
@@ -195,6 +196,72 @@ void main() {
     });
   });
 
+  group('ExercisePickerDialog (web) — foto del ejercicio', () {
+    testWidgets('cada ejercicio del catálogo dibuja su foto', (tester) async {
+      await _openPicker(tester);
+
+      // Sin esto el catálogo precargado se lee como una lista de nombres con
+      // el MISMO ícono repetido, y el PF tiene que saberse de memoria a qué se
+      // parece cada variante. El sheet del teléfono ya lo hacía; el picker web
+      // era el único que no.
+      expect(
+        find.byType(ExerciseAssetImage),
+        findsWidgets,
+        reason: 'el catálogo tiene que mostrar la foto de cada ejercicio',
+      );
+    });
+
+    testWidgets('el thumbnailUrl del doc llega al widget', (tester) async {
+      await _openPicker(
+        tester,
+        exercises: const [
+          Exercise(
+            id: 'bench-press',
+            name: 'Press de Banca',
+            muscleGroup: 'chest',
+            category: 'compound',
+            thumbnailUrl: 'https://example.test/bench.jpg',
+          ),
+        ],
+      );
+
+      // `thumbnailUrl` es el escalón 0 de la cascada: la foto REAL, un frame
+      // del propio video. Los assets bundleados quedan como su fallback.
+      //
+      // Este test existe porque el olvido silencioso es pasar `null` acá: el
+      // widget se dibuja igual, la cascada pinta la silueta del grupo muscular
+      // y NADA falla — sólo que la foto real nunca aparece.
+      final foto = tester.widget<ExerciseAssetImage>(
+        find.byType(ExerciseAssetImage),
+      );
+      expect(foto.thumbnailUrl, 'https://example.test/bench.jpg');
+      expect(foto.exerciseId, 'bench-press');
+      expect(foto.muscleGroup, 'chest');
+    });
+
+    testWidgets('un custom NO entra en la cascada del catálogo',
+        (tester) async {
+      await _openPicker(
+        tester,
+        extraOverrides: [
+          customExercisesForTrainerStreamProvider('u1').overrideWith(
+            (ref) => Stream<List<CustomExercise>>.value([_customBench]),
+          ),
+        ],
+      );
+
+      expect(find.text('Press plano casero'), findsOneWidget);
+      // Los ids de los customs no son los del catálogo: probar
+      // `assets/exercises/cx-1.png` es miss garantizado, y el escalón del
+      // grupo muscular pintaría una silueta ajena como si fuera el ejercicio.
+      // Mejor el ícono.
+      final ids = tester
+          .widgetList<ExerciseAssetImage>(find.byType(ExerciseAssetImage))
+          .map((w) => w.exerciseId);
+      expect(ids, isNot(contains('cx-1')));
+    });
+  });
+
   group('ExercisePickerDialog (web) — search + inline filters', () {
     testWidgets('search filters the list; selected count is maintained', (
       tester,
@@ -222,6 +289,11 @@ void main() {
         // Both chest exercises + the quads one are visible before filtering.
         expect(find.text('Press de Banca'), findsOneWidget);
         expect(find.text('Sentadilla con Barra'), findsOneWidget);
+
+        // Los chips arrancan COLAPSADOS desde el #860: desplegados eran 4
+        // filas y dejaban 3 ejercicios visibles. Hay que abrirlos primero.
+        await tester.tap(find.byKey(const Key('picker_filtros_toggle')));
+        await tester.pumpAndSettle();
 
         // Tap the PECHO muscle chip — filters to chest-only.
         await tester.tap(find.text('PECHO'));

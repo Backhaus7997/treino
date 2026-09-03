@@ -58,9 +58,10 @@ UserProfile _profile({
 /// Stands in for the routine editor: fires the gate once from a post-frame
 /// callback in create mode, exactly as `RoutineEditorScreen.initState` does.
 class _Host extends ConsumerStatefulWidget {
-  const _Host({required this.surface});
+  const _Host({required this.surface, this.alCrearEjercicio});
 
   final OnboardingSurface surface;
+  final Future<void> Function()? alCrearEjercicio;
 
   @override
   ConsumerState<_Host> createState() => _HostState();
@@ -76,6 +77,7 @@ class _HostState extends ConsumerState<_Host> {
         context: context,
         ref: ref,
         surface: widget.surface,
+        alCrearEjercicio: widget.alCrearEjercicio,
       );
     });
   }
@@ -129,6 +131,7 @@ Future<void> _pumpConRouter(
   WidgetTester tester, {
   required _CapturingUserRepository repo,
   UserProfile? profile,
+  Future<void> Function()? alCrearEjercicio,
 }) async {
   await tester.binding.setSurfaceSize(const Size(390, 844));
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -138,8 +141,11 @@ Future<void> _pumpConRouter(
     routes: [
       GoRoute(
         path: '/',
-        builder: (_, __) => const Scaffold(
-          body: _Host(surface: OnboardingSurface.customExerciseAthleteMobile),
+        builder: (_, __) => Scaffold(
+          body: _Host(
+            surface: OnboardingSurface.customExerciseAthleteMobile,
+            alCrearEjercicio: alCrearEjercicio,
+          ),
         ),
       ),
       GoRoute(
@@ -351,6 +357,52 @@ void main() {
       // sigue siendo saltar.
       expect(find.byType(CustomExerciseOnboardingView), findsNothing);
       expect(find.text('EDITOR:new'), findsNothing);
+    });
+
+    testWidgets('el callback inyectado gana sobre la ruta por default',
+        (tester) async {
+      final repo = _CapturingUserRepository();
+      var llamado = 0;
+      await _pumpConRouter(
+        tester,
+        repo: repo,
+        profile: _profile(),
+        alCrearEjercicio: () async => llamado++,
+      );
+
+      const cta = Key('custom_exercise_onboarding_primary_cta');
+      final slides = customExerciseSlidesFor(
+        OnboardingSurface.customExerciseAthleteMobile,
+      )!;
+      for (var i = 0; i < slides.length; i++) {
+        await _tapAndSettle(tester, cta);
+      }
+
+      // El destino NO es el mismo en las dos superficies: el teléfono navega a
+      // una ruta y el Coach Hub abre un diálogo, porque ahí el editor de
+      // ejercicios propios no está ruteado. Con el callback puesto, la ruta
+      // por default no corre.
+      expect(llamado, 1, reason: 'el CTA usa el callback inyectado');
+      expect(find.text('EDITOR:new'), findsNothing,
+          reason: 'y NO navega a la ruta del móvil');
+    });
+
+    testWidgets('SALTAR no dispara el callback', (tester) async {
+      final repo = _CapturingUserRepository();
+      var llamado = 0;
+      await _pumpConRouter(
+        tester,
+        repo: repo,
+        profile: _profile(),
+        alCrearEjercicio: () async => llamado++,
+      );
+
+      await _tapAndSettle(
+        tester,
+        const Key('custom_exercise_onboarding_skip_button'),
+      );
+
+      expect(llamado, 0);
     });
   });
 }
