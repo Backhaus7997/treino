@@ -51,6 +51,7 @@ import '../../../../workout/domain/routine_source.dart';
 import '../../../../workout/domain/routine_visibility.dart';
 import '../../../../workout/domain/set_enums.dart';
 import '../../../../workout/domain/set_spec.dart';
+import '../../widgets/create_custom_exercise_dialog.dart';
 import '../../widgets/exercise_picker_dialog.dart';
 
 /// Editor de rutinas web — crea o edita la rutina de UN alumno (mirrors
@@ -352,6 +353,12 @@ class _RoutineEditorWebScreenState
           context: context,
           ref: ref,
           surface: OnboardingSurface.customExerciseTrainerWeb,
+          // El CTA "CREAR MI EJERCICIO" abre el diálogo, que es como se crea
+          // un ejercicio propio en el Coach Hub: acá no hay una ruta para el
+          // editor. Antes el botón sólo cerraba el modal.
+          alCrearEjercicio: () async {
+            await showCreateCustomExerciseDialog(context);
+          },
         );
       });
     }
