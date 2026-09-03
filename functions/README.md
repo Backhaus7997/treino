@@ -2,6 +2,21 @@
 
 Firebase Cloud Functions for the TREINO app — Node.js 20 + TypeScript 5.
 
+> ## 🚨 `treino-dev` IS PRODUCTION
+>
+> It is TREINO's **only** Firebase project — `treino-prod` does not exist, and
+> there is no separate cloud dev environment. Real users live there. The
+> `firebase deploy` under [Deploying](#deploying) publishes to them.
+>
+> **A bare `firebase deploy`, with no `--project`, goes there too.**
+> `.firebaserc` declares `"default": "treino-dev"` and the CLI fills it in
+> silently, so nothing on the command line warns you. Run `firebase use`
+> (read-only) first to see which project you are actually pointed at.
+>
+> Emulators are the only disposable environment — everything under
+> [Running Tests](#running-tests) is safe. Read
+> [AGENTS.md → Entornos](../AGENTS.md#-entornos--leer-antes-de-correr-cualquier-comando) before deploying. (#826)
+
 ## Prerequisites
 
 - Node.js 20+
@@ -21,8 +36,11 @@ npm install
 Tests run against the Firebase Local Emulator Suite. Start emulators first:
 
 ```bash
-# From project root
-firebase emulators:start --only firestore,auth
+# From project root. El script fija `--project treino-dev`, que es el namespace
+# donde la app y las semillas escriben; un `emulators:start` pelado resolvería
+# `demo-treino` (el default seguro de .firebaserc, #840) y los datos quedarían
+# en otro proyecto: la UI de :4444 vacía y las suites de Storage en rojo.
+SKIP_FUNCTIONS=1 ./scripts/emulator.sh
 
 # In a second terminal
 cd functions
@@ -38,8 +56,9 @@ export JAVA_HOME=/opt/homebrew/opt/openjdk@21   # macOS via Homebrew
 ## Running the Full Emulator (with Functions)
 
 ```bash
-# From project root — builds functions first via predeploy hook
-firebase emulators:start --only firestore,auth,functions
+# From project root — compila functions antes de arrancar, y fija
+# `--project treino-dev` (ver nota de arriba, #840).
+./scripts/emulator.sh
 ```
 
 The `deleteAccount` callable will be available at:
@@ -69,11 +88,19 @@ npm run build
 
 ## Deploying
 
+⚠️ **This deploys to PRODUCTION.** `treino-dev` is TREINO's only Firebase
+project and it serves real users (#826). Maintainer sign-off required. Dropping
+`--project treino-dev` does **not** make it safer — `.firebaserc` defaults to
+the same project, it just stops showing you the name.
+
 ```bash
 # Authenticate first
 firebase login --reauth
 
-# Deploy to treino-dev (requires Blaze plan)
+# Confirm the target BEFORE deploying (read-only)
+firebase use
+
+# ⚠️ WRITES TO PRODUCTION — treino-dev is the live project (requires Blaze plan)
 firebase deploy --only functions --project treino-dev
 ```
 

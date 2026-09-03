@@ -36,7 +36,7 @@
  * AND already have a stamp are skipped. Re-runs write nothing new.
  *
  * Usage:
- *   # Production (needs scripts/sa-key.json, gitignored):
+ *   # Producción (necesita $TREINO_SA_KEY, fuera del repo — ver scripts/README.md):
  *   cd scripts && node backfill_racha_freshness.js           # writes
  *   cd scripts && node backfill_racha_freshness.js --dry-run # logs only
  *
@@ -46,27 +46,11 @@
 
 'use strict';
 
-const admin = require('firebase-admin');
+// Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla cerrado
+// con la migración; contra el emulador no pide nada. Ver scripts/lib/admin.js.
+const { inicializarAdmin } = require('./lib/admin');
 
-if (process.env.FIRESTORE_EMULATOR_HOST) {
-  // Admin SDK with emulator — no service account needed.
-  admin.initializeApp({ projectId: 'treino-dev' });
-} else {
-  let serviceAccount;
-  try {
-    serviceAccount = require('./sa-key.json');
-  } catch (err) {
-    if (err.code !== 'MODULE_NOT_FOUND') throw err;
-    console.error(
-      '\nERROR: scripts/sa-key.json not found — required to run against production.\n' +
-      'Download a service-account key from the Firebase console and save it as\n' +
-      'scripts/sa-key.json (gitignored), or target the local emulator instead:\n\n' +
-      '  FIRESTORE_EMULATOR_HOST=localhost:8080 node scripts/backfill_racha_freshness.js\n',
-    );
-    process.exit(1);
-  }
-  admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-}
+const { admin } = inicializarAdmin();
 const db = admin.firestore();
 
 const dryRun = process.argv.includes('--dry-run');

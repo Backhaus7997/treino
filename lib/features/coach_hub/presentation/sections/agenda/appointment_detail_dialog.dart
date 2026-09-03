@@ -514,7 +514,7 @@ class _AppointmentDetailDialogState
                   onPressed: _billing ? null : _confirmCobrar,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: palette.accent,
-                    foregroundColor: palette.bg,
+                    foregroundColor: TreinoButtonTokens.foreground(context),
                     minimumSize: const Size.fromHeight(44),
                     shape: const StadiumBorder(),
                     disabledBackgroundColor:
@@ -526,7 +526,7 @@ class _AppointmentDetailDialogState
                           height: 18,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: palette.bg,
+                            color: TreinoButtonTokens.foreground(context),
                           ),
                         )
                       : Text(
@@ -738,7 +738,7 @@ class _AppointmentDetailDialogState
                   onPressed: _saving ? null : _saveNotes,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: palette.accent,
-                    foregroundColor: palette.bg,
+                    foregroundColor: TreinoButtonTokens.foreground(context),
                     minimumSize: const Size.fromHeight(48),
                     shape: const StadiumBorder(),
                     disabledBackgroundColor:
@@ -750,7 +750,7 @@ class _AppointmentDetailDialogState
                           height: 18,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: palette.bg,
+                            color: TreinoButtonTokens.foreground(context),
                           ),
                         )
                       : Text(

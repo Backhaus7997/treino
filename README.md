@@ -4,6 +4,13 @@ App fitness multiplataforma (Flutter). Personal Trainers + comunidad + workout t
 
 > **Nuevo en el equipo?** Empezá por [CONTRIBUTING.md](./CONTRIBUTING.md) — guía de onboarding paso a paso.
 
+> [!WARNING]
+> **`treino-dev` es el proyecto de PRODUCCIÓN.** No hay un entorno de desarrollo
+> separado — el nombre dice "dev" por razones históricas (el project ID de Firebase
+> no se puede cambiar). Cualquier comando con `--project treino-dev` toca datos de
+> usuarios reales. Para desarrollo local usá el emulador (`./scripts/emulator.sh`).
+> Detalle en [AGENTS.md § Entornos](./AGENTS.md#-entornos--leer-antes-de-correr-cualquier-comando) y [#826](https://github.com/Backhaus7997/treino/issues/826).
+
 ## Documentación
 
 | Archivo | Para qué sirve |
@@ -11,7 +18,7 @@ App fitness multiplataforma (Flutter). Personal Trainers + comunidad + workout t
 | [AGENTS.md](./AGENTS.md) | **Constitución** del proyecto: índice + reglas críticas mínimas. Cargado automáticamente por Claude Code, Cursor, Codex, etc. |
 | [CONTRIBUTING.md](./CONTRIBUTING.md) | Onboarding técnico paso a paso para devs nuevos. |
 | [docs/](./docs/) | Documentación detallada por dominio: producto, design system, arquitectura, performance, workflow, roadmap. |
-| [.atl/skill-registry.md](./.atl/skill-registry.md) | Catálogo de las 24 skills de IA disponibles (11 Flutter + 13 SDD/ops). |
+| `.atl/skill-registry.md` | Catálogo de skills de IA. **Generado local**, no viene en el clone: `gentle-ai skill-registry refresh --force`. |
 
 ## Setup rápido
 
@@ -31,7 +38,7 @@ Si querés instalar manualmente, ver [CONTRIBUTING.md §2](./CONTRIBUTING.md#2-b
 - **go_router** para navegación (ShellRoute con 5 tabs)
 - **Phosphor Icons** + **Barlow / Barlow Condensed** (Google Fonts)
 - **freezed** + **json_serializable** para modelos
-- **Firebase** (Auth, Firestore, Storage, Functions, Messaging) — pendiente Fase 1
+- **Firebase** (Auth, Firestore, Storage, Functions, Messaging) — en producción desde Fase 1, proyecto `treino-dev` (ver aviso arriba)
 - **gentle-ai** (workflow SDD) + **engram** (memoria persistente) — para colaboración con agentes IA
 
 ## Estructura
@@ -81,7 +88,7 @@ dart format .          # formato consistente
 flutter test           # tests verdes (cuando haya tests)
 ```
 
-Detalles completos en [AGENTS.md](./AGENTS.md#calidad-gates-antes-de-cada-commit).
+Detalles completos en [AGENTS.md](./AGENTS.md#7-calidad-gates-antes-de-cada-commit).
 
 ## Workflow
 
@@ -94,7 +101,7 @@ Detalles completos en [AGENTS.md](./AGENTS.md#calidad-gates-antes-de-cada-commit
   ```
 - Cierre de fase: `git tag -a v0.X.0-fase<N>` (no rama).
 
-Detalles en [AGENTS.md → Branching](./AGENTS.md#branching) y [CONTRIBUTING.md → Workflow diario](./CONTRIBUTING.md#5-workflow-diario).
+Detalles en [AGENTS.md → Branching](./AGENTS.md#8-branching-y-prs) y [CONTRIBUTING.md → Workflow diario](./CONTRIBUTING.md#5-workflow-diario).
 
 ## Roadmap
 

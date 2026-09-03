@@ -95,15 +95,26 @@ final List<MuscleGroup> kCheckInPainAreas = List.unmodifiable(
 
 /// Registro subjetivo de UN día: cómo se sintió el usuario y si tuvo dolor.
 ///
-/// Vive en `users/{uid}/checkIns/{date}` — subcolección propia, NO campos
-/// colgados de `Session`. Colgarlo de la sesión arrastraría los `hasOnly` de
-/// `firestore.rules` (#635) y además dejaría sin registro los días que el
-/// usuario no entrena, que son la mayoría.
+/// Vive en `users/{uid}/wellbeingCheckIns/{checkInId}` — subcolección propia,
+/// NO campos colgados de `Session`. Colgarlo de la sesión arrastraría los
+/// `hasOnly` de `firestore.rules` (#635) y además dejaría sin registro los días
+/// que el usuario no entrena, que son la mayoría.
 ///
-/// **[date] es el id del documento**: la fecha LOCAL del usuario en formato
-/// `YYYY-MM-DD` (ver [checkInDateKey]). Eso da dedup natural — un doc por día
-/// por usuario — y es lo que ya documentan las reglas de Firestore. La
-/// contracara: dos check-ins el mismo día se pisan (last write wins).
+/// **Por qué NO cuelga de `users/{uid}/checkIns/{date}`**, que era el path de
+/// la slice 1: ese path estaba reservado para un check-in de PRESENCIA en el
+/// gym que nunca se implementó — quedan sus claves l10n huérfanas
+/// ("¿ESTÁS EN EL GYM HOY?", "SÍ, ENTRÉ") y sus tests de reglas, que siguen
+/// afirmando sobre un payload `{gymId, gymName, checkedInAt}`. Mismo uid y
+/// misma fecha daban el mismo documento: el día que esa feature aparezca, los
+/// dos registros colisionan en silencio. Dos conceptos distintos, dos
+/// subcolecciones distintas.
+///
+/// **[id] es el id del documento**, y NO es la fecha: es
+/// `{date}_{millisUTC}` (ver [checkInDocId]). La fecha como id daba dedup
+/// natural pero a costa de last-write-wins — un segundo entreno el mismo día
+/// pisaba el registro del primero, que es dato de salud perdido en silencio.
+/// El sufijo de milisegundos hace que dos registros del mismo día convivan, y
+/// el prefijo de fecha mantiene el id ordenable cronológicamente.
 ///
 /// ⚠️ La app REGISTRA lo que el usuario reporta; no interpreta, no
 /// diagnostica y no recomienda. Ningún consumidor de este modelo puede
@@ -111,7 +122,9 @@ final List<MuscleGroup> kCheckInPainAreas = List.unmodifiable(
 @freezed
 class CheckIn with _$CheckIn {
   const factory CheckIn({
-    /// Fecha local `YYYY-MM-DD`. Es también el id del documento.
+    /// Fecha local `YYYY-MM-DD` a la que pertenece el registro. Campo real del
+    /// documento (ya no se deriva del id) — es sobre él que consulta el rango
+    /// de la curva de tendencia, sin índice compuesto.
     required String date,
 
     /// Cómo se sintió. Único campo obligatorio del registro.
@@ -139,15 +152,24 @@ class CheckIn with _$CheckIn {
     @TimestampConverter() required DateTime recordedAt,
 
     /// Sesión que originó el registro, cuando se capturó al terminar de
-    /// entrenar. `null` para un check-in que no salió de una sesión.
+    /// entrenar. `null` para el check-in diario, que no sale de una sesión.
+    ///
+    /// Es también lo que distingue "otro entreno del mismo día" de "el mismo
+    /// registro editado": el resumen post-sesión sólo reconoce como propio el
+    /// check-in cuyo `sessionId` coincide con el suyo.
     String? sessionId,
+
+    /// Id del documento. Ausente hasta que el repositorio lo persiste; lo
+    /// inyecta la lectura. NO viaja en el body — el id ya lo lleva el doc.
+    // ignore: invalid_annotation_target
+    @JsonKey(includeToJson: false, includeFromJson: false) String? id,
   }) = _CheckIn;
 
   factory CheckIn.fromJson(Map<String, Object?> json) =>
       _$CheckInFromJson(json);
 }
 
-/// Clave de fecha LOCAL `YYYY-MM-DD` usada como id del documento.
+/// Clave de fecha LOCAL `YYYY-MM-DD` a la que se imputa el registro.
 ///
 /// Deliberadamente local y no UTC: el usuario que entrena a las 22:00 en
 /// Córdoba (UTC-3) espera que su registro cuente para HOY, no para mañana.
@@ -157,3 +179,20 @@ String checkInDateKey(DateTime local) {
   final d = local.day.toString().padLeft(2, '0');
   return '$y-$m-$d';
 }
+
+/// Id del documento: `{date}_{millisegundos UTC de recordedAt}`.
+///
+/// Dos propiedades, las dos deliberadas:
+///
+///  * **No colisiona.** Un segundo entreno el mismo día genera OTRO documento
+///    en vez de pisar el primero. Con la fecha sola como id, el registro de la
+///    mañana desaparecía sin aviso al registrar el de la tarde.
+///  * **Ordena.** El prefijo `YYYY-MM-DD` y el sufijo de milisegundos son de
+///    ancho fijo, así que el orden lexicográfico de los ids es el orden
+///    cronológico de los registros — útil para inspeccionar la colección a
+///    mano en la consola de Firebase.
+///
+/// [recordedAt] se normaliza a UTC: la misma marca de tiempo tiene que dar el
+/// mismo id se la pase quien se la pase.
+String checkInDocId(String date, DateTime recordedAt) =>
+    '${date}_${recordedAt.toUtc().millisecondsSinceEpoch}';

@@ -5,6 +5,28 @@
 **Engram key**: `sdd/gyms-foundation/proposal`
 **Depends on exploration**: engram `sdd/gyms-foundation/explore` (id 335)
 
+> ## 🚨 `treino-dev` es PRODUCCIÓN — el "dev-first" de este change apuntaba a un proyecto que no existe
+>
+> `treino-dev` es el **único** proyecto Firebase de TREINO. **`treino-prod` no
+> existe** y nunca existió. Las versiones anteriores de este change decían
+> *"correr contra `treino-dev`, verificar el conteo, después contra
+> `treino-prod`"*: el paso 1 de ese ensayo **ya era la escritura a producción**,
+> y el paso 2 apuntaba a la nada. Quien lo siguiera creía estar ensayando
+> mientras remapeaba el `gymId` de usuarios reales.
+>
+> El ensayo real es el **emulador**, que es el único entorno descartable
+> (`./scripts/emulator.sh`; ambos backfills ya lo soportan con
+> `FIRESTORE_EMULATOR_HOST=localhost:8080`, sin service-account key). Contra
+> `treino-dev` se corre **después**, con OK explícito de un humano, sabiendo que
+> es producción.
+>
+> Ojo con el guard de los scripts: refuerza `/dev/i.test(projectId)`, y contra
+> `treino-dev` ese test **pasa** — no hay refusal, no hay `--allow-prod`. La
+> única protección visible es el banner de `scripts/lib/firebase_projects.js`.
+> Ver [AGENTS.md § Entornos](../../../AGENTS.md#-entornos--leer-antes-de-correr-cualquier-comando),
+> [openspec/AGENTS.md](../../AGENTS.md), [#826](https://github.com/Backhaus7997/treino/issues/826)
+> y [#845](https://github.com/Backhaus7997/treino/issues/845).
+
 ## Why
 
 Hoy conviven DOS sistemas de gimnasios en paralelo y desincronizados:
@@ -48,7 +70,7 @@ Esta fragmentación causa: nombres inconsistentes (el atleta ve `SMART-FIT-PALER
 ### 4. Backfill de gymIds legacy
 - Los docs de usuario existentes guardan ids legacy: `smart-fit-palermo`, `sportclub-belgrano`, `megatlon-recoleta`.
 - Nota confirmada leyendo el seed: **`megatlon-recoleta` YA existe** en `gyms/` con ese mismo id exacto (sección CABA) → mapea 1:1 sin crear doc. Los otros dos (`smart-fit-palermo`, `sportclub-belgrano`) NO existen en el catálogo curado y requieren mapeo a un doc real de `gyms/`.
-- Script `scripts/migrate_legacy_gym_ids.js` dev-first que mapea los ids legacy → docs reales de `gyms/`, **espejando la disciplina de `scripts/migrate_trainer_locations.js`**: idempotente (skip si ya migrado), dual-write coherente (`users` + `userPublicProfiles`, igual que el repo en runtime), conteo verificado en consola, `treino-dev` antes que `treino-prod`, verificar el conteo de atletas prod con ids legacy antes de correrlo en prod.
+- Script `scripts/migrate_legacy_gym_ids.js` emulator-first que mapea los ids legacy → docs reales de `gyms/`, **espejando la disciplina de `scripts/migrate_trainer_locations.js`**: idempotente (skip si ya migrado), dual-write coherente (`users` + `userPublicProfiles`, igual que el repo en runtime), conteo verificado en consola, **emulador antes que `treino-dev`** (que es producción y es el único proyecto que hay), verificar el conteo de atletas con ids legacy en el emulador antes de escribir sobre usuarios reales.
 
 ### 5. Catálogo de Córdoba
 - Reescribir/expandir `scripts/seed_gyms.js`: el seed actual es **7/20 Córdoba** (13 son CABA/GBA). Curar los gimnasios principales de Córdoba Capital (los 7 actuales + más), manteniendo `source: 'seed'`.
@@ -76,7 +98,7 @@ Esta fragmentación causa: nombres inconsistentes (el atleta ve `SMART-FIT-PALER
 
 ### Migración de datos
 - **Sin migración de schema en `gyms/`**: los docs seed ya tienen coords; geo sigue requerido.
-- **Backfill 1 (gymIds legacy)**: `smart-fit-palermo` y `sportclub-belgrano` → doc real de `gyms/`; `megatlon-recoleta` mapea 1:1 (ya existe). Dev-first, conteo verificado.
+- **Backfill 1 (gymIds legacy)**: `smart-fit-palermo` y `sportclub-belgrano` → doc real de `gyms/`; `megatlon-recoleta` mapea 1:1 (ya existe). Emulator-first, conteo verificado.
 - **Backfill 2 (`gymName` denormalizado)**: rellenar `UserPublicProfile.gymName` para docs existentes, resolviendo el nombre desde `gyms/` por el `gymId` (ya backfilleado) del usuario. Orden: backfill de ids ANTES que backfill de nombres.
 
 ### Riesgos
@@ -86,7 +108,7 @@ Esta fragmentación causa: nombres inconsistentes (el atleta ve `SMART-FIT-PALER
 | Consistencia dual-write de `gymName` (perfil actualiza gym pero `gymName` queda stale) | Media | Dual-write atómico en el mismo write path; `gymByIdProvider` como fuente de verdad en detalle |
 | N+1 al resolver nombres en listas | Media | Denormalización `gymName` en listas elimina el N+1 (mismo patrón que `CheckIn.gymName`) |
 | `megatlon-recoleta` colisión/ambigüedad de id | Baja | Confirmado: mismo id exacto en seed → mapeo 1:1, no crea doc nuevo |
-| Backfill prod remapea gym del atleta silenciosamente | Baja-Media | Dev-first, conteo verificado, idempotente; escalar a prod solo tras validar conteo (open question) |
+| El backfill remapea el gym del atleta silenciosamente en producción | Baja-Media | Ensayo en emulador, conteo verificado, idempotente, `--dry-run`; correr contra `treino-dev` (producción) solo tras validar el conteo, con OK explícito de un humano (open question) |
 | Regen freezed / call-site breaks al retirar modelo legacy | Baja | Sin cambio de schema en el modelo rico; solo borrado + reruteo de call sites; `flutter analyze` como gate |
 | PR size > 400 LOC (cambio multi-pieza) | Media | Fundación multi-PR: dividir en slices (modelo+picker / name-resolution+backfill / catálogo). `sdd-tasks` define el corte. |
 

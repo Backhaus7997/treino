@@ -93,7 +93,7 @@ class _BlockOverrideFormDialogState
           onPressed: _saving ? null : () => _save(context),
           style: ElevatedButton.styleFrom(
             backgroundColor: palette.accent,
-            foregroundColor: palette.bg,
+            foregroundColor: TreinoButtonTokens.foreground(context),
           ),
           child: Text(
             'CONFIRMAR', // i18n
@@ -278,7 +278,7 @@ class _ExtraOverrideFormDialogState
           onPressed: _saving ? null : () => _save(context),
           style: ElevatedButton.styleFrom(
             backgroundColor: palette.accent,
-            foregroundColor: palette.bg,
+            foregroundColor: TreinoButtonTokens.foreground(context),
           ),
           child: Text(
             'CONFIRMAR', // i18n

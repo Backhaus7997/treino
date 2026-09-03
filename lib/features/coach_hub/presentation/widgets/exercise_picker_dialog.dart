@@ -349,7 +349,7 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
                             ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: palette.accent,
-                      foregroundColor: palette.bg,
+                      foregroundColor: TreinoButtonTokens.foreground(context),
                       disabledBackgroundColor: palette.accent.withValues(
                         alpha: 0.3,
                       ),

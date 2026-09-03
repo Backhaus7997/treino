@@ -33,6 +33,10 @@ import 'package:treino/features/workout/presentation/routine_editor_screen.dart'
 
 import '../../../helpers/fake_analytics_service.dart';
 import '../../../fixtures/exercises.dart';
+import 'package:treino/features/workout/presentation/widgets/day_tab_bar.dart';
+import 'package:treino/features/workout/presentation/widgets/routine_action_buttons.dart';
+import 'package:treino/features/workout/presentation/widgets/superset_block.dart';
+import '../../../fixtures/routine_editor_ui.dart';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -148,7 +152,8 @@ void main() {
     expect(find.text('NIVEL'), findsNothing);
 
     // Days-of-plan section visible
-    expect(find.text('DÍAS DEL PLAN'), findsOneWidget);
+    expect(find.byType(DayTabBar), findsOneWidget,
+        reason: 'la barra de pestañas reemplazó al label DÍAS DEL PLAN');
   });
 
   // ── SCENARIO-RER-021: SelfCreating shows name + days-of-plan ─────────────────
@@ -162,7 +167,8 @@ void main() {
     );
 
     expect(find.byKey(const Key('editor_name_field')), findsOneWidget);
-    expect(find.text('DÍAS DEL PLAN'), findsOneWidget);
+    expect(find.byType(DayTabBar), findsOneWidget,
+        reason: 'la barra de pestañas reemplazó al label DÍAS DEL PLAN');
     // Starts with 1 day
     expect(find.text('Día 1'), findsWidgets);
   });
@@ -199,8 +205,10 @@ void main() {
     // DÍAS/SEM selector removed — it was a dead control (never persisted,
     // never created days). Day count is driven only by "DÍAS DEL PLAN".
     expect(find.text('DÍAS/SEM'), findsNothing);
+    await abrirDatosDelPlan(tester);
     expect(find.text('NIVEL'), findsOneWidget);
-    expect(find.text('DÍAS DEL PLAN'), findsOneWidget);
+    expect(find.byType(DayTabBar), findsOneWidget,
+        reason: 'la barra de pestañas reemplazó al label DÍAS DEL PLAN');
   });
 
   // ── SCENARIO-RER-023: TrainerTemplating shows all fields ──────────────────────
@@ -219,8 +227,23 @@ void main() {
     // DÍAS/SEM selector removed — it was a dead control (never persisted,
     // never created days). Day count is driven only by "DÍAS DEL PLAN".
     expect(find.text('DÍAS/SEM'), findsNothing);
+    await abrirDatosDelPlan(tester);
     expect(find.text('NIVEL'), findsOneWidget);
-    expect(find.text('DÍAS DEL PLAN'), findsOneWidget);
+
+    // El editor es un ListView: lo que queda bajo el fold no está
+    // construido. Desde que el modo PLANTILLA suma el selector PARA QUÉ
+    // SIRVE (#635 PR#1b), DÍAS DEL PLAN cae fuera del área inicial y hay
+    // que traerlo — igual que haría el PF con el dedo. El test de
+    // TrainerAssigning de arriba no lo necesita: ahí el selector no se
+    // muestra, justamente porque un plan asignado no entra al catálogo.
+    await tester.scrollUntilVisible(
+      find.byType(DayTabBar),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.byType(DayTabBar), findsOneWidget,
+        reason: 'la barra de pestañas reemplazó al label DÍAS DEL PLAN');
+    expect(find.byKey(const Key('editor_goals_picker')), findsOneWidget);
   });
 
   // ── Validation: athlete mode passes without split ─────────────────────────────
@@ -298,6 +321,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Add exercises via the add-slot button in Day 1
+    await desplazarHastaAgregarEjercicio(tester);
     await tester.tap(find.text('Agregar ejercicio'));
     await tester.pumpAndSettle();
 
@@ -313,6 +337,9 @@ void main() {
     );
     await tester.tap(find.text('Agregar 1 ejercicio'));
     await tester.pumpAndSettle();
+    // Desde este cambio el ejercicio agregado nace PLEGADO: quien avisa
+    // que le falta completar sets es el borde rojo, no la card abierta.
+    await expandirEjercicios(tester);
 
     // New per-set table validation: reps must be > 0.
     // The REPS column field has hint text 'reps' and starts empty.
@@ -404,7 +431,9 @@ void main() {
       overrides: _overrides(repo: repo),
     );
 
-    expect(find.text('Editar rutina'), findsOneWidget);
+    // El app bar muestra el NOMBRE de la rutina desde #866; el modo lo dice
+    // el subtítulo. "Editar rutina" ya no aparece en ningún lado.
+    expect(find.textContaining('Tu rutina · solo la ves vos'), findsOneWidget);
     expect(find.text('Nueva rutina'), findsNothing);
   });
 
@@ -430,12 +459,16 @@ void main() {
 
     // Name field is hydrated — still need to add a slot for valid form.
     // Tap + Agregar ejercicio to add a slot.
+    await desplazarHastaAgregarEjercicio(tester);
     await tester.tap(find.text('Agregar ejercicio'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Press de Banca').first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Agregar 1 ejercicio'));
     await tester.pumpAndSettle();
+    // Desde este cambio el ejercicio agregado nace PLEGADO: quien avisa
+    // que le falta completar sets es el borde rojo, no la card abierta.
+    await expandirEjercicios(tester);
 
     // Fill reps.
     final emptyFields = find.byType(TextField).evaluate().where((e) {
@@ -697,5 +730,242 @@ void main() {
         reason: 'drop set type must survive round-trip');
     expect(capC.sets[1].repsMin, equals(6));
     expect(capC.sets[1].repsMax, equals(10));
+  });
+
+  // ── SelfCustomizing — "usar como base" (#647) ────────────────────────────
+  //
+  // El cuarto modo: el editor abre CARGADO con una rutina existente y guarda
+  // una rutina NUEVA del atleta. Es el punto medio entre usar la plantilla tal
+  // cual y arrancar de una pantalla en blanco.
+  //
+  // La línea que estos tests cuidan es qué viaja y qué no. Viaja el CONTENIDO
+  // (días, slots, sets por semana, superserie, notas, máscara de presencia,
+  // numWeeks). No viaja nada que haga que la plantilla sea del PF o del
+  // sistema: assignedBy/assignedTo, summary, imageUrl, estimatedMinutesPerDay,
+  // split, ni los agregados de reputación.
+  //
+  // El caso con nombre propio es `visibility`: TODA plantilla copiable es
+  // `public` —es lo que la vuelve legible—, así que heredar el toggle de
+  // "compartir en mi perfil" publicaría una copia del catálogo en el perfil
+  // del atleta sin que la haya pedido.
+
+  const sourceId = 'ppl-principiante';
+  const sourceTemplate = Routine(
+    id: sourceId,
+    name: 'Push Pull Legs — Principiante',
+    split: 'PPL',
+    level: ExperienceLevel.intermediate,
+    days: [
+      RoutineDay(
+        dayNumber: 1,
+        name: 'Empuje',
+        slots: [
+          RoutineSlot(
+            exerciseId: 'bench-press',
+            exerciseName: 'Press de Banca',
+            muscleGroup: 'chest',
+            targetSets: 3,
+            targetRepsMin: 8,
+            targetRepsMax: 8,
+            restSeconds: 90,
+            supersetGroup: 1,
+            notes: 'RIR 2 · pausa abajo',
+            activeWeeks: [0, 1],
+            weeklySets: [
+              [SetSpec(reps: 8), SetSpec(reps: 8), SetSpec(reps: 8)],
+              [SetSpec(reps: 10), SetSpec(reps: 10), SetSpec(reps: 10)],
+            ],
+          ),
+          RoutineSlot(
+            exerciseId: 'overhead-press',
+            exerciseName: 'Press Militar',
+            muscleGroup: 'shoulders',
+            targetSets: 2,
+            targetRepsMin: 12,
+            targetRepsMax: 12,
+            restSeconds: 60,
+            supersetGroup: 1,
+            weeklySets: [
+              [SetSpec(reps: 12), SetSpec(reps: 12)],
+              [SetSpec(reps: 12), SetSpec(reps: 12)],
+            ],
+          ),
+        ],
+      ),
+    ],
+    estimatedMinutesPerDay: 55,
+    imageUrl: 'assets/routines/ppl-principiante.png',
+    source: RoutineSource.system,
+    visibility: RoutineVisibility.public,
+    numWeeks: 2,
+    ratingAvg: 4.7,
+    ratingsCount: 42,
+    summary: 'Empujar, tirar y piernas: un tipo de movimiento por día.',
+  );
+
+  _MockRoutineRepository repoWithTemplate() {
+    final repo = _MockRoutineRepository();
+    when(() => repo.getById(sourceId)).thenAnswer((_) async => sourceTemplate);
+    return repo;
+  }
+
+  testWidgets(
+      'SelfCustomizing abre cargado, con nombre distinguible y CTA propio',
+      (tester) async {
+    final repo = repoWithTemplate();
+    await _pumpEditor(
+      tester,
+      mode: const SelfCustomizing(sourceRoutineId: sourceId),
+      overrides: _overrides(repo: repo),
+    );
+
+    verify(() => repo.getById(sourceId)).called(1);
+
+    // El sufijo evita cinco "Push Pull Legs — Principiante" indistinguibles en
+    // MIS RUTINAS. Es un punto de partida: el campo es editable antes de
+    // guardar.
+    final nameField = tester.widget<TextField>(
+      find.byKey(const Key('editor_name_field')),
+    );
+    expect(nameField.controller?.text,
+        equals('Push Pull Legs — Principiante (mi versión)'));
+
+    // Título y CTA propios: el atleta tiene que entender que sale con una
+    // rutina SUYA, no que está editando la plantilla.
+    // Ídem: el modo SelfCustomizing se anuncia en el subtítulo.
+    expect(find.textContaining('Copia tuya'), findsOneWidget);
+    expect(find.text('GUARDAR COMO MÍA'), findsOneWidget);
+    // Abre CARGADO — el punto entero del issue es que no sea una pantalla en
+    // blanco.
+    expect(
+      tester.widget<DayTabBar>(find.byType(DayTabBar)).labels.first,
+      'Empuje',
+      reason: 'la cabecera del día se fue en la revisión del 31/08: el nombre vive sólo en la pestaña',
+    );
+    // Y sigue siendo un modo de atleta: la plantilla trae split 'PPL', pero el
+    // campo es trainer-only (ADR-RER-04).
+    expect(find.byKey(const Key('editor_split_field')), findsNothing);
+  });
+
+  testWidgets(
+      'la superserie de la plantilla se ve como un bloque, con A1 y A2',
+      (tester) async {
+    // #869: el bloque se pintaba con `highlight` al 4,7% y el usuario no veía
+    // que dos ejercicios estaban agrupados. Acá se afirma lo que se ve, no el
+    // color: que existe el contenedor, que dice cuántos ejercicios agrupa, y
+    // que cada miembro trae su orden.
+    usarViewportAlto(tester);
+    final repo = repoWithTemplate();
+    await _pumpEditor(
+      tester,
+      mode: const SelfCustomizing(sourceRoutineId: sourceId),
+      overrides: _overrides(repo: repo),
+    );
+
+    expect(find.byType(SupersetBlock), findsOneWidget);
+    expect(find.text('SUPERSERIE · 2 EJERCICIOS'), findsOneWidget,
+        reason: 'la plantilla trae Press de Banca y Press Militar en el grupo 1');
+
+    // El orden de ejecución es la información que el bloque agrega: sin los
+    // badges, dos cards apiladas no dicen cuál va primero.
+    expect(find.text('A1'), findsOneWidget);
+    expect(find.text('A2'), findsOneWidget);
+  });
+
+  testWidgets('las acciones del día comparten fila y alto', (tester) async {
+    // El hallazgo de la revisión en device del 28/08: eran links desparejos.
+    usarViewportAlto(tester);
+    final repo = repoWithTemplate();
+    await _pumpEditor(
+      tester,
+      mode: const SelfCustomizing(sourceRoutineId: sourceId),
+      overrides: _overrides(repo: repo),
+    );
+
+    await desplazarHasta(tester, find.byType(DayActionButtons));
+    expect(find.byType(DayActionButtons), findsOneWidget);
+
+    final ejercicio =
+        find.byKey(const Key('day_add_exercise_button'));
+    final superserie = find.byKey(const Key('add_superset_button'));
+    expect(tester.getSize(ejercicio).height, 48);
+    expect(tester.getSize(superserie).height, 48);
+    expect(tester.getTopLeft(ejercicio).dy, tester.getTopLeft(superserie).dy,
+        reason: 'antes estaban apilados en dos filas a ancho completo');
+  });
+
+  testWidgets(
+      'SelfCustomizing guarda una rutina DEL ATLETA: copia el contenido, '
+      'no la identidad de la plantilla', (tester) async {
+    final repo = repoWithTemplate();
+    Routine? draft;
+    when(() => repo.createUserOwned(
+          uid: any(named: 'uid'),
+          draft: any(named: 'draft'),
+        )).thenAnswer((inv) async {
+      draft = inv.namedArguments[const Symbol('draft')] as Routine;
+      return draft!.copyWith(id: 'copia-1');
+    });
+
+    await _pumpEditor(
+      tester,
+      mode: const SelfCustomizing(sourceRoutineId: sourceId),
+      overrides: _overrides(repo: repo),
+    );
+    await tester.tap(find.text('GUARDAR COMO MÍA'));
+    await tester.pumpAndSettle();
+
+    verify(() => repo.createUserOwned(
+          uid: 'athlete-1',
+          draft: any(named: 'draft'),
+        )).called(1);
+    final copy = draft!;
+
+    // ── Identidad: la copia es del atleta, no del PF ni del sistema ────────
+    expect(copy.source, equals(RoutineSource.userCreated));
+    expect(copy.assignedBy, isNull,
+        reason: 'un campo de assignment del PF no puede viajar a la copia');
+    expect(copy.assignedTo, isNull);
+    expect(copy.visibility, equals(RoutineVisibility.private),
+        reason: 'la plantilla es public; heredarlo publicaría la copia en el '
+            'perfil del atleta sin que la haya pedido');
+    expect(copy.summary, isNull,
+        reason: 'prosa del PF que el atleta no puede editar después');
+    expect(copy.imageUrl, isNull, reason: 'portada del catálogo');
+    expect(copy.estimatedMinutesPerDay, isNull);
+    expect(copy.split, isNull, reason: 'ADR-RER-04');
+    expect(copy.level, equals(ExperienceLevel.beginner), reason: 'ADR-RER-04');
+    expect(copy.ratingAvg, isNull,
+        reason: 'la copia no hereda la reputación del original');
+    expect(copy.ratingsCount, isNull);
+
+    // ── Contenido: fiel, semana por semana ────────────────────────────────
+    expect(copy.numWeeks, equals(2),
+        reason: 'copiar mal la periodización corrompe el plan en silencio');
+    expect(copy.days, hasLength(1));
+    expect(copy.days.single.name, equals('Empuje'));
+    final press = copy.days.single.slots[0];
+    expect(press.exerciseId, equals('bench-press'));
+    expect(press.exerciseName, equals('Press de Banca'));
+    expect(press.muscleGroup, equals('chest'));
+    expect(press.restSeconds, equals(90));
+    expect(press.notes, equals('RIR 2 · pausa abajo'));
+    expect(press.supersetGroup, equals(1),
+        reason: 'la superserie tiene que sobrevivir a la copia');
+    expect(copy.days.single.slots[1].supersetGroup, equals(1));
+    expect(press.activeWeeks, equals([0, 1]),
+        reason: 'la presencia por semana viaja igual que la prescripción');
+    expect(press.weeklySets, hasLength(2));
+    expect(press.weeklySets[0].map((s) => s.reps).toList(), equals([8, 8, 8]));
+    expect(
+        press.weeklySets[1].map((s) => s.reps).toList(), equals([10, 10, 10]));
+
+    // ── Y la plantilla original queda intacta ─────────────────────────────
+    verifyNever(() => repo.updateUserOwned(
+        uid: any(named: 'uid'), draft: any(named: 'draft')));
+    verifyNever(() => repo.updateTemplate(
+        uid: any(named: 'uid'), draft: any(named: 'draft')));
+    verifyNever(() => repo.updateAssigned(
+        uid: any(named: 'uid'), draft: any(named: 'draft')));
   });
 }

@@ -49,10 +49,12 @@ import 'package:treino/features/profile/application/user_public_profile_provider
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
+import 'package:treino/features/workout/application/exercise_feedback_providers.dart';
 import 'package:treino/features/workout/application/exercise_progression_providers.dart';
 import 'package:treino/features/workout/application/exercise_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/data/session_repository.dart';
+import 'package:treino/features/workout/domain/exercise_feedback.dart';
 import 'package:treino/features/workout/domain/exercise_progression.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_day.dart';
@@ -233,6 +235,25 @@ SetLog _setLog({
       reps: reps,
       weightKg: weightKg,
       completedAt: DateTime.utc(2026, 1, 1),
+    );
+
+/// Un reporte del alumno (#628). El `exerciseId` por defecto NO es el de
+/// [_setLog]: el caso que importa es el ejercicio con CERO series.
+ExerciseFeedback _feedback({
+  String id = 'fb1',
+  String exerciseId = 'ex9',
+  String exerciseName = 'Remo en polea',
+  int? setNumber,
+  String text = 'Me tira el hombro',
+}) =>
+    ExerciseFeedback(
+      id: id,
+      exerciseId: exerciseId,
+      exerciseName: exerciseName,
+      setNumber: setNumber,
+      kind: ExerciseFeedbackKind.discomfort,
+      text: text,
+      createdAt: DateTime.utc(2026, 1, 1, 10),
     );
 
 AthleteNote _note({String note = 'Buena progresión', DateTime? updatedAt}) =>
@@ -596,6 +617,117 @@ void main() {
 
       expect(find.text('El alumno no compartió su historial.'), findsOneWidget);
       expect(find.text('No se pudo cargar el historial.'), findsNothing);
+    });
+
+    testWidgets(
+        'Entrenamientos: #628 un reporte sobre un ejercicio SIN series se ve',
+        (tester) async {
+      // Mismo agujero que en el athlete-detail mobile: los bloques salían
+      // EXCLUSIVAMENTE de los SetLog, así que un exerciseId con cero logs no
+      // tenía grupo y su reporte no se renderizaba en ninguna parte.
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        sessions: [_session(id: 's1', routineName: 'Hipertrofia 4 días')],
+        setLogs: [_setLog(exerciseName: 'Sentadilla')],
+        extraOverrides: [
+          coachSessionExerciseFeedbackProvider
+              .overrideWith((ref, key) async => [_feedback()]),
+        ],
+      );
+
+      await tester.tap(find.descendant(
+          of: find.byType(TabBar), matching: find.text('Entrenamientos')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Hipertrofia 4 días'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sentadilla'), findsOneWidget);
+      expect(find.text('Remo en polea'), findsOneWidget);
+      expect(find.text('Me tira el hombro'), findsOneWidget);
+    });
+
+    testWidgets(
+        'Entrenamientos: #628 sesión con reportes y CERO series no muestra '
+        'sólo "sin series"', (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        sessions: [_session(id: 's1', routineName: 'Hipertrofia 4 días')],
+        setLogs: const [],
+        extraOverrides: [
+          coachSessionExerciseFeedbackProvider
+              .overrideWith((ref, key) async => [_feedback(setNumber: 2)]),
+        ],
+      );
+
+      await tester.tap(find.descendant(
+          of: find.byType(TabBar), matching: find.text('Entrenamientos')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Hipertrofia 4 días'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sin series registradas en esta sesión.'), findsNothing);
+      expect(find.text('Remo en polea'), findsOneWidget);
+      expect(find.text('Me tira el hombro'), findsOneWidget);
+    });
+
+    testWidgets(
+        'Entrenamientos: #628 si FALLA la lectura de reportes se avisa Y las '
+        'series siguen', (tester) async {
+      // Idéntico al mobile: degradar a lista vacía sin avisar le muestra al PF
+      // un historial normal y lo deja concluir que no hubo molestias.
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        sessions: [_session(id: 's1', routineName: 'Hipertrofia 4 días')],
+        setLogs: [_setLog(exerciseName: 'Sentadilla')],
+        extraOverrides: [
+          coachSessionExerciseFeedbackProvider
+              .overrideWith((ref, key) async => throw Exception('boom')),
+        ],
+      );
+
+      await tester.tap(find.descendant(
+          of: find.byType(TabBar), matching: find.text('Entrenamientos')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Hipertrofia 4 días'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No pudimos cargar los reportes del alumno.'),
+          findsOneWidget);
+      expect(find.text('Sentadilla'), findsOneWidget);
+      expect(find.text('Sin series registradas en esta sesión.'), findsNothing);
+    });
+
+    testWidgets(
+        'Entrenamientos: #628 el aviso convive con el placeholder de sesión '
+        'vacía', (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        sessions: [_session(id: 's1', routineName: 'Hipertrofia 4 días')],
+        setLogs: const [],
+        extraOverrides: [
+          coachSessionExerciseFeedbackProvider
+              .overrideWith((ref, key) async => throw Exception('boom')),
+        ],
+      );
+
+      await tester.tap(find.descendant(
+          of: find.byType(TabBar), matching: find.text('Entrenamientos')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Hipertrofia 4 días'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No pudimos cargar los reportes del alumno.'),
+          findsOneWidget);
+      expect(
+          find.text('Sin series registradas en esta sesión.'), findsOneWidget);
     });
 
     testWidgets('Progreso muestra antropometría', (tester) async {

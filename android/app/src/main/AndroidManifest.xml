@@ -26,6 +26,30 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!--
+              App Links: los CTA de los mails transaccionales abren la app.
+
+              `pathPrefix` acota a /abrir y NO es opcional: sin el, CUALQUIER
+              link a app.gettreino.com abriria la app, y ese host es el Coach
+              Hub web, que tiene que seguir abriendo en el navegador.
+
+              `autoVerify` hace que Android busque
+              https://app.gettreino.com/.well-known/assetlinks.json al
+              instalar. Si la huella de ahi no coincide con la que firmo el
+              APK, la verificacion falla EN SILENCIO: no hay excepcion, no hay
+              log, y el link abre el navegador igual que antes. La huella tiene
+              que ser la de Play App Signing, no la de la upload key.
+              `scripts/test/deep_links.test.js` cubre lo que se puede cubrir
+              desde el repo.
+            -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https"
+                      android:host="app.gettreino.com"
+                      android:pathPrefix="/abrir"/>
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
@@ -49,5 +73,20 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!-- App companion NUEVA de Wear OS. Va acá y no en el plugin porque el
+             manifest de watch_connectivity 0.2.8 declara sólo dos de los TRES
+             paquetes que su propio `isPaired` consulta: le falta justo éste.
+
+             En Android 11+ `getInstalledApplications` filtra por visibilidad de
+             paquetes, así que en un teléfono que sólo tenga la app nueva el
+             chequeo da FALSE con el reloj perfectamente emparejado. El síntoma
+             es el peor posible: `deliverCredential` corta en `noWatchPaired`, no
+             se mintea nada, y no hay ni un error — la muñeca queda esperando una
+             credencial que nunca se pidió.
+
+             Los otros dos (com.google.android.wearable.app y
+             com.samsung.android.app.watchmanager) ya los declara el plugin y el
+             merge de manifests los suma; no hace falta repetirlos. -->
+        <package android:name="com.google.android.apps.wear.companion" />
     </queries>
 </manifest>

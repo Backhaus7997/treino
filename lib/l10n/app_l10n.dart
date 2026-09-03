@@ -122,10 +122,10 @@ abstract class AppL10n {
   /// **'Arrancá tu entrenamiento'**
   String get homeAthleteFirstRunTitle;
 
-  /// Home first-run empty-state body offering both the create-routine and find-trainer paths (finding 6).
+  /// Home first-run empty-state body naming the three onboarding paths: create a routine, explore ready-made plans, find a trainer (#636). Order must match the CTA order in _AthleteFirstRunCard.
   ///
   /// In es_AR, this message translates to:
-  /// **'Creá tu primera rutina o buscá un entrenador para empezar.'**
+  /// **'Creá tu propia rutina, explorá planes ya armados o buscá un entrenador que te guíe.'**
   String get homeAthleteFirstRunBody;
 
   /// Home first-run primary CTA to create a routine (finding 6).
@@ -133,6 +133,12 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'CREAR RUTINA'**
   String get homeAthleteFirstRunCreateCta;
+
+  /// Home first-run secondary CTA to the EXPLORAR page of the Entrenar tab, where ready-made plans live (#636). Wording tracks the tab label (workoutTabExplore), NOT the legacy 'plantillas' deep-link value.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Explorar planes'**
+  String get homeAthleteFirstRunExplorePlansCta;
 
   /// Home first-run secondary CTA to browse trainers (finding 6).
   ///
@@ -458,11 +464,35 @@ abstract class AppL10n {
   /// **'Si tu email está registrado, te enviamos un link para resetear la contraseña.'**
   String get authForgotSuccess;
 
-  /// No description provided for @authForgotBackToLogin.
+  /// Forgot-password success state: link back to the login screen.
   ///
   /// In es_AR, this message translates to:
   /// **'Volver al login'**
   String get authForgotBackToLogin;
+
+  /// Forgot-password success state: sets the expectation that the mail may be delayed or filtered, before offering the resend action (ux-audit-2026-06-16, MEDIUM · states).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿No te llegó? Puede tardar un minuto. Revisá también la carpeta de spam.'**
+  String get authForgotSpamHint;
+
+  /// Forgot-password success state: resend the reset link. Enabled once the cooldown elapses.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Reenviar el link'**
+  String get authForgotResendCta;
+
+  /// Forgot-password success state: cooldown label shown while the resend action is still disabled.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Podés reenviar en {seconds}s'**
+  String authForgotResendIn(int seconds);
+
+  /// Forgot-password success state: return to the form to correct a mistyped address. Needed because the anti-enumeration success copy hides a typo (ux-audit-2026-06-16).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Usar otra dirección'**
+  String get authForgotEditEmail;
 
   /// No description provided for @authTrainerInquiryDialogTitle.
   ///
@@ -649,6 +679,24 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'PEDIR VÍNCULO'**
   String get coachCtaLabel;
+
+  /// CTA primario del perfil público del PF (#637): abre un chat de pre-consulta SIN vínculo formal. Pasa a ser el camino visible y liviano; PEDIR VÍNCULO queda como el compromiso explícito que viene después.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CONSULTAR'**
+  String get coachInquiryCtaLabel;
+
+  /// Línea de ayuda debajo del par de CTAs. Existe porque el atleta necesita entender por qué hay dos botones: varios entrevistados querían consultar antes de decidir, y hoy el único camino compromete. También explica el botón deshabilitado cuando ya tiene un PF.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Preguntale precio, modalidad y horarios sin comprometerte con nadie.'**
+  String get coachInquiryCtaHelp;
+
+  /// Snackbar cuando falla el getOrCreate del chat de consulta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos abrir la consulta. Probá de nuevo.'**
+  String get coachInquiryCtaError;
 
   /// No description provided for @coachCtaProximamente.
   ///
@@ -1226,6 +1274,84 @@ abstract class AppL10n {
   /// **'¡Terminé mi entreno! 💪'**
   String get workoutPostAutoCompleteText;
 
+  /// Title of the wellbeing trend screen in the Insights hub. Past tense, first person: it is the user's own record, not an assessment of them.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CÓMO ME SENTÍ'**
+  String get wellbeingTrendScreenTitle;
+
+  /// Empty state of the wellbeing trend screen — no check-ins in the selected period. Must not nag or imply the user is failing at anything.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Todavía no registraste cómo te sentís. Cuando lo hagas, vas a ver tu propia serie acá.'**
+  String get wellbeingTrendEmptyState;
+
+  /// Shown when the period has exactly one check-in: a single data point is not a curve. Distinct from the empty state on purpose.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Con un solo registro todavía no hay tendencia que mostrar.'**
+  String get wellbeingTrendNeedsMoreData;
+
+  /// Error state of the wellbeing trend screen, paired with the shared retry CTA.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar tu registro. Probá de nuevo.'**
+  String get wellbeingTrendLoadError;
+
+  /// Section heading above the pain counters on the wellbeing trend screen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DOLOR O MOLESTIA'**
+  String get wellbeingTrendPainHeading;
+
+  /// Pain frequency in the selected period. A COUNT, never a verdict — no wording may qualify the number as good or bad.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{painCount} de {total} registros con dolor'**
+  String wellbeingTrendPainCount(int painCount, int total);
+
+  /// Same count for the previous window, so the user can compare their own data with their own data. Stated side by side, never as a qualified difference — no 'better', no 'worse', no trend arrow.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Período anterior: {painCount} de {total}'**
+  String wellbeingTrendPainCountPrevious(int painCount, int total);
+
+  /// Section heading above the per-zone pain counts. Zones use the shared MuscleGroup vocabulary.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ZONAS REGISTRADAS'**
+  String get wellbeingTrendAreasHeading;
+
+  /// Chart tooltip suffix marking a day the user reported pain. A mark, not a judgement.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'con dolor'**
+  String get wellbeingTrendPainMark;
+
+  /// Tile title on InsightsScreen navigating to the wellbeing trend screen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cómo me sentí'**
+  String get insightsTileWellbeingTitle;
+
+  /// Tile subtitle for the wellbeing entry in the stats hub.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu registro de sensación y dolor en el tiempo'**
+  String get insightsTileWellbeingSubtitle;
+
+  /// Title of the daily wellbeing card on Home, and of the sheet it opens. Present tense on purpose: the daily check-in does not assume a workout happened. Concrete, never abstract — the segment that asked for this feature is the one that tolerates abstraction worst.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿CÓMO TE SENTÍS HOY?'**
+  String get wellbeingDailyTitle;
+
+  /// Subtitle of the daily wellbeing card on Home. Says plainly what the card is for. Must NOT promise any interpretation, advice or diagnosis derived from the answer.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Anotá cómo amanecés, entrenes o no.'**
+  String get wellbeingDailyPrompt;
+
   /// Title of the skippable post-session check-in step, and of the sheet it opens. Asks how the athlete felt — subjective, never a performance metric.
   ///
   /// In es_AR, this message translates to:
@@ -1585,6 +1711,30 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Llegaste al máximo de 10 rutinas activas.'**
   String get workoutSelfEditorCapReached;
+
+  /// Acción del detalle de una plantilla que abre el editor con todo precargado para que el atleta arme su propia versión (#647). Es el punto medio entre usar la plantilla tal cual y arrancar de una pantalla en blanco.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Usar como base'**
+  String get workoutRoutineUseAsBase;
+
+  /// Título del editor en modo SelfCustomizing.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Personalizar rutina'**
+  String get workoutRoutineCustomizeTitle;
+
+  /// Botón de guardado en modo SelfCustomizing. Dice explícitamente que el resultado es una rutina del atleta, no una edición de la plantilla original.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'GUARDAR COMO MÍA'**
+  String get workoutRoutineCustomizeSubmitLabel;
+
+  /// Nombre con el que arranca una copia, para que no queden cinco plantillas indistinguibles en MIS RUTINAS. Es editable antes de guardar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{name} (mi versión)'**
+  String workoutRoutineCopyName(String name);
 
   /// Left pill of the athlete Entrenar segmented control (page 0 — own routines + session history). Key is semantic, not a copy of the label, so a future copy change does not strand the identifier the way `plantillas*` did (#638).
   ///
@@ -3218,6 +3368,78 @@ abstract class AppL10n {
   /// **'Flexibilidad'**
   String get performanceChartMetricSitAndReach;
 
+  /// Resumen de error en la cabecera colapsada de un ejercicio
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{n, plural, =1{1 set sin reps} other{{n} sets sin reps}}'**
+  String routineEditorSetsMissingReps(int n);
+
+  /// No description provided for @routineEditorEmptyDayTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DÍA VACÍO'**
+  String get routineEditorEmptyDayTitle;
+
+  /// No description provided for @routineEditorEmptyDayBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Agregá el primer ejercicio y ya queda listo para entrenar.'**
+  String get routineEditorEmptyDayBody;
+
+  /// No description provided for @routineEditorDayTabA11y.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Día {n}{estado}'**
+  String routineEditorDayTabA11y(int n, String estado);
+
+  /// No description provided for @routineEditorPlanSheetTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DATOS DEL PLAN'**
+  String get routineEditorPlanSheetTitle;
+
+  /// No description provided for @routineEditorPlanSheetA11y.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Datos del plan'**
+  String get routineEditorPlanSheetA11y;
+
+  /// No description provided for @routineEditorSubtitleSelfPrivate.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu rutina · solo la ves vos'**
+  String get routineEditorSubtitleSelfPrivate;
+
+  /// No description provided for @routineEditorSubtitleSelfShared.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu rutina · compartida en tu perfil'**
+  String get routineEditorSubtitleSelfShared;
+
+  /// No description provided for @routineEditorSubtitleCustomizing.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Copia tuya'**
+  String get routineEditorSubtitleCustomizing;
+
+  /// No description provided for @routineEditorSubtitleAssigned.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Plan asignado'**
+  String get routineEditorSubtitleAssigned;
+
+  /// No description provided for @routineEditorSubtitleTemplate.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Plantilla reusable'**
+  String get routineEditorSubtitleTemplate;
+
+  /// No description provided for @routineEditorSubtitleWeeks.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{n, plural, =1{1 semana} other{{n} semanas}}'**
+  String routineEditorSubtitleWeeks(int n);
+
   /// No description provided for @routineEditorDayName.
   ///
   /// In es_AR, this message translates to:
@@ -3344,6 +3566,18 @@ abstract class AppL10n {
   /// **'Eliminar'**
   String get routineEditorSlotMenuRemove;
 
+  /// Encabezado del bloque de superserie en el editor de rutina, con cuántos ejercicios agrupa.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SUPERSERIE · {count} {count, plural, =1{EJERCICIO} other{EJERCICIOS}}'**
+  String routineEditorSupersetHeader(int count);
+
+  /// Línea de ayuda debajo de las acciones del día: descubre los atajos que viven en el menú de tres puntos de cada ejercicio.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'El ⋮ de cada ejercicio tiene cambiar, copiar sets y mover.'**
+  String get routineEditorSlotMenuHint;
+
   /// No description provided for @routineEditorRestLabel.
   ///
   /// In es_AR, this message translates to:
@@ -3379,6 +3613,54 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Deshacer'**
   String get routineEditorFillKgUndo;
+
+  /// Botón de la barra sobre el teclado que replica el valor de la celda enfocada en toda su columna.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'A TODAS'**
+  String get routineEditorFillColumnLabel;
+
+  /// No description provided for @routineEditorFillColumnA11y.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Replicar este valor en toda la columna'**
+  String get routineEditorFillColumnA11y;
+
+  /// Contexto debajo de los atajos: sobre qué celda actúan.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{ejercicio} · set {set} · {campo}'**
+  String routineEditorAccessoryContext(String ejercicio, int set, String campo);
+
+  /// No description provided for @routineEditorFieldKg.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'kg'**
+  String get routineEditorFieldKg;
+
+  /// No description provided for @routineEditorFieldReps.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'reps'**
+  String get routineEditorFieldReps;
+
+  /// No description provided for @routineEditorRepsStepIncreaseA11y.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sumar {amount} repeticiones'**
+  String routineEditorRepsStepIncreaseA11y(String amount);
+
+  /// No description provided for @routineEditorRepsStepDecreaseA11y.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Restar {amount} repeticiones'**
+  String routineEditorRepsStepDecreaseA11y(String amount);
+
+  /// La celda desde la que se pidió replicar está vacía. Reemplaza a routineEditorFillKgEmpty, que hablaba del primer set porque el disparador vivía en el header.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cargá el peso de este set para poder replicarlo.'**
+  String get routineEditorFillColumnEmpty;
 
   /// Screen-reader label for a KG stepper button that adds weight to the set being edited.
   ///
@@ -3439,6 +3721,36 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Técnica, tempo, RIR…'**
   String get routineEditorNotesHint;
+
+  /// Section label of the plain-language routine summary field (#648). Trainer modes only — the athlete editor never shows it, and firestore.rules does not let an athlete write the field.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'RESUMEN'**
+  String get routineEditorSummaryLabel;
+
+  /// Help line under the RESUMEN label explaining what the field is for. The catalogue leads with jargon (PPL, Bro Split) and 2 of 5 usability participants could not tell what those meant.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Una frase que explique qué es la rutina, para alguien que nunca pisó un gimnasio.'**
+  String get routineEditorSummaryHelp;
+
+  /// Hint of the routine summary field. Verbatim one of the 7 seeded system-template summaries, so its length (78 chars) calibrates the expected answer.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ej: Empujar, tirar y piernas: cada día trabajás un tipo de movimiento distinto.'**
+  String get routineEditorSummaryHint;
+
+  /// Etiqueta del selector de objetivos en el editor de PLANTILLAS del PF (#635 PR#1b). Sólo aparece en modo plantilla: un plan asignado no entra al catálogo, así que nada lo rankea por objetivo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PARA QUÉ SIRVE'**
+  String get routineEditorGoalsLabel;
+
+  /// Bajada del selector. Dice qué se gana respondiendo, no que sea obligatorio: sin objetivos la plantilla sigue apareciendo en la grilla, sólo que sin señal para rankear.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Opcional. Ayuda a que el alumno encuentre la plantilla cuando busca por objetivo.'**
+  String get routineEditorGoalsHelp;
 
   /// No description provided for @exerciseNoteFromCoachTag.
   ///
@@ -5379,11 +5691,29 @@ abstract class AppL10n {
   /// **'No pudimos cargar tu reporte mensual. Probá de nuevo.'**
   String get monthlyReportLoadError;
 
-  /// [AD6/PR5b] Week-streak indicator text shown next to the flame icon above the workout-days calendar. Reuses computeStreak's day-count value (same 'racha' terminology as the rest of the app, e.g. esta_semana_card.dart) — NOT a separate week-based streak calculation. Zero is a valid, always-rendered value (not hidden).
+  /// Empty state in the monthly volume-by-group card when the selected month has no sets mapped to a display muscle group.
   ///
   /// In es_AR, this message translates to:
-  /// **'Racha de {n} días'**
+  /// **'No hay sets por grupo en este mes.'**
+  String get monthlyVolumeByGroupEmpty;
+
+  /// Set count shown at the right of each row in the monthly volume-by-group card.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{n, plural, =1{1 set} other{{n} sets}}'**
+  String monthlyVolumeByGroupSets(int n);
+
+  /// [AD6/PR5b] Streak indicator next to the flame icon above the workout-days calendar. Counts WEEKS in which the athlete met their active routine's day target (computeWeeklyStreak), not consecutive days. Zero is a valid, always-rendered value (not hidden).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{n, plural, =0{Sin racha} =1{Racha de 1 semana} other{Racha de {n} semanas}}'**
   String workoutDaysCalendarStreak(int n);
+
+  /// Small caption under the streak line explaining WHAT the streak counts: weeks in which the athlete met their routine's day target. Rendered for every value including zero, where it becomes the CTA to start one.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{n, plural, =0{Cumplí el objetivo de días de tu rutina esta semana y arrancás una racha.} =1{Completaste el objetivo de tu rutina 1 semana seguida.} other{Completaste el objetivo de tu rutina {n} semanas seguidas.}}'**
+  String workoutDaysCalendarStreakHint(int n);
 
   /// [stats-hub] Section heading above the tile list on InsightsScreen, between the daily-muscles card and the ESTADÍSTICAS AVANZADAS tiles (Hevy 'Statistics' parity, obs #445).
   ///
@@ -6278,6 +6608,816 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'{value} min'**
   String routineCardMinutes(String value);
+
+  /// Título del aviso de sesión recortada en el player (#645). El valor ya viene con el prefijo ~ cuando es calculado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ajustado a {value} min'**
+  String sessionTrimAdjustedTo(String value);
+
+  /// Ejercicios que el atleta dejó fuera de la sesión de hoy para que entrara en su tiempo (#645). La rutina no se modifica.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Fuera de hoy: {names}'**
+  String sessionTrimDroppedList(String names);
+
+  /// Acción que devuelve a la sesión todo lo que se había recortado (#645).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DESHACER'**
+  String get sessionTrimUndo;
+
+  /// Entrada al ajuste de tiempo en el player y título de su hoja (#645).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿CUÁNTO TIEMPO TENÉS HOY?'**
+  String get sessionTimeFitPromptTitle;
+
+  /// Duración estimada de la sesión de hoy antes de recortar (#645). El valor ya viene con el prefijo ~ porque siempre es calculado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esta sesión son {value} min'**
+  String sessionTimeFitCurrent(String value);
+
+  /// Respuesta cuando la sesión completa ya cabe en el tiempo declarado (#645).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Con {value} min ya entrás. No hace falta sacar nada.'**
+  String sessionTimeFitAlreadyFits(String value);
+
+  /// Encabezado de la propuesta de recorte, seguido de los nombres de los ejercicios (#645). La app sugiere; el atleta decide.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Si sacás esto, la sesión queda en {value} min:'**
+  String sessionTimeFitTrimHeadline(String value);
+
+  /// Respuesta cuando ni el recorte más profundo entra en el tiempo declarado (#645).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No llegamos a ese tiempo. Lo más corto posible son {value} min:'**
+  String sessionTimeFitCannotFit(String value);
+
+  /// Respuesta cuando no queda ningún ejercicio recortable (#645).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No hay nada que sacar sin dejar la sesión vacía.'**
+  String get sessionTimeFitNothingToTrim;
+
+  /// Confirma el recorte propuesto. Sólo afecta la sesión de hoy; la rutina no se modifica (#645).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'AJUSTAR HOY'**
+  String get sessionTimeFitApply;
+
+  /// Única salida de la card de onboarding de un módulo. Al tocarla se persiste el flag y la card no vuelve.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ENTENDIDO'**
+  String get onboardingCardDismiss;
+
+  /// Card de INICIO para el alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TU RESUMEN DEL DÍA'**
+  String get onboardingCardAthleteHomeTitle;
+
+  /// No description provided for @onboardingCardAthleteHomeBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Acá ves qué te toca entrenar hoy, cómo venís esta semana y tu racha. Si dejaste una sesión a medias, te la ofrece para retomar.'**
+  String get onboardingCardAthleteHomeBody;
+
+  /// Card de ENTRENAR para el alumno. Los tres caminos a una rutina no están explicados en ningún lado de la app.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ACÁ ARRANCA TU ENTRENO'**
+  String get onboardingCardAthleteWorkoutTitle;
+
+  /// No description provided for @onboardingCardAthleteWorkoutBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tenés tres formas de conseguir una rutina:'**
+  String get onboardingCardAthleteWorkoutBody;
+
+  /// No description provided for @onboardingCardAthleteWorkoutBullet1.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'El plan de tu entrenador, ya armado y asignado a vos'**
+  String get onboardingCardAthleteWorkoutBullet1;
+
+  /// No description provided for @onboardingCardAthleteWorkoutBullet2.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Una plantilla de TREINO, lista para usar'**
+  String get onboardingCardAthleteWorkoutBullet2;
+
+  /// No description provided for @onboardingCardAthleteWorkoutBullet3.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu propia rutina, armada ejercicio por ejercicio'**
+  String get onboardingCardAthleteWorkoutBullet3;
+
+  /// Card de FEED para el alumno. RANKINGS es una tab rotulada al lado, no una página escondida.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'LA PARTE SOCIAL'**
+  String get onboardingCardAthleteFeedTitle;
+
+  /// No description provided for @onboardingCardAthleteFeedBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Publicá tus entrenamientos y seguí a tus amigos. Al lado tenés Rankings:'**
+  String get onboardingCardAthleteFeedBody;
+
+  /// No description provided for @onboardingCardAthleteFeedBullet1.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Te compara con la gente de tu gym'**
+  String get onboardingCardAthleteFeedBullet1;
+
+  /// No description provided for @onboardingCardAthleteFeedBullet2.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Es opcional: si no lo activás, ni aparecés ni ves a nadie'**
+  String get onboardingCardAthleteFeedBullet2;
+
+  /// Card de COACH para el alumno. Distingue session_shares (automático) de profile_shares (opt-in manual).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TU ENTRENADOR'**
+  String get onboardingCardAthleteCoachTitle;
+
+  /// No description provided for @onboardingCardAthleteCoachBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Buscá y contratá un entrenador cerca tuyo. Vos controlás qué ve de vos:'**
+  String get onboardingCardAthleteCoachBody;
+
+  /// No description provided for @onboardingCardAthleteCoachBullet1.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tus entrenamientos los ve apenas aceptás el vínculo'**
+  String get onboardingCardAthleteCoachBullet1;
+
+  /// No description provided for @onboardingCardAthleteCoachBullet2.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tus datos personales y medidas, solo si los activás en Perfil › Privacidad'**
+  String get onboardingCardAthleteCoachBullet2;
+
+  /// Card de PERFIL para el alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TU CUENTA'**
+  String get onboardingCardAthleteProfileTitle;
+
+  /// No description provided for @onboardingCardAthleteProfileBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tus datos, tus medidas y tu privacidad. Acá decidís qué comparte tu perfil público y qué ve tu entrenador.'**
+  String get onboardingCardAthleteProfileBody;
+
+  /// Card de INICIO para el entrenador.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TU DÍA'**
+  String get onboardingCardTrainerHomeTitle;
+
+  /// No description provided for @onboardingCardTrainerHomeBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tus próximas sesiones, quién entrenó hoy, la actividad reciente de tus alumnos y lo que tenés por cobrar.'**
+  String get onboardingCardTrainerHomeBody;
+
+  /// Card de ENTRENAR para el entrenador.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TUS PLANTILLAS'**
+  String get onboardingCardTrainerWorkoutTitle;
+
+  /// No description provided for @onboardingCardTrainerWorkoutBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu biblioteca de plantillas propias y el atajo para asignarle un plan a un alumno. El editor completo está en Coach Hub, desde la compu.'**
+  String get onboardingCardTrainerWorkoutBody;
+
+  /// Card de FEED para el entrenador. Ojo: el trainer NO tiene la tab RANKINGS.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'LA COMUNIDAD'**
+  String get onboardingCardTrainerFeedTitle;
+
+  /// No description provided for @onboardingCardTrainerFeedBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'El feed social de TREINO. Podés seguir lo que publican tus alumnos y publicar vos también.'**
+  String get onboardingCardTrainerFeedBody;
+
+  /// Card de COACH para el entrenador. Corrige el modo de falla #1: el PF que espera con el roster vacío.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ALUMNOS Y AGENDA'**
+  String get onboardingCardTrainerCoachTitle;
+
+  /// No description provided for @onboardingCardTrainerCoachBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Acá trabajás con tus alumnos. Lo primero que conviene saber:'**
+  String get onboardingCardTrainerCoachBody;
+
+  /// No description provided for @onboardingCardTrainerCoachBullet1.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'El alumno te manda la solicitud a vos desde su app, no al revés'**
+  String get onboardingCardTrainerCoachBullet1;
+
+  /// No description provided for @onboardingCardTrainerCoachBullet2.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Abrí un alumno para ver su plan, sus series, su progreso y el chat'**
+  String get onboardingCardTrainerCoachBullet2;
+
+  /// No description provided for @onboardingCardTrainerCoachBullet3.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'En AGENDA creás turnos sueltos o series que se repiten'**
+  String get onboardingCardTrainerCoachBullet3;
+
+  /// Card de PERFIL para el entrenador.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TU PERFIL PROFESIONAL'**
+  String get onboardingCardTrainerProfileTitle;
+
+  /// No description provided for @onboardingCardTrainerProfileBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Así te ven los alumnos que te buscan. Desde acá también:'**
+  String get onboardingCardTrainerProfileBody;
+
+  /// No description provided for @onboardingCardTrainerProfileBullet1.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Aceptás las solicitudes entrantes de alumnos nuevos'**
+  String get onboardingCardTrainerProfileBullet1;
+
+  /// No description provided for @onboardingCardTrainerProfileBullet2.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Configurás tu disponibilidad horaria'**
+  String get onboardingCardTrainerProfileBullet2;
+
+  /// Saltea el tour de bienvenida. Visible desde la primera slide.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SALTAR'**
+  String get onboardingTourSkip;
+
+  /// Avanza a la siguiente slide del tour.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SIGUIENTE'**
+  String get onboardingTourNext;
+
+  /// CTA de la última slide; cierra el tour y deja usar la app.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'COMENZAR'**
+  String get onboardingTourFinish;
+
+  /// Etiqueta de lector de pantalla del indicador de progreso. Las barras son decorativas.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Paso {current} de {total}'**
+  String onboardingTourProgress(int current, int total);
+
+  /// CTA de la última slide del onboarding de ejercicios propios. Cierra el modal y devuelve al editor de rutina, donde 'Agregar ejercicio' lleva al alta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CREAR MI EJERCICIO'**
+  String get onboardingCustomExerciseCta;
+
+  /// Paso 1 del mini-onboarding de PLANTILLAS (#635). Pregunta por días disponibles.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Cuántos días podés entrenar?'**
+  String get templatesOnboardingStep1Title;
+
+  /// Paso 1, bajada. NO promete que la grilla se ordene: en este PR las respuestas sólo se persisten, el ranking por afinidad llega con #635 PR#3. Cuando ese ranking exista, esta copy se actualiza junto con él.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Elegí lo que vas a sostener. Guardamos tu respuesta para personalizar lo que te recomendamos.'**
+  String get templatesOnboardingStep1Body;
+
+  /// No description provided for @templatesOnboardingStep1Label.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Días por semana'**
+  String get templatesOnboardingStep1Label;
+
+  /// Aclara que responder no vacía la grilla. Cierto hoy (nada consume las respuestas) y después del ranking (#635 PR#3), que ordena pero nunca esconde.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ninguna respuesta filtra el catálogo: vas a seguir viendo todas las plantillas.'**
+  String get templatesOnboardingStep1Hint;
+
+  /// Paso 2. Pregunta por duración de sesión.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Cuánto dura tu sesión?'**
+  String get templatesOnboardingStep2Title;
+
+  /// No description provided for @templatesOnboardingStep2Body.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'45 minutos reales valen más que una hora ideal. Elegí el tiempo que tenés de verdad.'**
+  String get templatesOnboardingStep2Body;
+
+  /// No description provided for @templatesOnboardingStep2Label.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Minutos por sesión'**
+  String get templatesOnboardingStep2Label;
+
+  /// Paso 3. Pregunta por objetivo de entrenamiento.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Para qué querés entrenar?'**
+  String get templatesOnboardingStep3Title;
+
+  /// No description provided for @templatesOnboardingStep3Body.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Nadie elige por split, elige por para qué. Es la respuesta que más nos dice sobre lo que buscás.'**
+  String get templatesOnboardingStep3Body;
+
+  /// No description provided for @templatesOnboardingStep3Label.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Objetivo'**
+  String get templatesOnboardingStep3Label;
+
+  /// Paso 4. Zonas a priorizar; opcional. El título baja la presión de la última pregunta. NO dice 'queda como filtro': nada de esto filtra la grilla.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esto no es un examen'**
+  String get templatesOnboardingStep4Title;
+
+  /// Paso 4, bajada. NO promete controles para editar las respuestas desde PLANTILLAS: todavía no existen. Actualizar cuando #635 PR#3 los agregue.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Guardamos tus respuestas en tu perfil. Esta es opcional: dejala vacía si no tenés preferencia.'**
+  String get templatesOnboardingStep4Body;
+
+  /// No description provided for @templatesOnboardingStep4Label.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Zonas a priorizar · opcional'**
+  String get templatesOnboardingStep4Label;
+
+  /// CTA del último paso. Cierra el flow, persiste las respuestas y devuelve a la grilla.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VER MIS PLANTILLAS'**
+  String get templatesOnboardingCta;
+
+  /// No description provided for @templatesOnboardingMinutes30.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'30 MIN'**
+  String get templatesOnboardingMinutes30;
+
+  /// No description provided for @templatesOnboardingMinutes30Hint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Entro y salgo'**
+  String get templatesOnboardingMinutes30Hint;
+
+  /// No description provided for @templatesOnboardingMinutes45.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'45 MIN'**
+  String get templatesOnboardingMinutes45;
+
+  /// No description provided for @templatesOnboardingMinutes45Hint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Lo de siempre'**
+  String get templatesOnboardingMinutes45Hint;
+
+  /// No description provided for @templatesOnboardingMinutes60.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'60 MIN'**
+  String get templatesOnboardingMinutes60;
+
+  /// No description provided for @templatesOnboardingMinutes60Hint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Hora completa'**
+  String get templatesOnboardingMinutes60Hint;
+
+  /// No description provided for @templatesOnboardingMinutes75.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'75 MIN O MÁS'**
+  String get templatesOnboardingMinutes75;
+
+  /// No description provided for @templatesOnboardingMinutes75Hint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Fuerza'**
+  String get templatesOnboardingMinutes75Hint;
+
+  /// No description provided for @templatesGoalHealth.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SALUD'**
+  String get templatesGoalHealth;
+
+  /// No description provided for @templatesGoalInjuryPrevention.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PREVENCIÓN'**
+  String get templatesGoalInjuryPrevention;
+
+  /// No description provided for @templatesGoalAesthetics.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ESTÉTICA'**
+  String get templatesGoalAesthetics;
+
+  /// No description provided for @templatesGoalSport.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DEPORTE'**
+  String get templatesGoalSport;
+
+  /// No description provided for @templatesGoalWellbeing.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'BIENESTAR'**
+  String get templatesGoalWellbeing;
+
+  /// No description provided for @templatesZoneBack.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ESPALDA'**
+  String get templatesZoneBack;
+
+  /// No description provided for @templatesZoneChest.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PECHO'**
+  String get templatesZoneChest;
+
+  /// No description provided for @templatesZoneShoulders.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'HOMBROS'**
+  String get templatesZoneShoulders;
+
+  /// No description provided for @templatesZoneGlutes.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'GLÚTEOS'**
+  String get templatesZoneGlutes;
+
+  /// No description provided for @templatesZoneQuads.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CUÁDRICEPS'**
+  String get templatesZoneQuads;
+
+  /// No description provided for @templatesZoneCore.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CORE'**
+  String get templatesZoneCore;
+
+  /// Opción de días por semana del paso 1 (#635). 2 a 6.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{days} DÍAS'**
+  String templatesOnboardingDaysOption(int days);
+
+  /// Vuelve al paso anterior del mini-onboarding de PLANTILLAS (#635). Ausente en el paso 1.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'VOLVER'**
+  String get templatesOnboardingBack;
+
+  /// Acción de la barra de PLANTILLAS que reabre el mini-onboarding (#635 PR#3) sembrado con lo ya respondido. La gente cambia de disponibilidad; sin esto tendría que rehacer el cuestionario o no podría.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'AJUSTAR'**
+  String get templatesFilterBarAdjust;
+
+  /// Misma acción cuando el atleta todavía no respondió nada: el texto invita en vez de referirse a respuestas que no existen.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'AJUSTAR MI BÚSQUEDA'**
+  String get templatesFilterBarSetUp;
+
+  /// Explica por qué la grilla está en ese orden. Dice ORDENADO, no filtrado: con 7 plantillas un filtro duro la vaciaría, así que nada se esconde.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ordenado según lo que buscás'**
+  String get templatesFilterBarHint;
+
+  /// Acción en la card del ejercicio del player que abre el sheet de reporte al PF (#628).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'COMENTAR / REPORTAR'**
+  String get exerciseFeedbackAction;
+
+  /// Semantics del botón de reporte por ejercicio.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Comentar o reportar una molestia en {exerciseName}'**
+  String exerciseFeedbackActionA11y(String exerciseName);
+
+  /// Título del bottom sheet de reporte por ejercicio.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CONTALE A TU PF'**
+  String get exerciseFeedbackSheetTitle;
+
+  /// Subtítulo del sheet cuando el reporte queda anclado a una serie concreta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{exerciseName} · serie {setNumber}'**
+  String exerciseFeedbackSheetAnchorSet(String exerciseName, int setNumber);
+
+  /// Chip de tipo: comentario común, no notifica al PF.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Comentario'**
+  String get exerciseFeedbackKindComment;
+
+  /// Chip de tipo: molestia o dolor. Es el único que le avisa al PF.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Molestia / dolor'**
+  String get exerciseFeedbackKindDiscomfort;
+
+  /// Aclaración bajo los chips cuando está elegido 'molestia': el usuario tiene que saber que ESTE tipo notifica y el otro no.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu PF recibe un aviso al toque.'**
+  String get exerciseFeedbackDiscomfortNotice;
+
+  /// Placeholder del cuadro de texto del sheet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Qué le querés contar? Ej: en la 3ª me tiró el hombro derecho.'**
+  String get exerciseFeedbackTextHint;
+
+  /// Botón para sacar la foto con la cámara.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cámara'**
+  String get exerciseFeedbackPhotoCamera;
+
+  /// Botón para elegir la foto de la galería.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Galería'**
+  String get exerciseFeedbackPhotoGallery;
+
+  /// Saca la foto elegida antes de enviar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Quitar foto'**
+  String get exerciseFeedbackPhotoRemove;
+
+  /// Error al elegir o sacar la foto.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos abrir la foto. Probá de nuevo.'**
+  String get exerciseFeedbackPhotoError;
+
+  /// Descarta el reporte sin guardarlo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CANCELAR'**
+  String get exerciseFeedbackCancel;
+
+  /// Guarda el reporte. Deshabilitado mientras no haya ni texto ni foto.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ENVIAR'**
+  String get exerciseFeedbackSubmit;
+
+  /// Confirmación después de guardar el reporte.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Listo. Tu PF lo va a ver junto a la serie.'**
+  String get exerciseFeedbackSuccess;
+
+  /// Error al guardar el reporte.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos guardar tu reporte. Probá de nuevo.'**
+  String get exerciseFeedbackError;
+
+  /// Tag del reporte cuando es un comentario común. Espejo de 'DEL COACH' en la otra dirección.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'DEL ALUMNO'**
+  String get exerciseFeedbackNoteTagComment;
+
+  /// Tag del reporte cuando el alumno marcó dolor o molestia. Se ve distinto de un comentario a propósito.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MOLESTIA'**
+  String get exerciseFeedbackNoteTagDiscomfort;
+
+  /// Serie a la que quedó anclado el reporte, al lado del tag.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'SERIE {setNumber}'**
+  String exerciseFeedbackNoteSetTag(int setNumber);
+
+  /// Error al cargar el feedback por ejercicio en las superficies del PF.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar los reportes del alumno.'**
+  String get coachSessionFeedbackLoadError;
+
+  /// Mismo fallo que coachSessionFeedbackLoadError pero en la superficie del PROPIO alumno: ahi los reportes son suyos, no 'del alumno'.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar tus reportes.'**
+  String get sessionFeedbackLoadError;
+
+  /// Botón del pie que salta al primer día con un problema.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'IR'**
+  String get routineEditorGoToProblem;
+
+  /// No description provided for @routineEditorGoToProblemA11y.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ir al primer problema'**
+  String get routineEditorGoToProblemA11y;
+
+  /// Resumen del pie cuando el plan está completo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{dias, plural, =1{1 día} other{{dias} días}} · {sets, plural, =1{1 set} other{{sets} sets}} · todo listo'**
+  String routineEditorFooterSummary(int dias, int sets);
+
+  /// No description provided for @routineEditorProblemMissingName.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Falta el nombre del plan'**
+  String get routineEditorProblemMissingName;
+
+  /// No description provided for @routineEditorProblemMissingSplit.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Falta el split'**
+  String get routineEditorProblemMissingSplit;
+
+  /// No description provided for @routineEditorProblemEmptyDay.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Día {dia}: sin ejercicios'**
+  String routineEditorProblemEmptyDay(int dia);
+
+  /// No description provided for @routineEditorProblemDuplicate.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Día {dia}: ejercicio repetido'**
+  String routineEditorProblemDuplicate(int dia);
+
+  /// Un set incompleto es uno sin repeticiones (o sin tiempo, en modo duración).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Día {dia}: {count, plural, =1{1 set sin completar} other{{count} sets sin completar}}'**
+  String routineEditorProblemIncompleteSets(int dia, int count);
+
+  /// No description provided for @routineEditorProblemOtherWeek.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Semana {semana}: día {dia} sin completar'**
+  String routineEditorProblemOtherWeek(int semana, int dia);
+
+  /// Botón de la cabecera del día que abre la entrada rápida.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'RÁPIDO'**
+  String get routineEditorQuickEntryToggle;
+
+  /// No description provided for @routineEditorQuickEntryToggleA11y.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Entrada rápida'**
+  String get routineEditorQuickEntryToggleA11y;
+
+  /// Placeholder del campo: enseña el formato con un ejemplo en vez de explicarlo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'banca 4x10 60'**
+  String get routineEditorQuickEntryHint;
+
+  /// Confirma qué se va a agregar, antes de tocar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Se agrega como {sets, plural, =1{1 set} other{{sets} sets}} × {reps} a {peso}.'**
+  String routineEditorQuickEntryWillAdd(int sets, String reps, String peso);
+
+  /// No description provided for @routineEditorQuickEntryNoWeight.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'sin peso'**
+  String get routineEditorQuickEntryNoWeight;
+
+  /// No description provided for @routineEditorQuickEntryEmptyHint.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Buscá el ejercicio y tocalo. Después escribís 4x10 y el peso.'**
+  String get routineEditorQuickEntryEmptyHint;
+
+  /// Ayuda una vez elegido el ejercicio: enseña las dos listas con un ejemplo de cada una.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'4x10 y el peso. Por set con comas: 4x10,8,6,4 · 55,45,35,25. Por tiempo: 3x30s o 3x1:30. Decimales con punto: 62.5'**
+  String get routineEditorQuickEntryPickedHint;
+
+  /// Confirma la entrada rápida. Existe porque elegir el ejercicio dejó de agregarlo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'AGREGAR'**
+  String get routineEditorQuickEntryAdd;
+
+  /// Título de la hoja de acciones cuando todavía no se eligió un ejercicio; normalmente se muestra el nombre del ejercicio.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ACCIONES'**
+  String get routineEditorExerciseSheetTitle;
+
+  /// No description provided for @routineEditorSlotMenuCollapse.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Colapsar sets'**
+  String get routineEditorSlotMenuCollapse;
+
+  /// No description provided for @routineEditorSlotMenuExpand.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Desplegar sets'**
+  String get routineEditorSlotMenuExpand;
+
+  /// Título del editor al CREAR una plantilla. Antes reusaba el de asignar un plan y decía 'Crear plan'.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Nueva plantilla'**
+  String get coachTemplateEditorTitle;
+
+  /// No description provided for @coachTemplateEditorEditTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Editar plantilla'**
+  String get coachTemplateEditorEditTitle;
+
+  /// CTA del editor de plantillas. Antes reusaba el de asignar y decía 'ASIGNAR PLAN' en una plantilla que no se asigna a nadie.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'GUARDAR PLANTILLA'**
+  String get coachTemplateEditorSubmit;
+
+  /// El picker devolvió sólo ejercicios que el día ya tenía. Sin este aviso la pantalla no cambiaba y el tap parecía roto.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esos ejercicios ya estaban en el día.'**
+  String get routineEditorAddNothingNew;
+
+  /// Se pidió una superserie pero sólo entró un ejercicio nuevo: el resto ya estaba en el día.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Una superserie necesita dos ejercicios. Se agregó uno solo, suelto.'**
+  String get routineEditorSupersetNeedsTwo;
+
+  /// Agrupa este ejercicio con el anterior en una superserie. Es el camino que faltaba para ejercicios YA cargados: el botón + Superserie sólo agrega ejercicios nuevos agrupados.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Unir con el de arriba'**
+  String get routineEditorSlotMenuMergeUp;
+
+  /// No description provided for @routineEditorSlotMenuUngroup.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sacar de la superserie'**
+  String get routineEditorSlotMenuUngroup;
+
+  /// Agrupa este ejercicio con el siguiente. Sirve sobre todo para sumarse a una superserie que ya existe más abajo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Unir con el de abajo'**
+  String get routineEditorSlotMenuMergeDown;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

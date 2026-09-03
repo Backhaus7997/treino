@@ -415,7 +415,7 @@ class _CoachHubPlanPreviewScreenState
                           _saving ? null : () => _assign(plan, profile.uid),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: palette.accent,
-                        foregroundColor: palette.bg,
+                        foregroundColor: TreinoButtonTokens.foreground(context),
                         minimumSize: const Size.fromHeight(48),
                         shape: const StadiumBorder(),
                         disabledBackgroundColor:
@@ -427,7 +427,7 @@ class _CoachHubPlanPreviewScreenState
                               height: 18,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: palette.bg,
+                                color: TreinoButtonTokens.foreground(context),
                               ),
                             )
                           : Text(

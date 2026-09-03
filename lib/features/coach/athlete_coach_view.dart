@@ -171,7 +171,7 @@ class _AthleteCoachViewState extends ConsumerState<AthleteCoachView> {
           if (link == null) return const TrainersListScreen();
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: _LinkStateCard(link: link),
+            child: LinkStateCard(link: link),
           );
         },
       ),
@@ -181,8 +181,16 @@ class _AthleteCoachViewState extends ConsumerState<AthleteCoachView> {
 
 // ── Link state card — pending o active ────────────────────────────────────────
 
-class _LinkStateCard extends ConsumerWidget {
-  const _LinkStateCard({required this.link});
+/// The athlete's view of their trainer link: trainer identity, what is being
+/// shared, and the message / end-link actions.
+///
+/// Public because it has two consumers: [AthleteCoachView] renders it as the
+/// COACH tab's body, and the onboarding tour renders it on its own inside a
+/// device preview. The tour deliberately does NOT mount [AthleteCoachView] —
+/// that widget fires `_maybeShow30DayPrompt()` from a post-frame callback,
+/// which would pop a modal sheet on top of the tour.
+class LinkStateCard extends ConsumerWidget {
+  const LinkStateCard({super.key, required this.link});
   final TrainerLink link;
 
   @override
@@ -492,13 +500,14 @@ class _ActionRow extends ConsumerWidget {
                   onPressed: () => _onMessage(context, ref),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: palette.accent,
-                    foregroundColor: palette.bg,
+                    foregroundColor: TreinoButtonTokens.foreground(context),
                     minimumSize: const Size.fromHeight(48),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(AppRadius.full),
                     ),
                   ),
-                  icon: Icon(TreinoIcon.chat, size: 18, color: palette.bg),
+                  icon: Icon(TreinoIcon.chat,
+                      size: 18, color: TreinoButtonTokens.foreground(context)),
                   label: Text(
                     'MENSAJE',
                     style: GoogleFonts.barlowCondensed(
@@ -865,7 +874,7 @@ class _AliasRow extends StatelessWidget {
   }
 }
 
-/// Test-only harness that renders `_LinkStateCard` directly, bypassing the
+/// Test-only harness that renders [LinkStateCard] directly, bypassing the
 /// router dependency. Exported for widget tests only.
 ///
 /// @visibleForTesting
@@ -880,7 +889,7 @@ class AthleteCoachViewTestHarness extends ConsumerWidget {
       error: (_, __) => const SizedBox.shrink(),
       data: (link) {
         if (link == null) return const SizedBox.shrink();
-        return _LinkStateCard(link: link);
+        return LinkStateCard(link: link);
       },
     );
   }

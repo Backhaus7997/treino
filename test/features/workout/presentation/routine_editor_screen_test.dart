@@ -31,6 +31,7 @@ import 'package:treino/features/workout/presentation/routine_editor_mode.dart';
 import 'package:treino/features/workout/presentation/routine_editor_screen.dart';
 
 import '../../../helpers/fake_analytics_service.dart';
+import '../../../fixtures/routine_editor_ui.dart';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -198,6 +199,7 @@ void main() {
       // Starts with 1 day
       expect(find.text('Día 1'), findsWidgets);
       // Add slot button exists
+      await desplazarHastaAgregarEjercicio(tester);
       expect(find.text('Agregar ejercicio'), findsOneWidget);
     });
 
@@ -236,6 +238,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Open the picker by tapping the add-slot button (adds a slot first)
+      await desplazarHastaAgregarEjercicio(tester);
       await tester.tap(find.text('Agregar ejercicio'));
       await tester.pumpAndSettle();
 
@@ -260,6 +263,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await desplazarHastaAgregarEjercicio(tester);
       await tester.tap(find.text('Agregar ejercicio'));
       await tester.pumpAndSettle();
 
@@ -296,6 +300,7 @@ void main() {
       await tester.enterText(
           find.byKey(const Key('editor_split_field')), 'PPL');
       // Add a slot with an exercise
+      await desplazarHastaAgregarEjercicio(tester);
       await tester.tap(find.text('Agregar ejercicio'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Buscar ejercicio'));
@@ -382,6 +387,7 @@ void main() {
           find.byKey(const Key('editor_name_field')), 'Mi Plan');
       await tester.enterText(
           find.byKey(const Key('editor_split_field')), 'Full Body');
+      await desplazarHastaAgregarEjercicio(tester);
       await tester.tap(find.text('Agregar ejercicio'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Buscar ejercicio'));
@@ -416,6 +422,7 @@ void main() {
           find.byKey(const Key('editor_name_field')), 'Mi Plan');
       await tester.enterText(
           find.byKey(const Key('editor_split_field')), 'Full Body');
+      await desplazarHastaAgregarEjercicio(tester);
       await tester.tap(find.text('Agregar ejercicio'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Buscar ejercicio'));
@@ -448,6 +455,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await desplazarHasta(
+          tester, find.byKey(const Key('add_superset_button')));
       expect(find.byKey(const Key('add_superset_button')), findsOneWidget);
     });
 
@@ -461,6 +470,17 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      // El editor es un ListView y en modo PLANTILLA el selector PARA QUÉ
+      // SIRVE (#635 PR#1b) corre el botón fuera del área construida. SS-001
+      // no lo necesita: en TrainerAssigning ese selector no se muestra,
+      // porque un plan asignado no entra al catálogo.
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('add_superset_button')),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await desplazarHasta(
+          tester, find.byKey(const Key('add_superset_button')));
       expect(find.byKey(const Key('add_superset_button')), findsOneWidget);
     });
 
@@ -486,6 +506,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await desplazarHasta(
+          tester, find.byKey(const Key('add_superset_button')));
       expect(find.byKey(const Key('add_superset_button')), findsOneWidget);
     });
   });
@@ -535,6 +557,7 @@ void main() {
           find.byKey(const Key('editor_name_field')), 'Plan Test');
       await tester.enterText(
           find.byKey(const Key('editor_split_field')), 'PPL');
+      await desplazarHastaAgregarEjercicio(tester);
       await tester.tap(find.text('Agregar ejercicio'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Buscar ejercicio'));
@@ -577,6 +600,7 @@ void main() {
           find.byKey(const Key('editor_name_field')), 'Mi Rutina');
       await tester.enterText(
           find.byKey(const Key('editor_split_field')), 'Full Body');
+      await desplazarHastaAgregarEjercicio(tester);
       await tester.tap(find.text('Agregar ejercicio'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Buscar ejercicio'));
@@ -644,6 +668,7 @@ void main() {
           find.byKey(const Key('editor_name_field')), 'Mi Rutina');
       await tester.enterText(
           find.byKey(const Key('editor_split_field')), 'Full Body');
+      await desplazarHastaAgregarEjercicio(tester);
       await tester.tap(find.text('Agregar ejercicio'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Buscar ejercicio'));

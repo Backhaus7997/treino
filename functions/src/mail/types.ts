@@ -15,13 +15,43 @@
 
 /** Stable discriminator: selects the template and drives the dedupe key. */
 export type MailKind =
+  // Auth. Reemplazan las plantillas default de Firebase Auth: el link sigue
+  // siendo el que genera el Admin SDK (apunta al action handler que Firebase
+  // hostea), lo unico que cambia es quien manda el mail y como se ve.
+  | "password-reset"
+  // Se manda EN LUGAR de `password-reset` cuando la cuenta no tiene proveedor
+  // de contraseña. No lleva `actionLink`: no hay contraseña que restablecer.
+  | "federated-signin-hint"
+  | "email-verification"
   | "appointment-confirmed"
   | "appointment-series-created"
   | "appointment-cancelled"
   | "appointment-series-cancelled"
   | "link-requested"
   | "link-accepted"
-  | "payment-overdue";
+  | "payment-overdue"
+  // El unico de estos mails con consecuencia FISICA: el alumno avisa que algo
+  // le duele MIENTRAS entrena, y si el PF no tiene la app abierta se entera
+  // tarde. Destinatario: el PF. Sin `prefKey` a proposito — ver `templates.ts`.
+  | "discomfort-reported"
+  // ── Suscripcion del PF a TREINO ─────────────────────────────────────────
+  //
+  // OJO — NO CONFUNDIR CON `payment-overdue`. Ese va al ATLETA y es sobre la
+  // cuota que le paga a SU entrenador. Estos dos van al ENTRENADOR y son sobre
+  // lo que EL le paga a TREINO. Son dos sistemas de plata distintos que en
+  // castellano se dicen casi igual.
+  //
+  // Son los dos unicos mails del paywall, y los produce `subscription-mail.ts`.
+  // El criterio de por que existen ESTOS dos y no otros vive alla; en una linea:
+  // el mail existe para llegar cuando el PF NO esta mirando la app.
+  //
+  // Se cobro mal y hay ventana para arreglarlo. `grace` conserva el limite
+  // pagado, asi que NO se bloquea a nadie y NO rebota ninguna escritura: no
+  // existe ninguna señal in-app. Este mail es el unico canal que hay.
+  | "subscription-grace"
+  // El limite efectivo BAJO y ya hay consecuencia. Cubre pausa, cancelacion
+  // vencida y bajada de tier — el disparador es el limite, no el status.
+  | "subscription-downgraded";
 
 /**
  * Per-kind template parameters.

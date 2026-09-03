@@ -16,6 +16,7 @@
 // SESIÓN se habilita. Setup basado en session_player_screen_test.dart, grupo
 // "duration set detection".
 
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -25,6 +26,7 @@ import 'package:treino/features/workout/application/session_notifier.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/application/session_state.dart';
 import 'package:treino/features/workout/application/workout_clock.dart';
+import 'package:treino/features/workout/data/session_repository.dart';
 import 'package:treino/features/workout/domain/duration_timer.dart';
 import 'package:treino/features/workout/domain/routine_slot.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
@@ -105,10 +107,15 @@ SessionState _durationOnlyState() => SessionState(
 /// se hace pasar el tiempo.
 DateTime _ahora = DateTime.utc(2027, 1, 15, 10);
 
-Widget _wrap(SessionNotifier Function() create) => ProviderScope(
+Widget _wrap(
+  SessionNotifier Function() create, {
+  List<Override> extra = const [],
+}) =>
+    ProviderScope(
       overrides: [
         sessionNotifierProvider.overrideWith(create),
         workoutClockProvider.overrideWithValue(() => _ahora),
+        ...extra,
       ],
       child: MaterialApp(
         theme: AppTheme.dark(),
@@ -250,6 +257,117 @@ void main() {
       await tester.pump();
 
       expect(notifier.loggedSets, hasLength(1));
+    });
+  });
+
+  // ── #817 ────────────────────────────────────────────────────────────────────
+  group('la anotación de la sesión no queda huérfana al llegar a cero', () {
+    // El bug: `_revisarCronometro` limpiaba el `ValueNotifier` local con
+    // `clear()` —que a propósito NO toca Firestore— y ahí terminaba. Los dos
+    // caminos que sí borraban la anotación cubren CANCELACIONES: la fila cuando
+    // el atleta corta, y `WearTimerSync` cuando corta el reloj. El fin natural
+    // de la cuenta no lo cubría ninguno, así que el documento de la sesión
+    // quedaba con el cronómetro puesto para siempre.
+    //
+    // No rompía el teléfono —el filtro `owner == reloj` de `_resolver` hace que
+    // la app ignore su propia anotación—, pero el companion de Wear espeja lo
+    // anotado: abrir el reloj un rato después mostraba una cuenta vencida que
+    // nadie limpió.
+    //
+    // Este test entra por la PANTALLA REAL y mira Firestore, no un mock del
+    // recorder. Es deliberado: el borrado tiene que salir del `ProviderScope`
+    // que monta el player, y un doble del recorder no distingue el scope
+    // correcto del que devuelve `null` y no borra nada en silencio.
+    late FakeFirebaseFirestore firestore;
+    late SessionRepository repo;
+
+    const uid = 'u1';
+    const sessionId = 's1';
+
+    setUp(() {
+      _ahora = DateTime.utc(2027, 1, 15, 10);
+      firestore = FakeFirebaseFirestore();
+      repo = SessionRepository(firestore: firestore);
+    });
+
+    List<Override> overrides() => [
+          sessionRepositoryProvider.overrideWithValue(repo),
+          currentUidProvider.overrideWithValue(uid),
+        ];
+
+    Future<Map<String, dynamic>?> docDeSesion() async => (await firestore
+            .collection('users')
+            .doc(uid)
+            .collection('sessions')
+            .doc(sessionId)
+            .get())
+        .data();
+
+    testWidgets('al vencer la cuenta, el cronómetro se borra del documento',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          () => _DurationLoggingNotifier(_durationOnlyState()),
+          extra: overrides(),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.text('Iniciar'));
+      await tester.pump();
+      await tester.pump();
+
+      // Precondición, y no es decorativa: si esto ya fuera null el test pasaría
+      // por la razón equivocada —nunca se anotó nada— y no probaría el borrado.
+      expect(
+        (await docDeSesion())?[SessionRepository.fieldTimerEndsAt],
+        isNotNull,
+        reason: 'la fila tiene que haber anotado el cronómetro al arrancar',
+      );
+
+      // Y ahora la cuenta termina SOLA: nadie cancela nada.
+      _ahora = _ahora.add(const Duration(seconds: 5));
+      await tester.pump(DurationTimerRules.tickInterval);
+      await tester.pump();
+
+      final doc = await docDeSesion();
+      expect(
+        doc?[SessionRepository.fieldTimerEndsAt],
+        isNull,
+        reason: 'el reloj de Wear espeja esto: si queda, muestra una cuenta '
+            'vencida que nadie limpió',
+      );
+      // Los cinco campos se van juntos: media anotación es un estado que
+      // `watchExerciseTimer` lee como "no hay", pero deja basura en el doc.
+      expect(doc?[SessionRepository.fieldTimerExerciseId], isNull);
+      expect(doc?[SessionRepository.fieldTimerSetNumber], isNull);
+      expect(doc?[SessionRepository.fieldTimerTotalSeconds], isNull);
+      expect(doc?[SessionRepository.fieldTimerOwner], isNull);
+    });
+
+    testWidgets('y la serie se marca igual: el borrado no la pisa',
+        (tester) async {
+      // El borrado y el `logSet` salen en la misma función. No compiten —uno
+      // borra campos del documento de la sesión con `merge`, el otro crea un
+      // documento en la subcolección `setLogs`— y ninguno espera al otro. Esto
+      // lo fija: si algún día el borrado pasara a ser bloqueante o a reescribir
+      // el documento entero, la serie dejaría de marcarse y se vería acá.
+      final notifier = _DurationLoggingNotifier(_durationOnlyState());
+      await tester.pumpWidget(_wrap(() => notifier, extra: overrides()));
+      await tester.pump();
+
+      await tester.tap(find.text('Iniciar'));
+      await tester.pump();
+      _ahora = _ahora.add(const Duration(seconds: 5));
+      await tester.pump(DurationTimerRules.tickInterval);
+      await tester.pump();
+
+      expect(notifier.loggedSets, hasLength(1));
+      expect(notifier.loggedSets.single.exerciseId, 'edur');
+      expect(
+        (await docDeSesion())?[SessionRepository.fieldTimerEndsAt],
+        isNull,
+      );
     });
   });
 }

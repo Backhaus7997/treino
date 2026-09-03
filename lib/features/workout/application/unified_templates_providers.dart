@@ -4,6 +4,8 @@ import '../../coach/application/trainer_link_providers.dart';
 import '../../profile/application/user_public_profile_providers.dart';
 import '../domain/routine.dart';
 import 'routine_providers.dart';
+import 'template_preferences_providers.dart';
+import '../domain/template_affinity.dart';
 
 /// Where a PLANTILLAS grid entry comes from — drives its badge and its
 /// position in the grid.
@@ -105,4 +107,42 @@ final filteredUnifiedTemplatesProvider =
               if (e.routine.level == filter) e,
           ],
   );
+});
+
+/// [filteredUnifiedTemplatesProvider] ORDENADO por afinidad con lo que el
+/// atleta respondió en el mini-onboarding (#635 PR#3).
+///
+/// Ordena, no filtra. Con 7 plantillas en el catálogo, cruzar cuatro
+/// dimensiones da vacío en la mayoría de las combinaciones — ver el dartdoc de
+/// [TemplateAffinity]. Toda plantilla que entra sale; sólo cambia el orden.
+///
+/// Es un provider derivado y no una cuenta en el `build` a propósito:
+/// `PlantillasTab` es `AutomaticKeepAliveClientMixin`, así que rankear en el
+/// build recalcularía el puntaje de todo el catálogo en cada rebuild de la
+/// pestaña.
+///
+/// El orden es ESTABLE: ante puntajes iguales conserva el de
+/// [unifiedTemplatesProvider], que ya pone coach > comunidad > sistema. Sin
+/// eso, dos plantillas empatadas podrían intercambiarse entre rebuilds y la
+/// grilla bailaría sola. `List.sort` no garantiza estabilidad en Dart, así que
+/// el desempate va explícito por posición original.
+final rankedUnifiedTemplatesProvider =
+    Provider.autoDispose<AsyncValue<List<TemplateEntry>>>((ref) {
+  final entries = ref.watch(filteredUnifiedTemplatesProvider);
+  final preferences = ref.watch(athleteTemplatePreferencesProvider);
+  if (preferences.isEmpty) return entries;
+  return entries.whenData((list) {
+    final scored = [
+      for (var i = 0; i < list.length; i++)
+        (
+          entry: list[i],
+          score: TemplateAffinity.score(list[i].routine, preferences),
+          position: i,
+        ),
+    ]..sort((a, b) {
+        final byScore = b.score.compareTo(a.score);
+        return byScore != 0 ? byScore : a.position.compareTo(b.position);
+      });
+    return [for (final s in scored) s.entry];
+  });
 });

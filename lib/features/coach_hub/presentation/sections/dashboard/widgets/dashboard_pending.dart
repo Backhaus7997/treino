@@ -20,8 +20,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/app/theme/app_palette.dart';
-import 'package:treino/app/theme/tokens/components/treino_card_tokens.dart';
-import 'package:treino/app/theme/tokens/primitives.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
@@ -371,7 +370,7 @@ class _PendingRequestTileState extends ConsumerState<_PendingRequestTile> {
               onPressed: _accept,
               style: ElevatedButton.styleFrom(
                 backgroundColor: palette.accent,
-                foregroundColor: palette.bg,
+                foregroundColor: TreinoButtonTokens.foreground(context),
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s14),
                 shape: const StadiumBorder(),
               ),

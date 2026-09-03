@@ -51,6 +51,7 @@ const PRIVATE_ID = "routine-private";
 const LEGACY_ID = "routine-legacy-sin-visibility";
 const PUBLIC_ID = "routine-public-system";
 const SHARED_ID = "routine-shared";
+const SHARED_ASSIGNED_ID = "routine-shared-asignada";
 
 let testEnv: RulesTestEnvironment;
 
@@ -112,6 +113,19 @@ beforeEach(async () => {
       assignedTo: null,
       createdBy: TRAINER,
       source: "trainer-template",
+      visibility: "shared",
+    });
+
+    // QA-SEC-012 (#779): plan 'shared' que SI tiene destinatario. Es el caso
+    // que la feature futura ("planes compartidos entre multiples atletas")
+    // usaria, y el que prueba que sacar el disyunto de lectura mundial no le
+    // saca el plan a su duenio: entra por assignedTo / assignedBy.
+    await db.collection("routines").doc(SHARED_ASSIGNED_ID).set({
+      name: "Plan compartido con destinatario",
+      assignedBy: TRAINER,
+      assignedTo: ATHLETE,
+      createdBy: TRAINER,
+      source: "trainer-assigned",
       visibility: "shared",
     });
   });
@@ -176,7 +190,7 @@ describe("routines — lo legitimo sigue funcionando", () => {
         .get(),
     );
     expect(snap.docs.map((d) => d.id).sort()).toEqual(
-      [LEGACY_ID, PRIVATE_ID].sort(),
+      [LEGACY_ID, PRIVATE_ID, SHARED_ASSIGNED_ID].sort(),
     );
   });
 
@@ -202,8 +216,52 @@ describe("routines — lo legitimo sigue funcionando", () => {
     expect(snap.docs.map((d) => d.id)).toEqual([PUBLIC_ID]);
   });
 
-  it("cualquiera lee una rutina 'shared' por id", async () => {
-    await assertSucceeds(dbFor(OUTSIDER).collection("routines").doc(SHARED_ID).get());
+  it("el PF sigue leyendo su plantilla 'shared' (entra por assignedBy)", async () => {
+    const snap = await assertSucceeds(
+      dbFor(TRAINER).collection("routines").doc(SHARED_ID).get(),
+    );
+    expect(snap.exists).toBe(true);
+  });
+
+  it("el alumno sigue leyendo el plan 'shared' que le asignaron", async () => {
+    const snap = await assertSucceeds(
+      dbFor(ATHLETE).collection("routines").doc(SHARED_ASSIGNED_ID).get(),
+    );
+    expect(snap.data()?.name).toBe("Plan compartido con destinatario");
+  });
+});
+
+/**
+ * QA-SEC-012 (#779) — `visibility: 'shared'` YA NO es lectura mundial.
+ *
+ * `shared` esta declarado RESERVADO y sin uso en el dominio
+ * (routine_visibility.dart:6) y la regla de `read` igual lo trataba como
+ * 'public'. Era un permiso mundial concedido a una feature que no se disenio:
+ * el dia que alguien implemente "planes compartidos" nace mundo-legible y
+ * mundo-enumerable, y va a PARECER que funciona porque el cliente filtra.
+ *
+ * El `list` es el que mas pesa y es el que este bloque prueba primero: cada
+ * doc trae `assignedBy` + `assignedTo`, o sea el grafo PF<->alumno de toda la
+ * plataforma en una sola query. Igual que en el bug original de este archivo,
+ * el `get` solo no alcanzaba para verlo.
+ */
+describe("routines — 'shared' no es lectura mundial (QA-SEC-012)", () => {
+  it("un tercero NO puede enumerar las rutinas 'shared'", async () => {
+    // ESTE es el assert que el agujero hacia pasar: antes devolvia los 2 docs
+    // 'shared' con su assignedBy/assignedTo.
+    await assertFails(
+      dbFor(OUTSIDER)
+        .collection("routines")
+        .where("visibility", "==", "shared")
+        .get(),
+    );
+  });
+
+  it("un tercero NO puede leer una rutina 'shared' por id", async () => {
+    await assertFails(dbFor(OUTSIDER).collection("routines").doc(SHARED_ID).get());
+    await assertFails(
+      dbFor(OUTSIDER).collection("routines").doc(SHARED_ASSIGNED_ID).get(),
+    );
   });
 });
 

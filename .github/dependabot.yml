@@ -1,0 +1,175 @@
+# Dependabot — slice B de #680.
+#
+# Es la contraparte del job `npm-audit` de .github/workflows/security.yml: ese
+# job SÓLO reporta (functions/ arranca con 1 critical y 3 high heredadas), y
+# este archivo es lo que efectivamente las baja. Cuando el contador llegue a
+# cero, el gate de npm audit pasa a bloqueante.
+#
+# Ritmo pensado para un equipo de 3: agrupado y semanal, no un PR por paquete.
+# Sin `groups` esto abriría ~20 PRs la primera semana y nadie los revisa.
+version: 2
+
+updates:
+  # ---------------------------------------------------------------------------
+  # Cloud Functions — el código con privilegios de Admin SDK. Es el que más
+  # importa: un CVE acá corre con permisos de servidor sobre todos los datos.
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: npm
+    directory: /functions
+    schedule:
+      interval: weekly
+      day: monday
+      time: '09:00'
+      timezone: America/Argentina/Buenos_Aires
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
+      include: scope
+    labels:
+      - 'type:chore'
+    groups:
+      # Los majors van sueltos: firebase-admin 12→14 y jest 29→30 rompen API y
+      # necesitan review humano, no pueden viajar de polizón en un PR grupal.
+      functions-minor-patch:
+        patterns: ['*']
+        update-types: [minor, patch]
+
+  # ---------------------------------------------------------------------------
+  # Tooling local de seed (scripts/) — no corre en producción, pero comparte
+  # firebase-admin con functions/ y hoy también tiene 1 critical + 3 high.
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: npm
+    directory: /scripts
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: chore
+      include: scope
+    labels:
+      - 'type:chore'
+    groups:
+      scripts-minor-patch:
+        patterns: ['*']
+        update-types: [minor, patch]
+
+  # ---------------------------------------------------------------------------
+  # Tests de reglas standalone (scripts/rules_test/). @firebase/rules-unit-testing
+  # está en ^3 acá y en ^5 en functions/ — Dependabot va a proponer alinearlos.
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: npm
+    directory: /scripts/rules_test
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: chore
+      include: scope
+    labels:
+      - 'type:chore'
+    groups:
+      rules-test-minor-patch:
+        patterns: ['*']
+        update-types: [minor, patch]
+
+  # ---------------------------------------------------------------------------
+  # GitHub Actions.
+  #
+  # Los workflows corren con acceso al repo y, en el caso de CodeQL, con
+  # `security-events: write`. Una action desactualizada con una vuln de command
+  # injection es escalación directa sobre el CI. Barato de mantener: son 5
+  # actions en total entre ci.yml y security.yml.
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: ci
+    labels:
+      - 'type:chore'
+    groups:
+      actions:
+        patterns: ['*']
+        # Sin este filtro el grupo se llevaba TODO, majors incluidos, y eso
+        # contradice la política que declara este archivo más arriba ("los
+        # majors van sueltos"). Concreto: el PR #885 juntó upload-artifact
+        # v4->v7, setup-swift v2->v3 y setup-java v5->v6, y falló justo en
+        # `Conformance (Swift)` y `Watch capabilities` — los dos jobs que usan
+        # esas dos actions. Un bump de action que rompe un job tiene que llegar
+        # solo, para que el rojo apunte a UNA causa.
+        #
+        # Acá NO se ignoran los majors, como sí se hace en pub: una action major
+        # suele ser un cambio de runtime de Node y se revisa en cinco minutos.
+        # Lo único que se pide es que no viaje de polizón.
+        update-types: [minor, patch]
+
+  # ---------------------------------------------------------------------------
+  # pub.dev — las 61 dependencias de pubspec.yaml.
+  #
+  # LEER ESTO ANTES DE CONFIAR EN EL BLOQUE: Dependabot hace VERSION updates
+  # para pub, pero NO security updates ni alertas. pub.dev no está en la GitHub
+  # Advisory Database, así que no existe un feed de CVEs de paquetes Dart que
+  # GitHub pueda mirar. En criollo: esto avisa "salió firebase_auth 5.4", no
+  # "firebase_auth 5.3 tiene una vulnerabilidad".
+  #
+  # O sea que el ecosistema Dart —la mayor parte del código de TREINO— NO tiene
+  # hoy escaneo de vulnerabilidades de dependencias, del mismo modo que no tiene
+  # SAST (CodeQL tampoco soporta Dart). Es un hueco conocido y sin herramienta
+  # gratuita que lo tape; queda anotado acá para que nadie lea "Dependabot para
+  # pub" y asuma cobertura que no existe.
+  #
+  # Mensual y agrupado: un bump de Flutter/Firebase obliga a correr la suite
+  # entera (~13 min) y a probar en device. Semanal sería ruido puro.
+  - package-ecosystem: pub
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: chore
+      include: scope
+    labels:
+      - 'type:chore'
+    groups:
+      pub-minor-patch:
+        patterns: ['*']
+        update-types: [minor, patch]
+
+    # LOS MAJORS DE PUB NO SE PROPONEN. No es preferencia: el grupo de arriba
+    # NO alcanza para dejarlos afuera, y lo probamos caro.
+    #
+    # El PR #903 se llamaba "bump the pub-minor-patch group con 23 updates" y
+    # traía TRECE majors de dependencias DIRECTAS de pubspec.yaml:
+    #
+    #     firebase_core   ^3.6.0  -> ^4.14.0      cloud_firestore ^5.4.0 -> ^6.9.0
+    #     firebase_auth   ^5.3.1  -> ^6.6.1       cloud_functions ^5.2.0 -> ^6.4.0
+    #     file_picker     ^8.1.2  -> ^12.0.0-beta.7   <- ademas PRERELEASE
+    #
+    # La sintaxis del grupo es correcta —con npm el mismo `update-types` sí deja
+    # los majors afuera, y por eso eslint 8->10 y firebase-admin 12->14 vinieron
+    # en PRs propios—. Lo que falla es el flujo agrupado de pub: el grupo filtra
+    # los CANDIDATOS por tipo, pero después la resolución conjunta (`multiBreaking`
+    # en dependabot-core/pub) puede cruzar majors en cualquier dependencia directa
+    # como efecto colateral de resolver el conjunto. Por el mismo agujero se coló
+    # el prerelease: la integración de pub dice que los ignora salvo que la
+    # versión actual ya sea prerelease, y `8.1.2` no lo es.
+    #
+    # `ignore` sí se aplica como filtro de actualización y corta antes.
+    #
+    # OJO CON EL PREFIJO, que es el detalle que hace perder una tarde: adentro de
+    # `groups` los valores van pelados (`minor`, `patch`) y adentro de `ignore`
+    # van con prefijo (`version-update:semver-major`). No son intercambiables.
+    #
+    # QUÉ SE PIERDE: los majors de pub dejan de aparecer solos también, así que
+    # una migración de flutterfire hay que arrancarla a mano. Es lo que ya
+    # queríamos: acá arriba está escrito que para pub NO hay feed de CVEs
+    # —pub.dev no está en la GitHub Advisory Database—, o sea que un major de pub
+    # no trae urgencia de seguridad, y mover toda la familia Firebase obliga a
+    # correr la suite entera y a probar en device. Eso es trabajo planificado,
+    # no un PR para revisar un lunes a la mañana.
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']

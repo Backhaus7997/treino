@@ -31,6 +31,7 @@ import 'package:treino/l10n/app_l10n.dart';
 
 import '../../../fixtures/exercises.dart';
 import '../../../helpers/fake_analytics_service.dart';
+import '../../../fixtures/routine_editor_ui.dart';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -114,7 +115,8 @@ Future<void> _pumpEditor(WidgetTester tester) async {
 
 /// Adds two chest exercises to Día 1 in a single picker session.
 Future<void> _addTwoExercises(WidgetTester tester) async {
-  await tester.ensureVisible(find.text('Agregar ejercicio'));
+  await desplazarHastaAgregarEjercicio(tester);
+  await desplazarHastaAgregarEjercicio(tester);
   await tester.tap(find.text('Agregar ejercicio'));
   await tester.pumpAndSettle();
   await tester.tap(find.text('Press de Banca').first);
@@ -123,6 +125,9 @@ Future<void> _addTwoExercises(WidgetTester tester) async {
   await tester.pumpAndSettle();
   await tester.tap(find.text('Agregar 2 ejercicios'));
   await tester.pumpAndSettle();
+  // Desde este cambio el ejercicio agregado nace PLEGADO: quien avisa
+  // que le falta completar sets es el borde rojo, no la card abierta.
+  await expandirEjercicios(tester);
 }
 
 /// Set-row inputs are the only fields carrying these hints, so the hint is a

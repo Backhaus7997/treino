@@ -27,6 +27,7 @@ WATCH_SOURCES=(
   "${REPO_ROOT}/ios/TreinoWatch Watch App/SetResolution.swift"
   "${REPO_ROOT}/ios/TreinoWatch Watch App/SessionCounting.swift"
   "${REPO_ROOT}/ios/TreinoWatch Watch App/SetLogIdentity.swift"
+  "${REPO_ROOT}/ios/TreinoWatch Watch App/ExerciseCursor.swift"
   "${REPO_ROOT}/ios/TreinoWatch Watch App/SupersetOrder.swift"
   "${REPO_ROOT}/ios/TreinoWatch Watch App/CountdownRules.swift"
   "${REPO_ROOT}/ios/TreinoWatch Watch App/EffortBroadcastRules.swift"

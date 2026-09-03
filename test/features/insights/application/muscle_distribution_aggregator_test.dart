@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/insights/application/muscle_distribution_aggregator.dart';
 import 'package:treino/features/insights/domain/chart_period.dart';
+import 'package:treino/features/insights/domain/muscle_distribution_insights.dart';
+import 'package:treino/features/insights/domain/muscle_group.dart';
 import 'package:treino/features/insights/domain/radar_axis.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
@@ -74,8 +76,52 @@ void main() {
       expect(result.currentSetsByAxis[RadarAxis.chest], 1);
       expect(result.currentSetsByAxis[RadarAxis.back], 2);
       expect(result.previousSetsByAxis[RadarAxis.legs], 1);
+      expect(
+        result.previousSetsByGroup[MuscleGroupDisplay.cuadriceps],
+        1,
+      );
       expect(result.currentWorkouts, 1);
       expect(result.previousWorkouts, 1);
+    });
+
+    test('counts all 10 display groups without losing sets in the axis fold',
+        () {
+      final currentSession = _session('s1', inCurrent);
+      final rawGroups = <String, String>{
+        'chest': 'chest',
+        'back': 'back',
+        'shoulders': 'shoulders',
+        'biceps': 'biceps',
+        'triceps': 'triceps',
+        'quads': 'quads',
+        'hamstrings': 'hamstrings',
+        'glutes': 'glutes',
+        'calves': 'calves',
+        'abs': 'abs',
+      };
+
+      final result = aggregateMuscleDistribution(
+        periodWindow: window,
+        sessionsDesc: [currentSession],
+        logsBySession: {
+          's1': [
+            for (final exerciseId in rawGroups.keys) _log(exerciseId),
+          ],
+        },
+        muscleGroupByExerciseId: rawGroups,
+      );
+
+      expect(result.currentSetsByGroup.keys,
+          containsAll(MuscleGroupDisplay.values));
+      expect(
+          result.currentSetsByGroup.length, MuscleGroupDisplay.values.length);
+      expect(
+          result.currentSetsByGroup.values.every((sets) => sets == 1), isTrue);
+      expect(
+        result.currentSetsByGroup.values
+            .fold<int>(0, (sum, sets) => sum + sets),
+        result.currentSetsByAxis.values.fold<int>(0, (sum, sets) => sum + sets),
+      );
     });
 
     test('sums durationMin and totalVolumeKg per window', () {
@@ -194,6 +240,38 @@ void main() {
       );
 
       expect(result.isEmpty, isTrue);
+    });
+
+    test('equality and hashCode include currentSetsByGroup', () {
+      const chest = MuscleDistributionInsights(
+        currentSetsByAxis: {RadarAxis.chest: 1},
+        previousSetsByAxis: {},
+        currentSetsByGroup: {MuscleGroupDisplay.pecho: 1},
+        currentWorkouts: 1,
+        previousWorkouts: 0,
+        currentDurationMin: 0,
+        previousDurationMin: 0,
+        currentVolumeKg: 0,
+        previousVolumeKg: 0,
+        currentSets: 1,
+        previousSets: 0,
+      );
+      const shoulders = MuscleDistributionInsights(
+        currentSetsByAxis: {RadarAxis.chest: 1},
+        previousSetsByAxis: {},
+        currentSetsByGroup: {MuscleGroupDisplay.hombros: 1},
+        currentWorkouts: 1,
+        previousWorkouts: 0,
+        currentDurationMin: 0,
+        previousDurationMin: 0,
+        currentVolumeKg: 0,
+        previousVolumeKg: 0,
+        currentSets: 1,
+        previousSets: 0,
+      );
+
+      expect(chest, isNot(equals(shoulders)));
+      expect(chest.hashCode, isNot(shoulders.hashCode));
     });
   });
 }

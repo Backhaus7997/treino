@@ -31,7 +31,7 @@
  * See scripts/README.md (Emulator seed section) for full details.
  */
 
-const admin = require('firebase-admin');
+const { inicializarAdmin } = require('./lib/admin');
 
 // ── Guard: must target the emulator ─────────────────────────────────────────
 
@@ -47,7 +47,10 @@ if (!process.env.FIREBASE_AUTH_EMULATOR_HOST || !process.env.FIRESTORE_EMULATOR_
 }
 
 // Admin SDK with emulator — no service account needed.
-admin.initializeApp({ projectId: 'treino-dev' });
+// Pasa igual por la frontera (#834) aunque el guard de arriba ya garantiza
+// emulador: así no queda NINGÚN `initializeApp` suelto en `scripts/`, y el
+// día que alguien afloje ese guard la credencial sigue sin estar a mano.
+const { admin } = inicializarAdmin();
 
 const auth = admin.auth();
 const db = admin.firestore();
@@ -117,9 +120,9 @@ function postTime(sequence) {
 // ── Gyms (subset — full set in seed_gyms.js) ────────────────────────────────
 
 const GYMS = [
-  { id: 'seed-gym-baires-001', name: 'Megatlon Palermo', address: 'Av. Santa Fe 5025, Palermo', lat: -34.5786, lng: -58.4243 },
-  { id: 'seed-gym-baires-002', name: 'SmartFit Caballito', address: 'Av. Rivadavia 5050, Caballito', lat: -34.6189, lng: -58.4426 },
-  { id: 'seed-gym-cba-001', name: 'Megatlon Nueva Córdoba', address: 'Av. H. Yrigoyen 384, Nueva Córdoba', lat: -31.4189, lng: -64.1859 },
+  { id: 'seed-gym-baires-001', name: 'Hierro Palermo', address: 'Av. Santa Fe 4200, Palermo', lat: -34.5786, lng: -58.4243 },
+  { id: 'seed-gym-baires-002', name: 'Cadencia Caballito', address: 'Av. Rivadavia 4800, Caballito', lat: -34.6189, lng: -58.4426 },
+  { id: 'seed-gym-cba-001', name: 'Hierro Nueva Córdoba', address: 'Av. H. Yrigoyen 520, Nueva Córdoba', lat: -31.4189, lng: -64.1859 },
 ];
 
 // ── Coaches (trainers) ───────────────────────────────────────────────────────
@@ -817,7 +820,7 @@ const POSTS = [
     authorDisplayName: AUTHOR_META['seed-athlete-001'].displayName,
     authorAvatarUrl: null,
     authorGymId: 'seed-gym-baires-001',
-    text: 'El rack 3 de Megatlon Palermo va a hacer que algún día me lastime. Alguien que hable con administración.',
+    text: 'Tres semanas seguidas sin faltar a Hierro Palermo. La racha no se rompe.',
     routineTag: null,
     privacy: 'gym',
     createdAt: daysAgo(4),
@@ -839,7 +842,7 @@ const POSTS = [
     authorDisplayName: AUTHOR_META['seed-athlete-004'].displayName,
     authorAvatarUrl: null,
     authorGymId: 'seed-gym-baires-002',
-    text: 'SmartFit Caballito renovó las cintas. Finalmente.',
+    text: 'Cadencia Caballito renovó las cintas. Finalmente.',
     routineTag: null,
     privacy: 'gym',
     createdAt: daysAgo(6),

@@ -227,6 +227,10 @@
           }
         ]
       }
+    ],
+    "goals": [
+      "health",
+      "aesthetics"
     ]
   },
   {
@@ -424,6 +428,10 @@
           }
         ]
       }
+    ],
+    "goals": [
+      "health",
+      "wellbeing"
     ]
   },
   {
@@ -727,6 +735,10 @@
           }
         ]
       }
+    ],
+    "goals": [
+      "aesthetics",
+      "health"
     ]
   },
   {
@@ -1081,6 +1093,9 @@
           }
         ]
       }
+    ],
+    "goals": [
+      "aesthetics"
     ]
   },
   {
@@ -1351,6 +1366,9 @@
           }
         ]
       }
+    ],
+    "goals": [
+      "sport"
     ]
   },
   {
@@ -1559,6 +1577,10 @@
           }
         ]
       }
+    ],
+    "goals": [
+      "health",
+      "wellbeing"
     ]
   },
   {
@@ -1789,6 +1811,9 @@
           }
         ]
       }
+    ],
+    "goals": [
+      "aesthetics"
     ]
   }
 ]

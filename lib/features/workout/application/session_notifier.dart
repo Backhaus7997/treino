@@ -17,6 +17,9 @@ import 'session_init.dart';
 import 'session_duration.dart';
 import 'session_providers.dart';
 import 'session_state.dart';
+import 'weekly_streak_providers.dart';
+import '../../watch/application/watch_bridge_provider.dart';
+import '../../watch/data/treino_link.dart';
 
 /// Notifier de sesión activa. Despacha Path A (FreshSession) o Path B
 /// (ResumeSession) via switch sobre el arg sellado. Diseño §3.3.
@@ -262,6 +265,18 @@ class SessionNotifier
   void _nudgeWatch(String reason) {
     try {
       unawaited(ref.read(watchNudgeServiceProvider).nudge(reason: reason));
+
+      // Y por el canal propio, que es el ÚNICO que despierta al companion con
+      // la app del reloj cerrada — el caso normal: el atleta toca Empezar en el
+      // celular y recién después mira la muñeca.
+      //
+      // Va además del aviso de arriba y no en su lugar: aquél sigue sirviendo
+      // para el reloj que ya está abierto, y son dos transportes distintos.
+      if (reason == WatchNudgeService.reasonWorkoutStarted) {
+        unawaited(
+          ref.read(treinoLinkProvider).send(TreinoLink.pathWorkoutStarted),
+        );
+      }
     } catch (_) {
       // `ref.read` tira si el notifier ya se descartó (la ruta del player puede
       // salir mientras la escritura está en vuelo — ver la nota de #497 más
@@ -642,6 +657,70 @@ class SessionNotifier
     }
   }
 
+  /// Deja [exerciseIds] FUERA DE HOY para que la sesión entre en el tiempo que
+  /// el atleta declaró tener (#645).
+  ///
+  /// NO escribe nada: el recorte vive en [SessionState.droppedExerciseIds], que
+  /// es local a la sesión igual que `setCountOverride`. La rutina persistida no
+  /// se toca, y un plan asignado por un PF sigue diciendo exactamente lo que
+  /// decía — el atleta recorta su día, no el plan de su entrenador.
+  ///
+  /// Es aditivo (se acumula con lo ya recortado) e idempotente: recortar dos
+  /// veces lo mismo no emite estado nuevo.
+  ///
+  /// **Un ejercicio con series ya cargadas NUNCA se saca**, aunque venga en
+  /// [exerciseIds]. Sacarlo escondería trabajo real detrás de un ajuste de
+  /// tiempo, que es justo lo que el diálogo de `removeSet` existe para evitar.
+  /// `planSessionTimeFit` ya no lo propone; acá se lo sostiene como invariante
+  /// para que ningún llamador futuro pueda romperlo.
+  Future<void> dropExercisesForToday(Iterable<String> exerciseIds) async {
+    final current = state.value;
+    if (current == null || _finalized) return;
+
+    final worked = current.setLogs.map((l) => l.exerciseId).toSet();
+    final next = {
+      ...current.droppedExerciseIds,
+      ...exerciseIds.where((id) => !worked.contains(id)),
+    };
+    if (setEquals(next, current.droppedExerciseIds)) return;
+
+    state = AsyncData(current.copyWith(
+      droppedExerciseIds: next,
+      currentExerciseIndex: _indexAfterDrop(current, next),
+    ));
+  }
+
+  /// Devuelve a la sesión TODO lo que se había recortado (#645) — el "deshacer"
+  /// del ajuste de tiempo. Vuelve a poner el día como lo dice el plan.
+  Future<void> restoreDroppedExercises() async {
+    final current = state.value;
+    if (current == null || _finalized) return;
+    if (current.droppedExerciseIds.isEmpty) return;
+
+    state = AsyncData(current.copyWith(
+      droppedExerciseIds: const <String>{},
+      currentExerciseIndex: _indexAfterDrop(current, const <String>{}),
+    ));
+  }
+
+  /// Recalcula el cursor del player para el set de recortados [dropped].
+  ///
+  /// Hace falta porque el cursor puede quedar apuntando a algo que ya no se
+  /// hace: con los tres primeros ejercicios hechos y los dos últimos sacados,
+  /// `currentExerciseIndex` seguía en el 4to — un ejercicio que salió de la
+  /// sesión. Se resuelve con el mismo resolver que usan logSet/removeSet, así
+  /// que un recortado (planned 0) nunca puede ser "el que sigue".
+  int _indexAfterDrop(SessionState current, Set<String> dropped) =>
+      _nextIncompleteIndex(
+        current.day,
+        current.setLogs,
+        current.session.weekNumber,
+        (s) => dropped.contains(s.exerciseId)
+            ? 0
+            : (current.setCountOverride[s.exerciseId] ??
+                s.effectiveSetsForWeek(current.session.weekNumber).length),
+      );
+
   /// Reintenta la última operación de log/update/remove que falló. Lo invoca
   /// la acción "Reintentá" del SnackBar (capa de UI). Limpia el canal de
   /// error y re-despacha hacia logSet/updateSet/removeSet, que volverán a
@@ -684,6 +763,10 @@ class SessionNotifier
         wasFullyCompleted: false,
         totalVolumeKg: current.totalVolumeKg,
         durationMin: _durationMin(current.elapsedSeconds),
+        // Leído acá y no adentro del repositorio: la racha semanal se mide
+        // contra el objetivo de la rutina activa, y quien sabe resolver eso
+        // es la capa de aplicación.
+        weeklyTarget: ref.read(weeklyStreakTargetProvider),
       );
     } catch (_) {
       _finalized = false;
@@ -727,6 +810,10 @@ class SessionNotifier
         wasFullyCompleted: true,
         totalVolumeKg: current.totalVolumeKg,
         durationMin: _durationMin(current.elapsedSeconds),
+        // Leído acá y no adentro del repositorio: la racha semanal se mide
+        // contra el objetivo de la rutina activa, y quien sabe resolver eso
+        // es la capa de aplicación.
+        weeklyTarget: ref.read(weeklyStreakTargetProvider),
       );
     } catch (_) {
       _finalized = false;

@@ -465,6 +465,7 @@ void main() {
             sessionId: any(named: 'sessionId'),
             finishedAt: any(named: 'finishedAt'),
             wasFullyCompleted: any(named: 'wasFullyCompleted'),
+            weeklyTarget: any(named: 'weeklyTarget'),
             totalVolumeKg: any(named: 'totalVolumeKg'),
             durationMin: any(named: 'durationMin'),
           )).thenAnswer((_) async {});
@@ -492,6 +493,7 @@ void main() {
             wasFullyCompleted: true,
             totalVolumeKg: any(named: 'totalVolumeKg'),
             durationMin: 40,
+            weeklyTarget: any(named: 'weeklyTarget'),
           )).called(1);
     });
   });
@@ -611,6 +613,7 @@ void main() {
             totalVolumeKg: any(named: 'totalVolumeKg'),
             durationMin: any(named: 'durationMin'),
             wasFullyCompleted: any(named: 'wasFullyCompleted'),
+            weeklyTarget: any(named: 'weeklyTarget'),
           )).thenAnswer((_) async {});
 
       final (:container, :init) = await setupFresh(repo: repo);
@@ -713,6 +716,7 @@ void main() {
             totalVolumeKg: any(named: 'totalVolumeKg'),
             durationMin: any(named: 'durationMin'),
             wasFullyCompleted: any(named: 'wasFullyCompleted'),
+            weeklyTarget: any(named: 'weeklyTarget'),
           )).thenAnswer((_) async {});
 
       final routine = makeRoutine();
@@ -733,6 +737,7 @@ void main() {
             totalVolumeKg: any(named: 'totalVolumeKg'),
             durationMin: any(named: 'durationMin'),
             wasFullyCompleted: captureAny(named: 'wasFullyCompleted'),
+            weeklyTarget: any(named: 'weeklyTarget'),
           )).captured;
       expect(captured.first, isFalse);
     });
@@ -755,6 +760,7 @@ void main() {
             totalVolumeKg: any(named: 'totalVolumeKg'),
             durationMin: any(named: 'durationMin'),
             wasFullyCompleted: any(named: 'wasFullyCompleted'),
+            weeklyTarget: any(named: 'weeklyTarget'),
           )).thenAnswer((_) async {});
 
       final routine = makeRoutine();
@@ -775,6 +781,7 @@ void main() {
             totalVolumeKg: any(named: 'totalVolumeKg'),
             durationMin: any(named: 'durationMin'),
             wasFullyCompleted: any(named: 'wasFullyCompleted'),
+            weeklyTarget: any(named: 'weeklyTarget'),
           )).called(1);
     });
 
@@ -798,6 +805,7 @@ void main() {
             totalVolumeKg: any(named: 'totalVolumeKg'),
             durationMin: any(named: 'durationMin'),
             wasFullyCompleted: any(named: 'wasFullyCompleted'),
+            weeklyTarget: any(named: 'weeklyTarget'),
           )).thenAnswer((_) async {});
       when(() => repo.listByUid('u1', limit: any(named: 'limit')))
           .thenAnswer((_) async => <Session>[]);
@@ -856,6 +864,7 @@ void main() {
             totalVolumeKg: any(named: 'totalVolumeKg'),
             durationMin: any(named: 'durationMin'),
             wasFullyCompleted: any(named: 'wasFullyCompleted'),
+            weeklyTarget: any(named: 'weeklyTarget'),
           )).thenAnswer((_) async {});
 
       final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
@@ -876,6 +885,7 @@ void main() {
             totalVolumeKg: any(named: 'totalVolumeKg'),
             durationMin: any(named: 'durationMin'),
             wasFullyCompleted: captureAny(named: 'wasFullyCompleted'),
+            weeklyTarget: any(named: 'weeklyTarget'),
           )).captured;
       expect(captured.first, isTrue);
     });
@@ -941,6 +951,7 @@ void main() {
             totalVolumeKg: any(named: 'totalVolumeKg'),
             durationMin: any(named: 'durationMin'),
             wasFullyCompleted: any(named: 'wasFullyCompleted'),
+            weeklyTarget: any(named: 'weeklyTarget'),
           )).thenAnswer((_) async {});
       // sessionsByUidProvider's fetch — counted to prove the invalidation
       // forces a re-fetch.
@@ -1929,6 +1940,160 @@ void main() {
         reason:
             'la serie entró por el stream Y por el append: se contaba doble',
       );
+    });
+  });
+
+  // ── #645: recortar la sesión al tiempo disponible ─────────────────────────
+
+  group('SessionNotifier.dropExercisesForToday', () {
+    Future<({ProviderContainer container, SessionInit init})> boot({
+      required MockSessionRepository repo,
+      List<RoutineSlot>? slots,
+    }) async {
+      final routine = makeRoutine(
+        days: [
+          makeDay(
+            slots: slots ??
+                [
+                  makeSlot(exerciseId: 'e1', targetSets: 2),
+                  makeSlot(exerciseId: 'e2', targetSets: 2),
+                  makeSlot(exerciseId: 'e3', targetSets: 2),
+                ],
+          )
+        ],
+      );
+      when(() => repo.create(
+            uid: any(named: 'uid'),
+            routineId: any(named: 'routineId'),
+            routineName: any(named: 'routineName'),
+            startedAt: any(named: 'startedAt'),
+            dayNumber: any(named: 'dayNumber'),
+            weekNumber: any(named: 'weekNumber'),
+          )).thenAnswer((_) async => makeSession());
+
+      final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
+      addTearDown(container.dispose);
+      final init = FreshSession(routineId: routine.id, dayNumber: 1);
+      await container.read(sessionNotifierProvider(init).future);
+      return (container: container, init: init);
+    }
+
+    test('deja los ejercicios fuera de hoy sin escribir nada en Firestore',
+        () async {
+      final repo = MockSessionRepository();
+      final booted = await boot(repo: repo);
+      final notifier =
+          booted.container.read(sessionNotifierProvider(booted.init).notifier);
+
+      await notifier.dropExercisesForToday(const ['e2', 'e3']);
+
+      final state =
+          booted.container.read(sessionNotifierProvider(booted.init)).value!;
+      expect(state.droppedExerciseIds, equals(const {'e2', 'e3'}));
+      expect(state.activeExerciseCount, equals(1));
+      verifyNever(() => repo.addSetLog(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            setLog: any(named: 'setLog'),
+          ));
+      verifyNever(() => repo.deleteSetLog(
+            uid: any(named: 'uid'),
+            sessionId: any(named: 'sessionId'),
+            setLogId: any(named: 'setLogId'),
+          ));
+    });
+
+    test('NO saca un ejercicio que ya tiene series hechas', () async {
+      final repo = MockSessionRepository();
+      when(() => repo.addSetLog(
+                uid: any(named: 'uid'),
+                sessionId: any(named: 'sessionId'),
+                setLog: any(named: 'setLog'),
+              ))
+          .thenAnswer(
+              (i) async => i.namedArguments[const Symbol('setLog')] as SetLog);
+
+      final booted = await boot(repo: repo);
+      final notifier =
+          booted.container.read(sessionNotifierProvider(booted.init).notifier);
+      await notifier.logSet(makeSetLog(exerciseId: 'e2', setNumber: 1));
+
+      await notifier.dropExercisesForToday(const ['e2', 'e3']);
+
+      final state =
+          booted.container.read(sessionNotifierProvider(booted.init)).value!;
+      expect(state.droppedExerciseIds, equals(const {'e3'}),
+          reason: 'e2 tiene trabajo hecho: sacarlo lo escondería');
+    });
+
+    test('es acumulativo e idempotente — recortar dos veces no rompe nada',
+        () async {
+      final repo = MockSessionRepository();
+      final booted = await boot(repo: repo);
+      final notifier =
+          booted.container.read(sessionNotifierProvider(booted.init).notifier);
+
+      await notifier.dropExercisesForToday(const ['e3']);
+      final first =
+          booted.container.read(sessionNotifierProvider(booted.init)).value!;
+      await notifier.dropExercisesForToday(const ['e3']);
+      final again =
+          booted.container.read(sessionNotifierProvider(booted.init)).value!;
+      expect(identical(first, again), isTrue,
+          reason: 'sin cambio real no se emite estado nuevo');
+
+      await notifier.dropExercisesForToday(const ['e2']);
+      final merged =
+          booted.container.read(sessionNotifierProvider(booted.init)).value!;
+      expect(merged.droppedExerciseIds, equals(const {'e2', 'e3'}));
+    });
+
+    test('mueve el cursor fuera de un ejercicio que acaba de salir', () async {
+      final repo = MockSessionRepository();
+      final booted = await boot(repo: repo);
+      final notifier =
+          booted.container.read(sessionNotifierProvider(booted.init).notifier);
+
+      await notifier.dropExercisesForToday(const ['e1']);
+
+      final state =
+          booted.container.read(sessionNotifierProvider(booted.init)).value!;
+      expect(state.currentExerciseIndex, equals(1),
+          reason: 'e1 salió: el que sigue es e2');
+    });
+
+    test('la rutina persistida no se toca — el día del plan queda igual',
+        () async {
+      final repo = MockSessionRepository();
+      final booted = await boot(repo: repo);
+      final notifier =
+          booted.container.read(sessionNotifierProvider(booted.init).notifier);
+
+      await notifier.dropExercisesForToday(const ['e2', 'e3']);
+
+      final state =
+          booted.container.read(sessionNotifierProvider(booted.init)).value!;
+      expect(
+        state.day.slots.map((s) => s.exerciseId),
+        equals(['e1', 'e2', 'e3']),
+        reason: 'el recorte es de la sesión, no del plan',
+      );
+    });
+
+    test('restoreDroppedExercises devuelve todo a la sesión', () async {
+      final repo = MockSessionRepository();
+      final booted = await boot(repo: repo);
+      final notifier =
+          booted.container.read(sessionNotifierProvider(booted.init).notifier);
+
+      await notifier.dropExercisesForToday(const ['e2', 'e3']);
+      await notifier.restoreDroppedExercises();
+
+      final state =
+          booted.container.read(sessionNotifierProvider(booted.init)).value!;
+      expect(state.droppedExerciseIds, isEmpty);
+      expect(state.activeExerciseCount, equals(3));
+      expect(state.currentExerciseIndex, equals(0));
     });
   });
 }

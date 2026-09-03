@@ -334,7 +334,7 @@ class _CustomExerciseFormDialogState
                     onPressed: _saving ? null : _save,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: palette.accent,
-                      foregroundColor: palette.bg,
+                      foregroundColor: TreinoButtonTokens.foreground(context),
                       disabledBackgroundColor: palette.accent.withValues(
                         alpha: 0.3,
                       ),
@@ -349,7 +349,7 @@ class _CustomExerciseFormDialogState
                             height: 16,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: palette.bg,
+                              color: TreinoButtonTokens.foreground(context),
                             ),
                           )
                         : Text(

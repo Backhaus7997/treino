@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Temas del flavor `wear`. Pisan a los de `src/main` sólo en el APK del reloj.
+
+  ## Por qué se apaga windowSwipeToDismiss
+
+  En Wear OS el gesto izquierda→derecha cierra la Activity **desde cualquier
+  punto de la pantalla**, no desde un borde. Con eso prendido, cualquier
+  navegación horizontal compite contra el gesto de salida en el 100% de la
+  superficie: el dueño lo reportó como *"cuando quiero moverme a la izquierda no
+  funciona y se cierra la app"*.
+
+  Apagándolo, el `SwipeDismissLayout` nunca se inserta en el DecorView y el gesto
+  llega entero a Flutter.
+
+  ## El precio, y cómo se paga
+
+  Google marca apagarlo como no recomendado, y con razón: **ahora la salida es
+  responsabilidad nuestra**. Si no la implementamos, el atleta queda encerrado en
+  la app.
+
+  Se paga en `WearPager`: en la PRIMERA página, un arrastre izquierda→derecha
+  llama a `SystemNavigator.pop()`, que es exactamente lo que hacía el sistema.
+  En las demás páginas ese mismo gesto vuelve una página. O sea que el atleta no
+  aprende nada nuevo: el gesto significa "atrás", y en la primera pantalla atrás
+  es salir.
+
+  Va en LOS DOS estilos: `PhoneWindow.generateLayout()` lee el atributo del tema
+  activo al momento del primer `setContentView()`, y `FlutterActivity` cambia de
+  Launch a Normal en `onCreate`. Declararlo en ambos evita depender de ese orden.
+-->
+<resources>
+    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowBackground">@drawable/launch_background</item>
+        <item name="android:windowSwipeToDismiss">false</item>
+    </style>
+    <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowBackground">?android:colorBackground</item>
+        <item name="android:windowSwipeToDismiss">false</item>
+    </style>
+</resources>

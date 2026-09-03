@@ -1,0 +1,197 @@
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
+
+import '../../../../app/theme/app_palette.dart';
+import '../../../../core/widgets/treino_icon.dart';
+import 'superset_block.dart';
+
+/// Relleno del agarre cuando la card es miembro de una superserie, sobre 255.
+const int _kAgarreSuperserie = 40;
+
+/// Ancho del área que agarra el ejercicio para arrastrarlo, en dp.
+///
+/// Bien por encima del mínimo de 44: el agarre se toca en movimiento, con el
+/// pulgar, mirando otra parte de la pantalla. El ancho es lo BARATO de agrandar
+/// —desde el rediseño de ancho completo sobran ~62 dp— así que el target crece
+/// por acá y no por el alto.
+const double _kLadoAgarre = 56;
+
+/// Alto del agarre, en dp.
+///
+/// **48 y no más**, y no es una elección estética: la fila de la cabecera mide
+/// exactamente el alto de su hijo más alto, que es el botón ⋮ con su
+/// `minHeight: 48`. Un agarre más alto pasa a ser él el que manda y CADA card
+/// engorda, en la única pantalla donde el alto es el recurso escaso (ver la
+/// nota de la cabecera del día). La primera versión de esto puso 52 "porque el
+/// header ya era más alto" — no lo era, medía 44. Lo fija un test.
+const double _kAltoAgarre = 48;
+
+/// Collapsible presentation shell for one exercise in the routine editor.
+class ExerciseCard extends StatelessWidget {
+  const ExerciseCard({
+    required this.title,
+    required this.summary,
+    required this.expanded,
+    required this.onToggle,
+    required this.menu,
+    required this.child,
+    this.reorderIndex,
+    this.dragHandleKey,
+    this.hasError = false,
+    this.supersetPosition,
+    super.key,
+  });
+
+  final String title;
+  final Widget summary;
+  final bool expanded;
+  final VoidCallback onToggle;
+  final Widget menu;
+  final Widget child;
+  final bool hasError;
+
+  /// Posición de esta card en el [ReorderableListView] más cercano.
+  final int? reorderIndex;
+
+  /// Key estable para alcanzar el agarre desde tests de gesto.
+  final Key? dragHandleKey;
+
+  /// Posición 0-based dentro de una superserie, o null si el ejercicio es
+  /// suelto. Cuando está, el agarre se tiñe de `highlight` y muestra el badge
+  /// `A1`/`A2`: son las dos marcas que dicen "esta card es parte de un grupo"
+  /// desde afuera del bloque que la envuelve.
+  final int? supersetPosition;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+
+    final enSuperserie = supersetPosition != null;
+
+    // El target crece a lo ANCHO y no a lo alto. Por qué, en los dartdocs de
+    // [_kLadoAgarre] y [_kAltoAgarre] — el alto está atado al del ⋮ y no es
+    // negociable sin engordar cada card de la pantalla.
+    final handle = SizedBox(
+      key: dragHandleKey,
+      width: _kLadoAgarre,
+      height: _kAltoAgarre,
+      child: Center(
+        child: Container(
+          decoration: BoxDecoration(
+            color: enSuperserie
+                ? palette.highlight.withAlpha(_kAgarreSuperserie)
+                : palette.surfaceSubtle,
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+          ),
+          child: Icon(
+            TreinoIcon.dragHandle,
+            size: 18,
+            color: enSuperserie ? palette.highlight : palette.textFaint,
+          ),
+        ),
+      ),
+    );
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.s12,
+        AppSpacing.s12,
+        AppSpacing.s12,
+        AppSpacing.s8,
+      ),
+      decoration: BoxDecoration(
+        color: palette.bg,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        // El borde SÍ se pinta de rojo, pero SÓLO con la card cerrada.
+        //
+        // #868 lo había sacado del todo, y por una buena razón: un campo vacío
+        // llegó a marcar cinco cosas a la vez —celda, card, meta, punto de la
+        // pestaña y pie—, y con 3 días × 5 ejercicios eso es una pantalla en
+        // rojo donde ninguna señal manda.
+        //
+        // Lo que aquella versión no cubría es el estado CERRADO. Ahí la celda
+        // —la señal precisa, la que dice qué campo falta— no está en pantalla,
+        // y desde afuera una card sin completar se ve igual que una completa.
+        // La solución de entonces fue abrirla sola; en device eso resultó peor
+        // que el problema, porque reacomodar ejercicios desplegaba media
+        // pantalla de golpe.
+        //
+        // Así que la señal no se suma: se MUEVE con el estado. Cerrada, manda
+        // el borde y dice "acá falta algo". Abierta, el borde se apaga y manda
+        // la celda, que dice qué. Nunca las dos, que era el problema del #868.
+        border: Border.all(
+          color: hasError && !expanded ? palette.danger : palette.border,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // El agarre y el badge van FUERA del InkWell a propósito. Adentro,
+          // el toggle se los tragaba: un tap sobre el agarre desplegaba la
+          // card —medido— y eso es lo peor de los dos mundos, porque el
+          // agarre ES el widget que el usuario toca cuando quiere mover, no
+          // cuando quiere abrir. El área tapeable es el TÍTULO, que es lo que
+          // se lee como "abrime".
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (reorderIndex case final index?)
+                ReorderableDragStartListener(
+                  index: index,
+                  child: handle,
+                )
+              else
+                handle,
+              if (enSuperserie) ...[
+                SupersetBadge(position: supersetPosition!),
+                const SizedBox(width: AppSpacing.s8),
+              ],
+              Expanded(
+                child: InkWell(
+                  key: const Key('exercise_card_header'),
+                  onTap: onToggle,
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.hairline,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: GoogleFonts.barlow(
+                            fontSize: 16,
+                            height: 1.15,
+                            fontWeight: FontWeight.w700,
+                            color: palette.textPrimary,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: AppSpacing.hairline),
+                        summary,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              menu,
+            ],
+          ),
+          if (expanded) ...[
+            const SizedBox(height: AppSpacing.s12),
+            // La key existe SOLO cuando la card está desplegada: es lo
+            // que deja a un test saber en qué estado está sin depender
+            // del contenido. Ver `expandirEjercicios` en los fixtures.
+            KeyedSubtree(
+              key: const Key('exercise_card_body'),
+              child: child,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}

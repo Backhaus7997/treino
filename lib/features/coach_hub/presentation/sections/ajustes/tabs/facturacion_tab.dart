@@ -9,6 +9,7 @@ import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/subscription_tier.dart';
 import 'package:treino/features/coach/domain/weighted_load.dart';
+import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_upsell_banner.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 
 /// Tab «Facturación TREINO» (paywall Fase 7, PR2 — vista read-only).
@@ -70,14 +71,6 @@ class FacturacionTab extends ConsumerWidget {
   }
 }
 
-/// Nombre visible del tier.
-String _tierLabel(SubscriptionTier tier) => switch (tier) {
-      SubscriptionTier.free => 'Free', // i18n: Fase W3
-      SubscriptionTier.plan1 => 'Plan 1', // i18n: Fase W3
-      SubscriptionTier.plan2 => 'Plan 2', // i18n: Fase W3
-      SubscriptionTier.plan3 => 'Plan 3', // i18n: Fase W3
-    };
-
 class _CurrentPlanCard extends StatelessWidget {
   const _CurrentPlanCard({
     required this.tier,
@@ -131,7 +124,7 @@ class _CurrentPlanCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'TREINO Coach · ${_tierLabel(tier)}', // i18n: Fase W3
+                      'TREINO Coach · ${tierLabel(tier)}', // i18n: Fase W3
                       style: GoogleFonts.barlowCondensed(
                         color: palette.textPrimary,
                         fontSize: 20,

@@ -8,8 +8,12 @@ NOT `functions/src/__tests__/`, which uses the Admin SDK and bypasses rules).
 **Scenario namespace**: S1–S12 (rules, `design.md` §10.1) / T1–T6 (Dart, `design.md` §10.2), REQ-ASM-01..09
 **Env note (ALL rules-test runs)**: `export JAVA_HOME="$(brew --prefix openjdk@21)/libexec/openjdk.jdk/Contents/Home"`
 before `scripts/test_rules.sh` (JDK 21 required, `openjdk@21` is brew-installed but unlinked).
-**Hard gate**: PR2 tasks are BLOCKED until PR1 is merged AND `firebase deploy --only firestore:rules`
-has actually run against the target project. Widget/provider tests use `fake_cloud_firestore`, which does
+**Hard gate**: PR2 tasks are BLOCKED until PR1 is merged AND `firebase deploy --only firestore:rules --project prod`
+has actually run against the target project. 🚨 **That target project is PRODUCTION** — `prod` and
+`treino-dev` are the same and only Firebase project TREINO has, with real users in it. A bare
+`firebase deploy` with no `--project` lands there too: `.firebaserc` fills in the default silently.
+The deploy is a human step with explicit sign-off; an agent does NOT run it.
+See [openspec/AGENTS.md](../../AGENTS.md) · #826. Widget/provider tests use `fake_cloud_firestore`, which does
 NOT enforce rules — they will pass locally even if PR1's rule is not live. Shipping PR2 before the rule is
 deployed means real self-log writes fail with `permission-denied` in production.
 
@@ -129,7 +133,8 @@ changes.**
 - [ ] **1.17** `[GATE]` `firebase deploy --only firestore:rules --dry-run --project treino-dev` compiles
       with no syntax errors (no `storage.rules` change in this PR, so `--only firestore:rules` alone is
       sufficient — unlike `rules-hardening`, which touched both).
-- [ ] **1.18** `[MANUAL]` User's manual step: run `firebase deploy --only firestore:rules` to ship PR1.
+- [ ] **1.18** `[MANUAL — 🚨 PRODUCTION, do NOT run]` User's manual step: run
+      `firebase deploy --only firestore:rules --project prod` to ship PR1.
       Do this only after 1.16 and 1.17 are green and the PR is merged. **PR2 cannot start real writes
       until this has actually run** (see the hard gate note at the top of this file).
 
@@ -278,7 +283,7 @@ Chain strategy: stacked-to-main
   being LIVE in the deployed Firestore project (§ hard gate above), not merely merged in git. A
   feature-branch-chain (tracker branch accumulating both PRs) would not get the rule live until the
   final merge, which breaks PR2's self-log writes for the entire review window. PR1 must merge to main
-  AND be deployed (`firebase deploy --only firestore:rules`) before PR2 opens for real-environment
+  AND be deployed (🚨 PROD: `firebase deploy --only firestore:rules --project prod`) before PR2 opens for real-environment
   testing.
 - **400-line budget risk: Medium** — PR1 is Low risk (well under budget even at the high estimate). PR2
   is Low risk on production code alone but Medium overall once its 5 test files are counted; no further

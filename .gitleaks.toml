@@ -1,0 +1,104 @@
+# Configuración de gitleaks para TREINO — ver .github/workflows/security.yml
+#
+# El gate de secretos es BLOQUEANTE: si gitleaks encuentra algo, el PR no
+# mergea. Para que eso sea sostenible el ruido tiene que ser cero, y hoy el
+# ruleset por defecto marca 1042 hits sobre el repo — TODOS falsos positivos
+# verificados uno por uno (ver cada bloque de abajo). Sin este archivo el gate
+# sale rojo en el primer PR y a la semana alguien lo apaga.
+#
+# REGLA DE ORO al tocar este archivo: cada allowlist va acotada por
+# `targetRules` (qué regla se silencia) Y por `paths`/`regexes` (dónde). NUNCA
+# agregues un path global sin regla: eso deja el archivo ciego a secretos de
+# verdad para siempre. Si sumás una entrada, escribí POR QUÉ no es un secreto.
+
+title = "TREINO gitleaks config"
+
+[extend]
+useDefault = true
+
+# ---------------------------------------------------------------------------
+# 1. Config de cliente de Firebase — pública por diseño.
+#
+# Las API keys de `firebase_options.dart`, `google-services.json` y
+# `GoogleService-Info.plist` viajan dentro del binario de la app y del bundle
+# web: cualquiera que instale TREINO las tiene. No son un secreto y rotarlas no
+# aporta nada. La autorización real la dan las reglas de Firestore/Storage y
+# App Check, no la key.
+# ---------------------------------------------------------------------------
+[[allowlists]]
+description = "Firebase client config (API keys públicas por diseño)"
+# Las dos reglas: al silenciar gcp-api-key, generic-api-key agarra la misma línea.
+targetRules = ["gcp-api-key", "generic-api-key"]
+paths = [
+  '''^lib/firebase_options\.dart$''',
+  '''^android/app/google-services\.json$''',
+  '''^ios/Runner/GoogleService-Info\.plist$''',
+]
+
+# ---------------------------------------------------------------------------
+# 2. Client key de Google Places.
+#
+# Decisión ya tomada y documentada en el dartdoc de `_placesClientKey`: es una
+# client key RESTRINGIDA en GCP Console (API restriction = Places API New).
+# Igual que la de Firebase, viaja en el binario; la protección es la
+# restricción de la key, no esconderla.
+#
+# OJO: el gate NO puede verificar que la restricción siga puesta en GCP. Eso se
+# chequea a mano en Console → Credentials del project treino-dev.
+# ---------------------------------------------------------------------------
+[[allowlists]]
+description = "Places client key restringida (default committeado a propósito)"
+targetRules = ["gcp-api-key", "generic-api-key"]
+paths = ['''^lib/features/gyms/application/places_providers\.dart$''']
+
+# ---------------------------------------------------------------------------
+# 3. Podfile.lock — los "secretos" son los checksums SHA de cada pod.
+# ---------------------------------------------------------------------------
+[[allowlists]]
+description = "Checksums de CocoaPods, no secretos"
+targetRules = ["generic-api-key"]
+paths = ['''^ios/Podfile\.lock$''']
+
+# ---------------------------------------------------------------------------
+# 4. Catálogo de videos de ejercicios (docs/video-catalog-audit/).
+#
+# 1028 de los 1042 hits salen de acá: son download tokens de Firebase Storage
+# (`?alt=media&token=<uuid>`) dentro de las URLs de los videos demo del
+# catálogo. Los videos son contenido público del producto — el token da lectura
+# a un objeto que ya es world-readable.
+#
+# NO es PII ni credencial de usuario. Si algún día se sirve contenido privado
+# por URL con token, ese caso NO puede caer en esta carpeta.
+# ---------------------------------------------------------------------------
+[[allowlists]]
+description = "Download tokens de Storage de videos públicos del catálogo"
+targetRules = ["generic-api-key"]
+paths = ['''^docs/video-catalog-audit/''']
+
+# ---------------------------------------------------------------------------
+# 5. Región de las Cloud Functions.
+#
+# `southamerica-east1` matchea el patrón genérico de generic-api-key cuando
+# aparece entre backticks en los docs de openspec. Se silencia el string, no la
+# carpeta: cualquier otro secreto en openspec/ sigue siendo detectado.
+# ---------------------------------------------------------------------------
+[[allowlists]]
+description = "Región de GCP confundida con API key genérica"
+targetRules = ["generic-api-key"]
+regexes = ['''southamerica-east1''']
+
+# ---------------------------------------------------------------------------
+# 6. Output de build — gitignoreado, nunca commiteado.
+#
+# En CI no existe (el checkout es limpio), pero gitleaks NO lee .gitignore, así
+# que sin esto una corrida local sobre un working tree ya buildeado escupe hits
+# de `main.dart.js` y `app.dill` que no están en el repo. Es el único bloque sin
+# `targetRules` a propósito: no hay nada que auditar en artefactos generados.
+# ---------------------------------------------------------------------------
+[[allowlists]]
+description = "Artefactos de build locales (no versionados)"
+paths = [
+  '''^build/''',
+  '''^\.dart_tool/''',
+  '''(^|/)node_modules/''',
+]

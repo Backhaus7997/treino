@@ -12,7 +12,6 @@ import '../../../coach/domain/trainer_link.dart';
 import '../../../coach/domain/trainer_link_status.dart';
 import '../../../profile/application/user_providers.dart';
 import '../../../profile/application/user_public_profile_providers.dart';
-import '../../../profile/domain/experience_level.dart' show ExperienceLevelEs;
 import '../../application/assigned_routine_providers.dart';
 import '../../application/routine_providers.dart'
     show routineRepositoryProvider;
@@ -21,6 +20,7 @@ import '../../application/unified_routines_providers.dart';
 import '../../application/user_routines_providers.dart';
 import '../../domain/routine.dart';
 import 'coach_chip.dart';
+import 'routine_meta.dart';
 
 const int _kRoutineCap = 10;
 
@@ -460,7 +460,13 @@ class _RoutineCard extends ConsumerWidget {
                   ] else ...[
                     const SizedBox(height: 4),
                     Text(
-                      '${(routine.split ?? l10n.workoutSplitFallback).toUpperCase()} · ${routine.level.displayNameEs.toUpperCase()}',
+                      // #648: la jerga deja de liderar. Antes esta línea era
+                      // '{SPLIT} · {NIVEL}' y el split iba primero y en
+                      // mayúsculas. Ahora comparte fuente con la tarjeta de
+                      // EXPLORAR, que es lo que impide que vuelvan a divergir.
+                      routineMetaSegments(routine, l10n)
+                          .map((s) => s.toUpperCase())
+                          .join(' · '),
                       style: GoogleFonts.barlow(
                         fontWeight: FontWeight.w400,
                         fontSize: 12,

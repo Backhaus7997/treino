@@ -33,7 +33,7 @@
  *      turns this red and forces a deliberate inventory update.
  *   2. The SYNTACTIC INVARIANT (§6): no clause carrying a read verb may ever
  *      be in that set.
- *   3. The SHORT-CIRCUIT ORDER (§7) of the three read clauses that reach
+ *   3. The SHORT-CIRCUIT ORDER (§7) of the four read clauses that reach
  *      paywall-written DATA without ever naming the paywall.
  *
  * WHAT IT DOES **NOT** ASSERT — read this before trusting a green.
@@ -47,12 +47,15 @@
  *   the entitlement sweep writes `trainer_links`
  *     -> syncSessionShareOnTrainerLink (functions/src/sync-session-share.ts)
  *        fires on that write and sets/deletes `session_shares/{athleteId}`
- *     -> and `session_shares` is read by three clauses:
- *        firestore.rules:1471 (sessions), :1485 (setLogs), :1723 (measurements)
+ *     -> and `session_shares` is read by four clauses: the `sessions` doc, its
+ *        `setLogs` sub-collection, its `exerciseFeedback` sub-collection
+ *        (#628) and `measurements`. Line numbers are deliberately NOT quoted
+ *        here — they went stale twice; §7 names the clauses by match path and
+ *        the cross-check at the end of that section proves the list is whole.
  *
  * `session_shares` is deliberately NOT in PAYWALL_TOKENS, and that is a
- * decision, not an oversight. Adding it would paint those three clauses red
- * while all three are correct: in every one of them the OWNER branch comes
+ * decision, not an oversight. Adding it would paint those four clauses red
+ * while all four are correct: in every one of them the OWNER branch comes
  * FIRST and `||` short-circuits, so the athlete reading their own data never
  * reaches the get(). A red that has to be suppressed teaches nothing, and a
  * suppressed assert is worth nothing. §7 pins the fact that actually protects
@@ -75,13 +78,25 @@ const RAW_RULES = fs.readFileSync(RULES_PATH, "utf8");
 
 /**
  * Tokens that mean "this clause knows about the paywall block state".
- * `blockedAthleteIds` is not in firestore.rules today — it is listed because
+ *
+ * `blockedAthleteIds` was listed BEFORE it existed in firestore.rules, because
  * the denormalized-list shape is the most likely way a future enforcement
- * lands, and the scanner has to be armed BEFORE it is written.
+ * lands and the scanner has to be armed first. As of paywall slice 5 it is in
+ * the file — pinned equal-to-existing on `users/{uid}` update and refused
+ * outright on create, both WRITE clauses, both frozen below. Arming it early
+ * paid off: the entry landed in the inventory the moment the clause appeared,
+ * instead of someone having to remember.
+ *
+ * `acceptedAt` is listed for the same reason and is already in the file
+ * (trainer_links create + update). It is paywall-load-bearing by definition:
+ * it is the ONLY ordering key of reconcileEntitlements, so it decides WHICH
+ * athlete loses the slot when a trainer goes over the cap. If it ever shows up
+ * in a read/get/list clause, §6 must go red.
  */
 const PAYWALL_TOKENS = [
   "trainer_links",
   "entitlement",
+  "acceptedAt",
   "blockedAthleteIds",
   "blockedAt",
   "blockedReason",
@@ -509,8 +524,36 @@ describe("rules scanner sanity", () => {
 
 const FROZEN_PAYWALL_AWARE_CLAUSES: Readonly<Record<string, readonly string[]>> = {
   // The entitlement field-pin: entitlement/blockedAt/blockedReason are
-  // CF-write-only (paywall Fase 7 PR1, design 5.2).
-  "/trainer_links/{linkId} :: update": ["blockedAt", "blockedReason", "entitlement"],
+  // CF-write-only (paywall Fase 7 PR1, design 5.2). `acceptedAt` joins them in
+  // slice 5 — pinned equal-to-existing so no member can rewrite the ordering
+  // key that decides who keeps the slot.
+  "/trainer_links/{linkId} :: update": [
+    "acceptedAt", "blockedAt", "blockedReason", "entitlement",
+  ],
+  // The other half of the acceptedAt write path. The client DOES send this
+  // field on create (TrainerLinkRepository.request() does set(toJson())), so
+  // the create clause admits it only as null. A pin on one verb, documented as
+  // if it covered both, is worse than no pin.
+  "/trainer_links/{linkId} :: create": ["acceptedAt"],
+  // Same shape for the trainer's own doc: create refuses `blockedAthleteIds`
+  // outright, because the update pin below would make a value planted at
+  // create INDELIBLE from the client.
+  "/users/{uid} :: create": ["blockedAthleteIds"],
+  // ADDED deliberately (paywall slice 5), not to make this test pass. The
+  // `blockedAthleteIds` field-pin: the trainer's own doc now pins the
+  // denormalized blocked-athlete list equal-to-existing, so only the Admin SDK
+  // (reconcileEntitlements) can move it.
+  //
+  // The verb is what makes this admissible, and it is the only thing worth
+  // checking here — for this entry and for the three slice-5 entries above:
+  // every one of them is a `create` or `update` clause. They restrict WHO MAY
+  // WRITE the field; none of them reads the field to authorize anything, and
+  // no read verb shares an expression or a helper with them. §6 stays green
+  // ON ITS OWN — it
+  // is not suppressed and it was not touched. If a future edit lands
+  // `blockedAthleteIds` in a read/get/list clause, §6 goes red and the answer
+  // is to move the check to the write path, never to widen this table.
+  "/users/{uid} :: update": ["blockedAthleteIds"],
   // chatCreateOk() reads the named link to prove a coach relationship before
   // a chat may be opened. Reaches trainer_links through the helper.
   "/chats/{chatId} :: create": ["trainer_links"],
@@ -586,7 +629,7 @@ describe("firestore.rules — the athlete never loses read access", () => {
 // ---------------------------------------------------------------------------
 // 7. ASSERT 3 — the owner branch short-circuits before session_shares.
 // ---------------------------------------------------------------------------
-// The three read clauses that touch paywall-written data WITHOUT naming the
+// The four read clauses that touch paywall-written data WITHOUT naming the
 // paywall. `session_shares/{athleteId}` is maintained by
 // syncSessionShareOnTrainerLink, which fires on `trainer_links` writes — the
 // same collection the entitlement sweep writes. §6 is blind to this by
@@ -663,7 +706,7 @@ function firstIndexOfAny(haystack: string, needles: readonly string[]): number {
 // character, so a construct the parser mangled fails loudly instead of
 // quietly weakening the assert.
 //
-// NOT SUPPORTED ON PURPOSE: unary `!`. None of the three clauses uses it, and
+// NOT SUPPORTED ON PURPOSE: unary `!`. None of the four clauses uses it, and
 // negation flips which branch short-circuits, so guessing would be worse than
 // failing. `parseBoolExpr` throws when it sees one — teach it before shipping
 // a rule that needs it.
@@ -742,26 +785,26 @@ function parseBoolExpr(squeezed: string): BoolNode {
 /** Round-trip partner of the parser: must rebuild the input exactly. */
 function serializeBool(node: BoolNode): string {
   switch (node.kind) {
-    case "atom":
-      return node.text;
-    case "group":
-      return `(${serializeBool(node.inner)})`;
-    case "and":
-      return node.parts.map(serializeBool).join("&&");
-    case "or":
-      return node.parts.map(serializeBool).join("||");
+  case "atom":
+    return node.text;
+  case "group":
+    return `(${serializeBool(node.inner)})`;
+  case "and":
+    return node.parts.map(serializeBool).join("&&");
+  case "or":
+    return node.parts.map(serializeBool).join("||");
   }
 }
 
 function atomsOf(node: BoolNode): string[] {
   switch (node.kind) {
-    case "atom":
-      return [node.text];
-    case "group":
-      return atomsOf(node.inner);
-    case "and":
-    case "or":
-      return node.parts.flatMap(atomsOf);
+  case "atom":
+    return [node.text];
+  case "group":
+    return atomsOf(node.inner);
+  case "and":
+  case "or":
+    return node.parts.flatMap(atomsOf);
   }
 }
 
@@ -779,25 +822,25 @@ function evalShortCircuit(
   hit: { atom: string },
 ): boolean {
   switch (node.kind) {
-    case "group":
-      return evalShortCircuit(node.inner, isOwner, isLookup, assignment, hit);
-    case "and":
-      for (const part of node.parts) {
-        if (!evalShortCircuit(part, isOwner, isLookup, assignment, hit)) return false;
-      }
-      return true;
-    case "or":
-      for (const part of node.parts) {
-        if (evalShortCircuit(part, isOwner, isLookup, assignment, hit)) return true;
-      }
-      return false;
-    case "atom": {
-      if (isOwner(node.text)) return true;
-      if (isLookup(node.text) && hit.atom === "") hit.atom = node.text;
-      const value = assignment.get(node.text);
-      if (value === undefined) throw new Error(`short-circuit eval: no assignment for operand "${node.text}"`);
-      return value;
+  case "group":
+    return evalShortCircuit(node.inner, isOwner, isLookup, assignment, hit);
+  case "and":
+    for (const part of node.parts) {
+      if (!evalShortCircuit(part, isOwner, isLookup, assignment, hit)) return false;
     }
+    return true;
+  case "or":
+    for (const part of node.parts) {
+      if (evalShortCircuit(part, isOwner, isLookup, assignment, hit)) return true;
+    }
+    return false;
+  case "atom": {
+    if (isOwner(node.text)) return true;
+    if (isLookup(node.text) && hit.atom === "") hit.atom = node.text;
+    const value = assignment.get(node.text);
+    if (value === undefined) throw new Error(`short-circuit eval: no assignment for operand "${node.text}"`);
+    return value;
+  }
   }
 }
 
@@ -893,6 +936,18 @@ const SHORT_CIRCUIT_CASES: readonly ShortCircuitCase[] = [
     ownerForms: ["request.auth.uid==uid", "uid==request.auth.uid"],
   },
   {
+    // #628 — el feedback por ejercicio que el alumno escribe DURANTE la
+    // sesión: comentario o molestia, con foto opcional. Es la cláusula más
+    // cara de las cuatro si el short-circuit se rompe, porque el documento no
+    // sólo contiene dato de salud: contiene la URL con token de la foto, que
+    // es una credencial al portador y no pasa por storage.rules
+    // (docs/security.md §3.1). Quien lee el doc, baja la foto.
+    what: "the athlete's own exercise feedback",
+    path: "/users/{uid}/sessions/{sessionId}/exerciseFeedback/{feedbackId}",
+    verbs: "read",
+    ownerForms: ["request.auth.uid==uid", "uid==request.auth.uid"],
+  },
+  {
     what: "the athlete's own measurements",
     path: "/measurements/{measurementId}",
     verbs: "read",
@@ -945,10 +1000,16 @@ describe("firestore.rules — the owner branch short-circuits before session_sha
       expect(analysis.witnesses).toEqual([]);
     });
 
-  it("still names three clauses — the set is not silently shrinking", () => {
+  it("still names four clauses — the set is not silently shrinking", () => {
     // Guards the it.each above against the failure mode where someone deletes
     // a case instead of re-deriving it.
-    expect(SHORT_CIRCUIT_CASES).toHaveLength(3);
+    //
+    // Fueron tres hasta #628, que sumó `exerciseFeedback`. El número se
+    // actualiza A MANO y a propósito: el cross-check de abajo se pone rojo en
+    // cuanto una cláusula de lectura nueva toca session_shares, y subir este
+    // número es el acto deliberado de decir "sí, la miré y el dueño
+    // short-circuitea". Nunca al revés.
+    expect(SHORT_CIRCUIT_CASES).toHaveLength(4);
 
     // And cross-checks the other direction: no OTHER read clause started
     // consulting session_shares without being added here. The session_shares

@@ -37,6 +37,11 @@ class TreinoIcon {
   static const IconData mapPin = PhosphorIconsRegular.mapPin;
   static const IconData bell = PhosphorIconsRegular.bell;
 
+  /// Teléfono. Lo usa el companion de Wear OS para pedirle al atleta que abra
+  /// TREINO en el celular: el reloj no puede hablar con Firestore hasta que el
+  /// teléfono le mintee una credencial.
+  static const IconData phone = PhosphorIconsRegular.deviceMobile;
+
   /// Rayo de atención — caja de ícono mint del alert banner del dashboard
   /// Coach Hub web (Fase 2, WU-02). Alias de [specialty] (mismo glyph
   /// `lightning`, distinto significado semántico según contexto de uso).
@@ -104,6 +109,12 @@ class TreinoIcon {
 
   // Feed / social
   static const IconData dotsThree = PhosphorIconsRegular.dotsThreeVertical;
+
+  /// Agarre de arrastre (⠿). Distinto de [dotsThree] a propósito: el de tres
+  /// puntos abre un menú, éste dice "podés arrastrarme". Usar el mismo glifo
+  /// para las dos cosas —que es lo que pasaba en la card de ejercicio— deja al
+  /// usuario sin forma de saber cuál hace qué.
+  static const IconData dragHandle = PhosphorIconsRegular.dotsSixVertical;
   static const IconData verified = PhosphorIconsFill.sealCheck;
   static const IconData dumbbell = PhosphorIconsRegular.barbell;
   static const IconData chevronLeft = PhosphorIconsRegular.caretLeft;
@@ -153,6 +164,15 @@ class TreinoIcon {
 
   // Profile settings constant REMOVED 2026-05-28 — gear icon was removed from
   // ProfileHeader as part of the PR#4 pivot. Zero remaining usages.
+
+  /// Ajustes de un CONTENIDO, no de la app.
+  ///
+  /// Deliberadamente NO es un engranaje: el de `ProfileHeader` se sacó del kit
+  /// en 2026-05 y no conviene reintroducirlo con otro significado. Los faders
+  /// dicen "parámetros de esto que estás editando", que es lo que abre la hoja
+  /// "DATOS DEL PLAN".
+  static const IconData contentSettings =
+      PhosphorIconsRegular.slidersHorizontal;
 
   // Appearance / theme settings
   static const IconData appearance = PhosphorIconsRegular.sun;
@@ -225,4 +245,14 @@ class TreinoIcon {
   static const IconData viewCards = PhosphorIconsRegular.squaresFour;
   // Coach Hub Web — acción archivar rutina (Fase 5, WU-04).
   static const IconData archive = PhosphorIconsRegular.archive;
+
+  // Check-in de bienestar (#643) — la entrada del hub de Insights a la serie
+  // subjetiva del atleta.
+  //
+  // Va aparte de `heartRate` y de las reacciones del feed aunque los tres sean
+  // del mismo barrio semántico: heartRate es el esfuerzo que mide el reloj y
+  // las reacciones son del feed. Reusar cualquiera de los dos ataría el
+  // bienestar a algo que no tiene nada que ver, que es justo lo que el
+  // comentario de heartRate ya pidió no hacer.
+  static const IconData wellbeing = PhosphorIconsRegular.smiley;
 }

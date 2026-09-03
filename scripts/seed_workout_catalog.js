@@ -1,13 +1,45 @@
 'use strict';
 
-const admin = require('firebase-admin');
+/**
+ * seed_workout_catalog.js
+ *
+ * 🚨 ESCRIBE EN PRODUCCIÓN por Admin SDK —salteándose las rules— salvo que
+ * apuntes al emulador. Es el entrypoint de `npm run seed:exercises`,
+ * `seed:routines` y `seed:all`, y ninguno de esos tres nombra el proyecto: lo
+ * resuelve la credencial que apunta `$TREINO_SA_KEY` (#834). El que SÍ trae las
+ * env vars del emulador es `seed:emulator`, que es la EXCEPCIÓN, no el default.
+ * Imprime un cartel antes del primer write cuando el destino es producción.
+ *
+ *   # Emulador (recomendado):
+ *   FIRESTORE_EMULATOR_HOST=localhost:8080 node scripts/seed_workout_catalog.js --all
+ *
+ * Contexto: #826 · #834 · scripts/README.md · AGENTS.md → Entornos.
+ */
+
+const { inicializarAdmin } = require('./lib/admin');
 const { equipmentMap } = require('./_equipment_map.js');
 const { videoMap } = require('./_video_map.js');
-// Guarded: seed_emulator_full.js requires this module after initializing its
-// own emulator-bound app — a second initializeApp() here would throw.
-if (!admin.apps.length) {
-  admin.initializeApp(); // uses GOOGLE_APPLICATION_CREDENTIALS env var
-}
+
+// El cartel va ANTES de inicializar: cuando `seed_emulator_full.js` requiere
+// este módulo ya inicializó su propia app contra el emulador, y ahí no hay nada
+// que advertir — `inicializarAdmin` es idempotente y devuelve la que ya existe,
+// y con Firestore desviado `bannerDeProduccion` calla solo. Fuera de ese caso,
+// `npm run seed:all` escribe el catálogo entero en producción sin que
+// `treino-dev` aparezca una sola vez en pantalla. (#826)
+const { bannerDeProduccion } = require('./lib/firebase_projects');
+const { contraEmuladorDe, projectIdObjetivo } = require('./lib/target_project');
+// #846 — por servicio, no por OR. Este script escribe SÓLO en Firestore (un
+// único `admin.firestore()`, ni Auth ni Storage), y el viejo `usandoEmulador()`
+// también miraba `FIREBASE_AUTH_EMULATOR_HOST`: esa variable suelta —la que
+// queda exportada de una sesión de `emulator.sh`— apagaba el cartel de
+// `npm run seed:all` sin desviar un solo write.
+const bannerProd = bannerDeProduccion(projectIdObjetivo(), {
+  contraEmulador: contraEmuladorDe(['firestore']),
+});
+if (bannerProd) console.warn(bannerProd);
+
+// Credenciales: la única puerta (#834).
+const { admin } = inicializarAdmin();
 const db = admin.firestore();
 
 // -- DATA ------------------------------------------------------------------

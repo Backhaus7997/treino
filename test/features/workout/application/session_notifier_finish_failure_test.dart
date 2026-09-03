@@ -90,6 +90,7 @@ void main() {
             totalVolumeKg: any(named: 'totalVolumeKg'),
             durationMin: any(named: 'durationMin'),
             wasFullyCompleted: any(named: 'wasFullyCompleted'),
+            weeklyTarget: any(named: 'weeklyTarget'),
           )).thenAnswer((_) async {
         calls++;
         if (calls == 1) throw Exception('firestore write failed');
@@ -117,6 +118,7 @@ void main() {
             totalVolumeKg: any(named: 'totalVolumeKg'),
             durationMin: any(named: 'durationMin'),
             wasFullyCompleted: any(named: 'wasFullyCompleted'),
+            weeklyTarget: any(named: 'weeklyTarget'),
           )).called(2);
     });
 
@@ -153,6 +155,7 @@ void main() {
             totalVolumeKg: any(named: 'totalVolumeKg'),
             durationMin: any(named: 'durationMin'),
             wasFullyCompleted: any(named: 'wasFullyCompleted'),
+            weeklyTarget: any(named: 'weeklyTarget'),
           )).thenAnswer((_) async {
         calls++;
         if (calls == 1) throw Exception('firestore write failed');
@@ -181,6 +184,7 @@ void main() {
             totalVolumeKg: any(named: 'totalVolumeKg'),
             durationMin: any(named: 'durationMin'),
             wasFullyCompleted: any(named: 'wasFullyCompleted'),
+            weeklyTarget: any(named: 'weeklyTarget'),
           )).called(2);
     });
   });

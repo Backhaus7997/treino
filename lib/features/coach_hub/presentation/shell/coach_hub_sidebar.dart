@@ -7,7 +7,9 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/persistence/shared_prefs_provider.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/features/coach/domain/subscription_tier.dart';
 import 'package:treino/features/coach_hub/application/sidebar_collapsed_provider.dart';
+import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_upsell_banner.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 
@@ -401,10 +403,18 @@ class _ToggleRow extends StatelessWidget {
   }
 }
 
-/// Fila de perfil del footer: avatar + nombre + subtítulo + chevron
-/// (REQ-SH-005). Colapsado: solo el avatar, centrado.
+/// Fila de perfil del footer: avatar + nombre + plan + chevron (REQ-SH-005).
+/// Colapsado: solo el avatar, centrado, con tooltip.
 ///
-/// Subtítulo estático (placeholder) — sin nueva capa de datos en Fase 1.
+/// **Es el entrypoint a la cuenta.** Antes era decorativa —chevron incluido,
+/// que prometía un menú que nunca abría— y el subtítulo era el literal
+/// "Cuenta profesional", igual para un PF en Free que para uno en Plan 3.
+/// Ahora navega a `/ajustes` (tab Cuenta, el default), donde vive el banner
+/// de upsell, y el subtítulo muestra el tier real vía [tierPlanLabel].
+///
+/// `go` y no `push`: Ajustes es una sección del shell, no un sub-flujo. Con
+/// `push` el sidebar quedaría con Ajustes activo encima de la sección
+/// anterior y el back del browser se volvería un laberinto.
 class _ProfileRow extends ConsumerWidget {
   const _ProfileRow({required this.collapsed});
 
@@ -413,11 +423,15 @@ class _ProfileRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
-    final displayName =
-        ref.watch(userProfileProvider).valueOrNull?.displayName?.trim();
+    final tokens = CoachHubSidebarItemTokens.of(context);
+    final profile = ref.watch(userProfileProvider).valueOrNull;
+    final displayName = profile?.displayName?.trim();
     final hasName = displayName != null && displayName.isNotEmpty;
     final initial = hasName ? displayName.substring(0, 1).toUpperCase() : '?';
     final name = hasName ? displayName : 'Mi cuenta'; // i18n: Fase W1
+    // Sin `subscription` en el doc → Free por definición, mismo criterio que
+    // FacturacionTab (sin backfill).
+    final tier = profile?.subscription?.tier ?? SubscriptionTier.free;
 
     final avatar = CircleAvatar(
       radius: CoachHubLayoutTokens.sidebarAvatarDiameter / 2,
@@ -432,54 +446,66 @@ class _ProfileRow extends ConsumerWidget {
       ),
     );
 
-    if (collapsed) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.s12),
-        child: Center(child: avatar),
-      );
-    }
+    final content = collapsed
+        ? Center(child: avatar)
+        : Row(
+            children: [
+              avatar,
+              const SizedBox(width: AppSpacing.s12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      name,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontFamily: AppFonts.barlow,
+                        fontWeight: AppFonts.w600,
+                        fontSize: 14,
+                        color: palette.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      tierPlanLabel(tier),
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontFamily: AppFonts.barlow,
+                        fontWeight: AppFonts.w400,
+                        fontSize: 12,
+                        color: palette.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(TreinoIcon.chevronRight, size: 16, color: palette.textMuted),
+            ],
+          );
 
-    return Padding(
-      key: const Key('sidebar_profile_row'),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.s14,
-        vertical: AppSpacing.s12,
-      ),
-      child: Row(
-        children: [
-          avatar,
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  name,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontFamily: AppFonts.barlow,
-                    fontWeight: AppFonts.w600,
-                    fontSize: 14,
-                    color: palette.textPrimary,
-                  ),
-                ),
-                Text(
-                  'Cuenta profesional', // i18n: Fase W1 — placeholder estático
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontFamily: AppFonts.barlow,
-                    fontWeight: AppFonts.w400,
-                    fontSize: 12,
-                    color: palette.textMuted,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Icon(TreinoIcon.chevronDown, size: 16, color: palette.textMuted),
-        ],
+    // Sin margin ni radius: el hover pinta la banda completa del footer, igual
+    // que el resto de la franja. Con la píldora de `_SidebarItemRow` (margin 8
+    // + padding 14) el avatar de 44 px se corría 6 px respecto del layout que
+    // ya tenía la fila, y el footer quedaba desalineado con el nombre.
+    final row = TreinoInteractiveState(
+      key: Key(collapsed ? 'sidebar_profile_avatar' : 'sidebar_profile_row'),
+      onTap: () => context.go('/ajustes'),
+      builder: (ctx, states) => AnimatedContainer(
+        duration: AppMotionTokens.resolve(ctx, AppMotionTokens.cardStateChange),
+        curve: AppMotionTokens.enter,
+        padding: EdgeInsets.symmetric(
+          // Colapsado el avatar va centrado en 72 px; el padding lo desalinearía.
+          horizontal: collapsed ? 0 : AppSpacing.s14,
+          vertical: AppSpacing.s12,
+        ),
+        color: states.hovered ? tokens.hoverBackground : Colors.transparent,
+        child: content,
       ),
     );
+
+    return collapsed
+        ? Tooltip(message: 'Mi cuenta', child: row) // i18n: Fase W1
+        : row;
   }
 }

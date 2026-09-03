@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -33,6 +35,19 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   AuthFailure? _failure;
   bool _isLoading = false;
 
+  /// Segundos que faltan para poder reenviar. 0 = habilitado.
+  int _resendIn = 0;
+  Timer? _resendTimer;
+
+  /// Espera entre reenvíos.
+  ///
+  /// ALINEADO A PROPÓSITO con `THROTTLE_WINDOW_MIN` de
+  /// `functions/src/auth/request-auth-email.ts` (1 minuto). El servidor
+  /// deduplica los pedidos que caen en la misma ventana, así que un cooldown
+  /// más corto que esa ventana dejaría reenviar, mostraría la confirmación y
+  /// descartaría el mail en silencio. Si allá cambia, acá también.
+  static const _resendCooldown = 60;
+
   @override
   void initState() {
     super.initState();
@@ -41,13 +56,60 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
 
   @override
   void dispose() {
+    _resendTimer?.cancel();
     _emailCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _submit() async {
+  /// Arranca (o reinicia) la cuenta regresiva del reenvío.
+  void _startResendCooldown() {
+    _resendTimer?.cancel();
+    setState(() => _resendIn = _resendCooldown);
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      setState(() => _resendIn--);
+      if (_resendIn <= 0) timer.cancel();
+    });
+  }
+
+  /// Vuelve al formulario para corregir la dirección.
+  ///
+  /// Hace falta justamente por REQ-AUTH-011: el copy de éxito es el mismo para
+  /// una cuenta que existe y para una que no, así que un typo se ve idéntico a
+  /// un envío correcto. Sin esta salida, el único recurso es volver al login y
+  /// empezar de cero.
+  void _editEmail() {
+    _resendTimer?.cancel();
+    setState(() {
+      _sent = false;
+      _resendIn = 0;
+      _failure = null;
+    });
+  }
+
+  /// Marca el envío como hecho y arranca el cooldown del reenvío.
+  ///
+  /// Un solo lugar para los dos caminos que cuentan como éxito: el envío real
+  /// y `userNotFound`, que REQ-AUTH-011 obliga a que se vean idénticos.
+  void _markSent() {
+    setState(() {
+      _sent = true;
+      _isLoading = false;
+    });
+    _startResendCooldown();
+  }
+
+  /// Pide (o vuelve a pedir) el mail de reseteo.
+  ///
+  /// @param isResend - Salta la validación del formulario. En el estado de
+  ///                   éxito el campo está deshabilitado y la dirección ya
+  ///                   pasó por el validador, así que revalidar no aporta.
+  Future<void> _submit({bool isResend = false}) async {
     // Catch malformed emails before the network call (align with register).
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (!isResend && !(_formKey.currentState?.validate() ?? false)) return;
     final email = _emailCtrl.text.trim();
     setState(() {
       _isLoading = true;
@@ -60,18 +122,19 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
           .sendPasswordResetEmail(email: email);
       if (!mounted) return;
       // Success or userNotFound both treated as success (REQ-AUTH-011).
-      setState(() {
-        _sent = true;
-        _isLoading = false;
-      });
+      _markSent();
     } on AuthFailure catch (f) {
       if (!mounted) return;
       // REQ-AUTH-011: userNotFound MUST be treated as success (security).
+      //
+      // Hoy esta rama es INALCANZABLE: el callable `requestPasswordReset`
+      // responde igual exista o no la cuenta, asi que `AuthService` ya no
+      // puede construir `userNotFound` por este camino. Se queda igual, a
+      // proposito. Es defensa en profundidad: si alguien vuelve a filtrar la
+      // existencia desde la capa de datos, esta guarda la tapa igual. Una
+      // linea muerta cuesta menos que un oraculo de enumeracion.
       if (f == const AuthFailure.userNotFound()) {
-        setState(() {
-          _sent = true;
-          _isLoading = false;
-        });
+        _markSent();
       } else {
         setState(() {
           _failure = f;
@@ -166,6 +229,19 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                                     height: 1.5,
                                   ),
                                 ),
+                                const SizedBox(height: 10),
+                                // Fija la expectativa ANTES de ofrecer el
+                                // reenvío: casi siempre el mail sí llegó y
+                                // está en spam, así que el primer consejo
+                                // tiene que ser mirar ahí, no reenviar.
+                                Text(
+                                  l10n.authForgotSpamHint,
+                                  style: GoogleFonts.barlow(
+                                    fontSize: 13,
+                                    color: palette.textMuted,
+                                    height: 1.5,
+                                  ),
+                                ),
                                 const SizedBox(height: 20),
                                 // Field shown as read-only after success
                                 AuthInput(
@@ -176,7 +252,48 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                                   keyboardType: TextInputType.emailAddress,
                                   enabled: false,
                                 ),
-                                const SizedBox(height: 20),
+                                // Un reenvío que falla tiene que verse. Sin
+                                // esto el estado de éxito se come el error y
+                                // el usuario queda sin señal de nada.
+                                if (_failure != null) ...[
+                                  const SizedBox(height: 12),
+                                  AuthFailureBanner(failure: _failure!),
+                                ],
+                                const SizedBox(height: 16),
+                                // Reenviar: deshabilitado hasta que corra el
+                                // cooldown, con los segundos a la vista para
+                                // que la espera sea legible y no un botón
+                                // muerto sin explicación.
+                                TextButton(
+                                  onPressed: (_resendIn > 0 || _isLoading)
+                                      ? null
+                                      : () => _submit(isResend: true),
+                                  child: Text(
+                                    _resendIn > 0
+                                        ? l10n.authForgotResendIn(_resendIn)
+                                        : l10n.authForgotResendCta,
+                                    style: GoogleFonts.barlow(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: _resendIn > 0
+                                          ? palette.textMuted
+                                          : palette.accent,
+                                    ),
+                                  ),
+                                ),
+                                // Salida para el typo que el copy de éxito
+                                // vuelve indistinguible de un envío correcto.
+                                TextButton(
+                                  onPressed: _isLoading ? null : _editEmail,
+                                  child: Text(
+                                    l10n.authForgotEditEmail,
+                                    style: GoogleFonts.barlow(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: palette.accent,
+                                    ),
+                                  ),
+                                ),
                                 TextButton(
                                   onPressed: () => context.go('/login'),
                                   child: Text(

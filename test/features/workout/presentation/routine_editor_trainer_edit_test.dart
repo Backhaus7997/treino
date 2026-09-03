@@ -40,6 +40,7 @@ import 'package:treino/features/workout/presentation/routine_editor_screen.dart'
 
 import '../../../helpers/fake_analytics_service.dart';
 import '../../../fixtures/exercises.dart';
+import '../../../fixtures/routine_editor_ui.dart';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -202,7 +203,9 @@ void main() {
       overrides: _overrides(repo: repo),
     );
 
-    expect(find.text('Editar plan'), findsOneWidget);
+    // El título del app bar es el NOMBRE del plan desde #866. El modo va en
+    // el subtítulo, que en modo entrenador incluye split y nivel.
+    expect(find.textContaining('Plan asignado'), findsOneWidget);
     expect(find.text('Crear plan'), findsNothing);
   });
 
@@ -233,12 +236,29 @@ void main() {
 
     // The form is valid: name is hydrated, split is hydrated, days is empty
     // but in trainer mode days must be non-empty. Add one slot via the CTA.
+    // The CTA lives inside the editor's ListView, below the RESUMEN field
+    // added in #648 — scroll it into the 800x600 test viewport before tapping.
+    // `scrollUntilVisible` y no `ensureVisible`: el editor es un ListView y
+    // el CTA no está CONSTRUIDO hasta que se scrollea hasta él —
+    // `ensureVisible` necesita un elemento que ya exista y tira "No element".
+    // Se notó al sumar el selector PARA QUÉ SIRVE (#635 PR#1b), que corrió el
+    // CTA fuera del área inicial en modo plantilla.
+    await tester.scrollUntilVisible(
+      find.text('Agregar ejercicio'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await desplazarHastaAgregarEjercicio(tester);
     await tester.tap(find.text('Agregar ejercicio'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Press de Banca').first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Agregar 1 ejercicio'));
     await tester.pumpAndSettle();
+    // Desde este cambio el ejercicio agregado nace PLEGADO: quien avisa
+    // que le falta completar sets es el borde rojo, no la card abierta.
+    await expandirEjercicios(tester);
 
     // Fill reps field.
     final emptyFields = find.byType(TextField).evaluate().where((e) {
@@ -322,7 +342,9 @@ void main() {
       overrides: _overrides(repo: repo),
     );
 
-    expect(find.text('Editar plan'), findsOneWidget);
+    // El título del app bar es el NOMBRE del plan desde #866. El modo va en
+    // el subtítulo, que en modo entrenador incluye split y nivel.
+    expect(find.textContaining('Plantilla reusable'), findsOneWidget);
     expect(find.text('Crear plan'), findsNothing);
   });
 
@@ -348,12 +370,29 @@ void main() {
     await tester.pump();
 
     // Add a slot so the form is valid.
+    // The CTA lives inside the editor's ListView, below the RESUMEN field
+    // added in #648 — scroll it into the 800x600 test viewport before tapping.
+    // `scrollUntilVisible` y no `ensureVisible`: el editor es un ListView y
+    // el CTA no está CONSTRUIDO hasta que se scrollea hasta él —
+    // `ensureVisible` necesita un elemento que ya exista y tira "No element".
+    // Se notó al sumar el selector PARA QUÉ SIRVE (#635 PR#1b), que corrió el
+    // CTA fuera del área inicial en modo plantilla.
+    await tester.scrollUntilVisible(
+      find.text('Agregar ejercicio'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await desplazarHastaAgregarEjercicio(tester);
     await tester.tap(find.text('Agregar ejercicio'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Press de Banca').first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Agregar 1 ejercicio'));
     await tester.pumpAndSettle();
+    // Desde este cambio el ejercicio agregado nace PLEGADO: quien avisa
+    // que le falta completar sets es el borde rojo, no la card abierta.
+    await expandirEjercicios(tester);
 
     final emptyFields = find.byType(TextField).evaluate().where((e) {
       final w = e.widget as TextField;
@@ -364,7 +403,10 @@ void main() {
     await tester.enterText(find.byWidget(repsField), '10');
     await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(ElevatedButton, 'GUARDAR CAMBIOS'));
+    // "GUARDAR PLANTILLA" y no "GUARDAR CAMBIOS": desde #871 el editor de
+    // PLANTILLAS tiene copy propio. Antes reusaba el de asignar un plan.
+    await tester
+        .tap(find.widgetWithText(ElevatedButton, 'GUARDAR PLANTILLA'));
     await tester.pumpAndSettle();
 
     verify(() => repo.updateTemplate(
@@ -396,12 +438,29 @@ void main() {
     await tester.enterText(find.byKey(const Key('editor_split_field')), 'PPL');
     await tester.pumpAndSettle();
 
+    // The CTA lives inside the editor's ListView, below the RESUMEN field
+    // added in #648 — scroll it into the 800x600 test viewport before tapping.
+    // `scrollUntilVisible` y no `ensureVisible`: el editor es un ListView y
+    // el CTA no está CONSTRUIDO hasta que se scrollea hasta él —
+    // `ensureVisible` necesita un elemento que ya exista y tira "No element".
+    // Se notó al sumar el selector PARA QUÉ SIRVE (#635 PR#1b), que corrió el
+    // CTA fuera del área inicial en modo plantilla.
+    await tester.scrollUntilVisible(
+      find.text('Agregar ejercicio'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await desplazarHastaAgregarEjercicio(tester);
     await tester.tap(find.text('Agregar ejercicio'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Press de Banca').first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Agregar 1 ejercicio'));
     await tester.pumpAndSettle();
+    // Desde este cambio el ejercicio agregado nace PLEGADO: quien avisa
+    // que le falta completar sets es el borde rojo, no la card abierta.
+    await expandirEjercicios(tester);
 
     final emptyFields = find.byType(TextField).evaluate().where((e) {
       final w = e.widget as TextField;

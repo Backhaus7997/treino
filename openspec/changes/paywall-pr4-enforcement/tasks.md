@@ -103,11 +103,18 @@ Branch `fix/infra-firestore-rules-promotion-lock` · base PR3 branch · ~250-350
 
 ## Manual Deploy Runbook (human, sequenced — after PR1-PR3 merged)
 
-- [ ] M.1 [MANUAL] `firebase deploy --only functions:linkLoadReconcile,functions:acceptTrainerLink,functions:resumeTrainerLink` — explicit filters (bare `--only functions` prunes functions absent from `index.ts`). Verify via `firebase functions:list` (southamerica-east1).
+> 🚨 **Every `[MANUAL]` step below hits PRODUCTION.** `prod` and `treino-dev` are
+> the same and only Firebase project — real users. A bare `firebase deploy` with
+> no `--project` goes there too: `.firebaserc` fills in `"default":
+> "treino-dev"` silently, so the target never appears on screen. This runbook is
+> **human-run, with explicit sign-off** — an agent does NOT execute these.
+> See [openspec/AGENTS.md](../../AGENTS.md) · #826.
+
+- [ ] M.1 [MANUAL — 🚨 PRODUCTION, do NOT run unattended] `firebase deploy --only functions:linkLoadReconcile,functions:acceptTrainerLink,functions:resumeTrainerLink --project prod` — explicit filters (bare `--only functions` prunes functions absent from `index.ts`). Verify via `firebase functions:list --project prod` (southamerica-east1).
 - [ ] M.2 [MANUAL] Smoke on debug build: accept 1 pending, resume 1 paused, pause 1 active → `users/{T}.weightedLoad` moves in all 3.
 - [ ] M.3 [MANUAL] Release app to stores with slices 2+3 client changes (iOS review 1-3 days).
 - [ ] M.4 [MANUAL] Adoption gate, no new instrumentation (reuses 1.10/2.4/3.2 log lines). Over a 7-day Cloud Logging window: `adoption = 1 − (observed − cf) / observed`, `observed`=count `{event:'link-promoted-observed'}`, `cf`=count `{event:'link-promoted-cf'}`. Proceed only when adoption ≥95% sustained 7 consecutive days AND ≥7 days since M.3.
-- [ ] M.5 [MANUAL] Merge PR #4 if pending. Save current rules (`git show HEAD~1:firestore.rules > rules.prev`). Deploy: `firebase deploy --only firestore:rules`.
+- [ ] M.5 [MANUAL — 🚨 PRODUCTION, do NOT run unattended] Merge PR #4 if pending. Save current rules (`git show HEAD~1:firestore.rules > rules.prev`). Deploy: `firebase deploy --only firestore:rules --project prod`. This locks out every app build older than M.3 — see the accepted risk below.
 - [ ] M.6 [MANUAL] Post-deploy smoke (<10 min): accept via CF succeeds; direct client write to `status:'active'` denied. Monitor `permission-denied` rate 24h.
 - [ ] M.R [MANUAL — rollback if needed] Redeploy `rules.prev` (single file, instant) — restores client accept/resume.
 

@@ -17,6 +17,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/utils/argentina_time.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart'
@@ -338,7 +339,9 @@ class _RegistrarPagoDialogState extends ConsumerState<RegistrarPagoDialog> {
             ),
             child: Text(label,
                 style: TextStyle(
-                  color: selected ? palette.bg : palette.textMuted,
+                  color: selected
+                      ? TreinoButtonTokens.foreground(context)
+                      : palette.textMuted,
                   fontWeight: FontWeight.w700,
                   fontSize: 13,
                 )),

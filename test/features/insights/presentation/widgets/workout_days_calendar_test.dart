@@ -14,6 +14,7 @@ void main() {
 
   const labels = WorkoutDaysCalendarLabels(
     streakLabelBuilder: _streakLabel,
+    streakHintBuilder: _streakHint,
     weekdayLetters: ['L', 'M', 'M', 'J', 'V', 'S', 'D'],
   );
 
@@ -106,4 +107,7 @@ void main() {
   });
 }
 
-String _streakLabel(int streak) => 'Racha de $streak días';
+String _streakLabel(int streak) => 'Racha de $streak semanas';
+
+String _streakHint(int streak) =>
+    'Completaste el objetivo de tu rutina $streak semanas seguidas.';

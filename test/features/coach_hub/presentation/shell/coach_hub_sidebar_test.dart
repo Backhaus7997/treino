@@ -212,13 +212,46 @@ void main() {
     expect(find.text('GESTIÓN'), findsNothing);
   });
 
-  testWidgets('footer muestra avatar + nombre + subtítulo — REQ-SH-005',
+  testWidgets('footer muestra avatar + nombre + plan — REQ-SH-005',
       (tester) async {
     await _pumpSidebar(tester);
 
     expect(find.byKey(const Key('sidebar_profile_row')), findsOneWidget);
     expect(find.byType(CircleAvatar), findsOneWidget);
-    expect(find.byIcon(TreinoIcon.chevronDown), findsOneWidget);
+    // chevronRight y NO chevronDown: la fila navega a /ajustes, no abre un
+    // menú. El chevron hacia abajo prometía un desplegable inexistente.
+    expect(find.byIcon(TreinoIcon.chevronRight), findsOneWidget);
+    expect(find.byIcon(TreinoIcon.chevronDown), findsNothing);
+    // Sin perfil cargado el tier cae a Free (sin backfill), igual que en
+    // Facturación — antes acá había un literal "Cuenta profesional" que
+    // mostraba lo mismo a un PF en Free que a uno en Plan 3.
+    expect(find.text('Plan Free'), findsOneWidget);
+    expect(find.text('Cuenta profesional'), findsNothing);
+  });
+
+  testWidgets('footer expandido → tocar el perfil navega a /ajustes',
+      (tester) async {
+    await _pumpSidebar(tester);
+
+    await tester.tap(find.byKey(const Key('sidebar_profile_row')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('page:/ajustes'), findsOneWidget);
+  });
+
+  testWidgets('footer colapsado → el avatar sigue siendo el acceso a la cuenta',
+      (tester) async {
+    await _pumpSidebar(tester, prefs: {'coach_hub.sidebar.collapsed': true});
+
+    // Colapsado no hay fila: el target es el avatar, con tooltip propio.
+    expect(find.byKey(const Key('sidebar_profile_row')), findsNothing);
+    final avatar = find.byKey(const Key('sidebar_profile_avatar'));
+    expect(avatar, findsOneWidget);
+
+    await tester.tap(avatar);
+    await tester.pumpAndSettle();
+
+    expect(find.text('page:/ajustes'), findsOneWidget);
   });
 
   testWidgets('entrada del shell usa TreinoFadeSlideIn (REQ-SH-010)',

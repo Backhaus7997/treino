@@ -523,7 +523,7 @@ class _DayChip extends StatelessWidget {
         alignment: Alignment.center,
         child: Icon(
           TreinoIcon.checkCircleFill,
-          color: palette.bg,
+          color: TreinoButtonTokens.foreground(context),
           size: 18,
         ),
       );
@@ -827,6 +827,16 @@ class _StatsHubTileList extends StatelessWidget {
           title: l10n.insightsTileMeasurementsTitle,
           subtitle: l10n.insightsTileMeasurementsSubtitle,
           onTap: () => context.push('/home/insights/measurements'),
+        ),
+        const SizedBox(height: 12),
+        // Séptima entrada del hub, y la única que no mide kilos ni volumen.
+        // Va al final a propósito: suma una dimensión al hub, no reordena la
+        // jerarquía de lo que ya estaba (#643).
+        _StatTile(
+          icon: TreinoIcon.wellbeing,
+          title: l10n.insightsTileWellbeingTitle,
+          subtitle: l10n.insightsTileWellbeingSubtitle,
+          onTap: () => context.push('/home/insights/wellbeing'),
         ),
       ],
     );

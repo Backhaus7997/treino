@@ -20,7 +20,9 @@ CheckIn _$CheckInFromJson(Map<String, dynamic> json) {
 
 /// @nodoc
 mixin _$CheckIn {
-  /// Fecha local `YYYY-MM-DD`. Es también el id del documento.
+  /// Fecha local `YYYY-MM-DD` a la que pertenece el registro. Campo real del
+  /// documento (ya no se deriva del id) — es sobre él que consulta el rango
+  /// de la curva de tendencia, sin índice compuesto.
   String get date => throw _privateConstructorUsedError;
 
   /// Cómo se sintió. Único campo obligatorio del registro.
@@ -48,8 +50,17 @@ mixin _$CheckIn {
   DateTime get recordedAt => throw _privateConstructorUsedError;
 
   /// Sesión que originó el registro, cuando se capturó al terminar de
-  /// entrenar. `null` para un check-in que no salió de una sesión.
+  /// entrenar. `null` para el check-in diario, que no sale de una sesión.
+  ///
+  /// Es también lo que distingue "otro entreno del mismo día" de "el mismo
+  /// registro editado": el resumen post-sesión sólo reconoce como propio el
+  /// check-in cuyo `sessionId` coincide con el suyo.
   String? get sessionId => throw _privateConstructorUsedError;
+
+  /// Id del documento. Ausente hasta que el repositorio lo persiste; lo
+  /// inyecta la lectura. NO viaja en el body — el id ya lo lleva el doc.
+  @JsonKey(includeToJson: false, includeFromJson: false)
+  String? get id => throw _privateConstructorUsedError;
 
   /// Serializes this CheckIn to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -72,7 +83,8 @@ abstract class $CheckInCopyWith<$Res> {
       @MuscleGroupKeysConverter() List<MuscleGroup> painAreas,
       String? note,
       @TimestampConverter() DateTime recordedAt,
-      String? sessionId});
+      String? sessionId,
+      @JsonKey(includeToJson: false, includeFromJson: false) String? id});
 }
 
 /// @nodoc
@@ -97,6 +109,7 @@ class _$CheckInCopyWithImpl<$Res, $Val extends CheckIn>
     Object? note = freezed,
     Object? recordedAt = null,
     Object? sessionId = freezed,
+    Object? id = freezed,
   }) {
     return _then(_value.copyWith(
       date: null == date
@@ -127,6 +140,10 @@ class _$CheckInCopyWithImpl<$Res, $Val extends CheckIn>
           ? _value.sessionId
           : sessionId // ignore: cast_nullable_to_non_nullable
               as String?,
+      id: freezed == id
+          ? _value.id
+          : id // ignore: cast_nullable_to_non_nullable
+              as String?,
     ) as $Val);
   }
 }
@@ -145,7 +162,8 @@ abstract class _$$CheckInImplCopyWith<$Res> implements $CheckInCopyWith<$Res> {
       @MuscleGroupKeysConverter() List<MuscleGroup> painAreas,
       String? note,
       @TimestampConverter() DateTime recordedAt,
-      String? sessionId});
+      String? sessionId,
+      @JsonKey(includeToJson: false, includeFromJson: false) String? id});
 }
 
 /// @nodoc
@@ -168,6 +186,7 @@ class __$$CheckInImplCopyWithImpl<$Res>
     Object? note = freezed,
     Object? recordedAt = null,
     Object? sessionId = freezed,
+    Object? id = freezed,
   }) {
     return _then(_$CheckInImpl(
       date: null == date
@@ -198,6 +217,10 @@ class __$$CheckInImplCopyWithImpl<$Res>
           ? _value.sessionId
           : sessionId // ignore: cast_nullable_to_non_nullable
               as String?,
+      id: freezed == id
+          ? _value.id
+          : id // ignore: cast_nullable_to_non_nullable
+              as String?,
     ));
   }
 }
@@ -213,13 +236,16 @@ class _$CheckInImpl implements _CheckIn {
       final List<MuscleGroup> painAreas = const <MuscleGroup>[],
       this.note,
       @TimestampConverter() required this.recordedAt,
-      this.sessionId})
+      this.sessionId,
+      @JsonKey(includeToJson: false, includeFromJson: false) this.id})
       : _painAreas = painAreas;
 
   factory _$CheckInImpl.fromJson(Map<String, dynamic> json) =>
       _$$CheckInImplFromJson(json);
 
-  /// Fecha local `YYYY-MM-DD`. Es también el id del documento.
+  /// Fecha local `YYYY-MM-DD` a la que pertenece el registro. Campo real del
+  /// documento (ya no se deriva del id) — es sobre él que consulta el rango
+  /// de la curva de tendencia, sin índice compuesto.
   @override
   final String date;
 
@@ -263,13 +289,23 @@ class _$CheckInImpl implements _CheckIn {
   final DateTime recordedAt;
 
   /// Sesión que originó el registro, cuando se capturó al terminar de
-  /// entrenar. `null` para un check-in que no salió de una sesión.
+  /// entrenar. `null` para el check-in diario, que no sale de una sesión.
+  ///
+  /// Es también lo que distingue "otro entreno del mismo día" de "el mismo
+  /// registro editado": el resumen post-sesión sólo reconoce como propio el
+  /// check-in cuyo `sessionId` coincide con el suyo.
   @override
   final String? sessionId;
 
+  /// Id del documento. Ausente hasta que el repositorio lo persiste; lo
+  /// inyecta la lectura. NO viaja en el body — el id ya lo lleva el doc.
+  @override
+  @JsonKey(includeToJson: false, includeFromJson: false)
+  final String? id;
+
   @override
   String toString() {
-    return 'CheckIn(date: $date, feeling: $feeling, hasPain: $hasPain, painAreas: $painAreas, note: $note, recordedAt: $recordedAt, sessionId: $sessionId)';
+    return 'CheckIn(date: $date, feeling: $feeling, hasPain: $hasPain, painAreas: $painAreas, note: $note, recordedAt: $recordedAt, sessionId: $sessionId, id: $id)';
   }
 
   @override
@@ -286,7 +322,8 @@ class _$CheckInImpl implements _CheckIn {
             (identical(other.recordedAt, recordedAt) ||
                 other.recordedAt == recordedAt) &&
             (identical(other.sessionId, sessionId) ||
-                other.sessionId == sessionId));
+                other.sessionId == sessionId) &&
+            (identical(other.id, id) || other.id == id));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -299,7 +336,8 @@ class _$CheckInImpl implements _CheckIn {
       const DeepCollectionEquality().hash(_painAreas),
       note,
       recordedAt,
-      sessionId);
+      sessionId,
+      id);
 
   /// Create a copy of CheckIn
   /// with the given fields replaced by the non-null parameter values.
@@ -325,11 +363,15 @@ abstract class _CheckIn implements CheckIn {
       @MuscleGroupKeysConverter() final List<MuscleGroup> painAreas,
       final String? note,
       @TimestampConverter() required final DateTime recordedAt,
-      final String? sessionId}) = _$CheckInImpl;
+      final String? sessionId,
+      @JsonKey(includeToJson: false, includeFromJson: false)
+      final String? id}) = _$CheckInImpl;
 
   factory _CheckIn.fromJson(Map<String, dynamic> json) = _$CheckInImpl.fromJson;
 
-  /// Fecha local `YYYY-MM-DD`. Es también el id del documento.
+  /// Fecha local `YYYY-MM-DD` a la que pertenece el registro. Campo real del
+  /// documento (ya no se deriva del id) — es sobre él que consulta el rango
+  /// de la curva de tendencia, sin índice compuesto.
   @override
   String get date;
 
@@ -363,9 +405,19 @@ abstract class _CheckIn implements CheckIn {
   DateTime get recordedAt;
 
   /// Sesión que originó el registro, cuando se capturó al terminar de
-  /// entrenar. `null` para un check-in que no salió de una sesión.
+  /// entrenar. `null` para el check-in diario, que no sale de una sesión.
+  ///
+  /// Es también lo que distingue "otro entreno del mismo día" de "el mismo
+  /// registro editado": el resumen post-sesión sólo reconoce como propio el
+  /// check-in cuyo `sessionId` coincide con el suyo.
   @override
   String? get sessionId;
+
+  /// Id del documento. Ausente hasta que el repositorio lo persiste; lo
+  /// inyecta la lectura. NO viaja en el body — el id ya lo lleva el doc.
+  @override
+  @JsonKey(includeToJson: false, includeFromJson: false)
+  String? get id;
 
   /// Create a copy of CheckIn
   /// with the given fields replaced by the non-null parameter values.

@@ -25,6 +25,7 @@ import { logger } from "firebase-functions";
 import { sendFcm } from "./send-fcm";
 import { enqueueMail } from "../mail/enqueue-mail";
 import { resolveAthleteName, resolveTrainerName } from "../mail/format";
+import { APP_ENTRY_TRAINER } from "../mail/templates";
 
 function getApp(): admin.app.App {
   try {
@@ -71,7 +72,9 @@ async function enqueueLinkMail(
       toUid: trainerId,
       kind: "link-requested",
       scope: linkId,
-      params: { athleteName },
+      // El destinatario es el PF, asi que el CTA va al Coach Hub. El default
+      // (la landing) es para los mails que reciben ATLETAS.
+      params: { athleteName, ctaUrl: APP_ENTRY_TRAINER },
       // The recipient is always the trainer, who HAS a settings screen for
       // this row (kNotifTypes `nueva_solicitud`). Honour their toggle.
       prefKey: "nueva_solicitud",

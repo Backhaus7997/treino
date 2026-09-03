@@ -30,7 +30,29 @@ class Chat with _$Chat {
     /// permita. La validez del link la garantiza `chatCreateOk` al crear el doc
     /// y el pin de inmutabilidad en `chats/update`; acá sólo se lee.
     String? linkId,
+
+    /// Naturaleza del chat cuando NO lo respalda un vínculo formal.
+    ///
+    /// Hoy el único valor es `'inquiry'`: la PRE-CONSULTA de #637, que un
+    /// atleta abre desde el perfil público de un PF para preguntar antes de
+    /// comprometerse. Un chat social no lleva el campo.
+    ///
+    /// Espeja la tercera rama de `chatCreateOk`: las rules escapan por
+    /// `kind == 'inquiry'` en `senderMayPost`/`chatWriterOk` igual que por
+    /// `linkId`, y lo tienen pineado inmutable en `chats/update`. Acá sólo se
+    /// lee — la validez la garantiza el servidor al crear el doc.
+    String? kind,
   }) = _Chat;
+
+  const Chat._();
+
+  /// Chat de pre-consulta (#637): sin vínculo formal todavía.
+  bool get isInquiry => kind == inquiryKind;
+
+  /// Valor de [kind] para la pre-consulta. Tiene que coincidir EXACTAMENTE con
+  /// el literal de `chatCreateOk` en `firestore.rules` — si divergen, el CTA
+  /// abre chats que el backend rechaza.
+  static const String inquiryKind = 'inquiry';
 
   factory Chat.fromJson(Map<String, Object?> json) => _$ChatFromJson(json);
 }

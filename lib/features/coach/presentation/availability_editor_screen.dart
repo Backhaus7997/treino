@@ -561,7 +561,7 @@ class _RuleFormSheetState extends ConsumerState<_RuleFormSheet> {
                 onPressed: _saving ? null : () => _save(context),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: palette.accent,
-                  foregroundColor: palette.bg,
+                  foregroundColor: TreinoButtonTokens.foreground(context),
                   minimumSize: const Size.fromHeight(48),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(AppRadius.full),
@@ -726,7 +726,7 @@ class _BlockOverrideFormSheetState
                 onPressed: _saving ? null : () => _save(context),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: palette.accent,
-                  foregroundColor: palette.bg,
+                  foregroundColor: TreinoButtonTokens.foreground(context),
                   minimumSize: const Size.fromHeight(48),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(AppRadius.full),
@@ -1070,7 +1070,7 @@ class _ConfirmDialog extends StatelessWidget {
           onPressed: () => Navigator.of(context).pop(true),
           style: ElevatedButton.styleFrom(
             backgroundColor: palette.accent,
-            foregroundColor: palette.bg,
+            foregroundColor: TreinoButtonTokens.foreground(context),
           ),
           child: Text(
             confirmLabel,

@@ -113,7 +113,9 @@ class _Pill extends StatelessWidget {
             softWrap: false,
             textAlign: TextAlign.center,
             style: theme.textTheme.labelMedium?.copyWith(
-              color: isActive ? palette.bg : palette.textPrimary,
+              color: isActive
+                  ? TreinoButtonTokens.foreground(context)
+                  : palette.textPrimary,
               fontWeight: FontWeight.w600,
             ),
           ),

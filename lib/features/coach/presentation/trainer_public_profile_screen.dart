@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../../app/theme/tokens/tokens.dart' show AppSpacing;
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../reviews/presentation/widgets/review_cta.dart';
@@ -11,13 +12,18 @@ import '../application/trainer_discovery_providers.dart';
 import '../../coach_hub/presentation/sections/pagos/widgets/payment_format.dart'
     show fmtArs;
 import 'widgets/trainer_contact_cta_stub.dart';
+import 'widgets/trainer_inquiry_cta.dart';
 import 'widgets/trainer_profile_hero.dart';
 import 'widgets/trainer_stats_row.dart';
 
 /// Perfil público de un entrenador.
 ///
-/// Bajo ShellRoute per D17 (con bottom bar visible). CTA "PEDIR VÍNCULO"
-/// es stub esta etapa (Etapa 3 implementa el real).
+/// Bajo ShellRoute per D17 (con bottom bar visible).
+///
+/// Dos CTAs desde #637, en este orden: **CONSULTAR** (primario, abre un chat
+/// de pre-consulta sin vínculo formal) y **PEDIR VÍNCULO** (secundario, el
+/// compromiso explícito). Ver [TrainerInquiryCta] para el porqué de la
+/// jerarquía.
 class TrainerPublicProfileScreen extends ConsumerWidget {
   const TrainerPublicProfileScreen({super.key, required this.uid});
 
@@ -91,6 +97,19 @@ class TrainerPublicProfileScreen extends ConsumerWidget {
                   ],
                 ),
               const SizedBox(height: 24),
+              // #637 — ORDEN DELIBERADO, es la decisión de producto del issue.
+              //
+              // Consultar va PRIMERO y lleno: es el paso liviano, el que no
+              // compromete a nada y el que los entrevistados pedían poder dar
+              // antes de decidir. Pedir vínculo va debajo y contorneado: sigue
+              // estando a un toque, pero deja de ser el único camino y pasa a
+              // ser lo que siempre fue en realidad, el compromiso explícito.
+              //
+              // Antes, con un solo CTA, "PEDIR VÍNCULO" era primario por
+              // inercia — y el efecto era que preguntarle algo a un entrenador
+              // exigía elegirlo primero.
+              TrainerInquiryCta(trainerId: uid),
+              const SizedBox(height: AppSpacing.s12),
               TrainerContactCtaStub(trainerId: uid),
               const SizedBox(height: 12),
               ReviewCta(trainerId: uid),

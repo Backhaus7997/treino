@@ -204,7 +204,7 @@ class _TemplateRatingSheetState extends ConsumerState<TemplateRatingSheet> {
                         : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: palette.accent,
-                      foregroundColor: palette.bg,
+                      foregroundColor: TreinoButtonTokens.foreground(context),
                       minimumSize: const Size.fromHeight(48),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(AppRadius.full),
@@ -216,7 +216,7 @@ class _TemplateRatingSheetState extends ConsumerState<TemplateRatingSheet> {
                             height: 18,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: palette.bg,
+                              color: TreinoButtonTokens.foreground(context),
                             ),
                           )
                         : Text(

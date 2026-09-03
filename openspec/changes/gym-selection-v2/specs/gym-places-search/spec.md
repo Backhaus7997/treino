@@ -53,15 +53,26 @@ The system MUST treat an empty `searchNearby` result set as a normal, non-error 
 - THEN the nearby-gyms section is hidden
 - AND no error message is shown to the athlete
 
-### Requirement: Selecting a nearby gym uses the same selection path as Autocomplete
+### Requirement: Selecting a nearby gym uses the same selection path as typed search
 
-The system MUST route a tap on a nearby-list gym through the same selection/resolve/write path used for an Autocomplete suggestion tap. A nearby-originated selection MUST resolve correctly even without an Autocomplete session token.
+The system MUST route a tap on a nearby-list gym through the same selection/resolve/write path used for a typed-search suggestion tap — including *when* that path runs. On the profile-edit screen that means the tap MUST only stage the selection locally; the resolve and the write to the athlete's profile MUST happen only on explicit confirmation ("GUARDAR"). A nearby-originated selection MUST resolve correctly even without an Autocomplete session token.
 
-#### Scenario: Tapping a nearby gym selects and persists it
+(Corrected by issue #814. This requirement originally read "Tapping a nearby gym selects **and persists** it", and the shipped code matched: a nearby tap resolved the Place and wrote `users/{uid}.gymId` immediately. That contradicted REQ-PROFILE-019's confirm-to-save contract (`openspec/specs/profile/spec.md`, Section C: "Confirming saves via `UserRepository.update({gymId: selectedId})`") and silently changed a value that drives per-gym rankings and feed on any mis-tap, with no way to back out. "Same path as typed search" always meant the whole path, staging included; the original wording described only the resolve/write half of it.)
 
-- GIVEN an athlete taps a gym in the nearby list
-- WHEN the selection is processed
-- THEN it is resolved and written to the athlete's profile through the identical path used for an Autocomplete selection
+#### Scenario: Tapping a nearby gym stages the selection without persisting it
+
+- GIVEN an athlete with a gym already assigned opens the profile gym screen
+- WHEN they tap a gym in the nearby list
+- THEN the tapped gym becomes the active (staged) selection and is shown as such
+- AND no Place Details resolution is requested
+- AND the athlete's profile is not written
+- AND leaving the screen without confirming keeps their previously assigned gym
+
+#### Scenario: Confirming persists the staged nearby gym
+
+- GIVEN an athlete has staged a nearby gym by tapping it
+- WHEN they confirm with "GUARDAR"
+- THEN it is resolved and written to the athlete's profile through the identical path used for a typed-search selection
 - AND the absence of a session token does not cause an error or a degraded resolution
 
 ## MODIFIED Requirements

@@ -65,7 +65,7 @@ CF writes via Admin SDK (bypasses rules). Idempotency keyed on fields, not doc i
 
 ## Dependencies
 
-- User runs `firebase deploy --only functions,firestore:rules,firestore:indexes` from canonical `treino/` repo (CFs → `southamerica-east1`). DRS does **not** block scheduled CFs (only `allUsers` callables).
+- 🚨 PROD — User runs `firebase deploy --only functions,firestore:rules,firestore:indexes --project prod` from canonical `treino/` repo (CFs → `southamerica-east1`). DRS does **not** block scheduled CFs (only `allUsers` callables).
 
 ## Success Criteria
 

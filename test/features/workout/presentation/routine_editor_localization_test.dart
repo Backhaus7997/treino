@@ -28,6 +28,8 @@ import 'package:treino/features/workout/presentation/routine_editor_screen.dart'
 
 import '../../../helpers/fake_analytics_service.dart';
 import '../../../fixtures/exercises.dart';
+import 'package:treino/features/workout/presentation/widgets/day_tab_bar.dart';
+import '../../../fixtures/routine_editor_ui.dart';
 
 class _FakeRoutineRepository extends Fake implements RoutineRepository {}
 
@@ -81,14 +83,20 @@ void main() {
       await _pumpEditorEn(tester, mode: const SelfCreating());
 
       // English copy is present.
+      await abrirDatosDelPlan(tester);
       expect(find.text('WEEKS'), findsOneWidget);
-      expect(find.text('PLAN DAYS'), findsOneWidget);
-      expect(find.text('Day 1'), findsOneWidget); // default day name
+      expect(find.byType(DayTabBar), findsOneWidget,
+          reason: 'la barra de pestañas reemplazó al label PLAN DAYS');
+      expect(
+        tester.widget<DayTabBar>(find.byType(DayTabBar)).labels.first,
+        'Day 1',
+        reason: 'el nombre del día también sale en su pestaña',
+      );
 
       // The old hardcoded Spanish literals must not leak under en.
       expect(find.text('SEMANAS'), findsNothing);
       expect(find.text('DÍAS DEL PLAN'), findsNothing);
-      expect(find.text('Día 1'), findsNothing);
+      expect(find.textContaining('Día 1'), findsNothing);
     },
   );
 }

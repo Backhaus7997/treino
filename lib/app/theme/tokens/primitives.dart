@@ -15,6 +15,19 @@ abstract final class AppColorPrimitives {
   /// `#2CE5A2` — Mint esmeralda, acento primario TREINO.
   static const Color mint500 = Color(0xFF2CE5A2);
 
+  /// `#0B7A55` — Mint OSCURECIDO, para texto e íconos acento sobre light.
+  ///
+  /// El mint pleno es un color de FONDO. Sobre `paper50` compone 1,57:1: sirve
+  /// para pintar el relleno de un CTA (con texto ink encima), no para pintar
+  /// el texto mismo. Este tono baja la luminancia hasta 5,35:1 contra blanco y
+  /// 5,20:1 contra `paper50`, así que un label acento en tema claro cumple
+  /// WCAG AA (4,5:1) sin salirse del hue de marca.
+  ///
+  /// En dark no hace falta contraparte: el mint pleno ya mide 12,10:1 sobre
+  /// `ink950`. Por eso `AppPalette.accentText` resuelve a [mint500] en dark y
+  /// a este tono en light — el widget usa un token y no ramifica por tema.
+  static const Color mintText700 = Color(0xFF0B7A55);
+
   // ---------------------------------------------------------------------------
   // Familia Magenta (destaque secundario)
   // ---------------------------------------------------------------------------
@@ -31,6 +44,15 @@ abstract final class AppColorPrimitives {
 
   /// `#0F1513` — Ink profundo con tinte mint, fondo de card dark.
   static const Color ink900 = Color(0xFF0F1513);
+
+  /// `#141A18` — Ink elevado, un escalón POR ENCIMA de [ink900].
+  ///
+  /// Para superficies que flotan sobre el contenido en vez de apoyarse en él:
+  /// bottom sheets y la barra de accesorio anclada arriba del teclado. Una card
+  /// va en [ink900] porque comparte plano con el resto del scroll; una hoja que
+  /// tapa ese scroll necesita leerse como otra capa, y sin sombras (regla del
+  /// kit) el único recurso es subir el valor del relleno.
+  static const Color ink850 = Color(0xFF141A18);
 
   // ---------------------------------------------------------------------------
   // Familia Bone (texto claro)
@@ -111,6 +133,48 @@ abstract final class AppColorPrimitives {
   static const Color reactionClapDark = Color(0xFFD99000);
 
   // ---------------------------------------------------------------------------
+  // Familia Podium (top 3 del leaderboard)
+  // ---------------------------------------------------------------------------
+  //
+  // Metálicos de podio para el numeral de puesto de las 3 primeras filas de
+  // Rankings. Son expresivos, como la familia Reactions: NO son estados
+  // semánticos y no se reusan fuera del podio.
+  //
+  // Los seis salen medidos contra `bgCard` de su propia paleta Y contra la
+  // fila propia (`bgCard` + accent al 8%), que es la variante más exigente.
+  // El numeral es texto de 15 px, o sea texto chico: la barra es 4,5:1 (WCAG
+  // AA 1.4.3), no el 3:1 de gráficos. Lo fija `podium_contrast_test.dart`.
+
+  /// `#FFCE45` — Oro del 1er puesto, estado dark.
+  static const Color podiumGold = Color(0xFFFFCE45);
+
+  /// `#8A6100` — Oro del 1er puesto, estado light.
+  ///
+  /// El candidato obvio era `#9A6B00`, un tono más brillante y más "oro". Da
+  /// 4,69:1 sobre `bgCard` —pasa— y **4,48:1 sobre la fila propia**, donde el
+  /// overlay de accent al 8% aclara el fondo y se come el margen. Por 0,02 de
+  /// ratio el token habría entrado a la paleta incumpliendo justo en la fila
+  /// que el atleta más mira: la suya.
+  static const Color podiumGoldDark = Color(0xFF8A6100);
+
+  /// `#C7CBD1` — Plata del 2do puesto, estado dark.
+  static const Color podiumSilver = Color(0xFFC7CBD1);
+
+  /// `#677079` — Plata del 2do puesto, estado light.
+  static const Color podiumSilverDark = Color(0xFF677079);
+
+  /// `#D9915A` — Bronce del 3er puesto, estado dark.
+  static const Color podiumBronze = Color(0xFFD9915A);
+
+  /// `#A05A1E` — Bronce del 3er puesto, estado light.
+  ///
+  /// Más rojizo que el `#8C5A2B` clásico: en light los tres metálicos caen
+  /// todos en la franja marrón y el bronce necesita separarse en tono del oro
+  /// oliva. Aun así el color NO es el único indicador — el numeral del puesto
+  /// se sigue leyendo al lado, así que un daltónico nunca depende del tono.
+  static const Color podiumBronzeDark = Color(0xFFA05A1E);
+
+  // ---------------------------------------------------------------------------
   // Colores neutros absolutos
   // ---------------------------------------------------------------------------
 
@@ -130,8 +194,50 @@ abstract final class AppColorPrimitives {
   /// `0x33FFFFFF` — Blanco ~20% alpha, borde hover en dark.
   static const Color white20 = Color(0x33FFFFFF);
 
+  /// `0x59FFFFFF` — Blanco ~35% alpha, filo de superficie en dark.
+  ///
+  /// Existe porque [white10] y [white20] NO alcanzan para el LÍMITE de un
+  /// componente: compuestos sobre el relleno translúcido de la bottom bar dan
+  /// 1,37:1 y 1,79:1 contra `ink950`, muy por debajo del 3:1 que pide WCAG 2.2
+  /// SC 1.4.11 para el borde de un control. Con 35% el filo mide ~3,1:1 y la
+  /// barra vuelve a leerse como el contenedor del pill activo (#821).
+  ///
+  /// No confundir con [white20], que es el borde de HOVER de la web: aquel
+  /// marca un estado, éste marca un límite.
+  static const Color white35 = Color(0x59FFFFFF);
+
   /// `0x8CFFFFFF` — Blanco ~55% alpha, texto mutado en dark.
   static const Color white55 = Color(0x8CFFFFFF);
+
+  /// `0x0FFFFFFF` — Blanco ~6% alpha, relleno de superficie sutil en dark.
+  ///
+  /// NO es un borde ni texto: es el relleno mínimo con el que un control
+  /// pequeño (chip de set, botón circular del header) se despega de la card
+  /// que lo contiene sin dibujar un marco. Compone `#1A1A1A` sobre `ink950`.
+  static const Color white06 = Color(0x0FFFFFFF);
+
+  /// `0x75FFFFFF` — Blanco ~46% alpha, texto TERCIARIO en dark.
+  ///
+  /// El escalón por debajo de [white55], para headers de columna y hints.
+  ///
+  /// ⚠ El alpha exacto sale de dos mediciones, no de un redondeo lindo:
+  ///
+  /// 1. Al 40% —el valor del handoff de diseño— compone `#6C6C6C` sobre
+  ///    `ink950` y da **3,77:1**, abajo del 4,5:1 que WCAG AA pide para texto
+  ///    chico. El header `SET`/`KG`/`REPS` mide 10,5 px: no califica como
+  ///    texto grande ni siendo bold, así que le aplica el mínimo completo.
+  ///
+  /// 2. Al 45% (`0x73`) la cuenta ideal da 4,52:1 y parece alcanzar — pero el
+  ///    píxel que se pinta no es el ideal. La mezcla da 120,49 y el framebuffer
+  ///    de 8 bits la cuantiza a 120 (`#787878`), que mide **4,484:1**: falla
+  ///    por 16 milésimas. Al 46% (`0x75`) la mezcla cuantiza a `#7A7A7A` y
+  ///    llega a 4,61:1, con margen para el redondeo.
+  ///
+  /// La lección, más general que este token: un ratio calculado sobre el color
+  /// compuesto en punto flotante NO es el ratio del color que ve el usuario.
+  /// Cuantizá antes de medir. `routine_editor_tokens_contrast_test.dart` lo
+  /// hace desde que este caso lo demostró.
+  static const Color white46 = Color(0x75FFFFFF);
 
   // ---------------------------------------------------------------------------
   // Negros con alpha (overlays sobre light)
@@ -143,8 +249,27 @@ abstract final class AppColorPrimitives {
   /// `0x33000000` — Negro ~20% alpha, borde hover en light.
   static const Color black20 = Color(0x33000000);
 
+  /// `0x80000000` — Negro ~50% alpha, filo de superficie en light.
+  ///
+  /// Contraparte clara de [white35], y con MÁS alpha que él a propósito: el
+  /// relleno de la barra en light compone casi blanco puro, así que oscurecerlo
+  /// hasta el 3:1 contra `paper50` cuesta más tinta que aclarar el filo oscuro.
+  /// Ver [white35] para la medición completa (#821).
+  static const Color black50 = Color(0x80000000);
+
   /// `0x99000000` — Negro ~60% alpha, texto mutado en light.
   static const Color black60 = Color(0x99000000);
+
+  /// `0x0F000000` — Negro ~6% alpha, relleno de superficie sutil en light.
+  /// Contraparte clara de [white06].
+  static const Color black06 = Color(0x0F000000);
+
+  /// `0x8C000000` — Negro ~55% alpha, texto TERCIARIO en light.
+  ///
+  /// Contraparte clara de [white46], y con MÁS alpha que él: sobre `#FFFFFF`
+  /// hace falta bajar hasta `#737373` (53,5% de negro) para tocar 4,5:1, así
+  /// que 55% es el primer escalón redondo que cumple. Ver [white46].
+  static const Color black55 = Color(0x8C000000);
 
   // ---------------------------------------------------------------------------
   // Transparente (evita `Colors.transparent` crudo en el kit)
@@ -214,6 +339,19 @@ abstract final class AppDecorativePalettes {
     Color(0xFF14B8A6), // teal
     Color(0xFFF97316), // naranja
   ];
+
+  /// Sombra proyectada del marco de teléfono del onboarding
+  /// (`OnboardingDevicePreview`).
+  ///
+  /// Decorativa y **deliberadamente invariante al tema**, igual que el bezel
+  /// blanco que la proyecta: ese marco representa el chasis físico de un
+  /// teléfono, no UI de la app, así que no sigue a la paleta. Por eso no es
+  /// `AppPalette.shadow` ni un primitivo semántico.
+  ///
+  /// El valor coincide con [AppColorPrimitives.ink900] por casualidad
+  /// cromática, no por parentesco: si el ink de marca cambia, esta sombra no
+  /// tiene por qué seguirlo.
+  static const Color deviceFrameShadow = Color(0xFF0F1513);
 }
 
 /// Capa 1 — Tokens de spacing del sistema de diseño TREINO.
@@ -273,6 +411,57 @@ abstract final class AppRadius {
 
   /// `9999.0` — Radio completamente redondeado (pills, avatares).
   static const double full = 9999.0;
+}
+
+/// Capa 1 — Radios de las ILUSTRACIONES del onboarding (#627).
+///
+/// Contraparte de [AppDecorativePalettes] para la escala de radios, y existe
+/// por la misma razón: los decks del tour **dibujan** la app —un chasis de
+/// teléfono, una nav bar replicada, fotos en miniatura— en vez de mostrar
+/// capturas, y la geometría de un dibujo no es la geometría de la UI.
+///
+/// Estos valores **no son excepciones a [AppRadius] ni deuda pendiente de
+/// migrar**: forzarlos a la escala no los "corrige", deforma el dibujo. El
+/// marco exterior de 34 y la pantalla de 26 son proporciones de un teléfono
+/// visto en chico; con `AppRadius.lg` (20) los dos dejan de leerse como un
+/// teléfono. Y `AppRadius.sm` (12) es casi el ancho completo de la barra de
+/// progreso de 4px, que necesita 2.
+///
+/// La regla que sí aplica: **nada acá se usa en UI real**. Si un widget de
+/// producto necesita uno de estos números, el que está mal es el widget —
+/// va [AppRadius]. Estos son para pintar, no para construir.
+abstract final class AppDecorativeRadii {
+  /// `41.0` — Pill de la nav bar replicada en el deck (`OnboardingNavBar`).
+  ///
+  /// Deliberadamente distinto del `36` de `TreinoBottomBar`: la réplica se
+  /// dibuja más chata que la barra real para que entre en el device preview.
+  static const double navBarPill = 41.0;
+
+  /// `34.0` — Esquina exterior del chasis blanco (`OnboardingDevicePreview`).
+  static const double deviceFrame = 34.0;
+
+  /// `26.0` — Pantalla recortada dentro del chasis. La diferencia con
+  /// [deviceFrame] es el grosor del bezel; moverlos por separado lo deforma.
+  static const double deviceScreen = 26.0;
+
+  /// `24.0` — Marco de las cards que el deck del entrenador dibuja adentro
+  /// del preview (`trainer_previews.dart`).
+  static const double previewCardFrame = 24.0;
+
+  /// `14.0` — Fotos en miniatura dentro de un preview. No es `AppRadius.sm`
+  /// (12) ni `md` (16): a este tamaño de dibujo la foto es de ~90px de ancho
+  /// y los 2px se ven.
+  static const double previewPhoto = 14.0;
+
+  /// `7.0` — Barras de las ilustraciones esquemáticas
+  /// (`OnboardingIllustration`).
+  static const double illustrationBar = 7.0;
+
+  /// `6.0` — Barras del gráfico dibujado en las preview cards.
+  static const double previewChartBar = 6.0;
+
+  /// `2.0` — Segmento de la barra de progreso del flow (4px de ancho).
+  static const double progressSegment = 2.0;
 }
 
 /// Capa 1 — Tokens tipográficos del sistema de diseño TREINO.

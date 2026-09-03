@@ -3,6 +3,7 @@ import 'dart:ui' show lerpDouble;
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../app/theme/app_motion.dart';
 import '../../app/theme/app_palette.dart';
@@ -76,7 +77,7 @@ TreinoBarMetrics resolveBarMetrics({
 }) {
   final tabWidth = availableWidth / itemCount;
   // Los dos insets con los que el pill se separa del borde del tab. Sale de
-  // la constante y NO de un 16 escrito a mano: el `AnimatedPositioned` del
+  // la constante y NO de un 16 escrito a mano: el `Positioned` del pill en el
   // build usa la misma, así que lo que se mide acá es lo que se pinta allá.
   final pillWidth = tabWidth - 2 * _kPillInset;
   final desiredHeight = 22 + 8 + maxLabelHeight + 20;
@@ -246,9 +247,7 @@ class TreinoBottomBar extends StatelessWidget {
   /// [resolveBarMetrics]). Este flag es "el usuario está leyendo"; el otro es
   /// "el texto no entra". Cualquiera de los dos alcanza.
   ///
-  /// El `minHeight` que usan los scrollables para su padding inferior NO
-  /// cambia, así que el contenido no salta cuando la barra se achica. El área
-  /// tapeable de cada tab SÍ se achica con la barra (de [minHeight] a
+  /// El área tapeable de cada tab SÍ se achica con la barra (de [minHeight] a
   /// [collapsedHeight]), porque el `GestureDetector` vive adentro de la caja
   /// animada; a 52px sigue holgadamente por encima del mínimo de 44 de la HIG.
   final bool collapsed;
@@ -264,24 +263,70 @@ class TreinoBottomBar extends StatelessWidget {
 
   /// Altura mínima de la barra, sin contar el safe area.
   ///
-  /// Las pantallas del shell corren con `extendBody: true`, así que su
-  /// contenido pasa POR DEBAJO de la barra: cualquier lista scrolleable tiene
-  /// que sumar esto (más `MediaQuery.paddingOf(context).bottom`) a su padding
-  /// inferior, o el último item queda tapado y el scroll rebota antes de
-  /// dejarlo ver.
-  ///
   /// Es el piso, no la altura exacta: con textScale grande la barra crece
-  /// (`22 + 8 + altoDelLabel + 20`) y el padding queda algo justo, pero el
-  /// contenido sigue siendo alcanzable.
+  /// (`22 + 8 + altoDelLabel + 20`).
+  ///
+  /// ## ⚠️ Las pantallas NO suman esto a su padding inferior (#830)
+  ///
+  /// Esta constante es para el LAYOUT DE LA BARRA. Ninguna pantalla del shell
+  /// tiene que sumarla al padding de sus scrollables: el `Scaffold` ya publicó
+  /// la caja entera de la barra en `MediaQuery.padding.bottom`, y sumarla otra
+  /// vez duplica el hueco al final del scroll. Este dartdoc decía lo contrario
+  /// y fue exactamente lo que produjo el bug en `/feed` y en
+  /// `public_profile_screen`.
+  ///
+  /// El mecanismo, que está en el `Scaffold` y no acá: `_ShellScaffold` corre
+  /// con `extendBody: true`, y en ese modo el `Scaffold`
+  ///
+  ///  1. le BORRA al body el inset del sistema (lo hace siempre que haya
+  ///     `bottomNavigationBar`), y
+  ///  2. publica en su lugar `bottomWidgetsHeight`, que es la caja completa
+  ///     que ocupa esta barra: su margen inferior propio
+  ///     (`max(safeArea, _kBottomMarginMin)`) + los 8 de separación + el alto
+  ///     animado.
+  ///
+  /// O sea que `MediaQuery.paddingOf(context).bottom` adentro del shell YA
+  /// vale margen + 8 + alto. Medido: 114 con los labels a la vista y un home
+  /// indicator de 34.
+  ///
+  /// El `SafeArea(bottom: false)` del shell no lo consume a propósito —el body
+  /// tiene que llegar al borde físico para que el contenido se vea pasar por
+  /// debajo del vidrio—, así que el número llega intacto a la pantalla.
+  ///
+  /// Lo mismo vale para las subrutas que se montan adentro del shell
+  /// (`/feed/profile/:uid`, `/home/profile/:uid`, `/coach/trainer/:uid`…):
+  /// tienen `Scaffold` propio, pero sin `bottomNavigationBar`, y un `Scaffold`
+  /// así deja pasar el `padding.bottom` que heredó.
+  ///
+  /// **Regla**: en el shell, `padding.bottom` a secas. Sumale un gap de diseño
+  /// si lo querés (varias pantallas usan 8 o 20), nunca el alto de la barra.
+  /// Y sirve igual afuera del shell: ahí el `SafeArea` de `_immersive` ya se
+  /// comió el inset y la misma expresión da 0, sin ramas por contexto (ver
+  /// `routine_detail_screen.dart`).
   static const double minHeight = 72;
 
   /// Alto de la barra compactada ([collapsed] en `true`): solo íconos.
   ///
-  /// Deliberadamente NO afecta a [minHeight]: si el padding inferior de los
-  /// scrollables siguiera al alto real de la barra, colapsar la barra
-  /// reacomodaría toda la lista y el scroll saltaría bajo el dedo. El padding
-  /// se queda en el caso expandido (el peor caso) y punto.
+  /// Acá decía que el padding inferior de los scrollables se queda en el caso
+  /// expandido y no sigue al alto real de la barra. **No es cierto** y se
+  /// corrigió con #830: el padding es `MediaQuery.padding.bottom`, que el
+  /// `Scaffold` deriva del alto MEDIDO de la barra frame a frame, así que
+  /// sigue la animación de colapso. Medido en el shell, con un home indicator
+  /// de 34: 114 expandida → 94 compactada.
+  ///
+  /// Sólo se quedaba fijo en las dos pantallas que hardcodeaban [minHeight]
+  /// —las mismas que duplicaban el hueco—, así que la estabilidad que este
+  /// dartdoc prometía nunca existió en el resto del shell. Lo que sí es
+  /// constante es la separación entre el último item y el vidrio: los 8 del
+  /// margen superior de la barra viajan adentro de `padding.bottom`.
   static const double collapsedHeight = 52;
+
+  /// Key del pill de gradient activo.
+  ///
+  /// Es pública a propósito: es el ancla con la que los tests lo miden contra
+  /// su tab. Buscarlo por el tipo del widget que lo posiciona ataba el finder
+  /// justo a la pieza que cambia cuando se toca la animación.
+  static const Key pillKey = ValueKey('treino-bottom-bar-pill');
 
   static const List<_TabSpec> _items = [
     _TabSpec(
@@ -419,24 +464,90 @@ class TreinoBottomBar extends StatelessWidget {
                       height: lerpDouble(collapsedHeight, barHeight, expansion),
                       child: TreinoGlassSurface(
                         borderRadius: BorderRadius.circular(36),
+                        // Filo REFORZADO, no el `palette.border` que trae por
+                        // defecto [TreinoGlassSurface].
+                        //
+                        // El pill activo siempre estuvo contenido: se separa
+                        // [_kPillInset] del borde del tab en los cuatro lados
+                        // y el test de contención lo mide. Lo que se reportó
+                        // en #821 —"el pill sobresale y tapa el contenido de
+                        // arriba"— no era geometría sino que la barra no se
+                        // veía: rasterizando el árbol, el relleno translúcido
+                        // daba 1,05:1 contra `palette.bg` en dark y el borde
+                        // 1,37:1. Con el fondo de la app casi negro y la
+                        // sombra de abajo pintada en `palette.bg` (negro sobre
+                        // negro), el contenedor entero era invisible y el pill
+                        // mint, a 9,3:1, quedaba como el único objeto de la
+                        // zona. El ojo lee eso como un elemento flotando
+                        // encima del contenido, no como un tab adentro de una
+                        // barra.
+                        //
+                        // Subir `fillOpacity` NO lo arregla: `bgCard` sobre
+                        // `bg` es `ink900` sobre `ink950`, 1,07:1 aun al 100%
+                        // de opacidad. Los dos tonos son casi el mismo color a
+                        // propósito, así que el límite tiene que venir del
+                        // filo. [AppPalette.borderStrong] lo lleva a ~3:1, el
+                        // piso de WCAG 2.2 SC 1.4.11 para el borde de un
+                        // componente.
+                        //
+                        // Va SOLO acá y no en el default de la superficie: las
+                        // burbujas del header del feed se apoyan sobre
+                        // contenido, no sobre el fondo desnudo, y con este filo
+                        // se leerían como botones delineados.
+                        borderColor: palette.borderStrong,
                         child: LayoutBuilder(
                           builder: (context, innerConstraints) {
                             final tabWidth =
                                 innerConstraints.maxWidth / _items.length;
                             return Stack(
                               children: [
-                                AnimatedPositioned(
+                                // Lo que se anima es el ÍNDICE, no los
+                                // píxeles.
+                                //
+                                // Acá había un `AnimatedPositioned` que
+                                // interpolaba `left` y `width`, y eso mete en
+                                // la misma animación dos cosas de naturaleza
+                                // distinta: cambiar de tab —que SÍ tiene que
+                                // deslizarse— y cambiar de ancho la barra
+                                // —que NO, porque los tabs son un `Row` de
+                                // `Expanded` y se reacomodan en un frame—.
+                                // Ante una rotación o un fold el pill viajaba
+                                // los 320ms de `AppMotion.slow` hacia una
+                                // posición que sus tabs ya ocupaban desde el
+                                // primer frame: hasta 34pt de desvío (#734).
+                                //
+                                // Animando el índice, `left` y `width` se
+                                // derivan del `tabWidth` VIGENTE en cada
+                                // frame. Cambiar de tab sigue deslizando;
+                                // cambiar de ancho reacomoda pill y tabs
+                                // juntos, en el mismo frame. La regla general:
+                                // animar la magnitud LÓGICA que cambia por
+                                // decisión del usuario, nunca la geometría
+                                // que el layout puede redefinir sola.
+                                TweenAnimationBuilder<double>(
+                                  tween: Tween<double>(
+                                    end: currentIndex.toDouble(),
+                                  ),
                                   duration: AppMotion.slow,
                                   curve: AppMotion.standard,
-                                  // Mismo inset que usa `resolveBarMetrics`
-                                  // para decidir si el label entra. Si acá
-                                  // hubiera un número suelto, medir y pintar
-                                  // podrían separarse sin que nadie lo note.
-                                  left: tabWidth * currentIndex + _kPillInset,
-                                  top: _kPillInset,
-                                  bottom: _kPillInset,
-                                  width: tabWidth - 2 * _kPillInset,
-                                  child: _PillHighlight(palette: palette),
+                                  builder: (context, position, child) {
+                                    return Positioned(
+                                      // Mismo inset que usa
+                                      // `resolveBarMetrics` para decidir si el
+                                      // label entra. Si acá hubiera un número
+                                      // suelto, medir y pintar podrían
+                                      // separarse sin que nadie lo note.
+                                      left: tabWidth * position + _kPillInset,
+                                      top: _kPillInset,
+                                      bottom: _kPillInset,
+                                      width: tabWidth - 2 * _kPillInset,
+                                      child: child!,
+                                    );
+                                  },
+                                  child: _PillHighlight(
+                                    key: TreinoBottomBar.pillKey,
+                                    palette: palette,
+                                  ),
                                 ),
                                 Row(
                                   children: List.generate(_items.length, (i) {
@@ -499,7 +610,7 @@ class _TabSpec {
 }
 
 class _PillHighlight extends StatelessWidget {
-  const _PillHighlight({required this.palette});
+  const _PillHighlight({super.key, required this.palette});
 
   final AppPalette palette;
 
@@ -563,7 +674,8 @@ class _TabContent extends StatelessWidget {
         letterSpacing: 0.8,
       ),
       // El padding horizontal es EXACTAMENTE el inset del pill, y sale de la
-      // misma constante que usan el `AnimatedPositioned` y `resolveBarMetrics`.
+      // misma constante que usan el `Positioned` del pill y
+      // `resolveBarMetrics`.
       // Sin esto la caja del label mide `tabWidth` y el pill `tabWidth - 2*
       // inset`: en el tab activo, las letras que se pasan del pill se pintan en
       // `palette.bg` (casi negro) sobre el fondo oscuro de la barra y se leen
@@ -609,7 +721,7 @@ class _TabContent extends StatelessWidget {
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
                           height: 1.2,
-                          color: palette.bg,
+                          color: TreinoButtonTokens.foreground(context),
                         ),
                       ),
                     ),

@@ -147,4 +147,139 @@ describe("QA-CMP-002: deleteAthleteStorage removes the athlete's objects", () =>
   });
 });
 
+// QA-CMP-004b: `postPhotos/{uid}/` was missing from deleteAthleteStorage.
+// The header of cascade/posts.ts claimed posts had no Storage-backed media
+// field; `photoUrl` (firestore.rules:638 and :675) points at
+// `postPhotos/{uid}/{postId}.{ext}`, so deleting the post document used to
+// leave the object in the bucket with a live download token and `get` open to
+// any authenticated user.
+//
+// These assertions are deliberately about ABSENCE IN THE BUCKET, not about the
+// prefix showing up in some summary — asserting the summary is exactly the
+// weakness that let this hole through review.
+describe("QA-CMP-004b: deleteAthleteStorage removes the athlete's post photos", () => {
+  const uid = "storage-postphotos-cmp";
+  const other = "storage-postphotos-other";
+
+  async function save(path: string): Promise<void> {
+    await admin
+      .storage(testApp)
+      .bucket()
+      .file(path)
+      .save(Buffer.from("x"), { contentType: "image/jpeg" });
+  }
+  async function exists(path: string): Promise<boolean> {
+    const [e] = await admin.storage(testApp).bucket().file(path).exists();
+    return e;
+  }
+
+  afterEach(async () => {
+    const bucket = admin.storage(testApp).bucket();
+    const [files] = await bucket.getFiles({ prefix: "postPhotos/" });
+    await Promise.all(files.map((f) => f.delete().catch(() => undefined)));
+  });
+
+  it("deletes postPhotos/{uid}/ for any extension, keeps another athlete's", async () => {
+    await save(`postPhotos/${uid}/post-1.jpg`);
+    await save(`postPhotos/${uid}/post-2.heic`);
+    // Control — another athlete's post photo must survive.
+    await save(`postPhotos/${other}/keep.jpg`);
+
+    await deleteAthleteStorage(testApp, uid);
+
+    expect(await exists(`postPhotos/${uid}/post-1.jpg`)).toBe(false);
+    expect(await exists(`postPhotos/${uid}/post-2.heic`)).toBe(false);
+    expect(await exists(`postPhotos/${other}/keep.jpg`)).toBe(true);
+  });
+
+  it("leaves nothing at all under the postPhotos/{uid}/ prefix", async () => {
+    await save(`postPhotos/${uid}/post-1.jpg`);
+    await save(`postPhotos/${uid}/post-2.heic`);
+
+    await deleteAthleteStorage(testApp, uid);
+
+    const [left] = await admin
+      .storage(testApp)
+      .bucket()
+      .getFiles({ prefix: `postPhotos/${uid}/` });
+    expect(left).toHaveLength(0);
+  });
+
+  it("counts the post photos it deleted", async () => {
+    await save(`postPhotos/${uid}/post-1.jpg`);
+
+    const { deleted } = await deleteAthleteStorage(testApp, uid);
+
+    expect(deleted).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// #628: `sessionFeedback/{uid}/{sessionId}/{file}` — la foto de una molestia
+// o lesión que el alumno reportó durante la sesión.
+//
+// Es el mismo modo de falla que QA-CMP-004b y una vuelta de tuerca peor: la
+// URL con `?alt=media&token=` es una credencial al portador que NO evalúa
+// storage.rules (docs/security.md §3.1). Borrar el objeto es lo ÚNICO que la
+// revoca — endurecer las reglas no. Un objeto que sobrevive al borrado de
+// cuenta es dato de salud recuperable para siempre.
+//
+// Como en QA-CMP-004b, las aserciones son sobre AUSENCIA EN EL BUCKET, no
+// sobre que un string aparezca en `deletedCollections`.
+describe("#628: deleteAthleteStorage removes the athlete's session feedback photos", () => {
+  const uid = "storage-sessionfeedback-cmp";
+  const other = "storage-sessionfeedback-other";
+
+  async function save(path: string): Promise<void> {
+    await admin
+      .storage(testApp)
+      .bucket()
+      .file(path)
+      .save(Buffer.from("x"), { contentType: "image/jpeg" });
+  }
+  async function exists(path: string): Promise<boolean> {
+    const [e] = await admin.storage(testApp).bucket().file(path).exists();
+    return e;
+  }
+
+  afterEach(async () => {
+    const bucket = admin.storage(testApp).bucket();
+    const [files] = await bucket.getFiles({ prefix: "sessionFeedback/" });
+    await Promise.all(files.map((f) => f.delete().catch(() => undefined)));
+  });
+
+  it("deletes sessionFeedback/{uid}/ across sessions, keeps another athlete's", async () => {
+    await save(`sessionFeedback/${uid}/session-a/f1.jpg`);
+    await save(`sessionFeedback/${uid}/session-b/f2.heic`);
+    // Control — la foto de otro alumno debe sobrevivir.
+    await save(`sessionFeedback/${other}/session-a/keep.jpg`);
+
+    await deleteAthleteStorage(testApp, uid);
+
+    expect(await exists(`sessionFeedback/${uid}/session-a/f1.jpg`)).toBe(false);
+    expect(await exists(`sessionFeedback/${uid}/session-b/f2.heic`)).toBe(false);
+    expect(await exists(`sessionFeedback/${other}/session-a/keep.jpg`)).toBe(true);
+  });
+
+  it("leaves nothing at all under the sessionFeedback/{uid}/ prefix", async () => {
+    await save(`sessionFeedback/${uid}/session-a/f1.jpg`);
+    await save(`sessionFeedback/${uid}/session-b/nested/f2.jpg`);
+
+    await deleteAthleteStorage(testApp, uid);
+
+    const [left] = await admin
+      .storage(testApp)
+      .bucket()
+      .getFiles({ prefix: `sessionFeedback/${uid}/` });
+    expect(left).toHaveLength(0);
+  });
+
+  it("counts the feedback photos it deleted", async () => {
+    await save(`sessionFeedback/${uid}/session-a/f1.jpg`);
+
+    const { deleted } = await deleteAthleteStorage(testApp, uid);
+
+    expect(deleted).toBeGreaterThanOrEqual(1);
+  });
+});
+
 const db = () => admin.firestore(testApp);

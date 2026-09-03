@@ -4,6 +4,7 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 
 import '../../coach/domain/trainer_location.dart';
 import '../../coach/domain/trainer_subscription.dart';
+import '../../workout/domain/template_preferences.dart';
 import '../data/timestamp_converter.dart';
 import 'experience_level.dart';
 import 'gender.dart';
@@ -108,6 +109,35 @@ class UserProfile with _$UserProfile {
     // pausados=0.5) que el CF mantiene para que UI/rules lean sin agregar.
     TrainerSubscription? subscription,
     double? weightedLoad,
+
+    // ── Welcome tour seen-flags (issue #627) ────────────────────────────
+    // Map of `OnboardingSurface.wireKey` → version of the tour that user
+    // has already seen on that surface. Absent/empty ⇒ nothing seen yet, so
+    // existing accounts need no backfill and no migration.
+    //
+    // ONE ENTRY PER SURFACE, not a single global flag: a trainer who saw the
+    // mobile tour must still get the Coach Hub web one. Versioned per entry so
+    // a future redesign can re-show a single surface without touching data.
+    //
+    // Owner-writeable and owner-read only — no Cloud Function, no rules change
+    // (`users/{uid}` has no key allowlist; see firestore.rules:65-80).
+    // Read via `OnboardingSurface.shouldShow`, written via
+    // `OnboardingSurface.markedIn` — never index this map with a raw string.
+    @Default(<String, int>{}) Map<String, int> onboardingSeen,
+
+    // ── PLANTILLAS mini-onboarding answers (issue #635) ─────────────────
+    // Días, minutos, objetivo y zonas que el atleta declaró la primera vez que
+    // entró a PLANTILLAS. Null/ausente ⇒ todavía no lo respondió; no hay
+    // backfill ni migración, igual que `onboardingSeen`.
+    //
+    // PRIVADO: son preferencias del atleta, no parte de su perfil público. No
+    // se propagan a `userPublicProfiles` — ese path tiene su propio allowlist
+    // explícito de claves en firestore.rules, así que no puede filtrarse solo.
+    //
+    // `users/{uid}` no tiene guarda `hasOnly` en update (firestore.rules:65-80),
+    // así que este campo NO requiere cambio de reglas. El acoplamiento del
+    // COUPLING WARNING es de los paths de `routines`, no de este.
+    TemplatePreferences? templatePreferences,
   }) = _UserProfile;
 
   factory UserProfile.fromJson(Map<String, Object?> json) =>

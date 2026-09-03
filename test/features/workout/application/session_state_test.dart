@@ -4,6 +4,7 @@
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/workout/application/session_state.dart';
+import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/domain/set_spec.dart';
 
 import 'stub_factories.dart';
@@ -439,6 +440,113 @@ void main() {
         elapsedSeconds: 0,
       );
       expect(a == b, isFalse);
+    });
+
+    // ── #645: droppedExerciseIds — el recorte de tiempo de la sesión ─────────
+
+    group('droppedExerciseIds', () {
+      SessionState stateWith({
+        required Set<String> dropped,
+        List<SetLog> logs = const [],
+        Map<String, int> override = const {},
+      }) =>
+          SessionState(
+            session: makeSession(),
+            day: makeDay(slots: [
+              makeSlot(exerciseId: 'e1', targetSets: 3),
+              makeSlot(
+                  exerciseId: 'e2', exerciseName: 'Sentadilla', targetSets: 3),
+              makeSlot(exerciseId: 'e3', exerciseName: 'Remo', targetSets: 3),
+            ]),
+            setLogs: logs,
+            currentExerciseIndex: 0,
+            elapsedSeconds: 0,
+            setCountOverride: override,
+            droppedExerciseIds: dropped,
+          );
+
+      test('un ejercicio recortado vale 0 series hoy', () {
+        final state = stateWith(dropped: const {'e3'});
+        final slot = state.day.slots.last;
+        expect(state.plannedSetsFor(slot), equals(0));
+      });
+
+      test('el recorte gana sobre un setCountOverride del mismo ejercicio', () {
+        final state = stateWith(
+          dropped: const {'e3'},
+          override: const {'e3': 5},
+        );
+        expect(state.plannedSetsFor(state.day.slots.last), equals(0));
+      });
+
+      test(
+          'isFullyCompleted = true con lo que quedó hecho — una sesión '
+          'recortada a propósito cuenta como completa', () {
+        final logs = [
+          for (var n = 1; n <= 3; n++)
+            makeSetLog(exerciseId: 'e1', setNumber: n, id: 'a$n'),
+          for (var n = 1; n <= 3; n++)
+            makeSetLog(exerciseId: 'e2', setNumber: n, id: 'b$n'),
+        ];
+        final state = stateWith(dropped: const {'e3'}, logs: logs);
+        expect(state.isFullyCompleted, isTrue);
+      });
+
+      test('isFullyCompleted = false si falta algo de lo que NO se recortó',
+          () {
+        final logs = [
+          for (var n = 1; n <= 3; n++)
+            makeSetLog(exerciseId: 'e1', setNumber: n, id: 'a$n'),
+        ];
+        final state = stateWith(dropped: const {'e3'}, logs: logs);
+        expect(state.isFullyCompleted, isFalse);
+      });
+
+      test('recortar TODO no completa nada — el guard de trabajo cero sigue',
+          () {
+        final state = stateWith(dropped: const {'e1', 'e2', 'e3'});
+        expect(state.isFullyCompleted, isFalse);
+      });
+
+      test(
+          'el contador de progreso saca lo recortado del numerador y del '
+          'denominador: no dice "3/3" sobre una sesión de la que salió uno',
+          () {
+        final logs = [
+          for (var n = 1; n <= 3; n++)
+            makeSetLog(exerciseId: 'e1', setNumber: n, id: 'a$n'),
+        ];
+        final state = stateWith(dropped: const {'e3'}, logs: logs);
+        expect(state.activeExerciseCount, equals(2));
+        expect(state.completedExerciseCount, equals(1));
+        expect(
+          state.activeSlots.map((s) => s.exerciseId),
+          equals(['e1', 'e2']),
+        );
+      });
+
+      test('copyWith actualiza el recorte y deja el resto intacto', () {
+        final original = stateWith(dropped: const {});
+        final copy = original.copyWith(droppedExerciseIds: const {'e3'});
+        expect(copy.droppedExerciseIds, equals(const {'e3'}));
+        expect(
+            copy.currentExerciseIndex, equals(original.currentExerciseIndex));
+        expect(original.droppedExerciseIds, isEmpty);
+      });
+
+      test('== y hashCode ignoran el orden del set', () {
+        final a = stateWith(dropped: const {'e2', 'e3'});
+        final b = stateWith(dropped: const {'e3', 'e2'});
+        expect(a, equals(b));
+        expect(a.hashCode, equals(b.hashCode));
+      });
+
+      test('== es false cuando el recorte difiere', () {
+        expect(
+          stateWith(dropped: const {'e3'}) == stateWith(dropped: const {}),
+          isFalse,
+        );
+      });
     });
   });
 }

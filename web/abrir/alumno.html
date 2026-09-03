@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="robots" content="noindex">
+<title>Abrí TREINO</title>
+<link rel="stylesheet" href="/abrir/_estilo.css">
+<!--
+  Destino de los mails que van a ATLETAS: turno confirmado, serie creada,
+  cancelación, vínculo aceptado, pago vencido.
+
+  ─── Esta página es el FALLBACK, no el destino ─────────────────────────────
+
+  Con los App Links / Universal Links configurados, quien tenga la app
+  instalada nunca ve esto: el sistema operativo intercepta la URL y abre TREINO
+  directo. Llega acá quien abrió el mail en una computadora, o quien todavía no
+  tiene la app.
+
+  Por eso NO dice "abrí la app" como si fuera la acción principal — para quien
+  llegó hasta acá, esa acción ya falló.
+
+  ─── Por qué no hay botón de descarga ──────────────────────────────────────
+
+  La app está en TestFlight y en closed testing de Play: no hay ficha pública.
+  Un botón "Descargar" que lleva a un 404 es peor que no tenerlo. Cuando salga
+  a las tiendas, los links van acá.
+-->
+</head>
+<body>
+<main>
+  <div class="brand">
+    <img src="/email/wordmark.png" alt="TREINO" width="110" height="56">
+  </div>
+
+  <h1>Esto se abre en la app</h1>
+  <p>
+    Tu agenda, tus rutinas y tus mensajes con tu profe viven en la app de
+    TREINO, en tu teléfono.
+  </p>
+
+  <p>
+    Si estás leyendo esto en una computadora, abrí el mail desde el celular y
+    volvé a tocar el botón.
+  </p>
+
+  <div class="hint">
+    <strong>¿Ya tenés la app y aun así llegaste acá?</strong><br>
+    Puede que necesites actualizarla. Abrila a mano y vas a encontrar lo mismo
+    que te avisamos por mail.
+  </div>
+
+  <footer>
+    Recibiste un mail de TREINO porque tenés una cuenta.<br>
+    <a href="https://gettreino.com">gettreino.com</a>
+  </footer>
+</main>
+</body>
+</html>

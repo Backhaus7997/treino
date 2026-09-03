@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart'
     show QueryDocumentSnapshot, Timestamp;
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/core/utils/argentina_time.dart';
 import 'package:treino/features/profile/data/user_public_profile_repository.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/data/session_repository.dart';
@@ -111,6 +112,7 @@ void main() {
       finishedAt: finishedAt,
       totalVolumeKg: 95.5,
       durationMin: 45,
+      weeklyTarget: 1,
     );
 
     final snap = await firestore
@@ -321,6 +323,7 @@ void main() {
       finishedAt: DateTime.utc(2026, 5, 18, 10, 45, 0),
       totalVolumeKg: 0,
       durationMin: 0,
+      weeklyTarget: 1,
     );
 
     final result = await repo.getActive(uid);
@@ -704,6 +707,7 @@ void main() {
       finishedAt: DateTime.utc(2026, 5, 18, 10, 50, 0),
       totalVolumeKg: 1600.0,
       durationMin: 50,
+      weeklyTarget: 1,
     );
 
     // SetLogs must still be readable
@@ -720,7 +724,55 @@ void main() {
   // Uses repoWithProfile for BOTH create() and finish() to ensure
   // fake_cloud_firestore's sub-collection index is consistent.
   test(
-      'SCENARIO-321: finish() updates userPublicProfiles/{uid} with workoutsCount and racha',
+      'el caso positivo del invariante: sesión en la semana EN CURSO → sí se '
+      'persiste rachaSemanas', () async {
+    // Contraparte de SCENARIO-321. Sin este test, "no se escribe nunca"
+    // pasaría igual de verde que el contrato real.
+    //
+    // `finish` no tiene reloj inyectable: usa `DateTime.now()`. Por eso la
+    // sesión se ancla al LUNES de la semana en curso a mediodía UTC (= 09:00
+    // ART, el mismo día calendario bajo cualquier timezone del runner). Con
+    // objetivo 1, esa única sesión cumple la semana y el campo tiene que
+    // aparecer.
+    final repoWithProfile = SessionRepository(
+      firestore: firestore,
+      publicProfileRepository: publicProfileRepo,
+    );
+
+    final monday = mondayOfWeekArt(argentinaNow());
+    final enLaSemana =
+        DateTime.utc(monday.year, monday.month, monday.day, 12);
+
+    final session = await repoWithProfile.create(
+      uid: uid,
+      routineId: routineId,
+      routineName: routineName,
+      startedAt: enLaSemana,
+    );
+
+    await repoWithProfile.finish(
+      uid: uid,
+      sessionId: session.id,
+      finishedAt: enLaSemana.add(const Duration(hours: 1)),
+      totalVolumeKg: 100.0,
+      durationMin: 45,
+      wasFullyCompleted: true,
+      weeklyTarget: 1,
+    );
+
+    final data = (await firestore
+            .collection('userPublicProfiles')
+            .doc(uid)
+            .get())
+        .data()!;
+    expect(data['workoutsCount'], equals(1));
+    expect(data['rachaSemanas'], equals(1));
+    // El sello viaja en el MISMO write: es lo que hace confiable al decay.
+    expect(data.containsKey('rachaSemanasUpdatedAt'), isTrue);
+  });
+
+  test(
+      'SCENARIO-321: finish() updates userPublicProfiles/{uid} with workoutsCount and rachaSemanas',
       () async {
     final repoWithProfile = SessionRepository(
       firestore: firestore,
@@ -744,6 +796,7 @@ void main() {
       totalVolumeKg: 100.0,
       durationMin: 45,
       wasFullyCompleted: true,
+      weeklyTarget: 1,
     );
 
     final profileSnap =
@@ -752,12 +805,14 @@ void main() {
     final data = profileSnap.data()!;
     // 1 fully completed session
     expect(data['workoutsCount'], equals(1));
-    // racha is computed by computeStreak using DateTime.now(), bucketed by the
-    // Argentina calendar day (#411). Its value depends on the real "today" in
-    // ART relative to the fixed 2026-05-15 session, so we only assert it is a
-    // non-negative integer (TZ-independent). startedAt is UTC-flagged, as real
-    // data always is.
-    expect(data['racha'], isA<int>());
+    // `rachaSemanas` NO se escribe acá, y es el contrato nuevo, no un olvido:
+    // `finish` la persiste SÓLO cuando la semana EN CURSO cumplió el objetivo,
+    // y la sesión de este fixture está clavada en 2026-05-15 — una semana del
+    // pasado. Ese invariante es lo que le permite a `effectiveRachaSemanas`
+    // tratar un sello de la semana pasada como fresco: si el sello existe, esa
+    // semana CONTÓ. El caso positivo (sesión en la semana en curso → sí se
+    // escribe) está cubierto más abajo.
+    expect(data.containsKey('rachaSemanas'), isFalse);
   });
 
   // SCENARIO-321 failure: when public profile write fails, finish() still
@@ -781,6 +836,7 @@ void main() {
         finishedAt: DateTime.utc(2026, 5, 18, 10, 45, 0),
         totalVolumeKg: 75.0,
         durationMin: 40,
+        weeklyTarget: 1,
       ),
       completes,
     );
@@ -845,6 +901,7 @@ void main() {
       totalVolumeKg: 600.0,
       durationMin: 45,
       wasFullyCompleted: true,
+      weeklyTarget: 1,
     );
 
     final profile = await publicProfileRepo.get(uid);
@@ -893,6 +950,7 @@ void main() {
       totalVolumeKg: 600.0,
       durationMin: 45,
       wasFullyCompleted: true,
+      weeklyTarget: 1,
     );
 
     final profile = await publicProfileRepo.get(uid);
@@ -905,7 +963,7 @@ void main() {
 
   test(
       'SCENARIO-RANK-3h (sdd/rankings-integrity Phase 1): finish() still '
-      'writes workoutsCount/racha exactly as before, independent of the '
+      'writes workoutsCount exactly as before, independent of the '
       'ranking-metric server-side recompute', () async {
     await publicProfileRepo.set(
       const UserPublicProfile(uid: uid, rankingOptIn: true),
@@ -928,11 +986,14 @@ void main() {
       totalVolumeKg: 600.0,
       durationMin: 45,
       wasFullyCompleted: true,
+      weeklyTarget: 1,
     );
 
     final profile = await publicProfileRepo.get(uid);
     expect(profile!.workoutsCount, equals(1));
-    expect(profile.racha, isA<int>());
+    // Ver la nota de SCENARIO-321: la sesión del fixture es de una semana
+    // pasada, así que la racha no se persiste.
+    expect(profile.rachaSemanas, isNull);
   });
 }
 

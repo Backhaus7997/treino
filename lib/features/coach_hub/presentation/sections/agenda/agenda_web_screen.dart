@@ -278,7 +278,7 @@ class _DayPanelHeader extends StatelessWidget {
           onPressed: onNewSession,
           style: ElevatedButton.styleFrom(
             backgroundColor: palette.accent,
-            foregroundColor: palette.bg,
+            foregroundColor: TreinoButtonTokens.foreground(context),
             minimumSize: const Size(0, 36),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
             shape: const StadiumBorder(),

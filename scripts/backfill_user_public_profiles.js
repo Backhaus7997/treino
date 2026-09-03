@@ -23,9 +23,12 @@
  * 1. Install dependencies:
  *      npm install firebase-admin
  *
- * 2. Download a service account key from Firebase Console → Project Settings
- *    → Service Accounts → Generate new private key. Save as `sa-key.json`.
- *    DO NOT commit sa-key.json (already in .gitignore).
+ * 2. Credenciales (#834). La clave NO va adentro del repo: se guarda afuera y
+ *    la ruta sale de `$TREINO_SA_KEY`. Toda ruta adentro de un árbol de git
+ *    —incluido cualquier worktree— se rechaza.
+ *      mkdir -p ~/.config/treino && chmod 600 ~/.config/treino/sa-key.json
+ *      export TREINO_SA_KEY="~/.config/treino/sa-key.json"
+ *    Detalle y migración: scripts/README.md → "Credenciales (#834)".
  *
  * 3. Run:
  *      node scripts/backfill_user_public_profiles.js
@@ -53,27 +56,11 @@
 
 'use strict';
 
-const admin = require('firebase-admin');
+// Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla cerrado
+// con la migración; contra el emulador no pide nada. Ver scripts/lib/admin.js.
+const { inicializarAdmin } = require('./lib/admin');
 
-if (process.env.FIRESTORE_EMULATOR_HOST) {
-  // Admin SDK with emulator — no service account needed.
-  admin.initializeApp({ projectId: 'treino-dev' });
-} else {
-  let serviceAccount;
-  try {
-    serviceAccount = require('./sa-key.json');
-  } catch (err) {
-    if (err.code !== 'MODULE_NOT_FOUND') throw err;
-    console.error(
-      '\nERROR: scripts/sa-key.json not found — required to run against production.\n' +
-      'Download a service-account key from the Firebase console and save it as\n' +
-      'scripts/sa-key.json (gitignored), or target the local emulator instead:\n\n' +
-      '  FIRESTORE_EMULATOR_HOST=localhost:8080 node scripts/backfill_user_public_profiles.js\n',
-    );
-    process.exit(1);
-  }
-  admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-}
+const { admin } = inicializarAdmin();
 
 const db = admin.firestore();
 

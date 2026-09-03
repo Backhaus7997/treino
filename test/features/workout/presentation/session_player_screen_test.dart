@@ -35,10 +35,19 @@ import '../../../features/workout/application/stub_factories.dart';
 
 // ── Helpers de test ───────────────────────────────────────────────────────────
 
-Widget _wrapProvider(Widget w, List<Override> overrides) => ProviderScope(
+/// [locale] fija el idioma cuando el test mira copy que sale de AppL10n — sin
+/// él, el binding de test resuelve a `en` y los asserts en castellano fallan.
+/// Los tests que miran literales hardcodeados no lo necesitan.
+Widget _wrapProvider(
+  Widget w,
+  List<Override> overrides, {
+  Locale? locale,
+}) =>
+    ProviderScope(
       overrides: overrides,
       child: MaterialApp(
         theme: AppTheme.dark(),
+        locale: locale,
         localizationsDelegates: AppL10n.localizationsDelegates,
         supportedLocales: AppL10n.supportedLocales,
         home: Scaffold(body: w),
@@ -102,6 +111,37 @@ class _RemoveTrackingNotifier extends SessionNotifier {
   @override
   Future<void> removeSet(RoutineSlot slot, SetLog? target) async =>
       onRemoveSet(slot, target);
+}
+
+/// Stub que registra las llamadas a restoreDroppedExercises (#645) sin
+/// ejecutar lógica real — permite verificar que DESHACER en el aviso de
+/// sesión recortada dispara el notifier (mirrors _RemoveTrackingNotifier).
+class _RestoreTrackingNotifier extends SessionNotifier {
+  _RestoreTrackingNotifier(this._state, {required this.onRestore});
+  final SessionState _state;
+  final void Function() onRestore;
+
+  @override
+  Future<SessionState> build(SessionInit arg) async => _state;
+
+  @override
+  Future<void> restoreDroppedExercises() async => onRestore();
+}
+
+/// Stub que registra las llamadas a dropExercisesForToday (#645) sin ejecutar
+/// lógica real — permite verificar qué ids propuso la hoja y que AJUSTAR HOY
+/// los aplica tal cual.
+class _DropTrackingNotifier extends SessionNotifier {
+  _DropTrackingNotifier(this._state, {required this.onDrop});
+  final SessionState _state;
+  final void Function(Iterable<String> exerciseIds) onDrop;
+
+  @override
+  Future<SessionState> build(SessionInit arg) async => _state;
+
+  @override
+  Future<void> dropExercisesForToday(Iterable<String> exerciseIds) async =>
+      onDrop(exerciseIds);
 }
 
 // ── Factories de estado ───────────────────────────────────────────────────────
@@ -1939,6 +1979,246 @@ void main() {
       expect(find.text('3/3'), findsNothing,
           reason: 'progress must not wait for a 3rd set that no longer '
               'exists');
+    });
+  });
+
+  // ── #645: la sesión recortada al tiempo disponible ─────────────────────────
+
+  group('_SessionTrimNotice', () {
+    /// Un ejercicio que dura exactamente [minutes] minutos, para que los
+    /// números del aviso se lean de un vistazo.
+    RoutineSlot minSlot(String id, String name, int minutes) => makeSlot(
+          exerciseId: id,
+          exerciseName: name,
+          targetSets: 1,
+          restSeconds: 0,
+          durationSeconds: minutes * 60,
+        );
+
+    SessionState trimmedState({Set<String> dropped = const {}}) => SessionState(
+          session: makeSession(),
+          day: makeDay(dayNumber: 1, slots: [
+            minSlot('e1', 'Press de banca', 10),
+            minSlot('e2', 'Sentadilla', 10),
+            minSlot('e3', 'Remo con barra', 10),
+          ]),
+          setLogs: const [],
+          currentExerciseIndex: 0,
+          elapsedSeconds: 0,
+          droppedExerciseIds: dropped,
+        );
+
+    testWidgets('sin recorte no se dibuja ningún aviso', (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(trimmedState()),
+          locale: const Locale('es', 'AR'),
+        ),
+      );
+      await tester.pump();
+      expect(find.textContaining('Fuera de hoy'), findsNothing);
+      expect(find.text('DESHACER'), findsNothing);
+    });
+
+    testWidgets(
+        'con recorte muestra los minutos recalculados y qué quedó fuera',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(trimmedState(dropped: const {'e3'})),
+          locale: const Locale('es', 'AR'),
+        ),
+      );
+      await tester.pump();
+      // 30 min de plan menos los 10 de "Remo con barra".
+      expect(find.text('Ajustado a ~20 min'), findsOneWidget);
+      expect(find.text('Fuera de hoy: Remo con barra'), findsOneWidget);
+    });
+
+    testWidgets('nombra en orden del día todo lo que salió', (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(trimmedState(dropped: const {'e3', 'e2'})),
+          locale: const Locale('es', 'AR'),
+        ),
+      );
+      await tester.pump();
+      expect(find.text('Ajustado a ~10 min'), findsOneWidget);
+      expect(
+        find.text('Fuera de hoy: Sentadilla · Remo con barra'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets(
+        'el ejercicio recortado NO se dibuja en la lista — dibujarlo lo '
+        'mostraría como bloque completado', (tester) async {
+      // Se recorta el PRIMERO a propósito: si la lista lo dibujara igual,
+      // caería arriba de todo —y como `plannedSetsFor` le da 0,
+      // `computeBlockStatuses` lo marcaría COMPLETADO, o sea la pantalla le
+      // diría "lo hiciste" sobre algo que sacó. Recortar el último no prueba
+      // nada: queda fuera del viewport del test y el finder no lo ve aunque
+      // se esté construyendo.
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(trimmedState(dropped: const {'e1'})),
+          locale: const Locale('es', 'AR'),
+        ),
+      );
+      await tester.pump();
+      // La lista escribe los nombres en MAYÚSCULAS; el aviso, no.
+      expect(find.text('PRESS DE BANCA'), findsNothing);
+      expect(find.text('SENTADILLA'), findsWidgets);
+      expect(find.text('Fuera de hoy: Press de banca'), findsOneWidget);
+    });
+
+    testWidgets('el contador de progreso usa el denominador recortado',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(trimmedState(dropped: const {'e3'})),
+          locale: const Locale('es', 'AR'),
+        ),
+      );
+      await tester.pump();
+      expect(find.textContaining('0 / 2 ejercicios'), findsOneWidget);
+      expect(find.textContaining('0 / 3 ejercicios'), findsNothing);
+    });
+
+    testWidgets('DESHACER dispara restoreDroppedExercises', (tester) async {
+      var restored = 0;
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          [
+            sessionNotifierProvider.overrideWith(
+              () => _RestoreTrackingNotifier(
+                trimmedState(dropped: const {'e3'}),
+                onRestore: () => restored++,
+              ),
+            ),
+          ],
+          locale: const Locale('es', 'AR'),
+        ),
+      );
+      await tester.pump();
+      await tester.tap(find.text('DESHACER'));
+      await tester.pump();
+      expect(restored, equals(1));
+    });
+  });
+
+  // ── #645: la entrada al ajuste de tiempo desde el player ───────────────────
+
+  group('_TimeFitPrompt', () {
+    RoutineSlot minSlot(String id, String name, int minutes) => makeSlot(
+          exerciseId: id,
+          exerciseName: name,
+          targetSets: 1,
+          restSeconds: 0,
+          durationSeconds: minutes * 60,
+        );
+
+    SessionState fitState({Set<String> dropped = const {}}) => SessionState(
+          session: makeSession(),
+          day: makeDay(dayNumber: 1, slots: [
+            minSlot('e1', 'Press de banca', 10),
+            minSlot('e2', 'Sentadilla', 10),
+            minSlot('e3', 'Remo con barra', 10),
+          ]),
+          setLogs: const [],
+          currentExerciseIndex: 0,
+          elapsedSeconds: 0,
+          droppedExerciseIds: dropped,
+        );
+
+    testWidgets('invita a declarar el tiempo y dice cuánto dura la sesión',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(fitState()),
+          locale: const Locale('es', 'AR'),
+        ),
+      );
+      await tester.pump();
+      expect(find.text('¿CUÁNTO TIEMPO TENÉS HOY?'), findsOneWidget);
+      expect(find.text('Esta sesión son ~30 min'), findsOneWidget);
+    });
+
+    testWidgets(
+        'con el ajuste ya aplicado la invitación deja su lugar al aviso — '
+        'nunca los dos juntos', (tester) async {
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(fitState(dropped: const {'e3'})),
+          locale: const Locale('es', 'AR'),
+        ),
+      );
+      await tester.pump();
+      expect(find.text('¿CUÁNTO TIEMPO TENÉS HOY?'), findsNothing);
+      expect(find.text('Fuera de hoy: Remo con barra'), findsOneWidget);
+    });
+
+    testWidgets('un día sin nada medible no ofrece el ajuste', (tester) async {
+      final state = SessionState(
+        session: makeSession(),
+        day: makeDay(dayNumber: 1, slots: const []),
+        setLogs: const [],
+        currentExerciseIndex: 0,
+        elapsedSeconds: 0,
+      );
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          _stateOverride(state),
+          locale: const Locale('es', 'AR'),
+        ),
+      );
+      await tester.pump();
+      expect(find.text('¿CUÁNTO TIEMPO TENÉS HOY?'), findsNothing);
+    });
+
+    testWidgets('el flujo entero: abrir, elegir, aplicar — sin tocar la rutina',
+        (tester) async {
+      List<String>? applied;
+      await tester.pumpWidget(
+        _wrapProvider(
+          const SessionPlayerScreen(init: _kInit),
+          [
+            sessionNotifierProvider.overrideWith(
+              () => _DropTrackingNotifier(
+                fitState(),
+                onDrop: (ids) => applied = ids.toList(),
+              ),
+            ),
+          ],
+          locale: const Locale('es', 'AR'),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.text('¿CUÁNTO TIEMPO TENÉS HOY?'));
+      await tester.pumpAndSettle();
+      // La hoja está abierta: el título ahora aparece dos veces.
+      expect(find.text('¿CUÁNTO TIEMPO TENÉS HOY?'), findsNWidgets(2));
+
+      await tester.tap(find.text('20 min'));
+      await tester.pumpAndSettle();
+      expect(applied, isNull, reason: 'elegir no aplica');
+
+      await tester.tap(find.text('AJUSTAR HOY'));
+      await tester.pumpAndSettle();
+
+      expect(applied, equals(['e3']));
+      expect(find.text('AJUSTAR HOY'), findsNothing,
+          reason: 'la hoja se cerró');
     });
   });
 }

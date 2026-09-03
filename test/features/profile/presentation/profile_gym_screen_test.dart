@@ -467,9 +467,12 @@ void main() {
       expect(find.text('OTRO GYM / SIN GYM'), findsOneWidget);
     });
 
-    testWidgets(
-        'selecting a nearby gym replaces the active selection in the UI',
-        (tester) async {
+    // issue #814: hasta este fix el tap en un cercano resolvía el Place y
+    // escribía `users/{uid}.gymId` en el acto, y ESTE test lo verificaba
+    // como si fuera lo correcto (`verify(update(...))` sin haber tocado
+    // GUARDAR). Ahora el contrato es el del buscador: el tap deja borrador,
+    // GUARDAR persiste. Los dos tests de abajo cubren las dos mitades.
+    group('nearby selection is a draft until GUARDAR (#814)', () {
       final position = Position(
         latitude: -34.5,
         longitude: -58.4,
@@ -484,74 +487,143 @@ void main() {
       );
       final bucket = geohash5(position.latitude, position.longitude);
 
-      when(() => mockResolveService.call(
-            placeId: any(named: 'placeId'),
-            sessionToken: any(named: 'sessionToken'),
-          )).thenAnswer((_) async => const ResolveGymPlaceResult(
-            gymId: 'nearby-1',
-            name: 'Nearby Gym',
-            address: 'Nearby address',
-            source: 'google-places',
-          ));
+      /// Pantalla con gimnasio actual `gym-current` y un único cercano
+      /// `nearby-1`. Devuelve el controller del perfil para que el test
+      /// pueda re-emitir después del write mockeado, igual que re-emite
+      /// Firestore en producción.
+      (Widget, StreamController<UserProfile>) buildWithNearby() {
+        final oldProfile = _profile(gymId: 'gym-current');
+        final profileController = StreamController<UserProfile>.broadcast();
 
-      // gym-selection-v2 CRITICAL-1 fix: a controllable stream lets this
-      // test re-emit the profile AFTER the mocked write completes, the
-      // same way the real Firestore-backed `userProfileProvider` re-emits
-      // in production. A fixed `Stream.value(...)` (as used everywhere
-      // else in this file) can never prove the pinned card re-renders.
-      final oldProfile = _profile(gymId: 'gym-current');
-      final newProfile = oldProfile.copyWith(gymId: 'nearby-1');
-      final profileController = StreamController<UserProfile>.broadcast();
-      addTearDown(profileController.close);
+        when(() => mockResolveService.call(
+              placeId: any(named: 'placeId'),
+              sessionToken: any(named: 'sessionToken'),
+            )).thenAnswer((_) async => const ResolveGymPlaceResult(
+              gymId: 'nearby-1',
+              name: 'Nearby Gym',
+              address: 'Nearby address',
+              source: 'google-places',
+            ));
+        when(() => mockUserRepo.update('test-uid', {'gymId': 'nearby-1'}))
+            .thenAnswer((_) async {
+          profileController.add(oldProfile.copyWith(gymId: 'nearby-1'));
+        });
 
-      when(() => mockUserRepo.update('test-uid', {'gymId': 'nearby-1'}))
-          .thenAnswer((_) async {
-        profileController.add(newProfile);
-      });
-
-      await tester.pumpWidget(_buildScreen(
-        profile: oldProfile,
-        userRepo: mockUserRepo,
-        placesService: mockPlacesService,
-        resolveService: mockResolveService,
-        profileStream: profileController.stream,
-        extraOverrides: [
-          gymByIdProvider('gym-current')
-              .overrideWith((ref) async => gym('gym-current', 'Current Gym')),
-          gymByIdProvider('nearby-1')
-              .overrideWith((ref) async => gym('nearby-1', 'Nearby Gym')),
-          nearbyLocationProvider.overrideWith(
-              (ref) => NearbyLocationNotifier()..setForTest(position)),
-          nearbyGymsProvider(bucket).overrideWith(
-            (ref) async => [
-              const NearbyGym(
-                placeId: 'nearby-1',
-                name: 'Nearby Gym',
-                address: 'Nearby address',
-                lat: -34.5,
-                lng: -58.4,
+        return (
+          _buildScreen(
+            profile: oldProfile,
+            userRepo: mockUserRepo,
+            placesService: mockPlacesService,
+            resolveService: mockResolveService,
+            profileStream: profileController.stream,
+            extraOverrides: [
+              gymByIdProvider('gym-current').overrideWith(
+                  (ref) async => gym('gym-current', 'Current Gym')),
+              gymByIdProvider('nearby-1')
+                  .overrideWith((ref) async => gym('nearby-1', 'Nearby Gym')),
+              nearbyLocationProvider.overrideWith(
+                  (ref) => NearbyLocationNotifier()..setForTest(position)),
+              nearbyGymsProvider(bucket).overrideWith(
+                (ref) async => [
+                  const NearbyGym(
+                    placeId: 'nearby-1',
+                    name: 'Nearby Gym',
+                    address: 'Nearby address',
+                    lat: -34.5,
+                    lng: -58.4,
+                  ),
+                ],
               ),
             ],
           ),
-        ],
-      ));
-      profileController.add(oldProfile);
-      await tester.pumpAndSettle();
+          profileController,
+        );
+      }
 
-      expect(find.text('Current Gym'), findsOneWidget);
-      expect(find.text('Nearby Gym'), findsOneWidget);
+      testWidgets('tapping a nearby gym writes NOTHING — sólo habilita GUARDAR',
+          (tester) async {
+        final (screen, controller) = buildWithNearby();
+        addTearDown(controller.close);
 
-      await tester.tap(find.text('Nearby Gym'));
-      await tester.pumpAndSettle();
+        await tester.pumpWidget(screen);
+        controller.add(_profile(gymId: 'gym-current'));
+        await tester.pumpAndSettle();
 
-      verify(() => mockUserRepo.update('test-uid', {'gymId': 'nearby-1'}))
-          .called(1);
+        expect(find.text('Current Gym'), findsOneWidget);
+        expect(find.text('Nearby Gym'), findsOneWidget);
 
-      // The pinned card must now reflect the NEW gym — proving
-      // `PinnedCurrentGym` re-renders from `userProfileProvider`'s
-      // updated `currentGymId`, not just that the repo write happened.
-      expect(find.text('Nearby Gym'), findsOneWidget);
-      expect(find.text('Current Gym'), findsNothing);
+        await tester.tap(find.text('Nearby Gym'));
+        await tester.pumpAndSettle();
+
+        // El corazón de #814: ni Place Details (facturable) ni el write al
+        // perfil salen del tap.
+        verifyNever(() => mockResolveService.call(
+              placeId: any(named: 'placeId'),
+              sessionToken: any(named: 'sessionToken'),
+            ));
+        verifyNever(() => mockUserRepo.update(any(), any()));
+
+        // El gimnasio persistido no se movió: la tarjeta pinneada sigue
+        // mostrando el viejo.
+        expect(find.text('Current Gym'), findsOneWidget);
+
+        // Y GUARDAR dejó de ser redundante: ahora es lo que falta.
+        final saveButton = tester.widget<ElevatedButton>(
+          find.widgetWithText(ElevatedButton, 'GUARDAR'),
+        );
+        expect(saveButton.onPressed, isNotNull);
+      });
+
+      testWidgets(
+          'GUARDAR resolves the staged nearby gym (no session token) and '
+          'persists it', (tester) async {
+        final (screen, controller) = buildWithNearby();
+        addTearDown(controller.close);
+
+        await tester.pumpWidget(screen);
+        controller.add(_profile(gymId: 'gym-current'));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('Nearby Gym'));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.text('GUARDAR')); // i18n: Fase 6 Etapa 3
+        await tester.pumpAndSettle();
+
+        // Mismo camino de resolución que una sugerencia tipeada — lo único
+        // que cambió es CUÁNDO se dispara.
+        verify(() => mockResolveService.call(
+              placeId: 'nearby-1',
+              sessionToken: null,
+            )).called(1);
+        verify(() => mockUserRepo.update('test-uid', {'gymId': 'nearby-1'}))
+            .called(1);
+
+        // Guardado exitoso cierra la pantalla, igual que el camino tipeado.
+        expect(find.text('PROFILE_SCREEN'), findsOneWidget);
+      });
+
+      // Cobertura que antes vivía dentro del test del tap (fix CRITICAL-1 de
+      // gym-selection-v2): ahora que GUARDAR cierra la pantalla, la
+      // re-renderización en vivo de la tarjeta pinneada se prueba sola,
+      // empujando una emisión nueva del perfil sin tocar nada de la UI.
+      testWidgets('pinned card re-renders when the profile stream re-emits',
+          (tester) async {
+        final (screen, controller) = buildWithNearby();
+        addTearDown(controller.close);
+
+        await tester.pumpWidget(screen);
+        controller.add(_profile(gymId: 'gym-current'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Current Gym'), findsOneWidget);
+
+        controller.add(_profile(gymId: 'nearby-1'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Current Gym'), findsNothing);
+        expect(find.text('Nearby Gym'), findsWidgets);
+      });
     });
   });
 }

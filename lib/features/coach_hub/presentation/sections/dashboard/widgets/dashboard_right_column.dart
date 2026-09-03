@@ -27,6 +27,7 @@ import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/tokens/components/treino_card_tokens.dart';
 import 'package:treino/app/theme/tokens/primitives.dart';
+import 'package:treino/core/utils/app_clock.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
@@ -431,7 +432,7 @@ class _VencimientoRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final daysOverdue =
-        DateTime.now().toUtc().difference(payment.createdAt.toUtc()).inDays;
+        AppClock.now().toUtc().difference(payment.createdAt.toUtc()).inDays;
 
     // Payment sólo trae athleteId → resolvemos nombre + avatar del alumno.
     final profile =

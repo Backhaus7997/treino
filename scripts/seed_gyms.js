@@ -16,12 +16,14 @@
  * `gymNameFromId`/denormalización).
  *
  * USAGE
- *   $env:GOOGLE_APPLICATION_CREDENTIALS = "scripts\treino-dev-service-account.json"
+ *   $env:TREINO_SA_KEY = "$HOME\.config\treino\sa-key.json"
  *   node scripts/seed_gyms.js
  */
 
-const admin = require('firebase-admin');
-admin.initializeApp();
+const { inicializarAdmin } = require('./lib/admin');
+// Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla cerrado
+// con la migración; contra el emulador no pide nada. Ver scripts/lib/admin.js.
+const { admin } = inicializarAdmin();
 const db = admin.firestore();
 
 // ── geohash5 (port of lib/core/utils/geohash.dart) ───────────────────────

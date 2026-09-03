@@ -13,12 +13,18 @@
 //   SCENARIO-TRN-REPO-008: updateTemplate rejects empty draft.id.
 //   SCENARIO-PERIOD-050: updateAssigned / updateTemplate persist numWeeks in
 //                        the written doc (REQ-PERIOD-054).
+//   summary (#648):      updateAssigned / updateTemplate persist the resumen
+//                        (and clear it when emptied), while updateUserOwned
+//                        deliberately never sends it.
+//   goals (#635 PR#1b):  updateTemplate persists the catalogue goals; NEITHER
+//                        updateAssigned NOR updateUserOwned send them.
 
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/workout/data/routine_repository.dart';
 import 'package:treino/features/workout/domain/routine.dart';
+import 'package:treino/features/workout/domain/routine_goal.dart';
 import 'package:treino/features/workout/domain/routine_source.dart';
 import 'package:treino/features/workout/domain/routine_visibility.dart';
 
@@ -332,6 +338,253 @@ void main() {
       final data =
           (await firestore.collection('routines').doc(id).get()).data()!;
       expect(data['numWeeks'], equals(4));
+    });
+  });
+
+  // ── summary (#648) ────────────────────────────────────────────────────────
+  //
+  // Both update payloads are hand-built maps, so `summary` coming back into
+  // Routine.toJson() (PR #751) does NOT reach Firestore on its own. Without
+  // the explicit key the PF's resumen is dropped on the floor with no error —
+  // the exact silent-drop the COUPLING WARNING on each method warns about.
+
+  // ── goals (#635 PR#1b) ────────────────────────────────────────────────────
+  //
+  // El reparto NO es el mismo que el de `summary`, y esa diferencia es el
+  // punto: `summary` lo escriben los DOS paths del PF; `goals` sólo el de
+  // PLANTILLA. Un plan asignado es privado de un alumno y no entra a la grilla
+  // de PLANTILLAS, así que nada lo rankea por objetivo — y firestore.rules deja
+  // `goals` fuera del affectedKeys de ese path justamente para que no se pueda.
+  // Si `updateAssigned` lo mandara, cada edición de plan sería un
+  // permission-denied.
+  group('goals (#635 PR#1b)', () {
+    test('updateTemplate persiste los objetivos que declaró el PF', () async {
+      final id = await seedTemplate();
+
+      await repo.updateTemplate(
+        uid: 'trainer-a',
+        draft: Routine(
+          id: id,
+          name: 'Plantilla Original',
+          split: 'PPL',
+          level: ExperienceLevel.beginner,
+          days: const [],
+          source: RoutineSource.trainerTemplate,
+          assignedBy: 'trainer-a',
+          visibility: RoutineVisibility.private,
+          goals: const [RoutineGoal.health, RoutineGoal.aesthetics],
+        ),
+      );
+
+      final data =
+          (await firestore.collection('routines').doc(id).get()).data()!;
+      expect(data['goals'], equals(['health', 'aesthetics']));
+    });
+
+    test('updateTemplate escribe los wireKey, no los nombres del enum',
+        () async {
+      // `injuryPrevention` es el caso que lo delata: el nombre del enum y su
+      // wireKey difieren, y Firestore tiene que ver el segundo o el catálogo
+      // sembrado y lo que escribe el PF hablarían idiomas distintos.
+      final id = await seedTemplate();
+
+      await repo.updateTemplate(
+        uid: 'trainer-a',
+        draft: Routine(
+          id: id,
+          name: 'Plantilla Original',
+          split: 'PPL',
+          level: ExperienceLevel.beginner,
+          days: const [],
+          source: RoutineSource.trainerTemplate,
+          assignedBy: 'trainer-a',
+          visibility: RoutineVisibility.private,
+          goals: const [RoutineGoal.injuryPrevention],
+        ),
+      );
+
+      final data =
+          (await firestore.collection('routines').doc(id).get()).data()!;
+      expect(data['goals'], equals(['injury_prevention']));
+    });
+
+    test('updateTemplate los vacía cuando el PF deselecciona todo', () async {
+      final id = await seedTemplate();
+      await firestore.collection('routines').doc(id).update({
+        'goals': ['sport']
+      });
+
+      await repo.updateTemplate(
+        uid: 'trainer-a',
+        draft: Routine(
+          id: id,
+          name: 'Plantilla Original',
+          split: 'PPL',
+          level: ExperienceLevel.beginner,
+          days: const [],
+          source: RoutineSource.trainerTemplate,
+          assignedBy: 'trainer-a',
+          visibility: RoutineVisibility.private,
+        ),
+      );
+
+      final data =
+          (await firestore.collection('routines').doc(id).get()).data()!;
+      expect(data['goals'], isEmpty,
+          reason: 'sin objetivos es un estado válido, no un no-op');
+    });
+
+    test('updateAssigned NO manda goals — sería permission-denied', () async {
+      final id = await seedAssignedPlan();
+      await firestore.collection('routines').doc(id).update({
+        'goals': ['sport']
+      });
+
+      await repo.updateAssigned(
+        uid: 'trainer-a',
+        draft: Routine(
+          id: id,
+          name: 'Plan Renombrado',
+          split: 'PPL',
+          level: ExperienceLevel.beginner,
+          days: const [],
+          source: RoutineSource.trainerAssigned,
+          assignedBy: 'trainer-a',
+          assignedTo: 'athlete-b',
+          visibility: RoutineVisibility.private,
+          // Aunque el draft los traiga, el payload no debe incluirlos.
+          goals: const [RoutineGoal.aesthetics],
+        ),
+      );
+
+      final data =
+          (await firestore.collection('routines').doc(id).get()).data()!;
+      expect(data['name'], equals('Plan Renombrado'),
+          reason: 'el resto del update sí se aplica');
+      expect(data['goals'], equals(['sport']),
+          reason: 'los objetivos del doc quedan intactos: el payload no los '
+              'nombra, así que el PF no puede pisarlos desde este path');
+    });
+  });
+
+  group('summary (#648)', () {
+    test('updateAssigned writes the resumen the PF authored', () async {
+      final id = await seedAssignedPlan();
+
+      await repo.updateAssigned(
+        uid: 'trainer-a',
+        draft: Routine(
+          id: id,
+          name: 'Plan Original',
+          split: 'PPL',
+          level: ExperienceLevel.beginner,
+          days: const [],
+          source: RoutineSource.trainerAssigned,
+          assignedBy: 'trainer-a',
+          assignedTo: 'athlete-b',
+          visibility: RoutineVisibility.private,
+          summary: 'Empujar, tirar y piernas: cada día trabajás un tipo de '
+              'movimiento distinto.',
+        ),
+      );
+
+      final data =
+          (await firestore.collection('routines').doc(id).get()).data()!;
+      expect(
+        data['summary'],
+        equals('Empujar, tirar y piernas: cada día trabajás un tipo de '
+            'movimiento distinto.'),
+      );
+    });
+
+    test('updateAssigned clears the resumen when the PF empties the field',
+        () async {
+      final id = await seedAssignedPlan();
+      await firestore
+          .collection('routines')
+          .doc(id)
+          .update({'summary': 'Un resumen viejo.'});
+
+      await repo.updateAssigned(
+        uid: 'trainer-a',
+        draft: Routine(
+          id: id,
+          name: 'Plan Original',
+          split: 'PPL',
+          level: ExperienceLevel.beginner,
+          days: const [],
+          source: RoutineSource.trainerAssigned,
+          assignedBy: 'trainer-a',
+          assignedTo: 'athlete-b',
+          visibility: RoutineVisibility.private,
+        ),
+      );
+
+      final data =
+          (await firestore.collection('routines').doc(id).get()).data()!;
+      expect(data['summary'], isNull);
+    });
+
+    test('updateTemplate writes the resumen the PF authored', () async {
+      final id = await seedTemplate();
+
+      await repo.updateTemplate(
+        uid: 'trainer-a',
+        draft: Routine(
+          id: id,
+          name: 'Plantilla Original',
+          split: 'Full Body',
+          level: ExperienceLevel.beginner,
+          days: const [],
+          source: RoutineSource.trainerTemplate,
+          assignedBy: 'trainer-a',
+          visibility: RoutineVisibility.private,
+          summary: 'Trabajás todo el cuerpo en cada sesión, en vez de '
+              'repartirlo por día.',
+        ),
+      );
+
+      final data =
+          (await firestore.collection('routines').doc(id).get()).data()!;
+      expect(
+        data['summary'],
+        equals('Trabajás todo el cuerpo en cada sesión, en vez de repartirlo '
+            'por día.'),
+      );
+    });
+
+    test(
+        'updateUserOwned does NOT send summary — the athlete UPDATE path lists '
+        'it in keys() but not in affectedKeys(), so a PF resumen must survive '
+        'the athlete re-saving their own routine', () async {
+      final ref = await firestore.collection('routines').add({
+        'name': 'Mi rutina',
+        'level': 'beginner',
+        'days': <dynamic>[],
+        'source': 'user-created',
+        'createdBy': 'athlete-b',
+        'visibility': 'private',
+        'status': 'active',
+        'createdAt': DateTime.now(),
+        'summary': 'Un resumen que escribió el PF.',
+      });
+
+      await repo.updateUserOwned(
+        uid: 'athlete-b',
+        draft: Routine(
+          id: ref.id,
+          name: 'Mi rutina editada',
+          level: ExperienceLevel.beginner,
+          days: const [],
+          source: RoutineSource.userCreated,
+          createdBy: 'athlete-b',
+          visibility: RoutineVisibility.private,
+        ),
+      );
+
+      final data = (await ref.get()).data()!;
+      expect(data['name'], equals('Mi rutina editada'));
+      expect(data['summary'], equals('Un resumen que escribió el PF.'));
     });
   });
 }

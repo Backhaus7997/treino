@@ -135,8 +135,19 @@ test('SCENARIO-132: requester is blocked from updating status to accepted', asyn
   );
 });
 
-// Non-requester member can accept
-test('SCENARIO-132 inverse: non-requester member can accept the friendship', async () => {
+// SUPERSEDED by the `follow-model` migration (a57c6f79, 2026-08-07).
+//
+// This scenario used to assert the OTHER member could accept a pending
+// friendship. `friendships` is now FROZEN — PR2 of the migration flipped
+// `create`/`update`/`delete` to `if false` (ADR-FOLLOW-012); only `read`
+// survives, for rollback and for old builds that still list friends. The
+// accept flow lives in `follows` now.
+//
+// The assertion is inverted rather than deleted: a member write must stay
+// denied, and this file is where SCENARIO-132 is registered. The freeze
+// itself is pinned from every angle by
+// `functions/src/__tests__/friendships-freeze-rules.test.ts` (runs in CI).
+test('SCENARIO-132 inverse: member cannot accept — friendships are frozen', async () => {
   await testEnv.withSecurityRulesDisabled(async (ctx) => {
     await ctx
       .firestore()
@@ -151,7 +162,7 @@ test('SCENARIO-132 inverse: non-requester member can accept the friendship', asy
   });
 
   const u2 = testEnv.authenticatedContext('u2');
-  await assertSucceeds(
+  await assertFails(
     u2.firestore().collection('friendships').doc('u1_u2').update({
       requesterId: 'u1',
       members: ['u1', 'u2'],
@@ -233,8 +244,26 @@ test('SCENARIO-270: non-owner is blocked from writing another user public profil
   );
 });
 
-// Owner can write their own public profile — sanity check
+// Owner can write their own public profile — sanity check.
+//
+// The `users/{uid}` seed is NOT optional since c646376e (2026-07-06): the
+// create rule pins the public `gymId` against the private one with
+// `getAfter(/databases/$(database)/documents/users/$(uid)).data.gymId`.
+// With no `users/u1` doc, that dereference is a null-value error and the
+// whole rule evaluation fails — the write comes back PERMISSION_DENIED even
+// though the caller IS the owner. Seeding the private doc with the same
+// `gymId: null` is what the real signup flow does (ProfileSetup writes
+// `users/{uid}` before the public mirror), so this restores the scenario's
+// intent instead of relaxing anything.
 test('SCENARIO-270 inverse: owner can write their own public profile', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().collection('users').doc('u1').set({
+      uid: 'u1',
+      role: 'athlete',
+      gymId: null,
+    });
+  });
+
   const u1 = testEnv.authenticatedContext('u1');
   await assertSucceeds(
     u1.firestore().collection('userPublicProfiles').doc('u1').set({
@@ -254,14 +283,33 @@ test('SCENARIO-270 inverse: owner can write their own public profile', async () 
 // smoke test. Pre-existing rule denied this case, causing
 // publicProfileViewProvider to error when viewing profiles with no
 // prior friendship interaction.
+//
+// QA-SEC-010 — ACOTADO al par que el doc id encodea. La versión anterior de
+// este test lo afirmaba desde `u3`, un TERCERO ajeno al par `u1_u2`, y eso era
+// más ancho que el flujo que venía a proteger: quien mira un perfil público es
+// una de las dos puntas de la relación (`viewer_target`), nunca un tercero. Con
+// el permiso abierto a cualquiera, la diferencia entre "snapshot vacío" y
+// "PERMISSION_DENIED" respondía «¿estas dos personas son amigas?» a cualquier
+// cuenta gratis, sobre un doc id que es el par ordenado y con los dos padrones
+// de uid enumerables. Ahora el test cubre las DOS direcciones: el miembro
+// resuelve el vacío (que es lo que el escenario protege) y el tercero no
+// distingue un estado del otro.
 // ---------------------------------------------------------------------------
-test('SCENARIO-271: non-member can get a non-existent friendship doc (returns empty)', async () => {
+test('SCENARIO-271: member can get a non-existent friendship doc (returns empty)', async () => {
   // Do NOT seed any friendship — verify .get() returns empty snap, not failure.
-  const u3 = testEnv.authenticatedContext('u3');
+  const u1 = testEnv.authenticatedContext('u1');
   const snap = await assertSucceeds(
-    u3.firestore().collection('friendships').doc('u1_u2').get(),
+    u1.firestore().collection('friendships').doc('u1_u2').get(),
   );
   expect(snap.exists).toBe(false);
+});
+
+test('SCENARIO-271b: a non-member cannot tell a missing friendship from a private one', async () => {
+  // Sin sembrar nada: si esto pasara, el vacío sería la respuesta.
+  const u3 = testEnv.authenticatedContext('u3');
+  await assertFails(
+    u3.firestore().collection('friendships').doc('u1_u2').get(),
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -529,13 +577,34 @@ test('SCENARIO-601: spoofed createdBy is denied', async () => {
   );
 });
 
-// SCENARIO-602: visibility=public is denied for user-created (REQ-USR-012).
-test('SCENARIO-602: visibility=public is denied on user-created create', async () => {
+// SCENARIO-602: visibility=public is now ALLOWED on user-created create.
+//
+// REQ-USR-012 originally clamped athlete-authored routines to `private`.
+// d1d37ea2 (2026-07-07, "public profile tabs — RUTINAS PÚBLICAS + share
+// toggle", #297) reopened it: CREATE branch 2 accepts
+// `visibility in ['private', 'public']` so the athlete can opt in at create
+// time. `shared` stays trainer-assigned only — SCENARIO-602b pins that the
+// clamp is still a clamp and not an anything-goes field.
+test('SCENARIO-602: visibility=public is allowed on user-created create', async () => {
   const athleteA = testEnv.authenticatedContext('athlete-a');
-  await assertFails(
+  await assertSucceeds(
     athleteA.firestore().collection('routines').doc('r-602').set({
       ...validUserCreated('athlete-a'),
       visibility: 'public',
+    }),
+  );
+});
+
+// SCENARIO-602b: visibility=shared is still denied on user-created create —
+// `shared` is the trainer-assigned concept (CREATE branch 1), and letting an
+// athlete mint it here would put a self-authored doc into the branch of the
+// read rule that serves trainer-assigned plans.
+test('SCENARIO-602b: visibility=shared is denied on user-created create', async () => {
+  const athleteA = testEnv.authenticatedContext('athlete-a');
+  await assertFails(
+    athleteA.firestore().collection('routines').doc('r-602b').set({
+      ...validUserCreated('athlete-a'),
+      visibility: 'shared',
     }),
   );
 });
@@ -679,9 +748,16 @@ test('SCENARIO-607: owner can update status from active to archived', async () =
   );
 });
 
-// SCENARIO-608a: owner cannot update name — diff has non-status key
-// (ADR-USR-05 — DO NOT widen affectedKeys).
-test('SCENARIO-608a: owner cannot update name field (affectedKeys guard)', async () => {
+// SCENARIO-608a: owner CAN update name — UPDATE path 2 (REQ-USR-018,
+// ADR-USR-03), added by c0bc7cdf (2026-06-09, "editar rutina propia del
+// alumno"). Path 1 is still the narrow status-only flip of SCENARIO-607;
+// path 2 sits next to it and allows the content fields.
+//
+// The affectedKeys guard this scenario was written to defend did NOT
+// disappear, it moved: path 2's allowlist is
+// ['name', 'level', 'days', 'numWeeks', 'visibility']. SCENARIO-608c below
+// keeps that edge pinned so the guard cannot rot away unnoticed.
+test('SCENARIO-608a: owner can update name field (UPDATE path 2)', async () => {
   await testEnv.withSecurityRulesDisabled(async (ctx) => {
     await ctx.firestore().collection('routines').doc('r-608a').set(
       validUserCreated('athlete-a'),
@@ -689,9 +765,29 @@ test('SCENARIO-608a: owner cannot update name field (affectedKeys guard)', async
   });
 
   const athleteA = testEnv.authenticatedContext('athlete-a');
-  await assertFails(
+  await assertSucceeds(
     athleteA.firestore().collection('routines').doc('r-608a').update({
       name: 'Nombre cambiado',
+    }),
+  );
+});
+
+// SCENARIO-608c: `split` is inside path 2's keys().hasOnly() list (the doc
+// may carry it) but OUTSIDE its affectedKeys() allowlist — so it is a
+// readable, writable-at-create, immutable-at-update field. This is the
+// boundary of the widening: prove that path 2 opened `name`/`level`/`days`
+// and nothing more.
+test('SCENARIO-608c: owner cannot update split field (affectedKeys guard)', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().collection('routines').doc('r-608c').set(
+      validUserCreated('athlete-a'),
+    );
+  });
+
+  const athleteA = testEnv.authenticatedContext('athlete-a');
+  await assertFails(
+    athleteA.firestore().collection('routines').doc('r-608c').update({
+      split: 'Push Pull Legs',
     }),
   );
 });

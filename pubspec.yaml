@@ -1,7 +1,7 @@
 name: treino
 description: "TREINO — fitness app multiplataforma."
 publish_to: 'none'
-version: 0.1.0+16
+version: 0.1.0+36
 
 environment:
   sdk: ^3.5.0
@@ -21,7 +21,7 @@ dependencies:
   firebase_analytics: ^11.3.3
   firebase_app_check: ^0.3.2
   image_picker: ^1.1.2
-  image_cropper: ^9.0.0
+  image_cropper: ^12.2.1
   flutter_riverpod: ^2.5.1
   go_router: ^14.2.0
   google_fonts: ^6.2.1
@@ -40,7 +40,7 @@ dependencies:
   sign_in_with_apple: ^7.0.1
   crypto: ^3.0.3
   characters: ^1.3.0
-  geolocator: ^13.0.0
+  geolocator: ^14.0.2
   http: ^1.2.2
   table_calendar: ^3.2.0
   flutter_map: ^7.0.2
@@ -133,6 +133,7 @@ flutter:
     - assets/muscles/
     - assets/exercises/
     - assets/body/
+    - assets/onboarding/
     # Tipografías bundleadas. Van bajo `assets:` y NO bajo `fonts:` a
     # propósito: google_fonts las resuelve buscando en el AssetManifest un
     # archivo llamado `{Familia}-{Variante}.ttf`. Declaradas bajo `fonts:`

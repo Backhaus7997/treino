@@ -1,0 +1,190 @@
+/**
+ * Storage rules tests for the `temp/uploads/{userId}/{file=**}` block
+ * (QA-SEC-015 / #782).
+ *
+ * El bloque quedó CERRADO en las cuatro operaciones. El camino de escritura
+ * no se acotó con content-type + cap como los otros cinco bloques: se eliminó,
+ * porque nunca hubo un writer en `lib/` (`git log -S "temp/uploads" --all --
+ * lib/` devuelve cero commits) y el import de planes por Excel es 100%
+ * client-side en memoria. El razonamiento completo vive en el comentario del
+ * bloque en `storage.rules` y en `docs/security.md` §4.9.
+ *
+ * Antes de este archivo el bloque tenía **cero** celdas en la matriz de
+ * `docs/security.md` §1.2 — era uno de los dos huecos que §1.6 punto 2 tenía
+ * anotados como "barato de cerrar".
+ *
+ * ⚠️ Los objetos se seedean con `withSecurityRulesDisabled` A PROPÓSITO. Sin
+ * seed, un `assertFails` sobre `getBytes` / `deleteObject` pasaría igual —
+ * pero por un 404, no por el gate. Sería un rojo por el motivo equivocado, que
+ * es justo lo que §1.8 prohíbe. Con el objeto existiendo, el único motivo
+ * posible de la denegación es la regla.
+ *
+ * Run against the emulators (Java 21 required):
+ *   npm --prefix functions run test:rules:emulator
+ */
+
+import * as fs from "fs";
+import * as path from "path";
+import {
+  assertFails,
+  initializeTestEnvironment,
+  RulesTestEnvironment,
+} from "@firebase/rules-unit-testing";
+import {
+  deleteObject,
+  getBytes,
+  listAll,
+  ref,
+  uploadString,
+} from "firebase/storage";
+
+const PROJECT_ID = "treino-rules-test-temp-uploads";
+const RULES_PATH = path.resolve(__dirname, "../../../storage.rules");
+
+const OWNER = "owner-uid";
+const OTHER = "other-uid";
+const UPLOAD_PATH = `temp/uploads/${OWNER}/plan.xlsx`;
+const XLSX_MIME =
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+let testEnv: RulesTestEnvironment;
+
+beforeAll(async () => {
+  testEnv = await initializeTestEnvironment({
+    projectId: PROJECT_ID,
+    storage: {
+      rules: fs.readFileSync(RULES_PATH, "utf8"),
+      host: "127.0.0.1",
+      port: 9199,
+    },
+  });
+});
+
+afterAll(async () => {
+  await testEnv.cleanup();
+});
+
+beforeEach(async () => {
+  // Ver la nota ⚠️ del encabezado: sin este seed los negativos de get/delete
+  // pasarían por 404 en vez de por la regla.
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await uploadString(ref(ctx.storage(), UPLOAD_PATH), "seed-bytes", "raw", {
+      contentType: XLSX_MIME,
+    });
+  });
+});
+
+afterEach(async () => {
+  await testEnv.clearStorage();
+});
+
+function storageAs(uid: string | null) {
+  return uid === null
+    ? testEnv.unauthenticatedContext().storage()
+    : testEnv.authenticatedContext(uid).storage();
+}
+
+describe("temp/uploads/{userId}/{file=**} — storage rules", () => {
+  describe("write", () => {
+    it("DENIES the owner writing into their OWN folder", async () => {
+      // El caso que cierra QA-SEC-015. Antes esto era ALLOW con cualquier
+      // content-type y cualquier tamaño; ahora el camino de escritura no
+      // existe para nadie.
+      await assertFails(
+        uploadString(
+          ref(storageAs(OWNER), `temp/uploads/${OWNER}/nuevo.xlsx`),
+          "payload",
+          "raw",
+          { contentType: XLSX_MIME }
+        )
+      );
+    });
+
+    it("DENIES the owner writing a non-Excel payload", async () => {
+      // El `.exe` de 4 bytes de la tabla de §4.9. Deniega ahora por el cierre
+      // del bloque, no por una allowlist de content-type: no hay allowlist.
+      await assertFails(
+        uploadString(
+          ref(storageAs(OWNER), `temp/uploads/${OWNER}/payload.exe`),
+          "MZ\0\0",
+          "raw",
+          { contentType: "application/x-msdownload" }
+        )
+      );
+    });
+
+    it("DENIES writing into ANOTHER user's folder", async () => {
+      await assertFails(
+        uploadString(
+          ref(storageAs(OTHER), `temp/uploads/${OWNER}/hijack.xlsx`),
+          "payload",
+          "raw",
+          { contentType: XLSX_MIME }
+        )
+      );
+    });
+
+    it("DENIES an unauthenticated write", async () => {
+      await assertFails(
+        uploadString(
+          ref(storageAs(null), `temp/uploads/${OWNER}/anon.xlsx`),
+          "payload",
+          "raw",
+          { contentType: XLSX_MIME }
+        )
+      );
+    });
+  });
+
+  describe("get", () => {
+    it("DENIES the owner reading their OWN upload", async () => {
+      await assertFails(getBytes(ref(storageAs(OWNER), UPLOAD_PATH)));
+    });
+
+    it("DENIES a third party reading someone else's upload", async () => {
+      await assertFails(getBytes(ref(storageAs(OTHER), UPLOAD_PATH)));
+    });
+
+    it("DENIES an unauthenticated get", async () => {
+      await assertFails(getBytes(ref(storageAs(null), UPLOAD_PATH)));
+    });
+  });
+
+  describe("list", () => {
+    it("DENIES listing a user's folder — owner and third party", async () => {
+      await assertFails(
+        listAll(ref(storageAs(OWNER), `temp/uploads/${OWNER}`))
+      );
+      await assertFails(
+        listAll(ref(storageAs(OTHER), `temp/uploads/${OWNER}`))
+      );
+    });
+
+    it("DENIES listing the temp/uploads/ root — no uid enumeration", async () => {
+      // OJO: este caso NO es el análogo del "listar la raíz" de
+      // `post-photos-storage-rules.test.ts`. Ahí la raíz cae en el catch-all
+      // `{allPaths=**}` porque el `match` pide dos segmentos.
+      //
+      // Acá NO: la verificación por mutación lo midió. Al aflojar el `list`
+      // de ESTE bloque a `if request.auth != null`, la raíz `temp/uploads`
+      // pasó a ALLOW junto con la carpeta — o sea que el `{file=**}` la
+      // alcanza y la raíz está gobernada por este bloque, no por el
+      // catch-all. Este caso es por lo tanto un negativo **vivo**, no
+      // decorativo: se pone rojo si alguien abre el `list` de acá.
+      await assertFails(listAll(ref(storageAs(OWNER), "temp/uploads")));
+      await assertFails(listAll(ref(storageAs(OTHER), "temp/uploads")));
+    });
+  });
+
+  describe("delete", () => {
+    it("DENIES delete — owner and third party", async () => {
+      // Sin `allow delete` propio el borrado cae en `write`, que es
+      // `if false`: deniega **por permiso**, no por el null deref de
+      // `request.resource` que fue QA-SEC-009 (este bloque no dereferencia
+      // nada). El barrido real del prefijo lo hace `cascade/storage.ts:67`
+      // con Admin SDK, que ignora estas reglas (ADR-ACCDEL-013).
+      await assertFails(deleteObject(ref(storageAs(OWNER), UPLOAD_PATH)));
+      await assertFails(deleteObject(ref(storageAs(OTHER), UPLOAD_PATH)));
+    });
+  });
+});

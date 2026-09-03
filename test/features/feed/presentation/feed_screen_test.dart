@@ -9,7 +9,6 @@ import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_background.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
-import 'package:treino/core/widgets/treino_bottom_bar.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
@@ -39,6 +38,8 @@ import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
+
+import '../../../helpers/onboarding_test_helpers.dart';
 
 class _MockUser extends Mock implements User {}
 
@@ -119,6 +120,10 @@ UserProfile _makeProfile({String? gymId, UserRole role = UserRole.athlete}) =>
       createdAt: DateTime.utc(2026, 1, 1),
       updatedAt: DateTime.utc(2026, 1, 1),
       gymId: gymId,
+      // These tests are about the feed, not onboarding (#627). Without this the
+      // FEED card renders above the pill tabs and pushes content out of the
+      // test viewport.
+      onboardingSeen: allSurfacesSeen(),
     );
 
 Widget _wrapProvider(Widget w, List<Override> overrides) => ProviderScope(
@@ -1242,31 +1247,17 @@ void main() {
       expect(pillsRect.top, lessThan(viewportRect.bottom));
     });
 
-    testWidgets('post sliver preserves shell-safe bottom padding', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        _wrapProvider(const FeedScreen(), publicOverrides(longPosts())),
-      );
-      await tester.pumpAndSettle();
-
-      final context = tester.element(find.byType(PostCard).first);
-      final expectedBottom =
-          MediaQuery.paddingOf(context).bottom + TreinoBottomBar.minHeight;
-      final paddings = tester.widgetList<SliverPadding>(
-        find.descendant(
-          of: feedScrollView(),
-          matching: find.byType(SliverPadding),
-        ),
-      );
-
-      expect(
-        paddings.any(
-          (sliver) => (sliver.padding as EdgeInsets).bottom == expectedBottom,
-        ),
-        isTrue,
-      );
-    });
+    // Acá vivía `post sliver preserves shell-safe bottom padding`, borrado en
+    // #830. Leía del `SliverPadding` el mismo
+    // `padding.bottom + TreinoBottomBar.minHeight` que escribía la pantalla, o
+    // sea que comparaba producción contra una copia de producción: pasaba con
+    // el bug adentro. Y encima corría en `_wrapProvider`, un `Scaffold` pelado
+    // sin barra, donde `padding.bottom` vale 0 — así que el número que daba
+    // por bueno (72) no era el de ninguna pantalla real.
+    //
+    // Lo reemplaza `shell_bottom_inset_test.dart`, que monta el feed en un
+    // shell con `extendBody` y una `TreinoBottomBar` de verdad, scrollea hasta
+    // el fondo y mide el hueco EFECTIVO contra la caja medida de la barra.
 
     testWidgets('loadMore still fires within 400px of the end', (tester) async {
       final posts = longPosts();

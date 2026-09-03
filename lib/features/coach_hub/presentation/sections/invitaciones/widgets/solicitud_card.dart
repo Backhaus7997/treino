@@ -22,9 +22,7 @@ library;
 import 'package:flutter/material.dart';
 
 import 'package:treino/app/theme/app_palette.dart';
-import 'package:treino/app/theme/tokens/components/treino_card_tokens.dart';
-import 'package:treino/app/theme/tokens/components/treino_focus_tokens.dart';
-import 'package:treino/app/theme/tokens/primitives.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/treino_interactive_state.dart';
 import 'package:treino/features/feed/presentation/widgets/post_avatar.dart';
@@ -157,7 +155,7 @@ class SolicitudCard extends StatelessWidget {
                   actionKey: Key('accept_$id'),
                   label: l10n.coachHubActionAccept,
                   color: palette.accent,
-                  foregroundColor: palette.bg,
+                  foregroundColor: TreinoButtonTokens.foreground(context),
                   filled: true,
                   onTap: onAccept,
                 ),

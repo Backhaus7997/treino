@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../l10n/app_l10n.dart';
@@ -184,7 +185,7 @@ class _CoachHubLoginScreenState extends ConsumerState<CoachHubLoginScreen> {
                       onPressed: _submitting ? null : _submit,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: palette.accent,
-                        foregroundColor: palette.bg,
+                        foregroundColor: TreinoButtonTokens.foreground(context),
                         minimumSize: const Size.fromHeight(48),
                         shape: const StadiumBorder(),
                       ),
@@ -194,7 +195,7 @@ class _CoachHubLoginScreenState extends ConsumerState<CoachHubLoginScreen> {
                               height: 18,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: palette.bg,
+                                color: TreinoButtonTokens.foreground(context),
                               ),
                             )
                           : Text(

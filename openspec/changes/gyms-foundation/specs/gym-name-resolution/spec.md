@@ -1,5 +1,27 @@
 # Gym Name Resolution Specification
 
+> ## 🚨 `treino-dev` es PRODUCCIÓN — el "dev-first" de este change apuntaba a un proyecto que no existe
+>
+> `treino-dev` es el **único** proyecto Firebase de TREINO. **`treino-prod` no
+> existe** y nunca existió. Las versiones anteriores de este change decían
+> *"correr contra `treino-dev`, verificar el conteo, después contra
+> `treino-prod`"*: el paso 1 de ese ensayo **ya era la escritura a producción**,
+> y el paso 2 apuntaba a la nada. Quien lo siguiera creía estar ensayando
+> mientras remapeaba el `gymId` de usuarios reales.
+>
+> El ensayo real es el **emulador**, que es el único entorno descartable
+> (`./scripts/emulator.sh`; ambos backfills ya lo soportan con
+> `FIRESTORE_EMULATOR_HOST=localhost:8080`, sin service-account key). Contra
+> `treino-dev` se corre **después**, con OK explícito de un humano, sabiendo que
+> es producción.
+>
+> Ojo con el guard de los scripts: refuerza `/dev/i.test(projectId)`, y contra
+> `treino-dev` ese test **pasa** — no hay refusal, no hay `--allow-prod`. La
+> única protección visible es el banner de `scripts/lib/firebase_projects.js`.
+> Ver [AGENTS.md § Entornos](../../../../../AGENTS.md#-entornos--leer-antes-de-correr-cualquier-comando),
+> [openspec/AGENTS.md](../../../../AGENTS.md), [#826](https://github.com/Backhaus7997/treino/issues/826)
+> y [#845](https://github.com/Backhaus7997/treino/issues/845).
+
 ## Purpose
 
 Replace the stale hardcoded gym-name lookup (`gymNameFromId`) with real, resolvable names sourced from the curated `gyms/` catalog, using a denormalization strategy for list contexts and a cached provider for detail contexts. Includes backfilling legacy gym-id references and existing profile docs so no user-facing name regresses.
@@ -84,7 +106,7 @@ The system MUST treat `null`, empty string, and `kNoGymId` as "no gym" and MUST 
 
 ### Requirement: Legacy gymId backfill maps hardcoded ids to real gym docs
 
-The system MUST provide a dev-first, idempotent script (`scripts/migrate_legacy_gym_ids.js`) that maps the 3 legacy hardcoded ids (`smart-fit-palermo`, `sportclub-belgrano`, `megatlon-recoleta`) to real `gyms/` docs.
+The system MUST provide an emulator-first, idempotent script (`scripts/migrate_legacy_gym_ids.js`) that maps the 3 legacy hardcoded ids (`smart-fit-palermo`, `sportclub-belgrano`, `megatlon-recoleta`) to real `gyms/` docs.
 
 The system MUST reuse `megatlon-recoleta` as-is (already exists in `gyms/` with that exact id — no new doc created) and MUST create real `gyms/` docs for `smart-fit-palermo` and `sportclub-belgrano`.
 
@@ -92,7 +114,11 @@ The script MUST dual-write both `users/{uid}` and `userPublicProfiles/{uid}` for
 
 The script MUST be idempotent: running it multiple times MUST NOT change already-migrated docs or duplicate writes.
 
-The script MUST run silently with no end-user notice, and MUST run against `treino-dev` before `treino-prod`.
+The script MUST run silently with no end-user notice.
+
+The script MUST be verified against the local Firestore emulator (`FIRESTORE_EMULATOR_HOST=localhost:8080`, launched by `./scripts/emulator.sh`) — reaching a verified count there — before it is run against `treino-dev`.
+
+`treino-dev` is TREINO's only Firebase project and holds real user data. A run against it is a production write and MUST NOT proceed without explicit maintainer sign-off recorded in the PR. There is no second project to promote to: **`treino-prod` does not exist**, and any requirement phrased as "dev before prod" describes an environment this repo does not have.
 
 #### Scenario: megatlon-recoleta requires no new doc
 
@@ -113,12 +139,19 @@ The script MUST run silently with no end-user notice, and MUST run against `trei
 - WHEN the script is run again
 - THEN that user's docs are not modified a second time (skip-if-already-migrated)
 
-#### Scenario: Migration runs dev-first without user notice
+#### Scenario: Migration is rehearsed on the emulator before it touches production
 
 - GIVEN the migration script is executed
-- WHEN it targets `treino-dev`
-- THEN it completes and reports a verified count before any run against `treino-prod` is considered
+- WHEN it targets the local Firestore emulator
+- THEN it completes and reports a verified count before any run against `treino-dev` is considered
 - AND no in-app notice or prompt is shown to affected athletes
+
+#### Scenario: A run against treino-dev is a production run
+
+- GIVEN the emulator rehearsal has produced a verified count
+- WHEN the script is pointed at `treino-dev`
+- THEN that run is treated as a production write against real user data, gated on explicit maintainer sign-off
+- AND no further "promotion to prod" step exists, because `treino-dev` is the only Firebase project
 
 ### Requirement: Backfill of denormalized gymName for existing profiles
 
@@ -126,7 +159,7 @@ The system MUST provide a backfill that populates `UserPublicProfile.gymName` fo
 
 The backfill MUST run after the legacy gymId backfill (id migration first, name backfill second) so names resolve against already-corrected ids.
 
-The backfill MUST be idempotent and dev-first, consistent with the legacy gymId migration's operational discipline.
+The backfill MUST be idempotent and emulator-first, consistent with the legacy gymId migration's operational discipline: verified against the emulator, then run against `treino-dev` (production) only with explicit maintainer sign-off.
 
 #### Scenario: Existing profile gets gymName filled in
 

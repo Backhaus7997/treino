@@ -53,9 +53,11 @@ import '../features/insights/presentation/exercise_progression_screen.dart';
 import '../features/insights/presentation/frequent_exercises_screen.dart';
 import '../features/insights/presentation/insights_screen.dart';
 import '../features/insights/presentation/measurements_screen.dart';
+import '../features/insights/domain/monthly_report_deep_link.dart';
 import '../features/insights/presentation/monthly_report_screen.dart';
 import '../features/insights/presentation/muscle_distribution_screen.dart';
 import '../features/insights/presentation/volume_by_group_screen.dart';
+import '../features/insights/presentation/wellbeing_trend_screen.dart';
 import '../features/profile/application/user_providers.dart';
 import '../features/profile/domain/user_profile_trainer_completeness.dart';
 import '../features/profile/domain/user_role.dart';
@@ -220,6 +222,29 @@ GoRouter buildRouter({
     // de en la pantalla de error roja default de go_router.
     errorBuilder: (context, state) => const NotFoundScreen(),
     routes: [
+      // ── Deep links de los mails (App Links / Universal Links) ───────────
+      //
+      // `app.gettreino.com/abrir/...` abre la app en vez del navegador. No
+      // son pantallas: son REDIRECTS al lugar donde de verdad está lo que el
+      // mail vino a avisar.
+      //
+      // Existen dos y no una porque el rol cambia el destino, y esa misma
+      // asimetría es la que separa las dos páginas web de fallback: el atleta
+      // sólo tiene la app; el profe además tiene el Coach Hub.
+      //
+      // Si la sesión está cerrada, `authRedirect` gana antes que esto y manda
+      // a `/welcome` — correcto: primero entrar, después ver. Se pierde el
+      // destino puntual, que es aceptable mientras los dos destinos sean la
+      // home de cada rol.
+      GoRoute(
+        path: '/abrir/alumno',
+        redirect: (_, __) => '/home',
+      ),
+      GoRoute(
+        path: '/abrir/profe',
+        redirect: (_, __) => '/coach?tab=agenda',
+      ),
+
       // Entry routes — full screen, NO bottom bar
       GoRoute(
         path: '/splash',
@@ -391,6 +416,22 @@ GoRouter buildRouter({
           mode: SelfCreating(existingRoutineId: state.extra as String?),
         ),
       ),
+      GoRoute(
+        // "Usar como base" (#647): open the editor pre-loaded with an existing
+        // routine and save the result as a NEW routine owned by the athlete.
+        //
+        // The source id travels as a PATH param, not as `extra`: unlike
+        // `my-routine-editor` (where a null extra legitimately means "create
+        // from blank"), this route is meaningless without a source, and a path
+        // param makes that non-optional at the type level AND survives a deep
+        // link / process death, which `extra` does not.
+        path: '/workout/customize-routine/:routineId',
+        builder: (context, state) => RoutineEditorScreen(
+          mode: SelfCustomizing(
+            sourceRoutineId: state.pathParameters['routineId']!,
+          ),
+        ),
+      ),
 
       // ─── Full-screen sub-screens moved OUT of the ShellRoute ──────────────
       // These were shell sub-routes that showed the bottom nav bar; they read
@@ -493,8 +534,20 @@ GoRouter buildRouter({
         // Statistics hub detail screens — fullscreen, no bottom nav. They are
         // bare Columns, so wrap them in _immersive instead of shell _withBg.
         path: '/home/insights/monthly',
-        pageBuilder: (_, state) =>
-            _report(state.pageKey, _immersive(const _MonthlyReportRouteHost())),
+        // `?month=YYYY-MM` abre el reporte con ese mes ya seleccionado. Es el
+        // deep link del push "tu reporte de <mes> está listo" (la Cloud
+        // Function `notifyMonthlyReport` lo arma con ese formato exacto). Sin
+        // el parámetro, la pantalla abre en el mes más reciente, como siempre.
+        pageBuilder: (_, state) => _report(
+          state.pageKey,
+          _immersive(
+            _MonthlyReportRouteHost(
+              initialMonth: parseMonthlyReportMonthParam(
+                state.uri.queryParameters['month'],
+              ),
+            ),
+          ),
+        ),
       ),
       GoRoute(
         path: '/home/insights/muscle-distribution',
@@ -515,6 +568,11 @@ GoRouter buildRouter({
         path: '/home/insights/measurements',
         pageBuilder: (_, state) =>
             _report(state.pageKey, _immersive(const _MeasurementsRouteHost())),
+      ),
+      GoRoute(
+        path: '/home/insights/wellbeing',
+        pageBuilder: (_, state) => _report(
+            state.pageKey, _immersive(const _WellbeingTrendRouteHost())),
       ),
       GoRoute(
         // `?exerciseId=` opcional: preselecciona un ejercicio. Lo usa
@@ -913,12 +971,14 @@ Widget _immersive(Widget child) => Scaffold(
 /// uid explícito (no currentUidProvider directo en el screen) para que la
 /// misma pantalla pueda reusarse desde una vista de coach sin cambios.
 class _MonthlyReportRouteHost extends ConsumerWidget {
-  const _MonthlyReportRouteHost();
+  const _MonthlyReportRouteHost({this.initialMonth});
+
+  final DateTime? initialMonth;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final uid = ref.watch(currentUidProvider) ?? '';
-    return MonthlyReportScreen(uid: uid);
+    return MonthlyReportScreen(uid: uid, initialMonth: initialMonth);
   }
 }
 
@@ -931,6 +991,18 @@ class _MuscleDistributionRouteHost extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final uid = ref.watch(currentUidProvider) ?? '';
     return MuscleDistributionScreen(uid: uid);
+  }
+}
+
+/// Resuelve el uid actual y monta [WellbeingTrendScreen] — mismo patrón que
+/// los demás hosts del hub.
+class _WellbeingTrendRouteHost extends ConsumerWidget {
+  const _WellbeingTrendRouteHost();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final uid = ref.watch(currentUidProvider) ?? '';
+    return WellbeingTrendScreen(uid: uid);
   }
 }
 

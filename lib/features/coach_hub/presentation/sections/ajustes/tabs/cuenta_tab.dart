@@ -3,8 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_palette.dart';
-import 'package:treino/app/theme/tokens/components/treino_focus_tokens.dart';
-import 'package:treino/app/theme/tokens/primitives.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/image/avatar_cropper.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/motion/treino_shimmer.dart';
@@ -12,6 +11,7 @@ import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/avatar_web_uploader.dart';
+import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_upsell_banner.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
@@ -239,7 +239,7 @@ class _CuentaFormState extends ConsumerState<_CuentaForm> {
             onPressed: (_canSave && !_saving) ? _save : null,
             style: ElevatedButton.styleFrom(
               backgroundColor: palette.accent,
-              foregroundColor: palette.bg,
+              foregroundColor: TreinoButtonTokens.foreground(context),
               disabledBackgroundColor: palette.bgCard,
               disabledForegroundColor: palette.textMuted,
               padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
@@ -250,18 +250,26 @@ class _CuentaFormState extends ConsumerState<_CuentaForm> {
                     height: 16,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: palette.bg,
+                      color: TreinoButtonTokens.foreground(context),
                     ),
                   )
                 : const Text('GUARDAR CAMBIOS'), // i18n: Fase W3
           ),
         ),
         const SizedBox(height: 16),
-        // Tarjeta «INFORMACIÓN PERSONAL» — primera en el stagger eager
-        // (ADR-F12-04, PROHIBIDO dentro de ListView.builder; acá es un
-        // Column fijo, no aplica el riesgo).
+        // Invitación a plan pago — primera en el stagger eager (ADR-F12-04,
+        // PROHIBIDO dentro de ListView.builder; acá es un Column fijo, no
+        // aplica el riesgo). Va arriba de todo porque Cuenta es el aterrizaje
+        // de los dos símbolos de usuario del shell (sidebar y top bar), y es
+        // el único lugar del hub donde el upsell no interrumpe una tarea.
+        // Se auto-oculta en plan3 (no hay tier superior que vender).
         TreinoFadeSlideIn(
           delay: AppMotion.stagger(0),
+          child: const PlanUpsellBanner(),
+        ),
+        // Tarjeta «INFORMACIÓN PERSONAL».
+        TreinoFadeSlideIn(
+          delay: AppMotion.stagger(1),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -326,7 +334,7 @@ class _CuentaFormState extends ConsumerState<_CuentaForm> {
         ),
         const SizedBox(height: 28),
         TreinoFadeSlideIn(
-          delay: AppMotion.stagger(1),
+          delay: AppMotion.stagger(2),
           child: const _DangerZone(),
         ),
       ],
@@ -428,8 +436,11 @@ class _FotoEditorState extends ConsumerState<_FotoEditor> {
     if (_busy) return;
     setState(() => _busy = true);
     try {
-      // Borra el archivo de Storage (best-effort) y limpia la referencia para
-      // no dejar el objeto huérfano en avatars/{uid}.jpg.
+      // Borra el archivo de Storage ANTES de limpiar la referencia: si el
+      // borrado falla de verdad, el catch de abajo avisa y no queda un objeto
+      // huérfano en avatars/{uid}.jpg con la UI diciendo que lo quitó. Hasta
+      // #765 esto era best-effort y mentía siempre. `deleteStored()` sí tolera
+      // `object-not-found` — que no haya objeto es el estado deseado.
       await ref.read(avatarWebUploaderProvider).deleteStored();
       await ref
           .read(userRepositoryProvider)

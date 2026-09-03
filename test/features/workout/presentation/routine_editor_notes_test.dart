@@ -35,6 +35,7 @@ import 'package:treino/features/workout/presentation/routine_editor_mode.dart';
 import 'package:treino/features/workout/presentation/routine_editor_screen.dart';
 
 import '../../../helpers/fake_analytics_service.dart';
+import '../../../fixtures/routine_editor_ui.dart';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -82,6 +83,8 @@ Future<void> _pumpEditor(
   required RoutineEditorMode mode,
   RoutineRepository? repo,
 }) async {
+  usarViewportAlto(tester);
+
   final router = GoRouter(
     initialLocation: '/workout/editor',
     routes: [
@@ -118,6 +121,10 @@ Future<void> _pumpEditor(
       ),
     ),
   );
+
+  // La card de ejercicio arranca colapsada desde #864. Estos tests miran
+  // valores de sets, así que necesitan la tabla en el árbol.
+  await expandirEjercicios(tester);
 }
 
 /// Builds a [Routine] fixture carrying one slot with the given [notes].
@@ -218,7 +225,12 @@ void main() {
         repo: repo,
       );
       await tester.pumpAndSettle();
+      // La hidratación es asíncrona: cuando `_pumpEditor` corrió su expansión
+      // todavía no había ninguna card en el árbol. Hay que volver a abrirlas
+      // una vez que el plan terminó de cargar.
+      await expandirEjercicios(tester);
 
+      await desplazarHasta(tester, find.text('RIR 2 · pausa abajo'));
       // The slot notes field must show the hydrated value
       expect(find.text('RIR 2 · pausa abajo'), findsOneWidget);
     });

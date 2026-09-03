@@ -6,14 +6,16 @@
  * common Spanish names like "Sentadilla con barra" → "Back Squat".
  *
  * Usage:
- *   set GOOGLE_APPLICATION_CREDENTIALS=scripts/treino-dev-service-account.json
+ *   set TREINO_SA_KEY=%USERPROFILE%\.config\treino\sa-key.json
  *   node scripts/backfill_exercise_aliases.js
  *
  * Idempotent: overwrites the `aliases` field every time. Safe to re-run.
  */
 
-const admin = require('firebase-admin');
-admin.initializeApp();
+const { inicializarAdmin } = require('./lib/admin');
+// Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla cerrado
+// con la migración; contra el emulador no pide nada. Ver scripts/lib/admin.js.
+const { admin } = inicializarAdmin();
 const db = admin.firestore();
 
 const aliasesById = {

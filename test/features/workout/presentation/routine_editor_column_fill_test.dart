@@ -1,9 +1,13 @@
-// Issue #640 — PR#2: rellenar la columna KG desde el header.
+// Issue #640 — rellenar la columna KG. Gesto actualizado por #867.
 //
-// Decisión de gesto (la que pedía el issue): el bulk-fill vive en el header de
-// KG, el ÚNICO sin gesto. REPS / MÍN / MÁX / TIEMPO ya abren el picker de modo
-// de medición al tocarlos y meterle otra acción encima rompía una interacción
-// existente.
+// El bulk-fill vivía en el header de KG, el único sin gesto. Era un tap sobre
+// un label de 10,5 px con un ícono de 11: existía, y no lo encontraba nadie.
+// Desde #867 es "A TODAS" en la barra sobre el teclado, con un target de 44.
+//
+// Con el disparador cambió la FUENTE: antes replicaba siempre desde el primer
+// set —el header no pertenece a ninguna fila—, ahora desde la celda que se está
+// editando. Replicar el primer set mientras el usuario mira el tercero sería
+// replicar un número que no tiene delante.
 //
 // Cubre:
 //   - applyColumnWeights mueve SOLO el peso: SetType, reps, rango y duración
@@ -35,6 +39,7 @@ import 'package:treino/l10n/app_l10n.dart';
 
 import '../../../fixtures/exercises.dart';
 import '../../../helpers/fake_analytics_service.dart';
+import '../../../fixtures/routine_editor_ui.dart';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -117,13 +122,17 @@ Future<void> _pumpEditor(WidgetTester tester) async {
 }
 
 Future<void> _addBenchPress(WidgetTester tester) async {
-  await tester.ensureVisible(find.text('Agregar ejercicio'));
+  await desplazarHastaAgregarEjercicio(tester);
+  await desplazarHastaAgregarEjercicio(tester);
   await tester.tap(find.text('Agregar ejercicio'));
   await tester.pumpAndSettle();
   await tester.tap(find.text('Press de Banca').first);
   await tester.pumpAndSettle();
   await tester.tap(find.text('Agregar 1 ejercicio'));
   await tester.pumpAndSettle();
+  // Desde este cambio el ejercicio agregado nace PLEGADO: quien avisa
+  // que le falta completar sets es el borde rojo, no la card abierta.
+  await expandirEjercicios(tester);
 }
 
 Future<void> _tapVisible(WidgetTester tester, Finder finder) async {
@@ -152,7 +161,12 @@ Future<void> _enterInField(
   await tester.pumpAndSettle();
 }
 
-Finder get _fillButton => find.byKey(const Key('fill_kg_column_button'));
+Finder get _fillButton => find.byKey(const Key('accessory_fill_column'));
+
+/// Enfoca la celda KG número [i], con el teclado simulado, de modo que la
+/// barra de accesorio quede en el árbol.
+Future<void> _enfocarKg(WidgetTester tester, int i) =>
+    enfocarCelda(tester, _fieldsWithHint('kg').at(i));
 
 /// Lets the SnackBar's auto-dismiss timer run out so the test ends clean.
 Future<void> _flushSnackBar(WidgetTester tester) async {
@@ -280,27 +294,45 @@ void main() {
 
   // ── Widget: afordancia en el header ────────────────────────────────────────
 
-  group('header KG — visibilidad de la afordancia', () {
+  group('barra de accesorio — visibilidad de "A TODAS"', () {
     testWidgets('no aparece con un solo set', (tester) async {
+      usarViewportAlto(tester);
       await _pumpEditor(tester);
       await _addBenchPress(tester);
+      await _enfocarKg(tester, 0);
 
-      expect(_fillButton, findsNothing);
+      expect(_fillButton, findsNothing,
+          reason: 'con un set único no hay dónde replicar');
     });
 
     testWidgets('aparece a partir del segundo set', (tester) async {
+      usarViewportAlto(tester);
       await _pumpEditor(tester);
       await _addBenchPress(tester);
       await _addSet(tester);
+      await _enfocarKg(tester, 0);
 
       expect(_fillButton, findsOneWidget);
     });
 
-    testWidgets('no aparece en modo duración (no hay columna KG)',
-        (tester) async {
+    testWidgets('sin una celda en edición no hay barra', (tester) async {
+      usarViewportAlto(tester);
       await _pumpEditor(tester);
       await _addBenchPress(tester);
       await _addSet(tester);
+
+      expect(_fillButton, findsNothing,
+          reason: 'la barra es un accesorio del teclado: sin celda enfocada '
+              'no tiene sobre qué actuar');
+    });
+
+    testWidgets('no aparece en modo duración (no hay columna KG)',
+        (tester) async {
+      usarViewportAlto(tester);
+      await _pumpEditor(tester);
+      await _addBenchPress(tester);
+      await _addSet(tester);
+      await _enfocarKg(tester, 0);
       expect(_fillButton, findsOneWidget);
 
       // El header de REPS conserva su gesto original: abre el picker de modo.
@@ -314,8 +346,10 @@ void main() {
 
   // ── Widget: rellenar y deshacer ────────────────────────────────────────────
 
-  group('header KG — rellenar la columna', () {
-    testWidgets('replica el peso del primer set en todos', (tester) async {
+  group('barra de accesorio — rellenar la columna', () {
+    testWidgets('replica el peso de la celda enfocada en todos',
+        (tester) async {
+      usarViewportAlto(tester);
       await _pumpEditor(tester);
       await _addBenchPress(tester);
       await _addSet(tester);
@@ -328,6 +362,7 @@ void main() {
 
       expect(find.text('100'), findsOneWidget);
 
+      await _enfocarKg(tester, 0);
       await _tapVisible(tester, _fillButton);
 
       expect(find.text('100'), findsNWidgets(3));
@@ -339,7 +374,11 @@ void main() {
       await _flushSnackBar(tester);
     });
 
-    testWidgets('deshacer devuelve la columna a como estaba', (tester) async {
+    testWidgets('la fuente es la celda en edición, no siempre la primera',
+        (tester) async {
+      // Es el cambio de semántica que trajo #867: el disparador ya no es un
+      // header sin fila, es la celda que el usuario está mirando.
+      usarViewportAlto(tester);
       await _pumpEditor(tester);
       await _addBenchPress(tester);
       await _addSet(tester);
@@ -349,6 +388,28 @@ void main() {
       await _enterInField(tester, _fieldsWithHint('reps').at(0), '8');
       await _enterInField(tester, _fieldsWithHint('reps').at(1), '8');
 
+      await _enfocarKg(tester, 1);
+      await _tapVisible(tester, _fillButton);
+
+      expect(find.text('60'), findsNWidgets(2),
+          reason: 'replicó el 60 de la SEGUNDA fila, que era la enfocada');
+      expect(find.text('100'), findsNothing);
+
+      await _flushSnackBar(tester);
+    });
+
+    testWidgets('deshacer devuelve la columna a como estaba', (tester) async {
+      usarViewportAlto(tester);
+      await _pumpEditor(tester);
+      await _addBenchPress(tester);
+      await _addSet(tester);
+
+      await _enterInField(tester, _fieldsWithHint('kg').at(0), '100');
+      await _enterInField(tester, _fieldsWithHint('kg').at(1), '60');
+      await _enterInField(tester, _fieldsWithHint('reps').at(0), '8');
+      await _enterInField(tester, _fieldsWithHint('reps').at(1), '8');
+
+      await _enfocarKg(tester, 0);
       await _tapVisible(tester, _fillButton);
       expect(find.text('100'), findsNWidgets(2));
       expect(find.text('60'), findsNothing);
@@ -362,22 +423,27 @@ void main() {
       await _flushSnackBar(tester);
     });
 
-    testWidgets('sin peso en el primer set avisa y no vacía la columna',
+    testWidgets('con la celda fuente vacía avisa y no vacía la columna',
         (tester) async {
+      usarViewportAlto(tester);
       await _pumpEditor(tester);
       await _addBenchPress(tester);
       await _addSet(tester);
 
-      // Solo el SEGUNDO set tiene peso: la fuente (el primero) está vacía.
+      // Solo el SEGUNDO set tiene peso; se enfoca el PRIMERO, que está vacío.
       await _enterInField(tester, _fieldsWithHint('kg').at(1), '60');
       await _enterInField(tester, _fieldsWithHint('reps').at(0), '8');
       await _enterInField(tester, _fieldsWithHint('reps').at(1), '8');
 
+      await _enfocarKg(tester, 0);
       await _tapVisible(tester, _fillButton);
 
       expect(
-        find.text('Cargá el peso del primer set para poder replicarlo.'),
+        find.text('Cargá el peso de este set para poder replicarlo.'),
         findsOneWidget,
+        reason: 'dice "este set" y no "el primer set": la fuente es la celda '
+            'enfocada, y mandar al usuario a la primera fila lo dejaba '
+            'corrigiendo un valor que no se va a replicar',
       );
       expect(find.text('60'), findsOneWidget,
           reason: 'el peso ya cargado no se pisa con un vacío');

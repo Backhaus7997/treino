@@ -70,7 +70,9 @@ class _Pill extends StatelessWidget {
         child: Text(
           label,
           style: theme.textTheme.labelMedium?.copyWith(
-            color: isActive ? palette.bg : palette.textPrimary,
+            color: isActive
+                ? TreinoButtonTokens.foreground(context)
+                : palette.textPrimary,
             fontWeight: FontWeight.w600,
           ),
         ),

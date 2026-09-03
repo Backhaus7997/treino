@@ -10,6 +10,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/core/utils/app_clock.dart';
 import 'package:treino/core/utils/date_labels.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/motion/treino_success_check.dart';
@@ -57,6 +58,8 @@ import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_status.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
+import 'package:treino/features/workout/application/exercise_feedback_providers.dart';
+import 'package:treino/features/workout/domain/exercise_feedback.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/presentation/widgets/exercise_progression_chart.dart'
     show ExerciseProgressionChartLabels;
@@ -64,6 +67,7 @@ import 'package:treino/features/workout/presentation/widgets/exercise_progressio
 import 'package:treino/features/workout/presentation/widgets/most_frequent_exercises_list.dart';
 import 'package:treino/features/workout/presentation/widgets/personal_records_list.dart';
 import 'package:treino/features/workout/presentation/widgets/session_exercise_block.dart';
+import 'package:treino/features/workout/presentation/widgets/feedback_load_error_note.dart';
 import 'package:treino/features/profile/application/user_providers.dart'
     show userProfileProvider;
 import 'package:treino/features/payments/domain/payment.dart';
@@ -725,7 +729,7 @@ class _ResumenTab extends ConsumerWidget {
       sessions: sessions,
       measurements: measAsync.requireValue,
       weeklyTarget: active?.days.length ?? 0,
-      now: DateTime.now(),
+      now: AppClock.now(),
     );
 
     final adh = m.adherencia30dPct;
@@ -994,7 +998,7 @@ class _NoteCard extends ConsumerWidget {
   final String athleteId;
 
   String _haceDias(DateTime updatedAt) {
-    final diff = DateTime.now().difference(updatedAt.toLocal());
+    final diff = AppClock.now().difference(updatedAt.toLocal());
     final days = diff.inDays;
     if (days == 0) return 'hoy';
     if (days == 1) return 'hace 1 día';
@@ -2280,6 +2284,15 @@ class _SetLogsExpansion extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(coachSessionSetLogsProvider(
         (athleteUid: athleteId, sessionId: sessionId)));
+    // #628 — ver la nota en athlete_detail_screen: mismo provider, mismo
+    // criterio de degradación y el MISMO aviso independiente cuando la lectura
+    // falla. Que el PF esté en la web y no en el teléfono no cambia el modo de
+    // falla: sin el aviso, "no pudimos leer" se ve igual que "no reportó nada".
+    final feedbackAsync = ref.watch(coachSessionExerciseFeedbackProvider(
+        (athleteUid: athleteId, sessionId: sessionId)));
+    final feedback = feedbackAsync.valueOrNull ?? const <ExerciseFeedback>[];
+    final feedbackFailed = feedbackAsync.hasError;
+    final l10n = AppL10n.of(context);
     final muted = TextStyle(color: palette.textMuted, fontSize: 12);
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
@@ -2310,23 +2323,37 @@ class _SetLogsExpansion extends ConsumerWidget {
             );
           },
           data: (logs) {
-            if (logs.isEmpty) {
-              return Text(
-                  'Sin series registradas en esta sesión.', // i18n: Fase W2
-                  style: muted);
-            }
-            final groups = <String, List<SetLog>>{};
-            for (final log in logs) {
-              groups.putIfAbsent(log.exerciseId, () => <SetLog>[]).add(log);
-            }
+            final groups =
+                buildSessionExerciseGroups(sets: logs, feedback: feedback);
+            // Mismo criterio que el athlete-detail mobile (#628): el
+            // placeholder es de la sesión sin series Y sin reportes. Con
+            // `logs.isEmpty` el PF veía "sin series" y perdía la molestia que
+            // el alumno reportó sobre una serie que nunca registró.
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                for (final entry in groups.entries)
-                  SessionExerciseBlock(
-                    exerciseName: entry.value.first.exerciseName,
-                    sets: entry.value,
-                  ),
+                // Arriba y siempre que haya fallado, aun con la sesión vacía:
+                // "no hay series" y "no pudimos leer los reportes" son dos
+                // hechos distintos. Este SÍ sale por AppL10n aunque el resto
+                // del widget siga en `// i18n: Fase W2` — la clave ya existe
+                // (la creó este mismo change) y no había ningún motivo para
+                // estrenar deuda de i18n nueva.
+                if (feedbackFailed) ...[
+                  FeedbackLoadErrorNote(
+                      message: l10n.coachSessionFeedbackLoadError),
+                  const SizedBox(height: AppSpacing.s8),
+                ],
+                if (groups.isEmpty)
+                  Text(
+                      'Sin series registradas en esta sesión.', // i18n: Fase W2
+                      style: muted)
+                else
+                  for (final group in groups)
+                    SessionExerciseBlock(
+                      exerciseName: group.exerciseName,
+                      sets: group.sets,
+                      feedback: group.feedback,
+                    ),
               ],
             );
           },
@@ -2594,7 +2621,7 @@ class _NotasPrivadasTabState extends ConsumerState<_NotasPrivadasTab> {
                         : () => _save(trainerUid),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: palette.accent,
-                      foregroundColor: palette.bg,
+                      foregroundColor: TreinoButtonTokens.foreground(context),
                       disabledBackgroundColor:
                           palette.accent.withValues(alpha: 0.3),
                       padding: const EdgeInsets.symmetric(
@@ -2607,7 +2634,7 @@ class _NotasPrivadasTabState extends ConsumerState<_NotasPrivadasTab> {
                             height: 16,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: palette.bg,
+                              color: TreinoButtonTokens.foreground(context),
                             ),
                           )
                         : Text(
@@ -2942,7 +2969,7 @@ class _ArchivosTabState extends ConsumerState<_ArchivosTab> {
                 label: Text(l10n.coachHubAlumnoDetailArchivosUploadButton),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: palette.accent,
-                  foregroundColor: palette.bg,
+                  foregroundColor: TreinoButtonTokens.foreground(context),
                   disabledBackgroundColor:
                       palette.accent.withValues(alpha: 0.3),
                   padding:
@@ -3311,7 +3338,7 @@ class _MedicionesTabState extends ConsumerState<_MedicionesTab> {
                     : 'NUEVA PRUEBA'), // i18n: Fase W2
                 style: ElevatedButton.styleFrom(
                   backgroundColor: palette.accent,
-                  foregroundColor: palette.bg,
+                  foregroundColor: TreinoButtonTokens.foreground(context),
                   padding:
                       const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                   shape: const StadiumBorder(),
@@ -4197,7 +4224,7 @@ class _NuevaMedicionDialogState extends ConsumerState<_NuevaMedicionDialog> {
                     onPressed: _saving ? null : _save,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: palette.accent,
-                      foregroundColor: palette.bg,
+                      foregroundColor: TreinoButtonTokens.foreground(context),
                       padding: const EdgeInsets.symmetric(
                           horizontal: 20, vertical: 12),
                       shape: const StadiumBorder(),
@@ -4208,7 +4235,7 @@ class _NuevaMedicionDialogState extends ConsumerState<_NuevaMedicionDialog> {
                             height: 14,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: palette.bg,
+                              color: TreinoButtonTokens.foreground(context),
                             ),
                           )
                         : const Text('GUARDAR'), // i18n: Fase W2
@@ -4983,7 +5010,7 @@ class _NuevoRendimientoDialogState
                     onPressed: _saving ? null : _save,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: palette.accent,
-                      foregroundColor: palette.bg,
+                      foregroundColor: TreinoButtonTokens.foreground(context),
                       padding: const EdgeInsets.symmetric(
                           horizontal: 20, vertical: 12),
                       shape: const StadiumBorder(),
@@ -4994,7 +5021,7 @@ class _NuevoRendimientoDialogState
                             height: 14,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: palette.bg,
+                              color: TreinoButtonTokens.foreground(context),
                             ),
                           )
                         : const Text('GUARDAR'), // i18n: Fase W2
@@ -5122,7 +5149,7 @@ class _SeguimientoTabState extends ConsumerState<_SeguimientoTab> {
                 label: const Text('NUEVA ENTRADA'), // i18n: Fase W2
                 style: ElevatedButton.styleFrom(
                   backgroundColor: palette.accent,
-                  foregroundColor: palette.bg,
+                  foregroundColor: TreinoButtonTokens.foreground(context),
                   padding:
                       const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                   shape: const StadiumBorder(),
@@ -5482,7 +5509,7 @@ class _NuevaEntradaSeguimientoDialogState
                       onPressed: _saving ? null : _save,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: palette.accent,
-                        foregroundColor: palette.bg,
+                        foregroundColor: TreinoButtonTokens.foreground(context),
                         padding: const EdgeInsets.symmetric(
                             horizontal: 20, vertical: 12),
                         shape: const StadiumBorder(),
@@ -5493,7 +5520,7 @@ class _NuevaEntradaSeguimientoDialogState
                               height: 14,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: palette.bg,
+                                color: TreinoButtonTokens.foreground(context),
                               ),
                             )
                           : const Text('GUARDAR'), // i18n: Fase W2
@@ -5717,7 +5744,7 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
                   onPressed: _saving ? null : _save,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: palette.accent,
-                    foregroundColor: palette.bg,
+                    foregroundColor: TreinoButtonTokens.foreground(context),
                     padding: const EdgeInsets.symmetric(
                         horizontal: 20, vertical: 12),
                     shape: const StadiumBorder(),
@@ -5728,7 +5755,7 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
                           height: 14,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: palette.bg,
+                            color: TreinoButtonTokens.foreground(context),
                           ),
                         )
                       : const Text('GUARDAR PLAN'), // i18n: Fase W2

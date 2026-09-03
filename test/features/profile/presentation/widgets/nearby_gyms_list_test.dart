@@ -14,6 +14,7 @@ import 'package:treino/features/gyms/application/places_providers.dart';
 import 'package:treino/features/gyms/data/resolve_gym_place_service.dart';
 import 'package:treino/features/gyms/domain/nearby_gym.dart';
 import 'package:treino/features/profile/presentation/widgets/nearby_gyms_list.dart';
+import 'package:treino/features/profile_setup/presentation/widgets/gym_card.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 class MockResolveGymPlaceService extends Mock
@@ -67,6 +68,9 @@ class _FakeNearbyLocationNotifier extends NearbyLocationNotifier {
 
 Widget _wrap({
   required List<Override> overrides,
+  String? currentGymId,
+  String? selectedGymId,
+  void Function(String gymId)? onGymSelected,
 }) =>
     ProviderScope(
       overrides: overrides,
@@ -75,11 +79,12 @@ Widget _wrap({
         localizationsDelegates: AppL10n.localizationsDelegates,
         supportedLocales: AppL10n.supportedLocales,
         locale: const Locale('es', 'AR'),
-        home: const Scaffold(
+        home: Scaffold(
           body: SingleChildScrollView(
             child: NearbyGymsList(
-              uid: 'test-uid',
-              currentGymId: null,
+              currentGymId: currentGymId,
+              selectedGymId: selectedGymId,
+              onGymSelected: onGymSelected,
             ),
           ),
         ),
@@ -187,7 +192,7 @@ void main() {
           locale: const Locale('es', 'AR'),
           home: const Scaffold(
             body: SingleChildScrollView(
-              child: NearbyGymsList(uid: 'test-uid', currentGymId: null),
+              child: NearbyGymsList(currentGymId: null),
             ),
           ),
         ),
@@ -220,7 +225,7 @@ void main() {
           locale: const Locale('es', 'AR'),
           home: const Scaffold(
             body: SingleChildScrollView(
-              child: NearbyGymsList(uid: 'test-uid', currentGymId: null),
+              child: NearbyGymsList(currentGymId: null),
             ),
           ),
         ),
@@ -248,10 +253,7 @@ void main() {
           locale: const Locale('es', 'AR'),
           home: const Scaffold(
             body: SingleChildScrollView(
-              child: NearbyGymsList(
-                uid: 'test-uid',
-                currentGymId: 'current-gym',
-              ),
+              child: NearbyGymsList(currentGymId: 'current-gym'),
             ),
           ),
         ),
@@ -285,7 +287,7 @@ void main() {
           locale: const Locale('es', 'AR'),
           home: const Scaffold(
             body: SingleChildScrollView(
-              child: NearbyGymsList(uid: 'test-uid', currentGymId: null),
+              child: NearbyGymsList(currentGymId: null),
             ),
           ),
         ),
@@ -297,10 +299,34 @@ void main() {
     });
   });
 
-  group('nearby tap selection (task 2.10)', () {
-    testWidgets(
-        'tapping a nearby row invokes select(uid, placeId) with no session '
-        'token', (tester) async {
+  // Antes de #814 este grupo verificaba que el tap resolviera el Place y
+  // escribiera `users/{uid}.gymId` en el acto. Eso ERA el bug: la selección
+  // tiene que ser borrador y la escritura ocurrir recién en GUARDAR (ver
+  // profile_gym_screen_test.dart para el camino completo hasta Firestore).
+  group('nearby tap selection — draft-only (#814)', () {
+    testWidgets('tapping a nearby row notifies onGymSelected with its placeId',
+        (tester) async {
+      final fake = _FakeNearbyLocationNotifier(granted: true);
+      final selected = <String>[];
+
+      await tester.pumpWidget(_wrap(
+        overrides: [
+          nearbyLocationProvider.overrideWith((ref) => fake),
+          nearbyGymsProvider(_bucket)
+              .overrideWith((ref) async => [_gym('gym-0')]),
+        ],
+        onGymSelected: selected.add,
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Gym gym-0'));
+      await tester.pumpAndSettle();
+
+      expect(selected, ['gym-0']);
+    });
+
+    testWidgets('tapping a nearby row NEVER resolves the Place',
+        (tester) async {
       final fake = _FakeNearbyLocationNotifier(granted: true);
       final mockResolveService = MockResolveGymPlaceService();
       when(() => mockResolveService.call(
@@ -313,21 +339,52 @@ void main() {
             source: 'google-places',
           ));
 
-      await tester.pumpWidget(_wrap(overrides: [
-        nearbyLocationProvider.overrideWith((ref) => fake),
-        nearbyGymsProvider(_bucket)
-            .overrideWith((ref) async => [_gym('gym-0')]),
-        resolveGymPlaceServiceProvider.overrideWithValue(mockResolveService),
-      ]));
+      await tester.pumpWidget(_wrap(
+        overrides: [
+          nearbyLocationProvider.overrideWith((ref) => fake),
+          nearbyGymsProvider(_bucket)
+              .overrideWith((ref) async => [_gym('gym-0')]),
+          resolveGymPlaceServiceProvider.overrideWithValue(mockResolveService),
+        ],
+        onGymSelected: (_) {},
+      ));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('Gym gym-0'));
       await tester.pumpAndSettle();
 
-      verify(() => mockResolveService.call(
-            placeId: 'gym-0',
-            sessionToken: null,
-          )).called(1);
+      // Place Details es facturable: que no salga en el tap no es sólo
+      // correctitud de datos, también es plata.
+      verifyNever(() => mockResolveService.call(
+            placeId: any(named: 'placeId'),
+            sessionToken: any(named: 'sessionToken'),
+          ));
+    });
+
+    testWidgets(
+        'the row matching selectedGymId renders as selected — el único '
+        'feedback visible del tap ahora que no escribe', (tester) async {
+      final fake = _FakeNearbyLocationNotifier(granted: true);
+
+      await tester.pumpWidget(_wrap(
+        overrides: [
+          nearbyLocationProvider.overrideWith((ref) => fake),
+          nearbyGymsProvider(_bucket)
+              .overrideWith((ref) async => [_gym('gym-0'), _gym('gym-1')]),
+        ],
+        selectedGymId: 'gym-1',
+      ));
+      await tester.pumpAndSettle();
+
+      GymCard cardFor(String name) => tester.widget<GymCard>(
+            find.ancestor(
+              of: find.text(name),
+              matching: find.byType(GymCard),
+            ),
+          );
+
+      expect(cardFor('Gym gym-1').selected, isTrue);
+      expect(cardFor('Gym gym-0').selected, isFalse);
     });
   });
 }

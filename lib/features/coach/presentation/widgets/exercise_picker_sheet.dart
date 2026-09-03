@@ -644,12 +644,12 @@ class _ExerciseThumbnail extends StatelessWidget {
         maxWidth: 68,
         minHeight: 68,
         maxHeight: 68,
-        child: _buildCircle(fallbackIcon),
+        child: _buildCircle(context, fallbackIcon),
       ),
     );
   }
 
-  Widget _buildCircle(Icon fallbackIcon) {
+  Widget _buildCircle(BuildContext context, Icon fallbackIcon) {
     return SizedBox(
       width: 68,
       height: 68,
@@ -689,7 +689,7 @@ class _ExerciseThumbnail extends StatelessWidget {
                 child: Icon(
                   TreinoIcon.check,
                   size: 12,
-                  color: palette.bg,
+                  color: TreinoButtonTokens.foreground(context),
                 ),
               ),
             ),
@@ -754,7 +754,7 @@ class _StickyAddBar extends StatelessWidget {
           onPressed: count > 0 ? onTap : null,
           style: ElevatedButton.styleFrom(
             backgroundColor: palette.accent,
-            foregroundColor: palette.bg,
+            foregroundColor: TreinoButtonTokens.foreground(context),
             disabledBackgroundColor: palette.accent.withAlpha(80),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(AppRadius.full),

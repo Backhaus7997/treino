@@ -16,6 +16,8 @@ import '../../../l10n/app_l10n.dart';
 import '../../profile/application/user_providers.dart';
 import '../../gyms/application/gym_providers.dart';
 import '../../gyms/domain/gym_display_name.dart';
+import '../../coach/application/trainer_link_providers.dart';
+import '../application/duration_timer_providers.dart';
 import '../application/exercise_providers.dart';
 import '../application/routine_providers.dart';
 import '../application/session_init.dart';
@@ -28,8 +30,10 @@ import '../domain/duration_timer.dart';
 import '../domain/routine.dart';
 import '../domain/superset_order.dart';
 import '../domain/routine_slot.dart';
+import '../domain/superset_blocks.dart';
 import '../domain/set_enums.dart';
 import '../domain/set_limits.dart';
+import '../domain/session_time_fit.dart';
 import '../domain/set_log.dart';
 import '../../watch/application/watch_effort_notifier.dart';
 import '../../watch/application/watch_timer_control_notifier.dart';
@@ -39,8 +43,10 @@ import 'exercise_detail_screen.dart';
 import 'widgets/bounded_number_formatter.dart';
 import 'widgets/coach_note.dart';
 import 'widgets/duration_set_row.dart';
+import 'widgets/exercise_feedback_sheet.dart';
 import 'widgets/mmss.dart';
 import 'widgets/set_entry_sheet.dart';
+import 'widgets/time_fit_sheet.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
 // ── Block gating helpers (top-level, testable) ────────────────────────────────
@@ -63,29 +69,21 @@ typedef BlockInfo = ({List<RoutineSlot> slots, bool isSuperset});
 
 /// Splits the day's slots into ordered blocks (standalone or superset groups).
 /// A lone slot tagged with a supersetGroup falls back to standalone.
-List<BlockInfo> buildBlocks(List<RoutineSlot> slots) {
-  final blocks = <BlockInfo>[];
-  var i = 0;
-  while (i < slots.length) {
-    final group = slots[i].supersetGroup;
-    if (group != null) {
-      var scan = i;
-      final members = <RoutineSlot>[];
-      while (scan < slots.length && slots[scan].supersetGroup == group) {
-        members.add(slots[scan]);
-        scan++;
-      }
-      if (members.length >= 2) {
-        blocks.add((slots: members, isSuperset: true));
-        i = scan;
-        continue;
-      }
-    }
-    blocks.add((slots: [slots[i]], isSuperset: false));
-    i++;
-  }
-  return blocks;
-}
+/// El agrupamiento en sí vive en `superset_blocks.dart`, o sea en DOMINIO.
+///
+/// Estaba acá adentro, y por eso el companion de Wear no lo vio nunca: aplanaba
+/// los slots del día en una lista lineal y trataba una superserie A/B/C como
+/// tres ejercicios sueltos. Ahora los dos lados leen la misma definición de
+/// bloque y no pueden volver a divergir. Esta función sólo la envuelve en el
+/// tipo que consume la pantalla.
+List<BlockInfo> buildBlocks(List<RoutineSlot> slots) => [
+      for (final posiciones
+          in supersetBlockIndices([for (final s in slots) s.supersetGroup]))
+        (
+          slots: [for (final i in posiciones) slots[i]],
+          isSuperset: posiciones.length >= 2,
+        ),
+    ];
 
 /// Returns true if a standalone block (single slot) is fully completed.
 /// [week] is the 0-based active week (from [SessionState.activeWeek]).
@@ -233,6 +231,23 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
   /// El canal por el que el RELOJ pide cortar la cuenta del teléfono.
   WatchTimerControlNotifier? _controlDelReloj;
 
+  /// El contenedor del `ProviderScope` que ESTA pantalla monta en su rama
+  /// `data`, capturado para poder escribir desde el `State`.
+  ///
+  /// Parece un rodeo y no lo es (#817). `durationTimerRecorderProvider` declara
+  /// `dependencies: [playerSessionIdProvider]`, o sea que sólo resuelve la
+  /// sesión DENTRO de ese scope. Y el `ref` de este `State` cuelga del elemento
+  /// de la pantalla, que está ARRIBA del scope que la propia pantalla crea en
+  /// `build`: leer el recorder desde acá con `ref.read` devuelve uno cuyo
+  /// `playerSessionIdProvider` es el default `null`, así que `borrar()` no
+  /// borra nada — y no falla, no loguea, no deja rastro. Un fix que no borra y
+  /// no rompe es peor que el bug, porque además parece arreglado.
+  ///
+  /// Se guarda el CONTENEDOR y no el `WidgetRef`: el contenedor es un objeto
+  /// plano, estable mientras el scope viva, y no ata nada al ciclo de vida de
+  /// un widget que se reconstruye en cada frame.
+  ProviderContainer? _contenedorDelPlayer;
+
   @override
   void initState() {
     super.initState();
@@ -289,11 +304,59 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
     // interactiva a propósito, y con la cuenta vencida todavía puesta el botón
     // "Iniciar" quedaría muerto.
     _cronometro!.clear();
+    // Y con el estado local se va también la anotación de la sesión (#817).
+    // `clear()` toca sólo el `ValueNotifier` —a propósito: no le avisa al
+    // reloj, que llega a cero solo—, así que hasta acá el fin natural de la
+    // cuenta era el ÚNICO camino que no borraba el espejo de Firestore: los
+    // dos que sí borraban cubren cancelaciones (la fila y el pedido del
+    // reloj). El dato quedaba huérfano y el companion de Wear, que espeja lo
+    // anotado en la sesión, podía mostrar horas después un cronómetro vencido
+    // que nadie limpió. `wearTimerAjenoProvider` ya documentaba este borrado
+    // como un hecho ("el teléfono borra el documento al llegar a cero") — el
+    // teléfono era el que no cumplía.
+    _borrarAnotacionDelCronometro();
     HapticFeedback.heavyImpact();
 
     final slot = _slotDe(cuenta.exerciseId);
     if (slot == null) return;
     _logSet(slot, cuenta.setNumber, 0, 0.0);
+  }
+
+  /// Saca de la sesión la anotación del cronómetro que acaba de terminar.
+  ///
+  /// ── Por qué no se espera ──────────────────────────────────────────────────
+  ///
+  /// Igual que los otros dos borrados (`duration_set_row` cuando cancela el
+  /// teléfono, `WearTimerSync.cancelar` cuando cancela el reloj): la escritura
+  /// es el ESPEJO, no la serie. `DurationTimerRecorder.borrar()` es `void` y ya
+  /// hace `unawaited` con su propio `catchError` adentro, así que no hay nada
+  /// que esperar ni forma de esperarlo. Atar la vibración y el marcado de la
+  /// serie al ack del servidor es exactamente el error que costó tres bugs en
+  /// este ciclo: sin señal en el gimnasio, el atleta se queda mirando.
+  ///
+  /// ── Y por qué acá arriba y no después de `_logSet` ────────────────────────
+  ///
+  /// No hay carrera entre las dos escrituras: ésta borra campos del documento
+  /// de la sesión con `merge`, y `_logSet` crea un documento en la
+  /// subcolección `setLogs` — no se pisan, y ningún camino de log vuelve a
+  /// escribir los campos del timer. Pero el orden igual importa por otra
+  /// razón: abajo hay un `return` temprano si el slot ya no está en el día, y
+  /// con el borrado después de ese `return` el caso raro volvería a dejar la
+  /// anotación colgada. Se borra en el mismo punto en que se corta el estado
+  /// local, que es donde la cuenta termina de verdad.
+  void _borrarAnotacionDelCronometro() {
+    final contenedor = _contenedorDelPlayer;
+    // Sin scope montado no hay sesión resuelta y no hay nada que borrar: la
+    // cuenta no pudo haber arrancado desde una fila que nunca se dibujó.
+    if (contenedor == null) return;
+    try {
+      contenedor.read(durationTimerRecorderProvider).borrar();
+    } catch (e) {
+      // El scope puede haberse desmontado entre el tick y esta lectura (la
+      // sesión dejó de ser `data`). Un espejo que no se limpia no puede tumbar
+      // el entreno que está corriendo.
+      debugPrint('[duration-timer] no se pudo borrar al llegar a cero — $e');
+    }
   }
 
   /// El reloj pidió cortar la cuenta que corre acá.
@@ -522,20 +585,80 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
     );
   }
 
+  /// La ranura del ajuste de tiempo (#645): la invitacion a declararlo cuando
+  /// no hay nada recortado, o el aviso con el resultado y el deshacer cuando
+  /// si lo hay. Nunca las dos: un solo camino a mano en cada estado.
+  ///
+  /// Sin nada medible en el dia no se dibuja NADA. Ofrecer "ajustar" sobre una
+  /// sesion cuya duracion no se puede estimar es prometer una cuenta que la
+  /// pantalla despues no puede mostrar — misma postura que las tarjetas de
+  /// rutina, que ante `minutes == null` no escriben ni "0 min" ni un guion.
+  List<Widget> _buildTimeFitSlot(SessionState state) {
+    if (state.droppedExerciseIds.isNotEmpty) {
+      return [
+        const SizedBox(height: 12),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: _SessionTrimNotice(state: state, onUndo: _undoTrim),
+        ),
+      ];
+    }
+    final current = estimateSessionMinutes(state.day, week: state.activeWeek);
+    if (current == null) return const [];
+    return [
+      const SizedBox(height: 12),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: _TimeFitPrompt(
+          currentMinutes: current,
+          onTap: () => _openTimeFit(state),
+        ),
+      ),
+    ];
+  }
+
   /// Builds the exercise list with block gating: current block fully expanded,
   /// completed blocks collapsed to summary, future blocks locked/dimmed.
+  ///
+  /// La lista se arma sobre [SessionState.activeSlots], no sobre `day.slots`:
+  /// un ejercicio recortado (#645) no se dibuja. Dibujarlo lo mostraria como
+  /// bloque COMPLETADO —`plannedSetsFor` le da 0 y `computeBlockStatuses` lee
+  /// eso como "todo hecho"—, o sea, la lista le diria "lo hiciste" sobre algo
+  /// que el atleta saco. Lo que salio se cuenta en `_SessionTrimNotice`, que
+  /// es tambien donde esta el deshacer.
+  ///
+  /// Los indices de `_activatedBlocks` siguen siendo validos: el recorte es
+  /// siempre una cola contigua del final (`planSessionTimeFit`), asi que lo
+  /// que queda es un PREFIJO de los bloques y ningun indice se corre.
   List<Widget> _buildExerciseList(SessionState state) {
     final palette = AppPalette.of(context);
     // Source week ONCE here and thread down — single-week sessions use 0
     // so effectiveSetsForWeek(0) falls back to effectiveSets (REQ-PERIOD-042).
     final week = state.session.weekNumber;
-    final blocks = buildBlocks(state.day.slots);
+    final blocks = buildBlocks(state.activeSlots.toList(growable: false));
     // live-set-editing AD-5: single resolver every gating/render denominator
     // routes through. Bound method closes over `state`, so callers never
     // read the raw plan count directly.
     final plannedCountFor = state.plannedSetsFor;
     final statuses =
         computeBlockStatuses(blocks, state.setLogs, week, plannedCountFor);
+
+    // #628 — "Comentar / Reportar" sólo aparece si hay a QUIÉN reportarle.
+    //
+    // El riesgo de producto que el issue pide resolver es dejar al alumno
+    // mandar al vacío creyendo que su PF lo lee. Sin vínculo `active` no hay
+    // `session_shares` —lo crea `syncSessionShareOnTrainerLink` cuando el
+    // vínculo se activa— así que el reporte no tendría destinatario. Se
+    // esconde el CTA en vez de mostrarlo y explicar después: el alumno que
+    // quiere registrar una molestia para sí mismo ya tiene el check-in
+    // post-entreno (#643, dolor sí/no + zona), que es el lugar correcto.
+    //
+    // Es el MISMO provider que usa el resto de la app para "¿este alumno
+    // tiene PF?" — no se lee `session_shares` desde el cliente, que además
+    // es un doc que el cliente sólo escribe.
+    final hasActiveTrainer =
+        ref.watch(currentAthleteLinkProvider).valueOrNull != null;
+
     final out = <Widget>[];
 
     for (var blockIdx = 0; blockIdx < blocks.length; blockIdx++) {
@@ -560,6 +683,7 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
           onSetCheck: _logSet,
           onSetUpdate: _updateSet,
           onOpenDetail: _openExerciseDetail,
+          onFeedback: hasActiveTrainer ? _openExerciseFeedback : null,
         ));
       } else {
         final entry = _entryFor(state, block.slots.first);
@@ -578,6 +702,9 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
             onAddSet: () => _addSet(entry.slot),
             onRemoveSet: (log) => _onRemoveSetTapped(entry.slot, log),
             onOpenDetail: () => _openExerciseDetail(entry.slot),
+            onFeedback: hasActiveTrainer
+                ? (setNumber) => _openExerciseFeedback(entry.slot, setNumber)
+                : null,
           ),
         ));
       }
@@ -616,6 +743,39 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
         );
   }
 
+  /// Abre la hoja donde el atleta declara cuanto tiempo tiene hoy (#645).
+  ///
+  /// Los ejercicios que ya tienen series cargadas viajan como
+  /// `lockedExerciseIds`: el recorte nunca puede esconder trabajo hecho, y el
+  /// recorrido de `planSessionTimeFit` frena ahi.
+  void _openTimeFit(SessionState state) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => TimeFitSheet(
+        day: state.day,
+        week: state.activeWeek,
+        lockedExerciseIds: state.setLogs.map((l) => l.exerciseId).toSet(),
+        onApply: _applyTrim,
+      ),
+    );
+  }
+
+  /// Aplica el recorte que el atleta acepto. Solo toca la sesion de hoy.
+  void _applyTrim(List<String> exerciseIds) {
+    ref
+        .read(sessionNotifierProvider(widget.init).notifier)
+        .dropExercisesForToday(exerciseIds);
+  }
+
+  /// Devuelve a la sesion todo lo que se habia recortado por tiempo (#645).
+  void _undoTrim() {
+    ref
+        .read(sessionNotifierProvider(widget.init).notifier)
+        .restoreDroppedExercises();
+  }
+
   /// Callback wired to each row's delete icon (AD-6). Una fila SIN loguear
   /// (log == null) se borra directo, sin diálogo. Una fila LOGUEADA muestra
   /// el diálogo de confirmación (data loss) antes de disparar [_removeSet].
@@ -629,6 +789,43 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
       builder: (_) => _RemoveSetConfirmDialog(
         onConfirm: () => _removeSet(slot, log),
       ),
+    );
+  }
+
+  /// Abre "Comentar / Reportar" para [slot] (#628).
+  ///
+  /// CONTRATO DEL ANCLA — [setNumber] es la ÚLTIMA serie que el atleta
+  /// REALMENTE hizo en esa card, o null si todavía no hizo ninguna (reporte a
+  /// nivel ejercicio). Una sola frase, verdadera en los tres call sites: card
+  /// activa, bloque completado y miembro de superserie.
+  ///
+  /// NO es la serie en curso ni la pendiente. El dolor pasa en la serie que se
+  /// soltó, no en la que falta, y del lado del PF `session_exercise_block.dart`
+  /// matchea por `setNumber`: anclarlo una adelante deja la nota colgada de un
+  /// log que no existe. Eso es justo lo que el chat no puede dar — el PF lo ve
+  /// pegado a la serie que lo originó.
+  ///
+  /// Y null significa "todavía no hizo ninguna", NO "la card no está activa":
+  /// el bloque completado no tiene serie en curso y aun así manda el número de
+  /// su última serie hecha (ver [_CompletedBlockSummary]) — es el escenario que
+  /// motivó el botón, la molestia aparece al soltar la última serie.
+  ///
+  /// No pausa el cronómetro ni toca el estado de la sesión: el sheet es una
+  /// ruta modal aparte y esta pantalla sigue montada abajo.
+  void _openExerciseFeedback(RoutineSlot slot, int? setNumber) {
+    final uid = ref.read(currentUidProvider);
+    final sessionId =
+        ref.read(sessionNotifierProvider(widget.init)).value?.session.id;
+    // Sin sesión persistida todavía no hay dónde anclar el reporte. El botón
+    // ya no debería estar visible en ese estado; el guard es defensivo.
+    if (uid == null || sessionId == null || sessionId.isEmpty) return;
+    showExerciseFeedbackSheet(
+      context,
+      uid: uid,
+      sessionId: sessionId,
+      exerciseId: slot.exerciseId,
+      exerciseName: slot.exerciseName,
+      setNumber: setNumber,
     );
   }
 
@@ -700,67 +897,106 @@ class _SessionPlayerScreenState extends ConsumerState<SessionPlayerScreen> {
             ),
           ),
         ),
-        data: (state) => PopScope(
-          canPop: _isFinalizing,
-          onPopInvokedWithResult: (didPop, _) {
-            if (didPop || _isFinalizing) return;
-            _showAbandonConfirm();
-          },
-          child: SafeArea(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _SessionHeader(
-                  routineSplit: routineSplit,
-                  dayNumber: state.day.dayNumber,
-                  onAbandon: _showAbandonConfirm,
-                  onBack: _showAbandonConfirm,
-                ),
-                Expanded(
-                  child: ScrollConfiguration(
-                    behavior: ScrollConfiguration.of(context).copyWith(
-                      physics: const ClampingScrollPhysics(),
-                      overscroll: false,
-                    ),
-                    child: ListView(
-                      // Sin padding horizontal global: las cards de arriba
-                      // conservan su margen de 20, pero la zona EJERCICIOS
-                      // corre full-width con margen propio reducido (12).
-                      padding: EdgeInsets.zero,
-                      physics: const ClampingScrollPhysics(),
-                      children: [
-                        const SizedBox(height: 12),
-                        const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 20),
-                          child: _AttendanceCard(),
-                        ),
-                        const SizedBox(height: 14),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: _SessionStatsCard(state: state),
-                        ),
-                        const SizedBox(height: 20),
-                        const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 12),
-                          child: _SectionLabel('EJERCICIOS'),
-                        ),
-                        const SizedBox(height: 12),
-                        ..._buildExerciseList(state),
-                        const SizedBox(height: 20),
-                      ],
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
-                  child: _TerminarSessionButton(
-                    enabled: state.isFullyCompleted,
-                    onPressed: state.isFullyCompleted ? _finishSession : null,
-                  ),
-                ),
-              ],
-            ),
+        // El subarbol que dibuja ESTA sesion sabe cual es.
+        //
+        // Sin esto, la fila por tiempo tenia que deducirla —y la deducia con
+        // `getActive`, una lectura que va al servidor primero y no tiene
+        // timeout—: hasta que resolviera, el cronometro no se anotaba en la
+        // sesion y el reloj nunca se enteraba, sin ningun sintoma de este lado.
+        // Medido. El porque completo esta en [playerSessionIdProvider].
+        //
+        // Va en la rama `data` y no mas arriba porque es el unico punto donde
+        // la sesion esta resuelta de verdad.
+        data: (state) => ProviderScope(
+          overrides: [
+            playerSessionIdProvider.overrideWithValue(state.session.id),
+          ],
+          // El `Builder` existe para tomar el contexto de ADENTRO del scope
+          // (#817): es la única forma de que el `State` —que cuelga de un
+          // elemento de más arriba— alcance el contenedor donde el override de
+          // la sesion vale. Ver [_contenedorDelPlayer]. Es una asignación
+          // idempotente y sin `setState`, así que no reprograma el frame.
+          child: Builder(
+            builder: (scopeContext) {
+              _contenedorDelPlayer = ProviderScope.containerOf(
+                scopeContext,
+                listen: false,
+              );
+              return _cuerpoDelPlayer(state, routineSplit);
+            },
           ),
+        ),
+      ),
+    );
+  }
+
+  /// El árbol del player, ya con la sesión resuelta.
+  ///
+  /// Vive afuera de `build` sólo para que el `Builder` que captura el contenedor
+  /// del scope (#817) no empuje sesenta líneas de árbol dos niveles más adentro.
+  /// El `context` que usa adentro es el mismo `State.context` de siempre, así
+  /// que las búsquedas por herencia —`ScrollConfiguration.of`— resuelven igual.
+  Widget _cuerpoDelPlayer(SessionState state, String routineSplit) {
+    return PopScope(
+      canPop: _isFinalizing,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop || _isFinalizing) return;
+        _showAbandonConfirm();
+      },
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _SessionHeader(
+              routineSplit: routineSplit,
+              dayNumber: state.day.dayNumber,
+              onAbandon: _showAbandonConfirm,
+              onBack: _showAbandonConfirm,
+            ),
+            Expanded(
+              child: ScrollConfiguration(
+                behavior: ScrollConfiguration.of(context).copyWith(
+                  physics: const ClampingScrollPhysics(),
+                  overscroll: false,
+                ),
+                child: ListView(
+                  // Sin padding horizontal global: las cards de arriba
+                  // conservan su margen de 20, pero la zona EJERCICIOS
+                  // corre full-width con margen propio reducido (12).
+                  padding: EdgeInsets.zero,
+                  physics: const ClampingScrollPhysics(),
+                  children: [
+                    const SizedBox(height: 12),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 20),
+                      child: _AttendanceCard(),
+                    ),
+                    const SizedBox(height: 14),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: _SessionStatsCard(state: state),
+                    ),
+                    ..._buildTimeFitSlot(state),
+                    const SizedBox(height: 20),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 12),
+                      child: _SectionLabel('EJERCICIOS'),
+                    ),
+                    const SizedBox(height: 12),
+                    ..._buildExerciseList(state),
+                    const SizedBox(height: 20),
+                  ],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
+              child: _TerminarSessionButton(
+                enabled: state.isFullyCompleted,
+                onPressed: state.isFullyCompleted ? _finishSession : null,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -935,7 +1171,9 @@ class _SessionStatsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final total = state.day.slots.length;
+    // Los ejercicios recortados (#645) no estan en el denominador: la barra
+    // mide lo que se hace HOY, no lo que decia el plan.
+    final total = state.activeExerciseCount;
     final completed = state.completedExerciseCount;
     final progress = total > 0 ? completed / total : 0.0;
 
@@ -1002,6 +1240,165 @@ class _SessionStatsCard extends StatelessWidget {
   }
 }
 
+// ── _TimeFitPrompt ────────────────────────────────────────────────────────────
+
+/// La invitación a declarar el tiempo disponible, arriba del listado (#645).
+///
+/// Se dibuja sólo cuando NO hay nada recortado: una vez aplicado el ajuste,
+/// este lugar lo ocupa `_SessionTrimNotice`, que muestra el resultado y el
+/// deshacer. Dos estados de la misma ranura, nunca los dos juntos — así el
+/// atleta siempre tiene un solo camino a mano y no puede apilar recortes sin
+/// entender de dónde salió cada uno.
+class _TimeFitPrompt extends StatelessWidget {
+  const _TimeFitPrompt({required this.currentMinutes, required this.onTap});
+
+  final int currentMinutes;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    return TreinoTappable(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: palette.bgCard,
+          // Contorno tenue en acento: es la unica fila de esta pantalla que
+          // ABRE ALGO sin ser un ejercicio, y el chevron —la senal de "esto
+          // lleva al detalle"— ya esta gastado en las filas del listado.
+          border: Border.all(color: palette.accent.withValues(alpha: 0.35)),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            Icon(TreinoIcon.clock, size: 16, color: palette.accent),
+            const SizedBox(width: AppSpacing.s8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.sessionTimeFitPromptTitle,
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                      letterSpacing: 1.2,
+                      color: palette.accent,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.hairline),
+                  Text(
+                    l10n.sessionTimeFitCurrent('~$currentMinutes'),
+                    style: GoogleFonts.barlow(
+                      fontWeight: FontWeight.w400,
+                      fontSize: 12,
+                      color: palette.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── _SessionTrimNotice ────────────────────────────────────────────────────────
+
+/// El aviso de que la sesión de hoy va recortada para entrar en el tiempo que
+/// el atleta declaró tener (#645).
+///
+/// Existe SÓLO cuando hay algo recortado, y es el único lugar de la pantalla
+/// que nombra lo que salió: la lista de abajo dibuja la sesión de hoy y nada
+/// más. Sin este aviso el recorte sería invisible —la sesión se vería como una
+/// rutina más corta, sin rastro de la decisión— y no habría forma de volver
+/// atrás. Por eso el deshacer vive acá y no escondido en un menú.
+///
+/// El número se recalcula sobre lo que QUEDA ([estimateSessionMinutes]), no
+/// sobre el día del plan, y lleva siempre "~" porque siempre es calculado —
+/// misma convención que la duración de las tarjetas (#639).
+class _SessionTrimNotice extends StatelessWidget {
+  const _SessionTrimNotice({required this.state, required this.onUndo});
+
+  final SessionState state;
+  final VoidCallback onUndo;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+
+    // En el orden del día, no en el orden en que se sacaron.
+    final names = state.day.slots
+        .where((s) => state.droppedExerciseIds.contains(s.exerciseId))
+        .map((s) => s.exerciseName)
+        .join(' · ');
+    final minutes = estimateSessionMinutes(
+      state.day,
+      week: state.activeWeek,
+      droppedExerciseIds: state.droppedExerciseIds,
+    );
+
+    return Container(
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+      ),
+      padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(TreinoIcon.clock, size: 16, color: palette.accent),
+          const SizedBox(width: AppSpacing.s8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (minutes != null) ...[
+                  Text(
+                    l10n.sessionTrimAdjustedTo('~$minutes'),
+                    style: GoogleFonts.barlowCondensed(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                      letterSpacing: 1.2,
+                      color: palette.accent,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.hairline),
+                ],
+                Text(
+                  l10n.sessionTrimDroppedList(names),
+                  style: GoogleFonts.barlow(
+                    fontWeight: FontWeight.w400,
+                    fontSize: 12,
+                    color: palette.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: onUndo,
+            child: Text(
+              l10n.sessionTrimUndo,
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+                letterSpacing: 0.5,
+                color: palette.accent,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ── _SectionLabel ─────────────────────────────────────────────────────────────
 
 class _SectionLabel extends StatelessWidget {
@@ -1054,6 +1451,7 @@ class _StandaloneBlock extends StatelessWidget {
     this.onAddSet,
     this.onRemoveSet,
     this.onOpenDetail,
+    this.onFeedback,
   });
 
   final _SupersetEntry entry;
@@ -1086,6 +1484,17 @@ class _StandaloneBlock extends StatelessWidget {
   /// este bloque" y superponer destinos confunde.
   final VoidCallback? onOpenDetail;
 
+  /// "Comentar / Reportar" al PF (#628). El ARGUMENTO es la ÚLTIMA serie que
+  /// el atleta realmente hizo, o null si todavía no hizo ninguna (reporte a
+  /// nivel ejercicio) — ver el contrato completo en [_openExerciseFeedback].
+  /// NO es la serie en curso: los dos call sites de abajo pasan la última
+  /// hecha, tanto el bloque completado (:1419) como la card activa (:1449).
+  ///
+  /// Que el CALLBACK sea null es otra cosa: ⇒ affordance oculta, que es lo que
+  /// pasa cuando el atleta no tiene un vínculo `active` con un PF. Sin
+  /// destinatario, el botón sería una promesa vacía.
+  final void Function(int? setNumber)? onFeedback;
+
   @override
   Widget build(BuildContext context) {
     if (status == BlockStatus.completed) {
@@ -1093,6 +1502,23 @@ class _StandaloneBlock extends StatelessWidget {
         exerciseName: entry.slot.exerciseName,
         totalSets: plannedCountFor(entry.slot),
         onOpenDetail: onOpenDetail,
+        // El reporte SIGUE disponible con el ejercicio terminado (#628). La
+        // molestia que importa aparece muchas veces justo al soltar la última
+        // serie, y hasta acá el bloque se colapsaba en el mismo frame y se
+        // llevaba puesto el único acceso al canal.
+        onFeedback: onFeedback,
+        // ...y se ancla a la ÚLTIMA serie hecha, no a null. Este resumen ES el
+        // escenario que motivó el botón, así que tirar el ancla justo acá era
+        // regalar el dato más caro: el bloque completado no tiene serie EN
+        // CURSO, pero sí tiene una última serie HECHA, que es lo que el
+        // contrato pide (ver
+        // [_SessionPlayerScreenState._openExerciseFeedback]).
+        //
+        // Y es la ÚNICA superficie del caso: dentro de _ExerciseSection el
+        // camino `isDone == true` no se alcanza nunca para un standalone
+        // —`isDone` ⇔ `status == completed`, mismo conteo y mismo resolver—,
+        // así que el bloque terminado siempre cae en este widget.
+        feedbackSetNumber: entry.logs.isNotEmpty ? entry.logs.length : null,
       );
     }
     if (status == BlockStatus.future && !activated) {
@@ -1109,6 +1535,20 @@ class _StandaloneBlock extends StatelessWidget {
       slot: entry.slot,
       logsForExercise: entry.logs,
       currentSetNumber: isDone ? null : loggedCount + 1,
+      // OJO: `currentSetNumber` y `feedbackSetNumber` NO son el mismo número y
+      // no hay que volver a fusionarlos. El primero es la serie que TODAVÍA NO
+      // se hizo (resalta la fila a completar) y el segundo es la última que SÍ
+      // se hizo, que es a la que el reporte tiene que quedar anclado: si el
+      // atleta cargó la serie 3 y le tira el hombro, el dolor pasó en la 3, no
+      // en la 4 que ni existe. Fusionados, el reporte se guardaba con
+      // `loggedCount + 1` y encima se perdía entero al terminar el ejercicio
+      // (ahí `currentSetNumber` es null), así que del lado del PF la nota caía
+      // bajo el log equivocado — `session_exercise_block.dart` matchea por
+      // `setNumber`. Sin ninguna serie hecha el ancla es `null` (reporte a
+      // nivel ejercicio), NO la serie 1: inventar la 1 persiste el reporte
+      // contra una serie que el atleta no hizo — el mismo defecto que arriba,
+      // corrido un lugar.
+      feedbackSetNumber: loggedCount > 0 ? loggedCount : null,
       week: week,
       totalSets: totalSets,
       techniqueInstructions: entry.technique,
@@ -1118,6 +1558,7 @@ class _StandaloneBlock extends StatelessWidget {
       onAddSet: onAddSet,
       onRemoveSet: onRemoveSet,
       onOpenDetail: onOpenDetail,
+      onFeedback: onFeedback,
     );
   }
 }
@@ -1139,6 +1580,7 @@ class _SupersetBlock extends StatelessWidget {
     required this.onSetCheck,
     required this.onSetUpdate,
     this.onOpenDetail,
+    this.onFeedback,
   });
 
   final List<_SupersetEntry> entries;
@@ -1166,10 +1608,18 @@ class _SupersetBlock extends StatelessWidget {
   /// ejercicios en una fila y el destino sería ambiguo.
   final void Function(RoutineSlot slot)? onOpenDetail;
 
+  /// "Comentar / Reportar" sobre un MIEMBRO de la superserie (#628). Se ancla
+  /// al miembro, no al grupo: en una superserie el hombro te tira en UNO de
+  /// los dos ejercicios, y esa es justo la información que el PF necesita.
+  final void Function(RoutineSlot slot, int? setNumber)? onFeedback;
+
   @override
   Widget build(BuildContext context) {
     if (status == BlockStatus.completed) {
-      return _CompletedSupersetSummary(entries: entries);
+      // Mismo motivo que en _StandaloneBlock: la superserie terminada no puede
+      // ser un callejón sin salida para el reporte (#628).
+      return _CompletedSupersetSummary(
+          entries: entries, onFeedback: onFeedback);
     }
     if (status == BlockStatus.future && !activated) {
       return _FutureSupersetPreview(entries: entries, onActivate: onActivate);
@@ -1182,6 +1632,7 @@ class _SupersetBlock extends StatelessWidget {
       onSetCheck: onSetCheck,
       onSetUpdate: onSetUpdate,
       onOpenDetail: onOpenDetail,
+      onFeedback: onFeedback,
     );
   }
 }
@@ -1189,77 +1640,156 @@ class _SupersetBlock extends StatelessWidget {
 // ── _CompletedBlockSummary ────────────────────────────────────────────────────
 
 /// Compact collapsed row for a completed standalone block. Sin card: fila
-/// full-width plana (layout ampliado del player). Tap en la fila → detalle
-/// del ejercicio ([onOpenDetail]).
+/// full-width plana (layout ampliado del player). Tap en el nombre → detalle
+/// del ejercicio ([onOpenDetail]); el ícono de chat abre "Comentar / Reportar"
+/// ([onFeedback]).
 class _CompletedBlockSummary extends StatelessWidget {
   const _CompletedBlockSummary({
     required this.exerciseName,
     required this.totalSets,
+    required this.feedbackSetNumber,
     this.onOpenDetail,
+    this.onFeedback,
   });
 
   final String exerciseName;
   final int totalSets;
   final VoidCallback? onOpenDetail;
 
+  /// Serie a la que se ancla el reporte: la ÚLTIMA que el atleta hizo en este
+  /// ejercicio, o null si no hizo ninguna.
+  ///
+  /// Que el bloque esté cerrado NO significa reportar a nivel ejercicio. Es al
+  /// revés: acá es donde el ancla más vale. La molestia se siente al soltar la
+  /// última serie y el bloque colapsa en ese mismo frame, así que este resumen
+  /// es la única puerta que le queda al atleta — mandarla con `null` tiraba
+  /// justo el dato que el PF necesita para saber en qué serie pasó.
+  final int? feedbackSetNumber;
+
+  /// "Comentar / Reportar" al PF (#628). Recibe [feedbackSetNumber]. Null ⇒
+  /// affordance oculta (sin PF vinculado no hay destinatario).
+  final void Function(int? setNumber)? onFeedback;
+
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    // hint (no label): el nombre y el "n/n" descendientes ya se fusionan como
-    // label del nodo — un label explícito duplicaría el nombre en VoiceOver.
-    return Semantics(
-      button: onOpenDetail != null,
-      hint: onOpenDetail != null ? 'Ver detalle del ejercicio' : null,
-      child: TreinoTappable(
-        onTap: onOpenDetail,
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 44),
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
-            children: [
-              Icon(TreinoIcon.checkBare, color: palette.accent, size: 20),
-              const SizedBox(width: 12),
-              Expanded(
+    // El tappable envuelve SOLO el nombre, no la fila entera: el botón de
+    // reporte tiene que quedar afuera para que su propio nodo de semántica sea
+    // alcanzable (anidado dentro del `button` de la fila, VoiceOver lo fusiona
+    // y el atleta pierde la acción). Mismo armado que el header de
+    // _ExerciseSection, que ya resolvió este par nombre + acciones.
+    return Row(
+      children: [
+        Expanded(
+          // hint (no label): el nombre descendiente ya se fusiona como label
+          // del nodo — un label explícito duplicaría el nombre en VoiceOver.
+          child: Semantics(
+            button: onOpenDetail != null,
+            hint: onOpenDetail != null ? 'Ver detalle del ejercicio' : null,
+            child: TreinoTappable(
+              onTap: onOpenDetail,
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 44),
+                padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Row(
                   children: [
-                    Flexible(
-                      child: Text(
-                        exerciseName.toUpperCase(),
-                        style: GoogleFonts.barlowCondensed(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 16,
-                          letterSpacing: 0.5,
-                          color: palette.textMuted,
-                          decoration: TextDecoration.lineThrough,
-                          decorationColor: palette.textMuted,
-                        ),
+                    Icon(TreinoIcon.checkBare, color: palette.accent, size: 20),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              exerciseName.toUpperCase(),
+                              style: GoogleFonts.barlowCondensed(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                                letterSpacing: 0.5,
+                                color: palette.textMuted,
+                                decoration: TextDecoration.lineThrough,
+                                decorationColor: palette.textMuted,
+                              ),
+                            ),
+                          ),
+                          // Señal de navegación pegada al nombre — misma regla
+                          // que el header de _ExerciseSection: solo cuando el
+                          // tap abre el detalle. Decorativa para VoiceOver
+                          // (el hint de arriba ya anuncia la acción).
+                          if (onOpenDetail != null) ...[
+                            const SizedBox(width: 8),
+                            ExcludeSemantics(
+                              child: Icon(
+                                TreinoIcon.chevronRight,
+                                size: 14,
+                                color: palette.textMuted,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
-                    // Señal de navegación pegada al nombre — misma regla que
-                    // el header de _ExerciseSection: solo cuando la fila abre
-                    // el detalle. Decorativa para VoiceOver (hint de arriba).
-                    if (onOpenDetail != null) ...[
-                      const SizedBox(width: 8),
-                      ExcludeSemantics(
-                        child: Icon(
-                          TreinoIcon.chevronRight,
-                          size: 14,
-                          color: palette.textMuted,
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),
-              Text(
-                '$totalSets/$totalSets',
-                style: GoogleFonts.barlowCondensed(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 12,
-                  color: palette.accent,
-                ),
-              ),
-            ],
+            ),
+          ),
+        ),
+        if (onFeedback != null)
+          _FeedbackIconButton(
+            exerciseName: exerciseName,
+            onTap: () => onFeedback!(feedbackSetNumber),
+          ),
+        Text(
+          '$totalSets/$totalSets',
+          style: GoogleFonts.barlowCondensed(
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
+            color: palette.accent,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── _FeedbackIconButton ───────────────────────────────────────────────────────
+
+/// El acceso a "Comentar / Reportar" (#628): 44x44, ícono de chat, sin caja.
+///
+/// Vive suelto porque lo usan TRES lugares — el header del ejercicio activo y
+/// los dos resúmenes de bloque completado. Que el bloque terminado también lo
+/// lleve es el punto: la molestia articular aparece casi siempre al soltar la
+/// última serie, y ese es justo el frame en que el bloque colapsa.
+class _FeedbackIconButton extends StatelessWidget {
+  const _FeedbackIconButton({
+    required this.exerciseName,
+    required this.onTap,
+  });
+
+  /// Nombre del ejercicio ANCLADO (en superserie, el del miembro) — va al
+  /// label de VoiceOver para que la acción no quede ambigua entre miembros.
+  final String exerciseName;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    return Semantics(
+      button: true,
+      label: l10n.exerciseFeedbackActionA11y(exerciseName),
+      child: GestureDetector(
+        key: const Key('exercise_feedback_open'),
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Icon(
+            TreinoIcon.chat,
+            size: 20,
+            color: palette.textMuted,
           ),
         ),
       ),
@@ -1273,14 +1803,49 @@ class _CompletedBlockSummary extends StatelessWidget {
 /// edge-to-edge con barra lateral accent — conserva la identidad visual de
 /// superserie (agrupación lateral) sin el encajonado.
 class _CompletedSupersetSummary extends StatelessWidget {
-  const _CompletedSupersetSummary({required this.entries});
+  const _CompletedSupersetSummary({required this.entries, this.onFeedback});
 
   final List<_SupersetEntry> entries;
+
+  /// "Comentar / Reportar" al PF (#628), anclado al MIEMBRO y a la ÚLTIMA serie
+  /// que ese miembro hizo (null si no hizo ninguna). Que el bloque haya cerrado
+  /// no vuelve el reporte "a nivel ejercicio": es justo al revés, acá el ancla
+  /// es lo más valioso — ver [_CompletedBlockSummary.feedbackSetNumber].
+  final void Function(RoutineSlot slot, int? setNumber)? onFeedback;
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final names = joinNonEmpty(entries.map((e) => e.slot.exerciseName), ' · ');
+    // CON PF vinculado los nombres se listan uno por línea en vez del clásico
+    // "A · B" unido. No es cosmético: acá cuelga el reporte y en una superserie
+    // el hombro te tira en UNO de los dos ejercicios. Con la línea unida el
+    // botón no tendría a qué miembro apuntar —dos íconos de chat idénticos al
+    // lado de un texto único es una moneda al aire, y en VoiceOver directamente
+    // no se distinguen—, así que cada miembro se lleva su propia fila y su
+    // propio botón.
+    //
+    // SIN PF vinculado ([onFeedback] null) vuelve la línea unida. El costo de
+    // las N filas se paga sólo donde compra algo: el atleta sin PF nunca ve el
+    // botón, y hacerle crecer un resumen COLAPSADO de 1 a N líneas es empeorar
+    // la pantalla a cambio de nada. Ese caso además recupera el filtrado de
+    // [joinNonEmpty] (#550), que el desglose por miembro no tiene.
+    //
+    // En el desglose los nombres vacíos se saltean por la misma razón que
+    // joinNonEmpty los tira: una fila sin texto con un ícono de chat al lado es
+    // un botón cuyo label de VoiceOver queda vacío — una acción que se anuncia
+    // sin decir sobre qué.
+    final named = [
+      for (final e in entries)
+        if (e.slot.exerciseName.trim().isNotEmpty) e,
+    ];
+    final nameStyle = GoogleFonts.barlowCondensed(
+      fontWeight: FontWeight.w700,
+      fontSize: 16,
+      letterSpacing: 0.5,
+      color: palette.textMuted,
+      decoration: TextDecoration.lineThrough,
+      decorationColor: palette.textMuted,
+    );
     return Container(
       decoration: BoxDecoration(
         color: palette.highlight.withValues(alpha: 0.04),
@@ -1306,17 +1871,36 @@ class _CompletedSupersetSummary extends StatelessWidget {
                     color: palette.accent,
                   ),
                 ),
-                Text(
-                  names.toUpperCase(),
-                  style: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 16,
-                    letterSpacing: 0.5,
-                    color: palette.textMuted,
-                    decoration: TextDecoration.lineThrough,
-                    decorationColor: palette.textMuted,
-                  ),
-                ),
+                if (onFeedback == null)
+                  Text(
+                    joinNonEmpty(entries.map((e) => e.slot.exerciseName), ' · ')
+                        .toUpperCase(),
+                    style: nameStyle,
+                  )
+                else
+                  for (final e in named)
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            e.slot.exerciseName.toUpperCase(),
+                            style: nameStyle,
+                          ),
+                        ),
+                        _FeedbackIconButton(
+                          exerciseName: e.slot.exerciseName,
+                          // El ancla es de ESTE miembro: en el round-robin cada
+                          // uno puede cerrar con distinta cantidad de series
+                          // (planes con targetSets desparejos), así que leer el
+                          // conteo del grupo pondría la nota bajo el log del
+                          // otro ejercicio.
+                          onTap: () => onFeedback!(
+                            e.slot,
+                            e.logs.isNotEmpty ? e.logs.length : null,
+                          ),
+                        ),
+                      ],
+                    ),
               ],
             ),
           ),
@@ -1484,6 +2068,7 @@ class _SupersetSection extends StatelessWidget {
     required this.onSetCheck,
     required this.onSetUpdate,
     this.onOpenDetail,
+    this.onFeedback,
   });
 
   final List<_SupersetEntry> entries;
@@ -1500,6 +2085,9 @@ class _SupersetSection extends StatelessWidget {
 
   /// Tap en el nombre de un miembro → detalle de ese ejercicio.
   final void Function(RoutineSlot slot)? onOpenDetail;
+
+  /// Ver [_SupersetBlock.onFeedback].
+  final void Function(RoutineSlot slot, int? setNumber)? onFeedback;
 
   @override
   Widget build(BuildContext context) {
@@ -1536,6 +2124,15 @@ class _SupersetSection extends StatelessWidget {
         slot: e.slot,
         logsForExercise: e.logs,
         currentSetNumber: e.slot.exerciseId == activeId ? activeSet : null,
+        // El ancla del reporte es del MIEMBRO, no de la celda activa del
+        // round-robin: `currentSetNumber` es null en todos los miembros salvo
+        // en el que tiene el turno, y con eso el reporte del otro ejercicio se
+        // quedaba sin serie. Acá cada miembro apunta a su propia última serie
+        // hecha (ver el comentario largo en _StandaloneBlock: son dos
+        // conceptos distintos y no hay que volver a fusionarlos).
+        // Sin series hechas, `null` (nivel ejercicio) y no la serie 1: en el
+        // round-robin es normal que un miembro no haya arrancado todavía.
+        feedbackSetNumber: e.logs.isNotEmpty ? e.logs.length : null,
         week: week,
         totalSets: plannedCountFor(e.slot),
         techniqueInstructions: e.technique,
@@ -1546,6 +2143,9 @@ class _SupersetSection extends StatelessWidget {
         // Superset add/remove UI is out of scope this change (AD-5 note).
         onAddSet: null,
         onOpenDetail: onOpenDetail == null ? null : () => onOpenDetail!(e.slot),
+        onFeedback: onFeedback == null
+            ? null
+            : (setNumber) => onFeedback!(e.slot, setNumber),
       ));
       if (i != entries.length - 1) children.add(const SizedBox(height: 8));
     }
@@ -1609,6 +2209,7 @@ class _ExerciseSection extends StatefulWidget {
     required this.slot,
     required this.logsForExercise,
     required this.currentSetNumber,
+    required this.feedbackSetNumber,
     required this.week,
     required this.totalSets,
     required this.techniqueInstructions,
@@ -1618,13 +2219,32 @@ class _ExerciseSection extends StatefulWidget {
     this.onAddSet,
     this.onRemoveSet,
     this.onOpenDetail,
+    this.onFeedback,
   });
 
   final RoutineSlot slot;
   final List<SetLog> logsForExercise;
 
   /// Set (1-based) que debe estar activo. Null ⇒ ningún set activo.
+  ///
+  /// Es una decisión de RESALTADO DE FILA, no el ancla del reporte: mira hacia
+  /// adelante (la serie pendiente). Para el reporte usar [feedbackSetNumber].
   final int? currentSetNumber;
+
+  /// Set (1-based) al que se ancla "Comentar / Reportar": la última serie que
+  /// el atleta REALMENTE hizo, o `null` si todavía no hizo ninguna (reporte a
+  /// nivel ejercicio).
+  ///
+  /// El caso vacío NO es la serie 1. Persistir `setNumber: 1` sin que exista la
+  /// serie 1 es el mismo defecto que anclar a la pendiente: el PF ve la nota
+  /// colgada de un log que nunca ocurrió. La API ya acepta null justo para
+  /// esto.
+  ///
+  /// Deliberadamente separado de [currentSetNumber] — se intentó reusar aquel y
+  /// el reporte terminaba una serie adelantado (y sin serie al completarse el
+  /// ejercicio, cuando `currentSetNumber` pasa a null). Miran para lados
+  /// distintos: uno a la serie que falta, este a la que ya pasó.
+  final int? feedbackSetNumber;
 
   /// 0-based active week; single-week sessions use 0. (REQ-PERIOD-040)
   final int week;
@@ -1654,6 +2274,13 @@ class _ExerciseSection extends StatefulWidget {
   /// Tap en el NOMBRE del ejercicio → detalle completo. Acceso ADICIONAL al
   /// ⓘ de técnica (que sigue abriendo la TechniqueSheet in-place).
   final VoidCallback? onOpenDetail;
+
+  /// "Comentar / Reportar" al PF (#628) — la contraparte simétrica de
+  /// [CoachNote], que muestra el mensaje del PF en la otra dirección. Recibe
+  /// [feedbackSetNumber] para que el reporte quede anclado a la última serie
+  /// hecha (o a nivel ejercicio si no hizo ninguna). Null ⇒ affordance oculta
+  /// (sin PF vinculado).
+  final void Function(int? setNumber)? onFeedback;
 
   @override
   State<_ExerciseSection> createState() => _ExerciseSectionState();
@@ -1873,6 +2500,11 @@ class _ExerciseSectionState extends State<_ExerciseSection> {
                 ),
               ),
             ),
+            if (widget.onFeedback != null)
+              _FeedbackIconButton(
+                exerciseName: widget.slot.exerciseName,
+                onTap: () => widget.onFeedback!(widget.feedbackSetNumber),
+              ),
             if (_hasTechnique) ...[
               Semantics(
                 button: true,
@@ -2490,7 +3122,9 @@ class _TerminarSessionButton extends StatelessWidget {
             fontWeight: FontWeight.w700,
             fontSize: 16,
             letterSpacing: 1.0,
-            color: enabled ? palette.bg : palette.textMuted,
+            color: enabled
+                ? TreinoButtonTokens.foreground(context)
+                : palette.textMuted,
           ),
         ),
       ),

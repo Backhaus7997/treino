@@ -39,11 +39,15 @@ import 'package:treino/l10n/app_l10n.dart';
 import '../../../helpers/fake_analytics_service.dart';
 import '../../../fixtures/exercises.dart';
 
+import '../../../helpers/onboarding_test_helpers.dart';
+import '../../../fixtures/routine_editor_ui.dart';
+
 class _MockRoutineRepository extends Mock implements RoutineRepository {}
 
 class _MockUserRepository extends Mock implements UserRepository {}
 
 UserProfile _profile({String? activeRoutineId}) => UserProfile(
+      onboardingSeen: allSurfacesSeen(),
       uid: 'athlete-1',
       email: 'a1@treino.app',
       displayName: 'A1',
@@ -135,6 +139,7 @@ Future<void> _fillForm(WidgetTester tester) async {
       find.byKey(const Key('editor_name_field')), 'TEST BORRAR');
   await tester.pumpAndSettle();
 
+  await desplazarHastaAgregarEjercicio(tester);
   await tester.tap(find.text('Agregar ejercicio'));
   await tester.pumpAndSettle();
 
@@ -143,6 +148,9 @@ Future<void> _fillForm(WidgetTester tester) async {
 
   await tester.tap(find.text('Agregar 1 ejercicio'));
   await tester.pumpAndSettle();
+  // Desde este cambio el ejercicio agregado nace PLEGADO: quien avisa
+  // que le falta completar sets es el borde rojo, no la card abierta.
+  await expandirEjercicios(tester);
 
   final emptyFields = find.byType(TextField).evaluate().where((e) {
     final w = e.widget as TextField;

@@ -376,7 +376,7 @@ class _ProfileEditTrainerScreenState
               onPressed: _saving ? null : () => _save(profile.uid),
               style: ElevatedButton.styleFrom(
                 backgroundColor: palette.accent,
-                foregroundColor: palette.bg,
+                foregroundColor: TreinoButtonTokens.foreground(context),
                 minimumSize: const Size.fromHeight(48),
                 shape: const StadiumBorder(),
                 disabledBackgroundColor: palette.accent.withValues(alpha: 0.3),
@@ -387,7 +387,7 @@ class _ProfileEditTrainerScreenState
                       height: 18,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: palette.bg,
+                        color: TreinoButtonTokens.foreground(context),
                       ),
                     )
                   : Text(
@@ -1186,7 +1186,7 @@ class _CustomLocationSheetState extends State<_CustomLocationSheet> {
             onPressed: _submit,
             style: ElevatedButton.styleFrom(
               backgroundColor: palette.accent,
-              foregroundColor: palette.bg,
+              foregroundColor: TreinoButtonTokens.foreground(context),
               minimumSize: const Size.fromHeight(48),
               shape: const StadiumBorder(),
             ),

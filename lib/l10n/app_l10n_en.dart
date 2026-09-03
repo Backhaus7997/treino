@@ -22,10 +22,13 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get homeAthleteFirstRunBody =>
-      'Create your first routine or find a trainer to get started.';
+      'Create your own routine, explore ready-made plans, or find a trainer to guide you.';
 
   @override
   String get homeAthleteFirstRunCreateCta => 'CREATE ROUTINE';
+
+  @override
+  String get homeAthleteFirstRunExplorePlansCta => 'Explore plans';
 
   @override
   String get homeAthleteFirstRunFindTrainerCta => 'Find a trainer';
@@ -216,6 +219,20 @@ class AppL10nEn extends AppL10n {
   String get authForgotBackToLogin => '';
 
   @override
+  String get authForgotSpamHint => '';
+
+  @override
+  String get authForgotResendCta => '';
+
+  @override
+  String authForgotResendIn(int seconds) {
+    return '';
+  }
+
+  @override
+  String get authForgotEditEmail => '';
+
+  @override
   String get authTrainerInquiryDialogTitle => '';
 
   @override
@@ -307,6 +324,17 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get coachCtaLabel => '';
+
+  @override
+  String get coachInquiryCtaLabel => 'ASK A QUESTION';
+
+  @override
+  String get coachInquiryCtaHelp =>
+      'Ask about price, format and availability without committing to anyone.';
+
+  @override
+  String get coachInquiryCtaError =>
+      'We couldn\'t open the chat. Please try again.';
 
   @override
   String get coachCtaProximamente => '';
@@ -610,6 +638,52 @@ class AppL10nEn extends AppL10n {
   String get workoutPostAutoCompleteText => '';
 
   @override
+  String get wellbeingTrendScreenTitle => 'HOW I FELT';
+
+  @override
+  String get wellbeingTrendEmptyState =>
+      'You haven\'t logged how you feel yet. Once you do, your own series shows up here.';
+
+  @override
+  String get wellbeingTrendNeedsMoreData => 'One entry isn\'t a trend yet.';
+
+  @override
+  String get wellbeingTrendLoadError =>
+      'We couldn\'t load your log. Try again.';
+
+  @override
+  String get wellbeingTrendPainHeading => 'PAIN OR DISCOMFORT';
+
+  @override
+  String wellbeingTrendPainCount(int painCount, int total) {
+    return '$painCount of $total entries with pain';
+  }
+
+  @override
+  String wellbeingTrendPainCountPrevious(int painCount, int total) {
+    return 'Previous period: $painCount of $total';
+  }
+
+  @override
+  String get wellbeingTrendAreasHeading => 'LOGGED AREAS';
+
+  @override
+  String get wellbeingTrendPainMark => 'with pain';
+
+  @override
+  String get insightsTileWellbeingTitle => 'How I felt';
+
+  @override
+  String get insightsTileWellbeingSubtitle =>
+      'Your feeling and pain log over time';
+
+  @override
+  String get wellbeingDailyTitle => 'HOW ARE YOU FEELING TODAY?';
+
+  @override
+  String get wellbeingDailyPrompt => 'Log how you woke up, workout or not.';
+
+  @override
   String get wellbeingCheckInTitle => 'HOW DID YOU FEEL?';
 
   @override
@@ -795,6 +869,20 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get workoutSelfEditorCapReached => '';
+
+  @override
+  String get workoutRoutineUseAsBase => 'Use as a base';
+
+  @override
+  String get workoutRoutineCustomizeTitle => 'Customise routine';
+
+  @override
+  String get workoutRoutineCustomizeSubmitLabel => 'SAVE AS MINE';
+
+  @override
+  String workoutRoutineCopyName(String name) {
+    return '$name (my version)';
+  }
 
   @override
   String get workoutTabYours => 'YOUR WORKOUT';
@@ -1685,6 +1773,63 @@ class AppL10nEn extends AppL10n {
   String get performanceChartMetricSitAndReach => '';
 
   @override
+  String routineEditorSetsMissingReps(int n) {
+    String _temp0 = intl.Intl.pluralLogic(
+      n,
+      locale: localeName,
+      other: '$n sets without reps',
+      one: '1 set without reps',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get routineEditorEmptyDayTitle => 'EMPTY DAY';
+
+  @override
+  String get routineEditorEmptyDayBody =>
+      'Add the first exercise and it is ready to train.';
+
+  @override
+  String routineEditorDayTabA11y(int n, String estado) {
+    return 'Day $n$estado';
+  }
+
+  @override
+  String get routineEditorPlanSheetTitle => 'PLAN DETAILS';
+
+  @override
+  String get routineEditorPlanSheetA11y => 'Plan details';
+
+  @override
+  String get routineEditorSubtitleSelfPrivate =>
+      'Your routine · only you see it';
+
+  @override
+  String get routineEditorSubtitleSelfShared =>
+      'Your routine · shared on your profile';
+
+  @override
+  String get routineEditorSubtitleCustomizing => 'Your copy';
+
+  @override
+  String get routineEditorSubtitleAssigned => 'Assigned plan';
+
+  @override
+  String get routineEditorSubtitleTemplate => 'Reusable template';
+
+  @override
+  String routineEditorSubtitleWeeks(int n) {
+    String _temp0 = intl.Intl.pluralLogic(
+      n,
+      locale: localeName,
+      other: '$n weeks',
+      one: '1 week',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String routineEditorDayName(int n) {
     return 'Day $n';
   }
@@ -1758,6 +1903,21 @@ class AppL10nEn extends AppL10n {
   String get routineEditorSlotMenuRemove => 'Remove';
 
   @override
+  String routineEditorSupersetHeader(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'EXERCISES',
+      one: 'EXERCISE',
+    );
+    return 'SUPERSET · $count $_temp0';
+  }
+
+  @override
+  String get routineEditorSlotMenuHint =>
+      'The ⋮ on each exercise has replace, copy sets and move.';
+
+  @override
   String get routineEditorRestLabel => 'Rest';
 
   @override
@@ -1776,6 +1936,39 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get routineEditorFillKgUndo => 'Undo';
+
+  @override
+  String get routineEditorFillColumnLabel => 'ALL';
+
+  @override
+  String get routineEditorFillColumnA11y =>
+      'Replicate this value down the column';
+
+  @override
+  String routineEditorAccessoryContext(
+      String ejercicio, int set, String campo) {
+    return '$ejercicio · set $set · $campo';
+  }
+
+  @override
+  String get routineEditorFieldKg => 'kg';
+
+  @override
+  String get routineEditorFieldReps => 'reps';
+
+  @override
+  String routineEditorRepsStepIncreaseA11y(String amount) {
+    return 'Add $amount reps';
+  }
+
+  @override
+  String routineEditorRepsStepDecreaseA11y(String amount) {
+    return 'Subtract $amount reps';
+  }
+
+  @override
+  String get routineEditorFillColumnEmpty =>
+      'Enter this set\'s weight to replicate it.';
 
   @override
   String routineEditorKgStepIncreaseA11y(String amount) {
@@ -1810,6 +2003,24 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get routineEditorNotesHint => 'Technique, tempo, RIR…';
+
+  @override
+  String get routineEditorSummaryLabel => 'SUMMARY';
+
+  @override
+  String get routineEditorSummaryHelp =>
+      'One sentence explaining what the routine is, for someone who has never set foot in a gym.';
+
+  @override
+  String get routineEditorSummaryHint =>
+      'E.g. Push, pull and legs: each day trains a different kind of movement.';
+
+  @override
+  String get routineEditorGoalsLabel => 'WHAT IT IS FOR';
+
+  @override
+  String get routineEditorGoalsHelp =>
+      'Optional. It helps athletes find the template when they search by goal.';
 
   @override
   String get exerciseNoteFromCoachTag => 'FROM COACH';
@@ -2940,7 +3151,26 @@ class AppL10nEn extends AppL10n {
       'We couldn\'t load your monthly report. Try again.';
 
   @override
+  String get monthlyVolumeByGroupEmpty => 'No sets by group in this month.';
+
+  @override
+  String monthlyVolumeByGroupSets(int n) {
+    String _temp0 = intl.Intl.pluralLogic(
+      n,
+      locale: localeName,
+      other: '$n sets',
+      one: '1 set',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String workoutDaysCalendarStreak(int n) {
+    return '';
+  }
+
+  @override
+  String workoutDaysCalendarStreakHint(int n) {
     return '';
   }
 
@@ -3473,4 +3703,505 @@ class AppL10nEn extends AppL10n {
   String routineCardMinutes(String value) {
     return '$value min';
   }
+
+  @override
+  String sessionTrimAdjustedTo(String value) {
+    return 'Trimmed to $value min';
+  }
+
+  @override
+  String sessionTrimDroppedList(String names) {
+    return 'Out for today: $names';
+  }
+
+  @override
+  String get sessionTrimUndo => 'UNDO';
+
+  @override
+  String get sessionTimeFitPromptTitle => 'HOW MUCH TIME DO YOU HAVE TODAY?';
+
+  @override
+  String sessionTimeFitCurrent(String value) {
+    return 'This session runs $value min';
+  }
+
+  @override
+  String sessionTimeFitAlreadyFits(String value) {
+    return '$value min is enough. Nothing needs to come out.';
+  }
+
+  @override
+  String sessionTimeFitTrimHeadline(String value) {
+    return 'Drop these and the session runs $value min:';
+  }
+
+  @override
+  String sessionTimeFitCannotFit(String value) {
+    return 'We can\'t get there. The shortest possible is $value min:';
+  }
+
+  @override
+  String get sessionTimeFitNothingToTrim =>
+      'There\'s nothing to drop without emptying the session.';
+
+  @override
+  String get sessionTimeFitApply => 'TRIM TODAY';
+
+  @override
+  String get onboardingCardDismiss => 'GOT IT';
+
+  @override
+  String get onboardingCardAthleteHomeTitle => 'YOUR DAY AT A GLANCE';
+
+  @override
+  String get onboardingCardAthleteHomeBody =>
+      'See what you\'re training today, how your week is going and your streak. If you left a session half-done, it offers to pick it back up.';
+
+  @override
+  String get onboardingCardAthleteWorkoutTitle => 'YOUR TRAINING STARTS HERE';
+
+  @override
+  String get onboardingCardAthleteWorkoutBody =>
+      'There are three ways to get a routine:';
+
+  @override
+  String get onboardingCardAthleteWorkoutBullet1 =>
+      'Your coach\'s plan, already built and assigned to you';
+
+  @override
+  String get onboardingCardAthleteWorkoutBullet2 =>
+      'A TREINO template, ready to use';
+
+  @override
+  String get onboardingCardAthleteWorkoutBullet3 =>
+      'Your own routine, built exercise by exercise';
+
+  @override
+  String get onboardingCardAthleteFeedTitle => 'THE SOCIAL SIDE';
+
+  @override
+  String get onboardingCardAthleteFeedBody =>
+      'Post your workouts and follow your friends. Rankings sits right next to it:';
+
+  @override
+  String get onboardingCardAthleteFeedBullet1 =>
+      'It compares you with people at your gym';
+
+  @override
+  String get onboardingCardAthleteFeedBullet2 =>
+      'It\'s optional: leave it off and you neither appear nor see anyone';
+
+  @override
+  String get onboardingCardAthleteCoachTitle => 'YOUR COACH';
+
+  @override
+  String get onboardingCardAthleteCoachBody =>
+      'Find and hire a coach near you. You control what they see:';
+
+  @override
+  String get onboardingCardAthleteCoachBullet1 =>
+      'They see your workouts as soon as you accept the link';
+
+  @override
+  String get onboardingCardAthleteCoachBullet2 =>
+      'Your personal data and measurements only if you turn it on in Profile › Privacy';
+
+  @override
+  String get onboardingCardAthleteProfileTitle => 'YOUR ACCOUNT';
+
+  @override
+  String get onboardingCardAthleteProfileBody =>
+      'Your data, your measurements and your privacy. This is where you decide what your public profile shares and what your coach can see.';
+
+  @override
+  String get onboardingCardTrainerHomeTitle => 'YOUR DAY';
+
+  @override
+  String get onboardingCardTrainerHomeBody =>
+      'Your upcoming sessions, who trained today, your athletes\' recent activity and what you have left to collect.';
+
+  @override
+  String get onboardingCardTrainerWorkoutTitle => 'YOUR TEMPLATES';
+
+  @override
+  String get onboardingCardTrainerWorkoutBody =>
+      'Your own template library and the shortcut to assign a plan to an athlete. The full editor lives in Coach Hub, on your computer.';
+
+  @override
+  String get onboardingCardTrainerFeedTitle => 'THE COMMUNITY';
+
+  @override
+  String get onboardingCardTrainerFeedBody =>
+      'TREINO\'s social feed. Follow what your athletes post, and post yourself.';
+
+  @override
+  String get onboardingCardTrainerCoachTitle => 'ATHLETES AND SCHEDULE';
+
+  @override
+  String get onboardingCardTrainerCoachBody =>
+      'This is where you work with your athletes. First things worth knowing:';
+
+  @override
+  String get onboardingCardTrainerCoachBullet1 =>
+      'The athlete sends you the request from their app, not the other way round';
+
+  @override
+  String get onboardingCardTrainerCoachBullet2 =>
+      'Open an athlete to see their plan, sets, progress and chat';
+
+  @override
+  String get onboardingCardTrainerCoachBullet3 =>
+      'Under SCHEDULE you create one-off sessions or recurring series';
+
+  @override
+  String get onboardingCardTrainerProfileTitle => 'YOUR PROFESSIONAL PROFILE';
+
+  @override
+  String get onboardingCardTrainerProfileBody =>
+      'This is how athletes searching for a coach see you. From here you also:';
+
+  @override
+  String get onboardingCardTrainerProfileBullet1 =>
+      'Accept incoming requests from new athletes';
+
+  @override
+  String get onboardingCardTrainerProfileBullet2 =>
+      'Set your weekly availability';
+
+  @override
+  String get onboardingTourSkip => 'SKIP';
+
+  @override
+  String get onboardingTourNext => 'NEXT';
+
+  @override
+  String get onboardingTourFinish => 'START';
+
+  @override
+  String onboardingTourProgress(int current, int total) {
+    return 'Step $current of $total';
+  }
+
+  @override
+  String get onboardingCustomExerciseCta => 'CREATE MY EXERCISE';
+
+  @override
+  String get templatesOnboardingStep1Title => 'How many days can you train?';
+
+  @override
+  String get templatesOnboardingStep1Body =>
+      'Pick what you can keep up. We save your answer to personalise what we recommend.';
+
+  @override
+  String get templatesOnboardingStep1Label => 'Days per week';
+
+  @override
+  String get templatesOnboardingStep1Hint =>
+      'No answer filters the catalog: you will keep seeing every template.';
+
+  @override
+  String get templatesOnboardingStep2Title => 'How long is your session?';
+
+  @override
+  String get templatesOnboardingStep2Body =>
+      '45 real minutes beat an ideal hour. Pick the time you actually have.';
+
+  @override
+  String get templatesOnboardingStep2Label => 'Minutes per session';
+
+  @override
+  String get templatesOnboardingStep3Title => 'What are you training for?';
+
+  @override
+  String get templatesOnboardingStep3Body =>
+      'Nobody picks by split, they pick by what for. It is the answer that tells us most about what you are after.';
+
+  @override
+  String get templatesOnboardingStep3Label => 'Goal';
+
+  @override
+  String get templatesOnboardingStep4Title => 'This is not an exam';
+
+  @override
+  String get templatesOnboardingStep4Body =>
+      'We save your answers to your profile. This one is optional: leave it empty if you have no preference.';
+
+  @override
+  String get templatesOnboardingStep4Label => 'Zones to prioritise · optional';
+
+  @override
+  String get templatesOnboardingCta => 'SEE MY TEMPLATES';
+
+  @override
+  String get templatesOnboardingMinutes30 => '30 MIN';
+
+  @override
+  String get templatesOnboardingMinutes30Hint => 'In and out';
+
+  @override
+  String get templatesOnboardingMinutes45 => '45 MIN';
+
+  @override
+  String get templatesOnboardingMinutes45Hint => 'The usual';
+
+  @override
+  String get templatesOnboardingMinutes60 => '60 MIN';
+
+  @override
+  String get templatesOnboardingMinutes60Hint => 'A full hour';
+
+  @override
+  String get templatesOnboardingMinutes75 => '75 MIN OR MORE';
+
+  @override
+  String get templatesOnboardingMinutes75Hint => 'Strength';
+
+  @override
+  String get templatesGoalHealth => 'HEALTH';
+
+  @override
+  String get templatesGoalInjuryPrevention => 'PREVENTION';
+
+  @override
+  String get templatesGoalAesthetics => 'AESTHETICS';
+
+  @override
+  String get templatesGoalSport => 'SPORT';
+
+  @override
+  String get templatesGoalWellbeing => 'WELLBEING';
+
+  @override
+  String get templatesZoneBack => 'BACK';
+
+  @override
+  String get templatesZoneChest => 'CHEST';
+
+  @override
+  String get templatesZoneShoulders => 'SHOULDERS';
+
+  @override
+  String get templatesZoneGlutes => 'GLUTES';
+
+  @override
+  String get templatesZoneQuads => 'QUADS';
+
+  @override
+  String get templatesZoneCore => 'CORE';
+
+  @override
+  String templatesOnboardingDaysOption(int days) {
+    return '$days DAYS';
+  }
+
+  @override
+  String get templatesOnboardingBack => 'BACK';
+
+  @override
+  String get templatesFilterBarAdjust => 'ADJUST';
+
+  @override
+  String get templatesFilterBarSetUp => 'SET UP MY SEARCH';
+
+  @override
+  String get templatesFilterBarHint => 'Sorted to match what you are after';
+
+  @override
+  String get exerciseFeedbackAction => 'COMMENT / REPORT';
+
+  @override
+  String exerciseFeedbackActionA11y(String exerciseName) {
+    return 'Comment or report discomfort on $exerciseName';
+  }
+
+  @override
+  String get exerciseFeedbackSheetTitle => 'TELL YOUR COACH';
+
+  @override
+  String exerciseFeedbackSheetAnchorSet(String exerciseName, int setNumber) {
+    return '$exerciseName · set $setNumber';
+  }
+
+  @override
+  String get exerciseFeedbackKindComment => 'Comment';
+
+  @override
+  String get exerciseFeedbackKindDiscomfort => 'Discomfort / pain';
+
+  @override
+  String get exerciseFeedbackDiscomfortNotice =>
+      'Your coach gets notified right away.';
+
+  @override
+  String get exerciseFeedbackTextHint =>
+      'What do you want to tell them? E.g. my right shoulder pulled on set 3.';
+
+  @override
+  String get exerciseFeedbackPhotoCamera => 'Camera';
+
+  @override
+  String get exerciseFeedbackPhotoGallery => 'Gallery';
+
+  @override
+  String get exerciseFeedbackPhotoRemove => 'Remove photo';
+
+  @override
+  String get exerciseFeedbackPhotoError =>
+      'We could not open the photo. Try again.';
+
+  @override
+  String get exerciseFeedbackCancel => 'CANCEL';
+
+  @override
+  String get exerciseFeedbackSubmit => 'SEND';
+
+  @override
+  String get exerciseFeedbackSuccess =>
+      'Done. Your coach will see it next to the set.';
+
+  @override
+  String get exerciseFeedbackError =>
+      'We could not save your report. Try again.';
+
+  @override
+  String get exerciseFeedbackNoteTagComment => 'FROM ATHLETE';
+
+  @override
+  String get exerciseFeedbackNoteTagDiscomfort => 'DISCOMFORT';
+
+  @override
+  String exerciseFeedbackNoteSetTag(int setNumber) {
+    return 'SET $setNumber';
+  }
+
+  @override
+  String get coachSessionFeedbackLoadError =>
+      'We could not load the athlete\'s reports.';
+
+  @override
+  String get sessionFeedbackLoadError => 'We could not load your reports.';
+
+  @override
+  String get routineEditorGoToProblem => 'GO';
+
+  @override
+  String get routineEditorGoToProblemA11y => 'Go to the first problem';
+
+  @override
+  String routineEditorFooterSummary(int dias, int sets) {
+    String _temp0 = intl.Intl.pluralLogic(
+      dias,
+      locale: localeName,
+      other: '$dias days',
+      one: '1 day',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      sets,
+      locale: localeName,
+      other: '$sets sets',
+      one: '1 set',
+    );
+    return '$_temp0 · $_temp1 · all set';
+  }
+
+  @override
+  String get routineEditorProblemMissingName => 'The plan needs a name';
+
+  @override
+  String get routineEditorProblemMissingSplit => 'The plan needs a split';
+
+  @override
+  String routineEditorProblemEmptyDay(int dia) {
+    return 'Day $dia: no exercises';
+  }
+
+  @override
+  String routineEditorProblemDuplicate(int dia) {
+    return 'Day $dia: repeated exercise';
+  }
+
+  @override
+  String routineEditorProblemIncompleteSets(int dia, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count incomplete sets',
+      one: '1 incomplete set',
+    );
+    return 'Day $dia: $_temp0';
+  }
+
+  @override
+  String routineEditorProblemOtherWeek(int semana, int dia) {
+    return 'Week $semana: day $dia incomplete';
+  }
+
+  @override
+  String get routineEditorQuickEntryToggle => 'QUICK';
+
+  @override
+  String get routineEditorQuickEntryToggleA11y => 'Quick entry';
+
+  @override
+  String get routineEditorQuickEntryHint => 'bench 4x10 60';
+
+  @override
+  String routineEditorQuickEntryWillAdd(int sets, String reps, String peso) {
+    String _temp0 = intl.Intl.pluralLogic(
+      sets,
+      locale: localeName,
+      other: '$sets sets',
+      one: '1 set',
+    );
+    return 'Adds $_temp0 × $reps at $peso.';
+  }
+
+  @override
+  String get routineEditorQuickEntryNoWeight => 'no weight';
+
+  @override
+  String get routineEditorQuickEntryEmptyHint =>
+      'Search the exercise and tap it. Then type 4x10 and the weight.';
+
+  @override
+  String get routineEditorQuickEntryPickedHint =>
+      '4x10 and the weight. Per set with commas: 4x10,8,6,4 · 55,45,35,25. By time: 3x30s or 3x1:30. Decimals with a dot: 62.5';
+
+  @override
+  String get routineEditorQuickEntryAdd => 'ADD';
+
+  @override
+  String get routineEditorExerciseSheetTitle => 'ACTIONS';
+
+  @override
+  String get routineEditorSlotMenuCollapse => 'Collapse sets';
+
+  @override
+  String get routineEditorSlotMenuExpand => 'Expand sets';
+
+  @override
+  String get coachTemplateEditorTitle => 'New template';
+
+  @override
+  String get coachTemplateEditorEditTitle => 'Edit template';
+
+  @override
+  String get coachTemplateEditorSubmit => 'SAVE TEMPLATE';
+
+  @override
+  String get routineEditorAddNothingNew =>
+      'Those exercises were already in the day.';
+
+  @override
+  String get routineEditorSupersetNeedsTwo =>
+      'A superset needs two exercises. Only one was added, on its own.';
+
+  @override
+  String get routineEditorSlotMenuMergeUp => 'Merge with the one above';
+
+  @override
+  String get routineEditorSlotMenuUngroup => 'Remove from superset';
+
+  @override
+  String get routineEditorSlotMenuMergeDown => 'Merge with the one below';
 }

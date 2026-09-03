@@ -1,18 +1,24 @@
 # FCM Setup — APNs Auth Key + Cloud Function IAM
 
+> [!WARNING]
+> **`treino-dev` es el proyecto de PRODUCCIÓN.** No hay un entorno de desarrollo
+> separado: todo comando de este documento que lleve `--project treino-dev`
+> (o `--project prod`) toca datos de usuarios reales.
+> Ver [AGENTS.md § Entornos](../../AGENTS.md#-entornos--leer-antes-de-correr-cualquier-comando) y [#826](https://github.com/Backhaus7997/treino/issues/826).
+
 This document describes the manual steps required to make FCM push notifications deliver end-to-end in TREINO. There are TWO independent setup items, both **out-of-band prerequisites for smoke testing** — neither is required for code review or merge.
 
 1. **APNs Auth Key** (iOS only) — blocks real FCM delivery to iOS devices.
 2. **Cloud Function IAM** (both platforms) — blocks the CF triggers from dispatching FCM messages.
 
-Both were discovered during the Fase 6 Etapa 2 smoke and are required for any environment that runs the notification CFs (`treino-dev`, future `treino-prod`).
+Both were discovered during the Fase 6 Etapa 2 smoke and are required by `treino-dev`, the single Firebase project that runs the notification CFs. (There is no `treino-prod`, present or planned — an earlier version of this line said "future `treino-prod`" and that environment was never going to exist. #845)
 
 ---
 
 ## Prerequisites
 
 - Access to the Apple Developer Program account for TREINO.
-- Access to the Firebase Console project for TREINO (Firebase Project ID: `treino-dev` or production equivalent).
+- Access to the Firebase Console project for TREINO (Firebase Project ID: `treino-dev` — that **is** the production project; there is no separate one).
 
 ---
 

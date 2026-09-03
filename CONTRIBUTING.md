@@ -8,7 +8,8 @@ Guía paso a paso para que cualquier dev del equipo pueda clonar el repo en su m
 
 1. [AGENTS.md](./AGENTS.md) — reglas y convenciones del proyecto. Es la "constitución".
 2. Este archivo (CONTRIBUTING.md) — onboarding técnico.
-3. [.atl/skill-registry.md](./.atl/skill-registry.md) — catálogo de skills de IA disponibles.
+3. `.atl/skill-registry.md` — catálogo de skills de IA. **Se genera local**, no viene en el
+   clone porque lista rutas de tu propio home: `gentle-ai skill-registry refresh --force`.
 
 Toda PR que viole reglas de AGENTS.md se devuelve sin merge.
 
@@ -291,6 +292,22 @@ No hay rama de fase. El tag sirve como punto de referencia para `git diff v0.1.0
 ---
 
 ## 7. Trabajar con Firebase (Fase 1+)
+
+> ## 🚨 `treino-dev` es PRODUCCIÓN
+>
+> El proyecto Firebase al que te van a dar acceso se llama `treino-dev`, y ese
+> nombre engaña: es el **único** proyecto de TREINO. No existe `treino-prod`,
+> no existe un entorno de desarrollo separado en la nube, y ahí viven los
+> usuarios reales con sus pagos, turnos, mediciones y chats. No hay backup
+> declarado en ningún lado.
+>
+> Te van a agregar como **Editor**, o sea que vas a poder deployar y borrar.
+> Antes de correr cualquier `firebase deploy`, `firestore:delete` o script de
+> `scripts/`, leé [AGENTS.md → Entornos](./AGENTS.md#-entornos--leer-antes-de-correr-cualquier-comando).
+>
+> Para desarrollar y probar usá el emulador — es el único entorno descartable:
+> `./scripts/emulator.sh` y `flutter run --dart-define=USE_EMULATOR=true`.
+> (Contexto: issue #826.)
 
 Cuando arranquemos Fase 1, cada dev necesita acceso al proyecto Firebase. **No commitear** los archivos de credenciales generados (`google-services.json`, `GoogleService-Info.plist`, `firebase_options.dart`); ya están en `.gitignore`.
 

@@ -608,6 +608,119 @@ String _formatArs(int amount) {
   return buf.toString();
 }
 
+/// Oferta anual de un tier, DERIVADA de `kTierPricesArs` — nunca hardcodeada.
+///
+/// `listPrice` es lo que costarían 12 meses pagando el precio mensual; el
+/// anual sale más barato porque son 10 (`annual = monthly × 10`, los "2 meses
+/// gratis"). El porcentaje se calcula, así que el día que cambien los precios
+/// el cartel acompaña solo en vez de mentir.
+///
+/// Devuelve `null` cuando NO hay oferta que mostrar: Free (no tiene precio) y
+/// el caso defensivo de un anual que dejara de ser más barato que el mensual.
+({int listPrice, int percent})? _annualOffer(SubscriptionTier tier) {
+  final price = kTierPricesArs[tier];
+  if (price == null) return null;
+  final list = price.monthly * 12;
+  if (price.annual >= list) return null;
+  final pct = ((list - price.annual) / list * 100).round();
+  if (pct <= 0) return null;
+  return (listPrice: list, percent: pct);
+}
+
+/// Precio de lista tachado + chip con el % de descuento, arriba del
+/// precio-héroe cuando el ciclo es anual.
+///
+/// El toggle ya avisa "¡Ahorrá 2 meses con el anual!", pero eso vive a 40px de
+/// distancia de los números y el PF tiene que hacer la cuenta él: ve $120.000
+/// y no tiene contra qué compararlo. Acá la comparación está donde se toma la
+/// decisión.
+///
+/// [reserveSpace] existe por la grilla 2x2 del layout ancho: FREE no tiene
+/// oferta, y si su tarjeta no reservara esta fila su precio-héroe quedaría
+/// más arriba que el de PLAN 1, que está al lado. La reserva se hace con los
+/// textos VACÍOS y no escondiendo los de otro plan: el alto de un `Text` lo
+/// fija la tipografía y no el contenido, así que la fila mide igual, y no
+/// queda un "-17%" fantasma en el árbol para confundir a un `find.text` o a
+/// un lector de pantalla. Que el alto realmente coincida lo prueba el test de
+/// alineación FREE/PLAN 1, no este comentario.
+///
+/// En el layout angosto las tarjetas van apiladas, no hay nada con qué
+/// alinear, y la fila se omite entera.
+class _AnnualOfferRow extends StatelessWidget {
+  const _AnnualOfferRow({
+    required this.tier,
+    required this.palette,
+    required this.reserveSpace,
+    required this.compact,
+  });
+
+  final SubscriptionTier tier;
+  final AppPalette palette;
+  final bool reserveSpace;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final offer = _annualOffer(tier);
+    if (offer == null && !reserveSpace) return const SizedBox.shrink();
+
+    final listText = offer == null ? '' : '\$${_formatArs(offer.listPrice)}';
+    final pctText = offer == null ? '' : '-${offer.percent}%';
+
+    final row = Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Text(
+          listText,
+          style: GoogleFonts.barlowCondensed(
+            color: palette.textMuted,
+            fontSize: compact ? 14 : 20,
+            fontWeight: FontWeight.w600,
+            height: 1.0,
+            decoration: TextDecoration.lineThrough,
+            decorationColor: palette.textMuted,
+            decorationThickness: 2,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
+        SizedBox(width: compact ? 6 : 8),
+        Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 6 : 8,
+            vertical: compact ? 2 : 3,
+          ),
+          decoration: BoxDecoration(
+            // Sin oferta la píldora sigue ocupando su alto pero no pinta: un
+            // óvalo mint vacío en la tarjeta de FREE sería peor que el hueco.
+            color: offer == null ? Colors.transparent : palette.accent,
+            borderRadius: BorderRadius.circular(AppRadius.full),
+          ),
+          child: Text(
+            pctText,
+            style: GoogleFonts.barlowCondensed(
+              // Ink invariante: `palette.bg` sobre accent da 1.57:1 en el tema
+              // claro (AGENTS.md §2). Nunca `palette.bg` acá.
+              color: TreinoButtonTokens.foreground(context),
+              fontSize: compact ? 10 : 13,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.6,
+              height: 1.0,
+            ),
+          ),
+        ),
+      ],
+    );
+
+    // Mismo criterio que el precio-héroe: con textScale alto se achica en vez
+    // de desbordar la tarjeta.
+    return _PriceFit(
+      alignment: compact ? Alignment.centerLeft : Alignment.center,
+      child: row,
+    );
+  }
+}
+
 /// Envoltorio obligatorio del precio-héroe.
 ///
 /// El Row del precio es `mainAxisSize.min` y sus hijos no son `Flexible`: con
@@ -684,6 +797,15 @@ class _PlanCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 18),
+          if (annual) ...[
+            _AnnualOfferRow(
+              tier: tier,
+              palette: palette,
+              reserveSpace: true, // grilla 2x2: FREE reserva el alto
+              compact: false,
+            ),
+            const SizedBox(height: 8),
+          ],
           // Precio-héroe: "$" chico arriba a la izquierda del número gigante.
           _PriceFit(
             alignment: Alignment.center,
@@ -856,6 +978,15 @@ class _NarrowPlanCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 8),
+                    if (annual) ...[
+                      _AnnualOfferRow(
+                        tier: tier,
+                        palette: palette,
+                        reserveSpace: false, // apiladas: nada con qué alinear
+                        compact: true,
+                      ),
+                      const SizedBox(height: 6),
+                    ],
                     _PriceFit(
                       alignment: Alignment.centerLeft,
                       child: Row(
@@ -1021,7 +1152,7 @@ class _PopularBadge extends StatelessWidget {
       child: Text(
         'MÁS POPULAR', // i18n: Fase W3
         style: GoogleFonts.barlowCondensed(
-          color: palette.bg,
+          color: TreinoButtonTokens.foreground(context),
           fontSize: fontSize,
           fontWeight: FontWeight.w800,
           letterSpacing: letterSpacing,
@@ -1095,7 +1226,9 @@ class _PlanCtaButton extends StatelessWidget {
           child: Text(
             isFree ? 'GRATIS' : 'ELEGIR PLAN', // i18n: Fase W3
             style: GoogleFonts.barlowCondensed(
-              color: filled ? palette.bg : palette.textPrimary,
+              color: filled
+                  ? TreinoButtonTokens.foreground(context)
+                  : palette.textPrimary,
               fontSize: 13,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.6,

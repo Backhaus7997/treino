@@ -32,10 +32,12 @@ const STALE_TOKEN_CODES = new Set([
 export type NotificationKind =
   | "appointment"
   | "chat-message"
+  | "discomfort"
   | "friend-accepted"
   | "friend-follow"
   | "friend-request"
   | "link-change"
+  | "monthly-report"
   | "overdue-payment"
   | "reaction"
   | "review";

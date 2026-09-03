@@ -199,7 +199,33 @@ test('SCENARIO-RV-LINK-03d: review trainerId must match the linked trainer, not 
 // set(merge)/update. [AD-3][REQ:trainer-reviews#trainerPublicProfiles
 // Rating Fields Are CF-Write-Only — forged rating]
 // ---------------------------------------------------------------------------
+// QA-SEC-013 (#780): `trainerPublicProfiles` create/update ahora exige
+// `users/{uid}.role == 'trainer'`, así que el seed tiene que traer también el
+// doc privado del PF.
+//
+// Sin él pasaban DOS cosas, y la segunda es la peligrosa:
+//   1. Los positivos de este archivo se ponían rojos.
+//   2. Los NEGATIVOS seguían verdes, pero **por el motivo equivocado**: los
+//      denegaba el gate de rol nuevo, no el pin CF-write-only de
+//      `averageRating`/`reviewCount` que dicen custodiar. Un assertFails que
+//      pasa por otra razón es exactamente lo que `docs/security.md` §1.8
+//      prohíbe — y a diferencia de un rojo, no avisa.
+/**
+ * Seedea SÓLO el doc privado que le da el rol al PF. Lo usan los escenarios de
+ * CREATE, que no pueden llamar a `seedTrainerProfile` porque justamente están
+ * probando la creación del perfil desde cero.
+ */
+async function seedTrainerUser(uid) {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().collection('users').doc(uid).set({
+      uid,
+      role: 'trainer',
+    });
+  });
+}
+
 async function seedTrainerProfile(uid, extra = {}) {
+  await seedTrainerUser(uid);
   await testEnv.withSecurityRulesDisabled(async (ctx) => {
     await ctx.firestore().collection('trainerPublicProfiles').doc(uid).set({
       uid,
@@ -261,6 +287,7 @@ test('SCENARIO-TPP-RATING-02b: trainer CAN re-write the same averageRating/revie
 // [AD-3#create-side guard]
 // ---------------------------------------------------------------------------
 test('SCENARIO-TPP-RATING-03: trainer cannot seed averageRating/reviewCount at create time', async () => {
+  await seedTrainerUser('trainer3');
   const trainer = testEnv.authenticatedContext('trainer3');
   await assertFails(
     trainer.firestore().collection('trainerPublicProfiles').doc('trainer3').set({
@@ -274,6 +301,7 @@ test('SCENARIO-TPP-RATING-03: trainer cannot seed averageRating/reviewCount at c
 // Legit create (no rating fields at all) must still succeed — non-vacuity
 // anchor for the create path.
 test('SCENARIO-TPP-RATING-03b: trainer CAN create their own profile without seeding rating fields', async () => {
+  await seedTrainerUser('trainer3b');
   const trainer = testEnv.authenticatedContext('trainer3b');
   await assertSucceeds(
     trainer.firestore().collection('trainerPublicProfiles').doc('trainer3b').set({

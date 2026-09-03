@@ -151,7 +151,7 @@ class _EquipmentFilterSheetContentState
                   child: FilledButton(
                     style: FilledButton.styleFrom(
                       backgroundColor: palette.accent,
-                      foregroundColor: palette.bg,
+                      foregroundColor: TreinoButtonTokens.foreground(context),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(AppRadius.sm),

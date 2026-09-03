@@ -10,10 +10,12 @@ import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../../watch/application/watch_effort_notifier.dart';
 import '../../../watch/domain/watch_effort.dart';
+import '../../application/duration_timer_providers.dart';
 import '../../application/phone_duration_timer.dart';
 import '../../application/workout_clock.dart';
 import '../../domain/duration_timer.dart';
 import '../../domain/duration_timer_owner.dart';
+import '../../domain/duration_timer_state.dart';
 import 'mmss.dart';
 
 /// Fila de un set basado en duración.
@@ -129,6 +131,38 @@ class _DurationSetRowState extends ConsumerState<DurationSetRow> {
     }
     final propia = ref.read(phoneDurationTimerProvider).value;
     final effort = ref.read(watchEffortNotifierProvider).value;
+
+    // El espejo puede venir por DOS caminos, y no son alternativos sino
+    // complementarios. El reloj de APPLE publica un contexto (`effort`). El de
+    // WEAR OS no puede: su Data Layer exige emparejamiento con ESE teléfono, y
+    // un mensaje se pierde si la muñeca no está escuchando —el caso real es
+    // arrancar acá y mirar el reloj un rato después—, así que deja la cuenta
+    // anotada en la SESIÓN.
+    //
+    // Sólo cuenta si el dueño es el RELOJ: lo que anota el teléfono es nuestro
+    // propio eco, y tomarlo por ajeno le bloquearía "Iniciar" al atleta.
+    //
+    // Se elige una fuente ENTERA, no campo por campo: combinar el exerciseId de
+    // un reloj con el setNumber del otro dibujaría la cuenta en la fila
+    // equivocada, que es peor que no dibujarla.
+    final anotado = ref.read(sessionDurationTimerProvider).value;
+    final ({String? id, int? set, DateTime? endsAt})? delReloj;
+    if (effort?.timerExerciseId != null) {
+      delReloj = (
+        id: effort!.timerExerciseId,
+        set: effort.timerSetNumber,
+        endsAt: effort.timerEndsAt,
+      );
+    } else if (anotado != null && anotado.owner == DurationTimerOwner.reloj) {
+      delReloj = (
+        id: anotado.exerciseId,
+        set: anotado.setNumber,
+        endsAt: anotado.endsAt,
+      );
+    } else {
+      delReloj = null;
+    }
+
     return DurationTimerOwnership.resolve(
       exerciseId: widget.exerciseId,
       setNumber: widget.setNumber,
@@ -139,24 +173,37 @@ class _DurationSetRowState extends ConsumerState<DurationSetRow> {
               )
           ? propia.endsAt
           : null,
-      watchExerciseId: effort?.timerExerciseId,
-      watchSetNumber: effort?.timerSetNumber,
-      watchEndsAt: effort?.timerEndsAt,
+      watchExerciseId: delReloj?.id,
+      watchSetNumber: delReloj?.set,
+      watchEndsAt: delReloj?.endsAt,
       now: ahora,
     );
   }
 
   void _startTimer() {
     if (widget.isDone) return;
+
+    // El instante de fin se deriva UNA vez y viaja igual por los dos canales:
+    // si cada uno lo calculara por su cuenta, la divergencia recién se vería
+    // con los dos números a la vista, uno en la muñeca y otro en la mano.
+    final arrancada = DurationTimerState.startedAt(
+      exerciseId: widget.exerciseId,
+      setNumber: widget.setNumber,
+      totalSeconds: widget.targetSeconds,
+      start: _ahora(),
+      owner: DurationTimerOwner.telefono,
+    );
+
+    // Para el reloj de Wear OS, que espeja lo anotado en la sesión.
+    ref.read(durationTimerRecorderProvider).anotar(arrancada);
+
+    // Y el notifier avisa al de Apple, que sí escucha un mensaje.
     unawaited(
       ref.read(phoneDurationTimerProvider).start(
-            exerciseId: widget.exerciseId,
-            setNumber: widget.setNumber,
-            totalSeconds: widget.targetSeconds,
-            endsAt: DurationTimerRules.endsAt(
-              start: _ahora(),
-              totalSeconds: widget.targetSeconds,
-            ),
+            exerciseId: arrancada.exerciseId,
+            setNumber: arrancada.setNumber,
+            totalSeconds: arrancada.totalSeconds,
+            endsAt: arrancada.endsAt,
           ),
     );
   }
@@ -167,6 +214,10 @@ class _DurationSetRowState extends ConsumerState<DurationSetRow> {
   /// dejaba al atleta mirando una cuenta que no pidió, sin forma de volver y
   /// —peor— con la serie marcándose sola al llegar a cero.
   void _cancelTimer() {
+    // Por los dos canales, por lo mismo que se avisa el arranque: si la
+    // anotación quedara, el reloj de Wear seguiría contando algo que ya no
+    // existe, llegaría a cero y vibraría por una serie que nadie cargó.
+    ref.read(durationTimerRecorderProvider).borrar();
     unawaited(ref.read(phoneDurationTimerProvider).cancel());
   }
 
@@ -177,6 +228,12 @@ class _DurationSetRowState extends ConsumerState<DurationSetRow> {
     // teléfono desde el primer día y no lo consumía nadie, así que la fila
     // seguía ofreciendo "Iniciar" sobre una serie que ya se estaba cronometrando
     // en la muñeca.
+    // El de Wear OS no publica contexto: deja la cuenta anotada en la sesión.
+    // Se observa acá —y no sólo en `_resolver`— para que la fila se redibuje
+    // cuando el documento cambia; sin el `watch`, su espejo aparecería recién
+    // en el siguiente tick de otra cosa, o nunca.
+    ref.watch(sessionDurationTimerProvider);
+
     return ValueListenableBuilder<PhoneDurationTimer?>(
       valueListenable: ref.watch(phoneDurationTimerProvider),
       builder: (context, _, __) => ValueListenableBuilder<WatchEffort?>(

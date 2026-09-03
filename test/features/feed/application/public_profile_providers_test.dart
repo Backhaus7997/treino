@@ -185,7 +185,9 @@ void main() {
         'avatarUrl': null,
         'gymId': null,
         'workoutsCount': 89,
-        'racha': 23,
+        // `rachaSemanas`, no el `racha` legacy en días: el perfil público
+        // muestra semanas desde la migración.
+        'rachaSemanas': 23,
         'followersCount': 412,
         'followingCount': 284,
       });

@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_palette.dart';
-import 'package:treino/app/theme/tokens/primitives.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/motion/treino_tappable.dart';
@@ -371,7 +371,9 @@ class _Chip extends StatelessWidget {
         child: Text(
           label,
           style: TextStyle(
-            color: selected ? palette.bg : palette.textMuted,
+            color: selected
+                ? TreinoButtonTokens.foreground(context)
+                : palette.textMuted,
             fontSize: 12,
             fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
             letterSpacing: 0.4,
@@ -449,12 +451,17 @@ class _ViewModeToggle extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(icon,
-                  size: 15, color: selected ? palette.bg : palette.textMuted),
+                  size: 15,
+                  color: selected
+                      ? TreinoButtonTokens.foreground(context)
+                      : palette.textMuted),
               const SizedBox(width: 6),
               Text(
                 label,
                 style: TextStyle(
-                  color: selected ? palette.bg : palette.textMuted,
+                  color: selected
+                      ? TreinoButtonTokens.foreground(context)
+                      : palette.textMuted,
                   fontSize: 13,
                   fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
                 ),

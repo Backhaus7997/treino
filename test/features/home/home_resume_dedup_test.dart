@@ -12,7 +12,10 @@ import 'package:treino/features/workout/domain/session_status.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
+import '../../helpers/onboarding_test_helpers.dart';
+
 UserProfile _profile() => UserProfile(
+      onboardingSeen: allSurfacesSeen(),
       uid: 'u1',
       email: 'u1@test.com',
       displayName: 'Martín',

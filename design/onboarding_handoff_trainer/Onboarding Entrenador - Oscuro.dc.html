@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
+<style>
+  body { margin: 0; background: #141414; font-family: 'Barlow', sans-serif; -webkit-font-smoothing: antialiased; }
+  a { color: #FFFFFF; } a:hover { color: #C123E0; }
+  @keyframes rachaPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(44,229,162,.55); } 50% { box-shadow: 0 0 0 5px rgba(44,229,162,0); } }
+  .racha-dot { animation: rachaPulse 1.8s ease-in-out infinite; }
+</style>
+</helmet>
+
+<section style="display:flex;gap:72px;padding:72px;align-items:flex-start;flex-wrap:wrap;background:#141414">
+
+  <div id="1" style="display:flex;flex-direction:column;gap:18px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;letter-spacing:1.6px;color:#0A0A0A;background:#2CE5A2;padding:4px 10px;border-radius:999px">1</span>
+      <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;letter-spacing:1.4px;color:rgba(255,255,255,.55)">INICIO · ENTRENADOR</span>
+    </div>
+
+    <div data-screen-label="Onboarding PT 1" style="position:relative;width:393px;height:852px;border-radius:46px;overflow:hidden;background:#0A0A0A;box-shadow:0 30px 80px rgba(0,0,0,.18)">
+      <div style="position:absolute;inset:0;background:radial-gradient(70% 70% at 15% 15%, rgba(44,229,162,.18), rgba(44,229,162,0) 85%)"></div>
+      <div style="position:absolute;inset:0;background:radial-gradient(70% 70% at 90% 92%, rgba(193,35,224,.16), rgba(193,35,224,0) 85%)"></div>
+
+      <div style="position:relative;height:100%;display:flex;flex-direction:column">
+        <div style="position:relative;height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 30px">
+          <span style="font-family:'Barlow',sans-serif;font-weight:600;font-size:17px;color:#FFFFFF;letter-spacing:.2px">10:32</span>
+          <div style="position:absolute;left:50%;top:11px;transform:translateX(-50%);width:126px;height:37px;border-radius:20px;background:#000;box-shadow:0 0 0 1px rgba(255,255,255,.06)"></div>
+          <div style="display:flex;align-items:center;gap:7px;color:#FFFFFF">
+            <span style="display:flex;align-items:flex-end;gap:1.5px;height:11px">
+              <span style="width:2.5px;height:4px;border-radius:1px;background:#FFFFFF"></span>
+              <span style="width:2.5px;height:6px;border-radius:1px;background:#FFFFFF"></span>
+              <span style="width:2.5px;height:8.5px;border-radius:1px;background:#FFFFFF"></span>
+              <span style="width:2.5px;height:11px;border-radius:1px;background:#FFFFFF"></span>
+            </span>
+            <i class="ph-fill ph-wifi-high" style="font-size:17px"></i>
+            <span style="display:inline-block;width:25px;height:13px;border-radius:4px;border:1.5px solid rgba(255,255,255,.35);padding:1.5px"><span style="display:block;width:100%;height:100%;border-radius:2px;background:#FFFFFF"></span></span>
+          </div>
+        </div>
+
+        <div style="flex:none;display:flex;align-items:center;gap:18px;padding:14px 24px 0">
+          <div style="flex:1;display:flex;gap:11px">
+            <span style="flex:1;height:4px;border-radius:999px;background:#2CE5A2"></span>
+            <span style="flex:1;height:4px;border-radius:999px;background:rgba(255,255,255,.12)"></span>
+            <span style="flex:1;height:4px;border-radius:999px;background:rgba(255,255,255,.12)"></span>
+            <span style="flex:1;height:4px;border-radius:999px;background:rgba(255,255,255,.12)"></span>
+            <span style="flex:1;height:4px;border-radius:999px;background:rgba(255,255,255,.12)"></span>
+          </div>
+          <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;letter-spacing:2px;color:rgba(255,255,255,.45)">SALTAR</span>
+        </div>
+
+        <div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:18px 0 6px">
+          <div style="position:relative;padding:9px;border-radius:34px;background:rgb(255,255,255);box-shadow:0 22px 44px rgba(15,21,19,.14), 0 0 0 1px rgba(0,0,0,.05)">
+            <div style="position:absolute;left:50%;top:4px;transform:translateX(-50%);width:52px;height:4px;border-radius:999px;background:rgba(0,0,0,.12)"></div>
+            <div style="position:relative;width:220px;height:456px;border-radius:26px;overflow:hidden;background:#0A0A0A">
+              <div style="position:absolute;inset:0;background:radial-gradient(70% 70% at 15% 12%, rgba(44,229,162,.20), rgba(44,229,162,0) 85%)"></div>
+              <div style="position:absolute;inset:0;background:radial-gradient(70% 70% at 90% 95%, rgba(193,35,224,.14), rgba(193,35,224,0) 85%)"></div>
+              <div style="position:absolute;top:0;left:0;width:393px;transform:scale(.56);transform-origin:top left">
+                <div style="padding:24px 20px 0;display:flex;flex-direction:column;gap:14px">
+                  <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;letter-spacing:1.6px;color:#2CE5A2">MIÉRCOLES 12 AGOSTO</span>
+                  <div style="display:flex;align-items:center;gap:14px;margin-top:-6px">
+                    <span style="flex:1;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:30px;letter-spacing:.8px;color:#FFFFFF">HOLA, MATEO</span>
+                    <i class="ph ph-bell" style="font-size:24px;color:#FFFFFF"></i>
+                    <span style="width:44px;height:44px;border-radius:50%;border:1.5px solid #2CE5A2;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;letter-spacing:.8px;color:#2CE5A2">MP</span>
+                  </div>
+
+                  <div style="background:#0F1513;border:1px solid rgba(255,255,255,.10);border-radius:20px;padding:16px 14px;display:flex;flex-direction:column;gap:14px">
+                    <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;letter-spacing:1.6px;color:rgba(255,255,255,.55)">RESUMEN DEL DÍA</span>
+                    <div style="display:flex;align-items:stretch">
+                      <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px">
+                        <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:34px;line-height:1;color:#2CE5A2">3</span>
+                        <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.4px;color:rgba(255,255,255,.55)">PENDIENTES</span>
+                      </div>
+                      <div style="width:1px;background:rgba(255,255,255,.10)"></div>
+                      <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px">
+                        <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:34px;line-height:1;color:#FFFFFF">5</span>
+                        <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.4px;color:rgba(255,255,255,.55)">COMPLETADAS</span>
+                      </div>
+                      <div style="width:1px;background:rgba(255,255,255,.10)"></div>
+                      <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px">
+                        <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:34px;line-height:1;color:#FF4D6D">1</span>
+                        <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.4px;color:rgba(255,255,255,.55)">CANCELADAS</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:4px">
+                    <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;letter-spacing:1.4px;color:rgba(255,255,255,.60)">PRÓXIMAS SESIONES</span>
+                    <span style="display:flex;align-items:center;gap:6px;font-family:'Barlow',sans-serif;font-weight:600;font-size:13px;color:#2CE5A2">Agenda<i class="ph ph-caret-right" style="font-size:12px"></i></span>
+                  </div>
+                  <div style="background:#0F1513;border:1px solid rgba(255,255,255,.10);border-radius:18px;padding:12px 14px;display:flex;align-items:center;gap:11px">
+                    <span class="racha-dot" style="width:8px;height:8px;border-radius:50%;background:#2CE5A2;flex:none"></span>
+                    <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:20px;letter-spacing:.5px;color:#2CE5A2">12:00</span>
+                    <span style="width:38px;height:38px;border-radius:50%;border:1.5px solid #2CE5A2;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;color:#2CE5A2">LU</span>
+                    <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+                      <span style="font-family:'Barlow',sans-serif;font-weight:600;font-size:15px;color:#FFFFFF">Lucía Ammal</span>
+                      <span style="font-family:'Barlow',sans-serif;font-size:12px;color:rgba(255,255,255,.55)">Hoy · 60 min</span>
+                    </div>
+                    <i class="ph ph-caret-right" style="font-size:14px;color:rgba(255,255,255,.35)"></i>
+                  </div>
+                  <div style="background:#0F1513;border:1px solid rgba(255,255,255,.10);border-radius:18px;padding:12px 14px;display:flex;align-items:center;gap:11px">
+                    <span style="width:8px;flex:none"></span>
+                    <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:20px;letter-spacing:.5px;color:#FFFFFF">17:30</span>
+                    <span style="width:38px;height:38px;border-radius:50%;border:1.5px solid rgba(255,255,255,.20);display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;color:rgba(255,255,255,.55)">AG</span>
+                    <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+                      <span style="font-family:'Barlow',sans-serif;font-weight:600;font-size:15px;color:#FFFFFF">Agustín Sosa</span>
+                      <span style="font-family:'Barlow',sans-serif;font-size:12px;color:rgba(255,255,255,.55)">Hoy · 45 min</span>
+                    </div>
+                    <i class="ph ph-caret-right" style="font-size:14px;color:rgba(255,255,255,.35)"></i>
+                  </div>
+
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:4px">
+                    <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;letter-spacing:1.4px;color:rgba(255,255,255,.60)">ENTRENARON HOY</span>
+                    <span style="display:flex;align-items:center;gap:6px;font-family:'Barlow',sans-serif;font-weight:600;font-size:13px;color:#2CE5A2">Dejar feedback<i class="ph ph-caret-right" style="font-size:12px"></i></span>
+                  </div>
+                  <div style="background:#0F1513;border:1px solid rgba(255,255,255,.10);border-radius:18px;padding:6px 14px">
+                    <div style="display:flex;align-items:center;gap:12px;padding:10px 0">
+                      <span style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#2CE5A2,#C123E0);display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:#0A0A0A">F</span>
+                      <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                        <span style="font-family:'Barlow',sans-serif;font-weight:600;font-size:14px;color:#FFFFFF">Franco Molina</span>
+                        <span style="font-family:'Barlow',sans-serif;font-size:12px;color:rgba(255,255,255,.55)">Push A · 52 min · 3.240 kg</span>
+                      </div>
+                      <i class="ph-fill ph-check-circle" style="font-size:18px;color:#2CE5A2"></i>
+                    </div>
+                    <div style="height:1px;background:rgba(255,255,255,.08)"></div>
+                    <div style="display:flex;align-items:center;gap:12px;padding:10px 0">
+                      <span style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#C123E0,#2CE5A2);display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;color:#0A0A0A">L</span>
+                      <div style="flex:1;display:flex;flex-direction:column;gap:2px">
+                        <span style="font-family:'Barlow',sans-serif;font-weight:600;font-size:14px;color:#FFFFFF">Lucía Ammal</span>
+                        <span style="font-family:'Barlow',sans-serif;font-size:12px;color:rgba(255,255,255,.55)">Full Body B · 47 min · 2.610 kg</span>
+                      </div>
+                      <i class="ph-fill ph-check-circle" style="font-size:18px;color:#2CE5A2"></i>
+                    </div>
+                  </div>
+
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:4px">
+                    <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;letter-spacing:1.4px;color:rgba(255,255,255,.60)">PAGOS POR COBRAR</span>
+                    <span style="display:flex;align-items:center;gap:6px;font-family:'Barlow',sans-serif;font-weight:600;font-size:13px;color:#2CE5A2">+ Cobro<i class="ph ph-caret-right" style="font-size:12px"></i></span>
+                  </div>
+                  <div style="background:#0F1513;border:1px solid rgba(255,255,255,.10);border-radius:18px;padding:14px;display:flex;align-items:center;gap:12px">
+                    <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+                      <span style="font-family:'Barlow',sans-serif;font-weight:600;font-size:14px;color:#FFFFFF">2 cobros pendientes</span>
+                      <span style="font-family:'Barlow',sans-serif;font-size:12px;color:rgba(255,255,255,.55)">Agustín · vence 15/08 · Lucía · vence 20/08</span>
+                    </div>
+                    <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:20px;color:#C123E0">$64.000</span>
+                  </div>
+
+                  <div style="margin-top:6px;height:52px;border-radius:999px;background:#2CE5A2;display:flex;align-items:center;justify-content:center;gap:8px;color:#0A0A0A">
+                    <i class="ph-fill ph-plus" style="font-size:16px"></i>
+                    <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;letter-spacing:1px">ASIGNAR RUTINA</span>
+                  </div>
+                </div>
+              </div>
+
+              <div style="position:absolute;left:10px;right:10px;bottom:10px;height:46px;border-radius:23px;background:rgba(24,30,28,.92);backdrop-filter:blur(10px);box-shadow:0 10px 24px rgba(0,0,0,.22);display:flex;align-items:center;padding:0 4px">
+                <span style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:rgba(255,255,255,.55)"><i class="ph ph-barbell" style="font-size:14px"></i><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:5.5px;letter-spacing:.5px">ENTRENAR</span></span>
+                <span style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:rgba(255,255,255,.55)"><i class="ph ph-newspaper-clipping" style="font-size:14px"></i><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:5.5px;letter-spacing:.5px">FEED</span></span>
+                <span style="flex:1;display:flex;align-items:center;justify-content:center"><span style="width:40px;height:40px;border-radius:50%;background:#2CE5A2;box-shadow:0 0 18px rgba(44,229,162,.60), 0 4px 10px rgba(44,229,162,.35);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;color:#0A0A0A"><i class="ph-fill ph-house" style="font-size:14px"></i><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:5.5px;letter-spacing:.5px">INICIO</span></span></span>
+                <span style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:rgba(255,255,255,.55)"><i class="ph ph-chalkboard-teacher" style="font-size:14px"></i><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:5.5px;letter-spacing:.5px">COACH</span></span>
+                <span style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:rgba(255,255,255,.55)"><i class="ph ph-user" style="font-size:14px"></i><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:5.5px;letter-spacing:.5px">PERFIL</span></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="flex:none;padding:0 24px">
+          <div style="display:flex;align-items:center;gap:14px">
+            <span style="width:4px;height:38px;border-radius:2px;background:#2CE5A2"></span>
+            <i class="ph ph-house" style="font-size:28px;color:#2CE5A2"></i>
+            <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:30px;letter-spacing:.5px;color:#FFFFFF;line-height:1.05">TU DÍA EN UN PANTALLAZO</span>
+          </div>
+          <p style="margin:14px 0 0;font-family:'Barlow',sans-serif;font-size:17px;line-height:1.5;color:rgba(255,255,255,.60);text-wrap:pretty">Cuántas sesiones tenés hoy, quiénes ya entrenaron y qué cobros te quedan pendientes. Todo al abrir la app.</p>
+        </div>
+
+        <div style="flex:none;padding:22px 24px 22px">
+          <div style="height:56px;border-radius:999px;background:#2CE5A2;box-shadow:0 12px 28px rgba(44,229,162,.42);display:flex;align-items:center;justify-content:center">
+            <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;letter-spacing:2px;color:#0A0A0A">SIGUIENTE</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="2" style="display:flex;flex-direction:column;gap:18px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;letter-spacing:1.6px;color:#FFFFFF;background:rgba(255,255,255,.10);padding:4px 10px;border-radius:999px">2</span>
+      <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;letter-spacing:1.4px;color:rgba(255,255,255,.55)">ENTRENAR · CREAR PLANES</span>
+    </div>
+
+    <div data-screen-label="Onboarding PT 2" style="position:relative;width:393px;height:852px;border-radius:46px;overflow:hidden;background:#0A0A0A;box-shadow:0 30px 80px rgba(0,0,0,.18)">
+      <div style="position:absolute;inset:0;background:radial-gradient(70% 70% at 15% 15%, rgba(44,229,162,.18), rgba(44,229,162,0) 85%)"></div>
+      <div style="position:absolute;inset:0;background:radial-gradient(70% 70% at 90% 92%, rgba(193,35,224,.16), rgba(193,35,224,0) 85%)"></div>
+
+      <div style="position:relative;height:100%;display:flex;flex-direction:column">
+        <div style="position:relative;height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 30px">
+          <span style="font-family:'Barlow',sans-serif;font-weight:600;font-size:17px;color:#FFFFFF;letter-spacing:.2px">10:35</span>
+          <div style="position:absolute;left:50%;top:11px;transform:translateX(-50%);width:126px;height:37px;border-radius:20px;background:#000;box-shadow:0 0 0 1px rgba(255,255,255,.06)"></div>
+          <div style="display:flex;align-items:center;gap:7px;color:#FFFFFF">
+            <span style="display:flex;align-items:flex-end;gap:1.5px;height:11px">
+              <span style="width:2.5px;height:4px;border-radius:1px;background:#FFFFFF"></span>
+              <span style="width:2.5px;height:6px;border-radius:1px;background:#FFFFFF"></span>
+              <span style="width:2.5px;height:8.5px;border-radius:1px;background:#FFFFFF"></span>
+              <span style="width:2.5px;height:11px;border-radius:1px;background:#FFFFFF"></span>
+            </span>
+            <i class="ph-fill ph-wifi-high" style="font-size:17px"></i>
+            <span style="display:inline-block;width:25px;height:13px;border-radius:4px;border:1.5px solid rgba(255,255,255,.35);padding:1.5px"><span style="display:block;width:100%;height:100%;border-radius:2px;background:#FFFFFF"></span></span>
+          </div>
+        </div>
+
+        <div style="flex:none;display:flex;align-items:center;gap:18px;padding:14px 24px 0">
+          <div style="flex:1;display:flex;gap:11px">
+            <span style="flex:1;height:4px;border-radius:999px;background:#2CE5A2"></span>
+            <span style="flex:1;height:4px;border-radius:999px;background:#2CE5A2"></span>
+            <span style="flex:1;height:4px;border-radius:999px;background:rgba(255,255,255,.12)"></span>
+            <span style="flex:1;height:4px;border-radius:999px;background:rgba(255,255,255,.12)"></span>
+            <span style="flex:1;height:4px;border-radius:999px;background:rgba(255,255,255,.12)"></span>
+          </div>
+          <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;letter-spacing:2px;color:rgba(255,255,255,.45)">SALTAR</span>
+        </div>
+
+        <div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:18px 0 6px">
+          <div style="position:relative;padding:9px;border-radius:34px;background:rgb(255,255,255);box-shadow:0 22px 44px rgba(15,21,19,.14), 0 0 0 1px rgba(0,0,0,.05)">
+            <div style="position:absolute;left:50%;top:4px;transform:translateX(-50%);width:52px;height:4px;border-radius:999px;background:rgba(0,0,0,.12)"></div>
+            <div style="position:relative;width:220px;height:456px;border-radius:26px;overflow:hidden;background:#0A0A0A">
+              <div style="position:absolute;inset:0;background:radial-gradient(70% 70% at 15% 12%, rgba(44,229,162,.20), rgba(44,229,162,0) 85%)"></div>
+              <div style="position:absolute;inset:0;background:radial-gradient(70% 70% at 90% 95%, rgba(193,35,224,.14), rgba(193,35,224,0) 85%)"></div>
+              <div style="position:absolute;top:0;left:0;width:393px;transform:scale(.56);transform-origin:top left">
+                <div style="padding:24px 20px 0;display:flex;flex-direction:column;gap:12px">
+                  <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:32px;letter-spacing:.8px;color:#FFFFFF">CREAR PLANES</span>
+                  <p style="margin:0;font-family:'Barlow',sans-serif;font-size:15px;line-height:1.45;color:rgba(255,255,255,.60);text-wrap:pretty">Tu espacio para armar plantillas de rutina y asignarlas a tus alumnos.</p>
+
+                  <div style="background:#0F1513;border:1.5px solid #2CE5A2;border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:12px;margin-top:4px">
+                    <div style="display:flex;align-items:center;gap:10px">
+                      <i class="ph ph-users-three" style="font-size:20px;color:#2CE5A2"></i>
+                      <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;letter-spacing:1.2px;color:#2CE5A2">ASIGNAR A UN ALUMNO</span>
+                    </div>
+                    <p style="margin:0;font-family:'Barlow',sans-serif;font-size:14px;line-height:1.45;color:#FFFFFF;text-wrap:pretty">Elegí un alumno y armale el plan en su perfil. La plantilla queda guardada y la podés reutilizar.</p>
+                    <div style="height:48px;border-radius:999px;background:#2CE5A2;display:flex;align-items:center;justify-content:center">
+                      <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;letter-spacing:1.4px;color:#0A0A0A">VER ALUMNOS</span>
+                    </div>
+                  </div>
+
+                  <div style="background:#0F1513;border:1px solid rgba(255,255,255,.10);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:14px">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+                      <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;letter-spacing:1.4px;color:rgba(255,255,255,.55)">TU BIBLIOTECA DE PLANTILLAS</span>
+                      <span style="display:flex;align-items:center;gap:6px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;letter-spacing:1.2px;color:#2CE5A2"><i class="ph ph-plus" style="font-size:13px"></i>NUEVA</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:12px">
+                      <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+                        <span style="font-family:'Barlow',sans-serif;font-weight:600;font-size:15px;color:#FFFFFF">Visible para tus alumnos</span>
+                        <span style="font-family:'Barlow',sans-serif;font-size:12px;color:rgba(255,255,255,.55)">Tus alumnos ven todas tus plantillas en su Workout.</span>
+                      </div>
+                      <span style="width:52px;height:30px;border-radius:999px;background:rgba(44,229,162,.45);display:flex;align-items:center;justify-content:flex-end;padding:3px;box-sizing:border-box"><span style="width:24px;height:24px;border-radius:50%;background:#2CE5A2"></span></span>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:8px">
+                      <div style="background:#0A0A0A;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:10px">
+                        <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+                          <span style="font-family:'Barlow',sans-serif;font-weight:600;font-size:15px;color:#FFFFFF">Fuerza · Bloque 2</span>
+                          <span style="font-family:'Barlow',sans-serif;font-size:12px;color:rgba(255,255,255,.55)">4 días · 6 ejercicios</span>
+                        </div>
+                        <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;letter-spacing:1.2px;color:#2CE5A2">ASIGNAR</span>
+                        <i class="ph ph-dots-three-vertical" style="font-size:16px;color:rgba(255,255,255,.45)"></i>
+                      </div>
+                      <div style="background:#0A0A0A;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:10px">
+                        <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+                          <span style="font-family:'Barlow',sans-serif;font-weight:600;font-size:15px;color:#FFFFFF">Full Body express</span>
+                          <span style="font-family:'Barlow',sans-serif;font-size:12px;color:rgba(255,255,255,.55)">2 días · 5 ejercicios</span>
+                        </div>
+                        <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;letter-spacing:1.2px;color:#2CE5A2">ASIGNAR</span>
+                        <i class="ph ph-dots-three-vertical" style="font-size:16px;color:rgba(255,255,255,.45)"></i>
+                      </div>
+                      <div style="background:#0A0A0A;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:10px">
+                        <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+                          <span style="font-family:'Barlow',sans-serif;font-weight:600;font-size:15px;color:#FFFFFF">Hipertrofia PPL</span>
+                          <span style="font-family:'Barlow',sans-serif;font-size:12px;color:rgba(255,255,255,.55)">6 días · 8 ejercicios</span>
+                        </div>
+                        <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;letter-spacing:1.2px;color:#2CE5A2">ASIGNAR</span>
+                        <i class="ph ph-dots-three-vertical" style="font-size:16px;color:rgba(255,255,255,.45)"></i>
+                      </div>
+                      <div style="background:#0A0A0A;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:10px">
+                        <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+                          <span style="font-family:'Barlow',sans-serif;font-weight:600;font-size:15px;color:#FFFFFF">Vuelta a la actividad</span>
+                          <span style="font-family:'Barlow',sans-serif;font-size:12px;color:rgba(255,255,255,.55)">3 días · 5 ejercicios</span>
+                        </div>
+                        <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;letter-spacing:1.2px;color:#2CE5A2">ASIGNAR</span>
+                        <i class="ph ph-dots-three-vertical" style="font-size:16px;color:rgba(255,255,255,.45)"></i>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="position:absolute;left:10px;right:10px;bottom:10px;height:46px;border-radius:23px;background:rgba(24,30,28,.92);backdrop-filter:blur(10px);box-shadow:0 10px 24px rgba(0,0,0,.22);display:flex;align-items:center;padding:0 4px">
+                <span style="flex:1;display:flex;align-items:center;justify-content:center"><span style="width:40px;height:40px;border-radius:50%;background:#2CE5A2;box-shadow:0 0 18px rgba(44,229,162,.60), 0 4px 10px rgba(44,229,162,.35);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;color:#0A0A0A"><i class="ph-fill ph-barbell" style="font-size:14px"></i><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:5.5px;letter-spacing:.5px">ENTRENAR</span></span></span>
+                <span style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:rgba(255,255,255,.55)"><i class="ph ph-newspaper-clipping" style="font-size:14px"></i><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:5.5px;letter-spacing:.5px">FEED</span></span>
+                <span style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:rgba(255,255,255,.55)"><i class="ph ph-house" style="font-size:14px"></i><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:5.5px;letter-spacing:.5px">INICIO</span></span>
+                <span style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:rgba(255,255,255,.55)"><i class="ph ph-chalkboard-teacher" style="font-size:14px"></i><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:5.5px;letter-spacing:.5px">COACH</span></span>
+                <span style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:rgba(255,255,255,.55)"><i class="ph ph-user" style="font-size:14px"></i><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:5.5px;letter-spacing:.5px">PERFIL</span></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="flex:none;padding:0 24px">
+          <div style="display:flex;align-items:center;gap:14px">
+            <span style="width:4px;height:38px;border-radius:2px;background:#2CE5A2"></span>
+            <i class="ph ph-barbell" style="font-size:28px;color:#2CE5A2"></i>
+            <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:30px;letter-spacing:.5px;color:#FFFFFF;line-height:1.05">ARMÁ TUS PLANTILLAS</span>
+          </div>
+          <p style="margin:14px 0 0;font-family:'Barlow',sans-serif;font-size:17px;line-height:1.5;color:rgba(255,255,255,.60);text-wrap:pretty">Creá una plantilla de rutina una vez y asignala a los alumnos que quieras. Queda guardada en tu biblioteca para reutilizarla.</p>
+        </div>
+
+        <div style="flex:none;padding:22px 24px 22px">
+          <div style="height:56px;border-radius:999px;background:#2CE5A2;box-shadow:0 12px 28px rgba(44,229,162,.42);display:flex;align-items:center;justify-content:center">
+            <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;letter-spacing:2px;color:#0A0A0A">SIGUIENTE</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="3" style="display:flex;flex-direction:column;gap:18px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;letter-spacing:1.6px;color:#FFFFFF;background:rgba(255,255,255,.10);padding:4px 10px;border-radius:999px">3</span>
+      <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;letter-spacing:1.4px;color:rgba(255,255,255,.55)">FEED</span>
+    </div>
+
+    <div data-screen-label="Onboarding PT 3" style="position:relative;width:393px;height:852px;border-radius:46px;overflow:hidden;background:#0A0A0A;box-shadow:0 30px 80px rgba(0,0,0,.18)">
+      <div style="position:absolute;inset:0;background:radial-gradient(70% 70% at 15% 15%, rgba(44,229,162,.18), rgba(44,229,162,0) 85%)"></div>
+      <div style="position:absolute;inset:0;background:radial-gradient(70% 70% at 90% 92%, rgba(193,35,224,.16), rgba(193,35,224,0) 85%)"></div>
+
+      <div style="position:relative;height:100%;display:flex;flex-direction:column">
+        <div style="position:relative;height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 30px">
+          <span style="font-family:'Barlow',sans-serif;font-weight:600;font-size:17px;color:#FFFFFF;letter-spacing:.2px">10:34</span>
+          <div style="position:absolute;left:50%;top:11px;transform:translateX(-50%);width:126px;height:37px;border-radius:20px;background:#000;box-shadow:0 0 0 1px rgba(255,255,255,.06)"></div>
+          <div style="display:flex;align-items:center;gap:7px;color:#FFFFFF">
+            <span style="display:flex;align-items:flex-end;gap:1.5px;height:11px">
+              <span style="width:2.5px;height:4px;border-radius:1px;background:#FFFFFF"></span>
+              <span style="width:2.5px;height:6px;border-radius:1px;background:#FFFFFF"></span>
+              <span style="width:2.5px;height:8.5px;border-radius:1px;background:#FFFFFF"></span>
+              <span style="width:2.5px;height:11px;border-radius:1px;background:#FFFFFF"></span>
+            </span>
+            <i class="ph-fill ph-wifi-high" style="font-size:17px"></i>
+            <span style="display:inline-block;width:25px;height:13px;border-radius:4px;border:1.5px solid rgba(255,255,255,.35);padding:1.5px"><span style="display:block;width:100%;height:100%;border-radius:2px;background:#FFFFFF"></span></span>
+          </div>
+        </div>
+
+        <div style="flex:none;display:flex;align-items:center;gap:18px;padding:14px 24px 0">
+          <div style="flex:1;display:flex;gap:11px">
+            <span style="flex:1;height:4px;border-radius:999px;background:#2CE5A2"></span>
+            <span style="flex:1;height:4px;border-radius:999px;background:#2CE5A2"></span>
+            <span style="flex:1;height:4px;border-radius:999px;background:#2CE5A2"></span>
+            <span style="flex:1;height:4px;border-radius:999px;background:rgba(255,255,255,.12)"></span>
+            <span style="flex:1;height:4px;border-radius:999px;background:rgba(255,255,255,.12)"></span>
+          </div>
+          <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;letter-spacing:2px;color:rgba(255,255,255,.45)">SALTAR</span>
+        </div>
+
+        <div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:18px 0 6px">
+          <div style="position:relative;padding:9px;border-radius:34px;background:rgb(255,255,255);box-shadow:0 22px 44px rgba(15,21,19,.14), 0 0 0 1px rgba(0,0,0,.05)">
+            <div style="position:absolute;left:50%;top:4px;transform:translateX(-50%);width:52px;height:4px;border-radius:999px;background:rgba(0,0,0,.12)"></div>
+            <div style="position:relative;width:220px;height:456px;border-radius:26px;overflow:hidden;background:#0A0A0A">
+              <div style="position:absolute;inset:0;background:radial-gradient(70% 70% at 15% 12%, rgba(44,229,162,.20), rgba(44,229,162,0) 85%)"></div>
+              <div style="position:absolute;inset:0;background:radial-gradient(70% 70% at 90% 95%, rgba(193,35,224,.14), rgba(193,35,224,0) 85%)"></div>
+              <div style="position:absolute;top:0;left:0;width:393px;transform:scale(.56);transform-origin:top left">
+                <div style="padding:24px 20px 0;display:flex;flex-direction:column;gap:14px">
+                  <div style="display:flex;align-items:center;gap:16px">
+                    <span style="flex:1;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:30px;letter-spacing:.8px;color:#FFFFFF">FEED</span>
+                    <i class="ph ph-bell" style="font-size:22px;color:#FFFFFF"></i>
+                    <i class="ph ph-chat-circle" style="font-size:22px;color:#FFFFFF"></i>
+                    <i class="ph ph-magnifying-glass" style="font-size:22px;color:#FFFFFF"></i>
+                    <span style="width:40px;height:40px;border-radius:50%;background:#2CE5A2;display:flex;align-items:center;justify-content:center;color:#0A0A0A"><i class="ph-fill ph-plus" style="font-size:18px"></i></span>
+                  </div>
+                  <div style="display:flex;gap:10px">
+                    <span style="height:34px;padding:0 18px;border-radius:17px;background:#2CE5A2;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:.5px;color:#0A0A0A">AMIGOS</span>
+                    <span style="height:34px;padding:0 18px;border-radius:17px;background:#0F1513;border:1px solid rgba(255,255,255,.10);display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:.5px;color:rgba(255,255,255,.55)">MI GYM</span>
+                    <span style="height:34px;padding:0 18px;border-radius:17px;background:#0F1513;border:1px solid rgba(255,255,255,.10);display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:13px;letter-spacing:.5px;color:rgba(255,255,255,.55)">PÚBLICO</span>
+                  </div>
+
+                  <div style="background:#0F1513;border:1px solid rgba(255,255,255,.10);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:12px">
+                    <div style="display:flex;align-items:center;gap:12px">
+                      <span style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#2CE5A2,#C123E0);display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:#0A0A0A">L</span>
+                      <div style="flex:1;display:flex;flex-direction:column;gap:5px">
+                        <span style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;color:#FFFFFF">Lucía Ammal</span>
+                        <span style="font-family:'Barlow',sans-serif;font-size:12px;color:rgba(255,255,255,.55)">TU ALUMNA · hace 2h</span>
+                      </div>
+                      <span style="border:1px solid #C123E0;border-radius:999px;padding:3px 10px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:11px;letter-spacing:1.2px;color:#C123E0">ALUMNA</span>
+                    </div>
+                    <span style="font-family:'Barlow',sans-serif;font-size:14px;color:#FFFFFF">Full Body B terminado. Subí 5 kg en remo con barra 💪</span>
+                    <div style="display:flex;align-items:center;gap:16px;color:rgba(255,255,255,.55)">
+                      <span style="font-family:'Barlow',sans-serif;font-size:12px">2.610 kg</span>
+                      <span style="font-family:'Barlow',sans-serif;font-size:12px">47 min</span>
+                      <span style="font-family:'Barlow',sans-serif;font-size:12px">5 ej.</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:14px">
+                      <span style="display:flex;align-items:center;gap:6px;color:#FF4D6D"><i class="ph-fill ph-heart" style="font-size:16px"></i><span style="font-family:'Barlow',sans-serif;font-size:12px">18</span></span>
+                      <span style="display:flex;align-items:center;gap:6px;color:#FF7A2F"><i class="ph-fill ph-flame" style="font-size:16px"></i><span style="font-family:'Barlow',sans-serif;font-size:12px">7</span></span>
+                      <span style="display:flex;align-items:center;gap:6px;color:rgba(255,255,255,.55)"><i class="ph ph-chat-circle" style="font-size:16px"></i><span style="font-family:'Barlow',sans-serif;font-size:12px">2</span></span>
+                    </div>
+                  </div>
+
+                  <div style="background:#0F1513;border:1px solid rgba(255,255,255,.10);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:12px">
+                    <div style="display:flex;align-items:center;gap:12px">
+                      <span style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#C123E0,#2CE5A2);display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;color:#0A0A0A">F</span>
+                      <div style="flex:1;display:flex;flex-direction:column;gap:5px">
+                        <span style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:15px;color:#FFFFFF">Franco Molina</span>
+                        <span style="font-family:'Barlow',sans-serif;font-size:12px;color:rgba(255,255,255,.55)">GYM SUR · hace 5h</span>
+                      </div>
+                    </div>
+                    <div style="position:relative;width:100%;height:180px;border-radius:14px;overflow:hidden;background:#0A0A0A">
+                      <img src="assets/feed-post-photo.png" alt="Alumno entrenando con mancuernas" style="width:100%;height:100%;object-fit:cover;display:block"/>
+                    </div>
+                    <span style="font-family:'Barlow',sans-serif;font-size:14px;color:#FFFFFF">Última serie de la semana. Bloque 2 cerrado, gracias coach.</span>
+                    <div style="display:flex;align-items:center;gap:14px">
+                      <span style="display:flex;align-items:center;gap:6px;color:#FF4D6D"><i class="ph-fill ph-heart" style="font-size:16px"></i><span style="font-family:'Barlow',sans-serif;font-size:12px">31</span></span>
+                      <span style="display:flex;align-items:center;gap:6px;color:#FF7A2F"><i class="ph-fill ph-flame" style="font-size:16px"></i><span style="font-family:'Barlow',sans-serif;font-size:12px">14</span></span>
+                    </div>
+                  </div>
+
+                  <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:22px;letter-spacing:.5px;color:#FFFFFF;margin-top:4px">PERSONAS DE TU GYM</span>
+                  <div style="display:flex;flex-direction:column;gap:10px">
+                    <div style="background:#0F1513;border:1px solid rgba(255,255,255,.10);border-radius:16px;padding:12px 14px;display:flex;align-items:center;gap:14px">
+                      <span style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#2CE5A2,#C123E0);display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;color:#0A0A0A">A</span>
+                      <span style="flex:1;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:17px;letter-spacing:.5px;color:#FFFFFF">AGUSTÍN</span>
+                      <i class="ph ph-caret-right" style="font-size:14px;color:rgba(255,255,255,.35)"></i>
+                    </div>
+                    <div style="background:#0F1513;border:1px solid rgba(255,255,255,.10);border-radius:16px;padding:12px 14px;display:flex;align-items:center;gap:14px">
+                      <span style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#2CE5A2,#C123E0);display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;color:#0A0A0A">C</span>
+                      <span style="flex:1;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:17px;letter-spacing:.5px;color:#FFFFFF">CAMILA</span>
+                      <i class="ph ph-caret-right" style="font-size:14px;color:rgba(255,255,255,.35)"></i>
+                    </div>
+                    <div style="background:#0F1513;border:1px solid rgba(255,255,255,.10);border-radius:16px;padding:12px 14px;display:flex;align-items:center;gap:14px">
+                      <span style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#2CE5A2,#C123E0);display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;color:#0A0A0A">J</span>
+                      <span style="flex:1;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:17px;letter-spacing:.5px;color:#FFFFFF">JULIÁN</span>
+                      <i class="ph ph-caret-right" style="font-size:14px;color:rgba(255,255,255,.35)"></i>
+                    </div>
+                    <div style="background:#0F1513;border:1px solid rgba(255,255,255,.10);border-radius:16px;padding:12px 14px;display:flex;align-items:center;gap:14px">
+                      <span style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#2CE5A2,#C123E0);display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;color:#0A0A0A">S</span>
+                      <span style="flex:1;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:17px;letter-spacing:.5px;color:#FFFFFF">SOFÍA</span>
+                      <i class="ph ph-caret-right" style="font-size:14px;color:rgba(255,255,255,.35)"></i>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="position:absolute;left:10px;right:10px;bottom:10px;height:46px;border-radius:23px;background:rgba(24,30,28,.92);backdrop-filter:blur(10px);box-shadow:0 10px 24px rgba(0,0,0,.22);display:flex;align-items:center;padding:0 4px">
+                <span style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:rgba(255,255,255,.55)"><i class="ph ph-barbell" style="font-size:14px"></i><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:5.5px;letter-spacing:.5px">ENTRENAR</span></span>
+                <span style="flex:1;display:flex;align-items:center;justify-content:center"><span style="width:40px;height:40px;border-radius:50%;background:#2CE5A2;box-shadow:0 0 18px rgba(44,229,162,.60), 0 4px 10px rgba(44,229,162,.35);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;color:#0A0A0A"><i class="ph-fill ph-newspaper-clipping" style="font-size:14px"></i><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:5.5px;letter-spacing:.5px">FEED</span></span></span>
+                <span style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:rgba(255,255,255,.55)"><i class="ph ph-house" style="font-size:14px"></i><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:5.5px;letter-spacing:.5px">INICIO</span></span>
+                <span style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:rgba(255,255,255,.55)"><i class="ph ph-chalkboard-teacher" style="font-size:14px"></i><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:5.5px;letter-spacing:.5px">COACH</span></span>
+                <span style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:rgba(255,255,255,.55)"><i class="ph ph-user" style="font-size:14px"></i><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:5.5px;letter-spacing:.5px">PERFIL</span></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="flex:none;padding:0 24px">
+          <div style="display:flex;align-items:center;gap:14px">
+            <span style="width:4px;height:38px;border-radius:2px;background:#2CE5A2"></span>
+            <i class="ph ph-newspaper-clipping" style="font-size:28px;color:#2CE5A2"></i>
+            <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:30px;letter-spacing:.5px;color:#FFFFFF;line-height:1.05">SEGUÍ A TU COMUNIDAD</span>
+          </div>
+          <p style="margin:14px 0 0;font-family:'Barlow',sans-serif;font-size:17px;line-height:1.5;color:rgba(255,255,255,.60);text-wrap:pretty">Mirá lo que publican tus alumnos y la gente de tu gym, reaccioná a sus sesiones y conseguí alumnos nuevos.</p>
+        </div>
+
+        <div style="flex:none;padding:22px 24px 22px">
+          <div style="height:56px;border-radius:999px;background:#2CE5A2;box-shadow:0 12px 28px rgba(44,229,162,.42);display:flex;align-items:center;justify-content:center">
+            <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;letter-spacing:2px;color:#0A0A0A">SIGUIENTE</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="4" style="display:flex;flex-direction:column;gap:18px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;letter-spacing:1.6px;color:#FFFFFF;background:rgba(255,255,255,.10);padding:4px 10px;border-radius:999px">4</span>
+      <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;letter-spacing:1.4px;color:rgba(255,255,255,.55)">COACH · ALUMNOS</span>
+    </div>
+
+    <div data-screen-label="Onboarding PT 4" style="position:relative;width:393px;height:852px;border-radius:46px;overflow:hidden;background:#0A0A0A;box-shadow:0 30px 80px rgba(0,0,0,.18)">
+      <div style="position:absolute;inset:0;background:radial-gradient(70% 70% at 15% 15%, rgba(44,229,162,.18), rgba(44,229,162,0) 85%)"></div>
+      <div style="position:absolute;inset:0;background:radial-gradient(70% 70% at 90% 92%, rgba(193,35,224,.16), rgba(193,35,224,0) 85%)"></div>
+
+      <div style="position:relative;height:100%;display:flex;flex-direction:column">
+        <div style="position:relative;height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 30px">
+          <span style="font-family:'Barlow',sans-serif;font-weight:600;font-size:17px;color:#FFFFFF;letter-spacing:.2px">10:33</span>
+          <div style="position:absolute;left:50%;top:11px;transform:translateX(-50%);width:126px;height:37px;border-radius:20px;background:#000;box-shadow:0 0 0 1px rgba(255,255,255,.06)"></div>
+          <div style="display:flex;align-items:center;gap:7px;color:#FFFFFF">
+            <span style="display:flex;align-items:flex-end;gap:1.5px;height:11px">
+              <span style="width:2.5px;height:4px;border-radius:1px;background:#FFFFFF"></span>
+              <span style="width:2.5px;height:6px;border-radius:1px;background:#FFFFFF"></span>
+              <span style="width:2.5px;height:8.5px;border-radius:1px;background:#FFFFFF"></span>
+              <span style="width:2.5px;height:11px;border-radius:1px;background:#FFFFFF"></span>
+            </span>
+            <i class="ph-fill ph-wifi-high" style="font-size:17px"></i>
+            <span style="display:inline-block;width:25px;height:13px;border-radius:4px;border:1.5px solid rgba(255,255,255,.35);padding:1.5px"><span style="display:block;width:100%;height:100%;border-radius:2px;background:#FFFFFF"></span></span>
+          </div>
+        </div>
+
+        <div style="flex:none;display:flex;align-items:center;gap:18px;padding:14px 24px 0">
+          <div style="flex:1;display:flex;gap:11px">
+            <span style="flex:1;height:4px;border-radius:999px;background:#2CE5A2"></span>
+            <span style="flex:1;height:4px;border-radius:999px;background:#2CE5A2"></span>
+            <span style="flex:1;height:4px;border-radius:999px;background:#2CE5A2"></span>
+            <span style="flex:1;height:4px;border-radius:999px;background:#2CE5A2"></span>
+            <span style="flex:1;height:4px;border-radius:999px;background:rgba(255,255,255,.12)"></span>
+          </div>
+          <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;letter-spacing:2px;color:rgba(255,255,255,.45)">SALTAR</span>
+        </div>
+
+        <div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:18px 0 6px">
+          <div style="position:relative;padding:9px;border-radius:34px;background:rgb(255,255,255);box-shadow:0 22px 44px rgba(15,21,19,.14), 0 0 0 1px rgba(0,0,0,.05)">
+            <div style="position:absolute;left:50%;top:4px;transform:translateX(-50%);width:52px;height:4px;border-radius:999px;background:rgba(0,0,0,.12)"></div>
+            <div style="position:relative;width:220px;height:456px;border-radius:26px;overflow:hidden;background:#0A0A0A">
+              <div style="position:absolute;inset:0;background:radial-gradient(70% 70% at 15% 12%, rgba(44,229,162,.20), rgba(44,229,162,0) 85%)"></div>
+              <div style="position:absolute;inset:0;background:radial-gradient(70% 70% at 90% 95%, rgba(193,35,224,.14), rgba(193,35,224,0) 85%)"></div>
+              <div style="position:absolute;top:0;left:0;width:393px;transform:scale(.56);transform-origin:top left">
+                <div style="padding:24px 20px 0;display:flex;flex-direction:column;gap:14px">
+                  <div style="padding:4px;border-radius:26px;background:#0F1513;border:1px solid rgba(255,255,255,.10);display:flex;gap:4px">
+                    <span style="flex:1;height:44px;border-radius:22px;background:#2CE5A2;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;letter-spacing:1.2px;color:#0A0A0A">ALUMNOS</span>
+                    <span style="flex:1;height:44px;border-radius:22px;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;letter-spacing:1.2px;color:rgba(255,255,255,.55)">AGENDA</span>
+                  </div>
+
+                  <div style="background:#0F1513;border:1px solid rgba(255,255,255,.10);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:14px">
+                    <div style="display:flex;align-items:center;gap:14px">
+                      <span style="width:48px;height:48px;border-radius:50%;background:#0A0A0A;border:1px solid rgba(255,255,255,.10);display:flex;align-items:center;justify-content:center"><i class="ph ph-user" style="font-size:24px;color:rgba(255,255,255,.45)"></i></span>
+                      <div style="flex:1;display:flex;flex-direction:column;gap:4px">
+                        <span style="font-family:'Barlow',sans-serif;font-weight:600;font-size:17px;color:#FFFFFF">Agustín Sosa</span>
+                        <span style="font-family:'Barlow',sans-serif;font-size:13px;color:rgba(255,255,255,.55)">Vinculado desde 27/07/2026</span>
+                      </div>
+                      <span style="border:1px solid #2CE5A2;background:rgba(44,229,162,.14);border-radius:999px;padding:4px 10px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.2px;color:#2CE5A2">ACTIVO</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:14px;color:rgba(255,255,255,.55)">
+                      <span style="font-family:'Barlow',sans-serif;font-size:13px">Fuerza · Bloque 2</span>
+                      <span style="font-family:'Barlow',sans-serif;font-size:13px">4 de 5 sesiones</span>
+                    </div>
+                    <div style="height:44px;border-radius:999px;border:1.5px solid #2CE5A2;display:flex;align-items:center;justify-content:center">
+                      <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;letter-spacing:1.2px;color:#2CE5A2">PAUSAR VÍNCULO</span>
+                    </div>
+                    <div style="height:44px;border-radius:999px;border:1px solid rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center">
+                      <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;letter-spacing:1.2px;color:rgba(255,255,255,.60)">TERMINAR VÍNCULO</span>
+                    </div>
+                  </div>
+
+                  <div style="background:#0F1513;border:1px solid rgba(255,255,255,.10);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:14px">
+                    <div style="display:flex;align-items:center;gap:14px">
+                      <span style="width:48px;height:48px;border-radius:50%;background:#0A0A0A;border:1px solid rgba(255,255,255,.10);display:flex;align-items:center;justify-content:center"><i class="ph ph-user" style="font-size:24px;color:rgba(255,255,255,.45)"></i></span>
+                      <div style="flex:1;display:flex;flex-direction:column;gap:4px">
+                        <span style="font-family:'Barlow',sans-serif;font-weight:600;font-size:17px;color:#FFFFFF">Lucía Ammal</span>
+                        <span style="font-family:'Barlow',sans-serif;font-size:13px;color:rgba(255,255,255,.55)">Vinculado desde 27/07/2026</span>
+                      </div>
+                      <span style="border:1px solid #2CE5A2;background:rgba(44,229,162,.14);border-radius:999px;padding:4px 10px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.2px;color:#2CE5A2">ACTIVA</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:14px;color:rgba(255,255,255,.55)">
+                      <span style="font-family:'Barlow',sans-serif;font-size:13px">Full Body express</span>
+                      <span style="font-family:'Barlow',sans-serif;font-size:13px">2 de 3 sesiones</span>
+                    </div>
+                    <div style="height:44px;border-radius:999px;border:1.5px solid #2CE5A2;display:flex;align-items:center;justify-content:center">
+                      <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;letter-spacing:1.2px;color:#2CE5A2">PAUSAR VÍNCULO</span>
+                    </div>
+                    <div style="height:44px;border-radius:999px;border:1px solid rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center">
+                      <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;letter-spacing:1.2px;color:rgba(255,255,255,.60)">TERMINAR VÍNCULO</span>
+                    </div>
+                  </div>
+
+                  <div style="background:#0F1513;border:1px solid rgba(255,255,255,.10);border-radius:20px;padding:16px;display:flex;align-items:center;gap:14px">
+                    <span style="width:44px;height:44px;border-radius:50%;background:rgba(193,35,224,.12);display:flex;align-items:center;justify-content:center"><i class="ph ph-user-plus" style="font-size:22px;color:#C123E0"></i></span>
+                    <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+                      <span style="font-family:'Barlow',sans-serif;font-weight:600;font-size:15px;color:#FFFFFF">1 solicitud entrante</span>
+                      <span style="font-family:'Barlow',sans-serif;font-size:12px;color:rgba(255,255,255,.55)">Camila Duarte quiere vincularse</span>
+                    </div>
+                    <i class="ph ph-caret-right" style="font-size:14px;color:rgba(255,255,255,.35)"></i>
+                  </div>
+                </div>
+              </div>
+
+              <div style="position:absolute;left:10px;right:10px;bottom:10px;height:46px;border-radius:23px;background:rgba(24,30,28,.92);backdrop-filter:blur(10px);box-shadow:0 10px 24px rgba(0,0,0,.22);display:flex;align-items:center;padding:0 4px">
+                <span style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:rgba(255,255,255,.55)"><i class="ph ph-barbell" style="font-size:14px"></i><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:5.5px;letter-spacing:.5px">ENTRENAR</span></span>
+                <span style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:rgba(255,255,255,.55)"><i class="ph ph-newspaper-clipping" style="font-size:14px"></i><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:5.5px;letter-spacing:.5px">FEED</span></span>
+                <span style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:rgba(255,255,255,.55)"><i class="ph ph-house" style="font-size:14px"></i><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:5.5px;letter-spacing:.5px">INICIO</span></span>
+                <span style="flex:1;display:flex;align-items:center;justify-content:center"><span style="width:40px;height:40px;border-radius:50%;background:#2CE5A2;box-shadow:0 0 18px rgba(44,229,162,.60), 0 4px 10px rgba(44,229,162,.35);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;color:#0A0A0A"><i class="ph-fill ph-chalkboard-teacher" style="font-size:14px"></i><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:5.5px;letter-spacing:.5px">COACH</span></span></span>
+                <span style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:rgba(255,255,255,.55)"><i class="ph ph-user" style="font-size:14px"></i><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:5.5px;letter-spacing:.5px">PERFIL</span></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="flex:none;padding:0 24px">
+          <div style="display:flex;align-items:center;gap:14px">
+            <span style="width:4px;height:38px;border-radius:2px;background:#2CE5A2"></span>
+            <i class="ph ph-chalkboard-teacher" style="font-size:28px;color:#2CE5A2"></i>
+            <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:30px;letter-spacing:.5px;color:#FFFFFF;line-height:1.05">TUS ALUMNOS, ORDENADOS</span>
+          </div>
+          <p style="margin:14px 0 0;font-family:'Barlow',sans-serif;font-size:17px;line-height:1.5;color:rgba(255,255,255,.60);text-wrap:pretty">Gestioná cada vínculo, pausalo o cerralo cuando haga falta, y llevá tu agenda de sesiones desde la misma pestaña.</p>
+        </div>
+
+        <div style="flex:none;padding:22px 24px 22px">
+          <div style="height:56px;border-radius:999px;background:#2CE5A2;box-shadow:0 12px 28px rgba(44,229,162,.42);display:flex;align-items:center;justify-content:center">
+            <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;letter-spacing:2px;color:#0A0A0A">SIGUIENTE</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="5" style="display:flex;flex-direction:column;gap:18px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;letter-spacing:1.6px;color:#FFFFFF;background:rgba(255,255,255,.10);padding:4px 10px;border-radius:999px">5</span>
+      <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;letter-spacing:1.4px;color:rgba(255,255,255,.55)">PERFIL · YO</span>
+    </div>
+
+    <div data-screen-label="Onboarding PT 5" style="position:relative;width:393px;height:852px;border-radius:46px;overflow:hidden;background:#0A0A0A;box-shadow:0 30px 80px rgba(0,0,0,.18)">
+      <div style="position:absolute;inset:0;background:radial-gradient(70% 70% at 15% 15%, rgba(44,229,162,.18), rgba(44,229,162,0) 85%)"></div>
+      <div style="position:absolute;inset:0;background:radial-gradient(70% 70% at 90% 92%, rgba(193,35,224,.16), rgba(193,35,224,0) 85%)"></div>
+
+      <div style="position:relative;height:100%;display:flex;flex-direction:column">
+        <div style="position:relative;height:54px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 30px">
+          <span style="font-family:'Barlow',sans-serif;font-weight:600;font-size:17px;color:#FFFFFF;letter-spacing:.2px">10:39</span>
+          <div style="position:absolute;left:50%;top:11px;transform:translateX(-50%);width:126px;height:37px;border-radius:20px;background:#000;box-shadow:0 0 0 1px rgba(255,255,255,.06)"></div>
+          <div style="display:flex;align-items:center;gap:7px;color:#FFFFFF">
+            <span style="display:flex;align-items:flex-end;gap:1.5px;height:11px">
+              <span style="width:2.5px;height:4px;border-radius:1px;background:#FFFFFF"></span>
+              <span style="width:2.5px;height:6px;border-radius:1px;background:#FFFFFF"></span>
+              <span style="width:2.5px;height:8.5px;border-radius:1px;background:#FFFFFF"></span>
+              <span style="width:2.5px;height:11px;border-radius:1px;background:#FFFFFF"></span>
+            </span>
+            <i class="ph-fill ph-wifi-high" style="font-size:17px"></i>
+            <span style="display:inline-block;width:25px;height:13px;border-radius:4px;border:1.5px solid rgba(255,255,255,.35);padding:1.5px"><span style="display:block;width:100%;height:100%;border-radius:2px;background:#FFFFFF"></span></span>
+          </div>
+        </div>
+
+        <div style="flex:none;display:flex;align-items:center;gap:18px;padding:14px 24px 0">
+          <div style="flex:1;display:flex;gap:11px">
+            <span style="flex:1;height:4px;border-radius:999px;background:#2CE5A2"></span>
+            <span style="flex:1;height:4px;border-radius:999px;background:#2CE5A2"></span>
+            <span style="flex:1;height:4px;border-radius:999px;background:#2CE5A2"></span>
+            <span style="flex:1;height:4px;border-radius:999px;background:#2CE5A2"></span>
+            <span style="flex:1;height:4px;border-radius:999px;background:#2CE5A2"></span>
+          </div>
+        </div>
+
+        <div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:18px 0 6px">
+          <div style="position:relative;padding:9px;border-radius:34px;background:rgb(255,255,255);box-shadow:0 22px 44px rgba(15,21,19,.14), 0 0 0 1px rgba(0,0,0,.05)">
+            <div style="position:absolute;left:50%;top:4px;transform:translateX(-50%);width:52px;height:4px;border-radius:999px;background:rgba(0,0,0,.12)"></div>
+            <div style="position:relative;width:220px;height:456px;border-radius:26px;overflow:hidden;background:#0A0A0A">
+              <div style="position:absolute;inset:0;background:radial-gradient(70% 70% at 15% 12%, rgba(44,229,162,.20), rgba(44,229,162,0) 85%)"></div>
+              <div style="position:absolute;inset:0;background:radial-gradient(70% 70% at 90% 95%, rgba(193,35,224,.14), rgba(193,35,224,0) 85%)"></div>
+              <div style="position:absolute;top:0;left:0;width:393px;transform:scale(.56);transform-origin:top left">
+                <div style="padding:24px 20px 0;display:flex;flex-direction:column;gap:12px">
+                  <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;letter-spacing:1.6px;color:#2CE5A2">TU CUENTA</span>
+                  <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:32px;letter-spacing:1px;color:#FFFFFF;margin-top:-6px">YO</span>
+
+                  <div style="background:#0F1513;border:1px solid rgba(255,255,255,.10);border-radius:20px;padding:16px;display:flex;align-items:center;gap:16px">
+                    <span style="width:60px;height:60px;border-radius:50%;background:#C123E0;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:22px;letter-spacing:.8px;color:#0A0A0A">MP</span>
+                    <div style="flex:1;display:flex;flex-direction:column;gap:5px">
+                      <span style="font-family:'Barlow',sans-serif;font-weight:600;font-size:19px;color:#FFFFFF">mateo presset</span>
+                      <span style="font-family:'Barlow',sans-serif;font-size:14px;color:rgba(255,255,255,.55)">Coach · Plan Pro</span>
+                      <div style="display:flex;align-items:baseline;gap:16px;margin-top:2px">
+                        <span style="display:flex;align-items:baseline;gap:6px"><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px;color:#2CE5A2">12</span><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;letter-spacing:1.2px;color:rgba(255,255,255,.55)">ALUMNOS</span></span>
+                        <span style="display:flex;align-items:baseline;gap:6px"><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:18px;color:#2CE5A2">4,8</span><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;letter-spacing:1.2px;color:rgba(255,255,255,.55)">RATING</span></span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style="background:#0F1513;border:1px solid rgba(255,255,255,.10);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:14px">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+                      <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;letter-spacing:1.4px;color:rgba(255,255,255,.55)">PERFIL PÚBLICO</span>
+                      <span style="border:1px solid #2CE5A2;background:rgba(44,229,162,.14);border-radius:999px;padding:5px 12px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:12px;letter-spacing:1.2px;color:#2CE5A2">VISIBLE</span>
+                    </div>
+                    <span style="font-family:'Barlow',sans-serif;font-size:14px;color:#FFFFFF">Aparecés en Coach Discovery · Presencial · Online</span>
+                    <div style="display:flex;gap:12px">
+                      <span style="flex:1;height:48px;border-radius:999px;border:1px solid rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;letter-spacing:1.2px;color:#FFFFFF">VER PREVIEW</span>
+                      <span style="flex:1;height:48px;border-radius:999px;background:#2CE5A2;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;letter-spacing:1.2px;color:#0A0A0A">EDITAR</span>
+                    </div>
+                  </div>
+
+                  <div style="display:flex;flex-direction:column;gap:10px;margin-top:2px">
+                    <div style="background:#0F1513;border:1px solid rgba(255,255,255,.10);border-radius:16px;padding:14px;display:flex;align-items:center;gap:14px">
+                      <i class="ph ph-users-three" style="font-size:22px;color:#FFFFFF"></i>
+                      <span style="flex:1;font-family:'Barlow',sans-serif;font-weight:500;font-size:16px;color:#FFFFFF">Solicitudes entrantes</span>
+                      <span style="border:1px solid #C123E0;border-radius:999px;padding:2px 9px;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.2px;color:#C123E0">1</span>
+                      <i class="ph ph-caret-right" style="font-size:14px;color:rgba(255,255,255,.35)"></i>
+                    </div>
+                    <div style="background:#0F1513;border:1px solid rgba(255,255,255,.10);border-radius:16px;padding:14px;display:flex;align-items:center;gap:14px">
+                      <i class="ph ph-bell" style="font-size:22px;color:#FFFFFF"></i>
+                      <span style="flex:1;font-family:'Barlow',sans-serif;font-weight:500;font-size:16px;color:#FFFFFF">Disponibilidad</span>
+                      <i class="ph ph-caret-right" style="font-size:14px;color:rgba(255,255,255,.35)"></i>
+                    </div>
+                    <div style="background:#0F1513;border:1px solid rgba(255,255,255,.10);border-radius:16px;padding:14px;display:flex;align-items:center;gap:14px">
+                      <i class="ph ph-sparkle" style="font-size:22px;color:#FFFFFF"></i>
+                      <span style="flex:1;font-family:'Barlow',sans-serif;font-weight:500;font-size:16px;color:#FFFFFF">Mis ejercicios</span>
+                      <i class="ph ph-caret-right" style="font-size:14px;color:rgba(255,255,255,.35)"></i>
+                    </div>
+                    <div style="background:#0F1513;border:1px solid rgba(255,255,255,.10);border-radius:16px;padding:14px;display:flex;align-items:center;gap:14px">
+                      <i class="ph ph-sign-out" style="font-size:22px;color:#C123E0"></i>
+                      <span style="flex:1;font-family:'Barlow',sans-serif;font-weight:500;font-size:16px;color:#C123E0">Cerrar sesión</span>
+                    </div>
+                    <div style="background:#0F1513;border:1px solid rgba(255,255,255,.10);border-radius:16px;padding:14px;display:flex;align-items:center;gap:14px">
+                      <i class="ph ph-trash" style="font-size:22px;color:#FF4D6D"></i>
+                      <span style="flex:1;font-family:'Barlow',sans-serif;font-weight:500;font-size:16px;color:#FF4D6D">Eliminar cuenta</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="position:absolute;left:10px;right:10px;bottom:10px;height:46px;border-radius:23px;background:rgba(24,30,28,.92);backdrop-filter:blur(10px);box-shadow:0 10px 24px rgba(0,0,0,.22);display:flex;align-items:center;padding:0 4px">
+                <span style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:rgba(255,255,255,.55)"><i class="ph ph-barbell" style="font-size:14px"></i><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:5.5px;letter-spacing:.5px">ENTRENAR</span></span>
+                <span style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:rgba(255,255,255,.55)"><i class="ph ph-newspaper-clipping" style="font-size:14px"></i><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:5.5px;letter-spacing:.5px">FEED</span></span>
+                <span style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:rgba(255,255,255,.55)"><i class="ph ph-house" style="font-size:14px"></i><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:5.5px;letter-spacing:.5px">INICIO</span></span>
+                <span style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:rgba(255,255,255,.55)"><i class="ph ph-chalkboard-teacher" style="font-size:14px"></i><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:5.5px;letter-spacing:.5px">COACH</span></span>
+                <span style="flex:1;display:flex;align-items:center;justify-content:center"><span style="width:40px;height:40px;border-radius:50%;background:#2CE5A2;box-shadow:0 0 18px rgba(44,229,162,.60), 0 4px 10px rgba(44,229,162,.35);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;color:#0A0A0A"><i class="ph-fill ph-user" style="font-size:14px"></i><span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:5.5px;letter-spacing:.5px">PERFIL</span></span></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="flex:none;padding:0 24px">
+          <div style="display:flex;align-items:center;gap:14px">
+            <span style="width:4px;height:38px;border-radius:2px;background:#2CE5A2"></span>
+            <i class="ph ph-user" style="font-size:28px;color:#2CE5A2"></i>
+            <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:30px;letter-spacing:.5px;color:#FFFFFF;line-height:1.05">TU PERFIL PROFESIONAL</span>
+          </div>
+          <p style="margin:14px 0 0;font-family:'Barlow',sans-serif;font-size:17px;line-height:1.5;color:rgba(255,255,255,.60);text-wrap:pretty">Mostrate en Coach Discovery, definí tu disponibilidad y respondé las solicitudes de alumnos nuevos.</p>
+        </div>
+
+        <div style="flex:none;padding:22px 24px 22px">
+          <div style="height:56px;border-radius:999px;background:#2CE5A2;box-shadow:0 12px 28px rgba(44,229,162,.42);display:flex;align-items:center;justify-content:center">
+            <span style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:16px;letter-spacing:2px;color:#0A0A0A">EMPEZAR</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</section>
+</x-dc>
+</body>
+</html>

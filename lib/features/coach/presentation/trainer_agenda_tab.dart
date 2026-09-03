@@ -90,7 +90,7 @@ class _TrainerAgendaTabState extends ConsumerState<TrainerAgendaTab> {
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: palette.accent,
-                        foregroundColor: palette.bg,
+                        foregroundColor: TreinoButtonTokens.foreground(context),
                         minimumSize: const Size.fromHeight(48),
                         shape: const StadiumBorder(),
                       ),
@@ -300,7 +300,7 @@ class _TrainerCalendar extends ConsumerWidget {
           fontWeight: FontWeight.w600,
         ),
         selectedTextStyle: GoogleFonts.barlow(
-          color: palette.bg,
+          color: TreinoButtonTokens.foreground(context),
           fontWeight: FontWeight.w700,
         ),
       ),

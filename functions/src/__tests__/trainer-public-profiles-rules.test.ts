@@ -57,6 +57,27 @@ afterEach(async () => {
 
 const TRAINER = "trainer-388";
 
+// QA-SEC-013 (#780): el `create`/`update` de `trainerPublicProfiles` ahora
+// exige `users/{uid}.role == 'trainer'`, así que el fixture tiene que traer el
+// doc privado del PF. Antes no lo seedeaba y los tres positivos de este archivo
+// se pusieron rojos al agregar el gate.
+//
+// No es que el gate esté mal: el fixture modelaba un PF **sin doc privado**,
+// que no puede existir — los trainers se provisionan por Admin SDK y ese doc es
+// lo que les da el rol (AGENTS.md regla 3). Lo que el rojo sí dejó a la vista,
+// y vale anotarlo, es que la regla nueva **falla si `users/{uid}` no existe**:
+// `get()` sobre un doc ausente rompe la evaluación y deniega. Por eso
+// `scripts/audit_trainer_profiles.mjs` reporta aparte los perfiles huérfanos.
+beforeEach(async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx
+      .firestore()
+      .collection("users")
+      .doc(TRAINER)
+      .set({ uid: TRAINER, role: "trainer" });
+  });
+});
+
 function ctxDb(uid: string) {
   return testEnv.authenticatedContext(uid).firestore();
 }

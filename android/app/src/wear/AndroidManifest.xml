@@ -1,0 +1,146 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+      Manifest del companion de Wear OS. Se mergea SOLO en el flavor `wear`, en
+      cualquier build type — o sea que a diferencia del bloque que vivía en
+      src/debug/, esto SÍ entra en profile y release.
+
+      Ese era un agujero real: `startForegroundService()` devuelve null (y NO
+      tira) cuando el componente no está en el manifest mergeado, así que el
+      keep-alive degradaba en silencio al comportamiento SIN servicio. Un
+      re-test en release habría medido la celda A creyendo medir la B.
+    -->
+
+    <!-- Marca el APK como app de reloj. Es lo que hace que el launcher del
+         reloj la trate como tal y que Play la ofrezca al dispositivo correcto.
+         Va SOLO acá: en el APK del teléfono haría que la app no se pueda
+         instalar en un teléfono. -->
+    <uses-feature android:name="android.hardware.type.watch" />
+
+    <!-- Precondición de runtime del foreground service tipo `health`: es un OR
+         entre varios permisos, y HIGH_SAMPLING_RATE_SENSORS es la rama barata
+         — install-time, sin diálogo — así que arrancar el servicio no queda
+         atado al flujo de permisos de sensores. Sin cumplir la precondición,
+         startForeground() tira SecurityException con el manifest perfecto. -->
+    <uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS" />
+
+    <!-- El pulso de Health Services. Los DOS permisos, y no es redundancia.
+         Ambos son de RUNTIME: el atleta ve un diálogo la primera vez.
+
+         ⚠️ MEDIDO, y contradice lo que dice la documentación. La doc sostiene
+         que el corte BODY_SENSORS vs android.permission.health.READ_HEART_RATE
+         depende del **targetSdkVersion de la app**, así que con target 35
+         alcanzaría BODY_SENSORS. En un Samsung SM-L500 con Wear OS 6 (API 36)
+         y la app en target 35, `startExercise` tiró:
+
+             SecurityException: Missing permissions:
+             [android.permission.health.READ_HEART_RATE]
+
+         O sea que manda la versión del DISPOSITIVO, no el target. Se declaran
+         los dos: BODY_SENSORS acotado a <= 35 para relojes viejos, y
+         READ_HEART_RATE para 36+. En runtime se pide el que corresponda según
+         Build.VERSION.SDK_INT — ver MainActivity.
+
+         NUNCA pedir BODY_SENSORS y BODY_SENSORS_BACKGROUND en la misma
+         operación: la doc avisa que el sistema ignora el pedido y no otorga
+         NINGUNO de los dos. En v1 no se pide el de background. -->
+    <uses-permission
+        android:name="android.permission.BODY_SENSORS"
+        android:maxSdkVersion="35" />
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
+
+    <!-- Reconocimiento de actividad. Permiso de RUNTIME, y NO es opcional:
+         MEDIDO, sin esto `startExercise` tira
+         `SecurityException: Missing permissions:
+         [android.permission.ACTIVITY_RECOGNITION]`.
+
+         El sintoma es enganoso y vale anotarlo: el pulso SI aparece igual,
+         porque lo entrega `prepareExercise` (el calentamiento), que solo pide
+         el permiso de HR. Lo que falta son las calorias y el tracking real del
+         ejercicio. O sea que "se ve el pulso" NO prueba que el ejercicio
+         arranco. -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Es la precondicion del `setFullScreenIntent` con el que el reloj se
+         abre solo cuando el atleta arranca el entreno desde el telefono. Sin
+         esto la notificacion se muestra igual, pero NO trae la app al frente:
+         degrada a "tocala para entrar", que es justo lo que se quiere evitar.
+         Ver WorkoutLaunchService. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+
+    <!-- El aviso del descanso vibra. NO se declaran SCHEDULE_EXACT_ALARM ni
+         USE_EXACT_ALARM a propósito: la variante de setExact con
+         OnAlarmListener no los exige. El primero viene denegado por default
+         desde Android 14 para targets 33+, y el segundo Play lo restringe a
+         apps cuyo core ES un temporizador. Ver RestAlarm.kt. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!-- Wakelock parcial ACOTADO al descanso (60-90 s), no al entreno entero.
+         Google pide no tomar wakelocks en entrenos largos; sostener uno mientras
+         el atleta espera un aviso de 90 s es otra cosa.
+
+         Existe porque Doze IGNORA los wakelocks pero difiere las alarmas
+         —medido: setExact corrida +21m10s por device_idle—. El wakelock no
+         arregla la alarma: mantiene despierto el SoC para que el timer de la
+         propia app detecte el vencimiento, y así no hace falta ni
+         USE_EXACT_ALARM (riesgo de politica de Play) ni SCHEDULE_EXACT_ALARM
+         (friccion de UX). Ver RestAlarm.kt. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <application>
+        <!-- Sin foregroundServiceType, con targetSdk >= 34, startForeground()
+             tira IllegalArgumentException ("not a subset of ... 0x00000000"),
+             NO la MissingForegroundServiceTypeException que uno buscaría en
+             logcat. Es una hora perdida buscando el nombre equivocado. -->
+        <service
+            android:name="com.treino.app.workout.WorkoutForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="health" />
+
+        <!-- El otro transporte del mismo aviso: FCM.
+             A diferencia de la Data Layer no necesita emparejamiento — al reloj
+             le alcanza con internet, que ya tiene porque habla Firestore por
+             Wi-Fi. Se declara SOLO en el flavor wear: el APK del telefono no lo
+             lleva, asi que las notificaciones reales de alla no se tocan.
+             Ver WearMessagingService para el riesgo asumido. -->
+        <service
+            android:name="com.treino.app.workout.WearMessagingService"
+            android:exported="false">
+            <intent-filter android:priority="1">
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- Abre el companion cuando el entreno arranca en el TELEFONO.
+             Va en el manifest y no se registra desde Dart a proposito: el
+             listener del plugin `watch_connectivity` solo vive mientras la app
+             del reloj esta corriendo, y el caso que hay que cubrir es
+             exactamente el contrario — la app cerrada, el atleta tocando
+             Empezar en el celular.
+
+             `exported=true` es obligatorio: quien lo instancia es Play
+             Services, otro proceso. El `permission` lo acota a el y a nadie
+             mas.
+
+             El pathPrefix es `/treino` y ESO es todo el punto. Play Services
+             despacha armando `wear://<nodo>/<path>`; con el path sin barra
+             inicial que manda `watch_connectivity` la URI queda malformada y
+             ningun filtro la matchea — medido: el servicio no se desperto ni
+             una vez. Por eso los avisos van por TreinoLinkPlugin, que exige la
+             barra. -->
+        <service
+            android:name="com.treino.app.workout.WorkoutLaunchService"
+            android:exported="true"
+            android:permission="com.google.android.gms.permission.BIND_WEARABLE_LISTENER">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data
+                    android:scheme="wear"
+                    android:host="*"
+                    android:pathPrefix="/treino" />
+            </intent-filter>
+        </service>
+    </application>
+</manifest>

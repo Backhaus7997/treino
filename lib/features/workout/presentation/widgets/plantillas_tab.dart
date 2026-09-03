@@ -8,9 +8,12 @@ import '../../../../l10n/app_l10n.dart';
 import '../../../profile/domain/experience_level.dart';
 import '../../application/routine_providers.dart';
 import '../../application/unified_templates_providers.dart';
+import '../onboarding/templates_onboarding_gate.dart';
 import 'coach_chip.dart';
 import 'level_filter_pills.dart';
 import 'routine_card.dart';
+import 'templates_preferences_bar.dart';
+import '../../../../app/theme/tokens/primitives.dart';
 
 /// PLANTILLAS tab page (workout redesign slice 2) — EVERY template in one
 /// square grid: the linked coach's shared templates first (badged
@@ -43,11 +46,37 @@ class _PlantillasTabState extends ConsumerState<PlantillasTab>
   bool get wantKeepAlive => true;
 
   @override
+  void initState() {
+    super.initState();
+    // The PLANTILLAS mini-onboarding (#635 PR#2), first entry only.
+    //
+    // From a post-frame callback because `initState` has no `Localizations`
+    // ancestor resolved yet and the navigator cannot present mid-frame. The
+    // gate owns every other guard — role, profile readiness, the welcome tour,
+    // and the persisted seen-flag — so this call site stays a trigger and
+    // nothing more.
+    //
+    // Fires once per mount of `/workout` rather than once per visit to the tab:
+    // `wantKeepAlive` is true, so swiping TU ENTRENO ⇄ PLANTILLAS does not
+    // re-run it. That is the intended granularity — the flow is "first time you
+    // land here", not "every time you swipe back".
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      maybeShowTemplatesOnboarding(context: context, ref: ref);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     super.build(context);
     final palette = AppPalette.of(context);
     final theme = Theme.of(context);
-    final entriesAsync = ref.watch(filteredUnifiedTemplatesProvider);
+    // Rankeado, no sólo filtrado (#635 PR#3): las pills de nivel siguen
+    // filtrando, y encima de eso el catálogo se ordena por afinidad con lo que
+    // el atleta respondió en el mini-onboarding. Quien no respondió ve el
+    // mismo orden de siempre — con preferencias vacías el provider devuelve la
+    // lista sin tocar.
+    final entriesAsync = ref.watch(rankedUnifiedTemplatesProvider);
     final filter = ref.watch(routinesLevelFilterProvider);
 
     return Padding(
@@ -76,9 +105,18 @@ class _PlantillasTabState extends ConsumerState<PlantillasTab>
               delay: AppMotion.stagger(0),
               child: const LevelFilterPills(),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: AppSpacing.s8),
+            // Por qué la grilla está en ese orden, y cómo cambiarlo (#635 PR#3).
+            // Encima de la grilla y debajo de las pills de nivel: el nivel
+            // FILTRA (saca cosas), esto ORDENA (no saca nada), y verlos en ese
+            // orden es lo que hace legible la diferencia.
             TreinoFadeSlideIn(
               delay: AppMotion.stagger(1),
+              child: const TemplatesPreferencesBar(),
+            ),
+            const SizedBox(height: AppSpacing.s8),
+            TreinoFadeSlideIn(
+              delay: AppMotion.stagger(2),
               child: entriesAsync.when(
                 data: (entries) {
                   if (entries.isEmpty) {

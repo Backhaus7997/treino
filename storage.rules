@@ -6,27 +6,120 @@ service firebase.storage {
   match /b/{bucket}/o {
     // Avatars: any image extension owned by the authenticated user.
     // Path pattern: /avatars/{uid}.{ext}  e.g. avatars/abc123.jpg, avatars/abc123.heic
+    //
+    // `get` es amplio a propósito: el avatar se muestra en feed, chat, reviews
+    // y rankings a cualquier autenticado, y la misma imagen ya viaja por
+    // `userPublicProfiles/{uid}.avatarUrl`, que es world-readable a la misma
+    // audiencia (`firestore.rules:780`). No expone nada nuevo.
+    //
+    // `list` va cerrado (QA-SEC-007): el nombre del archivo **ES el uid**, así
+    // que enumerar el prefijo no devolvía "unas fotos" sino el padrón de uids
+    // que alguna vez subieron avatar, en una sola llamada. Los uids ya son
+    // enumerables por `userPublicProfiles`, así que esto no era la primera
+    // puerta — pero es una puerta **paralela**, sobre una población distinta
+    // (los objetos que existen en el bucket) y que sobreviviría a cualquier
+    // endurecimiento futuro de aquél. Cerrarlo es seguro: cero llamadas a
+    // `listAll()` / `.list()` del SDK de Storage en todo `lib/`. Ver
+    // `docs/security.md` §3.2.
+    //
+    // `delete` TIENE que ser una regla propia (QA-SEC-009): sin ella el
+    // borrado cae en `write`, cuya condición dereferencia
+    // `request.resource.size` y `.contentType` — y en un delete
+    // `request.resource` es **null**. La evaluación explotaba con
+    // "Null value error" y el borrado se denegaba **hasta para el dueño**,
+    // que es la regla 3 de `docs/security.md` §3.8: toda regla con
+    // `request.resource.<algo>` necesita su `allow delete` propio o el
+    // borrado se rompe en silencio. El gate es el mismo `fileName.matches`
+    // anclado al uid que usa el `write`, sin tocar `request.resource`.
     match /avatars/{fileName} {
-      allow read: if request.auth != null;
+      allow get: if request.auth != null;
+      allow list: if false;
       allow write: if request.auth != null
                   && fileName.matches(request.auth.uid + '\\..+')
                   && request.resource.size < 5 * 1024 * 1024
                   && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null
+                    && fileName.matches(request.auth.uid + '\\..+');
     }
 
-    // Excel imports: trainers upload Excel plan files under /temp/uploads/{uid}/...
-    // Authenticated users can write to their own folder; reads denied (server-only).
+    // Excel imports — bloque CERRADO en las cuatro operaciones (QA-SEC-015).
+    //
+    // El comentario viejo decía "trainers upload Excel plan files under
+    // /temp/uploads/{uid}/..." y era falso: **nunca hubo un writer en `lib/`**.
+    // No es que se borró — `git log -S "temp/uploads" --all -- lib/` devuelve
+    // cero commits. El bloque entró vestigial en el commit que trajo este
+    // archivo desde el repo viejo (`75581f89`, #106), describiendo una
+    // arquitectura server-side que en TREINO Flutter nunca se implementó.
+    //
+    // El import de planes por Excel es **100% client-side y en memoria**:
+    // `FilePicker.pickFiles(withData: true)` → `file.bytes` →
+    // `PlanImportRepository.parseAndMatch(bytes:)` → `parseExcelBytes()`. Los
+    // bytes del .xlsx no salen del proceso; lo único que viaja a Firebase es
+    // el `ParsedPlan` ya matcheado, como documentos de Firestore.
+    //
+    // Lo que el `write` abierto dejaba hacer, medido contra el emulador
+    // (`docs/security.md` §4.9): cualquier autenticado —incluido un rol
+    // `athlete`, que no tiene nada que hacer acá— subía bytes arbitrarios, de
+    // cualquier tipo y cualquier tamaño, sin ciclo de vida. El prefijo se
+    // llama `temp/` pero no había TTL ni job de limpieza: lo único que barre
+    // `temp/uploads/{uid}/` es el cascade de borrado de cuenta
+    // (`functions/src/cascade/storage.ts:67`), o sea que los bytes vivían
+    // mientras viviera la cuenta.
+    //
+    // Se cierra el camino de escritura entero en vez de acotarlo con
+    // content-type + cap como los otros cinco bloques. Acotar habría
+    // preservado una superficie de escritura que ningún código usa; cerrar la
+    // elimina, y de paso vuelve innecesaria la regla de ciclo de vida del
+    // bucket que pedía #782 — sin escrituras no hay acumulación que expirar.
+    // Si el import alguna vez se mueve a server-side, este bloque se reabre
+    // con el flujo real a la vista, que es mejor que adivinar un cap hoy.
+    //
+    // `get` y `list` van por separado aunque los dos sean `if false`
+    // (`docs/security.md` §3.8 regla 2): `read` a secas esconde que `list` es
+    // un permiso distinto, y fue la causa raíz de QA-SEC-007 y -008.
+    //
+    // NO lleva `allow delete` propio: la regla 3 de §3.8 aplica a los bloques
+    // que dereferencian `request.resource.<algo>` —ahí el delete explota con
+    // "Null value error" y se deniega hasta para el dueño (QA-SEC-009)—. Acá
+    // no queda ni un deref, así que el `write: if false` cubre el delete
+    // denegando por permiso, que es la denegación que queremos. El cascade de
+    // borrado de cuenta no se ve afectado: usa Admin SDK y bypasea estas
+    // reglas por completo (ADR-ACCDEL-013).
     match /temp/uploads/{userId}/{file=**} {
-      allow read: if false;
-      allow write: if request.auth != null && request.auth.uid == userId;
+      allow get: if false;
+      allow list: if false;
+      allow write: if false;
     }
 
     // Custom exercise tutorial videos: a trainer uploads short clips
     // (MP4 / MOV / M4V, max 100 MB) under /customExerciseVideos/{uid}/...
-    // Anyone authenticated can read so the trainer's athletes can play
-    // them inline; only the owner can write or delete.
+    // Only the owner can write or delete.
+    //
+    // `get` es amplio a propósito, pero NO por el reproductor: el comentario
+    // que decía "so the trainer's athletes can play them inline" era falso y
+    // se corrigió con QA-SEC-008. La URL `?alt=media&token=` que emite
+    // `getDownloadURL()` es una credencial al portador y NO evalúa estas
+    // reglas (medido: 200 sin auth, 403 sin token — `docs/security.md` §3.1);
+    // la app siempre renderiza desde la URL persistida en
+    // `users/{tid}/customExercises/{id}.videoUrl`, nunca reconstruye un
+    // `ref()`. El `get` amplio se conserva porque es consistente con
+    // `firestore.rules:1575` — el doc que referencia el video ya es legible
+    // por cualquier autenticado, así que el contenido no es más secreto que
+    // su referencia.
+    //
+    // `list` es otra cosa y va cerrado incondicionalmente (QA-SEC-008): el
+    // INVENTARIO sí es secreto — no hay ningún doc de Firestore que lo
+    // publique. Con `{file=**}` la enumeración era recursiva y alcanzaba dos
+    // cosas que no existen en ninguna otra parte del producto: listar la raíz
+    // devolvía el uid de cada PF con videos, y listar su carpeta devolvía la
+    // videoteca entera, incluidos los huérfanos de ejercicios ya borrados del
+    // catálogo. Cerrarlo es seguro: cero llamadas a `listAll()` / `.list()`
+    // del SDK de Storage en todo `lib/` (lo único que enumera el bucket es
+    // `functions/src/cascade/storage.ts`, con Admin SDK, que ignora estas
+    // reglas — ADR-ACCDEL-013). Mismo patrón que `postPhotos` y `chatMedia`.
     match /customExerciseVideos/{userId}/{file=**} {
-      allow read: if request.auth != null;
+      allow get: if request.auth != null;
+      allow list: if false;
       allow write: if request.auth != null
                   && request.auth.uid == userId
                   && request.resource.size < 100 * 1024 * 1024
@@ -132,6 +225,68 @@ service firebase.storage {
                   && request.auth.uid == userId
                   && request.resource.size < 15 * 1024 * 1024
                   && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Feedback del alumno por ejercicio durante la sesión (#628) — la foto
+    // opcional que acompaña un comentario o una MOLESTIA.
+    //
+    // Path: /sessionFeedback/{userId}/{sessionId}/{fileName}
+    //
+    // ⚠️ ESTO ES DATO DE SALUD, no una foto de post. El `get` NO puede ser
+    // `request.auth != null` como en avatars/customExerciseVideos/postPhotos:
+    // acá la foto es "dónde me duele". Se gatea con el MISMO grant de dos
+    // partes que gobierna la sesión en firestore.rules — dueño OR el PF que
+    // el alumno nombró en `session_shares/{userId}` — usando la llamada
+    // cross-service que ya prueba el bloque `chatMedia` de más arriba.
+    //
+    // El dueño va PRIMERO en el `||` para que corte antes de tocar Firestore:
+    // el alumno bajando su propia foto no debe depender de que exista el
+    // grant, ni pagar dos lecturas por objeto.
+    //
+    // La literal `(default)` es obligatoria — las reglas de Storage no tienen
+    // wildcard `$(database)` (misma nota que en chatMedia).
+    //
+    // ⚠️ Este gate NO es el que de verdad protege la foto. La URL que emite
+    // getDownloadURL() lleva `?alt=media&token=` y es una credencial al
+    // portador que NO evalúa estas reglas (docs/security.md §3.1, medido).
+    // Quien custodia la foto es el documento de Firestore donde vive esa URL:
+    // `users/{uid}/sessions/{sid}/exerciseFeedback/{id}`, con el mismo
+    // predicado de dos partes. Este bloque es defensa en profundidad para el
+    // único camino que sí pasa por las reglas: resolver el objeto por `ref()`.
+    //
+    // `list` cerrado INCONDICIONALMENTE, ni siquiera para el dueño. Es el
+    // patrón de postPhotos/chatMedia y no el de avatars/customExerciseVideos,
+    // que tienen `list` abierto y son los leaks confirmados QA-SEC-007 y
+    // QA-SEC-008 (docs/security.md §3.6). Enumerar `sessionFeedback/{uid}/`
+    // publicaría en QUÉ sesiones un alumno reportó dolor sin bajar un solo
+    // byte — el nombre del prefijo ya es el dato sensible.
+    //
+    // `delete` propio explícito, no heredado: docs/security.md §3.8 regla 3 —
+    // todo bloque con `request.resource.<algo>` necesita su `allow delete` o
+    // el borrado falla en silencio (la lección de QA-SEC-009 en avatars).
+    //
+    // Size limit: 15 MB, espejo del guard client-side, igual que postPhotos.
+    match /sessionFeedback/{userId}/{sessionId}/{fileName} {
+      allow get: if request.auth != null
+                 && (
+                      request.auth.uid == userId
+                      || (
+                           firestore.exists(
+                             /databases/(default)/documents/session_shares/$(userId))
+                           && firestore.get(
+                                /databases/(default)/documents/session_shares/$(userId)
+                              ).data.trainerId == request.auth.uid
+                         )
+                    );
+
+      allow list: if false;
+
+      allow write: if request.auth != null
+                  && request.auth.uid == userId
+                  && request.resource.size < 15 * 1024 * 1024
+                  && request.resource.contentType.matches('image/.*');
+
       allow delete: if request.auth != null && request.auth.uid == userId;
     }
 

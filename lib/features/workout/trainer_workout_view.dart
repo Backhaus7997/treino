@@ -155,7 +155,7 @@ class _AssignFromAlumnoCard extends StatelessWidget {
               onPressed: () => context.go('/coach?tab=alumnos'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: palette.accent,
-                foregroundColor: palette.bg,
+                foregroundColor: TreinoButtonTokens.foreground(context),
                 minimumSize: const Size.fromHeight(44),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(AppRadius.full),

@@ -4,20 +4,30 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_background.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/widgets/treino_bottom_bar.dart';
+import 'package:treino/features/home/application/todays_routine_provider.dart';
 import 'package:treino/features/home/home_screen.dart';
 import 'package:treino/features/home/widgets/empezar_entrenamiento_card.dart';
 import 'package:treino/features/home/widgets/esta_semana_card.dart';
 import 'package:treino/features/home/widgets/home_header.dart';
+import 'package:treino/features/insights/application/insights_providers.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
+import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
+import 'package:treino/features/workout/application/assigned_routine_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
+import 'package:treino/features/workout/application/user_routines_providers.dart';
+import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/l10n/app_l10n.dart';
+
+import '../../helpers/onboarding_test_helpers.dart';
 
 UserProfile makeProfile({
   String? displayName = 'Martín',
@@ -26,6 +36,7 @@ UserProfile makeProfile({
   String email = 'u1@test.com',
 }) =>
     UserProfile(
+      onboardingSeen: allSurfacesSeen(),
       uid: uid,
       email: email,
       displayName: displayName,
@@ -54,6 +65,79 @@ Widget _wrapWithOverrides(Widget w, List<Override> overrides) => ProviderScope(
         locale: const Locale('es', 'AR'),
         home: Scaffold(body: w),
       ),
+    );
+
+// ─── First-run harness (#636) ────────────────────────────────────────────────
+
+const _uid = 'u1';
+
+Routine _routine({String id = 'r1'}) => Routine(
+      id: id,
+      name: 'Full body',
+      level: ExperienceLevel.beginner,
+      // `days` vacío es válido (SCENARIO-052) y alcanza: estos tests sólo
+      // miran si la lista de rutinas está vacía o no, nunca su contenido.
+      days: const [],
+    );
+
+/// Overrides que ponen a Home en el estado que renderiza
+/// `_AthleteFirstRunCard`: uid resuelto y AMBAS listas de rutinas resueltas a
+/// vacío. Los providers Firestore que cuelgan del uid se cortan acá — con uid
+/// real irían a la red y el test dejaría de ser hermético.
+List<Override> _firstRunOverrides({
+  List<Routine> created = const [],
+  List<Routine> assigned = const [],
+}) =>
+    [
+      userProfileProvider.overrideWith((ref) => Stream.value(makeProfile())),
+      currentUidProvider.overrideWithValue(_uid),
+      userCreatedRoutinesProvider(_uid).overrideWith(
+        (ref) => Stream.value(created),
+      ),
+      assignedRoutinesProvider(_uid).overrideWith((ref) async => assigned),
+      activeSessionForUidProvider.overrideWith((ref) async => null),
+      todaysRoutineProvider.overrideWith((ref) async => null),
+      weeklyInsightsProvider.overrideWith((ref) async => null),
+    ];
+
+/// Home montada dentro de un GoRouter real, con rutas señuelo para cada
+/// destino de los tres caminos. Verificar el destino por la pantalla que
+/// aparece —y no espiando un callback— es lo único que prueba que la URL que
+/// se pushea de verdad resuelve.
+Widget _wrapWithRouter(GoRouter router, List<Override> overrides) =>
+    ProviderScope(
+      overrides: overrides,
+      child: MaterialApp.router(
+        theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
+        routerConfig: router,
+      ),
+    );
+
+GoRouter _firstRunRouter() => GoRouter(
+      initialLocation: '/home',
+      routes: [
+        GoRoute(
+          path: '/home',
+          builder: (_, __) => const Scaffold(body: HomeScreen()),
+        ),
+        GoRoute(
+          path: '/workout',
+          builder: (_, state) => Scaffold(
+            body: Text('WORKOUT:${state.uri.queryParameters['tab']}'),
+          ),
+        ),
+        GoRoute(
+          path: '/workout/my-routine-editor',
+          builder: (_, __) => const Scaffold(body: Text('EDITOR')),
+        ),
+        GoRoute(
+          path: '/coach',
+          builder: (_, __) => const Scaffold(body: Text('COACH')),
+        ),
+      ],
     );
 
 void main() {
@@ -282,6 +366,149 @@ void main() {
 
       expect(find.text('Entrenamiento en curso'), findsNothing);
       expect(find.byType(HomeHeader), findsOneWidget);
+    });
+  });
+
+  // ─── #636: los TRES caminos del primer arranque ────────────────────────────
+
+  group('HomeScreen — primer arranque del atleta (#636)', () {
+    testWidgets(
+        'sin rutinas → los tres CTAs visibles: crear rutina, explorar planes, buscar entrenador',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapWithRouter(_firstRunRouter(), _firstRunOverrides()),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('CREAR RUTINA'), findsOneWidget);
+      expect(find.text('Explorar planes'), findsOneWidget);
+      expect(find.text('Buscar entrenador'), findsOneWidget);
+      // La card de "ya tenés rutina" NO puede convivir con la de arranque.
+      expect(find.byType(EmpezarEntrenamientoCard), findsNothing);
+    });
+
+    testWidgets(
+        'el body nombra los TRES caminos, no dos — y en el orden de los botones',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapWithRouter(_firstRunRouter(), _firstRunOverrides()),
+      );
+      await tester.pumpAndSettle();
+
+      // El copy viejo enumeraba dos caminos y le decía al atleta, con razón,
+      // que sus opciones eran dos. Ese texto no puede volver.
+      expect(
+        find.text('Creá tu primera rutina o buscá un entrenador para empezar.'),
+        findsNothing,
+      );
+      expect(
+        find.text(
+          'Creá tu propia rutina, explorá planes ya armados o buscá un '
+          'entrenador que te guíe.',
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets(
+        'tap en "Explorar planes" → /workout?tab=plantillas (el deep-link, NO el label)',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapWithRouter(_firstRunRouter(), _firstRunOverrides()),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Explorar planes'));
+      await tester.pumpAndSettle();
+
+      // `plantillas` y no `explorar`: el copy del tab cambió en #638, la ruta
+      // no. Si alguien "sincroniza" el valor, rompe bookmarks vivos y este
+      // test se pone rojo.
+      expect(find.text('WORKOUT:plantillas'), findsOneWidget);
+    });
+
+    testWidgets('tap en "CREAR RUTINA" → /workout/my-routine-editor',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapWithRouter(_firstRunRouter(), _firstRunOverrides()),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('CREAR RUTINA'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('EDITOR'), findsOneWidget);
+    });
+
+    testWidgets('tap en "Buscar entrenador" → /coach', (tester) async {
+      await tester.pumpWidget(
+        _wrapWithRouter(_firstRunRouter(), _firstRunOverrides()),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Buscar entrenador'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('COACH'), findsOneWidget);
+    });
+
+    testWidgets(
+        'con rutina propia → EmpezarEntrenamientoCard, y NINGUNO de los tres caminos (regresión #551)',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapWithRouter(
+          _firstRunRouter(),
+          _firstRunOverrides(created: [_routine()]),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(EmpezarEntrenamientoCard), findsOneWidget);
+      expect(find.text('CREAR RUTINA'), findsNothing);
+      expect(find.text('Explorar planes'), findsNothing);
+      expect(find.text('Buscar entrenador'), findsNothing);
+    });
+
+    testWidgets(
+        'con plan asignado por un PF → EmpezarEntrenamientoCard, sin los tres caminos',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapWithRouter(
+          _firstRunRouter(),
+          _firstRunOverrides(assigned: [_routine(id: 'assigned-1')]),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(EmpezarEntrenamientoCard), findsOneWidget);
+      expect(find.text('Explorar planes'), findsNothing);
+    });
+
+    testWidgets(
+        'en pantalla chica (360x640) el tercer CTA no empuja EstaSemanaCard fuera del fold',
+        (tester) async {
+      // El issue pedía MEDIRLO, no darlo por bueno: tres pills apiladas de 48
+      // suman ~58px a la card. Pixel-5-ish, el piso realista de la base.
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        _wrapWithRouter(_firstRunRouter(), _firstRunOverrides()),
+      );
+      await tester.pumpAndSettle();
+
+      // El shell corre con extendBody: la barra flotante tapa el último tramo
+      // del viewport, así que el fold útil termina antes de los 640.
+      const fold = 640.0 - TreinoBottomBar.minHeight;
+      final top = tester.getTopLeft(find.byType(EstaSemanaCard)).dy;
+
+      expect(
+        top,
+        lessThan(fold),
+        reason: 'EstaSemanaCard arranca en $top, debajo del fold útil ($fold): '
+            'la card de primer arranque creció de más.',
+      );
     });
   });
 }

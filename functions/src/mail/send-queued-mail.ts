@@ -35,8 +35,14 @@ import { MailSendError, MailSender, createResendSender } from "./resend-client";
 
 /**
  * Resend API key. Create it with:
- *   firebase functions:secrets:set RESEND_API_KEY
+ *   firebase functions:secrets:set RESEND_API_KEY --project prod
  * Deploying without it fails fast rather than sending nothing silently.
+ *
+ * ⚠️ Ese comando escribe en PRODUCCIÓN (#826). `prod` y `treino-dev` son el
+ * mismo y único proyecto Firebase de TREINO: adentro están los usuarios reales.
+ * Sin `--project`, `.firebaserc` resuelve al mismo destino sin nombrarlo en
+ * pantalla. Pisar esta key manda a 403 todo el mail transaccional de la app
+ * publicada. Ver AGENTS.md § Entornos.
  */
 const RESEND_API_KEY = defineSecret("RESEND_API_KEY");
 
@@ -45,7 +51,15 @@ const RESEND_API_KEY = defineSecret("RESEND_API_KEY");
  * domain makes every send return 403.
  */
 const MAIL_FROM = defineString("MAIL_FROM", {
-  default: "TREINO <hola@treino.app>",
+  // `equipo@` y no `soporte@` a proposito. El nombre del remitente es una
+  // promesa sobre quien esta del otro lado, y hoy NADIE lee las respuestas:
+  // `send.gettreino.com` no tiene buzon —su MX es el de rebotes de SES— y el
+  // payload que se le manda a Resend todavia no lleva `reply_to`.
+  //
+  // `soporte@` es el peor nombre posible con esa deuda abierta: la persona que
+  // no puede entrar a su cuenta le responde pidiendo ayuda y nadie la lee.
+  // Cuanto mas explicita la promesa, mas caro incumplirla.
+  default: "TREINO <equipo@send.gettreino.com>",
 });
 
 /** Past this many attempts a document is declared permanently failed. */
@@ -203,6 +217,12 @@ export async function sendQueuedMailHandler(
     attempts,
     sentAt: FieldValue.serverTimestamp(),
     lastError: FieldValue.delete(),
+    // Los mails de auth llevan en `params.actionLink` un link de un solo uso
+    // con su `oobCode`. Una vez enviado, ese secreto no tiene por qué seguir
+    // viviendo en Firestore: la fila de la cola se conserva como registro de
+    // envío, no como copia del token. Sobre un documento sin ese campo el
+    // delete es un no-op, así que no hace falta ramificar por kind.
+    "params.actionLink": FieldValue.delete(),
   });
 
   logger.info("sendQueuedMail: sent", { mailId, kind: data.kind });

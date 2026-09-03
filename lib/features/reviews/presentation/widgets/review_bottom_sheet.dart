@@ -222,7 +222,7 @@ class _ReviewBottomSheetState extends ConsumerState<ReviewBottomSheet> {
                       onPressed: (_rating > 0 && !isLoading) ? _onSubmit : null,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: palette.accent,
-                        foregroundColor: palette.bg,
+                        foregroundColor: TreinoButtonTokens.foreground(context),
                         minimumSize: const Size.fromHeight(48),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(AppRadius.full),
@@ -234,7 +234,7 @@ class _ReviewBottomSheetState extends ConsumerState<ReviewBottomSheet> {
                               height: 18,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: palette.bg,
+                                color: TreinoButtonTokens.foreground(context),
                               ),
                             )
                           : Text(

@@ -14,8 +14,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_palette.dart';
-import 'package:treino/app/theme/tokens/components/treino_focus_tokens.dart';
-import 'package:treino/app/theme/tokens/primitives.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
@@ -375,7 +374,8 @@ class _RegistrarPagoButton extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(TreinoIcon.plus, size: 16, color: palette.bg),
+              Icon(TreinoIcon.plus,
+                  size: 16, color: TreinoButtonTokens.foreground(context)),
               const SizedBox(width: AppSpacing.hairline),
               Text(
                 'Registrar pago', // i18n

@@ -433,12 +433,15 @@ describe("syncTrainerEntitlements — trainer_link sin athleteId", () => {
 });
 
 describe("syncTrainerEntitlements — acceptedAt corrupto", () => {
-  // `acceptedAt` NO esta pinneado en firestore.rules y el `allow update` de
-  // trainer_links autoriza a cualquiera de los dos members, asi que un member
-  // puede escribir ahi lo que quiera. Con `acceptedAt.toMillis()` a secas eso
+  // Desde el slice 5 firestore.rules pinnea `acceptedAt` en los dos verbos del
+  // cliente (create solo admite null, update lo congela equal-to-existing), asi
+  // que hoy ningun member le mete un string. Este test NO es historia vieja: el
+  // Admin SDK bypasea rules y los docs escritos ANTES del pin siguen en la
+  // base, porque la regla vieja dejaba a cualquiera de los dos members
+  // reescribir el campo por update. Con `acceptedAt.toMillis()` a secas eso
   // tiraba TypeError, volteaba la transaccion, y como los dos llamadores hacen
   // catch-and-log sin relanzar, el PF dejaba de reconciliar para TODOS sus
-  // alumnos: un member le apagaba el barrido al entrenador con un solo write.
+  // alumnos: un solo dato roto le apagaba el barrido al entrenador entero.
   it("un acceptedAt que no es Timestamp no voltea la reconciliacion", async () => {
     const state = install({
       users: { t1: {} },
