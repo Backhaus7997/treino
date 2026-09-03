@@ -45,14 +45,21 @@ class _TermsCheckboxState extends State<TermsCheckbox> {
     super.dispose();
   }
 
-  void _openTerms() => _openDoc('Términos y Condiciones', kTermsSections);
+  void _openTerms() =>
+      _openDoc('Términos y Condiciones', kTermsSections, kTermsLastUpdated);
 
-  void _openPrivacy() => _openDoc('Política de Privacidad', kPrivacySections);
+  void _openPrivacy() => _openDoc(
+      'Política de Privacidad', kPrivacySections, kPrivacyLastUpdated);
 
-  void _openDoc(String title, List<LegalSection> sections) {
+  void _openDoc(
+      String title, List<LegalSection> sections, String lastUpdated) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => LegalDocumentScreen(title: title, sections: sections),
+        builder: (_) => LegalDocumentScreen(
+          title: title,
+          sections: sections,
+          lastUpdated: lastUpdated,
+        ),
       ),
     );
   }

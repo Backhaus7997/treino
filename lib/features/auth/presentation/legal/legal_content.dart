@@ -15,8 +15,18 @@ class LegalSection {
   final String body;
 }
 
-/// Fecha de última actualización mostrada al pie de cada documento.
-const String kLegalLastUpdated = '12 de junio de 2026';
+/// Fecha de última actualización de los Términos y Condiciones.
+const String kTermsLastUpdated = '12 de junio de 2026';
+
+/// Fecha de última actualización de la Política de Privacidad.
+///
+/// Va SEPARADA de la de los Términos, y no es burocracia: son dos documentos
+/// que cambian por separado. Con una sola constante, reescribir la política
+/// —como pasó el 3 de septiembre con la sección "4. Ubicación"— o dejaba la
+/// política fechada en junio, o le inventaba a los Términos una revisión que
+/// nunca tuvieron. Las dos opciones mienten sobre qué texto estaba vigente
+/// cuándo, que es justo lo que una fecha de revisión existe para contestar.
+const String kPrivacyLastUpdated = '3 de septiembre de 2026';
 
 /// Email de contacto para consultas legales / de privacidad.
 const String kLegalContactEmail = 'equipo@treino.app';

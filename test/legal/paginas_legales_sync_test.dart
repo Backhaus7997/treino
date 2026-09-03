@@ -87,12 +87,14 @@ void main() {
       }
     });
 
-    test('las dos muestran la fecha y el contacto del Dart', () {
+    test('cada una muestra SU fecha, no la del otro documento', () {
+      // Con una constante compartida esto pasaba solo y no probaba nada.
+      // Ahora falla si alguien reescribe un documento y se olvida de fechar,
+      // que es exactamente el defecto que trajo el review del #941.
+      expect(privacidad.readAsStringSync(), contains(kPrivacyLastUpdated));
+      expect(terminos.readAsStringSync(), contains(kTermsLastUpdated));
       for (final f in [privacidad, terminos]) {
-        final html = f.readAsStringSync();
-        expect(html, contains(kLegalLastUpdated),
-            reason: '${f.path} quedó con una fecha vieja');
-        expect(html, contains(kLegalContactEmail));
+        expect(f.readAsStringSync(), contains(kLegalContactEmail));
       }
     });
 
