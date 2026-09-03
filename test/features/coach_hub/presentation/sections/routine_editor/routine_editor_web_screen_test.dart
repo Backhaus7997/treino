@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
 import 'package:treino/features/coach/application/blocked_athletes_providers.dart';
@@ -143,7 +144,22 @@ Future<void> _pumpEditor(
         analytics: analytics,
         blocked: blocked,
       ),
-      child: MaterialApp.router(theme: AppTheme.dark(), routerConfig: router),
+      child: MaterialApp.router(
+        theme: AppTheme.dark(),
+        routerConfig: router,
+        // Los delegates que el root real del Coach Hub ya provee
+        // (`coach_hub_app.dart`) y este harness no tenía, porque la pantalla
+        // tiene prohibido llamar a `AppL10n` (constraint C-6) y hasta ahora
+        // ningún widget del árbol lo hacía.
+        //
+        // `QuickEntryPanel` sí lo llama — es compartido con el teléfono. C-6
+        // aplica a la PANTALLA, no a los widgets que usa: en producción esto
+        // funciona porque el root los inyecta. Sin ellos acá, el panel crashea
+        // con "Null check operator used on a null value" desde `AppL10n.of`.
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
+      ),
     ),
   );
   await tester.pumpAndSettle();
@@ -956,6 +972,12 @@ Future<void> _fillMinimalValidForm(WidgetTester tester) async {
     'Push/Pull/Legs',
   );
 
+  // El botón RÁPIDO agregó alto arriba de éste y lo empuja abajo del pliegue.
+  // Sin traerlo a la vista, el tap "encuentra" el widget y le pega al aire —
+  // el hit-test sólo AVISA, no falla, así que el test seguía y explotaba
+  // después, en el picker que nunca se abrió.
+  await tester.ensureVisible(find.text('Agregar ejercicio'));
+  await tester.pumpAndSettle();
   await tester.tap(find.text('Agregar ejercicio'));
   await tester.pumpAndSettle();
   await tester.tap(find.text('Press de Banca'));
@@ -1084,9 +1106,18 @@ void main() {
       await _pumpEditor(tester);
 
       expect(find.text('Día 1'), findsOneWidget);
-      await tester.tap(find.byKey(const Key('routine_editor_add_day_button')));
+      // Cada día es más alto desde que trae RÁPIDO y el estado vacío, así que
+      // este botón cae abajo del pliegue. El hit-test sólo AVISA cuando el tap
+      // le pega al aire: sin esto el día no se creaba y el test fallaba después
+      // buscando "Día 2", que era el síntoma y no la causa.
+      final agregarDia = find.byKey(const Key('routine_editor_add_day_button'));
+      await tester.ensureVisible(agregarDia);
+      await tester.pumpAndSettle();
+      await tester.tap(agregarDia);
       await tester.pumpAndSettle();
 
+      await tester.ensureVisible(find.text('Día 2'));
+      await tester.pumpAndSettle();
       expect(find.text('Día 2'), findsOneWidget);
     });
   });
@@ -3523,6 +3554,54 @@ void main() {
       await tester.tap(find.byKey(const Key('week_tab_1')));
       await tester.pumpAndSettle();
       expect(copyButtonsOf(tester)[1].onPressed, isNotNull);
+    });
+  });
+
+  group('RoutineEditorWebScreen — entrada rápida', () {
+    testWidgets('escribir la línea entra con la prescripción parseada',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any())).thenAnswer((_) async => null);
+      when(() => repo.createAssigned(any()))
+          .thenAnswer((i) async => i.positionalArguments.first as Routine);
+      await _pumpEditor(tester, repo: repo);
+
+      await tester.enterText(
+        find.byKey(const Key('routine_editor_name_field')),
+        'Plan rápido',
+      );
+      await tester.enterText(
+        find.byKey(const Key('routine_editor_split_field')),
+        'Full body',
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('RÁPIDO'));
+      await tester.pumpAndSettle();
+
+      // La sintaxis REAL del parser, la misma que el onboarding enseña:
+      // 4 series de 10 con 55 kg, escrito en una línea.
+      await tester.enterText(
+        find.byKey(const Key('quick_entry_field')),
+        'Press de Banca 4x10 55',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Press de Banca').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('quick_entry_confirm')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+      final draft = verify(() => repo.createAssigned(captureAny()))
+          .captured
+          .single as Routine;
+      final slot = draft.days.single.slots.single;
+      expect(slot.exerciseName, 'Press de Banca');
+      expect(slot.sets, hasLength(4),
+          reason: '4x10 son CUATRO series, no una');
+      expect(slot.sets.every((s) => s.reps == 10), isTrue);
+      expect(slot.sets.every((s) => s.weightKg == 55), isTrue);
     });
   });
 }

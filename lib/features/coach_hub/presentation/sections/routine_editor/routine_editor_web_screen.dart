@@ -13,6 +13,12 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/features/workout/domain/routine_goal.dart';
 
+import '../../../../workout/application/custom_exercise_providers.dart';
+import '../../../../workout/application/exercise_filter.dart';
+import '../../../../workout/application/exercise_providers.dart';
+import '../../../../workout/domain/custom_exercise.dart';
+import '../../../../workout/presentation/widgets/quick_entry_panel.dart';
+import '../../../../workout/presentation/widgets/quick_entry_parser.dart';
 import '../../../../workout/presentation/widgets/empty_day_state.dart';
 import '../../../../workout/presentation/widgets/exercise_card.dart';
 import '../../../../workout/presentation/widgets/prescription_chips.dart';
@@ -466,7 +472,193 @@ class _RoutineEditorWebScreenState
     _nameCtrl.dispose();
     _splitCtrl.dispose();
     _summaryCtrl.dispose();
+    _quickEntryCtrl.dispose();
+    _quickEntryFocus.dispose();
     super.dispose();
+  }
+
+  // ── Entrada rápida ─────────────────────────────────────────────────────
+  //
+  // Es la pieza del editor mobile que MÁS gana en la web: acá hay teclado
+  // real. Escribir `press de banca 4x10 55` y que entre con su prescripción
+  // reemplaza abrir el modal, filtrar, elegir y después completar cuatro
+  // campos a mano.
+  //
+  // UN panel a la vez, marcado por índice de día. En el teléfono se ve un día
+  // por pantalla y la pregunta no existe; acá los días están apilados, así que
+  // el panel tiene que decir a QUÉ día pertenece lo que se escriba.
+
+  final TextEditingController _quickEntryCtrl = TextEditingController();
+  final FocusNode _quickEntryFocus = FocusNode();
+
+  /// El día que tiene el panel abierto, o null si está cerrado.
+  int? _quickEntryDia;
+
+  /// El ejercicio ya elegido de la lista, o null mientras se busca.
+  QuickEntryResult? _quickEntryElegido;
+
+  void _cerrarEntradaRapida() {
+    _quickEntryDia = null;
+    _quickEntryElegido = null;
+    _quickEntryCtrl.clear();
+  }
+
+  /// El catálogo del sistema MÁS los ejercicios propios del PF.
+  ///
+  /// Los dos, y no sólo el del sistema: buscar acá y no encontrar la variante
+  /// que uno mismo cargó, cuando el picker de al lado sí la muestra, confunde
+  /// más de lo que el atajo ayuda. Mismo criterio que el editor mobile.
+  List<Exercise> _catalogoCompleto() {
+    final uid = ref.read(currentUidProvider) ?? '';
+    final propios = uid.isEmpty
+        ? const <CustomExercise>[]
+        : (ref.read(customExercisesForTrainerStreamProvider(uid)).valueOrNull ??
+            const <CustomExercise>[]);
+    return <Exercise>[
+      ...?ref.read(exercisesProvider).valueOrNull,
+      ...propios.map(customToExercise),
+    ];
+  }
+
+  /// El panel armado para el día [dayIndex].
+  ///
+  /// Se construye acá y no en `_DayCard` porque el controller y el foco viven
+  /// en el `State`: elegir un resultado tiene que DEVOLVER el foco con el
+  /// cursor al final, y sin eso el usuario pierde el teclado justo cuando va a
+  /// escribir la prescripción.
+  Widget _panelDeEntradaRapida(int dayIndex) {
+    // `watch` y no `read`: `read` NO suscribe, así que si nadie más está
+    // observando el catálogo sigue en `AsyncLoading` y la búsqueda no devuelve
+    // nada. En el teléfono no se notaba porque otra parte del árbol ya lo
+    // observaba; acá el panel es el único que lo necesita.
+    final uid = ref.watch(currentUidProvider) ?? '';
+    final propios = uid.isEmpty
+        ? const <CustomExercise>[]
+        : (ref
+                .watch(customExercisesForTrainerStreamProvider(uid))
+                .valueOrNull ??
+            const <CustomExercise>[]);
+    final catalogo = <Exercise>[
+      ...?ref.watch(exercisesProvider).valueOrNull,
+      ...propios.map(customToExercise),
+    ];
+
+    // `ValueListenableBuilder` sobre el controller, no `_quickEntryCtrl.text`
+    // leído en el build: sin esto el panel no se actualiza mientras se tipea
+    // —los resultados y el hint quedan congelados en lo que había al abrirlo—
+    // porque nada dispara un rebuild por cada tecla.
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: _quickEntryCtrl,
+      builder: (context, value, _) {
+        final entry = parseQuickEntry(value.text);
+        final elegido = _quickEntryElegido;
+        // El elegido se suelta si el nombre dejó de estar en el texto: borrar
+        // el ejercicio para buscar otro tiene que devolver la lista sin cerrar
+        // el panel. Misma regla que el editor mobile.
+        final sigueElegido = elegido != null &&
+            value.text.toLowerCase().contains(elegido.name.toLowerCase());
+        if (elegido != null && !sigueElegido) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) setState(() => _quickEntryElegido = null);
+          });
+        }
+
+        return QuickEntryPanel(
+          controller: _quickEntryCtrl,
+          focusNode: _quickEntryFocus,
+          entry: entry,
+          selected: sigueElegido ? elegido : null,
+          // Una vez elegido, la lista estorba.
+          results: sigueElegido
+              ? const []
+              : _buscarParaEntradaRapida(entry.query, dayIndex, catalogo),
+          onSelect: (r) => setState(() {
+            _quickEntryElegido = r;
+            // Devolver el foco: el tap sobre la lista lo suelta, y sin
+            // recuperarlo el usuario pierde el cursor justo cuando va a
+            // escribir la prescripción.
+            _quickEntryFocus.requestFocus();
+          }),
+          onConfirm: () {
+            final r = _quickEntryElegido;
+            if (r == null) return;
+            _agregarPorEntradaRapida(dayIndex, r.id, entry);
+          },
+        );
+      },
+    );
+  }
+
+  List<QuickEntryResult> _buscarParaEntradaRapida(
+    String query,
+    int dayIndex,
+    List<Exercise> catalogo,
+  ) {
+    final texto = query.trim();
+    if (texto.isEmpty) return const [];
+    final yaEstan = _days[dayIndex]
+        .slots
+        .where((s) => s.exercise != null)
+        .map((s) => s.exercise!.id)
+        .toSet();
+    // El mismo matcher que el picker (ADR-BIBW-01), no un `contains`: busca
+    // por tokens y tolera diacríticos, así que "press banca" encuentra "Press
+    // de Banca" —el `de` del medio rompe un contains— y "biceps" llega a
+    // "Bíceps". La REGLA es compartida; acá sólo se repite el cableado.
+    return catalogo
+        .where((e) =>
+            !yaEstan.contains(e.id) &&
+            exerciseMatchesFilters(
+              e,
+              query: texto,
+              muscles: const {},
+              equipment: const {},
+            ))
+        .take(QuickEntryPanel.kMaxResultados)
+        .map((e) => QuickEntryResult(
+              id: e.id,
+              name: e.name,
+              muscleGroup: e.muscleGroup,
+            ))
+        .toList();
+  }
+
+  /// Agrega el ejercicio [exerciseId] al día [dayIndex] con la prescripción que
+  /// el parser entendió de la línea.
+  void _agregarPorEntradaRapida(
+    int dayIndex,
+    String exerciseId,
+    QuickEntry entry,
+  ) {
+    final ex =
+        _catalogoCompleto().where((e) => e.id == exerciseId).firstOrNull;
+    if (ex == null) return;
+
+    _markDirty();
+    setState(() {
+      final slot = _EditorSlot()
+        ..exercise = ex
+        ..restSeconds = 0
+        // `3x30s` prescribe TIEMPO, no repeticiones: el slot entra derecho en
+        // modo duración en vez de obligar a cambiarlo después.
+        ..exerciseMode =
+            entry.esDuracion ? ExerciseMode.duration : ExerciseMode.reps
+        ..weeklySets = List.generate(
+          _numWeeks,
+          // Cada set lleva LO SUYO: `4x10,8,6,4` es una pirámide y
+          // `4x10 55,45,35,25` una descarga. Una lista más corta que la
+          // cantidad de sets repite su último valor.
+          (_) => List.generate(
+            entry.sets,
+            (i) => _EditorSet()
+              ..reps = entry.repsDeSet(i)
+              ..weightKg = entry.pesoDeSet(i)
+              ..durationSeconds = entry.duracionDeSet(i),
+          ),
+        );
+      _days[dayIndex].slots = [..._days[dayIndex].slots, slot];
+      _cerrarEntradaRapida();
+    });
   }
 
   // Deliberately no setState here (mirrors mobile's own _markDirty): callers
@@ -2052,6 +2244,21 @@ class _RoutineEditorWebScreenState
                                         () => _days[i].slots[s].expandido =
                                             !_days[i].slots[s].expandido,
                                       ),
+                                      quickEntryAbierto: _quickEntryDia == i,
+                                      onToggleQuickEntry: () => setState(() {
+                                        if (_quickEntryDia == i) {
+                                          _cerrarEntradaRapida();
+                                        } else {
+                                          // Abrir en otro día CIERRA el
+                                          // anterior: un solo panel a la vez.
+                                          _cerrarEntradaRapida();
+                                          _quickEntryDia = i;
+                                          _quickEntryFocus.requestFocus();
+                                        }
+                                      }),
+                                      quickEntryPanel: _quickEntryDia == i
+                                          ? _panelDeEntradaRapida(i)
+                                          : null,
                                       onReplaceSlot: (s) =>
                                           _replaceSlotExercise(i, s),
                                       onMoveSlot: (s, dir) =>
@@ -2570,6 +2777,9 @@ class _DayCard extends StatelessWidget {
     required this.onAddExercises,
     required this.onRemoveSlot,
     required this.onToggleSlotExpanded,
+    required this.quickEntryAbierto,
+    required this.onToggleQuickEntry,
+    this.quickEntryPanel,
     required this.onReplaceSlot,
     required this.onMoveSlot,
     required this.copyPreviousCallbackFor,
@@ -2616,6 +2826,16 @@ class _DayCard extends StatelessWidget {
   /// Abre o cierra la card del slot [slotIndex]. Sube hasta el `State` porque
   /// la bandera vive en el modelo, no en el widget.
   final void Function(int slotIndex) onToggleSlotExpanded;
+
+  /// Si ESTE día tiene el panel de entrada rápida abierto. Uno a la vez en toda
+  /// la pantalla: con los días apilados, dos paneles abiertos no dirían a cuál
+  /// pertenece lo que se escribe.
+  final bool quickEntryAbierto;
+  final VoidCallback onToggleQuickEntry;
+
+  /// El panel ya construido, o null cuando este día lo tiene cerrado. Lo arma
+  /// el `State` porque el controller y el foco viven allá.
+  final Widget? quickEntryPanel;
   final void Function(int slotIndex) onReplaceSlot;
   final void Function(int slotIndex, int dir) onMoveSlot;
 
@@ -2700,6 +2920,34 @@ class _DayCard extends StatelessWidget {
                 ),
             ],
           ),
+          // RÁPIDO: escribir `press de banca 4x10 55` en vez de abrir el
+          // modal, filtrar, elegir y completar cuatro campos. Es la pieza del
+          // editor mobile que más gana acá, porque en la web hay teclado real.
+          const SizedBox(height: AppSpacing.s8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: onToggleQuickEntry,
+              icon: Icon(
+                TreinoIcon.specialty,
+                size: 15,
+                color: quickEntryAbierto ? palette.accent : palette.textMuted,
+              ),
+              label: Text(
+                'RÁPIDO', // i18n
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12.5,
+                  letterSpacing: 1.1,
+                  color: quickEntryAbierto ? palette.accent : palette.textMuted,
+                ),
+              ),
+            ),
+          ),
+          if (quickEntryPanel != null) ...[
+            const SizedBox(height: AppSpacing.s8),
+            quickEntryPanel!,
+          ],
           for (var i = 0; i < day.slots.length; i++) ...[
             const SizedBox(height: 8),
             _SlotCard(
