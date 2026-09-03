@@ -1448,6 +1448,19 @@ class AppL10nEn extends AppL10n {
       'Agregá al menos una ubicación o activá clases virtuales.';
 
   @override
+  String get trainerLocationConsentSheetTitle => 'PUBLISH YOUR LOCATION';
+
+  @override
+  String get trainerLocationConsentSheetBody =>
+      'Athletes will be able to see where you train and how far it is from them. You can turn this off anytime from your professional profile.';
+
+  @override
+  String get trainerLocationConsentSheetAccept => 'ACCEPT';
+
+  @override
+  String get trainerLocationConsentSheetRevoke => 'TURN OFF PUBLISHING';
+
+  @override
   String get athleteDetailPlansSection => 'PLANES ASIGNADOS';
 
   @override

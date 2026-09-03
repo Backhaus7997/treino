@@ -15,6 +15,8 @@ import '../notifications/presentation/permission_gate.dart';
 import '../onboarding/presentation/onboarding_gate.dart';
 import '../profile/application/user_providers.dart';
 import '../profile/domain/user_role.dart';
+import '../profile/presentation/trainer_location_consent_sheet.dart'
+    show TrainerLocationConsentGate;
 import '../workout/application/assigned_routine_providers.dart';
 import '../workout/application/session_duration.dart';
 import '../workout/application/session_providers.dart';
@@ -66,6 +68,12 @@ class HomeScreen extends ConsumerWidget {
         // sequencing (tour first, prompt second) is enforced by
         // `onboardingBlocksProvider`, not by Stack order.
         const OnboardingGate(),
+        // Trainer location-publication consent prompt
+        // (consentimiento-legal-versionado, R7). Also SizedBox.shrink() —
+        // waits on `onboardingBlocksProvider` internally so it never stacks
+        // with the welcome tour or the push-permission prompt on the same
+        // frame.
+        const TrainerLocationConsentGate(),
       ],
     );
   }

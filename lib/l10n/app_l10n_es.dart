@@ -1482,6 +1482,19 @@ class AppL10nEs extends AppL10n {
       'Agregá al menos una ubicación o activá clases virtuales.';
 
   @override
+  String get trainerLocationConsentSheetTitle => 'PUBLICAR TU UBICACIÓN';
+
+  @override
+  String get trainerLocationConsentSheetBody =>
+      'Los atletas van a poder ver dónde entrenas y a qué distancia les queda. Puedes apagar esto cuando quieras desde tu perfil profesional.';
+
+  @override
+  String get trainerLocationConsentSheetAccept => 'ACEPTAR';
+
+  @override
+  String get trainerLocationConsentSheetRevoke => 'APAGAR LA PUBLICACIÓN';
+
+  @override
   String get athleteDetailPlansSection => 'PLANES ASIGNADOS';
 
   @override
@@ -5759,6 +5772,19 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get profileEditTrainerValidationLocation =>
       'Agregá al menos una ubicación o activá clases virtuales.';
+
+  @override
+  String get trainerLocationConsentSheetTitle => 'PUBLICAR TU UBICACIÓN';
+
+  @override
+  String get trainerLocationConsentSheetBody =>
+      'Los atletas van a poder ver dónde entrenás y a qué distancia les queda. Podés apagar esto cuando quieras desde tu perfil profesional.';
+
+  @override
+  String get trainerLocationConsentSheetAccept => 'ACEPTAR';
+
+  @override
+  String get trainerLocationConsentSheetRevoke => 'APAGAR LA PUBLICACIÓN';
 
   @override
   String get athleteDetailPlansSection => 'PLANES ASIGNADOS';

@@ -1770,5 +1770,13 @@
   "routineEditorSlotMenuUngroup": "Remove from superset",
   "@routineEditorSlotMenuUngroup": {},
   "routineEditorSlotMenuMergeDown": "Merge with the one below",
-  "@routineEditorSlotMenuMergeDown": {}
+  "@routineEditorSlotMenuMergeDown": {},
+  "trainerLocationConsentSheetTitle": "PUBLISH YOUR LOCATION",
+  "@trainerLocationConsentSheetTitle": {},
+  "trainerLocationConsentSheetBody": "Athletes will be able to see where you train and how far it is from them. You can turn this off anytime from your professional profile.",
+  "@trainerLocationConsentSheetBody": {},
+  "trainerLocationConsentSheetAccept": "ACCEPT",
+  "@trainerLocationConsentSheetAccept": {},
+  "trainerLocationConsentSheetRevoke": "TURN OFF PUBLISHING",
+  "@trainerLocationConsentSheetRevoke": {}
 }

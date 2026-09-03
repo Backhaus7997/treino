@@ -1017,5 +1017,9 @@
   "exerciseFeedbackNoteTagDiscomfort": "MOLESTIA",
   "exerciseFeedbackNoteSetTag": "SERIE {setNumber}",
   "coachSessionFeedbackLoadError": "No pudimos cargar los reportes del alumno.",
-  "sessionFeedbackLoadError": "No pudimos cargar tus reportes."
+  "sessionFeedbackLoadError": "No pudimos cargar tus reportes.",
+  "trainerLocationConsentSheetTitle": "PUBLICAR TU UBICACIÓN",
+  "trainerLocationConsentSheetBody": "Los atletas van a poder ver dónde entrenas y a qué distancia les queda. Puedes apagar esto cuando quieras desde tu perfil profesional.",
+  "trainerLocationConsentSheetAccept": "ACEPTAR",
+  "trainerLocationConsentSheetRevoke": "APAGAR LA PUBLICACIÓN"
 }

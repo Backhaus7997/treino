@@ -2768,6 +2768,30 @@ abstract class AppL10n {
   /// **'Agregá al menos una ubicación o activá clases virtuales.'**
   String get profileEditTrainerValidationLocation;
 
+  /// No description provided for @trainerLocationConsentSheetTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PUBLICAR TU UBICACIÓN'**
+  String get trainerLocationConsentSheetTitle;
+
+  /// No description provided for @trainerLocationConsentSheetBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Los atletas van a poder ver dónde entrenás y a qué distancia les queda. Podés apagar esto cuando quieras desde tu perfil profesional.'**
+  String get trainerLocationConsentSheetBody;
+
+  /// No description provided for @trainerLocationConsentSheetAccept.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ACEPTAR'**
+  String get trainerLocationConsentSheetAccept;
+
+  /// No description provided for @trainerLocationConsentSheetRevoke.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'APAGAR LA PUBLICACIÓN'**
+  String get trainerLocationConsentSheetRevoke;
+
   /// No description provided for @athleteDetailPlansSection.
   ///
   /// In es_AR, this message translates to:
