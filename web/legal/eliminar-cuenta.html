@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Eliminar tu cuenta · TREINO</title>
+<link rel="stylesheet" href="/legal/_estilo.css">
+<!--
+  ─── Por qué esta página existe ──────────────────────────────────────────────
+
+  Google Play exige un enlace WEB donde se pueda pedir el borrado de la cuenta
+  SIN tener la app instalada. El borrado in-app ya está implementado
+  (`account_deletion_service.dart`) y es lo que exige Apple — pero no alcanza
+  para Play: alguien que desinstaló la app tiene que poder pedirlo igual.
+
+  Esta página NO se genera desde el Dart: su texto no sale de
+  `legal_content.dart`, se edita a mano acá.
+
+  ─── Qué falta para que sea del todo cierta ──────────────────────────────────
+
+  Hoy la vía web es un mail. Es válido para Play siempre que el pedido se
+  atienda de verdad, pero conviene reemplazarlo por un formulario cuando haya
+  volumen: un mail depende de que alguien lo lea.
+-->
+</head>
+<body>
+<main>
+  <div class="brand">
+    <a href="https://gettreino.com"><img src="/email/wordmark.png" alt="TREINO" width="110" height="56"></a>
+  </div>
+
+  <h1>Eliminar tu cuenta</h1>
+  <p class="lede">
+    Podés borrar tu cuenta de TREINO cuando quieras. Hay dos formas, y la
+    primera es la más rápida.
+  </p>
+
+  <section>
+    <h2>1. Desde la app (recomendado)</h2>
+    <p>
+      Abrí TREINO y entrá a <strong>Perfil</strong>. Al final de la pantalla vas
+      a encontrar <strong>Eliminar cuenta</strong>. La app te pide confirmar y
+      listo: el borrado arranca en el momento, sin esperar a que nadie lo
+      atienda.
+    </p>
+    <p>
+      Es la vía recomendada justamente por eso — no depende de que alguien lea
+      un mail.
+    </p>
+  </section>
+
+  <section>
+    <h2>2. Por mail, si ya desinstalaste la app</h2>
+    <p>
+      Escribinos a <a href="mailto:equipo@treino.app?subject=Eliminar%20mi%20cuenta">equipo@treino.app</a>
+      desde <strong>la misma dirección con la que te registraste</strong>, con el
+      asunto “Eliminar mi cuenta”. Necesitamos que sea la misma dirección: es la
+      única forma de saber que sos vos y no alguien pidiendo que borren la
+      cuenta de otra persona.
+    </p>
+  </section>
+
+  <section>
+    <h2>Qué se borra</h2>
+    <p>
+      Tu cuenta y tu perfil, tus rutinas y sesiones de entrenamiento, tus
+      mediciones, tus mensajes de chat y los archivos que hayas subido (foto de
+      perfil, imágenes y videos).
+    </p>
+    <p>
+      Los mensajes que le mandaste a otra persona pueden seguir viéndose del
+      lado de esa persona, igual que un mail enviado no desaparece de la casilla
+      de quien lo recibió.
+    </p>
+  </section>
+
+  <section>
+    <h2>Qué puede quedar, y por cuánto</h2>
+    <p>
+      Registros mínimos que necesitamos conservar por obligaciones contables o
+      legales — por ejemplo, comprobantes de pagos — durante el plazo que la ley
+      exija. No se usan para perfilarte ni para contactarte.
+    </p>
+    <p>
+      Los backups del sistema se rotan solos: una copia previa a tu borrado
+      puede sobrevivir hasta que le toque expirar. No se restaura para
+      recuperar cuentas borradas.
+    </p>
+  </section>
+
+  <section>
+    <h2>¿Dudas?</h2>
+    <p>
+      Escribinos a <a href="mailto:equipo@treino.app">equipo@treino.app</a>.
+      También podés leer nuestra
+      <a href="/legal/privacidad.html">Política de Privacidad</a>, que explica
+      qué datos guardamos y para qué.
+    </p>
+  </section>
+
+  <footer>
+    <a href="/legal/terminos.html">Términos y Condiciones</a> ·
+    <a href="/legal/privacidad.html">Política de Privacidad</a> ·
+    <a href="https://gettreino.com">gettreino.com</a>
+  </footer>
+</main>
+</body>
+</html>
