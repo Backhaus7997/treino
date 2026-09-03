@@ -5,6 +5,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart' hide generateNonce;
 
 import '../domain/auth_failure.dart';
+import '../presentation/legal/legal_content.dart';
 import '../../profile/data/user_repository.dart';
 import 'apple_sign_in_gateway.dart';
 import 'nonce_helpers.dart';
@@ -94,6 +95,11 @@ class AuthService {
           // that leads here) — so the signup itself IS the email flow's
           // consent event (QA-AUTH-001, issue #434).
           termsAcceptedAt: DateTime.now().toUtc(),
+          // consentimiento-legal-versionado (R3): the same checkbox accepts
+          // BOTH documents at their current text, so both versions are
+          // stamped in this same call.
+          acceptedTermsVersion: kTermsVersion,
+          acceptedPrivacyVersion: kPrivacyVersion,
         );
       } catch (firestoreError) {
         // Rollback: best-effort delete the orphan Auth user.
