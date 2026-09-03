@@ -9,6 +9,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/widgets/exercise_asset_image.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../workout/application/custom_exercise_providers.dart';
 import '../../../workout/application/exercise_filter.dart';
@@ -556,6 +557,8 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
                   : muscleGroupLabel(c.muscleGroup),
               badge: 'MÍO', // i18n
               isCustom: true,
+              muscleGroup: c.muscleGroup,
+              thumbnailUrl: null,
               ownerId: ref.watch(currentUidProvider),
               selected: _selected.contains(c.id),
               palette: palette,
@@ -573,6 +576,8 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
               subtitle: muscleGroupLabel(e.muscleGroup),
               badge: null,
               isCustom: false,
+              muscleGroup: e.muscleGroup,
+              thumbnailUrl: e.thumbnailUrl,
               ownerId: null,
               selected: _selected.contains(e.id),
               palette: palette,
@@ -708,6 +713,8 @@ class _ExerciseRow extends StatelessWidget {
     required this.subtitle,
     required this.badge,
     required this.isCustom,
+    required this.muscleGroup,
+    required this.thumbnailUrl,
     required this.ownerId,
     required this.selected,
     required this.palette,
@@ -721,6 +728,15 @@ class _ExerciseRow extends StatelessWidget {
   final String? subtitle;
   final String? badge;
   final bool isCustom;
+
+  /// Clave canónica del grupo muscular: es el último escalón de la cascada de
+  /// [ExerciseAssetImage] y el que carga el catálogo entero (los PNG con
+  /// nombre de ejercicio existen para un puñado).
+  final String muscleGroup;
+
+  /// Foto real del ejercicio (frame de su propio video). null en customs y en
+  /// docs anteriores al backfill: ahí manda la cascada de assets.
+  final String? thumbnailUrl;
   final String? ownerId;
   final bool selected;
   final AppPalette palette;
@@ -729,6 +745,12 @@ class _ExerciseRow extends StatelessWidget {
   /// Present only for the trainer's own custom exercises → renders edit/delete.
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+
+  Icon _iconoDeFallback(AppPalette palette) => Icon(
+        TreinoIcon.dumbbell,
+        size: 26,
+        color: palette.textMuted,
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -753,10 +775,65 @@ class _ExerciseRow extends StatelessWidget {
             horizontal: 12,
             vertical: 2,
           ),
-          leading: Icon(
-            selected ? TreinoIcon.check : TreinoIcon.dumbbell,
-            color: selected ? palette.accent : palette.textMuted,
-            size: 20,
+          // La foto, no un ícono repetido 800 veces. Sin esto el catálogo
+          // precargado se lee como una lista de nombres y el PF tiene que
+          // saberse de memoria a qué se parece cada variante.
+          //
+          // 56 px es el alto máximo que `ListTile` le da al leading (maxHeight
+          // fija del SDK, list_tile.dart): más grande obliga al truco del
+          // `OverflowBox` que usa el sheet del teléfono, y acá el panel es una
+          // lista densa donde el alto de fila es justo lo que el #860 vino a
+          // cuidar.
+          leading: SizedBox(
+            width: 56,
+            height: 56,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                ClipOval(
+                  child: Container(
+                    width: 56,
+                    height: 56,
+                    color: palette.bgCard,
+                    alignment: Alignment.center,
+                    // Los customs no tienen foto ni entran en la cascada:
+                    // sus ids no son los del catálogo.
+                    child: isCustom
+                        ? _iconoDeFallback(palette)
+                        : ExerciseAssetImage(
+                            exerciseId: id,
+                            muscleGroup: muscleGroup,
+                            thumbnailUrl: thumbnailUrl,
+                            width: 56,
+                            height: 56,
+                            fallback: _iconoDeFallback(palette),
+                          ),
+                  ),
+                ),
+                // El tilde pasa a badge encima de la foto: el fondo acentuado
+                // y el borde izquierdo ya dicen "elegido", pero en una lista
+                // larga el ojo busca la marca en el mismo lugar de siempre.
+                if (selected)
+                  Positioned(
+                    right: -2,
+                    bottom: -2,
+                    child: Container(
+                      width: 20,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        color: palette.accent,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: palette.bgCard, width: 2),
+                      ),
+                      child: Icon(
+                        TreinoIcon.check,
+                        size: 11,
+                        color: TreinoButtonTokens.foreground(context),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
           title: Text(
             name,
