@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/core/analytics/analytics_service.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/presentation/widgets/athlete_picker_sheet.dart';
@@ -133,10 +134,18 @@ Future<void> _assignTemplateToAthlete(
   if (athleteId == null || !context.mounted) return;
   // Capture the messenger before the async gap — context may unmount.
   final messenger = ScaffoldMessenger.of(context);
+  // Same reason for analytics: a WidgetRef read after dispose throws.
+  final analytics = ref.read(analyticsServiceProvider);
   try {
     await ref
         .read(routineRepositoryProvider)
         .assignTemplateToAthlete(template: template, athleteId: athleteId);
+    // The assigned copy is born with the template's shape.
+    analytics.logRoutineCreated(
+      source: RoutineCreationSource.trainerAssigned,
+      daysCount: template.days.length,
+      weeksCount: template.numWeeks,
+    );
     messenger.showSnackBar(
       const SnackBar(content: Text('Plantilla asignada al alumno.')), // i18n
     );

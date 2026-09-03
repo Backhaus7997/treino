@@ -143,6 +143,94 @@ void main() {
       });
     });
 
+    // ── Forma de rutina: los tres eventos que alimentan la decisión del
+    // paywall del alumno suelto. Se assertean los params completos y no sólo
+    // el nombre: un `routine_created` sin `days_count` no responde la única
+    // pregunta para la que existe.
+    test('logRoutineCreated captura source + days_count + weeks_count',
+        () async {
+      final f = FakeAnalyticsService();
+      await f.logRoutineCreated(
+        source: RoutineCreationSource.self,
+        daysCount: 3,
+        weeksCount: 8,
+      );
+      expect(f.events, ['routine_created']);
+      expect(f.calls.single.params, {
+        'source': 'self',
+        'days_count': 3,
+        'weeks_count': 8,
+      });
+    });
+
+    test('RoutineCreationSource — un wireName distinto por variante', () {
+      // El enum existe para que `source` no sea un String suelto. Si dos
+      // variantes colapsaran en el mismo valor, la segmentación que separa al
+      // alumno suelto del PF dejaría de existir sin que ningún test lo note.
+      final wires = RoutineCreationSource.values.map((s) => s.wireName);
+      expect(wires.toSet().length, RoutineCreationSource.values.length);
+      expect(RoutineCreationSource.self.wireName, 'self');
+      expect(
+        RoutineCreationSource.selfFromTemplate.wireName,
+        'self_from_template',
+      );
+      expect(
+        RoutineCreationSource.trainerAssigned.wireName,
+        'trainer_assigned',
+      );
+      expect(
+        RoutineCreationSource.trainerTemplate.wireName,
+        'trainer_template',
+      );
+    });
+
+    test('logRoutineDayAdded captura source + days_count', () async {
+      final f = FakeAnalyticsService();
+      await f.logRoutineDayAdded(
+        source: RoutineCreationSource.selfFromTemplate,
+        daysCount: 4,
+      );
+      expect(f.events, ['routine_day_added']);
+      expect(f.calls.single.params, {
+        'source': 'self_from_template',
+        'days_count': 4,
+      });
+    });
+
+    test('logRoutineWeekAdded captura source + weeks_count', () async {
+      final f = FakeAnalyticsService();
+      await f.logRoutineWeekAdded(
+        source: RoutineCreationSource.trainerAssigned,
+        weeksCount: 2,
+      );
+      expect(f.events, ['routine_week_added']);
+      expect(f.calls.single.params, {
+        'source': 'trainer_assigned',
+        'weeks_count': 2,
+      });
+    });
+
+    test('paramsOf filtra por nombre y conserva el orden', () async {
+      final f = FakeAnalyticsService();
+      await f.logRoutineDayAdded(
+        source: RoutineCreationSource.self,
+        daysCount: 2,
+      );
+      await f.logRoutineWeekAdded(
+        source: RoutineCreationSource.self,
+        weeksCount: 2,
+      );
+      await f.logRoutineDayAdded(
+        source: RoutineCreationSource.self,
+        daysCount: 3,
+      );
+      expect(
+        f.paramsOf('routine_day_added').map((p) => p['days_count']),
+        [2, 3],
+      );
+      expect(f.paramsOf('routine_created'), isEmpty);
+    });
+
     test('multiple calls accumulate in order', () async {
       final f = FakeAnalyticsService();
       await f.logRoutineStarted(routineId: 'r1');

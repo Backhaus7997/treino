@@ -152,6 +152,11 @@ class _CoachHubPlanPreviewScreenState
           assignedBy: trainerUid,
           assignedTo: athleteId,
         );
+        analytics.logRoutineCreated(
+          source: RoutineCreationSource.trainerAssigned,
+          daysCount: routine.days.length,
+          weeksCount: routine.numWeeks,
+        );
       } catch (_) {
         failed.add(athleteId);
       }
