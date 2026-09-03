@@ -7,9 +7,24 @@ FUENTE UNICA: el markdown de `docs/legal/`. Todo lo demas se genera.
     python3 scripts/build_legal_content.py --check    # CI: falla si hay drift
     python3 scripts/build_legal_content.py --preview  # genera todo bajo build/
 
-Salidas:
-  • lib/features/auth/presentation/legal/legal_content.dart  (app)
-  • build/legal-web/*.html + index.html                      (gettreino.com)
+Salida:
+  • lib/features/auth/presentation/legal/legal_content.dart
+
+ESTE ES EL PRIMER ESLABON DE UNA CADENA DE DOS:
+
+    docs/legal/*.md  ->  legal_content.dart  ->  web/legal/*.html
+      (este script)         (eslabon)         (tool/build_legal_pages.dart)
+
+El segundo eslabon lo hizo otra rama (PR #941) y renderiza las paginas publicas
+que sirven las tiendas. Por eso este script NO emite HTML: seria una segunda
+salida web compitiendo con la de `tool/build_legal_pages.dart`, que ademas viaja
+sola con `flutter build web`. Cada eslabon tiene su guarda propia: el gate de
+`ci.yml` compara markdown contra Dart, y `test/legal/paginas_legales_sync_test`
+compara Dart contra HTML.
+
+Despues de correr este script hay que correr el otro:
+
+    dart run tool/build_legal_pages.dart
 
 Por que existe: el mismo texto legal vive en la app y en el sitio, que ademas
 esta en otro repositorio. Mantener copias a mano es como se desincronizo el
@@ -277,8 +292,11 @@ def emit_dart(docs: list[dict]) -> str:
     out = [BANNER_DART, "library;", "", "/// Una seccion de un documento legal: encabezado + cuerpo.",
            "class LegalSection {", "  const LegalSection(this.heading, this.body);",
            "", "  final String heading;", "  final String body;", "}", ""]
-    out.append(f"/// Fecha de ultima actualizacion mostrada al pie de cada documento.")
-    out.append(f"const String kLegalLastUpdated = {dart_str(docs[0]['updated'])};")
+    # Fecha POR DOCUMENTO. Los Terminos y la Politica se revisan por separado,
+    # asi que una fecha global mentiria sobre uno de los dos (#941).
+    for d in docs:
+        out.append(f"/// Ultima revision de {d['title']}.")
+        out.append(f"const String {d['date_const']} = {dart_str(d['updated'])};")
     out.append("")
     out.append("/// Email de contacto para consultas legales / de privacidad.")
     out.append(f"const String kLegalContactEmail = {dart_str(CONTACT_EMAIL)};")
@@ -295,11 +313,22 @@ def emit_dart(docs: list[dict]) -> str:
         out.append("];")
         out.append("")
     # indice para la pantalla Perfil -> Legales
+    out.append("/// Una entrada del indice de documentos legales.")
+    out.append("typedef LegalDocumentEntry = ({")
+    out.append("  String title,")
+    out.append("  List<LegalSection> sections,")
+    out.append("  String lastUpdated,")
+    out.append("});")
+    out.append("")
     out.append("/// Indice de los documentos, para la entrada Perfil -> Legales.")
-    out.append("const List<({String title, List<LegalSection> sections})>")
-    out.append("    kLegalDocuments = <({String title, List<LegalSection> sections})>[")
+    out.append("const List<LegalDocumentEntry> kLegalDocuments =")
+    out.append("    <LegalDocumentEntry>[")
     for d in docs:
-        out.append(f"  (title: {dart_str(d['title'])}, sections: {d['dart']}),")
+        out.append("  (")
+        out.append(f"    title: {dart_str(d['title'])},")
+        out.append(f"    sections: {d['dart']},")
+        out.append(f"    lastUpdated: {d['date_const']},")
+        out.append("  ),")
     out.append("];")
     return "\n".join(out) + "\n"
 
@@ -423,6 +452,9 @@ def load() -> tuple[list[dict], list[str]]:
             "title": fm["title"],
             "dart": fm["dart"],
             "updated": inline(um.group(1)) if um else "sin fecha",
+            # kTermsSections -> kTermsLastUpdated. Los nombres de #941 salen
+            # solos de esta regla, asi que nada que mapear a mano.
+            "date_const": fm["dart"].replace("Sections", "LastUpdated"),
             "sections": to_sections(md),
         })
     # los demas .md son internos a proposito
@@ -463,7 +495,6 @@ def main() -> int:
         return 2
 
     dart = emit_dart(docs)
-    html = emit_html(docs)
     dart_path = (ROOT / "build/legal-preview/legal_content.dart"
                  if args.preview else DART_OUT)
 
@@ -479,10 +510,6 @@ def main() -> int:
         stale = []
         if not DART_OUT.exists() or DART_OUT.read_text(encoding="utf-8") != dart:
             stale.append(str(DART_OUT.relative_to(ROOT)))
-        for name, body in html.items():
-            f = WEB_OUT / name
-            if not f.exists() or f.read_text(encoding="utf-8") != body:
-                stale.append(str(f.relative_to(ROOT)))
         if stale:
             print("[!] Desfasaje: se edito docs/legal/ y no se regenero.\n"
                   "    Corre: python3 scripts/build_legal_content.py\n",
@@ -496,12 +523,9 @@ def main() -> int:
     dart_path.parent.mkdir(parents=True, exist_ok=True)
     dart_path.write_text(dart, encoding="utf-8")
     dart_format(dart_path)
-    WEB_OUT.mkdir(parents=True, exist_ok=True)
-    for name, body in html.items():
-        (WEB_OUT / name).write_text(body, encoding="utf-8")
 
     print(f"[OK] {dart_path.relative_to(ROOT)}")
-    print(f"[OK] {WEB_OUT.relative_to(ROOT)}/ — {len(html)} paginas")
+    print("     falta el segundo eslabon: dart run tool/build_legal_pages.dart")
     for d in docs:
         print(f"       {len(d['sections']):>2} secciones  {d['slug']}")
     if pending:

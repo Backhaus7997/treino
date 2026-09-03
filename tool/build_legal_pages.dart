@@ -12,8 +12,20 @@
 // confundido: es que la política que aceptó el usuario en la app diga una cosa
 // y la que declaraste en la tienda diga otra.
 //
-// La fuente de verdad es y sigue siendo `legal_content.dart`. Esto es un
-// renderer.
+// Esto es un renderer, y es el SEGUNDO eslabón de una cadena de dos:
+//
+//     docs/legal/*.md  ->  legal_content.dart  ->  web/legal/*.html
+//   (build_legal_content.py)   (eslabón)            (este archivo)
+//
+// La fuente de verdad son los markdown de `docs/legal/`, que es donde se
+// redactan y se revisan los textos. `legal_content.dart` dejó de ser fuente y
+// pasó a ser un artefacto intermedio: lo genera `scripts/build_legal_content.py`
+// y lleva un encabezado que dice que no se edita a mano. Editarlo directamente
+// hace que la app diga una cosa y el markdown otra, que es el mismo problema
+// que este archivo vino a resolver, un nivel más arriba.
+//
+// Cada eslabón tiene su guarda: el gate de `ci.yml` compara markdown contra
+// Dart, y `test/legal/paginas_legales_sync_test.dart` compara Dart contra HTML.
 //
 // ─── Uso ─────────────────────────────────────────────────────────────────────
 //
@@ -58,10 +70,8 @@ const _bannerGenerado = '''
       dart run tool/build_legal_pages.dart
 -->''';
 
-String _escape(String s) => s
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;');
+String _escape(String s) =>
+    s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 
 /// Convierte el cuerpo de una sección en párrafos. Los saltos de línea dobles
 /// del Dart separan párrafos; los simples son sólo wrapping del código fuente y
@@ -80,13 +90,11 @@ String _pagina({
   required List<LegalSection> secciones,
   required String ultimaActualizacion,
 }) {
-  final cuerpo = secciones
-      .map((s) => '''
+  final cuerpo = secciones.map((s) => '''
   <section>
     <h2>${_escape(s.heading)}</h2>
 ${_cuerpo(s.body)}
-  </section>''')
-      .join('\n\n');
+  </section>''').join('\n\n');
 
   return '''<!doctype html>
 <html lang="es-AR">
@@ -235,8 +243,8 @@ void main() {
   stdout.writeln('  web/legal/_estilo.css');
   stdout.writeln(
       '  web/legal/privacidad.html  (${kPrivacySections.length} secciones)');
-  stdout
-      .writeln('  web/legal/terminos.html    (${kTermsSections.length} secciones)');
+  stdout.writeln(
+      '  web/legal/terminos.html    (${kTermsSections.length} secciones)');
   stdout.writeln('');
   stdout.writeln('web/legal/eliminar-cuenta.html NO se genera: no sale del');
   stdout.writeln('Dart, se edita a mano.');

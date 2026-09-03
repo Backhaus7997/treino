@@ -95,12 +95,25 @@ app y el HTML del sitio se generan desde acá:
 python3 scripts/build_legal_content.py
 ```
 
-Produce:
+Es el **primer eslabón de una cadena de dos**:
 
-| Salida | Para |
-|---|---|
-| `lib/features/auth/presentation/legal/legal_content.dart` | La app |
-| `build/legal-web/*.html` + `index.html` | Publicar en `gettreino.com/legal/` |
+```
+docs/legal/*.md  ->  legal_content.dart  ->  web/legal/*.html
+  (este script)         (eslabón)         (tool/build_legal_pages.dart)
+```
+
+El segundo eslabón vino del PR #941 y renderiza las páginas públicas que sirven
+las tiendas; viaja solo con `flutter build web`. Por eso este script **no emite
+HTML**: sería una segunda salida web compitiendo con esa.
+
+Después de correr este script hay que correr el otro:
+
+```bash
+dart run tool/build_legal_pages.dart
+```
+
+Cada eslabón tiene su guarda: el gate de `ci.yml` compara markdown contra Dart,
+y `test/legal/paginas_legales_sync_test.dart` compara Dart contra HTML.
 
 **No edites `legal_content.dart` a mano.** Lleva un encabezado que lo dice. Es
 el mismo trato que con freezed: se edita la fuente, se corre el generador, la
