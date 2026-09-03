@@ -816,9 +816,23 @@ class _RoutineEditorWebScreenState
     slots.removeAt(index);
   }
 
+  /// Dimensión `source` de los eventos de forma de rutina. Este editor es
+  /// SOLO del PF (`coachHubRedirect` manda a `/not-allowed` a cualquier otro
+  /// rol), así que nunca emite `self`/`self_from_template`: el alumno suelto
+  /// no llega acá. Se instrumenta igual para que el desglose por `source` sea
+  /// completo — si el PF web no contara, `trainer_assigned` quedaría
+  /// subreportado respecto del PF móvil y la comparación mentiría.
+  RoutineCreationSource get _analyticsSource => widget.isTemplate
+      ? RoutineCreationSource.trainerTemplate
+      : RoutineCreationSource.trainerAssigned;
+
   void _setNumWeeks(int value) {
     final clamped = value.clamp(1, _kMaxWeeks);
     if (clamped == _numWeeks) return;
+    // Un stepper puede saltar de 1 a 4: eso es UN `routine_week_added` con
+    // `weeks_count: 4`. Bajar no se cuenta — el evento mide fricción hacia
+    // arriba, que es donde un tope mordería.
+    final grew = clamped > _numWeeks;
     _markDirty();
     setState(() {
       _numWeeks = clamped;
@@ -830,6 +844,12 @@ class _RoutineEditorWebScreenState
       if (_selectedWeek > _numWeeks - 1) _selectedWeek = _numWeeks - 1;
       if (_selectedWeek < 0) _selectedWeek = 0;
     });
+    if (grew) {
+      ref.read(analyticsServiceProvider).logRoutineWeekAdded(
+            source: _analyticsSource,
+            weeksCount: _numWeeks,
+          );
+    }
   }
 
   // ── Day operations ───────────────────────────────────────────────────────
@@ -841,6 +861,10 @@ class _RoutineEditorWebScreenState
       final n = _days.length + 1;
       _days.add(_EditorDay(dayNumber: n, name: 'Día $n')); // i18n
     });
+    ref.read(analyticsServiceProvider).logRoutineDayAdded(
+          source: _analyticsSource,
+          daysCount: _days.length,
+        );
   }
 
   void _removeDay(int index) {
@@ -1678,6 +1702,10 @@ class _RoutineEditorWebScreenState
     // must land even if this screen is disposed mid-save, and a WidgetRef
     // touched after dispose throws. See [invalidateRoutineById].
     final container = ProviderScope.containerOf(context, listen: false);
+    // Same reason for analytics — `routine_created` has to be counted even if
+    // the PF navigated away while the write was in flight.
+    final analytics = ref.read(analyticsServiceProvider);
+    final analyticsSource = _analyticsSource;
     try {
       if (_isEditing) {
         // Preserve the loaded routine's identity (id, assignedBy/To, source,
@@ -1724,6 +1752,11 @@ class _RoutineEditorWebScreenState
           visibility: RoutineVisibility.private,
         );
         await repo.createTemplate(template);
+        analytics.logRoutineCreated(
+          source: analyticsSource,
+          daysCount: days.length,
+          weeksCount: _numWeeks,
+        );
       } else {
         final routine = Routine(
           id: '',
@@ -1743,6 +1776,11 @@ class _RoutineEditorWebScreenState
           visibility: RoutineVisibility.private,
         );
         await repo.createAssigned(routine);
+        analytics.logRoutineCreated(
+          source: analyticsSource,
+          daysCount: days.length,
+          weeksCount: _numWeeks,
+        );
       }
       // trainerTemplatesStreamProvider is a live stream — no invalidation
       // needed. The assigned list is a one-shot FutureProvider, so invalidate

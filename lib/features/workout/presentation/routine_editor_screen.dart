@@ -1504,6 +1504,17 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   /// the resumen (the copy does not carry the PF's).
   bool get _isCustomizing => widget.mode is SelfCustomizing;
 
+  /// Dimensión `source` de los eventos de forma de rutina (`routine_created`,
+  /// `routine_day_added`, `routine_week_added`). Derivada del modo y no pasada
+  /// a mano, así ningún call site puede mandar un `source` que el modo
+  /// desmienta.
+  RoutineCreationSource get _analyticsSource => switch (widget.mode) {
+        SelfCreating() => RoutineCreationSource.self,
+        SelfCustomizing() => RoutineCreationSource.selfFromTemplate,
+        TrainerAssigning() => RoutineCreationSource.trainerAssigned,
+        TrainerTemplating() => RoutineCreationSource.trainerTemplate,
+      };
+
   /// The resumen to persist, or `null` when the PF left it blank (#648).
   ///
   /// The field is OPTIONAL: an empty (or whitespace-only) box must save as
@@ -1614,6 +1625,10 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       }
       _selectedWeek = _numWeeks - 1;
     });
+    ref.read(analyticsServiceProvider).logRoutineWeekAdded(
+          source: _analyticsSource,
+          weeksCount: _numWeeks,
+        );
   }
 
   /// Drops the last week and its data from every slot, clamping the selected
@@ -1745,6 +1760,10 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       // Agregar un día y quedarse mirando el anterior no tiene sentido.
       _selectedDayIndex = _days.length - 1;
     });
+    ref.read(analyticsServiceProvider).logRoutineDayAdded(
+          source: _analyticsSource,
+          daysCount: _days.length,
+        );
   }
 
   void _removeDay(int index) {
@@ -2491,6 +2510,11 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     // survive an unmount during the save, and a WidgetRef touched after dispose
     // throws. The container does not care whether this screen is still alive.
     final container = ProviderScope.containerOf(context, listen: false);
+    // Y por el mismo motivo se captura analytics ANTES del await: el evento de
+    // creación tiene que salir aunque el atleta haya vuelto atrás mientras se
+    // guardaba, y `ref.read` después del dispose tira.
+    final analytics = ref.read(analyticsServiceProvider);
+    final analyticsSource = _analyticsSource;
 
     try {
       final repo = ref.read(routineRepositoryProvider);
@@ -2535,11 +2559,16 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             summary: _summaryOrNull,
           );
           final created = await repo.createAssigned(routine);
-          ref.read(analyticsServiceProvider).logPlanAssigned(
-                routineId: created.id,
-                assignedBy: uid,
-                assignedTo: athleteId,
-              );
+          analytics.logPlanAssigned(
+            routineId: created.id,
+            assignedBy: uid,
+            assignedTo: athleteId,
+          );
+          analytics.logRoutineCreated(
+            source: analyticsSource,
+            daysCount: days.length,
+            weeksCount: _numWeeks,
+          );
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(l10n.coachCreatePlanSuccess)),
@@ -2586,6 +2615,11 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             goals: _goalsOrdered,
           );
           await repo.createTemplate(routine);
+          analytics.logRoutineCreated(
+            source: analyticsSource,
+            daysCount: days.length,
+            weeksCount: _numWeeks,
+          );
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(l10n.coachCreatePlanSuccess)),
@@ -2631,6 +2665,15 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             numWeeks: _numWeeks,
           );
           final created = await repo.createUserOwned(uid: uid, draft: draft);
+          // Va antes del mounted-guard a propósito: usa el `analytics`
+          // capturado arriba, no `ref`, así que sobrevive al dispose — y una
+          // rutina que se guardó tiene que contarse aunque el atleta ya no
+          // esté mirando la pantalla.
+          analytics.logRoutineCreated(
+            source: analyticsSource,
+            daysCount: days.length,
+            weeksCount: _numWeeks,
+          );
           // The mounted-guard must run BEFORE touching `ref` again: a back
           // gesture during the create (canPop is true — _isDirty was cleared
           // at the top of _submit) disposes this element and ref.read would

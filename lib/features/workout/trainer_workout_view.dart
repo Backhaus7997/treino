@@ -6,6 +6,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../app/theme/app_motion.dart';
 import '../../app/theme/app_palette.dart';
+import '../../core/analytics/analytics_service.dart';
 import '../../l10n/app_l10n.dart';
 import '../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../core/widgets/motion/treino_state_switcher.dart';
@@ -588,11 +589,19 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
     final athleteId = await showAthletePickerSheet(context);
     if (athleteId == null || !mounted) return;
     setState(() => _assigning = true);
+    // Capturado antes del await: `ref` después de un dispose tira.
+    final analytics = ref.read(analyticsServiceProvider);
     try {
       await ref.read(routineRepositoryProvider).assignTemplateToAthlete(
             template: widget.template,
             athleteId: athleteId,
           );
+      // La copia asignada nace con la forma de la plantilla.
+      analytics.logRoutineCreated(
+        source: RoutineCreationSource.trainerAssigned,
+        daysCount: widget.template.days.length,
+        weeksCount: widget.template.numWeeks,
+      );
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Plantilla asignada al alumno.')),

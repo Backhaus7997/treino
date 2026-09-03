@@ -78,6 +78,48 @@ class FakeAnalyticsService implements AnalyticsService {
   }
 
   @override
+  Future<void> logRoutineCreated({
+    required RoutineCreationSource source,
+    required int daysCount,
+    required int weeksCount,
+  }) async {
+    _registrar('routine_created', {
+      'source': source.wireName,
+      'days_count': daysCount,
+      'weeks_count': weeksCount,
+    });
+  }
+
+  @override
+  Future<void> logRoutineDayAdded({
+    required RoutineCreationSource source,
+    required int daysCount,
+  }) async {
+    _registrar('routine_day_added', {
+      'source': source.wireName,
+      'days_count': daysCount,
+    });
+  }
+
+  @override
+  Future<void> logRoutineWeekAdded({
+    required RoutineCreationSource source,
+    required int weeksCount,
+  }) async {
+    _registrar('routine_week_added', {
+      'source': source.wireName,
+      'weeks_count': weeksCount,
+    });
+  }
+
+  /// Los params de cada evento con nombre [name], en orden. Para los tres
+  /// eventos de forma de rutina los tests assertean sobre `source` y los
+  /// contadores, no solo sobre el nombre: un `routine_day_added` sin
+  /// `days_count` no responde ninguna pregunta.
+  List<Map<String, Object?>> paramsOf(String name) =>
+      calls.where((c) => c.name == name).map((c) => c.params).toList();
+
+  @override
   Future<void> logPlanAssigned({
     required String routineId,
     required String assignedBy,
