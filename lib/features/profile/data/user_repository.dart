@@ -313,10 +313,19 @@ class UserRepository {
   /// the time `AuthService.signUpWithEmail` reaches this call the user has
   /// already accepted. `null` leaves the field unset, matching a legacy
   /// pre-feature account.
+  ///
+  /// [acceptedTermsVersion] / [acceptedPrivacyVersion]
+  /// (consentimiento-legal-versionado, R3): same nullable pattern as
+  /// [termsAcceptedAt] — the caller stamping consent MUST pass the current
+  /// `kTermsVersion`/`kPrivacyVersion` in the SAME call that sets
+  /// [termsAcceptedAt]. Never inferred here: this method has no opinion on
+  /// what "current" means, callers own that.
   Future<UserProfile> getOrCreate({
     required String uid,
     required String email,
     DateTime? termsAcceptedAt,
+    int? acceptedTermsVersion,
+    int? acceptedPrivacyVersion,
   }) async {
     final existing = await get(uid);
     if (existing != null) return existing;
@@ -329,6 +338,8 @@ class UserRepository {
       createdAt: now,
       updatedAt: now,
       termsAcceptedAt: termsAcceptedAt,
+      acceptedTermsVersion: acceptedTermsVersion,
+      acceptedPrivacyVersion: acceptedPrivacyVersion,
     );
 
     final batch = _firestore.batch();
