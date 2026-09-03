@@ -135,8 +135,16 @@ class _CurrentPlanCard extends StatelessWidget {
                   ],
                 ),
               ),
-              // CAMBIAR PLAN llega en PR3 (flujo Mercado Pago). Se muestra
-              // deshabilitado para no prometer una pantalla que no existe.
+              // Decia que este boton llegaba «en PR3» y que se mostraba
+              // «deshabilitado para no prometer una pantalla que no existe».
+              // Las dos cosas son falsas desde PR3: el boton esta vivo y
+              // navega, y `/facturacion/planes` existe.
+              //
+              // NO cablear el checkout aca. Este boton NAVEGA a la pricing
+              // page y nada mas; el unico punto de cobro de la app es
+              // `PlanCheckoutAvailable.start` (ver `plan_checkout.dart`).
+              // Meterlo aca daria DOS puntos de compra que se desincronizan:
+              // este no sabe si el PF eligio mensual o anual.
               _ChangePlanButton(palette: palette),
             ],
           ),

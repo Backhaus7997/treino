@@ -8,6 +8,7 @@ import '../../../../../app/theme/app_palette.dart';
 import '../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../../core/widgets/treino_icon.dart';
 import '../../../../coach/domain/subscription_tier.dart';
+import 'plan_checkout.dart';
 import 'plan_copy.dart';
 
 /// Muestra el paywall de bloqueo cuando el PF intentó agregar un alumno que
@@ -519,26 +520,55 @@ class _PrimaryCta extends StatelessWidget {
     if (isInactive) {
       return TreinoTappable(
         onTap: () {
+          // REACTIVAR ES COBRAR. Este CTA es el otro punto de entrada al pago
+          // que se ve DESDE EL TELEFONO (dashboard movil -> aceptar solicitud
+          // con la suscripcion pausada -> este modal), y es donde el dia que se
+          // cablee Mercado Pago alguien va a escribir la llamada: reactivar es
+          // la mitad del negocio de una suscripcion y la pricing page ni
+          // siquiera se lo ofrece a quien ya tiene el plan.
+          //
+          // Por eso pasa por el MISMO guard que la pricing page y no por
+          // `billingRoute == null`. La ruta es un string que hoy correlaciona
+          // con la superficie de casualidad (solo los callsites del Coach Hub
+          // la pasan): el dia que alguien agregue '/ajustes' al router movil,
+          // esa correlacion se rompe sin que nadie lo revise. La superficie no.
+          //
+          // El `switch` es exhaustivo sobre el sellado: una tercera superficie
+          // rompe la compilacion aca tambien.
+          final checkout = resolvePlanCheckout();
           final route = billingRoute;
           Navigator.of(context).pop();
-          if (route == null) {
-            // Superficie sin vista de facturacion (la app movil no tiene
-            // ninguna). Antes esto navegaba a '/ajustes' fijo y en movil moria
-            // contra una ruta inexistente: el modal decia lo correcto y el
-            // boton no hacia nada. Mejor decirlo que fingirlo.
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text(
-                  'Regularizá tu suscripción desde TREINO web.',
-                ), // i18n: Fase W3
-              ),
-            );
-            return;
+          switch (checkout) {
+            case PlanCheckoutOnWebOnly():
+              // La app informa donde se regulariza. No navega, no linkea y no
+              // abre nada: si algun dia esto arranca un cobro, es 3.1.3(c).
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Regularizá tu suscripción desde TREINO web.',
+                  ), // i18n: Fase W3
+                ),
+              );
+            case PlanCheckoutAvailable():
+              if (route == null) {
+                // Superficie que cobra pero sin vista de facturacion cableada.
+                // Antes esto navegaba a '/ajustes' fijo y en movil moria contra
+                // una ruta inexistente: el modal decia lo correcto y el boton
+                // no hacia nada. Mejor decirlo que fingirlo.
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Regularizá tu suscripción desde TREINO web.',
+                    ), // i18n: Fase W3
+                  ),
+                );
+                return;
+              }
+              // NUNCA mandar a /facturacion/planes aca: es la pagina de upsell,
+              // el mensaje opuesto al que necesita quien ya pago.
+              // TODO(producto): deep-link al tab de Facturacion cuando exista.
+              context.push(route);
           }
-          // NUNCA mandar a /facturacion/planes acá: es la página de upsell, el
-          // mensaje opuesto al que necesita quien ya pagó.
-          // TODO(producto): deep-link al tab de Facturación cuando exista.
-          context.push(route);
         },
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 13),
