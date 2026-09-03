@@ -8,6 +8,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/core/analytics/analytics_service.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
@@ -24,6 +25,8 @@ import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
 import 'package:treino/l10n/app_l10n.dart';
+
+import '../../../../../helpers/fake_analytics_service.dart';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -140,10 +143,12 @@ List<Override> _overrides({
   Map<String, UserPublicProfile> profiles = const {},
   _StubAppointmentRepository? repo,
   List<AvailabilityOverride> availabilityOverrides = const [],
+  FakeAnalyticsService? analytics,
 }) {
   final stub = repo ?? _StubAppointmentRepository();
   return [
     currentUidProvider.overrideWithValue(_kTrainerId),
+    if (analytics != null) analyticsServiceProvider.overrideWithValue(analytics),
     trainerLinksStreamProvider.overrideWith(
       (ref) => Stream.value(links),
     ),
@@ -170,6 +175,7 @@ Future<void> _openDialogViaScreen(
   Map<String, UserPublicProfile> profiles = const {},
   _StubAppointmentRepository? repo,
   List<AvailabilityOverride> availabilityOverrides = const [],
+  FakeAnalyticsService? analytics,
 }) async {
   await tester.pumpWidget(
     _wrap(
@@ -179,6 +185,7 @@ Future<void> _openDialogViaScreen(
         profiles: profiles,
         repo: repo,
         availabilityOverrides: availabilityOverrides,
+        analytics: analytics,
       ),
     ),
   );
@@ -318,6 +325,64 @@ void main() {
       expect(stub.capturedAthleteDisplayName, equals('Carlos Pérez'));
       expect(stub.capturedDurationMin, equals(45));
       expect(stub.capturedStartsAt, isNotNull);
+    });
+
+    // Fase 6 etapa 6: `appointment_created` estaba declarado en las tres
+    // implementaciones de AnalyticsService y NO lo llamaba nadie. El evento
+    // existía en el contrato y no existía en los datos.
+    testWidgets('emite appointment_created con el id de la cita creada',
+        (tester) async {
+      final analytics = FakeAnalyticsService();
+
+      await _openDialogViaScreen(
+        tester,
+        links: [_activeLink(_kAthleteId1)],
+        profiles: {_kAthleteId1: _pub(_kAthleteId1, 'Carlos Pérez')},
+        analytics: analytics,
+      );
+
+      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Carlos Pérez').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('REGISTRAR SESIÓN')); // i18n
+      await tester.pumpAndSettle();
+
+      expect(analytics.events, contains('appointment_created'));
+      final call = analytics.calls
+          .firstWhere((c) => c.name == 'appointment_created')
+          .params;
+      expect(call['appointment_id'], 'new-appt');
+      expect(call['trainer_id'], _kTrainerId);
+      expect(call['athlete_id'], _kAthleteId1);
+      // Una cita suelta es una sola ocurrencia y no es serie.
+      expect(call['occurrences'], 1);
+      expect(call['booking_type'], 'single');
+    });
+
+    testWidgets('si el repo falla, NO se emite appointment_created',
+        (tester) async {
+      // El evento tiene que contar citas que existen. Emitirlo en el catch
+      // inflaría la métrica justo cuando la feature está rota.
+      final analytics = FakeAnalyticsService();
+      final stub = _StubAppointmentRepository()..shouldThrow = true;
+
+      await _openDialogViaScreen(
+        tester,
+        links: [_activeLink(_kAthleteId1)],
+        profiles: {_kAthleteId1: _pub(_kAthleteId1, 'Carlos Pérez')},
+        repo: stub,
+        analytics: analytics,
+      );
+
+      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Carlos Pérez').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('REGISTRAR SESIÓN')); // i18n
+      await tester.pumpAndSettle();
+
+      expect(analytics.events, isNot(contains('appointment_created')));
     });
   });
 

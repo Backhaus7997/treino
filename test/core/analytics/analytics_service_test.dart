@@ -75,7 +75,7 @@ void main() {
       expect(f.events, ['chat_message_sent']);
     });
 
-    test('logAppointmentCreated', () async {
+    test('logAppointmentCreated — cita suelta', () async {
       final f = FakeAnalyticsService();
       await f.logAppointmentCreated(
         appointmentId: 'a1',
@@ -87,7 +87,29 @@ void main() {
         'appointment_id': 'a1',
         'trainer_id': 't1',
         'athlete_id': 'al1',
+        'occurrences': 1,
+        'booking_type': 'single',
       });
+    });
+
+    test('logAppointmentCreated — serie recurrente: sin id, con occurrences',
+        () async {
+      // `createRecurringByTrainer` devuelve un conteo y ningún id: no hay UNA
+      // cita que nombrar. El evento igual tiene que contar N y no 1, o la
+      // adopción de la feature se subreporta justo donde más se usa.
+      final f = FakeAnalyticsService();
+      await f.logAppointmentCreated(
+        trainerId: 't1',
+        athleteId: 'al1',
+        occurrences: 8,
+      );
+      expect(f.calls.single.params, {
+        'trainer_id': 't1',
+        'athlete_id': 'al1',
+        'occurrences': 8,
+        'booking_type': 'series',
+      });
+      expect(f.calls.single.params.containsKey('appointment_id'), isFalse);
     });
 
     test('logPaywallWriteDenied captura los 6 campos del incidente', () async {

@@ -10,6 +10,7 @@ import 'package:cloud_firestore/cloud_firestore.dart'
         SetOptions,
         Timestamp;
 
+import '../../../core/telemetry/non_fatal.dart';
 import '../../../core/utils/argentina_time.dart';
 import '../../../core/utils/weekly_streak_calculator.dart';
 import '../../profile/data/user_public_profile_repository.dart';
@@ -26,11 +27,21 @@ class SessionRepository {
   SessionRepository({
     required FirebaseFirestore firestore,
     UserPublicProfileRepository? publicProfileRepository,
+    NonFatalReporter? nonFatalReporter,
   })  : _firestore = firestore,
-        _publicProfileRepository = publicProfileRepository;
+        _publicProfileRepository = publicProfileRepository,
+        _reportNonFatal = nonFatalReporter ?? reportNonFatal;
 
   final FirebaseFirestore _firestore;
   final UserPublicProfileRepository? _publicProfileRepository;
+
+  /// Cómo se reporta un error que [finish] decide NO propagar.
+  ///
+  /// Inyectable y opcional por la misma razón que `followerCountResolver`
+  /// (ADR-WRS-13): el default es el reporter real y los tests pasan un fake
+  /// para assertear que el error viajó, en vez de tener que inicializar
+  /// Firebase.
+  final NonFatalReporter _reportNonFatal;
 
   /// Upper bound on how many recent sessions [finish] reads back when
   /// recomputing the public `workoutsCount` / `racha` counters. Caps the read
@@ -200,13 +211,33 @@ class SessionRepository {
 
       await pubRepo.updateCounters(uid, counters);
     } catch (e, st) {
-      developer.log(
-        'SessionRepository.finish: failed to update public profile counters '
-        'for $uid',
-        error: e,
-        stackTrace: st,
-      );
-      // DO NOT rethrow — public stats are best-effort
+      // DO NOT rethrow — public stats are best-effort (ADR-WRS-10): romperle
+      // el cierre de sesión al atleta por un contador es la prioridad
+      // invertida.
+      //
+      // Pero best-effort NO es "que no se entere nadie". Hasta la etapa 6 de
+      // Fase 6 esto sólo escribía a `developer.log`, que en el teléfono de un
+      // usuario real no va a ninguna parte: si el write fallaba SIEMPRE —una
+      // regla mal escrita, un campo que dejó de validar— el perfil público
+      // quedaba con números viejos y no había forma de enterarse. Ahora sale
+      // como non-fatal a Crashlytics.
+      //
+      // El try/catch de adentro no es paranoia: sin él, un reporter que tira
+      // —uno inyectado en un test, o el real si algún día deja de tragarse lo
+      // suyo— hace que la excepción salga por ACÁ y rompa `finish()`. Sería
+      // reintroducir el fallo que este catch existe para evitar, por la
+      // puerta de la telemetría. Mismo error que documenta `boundedWrite` en
+      // `firestore_write.dart`: acotar un write sin guardar es una regresión.
+      try {
+        await _reportNonFatal(
+          e,
+          st,
+          reason: 'SessionRepository.finish: failed to update public profile '
+              'counters for $uid',
+        );
+      } catch (_) {
+        // Telemetría rota no es un entrenamiento roto.
+      }
     }
   }
 

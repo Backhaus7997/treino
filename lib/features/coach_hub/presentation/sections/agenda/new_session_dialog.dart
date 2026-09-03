@@ -17,6 +17,8 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../../app/theme/app_motion.dart';
 import '../../../../../app/theme/app_palette.dart';
+import '../../../../../core/analytics/analytics_service.dart';
+import '../../../../../core/telemetry/non_fatal.dart';
 import '../../../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../../../core/widgets/motion/treino_success_check.dart';
 import '../../../../../core/widgets/motion/treino_tappable.dart';
@@ -195,7 +197,11 @@ class _NewSessionDialogState extends ConsumerState<NewSessionDialog> {
 
       final note = _noteController.text.trim();
 
-      await ref.read(appointmentRepositoryProvider).createByTrainer(
+      // Ver la nota en `new_session_sheet.dart`: el servicio se lee antes del
+      // await porque después el `ref` puede estar disposeado.
+      final analytics = ref.read(analyticsServiceProvider);
+
+      final appt = await ref.read(appointmentRepositoryProvider).createByTrainer(
             trainerId: trainerId,
             athleteId: athleteId,
             athleteDisplayName: athleteDisplayName,
@@ -203,6 +209,17 @@ class _NewSessionDialogState extends ConsumerState<NewSessionDialog> {
             durationMin: dur,
             noteBefore: note.isEmpty ? null : note,
           );
+
+      // Ver la nota del mismo evento en `new_session_sheet.dart`: va antes del
+      // guard de `mounted` porque la cita ya está escrita.
+      fireAndForget(
+        analytics.logAppointmentCreated(
+          appointmentId: appt.id,
+          trainerId: trainerId,
+          athleteId: athleteId,
+        ),
+        reason: 'analytics: appointment_created (Coach Hub) falló',
+      );
 
       if (!mounted) return;
       Navigator.of(context).pop(true);

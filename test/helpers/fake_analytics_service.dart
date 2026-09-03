@@ -24,6 +24,27 @@ class FakeAnalyticsService implements AnalyticsService {
   /// necesita assertear los parámetros además del nombre.
   final List<({String name, Map<String, Object?> params})> calls = [];
 
+  /// Aplica la MISMA restricción que `firebase_analytics`: un valor de
+  /// parámetro sólo puede ser `String` o `num`
+  /// (`_assertParameterTypesAreCorrect`, 11.6.0).
+  ///
+  /// Sin esto el fake es más permisivo que la plataforma, y ahí el test verde
+  /// deja de significar algo: un `bool` pasaba por acá y en el device rompía
+  /// el evento entero. Pasó con `appointment_created` — lo agarró un review
+  /// bot, no la suite. Un doble que no modela la restricción que importa es
+  /// un doble que miente.
+  void _registrar(String name, Map<String, Object?> params) {
+    for (final e in params.entries) {
+      assert(
+        e.value is String || e.value is num,
+        "firebase_analytics sólo acepta String o num: el parámetro "
+        "'${e.key}' del evento '$name' es ${e.value.runtimeType}",
+      );
+    }
+    events.add(name);
+    calls.add((name: name, params: params));
+  }
+
   @override
   Future<void> logRoutineStarted({
     required String routineId,
@@ -111,19 +132,18 @@ class FakeAnalyticsService implements AnalyticsService {
 
   @override
   Future<void> logAppointmentCreated({
-    required String appointmentId,
+    String? appointmentId,
     required String trainerId,
     required String athleteId,
+    int occurrences = 1,
   }) async {
-    events.add('appointment_created');
-    calls.add((
-      name: 'appointment_created',
-      params: {
-        'appointment_id': appointmentId,
-        'trainer_id': trainerId,
-        'athlete_id': athleteId,
-      }
-    ));
+    _registrar('appointment_created', {
+      if (appointmentId != null) 'appointment_id': appointmentId,
+      'trainer_id': trainerId,
+      'athlete_id': athleteId,
+      'occurrences': occurrences,
+      'booking_type': occurrences > 1 ? 'series' : 'single',
+    });
   }
 
   @override
