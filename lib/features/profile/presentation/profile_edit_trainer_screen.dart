@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
+import '../../../core/utils/location_precision.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/utils/geohash.dart';
 import '../../../l10n/app_l10n.dart';
@@ -1044,7 +1045,8 @@ class _CustomLocationSheetState extends State<_CustomLocationSheet> {
         });
         return;
       }
-      final pos = await Geolocator.getCurrentPosition();
+      final pos = await Geolocator.getCurrentPosition(
+          locationSettings: kTrainerLocationSettings);
       setState(() {
         _lat = pos.latitude;
         _lng = pos.longitude;

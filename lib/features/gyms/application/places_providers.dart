@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 
+import '../../../core/utils/location_precision.dart';
 import '../../../core/utils/geohash.dart';
 import '../../profile/application/user_providers.dart'
     show userRepositoryProvider;
@@ -93,7 +94,8 @@ final gymSearchLocationBiasProvider = FutureProvider.autoDispose<Position?>(
       final granted = permission == LocationPermission.always ||
           permission == LocationPermission.whileInUse;
       if (!granted) return null;
-      return await Geolocator.getCurrentPosition();
+      return await Geolocator.getCurrentPosition(
+          locationSettings: kAthleteLocationSettings);
     } catch (_) {
       return null;
     }
@@ -307,7 +309,8 @@ class NearbyLocationNotifier extends StateNotifier<AsyncValue<Position?>> {
         return;
       }
       _isPermissionDenied = false;
-      state = AsyncData(await Geolocator.getCurrentPosition());
+      state = AsyncData(await Geolocator.getCurrentPosition(
+          locationSettings: kAthleteLocationSettings));
     } catch (_) {
       _isPermissionDenied = true;
       state = const AsyncData(null);
@@ -329,7 +332,8 @@ class NearbyLocationNotifier extends StateNotifier<AsyncValue<Position?>> {
         state = const AsyncData(null);
         return;
       }
-      final pos = await Geolocator.getCurrentPosition();
+      final pos = await Geolocator.getCurrentPosition(
+          locationSettings: kAthleteLocationSettings);
       state = AsyncData(pos);
     } catch (e, st) {
       state = AsyncError(e, st);
@@ -371,7 +375,11 @@ final nearbyLocationProvider =
 /// — `searchNearby` needs real coordinates, not the bucket string itself.
 /// Uses the same base32 alphabet as `geohash5` (core/utils/geohash.dart);
 /// duplicated here as the inverse operation rather than adding a shared
-/// decode function with only one caller.
+/// decode function. Ahora tiene DOS llamadores en este archivo
+/// (`nearbyGymsProvider` y la búsqueda por texto): los dos mandan a Places el
+/// centro de la celda y no el punto del usuario. Si aparece un tercero fuera
+/// de este archivo, ahí sí conviene moverlo a `core/utils/geohash.dart` al
+/// lado de su inversa.
 (double, double) _decodeGeohashBucketCenter(String bucket) {
   const base32 = '0123456789bcdefghjkmnpqrstuvwxyz';
   double minLat = -90.0, maxLat = 90.0;
@@ -542,6 +550,29 @@ final placesTextSearchProvider =
     if (disposed) return const [];
 
     final position = await ref.watch(gymSearchLocationBiasProvider.future);
+
+    // El bias va REDONDEADO al centro de la celda geohash5 (~4,9 km), igual
+    // que en `nearbyGymsProvider`. Antes viajaban `position.latitude` y
+    // `position.longitude` crudas. Dos razones para cambiarlo, y la segunda
+    // es un bug, no una preferencia:
+    //
+    // 1. Las coordenadas exactas del usuario no tienen por qué salir del
+    //    teléfono para sesgar una búsqueda de texto. La sección "4. Ubicación"
+    //    de `legal_content.dart` ahora afirma exactamente esto — que lo que
+    //    sale es una zona de ~5 km y no tu punto—, y una afirmación de ese
+    //    tipo en un texto legal tiene que ser cierta en el código.
+    //
+    // 2. La cache key YA era la celda (`_textSearchCacheKey`), así que dos
+    //    usuarios en la misma celda comparten resultados. Con el punto exacto
+    //    en el request, los resultados que reusaba el segundo los había
+    //    moldeado la posición precisa del PRIMERO. Mandar celda y cachear por
+    //    celda es lo consistente.
+    final biasBucket = position == null
+        ? null
+        : geohash5(position.latitude, position.longitude);
+    final biasCenter =
+        biasBucket == null ? null : _decodeGeohashBucketCenter(biasBucket);
+
     final cacheKey = _textSearchCacheKey(trimmed, position);
 
     final cache = ref.watch(textSearchCacheProvider);
@@ -551,8 +582,8 @@ final placesTextSearchProvider =
     final service = ref.watch(placesTextSearchServiceProvider);
     final results = await service.search(
       textQuery: trimmed,
-      biasLatitude: position?.latitude,
-      biasLongitude: position?.longitude,
+      biasLatitude: biasCenter?.$1,
+      biasLongitude: biasCenter?.$2,
     );
 
     cache.put(cacheKey, results);

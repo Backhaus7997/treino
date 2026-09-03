@@ -16,6 +16,7 @@ void main() {
       const LegalDocumentScreen(
         title: 'Términos y Condiciones',
         sections: kTermsSections,
+        lastUpdated: kTermsLastUpdated,
       ),
     ));
     await tester.pumpAndSettle();
@@ -31,11 +32,34 @@ void main() {
       const LegalDocumentScreen(
         title: 'Política de Privacidad',
         sections: kPrivacySections,
+        lastUpdated: kPrivacyLastUpdated,
       ),
     ));
     await tester.pumpAndSettle();
 
     expect(find.text('Política de Privacidad'), findsOneWidget);
     expect(find.text(kPrivacySections.first.heading), findsOneWidget);
+  });
+
+  testWidgets('cada documento muestra SU propia fecha de revisión',
+      (tester) async {
+    // Antes las dos salían de una constante compartida, así que reescribir
+    // la política dejaba la fecha de junio o le inventaba una revisión a los
+    // Términos. Lo trajo el review del #941.
+    await tester.pumpWidget(wrap(
+      const LegalDocumentScreen(
+        title: 'Política de Privacidad',
+        sections: kPrivacySections,
+        lastUpdated: kPrivacyLastUpdated,
+      ),
+    ));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.textContaining('Última actualización'),
+      300,
+    );
+
+    expect(find.textContaining(kPrivacyLastUpdated), findsOneWidget);
+    expect(find.textContaining(kTermsLastUpdated), findsNothing);
   });
 }

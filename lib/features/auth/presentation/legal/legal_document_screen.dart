@@ -19,10 +19,15 @@ class LegalDocumentScreen extends StatelessWidget {
     super.key,
     required this.title,
     required this.sections,
+    required this.lastUpdated,
   });
 
   final String title;
   final List<LegalSection> sections;
+
+  /// La fecha de ESTE documento. Antes salía de una constante global, así que
+  /// los dos documentos mostraban siempre la misma.
+  final String lastUpdated;
 
   @override
   Widget build(BuildContext context) {
@@ -87,7 +92,7 @@ class LegalDocumentScreen extends StatelessWidget {
                         return Padding(
                           padding: const EdgeInsets.only(top: 8),
                           child: Text(
-                            'Última actualización: $kLegalLastUpdated.\n'
+                            'Última actualización: $lastUpdated.\n'
                             'Consultas: $kLegalContactEmail',
                             style: GoogleFonts.barlow(
                               fontSize: 12,

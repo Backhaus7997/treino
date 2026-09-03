@@ -78,6 +78,7 @@ String _pagina({
   required String titulo,
   required String subtitulo,
   required List<LegalSection> secciones,
+  required String ultimaActualizacion,
 }) {
   final cuerpo = secciones
       .map((s) => '''
@@ -109,7 +110,7 @@ $_bannerGenerado
 $cuerpo
 
   <footer>
-    Última actualización: ${_escape(kLegalLastUpdated)}.<br>
+    Última actualización: ${_escape(ultimaActualizacion)}.<br>
     Consultas: <a href="mailto:${_escape(kLegalContactEmail)}">${_escape(kLegalContactEmail)}</a><br>
     <a href="/legal/terminos.html">Términos y Condiciones</a> ·
     <a href="/legal/privacidad.html">Política de Privacidad</a> ·
@@ -220,12 +221,14 @@ void main() {
     subtitulo:
         'Qué datos tuyos guarda TREINO, para qué, y qué podés hacer con ellos.',
     secciones: kPrivacySections,
+    ultimaActualizacion: kPrivacyLastUpdated,
   ));
 
   File('web/legal/terminos.html').writeAsStringSync(_pagina(
     titulo: 'Términos y Condiciones',
     subtitulo: 'Las reglas de uso de TREINO. En castellano y sin letra chica.',
     secciones: kTermsSections,
+    ultimaActualizacion: kTermsLastUpdated,
   ));
 
   stdout.writeln('Generado:');
