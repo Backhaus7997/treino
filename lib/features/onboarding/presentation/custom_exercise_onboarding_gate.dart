@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../l10n/app_l10n.dart';
@@ -94,10 +95,18 @@ Future<void> maybeShowCustomExerciseOnboarding({
   final tourOpen = ref.read(onboardingTourOpenProvider.notifier);
   final onboardingController = ref.read(onboardingControllerProvider);
 
+  // El CTA dice "CREAR MI EJERCICIO" y hasta ahora sólo cerraba el modal: el
+  // gate le pasaba el MISMO `onClose` a `onFinish` y a `onSkip`, así que
+  // apretar el botón y saltar hacían lo mismo. Un botón que nombra una acción
+  // y no la ejecuta es peor que no tenerlo — el usuario aprende a no creerle.
+  //
+  // `null` cuando se cerró por arrastre o por back: eso no es el CTA.
+  bool? cerroPorCta;
+
   tourOpen.state = true;
   try {
     if (isWeb) {
-      await showDialog<void>(
+      cerroPorCta = await showDialog<bool>(
         context: context,
         // Exits are SALTAR and the CTA. Both persist the flag; a stray click on
         // the scrim should not decide whether the user ever sees this.
@@ -106,11 +115,12 @@ Future<void> maybeShowCustomExerciseOnboarding({
         builder: (dialogContext) => _OnboardingDialog(
           slides: slides,
           l10n: l10n,
-          onClose: () => Navigator.of(dialogContext).pop(),
+          onFinish: () => Navigator.of(dialogContext).pop(true),
+          onSkip: () => Navigator.of(dialogContext).pop(false),
         ),
       );
     } else {
-      await showModalBottomSheet<void>(
+      cerroPorCta = await showModalBottomSheet<bool>(
         context: context,
         // Without this the sheet is pushed under `_ShellScaffold` and the
         // bottom bar sits on top of it.
@@ -128,7 +138,8 @@ Future<void> maybeShowCustomExerciseOnboarding({
         builder: (sheetContext) => _OnboardingSheet(
           slides: slides,
           l10n: l10n,
-          onClose: () => Navigator.of(sheetContext).pop(),
+          onFinish: () => Navigator.of(sheetContext).pop(true),
+          onSkip: () => Navigator.of(sheetContext).pop(false),
         ),
       );
     }
@@ -142,6 +153,19 @@ Future<void> maybeShowCustomExerciseOnboarding({
     // never throws into the caller's `initState`.
     await onboardingController.markSeen(surface);
   }
+
+  // Después del `finally`: el flag se persiste igual, se navegue o no.
+  if (cerroPorCta != true || !context.mounted) return;
+  if (isWeb) {
+    // La web NO tiene el editor de ejercicios ruteado
+    // (`coach_hub_router.dart` no lo declara): ahí se crea desde el diálogo
+    // del picker, adentro del editor de rutina. Navegar no es posible todavía
+    // y mandarlo a una ruta inexistente sería peor que no hacer nada.
+    return;
+  }
+  // `/profile/my-exercises/new` — `'new'` es el centinela que abre el editor
+  // en blanco (ver `CustomExerciseEditorScreen.isEditing`).
+  context.push('/profile/my-exercises/new');
 }
 
 /// Mobile presentation: bottom sheet, content owns its chrome.
@@ -152,12 +176,17 @@ class _OnboardingSheet extends StatelessWidget {
   const _OnboardingSheet({
     required this.slides,
     required this.l10n,
-    required this.onClose,
+    required this.onFinish,
+    required this.onSkip,
   });
 
   final List<OnboardingCardContent> slides;
   final AppL10n l10n;
-  final VoidCallback onClose;
+  /// Separados a propósito: el CTA navega al editor de ejercicios y SALTAR no.
+  /// Con un solo callback para los dos, el botón que dice "CREAR MI EJERCICIO"
+  /// no se distinguía de saltear.
+  final VoidCallback onFinish;
+  final VoidCallback onSkip;
 
   @override
   Widget build(BuildContext context) {
@@ -179,8 +208,8 @@ class _OnboardingSheet extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
           child: CustomExerciseOnboardingView(
             slides: slides,
-            onFinish: onClose,
-            onSkip: onClose,
+            onFinish: onFinish,
+            onSkip: onSkip,
             skipLabel: l10n.onboardingTourSkip,
             nextLabel: l10n.onboardingTourNext,
             finishLabel: l10n.onboardingCustomExerciseCta,
@@ -198,12 +227,17 @@ class _OnboardingDialog extends StatelessWidget {
   const _OnboardingDialog({
     required this.slides,
     required this.l10n,
-    required this.onClose,
+    required this.onFinish,
+    required this.onSkip,
   });
 
   final List<OnboardingCardContent> slides;
   final AppL10n l10n;
-  final VoidCallback onClose;
+  /// Separados a propósito: el CTA navega al editor de ejercicios y SALTAR no.
+  /// Con un solo callback para los dos, el botón que dice "CREAR MI EJERCICIO"
+  /// no se distinguía de saltear.
+  final VoidCallback onFinish;
+  final VoidCallback onSkip;
 
   @override
   Widget build(BuildContext context) {
@@ -222,8 +256,8 @@ class _OnboardingDialog extends StatelessWidget {
           child: CustomExerciseOnboardingView(
             slides: slides,
             layout: CustomExerciseOnboardingLayout.dialog,
-            onFinish: onClose,
-            onSkip: onClose,
+            onFinish: onFinish,
+            onSkip: onSkip,
             skipLabel: l10n.onboardingTourSkip,
             nextLabel: l10n.onboardingTourNext,
             finishLabel: l10n.onboardingCustomExerciseCta,
