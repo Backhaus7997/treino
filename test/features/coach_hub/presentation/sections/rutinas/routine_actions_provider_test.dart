@@ -11,6 +11,7 @@ import 'package:treino/features/workout/application/routine_providers.dart';
 import 'package:treino/features/workout/data/routine_repository.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/workout/domain/routine.dart';
+import 'package:treino/features/workout/domain/routine_status.dart';
 
 class _MockRoutineRepository extends Mock implements RoutineRepository {}
 
@@ -65,25 +66,29 @@ void main() {
     });
 
     test(
-        'invalida también routineByIdProvider — la rutina archivada dejaba de '
-        'aparecer en el listado pero seguía siendo arrancable', () async {
+        'invalida también routineByIdProvider — la caché single-doc se quedaba '
+        'con el `status: active` previo al archivado', () async {
       when(() => mockRepo.archive(any())).thenAnswer((_) async {});
 
-      // El doc "vivo" antes de archivar, y el archivado después. Sin la
-      // invalidación, `routineByIdProvider` sigue devolviendo el primero para
-      // toda la vida del proceso: su keepAlive sólo se suelta si el fetch tira.
+      // El stub imita lo que hace el repo DE VERDAD: `archive` sólo escribe
+      // `status: archived`, el doc sigue existiendo y `_fromDoc` únicamente
+      // devuelve null cuando `!snap.exists`. Un stub que devolviera null acá
+      // haría pasar el test por un comportamiento que producción no tiene.
       var archived = false;
       var getByIdCalls = 0;
       when(() => mockRepo.getById('r1')).thenAnswer((_) async {
         getByIdCalls++;
-        return archived ? null : _makeRoutine('r1');
+        return _makeRoutine(
+          'r1',
+          status: archived ? RoutineStatus.archived : RoutineStatus.active,
+        );
       });
 
       final container = makeContainer();
       addTearDown(container.dispose);
 
       final before = await container.read(routineByIdProvider('r1').future);
-      expect(before, isNotNull);
+      expect(before!.status, RoutineStatus.active);
       expect(getByIdCalls, 1);
 
       archived = true;
@@ -91,8 +96,11 @@ void main() {
           .read(routineActionsProvider.notifier)
           .archive(routineId: 'r1', athleteId: _athleteId);
 
+      // Sin la invalidación esto seguiría dando `active`: el keepAlive de
+      // `_cacheOnlyOnSuccess` sólo se suelta si el fetch TIRA, así que el doc
+      // previo al archivado quedaba servido para toda la vida del proceso.
       final after = await container.read(routineByIdProvider('r1').future);
-      expect(after, isNull);
+      expect(after!.status, RoutineStatus.archived);
       expect(getByIdCalls, 2,
           reason: 'la caché single-doc tiene que refetchear tras el archive');
     });
@@ -112,9 +120,14 @@ void main() {
   });
 }
 
-Routine _makeRoutine(String id) => Routine(
+Routine _makeRoutine(
+  String id, {
+  RoutineStatus status = RoutineStatus.active,
+}) =>
+    Routine(
       id: id,
       name: 'Plan',
       level: ExperienceLevel.intermediate,
       days: const [],
+      status: status,
     );
