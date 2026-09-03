@@ -431,6 +431,10 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
   bool _publishing = false;
 
   Future<void> _onDelete(BuildContext context) async {
+    // Captured BEFORE the confirmation dialog, not just before the write: the
+    // cache drop must land even if this card is disposed mid-delete, and a
+    // BuildContext read after an async gap is exactly what we cannot do then.
+    final container = ProviderScope.containerOf(context, listen: false);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -477,6 +481,10 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
       await ref
           .read(routineRepositoryProvider)
           .deleteRoutine(widget.template.id);
+      // The stream-backed list heals itself; the one-shot single-doc caches do
+      // not. Without this, `routineByIdProvider` keeps handing out a routine
+      // whose Firestore doc no longer exists for the rest of the process.
+      invalidateRoutineById(container, widget.template.id);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Plantilla eliminada.')),
@@ -493,6 +501,8 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
   }
 
   Future<void> _onTogglePublished(BuildContext context) async {
+    // Captured BEFORE the confirmation dialog — see _onDelete.
+    final container = ProviderScope.containerOf(context, listen: false);
     final isPublished = widget.template.visibility == RoutineVisibility.public;
     final confirmed = await showDialog<bool>(
       context: context,
@@ -547,6 +557,10 @@ class _TemplateCardState extends ConsumerState<_TemplateCard> {
       } else {
         await repo.publishTemplate(widget.template.id);
       }
+      // `visibility` is exactly what the cached copy gets wrong here: an
+      // unpublished template stays "public" for every one-shot reader, and
+      // `visibleRoutineByIdProvider` keeps resolving it instead of null.
+      invalidateRoutineById(container, widget.template.id);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

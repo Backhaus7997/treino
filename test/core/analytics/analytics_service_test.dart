@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/core/analytics/analytics_service.dart';
 
 import '../../helpers/fake_analytics_service.dart';
 
@@ -86,6 +87,37 @@ void main() {
         'appointment_id': 'a1',
         'trainer_id': 't1',
         'athlete_id': 'al1',
+      });
+    });
+
+    test('logPaywallWriteDenied captura los 6 campos del incidente', () async {
+      // Entrada en la canary porque este evento es la unica senal
+      // server-visible del enforcement: Firestore no loguea las denegaciones
+      // de reglas en ningun lado consultable y el Coach Hub web no inicializa
+      // Crashlytics. Un campo que se cae en silencio no lo agarra nadie hasta
+      // el dia del incidente, que es tarde.
+      final f = FakeAnalyticsService();
+      await f.logPaywallWriteDenied(
+        trainerId: 't1',
+        athleteId: 'a1',
+        collection: 'routines',
+        operation: 'create',
+        surface: 'routine_editor_web',
+        athleteEntitlement: 'blocked',
+      );
+      // El literal se assertea a proposito, y no `kPaywallWriteDeniedEvent`:
+      // la constante la comparten el fake y `FirebaseAnalyticsService`, asi
+      // que pinear el string aca pinea tambien el nombre que llega a BigQuery.
+      // Con la constante de los dos lados el assert se cumpliria solo.
+      expect(f.events, ['paywall_write_denied']);
+      expect(kPaywallWriteDeniedEvent, 'paywall_write_denied');
+      expect(f.calls.single.params, {
+        'trainer_id': 't1',
+        'athlete_id': 'a1',
+        'collection': 'routines',
+        'operation': 'create',
+        'surface': 'routine_editor_web',
+        'athlete_entitlement': 'blocked',
       });
     });
 

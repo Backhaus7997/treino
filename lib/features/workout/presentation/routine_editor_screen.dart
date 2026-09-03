@@ -29,7 +29,8 @@ import '../domain/custom_exercise.dart' show CustomExercise;
 import '../application/exercise_filter.dart'
     show customToExercise, exerciseMatchesFilters;
 import '../application/exercise_providers.dart' show exercisesProvider;
-import '../application/routine_providers.dart' show routineRepositoryProvider;
+import '../application/routine_providers.dart'
+    show invalidateRoutineById, routineRepositoryProvider;
 import '../application/session_providers.dart' show currentUidProvider;
 import '../application/user_routines_providers.dart'
     show userCreatedRoutinesProvider;
@@ -2485,6 +2486,10 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     final days = _buildDays();
     // Capture l10n before async gap (context may be stale after await).
     final l10n = AppL10n.of(context);
+    // Same reason, different consumer: the post-write cache invalidation must
+    // survive an unmount during the save, and a WidgetRef touched after dispose
+    // throws. The container does not care whether this screen is still alive.
+    final container = ProviderScope.containerOf(context, listen: false);
 
     try {
       final repo = ref.read(routineRepositoryProvider);
@@ -2506,6 +2511,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             summary: _summaryOrNull,
           );
           await repo.updateAssigned(uid: uid, draft: draft);
+          invalidateRoutineById(container, planId);
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(l10n.coachUpdatePlanSuccess)),
@@ -2555,6 +2561,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             goals: _goalsOrdered,
           );
           await repo.updateTemplate(uid: uid, draft: draft);
+          invalidateRoutineById(container, templateId);
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(l10n.coachUpdatePlanSuccess)),
@@ -2674,6 +2681,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             numWeeks: _numWeeks,
           );
           await repo.updateUserOwned(uid: uid, draft: draft);
+          invalidateRoutineById(container, existingId);
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(l10n.workoutSelfEditorUpdateSuccess)),

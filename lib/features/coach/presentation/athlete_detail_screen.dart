@@ -37,7 +37,7 @@ import '../../insights/domain/chart_period.dart';
 import '../../workout/application/assigned_routine_providers.dart';
 import '../../workout/application/exercise_frequency_providers.dart';
 import '../../workout/application/routine_providers.dart'
-    show routineRepositoryProvider;
+    show invalidateRoutineById, routineRepositoryProvider;
 import '../../workout/application/session_providers.dart'
     show currentUidProvider, sessionsByUidProvider, coachSessionSetLogsProvider;
 import '../../workout/domain/routine.dart';
@@ -490,9 +490,15 @@ class _PlanesSection extends ConsumerWidget {
       ),
     );
     if (confirmed != true || !context.mounted) return;
+    // Captured before the async gap so the cache drop survives an unmount.
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
       await ref.read(routineRepositoryProvider).deleteRoutine(plan.id);
       ref.invalidate(assignedRoutinesProvider(athleteId));
+      // The athlete's list is not the only reader: the one-shot single-doc
+      // caches would keep serving the deleted plan for the rest of the
+      // process, "empezar sesión" included.
+      invalidateRoutineById(container, plan.id);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
