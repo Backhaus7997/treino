@@ -434,6 +434,91 @@ class UserRepository {
     await batch.commit();
   }
 
+  /// Grants trainer location-publication consent (R8) — the ACCEPT exit of
+  /// the consent prompt, and the confirmation before a trainer's first-ever
+  /// location save (D-F).
+  ///
+  /// Single `batch.commit()`:
+  ///  - `users/{uid}`: stamps `trainerLocationConsentAt` AND
+  ///    `trainerLocationConsentPromptedAt` to now.
+  ///  - `trainerPublicProfiles/{uid}`: RE-MIRRORS the trainer's
+  ///    currently-stored `trainerLocations`/`trainerGeohashes`. This is not
+  ///    optional — a consent-only write carries no location keys, so without
+  ///    the explicit re-mirror the trainer would be stamped as consented
+  ///    while `_trainerPublicSubsetFromPartial`'s gate (R6) has nothing to
+  ///    let through yet, leaving them "consented but invisible" (design D-C).
+  Future<void> grantTrainerLocationConsent(String uid) async {
+    final now = Timestamp.fromDate(DateTime.now().toUtc());
+    final snap = await _users.doc(uid).get();
+    final stored = snap.data();
+
+    final batch = _firestore.batch();
+    batch.set(
+      _users.doc(uid),
+      {
+        'trainerLocationConsentAt': now,
+        'trainerLocationConsentPromptedAt': now,
+      },
+      SetOptions(merge: true),
+    );
+    batch.set(
+      _trainerPublicProfiles.doc(uid),
+      {
+        'uid': uid,
+        'trainerLocations': stored?['trainerLocations'] ?? const <Object?>[],
+        'trainerGeohashes': stored?['trainerGeohashes'] ?? const <Object?>[],
+      },
+      SetOptions(merge: true),
+    );
+    await batch.commit();
+  }
+
+  /// Revokes trainer location-publication consent (R8) — the "APAGAR LA
+  /// PUBLICACIÓN" exit of the consent prompt, and the revoke path from
+  /// `profile_edit_trainer_screen.dart`'s status row.
+  ///
+  /// Single `batch.commit()`:
+  ///  - `users/{uid}`: writes ONLY `{trainerLocationConsentAt: null,
+  ///    trainerLocationConsentPromptedAt: now}` — ZERO location-guard keys.
+  ///    T1: `_assertTrainerLocationStateIsValid` only evaluates when a
+  ///    partial contains BOTH `trainerLocations` and `trainerOffersOnline`;
+  ///    since neither is ever in this partial, the guard is a correct no-op
+  ///    and the trainer's private location data on `users/{uid}` (including
+  ///    the deprecated singular fields) is left completely untouched — no
+  ///    data loss for exercising a legal right.
+  ///  - `trainerPublicProfiles/{uid}`: clears all 5 location keys
+  ///    (`trainerLocations`, `trainerGeohashes`, `trainerLatitude`,
+  ///    `trainerLongitude`, `trainerGeohash`). `trainerOffersOnline` is NOT a
+  ///    location key and is left untouched — a trainer who does not also
+  ///    offer online classes becomes unreachable via nearby-location search,
+  ///    which is the accepted consequence of their own choice (design R3),
+  ///    not something this method compensates for by forcing the flag.
+  Future<void> revokeTrainerLocationConsent(String uid) async {
+    final now = Timestamp.fromDate(DateTime.now().toUtc());
+    final batch = _firestore.batch();
+    batch.set(
+      _users.doc(uid),
+      {
+        'trainerLocationConsentAt': null,
+        'trainerLocationConsentPromptedAt': now,
+      },
+      SetOptions(merge: true),
+    );
+    batch.set(
+      _trainerPublicProfiles.doc(uid),
+      {
+        'uid': uid,
+        'trainerLocations': const <Object?>[],
+        'trainerGeohashes': const <Object?>[],
+        'trainerLatitude': null,
+        'trainerLongitude': null,
+        'trainerGeohash': null,
+      },
+      SetOptions(merge: true),
+    );
+    await batch.commit();
+  }
+
   Stream<UserProfile?> watch(String uid) {
     return _users
         .doc(uid)
