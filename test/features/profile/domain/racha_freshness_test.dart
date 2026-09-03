@@ -2,72 +2,137 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/core/utils/argentina_time.dart';
 import 'package:treino/features/profile/domain/racha_freshness.dart';
 
-// [#552] Unit del decay puro. El frame es ART: un stamp de "hoy" o "ayer"
-// (calendario argentino) mantiene el valor; 2+ días lo colapsa a 0; sin stamp
-// (doc legacy) el valor pasa tal cual.
+// [#552 → semanas 2026-09-02] Unit del decay puro. El frame es ART y la
+// ventana ahora se mide en SEMANAS lunes-domingo: un sello de la semana en
+// curso o de la anterior mantiene el valor; 2+ semanas lo colapsa a 0.
+// Sin sello → 0, no passthrough: un valor viejo son DÍAS y mostrarlo como
+// semanas sería inflar el número en un board público (AGENTS.md §11.1).
 
 void main() {
-  // Ancla fija: 2026-07-24 12:00 ART == 15:00Z. Independiente del TZ de la
-  // máquina (CI en UTC, dev en ART).
+  // Ancla fija: viernes 2026-07-24 12:00 ART == 15:00Z. Independiente del TZ
+  // de la máquina (CI en UTC, dev en ART). Su lunes es el 2026-07-20.
   final now = DateTime.utc(2026, 7, 24, 15);
 
   DateTime artNoon(int y, int m, int d) => DateTime.utc(y, m, d, 15);
 
-  test('stamp de hoy → valor intacto', () {
+  test('sello de esta semana → valor intacto', () {
     expect(
-      effectiveRacha(racha: 3, rachaUpdatedAt: artNoon(2026, 7, 24), now: now),
+      effectiveRachaSemanas(
+        rachaSemanas: 3,
+        rachaSemanasUpdatedAt: artNoon(2026, 7, 22), // miércoles, misma semana
+        now: now,
+      ),
       3,
     );
   });
 
-  test('stamp de ayer → valor intacto (día de gracia de computeStreak)', () {
+  test('sello del lunes de esta semana → valor intacto (borde inclusivo)', () {
     expect(
-      effectiveRacha(racha: 3, rachaUpdatedAt: artNoon(2026, 7, 23), now: now),
+      effectiveRachaSemanas(
+        rachaSemanas: 3,
+        rachaSemanasUpdatedAt: artNoon(2026, 7, 20),
+        now: now,
+      ),
       3,
     );
   });
 
-  test('stamp de hace 2 días → 0 (la racha ya no está viva)', () {
+  test('sello de la semana pasada → intacto: la semana en curso no corta', () {
+    // Domingo 19/07, último día de la semana anterior. El atleta todavía no
+    // entrenó esta semana, pero `computeWeeklyStreak` no la da por perdida.
     expect(
-      effectiveRacha(racha: 3, rachaUpdatedAt: artNoon(2026, 7, 22), now: now),
+      effectiveRachaSemanas(
+        rachaSemanas: 3,
+        rachaSemanasUpdatedAt: artNoon(2026, 7, 19),
+        now: now,
+      ),
+      3,
+    );
+  });
+
+  test('sello de hace 2 semanas → 0 (hubo una semana cerrada sin entrenar)',
+      () {
+    expect(
+      effectiveRachaSemanas(
+        rachaSemanas: 3,
+        rachaSemanasUpdatedAt: artNoon(2026, 7, 10), // viernes, 2 semanas atrás
+        now: now,
+      ),
       0,
     );
   });
 
-  test('stamp de hace 10 días → 0', () {
+  test('sello de hace 10 semanas → 0', () {
     expect(
-      effectiveRacha(racha: 5, rachaUpdatedAt: artNoon(2026, 7, 14), now: now),
+      effectiveRachaSemanas(
+        rachaSemanas: 5,
+        rachaSemanasUpdatedAt: artNoon(2026, 5, 15),
+        now: now,
+      ),
       0,
     );
   });
 
-  test('sin stamp (doc legacy pre-#552) → passthrough del valor crudo', () {
-    expect(effectiveRacha(racha: 1, rachaUpdatedAt: null, now: now), 1);
-    expect(effectiveRacha(racha: null, rachaUpdatedAt: null, now: now), 0);
+  test('sin sello (doc que nunca escribió el campo nuevo) → 0, NO passthrough',
+      () {
+    // El cambio de default respecto de la versión por días es deliberado: un
+    // valor sin sello viene de la era en DÍAS y mostrarlo como semanas pondría
+    // un 23 donde corresponde un 3.
+    expect(
+      effectiveRachaSemanas(
+        rachaSemanas: 23,
+        rachaSemanasUpdatedAt: null,
+        now: now,
+      ),
+      0,
+    );
+    expect(
+      effectiveRachaSemanas(
+        rachaSemanas: null,
+        rachaSemanasUpdatedAt: null,
+        now: now,
+      ),
+      0,
+    );
   });
 
-  test('stamp "futuro" (skew de reloj device vs serverTimestamp) → fresco', () {
+  test('sello "futuro" (skew de reloj device vs serverTimestamp) → fresco', () {
     expect(
-      effectiveRacha(racha: 2, rachaUpdatedAt: artNoon(2026, 7, 25), now: now),
+      effectiveRachaSemanas(
+        rachaSemanas: 2,
+        rachaSemanasUpdatedAt: artNoon(2026, 7, 27), // lunes siguiente
+        now: now,
+      ),
       2,
     );
   });
 
-  test('borde ART: stamp 23:30 ART de ayer sigue siendo ayer, no anteayer', () {
-    // 23:30 ART del 23/07 == 02:30Z del 24/07 — en frame UTC parecería "hoy";
-    // el decay debe bucketear en ART (mismo criterio que computeStreak).
-    final lateNightArt = DateTime.utc(2026, 7, 24, 2, 30);
-    expect(toArgentina(lateNightArt).day, 23, reason: 'sanity del fixture');
+  test('borde ART: domingo 23:30 ART sigue en la semana que cierra', () {
+    // 23:30 ART del domingo 19/07 == 02:30Z del lunes 20/07 — en frame UTC
+    // parecería la semana en curso; en ART todavía es la anterior. Cae en la
+    // semana de gracia igual, así que el valor sobrevive; el assert de sanity
+    // es el que fija que el bucketeo se hace en ART.
+    final lateSundayArt = DateTime.utc(2026, 7, 20, 2, 30);
+    expect(toArgentina(lateSundayArt).weekday, DateTime.sunday,
+        reason: 'sanity del fixture');
     expect(
-      effectiveRacha(racha: 4, rachaUpdatedAt: lateNightArt, now: now),
+      effectiveRachaSemanas(
+        rachaSemanas: 4,
+        rachaSemanasUpdatedAt: lateSundayArt,
+        now: now,
+      ),
       4,
     );
   });
 
-  test('racha 0 con stamp fresco → 0 (0 es un valor honesto, no se inventa)',
+  test('racha 0 con sello fresco → 0 (0 es un valor honesto, no se inventa)',
       () {
     expect(
-      effectiveRacha(racha: 0, rachaUpdatedAt: artNoon(2026, 7, 24), now: now),
+      effectiveRachaSemanas(
+        rachaSemanas: 0,
+        rachaSemanasUpdatedAt: artNoon(2026, 7, 24),
+        now: now,
+      ),
       0,
     );
   });

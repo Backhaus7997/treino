@@ -118,6 +118,7 @@ void main() {
       totalVolumeKg: totalVolumeKg,
       durationMin: 45,
       wasFullyCompleted: true,
+      weeklyTarget: 1,
     );
     return session.id;
   }

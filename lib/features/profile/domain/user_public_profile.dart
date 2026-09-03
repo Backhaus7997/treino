@@ -40,7 +40,24 @@ class UserPublicProfile with _$UserPublicProfile {
     /// See gyms-foundation Phase 3 (name resolution + denormalization).
     String? gymName,
     int? workoutsCount,
+
+    /// LEGACY — racha en DÍAS. Congelado: ya no se escribe ni se muestra.
+    /// Se conserva sólo para que los docs viejos sigan decodificando y para
+    /// que `scripts/backfill_racha_semanas.js` pueda leer de dónde venía.
+    /// Lo que la app muestra hoy es [rachaSemanas].
     int? racha,
+
+    /// Racha en SEMANAS: cuántas semanas seguidas el atleta cumplió el
+    /// objetivo de días de su rutina (ver `computeWeeklyStreak`).
+    ///
+    /// Campo NUEVO en vez de reusar [racha] con otra unidad, a propósito. Los
+    /// docs existentes guardan días; si les cambiábamos el significado sin
+    /// cambiarles el nombre, una racha de 23 días aparecía como "23 semanas"
+    /// en un board PÚBLICO hasta que el atleta volviera a entrenar. Un número
+    /// inflado que parece verdadero es peor que no tener número (AGENTS.md
+    /// §11.1). Con campo nuevo, quien todavía no entrenó desde el deploy
+    /// muestra 0 —honesto— y se corrige solo.
+    int? rachaSemanas,
     // ignore: invalid_annotation_target
     @JsonKey(fromJson: _nonNegativeCount) int? followersCount,
     // ignore: invalid_annotation_target

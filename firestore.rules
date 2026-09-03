@@ -1047,13 +1047,20 @@ service cloud.firestore {
                     && request.resource.data.keys().hasOnly([
                          'uid', 'displayName', 'displayNameLowercase',
                          'avatarUrl', 'gymId', 'gymName', 'workoutsCount',
-                         'racha', 'rachaUpdatedAt', 'followersCount',
+                         'racha', 'rachaUpdatedAt',
+                         'rachaSemanas', 'rachaSemanasUpdatedAt',
+                         'followersCount',
                          'followingCount',
                          'sharedTemplatesWithAthletes', 'rankingOptIn',
                          'isProfilePublic',
                          'lifetimeVolumeKg', 'bestSquatKg', 'bestBenchKg',
                          'bestDeadliftKg'
                        ])
+                    // Sello de frescura de `rachaSemanas`, siempre derivado
+                    // por UserPublicProfileRepository.updateCounters (server
+                    // timestamp) — timestamp cuando está presente.
+                    && (!('rachaSemanasUpdatedAt' in request.resource.data)
+                        || request.resource.data.rachaSemanasUpdatedAt is timestamp)
                     // #552: freshness stamp for `racha`, always derived by
                     // UserPublicProfileRepository.updateCounters (server
                     // timestamp) — timestamp when present.
@@ -1093,13 +1100,23 @@ service cloud.firestore {
                     && request.resource.data.keys().hasOnly([
                          'uid', 'displayName', 'displayNameLowercase',
                          'avatarUrl', 'gymId', 'gymName', 'workoutsCount',
-                         'racha', 'rachaUpdatedAt', 'followersCount',
+                         'racha', 'rachaUpdatedAt',
+                         'rachaSemanas', 'rachaSemanasUpdatedAt',
+                         'followersCount',
                          'followingCount',
                          'sharedTemplatesWithAthletes', 'rankingOptIn',
                          'isProfilePublic',
                          'lifetimeVolumeKg', 'bestSquatKg', 'bestBenchKg',
                          'bestDeadliftKg'
                        ])
+                    // Sello de frescura de `rachaSemanas` — timestamp cuando
+                    // está presente. El disyunto `unchanged` es el del #849:
+                    // sin él, el chequeo de TIPO valida el DOCUMENTO y no la
+                    // escritura, y un doc con el campo mal tipado no se puede
+                    // actualizar nunca más.
+                    && (!('rachaSemanasUpdatedAt' in request.resource.data)
+                        || unchanged(request.resource.data, resource.data, 'rachaSemanasUpdatedAt')
+                        || request.resource.data.rachaSemanasUpdatedAt is timestamp)
                     // #552: freshness stamp for `racha` — timestamp when
                     // present (always serverTimestamp() derived in
                     // UserPublicProfileRepository.updateCounters).

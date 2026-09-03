@@ -100,28 +100,29 @@ class UserPublicProfileRepository {
   /// clobbering identity fields (displayName, avatarUrl, gymId) set by
   /// UserRepository. See ADR-WRS-12.
   ///
-  /// #552 — Callers MUST NOT pass `rachaUpdatedAt`: whenever the write
-  /// includes `racha`, this method derives the freshness stamp itself
+  /// #552 — Callers MUST NOT pass `rachaSemanasUpdatedAt`: whenever the write
+  /// includes `rachaSemanas`, this method derives the freshness stamp itself
   /// (server timestamp), mirroring how `UserRepository` always derives
   /// `displayNameLowercase`/`n`. Keeping value and stamp in the SAME write
-  /// is what makes [effectiveRacha]'s read-time decay trustworthy — a racha
-  /// written without a stamp (or vice versa) would decay wrongly.
+  /// is what makes [effectiveRachaSemanas]'s read-time decay trustworthy — un
+  /// valor escrito sin sello (o al revés) decae mal.
   Future<void> updateCounters(String uid, Map<String, Object?> fields) async {
-    if (fields.containsKey('racha')) {
+    if (fields.containsKey('rachaSemanas')) {
       final stamped = <String, Object?>{
         ...fields,
-        'rachaUpdatedAt': FieldValue.serverTimestamp(),
+        'rachaSemanasUpdatedAt': FieldValue.serverTimestamp(),
       };
       try {
         await _col.doc(uid).set(stamped, SetOptions(merge: true));
         return;
       } on FirebaseException catch (e) {
-        // Transitional (#552): until the updated firestore.rules (which add
-        // `rachaUpdatedAt` to the userPublicProfiles field allowlist) are
-        // deployed, the stamped write is denied. Fall back to the legacy
-        // shape so `racha`/`workoutsCount` keep flowing — the board then
-        // shows the pre-#552 passthrough behavior instead of silently
-        // freezing every counter. Remove once the rules deploy is live.
+        // Transicional: hasta que se deployen las rules con
+        // `rachaSemanas`/`rachaSemanasUpdatedAt` en el allowlist de
+        // userPublicProfiles, el write sellado se rechaza. Caemos a la forma
+        // sin sello para que `workoutsCount` siga fluyendo en vez de congelar
+        // todos los contadores en silencio. El board, mientras tanto, muestra
+        // 0 en racha —que es lo correcto: sin sello no hay frescura que
+        // verificar. Sacar cuando el deploy de rules esté vivo.
         // Not covered by fake_cloud_firestore (it does not enforce rules);
         // covered by the T35-style manual emulator pass, like the rest of
         // this file's permission behavior.
@@ -204,26 +205,29 @@ class UserPublicProfileRepository {
     final snap =
         await query.orderBy(metricField, descending: true).limit(limit).get();
 
-    if (metricField == 'racha') return _decayedStreakBoard(snap.docs);
+    if (metricField == 'rachaSemanas') return _decayedStreakBoard(snap.docs);
 
     return snap.docs.map((d) => UserPublicProfile.fromJson(d.data())).toList();
   }
 
-  /// #552 — read-time decay for the streak board. The stored `racha` is a
-  /// snapshot from the athlete's last finish and never decays on its own, so
-  /// an inactive athlete would sit on the board with a dead streak forever
-  /// while their own PERFIL (live `computeStreak`) says 0. Each row's racha
-  /// is replaced with [effectiveRacha] (0 unless its `rachaUpdatedAt` stamp
-  /// is from today/yesterday in ART), then rows are re-sorted because decay
-  /// can reorder them.
+  /// #552 — read-time decay for the streak board. La `rachaSemanas` guardada
+  /// es una foto del último finish del atleta y no decae sola, así que un
+  /// atleta inactivo se quedaría para siempre en el board con una racha
+  /// muerta mientras su propio PERFIL (cálculo en vivo) dice 0. El valor de
+  /// cada fila se reemplaza por [effectiveRachaSemanas] (0 salvo que el sello
+  /// `rachaSemanasUpdatedAt` sea de esta semana ART o de la anterior), y
+  /// después se re-ordena porque el decay puede cambiar el orden.
   ///
   /// Metric-specific handling inside the generic query method follows the
   /// [_presenceRequiredMetrics] precedent above. Known bounded limitation:
   /// the top-[limit] cut happens server-side on the RAW values, so with more
   /// than `limit` opted-in athletes a stale-but-high racha can crowd a
   /// fresh-but-low one out of the page; within the page, order and values
-  /// are correct. Docs never stamped (pre-#552) pass through undecayed until
-  /// `scripts/backfill_racha_freshness.js` stamps them.
+  /// are correct. Los docs sin sello leen 0 —no passthrough— hasta que el
+  /// atleta vuelva a entrenar. Ojo: para siquiera LLEGAR acá el doc tiene que
+  /// tener el campo, porque el `orderBy` de arriba excluye los ausentes — de
+  /// eso se ocupa `scripts/seed_racha_semanas.js`. Detalle en
+  /// [effectiveRachaSemanas].
   List<UserPublicProfile> _decayedStreakBoard(
     List<DocumentSnapshot<Map<String, Object?>>> docs,
   ) {
@@ -231,11 +235,11 @@ class UserPublicProfileRepository {
     final decayed = docs.map((d) {
       final data = d.data() ?? const <String, Object?>{};
       final profile = UserPublicProfile.fromJson(data);
-      final stamp = data['rachaUpdatedAt'];
+      final stamp = data['rachaSemanasUpdatedAt'];
       return profile.copyWith(
-        racha: effectiveRacha(
-          racha: profile.racha,
-          rachaUpdatedAt: stamp is Timestamp ? stamp.toDate() : null,
+        rachaSemanas: effectiveRachaSemanas(
+          rachaSemanas: profile.rachaSemanas,
+          rachaSemanasUpdatedAt: stamp is Timestamp ? stamp.toDate() : null,
           now: now,
         ),
       );
@@ -244,7 +248,7 @@ class UserPublicProfileRepository {
     // ASC — here uid == doc id), so the order is deterministic regardless of
     // List.sort's stability.
     decayed.sort((a, b) {
-      final byRacha = (b.racha ?? 0).compareTo(a.racha ?? 0);
+      final byRacha = (b.rachaSemanas ?? 0).compareTo(a.rachaSemanas ?? 0);
       return byRacha != 0 ? byRacha : a.uid.compareTo(b.uid);
     });
     return decayed;
@@ -260,7 +264,7 @@ class UserPublicProfileRepository {
   /// and (under `descending: true`) landed at the tail of the board, where the
   /// client rendered it as a fabricated "0 kg" PR.
   ///
-  /// `racha` and `lifetimeVolumeKg` are deliberately NOT in this set: no
+  /// `rachaSemanas` and `lifetimeVolumeKg` are deliberately NOT in this set: no
   /// streak IS a 0-day streak and no volume IS 0 kg lifted, so their 0 floor
   /// is honest and those athletes stay on their boards.
   static const _presenceRequiredMetrics = {

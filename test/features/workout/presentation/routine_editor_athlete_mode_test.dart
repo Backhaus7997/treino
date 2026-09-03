@@ -337,6 +337,9 @@ void main() {
     );
     await tester.tap(find.text('Agregar 1 ejercicio'));
     await tester.pumpAndSettle();
+    // Desde este cambio el ejercicio agregado nace PLEGADO: quien avisa
+    // que le falta completar sets es el borde rojo, no la card abierta.
+    await expandirEjercicios(tester);
 
     // New per-set table validation: reps must be > 0.
     // The REPS column field has hint text 'reps' and starts empty.
@@ -463,6 +466,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Agregar 1 ejercicio'));
     await tester.pumpAndSettle();
+    // Desde este cambio el ejercicio agregado nace PLEGADO: quien avisa
+    // que le falta completar sets es el borde rojo, no la card abierta.
+    await expandirEjercicios(tester);
 
     // Fill reps.
     final emptyFields = find.byType(TextField).evaluate().where((e) {

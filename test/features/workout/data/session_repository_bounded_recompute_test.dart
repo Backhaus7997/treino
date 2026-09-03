@@ -80,6 +80,7 @@ void main() {
       totalVolumeKg: 100.0,
       durationMin: 60,
       wasFullyCompleted: true,
+      weeklyTarget: 1,
     );
 
     final profileSnap =

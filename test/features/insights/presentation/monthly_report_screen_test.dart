@@ -26,7 +26,11 @@ void main() {
     registerFallbackValue(makeSetLog());
   });
 
-  Widget wrap(Widget child, {required List<Override> overrides}) =>
+  Widget wrap(
+    Widget child, {
+    required List<Override> overrides,
+    DateTime? initialMonth,
+  }) =>
       ProviderScope(
         overrides: [
           // Defaults so the month-vs-month radar section (AD6/PR5c) doesn't
@@ -41,7 +45,9 @@ void main() {
           localizationsDelegates: AppL10n.localizationsDelegates,
           supportedLocales: AppL10n.supportedLocales,
           locale: const Locale('es', 'AR'),
-          home: const Scaffold(body: MonthlyReportScreen(uid: 'u1')),
+          home: Scaffold(
+            body: MonthlyReportScreen(uid: 'u1', initialMonth: initialMonth),
+          ),
         ),
       );
 
@@ -284,7 +290,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(streakFinder, findsOneWidget);
-    expect(find.text('Racha de 2 días'), findsOneWidget);
+    // Sin rutina activa el objetivo cae al fallback de 1 sesión por
+    // semana, y las dos sesiones del fixture caen en la MISMA semana:
+    // eso es una semana cumplida, no dos.
+    expect(find.text('Racha de 1 semana'), findsOneWidget);
   });
 
   testWidgets(
@@ -318,12 +327,15 @@ void main() {
     // marked, streak is 0 (session is in a different month, not
     // yesterday/today).
     await tester.scrollUntilVisible(
-      find.textContaining('Racha de'),
+      // En 0 el label ya no dice "Racha de …" sino "Sin racha", así que
+      // scrolleamos hasta ESE texto: buscar el otro nunca aparecería y el
+      // scroll se comería el timeout en vez de fallar donde importa.
+      find.text('Sin racha'),
       300,
       scrollable: find.byType(Scrollable).first,
     );
     await tester.pumpAndSettle();
-    expect(find.text('Racha de 0 días'), findsOneWidget);
+    expect(find.text('Sin racha'), findsOneWidget);
     expect(find.byKey(const ValueKey('workout-day-trained')), findsNothing);
 
     // Scroll the chart itself into view before grabbing its state — the
@@ -409,8 +421,9 @@ void main() {
   });
 
   testWidgets(
-      'switching the selected month updates the radar legend to that '
-      "month's name (real data-delta, not a smoke check)", (tester) async {
+      'switching the selected month updates the radar legend and monthly '
+      'volume-by-group card (real data-delta, not a smoke check)',
+      (tester) async {
     final repo = MockSessionRepository();
     final now = DateTime.now();
     final olderMonth = DateTime(now.year, now.month - 2);
@@ -425,11 +438,23 @@ void main() {
               ),
             ]);
     when(() => repo.listSetLogs(uid: 'u1', sessionId: any(named: 'sessionId')))
-        .thenAnswer((_) async => [makeSetLog()]);
+        .thenAnswer((_) async => [
+              makeSetLog(id: 'l1', exerciseId: 'e-chest'),
+            ]);
 
     await tester.pumpWidget(wrap(
       const SizedBox.shrink(),
-      overrides: [sessionRepositoryProvider.overrideWithValue(repo)],
+      overrides: [
+        sessionRepositoryProvider.overrideWithValue(repo),
+        exercisesProvider.overrideWith((ref) async => const [
+              Exercise(
+                id: 'e-chest',
+                name: 'Press',
+                muscleGroup: 'chest',
+                category: 'compound',
+              ),
+            ]),
+      ],
     ));
     await tester.pumpAndSettle();
 
@@ -458,6 +483,115 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text(_capitalize(expectedLabel)), findsOneWidget);
+    expect(find.text('VOLUMEN POR GRUPO'), findsOneWidget);
+    expect(find.text('PECHO'), findsOneWidget);
+    expect(find.text('1 set'), findsOneWidget);
+  });
+
+  // ── Deep link del push mensual ───────────────────────────────────────────
+  // El contrato de la URL (`?month=YYYY-MM`) está cubierto en
+  // `monthly_report_deep_link_test.dart` del lado que parsea, y en
+  // `functions/src/__tests__/notify-monthly-report.test.ts` del lado que la
+  // arma. Acá se prueba lo que queda: que la pantalla HONRE el mes.
+
+  testWidgets('initialMonth abre la pantalla en ese mes, no en el más reciente',
+      (tester) async {
+    final repo = MockSessionRepository();
+    final now = DateTime.now();
+    final currentMonthStart = DateTime(now.year, now.month, 1);
+    // El mes que el push reportaría: el que cerró.
+    final reportedMonth = DateTime(now.year, now.month - 1, 1);
+
+    when(() => repo.listByUid('u1', limit: any(named: 'limit')))
+        .thenAnswer((_) async => [
+              makeSession(
+                id: 's-actual',
+                startedAt: DateTime(
+                    currentMonthStart.year, currentMonthStart.month, 1, 12),
+                status: SessionStatus.finished,
+                wasFullyCompleted: true,
+                durationMin: 45,
+              ),
+              makeSession(
+                id: 's-reportado',
+                startedAt:
+                    DateTime(reportedMonth.year, reportedMonth.month, 15, 12),
+                status: SessionStatus.finished,
+                wasFullyCompleted: true,
+                durationMin: 60,
+              ),
+            ]);
+    when(() => repo.listSetLogs(uid: 'u1', sessionId: any(named: 'sessionId')))
+        .thenAnswer((_) async => [makeSetLog()]);
+
+    await tester.pumpWidget(wrap(
+      const SizedBox.shrink(),
+      overrides: [sessionRepositoryProvider.overrideWithValue(repo)],
+      initialMonth: reportedMonth,
+    ));
+    await tester.pumpAndSettle();
+
+    // El título de la pantalla es el mes seleccionado. Sin initialMonth sería
+    // el mes actual — que el 1° del mes está vacío, que es justamente el
+    // motivo por el que el push manda el mes anterior.
+    final expected = _capitalize(
+      '${monthAbbrev(reportedMonth, 'es_AR')} ${reportedMonth.year}',
+    );
+    final notExpected = _capitalize(
+      '${monthAbbrev(currentMonthStart, 'es_AR')} ${currentMonthStart.year}',
+    );
+
+    await tester.scrollUntilVisible(
+      find.text('DISTRIBUCIÓN MUSCULAR'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text(expected), findsOneWidget);
+    expect(find.text(notExpected), findsNothing);
+  });
+
+  testWidgets(
+      'un initialMonth fuera de la ventana de 12 meses cae al más reciente, '
+      'no a una pantalla vacía', (tester) async {
+    final repo = MockSessionRepository();
+    final now = DateTime.now();
+    final currentMonthStart = DateTime(now.year, now.month, 1);
+
+    when(() => repo.listByUid('u1', limit: any(named: 'limit')))
+        .thenAnswer((_) async => [
+              makeSession(
+                id: 's1',
+                startedAt: DateTime(
+                    currentMonthStart.year, currentMonthStart.month, 1, 12),
+                status: SessionStatus.finished,
+                wasFullyCompleted: true,
+                durationMin: 45,
+              ),
+            ]);
+    when(() => repo.listSetLogs(uid: 'u1', sessionId: any(named: 'sessionId')))
+        .thenAnswer((_) async => [makeSetLog()]);
+
+    await tester.pumpWidget(wrap(
+      const SizedBox.shrink(),
+      overrides: [sessionRepositoryProvider.overrideWithValue(repo)],
+      // Un bookmark viejo, o un push que quedó sin abrir muchos meses.
+      initialMonth: DateTime(now.year - 5, 3),
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('DISTRIBUCIÓN MUSCULAR'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    final expected = _capitalize(
+      '${monthAbbrev(currentMonthStart, 'es_AR')} ${currentMonthStart.year}',
+    );
+    expect(find.text(expected), findsOneWidget);
   });
 }
 

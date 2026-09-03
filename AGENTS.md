@@ -248,6 +248,7 @@ pagos, turnos, mediciones, chats y perfiles comerciales publicados.
 | [docs/design-system.md](./docs/design-system.md) | Paletas, tipografía, spacing, radii, reglas de código UI |
 | [docs/architecture.md](./docs/architecture.md) | Stack, estructura, modelos freezed, memoria persistente Engram |
 | [docs/performance.md](./docs/performance.md) | State management, rebuilds, batería, multi-device, profiling |
+| [docs/firestore-indexes.md](./docs/firestore-indexes.md) | Antes de correr `deploy --only firestore:indexes`: qué índices hay de más en prod, cuáles son huérfanos a propósito, y cómo contestar el prompt de borrado |
 | [docs/workflow.md](./docs/workflow.md) | Setup, equipo, commits, branching, PRs, ciclo SDD, gates de calidad |
 | [docs/roadmap.md](./docs/roadmap.md) | Fases 0-6, Fase 1 desglosada en 7 etapas con owner sugerido |
 | [CONTRIBUTING.md](./CONTRIBUTING.md) | Onboarding técnico paso a paso para devs nuevos |

@@ -2680,9 +2680,31 @@
   "@monthlyReportLoadError": {
     "description": "[AD6/PR5a] Error state for the Monthly Report screen's provider load failure. Paired with coachRetryLabel for the retry CTA."
   },
-  "workoutDaysCalendarStreak": "Racha de {n} días",
+  "monthlyVolumeByGroupEmpty": "No hay sets por grupo en este mes.",
+  "@monthlyVolumeByGroupEmpty": {
+    "description": "Empty state in the monthly volume-by-group card when the selected month has no sets mapped to a display muscle group."
+  },
+  "monthlyVolumeByGroupSets": "{n, plural, =1{1 set} other{{n} sets}}",
+  "@monthlyVolumeByGroupSets": {
+    "description": "Set count shown at the right of each row in the monthly volume-by-group card.",
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "workoutDaysCalendarStreak": "{n, plural, =0{Sin racha} =1{Racha de 1 semana} other{Racha de {n} semanas}}",
   "@workoutDaysCalendarStreak": {
-    "description": "[AD6/PR5b] Week-streak indicator text shown next to the flame icon above the workout-days calendar. Reuses computeStreak's day-count value (same 'racha' terminology as the rest of the app, e.g. esta_semana_card.dart) — NOT a separate week-based streak calculation. Zero is a valid, always-rendered value (not hidden).",
+    "description": "[AD6/PR5b] Streak indicator next to the flame icon above the workout-days calendar. Counts WEEKS in which the athlete met their active routine's day target (computeWeeklyStreak), not consecutive days. Zero is a valid, always-rendered value (not hidden).",
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "workoutDaysCalendarStreakHint": "{n, plural, =0{Cumplí el objetivo de días de tu rutina esta semana y arrancás una racha.} =1{Completaste el objetivo de tu rutina 1 semana seguida.} other{Completaste el objetivo de tu rutina {n} semanas seguidas.}}",
+  "@workoutDaysCalendarStreakHint": {
+    "description": "Small caption under the streak line explaining WHAT the streak counts: weeks in which the athlete met their routine's day target. Rendered for every value including zero, where it becomes the CTA to start one.",
     "placeholders": {
       "n": {
         "type": "int"

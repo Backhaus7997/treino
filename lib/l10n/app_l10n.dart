@@ -5691,11 +5691,29 @@ abstract class AppL10n {
   /// **'No pudimos cargar tu reporte mensual. Probá de nuevo.'**
   String get monthlyReportLoadError;
 
-  /// [AD6/PR5b] Week-streak indicator text shown next to the flame icon above the workout-days calendar. Reuses computeStreak's day-count value (same 'racha' terminology as the rest of the app, e.g. esta_semana_card.dart) — NOT a separate week-based streak calculation. Zero is a valid, always-rendered value (not hidden).
+  /// Empty state in the monthly volume-by-group card when the selected month has no sets mapped to a display muscle group.
   ///
   /// In es_AR, this message translates to:
-  /// **'Racha de {n} días'**
+  /// **'No hay sets por grupo en este mes.'**
+  String get monthlyVolumeByGroupEmpty;
+
+  /// Set count shown at the right of each row in the monthly volume-by-group card.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{n, plural, =1{1 set} other{{n} sets}}'**
+  String monthlyVolumeByGroupSets(int n);
+
+  /// [AD6/PR5b] Streak indicator next to the flame icon above the workout-days calendar. Counts WEEKS in which the athlete met their active routine's day target (computeWeeklyStreak), not consecutive days. Zero is a valid, always-rendered value (not hidden).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{n, plural, =0{Sin racha} =1{Racha de 1 semana} other{Racha de {n} semanas}}'**
   String workoutDaysCalendarStreak(int n);
+
+  /// Small caption under the streak line explaining WHAT the streak counts: weeks in which the athlete met their routine's day target. Rendered for every value including zero, where it becomes the CTA to start one.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'{n, plural, =0{Cumplí el objetivo de días de tu rutina esta semana y arrancás una racha.} =1{Completaste el objetivo de tu rutina 1 semana seguida.} other{Completaste el objetivo de tu rutina {n} semanas seguidas.}}'**
+  String workoutDaysCalendarStreakHint(int n);
 
   /// [stats-hub] Section heading above the tile list on InsightsScreen, between the daily-muscles card and the ESTADÍSTICAS AVANZADAS tiles (Hevy 'Statistics' parity, obs #445).
   ///

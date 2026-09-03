@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import 'muscle_group.dart';
 import 'radar_axis.dart';
 
 /// [AD4] Immutable DTO with the current-vs-previous period aggregates for
@@ -14,6 +15,8 @@ class MuscleDistributionInsights {
   const MuscleDistributionInsights({
     required this.currentSetsByAxis,
     required this.previousSetsByAxis,
+    this.currentSetsByGroup = const {},
+    this.previousSetsByGroup = const {},
     required this.currentWorkouts,
     required this.previousWorkouts,
     required this.currentDurationMin,
@@ -32,6 +35,16 @@ class MuscleDistributionInsights {
   /// Sets logged per [RadarAxis] during the PREVIOUS (comparison) period
   /// window.
   final Map<RadarAxis, int> previousSetsByAxis;
+
+  /// Sets logged per one of the 10 display groups during the CURRENT period.
+  ///
+  /// This is the granular source behind [currentSetsByAxis]: the radar folds
+  /// multiple groups into six axes, while report surfaces that need the real
+  /// group split can reuse the same aggregation without reading SetLogs again.
+  final Map<MuscleGroupDisplay, int> currentSetsByGroup;
+
+  /// Granular set counts for the PREVIOUS comparison period.
+  final Map<MuscleGroupDisplay, int> previousSetsByGroup;
 
   /// Finished sessions count — current period.
   final int currentWorkouts;
@@ -69,6 +82,8 @@ class MuscleDistributionInsights {
   static const empty = MuscleDistributionInsights(
     currentSetsByAxis: {},
     previousSetsByAxis: {},
+    currentSetsByGroup: {},
+    previousSetsByGroup: {},
     currentWorkouts: 0,
     previousWorkouts: 0,
     currentDurationMin: 0,
@@ -85,6 +100,8 @@ class MuscleDistributionInsights {
       other is MuscleDistributionInsights &&
           mapEquals(other.currentSetsByAxis, currentSetsByAxis) &&
           mapEquals(other.previousSetsByAxis, previousSetsByAxis) &&
+          mapEquals(other.currentSetsByGroup, currentSetsByGroup) &&
+          mapEquals(other.previousSetsByGroup, previousSetsByGroup) &&
           other.currentWorkouts == currentWorkouts &&
           other.previousWorkouts == previousWorkouts &&
           other.currentDurationMin == currentDurationMin &&
@@ -98,6 +115,8 @@ class MuscleDistributionInsights {
   int get hashCode => Object.hash(
         _stableMapHash(currentSetsByAxis),
         _stableMapHash(previousSetsByAxis),
+        _stableGroupMapHash(currentSetsByGroup),
+        _stableGroupMapHash(previousSetsByGroup),
         currentWorkouts,
         previousWorkouts,
         currentDurationMin,
@@ -114,6 +133,19 @@ class MuscleDistributionInsights {
   static int _stableMapHash(Map<RadarAxis, int> map) {
     final flat = <int>[];
     for (final key in RadarAxis.values) {
+      if (map.containsKey(key)) {
+        flat.add(key.index);
+        flat.add(map[key]!);
+      }
+    }
+    return Object.hashAll(flat);
+  }
+
+  /// Group-map counterpart to [_stableMapHash]. Iterating the enum rather than
+  /// the map entries keeps equal sparse maps reproducible across instances.
+  static int _stableGroupMapHash(Map<MuscleGroupDisplay, int> map) {
+    final flat = <int>[];
+    for (final key in MuscleGroupDisplay.values) {
       if (map.containsKey(key)) {
         flat.add(key.index);
         flat.add(map[key]!);

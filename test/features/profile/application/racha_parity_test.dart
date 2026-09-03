@@ -6,12 +6,14 @@ import 'package:treino/core/utils/argentina_time.dart';
 import 'package:treino/features/profile/application/profile_stats_providers.dart';
 import 'package:treino/features/profile/data/user_public_profile_repository.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
+import 'package:treino/features/workout/application/weekly_streak_providers.dart';
 import 'package:treino/features/workout/data/session_repository.dart';
 
-// [#552] Paridad de la racha: PERFIL (fila de stats, userSessionStatsProvider
-// → computeStreak en vivo) y RANKINGS → RACHAS (leaderboard sobre el campo
-// denormalizado `racha` de userPublicProfiles) deben mostrar EL MISMO número
-// para el mismo usuario en el mismo instante.
+// [#552, migrado a semanas] Paridad de la racha: PERFIL (fila de stats,
+// userSessionStatsProvider → computeWeeklyStreak en vivo) y RANKINGS → RACHAS
+// (leaderboard sobre el campo denormalizado `rachaSemanas` de
+// userPublicProfiles) deben mostrar EL MISMO número para el mismo usuario en
+// el mismo instante.
 //
 // Antes del fix, el campo denormalizado era un snapshot del último finish()
 // que nunca decaía: un atleta que dejaba de entrenar quedaba en el board con
@@ -20,9 +22,10 @@ import 'package:treino/features/workout/data/session_repository.dart';
 // que #442.
 //
 // Decisión semántica (#552): "racha" significa SIEMPRE la racha actual hasta
-// hoy en frame ART. El board ahora decae el valor guardado en lectura usando
-// el stamp `rachaUpdatedAt` que updateCounters deriva junto a cada escritura
-// de `racha`.
+// hoy en frame ART. El board decae el valor guardado en lectura usando el
+// stamp `rachaSemanasUpdatedAt` que updateCounters deriva junto a cada
+// escritura de `rachaSemanas`. Desde la migración la unidad es la SEMANA y la
+// ventana de gracia del decay es {semana en curso, semana anterior}.
 //
 // Estilo #442: integración sobre UNA FakeFirebaseFirestore compartida, con
 // los repos REALES encadenados (SessionRepository.finish → updateCounters →
@@ -37,11 +40,27 @@ DateTime _artNoonDaysAgo(int daysAgo) {
   return DateTime.utc(art.year, art.month, art.day, 15);
 }
 
+/// Mediodía ART del LUNES de hace [weeksAgo] semanas.
+///
+/// La racha se cuenta por semanas, así que los fixtures se anclan al borde de
+/// semana y no a "hace N días": con días, el mismo fixture da un número
+/// distinto según el día en que corra la suite (si hoy es lunes, "ayer" ya es
+/// la semana pasada).
+DateTime _artNoonWeeksAgo(int weeksAgo) {
+  final monday = mondayOfWeekArt(toArgentina(DateTime.now().toUtc()));
+  return DateTime.utc(
+    monday.year,
+    monday.month,
+    monday.day - (7 * weeksAgo),
+    15,
+  );
+}
+
 Future<void> _seedPublicProfile(
   FakeFirebaseFirestore firestore,
   String uid, {
-  int? racha,
-  Timestamp? rachaUpdatedAt,
+  int? rachaSemanas,
+  Timestamp? rachaSemanasUpdatedAt,
 }) {
   return firestore.collection('userPublicProfiles').doc(uid).set({
     'uid': uid,
@@ -49,8 +68,9 @@ Future<void> _seedPublicProfile(
     'displayNameLowercase': uid,
     'gymId': 'g1',
     'rankingOptIn': true,
-    if (racha != null) 'racha': racha,
-    if (rachaUpdatedAt != null) 'rachaUpdatedAt': rachaUpdatedAt,
+    if (rachaSemanas != null) 'rachaSemanas': rachaSemanas,
+    if (rachaSemanasUpdatedAt != null)
+      'rachaSemanasUpdatedAt': rachaSemanasUpdatedAt,
   });
 }
 
@@ -76,8 +96,13 @@ void main() {
     addTearDown(container.dispose);
   });
 
-  Future<void> trainOn({required int daysAgo, double volumeKg = 100}) async {
-    final startedAt = _artNoonDaysAgo(daysAgo);
+  Future<void> trainOn({
+    required int weeksAgo,
+    double volumeKg = 100,
+    int weeklyTarget = 1,
+    String suffix = '',
+  }) async {
+    final startedAt = _artNoonWeeksAgo(weeksAgo);
     final session = await sessionRepo.create(
       uid: 'u1',
       routineId: 'r1',
@@ -91,6 +116,7 @@ void main() {
       totalVolumeKg: volumeKg,
       durationMin: 60,
       wasFullyCompleted: true,
+      weeklyTarget: weeklyTarget,
     );
   }
 
@@ -100,20 +126,20 @@ void main() {
   Future<int?> boardRachaOf(String uid) async {
     final board = await publicRepo.leaderboard(
       gymId: 'g1',
-      metricField: 'racha',
+      metricField: 'rachaSemanas',
     );
     for (final p in board) {
-      if (p.uid == uid) return p.racha;
+      if (p.uid == uid) return p.rachaSemanas;
     }
     return null;
   }
 
   test(
-      '#552 parity: racha viva (entrenó hoy y ayer) — PERFIL y RANKINGS '
-      'muestran el mismo valor', () async {
+      '#552 parity: racha viva (cumplió esta semana y la pasada) — PERFIL y '
+      'RANKINGS muestran el mismo valor', () async {
     await _seedPublicProfile(firestore, 'u1');
-    await trainOn(daysAgo: 1);
-    await trainOn(daysAgo: 0);
+    await trainOn(weeksAgo: 1);
+    await trainOn(weeksAgo: 0);
 
     final perfil = await profileRacha();
     final rankings = await boardRachaOf('u1');
@@ -124,36 +150,37 @@ void main() {
   });
 
   test(
-      '#552 parity: updateCounters deriva rachaUpdatedAt junto con racha — '
-      'el caller (finish) no lo pasa', () async {
+      '#552 parity: updateCounters deriva rachaSemanasUpdatedAt junto con '
+      'rachaSemanas — el caller (finish) no lo pasa', () async {
     await _seedPublicProfile(firestore, 'u1');
-    await trainOn(daysAgo: 0);
+    await trainOn(weeksAgo: 0);
 
     final doc =
         await firestore.collection('userPublicProfiles').doc('u1').get();
-    expect(doc.data()!['racha'], 1);
-    expect(doc.data()!['rachaUpdatedAt'], isA<Timestamp>(),
+    expect(doc.data()!['rachaSemanas'], 1);
+    expect(doc.data()!['rachaSemanasUpdatedAt'], isA<Timestamp>(),
         reason: 'el stamp de frescura viaja SIEMPRE en el mismo write que '
-            'racha, derivado por el repositorio');
+            'rachaSemanas, derivado por el repositorio');
   });
 
   test(
-      '#552 regresión: racha cortada (último entreno hace 3 días) — el board '
-      'decae el snapshot viejo a 0, igual que el perfil en vivo', () async {
-    // Estado prod del bug: el finish() de hace 3 días dejó racha:1 con stamp
-    // de ese día; desde entonces el atleta no entrenó. Se fabrica el doc tal
-    // como quedó (el flow real corrido HOY se auto-sanaría escribiendo 0).
+      '#552 regresión: racha cortada (último entreno hace 3 semanas) — el '
+      'board decae el snapshot viejo a 0, igual que el perfil en vivo',
+      () async {
+    // Estado prod del bug: el finish() de hace 3 semanas dejó rachaSemanas:1
+    // con stamp de ese día; desde entonces el atleta no entrenó. Se fabrica el
+    // doc tal como quedó (el flow real corrido HOY se auto-sanaría con 0).
     await _seedPublicProfile(
       firestore,
       'u1',
-      racha: 1,
-      rachaUpdatedAt: Timestamp.fromDate(_artNoonDaysAgo(3)),
+      rachaSemanas: 1,
+      rachaSemanasUpdatedAt: Timestamp.fromDate(_artNoonWeeksAgo(3)),
     );
     await sessionRepo.create(
       uid: 'u1',
       routineId: 'r1',
       routineName: 'Rutina',
-      startedAt: _artNoonDaysAgo(3),
+      startedAt: _artNoonWeeksAgo(3),
     );
     // La sesión existe como finished sin pasar por finish() para no
     // re-estampar el contador con el reloj de hoy.
@@ -165,7 +192,7 @@ void main() {
     await snap.docs.single.reference.update({
       'status': 'finished',
       'finishedAt': Timestamp.fromDate(
-        _artNoonDaysAgo(3).add(const Duration(hours: 1)),
+        _artNoonWeeksAgo(3).add(const Duration(hours: 1)),
       ),
       'wasFullyCompleted': true,
       'totalVolumeKg': 100.0,
@@ -174,7 +201,8 @@ void main() {
     final perfil = await profileRacha();
     final rankings = await boardRachaOf('u1');
 
-    expect(perfil, 0, reason: 'racha cortada: hoy y ayer sin entrenar');
+    expect(perfil, 0,
+        reason: 'racha cortada: la semana en curso y la anterior sin cumplir');
     expect(rankings, 0,
         reason: 'el board ya no puede mostrar el snapshot congelado (era el '
             'bug: PERFIL 0 vs RANKINGS 1)');
@@ -187,39 +215,97 @@ void main() {
     await _seedPublicProfile(
       firestore,
       'u1',
-      racha: 2,
-      rachaUpdatedAt: Timestamp.fromDate(_artNoonDaysAgo(0)),
+      rachaSemanas: 2,
+      rachaSemanasUpdatedAt: Timestamp.fromDate(_artNoonWeeksAgo(0)),
     );
     await _seedPublicProfile(
       firestore,
       'u2',
-      racha: 5,
-      rachaUpdatedAt: Timestamp.fromDate(_artNoonDaysAgo(10)),
+      rachaSemanas: 5,
+      rachaSemanasUpdatedAt: Timestamp.fromDate(_artNoonWeeksAgo(10)),
     );
 
     final board = await publicRepo.leaderboard(
       gymId: 'g1',
-      metricField: 'racha',
+      metricField: 'rachaSemanas',
     );
 
     expect(board.map((p) => p.uid).toList(), ['u1', 'u2'],
         reason: 'el valor guardado 5 está muerto — decae a 0 y baja');
-    expect(board.first.racha, 2);
-    expect(board.last.racha, 0);
+    expect(board.first.rachaSemanas, 2);
+    expect(board.last.rachaSemanas, 0);
   });
 
   test(
-      '#552 doc legacy sin stamp: passthrough documentado hasta correr '
-      'backfill_racha_freshness.js', () async {
-    // Un doc escrito antes de este fix no tiene rachaUpdatedAt: el board no
-    // puede juzgar frescura y muestra el valor tal cual (comportamiento
-    // pre-#552). La divergencia con el perfil para estos docs se cierra con
-    // el backfill (o con el próximo finish() del atleta, que ya estampa).
-    await _seedPublicProfile(firestore, 'u1', racha: 1);
+      'regresión: una semana a medias NO deja el valor viejo pasando por '
+      'fresco una semana de más', () async {
+    // El caso que rompía el decay antes del invariante de escritura.
+    //
+    // Objetivo 3. El atleta cumple la semana -2 completa (racha 1) y en la
+    // semana -1 hace UNA sola sesión: esa semana cerró incumplida, así que
+    // hoy la racha en vivo es 0.
+    //
+    // Con la escritura incondicional, esa única sesión de la semana -1
+    // sellaba el valor heredado (1) con fecha de la semana -1 — y el filtro
+    // de gracia lo daba por fresco esta semana. Rankings 1 contra Perfil 0:
+    // el #552 otra vez. Ahora `finish` sólo persiste cuando la semana en
+    // curso cumplió, así que el sello sigue siendo el de la semana -2 y el
+    // decay lo baja bien.
+    await _seedPublicProfile(firestore, 'u1');
+
+    for (var i = 0; i < 3; i++) {
+      await trainOn(weeksAgo: 2, weeklyTarget: 3);
+    }
+    await trainOn(weeksAgo: 1, weeklyTarget: 3); // 1 de 3 — no alcanza
+
+    // El lado PERFIL calcula en vivo y saca el objetivo de
+    // `weeklyStreakTargetProvider`. Sin este override caería al fallback de 1
+    // y los dos lados de la paridad estarían midiendo contra varas distintas
+    // — el test daría 2 y no probaría nada de lo que dice probar.
+    final conObjetivo3 = ProviderContainer(
+      overrides: [
+        currentUidProvider.overrideWithValue('u1'),
+        sessionRepositoryProvider.overrideWithValue(sessionRepo),
+        weeklyStreakTargetProvider.overrideWithValue(3),
+      ],
+    );
+    addTearDown(conObjetivo3.dispose);
+
+    final perfil =
+        (await conObjetivo3.read(userSessionStatsProvider.future)).streak;
+    final rankings = await boardRachaOf('u1');
+
+    expect(perfil, 0,
+        reason: 'la semana -1 cerró con 1 de 3: la racha está cortada');
+    expect(rankings, 0,
+        reason: 'el board no puede seguir mostrando el 1 heredado');
+    expect(rankings, perfil);
+  });
+
+  test('doc de la era en DÍAS: el board muestra 0, NO el valor viejo',
+      () async {
+    // Este test invirtió su expectativa con la migración a semanas, y es el
+    // punto entero del campo nuevo.
+    //
+    // Antes: un doc sin stamp hacía passthrough del valor crudo. Con la
+    // migración, un doc que sólo tiene el `racha` legacy guarda DÍAS: dejarlo
+    // pasar mostraría "23 semanas" donde corresponde "3" — un número inflado
+    // en un board PÚBLICO, que es exactamente la advertencia falsa del §11.1
+    // de AGENTS.md. Sin `rachaSemanas` ni su stamp, el valor honesto es 0, y
+    // se corrige solo en el próximo finish() del atleta.
+    await firestore.collection('userPublicProfiles').doc('u1').set({
+      'uid': 'u1',
+      'displayName': 'u1',
+      'displayNameLowercase': 'u1',
+      'gymId': 'g1',
+      'rankingOptIn': true,
+      'racha': 23, // legacy, en días
+      'rachaUpdatedAt': Timestamp.fromDate(_artNoonDaysAgo(0)),
+    });
 
     final rankings = await boardRachaOf('u1');
 
-    expect(rankings, 1,
-        reason: 'sin stamp no hay decay — passthrough hasta el backfill');
+    expect(rankings, 0,
+        reason: 'el 23 son DÍAS; mostrarlo como semanas sería mentir');
   });
 }

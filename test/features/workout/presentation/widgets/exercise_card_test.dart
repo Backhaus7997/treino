@@ -85,17 +85,21 @@ void main() {
     'light': AppPalette.mintMagentaLight,
   }.entries) {
     testWidgets(
-        '${entry.key}: el borde de la card NO cambia con error — #868 dejó '
-        'tres señales, no cinco', (tester) async {
+        '${entry.key}: el borde marca error SÓLO con la card cerrada',
+        (tester) async {
       final palette = entry.value;
-      Future<BoxDecoration> bordeCon({required bool hasError}) async {
+      Future<BoxDecoration> bordeCon({
+        required bool hasError,
+        required bool expanded,
+      }) async {
         await tester.pumpWidget(
           MaterialApp(
             theme: ThemeData(extensions: [palette]),
-            home: Scaffold(body: card(hasError: hasError)),
+            home: Scaffold(
+              body: card(hasError: hasError, expanded: expanded),
+            ),
           ),
         );
-        // El segundo Container es la card; el primero es el agarre.
         return tester
             .widgetList<Container>(find.descendant(
               of: find.byType(ExerciseCard),
@@ -105,26 +109,40 @@ void main() {
             .firstWhere((d) => d.border != null && d.color == palette.bg);
       }
 
-      final conError = await bordeCon(hasError: true);
-      final sinError = await bordeCon(hasError: false);
+      Color borde(BoxDecoration d) => (d.border! as Border).top.color;
 
-      // Este test afirmaba lo contrario hasta #868. Un campo de reps vacío
-      // llegó a marcar CINCO cosas a la vez —celda, borde de la card, texto de
-      // su meta, punto de la pestaña y el pie—, y con 3 días × 5 ejercicios eso
-      // es una pantalla en rojo donde ninguna señal manda. Quedan tres, una por
-      // escala: la CELDA dice qué campo falta, el PUNTO de la pestaña en qué
-      // día está, y el PIE cuántos quedan y cómo llegar.
+      // #868 sacó el borde rojo del todo, y tenía razón en el problema: un
+      // campo de reps vacío llegó a marcar CINCO cosas a la vez —celda, borde
+      // de la card, texto de su meta, punto de la pestaña y el pie—, y con
+      // 3 días × 5 ejercicios eso es una pantalla en rojo donde ninguna señal
+      // manda.
+      //
+      // Lo que aquella versión no cubría es el estado CERRADO: ahí la celda no
+      // está en pantalla y una card sin completar se ve igual que una completa.
+      // Se resolvía abriéndola sola, y en device eso resultó peor —reacomodar
+      // ejercicios desplegaba media pantalla.
+      //
+      // Así que la señal no se suma: se MUEVE. Este test es el que impide que
+      // vuelvan a convivir.
       expect(
-        (conError.border! as Border).top.color,
-        palette.border,
-        reason: 'la card ya no se pinta: quien marca el campo es la celda, a '
-            '40 px de acá y con más precisión',
+        borde(await bordeCon(hasError: true, expanded: false)),
+        palette.danger,
+        reason: 'cerrada y sin completar, el borde es lo ÚNICO que puede '
+            'avisar: la celda no está en pantalla',
       );
-      expect((sinError.border! as Border).top.color, palette.border);
       expect(
-        (conError.border! as Border).top.color,
-        (sinError.border! as Border).top.color,
-        reason: 'con y sin error el borde es el mismo',
+        borde(await bordeCon(hasError: true, expanded: true)),
+        palette.border,
+        reason: 'abierta manda la celda, que dice QUÉ campo falta. Si el borde '
+            'también se pinta, volvimos al #868',
+      );
+      expect(
+        borde(await bordeCon(hasError: false, expanded: false)),
+        palette.border,
+      );
+      expect(
+        borde(await bordeCon(hasError: false, expanded: true)),
+        palette.border,
       );
     });
   }

@@ -24,6 +24,7 @@ class SupersetBlock extends StatelessWidget {
   const SupersetBlock({
     required this.count,
     required this.children,
+    this.resaltadoParaUnir = false,
     this.reorderIndex,
     this.trailing,
     this.footer,
@@ -36,6 +37,9 @@ class SupersetBlock extends StatelessWidget {
 
   /// Los editores de cada miembro, en orden.
   final List<Widget> children;
+
+  /// Refuerza relleno y borde mientras este bloque es el destino del drop.
+  final bool resaltadoParaUnir;
 
   /// Posición del bloque en el reorderable exterior. Null deja el header sin
   /// gesto de drag, pero conserva los controles accesibles de subir/bajar.
@@ -61,6 +65,23 @@ class SupersetBlock extends StatelessWidget {
   /// era el caso contrario: ahí el borde era el único límite.
   static const int _kBorde = 140;
 
+  /// Relleno del bloque mientras es el destino explícito del drop.
+  ///
+  /// Se despega del relleno en reposo por 21 (dark) y 23 (light) sobre 255 por
+  /// canal — arriba del umbral de 16 que usa el resto del archivo. Si no se
+  /// despegara, el usuario arrastraría sin saber si va a unir o a reordenar,
+  /// que es lo único que este estado existe para comunicar.
+  static const int _kRellenoResaltado = 46;
+
+  /// Borde del destino explícito de unión: magenta pleno.
+  ///
+  /// Mide 3,50:1 (dark) y 3,48:1 (light) contra [_kRellenoResaltado], por
+  /// encima del 3:1 de SC 1.4.11 para gráficos. **Medido** en
+  /// `test/app/theme/tokens/superset_block_contrast_test.dart` — la primera
+  /// versión de este dartdoc afirmaba el 3:1 sin ningún test detrás, que es
+  /// exactamente lo que ese archivo existe para impedir (AGENTS.md §11.1).
+  static const int _kBordeResaltado = 255;
+
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
@@ -69,9 +90,15 @@ class SupersetBlock extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.s12),
       decoration: BoxDecoration(
-        color: palette.highlight.withAlpha(_kRelleno),
+        color: palette.highlight.withAlpha(
+          resaltadoParaUnir ? _kRellenoResaltado : _kRelleno,
+        ),
         borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: palette.highlight.withAlpha(_kBorde)),
+        border: Border.all(
+          color: palette.highlight.withAlpha(
+            resaltadoParaUnir ? _kBordeResaltado : _kBorde,
+          ),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

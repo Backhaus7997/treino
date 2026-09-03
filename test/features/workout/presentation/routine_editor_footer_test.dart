@@ -87,6 +87,9 @@ Future<void> _agregarPressDeBanca(WidgetTester tester) async {
   await tester.pumpAndSettle();
   await tester.tap(find.text('Agregar 1 ejercicio'));
   await tester.pumpAndSettle();
+  // Desde este cambio el ejercicio agregado nace PLEGADO: quien avisa
+  // que le falta completar sets es el borde rojo, no la card abierta.
+  await expandirEjercicios(tester);
 }
 
 Future<void> _tocar(WidgetTester tester, Finder f) async {

@@ -30,6 +30,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/gym_rankings/application/ranking_providers.dart';
@@ -76,7 +77,9 @@ UserPublicProfile _rankedProfile({
       displayName: displayName,
       gymId: _gymId,
       rankingOptIn: true,
-      racha: racha,
+      // El parámetro se sigue llamando `racha` porque es como se lee en los
+      // call sites; el CAMPO es el nuevo, en semanas.
+      rachaSemanas: racha,
       lifetimeVolumeKg: lifetimeVolumeKg ?? 0,
       bestSquatKg: bestSquatKg,
       bestBenchKg: bestBenchKg,
@@ -215,6 +218,51 @@ void main() {
       // competitionRanks, not the old index+1.
       expect(find.text('2'), findsNothing);
       expect(find.text('3'), findsOneWidget);
+    });
+
+    testWidgets(
+        'el top 3 pinta el numeral de puesto con su metálico y el 4º vuelve '
+        'a textMuted', (tester) async {
+      await tester.pumpWidget(_buildScreen(
+        overrides: baseOverrides(
+          streak: [
+            _rankedProfile(uid: 'u2', displayName: 'Lu', racha: 12),
+            _rankedProfile(uid: 'u3', displayName: 'Coti', racha: 9),
+            _rankedProfile(uid: 'u4', displayName: 'Ana', racha: 7),
+            _rankedProfile(uid: 'u5', displayName: 'Bau', racha: 4),
+          ],
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      const p = AppPalette.mintMagenta;
+      expect(_rankColor(tester, row: 'u2', rank: '1'), p.podiumGold);
+      expect(_rankColor(tester, row: 'u3', rank: '2'), p.podiumSilver);
+      expect(_rankColor(tester, row: 'u4', rank: '3'), p.podiumBronze);
+      expect(_rankColor(tester, row: 'u5', rank: '4'), p.textMuted);
+    });
+
+    testWidgets(
+        'con empate en el 1º hay DOS oros y el siguiente es bronce: la plata '
+        'no se le regala al 3er puesto', (tester) async {
+      await tester.pumpWidget(_buildScreen(
+        overrides: baseOverrides(
+          streak: [
+            _rankedProfile(uid: 'u2', displayName: 'Lu', racha: 12),
+            _rankedProfile(uid: 'u3', displayName: 'Coti', racha: 12),
+            _rankedProfile(uid: 'u4', displayName: 'Ana', racha: 9),
+          ],
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      const p = AppPalette.mintMagenta;
+      expect(_rankColor(tester, row: 'u2', rank: '1'), p.podiumGold);
+      expect(_rankColor(tester, row: 'u3', rank: '1'), p.podiumGold);
+      // Ana entra 3ª, no 2ª: le toca bronce. Si el podio se pintara por índice
+      // de fila en vez de por puesto, acá saldría plata.
+      expect(_rankColor(tester, row: 'u4', rank: '3'), p.podiumBronze);
+      expect(_rankColor(tester, row: 'u4', rank: '3'), isNot(p.podiumSilver));
     });
 
     testWidgets('current user is highlighted when present in a leaderboard',
@@ -730,6 +778,47 @@ void main() {
   });
 
   // ──────────────────────────────────────────────────────────────────────
+  // Podio del top 3 — mapeo puesto → metálico (no widget pumping).
+  // ──────────────────────────────────────────────────────────────────────
+  group('podiumColor', () {
+    const p = AppPalette.mintMagenta;
+
+    test('1º oro, 2º plata, 3º bronce', () {
+      expect(podiumColor(1, p), p.podiumGold);
+      expect(podiumColor(2, p), p.podiumSilver);
+      expect(podiumColor(3, p), p.podiumBronze);
+    });
+
+    test('del 4º en adelante no hay metálico', () {
+      expect(podiumColor(4, p), isNull);
+      expect(podiumColor(5, p), isNull);
+      expect(podiumColor(50, p), isNull);
+    });
+
+    test('mapea por PUESTO, así que los empates de competitionRanks mandan',
+        () {
+      // Board 1, 1, 3: dos oros, ninguna plata, y el bronce al que entró 3º.
+      final ranks = competitionRanks([12, 12, 9]);
+      expect(ranks.map((r) => podiumColor(r, p)).toList(),
+          [p.podiumGold, p.podiumGold, p.podiumBronze]);
+    });
+
+    test('triple empate arriba: tres oros y el 4º sin metálico', () {
+      final ranks = competitionRanks([12, 12, 12, 5]);
+      expect(ranks.map((r) => podiumColor(r, p)).toList(),
+          [p.podiumGold, p.podiumGold, p.podiumGold, null]);
+    });
+
+    test('resuelve contra la paleta que recibe, no contra una constante', () {
+      // Un metálico hardcodeado pasaría los tests de arriba y rompería el
+      // tema claro en silencio.
+      expect(podiumColor(1, AppPalette.mintMagentaLight),
+          AppPalette.mintMagentaLight.podiumGold);
+      expect(podiumColor(1, AppPalette.mintMagentaLight), isNot(p.podiumGold));
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────
   // QA-GYM-506 — pure metric/filter unit tests (no widget pumping).
   // ──────────────────────────────────────────────────────────────────────
   group('rankingMetricValue (QA-GYM-506)', () {
@@ -750,6 +839,24 @@ void main() {
       expect(rankingMetricValue(RankingDimension.streak, profile), 0);
       expect(rankingMetricValue(RankingDimension.volume, profile), 0);
     });
+
+    test('la racha sale de rachaSemanas, NO del `racha` legacy en días', () {
+      // Regresión: la pantalla leía `racha` mientras el repositorio ya
+      // ordenaba y decaía por `rachaSemanas`. El board habría quedado
+      // ordenado por semanas y mostrando días — cada fila con un número que
+      // no explica su propia posición. Ningún test lo agarró porque todos
+      // sembraban el campo viejo.
+      const migrated = UserPublicProfile(
+        uid: 'u1',
+        racha: 23, // legacy, en días
+        rachaSemanas: 3,
+      );
+      expect(rankingMetricValue(RankingDimension.streak, migrated), 3);
+
+      // Doc que nunca escribió el campo nuevo: 0, no el valor en días.
+      const legacyOnly = UserPublicProfile(uid: 'u2', racha: 23);
+      expect(rankingMetricValue(RankingDimension.streak, legacyOnly), 0);
+    });
   });
 
   group('rankableEntries (QA-GYM-506)', () {
@@ -766,7 +873,7 @@ void main() {
     });
 
     test('keeps everyone on a dimension with a legitimate 0 floor', () {
-      const withStreak = UserPublicProfile(uid: 'u1', racha: 5);
+      const withStreak = UserPublicProfile(uid: 'u1', rachaSemanas: 5);
       const withoutStreak = UserPublicProfile(uid: 'u2');
 
       expect(
@@ -809,4 +916,24 @@ class _FakeRankingOptInController implements RankingOptInControllerBase {
 
   @override
   Future<void> syncGymIfDesynced(String uid) async {}
+}
+
+/// Color del numeral de puesto de la fila del atleta [row], verificando de
+/// paso que ese puesto sea [rank].
+///
+/// Va por la key del numeral y NO por su texto: puesto y métrica de una misma
+/// fila pueden ser el mismo string —el 4º con una racha de 4 semanas— y ahí
+/// `find.text` devuelve dos widgets con estilos distintos.
+Color? _rankColor(
+  WidgetTester tester, {
+  required String row,
+  required String rank,
+}) {
+  final finder = find.byKey(Key('rankings_rank_$row'));
+  expect(finder, findsOneWidget,
+      reason: 'no encontré el numeral de puesto de la fila $row');
+  final text = tester.widget<Text>(finder);
+  expect(text.data, rank,
+      reason: 'la fila $row no está en el puesto $rank que espera el test');
+  return text.style?.color;
 }

@@ -9,6 +9,7 @@ import '../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../../core/widgets/treino_icon.dart';
 import '../../../../coach/domain/subscription_tier.dart';
 import 'plan_checkout.dart';
+import 'plan_copy.dart';
 
 /// Muestra el paywall de bloqueo cuando el PF intentó agregar un alumno que
 /// supera el límite de su plan (Fase 7, PR3 UI — el trigger real es el
@@ -273,8 +274,8 @@ class _PlanLimitPaywallContent extends StatelessWidget {
               ? 'Mientras tu suscripción no esté al día, tu cuenta '
                   'funciona con el límite del plan Free. Ningún alumno '
                   'se elimina.' // i18n: Fase W3
-              : 'Tu plan ${_tierName(currentTier)} incluye '
-                  '${_cupoTexto(currentTier)}. Para sumar más, '
+              : 'Tu plan ${tierName(currentTier)} incluye '
+                  '${cupoTexto(currentTier)}. Para sumar más, '
                   'subí de plan.', // i18n: Fase W3
           textAlign: TextAlign.center,
           style: TextStyle(color: palette.textMuted, fontSize: 14),
@@ -339,7 +340,7 @@ class _UpsellBox extends StatelessWidget {
       child: Column(
         children: [
           Text(
-            'PASATE A ${_tierName(nextTier).toUpperCase()}', // i18n: Fase W3
+            'PASATE A ${tierName(nextTier).toUpperCase()}', // i18n: Fase W3
             style: GoogleFonts.barlowCondensed(
               color: palette.accent,
               fontSize: 15,
@@ -472,7 +473,7 @@ class _ReactivateBox extends StatelessWidget {
       child: Column(
         children: [
           Text(
-            'TU PLAN: ${_tierName(currentTier).toUpperCase()}', // i18n: Fase W3
+            'TU PLAN: ${tierName(currentTier).toUpperCase()}', // i18n: Fase W3
             style: GoogleFonts.barlowCondensed(
               color: palette.textPrimary,
               fontSize: 15,
@@ -483,7 +484,7 @@ class _ReactivateBox extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             // TODO(producto): copy placeholder — pendiente de revisión.
-            'Reactivalo y volvés a tus ${_cupoTexto(currentTier)} '
+            'Reactivalo y volvés a tus ${cupoTexto(currentTier)} '
             'al instante.', // i18n: Fase W3
             textAlign: TextAlign.center,
             style: TextStyle(color: palette.textMuted, fontSize: 13),
@@ -633,24 +634,6 @@ String _statusName(SubscriptionStatus status) => switch (status) {
       SubscriptionStatus.paused => 'pausada', // i18n: Fase W3
       SubscriptionStatus.cancelled => 'cancelada', // i18n: Fase W3
     };
-
-/// Cupo del tier en texto.
-///
-/// `weightLimit == null` (plan3) NO es un dato faltante: significa SIN
-/// LÍMITE. Interpolarlo directo renderiza la palabra «null» — y eso fue
-/// exactamente lo que se publicó: el upsell al plan más caro decía
-/// «Hasta null alumnos». Cualquier lugar que muestre el cupo pasa por acá.
-String _cupoTexto(SubscriptionTier tier) => tier.isUnlimited
-    ? 'alumnos sin límite' // i18n: Fase W3
-    : '${tier.weightLimit} alumnos'; // i18n: Fase W3
-
-String _tierName(SubscriptionTier tier) => switch (tier) {
-      SubscriptionTier.free => 'Free', // i18n: Fase W3
-      SubscriptionTier.plan1 => 'Plan 1', // i18n: Fase W3
-      SubscriptionTier.plan2 => 'Plan 2', // i18n: Fase W3
-      SubscriptionTier.plan3 => 'Plan 3', // i18n: Fase W3
-    };
-
 String _formatArs(int amount) {
   final s = amount.toString();
   final buf = StringBuffer();

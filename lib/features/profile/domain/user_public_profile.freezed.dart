@@ -35,7 +35,24 @@ mixin _$UserPublicProfile {
   /// See gyms-foundation Phase 3 (name resolution + denormalization).
   String? get gymName => throw _privateConstructorUsedError;
   int? get workoutsCount => throw _privateConstructorUsedError;
-  int? get racha =>
+
+  /// LEGACY — racha en DÍAS. Congelado: ya no se escribe ni se muestra.
+  /// Se conserva sólo para que los docs viejos sigan decodificando y para
+  /// que `scripts/backfill_racha_semanas.js` pueda leer de dónde venía.
+  /// Lo que la app muestra hoy es [rachaSemanas].
+  int? get racha => throw _privateConstructorUsedError;
+
+  /// Racha en SEMANAS: cuántas semanas seguidas el atleta cumplió el
+  /// objetivo de días de su rutina (ver `computeWeeklyStreak`).
+  ///
+  /// Campo NUEVO en vez de reusar [racha] con otra unidad, a propósito. Los
+  /// docs existentes guardan días; si les cambiábamos el significado sin
+  /// cambiarles el nombre, una racha de 23 días aparecía como "23 semanas"
+  /// en un board PÚBLICO hasta que el atleta volviera a entrenar. Un número
+  /// inflado que parece verdadero es peor que no tener número (AGENTS.md
+  /// §11.1). Con campo nuevo, quien todavía no entrenó desde el deploy
+  /// muestra 0 —honesto— y se corrige solo.
+  int? get rachaSemanas =>
       throw _privateConstructorUsedError; // ignore: invalid_annotation_target
   @JsonKey(fromJson: _nonNegativeCount)
   int? get followersCount =>
@@ -135,6 +152,7 @@ abstract class $UserPublicProfileCopyWith<$Res> {
       String? gymName,
       int? workoutsCount,
       int? racha,
+      int? rachaSemanas,
       @JsonKey(fromJson: _nonNegativeCount) int? followersCount,
       @JsonKey(fromJson: _nonNegativeCount) int? followingCount,
       bool sharedTemplatesWithAthletes,
@@ -169,6 +187,7 @@ class _$UserPublicProfileCopyWithImpl<$Res, $Val extends UserPublicProfile>
     Object? gymName = freezed,
     Object? workoutsCount = freezed,
     Object? racha = freezed,
+    Object? rachaSemanas = freezed,
     Object? followersCount = freezed,
     Object? followingCount = freezed,
     Object? sharedTemplatesWithAthletes = null,
@@ -211,6 +230,10 @@ class _$UserPublicProfileCopyWithImpl<$Res, $Val extends UserPublicProfile>
       racha: freezed == racha
           ? _value.racha
           : racha // ignore: cast_nullable_to_non_nullable
+              as int?,
+      rachaSemanas: freezed == rachaSemanas
+          ? _value.rachaSemanas
+          : rachaSemanas // ignore: cast_nullable_to_non_nullable
               as int?,
       followersCount: freezed == followersCount
           ? _value.followersCount
@@ -269,6 +292,7 @@ abstract class _$$UserPublicProfileImplCopyWith<$Res>
       String? gymName,
       int? workoutsCount,
       int? racha,
+      int? rachaSemanas,
       @JsonKey(fromJson: _nonNegativeCount) int? followersCount,
       @JsonKey(fromJson: _nonNegativeCount) int? followingCount,
       bool sharedTemplatesWithAthletes,
@@ -301,6 +325,7 @@ class __$$UserPublicProfileImplCopyWithImpl<$Res>
     Object? gymName = freezed,
     Object? workoutsCount = freezed,
     Object? racha = freezed,
+    Object? rachaSemanas = freezed,
     Object? followersCount = freezed,
     Object? followingCount = freezed,
     Object? sharedTemplatesWithAthletes = null,
@@ -343,6 +368,10 @@ class __$$UserPublicProfileImplCopyWithImpl<$Res>
       racha: freezed == racha
           ? _value.racha
           : racha // ignore: cast_nullable_to_non_nullable
+              as int?,
+      rachaSemanas: freezed == rachaSemanas
+          ? _value.rachaSemanas
+          : rachaSemanas // ignore: cast_nullable_to_non_nullable
               as int?,
       followersCount: freezed == followersCount
           ? _value.followersCount
@@ -396,6 +425,7 @@ class _$UserPublicProfileImpl implements _UserPublicProfile {
       this.gymName,
       this.workoutsCount,
       this.racha,
+      this.rachaSemanas,
       @JsonKey(fromJson: _nonNegativeCount) this.followersCount,
       @JsonKey(fromJson: _nonNegativeCount) this.followingCount,
       this.sharedTemplatesWithAthletes = false,
@@ -431,8 +461,26 @@ class _$UserPublicProfileImpl implements _UserPublicProfile {
   final String? gymName;
   @override
   final int? workoutsCount;
+
+  /// LEGACY — racha en DÍAS. Congelado: ya no se escribe ni se muestra.
+  /// Se conserva sólo para que los docs viejos sigan decodificando y para
+  /// que `scripts/backfill_racha_semanas.js` pueda leer de dónde venía.
+  /// Lo que la app muestra hoy es [rachaSemanas].
   @override
   final int? racha;
+
+  /// Racha en SEMANAS: cuántas semanas seguidas el atleta cumplió el
+  /// objetivo de días de su rutina (ver `computeWeeklyStreak`).
+  ///
+  /// Campo NUEVO en vez de reusar [racha] con otra unidad, a propósito. Los
+  /// docs existentes guardan días; si les cambiábamos el significado sin
+  /// cambiarles el nombre, una racha de 23 días aparecía como "23 semanas"
+  /// en un board PÚBLICO hasta que el atleta volviera a entrenar. Un número
+  /// inflado que parece verdadero es peor que no tener número (AGENTS.md
+  /// §11.1). Con campo nuevo, quien todavía no entrenó desde el deploy
+  /// muestra 0 —honesto— y se corrige solo.
+  @override
+  final int? rachaSemanas;
 // ignore: invalid_annotation_target
   @override
   @JsonKey(fromJson: _nonNegativeCount)
@@ -522,7 +570,7 @@ class _$UserPublicProfileImpl implements _UserPublicProfile {
 
   @override
   String toString() {
-    return 'UserPublicProfile(uid: $uid, displayName: $displayName, displayNameLowercase: $displayNameLowercase, avatarUrl: $avatarUrl, gymId: $gymId, gymName: $gymName, workoutsCount: $workoutsCount, racha: $racha, followersCount: $followersCount, followingCount: $followingCount, sharedTemplatesWithAthletes: $sharedTemplatesWithAthletes, isProfilePublic: $isProfilePublic, rankingOptIn: $rankingOptIn, lifetimeVolumeKg: $lifetimeVolumeKg, bestSquatKg: $bestSquatKg, bestBenchKg: $bestBenchKg, bestDeadliftKg: $bestDeadliftKg)';
+    return 'UserPublicProfile(uid: $uid, displayName: $displayName, displayNameLowercase: $displayNameLowercase, avatarUrl: $avatarUrl, gymId: $gymId, gymName: $gymName, workoutsCount: $workoutsCount, racha: $racha, rachaSemanas: $rachaSemanas, followersCount: $followersCount, followingCount: $followingCount, sharedTemplatesWithAthletes: $sharedTemplatesWithAthletes, isProfilePublic: $isProfilePublic, rankingOptIn: $rankingOptIn, lifetimeVolumeKg: $lifetimeVolumeKg, bestSquatKg: $bestSquatKg, bestBenchKg: $bestBenchKg, bestDeadliftKg: $bestDeadliftKg)';
   }
 
   @override
@@ -542,6 +590,8 @@ class _$UserPublicProfileImpl implements _UserPublicProfile {
             (identical(other.workoutsCount, workoutsCount) ||
                 other.workoutsCount == workoutsCount) &&
             (identical(other.racha, racha) || other.racha == racha) &&
+            (identical(other.rachaSemanas, rachaSemanas) ||
+                other.rachaSemanas == rachaSemanas) &&
             (identical(other.followersCount, followersCount) ||
                 other.followersCount == followersCount) &&
             (identical(other.followingCount, followingCount) ||
@@ -576,6 +626,7 @@ class _$UserPublicProfileImpl implements _UserPublicProfile {
       gymName,
       workoutsCount,
       racha,
+      rachaSemanas,
       followersCount,
       followingCount,
       sharedTemplatesWithAthletes,
@@ -613,6 +664,7 @@ abstract class _UserPublicProfile implements UserPublicProfile {
       final String? gymName,
       final int? workoutsCount,
       final int? racha,
+      final int? rachaSemanas,
       @JsonKey(fromJson: _nonNegativeCount) final int? followersCount,
       @JsonKey(fromJson: _nonNegativeCount) final int? followingCount,
       final bool sharedTemplatesWithAthletes,
@@ -648,8 +700,26 @@ abstract class _UserPublicProfile implements UserPublicProfile {
   String? get gymName;
   @override
   int? get workoutsCount;
+
+  /// LEGACY — racha en DÍAS. Congelado: ya no se escribe ni se muestra.
+  /// Se conserva sólo para que los docs viejos sigan decodificando y para
+  /// que `scripts/backfill_racha_semanas.js` pueda leer de dónde venía.
+  /// Lo que la app muestra hoy es [rachaSemanas].
   @override
-  int? get racha; // ignore: invalid_annotation_target
+  int? get racha;
+
+  /// Racha en SEMANAS: cuántas semanas seguidas el atleta cumplió el
+  /// objetivo de días de su rutina (ver `computeWeeklyStreak`).
+  ///
+  /// Campo NUEVO en vez de reusar [racha] con otra unidad, a propósito. Los
+  /// docs existentes guardan días; si les cambiábamos el significado sin
+  /// cambiarles el nombre, una racha de 23 días aparecía como "23 semanas"
+  /// en un board PÚBLICO hasta que el atleta volviera a entrenar. Un número
+  /// inflado que parece verdadero es peor que no tener número (AGENTS.md
+  /// §11.1). Con campo nuevo, quien todavía no entrenó desde el deploy
+  /// muestra 0 —honesto— y se corrige solo.
+  @override
+  int? get rachaSemanas; // ignore: invalid_annotation_target
   @override
   @JsonKey(fromJson: _nonNegativeCount)
   int? get followersCount; // ignore: invalid_annotation_target
