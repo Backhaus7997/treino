@@ -19,9 +19,12 @@ import 'onboarding_card_content.dart';
 /// library, the trainer builds one to assign, and the last slide is the whole
 /// point of the difference.
 
-/// The routine editor gestures are identical for athletes and trainers: they
-/// depend on the mobile screen, not on the user's role. The Coach Hub editor is
-/// a different screen and deliberately does not receive these slides.
+/// The routine editor functions are identical for athletes and trainers: they
+/// depend on the mobile screen, not on the user's role.
+///
+/// El Coach Hub recibe SÓLO las que existen allá — ver
+/// [trainerWebCustomExerciseSlides], que comparte la de entrada rápida y las
+/// dos `const` de abajo, y deja afuera el arrastre y la barra de teclado.
 const editorGestureSlides = <OnboardingCardContent>[
   OnboardingCardContent(
     icon: TreinoIcon.specialty,
@@ -47,7 +50,43 @@ const editorGestureSlides = <OnboardingCardContent>[
         'grupo.', // i18n
     illustration: CustomExerciseOnboardingArt.menu(),
   ),
+  _setTypeSlide,
+  OnboardingCardContent(
+    icon: TreinoIcon.copy,
+    title: 'LA BARRA SOBRE EL TECLADO', // i18n
+    // Es la función MÁS escondida del editor: la barra sólo existe con el
+    // teclado abierto, así que quien no cargó un número nunca la vio.
+    body: 'Mientras cargás un número te dice qué estás editando y suma o resta '
+        'de a 2,5 kg (o 1 rep). Con «A TODAS» replicás ese peso en todos los '
+        'sets del ejercicio, y si no era lo que querías, «Deshacer».', // i18n
+    illustration: CustomExerciseOnboardingArt.keyboardBar(),
+  ),
+  _weeksSlide,
 ];
+
+/// Tocar el chip de la serie. Va en las TRES superficies: el chip existe igual
+/// en el teléfono y en el Coach Hub (`SetTypeChip`).
+const _setTypeSlide = OnboardingCardContent(
+  icon: TreinoIcon.dumbbell,
+  title: 'CADA SERIE PUEDE TENER SU TIPO', // i18n
+  // Nada en la pantalla dice que el número de la serie se toca. Es la razón
+  // por la que esta slide existe.
+  body: 'Tocá el número de la serie y elegila como Entrada en calor (W), Drop '
+      '(D) o Al fallo (F). El chip cambia de glifo, así se ve de un vistazo '
+      'para qué es cada serie.', // i18n
+  illustration: CustomExerciseOnboardingArt.setTypes(),
+);
+
+/// Semanas y alcance. También en las tres: el Coach Hub tiene las pestañas de
+/// semana, `Duplicar semana` y el mismo diálogo de alcance.
+const _weeksSlide = OnboardingCardContent(
+  icon: TreinoIcon.calendar,
+  title: 'UN PLAN DE VARIAS SEMANAS', // i18n
+  body: '«Semana» agrega otra, y «Duplicar semana» copia la anterior ejercicio '
+      'por ejercicio. Cuando agregás o borrás uno, el editor te pregunta si es '
+      'solo en esta semana o en todas.', // i18n
+  illustration: CustomExerciseOnboardingArt.weeks(),
+);
 
 /// Athlete deck — a library for their own routines.
 const athleteCustomExerciseSlides = <OnboardingCardContent>[
@@ -114,13 +153,41 @@ const trainerCustomExerciseSlides = <OnboardingCardContent>[
   ...editorGestureSlides,
 ];
 
-/// Coach Hub deck — introduction only.
+/// Coach Hub deck — introduction plus the WEB editor's own functions.
 ///
-/// It is intentionally separate from the trainer mobile deck: Coach Hub has no
-/// RÁPIDO entry or drag handle, so teaching those gestures on web would be a
-/// false promise.
+/// Sigue separado del deck del teléfono, pero ya no por lo que decía antes.
+/// El comentario anterior era «Coach Hub no tiene RÁPIDO ni agarre de arrastre,
+/// enseñar esos gestos en la web sería prometer algo falso». La mitad se venció:
+/// la entrada rápida ES la misma en la web desde que el editor usa
+/// `QuickEntryPanel` compartido, y el toggle dice `RÁPIDO` igual.
+///
+/// Lo que sigue siendo cierto es el arrastre: la web NO tiene
+/// `ReorderableListView` ni barra de accesorio de teclado —se ordena con las
+/// acciones de subir/bajar—, así que esas dos slides se quedan afuera. Y a
+/// cambio tiene una que el teléfono no tiene: el panel lateral fijo (#860).
 const trainerWebCustomExerciseSlides = <OnboardingCardContent>[
   ..._trainerCustomExerciseIntroduction,
+  OnboardingCardContent(
+    icon: TreinoIcon.specialty,
+    title: 'ESCRIBILO EN UNA LÍNEA', // i18n
+    body: 'Tocá RÁPIDO y escribí «press de banca 4x10 55»: entra con 4 series '
+        'de 10 y 55 kg. Para una pirámide, «4x10, 8, 6, 4». Para tiempo, '
+        '«plancha 3x30s».', // i18n
+    illustration: CustomExerciseOnboardingArt.quickEntry(),
+  ),
+  OnboardingCardContent(
+    icon: TreinoIcon.streak,
+    title: 'EL PANEL QUEDA ABIERTO', // i18n
+    // El punto del #860: el modal tapaba la rutina justo cuando hay que
+    // mirarla. Sin esta slide, el botón de superserie del panel no se
+    // descubre — sólo aparece con dos o más tildados.
+    body: 'La lista de ejercicios vive a la derecha mientras armás: elegís, '
+        'ves cómo quedó el día y seguís. Con dos o más tildados aparece «En '
+        'superserie» y entran ya agrupados.', // i18n
+    illustration: CustomExerciseOnboardingArt.sidePanel(),
+  ),
+  _setTypeSlide,
+  _weeksSlide,
 ];
 
 /// The deck for [surface], or `null` if it is not a custom-exercise surface.

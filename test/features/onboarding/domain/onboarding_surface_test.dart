@@ -97,22 +97,28 @@ void main() {
       );
     });
 
-    test('re-shows version 1 only on the changed mobile feature decks', () {
+    test('re-shows every feature deck that sumó slides del editor', () {
+      // Los TRES cambiaron: el teléfono pasó de 6 a 9 slides y la web de 3 a
+      // 7. Quien había cerrado la versión anterior tiene que volver a verlo —
+      // es el único mecanismo que hay para que se entere de lo nuevo.
       const athlete = OnboardingSurface.customExerciseAthleteMobile;
       const trainer = OnboardingSurface.customExerciseTrainerMobile;
       const web = OnboardingSurface.customExerciseTrainerWeb;
 
-      expect(athlete.shouldShow({athlete.wireKey: 1}), isTrue);
-      expect(trainer.shouldShow({trainer.wireKey: 1}), isTrue);
-      expect(web.shouldShow({web.wireKey: 1}), isFalse);
+      expect(athlete.shouldShow({athlete.wireKey: 2}), isTrue);
+      expect(trainer.shouldShow({trainer.wireKey: 2}), isTrue);
+      expect(web.shouldShow({web.wireKey: 1}), isTrue);
     });
 
-    test('does NOT re-show mobile feature decks already seen at version 2', () {
-      const athlete = OnboardingSurface.customExerciseAthleteMobile;
-      const trainer = OnboardingSurface.customExerciseTrainerMobile;
-
-      expect(athlete.shouldShow({athlete.wireKey: 2}), isFalse);
-      expect(trainer.shouldShow({trainer.wireKey: 2}), isFalse);
+    test('does NOT re-show a deck already seen at its current version', () {
+      for (final s in [
+        OnboardingSurface.customExerciseAthleteMobile,
+        OnboardingSurface.customExerciseTrainerMobile,
+        OnboardingSurface.customExerciseTrainerWeb,
+      ]) {
+        expect(s.shouldShow({s.wireKey: s.currentVersion}), isFalse,
+            reason: '$s se re-mostraría en loop');
+      }
     });
   });
 
