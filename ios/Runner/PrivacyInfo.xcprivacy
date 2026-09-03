@@ -28,11 +28,26 @@
   alguien completó. Una declaración que no matchea lo que hace el binario es
   causa de BAJA, no de corrección. Repasalas una por una.
 
-  Y hay una que ya sabemos que no cierra: se declara PreciseLocation porque
-  `Geolocator.getCurrentPosition()` se llama SIN argumentos —o sea, precisión
-  máxima— en cuatro lugares del código. Pero la Política de Privacidad dice
-  "tu ubicación APROXIMADA". Una de las dos está mal y hay que elegir cuál:
-  o el código pide `LocationAccuracy.low`, o el texto legal se corrige.
+  ─── Sobre PreciseLocation ───────────────────────────────────────────────────
+
+  Se declara, y el motivo es UNO: el entrenador que carga dónde trabaja
+  (`kTrainerLocationSettings` = `LocationAccuracy.best`). Esa ubicación se
+  guarda y se publica en su perfil — es la feature de discovery, no un exceso.
+
+  El atleta ya NO pide precisión máxima: pasó a `kAthleteLocationSettings`
+  (`high`: 10 m en iOS, 0-100 m en Android), calzado con los 100 m que es lo
+  más fino que la UI muestra. Y sus coordenadas crudas no salen del teléfono:
+  el bias que va a Google Places es el centro de una celda geohash5 (~4,9 km).
+
+  Aun así la declaración sigue siendo `PreciseLocation`, porque basta un uso
+  preciso para que lo sea, y el del PF lo es. Declarar `CoarseLocation` acá
+  sería falso.
+
+  Una versión anterior de este archivo decía que el código y la Política de
+  Privacidad se contradecían sobre esto —el código pedía máxima y el texto
+  decía "aproximada"—. Se resolvió por los dos lados: el código bajó donde
+  correspondía y el texto ahora describe los dos roles por separado
+  (`legal_content.dart`, sección "4. Ubicación").
 -->
 <plist version="1.0">
 <dict>

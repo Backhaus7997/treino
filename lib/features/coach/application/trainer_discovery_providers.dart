@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../../profile/application/user_providers.dart' show firestoreProvider;
+import '../../../core/utils/location_precision.dart';
 import '../data/trainer_public_profile_repository.dart';
 import '../domain/discovery_filters.dart';
 import '../domain/trainer_location.dart';
@@ -118,7 +119,8 @@ class AthleteLocationNotifier extends StateNotifier<AsyncValue<Position?>> {
         state = const AsyncData(null);
         return;
       }
-      final pos = await Geolocator.getCurrentPosition();
+      final pos = await Geolocator.getCurrentPosition(
+          locationSettings: kAthleteLocationSettings);
       state = AsyncData(pos);
     } catch (e, st) {
       state = AsyncError(e, st);
