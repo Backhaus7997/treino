@@ -83,6 +83,11 @@ export class MpApiError extends Error {
 export interface MpPreapproval {
   id?: unknown;
   status?: unknown;
+  /**
+   * La URL del checkout. Solo viene al CREAR — un GET de un preapproval ya
+   * autorizado no la trae, y por eso hay que guardarla cuando aparece.
+   */
+  init_point?: unknown;
   /** Nuestro enganche al uid de Firebase. Lo mandamos nosotros al crear. */
   external_reference?: unknown;
   /** ISO 8601 del proximo cobro programado. */
@@ -93,9 +98,45 @@ export interface MpPreapproval {
   summarized?: unknown;
 }
 
+/**
+ * Lo que hay que decirle a MP para abrir una suscripcion.
+ *
+ * NO lleva `preapproval_plan_id`. Se crea la suscripcion con el monto EXPLICITO
+ * y no contra un plan preconfigurado en el panel de MP, por una razon que
+ * condiciona todo lo que viene: **MP no devuelve `preapproval_plan_id` en la
+ * respuesta**, solo lo acepta en el request. Atarse a planes del panel nos
+ * dejaria sin poder preguntar de que plan es una suscripcion — y encima con la
+ * tabla de precios viviendo en dos lugares, el panel y `tier-config.ts`.
+ *
+ * Con monto explicito la tabla queda en UN lugar, el servidor, y el tier se
+ * recupera del monto (ver `tier-mapping.ts`).
+ */
+export interface CreatePreapprovalInput {
+  /** Lo que el PF ve como concepto del cobro en su resumen. */
+  reason: string;
+  /** Nuestro enganche: el uid de Firebase. Vuelve en cada GET. */
+  externalReference: string;
+  /** MP lo exige. Es el mail con el que el PF paga, no necesariamente el suyo. */
+  payerEmail: string;
+  /** A donde vuelve el navegador despues del checkout. */
+  backUrl: string;
+  transactionAmount: number;
+  /** Cada cuantos MESES se cobra. 1 = mensual, 12 = anual. */
+  frequencyMonths: number;
+}
+
 export interface MpClient {
   /** Lee una suscripcion. Es la FUENTE DE LA VERDAD de todo el sistema. */
   getPreapproval(preapprovalId: string): Promise<MpPreapproval>;
+  /**
+   * Abre una suscripcion. Devuelve el preapproval con `id` e `init_point` —
+   * la URL a la que hay que mandar al PF para que autorice el pago.
+   *
+   * NO deja la suscripcion activa: la deja en `pending` hasta que el PF pone
+   * su medio de pago. Por eso quien llame a esto NO puede escribir
+   * `subscription` — eso lo hace el reconciliador cuando MP diga `authorized`.
+   */
+  createPreapproval(input: CreatePreapprovalInput): Promise<MpPreapproval>;
 }
 
 /**
@@ -113,54 +154,114 @@ export function createMpClient(
     throw new Error("mp/client: MP_ACCESS_TOKEN vacio o ausente");
   }
 
+  /**
+   * El unico lugar que toca la red. Las dos operaciones comparten timeout,
+   * clasificacion de errores y validacion de la respuesta — tenerlo dos veces
+   * garantizaba que un dia divergieran.
+   */
+  async function request(
+    path: string,
+    method: "GET" | "POST",
+    body?: unknown,
+  ): Promise<MpPreapproval> {
+    let response: Response;
+    try {
+      response = await fetchImpl(`${MP_API}${path}`, {
+        method,
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+    } catch (e) {
+      // Nunca llegamos a MP: red, DNS o timeout. Siempre vale reintentar, y
+      // por eso va con status 0.
+      throw new MpApiError(
+        `mp/client: la llamada no completo — ${(e as Error).message}`,
+        0,
+      );
+    }
+
+    if (!response.ok) {
+      const bodyText = await response.text().catch(() => "");
+      throw new MpApiError(
+        `mp/client: HTTP ${response.status} en ${method} ${path}`,
+        response.status,
+        // El body puede traer detalle util de MP, pero tambien puede ser
+        // enorme. Se recorta: esto va a Cloud Logging.
+        bodyText.slice(0, 500),
+      );
+    }
+
+    const json: unknown = await response.json().catch(() => null);
+    if (json === null || typeof json !== "object") {
+      throw new MpApiError(
+        "mp/client: la respuesta no es un objeto JSON",
+        response.status,
+      );
+    }
+
+    return json as MpPreapproval;
+  }
+
   return {
     async getPreapproval(preapprovalId: string): Promise<MpPreapproval> {
       if (!preapprovalId) {
         throw new MpApiError("mp/client: preapprovalId vacio", 0);
       }
+      return request(
+        `/preapproval/${encodeURIComponent(preapprovalId)}`,
+        "GET",
+      );
+    },
 
-      let response: Response;
-      try {
-        response = await fetchImpl(
-          `${MP_API}/preapproval/${encodeURIComponent(preapprovalId)}`,
-          {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-              "Content-Type": "application/json",
-            },
-            signal: AbortSignal.timeout(TIMEOUT_MS),
-          },
-        );
-      } catch (e) {
-        // Nunca llegamos a MP: red, DNS o timeout. Siempre vale reintentar, y
-        // por eso va con status 0.
+    async createPreapproval(
+      input: CreatePreapprovalInput,
+    ): Promise<MpPreapproval> {
+      // Chequeos que fallan ANTES de salir a la red. Un monto en 0 o un
+      // externalReference vacio no son errores de MP: son bugs nuestros, y
+      // descubrirlos por un 400 los disfraza de problema de ellos.
+      if (!input.externalReference) {
+        throw new MpApiError("mp/client: externalReference vacio", 0);
+      }
+      if (!input.payerEmail) {
+        throw new MpApiError("mp/client: payerEmail vacio", 0);
+      }
+      if (!Number.isFinite(input.transactionAmount) ||
+          input.transactionAmount <= 0) {
         throw new MpApiError(
-          `mp/client: la llamada no completo — ${(e as Error).message}`,
+          `mp/client: transactionAmount invalido (${input.transactionAmount})`,
+          0,
+        );
+      }
+      if (!Number.isInteger(input.frequencyMonths) ||
+          input.frequencyMonths <= 0) {
+        throw new MpApiError(
+          `mp/client: frequencyMonths invalido (${input.frequencyMonths})`,
           0,
         );
       }
 
-      if (!response.ok) {
-        const body = await response.text().catch(() => "");
-        throw new MpApiError(
-          `mp/client: HTTP ${response.status} al leer preapproval`,
-          response.status,
-          // El body puede traer detalle util de MP, pero tambien puede ser
-          // enorme. Se recorta: esto va a Cloud Logging.
-          body.slice(0, 500),
-        );
-      }
-
-      const json: unknown = await response.json().catch(() => null);
-      if (json === null || typeof json !== "object") {
-        throw new MpApiError(
-          "mp/client: la respuesta no es un objeto JSON",
-          response.status,
-        );
-      }
-
-      return json as MpPreapproval;
+      return request("/preapproval", "POST", {
+        reason: input.reason,
+        external_reference: input.externalReference,
+        payer_email: input.payerEmail,
+        back_url: input.backUrl,
+        // `pending` y no `authorized`: la suscripcion nace SIN medio de pago.
+        // El PF lo carga en el `init_point` y recien ahi MP la mueve.
+        status: "pending",
+        auto_recurring: {
+          frequency: input.frequencyMonths,
+          // "months" y no "years" para el anual: `months` esta documentado en
+          // los tipos del SDK y `years` no aparece. 12 meses es lo mismo y no
+          // depende de un valor que no pudimos verificar.
+          frequency_type: "months",
+          transaction_amount: input.transactionAmount,
+          currency_id: "ARS",
+        },
+      });
     },
   };
 }
