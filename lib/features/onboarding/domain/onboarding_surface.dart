@@ -88,8 +88,8 @@ extension OnboardingSurfaceX on OnboardingSurface {
         OnboardingSurface.athleteMobile => 1,
         OnboardingSurface.trainerMobile => 1,
         OnboardingSurface.trainerWeb => 1,
-        OnboardingSurface.customExerciseAthleteMobile => 1,
-        OnboardingSurface.customExerciseTrainerMobile => 1,
+        OnboardingSurface.customExerciseAthleteMobile => 2,
+        OnboardingSurface.customExerciseTrainerMobile => 2,
         OnboardingSurface.customExerciseTrainerWeb => 1,
         OnboardingSurface.templatesAthleteMobile => 1,
       };

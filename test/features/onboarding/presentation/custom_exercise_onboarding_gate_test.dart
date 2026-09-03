@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/features/onboarding/presentation/custom_exercise_onboarding_slides.dart';
 import 'package:treino/features/onboarding/domain/onboarding_surface.dart';
 import 'package:treino/features/onboarding/presentation/custom_exercise_onboarding_gate.dart';
 import 'package:treino/features/onboarding/presentation/custom_exercise_onboarding_view.dart';
@@ -139,7 +140,14 @@ void main() {
         tester,
         repo: repo,
         profile: _profile(
-          onboardingSeen: {..._toursSeen, 'customExerciseAthleteMobile': 1},
+          onboardingSeen: {
+            ..._toursSeen,
+            // La versión ACTUAL, no un 1 literal: "ya lo vio" significa que vio
+            // ESTA versión. Con el número escrito a mano, subir la versión
+            // rompía este test aunque el comportamiento fuera el correcto.
+            'customExerciseAthleteMobile':
+                OnboardingSurface.customExerciseAthleteMobile.currentVersion,
+          },
         ),
       );
 
@@ -167,9 +175,16 @@ void main() {
       await _pump(tester, repo: repo, profile: _profile());
 
       const cta = Key('custom_exercise_onboarding_primary_cta');
-      await _tapAndSettle(tester, cta); // slide 2
-      await _tapAndSettle(tester, cta); // slide 3
-      await _tapAndSettle(tester, cta); // finish
+      // Un tap por slide — el último es el que cierra. Derivado del DECK y no
+      // escrito a mano: con los taps contados a mano, sumar una slide rompía
+      // este test aunque el flujo siguiera funcionando, y el mensaje ("no se
+      // cerró") no decía que el problema era el conteo.
+      final slides = customExerciseSlidesFor(
+        OnboardingSurface.customExerciseAthleteMobile,
+      )!;
+      for (var i = 0; i < slides.length; i++) {
+        await _tapAndSettle(tester, cta);
+      }
 
       expect(find.byType(CustomExerciseOnboardingView), findsNothing);
       expect(repo.updateCount, 1);
@@ -178,7 +193,8 @@ void main() {
         {
           'onboardingSeen': {
             ..._toursSeen,
-            'customExerciseAthleteMobile': 1,
+            'customExerciseAthleteMobile':
+                OnboardingSurface.customExerciseAthleteMobile.currentVersion,
           },
         },
         reason: 'the WHOLE map is written, never a single-key partial',
@@ -199,7 +215,7 @@ void main() {
       expect(
         (repo.capturedPartial!['onboardingSeen']!
             as Map)['customExerciseAthleteMobile'],
-        1,
+        OnboardingSurface.customExerciseAthleteMobile.currentVersion,
         reason: 'skipping is a real exit, not a postponement',
       );
     });

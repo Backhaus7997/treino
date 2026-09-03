@@ -43,6 +43,16 @@ class CustomExerciseOnboardingArt extends StatelessWidget {
   /// Slide 3 — the finished exercise sitting in a routine day.
   const CustomExerciseOnboardingArt.library() : this._(_Variant.library);
 
+  /// Slide 4 — one-line entry converted into a complete prescription.
+  const CustomExerciseOnboardingArt.quickEntry()
+      : this._(_Variant.quickEntry);
+
+  /// Slide 5 — a routine row being moved by its drag handle.
+  const CustomExerciseOnboardingArt.drag() : this._(_Variant.drag);
+
+  /// Slide 6 — the overflow menu containing the remaining editor actions.
+  const CustomExerciseOnboardingArt.menu() : this._(_Variant.menu);
+
   final _Variant _variant;
 
   /// Fixed design canvas. Everything inside is laid out against these numbers
@@ -82,13 +92,16 @@ class CustomExerciseOnboardingArt extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const _ArtHeader(),
+                    _ArtHeader(_variant),
                     const SizedBox(height: 12),
                     Expanded(
                       child: switch (_variant) {
                         _Variant.form => const _FormBody(),
                         _Variant.video => const _VideoBody(),
                         _Variant.library => const _LibraryBody(),
+                        _Variant.quickEntry => const _QuickEntryBody(),
+                        _Variant.drag => const _DragBody(),
+                        _Variant.menu => const _MenuBody(),
                       },
                     ),
                   ],
@@ -102,11 +115,13 @@ class CustomExerciseOnboardingArt extends StatelessWidget {
   }
 }
 
-enum _Variant { form, video, library }
+enum _Variant { form, video, library, quickEntry, drag, menu }
 
 /// `‹ NUEVO EJERCICIO` — the real screen's back affordance and title.
 class _ArtHeader extends StatelessWidget {
-  const _ArtHeader();
+  const _ArtHeader(this.variant);
+
+  final _Variant variant;
 
   @override
   Widget build(BuildContext context) {
@@ -118,7 +133,12 @@ class _ArtHeader extends StatelessWidget {
         Icon(TreinoIcon.back, size: 13, color: muted),
         const SizedBox(width: 8),
         Text(
-          'NUEVO EJERCICIO', // i18n
+          switch (variant) {
+            _Variant.form || _Variant.video => 'NUEVO EJERCICIO',
+            _Variant.library || _Variant.drag || _Variant.menu =>
+              'EDITOR DE RUTINA',
+            _Variant.quickEntry => 'ENTRADA RÁPIDA',
+          }, // i18n
           style: GoogleFonts.barlowCondensed(
             fontSize: 11,
             fontWeight: FontWeight.w700,
@@ -467,6 +487,169 @@ class _LibraryBody extends StatelessWidget {
   }
 }
 
+// ─────────────────────────────────────────────────── slide 4 · quick entry
+
+class _QuickEntryBody extends StatelessWidget {
+  const _QuickEntryBody();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _FieldLabel('Escribí ejercicio, series, reps y peso'), // i18n
+        const SizedBox(height: 8),
+        _Box(
+          height: 38,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'press de banca 4x10 55',
+                    style: GoogleFonts.barlow(
+                      fontSize: 12,
+                      color: palette.textPrimary,
+                    ),
+                  ),
+                ),
+                Icon(TreinoIcon.specialty, size: 14, color: palette.accent),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Center(
+          child: Text(
+            'SE CONVIERTE EN', // i18n
+            style: GoogleFonts.barlowCondensed(
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.2,
+              color: palette.accent,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        const _ExerciseRow(
+          title: 'Press de banca',
+          detail: '4 series × 10 reps · 55 kg',
+          isOwn: true,
+        ),
+      ],
+    );
+  }
+}
+
+// ───────────────────────────────────────────────────────── slide 5 · drag
+
+class _DragBody extends StatelessWidget {
+  const _DragBody();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+
+    return Column(
+      children: [
+        const _ExerciseRow(
+          title: 'Press militar',
+          detail: '3 × 10',
+          showDragHandle: true,
+        ),
+        const SizedBox(height: 8),
+        _DashedBox(
+          color: palette.accent.withValues(alpha: 0.55),
+          fill: palette.accent.withValues(alpha: 0.06),
+          child: const SizedBox(height: 38),
+        ),
+        const SizedBox(height: 8),
+        const _ExerciseRow(
+          title: 'Press de banca',
+          detail: '4 × 10 · moviendo',
+          showDragHandle: true,
+          lifted: true,
+        ),
+      ],
+    );
+  }
+}
+
+// ───────────────────────────────────────────────────────── slide 6 · menu
+
+class _MenuBody extends StatelessWidget {
+  const _MenuBody();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+
+    return Stack(
+      children: [
+        const _ExerciseRow(
+          title: 'Press de banca',
+          detail: '4 × 10 · 55 kg',
+          showMenuButton: true,
+        ),
+        Align(
+          alignment: Alignment.bottomRight,
+          child: SizedBox(
+            width: 190,
+            child: _Box(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const _MenuAction('Cambiar ejercicio'), // i18n
+                    const SizedBox(height: 8),
+                    const _MenuAction('Copiar sets del anterior'), // i18n
+                    const SizedBox(height: 8),
+                    const _MenuAction('Subir / bajar'), // i18n
+                    const SizedBox(height: 8),
+                    const _MenuAction('Unir en superserie'), // i18n
+                    const SizedBox(height: 8),
+                    _MenuAction(
+                      'Separar del grupo', // i18n
+                      color: palette.highlight,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MenuAction extends StatelessWidget {
+  const _MenuAction(this.label, {this.color});
+
+  final String label;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+
+    return Text(
+      label,
+      style: GoogleFonts.barlow(
+        fontSize: 10,
+        fontWeight: FontWeight.w600,
+        height: 1.0,
+        color: color ?? palette.textPrimary,
+      ),
+    );
+  }
+}
+
 /// One row of a routine day. [isOwn] is the exercise the user just created:
 /// accent thumbnail, accent outline and a `MÍO` badge.
 class _ExerciseRow extends StatelessWidget {
@@ -474,11 +657,17 @@ class _ExerciseRow extends StatelessWidget {
     required this.title,
     required this.detail,
     this.isOwn = false,
+    this.showDragHandle = false,
+    this.showMenuButton = false,
+    this.lifted = false,
   });
 
   final String title;
   final String detail;
   final bool isOwn;
+  final bool showDragHandle;
+  final bool showMenuButton;
+  final bool lifted;
 
   @override
   Widget build(BuildContext context) {
@@ -488,13 +677,32 @@ class _ExerciseRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: palette.textPrimary.withValues(alpha: 0.07),
-        border: isOwn
+        border: isOwn || lifted
             ? Border.all(color: palette.accent.withValues(alpha: 0.35))
             : null,
         borderRadius: BorderRadius.circular(AppRadius.sm),
+        boxShadow: lifted
+            ? [
+                BoxShadow(
+                  color: palette.scrimDark.withValues(alpha: 0.18),
+                  blurRadius: 8,
+                  offset: const Offset(0, AppSpacing.hairline),
+                ),
+              ]
+            : null,
       ),
       child: Row(
         children: [
+          if (showDragHandle) ...[
+            Icon(
+              TreinoIcon.dragHandle,
+              size: 14,
+              color: lifted
+                  ? palette.accent
+                  : palette.textPrimary.withValues(alpha: 0.45),
+            ),
+            const SizedBox(width: 8),
+          ],
           Container(
             width: 28,
             height: 28,
@@ -548,6 +756,14 @@ class _ExerciseRow extends StatelessWidget {
                   color: palette.accent,
                 ),
               ),
+            ),
+          ],
+          if (showMenuButton) ...[
+            const SizedBox(width: 8),
+            Icon(
+              TreinoIcon.dotsThree,
+              size: 16,
+              color: palette.accent,
             ),
           ],
         ],
