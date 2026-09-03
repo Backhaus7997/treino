@@ -56,6 +56,7 @@ import 'widgets/empty_day_state.dart';
 import 'widgets/exercise_actions_sheet.dart';
 import 'widgets/keyboard_accessory_bar.dart';
 import 'widgets/exercise_card.dart';
+import 'widgets/prescription_summary.dart';
 import 'widgets/prescription_chips.dart';
 import 'widgets/quick_entry_panel.dart';
 import 'widgets/quick_entry_parser.dart';
@@ -5163,40 +5164,30 @@ class _SlotEditorState extends State<_SlotEditor> {
     );
   }
 
+  /// Delega en `resumenDePrescripcion` (widgets/prescription_summary.dart).
+  ///
+  /// Vivía acá, privado, y por eso el editor web del Coach Hub no lo podía
+  /// usar aunque dibuje la misma card. Se extrajo al mover la card compartida
+  /// a la web: dos pantallas formateando la misma prescripción por su cuenta
+  /// divergen, y en este repo eso ya pasó con la regla de agrupar superseries.
   String _prescriptionSummary(
     _EditableSlot slot,
     List<_EditableSet> sets,
     AppL10n l10n,
-  ) {
-    final measureValues = slot.exerciseMode == ExerciseMode.duration
-        ? sets.map((set) => set.durationSeconds).toList()
-        : sets.map((set) => set.reps).toList();
-    final measure = _uniform(measureValues);
-    final measureText = measure == null
-        ? '—'
-        : slot.exerciseMode == ExerciseMode.duration
-            ? _restSummary(measure)
-            : '$measure';
+  ) =>
+      resumenDePrescripcion(
+        modo: slot.exerciseMode,
+        sets: [
+          for (final set in sets)
+            (
+              reps: set.reps,
+              durationSeconds: set.durationSeconds,
+              weightKg: set.weightKg,
+            ),
+        ],
+        unidadDePeso: l10n.monthlyReportVolumeUnit,
+      );
 
-    final segments = <String>['${sets.length} × $measureText'];
-    if (slot.exerciseMode != ExerciseMode.duration) {
-      final weight = _uniform(sets.map((set) => set.weightKg).toList());
-      if (weight != null) {
-        segments.add(
-          '${formatWeightKg(weight)} ${l10n.monthlyReportVolumeUnit}',
-        );
-      } else if (sets.any((set) => set.weightKg != null)) {
-        segments.add('— ${l10n.monthlyReportVolumeUnit}');
-      }
-    }
-    return segments.join(' · ');
-  }
-
-  T? _uniform<T>(List<T?> values) {
-    if (values.isEmpty || values.first == null) return null;
-    final first = values.first;
-    return values.every((value) => value == first) ? first : null;
-  }
 
   String _restSummary(int seconds) {
     final display = secondsToMmss(seconds);

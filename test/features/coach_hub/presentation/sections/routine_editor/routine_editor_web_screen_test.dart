@@ -33,6 +33,7 @@ import 'package:treino/features/workout/domain/routine_visibility.dart';
 import 'package:treino/features/workout/domain/set_enums.dart';
 import 'package:treino/features/workout/domain/set_spec.dart';
 
+import '../../../../../fixtures/routine_editor_ui.dart';
 import '../../../../../fixtures/exercises.dart';
 import '../../../../../helpers/fake_analytics_service.dart';
 
@@ -153,6 +154,32 @@ Future<void> _pumpEditor(
         : '/routine-editor/$_athleteId/$routineId',
   );
   await tester.pumpAndSettle();
+
+  // La card del ejercicio pasó a ser `ExerciseCard`, la MISMA del editor del
+  // teléfono, y nace COLAPSADA: los campos de sets no están en el árbol hasta
+  // que alguien abre la card. Sin esto, 42 de estos tests fallaban con
+  // "Found 0 widgets" sobre campos que sí existen.
+  //
+  // El helper es el del mobile sin adaptar: busca las keys de `ExerciseCard`,
+  // que ahora las dos pantallas dibujan. Es el primer beneficio concreto de
+  // compartir el widget en vez de tener dos implementaciones.
+  await expandirEjercicios(tester);
+
+  // Y volver ARRIBA. `expandirEjercicios` usa `ensureVisible` para alcanzar
+  // cada cabecera, así que deja el viewport corrido donde estaba la última
+  // card. Cualquier test que después tapee algo de la parte de arriba —las
+  // pestañas de semana, el botón de duplicar— fallaba con "Found 0 widgets"
+  // sobre un widget que existe.
+  //
+  // Se resuelve acá y no en cada test a propósito: es un efecto de este
+  // helper, no un problema de los tests.
+  final vertical = find.byWidgetPredicate(
+    (w) => w is Scrollable && w.axisDirection == AxisDirection.down,
+  );
+  if (vertical.evaluate().isNotEmpty) {
+    tester.state<ScrollableState>(vertical.first).position.jumpTo(0);
+    await tester.pumpAndSettle();
+  }
 }
 
 /// A web-editable (simple, single-week, reps) routine — the kind edit mode
@@ -935,6 +962,9 @@ Future<void> _fillMinimalValidForm(WidgetTester tester) async {
   await tester.pumpAndSettle();
   await tester.tap(find.text('Agregar (1)'));
   await tester.pumpAndSettle();
+  // La card nace PLEGADA desde que la web usa `ExerciseCard`: los campos
+  // de sets no están en el árbol hasta abrirla.
+  await expandirEjercicios(tester);
 
   // Reps field for the single default set — located via its 'reps' hint
   // (not '.first' on any empty TextFormField, which would also match the
@@ -1036,6 +1066,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Agregar (1)'));
       await tester.pumpAndSettle();
+      // La card nace PLEGADA desde que la web usa `ExerciseCard`: los campos
+      // de sets no están en el árbol hasta abrirla.
+      await expandirEjercicios(tester);
 
       // Reps left empty.
       await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
@@ -1083,6 +1116,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Agregar (1)'));
       await tester.pumpAndSettle();
+      // La card nace PLEGADA desde que la web usa `ExerciseCard`: los campos
+      // de sets no están en el árbol hasta abrirla.
+      await expandirEjercicios(tester);
     }
 
     testWidgets('cambia el ejercicio conservando las series ya cargadas', (
@@ -1142,6 +1178,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Agregar (1)'));
       await tester.pumpAndSettle();
+      // La card nace PLEGADA desde que la web usa `ExerciseCard`: los campos
+      // de sets no están en el árbol hasta abrirla.
+      await expandirEjercicios(tester);
     }
 
     testWidgets('en plan de 1 semana el tacho borra directo, sin diálogo', (
@@ -1256,6 +1295,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Agregar (1)'));
       await tester.pumpAndSettle();
+      // La card nace PLEGADA desde que la web usa `ExerciseCard`: los campos
+      // de sets no están en el árbol hasta abrirla.
+      await expandirEjercicios(tester);
     }
 
     testWidgets(
@@ -1887,6 +1929,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Agregar (1)'));
       await tester.pumpAndSettle();
+      // La card nace PLEGADA desde que la web usa `ExerciseCard`: los campos
+      // de sets no están en el árbol hasta abrirla.
+      await expandirEjercicios(tester);
 
       // Toggle to range mode → the set row swaps its 'reps' field for mín/máx.
       await tester.tap(find.text('Rango'));
@@ -1963,6 +2008,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Agregar (1)'));
       await tester.pumpAndSettle();
+      // La card nace PLEGADA desde que la web usa `ExerciseCard`: los campos
+      // de sets no están en el árbol hasta abrirla.
+      await expandirEjercicios(tester);
       await tester.tap(find.text('Rango'));
       await tester.pumpAndSettle();
 
@@ -2045,6 +2093,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Agregar (1)'));
       await tester.pumpAndSettle();
+      // La card nace PLEGADA desde que la web usa `ExerciseCard`: los campos
+      // de sets no están en el árbol hasta abrirla.
+      await expandirEjercicios(tester);
 
       await tester.tap(find.text('Tiempo'));
       await tester.pumpAndSettle();
@@ -2089,6 +2140,9 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Agregar (1)'));
       await tester.pumpAndSettle();
+      // La card nace PLEGADA desde que la web usa `ExerciseCard`: los campos
+      // de sets no están en el árbol hasta abrirla.
+      await expandirEjercicios(tester);
       await tester.tap(find.text('Tiempo'));
       await tester.pumpAndSettle();
 

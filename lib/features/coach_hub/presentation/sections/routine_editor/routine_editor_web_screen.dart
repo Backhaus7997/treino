@@ -5,6 +5,9 @@ library;
 
 import 'dart:async';
 
+import '../../../../workout/presentation/widgets/exercise_card.dart';
+import '../../../../workout/presentation/widgets/prescription_chips.dart';
+import '../../../../workout/presentation/widgets/prescription_summary.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -167,6 +170,17 @@ class _EditorSlot {
   /// Whether this slot is present in 0-based [w].
   /// Rule: `activeWeeks.isEmpty || activeWeeks.contains(w)`.
   bool isPresentInWeek(int w) => activeWeeks.isEmpty || activeWeeks.contains(w);
+
+  /// Si la card se ve desplegada. Vive en el MODELO y no en el `State` del
+  /// widget, igual que `_EditableSlot.expandido` en el editor mobile — y por
+  /// la misma razón, que allá fue un bug real: mover un slot lo cambia de
+  /// lugar en el árbol, Flutter destruye y recrea su `State`, y cualquier
+  /// bandera local vuelve a su valor inicial.
+  ///
+  /// Arranca en `false`: **todo nace plegado**, incluidos los ejercicios sin
+  /// completar. A ésos los distingue el borde rojo de [ExerciseCard], que es
+  /// lo que hace innecesario abrirlos.
+  bool expandido = false;
 }
 
 /// Copies the prescription of [source] onto [target] for the 0-based [week]
@@ -2032,6 +2046,10 @@ class _RoutineEditorWebScreenState
                                       onAddExercises: () =>
                                           _addExercisesToDay(i),
                                       onRemoveSlot: (s) => _onDeleteSlot(i, s),
+                                      onToggleSlotExpanded: (s) => setState(
+                                        () => _days[i].slots[s].expandido =
+                                            !_days[i].slots[s].expandido,
+                                      ),
                                       onReplaceSlot: (s) =>
                                           _replaceSlotExercise(i, s),
                                       onMoveSlot: (s, dir) =>
@@ -2549,6 +2567,7 @@ class _DayCard extends StatelessWidget {
     required this.onRemove,
     required this.onAddExercises,
     required this.onRemoveSlot,
+    required this.onToggleSlotExpanded,
     required this.onReplaceSlot,
     required this.onMoveSlot,
     required this.copyPreviousCallbackFor,
@@ -2591,6 +2610,10 @@ class _DayCard extends StatelessWidget {
   final VoidCallback onRemove;
   final VoidCallback onAddExercises;
   final void Function(int slotIndex) onRemoveSlot;
+
+  /// Abre o cierra la card del slot [slotIndex]. Sube hasta el `State` porque
+  /// la bandera vive en el modelo, no en el widget.
+  final void Function(int slotIndex) onToggleSlotExpanded;
   final void Function(int slotIndex) onReplaceSlot;
   final void Function(int slotIndex, int dir) onMoveSlot;
 
@@ -2678,6 +2701,7 @@ class _DayCard extends StatelessWidget {
           for (var i = 0; i < day.slots.length; i++) ...[
             const SizedBox(height: 8),
             _SlotCard(
+              onToggleExpanded: () => onToggleSlotExpanded(i),
               slot: day.slots[i],
               palette: palette,
               selectedWeek: selectedWeek,
@@ -2738,6 +2762,7 @@ class _DayCard extends StatelessWidget {
 
 class _SlotCard extends StatelessWidget {
   const _SlotCard({
+    required this.onToggleExpanded,
     required this.slot,
     required this.palette,
     required this.selectedWeek,
@@ -2768,6 +2793,11 @@ class _SlotCard extends StatelessWidget {
     required this.onToggleLink,
     required this.onTogglePresence,
   });
+
+  /// Abre o cierra la card. El estado vive en `_EditorSlot.expandido` —o sea
+  /// en el MODELO— así que sobrevive a que Flutter recree el `State` de la
+  /// fila al moverse. En el editor mobile eso fue un bug real.
+  final VoidCallback onToggleExpanded;
 
   final _EditorSlot slot;
   final AppPalette palette;
@@ -2818,44 +2848,20 @@ class _SlotCard extends StatelessWidget {
     // The sets for the currently-viewed week only — other weeks' rows aren't
     // rendered while a different tab is selected (Fase 4b).
     final weekSets = slot.weeklySets[selectedWeek];
-    final card = Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: palette.bg,
-        borderRadius: BorderRadius.circular(10),
-        // Slots in a superset run share an accent-tinted border to read as a
-        // group (the "link with next" toggle is what forms the run).
-        border: hasError
-            ? Border.all(
-                color: palette.danger.withValues(alpha: 0.75),
-                width: 1.5,
-              )
-            : inSuperset
-                ? Border.all(color: palette.accent.withValues(alpha: 0.55))
-                : null,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: InkWell(
-                  onTap: onReplace,
-                  borderRadius: BorderRadius.circular(6),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Text(
-                      exercise?.name ?? '—',
-                      style: GoogleFonts.barlow(
-                        color: palette.textPrimary,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+    // La cáscara la dibuja `ExerciseCard`, el MISMO widget que el editor del
+    // teléfono. Lo que eso trae acá y antes no había: la card se colapsa y,
+    // cerrada, muestra el resumen de la prescripción; y el borde se pinta de
+    // rojo **sólo cerrada** — abierta manda la celda del campo que falta, que
+    // es más precisa. Nunca las dos a la vez (ver el comentario de #868 en
+    // `exercise_card.dart`).
+    //
+    // NO se porta el agarre `::` ni el drag para unir/separar superseries:
+    // `reorderIndex` y `dragHandleKey` quedan en null y el agarre no se
+    // dibuja. Son gestos de pulgar; con mouse los chevrons y el ⋮ que esta
+    // pantalla ya tenía son más precisos, y siguen acá abajo.
+    final controles = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
               IconButton(
                 tooltip: 'Cambiar ejercicio', // i18n
                 icon: Icon(TreinoIcon.edit, size: 15, color: palette.textMuted),
@@ -2900,8 +2906,32 @@ class _SlotCard extends StatelessWidget {
                 onPressed: onRemove,
                 visualDensity: VisualDensity.compact,
               ),
-            ],
-          ),
+      ],
+    );
+
+    final card = ExerciseCard(
+      title: exercise?.name ?? '—',
+      summary: PrescriptionChips(
+        prescription: resumenDePrescripcion(
+          modo: slot.exerciseMode,
+          sets: [
+            for (final set in weekSets)
+              (
+                reps: set.reps,
+                durationSeconds: set.durationSeconds,
+                weightKg: set.weightKg,
+              ),
+          ],
+          unidadDePeso: 'kg', // i18n
+        ),
+      ),
+      expanded: slot.expandido,
+      onToggle: onToggleExpanded,
+      hasError: hasError,
+      menu: controles,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
           if (errorText != null) ...[
             const SizedBox(height: 4),
             Text(
