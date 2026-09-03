@@ -17,6 +17,7 @@ import '../../../../workout/application/custom_exercise_providers.dart';
 import '../../../../workout/application/exercise_filter.dart';
 import '../../../../workout/application/exercise_providers.dart';
 import '../../../../workout/domain/custom_exercise.dart';
+import '../../../../workout/presentation/widgets/superset_block.dart';
 import '../../../../workout/presentation/widgets/quick_entry_panel.dart';
 import '../../../../workout/presentation/widgets/quick_entry_parser.dart';
 import '../../../../workout/presentation/widgets/empty_day_state.dart';
@@ -2948,43 +2949,7 @@ class _DayCard extends StatelessWidget {
             const SizedBox(height: AppSpacing.s8),
             quickEntryPanel!,
           ],
-          for (var i = 0; i < day.slots.length; i++) ...[
-            const SizedBox(height: 8),
-            _SlotCard(
-              onToggleExpanded: () => onToggleSlotExpanded(i),
-              slot: day.slots[i],
-              palette: palette,
-              selectedWeek: selectedWeek,
-              numWeeks: numWeeks,
-              hasError: slotHasError(day.slots[i]),
-              errorText: slotErrorText(day.slots[i]),
-              canMoveUp: i > 0,
-              canMoveDown: i < day.slots.length - 1,
-              canLink: i < day.slots.length - 1,
-              linkedToNext: day.slots[i].linkedToNext,
-              inSuperset:
-                  (i < day.slots.length - 1 && day.slots[i].linkedToNext) ||
-                      (i > 0 && day.slots[i - 1].linkedToNext),
-              onRemove: () => onRemoveSlot(i),
-              onReplace: () => onReplaceSlot(i),
-              onMoveUp: () => onMoveSlot(i, -1),
-              onMoveDown: () => onMoveSlot(i, 1),
-              onCopyPrevious: copyPreviousCallbackFor(i),
-              onRestChanged: (v) => onRestChanged(i, v),
-              onAddSet: () => onAddSet(i),
-              onRemoveSet: (set) => onRemoveSet(i, set),
-              onSetRepsChanged: (set, v) => onSetRepsChanged(i, set, v),
-              onSetRepsMinChanged: (set, v) => onSetRepsMinChanged(i, set, v),
-              onSetRepsMaxChanged: (set, v) => onSetRepsMaxChanged(i, set, v),
-              onSetDurationChanged: (set, v) => onSetDurationChanged(i, set, v),
-              onSetWeightChanged: (set, v) => onSetWeightChanged(i, set, v),
-              onSetTypeChanged: (set, t) => onSetTypeChanged(i, set, t),
-              onModeChanged: (em, rm) => onModeChanged(i, em, rm),
-              onNotesChanged: (v) => onNotesChanged(i, v),
-              onToggleLink: () => onToggleLink(i),
-              onTogglePresence: (w) => onTogglePresence(i, w),
-            ),
-          ],
+          ..._filasDeSlots(),
           // Un día sin ejercicios no dibujaba NADA entre el nombre y el botón:
           // desde afuera no se distinguía de uno que no cargó todavía. El
           // editor del teléfono ya tenía esta pieza.
@@ -3014,6 +2979,88 @@ class _DayCard extends StatelessWidget {
       ),
     );
   }
+
+  /// Agrupa los slots en corridas: un suelto es su propia fila; los enlazados
+  /// consecutivos comparten un [SupersetBlock].
+  ///
+  /// La corrida la define `linkedToNext`, igual que al guardar
+  /// (`supersetBlockIndices` del dominio ve slots CONTIGUOS con el mismo
+  /// grupo). Acá sólo se dibuja lo que ese modelo ya dice.
+  ///
+  /// Antes la web marcaba el grupo tiñendo el BORDE de cada slot, y el #869 ya
+  /// había medido que eso no se ve: 10 sobre 255 por canal contra la card.
+  /// Peor, al pasar la card a `ExerciseCard` ese borde desapareció y el grupo
+  /// quedó SIN marca — una regresión que compiló y pasó 3133 tests porque
+  /// ningún test cubría "los agrupados se ven agrupados".
+  List<Widget> _filasDeSlots() {
+    final filas = <Widget>[];
+    var i = 0;
+    while (i < day.slots.length) {
+      final desde = i;
+      var hasta = i;
+      while (hasta < day.slots.length - 1 && day.slots[hasta].linkedToNext) {
+        hasta++;
+      }
+      final miembros = hasta - desde + 1;
+      filas.add(const SizedBox(height: 8));
+      if (miembros == 1) {
+        filas.add(_slotCard(desde, null));
+      } else {
+        filas.add(SupersetBlock(
+          count: miembros,
+          children: [
+            for (var k = desde; k <= hasta; k++) ...[
+              _slotCard(k, k - desde),
+              if (k < hasta) const SizedBox(height: AppSpacing.s8),
+            ],
+          ],
+        ));
+      }
+      i = hasta + 1;
+    }
+    return filas;
+  }
+
+  /// Una card de slot. [posEnGrupo] alimenta el badge A1/A2 y va en null
+  /// cuando el ejercicio es suelto.
+  Widget _slotCard(int i, int? posEnGrupo) {
+    return _SlotCard(
+            onToggleExpanded: () => onToggleSlotExpanded(i),
+            slot: day.slots[i],
+            palette: palette,
+            selectedWeek: selectedWeek,
+            numWeeks: numWeeks,
+            hasError: slotHasError(day.slots[i]),
+            errorText: slotErrorText(day.slots[i]),
+            canMoveUp: i > 0,
+            canMoveDown: i < day.slots.length - 1,
+            canLink: i < day.slots.length - 1,
+            linkedToNext: day.slots[i].linkedToNext,
+            inSuperset:
+                (i < day.slots.length - 1 && day.slots[i].linkedToNext) ||
+                    (i > 0 && day.slots[i - 1].linkedToNext),
+            onRemove: () => onRemoveSlot(i),
+            onReplace: () => onReplaceSlot(i),
+            onMoveUp: () => onMoveSlot(i, -1),
+            onMoveDown: () => onMoveSlot(i, 1),
+            onCopyPrevious: copyPreviousCallbackFor(i),
+            onRestChanged: (v) => onRestChanged(i, v),
+            onAddSet: () => onAddSet(i),
+            onRemoveSet: (set) => onRemoveSet(i, set),
+            onSetRepsChanged: (set, v) => onSetRepsChanged(i, set, v),
+            onSetRepsMinChanged: (set, v) => onSetRepsMinChanged(i, set, v),
+            onSetRepsMaxChanged: (set, v) => onSetRepsMaxChanged(i, set, v),
+            onSetDurationChanged: (set, v) => onSetDurationChanged(i, set, v),
+            onSetWeightChanged: (set, v) => onSetWeightChanged(i, set, v),
+            onSetTypeChanged: (set, t) => onSetTypeChanged(i, set, t),
+            onModeChanged: (em, rm) => onModeChanged(i, em, rm),
+            onNotesChanged: (v) => onNotesChanged(i, v),
+            onToggleLink: () => onToggleLink(i),
+            onTogglePresence: (w) => onTogglePresence(i, w),
+            supersetPosition: posEnGrupo,
+          );
+  }
+
 }
 
 // ── Exercise slot card ─────────────────────────────────────────────────────
@@ -3021,6 +3068,7 @@ class _DayCard extends StatelessWidget {
 class _SlotCard extends StatelessWidget {
   const _SlotCard({
     required this.onToggleExpanded,
+    this.supersetPosition,
     required this.slot,
     required this.palette,
     required this.selectedWeek,
@@ -3056,6 +3104,10 @@ class _SlotCard extends StatelessWidget {
   /// en el MODELO— así que sobrevive a que Flutter recree el `State` de la
   /// fila al moverse. En el editor mobile eso fue un bug real.
   final VoidCallback onToggleExpanded;
+
+  /// Posición 0-based dentro de la superserie, o null si el ejercicio es
+  /// suelto. Es lo que pinta el badge A1/A2 y tiñe el agarre.
+  final int? supersetPosition;
 
   final _EditorSlot slot;
   final AppPalette palette;
@@ -3186,6 +3238,7 @@ class _SlotCard extends StatelessWidget {
       expanded: slot.expandido,
       onToggle: onToggleExpanded,
       hasError: hasError,
+      supersetPosition: supersetPosition,
       menu: controles,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

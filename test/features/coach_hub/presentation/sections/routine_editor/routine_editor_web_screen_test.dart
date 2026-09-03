@@ -8,6 +8,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:treino/features/workout/presentation/widgets/exercise_card.dart';
+import 'package:treino/features/workout/presentation/widgets/superset_block.dart';
 import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/analytics/analytics_service.dart';
@@ -3602,6 +3604,47 @@ void main() {
           reason: '4x10 son CUATRO series, no una');
       expect(slot.sets.every((s) => s.reps == 10), isTrue);
       expect(slot.sets.every((s) => s.weightKg == 55), isTrue);
+    });
+  });
+
+  group('RoutineEditorWebScreen — la superserie se ve como un grupo', () {
+    testWidgets('dos ejercicios enlazados quedan dentro de UN bloque',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any()))
+          .thenAnswer((_) async => _supersetRoutine());
+      await _pumpEditor(tester, repo: repo, routineId: 'r1');
+
+      // Este test no existía, y su ausencia dejó pasar una regresión real: al
+      // mover la card a `ExerciseCard` desapareció el borde teñido que era la
+      // ÚNICA marca de agrupación en la web. Compiló y pasaron 3133 tests.
+      expect(
+        find.byKey(const Key('superset_block_header')),
+        findsOneWidget,
+        reason: 'un grupo, un encabezado',
+      );
+      expect(find.text('A1'), findsOneWidget);
+      expect(find.text('A2'), findsOneWidget);
+      expect(
+        find
+            .descendant(
+              of: find.byType(SupersetBlock),
+              matching: find.byType(ExerciseCard),
+            )
+            .evaluate()
+            .length,
+        2,
+        reason: 'los DOS miembros van adentro del bloque',
+      );
+    });
+
+    testWidgets('un ejercicio suelto NO queda en un bloque', (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any())).thenAnswer((_) async => _simpleRoutine());
+      await _pumpEditor(tester, repo: repo, routineId: 'r1');
+
+      expect(find.byType(SupersetBlock), findsNothing);
+      expect(find.text('A1'), findsNothing);
     });
   });
 }
