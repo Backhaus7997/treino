@@ -70,7 +70,7 @@ void main() {
   });
 
   group('la declaración de ubicación tiene que matchear el código', () {
-    List<File> _dartDeLib() => Directory('lib')
+    List<File> dartDeLib() => Directory('lib')
         .listSync(recursive: true)
         .whereType<File>()
         .where((f) => f.path.endsWith('.dart'))
@@ -81,7 +81,7 @@ void main() {
       // por default. Eso NO es una decisión: es lo que quedó. Exigir el
       // parámetro explícito obliga a que cada call site diga qué precisión
       // pide y por qué — y hace que este test pueda auditarlo.
-      final implicitas = _dartDeLib()
+      final implicitas = dartDeLib()
           .where((f) =>
               f.readAsStringSync().contains('getCurrentPosition()'))
           .map((f) => f.path)
@@ -98,7 +98,7 @@ void main() {
       // día TODOS los usos bajan a `low`/`medium`, este test deja de exigir
       // PreciseLocation y hay que bajar también la declaración — que es justo
       // lo que uno se olvida.
-      final pideFino = _dartDeLib().any((f) {
+      final pideFino = dartDeLib().any((f) {
         final src = f.readAsStringSync();
         return src.contains('LocationAccuracy.best') ||
             src.contains('LocationAccuracy.high');
