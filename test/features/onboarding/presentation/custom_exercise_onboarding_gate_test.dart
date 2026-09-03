@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/onboarding/presentation/custom_exercise_onboarding_slides.dart';
@@ -122,6 +123,54 @@ Future<void> _tapAndSettle(WidgetTester tester, Key key) async {
   }
 }
 
+/// Igual que [_pump] pero con un `GoRouter` de verdad, porque el CTA NAVEGA y
+/// `context.push` sobre un `MaterialApp(home:)` explota.
+Future<void> _pumpConRouter(
+  WidgetTester tester, {
+  required _CapturingUserRepository repo,
+  UserProfile? profile,
+}) async {
+  await tester.binding.setSurfaceSize(const Size(390, 844));
+  addTearDown(() => tester.binding.setSurfaceSize(null));
+
+  final router = GoRouter(
+    initialLocation: '/',
+    routes: [
+      GoRoute(
+        path: '/',
+        builder: (_, __) => const Scaffold(
+          body: _Host(surface: OnboardingSurface.customExerciseAthleteMobile),
+        ),
+      ),
+      GoRoute(
+        path: '/profile/my-exercises/:exId',
+        builder: (_, state) => Scaffold(
+          body: Text('EDITOR:${state.pathParameters['exId']}'),
+        ),
+      ),
+    ],
+  );
+
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        userRepositoryProvider.overrideWithValue(repo),
+        userProfileProvider.overrideWith((ref) => Stream.value(profile)),
+      ],
+      child: MaterialApp.router(
+        theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
+        routerConfig: router,
+      ),
+    ),
+  );
+  for (var i = 0; i < 6; i++) {
+    await tester.pump(const Duration(milliseconds: 200));
+  }
+}
+
 void main() {
   group('maybeShowCustomExerciseOnboarding', () {
     testWidgets('presents the sheet for a user who has not seen it',
@@ -172,7 +221,10 @@ void main() {
     testWidgets('marks the surface seen when the CTA finishes it',
         (tester) async {
       final repo = _CapturingUserRepository();
-      await _pump(tester, repo: repo, profile: _profile());
+      // Con router: desde que el CTA navega, `context.push` sobre un
+      // `MaterialApp(home:)` revienta. Lo que este test mide —que se persista
+      // el flag— no cambia.
+      await _pumpConRouter(tester, repo: repo, profile: _profile());
 
       const cta = Key('custom_exercise_onboarding_primary_cta');
       // Un tap por slide — el último es el que cierra. Derivado del DECK y no
@@ -261,6 +313,44 @@ void main() {
 
       expect(find.byType(Dialog), findsOneWidget);
       expect(find.byType(CustomExerciseOnboardingView), findsOneWidget);
+    });
+
+    testWidgets('el CTA lleva al editor de ejercicio, no sólo cierra el modal',
+        (tester) async {
+      final repo = _CapturingUserRepository();
+      await _pumpConRouter(tester, repo: repo, profile: _profile());
+
+      const cta = Key('custom_exercise_onboarding_primary_cta');
+      final slides = customExerciseSlidesFor(
+        OnboardingSurface.customExerciseAthleteMobile,
+      )!;
+      for (var i = 0; i < slides.length; i++) {
+        await _tapAndSettle(tester, cta);
+      }
+
+      // El botón dice "CREAR MI EJERCICIO". Hasta este fix el gate le pasaba el
+      // MISMO callback a `onFinish` y a `onSkip`, así que sólo cerraba: un
+      // botón que nombra una acción y no la ejecuta enseña a no creerle.
+      expect(
+        find.text('EDITOR:new'),
+        findsOneWidget,
+        reason: 'el CTA tiene que abrir el editor en blanco',
+      );
+    });
+
+    testWidgets('SALTAR cierra y NO navega', (tester) async {
+      final repo = _CapturingUserRepository();
+      await _pumpConRouter(tester, repo: repo, profile: _profile());
+
+      await _tapAndSettle(
+        tester,
+        const Key('custom_exercise_onboarding_skip_button'),
+      );
+
+      // La otra mitad del fix: separar los callbacks sirve sólo si saltar
+      // sigue siendo saltar.
+      expect(find.byType(CustomExerciseOnboardingView), findsNothing);
+      expect(find.text('EDITOR:new'), findsNothing);
     });
   });
 }
