@@ -246,20 +246,28 @@ personas o la integridad del servicio.
 
 ---
 
-## 7. Transferencia internacional
+## 7. Alcance mundial y transferencias internacionales
 
-Nuestros proveedores operan servidores **fuera de la República Argentina**. Al
-usar TREINO, tus datos —incluidos los de salud— se almacenan y procesan en el
-exterior.
+**TREINO se ofrece a nivel mundial.** Nuestros proveedores operan servidores
+fuera de la República Argentina, así que tus datos —incluidos los de salud— se
+almacenan y procesan en el exterior.
 
-Esta transferencia se realiza al amparo del art. 12 de la Ley 25.326, sobre la
-base de tu consentimiento informado y de los acuerdos de tratamiento de datos
-suscriptos con cada proveedor.
+Esa transferencia se realiza al amparo del art. 12 de la Ley 25.326, sobre la
+base de tu consentimiento informado y de los acuerdos de tratamiento suscriptos
+con cada proveedor.
 
-[[PENDIENTE — a revisar con asesoramiento legal: encuadre exacto y verificación
-de la regiones de los proyectos de Firebase.]]
+Si residís fuera de la Argentina, pueden aplicarse además las normas de
+protección de datos de tu país, y reconocemos los derechos que te reconozcan
+aunque sean más amplios que los previstos acá.
 
----
+[[PENDIENTE — REESTRUCTURACIÓN POR ALCANCE MUNDIAL. Esta política está escrita
+sobre la Ley 25.326. Ofrecer el servicio en todo el mundo exige incorporar al
+menos: base legal por finalidad y no consentimiento genérico (RGPD art. 6),
+tratamiento de categorías especiales (art. 9) para los datos de salud,
+mecanismo de transferencia con cláusulas contractuales tipo, evaluación de
+representante en la Unión (art. 27), derechos de portabilidad y oposición,
+notificación de incidentes en 72 horas, y los avisos que exijan otras
+jurisdicciones relevantes. Es una reescritura estructural, no un párrafo.]]
 
 ## 8. Cuánto tiempo conservamos tus datos
 
@@ -334,16 +342,58 @@ corresponda.
 
 ## 12. Menores de edad
 
-[[PENDIENTE — DECISIÓN DEL TITULAR. Redactado provisionalmente para 18 años.]]
+**La edad mínima para crear una cuenta en TREINO es de 9 años.**
 
-TREINO no está dirigido a menores de 18 años. No recolectamos deliberadamente
-datos de menores. Si tomamos conocimiento de que una cuenta pertenece a un menor
-sin la debida autorización, la daremos de baja y eliminaremos sus datos.
+Si tenés menos de 18, hace falta el consentimiento de tu madre, padre o
+representante legal antes de que uses la aplicación y antes de que carguemos
+cualquier dato tuyo.
 
-Si sos madre, padre o responsable y creés que un menor a tu cargo nos brindó
-datos, escribinos y los eliminamos.
+### 12.1 Si sos madre, padre o representante legal
 
----
+Tenés derecho a:
+
+- **Saber qué datos recolectamos** de la persona menor a tu cargo. Están todos
+  descriptos en la sección 3 de esta política, incluidos los datos de salud.
+- **Acceder** a esos datos y pedir una copia.
+- **Rectificarlos** o pedir que los eliminemos.
+- **Negarte a que sigamos recolectándolos**, lo que implica dar de baja la
+  cuenta.
+- **Revocar tu consentimiento** en cualquier momento.
+
+Escribinos a treino@gettreino.com desde una dirección que podamos asociar a la
+cuenta y lo resolvemos.
+
+### 12.2 Lo que conviene que sepas antes de consentir
+
+Con la misma franqueza con la que está escrito el resto de este documento:
+
+- TREINO registra **peso, medidas corporales y porcentaje de grasa**, y grafica
+  su evolución en el tiempo.
+- La aplicación permite **vincularse con entrenadores personales
+  independientes**. TREINO **no verifica sus títulos ni sus credenciales**. Ese
+  vínculo habilita **mensajería privada** y el acceso a las medidas, las fotos
+  de molestias y el historial que la persona comparta.
+- El feed social permite publicar texto y fotos a otros usuarios, y los rankings
+  por gimnasio muestran resultados a la comunidad de ese gimnasio, si se activa
+  el opt-in.
+
+Todas esas funciones son opcionales, pero conviene que las conozcas antes de
+consentir.
+
+### 12.3 Cumplimiento
+
+Si tomamos conocimiento de que se creó una cuenta de una persona menor **sin el
+consentimiento de su representante legal**, la suspendemos y eliminamos sus
+datos.
+
+[[PENDIENTE — REVISIÓN LEGAL PRIORITARIA. Con edad mínima de 9 años y alcance
+mundial se activan: COPPA en Estados Unidos, que exige consentimiento parental
+**verificable** —no declarativo— antes de recolectar el primer dato, aviso
+directo al progenitor y derecho de revisión y supresión; el art. 8 del RGPD en
+Europa, con umbral de 13 a 16 según el Estado miembro; y las políticas de
+familias de App Store y Google Play. El abogado tiene que definir el mecanismo
+de verificación exigible por jurisdicción y si corresponde restringir funciones
+por edad — en particular el vínculo con entrenadores y el feed social.]]
 
 ## 13. Cambios a esta política
 

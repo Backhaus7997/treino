@@ -45,23 +45,42 @@ de entrenamiento por sí misma.
 
 ---
 
-## 3. Edad mínima
+## 3. Edad mínima y cuentas de menores
 
-[[PENDIENTE — DECISIÓN D2. Redactado provisionalmente para 18 años. Ver
-sección 3 de `guia-legal-treino.pdf`.]]
+Para crear una cuenta en TREINO tenés que tener **9 años cumplidos**.
 
-Para usar TREINO tenés que tener **18 años cumplidos**. Al registrarte declarás
-que los tenés.
+**Si tenés menos de 18 años**, necesitás que tu madre, padre o representante
+legal lea estos Términos, la Política de Privacidad y el Descargo Médico, y dé
+su consentimiento antes de que uses la aplicación.
 
-Si tomamos conocimiento de que una cuenta pertenece a un menor, la damos de
-baja y eliminamos sus datos.
+**Si sos madre, padre o representante legal** de una persona menor de edad que
+usa TREINO:
 
-> **Nota de implementación.** Hoy la aplicación **no verifica la edad**: la
-> fecha de nacimiento es un campo opcional del editor de perfil, no del alta.
-> Esta cláusula no es exigible hasta que exista el control. Es tarea de
-> desarrollo, no de redacción.
+- Sos responsable de supervisar su uso de la aplicación.
+- Podés **acceder a sus datos, pedir su rectificación y solicitar que los
+  eliminemos** en cualquier momento, escribiendo a treino@gettreino.com.
+- Podés **revocar tu consentimiento** cuando quieras, lo que implica dar de baja
+  la cuenta.
+- Tené presente que la aplicación permite **vincularse con entrenadores
+  personales independientes**, cuyas credenciales TREINO no verifica, y que ese
+  vínculo habilita mensajería privada y el acceso a datos corporales. Ver la
+  sección 6.
 
----
+Si tomamos conocimiento de que una cuenta de una persona menor se creó **sin
+ese consentimiento**, la suspendemos y eliminamos sus datos.
+
+[[PENDIENTE — REVISIÓN LEGAL PRIORITARIA. Admitir cuentas desde los 9 años con
+alcance mundial activa regímenes específicos de protección de menores: COPPA en
+Estados Unidos exige consentimiento parental **verificable** previo a toda
+recolección, con derechos de acceso y supresión para el progenitor; el art. 8
+del RGPD lo exige en Europa; y ambas tiendas aplican políticas de familias. El
+abogado tiene que definir el mecanismo de verificación exigible y si el vínculo
+con entrenadores debe restringirse por edad.]]
+
+> **Nota de implementación.** Hoy la aplicación **no verifica edad ni pide
+> consentimiento parental**: la fecha de nacimiento es un campo opcional del
+> editor de perfil, no del alta. Esta cláusula no es exigible hasta que ese
+> flujo exista, y con esta decisión pasa a ser bloqueante de publicación.
 
 ## 4. Tu cuenta
 
@@ -132,22 +151,33 @@ económico en sí no lo resolvemos nosotros.
 
 ---
 
-## 8. Suscripciones
+## 8. Suscripciones y pagos a TREINO
 
-[[PENDIENTE — DECISIONES D4 y D6. No se puede redactar sin definir qué pasarela
-procesa el cobro, la política de reembolso y el plazo de arrepentimiento.
-Requiere además el botón de arrepentimiento y la baja en línea de la
-Resolución 424/2020. Ver `terminos-suscripcion.md` cuando exista.]]
+Algunas funciones requieren una suscripción paga. Hoy existe para entrenadores,
+y está prevista una para atletas.
 
-Hoy el uso de TREINO como atleta es gratuito. Los entrenadores requieren una
-suscripción paga, regida por los [Términos para
-Entrenadores](./contrato-entrenador.md).
+**Cómo se cobra.** Los pagos se procesan a través de un **proveedor de servicios
+de pago externo**, que captura el medio de pago y liquida los fondos a la cuenta
+bancaria de BACKHAUSTIN S.A.S. TREINO **no almacena los datos completos de tu
+tarjeta ni de tu medio de pago**: quedan en poder de ese procesador, que actúa
+como responsable de su propio tratamiento.
 
-Está prevista una suscripción para atletas a futuro. Cuando exista, te vamos a
-informar sus condiciones y no se te va a cobrar nada sin tu consentimiento
-expreso.
+Esto es **distinto** de los pagos entre vos y tu entrenador, que no pasan por
+TREINO en absoluto. Ver la sección 7.
 
----
+Antes de cualquier cobro se te informa el precio, la moneda, la periodicidad y
+las condiciones de renovación. No se te cobra nada sin tu consentimiento
+expreso, y si sos menor de edad, sin el de tu representante legal.
+
+[[PENDIENTE — DECISIÓN D6 y REVISIÓN LEGAL. Falta definir plazo de
+arrepentimiento, política de reembolso, renovación automática y procedimiento de
+baja. Con alcance mundial hay que contemplar el derecho de desistimiento de cada
+jurisdicción y el tratamiento fiscal de servicios digitales. Y hay una colisión
+a resolver ANTES de construir la integración: los bienes digitales consumidos
+dentro de la app están sujetos a la regla 3.1.1 de Apple y a la política de
+facturación de Google, que exigen el sistema de pago de la tienda. Cobrar por
+pasarela externa una suscripción de consumidor usada dentro de la app es
+exactamente el supuesto que esas reglas alcanzan.]]
 
 ## 9. Tu contenido
 
@@ -244,16 +274,18 @@ continuado implica aceptar la versión vigente.
 
 ## 16. Ámbito territorial
 
-[[PENDIENTE — DECISIÓN D3. Redactado provisionalmente para Argentina, con
-apertura a Latinoamérica y exclusión expresa de la Unión Europea.]]
+TREINO se ofrece **a nivel mundial**.
 
-TREINO se ofrece en la República Argentina y en países de Latinoamérica.
+Además de la legislación argentina pueden aplicarse las normas de protección de
+datos y de defensa del consumidor del país donde residas. Reconocemos y
+respetamos los derechos que esas normas te reconozcan, aunque sean más amplios
+que los previstos acá.
 
-**No está dirigido a residentes de la Unión Europea** y no se ofrece allí. Si
-accedés desde la UE, lo hacés por tu cuenta y no garantizamos el cumplimiento
-del régimen europeo de protección de datos.
-
----
+[[PENDIENTE — REVISIÓN LEGAL. El alcance mundial exige como mínimo: base legal
+por finalidad y no sólo consentimiento (RGPD art. 6), mecanismo de transferencia
+internacional, evaluación de representante en la Unión Europea (art. 27),
+derechos ampliados de portabilidad y oposición, notificación de incidentes en 72
+horas, y régimen de menores por jurisdicción.]]
 
 ## 17. Ley aplicable y jurisdicción
 
