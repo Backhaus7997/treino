@@ -30,6 +30,15 @@ _$UserProfileImpl _$$UserProfileImplFromJson(Map<String, dynamic> json) =>
           json['bornAt'], const TimestampConverter().fromJson),
       termsAcceptedAt: _$JsonConverterFromJson<Timestamp, DateTime>(
           json['termsAcceptedAt'], const TimestampConverter().fromJson),
+      acceptedTermsVersion: (json['acceptedTermsVersion'] as num?)?.toInt(),
+      acceptedPrivacyVersion: (json['acceptedPrivacyVersion'] as num?)?.toInt(),
+      trainerLocationConsentAt: _$JsonConverterFromJson<Timestamp, DateTime>(
+          json['trainerLocationConsentAt'],
+          const TimestampConverter().fromJson),
+      trainerLocationConsentPromptedAt:
+          _$JsonConverterFromJson<Timestamp, DateTime>(
+              json['trainerLocationConsentPromptedAt'],
+              const TimestampConverter().fromJson),
       trainerBio: json['trainerBio'] as String?,
       trainerSpecialty: json['trainerSpecialty'] as String?,
       trainerMonthlyRate: (json['trainerMonthlyRate'] as num?)?.toInt(),
@@ -84,6 +93,14 @@ Map<String, dynamic> _$$UserProfileImplToJson(_$UserProfileImpl instance) =>
           instance.bornAt, const TimestampConverter().toJson),
       'termsAcceptedAt': _$JsonConverterToJson<Timestamp, DateTime>(
           instance.termsAcceptedAt, const TimestampConverter().toJson),
+      'acceptedTermsVersion': instance.acceptedTermsVersion,
+      'acceptedPrivacyVersion': instance.acceptedPrivacyVersion,
+      'trainerLocationConsentAt': _$JsonConverterToJson<Timestamp, DateTime>(
+          instance.trainerLocationConsentAt, const TimestampConverter().toJson),
+      'trainerLocationConsentPromptedAt':
+          _$JsonConverterToJson<Timestamp, DateTime>(
+              instance.trainerLocationConsentPromptedAt,
+              const TimestampConverter().toJson),
       'trainerBio': instance.trainerBio,
       'trainerSpecialty': instance.trainerSpecialty,
       'trainerMonthlyRate': instance.trainerMonthlyRate,
