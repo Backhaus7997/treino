@@ -150,10 +150,16 @@ private func runRoutineSelection(fixtureURL: URL) {
             continue
         }
 
+        // `catalogIds` es OPCIONAL en el fixture: los casos anteriores a
+        // "seguir sin copiar" no lo traen, y ausente significa lista vacía.
+        // Exigirlo en el guard de arriba pondría en rojo todos esos casos.
+        let catalog = given["catalogIds"] as? [String] ?? []
+
         let actual = resolveActiveRoutineId(
             activeRoutineId: given["activeRoutineId"] as? String,
             assignedIds: assigned,
-            selfCreatedIds: selfCreated
+            selfCreatedIds: selfCreated,
+            catalogIds: catalog
         )
         let expectedId = expected["routineId"] as? String
 

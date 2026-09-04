@@ -1788,5 +1788,13 @@
   "progressionPeriodLast3Months": "",
   "@progressionPeriodLast3Months": {},
   "progressionPeriodLast1Year": "",
-  "@progressionPeriodLast1Year": {}
+  "@progressionPeriodLast1Year": {},
+  "workoutRoutineFollow": "",
+  "@workoutRoutineFollow": {},
+  "workoutRoutineFollowing": "",
+  "@workoutRoutineFollowing": {},
+  "workoutRoutineFollowSuccess": "",
+  "@workoutRoutineFollowSuccess": {},
+  "workoutRoutineFollowError": "",
+  "@workoutRoutineFollowError": {}
 }

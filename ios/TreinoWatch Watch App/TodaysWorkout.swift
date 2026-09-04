@@ -230,13 +230,35 @@ enum TodaysWorkoutResolver {
         let assigned = try await RoutineCatalog.assignedPlans(client: client, uid: uid)
         let selfCreated = try await RoutineCatalog.selfCreatedPlans(client: client, uid: uid)
 
-        guard let resolvedId = resolveActiveRoutineId(
+        var resolvedId = resolveActiveRoutineId(
             activeRoutineId: activeRoutineId,
             assignedIds: assigned.map(\.id),
             selfCreatedIds: selfCreated.map(\.id)
-        ) else { return nil }
+        )
 
-        return (assigned + selfCreated).first { $0.id == resolvedId }
+        // El catálogo se consulta SÓLO si hace falta, y hace falta en un único
+        // caso: hay marcador y no matcheó contra los planes. Ahí puede ser una
+        // plantilla del sistema que el atleta eligió SEGUIR sin copiarla.
+        //
+        // Es una tercera query por sync, y en un reloj eso se paga en batería:
+        // por eso no se pide siempre. Quien tiene plan del PF o rutina propia
+        // ya resolvió arriba. Mismo criterio que `todaysRoutineProvider` en el
+        // teléfono — si acá se pidiera siempre y allá no, las dos listas
+        // seguirían coincidiendo, pero el costo no.
+        var catalog: [FirestoreDocument] = []
+        if let marker = activeRoutineId, !marker.isEmpty, resolvedId != marker {
+            catalog = try await RoutineCatalog.systemTemplateDocs(client: client)
+            resolvedId = resolveActiveRoutineId(
+                activeRoutineId: activeRoutineId,
+                assignedIds: assigned.map(\.id),
+                selfCreatedIds: selfCreated.map(\.id),
+                catalogIds: catalog.map(\.id)
+            )
+        }
+
+        guard let finalId = resolvedId else { return nil }
+
+        return (assigned + selfCreated + catalog).first { $0.id == finalId }
     }
 
     /// Última sesión FINALIZADA de esa rutina, que es la entrada de

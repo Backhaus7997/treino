@@ -76,13 +76,14 @@ Routine _routine({
       isPremium: isPremium,
     );
 
-UserProfile _profile(UserRole role) => UserProfile(
+UserProfile _profile(UserRole role, [String? activeRoutineId]) => UserProfile(
       uid: _athlete,
       email: 'a@treino.app',
       displayName: 'Ana',
       role: role,
       createdAt: DateTime(2026, 1, 1),
       updatedAt: DateTime(2026, 1, 1),
+      activeRoutineId: activeRoutineId,
     );
 
 Future<void> _pump(
@@ -90,6 +91,7 @@ Future<void> _pump(
   Routine routine, {
   UserRole role = UserRole.athlete,
   String? uid = _athlete,
+  String? activeRoutineId,
   bool? paywallEnabled,
   AthleteEntitlement? entitlement,
 }) async {
@@ -99,7 +101,9 @@ Future<void> _pump(
         routineByIdStreamProvider('r-1')
             .overrideWith((ref) => Stream.value(routine)),
         currentUidProvider.overrideWithValue(uid),
-        userProfileProvider.overrideWith((ref) => Stream.value(_profile(role))),
+        userProfileProvider.overrideWith(
+          (ref) => Stream.value(_profile(role, activeRoutineId)),
+        ),
         if (paywallEnabled != null)
           athletePaywallEnabledProvider.overrideWithValue(paywallEnabled),
         if (entitlement != null)
@@ -216,7 +220,8 @@ void main() {
     IconData iconoDelChip(WidgetTester tester) =>
         (tester.widget<IconButton>(find.byKey(_chip)).icon as Icon).icon!;
 
-    testWidgets('alumno free: el chip sigue ahí y abre la hoja', (tester) async {
+    testWidgets('alumno free: el chip sigue ahí y abre la hoja',
+        (tester) async {
       await _pump(
         tester,
         _routine(source: RoutineSource.system, isPremium: true),
@@ -225,7 +230,8 @@ void main() {
       );
 
       expect(find.byKey(_chip), findsOneWidget,
-          reason: 'esconderlo dejaría al alumno sin saber que la función existe');
+          reason:
+              'esconderlo dejaría al alumno sin saber que la función existe');
       expect(iconoDelChip(tester), TreinoIcon.lock);
 
       await tester.tap(find.byKey(_chip));
@@ -243,7 +249,8 @@ void main() {
       );
 
       expect(iconoDelChip(tester), TreinoIcon.copy,
-          reason: 'con derecho, la plantilla paga se copia como cualquier otra');
+          reason:
+              'con derecho, la plantilla paga se copia como cualquier otra');
     });
 
     testWidgets('plantilla gratis: nada cambia aunque el paywall esté activo',
@@ -272,6 +279,89 @@ void main() {
 
       expect(iconoDelChip(tester), TreinoIcon.copy);
       expect(find.byKey(sheet), findsNothing);
+    });
+  });
+
+  // ── "Seguir esta plantilla" (§4.1: seguir sin copiar) ─────────────────────
+  //
+  // La otra mitad de "Usar como base". Copiar es "quiero MI versión de esto";
+  // seguir es "quiero hacer esto tal cual", sin consumir cupo de rutinas
+  // propias ni heredar los días de la plantilla.
+  group('seguir una plantilla sin copiarla', () {
+    const seguir = Key('routine_follow_template');
+
+    testWidgets('aparece sobre una plantilla del sistema', (tester) async {
+      await _pump(tester, _routine(source: RoutineSource.system));
+      expect(find.byKey(seguir), findsOneWidget);
+    });
+
+    testWidgets('NO aparece sobre una plantilla publicada por un PF',
+        (tester) async {
+      // Se puede copiar pero no seguir: su dueño puede despublicarla y el
+      // marcador quedaría apuntando a la nada sin que el atleta hiciera nada.
+      await _pump(
+        tester,
+        _routine(
+          source: RoutineSource.trainerTemplate,
+          visibility: RoutineVisibility.public,
+          assignedBy: 'trainer-1',
+        ),
+      );
+      expect(find.byKey(seguir), findsNothing);
+      expect(find.byKey(_chip), findsOneWidget,
+          reason: 'copiarla sí se puede — son dos permisos distintos');
+    });
+
+    testWidgets('NO aparece sobre un plan del PF ni sobre la rutina propia',
+        (tester) async {
+      await _pump(
+        tester,
+        _routine(
+          source: RoutineSource.trainerAssigned,
+          assignedBy: 'trainer-1',
+          assignedTo: _athlete,
+        ),
+      );
+      expect(find.byKey(seguir), findsNothing);
+
+      await _pump(
+        tester,
+        _routine(source: RoutineSource.userCreated, createdBy: _athlete),
+      );
+      expect(find.byKey(seguir), findsNothing);
+    });
+
+    testWidgets('el PF no la ve: no entrena en la app', (tester) async {
+      await _pump(
+        tester,
+        _routine(source: RoutineSource.system),
+        role: UserRole.trainer,
+      );
+      expect(find.byKey(seguir), findsNothing);
+    });
+
+    testWidgets('si ya la sigue, el botón queda deshabilitado', (tester) async {
+      // Para cambiar de rutina activa se elige OTRA. Un botón que la desactiva
+      // dejaría al atleta sin ninguna, que no es algo que haya pedido.
+      await _pump(
+        tester,
+        _routine(source: RoutineSource.system),
+        activeRoutineId: 'r-1',
+      );
+      final boton = tester.widget<IconButton>(find.byKey(seguir));
+      expect(boton.onPressed, isNull);
+      expect((boton.icon as Icon).icon, TreinoIcon.check);
+    });
+
+    testWidgets('si no la sigue, el botón está habilitado', (tester) async {
+      await _pump(
+        tester,
+        _routine(source: RoutineSource.system),
+        activeRoutineId: 'otra-cosa',
+      );
+      final boton = tester.widget<IconButton>(find.byKey(seguir));
+      expect(boton.onPressed, isNotNull);
+      expect((boton.icon as Icon).icon, TreinoIcon.play);
     });
   });
 }

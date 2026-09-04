@@ -61,6 +61,12 @@ void main() {
           assignedIds: (given['assignedIds'] as List<dynamic>).cast<String>(),
           selfCreatedIds:
               (given['selfCreatedIds'] as List<dynamic>).cast<String>(),
+          // Opcional en el fixture: los casos anteriores a "seguir sin copiar"
+          // no lo traen, y ausente significa lista vacía. El runner Swift lee
+          // este campo con el mismo default.
+          catalogIds:
+              (given['catalogIds'] as List<dynamic>?)?.cast<String>() ??
+                  const [],
         );
         final expectedId = expected['routineId'] as String?;
 
