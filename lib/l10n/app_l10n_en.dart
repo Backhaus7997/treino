@@ -4225,4 +4225,10 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get workoutPlantillasPremiumChip => '';
+
+  @override
+  String get progressionPeriodLast3Months => '';
+
+  @override
+  String get progressionPeriodLast1Year => '';
 }

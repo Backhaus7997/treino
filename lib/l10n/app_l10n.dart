@@ -7460,6 +7460,18 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'PLAN PAGO'**
   String get workoutPlantillasPremiumChip;
+
+  /// Pill del selector de periodo de los graficos: los ultimos 3 meses calendario terminando hoy.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'3 meses'**
+  String get progressionPeriodLast3Months;
+
+  /// Pill del selector de periodo de los graficos: los ultimos 12 meses calendario. Es el periodo mas largo que se puede ofrecer: el historial de sesiones esta acotado a 365 (kSessionHistoryFetchLimit), asi que un 'todo' seria mentira.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'1 año'**
+  String get progressionPeriodLast1Year;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

@@ -32,6 +32,8 @@ class ChartPeriodLabels {
     required this.last30dLabel,
     required this.thisWeekLabel,
     required this.monthLabel,
+    required this.last3mLabel,
+    required this.last1yLabel,
   });
 
   /// E.g. 'Últimos 30 días' — [ChartPeriod.last30d] (default).
@@ -43,6 +45,12 @@ class ChartPeriodLabels {
   /// E.g. 'Este mes' — [ChartPeriod.month].
   final String monthLabel;
 
+  /// E.g. '3 meses' — [ChartPeriod.last3m].
+  final String last3mLabel;
+
+  /// E.g. '1 año' — [ChartPeriod.last1y].
+  final String last1yLabel;
+
   String labelFor(ChartPeriod period) {
     switch (period) {
       case ChartPeriod.last30d:
@@ -51,6 +59,10 @@ class ChartPeriodLabels {
         return thisWeekLabel;
       case ChartPeriod.month:
         return monthLabel;
+      case ChartPeriod.last3m:
+        return last3mLabel;
+      case ChartPeriod.last1y:
+        return last1yLabel;
     }
   }
 }

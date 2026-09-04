@@ -18,6 +18,8 @@ MostFrequentExercisesListLabels _labels() => MostFrequentExercisesListLabels(
         last30dLabel: 'Últimos 30 días',
         thisWeekLabel: 'Esta semana',
         monthLabel: 'Este mes',
+        last3mLabel: '3 meses',
+        last1yLabel: '1 año',
       ),
     );
 

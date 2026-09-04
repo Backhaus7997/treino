@@ -27,6 +27,23 @@ class ChartPeriodWindow with _$ChartPeriodWindow {
 ///   exercise progression and muscle radar charts (not calendar-aligned).
 /// - [thisWeek]: the calendar week (Monday..Sunday) containing "now".
 /// - [month]: the calendar month containing "now".
+/// - [last3m]: rolling 3 calendar months ending "today".
+/// - [last1y]: rolling 12 calendar months ending "today".
+///
+/// ## Por qué NO hay un "todo el historial"
+///
+/// Porque hoy sería mentira. `sessionsByUidProvider` lee como mucho
+/// `kSessionHistoryFetchLimit` (365) sesiones, así que un período "todo"
+/// mostraría el último año largo y lo etiquetaría como la historia completa.
+/// El propio `session_providers.dart` deja anotado que cargar historial más
+/// viejo detrás de un cursor es un follow-up; hasta que exista, [last1y] es el
+/// período más largo que se puede ofrecer sin afirmar algo que no se sabe.
+///
+/// ## Orden de las variantes
+///
+/// Las nuevas van al FINAL y no intercaladas por duración: el selector
+/// renderiza `ChartPeriod.values` en orden, y reordenar movería de lugar las
+/// pills que el usuario ya tiene aprendidas.
 ///
 /// All window arithmetic uses `DateTime(year, month, day)` CALENDAR
 /// CONSTRUCTOR math, never `.add(Duration(days: n))` — the latter can drift
@@ -37,7 +54,9 @@ class ChartPeriodWindow with _$ChartPeriodWindow {
 enum ChartPeriod {
   last30d,
   thisWeek,
-  month;
+  month,
+  last3m,
+  last1y;
 
   /// The default period for exercise progression + muscle radar charts.
   static const ChartPeriod defaultPeriod = ChartPeriod.last30d;
@@ -53,6 +72,10 @@ enum ChartPeriod {
         return _thisWeekWindow(now);
       case ChartPeriod.month:
         return _monthWindow(now);
+      case ChartPeriod.last3m:
+        return _rollingMonthsWindow(now, 3);
+      case ChartPeriod.last1y:
+        return _rollingMonthsWindow(now, 12);
     }
   }
 }
@@ -68,6 +91,39 @@ ChartPeriodWindow _last30dWindow(DateTime now) {
       DateTime.utc(currentStart.year, currentStart.month, currentStart.day - 1);
   final previousStart =
       DateTime.utc(previousEnd.year, previousEnd.month, previousEnd.day - 29);
+
+  return ChartPeriodWindow(
+    currentStart: currentStart,
+    currentEnd: today,
+    previousStart: previousStart,
+    previousEnd: previousEnd,
+  );
+}
+
+/// Ventana rodante de [months] meses calendario terminando HOY:
+/// `[hoy - months meses + 1 día, hoy]`. La previa son los [months] meses
+/// inmediatamente anteriores, sin solaparse (`previousEnd` es el día ANTERIOR
+/// a `currentStart`), misma convención que las otras tres.
+///
+/// Se cuenta en MESES y no en días (90 / 365) a propósito: "3 meses" para el
+/// usuario significa "de julio a septiembre", no "los últimos 90 días". La
+/// aritmética con el constructor de calendario resuelve sola los meses de
+/// distinto largo y el salto de año — `DateTime.utc(2026, 1 - 3, 15)` da
+/// octubre de 2025.
+///
+/// El `+ 1 día` en `currentStart` hace la ventana INCLUSIVA de los dos lados:
+/// sin él, un rango de 3 meses cubriría 3 meses y un día.
+ChartPeriodWindow _rollingMonthsWindow(DateTime now, int months) {
+  final today = DateTime.utc(now.year, now.month, now.day);
+  final currentStart =
+      DateTime.utc(today.year, today.month - months, today.day + 1);
+  final previousEnd =
+      DateTime.utc(currentStart.year, currentStart.month, currentStart.day - 1);
+  final previousStart = DateTime.utc(
+    previousEnd.year,
+    previousEnd.month - months,
+    previousEnd.day + 1,
+  );
 
   return ChartPeriodWindow(
     currentStart: currentStart,

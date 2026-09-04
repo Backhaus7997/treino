@@ -4305,6 +4305,12 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get workoutPlantillasPremiumChip => 'PLAN PAGO';
+
+  @override
+  String get progressionPeriodLast3Months => '3 meses';
+
+  @override
+  String get progressionPeriodLast1Year => '1 año';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -8605,4 +8611,10 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get workoutPlantillasPremiumChip => 'PLAN PAGO';
+
+  @override
+  String get progressionPeriodLast3Months => '3 meses';
+
+  @override
+  String get progressionPeriodLast1Year => '1 año';
 }

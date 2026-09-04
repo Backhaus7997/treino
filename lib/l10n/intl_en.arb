@@ -1784,5 +1784,9 @@
   "paywallFreePlanLimitTemplateBody": "",
   "@paywallFreePlanLimitTemplateBody": {},
   "workoutPlantillasPremiumChip": "",
-  "@workoutPlantillasPremiumChip": {}
+  "@workoutPlantillasPremiumChip": {},
+  "progressionPeriodLast3Months": "",
+  "@progressionPeriodLast3Months": {},
+  "progressionPeriodLast1Year": "",
+  "@progressionPeriodLast1Year": {}
 }
