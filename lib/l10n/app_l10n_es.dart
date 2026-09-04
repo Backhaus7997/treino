@@ -4281,6 +4281,23 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get routineEditorSlotMenuMergeDown => 'Unir con el de abajo';
+
+  @override
+  String get paywallFreePlanLimitTitle => 'Esto es parte del plan pago';
+
+  @override
+  String get paywallFreePlanLimitDaysBody =>
+      'Con el plan gratis armas rutinas de hasta 2 dias. Las plantillas de principiante del catalogo las seguis completas, sin tope.';
+
+  @override
+  String get paywallFreePlanLimitWeeksBody =>
+      'Periodizar en varias semanas es parte del plan pago. Con el gratis tu rutina propia va de a una semana.';
+
+  @override
+  String get paywallFreePlanLimitUpgrade => 'Ver el plan pago';
+
+  @override
+  String get paywallFreePlanLimitDismiss => 'Entendido';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -8557,4 +8574,21 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get routineEditorSlotMenuMergeDown => 'Unir con el de abajo';
+
+  @override
+  String get paywallFreePlanLimitTitle => 'Esto es parte del plan pago';
+
+  @override
+  String get paywallFreePlanLimitDaysBody =>
+      'Con el plan gratis armas rutinas de hasta 2 dias. Las plantillas de principiante del catalogo las seguis completas, sin tope.';
+
+  @override
+  String get paywallFreePlanLimitWeeksBody =>
+      'Periodizar en varias semanas es parte del plan pago. Con el gratis tu rutina propia va de a una semana.';
+
+  @override
+  String get paywallFreePlanLimitUpgrade => 'Ver el plan pago';
+
+  @override
+  String get paywallFreePlanLimitDismiss => 'Entendido';
 }

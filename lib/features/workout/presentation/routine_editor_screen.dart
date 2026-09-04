@@ -20,6 +20,9 @@ import '../../../l10n/app_l10n.dart';
 import '../../coach/presentation/widgets/exercise_picker_sheet.dart';
 import '../../onboarding/domain/onboarding_surface.dart';
 import '../../onboarding/presentation/custom_exercise_onboarding_gate.dart';
+import '../../paywall/application/athlete_entitlement_provider.dart';
+import '../../paywall/domain/athlete_entitlement.dart';
+import '../../paywall/presentation/free_plan_limit_sheet.dart';
 import '../../profile/application/user_providers.dart'
     show userProfileProvider, userRepositoryProvider;
 import '../../profile/domain/experience_level.dart';
@@ -1504,6 +1507,38 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   /// the resumen (the copy does not carry the PF's).
   bool get _isCustomizing => widget.mode is SelfCustomizing;
 
+  /// `true` cuando lo que este editor va a guardar es una rutina DEL ALUMNO
+  /// (`source: user-created`), sea desde cero o copiando una plantilla.
+  ///
+  /// Es el único caso donde el paywall del alumno aplica: los modos de PF
+  /// escriben `trainer-assigned` / `trainer-template`, y el PF ya paga por su
+  /// cupo (`docs/paywall-alumno-suelto.md` §2).
+  bool get _isAthleteOwnedMode =>
+      widget.mode is SelfCreating || widget.mode is SelfCustomizing;
+
+  /// `true` si el plan free frena esta operación — y en ese caso ya abrió la
+  /// hoja que la explica.
+  ///
+  /// [next] es el total que quedaría DESPUÉS de la operación, no el actual.
+  ///
+  /// El orden de las guardas es el orden de su costo: el flag es una
+  /// constante, el modo es un `is`, el umbral es una comparación, y recién al
+  /// final se lee el entitlement — que es el único que toca Firestore. Un
+  /// editor de PF, o un alumno que todavía no llegó al tope, no paga por una
+  /// lectura que no cambia nada.
+  bool _freePlanBlocks(FreePlanLimit limit, {required int next}) {
+    if (!ref.read(athletePaywallEnabledProvider)) return false;
+    if (!_isAthleteOwnedMode) return false;
+    final max = switch (limit) {
+      FreePlanLimit.days => kFreeMaxRoutineDays,
+      FreePlanLimit.weeks => kFreeMaxRoutineWeeks,
+    };
+    if (next <= max) return false;
+    if (!ref.read(athleteEntitlementProvider).gatesFreeLimits) return false;
+    showFreePlanLimitSheet(context, limit: limit);
+    return true;
+  }
+
   /// Dimensión `source` de los eventos de forma de rutina (`routine_created`,
   /// `routine_day_added`, `routine_week_added`). Derivada del modo y no pasada
   /// a mano, así ningún call site puede mandar un `source` que el modo
@@ -1614,6 +1649,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   /// (ADR-PB-04). SCENARIO-PERIOD-010/011.
   void _addWeek() {
     if (_numWeeks >= _kMaxWeeks) return;
+    if (_freePlanBlocks(FreePlanLimit.weeks, next: _numWeeks + 1)) return;
     FocusManager.instance.primaryFocus?.unfocus();
     _markDirty();
     setState(() {
@@ -1745,6 +1781,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
 
   void _addDay() {
     if (_days.length >= _kMaxDays) return;
+    if (_freePlanBlocks(FreePlanLimit.days, next: _days.length + 1)) return;
     final l10n = AppL10n.of(context);
     _markDirty();
     setState(() {
@@ -2921,6 +2958,14 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     if (uidCatalogo.isNotEmpty) {
       ref.watch(customExercisesForTrainerStreamProvider(uidCatalogo));
     }
+
+    // El entitlement se observa por la MISMA razón del bloque de arriba, y el
+    // síntoma sería peor: `athleteEntitlementProvider` es autoDispose y lo
+    // consume `_freePlanBlocks` con un `read` desde el handler del "+". Sin
+    // este watch, cada read lo crea en frío, el stream todavía no emitió,
+    // devuelve `unknown` — y el gate no muerde NUNCA. Con el watch queda vivo
+    // mientras el editor está montado y el read ve el valor real.
+    if (_isAthleteOwnedMode) ref.watch(athleteEntitlementProvider);
 
     // Loading state: hydrating from Firestore.
     if (_loading) {
