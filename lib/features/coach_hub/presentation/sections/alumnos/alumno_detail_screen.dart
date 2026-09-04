@@ -1930,6 +1930,8 @@ class _ProgressionTabSectionState extends State<_ProgressionTabSection> {
               last30dLabel: 'Últimos 30 días', // i18n: Fase W2
               thisWeekLabel: 'Esta semana', // i18n: Fase W2
               monthLabel: 'Este mes', // i18n: Fase W2
+              last3mLabel: '3 meses', // i18n: Fase W2
+              last1yLabel: '1 año', // i18n: Fase W2
             ),
             localeName: 'es_AR', // hardcoded for web Coach Hub (i18n: Fase W2)
             personalRecordsLabels: const PersonalRecordsListLabels(
@@ -2006,6 +2008,8 @@ class _MostFrequentExercisesTabSectionState
               last30dLabel: 'Últimos 30 días', // i18n: Fase W2
               thisWeekLabel: 'Esta semana', // i18n: Fase W2
               monthLabel: 'Este mes', // i18n: Fase W2
+              last3mLabel: '3 meses', // i18n: Fase W2
+              last1yLabel: '1 año', // i18n: Fase W2
             ),
           ),
         ),

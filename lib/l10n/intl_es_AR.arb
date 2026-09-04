@@ -3695,5 +3695,13 @@
   "workoutPlantillasPremiumChip": "PLAN PAGO",
   "@workoutPlantillasPremiumChip": {
     "description": "Pildora con candado sobre las cards del catalogo que el alumno no puede usar con su plan actual. Solo se dibuja cuando la plantilla esta realmente bloqueada para quien mira."
+  },
+  "progressionPeriodLast3Months": "3 meses",
+  "@progressionPeriodLast3Months": {
+    "description": "Pill del selector de periodo de los graficos: los ultimos 3 meses calendario terminando hoy."
+  },
+  "progressionPeriodLast1Year": "1 año",
+  "@progressionPeriodLast1Year": {
+    "description": "Pill del selector de periodo de los graficos: los ultimos 12 meses calendario. Es el periodo mas largo que se puede ofrecer: el historial de sesiones esta acotado a 365 (kSessionHistoryFetchLimit), asi que un 'todo' seria mentira."
   }
 }

@@ -48,6 +48,8 @@ class _MuscleDistributionScreenState
       last30dLabel: l10n.progressionPeriodLast30Days,
       thisWeekLabel: l10n.progressionPeriodThisWeek,
       monthLabel: l10n.progressionPeriodMonth,
+last3mLabel: l10n.progressionPeriodLast3Months,
+last1yLabel: l10n.progressionPeriodLast1Year,
     );
 
     final radarLabels = MuscleDistributionLabels(

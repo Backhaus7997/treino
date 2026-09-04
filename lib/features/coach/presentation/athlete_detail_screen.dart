@@ -2134,6 +2134,8 @@ class _ProgressionSectionState extends State<_ProgressionSection> {
               last30dLabel: l10n.progressionPeriodLast30Days,
               thisWeekLabel: l10n.progressionPeriodThisWeek,
               monthLabel: l10n.progressionPeriodMonth,
+last3mLabel: l10n.progressionPeriodLast3Months,
+last1yLabel: l10n.progressionPeriodLast1Year,
             ),
             localeName: l10n.localeName,
             personalRecordsLabels: PersonalRecordsListLabels(
@@ -2205,6 +2207,8 @@ class _MostFrequentExercisesSectionState
             last30dLabel: l10n.progressionPeriodLast30Days,
             thisWeekLabel: l10n.progressionPeriodThisWeek,
             monthLabel: l10n.progressionPeriodMonth,
+last3mLabel: l10n.progressionPeriodLast3Months,
+last1yLabel: l10n.progressionPeriodLast1Year,
           ),
         ),
       ),
