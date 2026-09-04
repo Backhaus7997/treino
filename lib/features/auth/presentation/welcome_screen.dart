@@ -17,7 +17,7 @@ import 'widgets/auth_failure_banner.dart';
 import 'widgets/auth_pill_button.dart';
 import 'widgets/auth_secondary_button.dart';
 import 'widgets/terms_notice_text.dart';
-import 'widgets/treino_logo.dart';
+import '../../../core/widgets/treino_logo.dart';
 
 /// Identifies which social provider button is currently awaiting its OAuth
 /// round-trip, so only that button shows an in-flight spinner.

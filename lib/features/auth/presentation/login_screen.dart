@@ -20,7 +20,7 @@ import 'widgets/auth_pill_button.dart';
 import 'widgets/auth_secondary_button.dart';
 import 'widgets/terms_notice_text.dart';
 import 'widgets/trainer_inquiry_card.dart';
-import 'widgets/treino_logo.dart';
+import '../../../core/widgets/treino_logo.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
