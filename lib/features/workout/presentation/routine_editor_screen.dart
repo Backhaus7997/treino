@@ -1532,8 +1532,12 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     final max = switch (limit) {
       FreePlanLimit.days => kFreeMaxRoutineDays,
       FreePlanLimit.weeks => kFreeMaxRoutineWeeks,
+      // El editor no gatea por plantilla paga: ese eje se decide ANTES, en el
+      // detalle de la plantilla — si el alumno llegó hasta acá con una copia,
+      // es porque tenía derecho a copiarla. `null` = este límite no aplica.
+      FreePlanLimit.premiumTemplate => null,
     };
-    if (next <= max) return false;
+    if (max == null || next <= max) return false;
     if (!ref.read(athleteEntitlementProvider).gatesFreeLimits) return false;
     showFreePlanLimitSheet(context, limit: limit);
     return true;

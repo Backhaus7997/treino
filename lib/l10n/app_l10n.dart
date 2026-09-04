@@ -7448,6 +7448,18 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Entendido'**
   String get paywallFreePlanLimitDismiss;
+
+  /// Cuerpo de la hoja cuando el alumno toca una plantilla del catalogo marcada isPremium. Nombra la salida gratis (las de principiante) para que el limite no se lea como que el catalogo entero esta cerrado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esta plantilla es parte del plan pago. Las de nivel principiante las podes usar completas con el plan gratis.'**
+  String get paywallFreePlanLimitTemplateBody;
+
+  /// Pildora con candado sobre las cards del catalogo que el alumno no puede usar con su plan actual. Solo se dibuja cuando la plantilla esta realmente bloqueada para quien mira.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PLAN PAGO'**
+  String get workoutPlantillasPremiumChip;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

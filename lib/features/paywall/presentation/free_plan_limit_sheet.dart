@@ -8,7 +8,17 @@ import '../../../l10n/app_l10n.dart';
 
 /// Qué eje del plan free se tocó. Cambia sólo el cuerpo del mensaje: el título
 /// y la acción son los mismos.
-enum FreePlanLimit { days, weeks }
+enum FreePlanLimit {
+  /// Tope de días de la rutina PROPIA del alumno.
+  days,
+
+  /// Tope de semanas (o sea, periodización) de la rutina propia.
+  weeks,
+
+  /// Plantilla del catálogo marcada `isPremium`. Eje distinto: acá el límite
+  /// no es la forma de lo que armó, es el contenido curado al que accede.
+  premiumTemplate,
+}
 
 /// Hoja que explica por qué no se pudo agregar un día (o una semana) más.
 ///
@@ -94,6 +104,8 @@ class _FreePlanLimitBody extends StatelessWidget {
               switch (limit) {
                 FreePlanLimit.days => l10n.paywallFreePlanLimitDaysBody,
                 FreePlanLimit.weeks => l10n.paywallFreePlanLimitWeeksBody,
+                FreePlanLimit.premiumTemplate =>
+                  l10n.paywallFreePlanLimitTemplateBody,
               },
               style: GoogleFonts.inter(
                 fontSize: 14,

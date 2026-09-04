@@ -98,6 +98,20 @@ final athleteEntitlementProvider = Provider.autoDispose<AthleteEntitlement>(
   },
 );
 
+/// `true` cuando el candado del catálogo pago está ACTIVO para el alumno
+/// actual — o sea, cuando una plantilla con `isPremium` le queda bloqueada.
+///
+/// Se combina con el campo de la plantilla, no lo reemplaza:
+/// `routine.isPremium && ref.watch(catalogLockActiveProvider)`.
+///
+/// Existe como provider propio para que la grilla y el detalle no puedan
+/// discrepar: si una pinta el candado y la otra deja pasar, el alumno ve una
+/// promesa rota. Una sola fuente, dos consumidores.
+final catalogLockActiveProvider = Provider.autoDispose<bool>((ref) {
+  if (!ref.watch(athletePaywallEnabledProvider)) return false;
+  return ref.watch(athleteEntitlementProvider).gatesFreeLimits;
+});
+
 /// El `status` crudo de `users/{uid}.athleteSubscription`, o `null` si el mapa
 /// no está.
 ///
