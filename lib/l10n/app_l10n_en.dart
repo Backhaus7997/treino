@@ -4204,4 +4204,25 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get routineEditorSlotMenuMergeDown => 'Merge with the one below';
+
+  @override
+  String get paywallFreePlanLimitTitle => '';
+
+  @override
+  String get paywallFreePlanLimitDaysBody => '';
+
+  @override
+  String get paywallFreePlanLimitWeeksBody => '';
+
+  @override
+  String get paywallFreePlanLimitUpgrade => '';
+
+  @override
+  String get paywallFreePlanLimitDismiss => '';
+
+  @override
+  String get paywallFreePlanLimitTemplateBody => '';
+
+  @override
+  String get workoutPlantillasPremiumChip => '';
 }

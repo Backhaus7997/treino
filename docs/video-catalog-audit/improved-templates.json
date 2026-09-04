@@ -231,7 +231,8 @@
     "goals": [
       "health",
       "aesthetics"
-    ]
+    ],
+    "isPremium": false
   },
   {
     "id": "full-body-3day",
@@ -432,7 +433,8 @@
     "goals": [
       "health",
       "wellbeing"
-    ]
+    ],
+    "isPremium": false
   },
   {
     "id": "upper-lower-intermediate",
@@ -739,7 +741,8 @@
     "goals": [
       "aesthetics",
       "health"
-    ]
+    ],
+    "isPremium": true
   },
   {
     "id": "bro-split-intermediate",
@@ -1096,7 +1099,8 @@
     ],
     "goals": [
       "aesthetics"
-    ]
+    ],
+    "isPremium": true
   },
   {
     "id": "powerlifting-base",
@@ -1369,7 +1373,8 @@
     ],
     "goals": [
       "sport"
-    ]
+    ],
+    "isPremium": true
   },
   {
     "id": "calistenia-beginner",
@@ -1581,7 +1586,8 @@
     "goals": [
       "health",
       "wellbeing"
-    ]
+    ],
+    "isPremium": false
   },
   {
     "id": "hipertrofia-intermedio",
@@ -1814,6 +1820,7 @@
     ],
     "goals": [
       "aesthetics"
-    ]
+    ],
+    "isPremium": true
   }
 ]
