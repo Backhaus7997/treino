@@ -53,6 +53,20 @@ class CustomExerciseOnboardingArt extends StatelessWidget {
   /// Slide 6 — the overflow menu containing the remaining editor actions.
   const CustomExerciseOnboardingArt.menu() : this._(_Variant.menu);
 
+  /// The set chip opened on its four types.
+  const CustomExerciseOnboardingArt.setTypes() : this._(_Variant.setTypes);
+
+  /// The accessory bar that only exists while the keyboard is up.
+  const CustomExerciseOnboardingArt.keyboardBar()
+      : this._(_Variant.keyboardBar);
+
+  /// Week tabs plus the scope question that adding an exercise triggers.
+  const CustomExerciseOnboardingArt.weeks() : this._(_Variant.weeks);
+
+  /// Coach Hub only — the exercise panel pinned open beside the day.
+  const CustomExerciseOnboardingArt.sidePanel()
+      : this._(_Variant.sidePanel);
+
   final _Variant _variant;
 
   /// Fixed design canvas. Everything inside is laid out against these numbers
@@ -102,6 +116,10 @@ class CustomExerciseOnboardingArt extends StatelessWidget {
                         _Variant.quickEntry => const _QuickEntryBody(),
                         _Variant.drag => const _DragBody(),
                         _Variant.menu => const _MenuBody(),
+                        _Variant.setTypes => const _SetTypesBody(),
+                        _Variant.keyboardBar => const _KeyboardBarBody(),
+                        _Variant.weeks => const _WeeksBody(),
+                        _Variant.sidePanel => const _SidePanelBody(),
                       },
                     ),
                   ],
@@ -115,7 +133,18 @@ class CustomExerciseOnboardingArt extends StatelessWidget {
   }
 }
 
-enum _Variant { form, video, library, quickEntry, drag, menu }
+enum _Variant {
+  form,
+  video,
+  library,
+  quickEntry,
+  drag,
+  menu,
+  setTypes,
+  keyboardBar,
+  weeks,
+  sidePanel,
+}
 
 /// `‹ NUEVO EJERCICIO` — the real screen's back affordance and title.
 class _ArtHeader extends StatelessWidget {
@@ -132,12 +161,24 @@ class _ArtHeader extends StatelessWidget {
       children: [
         Icon(TreinoIcon.back, size: 13, color: muted),
         const SizedBox(width: 8),
-        Text(
+        // Flexible: el título más largo del set —`PLAN DE VARIAS SEMANAS`—
+        // desbordaba esta fila. Acá pasa con la fuente de fallback de los
+        // tests y no en producción, pero un header que se recorta es mejor que
+        // uno que esconde contenido, y así el próximo título largo tampoco
+        // rompe nada.
+        Flexible(
+            child: Text(
           switch (variant) {
             _Variant.form || _Variant.video => 'NUEVO EJERCICIO',
-            _Variant.library || _Variant.drag || _Variant.menu =>
+            _Variant.library ||
+            _Variant.drag ||
+            _Variant.menu ||
+            _Variant.setTypes ||
+            _Variant.keyboardBar =>
               'EDITOR DE RUTINA',
             _Variant.quickEntry => 'ENTRADA RÁPIDA',
+            _Variant.weeks => 'PLAN DE VARIAS SEMANAS',
+            _Variant.sidePanel => 'EDITOR EN LA WEB',
           }, // i18n
           style: GoogleFonts.barlowCondensed(
             fontSize: 11,
@@ -146,7 +187,9 @@ class _ArtHeader extends StatelessWidget {
             height: 1.0,
             color: muted,
           ),
-        ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        )),
       ],
     );
   }
@@ -646,6 +689,460 @@ class _MenuAction extends StatelessWidget {
         height: 1.0,
         color: color ?? palette.textPrimary,
       ),
+    );
+  }
+}
+
+// ───────────────────────────────────────────────── slide · tipos de serie
+
+/// La tabla de series con el chip abierto en sus cuatro tipos.
+///
+/// Los cuatro labels son verbatim de `intl_es_AR.arb`:
+/// `routineEditorSetTypeNormal` … `routineEditorSetTypeFailure`. **Si cambian
+/// ahí, cambian acá.** Las letras entre paréntesis no son decoración: son la
+/// glifo que el chip muestra de verdad (`setChipLabel`).
+class _SetTypesBody extends StatelessWidget {
+  const _SetTypesBody();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+
+    // En COLUMNA y no en `Stack`: con tres filas de series arriba, el menú
+    // anclado abajo se les montaba encima y el dibujo se leía como un bug.
+    // Una fila alcanza para decir "esto es una serie"; el menú abajo dice
+    // "tocá el número y aparece esto".
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SetRow(chip: '1', kg: '55', reps: '10', esTipo: true),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: 158,
+          child: _Box(
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const _MenuAction('Normal'), // i18n
+                  const SizedBox(height: 7),
+                  const _MenuAction('Entrada en calor (W)'), // i18n
+                  const SizedBox(height: 7),
+                  const _MenuAction('Drop (D)'), // i18n
+                  const SizedBox(height: 7),
+                  _MenuAction(
+                    'Al fallo (F)', // i18n
+                    color: palette.accent,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Una fila de la tabla de series: chip + kg + reps.
+///
+/// [esTipo] pinta el chip en acento, que es lo que hace en la pantalla real
+/// cuando la serie NO es normal — es la única señal de que ese glifo cambió.
+class _SetRow extends StatelessWidget {
+  const _SetRow({
+    required this.chip,
+    required this.kg,
+    required this.reps,
+    this.esTipo = false,
+  });
+
+  final String chip;
+  final String kg;
+  final String reps;
+  final bool esTipo;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+
+    return Row(
+      children: [
+        Container(
+          width: 22,
+          height: 22,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: esTipo
+                ? palette.accent.withValues(alpha: 0.18)
+                : palette.textPrimary.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(AppRadius.full),
+          ),
+          child: Text(
+            chip,
+            style: GoogleFonts.barlowCondensed(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              height: 1.0,
+              color: esTipo ? palette.accent : palette.textPrimary,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(child: _Box(height: 22, child: _Celda('$kg kg'))),
+        const SizedBox(width: 6),
+        Expanded(child: _Box(height: 22, child: _Celda('$reps reps'))),
+      ],
+    );
+  }
+}
+
+class _Celda extends StatelessWidget {
+  const _Celda(this.texto);
+
+  final String texto;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: _Placeholder(texto, size: 10),
+      );
+}
+
+// ──────────────────────────────────────────── slide · barra sobre el teclado
+
+/// La barra de accesorio, con la celda enfocada arriba.
+///
+/// El label de contexto tiene la forma real que documenta `FocusedSetCell`:
+/// `Press de banca con barra · set 3 · kg`. Los pasos son los de verdad —
+/// 2,5 en kilos (un par de discos de 1,25), 1 en repeticiones — y `A TODAS`
+/// es `routineEditorFillColumnLabel` verbatim.
+class _KeyboardBarBody extends StatelessWidget {
+  const _KeyboardBarBody();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SetRow(chip: '3', kg: '55', reps: '10'),
+        const SizedBox(height: 14),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: palette.textPrimary.withValues(alpha: 0.07),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+          ),
+          child: const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _FieldLabel('Press de banca · set 3 · kg'), // i18n
+              SizedBox(height: 8),
+              Row(
+                children: [
+                  _BarButton('−2,5'), // i18n
+                  SizedBox(width: 6),
+                  _BarButton('+2,5'), // i18n
+                  Spacer(),
+                  _BarButton(
+                    'A TODAS', // i18n
+                    acento: true,
+                    icono: TreinoIcon.copy,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Icon(TreinoIcon.check, size: 11, color: palette.accent),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                'Peso replicado en todos los sets.', // i18n
+                style: GoogleFonts.barlow(
+                  fontSize: 9,
+                  height: 1.0,
+                  color: palette.accent,
+                ),
+              ),
+            ),
+            Text(
+              'Deshacer', // i18n
+              style: GoogleFonts.barlow(
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+                height: 1.0,
+                color: palette.textPrimary,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _BarButton extends StatelessWidget {
+  const _BarButton(this.label, {this.acento = false, this.icono});
+
+  final String label;
+  final bool acento;
+  final IconData? icono;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      decoration: BoxDecoration(
+        color: acento
+            ? palette.accent.withValues(alpha: 0.16)
+            : palette.textPrimary.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icono != null) ...[
+            Icon(icono, size: 10, color: palette.accent),
+            const SizedBox(width: 4),
+          ],
+          // `Flexible` + elipsis en vez de un `Text` suelto: con dos de estos
+          // en una fila angosta —el pie del panel— el label desbordaba. En
+          // producción no llega a recortarse; en los tests sí, porque
+          // GoogleFonts no resuelve Barlow y mide con la fuente de fallback,
+          // bastante más ancha. Que degrade es correcto en los dos casos:
+          // desbordar esconde contenido, elipsis no.
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.barlowCondensed(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                height: 1.0,
+                color: acento ? palette.accent : palette.textPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ──────────────────────────────────────────────────────── slide · semanas
+
+/// Las pestañas de semana y la pregunta de alcance.
+///
+/// `Semana`, `¿En qué semanas agregar?`, `Solo esta semana` y `Todas las
+/// semanas` son verbatim de `routineEditorAddWeek`, `routineEditorAddScopeTitle`
+/// y `routineEditorScope*`.
+class _WeeksBody extends StatelessWidget {
+  const _WeeksBody();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            _WeekTab('S1', activa: true),
+            SizedBox(width: 6),
+            _WeekTab('S2'),
+            SizedBox(width: 6),
+            _WeekTab('S3'),
+            // Separación fija y no `Spacer`: el Spacer se quedaba con TODO el
+            // sobrante y empujaba el botón contra el borde, donde desbordaba.
+            SizedBox(width: 10),
+            Flexible(child: _BarButton('+ Semana', acento: true)), // i18n
+          ],
+        ),
+        const SizedBox(height: 14),
+        _Box(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '¿En qué semanas agregar?', // i18n
+                  style: GoogleFonts.barlowCondensed(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.6,
+                    height: 1.0,
+                    color: palette.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Row(
+                  children: [
+                    Flexible(child: _BarButton('Solo esta semana')), // i18n
+                    SizedBox(width: 6),
+                    Flexible(
+                      child: _BarButton('Todas las semanas', acento: true),
+                    ), // i18n
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _WeekTab extends StatelessWidget {
+  const _WeekTab(this.label, {this.activa = false});
+
+  final String label;
+  final bool activa;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: activa
+            ? palette.accent.withValues(alpha: 0.18)
+            : palette.textPrimary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppRadius.full),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.barlowCondensed(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          height: 1.0,
+          color: activa ? palette.accent : palette.textPrimary,
+        ),
+      ),
+    );
+  }
+}
+
+// ───────────────────────────────────────────────── slide · panel de la web
+
+/// El día a la izquierda y el panel de ejercicios fijo a la derecha (#860).
+///
+/// `Agregar (2)` y `En superserie` son los labels reales del pie del panel.
+class _SidePanelBody extends StatelessWidget {
+  const _SidePanelBody();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // El día: 55/45, la misma proporción que el editor real.
+        const Expanded(
+          flex: 55,
+          child: Column(
+            children: [
+              _ExerciseRow(title: 'Press de banca', detail: '4 × 10 · 55 kg'),
+              SizedBox(height: 6),
+              _ExerciseRow(title: 'Aperturas', detail: '3 × 12'),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          flex: 45,
+          child: _Box(
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const _FieldLabel('EJERCICIOS'), // i18n
+                  const SizedBox(height: 8),
+                  const _PanelRow('Press de banca', tildado: true),
+                  const SizedBox(height: 5),
+                  const _PanelRow('Aperturas', tildado: true),
+                  const SizedBox(height: 5),
+                  const _PanelRow('Fondos'),
+                  const SizedBox(height: 10),
+                  const Row(
+                    children: [
+                      Flexible(
+                        child: _BarButton('Agregar (2)', acento: true), // i18n
+                      ),
+                      SizedBox(width: 4),
+                      Flexible(
+                        child: _BarButton(
+                          'En superserie', // i18n
+                          icono: TreinoIcon.streak,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Spacer(),
+                  Text(
+                    'Crear ejercicio nuevo', // i18n
+                    style: GoogleFonts.barlow(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      height: 1.0,
+                      color: palette.accent,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PanelRow extends StatelessWidget {
+  const _PanelRow(this.nombre, {this.tildado = false});
+
+  final String nombre;
+  final bool tildado;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+
+    return Row(
+      children: [
+        Container(
+          width: 14,
+          height: 14,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: tildado
+                ? palette.accent.withValues(alpha: 0.18)
+                : palette.textPrimary.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(AppRadius.full),
+          ),
+          child: tildado
+              ? Icon(TreinoIcon.check, size: 8, color: palette.accent)
+              : null,
+        ),
+        const SizedBox(width: 6),
+        Expanded(child: _Placeholder(nombre, size: 9)),
+      ],
     );
   }
 }
