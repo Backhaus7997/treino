@@ -30,6 +30,7 @@ _$RoutineImpl _$$RoutineImplFromJson(Map<String, dynamic> json) =>
       numWeeks: (json['numWeeks'] as num?)?.toInt() ?? 1,
       ratingAvg: (json['ratingAvg'] as num?)?.toDouble(),
       ratingsCount: (json['ratingsCount'] as num?)?.toInt(),
+      isPremium: json['isPremium'] as bool? ?? false,
       summary: json['summary'] as String?,
       goals: json['goals'] == null
           ? const <RoutineGoal>[]

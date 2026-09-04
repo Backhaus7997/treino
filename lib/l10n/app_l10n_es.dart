@@ -4298,6 +4298,13 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get paywallFreePlanLimitDismiss => 'Entendido';
+
+  @override
+  String get paywallFreePlanLimitTemplateBody =>
+      'Esta plantilla es parte del plan pago. Las de nivel principiante las podes usar completas con el plan gratis.';
+
+  @override
+  String get workoutPlantillasPremiumChip => 'PLAN PAGO';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -8591,4 +8598,11 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get paywallFreePlanLimitDismiss => 'Entendido';
+
+  @override
+  String get paywallFreePlanLimitTemplateBody =>
+      'Esta plantilla es parte del plan pago. Las de nivel principiante las podes usar completas con el plan gratis.';
+
+  @override
+  String get workoutPlantillasPremiumChip => 'PLAN PAGO';
 }

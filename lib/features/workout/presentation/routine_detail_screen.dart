@@ -11,6 +11,8 @@ import '../../../core/widgets/motion/treino_shimmer.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
+import '../../paywall/application/athlete_entitlement_provider.dart';
+import '../../paywall/presentation/free_plan_limit_sheet.dart';
 import '../../profile/application/user_providers.dart' show userProfileProvider;
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../profile/domain/user_role.dart';
@@ -346,6 +348,13 @@ class _UseAsBaseBar extends ConsumerWidget {
     final uid = ref.watch(currentUidProvider);
     if (uid == null || uid.isEmpty) return const SizedBox.shrink();
 
+    // Plantilla paga y alumno sin derecho: el botón SIGUE visible y abre la
+    // hoja que lo explica, en vez de desaparecer. Esconderlo dejaría al alumno
+    // sin saber que la función existe, y el candado de la grilla ya le anticipó
+    // que esta plantilla es del plan pago — que el detalle no diga nada sería
+    // la app cambiando de idea entre dos pantallas.
+    final locked = routine.isPremium && ref.watch(catalogLockActiveProvider);
+
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     return Padding(
@@ -360,9 +369,16 @@ class _UseAsBaseBar extends ConsumerWidget {
           child: IconButton(
             key: const Key('routine_use_as_base'),
             tooltip: l10n.workoutRoutineUseAsBase,
-            icon: Icon(TreinoIcon.copy, color: palette.textPrimary),
-            onPressed: () =>
-                context.push('/workout/customize-routine/${routine.id}'),
+            icon: Icon(
+              locked ? TreinoIcon.lock : TreinoIcon.copy,
+              color: locked ? palette.textMuted : palette.textPrimary,
+            ),
+            onPressed: () => locked
+                ? showFreePlanLimitSheet(
+                    context,
+                    limit: FreePlanLimit.premiumTemplate,
+                  )
+                : context.push('/workout/customize-routine/${routine.id}'),
           ),
         ),
       ),

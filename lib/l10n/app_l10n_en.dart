@@ -4219,4 +4219,10 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get paywallFreePlanLimitDismiss => '';
+
+  @override
+  String get paywallFreePlanLimitTemplateBody => '';
+
+  @override
+  String get workoutPlantillasPremiumChip => '';
 }
