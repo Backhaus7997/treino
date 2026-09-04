@@ -241,7 +241,7 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get authTrainerInquiryDialogBody =>
-      'Para alta de entrenador, escribinos a equipo@treino.app';
+      'Para alta de entrenador, escribinos a treino@gettreino.com';
 
   @override
   String get authTrainerInquiryDialogClose => 'Cerrar';
@@ -4520,7 +4520,7 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get authTrainerInquiryDialogBody =>
-      'Para alta de entrenador, escribinos a equipo@treino.app';
+      'Para alta de entrenador, escribinos a treino@gettreino.com';
 
   @override
   String get authTrainerInquiryDialogClose => 'Cerrar';

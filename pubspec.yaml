@@ -124,6 +124,21 @@ flutter_launcher_icons:
 
   remove_alpha_ios: true
 
+  # Web. Faltaba, y es el MISMO agujero que el comentario de arriba documenta
+  # para Android una plataforma antes: sin la clave, `web/icons/*` y
+  # `web/favicon.png` se quedaron como los dejó `flutter create` —el logo de
+  # Flutter— y eso es lo que se veía en la pestaña del navegador y al instalar
+  # el Coach Hub como PWA.
+  #
+  # `background_color`/`theme_color` replican los que ya tenía
+  # `web/manifest.json` a mano: el generador reescribe ese archivo, así que si
+  # no coinciden, regenerar cambia el color de la PWA sin que nadie lo pida.
+  web:
+    generate: true
+    image_path: "assets/icon/app_icon.png"
+    background_color: "#0A0A0A"
+    theme_color: "#0A0A0A"
+
 flutter:
   generate: true
   uses-material-design: true
