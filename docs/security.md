@@ -2195,10 +2195,28 @@ exacta— **devuelve cero filas**: el mensaje real trae más texto. En §4.8.2 e
 filtro va con `:` (contiene), y esa diferencia de un carácter parece "no hay
 tráfico".
 
-**La condición de salida para encender el enforcement**, entonces, no es una
-tasa: es que `acceptTrainerLink` y `requestPasswordReset` dejen de dar cero.
-Mientras eso no pase, encenderlo rompe el alta de alumnos y la recuperación de
-cuenta el mismo día, y el síntoma no se va a parecer a App Check.
+**La condición de salida para encender el enforcement.** La primera versión de
+esta sección decía "que esos dos callables dejen de dar cero", y era un piso
+trivial: con 1 `VALID` y 27 fallando, la condición se cumplía y el flujo seguía
+roto para el 96% de la gente. La condición real tiene tres partes, y las tres
+son por CALLABLE que se vaya a enforzar:
+
+1. **`INVALID` ~ 0 sobre una ventana con tráfico real**, no una llamada
+   afortunada.  es un cliente que manda token y no lo puede producir
+   bien — cada uno de esos es un usuario que se queda afuera.
+2. **Tráfico medido desde TODAS las plataformas que llaman a ese callable.**
+   Una tasa buena que sólo vio iOS no dice nada de Android, y hoy el cruce por
+   cliente ni siquiera se puede reproducir con este filtro (punto 3 de arriba).
+3. **Los `MISSING` resueltos aparte.** No son un problema de atestación: son
+   clientes que no mandan token. El Coach Hub web no activa App Check
+   (§4.10), así que un callable que recibe tráfico web O se le activa al
+   cliente, O no se puede enforzar.  tiene 17 
+   sobre 27 — enforzarlo con el hub como está lo rompe entero, aunque el móvil
+   atestigüe perfecto.
+
+Mientras eso no se cumpla, encender el enforcement rompe el alta de alumnos y
+la recuperación de cuenta el mismo día, y el síntoma no se va a parecer a App
+Check.
 
 ---
 
