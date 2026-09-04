@@ -81,6 +81,7 @@ import '../pagos/widgets/payment_format.dart';
 import 'alumnos_screen.dart' show AlumnoEstado, AlumnoEstadoX, estadoForLink;
 import 'resumen_metrics.dart';
 import 'package:treino/core/widgets/treino_segmented_pill.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
 
 /// Detalle del alumno (`/alumnos/:id`, Fase W2 PR2).
 ///
@@ -487,9 +488,7 @@ class _ChatTab extends ConsumerWidget {
         data: (_) => 'data',
       )),
       child: chatAsync.when(
-        loading: () => Center(
-          child: CircularProgressIndicator(color: palette.accent),
-        ),
+        loading: () => const CoachHubSkeleton(filas: 3),
         error: (_, __) => Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
           child: Text(
@@ -523,7 +522,7 @@ class _ProgresoTab extends ConsumerWidget {
     if (measAsync.isLoading || perfAsync.isLoading) {
       return const TreinoStateSwitcher(
         childKey: ValueKey('loading'),
-        child: Center(child: CircularProgressIndicator()),
+        child: CoachHubSkeleton(filas: 3),
       );
     }
     if (measAsync.hasError || perfAsync.hasError) {
@@ -700,7 +699,7 @@ class _ResumenTab extends ConsumerWidget {
         routinesAsync.isLoading) {
       return const TreinoStateSwitcher(
         childKey: ValueKey('loading'),
-        child: Center(child: CircularProgressIndicator()),
+        child: CoachHubSkeleton(filas: 3),
       );
     }
     // measurements (trainer-owned) y routines SIEMPRE son legibles → si alguna
@@ -1607,7 +1606,7 @@ class _PagosTab extends ConsumerWidget {
     String stateKey;
     if (paymentsAsync.isLoading || pendingAsync.isLoading) {
       stateKey = 'loading';
-      body = const Center(child: CircularProgressIndicator());
+      body = const CoachHubSkeleton(filas: 3);
     } else if (paymentsAsync.hasError || pendingAsync.hasError) {
       stateKey = 'error';
       body =
@@ -2511,9 +2510,7 @@ class _NotasPrivadasTabState extends ConsumerState<_NotasPrivadasTab> {
         data: (_) => 'data',
       )),
       child: noteAsync.when(
-        loading: () => Center(
-          child: CircularProgressIndicator(color: palette.accent),
-        ),
+        loading: () => const CoachHubSkeleton(filas: 3),
         error: (_, __) => Center(
           child: Text(
             l10n.coachHubAlumnoDetailNotasLoadError,
@@ -2688,9 +2685,7 @@ class _HistorialTab extends ConsumerWidget {
         data: (_) => 'data',
       )),
       child: sessionsAsync.when(
-        loading: () => Center(
-          child: CircularProgressIndicator(color: palette.accent),
-        ),
+        loading: () => const CoachHubSkeleton(filas: 3),
         // Un link pausado borra session_shares → permission-denied. No es un
         // fallo de carga: el alumno dejó de compartir. Lo decimos claro, igual
         // que Entrenamientos y el card de última sesión del Resumen.
@@ -3028,9 +3023,7 @@ class _ArchivosTabState extends ConsumerState<_ArchivosTab> {
                       ),
                     );
                   }
-                  return Center(
-                    child: CircularProgressIndicator(color: palette.accent),
-                  );
+                  return const CoachHubSkeleton(filas: 3);
                 },
               ),
             ),
@@ -3493,9 +3486,9 @@ class _AntropoList extends ConsumerWidget {
         ),
       );
     }
-    return TreinoStateSwitcher(
-      childKey: const ValueKey('loading'),
-      child: Center(child: CircularProgressIndicator(color: palette.accent)),
+    return const TreinoStateSwitcher(
+      childKey: ValueKey('loading'),
+      child: CoachHubSkeleton(filas: 3),
     );
   }
 }
@@ -3558,9 +3551,9 @@ class _RendimientoList extends ConsumerWidget {
         ),
       );
     }
-    return TreinoStateSwitcher(
-      childKey: const ValueKey('loading'),
-      child: Center(child: CircularProgressIndicator(color: palette.accent)),
+    return const TreinoStateSwitcher(
+      childKey: ValueKey('loading'),
+      child: CoachHubSkeleton(filas: 3),
     );
   }
 }
@@ -5199,9 +5192,7 @@ class _SeguimientoTabState extends ConsumerState<_SeguimientoTab> {
                       ),
                     );
                   }
-                  return Center(
-                    child: CircularProgressIndicator(color: palette.accent),
-                  );
+                  return const CoachHubSkeleton(filas: 3);
                 },
               ),
             ),
@@ -5704,9 +5695,9 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
     }
 
     if (_draft == null) {
-      return TreinoStateSwitcher(
-        childKey: const ValueKey('loading'),
-        child: Center(child: CircularProgressIndicator(color: palette.accent)),
+      return const TreinoStateSwitcher(
+        childKey: ValueKey('loading'),
+        child: CoachHubSkeleton(filas: 3),
       );
     }
 

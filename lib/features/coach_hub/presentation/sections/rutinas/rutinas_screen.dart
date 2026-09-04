@@ -21,6 +21,7 @@ import 'package:treino/features/profile/application/user_public_profile_provider
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
 import 'package:treino/features/workout/domain/routine_status.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
 
 /// Sección «Rutinas» del Coach Hub web.
 ///
@@ -79,9 +80,9 @@ class RutinasScreen extends ConsumerWidget {
                   : 'data',
             )),
             child: linksAsync.when(
-              loading: () => const Padding(
-                padding: EdgeInsets.symmetric(vertical: 40),
-                child: Center(child: CircularProgressIndicator()),
+              loading: () => const CoachHubSkeleton(
+                filas: 4,
+                padding: EdgeInsets.symmetric(vertical: 24, horizontal: 12),
               ),
               error: (_, __) =>
                   _muted(palette, 'No pudimos cargar los alumnos.'), // i18n
