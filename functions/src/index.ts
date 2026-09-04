@@ -146,3 +146,9 @@ export { mintWatchCredential } from "./mint-watch-credential";
 // Requiere el secreto MP_ACCESS_TOKEN:
 //   firebase functions:secrets:set MP_ACCESS_TOKEN --project prod
 export { createPreapproval } from "./subscriptions/mp/create-preapproval";
+
+// Paywall del entrenador — el reconciliador. Es lo que hace que pagar
+// SIGNIFIQUE algo: sin esto, `createPreapproval` abre un cobro y nadie se
+// entera. Corre a las 03:00 ART, una hora ANTES que `sweepEntitlements`, para
+// que el barrido decida bloqueos sobre datos de hoy y no de ayer.
+export { reconcileMpSubscriptions } from "./subscriptions/mp/reconcile";
