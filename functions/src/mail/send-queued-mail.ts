@@ -129,6 +129,9 @@ async function emailChannelAllowed(
 export async function sendQueuedMailHandler(
   app: admin.app.App,
   mailId: string,
+  // Se reasigna con la lectura fresca de abajo. Ver el bloque que explica por
+  // qué el snapshot del evento no alcanza.
+  // eslint-disable-next-line no-param-reassign
   data: MailQueueDoc | undefined,
   sender: MailSender,
 ): Promise<void> {
@@ -141,6 +144,33 @@ export async function sendQueuedMailHandler(
     .firestore(app)
     .collection(MAIL_QUEUE_COLLECTION)
     .doc(mailId);
+
+  // ── El snapshot del evento es de la CREACIÓN, y puede estar viejo ────────
+  //
+  // `sendQueuedMail` es `onDocumentCreated`: `event.data` congela el documento
+  // tal como nació y NO refleja ninguna escritura posterior. Renderizar desde
+  // ahí tiene dos consecuencias, y las dos son bugs:
+  //
+  // 1. `enqueueMail({ refreshPendingParams: true })` actualiza los params del
+  //    mail encolado cuando llega un segundo pedido — es lo que impide mandar
+  //    un link de reseteo que el segundo pedido ya invalidó. Sin releer, esa
+  //    actualización no llega al mail: se escribe en Firestore y el envío
+  //    sigue usando el link muerto. El arreglo del throttle sería cosmético.
+  //
+  // 2. El guard de re-entrada de abajo lee `status` del MISMO snapshot. Con
+  //    `retry: true`, una reentrega trae otra vez el snapshot de creación, o
+  //    sea `pending` — así que "already sent, skipping" no se disparaba nunca
+  //    y la idempotencia dependía sólo de la clave que se le pasa a Resend.
+  //
+  // Releer cuesta una lectura por mail y cierra las dos.
+  const fresh = await ref.get();
+  if (!fresh.exists) {
+    logger.warn("sendQueuedMail: el documento ya no existe, skipping", {
+      mailId,
+    });
+    return;
+  }
+  data = (fresh.data() as MailQueueDoc) ?? data;
 
   // Re-entry guard: a redelivered event whose send already landed.
   if (data.status === "sent") {

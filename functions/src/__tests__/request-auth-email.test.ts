@@ -373,6 +373,98 @@ describe("requestPasswordReset: limita la tasa por ventana", () => {
 });
 
 // ---------------------------------------------------------------------------
+
+/**
+ * El throttle mataba el link que ya estaba encolado.
+ *
+ * Reproducido en producción el 2026-09-04. Dos pedidos con un segundo de
+ * diferencia:
+ *
+ *   14:44:06.088  enqueueMail: queued                    ← link A encolado
+ *   14:44:06.532  enqueueMail: already queued, skipping  ← link B lo descarta
+ *
+ * `generatePasswordResetLink` invalida el código anterior del mismo usuario,
+ * así que el link B —que nunca llegó a ningún mail— dejó muerto al link A. El
+ * usuario abrió un mail recién llegado y leyó "expired or the link has already
+ * been used".
+ *
+ * Y no hace falta un doble tap: cuando el segundo pedido salió, el documento
+ * del primero TODAVÍA NO EXISTÍA (lo creó 900 ms después). La ventana es de
+ * segundos porque generar el link es lento, así que un reintento normal, dos
+ * dispositivos o dos pestañas alcanzan.
+ */
+describe("el segundo pedido no puede matar el link del primero", () => {
+  const uid = "auth-mail-refresh";
+  const email = "refresh@example.com";
+  const id = dedupeKey("password-reset", `${uid}_${throttleWindow(NOW)}`, uid);
+
+  beforeEach(async () => {
+    await seedUser({ uid, email });
+  });
+
+  afterEach(async () => {
+    await purgeQueueFor(uid);
+    await admin.auth(testApp).deleteUser(uid).catch(() => undefined);
+  });
+
+  it("el mail encolado se queda con el link del ÚLTIMO pedido", async () => {
+    await runRequestPasswordReset(testApp, email, NOW);
+    const primero = String((await readQueueDoc(id))?.params.actionLink);
+
+    await runRequestPasswordReset(testApp, email, NOW);
+    const segundo = String((await readQueueDoc(id))?.params.actionLink);
+
+    // Sigue habiendo UN solo mail: el throttle no se tocó.
+    expect(await queueCountFor(uid)).toBe(1);
+
+    // Pero lleva el código vivo, no el que acaba de invalidarse.
+    expect(segundo).not.toBe(primero);
+    expect(segundo).toContain("oobCode=");
+  });
+
+  it("no toca el estado del mail: sigue pendiente y sin intentos", async () => {
+    await runRequestPasswordReset(testApp, email, NOW);
+    await runRequestPasswordReset(testApp, email, NOW);
+
+    const doc = await readQueueDoc(id);
+    expect(doc?.status).toBe("pending");
+    expect(doc?.attempts).toBe(0);
+    expect(doc?.kind).toBe("password-reset");
+    expect(doc?.toUid).toBe(uid);
+  });
+
+  it("si el mail YA se envió, no se reescribe", async () => {
+    // La invariante que `create()` protege a propósito (ver el docstring de
+    // enqueueMail): reescribir un documento en `sent` lo devolvería a la cola
+    // y el usuario recibiría el mismo mail dos veces. Preferimos que se quede
+    // con un link muerto antes que mandarlo de nuevo.
+    await runRequestPasswordReset(testApp, email, NOW);
+    const enviado = String((await readQueueDoc(id))?.params.actionLink);
+
+    await db()
+      .collection(MAIL_QUEUE_COLLECTION)
+      .doc(id)
+      .update({ status: "sent" });
+
+    await runRequestPasswordReset(testApp, email, NOW);
+
+    const doc = await readQueueDoc(id);
+    expect(doc?.status).toBe("sent");
+    expect(String(doc?.params.actionLink)).toBe(enviado);
+  });
+
+  it("un pedido en la ventana siguiente sigue generando su propio mail",
+    async () => {
+      // El refresh no puede haberse comido el camino normal: quien de verdad
+      // no puede entrar tiene que poder reintentar y recibir OTRO mail.
+      await runRequestPasswordReset(testApp, email, NOW);
+      await runRequestPasswordReset(testApp, email, NOW + 90 * 1000);
+
+      expect(await queueCountFor(uid)).toBe(2);
+    });
+});
+
+// ---------------------------------------------------------------------------
 // Verificación de email
 // ---------------------------------------------------------------------------
 describe("requestEmailVerification", () => {
