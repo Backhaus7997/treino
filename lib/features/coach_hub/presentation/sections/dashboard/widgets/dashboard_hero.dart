@@ -241,16 +241,7 @@ class DashboardWelcomeCard extends ConsumerWidget {
         // a ser los dos últimos stops: fuera del glow se ve idéntico.
         borderRadius: BorderRadius.circular(TreinoCardTokens.borderRadius),
         border: Border.all(color: TreinoCardTokens.border(context)),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            palette.accent.withValues(alpha: 0.12),
-            TreinoCardTokens.background(context),
-            TreinoCardTokens.background(context),
-          ],
-          stops: const [0.0, 0.45, 1.0],
-        ),
+        gradient: TreinoCardTokens.glow(context),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

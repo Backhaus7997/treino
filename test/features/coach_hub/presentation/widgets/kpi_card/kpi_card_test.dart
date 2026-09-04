@@ -107,11 +107,14 @@ void main() {
       ));
       await tester.pump();
 
+      // El fondo pasó de color plano al glow mint de la welcome card, así que
+      // lo que cambia en hover es la intensidad del degradé, no un `color`.
       Color decorationColor() {
         final container = tester.widget<AnimatedContainer>(
           find.byKey(const Key('kpi_card_root')),
         );
-        return (container.decoration! as BoxDecoration).color!;
+        final decoration = container.decoration! as BoxDecoration;
+        return (decoration.gradient! as LinearGradient).colors.first;
       }
 
       final normalColor = decorationColor();

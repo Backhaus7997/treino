@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/widget_previews.dart';
 
+import '../../../../../app/theme/app_palette.dart';
 import '../../../../../app/theme/tokens/components/treino_empty_state_tokens.dart';
 import '../../../../../app/theme/tokens/primitives.dart';
 import '../../../../../core/widgets/motion/treino_fade_slide_in.dart';
@@ -93,12 +94,24 @@ class TreinoEmptyState extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                icon,
-                size: TreinoEmptyStateTokens.iconSize,
-                color: tokens.iconColor,
+              // El ícono iba suelto, gris y a 48 px. En un panel vacío eso no
+              // lee como "no hay nada todavía": lee como un símbolo de
+              // prohibido. Va adentro de un medallón mint, más chico, con el
+              // mismo gesto que el chip de ícono del alert banner.
+              Container(
+                key: const Key('empty_state_medallion'),
+                padding: const EdgeInsets.all(AppSpacing.s18),
+                decoration: BoxDecoration(
+                  color: AppPalette.of(context).accent.withValues(alpha: 0.10),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  size: TreinoEmptyStateTokens.iconSize / 2,
+                  color: AppPalette.of(context).accent,
+                ),
               ),
-              const SizedBox(height: AppSpacing.s12),
+              const SizedBox(height: AppSpacing.s14),
               Text(
                 title,
                 textAlign: TextAlign.center,

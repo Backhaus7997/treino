@@ -117,22 +117,10 @@ class CoachHubSectionHero extends StatelessWidget {
     return Container(
       key: const Key('section_hero_root'),
       padding: const EdgeInsets.all(AppSpacing.s20),
-      // Mismo glow que la welcome card (#341): BoxDecoration no admite
-      // `color` y `gradient` a la vez, así que el fondo de la card pasa a ser
-      // los dos últimos stops — fuera del glow se ve idéntico a una card lisa.
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(TreinoCardTokens.borderRadius),
         border: Border.all(color: TreinoCardTokens.border(context)),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            palette.accent.withValues(alpha: 0.12),
-            TreinoCardTokens.background(context),
-            TreinoCardTokens.background(context),
-          ],
-          stops: const [0.0, 0.45, 1.0],
-        ),
+        gradient: TreinoCardTokens.glow(context),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
