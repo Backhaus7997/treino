@@ -115,7 +115,7 @@ import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 import { sendFcm } from "./send-fcm";
 import { enqueueMail } from "../mail/enqueue-mail";
-import { APP_ENTRY_TRAINER } from "../mail/templates";
+import { trainerEntry } from "../mail/templates";
 
 function getApp(): admin.app.App {
   try {
@@ -279,7 +279,14 @@ export async function notifyOnExerciseFeedbackHandler(
     // El destinatario es el PF, asi que el CTA va a SU entrada. El default del
     // template es la del atleta, que aca dejaria al profe mirando la pantalla
     // equivocada. Mismo patron que `link-requested`.
-    params: { athleteName, ctaUrl: APP_ENTRY_TRAINER },
+    //
+    // `to: "alumno"` con el uid del ATLETA (no del PF, que ya es `trainerId`
+    // arriba): manda directo al perfil de quien reporto la molestia, no a un
+    // listado generico de alumnos que el profe tendria que volver a filtrar.
+    params: {
+      athleteName,
+      ctaUrl: trainerEntry({ to: "alumno", athleteId: athleteUid }),
+    },
     // Sin `prefKey` A PROPOSITO: es transaccional. Ver el header.
   }).catch((error: unknown) => {
     logger.warn("notifyOnExerciseFeedback: mail enqueue failed", {

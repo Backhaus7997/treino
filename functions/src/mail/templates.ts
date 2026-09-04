@@ -101,6 +101,39 @@ export const APP_ENTRY_ATHLETE = "https://app.gettreino.com/abrir/alumno";
 export const APP_ENTRY_TRAINER = "https://app.gettreino.com/abrir/profe";
 
 /**
+ * Los destinos finos que un mail al PF puede pedir. Es la unica fuente de
+ * los valores VALIDOS de `to` — si un valor de aca no tiene case en alguno
+ * de los dos routers de Dart (`lib/app/router.dart` para mobile,
+ * `lib/app/coach_hub_router.dart` para el Coach Hub web, via
+ * `lib/core/utils/deep_link_destination.dart`), ese mail cae al dashboard
+ * en silencio: ni la app ni el Hub avisan que un `to` no matcheo nada.
+ *
+ * Union discriminada por `to` para que `athleteId` sea IMPOSIBLE de pasar
+ * con cualquier otro destino: TypeScript rechaza `{ to: "agenda",
+ * athleteId: "x" }` en tiempo de compilacion, no en runtime.
+ */
+export type TrainerDestination =
+  | { to: "facturacion" }
+  | { to: "agenda" }
+  | { to: "solicitudes" }
+  | { to: "alumno"; athleteId: string };
+
+/**
+ * A donde manda el CTA de un mail al PF, con el destino fino codificado en
+ * el query string de `APP_ENTRY_TRAINER`.
+ *
+ * Sin destino: la entrada bare, igual que siempre (usa esto
+ * `federated-signin-hint` via `entradaSegunRol` — ahi no hay contexto de
+ * "para que" entra, asi que no hay destino fino que ofrecer).
+ */
+export function trainerEntry(dest?: TrainerDestination): string {
+  if (!dest) return APP_ENTRY_TRAINER;
+  const params = new URLSearchParams({ to: dest.to });
+  if (dest.to === "alumno") params.set("id", dest.athleteId);
+  return `${APP_ENTRY_TRAINER}?${params.toString()}`;
+}
+
+/**
  * El wordmark de TREINO, servido desde el propio deploy del Coach Hub.
  *
  * PNG y no SVG porque NINGUN cliente de mail renderiza SVG — el

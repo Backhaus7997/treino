@@ -78,6 +78,7 @@ Future<GoRouter> _pumpRouter(
   WidgetTester tester, {
   required Override authOverride,
   Override? profileOverride,
+  Uri? initialUri,
 }) async {
   // Coach Hub es un layout de escritorio (min 1024px). En el surface default
   // de 800x600 el sidebar (264px) deja muy poco ancho y el dashboard real
@@ -117,6 +118,7 @@ Future<GoRouter> _pumpRouter(
   final router = buildCoachHubRouter(
     refreshListenable: refresh,
     read: container.read,
+    initialUri: initialUri,
   );
 
   await tester.pumpWidget(
@@ -215,6 +217,70 @@ void main() {
         expect(find.byType(CoachHubScaffold), findsOneWidget);
         expect(find.byType(ProximamenteScreen), findsOneWidget);
         expect(find.text('Próximamente.'), findsOneWidget);
+      },
+    );
+  });
+
+  // Encontrado en revisión adversarial: el mapeo `to` → path está probado a
+  // fondo via la función pura `coachHubRedirect`, pero el PEGAMENTO real —
+  // `buildCoachHubRouter` leyendo `Uri.base`/`initialUri` y pasándolo por
+  // closure a cada `redirect:` — nunca se ejercitaba con un router de
+  // verdad. Si alguien rompe esa plomería (por ejemplo, deja de pasar
+  // `initialDestination: destination` en la llamada real), esto lo detecta;
+  // los tests de la función pura no pueden, porque construyen el destino a
+  // mano.
+  group('Coach Hub router — destino fino via Uri.base/initialUri', () {
+    testWidgets(
+      'un trainer que llega con to=agenda en la URL cae en /agenda',
+      (tester) async {
+        final router = await _pumpRouter(
+          tester,
+          authOverride: authNotifierProvider.overrideWith(
+            () => _StubAuthNotifier(AsyncData(_MockUser())),
+          ),
+          profileOverride: userProfileProvider.overrideWith(
+            (ref) => Stream<UserProfile?>.value(_trainerProfile()),
+          ),
+          initialUri: Uri.parse('https://app.gettreino.com/?to=agenda'),
+        );
+
+        // El router pumpeado arranca en `initialLocation: '/dashboard'` (no
+        // hay browser real en el test VM que le dicte otra cosa) — ahí el
+        // gate de destino fino no se dispara, a propósito, es la misma razón
+        // por la que un PF ya en una ruta protegida no se ve afectado. Forzar
+        // `/login` simula el gate que SÍ dispara en la app real (un trainer
+        // recién autenticado, con `location=='/'` o `/login`).
+        router.go('/login');
+        await tester.pumpAndSettle();
+
+        expect(
+          router.routerDelegate.currentConfiguration.uri.toString(),
+          '/agenda',
+        );
+      },
+    );
+
+    testWidgets(
+      'sin to en la URL, el gate sigue cayendo en /dashboard como siempre',
+      (tester) async {
+        final router = await _pumpRouter(
+          tester,
+          authOverride: authNotifierProvider.overrideWith(
+            () => _StubAuthNotifier(AsyncData(_MockUser())),
+          ),
+          profileOverride: userProfileProvider.overrideWith(
+            (ref) => Stream<UserProfile?>.value(_trainerProfile()),
+          ),
+          initialUri: Uri.parse('https://app.gettreino.com/'),
+        );
+
+        router.go('/login');
+        await tester.pumpAndSettle();
+
+        expect(
+          router.routerDelegate.currentConfiguration.uri.toString(),
+          '/dashboard',
+        );
       },
     );
   });

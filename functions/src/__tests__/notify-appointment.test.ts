@@ -18,6 +18,7 @@ import * as admin from "firebase-admin";
 import { notifyOnAppointmentHandler } from "../notifications/notify-appointment";
 import { dedupeKey } from "../mail/enqueue-mail";
 import { MAIL_QUEUE_COLLECTION } from "../mail/types";
+import { trainerEntry } from "../mail/templates";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
@@ -229,6 +230,36 @@ describe("SCENARIO-634: confirmed→cancelled, no cancelledBy → notify both pa
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
     expect(callArg.tokens).toContain("trainer-token-634");
     expect(callArg.tokens).toContain("athlete-token-634");
+  });
+
+  // Encontrado en revisión adversarial: notify-link-change.ts y este archivo
+  // eran los únicos 2 productores tocados por el destino fino sin ningún
+  // test sobre `ctaUrl` — el mismo patrón de QA-API-001 arriba (un test que
+  // asertea el push y nada del mail deja pasar una regresión real en la
+  // misma rama).
+  it("el mail al PF lleva el CTA a su agenda, no a la entrada bare", async () => {
+    const beforeData = { trainerId, athleteId, status: "confirmed" };
+    const afterData = {
+      trainerId,
+      athleteId,
+      status: "cancelled",
+      startsAt: APPT_STARTS_AT,
+    };
+
+    await notifyOnAppointmentHandler(
+      testApp,
+      APPT_ID,
+      beforeData,
+      afterData,
+      makeMockMessaging(),
+    );
+
+    const snap = await db()
+      .collection(MAIL_QUEUE_COLLECTION)
+      .doc(dedupeKey("appointment-cancelled", APPT_ID, trainerId))
+      .get();
+    expect(snap.exists).toBe(true);
+    expect(snap.data()?.params?.ctaUrl).toBe(trainerEntry({ to: "agenda" }));
   });
 });
 

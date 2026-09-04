@@ -36,6 +36,7 @@ import * as admin from "firebase-admin";
 import { notifyOnExerciseFeedbackHandler } from "../notifications/notify-exercise-feedback";
 import { dedupeKey } from "../mail/enqueue-mail";
 import { MAIL_QUEUE_COLLECTION, MailQueueDoc } from "../mail/types";
+import { trainerEntry } from "../mail/templates";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
@@ -772,7 +773,11 @@ describe("mail al PF: se encola junto con el push", () => {
     );
 
     const [doc] = await queuedMailFor(trainerId);
-    expect(doc.params.ctaUrl).toBe("https://app.gettreino.com/abrir/profe");
+    // No la entrada bare: manda directo al perfil del atleta que reporto la
+    // molestia, con `to=alumno` y su uid.
+    expect(doc.params.ctaUrl).toBe(
+      trainerEntry({ to: "alumno", athleteId: athleteUid }),
+    );
   });
 
   // Decisión 1: transaccional. No existe un ajuste razonable que diga "no me
