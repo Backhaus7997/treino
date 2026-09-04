@@ -286,7 +286,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Set up Swift
-        uses: swift-actions/setup-swift@v2
+        uses: swift-actions/setup-swift@v3
 
       - name: Run Swift conformance
         run: bash conformance/run_swift.sh
@@ -311,7 +311,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Set up Swift
-        uses: swift-actions/setup-swift@v2
+        uses: swift-actions/setup-swift@v3
 
       # Que el entitlement de HealthKit, su enganche a las TRES configuraciones
       # del target y los textos de permiso sigan en su lugar.
