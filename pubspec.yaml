@@ -70,7 +70,6 @@ dependencies:
   # pero exige que reloj y teléfono compartan clave de firma, y la firma de
   # release de Android sigue en debug keys (android/app/build.gradle).
   watch_connectivity: ^0.2.8
-  flutter_branch_sdk: ^9.3.3
 
 dev_dependencies:
   flutter_test:

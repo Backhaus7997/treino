@@ -179,15 +179,7 @@ const List<LegalSection> kPrivacySections = <LegalSection>[
     'Usamos proveedores de infraestructura como Google Firebase, que actúan como '
         'encargados del tratamiento por nuestra cuenta. Si te vinculás con un '
         'entrenador, este puede ver los datos de entrenamiento necesarios para '
-        'asistirte. No vendemos tus datos personales a terceros.\n\n'
-        'Links de invitación. Cuando un entrenador te comparte un link para '
-        'vincularse con vos, usamos a Branch Metrics como encargado para que esa '
-        'invitación siga estando cuando abrís la app por primera vez después de '
-        'instalarla. Para lograrlo, Branch recibe datos técnicos de tu '
-        'dispositivo —modelo, sistema operativo, dirección IP y momento del '
-        'click— y los usa para reconocer que esa apertura corresponde a ese '
-        'link. No lo usamos para publicidad ni para seguirte entre apps. Si no '
-        'abrís ningún link de invitación, no hay nada que emparejar.',
+        'asistirte. No vendemos tus datos personales a terceros.',
   ),
   LegalSection(
     '6. Conservación',
