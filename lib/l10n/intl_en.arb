@@ -1790,5 +1790,13 @@
   "profileEditTrainerPublished": "Visible to athletes",
   "@profileEditTrainerPublished": {},
   "profileEditTrainerNotPublished": "Not published",
-  "@profileEditTrainerNotPublished": {}
+  "@profileEditTrainerNotPublished": {},
+  "legacyPrivacyNoticeTitle": "We updated our Privacy Policy",
+  "@legacyPrivacyNoticeTitle": {},
+  "legacyPrivacyNoticeBody": "We clarified how we handle your location. Nothing changed about what we collect from you.",
+  "@legacyPrivacyNoticeBody": {},
+  "legacyPrivacyNoticeAction": "READ THE POLICY",
+  "@legacyPrivacyNoticeAction": {},
+  "legacyPrivacyNoticeDismiss": "Dismiss",
+  "@legacyPrivacyNoticeDismiss": {}
 }

@@ -1027,5 +1027,9 @@
   "profileEditTrainerConsentConfirmAccept": "PUBLICAR",
   "profileEditTrainerConsentConfirmCancel": "CANCELAR",
   "profileEditTrainerPublished": "Visible para los atletas",
-  "profileEditTrainerNotPublished": "No publicada"
+  "profileEditTrainerNotPublished": "No publicada",
+  "legacyPrivacyNoticeTitle": "Actualizamos la Política de Privacidad",
+  "legacyPrivacyNoticeBody": "Aclaramos cómo tratamos tu ubicación. No cambió nada de lo que recolectamos de ti.",
+  "legacyPrivacyNoticeAction": "LEER LA POLÍTICA",
+  "legacyPrivacyNoticeDismiss": "Cerrar"
 }

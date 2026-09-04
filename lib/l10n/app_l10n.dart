@@ -2828,6 +2828,30 @@ abstract class AppL10n {
   /// **'No publicada'**
   String get profileEditTrainerNotPublished;
 
+  /// No description provided for @legacyPrivacyNoticeTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Actualizamos la Política de Privacidad'**
+  String get legacyPrivacyNoticeTitle;
+
+  /// No description provided for @legacyPrivacyNoticeBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Aclaramos cómo tratamos tu ubicación. No cambió nada de lo que recolectamos de vos.'**
+  String get legacyPrivacyNoticeBody;
+
+  /// No description provided for @legacyPrivacyNoticeAction.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'LEER LA POLÍTICA'**
+  String get legacyPrivacyNoticeAction;
+
+  /// No description provided for @legacyPrivacyNoticeDismiss.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cerrar'**
+  String get legacyPrivacyNoticeDismiss;
+
   /// No description provided for @athleteDetailPlansSection.
   ///
   /// In es_AR, this message translates to:

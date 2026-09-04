@@ -1515,6 +1515,20 @@ class AppL10nEs extends AppL10n {
   String get profileEditTrainerNotPublished => 'No publicada';
 
   @override
+  String get legacyPrivacyNoticeTitle =>
+      'Actualizamos la Política de Privacidad';
+
+  @override
+  String get legacyPrivacyNoticeBody =>
+      'Aclaramos cómo tratamos tu ubicación. No cambió nada de lo que recolectamos de ti.';
+
+  @override
+  String get legacyPrivacyNoticeAction => 'LEER LA POLÍTICA';
+
+  @override
+  String get legacyPrivacyNoticeDismiss => 'Cerrar';
+
+  @override
   String get athleteDetailPlansSection => 'PLANES ASIGNADOS';
 
   @override
@@ -5825,6 +5839,20 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get profileEditTrainerNotPublished => 'No publicada';
+
+  @override
+  String get legacyPrivacyNoticeTitle =>
+      'Actualizamos la Política de Privacidad';
+
+  @override
+  String get legacyPrivacyNoticeBody =>
+      'Aclaramos cómo tratamos tu ubicación. No cambió nada de lo que recolectamos de vos.';
+
+  @override
+  String get legacyPrivacyNoticeAction => 'LEER LA POLÍTICA';
+
+  @override
+  String get legacyPrivacyNoticeDismiss => 'Cerrar';
 
   @override
   String get athleteDetailPlansSection => 'PLANES ASIGNADOS';

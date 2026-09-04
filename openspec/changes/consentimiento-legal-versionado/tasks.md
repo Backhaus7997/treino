@@ -135,10 +135,10 @@ Depende de: 3, 5 (NO de 10 — confirmación propia más liviana que el sheet co
 
 Depende de: 1. Paralelizable con 2-11 (no comparte código con la rama de consentimiento del PF).
 
-- [ ] 12.1 RED — nuevo test de provider: gate `role==athlete && termsAcceptedAt!=null && termsAcceptedAt.isBefore(kPrivacyV1PublishedAt)`; atleta al día ⇒ `false`; PF ⇒ `false`. **[R4]**
-- [ ] 12.2 RED — nuevo widget test: el banner no bloquea navegación ni ninguna acción (semántica, no layout). **[R4]**
-- [ ] 12.3 GREEN — nuevo `lib/features/profile/presentation/legacy_privacy_notice_banner.dart`: provider del gate + banner, montado en `home_screen.dart` `Stack`. **[R4]**
-- [ ] 12.4 Copy — claves nuevas en los 3 `.arb`. **[R4]**
+- [x] 12.1 RED — nuevo test de provider: gate `role==athlete && termsAcceptedAt!=null && termsAcceptedAt.isBefore(kPrivacyV1PublishedAt)`; atleta al día ⇒ `false`; PF ⇒ `false`. **[R4]**
+- [x] 12.2 RED — nuevo widget test: el banner no bloquea navegación ni ninguna acción (semántica, no layout). **[R4]**
+- [x] 12.3 GREEN — nuevo `lib/features/profile/presentation/legacy_privacy_notice_banner.dart`: provider del gate + banner, montado en `home_screen.dart` `Stack`. **[R4]**
+- [x] 12.4 Copy — claves nuevas en los 3 `.arb`. **[R4]**
 
 ## 13. Verificación final (no es un commit de producto — corre antes de abrir el PR)
 

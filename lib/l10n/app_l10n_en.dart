@@ -1480,6 +1480,19 @@ class AppL10nEn extends AppL10n {
   String get profileEditTrainerNotPublished => 'Not published';
 
   @override
+  String get legacyPrivacyNoticeTitle => 'We updated our Privacy Policy';
+
+  @override
+  String get legacyPrivacyNoticeBody =>
+      'We clarified how we handle your location. Nothing changed about what we collect from you.';
+
+  @override
+  String get legacyPrivacyNoticeAction => 'READ THE POLICY';
+
+  @override
+  String get legacyPrivacyNoticeDismiss => 'Dismiss';
+
+  @override
   String get athleteDetailPlansSection => 'PLANES ASIGNADOS';
 
   @override
