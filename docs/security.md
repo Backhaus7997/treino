@@ -2202,15 +2202,15 @@ roto para el 96% de la gente. La condición real tiene tres partes, y las tres
 son por CALLABLE que se vaya a enforzar:
 
 1. **`INVALID` ~ 0 sobre una ventana con tráfico real**, no una llamada
-   afortunada.  es un cliente que manda token y no lo puede producir
-   bien — cada uno de esos es un usuario que se queda afuera.
+   afortunada. `INVALID` es un cliente que manda token y no lo puede
+   producir bien — cada uno de esos es un usuario que se queda afuera.
 2. **Tráfico medido desde TODAS las plataformas que llaman a ese callable.**
    Una tasa buena que sólo vio iOS no dice nada de Android, y hoy el cruce por
    cliente ni siquiera se puede reproducir con este filtro (punto 3 de arriba).
 3. **Los `MISSING` resueltos aparte.** No son un problema de atestación: son
    clientes que no mandan token. El Coach Hub web no activa App Check
    (§4.10), así que un callable que recibe tráfico web O se le activa al
-   cliente, O no se puede enforzar.  tiene 17 
+   cliente, O no se puede enforzar. `acceptTrainerLink` tiene 17 `MISSING`
    sobre 27 — enforzarlo con el hub como está lo rompe entero, aunque el móvil
    atestigüe perfecto.
 
