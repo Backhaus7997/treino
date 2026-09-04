@@ -3726,5 +3726,48 @@ service cloud.firestore {
     match /mail_queue/{mailId} {
       allow read, write: if false;
     }
+
+    // Las dos colecciones del cobro con Mercado Pago. Escritas SOLO por
+    // `createPreapproval` y `reconcileMpSubscriptions` vía Admin SDK, que
+    // saltea estas reglas. Ningún cliente las toca, ni para leer.
+    //
+    // ⚠️ ESTAS DOS REGLAS NO PROTEGEN NADA. Son DOCUMENTACIÓN. Está medido:
+    //
+    //   - Sacándolas, `mp-collections-rules.test.ts` sigue en 12/12 verde: el
+    //     default-deny ya denegaba, porque ningún match comodín las alcanza.
+    //   - Agregando un `match /{x=**} { allow read: if request.auth != null }`
+    //     CON estas reglas puestas, caen 5 tests. El `if false` NO lo frenó.
+    //
+    // Lo segundo es lo que importa y es contraintuitivo: las reglas de Firestore
+    // son UNIÓN PERMISIVA. Si algún match permite, se permite. Un deny no le
+    // gana a un allow, así que escribir `if false` no blinda una colección
+    // contra un comodín que alguien agregue después.
+    //
+    // Entonces, ¿para qué están? Para que quien lea este archivo vea que estas
+    // colecciones existen y son CF-only, en vez de que sean invisibles. Mismo
+    // valor —y mismo límite— que el bloque de `mail_queue` de acá arriba.
+    //
+    // **Lo que de verdad protege es el test.** Si mañana entra un match más
+    // ancho, lo agarra `mp-collections-rules.test.ts` y nada más.
+    //
+    // Lo que se protege NO es simétrico entre las dos:
+    //
+    // `mp_checkouts/{uid}` guarda el `init_point`, que es un LINK DE PAGO vivo.
+    // Un cliente que pudiera leer esta colección vería los checkouts abiertos de
+    // otros entrenadores — quién está comprando qué plan, y la URL para
+    // completarlo. Y uno que pudiera ESCRIBIR podría plantar un `initPoint` a un
+    // sitio propio: la función lo reusa dentro de su ventana de 30 minutos, así
+    // que el próximo click del PF lo mandaría a pagarle a un tercero desde
+    // nuestra app. Es el vector más caro de los dos.
+    //
+    // `mp_preapprovals/{preapprovalId}` es el mapeo suscripción → (PF, plan).
+    // Escribirlo es elegirse el tier: el reconciliador lee de acá para saber qué
+    // límite otorgar, así que un cliente con escritura se firma `plan3` gratis.
+    match /mp_checkouts/{uid} {
+      allow read, write: if false;
+    }
+    match /mp_preapprovals/{preapprovalId} {
+      allow read, write: if false;
+    }
   }
 }

@@ -129,7 +129,8 @@ idéntico. La sección 4.1 resuelve esto.
 |---|---|---|
 | Días por rutina propia | **2** | hasta 7 (`_kMaxDays`) |
 | Semanas por rutina propia | **1** | hasta 16 (`_kMaxWeeks`) + periodización (`weeklySets`, `activeWeeks`) |
-| Seguir el catálogo del sistema tal cual | **sí, entero** | sí |
+| Seguir el catálogo — nivel principiante (3 plantillas) | **sí** | sí |
+| Seguir el catálogo — nivel intermedio/avanzado (4 plantillas) | no — ver 4.1.1 | sí |
 | Editar / personalizar una plantilla del catálogo | no | sí |
 | Gráficos históricos | 3 meses | all-time |
 
@@ -161,6 +162,66 @@ Costo estimado (sin implementar):
 
 La alternativa — subir el free a 5 días para que entre toda plantilla — vacía el
 paywall: 5 días es más que Hevy y Strong juntos.
+
+### 4.1.1 El catálogo también se parte: principiante gratis, intermedio+ paga
+
+Con 4.1 construido, la restricción de días de la sección 4 deja de aplicarle
+al catálogo — seguir sin copiar nunca pasa por `user-created`, así que la
+regla de `days.size()` (6.2) no lo ve. Eso deja una pregunta sin responder: si
+CUALQUIER plantilla se sigue gratis y sin límite, ¿qué le queda al plan pago
+además de "arma la tuya"?
+
+Decidido en esta sesión (2026-09-03): el catálogo también se parte, por
+**nivel**, no por días. El campo `level` de cada plantilla, verificado contra
+`docs/video-catalog-audit/improved-templates.json` — la primera vuelta de esta
+conversación asumió "Powerlifting Base" intermedio por el nombre; el campo
+real dice `advanced`:
+
+| Libre | id | `level` | Días |
+|---|---|---|---|
+| sí | `ppl-beginner` | beginner | 3 |
+| sí | `full-body-3day` | beginner | 3 |
+| sí | `calistenia-beginner` | beginner | 3 |
+| no | `upper-lower-intermediate` | intermediate | 4 |
+| no | `bro-split-intermediate` | intermediate | 5 |
+| no | `hipertrofia-intermedio` | intermediate | 3 |
+| no | `powerlifting-base` | **advanced** | 4 |
+
+Encuadre: "empezá gratis, progresá con la app paga". Pega más fuerte que el
+tope de días de la sección 4, porque no depende de que el alumno quiera
+diseñar algo propio — todo el que progresa sale de principiante tarde o
+temprano, use catálogo o rutina propia.
+
+**Flag explícito, no `level` reutilizado — decisión de esta sesión.** Gatear
+directo por `level` sería gratis en código (el campo ya existe), pero ata el
+PRECIO a la DIFICULTAD, y son decisiones distintas: el día de mañana puede
+convenir dejar "Powerlifting Base" gratis como gancho de adquisición aunque
+sea `advanced`, o cobrar un principiante particularmente bien producido. Un
+campo nuevo — `isPremium: bool`, default `false` — en el seed
+(`docs/video-catalog-audit/improved-templates.json` +
+`scripts/seed_templates.js`) desacopla las dos cosas. Costo bajo: el seed ya
+es un proceso manual e infrecuente, un campo más no cambia eso.
+
+**Dónde va el enforcement — distinto del de 6.2.** Acá no hay escritura en
+`routines`: seguir sin copiar solo pisa `users/{uid}.activeRoutineId`. La
+regla que hace falta es sobre ESE campo, no sobre `routines` — un `get()` a la
+plantilla resuelta (mismo patrón de `firestore.rules:623`, que ya lee
+`users/{uid}.role`) para leer su `isPremium`, exigiendo el mismo campo de
+entitlement que 6.3 propone para `user-created`.
+
+**La vidriera también tiene que saberlo.** El grid de Plantillas necesita un
+candado o badge visible en las 4 no-gratis ANTES de que el alumno toque
+"Seguir" — bloquear en silencio al tocar se siente como que la app miente.
+
+**Telemetría que falta si esto se construye.** El día que "seguir sin copiar"
+exista, seguir una plantilla deja de generar `routine_created` (no hay
+create). Hace falta un evento nuevo — algo como `catalog_template_followed`
+con `template_id` e `is_premium` — para no perder visibilidad de este camino.
+Y uno más, de mayor señal para este eje específico: algo como
+`premium_template_blocked`, que mide directo "cuánta gente quiso una
+no-gratis y no pudo" — el número que de verdad justifica construir esto.
+Ninguno de los dos está instrumentado; van cuando exista el gate que miden, no
+antes.
 
 ### 4.2 Gráficos: el eje que convierte, pero todavía no existe la superficie
 
@@ -421,7 +482,9 @@ gráficos (4.2), no días.
    cuenta contra el cap de 10; y la copia hereda los días de la plantilla, así
    que también chocaría contra un tope de días. La sección 4.1 propone que
    seguir sin copiar no consuma nada. Sin eso, el free vacía el catálogo, no el
-   límite.
+   límite. Resuelto en el diseño (4.1.1): "sin copiar" es gratis solo para las
+   3 plantillas `beginner`; las 4 restantes (`intermediate`/`advanced`) quedan
+   pagas, gateadas por un flag nuevo, no por `level` directo.
 3. **Qué cobra un PF argentino por un plan online.** Cubierto con fuente
    débil: ARS 20.000–40.000/mes (sección 8.1). Alcanza para descartar que
    ARS 3.000 compita con el PF, pero no para afinar la banda. Vale una encuesta
@@ -446,6 +509,9 @@ el 2026-09-03.
 - Spotify Individual ARS 4.499 + impuestos (spotify.com/ar).
 - SMVM ARS 383.800 desde el 1/9/2026, Res. 4/2026 (Infobae citando el BO).
   Corrige el 376.600 del brief.
+- El campo `level` de las 7 plantillas del sistema, leído directo del JSON del
+  seed (4.1.1). Corrige una afirmación dicha en el chat de esta misma sesión:
+  "Powerlifting Base" no es `intermediate`, es `advanced`.
 
 **Cubierto con fuente débil (agregadores o reseñas, sin metodología)**
 

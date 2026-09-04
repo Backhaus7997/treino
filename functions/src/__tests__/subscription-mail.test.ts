@@ -19,7 +19,7 @@ import {
 import { SubscriptionState } from "../subscriptions/effective-limit";
 import { MappedSubscription } from "../subscriptions/subscription-state";
 import { enqueueMail } from "../mail/enqueue-mail";
-import { APP_ENTRY_TRAINER } from "../mail/templates";
+import { trainerEntry } from "../mail/templates";
 
 jest.mock("../mail/enqueue-mail", () => ({
   enqueueMail: jest.fn(async () => "queued-id"),
@@ -304,7 +304,7 @@ describe("enqueueSubscriptionMail", () => {
 
     const arg = enqueueMock.mock.calls[0][1];
     expect(arg.toUid).toBe("pf-1");
-    expect(arg.params.ctaUrl).toBe(APP_ENTRY_TRAINER);
+    expect(arg.params.ctaUrl).toBe(trainerEntry({ to: "facturacion" }));
     // El PF no puede optar por no enterarse de que su servicio se corta.
     expect(arg.prefKey).toBeUndefined();
   });

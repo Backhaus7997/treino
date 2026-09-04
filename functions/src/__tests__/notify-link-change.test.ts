@@ -18,6 +18,9 @@
 
 import * as admin from "firebase-admin";
 import { notifyOnLinkChangeHandler } from "../notifications/notify-link-change";
+import { dedupeKey } from "../mail/enqueue-mail";
+import { MAIL_QUEUE_COLLECTION } from "../mail/types";
+import { trainerEntry } from "../mail/templates";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
@@ -55,6 +58,19 @@ async function seedUser(uid: string, fcmTokens: string[]): Promise<void> {
 async function cleanup(...uids: string[]): Promise<void> {
   for (const uid of uids) {
     await db().collection("users").doc(uid).delete().catch(() => undefined);
+
+    // Mismo motivo que en notify-appointment.test.ts: el mail encolado tiene
+    // id determinístico y `enqueueMail` trata un id ya existente como dedupe
+    // legítimo — sin borrar acá, la corrida siguiente leería el doc de la
+    // anterior y una regresión en los params pasaría en verde.
+    const queued = await db()
+      .collection(MAIL_QUEUE_COLLECTION)
+      .where("toUid", "==", uid)
+      .get()
+      .catch(() => null);
+    if (queued) {
+      await Promise.all(queued.docs.map((d) => d.ref.delete()));
+    }
   }
 }
 
@@ -84,6 +100,30 @@ describe("SCENARIO-637: new link status=pending → notify trainer", () => {
     expect(callArg.tokens).not.toContain("athlete-token-637");
     expect(callArg.data?.deepLink).toBe("/coach");
     expect(callArg.data?.kind).toBe("link-change");
+  });
+
+  // Encontrado en revisión adversarial: este archivo tocaba `ctaUrl` en el
+  // productor pero ningún test lo verificaba (a diferencia de
+  // notify-exercise-feedback.test.ts y subscription-mail.test.ts, que sí).
+  it("el mail al PF lleva el CTA a solicitudes, no a la entrada bare", async () => {
+    const afterData = { trainerId, athleteId, status: "pending" };
+
+    await notifyOnLinkChangeHandler(
+      testApp,
+      "link-test",
+      undefined,
+      afterData,
+      makeMockMessaging(),
+    );
+
+    const snap = await db()
+      .collection(MAIL_QUEUE_COLLECTION)
+      .doc(dedupeKey("link-requested", "link-test", trainerId))
+      .get();
+    expect(snap.exists).toBe(true);
+    expect(snap.data()?.params?.ctaUrl).toBe(
+      trainerEntry({ to: "solicitudes" }),
+    );
   });
 });
 

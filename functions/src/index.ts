@@ -136,3 +136,19 @@ export { syncEntitlementsOnSubscription, sweepEntitlements } from "./subscriptio
 // `User.refreshToken` de firebase_auth es vacio en nativo, asi que el telefono
 // no puede compartir la suya.
 export { mintWatchCredential } from "./mint-watch-credential";
+
+// Paywall del entrenador — el checkout de Mercado Pago. Es el UNICO punto de
+// la app que abre un cobro. NO escribe `subscription`: crear el preapproval lo
+// deja `pending` en MP hasta que el PF carga su medio de pago, y el tier lo
+// escribe el reconciliador cuando MP diga `authorized`. Ver el encabezado de
+// `subscriptions/mp/create-preapproval.ts`.
+//
+// Requiere el secreto MP_ACCESS_TOKEN:
+//   firebase functions:secrets:set MP_ACCESS_TOKEN --project prod
+export { createPreapproval } from "./subscriptions/mp/create-preapproval";
+
+// Paywall del entrenador — el reconciliador. Es lo que hace que pagar
+// SIGNIFIQUE algo: sin esto, `createPreapproval` abre un cobro y nadie se
+// entera. Corre a las 03:00 ART, una hora ANTES que `sweepEntitlements`, para
+// que el barrido decida bloqueos sobre datos de hoy y no de ayer.
+export { reconcileMpSubscriptions } from "./subscriptions/mp/reconcile";

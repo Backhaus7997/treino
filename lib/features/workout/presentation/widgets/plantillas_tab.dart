@@ -5,12 +5,14 @@ import '../../../../app/theme/app_motion.dart';
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../../l10n/app_l10n.dart';
+import '../../../paywall/application/athlete_entitlement_provider.dart';
 import '../../../profile/domain/experience_level.dart';
 import '../../application/routine_providers.dart';
 import '../../application/unified_templates_providers.dart';
 import '../onboarding/templates_onboarding_gate.dart';
 import 'coach_chip.dart';
 import 'level_filter_pills.dart';
+import 'premium_chip.dart';
 import 'routine_card.dart';
 import 'templates_preferences_bar.dart';
 import '../../../../app/theme/tokens/primitives.dart';
@@ -217,7 +219,7 @@ class _CatalogErrorState extends ConsumerWidget {
 /// row heights come from [RoutineCard.reserveTitleLines] making every card
 /// deterministic-height; the badge lives inside the card's fixed icon row, so
 /// coach cards measure exactly like catalog cards.
-class _TemplatesGrid extends StatelessWidget {
+class _TemplatesGrid extends ConsumerWidget {
   const _TemplatesGrid({required this.entries});
 
   final List<TemplateEntry> entries;
@@ -228,8 +230,11 @@ class _TemplatesGrid extends StatelessWidget {
       );
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final useSingleColumn = MediaQuery.textScalerOf(context).scale(1) > 1.3;
+    // Una sola lectura para toda la grilla: si el catálogo pago está
+    // bloqueando a quien mira. Se cruza con el `isPremium` de cada plantilla.
+    final catalogLocked = ref.watch(catalogLockActiveProvider);
     final cells = <Widget>[
       for (final entry in entries)
         RoutineCard(
@@ -247,7 +252,14 @@ class _TemplatesGrid extends StatelessWidget {
                 routineId: entry.routine.id,
                 variant: CoachChipVariant.communityTrainer,
               ),
-            TemplateOrigin.system => null,
+            // El candado sólo aparece si esta plantilla está bloqueada para
+            // QUIEN MIRA: `isPremium` sola no alcanza. Un alumno con derecho
+            // ve el catálogo entero sin candados, y con el paywall apagado
+            // no lo ve nadie.
+            TemplateOrigin.system =>
+              catalogLocked && entry.routine.isPremium
+                  ? PremiumChip(routineId: entry.routine.id)
+                  : null,
           },
         ),
     ];

@@ -55,6 +55,28 @@ mixin _$Routine {
       throw _privateConstructorUsedError; // ignore: invalid_annotation_target
   @JsonKey(includeToJson: false)
   int? get ratingsCount =>
+      throw _privateConstructorUsedError; // ── Catálogo pago (paywall del alumno suelto, spec §4.1.1) ───────────────
+// `true` en las plantillas del sistema que sólo puede usar un alumno con
+// derecho. Lo siembra `scripts/seed_templates.js` (Admin SDK, saltea las
+// reglas) desde `improved-templates.json`; el cliente sólo lo LEE.
+//
+// `includeToJson: false` por el mismo motivo que ratingAvg/ratingsCount, y
+// acá el motivo es más filoso: sin eso `toJson()` lo emitiría en TODA
+// rutina, incluidas las `user-created`, y el `hasOnly(userCreatedRoutineFields())`
+// de firestore.rules —que no conoce este campo— rechazaría el create y el
+// update de cualquier rutina de atleta. Es exactamente el modo de falla de
+// #563 que el propio archivo de reglas advierte en su COUPLING WARNING.
+// Manteniéndolo fuera del payload, las reglas no necesitan enterarse.
+//
+// Default `false`: una plantilla sin el campo es GRATIS. Ningún doc lo
+// tiene hoy, así que el default es lo que hace que esto no necesite
+// backfill y que un error de siembra falle del lado seguro (abre, no cobra).
+//
+// NO gobierna el tope de días/semanas: ese es el otro eje del paywall y
+// aplica a la rutina propia del alumno, no al catálogo (spec §4).
+// ignore: invalid_annotation_target
+  @JsonKey(includeToJson: false)
+  bool get isPremium =>
       throw _privateConstructorUsedError; // ── Plain-language summary (#648) ────────────────────────────────────────
 // One sentence explaining what the routine IS, in words someone who has
 // never set foot in a gym can parse. The catalogue leads with jargon —
@@ -133,6 +155,7 @@ abstract class $RoutineCopyWith<$Res> {
       int numWeeks,
       @JsonKey(includeToJson: false) double? ratingAvg,
       @JsonKey(includeToJson: false) int? ratingsCount,
+      @JsonKey(includeToJson: false) bool isPremium,
       String? summary,
       @RoutineGoalListConverter() List<RoutineGoal> goals});
 }
@@ -168,6 +191,7 @@ class _$RoutineCopyWithImpl<$Res, $Val extends Routine>
     Object? numWeeks = null,
     Object? ratingAvg = freezed,
     Object? ratingsCount = freezed,
+    Object? isPremium = null,
     Object? summary = freezed,
     Object? goals = null,
   }) {
@@ -236,6 +260,10 @@ class _$RoutineCopyWithImpl<$Res, $Val extends Routine>
           ? _value.ratingsCount
           : ratingsCount // ignore: cast_nullable_to_non_nullable
               as int?,
+      isPremium: null == isPremium
+          ? _value.isPremium
+          : isPremium // ignore: cast_nullable_to_non_nullable
+              as bool,
       summary: freezed == summary
           ? _value.summary
           : summary // ignore: cast_nullable_to_non_nullable
@@ -272,6 +300,7 @@ abstract class _$$RoutineImplCopyWith<$Res> implements $RoutineCopyWith<$Res> {
       int numWeeks,
       @JsonKey(includeToJson: false) double? ratingAvg,
       @JsonKey(includeToJson: false) int? ratingsCount,
+      @JsonKey(includeToJson: false) bool isPremium,
       String? summary,
       @RoutineGoalListConverter() List<RoutineGoal> goals});
 }
@@ -305,6 +334,7 @@ class __$$RoutineImplCopyWithImpl<$Res>
     Object? numWeeks = null,
     Object? ratingAvg = freezed,
     Object? ratingsCount = freezed,
+    Object? isPremium = null,
     Object? summary = freezed,
     Object? goals = null,
   }) {
@@ -373,6 +403,10 @@ class __$$RoutineImplCopyWithImpl<$Res>
           ? _value.ratingsCount
           : ratingsCount // ignore: cast_nullable_to_non_nullable
               as int?,
+      isPremium: null == isPremium
+          ? _value.isPremium
+          : isPremium // ignore: cast_nullable_to_non_nullable
+              as bool,
       summary: freezed == summary
           ? _value.summary
           : summary // ignore: cast_nullable_to_non_nullable
@@ -405,6 +439,7 @@ class _$RoutineImpl extends _Routine {
       this.numWeeks = 1,
       @JsonKey(includeToJson: false) this.ratingAvg,
       @JsonKey(includeToJson: false) this.ratingsCount,
+      @JsonKey(includeToJson: false) this.isPremium = false,
       this.summary,
       @RoutineGoalListConverter()
       final List<RoutineGoal> goals = const <RoutineGoal>[]})
@@ -476,6 +511,29 @@ class _$RoutineImpl extends _Routine {
   @override
   @JsonKey(includeToJson: false)
   final int? ratingsCount;
+// ── Catálogo pago (paywall del alumno suelto, spec §4.1.1) ───────────────
+// `true` en las plantillas del sistema que sólo puede usar un alumno con
+// derecho. Lo siembra `scripts/seed_templates.js` (Admin SDK, saltea las
+// reglas) desde `improved-templates.json`; el cliente sólo lo LEE.
+//
+// `includeToJson: false` por el mismo motivo que ratingAvg/ratingsCount, y
+// acá el motivo es más filoso: sin eso `toJson()` lo emitiría en TODA
+// rutina, incluidas las `user-created`, y el `hasOnly(userCreatedRoutineFields())`
+// de firestore.rules —que no conoce este campo— rechazaría el create y el
+// update de cualquier rutina de atleta. Es exactamente el modo de falla de
+// #563 que el propio archivo de reglas advierte en su COUPLING WARNING.
+// Manteniéndolo fuera del payload, las reglas no necesitan enterarse.
+//
+// Default `false`: una plantilla sin el campo es GRATIS. Ningún doc lo
+// tiene hoy, así que el default es lo que hace que esto no necesite
+// backfill y que un error de siembra falle del lado seguro (abre, no cobra).
+//
+// NO gobierna el tope de días/semanas: ese es el otro eje del paywall y
+// aplica a la rutina propia del alumno, no al catálogo (spec §4).
+// ignore: invalid_annotation_target
+  @override
+  @JsonKey(includeToJson: false)
+  final bool isPremium;
 // ── Plain-language summary (#648) ────────────────────────────────────────
 // One sentence explaining what the routine IS, in words someone who has
 // never set foot in a gym can parse. The catalogue leads with jargon —
@@ -550,7 +608,7 @@ class _$RoutineImpl extends _Routine {
 
   @override
   String toString() {
-    return 'Routine(id: $id, name: $name, split: $split, level: $level, days: $days, estimatedMinutesPerDay: $estimatedMinutesPerDay, imageUrl: $imageUrl, source: $source, assignedBy: $assignedBy, assignedTo: $assignedTo, visibility: $visibility, createdBy: $createdBy, status: $status, numWeeks: $numWeeks, ratingAvg: $ratingAvg, ratingsCount: $ratingsCount, summary: $summary, goals: $goals)';
+    return 'Routine(id: $id, name: $name, split: $split, level: $level, days: $days, estimatedMinutesPerDay: $estimatedMinutesPerDay, imageUrl: $imageUrl, source: $source, assignedBy: $assignedBy, assignedTo: $assignedTo, visibility: $visibility, createdBy: $createdBy, status: $status, numWeeks: $numWeeks, ratingAvg: $ratingAvg, ratingsCount: $ratingsCount, isPremium: $isPremium, summary: $summary, goals: $goals)';
   }
 
   @override
@@ -583,32 +641,36 @@ class _$RoutineImpl extends _Routine {
                 other.ratingAvg == ratingAvg) &&
             (identical(other.ratingsCount, ratingsCount) ||
                 other.ratingsCount == ratingsCount) &&
+            (identical(other.isPremium, isPremium) ||
+                other.isPremium == isPremium) &&
             (identical(other.summary, summary) || other.summary == summary) &&
             const DeepCollectionEquality().equals(other._goals, _goals));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(
-      runtimeType,
-      id,
-      name,
-      split,
-      level,
-      const DeepCollectionEquality().hash(_days),
-      estimatedMinutesPerDay,
-      imageUrl,
-      source,
-      assignedBy,
-      assignedTo,
-      visibility,
-      createdBy,
-      status,
-      numWeeks,
-      ratingAvg,
-      ratingsCount,
-      summary,
-      const DeepCollectionEquality().hash(_goals));
+  int get hashCode => Object.hashAll([
+        runtimeType,
+        id,
+        name,
+        split,
+        level,
+        const DeepCollectionEquality().hash(_days),
+        estimatedMinutesPerDay,
+        imageUrl,
+        source,
+        assignedBy,
+        assignedTo,
+        visibility,
+        createdBy,
+        status,
+        numWeeks,
+        ratingAvg,
+        ratingsCount,
+        isPremium,
+        summary,
+        const DeepCollectionEquality().hash(_goals)
+      ]);
 
   /// Create a copy of Routine
   /// with the given fields replaced by the non-null parameter values.
@@ -644,6 +706,7 @@ abstract class _Routine extends Routine {
           final int numWeeks,
           @JsonKey(includeToJson: false) final double? ratingAvg,
           @JsonKey(includeToJson: false) final int? ratingsCount,
+          @JsonKey(includeToJson: false) final bool isPremium,
           final String? summary,
           @RoutineGoalListConverter() final List<RoutineGoal> goals}) =
       _$RoutineImpl;
@@ -695,7 +758,30 @@ abstract class _Routine extends Routine {
   @override
   @JsonKey(includeToJson: false)
   int?
-      get ratingsCount; // ── Plain-language summary (#648) ────────────────────────────────────────
+      get ratingsCount; // ── Catálogo pago (paywall del alumno suelto, spec §4.1.1) ───────────────
+// `true` en las plantillas del sistema que sólo puede usar un alumno con
+// derecho. Lo siembra `scripts/seed_templates.js` (Admin SDK, saltea las
+// reglas) desde `improved-templates.json`; el cliente sólo lo LEE.
+//
+// `includeToJson: false` por el mismo motivo que ratingAvg/ratingsCount, y
+// acá el motivo es más filoso: sin eso `toJson()` lo emitiría en TODA
+// rutina, incluidas las `user-created`, y el `hasOnly(userCreatedRoutineFields())`
+// de firestore.rules —que no conoce este campo— rechazaría el create y el
+// update de cualquier rutina de atleta. Es exactamente el modo de falla de
+// #563 que el propio archivo de reglas advierte en su COUPLING WARNING.
+// Manteniéndolo fuera del payload, las reglas no necesitan enterarse.
+//
+// Default `false`: una plantilla sin el campo es GRATIS. Ningún doc lo
+// tiene hoy, así que el default es lo que hace que esto no necesite
+// backfill y que un error de siembra falle del lado seguro (abre, no cobra).
+//
+// NO gobierna el tope de días/semanas: ese es el otro eje del paywall y
+// aplica a la rutina propia del alumno, no al catálogo (spec §4).
+// ignore: invalid_annotation_target
+  @override
+  @JsonKey(includeToJson: false)
+  bool
+      get isPremium; // ── Plain-language summary (#648) ────────────────────────────────────────
 // One sentence explaining what the routine IS, in words someone who has
 // never set foot in a gym can parse. The catalogue leads with jargon —
 // "Bro Split", "PPL", "Upper/Lower" — and 2 of 5 usability participants
