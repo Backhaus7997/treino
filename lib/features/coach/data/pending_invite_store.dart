@@ -27,6 +27,21 @@ class PendingInviteStore {
 
   final SharedPreferences _prefs;
 
+  /// La misma invitación, en MEMORIA, disponible en el mismo turno.
+  ///
+  /// El disco resuelve que la invitación sobreviva al login y a cerrar la app.
+  /// No resuelve el caso más común: el alumno YA tiene sesión, abre el link, y
+  /// entre que el router captura y el gate lee no hay ningún login de por
+  /// medio — hay milisegundos. La escritura a `SharedPreferences` es asíncrona,
+  /// así que el gate llegaba a leer ANTES de que terminara y no encontraba
+  /// nada. El vínculo no se creaba y no había error en ninguna parte.
+  ///
+  /// Es estático porque las dos puntas son instancias distintas: el router lo
+  /// escribe desde su propio `PendingInviteStore` y el gate lo lee desde el
+  /// suyo, ambos creados por el provider.
+  static String? _enMemoria;
+  static DateTime? _enMemoriaDesde;
+
   static const _kTrainerId = 'pending_invite_trainer_id';
   static const _kRecibidaEn = 'pending_invite_received_at';
 
@@ -47,6 +62,9 @@ class PendingInviteStore {
   /// sumaba al total igual.)
   Future<void> guardar(String trainerId, {DateTime? ahora}) async {
     if (trainerId.trim().isEmpty) return;
+    // Primero memoria, SIN await: quien lea en este mismo turno la encuentra.
+    _enMemoria = trainerId;
+    _enMemoriaDesde = ahora ?? AppClock.now();
     await _prefs.setString(_kTrainerId, trainerId);
     await _prefs.setInt(
       _kRecibidaEn,
@@ -59,6 +77,16 @@ class PendingInviteStore {
   /// Una caducada se limpia acá mismo: dejarla ocupando lugar significa que la
   /// próxima invitación que llegue tenga que competir con ella.
   Future<String?> leer({DateTime? ahora}) async {
+    // Memoria primero: es la única que está garantizada en el mismo turno.
+    final enMemoria = _enMemoria;
+    if (enMemoria != null && _enMemoriaDesde != null) {
+      if ((ahora ?? AppClock.now()).difference(_enMemoriaDesde!) <= validez) {
+        return enMemoria;
+      }
+      _enMemoria = null;
+      _enMemoriaDesde = null;
+    }
+
     final id = _prefs.getString(_kTrainerId);
     if (id == null || id.isEmpty) return null;
 
@@ -81,6 +109,8 @@ class PendingInviteStore {
   /// o no. Una invitación que el alumno ya vio y decidió cancelar no puede
   /// volver a aparecer en el próximo arranque.
   Future<void> limpiar() async {
+    _enMemoria = null;
+    _enMemoriaDesde = null;
     await _prefs.remove(_kTrainerId);
     await _prefs.remove(_kRecibidaEn);
   }

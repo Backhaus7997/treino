@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:treino/features/coach/data/pending_invite_store.dart';
@@ -79,6 +81,41 @@ void main() {
     final s = await _store();
     await s.guardar('   ');
 
+    expect(await s.leer(), isNull);
+  });
+
+  test('se lee en el MISMO turno, sin esperar al disco', () async {
+    // El bug que esto cubre: el alumno YA tiene sesión, abre el link, y entre
+    // que el router captura y el gate lee no hay ningún login de por medio.
+    // La escritura a SharedPreferences es asíncrona, así que el gate llegaba a
+    // leer antes de que terminara: no encontraba nada, el vínculo no se creaba
+    // y no había error en ninguna parte.
+    //
+    // `guardar` NO se espera acá a propósito — así es como lo llama el
+    // redirect del router.
+    final s = await _store();
+    unawaited(s.guardar('pf-9'));
+
+    expect(await s.leer(), 'pf-9');
+  });
+
+  test('lo guardado por una instancia lo ve otra, en el acto', () async {
+    // Las dos puntas son instancias distintas: el router escribe desde la suya
+    // y el gate lee desde la suya, ambas creadas por el provider.
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    unawaited(PendingInviteStore(prefs).guardar('pf-9'));
+
+    expect(await PendingInviteStore(prefs).leer(), 'pf-9');
+  });
+
+  test('limpiar la borra también de memoria', () async {
+    final s = await _store();
+    unawaited(s.guardar('pf-9'));
+    await s.limpiar();
+
+    // Si sólo se limpiara el disco, la copia en memoria haría reaparecer una
+    // invitación que el alumno ya canceló.
     expect(await s.leer(), isNull);
   });
 }

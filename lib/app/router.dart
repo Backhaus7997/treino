@@ -269,8 +269,16 @@ GoRouter buildRouter({
       // que era. Esto es un efecto de al lado, no una condición suya.
       final invitacion = trainerIdDeInvitacion(state.uri);
       if (invitacion != null) {
-        // Sin await: un redirect es síncrono. La escritura termina mucho antes
-        // de que haya sesión para consumirla — hay un login de por medio.
+        // Sin await porque un redirect es síncrono. Que la escritura a disco
+        // no haya terminado NO importa: `guardar` deja la invitación en
+        // memoria antes de tocar el disco, y de ahí la lee el gate.
+        //
+        // El comentario anterior decía «la escritura termina mucho antes de
+        // que haya sesión para consumirla — hay un login de por medio». Eso
+        // vale sólo si NO hay sesión. Con el alumno ya logueado —el caso más
+        // común— no hay login de por medio: hay milisegundos, y el gate leía
+        // el disco antes de que la escritura terminara. El vínculo no se creaba
+        // y no había error en ninguna parte.
         // El store puede no existir todavía (prefs sin resolver). Perder la
         // captura es mejor que tumbar la navegación por una invitación.
         final store = read(pendingInviteStoreProvider);
