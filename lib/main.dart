@@ -101,7 +101,13 @@ Future<void> main() async {
     // `deleteAccount` lo tuvo del 2026-07-20 al 2026-08-25 y en ese mes el
     // borrado de cuenta no funcionó nunca; se sacó por eso (§4.8.2). No
     // confundir "el callable exige atestación" con "el cliente puede
-    // producirla": al 2026-08-25 Android va 1 token válido cada 9.
+    // producirla".
+    //
+    // Medido ancho el 2026-09-04 (24 días, 6 callables, docs/security.md
+    // §4.8.3): el problema no es una tasa baja, son DOS CALLABLES EN CERO.
+    // `acceptTrainerLink` —el gate del paywall— no produjo ni una atestación
+    // válida en 10 intentos, y `requestPasswordReset` tampoco. Con enforcement
+    // encendido esos dos flujos no fallan a veces: fallan siempre.
     //
     // El inventario de qué callable exige qué —y por qué los que no, no— vive
     // en functions/src/__tests__/appcheck-enforcement.test.ts, derivado del

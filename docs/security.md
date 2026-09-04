@@ -2101,6 +2101,13 @@ Apple Guideline 5.1.1(v) exige que el borrado de cuenta funcione.
 > `mintWatchCredential` — conviene restaurar los dos juntos el día que Android
 > emita atestación válida.
 
+> **Leer §4.8.3 antes de usar los números de acá.** La medición del
+> 2026-09-04 cubre 24 días y los 6 callables con tráfico, y encuentra algo que
+> este corte —un callable, un día— no podía ver: `acceptTrainerLink` y
+> `requestPasswordReset` no producen **ninguna** atestación válida. La tabla de
+> abajo sigue siendo válida como corte histórico; la condición de salida para
+> encender el enforcement es la de §4.8.3, no la de acá.
+
 Ese cliente era un **simulador** (`hw/sim`), no un tester de TestFlight — pero el
 modo de falla no es exclusivo del simulador. Cruzando cada verificación con su
 user-agent sobre `mintWatchCredential`, que recibe tráfico real y no tiene el
@@ -2135,6 +2142,63 @@ El campo `jsonPayload.verifications.app` vale `VALID` / `INVALID` / `MISSING`, y
 distingue *"no mandó token"* de *"mandó uno que no se pudo decodificar"* — que es
 justamente la distinción entre la web y el móvil. Es la fuente de la que dependen
 el plan de restore de #704 y la condición de salida de `mintWatchCredential`.
+
+#### 4.8.3 La medición ancha (2026-09-04): dos callables en CERO
+
+La de §4.8.2 miró **un callable y un día**. Repetida sobre **24 días y los 6
+callables** que reciben tráfico —159 verificaciones, filtro
+`jsonPayload.verifications:*`— aparece algo que ese corte no podía ver.
+
+| callable | `VALID` | `INVALID` | `MISSING` | tasa entre los que mandan token |
+|---|---|---|---|---|
+| `mintWatchCredential` | 49 | 44 | 5 | 49/93 — **53%** |
+| **`acceptTrainerLink`** | **0** | **10** | 17 | **0/10** |
+| **`requestPasswordReset`** | **0** | 1 | 16 | **0/1** |
+| `deleteAccount` | 1 | 3 | 8 | 1/4 |
+| `resumeTrainerLink` | 0 | 1 | 1 | 0/1 |
+| `addAlias` | — | — | 3 | — (nunca manda token, §4.10) |
+| **TOTAL** | **50** | **59** | **50** | 50/109 |
+
+**Tres cosas que corrige respecto de §4.8.2.**
+
+1. **El "1 de cada 9" era el peor corte, no la tasa.** Sobre 24 días
+   `mintWatchCredential` va 53%. El número viejo salía de cruzar por
+   user-agent contra Android en una ventana angosta; sigue siendo cierto que
+   Android es el que falla, pero la tasa global del callable no es 11%.
+
+2. **El problema no es una tasa baja: son DOS CALLABLES EN CERO.**
+   `acceptTrainerLink` no produjo **ni una** atestación válida en 10 intentos.
+   Es el gate del paywall —promueve `pending → active` detrás del límite de
+   plan (`subscriptions/accept-trainer-link.ts`)—, o sea el flujo por el que un
+   PF empieza a trabajar con un alumno. Con enforcement encendido no falla "8
+   de cada 9": **falla siempre**. Es exactamente la historia de
+   `deleteAccount` (§4.8.2) en dos flujos más, uno de ellos el que cobra.
+
+3. **El user-agent NO está en estos logs.** Las 159 entradas salen de
+   `run.googleapis.com/stderr` y **cero tienen `httpRequest`**, así que el
+   cruce por cliente de §4.8.2 no se puede reproducir con este filtro. Los
+   user-agents viven en los logs de *request* de Cloud Run, que son otro
+   `logName` y se cruzan por el campo `trace`. Hasta hacer ese cruce, **la
+   separación iOS/Android de la tabla de §4.8.2 no está re-verificada**.
+
+**Cómo repetir esta medición** (no depende del texto del mensaje, sólo de que
+el campo exista):
+
+```bash
+gcloud logging read 'jsonPayload.verifications:*' \
+  --project=treino-dev --limit=200 --freshness=30d \
+  --format='value(timestamp,resource.labels.service_name,jsonPayload.verifications.app)'
+```
+
+⚠️ Con `jsonPayload.message="Callable request verification"` —comparación
+exacta— **devuelve cero filas**: el mensaje real trae más texto. En §4.8.2 el
+filtro va con `:` (contiene), y esa diferencia de un carácter parece "no hay
+tráfico".
+
+**La condición de salida para encender el enforcement**, entonces, no es una
+tasa: es que `acceptTrainerLink` y `requestPasswordReset` dejen de dar cero.
+Mientras eso no pase, encenderlo rompe el alta de alumnos y la recuperación de
+cuenta el mismo día, y el síntoma no se va a parecer a App Check.
 
 ---
 
