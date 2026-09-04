@@ -96,20 +96,10 @@ class _BibliotecaWebScreenState extends ConsumerState<BibliotecaWebScreen>
               AppSpacing.s20,
               0,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const TreinoSectionHeader(title: 'Biblioteca'), // i18n
-                const SizedBox(height: AppSpacing.hairline),
-                Text(
+            child: CoachHubSectionHero(
+              title: 'Biblioteca', // i18n
+              subtitle:
                   '$ejerciciosN ejercicios · $templatesN templates', // i18n
-                  style: TextStyle(
-                    fontFamily: AppFonts.barlow,
-                    fontSize: 13,
-                    color: palette.textMuted,
-                  ),
-                ),
-              ],
             ),
           ),
         ),

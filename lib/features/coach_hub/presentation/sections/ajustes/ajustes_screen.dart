@@ -52,7 +52,6 @@ class AjustesScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final palette = AppPalette.of(context);
     final selected = ref.watch(_ajustesTabProvider);
 
     return Padding(
@@ -60,11 +59,9 @@ class AjustesScreen extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const TreinoSectionHeader(title: 'CONFIGURACIÓN'), // i18n: Fase W3
-          const SizedBox(height: 4),
-          Text(
-            'Cuenta · Negocio · Preferencias', // i18n: Fase W3
-            style: TextStyle(color: palette.textMuted, fontSize: 13),
+          const CoachHubSectionHero(
+            title: 'Configuración', // i18n: Fase W3
+            subtitle: 'Cuenta · Negocio · Preferencias', // i18n: Fase W3
           ),
           const SizedBox(height: 20),
           Expanded(

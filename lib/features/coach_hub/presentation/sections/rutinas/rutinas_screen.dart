@@ -55,17 +55,11 @@ class RutinasScreen extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const TreinoSectionHeader(title: 'Rutinas'), // i18n
-          const SizedBox(height: 6),
           TreinoFadeSlideIn(
-            delay: AppMotion.stagger(1),
-            child: Text(
-              'Elegí un alumno para armarle una rutina.', // i18n
-              style: TextStyle(
-                fontFamily: AppFonts.barlow,
-                color: palette.textMuted,
-                fontSize: 14,
-              ),
+            delay: AppMotion.stagger(0),
+            child: const CoachHubSectionHero(
+              title: 'Rutinas', // i18n
+              subtitle: 'Elegí un alumno para armarle una rutina.', // i18n
             ),
           ),
           const SizedBox(height: 20),

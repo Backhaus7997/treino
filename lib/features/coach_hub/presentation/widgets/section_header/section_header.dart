@@ -3,6 +3,7 @@ import 'package:flutter/widget_previews.dart';
 
 import '../../../../../app/theme/tokens/components/treino_focus_tokens.dart';
 import '../../../../../app/theme/tokens/components/treino_section_header_tokens.dart';
+import '../../../../../app/theme/app_palette.dart';
 import '../../../../../app/theme/tokens/primitives.dart';
 import '../preview_wrapper.dart';
 import '../treino_interactive_state.dart';
@@ -18,6 +19,17 @@ Widget sectionHeaderActionPreview() => TreinoSectionHeader(
       count: 24,
       action: TreinoSectionHeaderAction(label: 'Ver todos', onTap: () {}),
     );
+
+/// Escala visual del [TreinoSectionHeader].
+///
+/// - [label] — 12 px, count apagado. Es la cabecera de una sub-sección
+///   dentro de una pantalla ("Pendientes", "Próximas sesiones"). Es el
+///   default histórico y el que usa la app mobile: NO cambiar su render.
+/// - [hero] — 28 px con el count resaltado en [AppPalette.accent]. Es el
+///   título de la pantalla, con el mismo peso visual que el saludo de la
+///   welcome card del dashboard ("BUENAS, MATEO"). Lo usa
+///   `CoachHubSectionHero`, no se instancia suelto.
+enum TreinoSectionHeaderVariant { label, hero }
 
 /// Datos de la acción opcional del [TreinoSectionHeader].
 @immutable
@@ -59,6 +71,11 @@ class TreinoSectionHeaderAction {
 ///   ),
 /// )
 /// ```
+/// Tamaño del título en [TreinoSectionHeaderVariant.hero] — el mismo 28 px
+/// del saludo de la welcome card (`dashboard_hero.dart`), para que las dos
+/// piezas lean como una sola familia.
+const double _heroFontSize = 28.0;
+
 class TreinoSectionHeader extends StatelessWidget {
   const TreinoSectionHeader({
     super.key,
@@ -66,6 +83,7 @@ class TreinoSectionHeader extends StatelessWidget {
     this.count,
     this.action,
     this.disabled = false,
+    this.variant = TreinoSectionHeaderVariant.label,
   });
 
   /// Título de la sección. Se transforma a UPPERCASE automáticamente.
@@ -80,10 +98,22 @@ class TreinoSectionHeader extends StatelessWidget {
   /// `true` = sin interactividad, colores apagados.
   final bool disabled;
 
+  /// Escala visual — ver [TreinoSectionHeaderVariant].
+  final TreinoSectionHeaderVariant variant;
+
   @override
   Widget build(BuildContext context) {
     final tokens = TreinoSectionHeaderTokens.of(context);
     final titleColor = disabled ? tokens.disabledColor : tokens.titleColor;
+    final isHero = variant == TreinoSectionHeaderVariant.hero;
+    final fontSize =
+        isHero ? _heroFontSize : TreinoSectionHeaderTokens.fontSize;
+    // En hero el count es el dato que se resalta, igual que el nombre en el
+    // saludo de la welcome card. En label queda apagado (comportamiento
+    // histórico, lo asume la app mobile).
+    final countColor = isHero && !disabled
+        ? AppPalette.of(context).accent
+        : tokens.disabledColor;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -94,20 +124,21 @@ class TreinoSectionHeader extends StatelessWidget {
           style: TextStyle(
             fontFamily: TreinoSectionHeaderTokens.fontFamily,
             fontWeight: TreinoSectionHeaderTokens.fontWeight,
-            fontSize: TreinoSectionHeaderTokens.fontSize,
+            fontSize: fontSize,
             color: titleColor,
-            letterSpacing: 0.5,
+            letterSpacing: isHero ? 1.2 : 0.5,
           ),
         ),
         if (count != null) ...[
-          const SizedBox(width: AppSpacing.hairline),
+          const SizedBox(width: AppSpacing.s8),
           Text(
             '$count',
             style: TextStyle(
-              fontFamily: AppFonts.barlow,
-              fontWeight: FontWeight.w600,
-              fontSize: TreinoSectionHeaderTokens.fontSize,
-              color: tokens.disabledColor,
+              fontFamily: isHero ? AppFonts.barlowCondensed : AppFonts.barlow,
+              fontWeight: isHero ? AppFonts.w700 : FontWeight.w600,
+              fontSize: fontSize,
+              letterSpacing: isHero ? 1.2 : null,
+              color: countColor,
             ),
           ),
         ],
