@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/utils/deep_link_destination.dart';
 import '../core/widgets/treino_bottom_bar.dart';
 import '../features/coach_hub/presentation/sections/facturacion_planes/pricing_screen.dart';
 import '../features/auth/application/auth_providers.dart';
@@ -210,6 +211,36 @@ String? authRedirect(
   return null;
 }
 
+/// A dónde manda `/abrir/profe` en mobile, según el destino fino que trae el
+/// mail — pura y testeable, igual que [authRedirect].
+///
+/// `to=agenda` mapea al mismo lugar que el default de siempre (sin `to`), y
+/// eso queda repetido a propósito: hace explícito que son el MISMO destino
+/// por dos caminos, no una coincidencia que se rompe si alguno cambia solo.
+///
+/// `to=solicitudes` cae en `/coach` a secas: las solicitudes pendientes viven
+/// en un bottom sheet que abre la campanita del header (#393), no en una
+/// pantalla con ruta propia. No hay más lejos a dónde apuntar en mobile hoy.
+///
+/// DEUDA CONOCIDA, encontrada en revisión adversarial: `authRedirect` (el
+/// gate de auth de mobile) NO chequea `profile.role` antes de dejar pasar a
+/// `/coach/athlete/:id` — a diferencia de `coachHubRedirect`, que manda a
+/// cualquier no-trainer a `/not-allowed` ANTES de aplicar el destino fino.
+/// Un link de `discomfort-reported` (el único de los 5 mails con
+/// `to=alumno`) reenviado a, o abierto por, una cuenta que no es ese
+/// trainer llega igual a esa pantalla. El impacto real es acotado —las
+/// reglas de Firestore degradan cada sección con permission-denied, y el
+/// perfil público ya es legible por cualquier autenticado— pero es una
+/// asimetría real entre los dos routers que valdría la pena cerrar con un
+/// gate de rol en `authRedirect`, no en este switch puntual.
+String mobileTrainerEntryPath(DeepLinkDestination? dest) => switch (dest?.to) {
+      DeepLinkTo.facturacion => '/facturacion/planes',
+      DeepLinkTo.agenda => '/coach?tab=agenda',
+      DeepLinkTo.solicitudes => '/coach',
+      DeepLinkTo.alumno => '/coach/athlete/${dest!.athleteId}',
+      null => '/coach?tab=agenda',
+    };
+
 GoRouter buildRouter({
   required Listenable refreshListenable,
   required T Function<T>(ProviderListenable<T>) read,
@@ -242,7 +273,10 @@ GoRouter buildRouter({
       ),
       GoRoute(
         path: '/abrir/profe',
-        redirect: (_, __) => '/coach?tab=agenda',
+        redirect: (_, state) =>
+            mobileTrainerEntryPath(DeepLinkDestination.fromQuery(
+          state.uri.queryParameters,
+        )),
       ),
 
       // Entry routes — full screen, NO bottom bar

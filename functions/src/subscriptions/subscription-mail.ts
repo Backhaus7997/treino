@@ -113,7 +113,7 @@ import * as admin from "firebase-admin";
 
 import { enqueueMail } from "../mail/enqueue-mail";
 import { artDateKey } from "../mail/format";
-import { APP_ENTRY_TRAINER } from "../mail/templates";
+import { trainerEntry } from "../mail/templates";
 import { MailParams } from "../mail/types";
 import { effectiveWeightLimit, SubscriptionState } from "./effective-limit";
 import { MappedSubscription } from "./subscription-state";
@@ -348,7 +348,13 @@ export async function enqueueSubscriptionMail(
   plan: SubscriptionMailPlan,
   blockedCount: number,
 ): Promise<string | null> {
-  const params: MailParams = { ...plan.params, ctaUrl: APP_ENTRY_TRAINER };
+  // `to: "facturacion"`: las dos ramas de esta funcion (grace y
+  // downgraded) son sobre plata, y las dos se resuelven en la MISMA
+  // pantalla.
+  const params: MailParams = {
+    ...plan.params,
+    ctaUrl: trainerEntry({ to: "facturacion" }),
+  };
   if (plan.kind === "subscription-downgraded") {
     params.blockedCount = blockedCount;
   }
