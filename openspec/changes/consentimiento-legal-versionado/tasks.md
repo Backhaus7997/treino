@@ -142,11 +142,11 @@ Depende de: 1. Paralelizable con 2-11 (no comparte código con la rama de consen
 
 ## 13. Verificación final (no es un commit de producto — corre antes de abrir el PR)
 
-- [ ] 13.1 `flutter analyze` → 0 issues sobre todo lo tocado.
-- [ ] 13.2 `dart format` SOLO los archivos de este change — NUNCA `dart format .` (reformatea ~1195 líneas ajenas por drift del SDK, sin gate de formato en CI).
-- [ ] 13.3 Correr sólo los tests afectados por path (no `flutter test` pelado — la suite completa tarda ~40 min).
-- [ ] 13.4 `git diff --stat firestore.rules` vacío — confirma **[R9]** (evidencia, no frontera de reglas; no se toca).
-- [ ] 13.5 Pase manual en device/emulador del sheet y la fila de estado — ningún widget test cubre ancho/wrap/overflow de texto (`google_fonts` no carga en `flutter_test`).
+- [x] 13.1 `flutter analyze` → 0 issues sobre todo lo tocado.
+- [x] 13.2 `dart format` SOLO los archivos de este change — NUNCA `dart format .` (reformatea ~1195 líneas ajenas por drift del SDK, sin gate de formato en CI).
+- [x] 13.3 Correr sólo los tests afectados por path (no `flutter test` pelado — la suite completa tarda ~40 min).
+- [x] 13.4 `git diff --stat firestore.rules` vacío — confirma **[R9]** (evidencia, no frontera de reglas; no se toca).
+- [ ] 13.5 **(PENDIENTE — requiere device/emulador, no lo cubre ningún test)**  Pase manual en device/emulador del sheet y la fila de estado — ningún widget test cubre ancho/wrap/overflow de texto (`google_fonts` no carga en `flutter_test`).
 
 ---
 
