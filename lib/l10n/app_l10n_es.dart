@@ -4311,6 +4311,20 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get progressionPeriodLast1Year => '1 año';
+
+  @override
+  String get workoutRoutineFollow => 'Seguir esta plantilla';
+
+  @override
+  String get workoutRoutineFollowing => 'La estas siguiendo';
+
+  @override
+  String get workoutRoutineFollowSuccess =>
+      'Listo, ahora seguís esta plantilla.';
+
+  @override
+  String get workoutRoutineFollowError =>
+      'No pudimos marcarla. Probá de nuevo.';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -8617,4 +8631,18 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get progressionPeriodLast1Year => '1 año';
+
+  @override
+  String get workoutRoutineFollow => 'Seguir esta plantilla';
+
+  @override
+  String get workoutRoutineFollowing => 'La estas siguiendo';
+
+  @override
+  String get workoutRoutineFollowSuccess =>
+      'Listo, ahora seguís esta plantilla.';
+
+  @override
+  String get workoutRoutineFollowError =>
+      'No pudimos marcarla. Probá de nuevo.';
 }

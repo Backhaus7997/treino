@@ -7472,6 +7472,30 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'1 año'**
   String get progressionPeriodLast1Year;
+
+  /// Accion del detalle de una plantilla del catalogo que la marca como la rutina activa SIN copiarla. Es la otra mitad de 'Usar como base': copiar es 'quiero mi version', seguir es 'quiero hacer esto tal cual'.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Seguir esta plantilla'**
+  String get workoutRoutineFollow;
+
+  /// Estado del boton cuando esa plantilla YA es la rutina activa. El boton queda deshabilitado: para cambiar de rutina se elige otra, no se desactiva esta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'La estas siguiendo'**
+  String get workoutRoutineFollowing;
+
+  /// No description provided for @workoutRoutineFollowSuccess.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Listo, ahora seguís esta plantilla.'**
+  String get workoutRoutineFollowSuccess;
+
+  /// No description provided for @workoutRoutineFollowError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos marcarla. Probá de nuevo.'**
+  String get workoutRoutineFollowError;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

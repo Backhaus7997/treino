@@ -14,7 +14,8 @@
 /// PRIORIDAD (decision log 2026-06-18, workout redesign slice 1):
 ///
 /// 0. Marcador explícito `UserProfile.activeRoutineId`, resuelto contra la
-///    lista UNIFICADA: primero las asignadas por PF, después las auto-creadas.
+///    lista UNIFICADA: primero las asignadas por PF, después las auto-creadas,
+///    y por último las plantillas del catálogo que el atleta eligió seguir.
 ///    Un id obsoleto (rutina archivada o borrada) cae al resto de la cadena.
 /// 1. Plan asignado por un PF. Si hay varios gana el más nuevo — el repo ya
 ///    los ordena por `createdAt` descendente.
@@ -22,17 +23,34 @@
 /// 3. Varias auto-creadas: exige marcador explícito.
 /// 4. Null — multi-rutina sin marcador. El home cae al CTA vacío.
 ///
+/// El catálogo NO tiene tier propio a propósito: seguir una plantilla es
+/// siempre una decisión explícita del atleta, y auto-activar una del montón
+/// sería elegir por él entre siete opciones que no pidió.
+///
 /// [assignedIds] y [selfCreatedIds] llegan ordenados como los devuelve el
 /// repositorio (más nuevo primero).
+///
+/// [catalogIds] son las plantillas del sistema (`source == 'system'`) que el
+/// atleta puede estar SIGUIENDO sin haberlas copiado. Sólo participan del tier
+/// 0: una plantilla del catálogo nunca se auto-activa, hay que elegirla — por
+/// eso no entra en los tiers 1-3.
+///
+/// El llamador puede pasar `const []` cuando ya sabe que no hace falta
+/// resolverla —marcador nulo, o marcador que ya matcheó contra las otras dos
+/// listas— y ahorrarse la lectura. Eso NO cambia el resultado: en los dos
+/// casos el catálogo no se hubiera consultado igual. Es la optimización que
+/// evita una query extra por sync en el reloj y una lectura extra en la Home.
 String? resolveActiveRoutineId({
   required String? activeRoutineId,
   required List<String> assignedIds,
   required List<String> selfCreatedIds,
+  List<String> catalogIds = const [],
 }) {
-  // Tier 0 — marcador explícito, buscado en ambas listas.
+  // Tier 0 — marcador explícito, buscado en las tres listas.
   if (activeRoutineId != null && activeRoutineId.isNotEmpty) {
     if (assignedIds.contains(activeRoutineId)) return activeRoutineId;
     if (selfCreatedIds.contains(activeRoutineId)) return activeRoutineId;
+    if (catalogIds.contains(activeRoutineId)) return activeRoutineId;
     // Id obsoleto: sigue la cadena en vez de devolver null.
   }
 

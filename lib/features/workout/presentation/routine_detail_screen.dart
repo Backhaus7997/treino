@@ -13,7 +13,8 @@ import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../paywall/application/athlete_entitlement_provider.dart';
 import '../../paywall/presentation/free_plan_limit_sheet.dart';
-import '../../profile/application/user_providers.dart' show userProfileProvider;
+import '../../profile/application/user_providers.dart'
+    show userProfileProvider, userRepositoryProvider;
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../profile/domain/user_role.dart';
 import '../application/routine_providers.dart';
@@ -198,6 +199,7 @@ class _RoutineDetailScreenState extends ConsumerState<RoutineDetailScreen> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              _FollowTemplateBar(routineAsync: routineAsync),
               _UseAsBaseBar(routineAsync: routineAsync),
               _EditBar(routineAsync: routineAsync),
             ],
@@ -320,6 +322,106 @@ class _EditBar extends ConsumerWidget {
 ///
 /// The copy keeps NO link to its origin — nothing to reconcile when the
 /// trainer later edits or unpublishes the original.
+/// "Seguir esta plantilla" — marca una plantilla del CATÁLOGO como la rutina
+/// activa del atleta **sin copiarla**.
+///
+/// Es la otra mitad de "Usar como base", y la diferencia es lo que cada una
+/// significa: copiar es "quiero MI versión de esto", seguir es "quiero hacer
+/// esto tal cual". Hasta ahora sólo existía la primera, así que para entrenar
+/// un programa del catálogo había que copiarlo — con dos consecuencias que la
+/// spec del paywall (§4.1) dejó anotadas: consumía cupo de rutinas propias, y
+/// la copia heredaba los días de la plantilla, así que un tope de días la
+/// rebotaba entera.
+///
+/// Escribe el MISMO campo que "marcar como activa" de MIS RUTINAS
+/// (`users/{uid}.activeRoutineId`). Lo que hace que esto funcione es que
+/// `resolveActiveRoutineId` ahora acepta un id del catálogo en su tier 0; antes
+/// lo trataba como marcador obsoleto y lo descartaba.
+///
+/// Sólo sobre `source == system`: una plantilla publicada por un PF se puede
+/// copiar pero no seguir, porque su dueño puede despublicarla y el marcador
+/// quedaría apuntando a la nada sin que el atleta hiciera nada.
+class _FollowTemplateBar extends ConsumerWidget {
+  const _FollowTemplateBar({required this.routineAsync});
+
+  final AsyncValue<Routine?> routineAsync;
+
+  Future<void> _follow(BuildContext context, WidgetRef ref, Routine r) async {
+    final uid = ref.read(currentUidProvider) ?? '';
+    if (uid.isEmpty) return;
+    final l10n = AppL10n.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(userRepositoryProvider).update(uid, {
+        'activeRoutineId': r.id,
+      });
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.workoutRoutineFollowSuccess)),
+      );
+    } catch (_) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.workoutRoutineFollowError)),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final routine = routineAsync.valueOrNull;
+    if (routine == null) return const SizedBox.shrink();
+    if (routine.source != RoutineSource.system) return const SizedBox.shrink();
+    // Una plantilla sin días no se puede seguir: `todaysRoutineProvider`
+    // devuelve null y el atleta quedaría con un marcador que no resuelve.
+    if (routine.days.isEmpty) return const SizedBox.shrink();
+
+    // El PF no entrena en la app — misma guarda que las otras dos afordancias.
+    final role = ref.watch(
+      userProfileProvider.select((async) => async.valueOrNull?.role),
+    );
+    if (role == UserRole.trainer) return const SizedBox.shrink();
+
+    final uid = ref.watch(currentUidProvider);
+    if (uid == null || uid.isEmpty) return const SizedBox.shrink();
+
+    final activeId = ref.watch(
+      userProfileProvider.select((a) => a.valueOrNull?.activeRoutineId),
+    );
+    final yaLaSigue = activeId == routine.id;
+
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    final label =
+        yaLaSigue ? l10n.workoutRoutineFollowing : l10n.workoutRoutineFollow;
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 12, top: 8),
+      child: Material(
+        color: palette.scrimDark.withValues(alpha: 0.35),
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: Semantics(
+          button: true,
+          label: label,
+          child: IconButton(
+            key: const Key('routine_follow_template'),
+            tooltip: label,
+            icon: Icon(
+              yaLaSigue ? TreinoIcon.check : TreinoIcon.play,
+              color: yaLaSigue ? palette.accent : palette.textPrimary,
+            ),
+            // Ya seguirla no es un estado que haya que "deshacer" desde acá:
+            // para cambiar de rutina activa se elige OTRA. Un botón que la
+            // desactiva dejaría al atleta sin ninguna, que no es algo que
+            // haya pedido.
+            onPressed:
+                yaLaSigue ? null : () => _follow(context, ref, routine),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _UseAsBaseBar extends ConsumerWidget {
   const _UseAsBaseBar({required this.routineAsync});
 

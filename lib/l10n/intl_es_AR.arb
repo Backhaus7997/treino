@@ -3703,5 +3703,17 @@
   "progressionPeriodLast1Year": "1 año",
   "@progressionPeriodLast1Year": {
     "description": "Pill del selector de periodo de los graficos: los ultimos 12 meses calendario. Es el periodo mas largo que se puede ofrecer: el historial de sesiones esta acotado a 365 (kSessionHistoryFetchLimit), asi que un 'todo' seria mentira."
-  }
+  },
+  "workoutRoutineFollow": "Seguir esta plantilla",
+  "@workoutRoutineFollow": {
+    "description": "Accion del detalle de una plantilla del catalogo que la marca como la rutina activa SIN copiarla. Es la otra mitad de 'Usar como base': copiar es 'quiero mi version', seguir es 'quiero hacer esto tal cual'."
+  },
+  "workoutRoutineFollowing": "La estas siguiendo",
+  "@workoutRoutineFollowing": {
+    "description": "Estado del boton cuando esa plantilla YA es la rutina activa. El boton queda deshabilitado: para cambiar de rutina se elige otra, no se desactiva esta."
+  },
+  "workoutRoutineFollowSuccess": "Listo, ahora seguís esta plantilla.",
+  "@workoutRoutineFollowSuccess": {},
+  "workoutRoutineFollowError": "No pudimos marcarla. Probá de nuevo.",
+  "@workoutRoutineFollowError": {}
 }

@@ -4231,4 +4231,16 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get progressionPeriodLast1Year => '';
+
+  @override
+  String get workoutRoutineFollow => '';
+
+  @override
+  String get workoutRoutineFollowing => '';
+
+  @override
+  String get workoutRoutineFollowSuccess => '';
+
+  @override
+  String get workoutRoutineFollowError => '';
 }
