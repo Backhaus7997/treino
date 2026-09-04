@@ -25,6 +25,7 @@ import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
 import 'package:treino/l10n/app_l10n.dart';
+import '../../../widgets/invite_athlete_dialog.dart';
 
 // ── Alert banner (REAL — composes vencidos + solicitudes + inactivos) ────────
 
@@ -279,7 +280,10 @@ class DashboardWelcomeCard extends ConsumerWidget {
                     _PrimaryQuickAction(
                       label: l10n.dashboardQuickActionNuevoAlumno,
                       icon: TreinoIcon.plus,
-                      onTap: () => context.go('/alumnos'),
+                      // Antes iba a `/alumnos`: la lista de los que YA tenés,
+                      // que es justo donde no está el que querés sumar. El
+                      // alta arranca por el link de invitación.
+                      onTap: () => showInviteAthleteDialog(context),
                     ),
                     _QuickAction(
                       key: const Key('quick_action_crear_rutina'),

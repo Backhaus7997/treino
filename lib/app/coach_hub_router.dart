@@ -155,6 +155,11 @@ String? _coachHubPathFor(DeepLinkDestination? dest) => switch (dest?.to) {
       DeepLinkTo.agenda => '/agenda',
       DeepLinkTo.solicitudes => '/invitaciones',
       DeepLinkTo.alumno => '/alumnos/${dest!.athleteId}',
+      // Misma razón que en `mobileTrainerEntryPath`: el Coach Hub es
+      // trainer-only por construcción (`coachHubRedirect` manda a cualquier
+      // otro rol a `/not-allowed`), así que acá NUNCA hay un alumno esperando
+      // vincularse. `null` cae al dashboard, que es lo correcto.
+      DeepLinkTo.invitacion => null,
       null => null,
     };
 

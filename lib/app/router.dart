@@ -238,6 +238,12 @@ String mobileTrainerEntryPath(DeepLinkDestination? dest) => switch (dest?.to) {
       DeepLinkTo.agenda => '/coach?tab=agenda',
       DeepLinkTo.solicitudes => '/coach',
       DeepLinkTo.alumno => '/coach/athlete/${dest!.athleteId}',
+      // Una invitación es para el ALUMNO, y esta función resuelve la entrada
+      // del ENTRENADOR. Un PF que abre el link que él mismo generó —probando
+      // que anda, o porque se lo reenviaron— cae en su agenda, igual que si
+      // hubiera abierto la app sin link. Mandarlo a una pantalla de
+      // vinculación sería ofrecerle vincularse consigo mismo.
+      DeepLinkTo.invitacion => '/coach?tab=agenda',
       null => '/coach?tab=agenda',
     };
 
