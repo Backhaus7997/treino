@@ -164,6 +164,56 @@ class _ProfileEditTrainerScreenState
     });
   }
 
+  /// Confirmación previa a la primera publicación de la ubicación.
+  ///
+  /// Deliberadamente NO reusa `TrainerLocationConsentSheet`: ese sheet es el
+  /// camino de re-consentimiento para el PF que YA tiene ubicaciones
+  /// publicadas y ofrece apagar la publicación. Acá el PF está en el acto
+  /// opuesto —está por publicar por primera vez, con intención explícita—, y
+  /// ofrecerle "APAGAR LA PUBLICACIÓN" sobre algo que todavía no publicó no
+  /// tiene sentido. Son dos entradas distintas al mismo consentimiento.
+  Future<bool> _askLocationConsent() async {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: const Key('profile_edit_trainer_consent_confirm'),
+        backgroundColor: palette.bgElevated,
+        title: Text(
+          l10n.profileEditTrainerConsentConfirmTitle,
+          style: TextStyle(color: palette.textPrimary),
+        ),
+        content: Text(
+          l10n.profileEditTrainerConsentConfirmBody,
+          style: TextStyle(color: palette.textMuted, fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            key: const Key('profile_edit_trainer_consent_cancel'),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(
+              l10n.profileEditTrainerConsentConfirmCancel,
+              style: TextStyle(color: palette.textMuted),
+            ),
+          ),
+          TextButton(
+            key: const Key('profile_edit_trainer_consent_accept'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(
+              l10n.profileEditTrainerConsentConfirmAccept,
+              style: TextStyle(
+                color: palette.accent,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    return accepted ?? false;
+  }
+
   Future<void> _save(String uid) async {
     if (_saving) return;
     if (!_formKey.currentState!.validate()) return;
@@ -176,6 +226,28 @@ class _ProfileEditTrainerScreenState
       setState(() =>
           _error = AppL10n.of(context).profileEditTrainerValidationLocation);
       return;
+    }
+
+    // consentimiento-legal-versionado (T2): pedir el consentimiento ANTES
+    // del primer publish.
+    //
+    // Sin esto, el PF recién promovido cae en el peor de los mundos: el sheet
+    // de re-consentimiento no le aplica (no tenía ubicaciones, así que
+    // `shouldAskTrainerLocationConsentProvider` da false), y al guardar la
+    // primera `_resolveEffectiveLocationConsent` descarta la ubicación del
+    // espejo público **en silencio**. Guardaría feliz, y no aparecería en
+    // discovery, sin un solo error que se lo explique.
+    if (_locations.isNotEmpty &&
+        ref.read(userProfileProvider).valueOrNull?.trainerLocationConsentAt ==
+            null) {
+      final consented = await _askLocationConsent();
+      if (!mounted) return;
+      // Cancelar aborta el guardado y deja el form intacto: lo que cargó sigue
+      // en pantalla. Un "cancelar" que además le vacía la lista sería otra
+      // falla silenciosa, en la dirección opuesta.
+      if (!consented) return;
+      await ref.read(userRepositoryProvider).grantTrainerLocationConsent(uid);
+      if (!mounted) return;
     }
 
     setState(() {
@@ -354,6 +426,28 @@ class _ProfileEditTrainerScreenState
               onAdd: _addCustom,
               onRemove: _removeLocation,
             ),
+            // consentimiento-legal-versionado (T2): el estado real de
+            // publicación, no el de la lista. `revokeTrainerLocationConsent`
+            // NO toca `trainerLocations` en `users/{uid}` — sólo vacía el
+            // espejo público —, así que después de revocar la lista sigue
+            // llena. Leer la lista para pintar este estado le mentiría al PF
+            // exactamente igual que le mentía el texto legal viejo.
+            if (_locations.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              Text(
+                key: const Key('profile_edit_trainer_publication_status'),
+                profile.trainerLocationConsentAt != null
+                    ? l10n.profileEditTrainerPublished
+                    : l10n.profileEditTrainerNotPublished,
+                style: TextStyle(
+                  color: profile.trainerLocationConsentAt != null
+                      ? palette.accent
+                      : palette.textMuted,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
             const SizedBox(height: 18),
             _OnlineToggle(
               palette: palette,

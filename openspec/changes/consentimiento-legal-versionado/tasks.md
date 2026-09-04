@@ -127,9 +127,9 @@ Depende de: 5, 9.
 
 Depende de: 3, 5 (NO de 10 — confirmación propia más liviana que el sheet completo, no el sheet reusado).
 
-- [ ] 11.1 RED — nuevo `test/features/profile/presentation/profile_edit_trainer_screen_test.dart`: (a) `_locations` vacío→no-vacío + `consentAt==null` al guardar ⇒ pide consentimiento antes de persistir; si cancela, no se pierde en silencio; (b) tras revocar (`users` con locations, `trainerPublicProfiles` sin ellas) la fila de estado muestra "no publicado". Estado/semántica, no texto exacto. **[T2]**
-- [ ] 11.2 GREEN — `lib/features/profile/presentation/profile_edit_trainer_screen.dart`: en `_save()` (~186-207), si `_locations` pasa de vacío a no-vacío y `trainerLocationConsentAt==null` ⇒ confirmación inline que llama `grantTrainerLocationConsent(uid)` antes de `repo.update`; en `build()` (~232+), fila de estado leyendo `profile.trainerLocationConsentAt` vs `profile.trainerLocations`. **[T2]**
-- [ ] 11.3 Copy — claves nuevas en los 3 `.arb` para la confirmación/fila. **[T2]**
+- [x] 11.1 RED — nuevo `test/features/profile/presentation/profile_edit_trainer_screen_test.dart`: (a) `_locations` vacío→no-vacío + `consentAt==null` al guardar ⇒ pide consentimiento antes de persistir; si cancela, no se pierde en silencio; (b) tras revocar (`users` con locations, `trainerPublicProfiles` sin ellas) la fila de estado muestra "no publicado". Estado/semántica, no texto exacto. **[T2]**
+- [x] 11.2 GREEN — `lib/features/profile/presentation/profile_edit_trainer_screen.dart`: en `_save()` (~186-207), si `_locations` pasa de vacío a no-vacío y `trainerLocationConsentAt==null` ⇒ confirmación inline que llama `grantTrainerLocationConsent(uid)` antes de `repo.update`; en `build()` (~232+), fila de estado leyendo `profile.trainerLocationConsentAt` vs `profile.trainerLocations`. **[T2]**
+- [x] 11.3 Copy — claves nuevas en los 3 `.arb` para la confirmación/fila. **[T2]**
 
 ## 12. `feat(profile): aviso no bloqueante de política actualizada para atletas legacy`
 

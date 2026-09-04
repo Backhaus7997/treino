@@ -1461,6 +1461,25 @@ class AppL10nEn extends AppL10n {
   String get trainerLocationConsentSheetRevoke => 'TURN OFF PUBLISHING';
 
   @override
+  String get profileEditTrainerConsentConfirmTitle => 'Publish this location?';
+
+  @override
+  String get profileEditTrainerConsentConfirmBody =>
+      'Saving will make this location visible to athletes, with its pin on the map and the distance to them. You can turn it off anytime.';
+
+  @override
+  String get profileEditTrainerConsentConfirmAccept => 'PUBLISH';
+
+  @override
+  String get profileEditTrainerConsentConfirmCancel => 'CANCEL';
+
+  @override
+  String get profileEditTrainerPublished => 'Visible to athletes';
+
+  @override
+  String get profileEditTrainerNotPublished => 'Not published';
+
+  @override
   String get athleteDetailPlansSection => 'PLANES ASIGNADOS';
 
   @override

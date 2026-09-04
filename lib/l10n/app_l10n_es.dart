@@ -1495,6 +1495,26 @@ class AppL10nEs extends AppL10n {
   String get trainerLocationConsentSheetRevoke => 'APAGAR LA PUBLICACIÓN';
 
   @override
+  String get profileEditTrainerConsentConfirmTitle =>
+      '¿Publicar esta ubicación?';
+
+  @override
+  String get profileEditTrainerConsentConfirmBody =>
+      'Al guardar, esta ubicación va a ser visible para los atletas, con su punto en el mapa y la distancia hasta ellos. Puedes apagarla cuando quieras.';
+
+  @override
+  String get profileEditTrainerConsentConfirmAccept => 'PUBLICAR';
+
+  @override
+  String get profileEditTrainerConsentConfirmCancel => 'CANCELAR';
+
+  @override
+  String get profileEditTrainerPublished => 'Visible para los atletas';
+
+  @override
+  String get profileEditTrainerNotPublished => 'No publicada';
+
+  @override
   String get athleteDetailPlansSection => 'PLANES ASIGNADOS';
 
   @override
@@ -5785,6 +5805,26 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get trainerLocationConsentSheetRevoke => 'APAGAR LA PUBLICACIÓN';
+
+  @override
+  String get profileEditTrainerConsentConfirmTitle =>
+      '¿Publicar esta ubicación?';
+
+  @override
+  String get profileEditTrainerConsentConfirmBody =>
+      'Al guardar, esta ubicación va a ser visible para los atletas, con su punto en el mapa y la distancia hasta ellos. Podés apagarla cuando quieras.';
+
+  @override
+  String get profileEditTrainerConsentConfirmAccept => 'PUBLICAR';
+
+  @override
+  String get profileEditTrainerConsentConfirmCancel => 'CANCELAR';
+
+  @override
+  String get profileEditTrainerPublished => 'Visible para los atletas';
+
+  @override
+  String get profileEditTrainerNotPublished => 'No publicada';
 
   @override
   String get athleteDetailPlansSection => 'PLANES ASIGNADOS';

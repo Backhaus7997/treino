@@ -1021,5 +1021,11 @@
   "trainerLocationConsentSheetTitle": "PUBLICAR TU UBICACIÓN",
   "trainerLocationConsentSheetBody": "Los atletas van a poder ver dónde entrenas y a qué distancia les queda. Puedes apagar esto cuando quieras desde tu perfil profesional.",
   "trainerLocationConsentSheetAccept": "ACEPTAR",
-  "trainerLocationConsentSheetRevoke": "APAGAR LA PUBLICACIÓN"
+  "trainerLocationConsentSheetRevoke": "APAGAR LA PUBLICACIÓN",
+  "profileEditTrainerConsentConfirmTitle": "¿Publicar esta ubicación?",
+  "profileEditTrainerConsentConfirmBody": "Al guardar, esta ubicación va a ser visible para los atletas, con su punto en el mapa y la distancia hasta ellos. Puedes apagarla cuando quieras.",
+  "profileEditTrainerConsentConfirmAccept": "PUBLICAR",
+  "profileEditTrainerConsentConfirmCancel": "CANCELAR",
+  "profileEditTrainerPublished": "Visible para los atletas",
+  "profileEditTrainerNotPublished": "No publicada"
 }

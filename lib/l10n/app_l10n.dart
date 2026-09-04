@@ -2792,6 +2792,42 @@ abstract class AppL10n {
   /// **'APAGAR LA PUBLICACIÓN'**
   String get trainerLocationConsentSheetRevoke;
 
+  /// No description provided for @profileEditTrainerConsentConfirmTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Publicar esta ubicación?'**
+  String get profileEditTrainerConsentConfirmTitle;
+
+  /// No description provided for @profileEditTrainerConsentConfirmBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Al guardar, esta ubicación va a ser visible para los atletas, con su punto en el mapa y la distancia hasta ellos. Podés apagarla cuando quieras.'**
+  String get profileEditTrainerConsentConfirmBody;
+
+  /// No description provided for @profileEditTrainerConsentConfirmAccept.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PUBLICAR'**
+  String get profileEditTrainerConsentConfirmAccept;
+
+  /// No description provided for @profileEditTrainerConsentConfirmCancel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CANCELAR'**
+  String get profileEditTrainerConsentConfirmCancel;
+
+  /// No description provided for @profileEditTrainerPublished.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Visible para los atletas'**
+  String get profileEditTrainerPublished;
+
+  /// No description provided for @profileEditTrainerNotPublished.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No publicada'**
+  String get profileEditTrainerNotPublished;
+
   /// No description provided for @athleteDetailPlansSection.
   ///
   /// In es_AR, this message translates to:

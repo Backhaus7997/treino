@@ -1778,5 +1778,17 @@
   "trainerLocationConsentSheetAccept": "ACCEPT",
   "@trainerLocationConsentSheetAccept": {},
   "trainerLocationConsentSheetRevoke": "TURN OFF PUBLISHING",
-  "@trainerLocationConsentSheetRevoke": {}
+  "@trainerLocationConsentSheetRevoke": {},
+  "profileEditTrainerConsentConfirmTitle": "Publish this location?",
+  "@profileEditTrainerConsentConfirmTitle": {},
+  "profileEditTrainerConsentConfirmBody": "Saving will make this location visible to athletes, with its pin on the map and the distance to them. You can turn it off anytime.",
+  "@profileEditTrainerConsentConfirmBody": {},
+  "profileEditTrainerConsentConfirmAccept": "PUBLISH",
+  "@profileEditTrainerConsentConfirmAccept": {},
+  "profileEditTrainerConsentConfirmCancel": "CANCEL",
+  "@profileEditTrainerConsentConfirmCancel": {},
+  "profileEditTrainerPublished": "Visible to athletes",
+  "@profileEditTrainerPublished": {},
+  "profileEditTrainerNotPublished": "Not published",
+  "@profileEditTrainerNotPublished": {}
 }
