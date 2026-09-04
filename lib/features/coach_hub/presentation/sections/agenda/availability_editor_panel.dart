@@ -13,6 +13,7 @@ import '../../../../coach/domain/availability_rule.dart';
 import '../../../../coach/presentation/agenda_formatters.dart';
 import 'override_form_dialog.dart';
 import 'rule_form_dialog.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
 
 // ─── AvailabilityEditorPanel ──────────────────────────────────────────────────
 
@@ -89,11 +90,10 @@ class AvailabilityEditorPanel extends ConsumerWidget {
                   children: [
                     // ── Reglas ─────────────────────────────────────────────────
                     rulesAsync.when(
-                      loading: () => Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(32),
-                          child:
-                              CircularProgressIndicator(color: palette.accent),
+                      loading: () => const Center(
+                        child: CoachHubSkeleton(
+                          filas: 3,
+                          padding: EdgeInsets.all(20),
                         ),
                       ),
                       error: (e, _) => _ErrorState(

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -75,6 +77,8 @@ import '../features/profile_setup/presentation/profile_setup_flow.dart';
 import '../features/workout/workout_screen.dart';
 import 'theme/app_background.dart';
 import 'theme/app_motion.dart';
+import '../features/coach/application/pending_invite_providers.dart';
+import '../features/coach/domain/invite_capture.dart';
 
 const _kTabs = ['/workout', '/feed', '/home', '/coach', '/profile'];
 
@@ -238,6 +242,12 @@ String mobileTrainerEntryPath(DeepLinkDestination? dest) => switch (dest?.to) {
       DeepLinkTo.agenda => '/coach?tab=agenda',
       DeepLinkTo.solicitudes => '/coach',
       DeepLinkTo.alumno => '/coach/athlete/${dest!.athleteId}',
+      // Una invitación es para el ALUMNO, y esta función resuelve la entrada
+      // del ENTRENADOR. Un PF que abre el link que él mismo generó —probando
+      // que anda, o porque se lo reenviaron— cae en su agenda, igual que si
+      // hubiera abierto la app sin link. Mandarlo a una pantalla de
+      // vinculación sería ofrecerle vincularse consigo mismo.
+      DeepLinkTo.invitacion => '/coach?tab=agenda',
       null => '/coach?tab=agenda',
     };
 
@@ -248,7 +258,34 @@ GoRouter buildRouter({
   return GoRouter(
     initialLocation: '/splash',
     refreshListenable: refreshListenable,
-    redirect: (ctx, state) => authRedirect(read, state.matchedLocation),
+    redirect: (ctx, state) {
+      // La captura va ANTES del gate de auth y no adentro de la ruta
+      // `/abrir/alumno`: con la sesión cerrada, `authRedirect` gana y manda a
+      // `/welcome`, así que el redirect de esa ruta nunca llega a correr y la
+      // invitación se perdía justo en el caso que más la necesita —el alumno
+      // que todavía no tiene cuenta—.
+      //
+      // `authRedirect` queda intacta: sigue siendo la función pura y testeada
+      // que era. Esto es un efecto de al lado, no una condición suya.
+      final invitacion = trainerIdDeInvitacion(state.uri);
+      if (invitacion != null) {
+        // Sin await porque un redirect es síncrono. Que la escritura a disco
+        // no haya terminado NO importa: `guardar` deja la invitación en
+        // memoria antes de tocar el disco, y de ahí la lee el gate.
+        //
+        // El comentario anterior decía «la escritura termina mucho antes de
+        // que haya sesión para consumirla — hay un login de por medio». Eso
+        // vale sólo si NO hay sesión. Con el alumno ya logueado —el caso más
+        // común— no hay login de por medio: hay milisegundos, y el gate leía
+        // el disco antes de que la escritura terminara. El vínculo no se creaba
+        // y no había error en ninguna parte.
+        // El store puede no existir todavía (prefs sin resolver). Perder la
+        // captura es mejor que tumbar la navegación por una invitación.
+        final store = read(pendingInviteStoreProvider);
+        if (store != null) unawaited(store.guardar(invitacion));
+      }
+      return authRedirect(read, state.matchedLocation);
+    },
     // QA-NAV-002: una ruta desconocida o un deep-link malformado cae acá en vez
     // de en la pantalla de error roja default de go_router.
     errorBuilder: (context, state) => const NotFoundScreen(),

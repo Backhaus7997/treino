@@ -30,6 +30,8 @@ import 'package:treino/features/payments/domain/payment.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
+import 'package:treino/core/utils/deep_link_destination.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/invite_athlete_dialog.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
 import 'package:treino/l10n/app_l10n.dart';
@@ -210,9 +212,8 @@ void main() {
       expect(find.textContaining('BUENAS, JOACO'), findsOneWidget);
     });
 
-    testWidgets(
-        'the 3 primary quick actions navigate to /alumnos, /template-editor, '
-        '/chat', (tester) async {
+    testWidgets('"+ Nuevo alumno" abre la invitación, no la lista',
+        (tester) async {
       await _pumpWithRouter(
         tester,
         const DashboardWelcomeCard(),
@@ -221,7 +222,24 @@ void main() {
 
       await tester.tap(find.byKey(const Key('quick_action_nuevo_alumno')));
       await tester.pumpAndSettle();
-      expect(find.text('page:/alumnos'), findsOneWidget);
+
+      // Antes navegaba a `/alumnos`: la lista de los que YA tenés, que es
+      // justo donde no está el que querés sumar. Ahora abre el link de
+      // invitación, y el link lleva a ESTE PF.
+      expect(find.byType(InviteAthleteDialog), findsOneWidget);
+      final link = tester
+          .widget<SelectableText>(
+            find.descendant(
+              of: find.byKey(const Key('invite_dialog_link')),
+              matching: find.byType(SelectableText),
+            ),
+          )
+          .data!;
+      expect(
+        DeepLinkDestination.fromQuery(Uri.parse(link).queryParameters)!
+            .trainerId,
+        'trainer-1',
+      );
     });
 
     // #569: antes iba a /biblioteca (el listado) en vez del editor.
@@ -338,7 +356,7 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.enter);
       await tester.pumpAndSettle();
 
-      expect(find.text('page:/alumnos'), findsOneWidget,
+      expect(find.byType(InviteAthleteDialog), findsOneWidget,
           reason: 'Enter (teclado) debe activar el CTA igual que el tap');
 
       handle.dispose();

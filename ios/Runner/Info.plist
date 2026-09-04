@@ -29,6 +29,21 @@
 		ios/Runner/GoogleService-Info.plist. If you re-download that plist,
 		copy the new REVERSED_CLIENT_ID value here.
 	-->
+	<!--
+		Universal links: sin esto, iOS abre la app cuando alguien toca un
+		`app.gettreino.com/abrir/...` pero NO le entrega la URL a Flutter, así
+		que el link se pierde y el alumno aterriza en la home sin invitación.
+		Android ya lo hacía por su `intent-filter` con `autoVerify`; esta era la
+		mitad que faltaba.
+
+		Con el flag, el motor le pasa el path a go_router. Las dos rutas que lo
+		reciben —`/abrir/alumno` y `/abrir/profe`— ya existen y redirigen, y
+		cualquier otra cae en `NotFoundScreen` por el `errorBuilder`, no en la
+		pantalla roja de go_router. Habilitarlo SIN esas rutas hubiera sido peor
+		que dejarlo apagado.
+	-->
+	<key>FlutterDeepLinkingEnabled</key>
+	<true/>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

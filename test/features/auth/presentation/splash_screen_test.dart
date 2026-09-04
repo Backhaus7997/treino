@@ -9,7 +9,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:treino/features/auth/application/auth_notifier.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/auth/presentation/splash_screen.dart';
-import 'package:treino/features/auth/presentation/widgets/treino_logo.dart';
+import 'package:treino/core/widgets/treino_logo.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';

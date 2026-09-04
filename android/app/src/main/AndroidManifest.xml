@@ -42,6 +42,22 @@
               `scripts/test/deep_links.test.js` cubre lo que se puede cubrir
               desde el repo.
             -->
+            <!--
+                Sin esto, Android abre la app por el `intent-filter` de abajo
+                pero el motor DESCARTA la URL: go_router nunca ve el
+                `?to=invitacion&pf=...` y el alumno aterriza en la home sin
+                invitación. El filtro por sí solo consigue que la app se abra,
+                no que se entere de POR QUÉ se abrió.
+
+                Es la simétrica de `FlutterDeepLinkingEnabled` en el
+                `Info.plist` de iOS. Las dos rutas que reciben —`/abrir/alumno`
+                y `/abrir/profe`— ya existen, y cualquier otra cae en
+                `NotFoundScreen` por el `errorBuilder` del router.
+            -->
+            <meta-data
+                android:name="flutter_deeplinking_enabled"
+                android:value="true" />
+
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>

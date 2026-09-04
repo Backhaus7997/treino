@@ -16,6 +16,7 @@ import '../../../../profile/application/user_providers.dart';
 import '../../../../profile/application/user_public_profile_providers.dart';
 import 'plan_copy.dart';
 import 'plan_limit_paywall.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
 
 /// La ruta de esta pantalla, en UN solo lugar.
 ///
@@ -93,9 +94,9 @@ class BlockedStudentsScreen extends ConsumerWidget {
                 profileLoaded: profileAsync.valueOrNull != null,
                 palette: palette,
               ),
-            _ => const Padding(
-                padding: EdgeInsets.only(top: 48),
-                child: Center(child: CircularProgressIndicator()),
+            _ => const CoachHubSkeleton(
+                filas: 3,
+                padding: EdgeInsets.only(top: 32, left: 12, right: 12),
               ),
           },
         ),

@@ -3,6 +3,7 @@ import 'package:flutter/widget_previews.dart';
 
 import '../../../../../app/theme/app_motion.dart';
 import '../../../../../app/theme/app_palette.dart';
+import '../../../../../app/theme/tokens/components/treino_card_tokens.dart';
 import '../../../../../app/theme/tokens/components/treino_kpi_card_tokens.dart';
 import '../../../../../app/theme/tokens/primitives.dart';
 import '../../../../../core/widgets/motion/treino_shimmer.dart';
@@ -138,9 +139,14 @@ class KpiCard extends StatelessWidget {
           duration: AppMotion.resolve(ctx, AppMotion.fast),
           curve: AppMotion.standard,
           decoration: BoxDecoration(
-            color: highlighted
-                ? tokens.border.withValues(alpha: 0.08)
-                : tokens.background,
+            // El glow de la welcome card, al 6% en vez del 12%: son cuatro
+            // en fila y a intensidad plena la tira compite con el hero en vez
+            // de acompañarlo. El hover lo sube — es el mismo gesto de siempre
+            // (la card se aclara), contado en el idioma de la pantalla.
+            gradient: TreinoCardTokens.glow(
+              ctx,
+              alpha: highlighted ? 0.14 : 0.06,
+            ),
             border: Border.all(
               color: highlighted ? p.borderHover : tokens.border,
             ),

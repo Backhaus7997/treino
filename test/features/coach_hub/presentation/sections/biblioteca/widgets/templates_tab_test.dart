@@ -26,6 +26,7 @@ import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_day.dart';
 import 'package:treino/features/workout/domain/routine_source.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -276,7 +277,7 @@ void main() {
         );
         await tester.pump(); // single frame — stream still pending
 
-        expect(find.byType(CircularProgressIndicator), findsOneWidget);
+        expect(find.byType(CoachHubSkeleton), findsOneWidget);
       },
     );
 
