@@ -3669,5 +3669,23 @@
   "routineEditorSlotMenuMergeDown": "Unir con el de abajo",
   "@routineEditorSlotMenuMergeDown": {
     "description": "Agrupa este ejercicio con el siguiente. Sirve sobre todo para sumarse a una superserie que ya existe más abajo."
-  }
+  },
+  "paywallFreePlanLimitTitle": "Esto es parte del plan pago",
+  "@paywallFreePlanLimitTitle": {
+    "description": "Titulo de la hoja que se abre cuando un alumno en plan free toca el + que cruzaria el tope de dias o semanas de su propia rutina."
+  },
+  "paywallFreePlanLimitDaysBody": "Con el plan gratis armas rutinas de hasta 2 dias. Las plantillas de principiante del catalogo las seguis completas, sin tope.",
+  "@paywallFreePlanLimitDaysBody": {
+    "description": "Cuerpo para el tope de DIAS. Aclara que el catalogo de principiante sigue libre, para que el limite no se lea como que no puede entrenar."
+  },
+  "paywallFreePlanLimitWeeksBody": "Periodizar en varias semanas es parte del plan pago. Con el gratis tu rutina propia va de a una semana.",
+  "@paywallFreePlanLimitWeeksBody": {
+    "description": "Cuerpo para el tope de SEMANAS."
+  },
+  "paywallFreePlanLimitUpgrade": "Ver el plan pago",
+  "@paywallFreePlanLimitUpgrade": {
+    "description": "CTA de la hoja de limite. Solo se dibuja cuando existe checkout: hoy la hoja se muestra sin este boton."
+  },
+  "paywallFreePlanLimitDismiss": "Entendido",
+  "@paywallFreePlanLimitDismiss": {}
 }

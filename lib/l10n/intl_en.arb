@@ -1770,5 +1770,15 @@
   "routineEditorSlotMenuUngroup": "Remove from superset",
   "@routineEditorSlotMenuUngroup": {},
   "routineEditorSlotMenuMergeDown": "Merge with the one below",
-  "@routineEditorSlotMenuMergeDown": {}
+  "@routineEditorSlotMenuMergeDown": {},
+  "paywallFreePlanLimitTitle": "",
+  "@paywallFreePlanLimitTitle": {},
+  "paywallFreePlanLimitDaysBody": "",
+  "@paywallFreePlanLimitDaysBody": {},
+  "paywallFreePlanLimitWeeksBody": "",
+  "@paywallFreePlanLimitWeeksBody": {},
+  "paywallFreePlanLimitUpgrade": "",
+  "@paywallFreePlanLimitUpgrade": {},
+  "paywallFreePlanLimitDismiss": "",
+  "@paywallFreePlanLimitDismiss": {}
 }
