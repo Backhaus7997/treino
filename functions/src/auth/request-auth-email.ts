@@ -258,6 +258,11 @@ export async function runRequestPasswordReset(
       kind,
       scope,
       params: { actionLink: rewriteActionHost(link) },
+      // Generar el link de arriba INVALIDA el anterior del mismo usuario. Si
+      // el throttle descarta este mail, el que ya está encolado queda con un
+      // código muerto y el usuario ve "expired or already used" sobre un mail
+      // recién llegado. Con esto, el pedido nuevo le pisa el link al viejo.
+      refreshPendingParams: true,
     });
   } catch (error: unknown) {
     // Se traga TODO a proposito — incluido user-not-found. Se logea para
@@ -309,6 +314,9 @@ export async function runRequestEmailVerification(
       kind: "email-verification",
       scope: `${uid}_${throttleWindow(nowMs)}`,
       params: { actionLink: rewriteActionHost(link) },
+      // Mismo motivo que en el reseteo: `generateEmailVerificationLink`
+      // invalida el código anterior.
+      refreshPendingParams: true,
     });
   } catch (error: unknown) {
     logger.warn("requestEmailVerification: no se encolo", { uid, error });
