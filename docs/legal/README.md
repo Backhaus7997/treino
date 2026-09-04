@@ -10,6 +10,7 @@ su reemplazo, y hay que portarlos ahí y publicarlos en `gettreino.com/legal/*`.
 |---|---|---|
 | [AUDITORIA-legal-vigente.md](./AUDITORIA-legal-vigente.md) | Contraste del texto vigente contra el código. 18 hallazgos | Leer primero |
 | [terminos-y-condiciones.md](./terminos-y-condiciones.md) | Reemplazo de `kTermsSections` | Borrador — 3 cláusulas esperan D2, D3, D4/D6 |
+| [terminos-suscripcion.md](./terminos-suscripcion.md) | Planes, cobro, arrepentimiento de 14 días y baja | Borrador |
 | [politica-de-privacidad.md](./politica-de-privacidad.md) | Reemplazo de `kPrivacySections`, contra el mapa de datos real | Borrador |
 | [descargo-medico.md](./descargo-medico.md) | Asunción de riesgo + dónde mostrarlo | Borrador — **revisión legal obligatoria** |
 | [contrato-entrenador.md](./contrato-entrenador.md) | Términos para PFs: independencia, datos de alumnos, planes | Borrador — **revisión legal obligatoria** |
@@ -24,8 +25,7 @@ su reemplazo, y hay que portarlos ahí y publicarlos en `gettreino.com/legal/*`.
 
 | Documento | Bloqueado por |
 |---|---|
-| Términos de suscripción | **D4** (medio de cobro) y **D6** (reembolsos) |
-| Botón de arrepentimiento y baja online | **D4** y **D6**. Res. 424/2020 |
+| Botón de arrepentimiento — implementación | No es documento: está especificado en [`spec-web-legal.md`](./spec-web-legal.md) |
 | Política de cookies | **D3** (países) y relevar qué carga la landing, que vive en otro proyecto de Vercel |
 | Licencias de software libre | No es un documento: es cablear `showLicensePage` de Flutter, que hoy no está en el código |
 

@@ -417,6 +417,7 @@ def emit_html(docs: list[dict]) -> dict[str, str]:
 # --------------------------------------------------------------------- main
 ORDER = [
     "terminos-y-condiciones.md",
+    "terminos-suscripcion.md",
     "politica-de-privacidad.md",
     "descargo-medico.md",
     "consentimiento-datos-salud.md",

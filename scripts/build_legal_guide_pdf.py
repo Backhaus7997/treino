@@ -279,11 +279,11 @@ def build_story():
     A(PageBreak())
 
     # ---- 3 decisiones
-    A(P("3. Las seis decisiones", "h1"))
+    A(P("3. Las seis decisiones — todas resueltas", "h1"))
     A(P("Ninguna de estas la puede tomar un abogado por vos, ni yo. Son "
         "definiciones de negocio. Hasta que no estén, los nueve documentos "
         "pendientes no se pueden escribir sin inventar. "
-        "<b>Cinco están resueltas; queda D6.</b>"))
+        "<b>Las seis están resueltas.</b>"))
 
     for block in resolved(
         1, "Quién es el titular de TREINO",
@@ -485,23 +485,45 @@ def build_story():
 
     sp(6)
 
-    for block in decision(
+    for block in resolved(
         6, "Reembolsos y baja",
-        "Qué pasa si un entrenador se arrepiente, quiere la baja, o pide "
-        "devolución.",
-        "En Argentina esto no es del todo negociable. La Ley de Defensa del "
-        "Consumidor es de orden público —lo que pactes por debajo del piso "
-        "legal se tiene por no escrito— y la Resolución 424/2020 obliga a "
-        "tener botón de arrepentimiento y baja en línea, visibles, en el sitio "
-        "que vende. No es una cláusula: es un botón que tiene que existir.",
-        None,
-        "Definí el plazo de arrepentimiento respetando el mínimo legal, baja "
-        "en línea sin llamada ni mail, y proporcionalidad en el reembolso. "
-        "Escribilo simple: si el texto es simple y generoso, no hay conflicto "
-        "que gestionar. Este es un caso donde ser prolijo sale más barato que "
-        "ser astuto.",
-        "Términos de suscripción (8), arrepentimiento y baja (9), y "
-        "desarrollo en el Coach Hub web."):
+        "<b>14 días corridos de arrepentimiento con reembolso total</b>, para "
+        "todo el mundo. Fuera de ese plazo, baja cuando se quiera con acceso "
+        "hasta el fin del período pagado y sin reembolso.",
+        [["Arrepentimiento", "<b>14 días corridos</b>, reembolso total, sin "
+          "explicaciones"],
+         ["Por qué 14", "Argentina exige 10 y la Unión Europea 14. Con 14 una "
+          "sola regla cumple en todas partes, sin lógica por país"],
+         ["Fuera de plazo", "Baja en línea. Acceso hasta el fin del período "
+          "pagado. Sin reembolso de ese período"],
+         ["Prueba gratuita", "Sí. Es lo que hace que dentro de la ventana de "
+          "arrepentimiento casi no haya dinero"],
+         ["Operación", "Reembolso <b>a mano</b> desde el panel de la pasarela"]],
+        [["Frente", "Qué exige"],
+         ["<b>El derecho es irrenunciable</b>",
+          "La Ley de Defensa del Consumidor es de orden público: una cláusula "
+          "que diga «no hay reembolsos» se tiene por no escrita y se aplica la "
+          "ley igual. Escribirla es peor que no escribirla"],
+         ["<b>Botón de Arrepentimiento</b>",
+          "Resolución 424/2020: enlace de acceso fácil y directo desde la "
+          "página de inicio, destacado en visibilidad y tamaño, y <b>sin "
+          "requerir registración previa ni ningún otro trámite</b>. El pie de "
+          "página alcanza y es la práctica de mercado"],
+         ["<b>Código en 24 horas</b>",
+          "La norma exige informar por el mismo medio, dentro de las 24 horas, "
+          "un código de identificación del arrepentimiento. Es lo que casi "
+          "nadie implementa y lo primero que se verifica"],
+         ["<b>Baja en línea</b>",
+          "Sin llamar ni escribir. Va en el Coach Hub web"],
+         ["<b>Si el cobro va por las tiendas</b>",
+          "Apple y Google gestionan baja y reembolso con sus políticas. No se "
+          "puede procesar ni negar. Otra razón para resolver la regla 3.1.1 "
+          "antes de construir la integración"]],
+        "El proceso que pide la norma es un formulario, un correo y una persona "
+        "que atienda: <b>no hace falta construir reembolsos automáticos</b>. Y "
+        "con período de prueba gratuito, dentro de la ventana de 14 días casi "
+        "no hay dinero que devolver — el miedo al botón está puesto en el lugar "
+        "equivocado."):
         A(block)
 
     A(PageBreak())
@@ -791,7 +813,7 @@ def build_story():
     A(table([
         ["Etapa", "Qué pasa", "Quién"],
         ["<b>1. Decidir</b>",
-         "Queda D6: reembolsos y baja. Las otras cinco ya están",
+         "[OK] Las seis decisiones de la sección 3 están tomadas",
          "Product Owner"],
         ["<b>1.b Cuentas de tiendas</b>",
          "Tramitar el D-U-N-S ya, dejar renovar Apple el 5/9 y elegir camino "

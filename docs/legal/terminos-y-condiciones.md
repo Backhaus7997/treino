@@ -153,31 +153,24 @@ económico en sí no lo resolvemos nosotros.
 
 ## 8. Suscripciones y pagos a TREINO
 
-Algunas funciones requieren una suscripción paga. Hoy existe para entrenadores,
-y está prevista una para atletas.
+Usar TREINO como atleta es gratuito. Los entrenadores requieren una suscripción,
+y está prevista una para atletas a futuro.
 
-**Cómo se cobra.** Los pagos se procesan a través de un **proveedor de servicios
-de pago externo**, que captura el medio de pago y liquida los fondos a la cuenta
-bancaria de BACKHAUSTIN S.A.S. TREINO **no almacena los datos completos de tu
-tarjeta ni de tu medio de pago**: quedan en poder de ese procesador, que actúa
-como responsable de su propio tratamiento.
+Los pagos se procesan por un **proveedor de servicios de pago externo**, que
+liquida los fondos a la cuenta bancaria de BACKHAUSTIN S.A.S. **No almacenamos
+los datos completos de tu medio de pago.**
+
+**Tenés 14 días corridos desde la contratación para arrepentirte y recuperar
+todo lo pagado**, sin dar explicaciones. Podés ejercerlo desde el Botón de
+Arrepentimiento de la página principal, sin necesidad de iniciar sesión.
+Pasado ese plazo podés dar de baja cuando quieras, conservando el acceso hasta
+el final del período pagado, pero sin reembolso de ese período.
+
+Las condiciones completas —planes, precios, renovación, prueba gratuita y
+baja— están en los [Términos de Suscripción](./terminos-suscripcion.md).
 
 Esto es **distinto** de los pagos entre vos y tu entrenador, que no pasan por
-TREINO en absoluto. Ver la sección 7.
-
-Antes de cualquier cobro se te informa el precio, la moneda, la periodicidad y
-las condiciones de renovación. No se te cobra nada sin tu consentimiento
-expreso, y si sos menor de edad, sin el de tu representante legal.
-
-[[PENDIENTE — DECISIÓN D6 y REVISIÓN LEGAL. Falta definir plazo de
-arrepentimiento, política de reembolso, renovación automática y procedimiento de
-baja. Con alcance mundial hay que contemplar el derecho de desistimiento de cada
-jurisdicción y el tratamiento fiscal de servicios digitales. Y hay una colisión
-a resolver ANTES de construir la integración: los bienes digitales consumidos
-dentro de la app están sujetos a la regla 3.1.1 de Apple y a la política de
-facturación de Google, que exigen el sistema de pago de la tienda. Cobrar por
-pasarela externa una suscripción de consumidor usada dentro de la app es
-exactamente el supuesto que esas reglas alcanzan.]]
+TREINO. Ver la sección 7.
 
 ## 9. Tu contenido
 

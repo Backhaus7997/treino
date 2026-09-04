@@ -265,13 +265,21 @@ tuvo nada que ver.
 
 Al regularizar, los vínculos se reactivan hasta el límite de tu plan.
 
-### 8.4 Medio de pago, facturación, renovación y reembolsos
+### 8.4 Cobro, arrepentimiento y baja
 
-[[PENDIENTE — depende de D4 y D6. No se puede redactar sin saber qué pasarela
-procesa el cobro y cuál es la política de reembolso. Ver
-[`terminos-suscripcion.md`] cuando exista.]]
+El cobro se procesa por un proveedor de servicios de pago externo. La
+suscripción **se renueva automáticamente** al final de cada período, con aviso
+previo, salvo que la des de baja antes.
 
----
+**Tenés 14 días corridos desde la contratación para arrepentirte y recuperar
+todo lo pagado.** Pasado ese plazo podés dar de baja cuando quieras: conservás
+el acceso hasta el final del período pagado y no se reembolsa ese período.
+
+Si tu suscripción se contrató desde la aplicación por App Store o Google Play,
+la baja y el reembolso los gestiona la tienda con sus propias políticas.
+
+Todo el detalle en los [Términos de
+Suscripción](./terminos-suscripcion.md), que forman parte de este acuerdo.
 
 ## 9. Reseñas
 
