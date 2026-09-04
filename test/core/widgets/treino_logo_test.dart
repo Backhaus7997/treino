@@ -3,7 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
-import 'package:treino/features/auth/presentation/widgets/treino_logo.dart';
+import 'package:treino/core/widgets/treino_logo.dart';
 
 Widget _wrap(Widget child) => MaterialApp(
       theme: AppTheme.dark(),
