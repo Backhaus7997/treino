@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/features/auth/presentation/legal/legal_content.dart';
 import 'package:treino/features/gyms/data/gym_repository.dart';
 import 'package:treino/features/profile/data/user_repository.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
@@ -92,6 +93,49 @@ void main() {
       // Timestamp.toDate() returns a LOCAL DateTime — .toUtc() normalizes it
       // before comparing against the UTC fixture (mirrors TimestampConverter).
       expect(stored.toDate().toUtc(), equals(acceptedAt));
+    });
+
+    // consentimiento-legal-versionado (R3): con termsAcceptedAt seteado, el
+    // doc también debe persistir la versión aceptada de cada documento.
+    test(
+        'getOrCreate with termsAcceptedAt also persists '
+        'acceptedTermsVersion/acceptedPrivacyVersion on the new doc', () async {
+      final acceptedAt = DateTime.utc(2026, 6, 1, 9, 30);
+
+      final result = await repo.getOrCreate(
+        uid: 'uid-terms-version-1',
+        email: 'a@b.com',
+        termsAcceptedAt: acceptedAt,
+        acceptedTermsVersion: kTermsVersion,
+        acceptedPrivacyVersion: kPrivacyVersion,
+      );
+
+      expect(result.acceptedTermsVersion, equals(kTermsVersion));
+      expect(result.acceptedPrivacyVersion, equals(kPrivacyVersion));
+
+      final snap =
+          await firestore.collection('users').doc('uid-terms-version-1').get();
+      expect(snap.data()!['acceptedTermsVersion'], equals(kTermsVersion));
+      expect(snap.data()!['acceptedPrivacyVersion'], equals(kPrivacyVersion));
+    });
+
+    // OAuth backfill paths never pass version params either — must stay
+    // unset, same contract as termsAcceptedAt above.
+    test(
+        'getOrCreate without version params leaves both null/absent on the '
+        'new doc', () async {
+      final result = await repo.getOrCreate(
+        uid: 'uid-terms-version-2',
+        email: 'a@b.com',
+      );
+
+      expect(result.acceptedTermsVersion, isNull);
+      expect(result.acceptedPrivacyVersion, isNull);
+
+      final snap =
+          await firestore.collection('users').doc('uid-terms-version-2').get();
+      expect(snap.data()!['acceptedTermsVersion'], isNull);
+      expect(snap.data()!['acceptedPrivacyVersion'], isNull);
     });
 
     // OAuth backfill paths never pass termsAcceptedAt — it must stay unset.

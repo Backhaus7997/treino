@@ -2768,6 +2768,90 @@ abstract class AppL10n {
   /// **'Agregá al menos una ubicación o activá clases virtuales.'**
   String get profileEditTrainerValidationLocation;
 
+  /// No description provided for @trainerLocationConsentSheetTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PUBLICAR TU UBICACIÓN'**
+  String get trainerLocationConsentSheetTitle;
+
+  /// No description provided for @trainerLocationConsentSheetBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Los atletas van a poder ver dónde entrenás y a qué distancia les queda. Podés apagar esto cuando quieras desde tu perfil profesional.'**
+  String get trainerLocationConsentSheetBody;
+
+  /// No description provided for @trainerLocationConsentSheetAccept.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ACEPTAR'**
+  String get trainerLocationConsentSheetAccept;
+
+  /// No description provided for @trainerLocationConsentSheetRevoke.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'APAGAR LA PUBLICACIÓN'**
+  String get trainerLocationConsentSheetRevoke;
+
+  /// No description provided for @profileEditTrainerConsentConfirmTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Publicar esta ubicación?'**
+  String get profileEditTrainerConsentConfirmTitle;
+
+  /// No description provided for @profileEditTrainerConsentConfirmBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Al guardar, esta ubicación va a ser visible para los atletas, con su punto en el mapa y la distancia hasta ellos. Podés apagarla cuando quieras.'**
+  String get profileEditTrainerConsentConfirmBody;
+
+  /// No description provided for @profileEditTrainerConsentConfirmAccept.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PUBLICAR'**
+  String get profileEditTrainerConsentConfirmAccept;
+
+  /// No description provided for @profileEditTrainerConsentConfirmCancel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CANCELAR'**
+  String get profileEditTrainerConsentConfirmCancel;
+
+  /// No description provided for @profileEditTrainerPublished.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Visible para los atletas'**
+  String get profileEditTrainerPublished;
+
+  /// No description provided for @profileEditTrainerNotPublished.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No publicada'**
+  String get profileEditTrainerNotPublished;
+
+  /// No description provided for @legacyPrivacyNoticeTitle.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Actualizamos la Política de Privacidad'**
+  String get legacyPrivacyNoticeTitle;
+
+  /// No description provided for @legacyPrivacyNoticeBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Aclaramos cómo tratamos tu ubicación. No cambió nada de lo que recolectamos de vos.'**
+  String get legacyPrivacyNoticeBody;
+
+  /// No description provided for @legacyPrivacyNoticeAction.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'LEER LA POLÍTICA'**
+  String get legacyPrivacyNoticeAction;
+
+  /// No description provided for @legacyPrivacyNoticeDismiss.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Cerrar'**
+  String get legacyPrivacyNoticeDismiss;
+
   /// No description provided for @athleteDetailPlansSection.
   ///
   /// In es_AR, this message translates to:

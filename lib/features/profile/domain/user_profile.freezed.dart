@@ -51,6 +51,44 @@ mixin _$UserProfile {
 // cuentas nuevas). Null ⇒ cuenta legacy pre-feature (sin evidencia).
   @TimestampConverter()
   DateTime? get termsAcceptedAt =>
+      throw _privateConstructorUsedError; // ── Consentimiento legal versionado (consentimiento-legal-versionado) ─
+// `acceptedTermsVersion` / `acceptedPrivacyVersion`: qué VERSIÓN de cada
+// documento aceptó, sellada en la misma escritura que `termsAcceptedAt`
+// en cada uno de los 3 caminos de aceptación (signup email, submit de
+// ProfileSetup, `UserRepository.getOrCreate`). `null` ⇒ cuenta legacy
+// sin evidencia versionada — NUNCA se trata como "aceptó la versión 0"
+// ni "aceptó la vigente".
+//
+// `trainerLocationConsentAt` / `trainerLocationConsentPromptedAt` son un
+// consentimiento DISTINTO e independiente del gate de versión de arriba:
+// habilitan la publicación de la ubicación del PF en el mapa. Se
+// disparan recién en la promoción a `trainer`, nunca en signup ni en
+// ninguna escritura de aceptación de T&C/Privacidad — un atleta que
+// aceptó la Política vigente y es promovido después IGUAL necesita este
+// consentimiento aparte (spec: comparar sólo versiones no cubre ese
+// caso).
+//
+// Tabla de estados (el contrato — cualquier gate que lea estos 2 campos
+// debe resolver exactamente esto):
+//
+// | consentAt | promptedAt | Significado                        | ¿Sheet? | Ubicación publicada |
+// |-----------|------------|-------------------------------------|---------|----------------------|
+// | null      | null       | nunca preguntado / legacy            | sí      | sí (status quo)      |
+// | set       | set        | otorgado                             | no      | sí                   |
+// | null      | set        | preguntado y no otorgado (cerró/apagó)| no     | según el espejo      |
+// | set       | null       | imposible por construcción — tratar como otorgado | no | sí |
+//
+// `promptedAt` es el campo anti-loop: responde "¿ya se lo preguntamos?",
+// no "¿consintió?". Es lo único que gatea el re-display del sheet —
+// NUNCA `trainerLocations.isNotEmpty` (ese es sólo un filtro de
+// relevancia: revocar no vacía `trainerLocations` en `users/`, así que
+// gatear por ahí reabriría el sheet en cada arranque).
+  int? get acceptedTermsVersion => throw _privateConstructorUsedError;
+  int? get acceptedPrivacyVersion => throw _privateConstructorUsedError;
+  @TimestampConverter()
+  DateTime? get trainerLocationConsentAt => throw _privateConstructorUsedError;
+  @TimestampConverter()
+  DateTime? get trainerLocationConsentPromptedAt =>
       throw _privateConstructorUsedError; // ── Trainer-specific (Fase 5 Etapa 1 foundations) ───────────────────
   String? get trainerBio => throw _privateConstructorUsedError;
   String? get trainerSpecialty => throw _privateConstructorUsedError;
@@ -171,6 +209,10 @@ abstract class $UserProfileCopyWith<$Res> {
       String? phone,
       @TimestampConverter() DateTime? bornAt,
       @TimestampConverter() DateTime? termsAcceptedAt,
+      int? acceptedTermsVersion,
+      int? acceptedPrivacyVersion,
+      @TimestampConverter() DateTime? trainerLocationConsentAt,
+      @TimestampConverter() DateTime? trainerLocationConsentPromptedAt,
       String? trainerBio,
       String? trainerSpecialty,
       int? trainerMonthlyRate,
@@ -224,6 +266,10 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
     Object? phone = freezed,
     Object? bornAt = freezed,
     Object? termsAcceptedAt = freezed,
+    Object? acceptedTermsVersion = freezed,
+    Object? acceptedPrivacyVersion = freezed,
+    Object? trainerLocationConsentAt = freezed,
+    Object? trainerLocationConsentPromptedAt = freezed,
     Object? trainerBio = freezed,
     Object? trainerSpecialty = freezed,
     Object? trainerMonthlyRate = freezed,
@@ -309,6 +355,23 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
       termsAcceptedAt: freezed == termsAcceptedAt
           ? _value.termsAcceptedAt
           : termsAcceptedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      acceptedTermsVersion: freezed == acceptedTermsVersion
+          ? _value.acceptedTermsVersion
+          : acceptedTermsVersion // ignore: cast_nullable_to_non_nullable
+              as int?,
+      acceptedPrivacyVersion: freezed == acceptedPrivacyVersion
+          ? _value.acceptedPrivacyVersion
+          : acceptedPrivacyVersion // ignore: cast_nullable_to_non_nullable
+              as int?,
+      trainerLocationConsentAt: freezed == trainerLocationConsentAt
+          ? _value.trainerLocationConsentAt
+          : trainerLocationConsentAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      trainerLocationConsentPromptedAt: freezed ==
+              trainerLocationConsentPromptedAt
+          ? _value.trainerLocationConsentPromptedAt
+          : trainerLocationConsentPromptedAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
       trainerBio: freezed == trainerBio
           ? _value.trainerBio
@@ -433,6 +496,10 @@ abstract class _$$UserProfileImplCopyWith<$Res>
       String? phone,
       @TimestampConverter() DateTime? bornAt,
       @TimestampConverter() DateTime? termsAcceptedAt,
+      int? acceptedTermsVersion,
+      int? acceptedPrivacyVersion,
+      @TimestampConverter() DateTime? trainerLocationConsentAt,
+      @TimestampConverter() DateTime? trainerLocationConsentPromptedAt,
       String? trainerBio,
       String? trainerSpecialty,
       int? trainerMonthlyRate,
@@ -486,6 +553,10 @@ class __$$UserProfileImplCopyWithImpl<$Res>
     Object? phone = freezed,
     Object? bornAt = freezed,
     Object? termsAcceptedAt = freezed,
+    Object? acceptedTermsVersion = freezed,
+    Object? acceptedPrivacyVersion = freezed,
+    Object? trainerLocationConsentAt = freezed,
+    Object? trainerLocationConsentPromptedAt = freezed,
     Object? trainerBio = freezed,
     Object? trainerSpecialty = freezed,
     Object? trainerMonthlyRate = freezed,
@@ -571,6 +642,23 @@ class __$$UserProfileImplCopyWithImpl<$Res>
       termsAcceptedAt: freezed == termsAcceptedAt
           ? _value.termsAcceptedAt
           : termsAcceptedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      acceptedTermsVersion: freezed == acceptedTermsVersion
+          ? _value.acceptedTermsVersion
+          : acceptedTermsVersion // ignore: cast_nullable_to_non_nullable
+              as int?,
+      acceptedPrivacyVersion: freezed == acceptedPrivacyVersion
+          ? _value.acceptedPrivacyVersion
+          : acceptedPrivacyVersion // ignore: cast_nullable_to_non_nullable
+              as int?,
+      trainerLocationConsentAt: freezed == trainerLocationConsentAt
+          ? _value.trainerLocationConsentAt
+          : trainerLocationConsentAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      trainerLocationConsentPromptedAt: freezed ==
+              trainerLocationConsentPromptedAt
+          ? _value.trainerLocationConsentPromptedAt
+          : trainerLocationConsentPromptedAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
       trainerBio: freezed == trainerBio
           ? _value.trainerBio
@@ -661,6 +749,10 @@ class _$UserProfileImpl implements _UserProfile {
       this.phone,
       @TimestampConverter() this.bornAt,
       @TimestampConverter() this.termsAcceptedAt,
+      this.acceptedTermsVersion,
+      this.acceptedPrivacyVersion,
+      @TimestampConverter() this.trainerLocationConsentAt,
+      @TimestampConverter() this.trainerLocationConsentPromptedAt,
       this.trainerBio,
       this.trainerSpecialty,
       this.trainerMonthlyRate,
@@ -732,6 +824,48 @@ class _$UserProfileImpl implements _UserProfile {
   @override
   @TimestampConverter()
   final DateTime? termsAcceptedAt;
+// ── Consentimiento legal versionado (consentimiento-legal-versionado) ─
+// `acceptedTermsVersion` / `acceptedPrivacyVersion`: qué VERSIÓN de cada
+// documento aceptó, sellada en la misma escritura que `termsAcceptedAt`
+// en cada uno de los 3 caminos de aceptación (signup email, submit de
+// ProfileSetup, `UserRepository.getOrCreate`). `null` ⇒ cuenta legacy
+// sin evidencia versionada — NUNCA se trata como "aceptó la versión 0"
+// ni "aceptó la vigente".
+//
+// `trainerLocationConsentAt` / `trainerLocationConsentPromptedAt` son un
+// consentimiento DISTINTO e independiente del gate de versión de arriba:
+// habilitan la publicación de la ubicación del PF en el mapa. Se
+// disparan recién en la promoción a `trainer`, nunca en signup ni en
+// ninguna escritura de aceptación de T&C/Privacidad — un atleta que
+// aceptó la Política vigente y es promovido después IGUAL necesita este
+// consentimiento aparte (spec: comparar sólo versiones no cubre ese
+// caso).
+//
+// Tabla de estados (el contrato — cualquier gate que lea estos 2 campos
+// debe resolver exactamente esto):
+//
+// | consentAt | promptedAt | Significado                        | ¿Sheet? | Ubicación publicada |
+// |-----------|------------|-------------------------------------|---------|----------------------|
+// | null      | null       | nunca preguntado / legacy            | sí      | sí (status quo)      |
+// | set       | set        | otorgado                             | no      | sí                   |
+// | null      | set        | preguntado y no otorgado (cerró/apagó)| no     | según el espejo      |
+// | set       | null       | imposible por construcción — tratar como otorgado | no | sí |
+//
+// `promptedAt` es el campo anti-loop: responde "¿ya se lo preguntamos?",
+// no "¿consintió?". Es lo único que gatea el re-display del sheet —
+// NUNCA `trainerLocations.isNotEmpty` (ese es sólo un filtro de
+// relevancia: revocar no vacía `trainerLocations` en `users/`, así que
+// gatear por ahí reabriría el sheet en cada arranque).
+  @override
+  final int? acceptedTermsVersion;
+  @override
+  final int? acceptedPrivacyVersion;
+  @override
+  @TimestampConverter()
+  final DateTime? trainerLocationConsentAt;
+  @override
+  @TimestampConverter()
+  final DateTime? trainerLocationConsentPromptedAt;
 // ── Trainer-specific (Fase 5 Etapa 1 foundations) ───────────────────
   @override
   final String? trainerBio;
@@ -872,7 +1006,7 @@ class _$UserProfileImpl implements _UserProfile {
 
   @override
   String toString() {
-    return 'UserProfile(uid: $uid, email: $email, displayName: $displayName, role: $role, createdAt: $createdAt, updatedAt: $updatedAt, gymId: $gymId, bodyWeightKg: $bodyWeightKg, heightCm: $heightCm, gender: $gender, experienceLevel: $experienceLevel, avatarUrl: $avatarUrl, firstName: $firstName, lastName: $lastName, phone: $phone, bornAt: $bornAt, termsAcceptedAt: $termsAcceptedAt, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerMonthlyRate: $trainerMonthlyRate, paymentAlias: $paymentAlias, trainerExperienceYears: $trainerExperienceYears, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerGeohash: $trainerGeohash, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline, activeRoutineId: $activeRoutineId, subscription: $subscription, weightedLoad: $weightedLoad, onboardingSeen: $onboardingSeen, templatePreferences: $templatePreferences)';
+    return 'UserProfile(uid: $uid, email: $email, displayName: $displayName, role: $role, createdAt: $createdAt, updatedAt: $updatedAt, gymId: $gymId, bodyWeightKg: $bodyWeightKg, heightCm: $heightCm, gender: $gender, experienceLevel: $experienceLevel, avatarUrl: $avatarUrl, firstName: $firstName, lastName: $lastName, phone: $phone, bornAt: $bornAt, termsAcceptedAt: $termsAcceptedAt, acceptedTermsVersion: $acceptedTermsVersion, acceptedPrivacyVersion: $acceptedPrivacyVersion, trainerLocationConsentAt: $trainerLocationConsentAt, trainerLocationConsentPromptedAt: $trainerLocationConsentPromptedAt, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerMonthlyRate: $trainerMonthlyRate, paymentAlias: $paymentAlias, trainerExperienceYears: $trainerExperienceYears, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerGeohash: $trainerGeohash, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline, activeRoutineId: $activeRoutineId, subscription: $subscription, weightedLoad: $weightedLoad, onboardingSeen: $onboardingSeen, templatePreferences: $templatePreferences)';
   }
 
   @override
@@ -907,6 +1041,16 @@ class _$UserProfileImpl implements _UserProfile {
             (identical(other.bornAt, bornAt) || other.bornAt == bornAt) &&
             (identical(other.termsAcceptedAt, termsAcceptedAt) ||
                 other.termsAcceptedAt == termsAcceptedAt) &&
+            (identical(other.acceptedTermsVersion, acceptedTermsVersion) ||
+                other.acceptedTermsVersion == acceptedTermsVersion) &&
+            (identical(other.acceptedPrivacyVersion, acceptedPrivacyVersion) ||
+                other.acceptedPrivacyVersion == acceptedPrivacyVersion) &&
+            (identical(
+                    other.trainerLocationConsentAt, trainerLocationConsentAt) ||
+                other.trainerLocationConsentAt == trainerLocationConsentAt) &&
+            (identical(other.trainerLocationConsentPromptedAt, trainerLocationConsentPromptedAt) ||
+                other.trainerLocationConsentPromptedAt ==
+                    trainerLocationConsentPromptedAt) &&
             (identical(other.trainerBio, trainerBio) ||
                 other.trainerBio == trainerBio) &&
             (identical(other.trainerSpecialty, trainerSpecialty) ||
@@ -962,6 +1106,10 @@ class _$UserProfileImpl implements _UserProfile {
         phone,
         bornAt,
         termsAcceptedAt,
+        acceptedTermsVersion,
+        acceptedPrivacyVersion,
+        trainerLocationConsentAt,
+        trainerLocationConsentPromptedAt,
         trainerBio,
         trainerSpecialty,
         trainerMonthlyRate,
@@ -1015,6 +1163,10 @@ abstract class _UserProfile implements UserProfile {
       final String? phone,
       @TimestampConverter() final DateTime? bornAt,
       @TimestampConverter() final DateTime? termsAcceptedAt,
+      final int? acceptedTermsVersion,
+      final int? acceptedPrivacyVersion,
+      @TimestampConverter() final DateTime? trainerLocationConsentAt,
+      @TimestampConverter() final DateTime? trainerLocationConsentPromptedAt,
       final String? trainerBio,
       final String? trainerSpecialty,
       final int? trainerMonthlyRate,
@@ -1083,7 +1235,49 @@ abstract class _UserProfile implements UserProfile {
   @override
   @TimestampConverter()
   DateTime?
-      get termsAcceptedAt; // ── Trainer-specific (Fase 5 Etapa 1 foundations) ───────────────────
+      get termsAcceptedAt; // ── Consentimiento legal versionado (consentimiento-legal-versionado) ─
+// `acceptedTermsVersion` / `acceptedPrivacyVersion`: qué VERSIÓN de cada
+// documento aceptó, sellada en la misma escritura que `termsAcceptedAt`
+// en cada uno de los 3 caminos de aceptación (signup email, submit de
+// ProfileSetup, `UserRepository.getOrCreate`). `null` ⇒ cuenta legacy
+// sin evidencia versionada — NUNCA se trata como "aceptó la versión 0"
+// ni "aceptó la vigente".
+//
+// `trainerLocationConsentAt` / `trainerLocationConsentPromptedAt` son un
+// consentimiento DISTINTO e independiente del gate de versión de arriba:
+// habilitan la publicación de la ubicación del PF en el mapa. Se
+// disparan recién en la promoción a `trainer`, nunca en signup ni en
+// ninguna escritura de aceptación de T&C/Privacidad — un atleta que
+// aceptó la Política vigente y es promovido después IGUAL necesita este
+// consentimiento aparte (spec: comparar sólo versiones no cubre ese
+// caso).
+//
+// Tabla de estados (el contrato — cualquier gate que lea estos 2 campos
+// debe resolver exactamente esto):
+//
+// | consentAt | promptedAt | Significado                        | ¿Sheet? | Ubicación publicada |
+// |-----------|------------|-------------------------------------|---------|----------------------|
+// | null      | null       | nunca preguntado / legacy            | sí      | sí (status quo)      |
+// | set       | set        | otorgado                             | no      | sí                   |
+// | null      | set        | preguntado y no otorgado (cerró/apagó)| no     | según el espejo      |
+// | set       | null       | imposible por construcción — tratar como otorgado | no | sí |
+//
+// `promptedAt` es el campo anti-loop: responde "¿ya se lo preguntamos?",
+// no "¿consintió?". Es lo único que gatea el re-display del sheet —
+// NUNCA `trainerLocations.isNotEmpty` (ese es sólo un filtro de
+// relevancia: revocar no vacía `trainerLocations` en `users/`, así que
+// gatear por ahí reabriría el sheet en cada arranque).
+  @override
+  int? get acceptedTermsVersion;
+  @override
+  int? get acceptedPrivacyVersion;
+  @override
+  @TimestampConverter()
+  DateTime? get trainerLocationConsentAt;
+  @override
+  @TimestampConverter()
+  DateTime?
+      get trainerLocationConsentPromptedAt; // ── Trainer-specific (Fase 5 Etapa 1 foundations) ───────────────────
   @override
   String? get trainerBio;
   @override

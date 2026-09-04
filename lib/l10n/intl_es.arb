@@ -1017,5 +1017,19 @@
   "exerciseFeedbackNoteTagDiscomfort": "MOLESTIA",
   "exerciseFeedbackNoteSetTag": "SERIE {setNumber}",
   "coachSessionFeedbackLoadError": "No pudimos cargar los reportes del alumno.",
-  "sessionFeedbackLoadError": "No pudimos cargar tus reportes."
+  "sessionFeedbackLoadError": "No pudimos cargar tus reportes.",
+  "trainerLocationConsentSheetTitle": "PUBLICAR TU UBICACIÓN",
+  "trainerLocationConsentSheetBody": "Los atletas van a poder ver dónde entrenas y a qué distancia les queda. Puedes apagar esto cuando quieras desde tu perfil profesional.",
+  "trainerLocationConsentSheetAccept": "ACEPTAR",
+  "trainerLocationConsentSheetRevoke": "APAGAR LA PUBLICACIÓN",
+  "profileEditTrainerConsentConfirmTitle": "¿Publicar esta ubicación?",
+  "profileEditTrainerConsentConfirmBody": "Al guardar, esta ubicación va a ser visible para los atletas, con su punto en el mapa y la distancia hasta ellos. Puedes apagarla cuando quieras.",
+  "profileEditTrainerConsentConfirmAccept": "PUBLICAR",
+  "profileEditTrainerConsentConfirmCancel": "CANCELAR",
+  "profileEditTrainerPublished": "Visible para los atletas",
+  "profileEditTrainerNotPublished": "No publicada",
+  "legacyPrivacyNoticeTitle": "Actualizamos la Política de Privacidad",
+  "legacyPrivacyNoticeBody": "Aclaramos cómo tratamos tu ubicación. No cambió nada de lo que recolectamos de ti.",
+  "legacyPrivacyNoticeAction": "LEER LA POLÍTICA",
+  "legacyPrivacyNoticeDismiss": "Cerrar"
 }

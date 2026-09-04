@@ -15,6 +15,9 @@ import '../notifications/presentation/permission_gate.dart';
 import '../onboarding/presentation/onboarding_gate.dart';
 import '../profile/application/user_providers.dart';
 import '../profile/domain/user_role.dart';
+import '../profile/presentation/legacy_privacy_notice_banner.dart';
+import '../profile/presentation/trainer_location_consent_sheet.dart'
+    show TrainerLocationConsentGate;
 import '../workout/application/assigned_routine_providers.dart';
 import '../workout/application/session_duration.dart';
 import '../workout/application/session_providers.dart';
@@ -66,6 +69,19 @@ class HomeScreen extends ConsumerWidget {
         // sequencing (tour first, prompt second) is enforced by
         // `onboardingBlocksProvider`, not by Stack order.
         const OnboardingGate(),
+        // Trainer location-publication consent prompt
+        // (consentimiento-legal-versionado, R7). Also SizedBox.shrink() —
+        // waits on `onboardingBlocksProvider` internally so it never stacks
+        // with the welcome tour or the push-permission prompt on the same
+        // frame.
+        const TrainerLocationConsentGate(),
+        // Aviso de política actualizada para el atleta legacy
+        // (consentimiento-legal-versionado, R4). Único de este Stack que sí
+        // pinta algo: los otros tres son prompts que colapsan a
+        // SizedBox.shrink(). Este también colapsa cuando no corresponde, y
+        // cuando corresponde se ancla abajo sin capturar los taps de la app
+        // — a diferencia de ellos, no interrumpe nada.
+        const LegacyPrivacyNoticeBanner(),
       ],
     );
   }

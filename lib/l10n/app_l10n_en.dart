@@ -1448,6 +1448,51 @@ class AppL10nEn extends AppL10n {
       'Agregá al menos una ubicación o activá clases virtuales.';
 
   @override
+  String get trainerLocationConsentSheetTitle => 'PUBLISH YOUR LOCATION';
+
+  @override
+  String get trainerLocationConsentSheetBody =>
+      'Athletes will be able to see where you train and how far it is from them. You can turn this off anytime from your professional profile.';
+
+  @override
+  String get trainerLocationConsentSheetAccept => 'ACCEPT';
+
+  @override
+  String get trainerLocationConsentSheetRevoke => 'TURN OFF PUBLISHING';
+
+  @override
+  String get profileEditTrainerConsentConfirmTitle => 'Publish this location?';
+
+  @override
+  String get profileEditTrainerConsentConfirmBody =>
+      'Saving will make this location visible to athletes, with its pin on the map and the distance to them. You can turn it off anytime.';
+
+  @override
+  String get profileEditTrainerConsentConfirmAccept => 'PUBLISH';
+
+  @override
+  String get profileEditTrainerConsentConfirmCancel => 'CANCEL';
+
+  @override
+  String get profileEditTrainerPublished => 'Visible to athletes';
+
+  @override
+  String get profileEditTrainerNotPublished => 'Not published';
+
+  @override
+  String get legacyPrivacyNoticeTitle => 'We updated our Privacy Policy';
+
+  @override
+  String get legacyPrivacyNoticeBody =>
+      'We clarified how we handle your location. Nothing changed about what we collect from you.';
+
+  @override
+  String get legacyPrivacyNoticeAction => 'READ THE POLICY';
+
+  @override
+  String get legacyPrivacyNoticeDismiss => 'Dismiss';
+
+  @override
   String get athleteDetailPlansSection => 'PLANES ASIGNADOS';
 
   @override

@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/features/auth/application/auth_providers.dart'
     show firebaseAuthProvider;
+import 'package:treino/features/auth/presentation/legal/legal_content.dart';
 import 'package:treino/features/profile/application/user_providers.dart'
     show firestoreProvider, userProfileProvider, userRepositoryProvider;
 import 'package:treino/features/profile/data/user_repository.dart';
@@ -234,6 +235,31 @@ void main() {
       final usersSnap = await firestore.collection('users').doc('u1').get();
       expect(usersSnap.exists, isTrue);
       expect(usersSnap.data()!['termsAcceptedAt'], isNotNull);
+    });
+
+    // consentimiento-legal-versionado (R3): el mismo checkbox de OAuth
+    // acepta las 2 versiones vigentes — el partial que estampa
+    // termsAcceptedAt debe llevar también acceptedTermsVersion/
+    // acceptedPrivacyVersion.
+    test(
+        'OAuth new user with terms accepted — partial also includes '
+        'acceptedTermsVersion/acceptedPrivacyVersion', () async {
+      final container = makeContainer();
+      addTearDown(container.dispose);
+      await primeUserProfile(container);
+
+      final notifier = container.read(profileSetupNotifierProvider.notifier);
+      notifier.updateUsername('Carlos');
+      notifier.updateTermsAccepted(true);
+
+      await notifier.submit();
+
+      final usersSnap = await firestore.collection('users').doc('u1').get();
+      expect(usersSnap.data()!['acceptedTermsVersion'], equals(kTermsVersion));
+      expect(
+        usersSnap.data()!['acceptedPrivacyVersion'],
+        equals(kPrivacyVersion),
+      );
     });
 
     test(

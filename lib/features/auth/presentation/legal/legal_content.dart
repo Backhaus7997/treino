@@ -28,6 +28,31 @@ const String kTermsLastUpdated = '12 de junio de 2026';
 /// cuándo, que es justo lo que una fecha de revisión existe para contestar.
 const String kPrivacyLastUpdated = '3 de septiembre de 2026';
 
+/// Versión de los Términos y Condiciones vigentes, para evidencia de
+/// aceptación (`UserProfile.acceptedTermsVersion`).
+///
+/// Entero monotónico, independiente de [kPrivacyVersion] — bumpear uno de
+/// los dos documentos NUNCA obliga a tocar el otro; son textos legales
+/// separados que cambian en momentos distintos.
+const int kTermsVersion = 1;
+
+/// Versión de la Política de Privacidad vigente, para evidencia de
+/// aceptación (`UserProfile.acceptedPrivacyVersion`).
+///
+/// Independiente de [kTermsVersion] — ver ese dartdoc.
+const int kPrivacyVersion = 1;
+
+/// Fecha, machine-comparable (UTC), en la que el texto de la Política de
+/// Privacidad identificado por [kPrivacyVersion] entró en vigencia.
+///
+/// Distinta de [kPrivacyLastUpdated]: esa es un `String` de DISPLAY para la
+/// pantalla legal, y nunca se parsea. Esta constante es el puente que
+/// permite comparar `termsAcceptedAt.isBefore(kPrivacyV1PublishedAt)` para
+/// decidir si un atleta legacy necesita el aviso no bloqueante de política
+/// actualizada (R4). Se actualiza UNA sola vez por bump de versión — no en
+/// cada edición menor de [kPrivacyLastUpdated].
+final DateTime kPrivacyV1PublishedAt = DateTime.utc(2026, 9, 3);
+
 /// Email de contacto para consultas legales / de privacidad.
 const String kLegalContactEmail = 'equipo@treino.app';
 

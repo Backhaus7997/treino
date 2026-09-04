@@ -173,10 +173,19 @@ class UserRepository {
   /// card in sync. `displayNameLowercase` is always derived when `displayName`
   /// is present.
   ///
+  /// [hasLocationConsent] (consentimiento-legal-versionado, R6): gates the
+  /// CURRENT multi-location keys (`trainerLocations`, `trainerGeohashes`) —
+  /// when `false`, a partial carrying either is silently withheld from the
+  /// public mirror instead of republishing a location the trainer never
+  /// consented to. `trainerOffersOnline` is NOT a location key and always
+  /// flows regardless of this gate. See [update] for how the caller resolves
+  /// the effective consent value it passes in here.
+  ///
   /// REQ-COACH-DISC-DUAL-001.
   Map<String, Object?>? _trainerPublicSubsetFromPartial(
     Map<String, Object?> partial, {
     required String uid,
+    required bool hasLocationConsent,
   }) {
     final hasTrainerField =
         partial.keys.any((k) => _trainerPublicFields.contains(k));
@@ -216,11 +225,16 @@ class UserRepository {
       result['trainerExperienceYears'] = partial['trainerExperienceYears'];
     }
     // ── Multi-location (Fase 6 Etapa 0) ──────────────────────────────────
-    if (partial.containsKey('trainerLocations')) {
-      result['trainerLocations'] = partial['trainerLocations'];
-    }
-    if (partial.containsKey('trainerGeohashes')) {
-      result['trainerGeohashes'] = partial['trainerGeohashes'];
+    // R6: withheld entirely when there is no effective consent — this is
+    // the choke point that makes the anti-republish guarantee a property of
+    // the repo, not an assumption about the caller.
+    if (hasLocationConsent) {
+      if (partial.containsKey('trainerLocations')) {
+        result['trainerLocations'] = partial['trainerLocations'];
+      }
+      if (partial.containsKey('trainerGeohashes')) {
+        result['trainerGeohashes'] = partial['trainerGeohashes'];
+      }
     }
     if (partial.containsKey('trainerOffersOnline')) {
       result['trainerOffersOnline'] = partial['trainerOffersOnline'];
@@ -229,6 +243,37 @@ class UserRepository {
     // the first-ever write. SetOptions(merge:true) makes this idempotent.
     result['uid'] = uid;
     return result;
+  }
+
+  /// Resolves whether the trainer has EFFECTIVE location-publication consent
+  /// at write time, for [_trainerPublicSubsetFromPartial]'s [hasLocationConsent]
+  /// gate (R6).
+  ///
+  /// The partial WINS over what is stored — if [partial] itself carries
+  /// `trainerLocationConsentAt`, its non-null-ness settles the answer with no
+  /// read. `update()` never sets that key on the hot path (consent state only
+  /// changes via [grantTrainerLocationConsent] / [revokeTrainerLocationConsent]),
+  /// so in practice this branch matters for those two callers, not for an
+  /// ordinary form save.
+  ///
+  /// Otherwise, a `get()` on `users/{uid}` is performed ONLY when [partial]
+  /// is actually touching the current multi-location fields
+  /// (`trainerLocations` / `trainerGeohashes`) — never on the hot path of an
+  /// unrelated save (e.g. a bio-only edit never pays this read).
+  Future<bool> _resolveEffectiveLocationConsent(
+    String uid,
+    Map<String, Object?> partial,
+  ) async {
+    if (partial.containsKey('trainerLocationConsentAt')) {
+      return partial['trainerLocationConsentAt'] != null;
+    }
+    final touchesLocationData = partial.containsKey('trainerLocations') ||
+        partial.containsKey('trainerGeohashes');
+    if (!touchesLocationData) return false;
+
+    final snap = await _users.doc(uid).get();
+    final data = snap.data();
+    return data != null && data['trainerLocationConsentAt'] != null;
   }
 
   /// Valida que el partial NO deje al PF en estado inválido. Combinación
@@ -268,10 +313,19 @@ class UserRepository {
   /// the time `AuthService.signUpWithEmail` reaches this call the user has
   /// already accepted. `null` leaves the field unset, matching a legacy
   /// pre-feature account.
+  ///
+  /// [acceptedTermsVersion] / [acceptedPrivacyVersion]
+  /// (consentimiento-legal-versionado, R3): same nullable pattern as
+  /// [termsAcceptedAt] — the caller stamping consent MUST pass the current
+  /// `kTermsVersion`/`kPrivacyVersion` in the SAME call that sets
+  /// [termsAcceptedAt]. Never inferred here: this method has no opinion on
+  /// what "current" means, callers own that.
   Future<UserProfile> getOrCreate({
     required String uid,
     required String email,
     DateTime? termsAcceptedAt,
+    int? acceptedTermsVersion,
+    int? acceptedPrivacyVersion,
   }) async {
     final existing = await get(uid);
     if (existing != null) return existing;
@@ -284,6 +338,8 @@ class UserRepository {
       createdAt: now,
       updatedAt: now,
       termsAcceptedAt: termsAcceptedAt,
+      acceptedTermsVersion: acceptedTermsVersion,
+      acceptedPrivacyVersion: acceptedPrivacyVersion,
     );
 
     final batch = _firestore.batch();
@@ -353,8 +409,13 @@ class UserRepository {
     )..['updatedAt'] = Timestamp.fromDate(DateTime.now().toUtc());
 
     final publicSubset = await _publicSubsetFromPartial(partial, uid: uid);
-    final trainerPublicSubset =
-        _trainerPublicSubsetFromPartial(partial, uid: uid);
+    final hasLocationConsent =
+        await _resolveEffectiveLocationConsent(uid, partial);
+    final trainerPublicSubset = _trainerPublicSubsetFromPartial(
+      partial,
+      uid: uid,
+      hasLocationConsent: hasLocationConsent,
+    );
 
     if (publicSubset == null && trainerPublicSubset == null) {
       // No public-relevant fields — single write to users only.
@@ -381,6 +442,91 @@ class UserRepository {
       );
     }
 
+    await batch.commit();
+  }
+
+  /// Grants trainer location-publication consent (R8) — the ACCEPT exit of
+  /// the consent prompt, and the confirmation before a trainer's first-ever
+  /// location save (D-F).
+  ///
+  /// Single `batch.commit()`:
+  ///  - `users/{uid}`: stamps `trainerLocationConsentAt` AND
+  ///    `trainerLocationConsentPromptedAt` to now.
+  ///  - `trainerPublicProfiles/{uid}`: RE-MIRRORS the trainer's
+  ///    currently-stored `trainerLocations`/`trainerGeohashes`. This is not
+  ///    optional — a consent-only write carries no location keys, so without
+  ///    the explicit re-mirror the trainer would be stamped as consented
+  ///    while `_trainerPublicSubsetFromPartial`'s gate (R6) has nothing to
+  ///    let through yet, leaving them "consented but invisible" (design D-C).
+  Future<void> grantTrainerLocationConsent(String uid) async {
+    final now = Timestamp.fromDate(DateTime.now().toUtc());
+    final snap = await _users.doc(uid).get();
+    final stored = snap.data();
+
+    final batch = _firestore.batch();
+    batch.set(
+      _users.doc(uid),
+      {
+        'trainerLocationConsentAt': now,
+        'trainerLocationConsentPromptedAt': now,
+      },
+      SetOptions(merge: true),
+    );
+    batch.set(
+      _trainerPublicProfiles.doc(uid),
+      {
+        'uid': uid,
+        'trainerLocations': stored?['trainerLocations'] ?? const <Object?>[],
+        'trainerGeohashes': stored?['trainerGeohashes'] ?? const <Object?>[],
+      },
+      SetOptions(merge: true),
+    );
+    await batch.commit();
+  }
+
+  /// Revokes trainer location-publication consent (R8) — the "APAGAR LA
+  /// PUBLICACIÓN" exit of the consent prompt, and the revoke path from
+  /// `profile_edit_trainer_screen.dart`'s status row.
+  ///
+  /// Single `batch.commit()`:
+  ///  - `users/{uid}`: writes ONLY `{trainerLocationConsentAt: null,
+  ///    trainerLocationConsentPromptedAt: now}` — ZERO location-guard keys.
+  ///    T1: `_assertTrainerLocationStateIsValid` only evaluates when a
+  ///    partial contains BOTH `trainerLocations` and `trainerOffersOnline`;
+  ///    since neither is ever in this partial, the guard is a correct no-op
+  ///    and the trainer's private location data on `users/{uid}` (including
+  ///    the deprecated singular fields) is left completely untouched — no
+  ///    data loss for exercising a legal right.
+  ///  - `trainerPublicProfiles/{uid}`: clears all 5 location keys
+  ///    (`trainerLocations`, `trainerGeohashes`, `trainerLatitude`,
+  ///    `trainerLongitude`, `trainerGeohash`). `trainerOffersOnline` is NOT a
+  ///    location key and is left untouched — a trainer who does not also
+  ///    offer online classes becomes unreachable via nearby-location search,
+  ///    which is the accepted consequence of their own choice (design R3),
+  ///    not something this method compensates for by forcing the flag.
+  Future<void> revokeTrainerLocationConsent(String uid) async {
+    final now = Timestamp.fromDate(DateTime.now().toUtc());
+    final batch = _firestore.batch();
+    batch.set(
+      _users.doc(uid),
+      {
+        'trainerLocationConsentAt': null,
+        'trainerLocationConsentPromptedAt': now,
+      },
+      SetOptions(merge: true),
+    );
+    batch.set(
+      _trainerPublicProfiles.doc(uid),
+      {
+        'uid': uid,
+        'trainerLocations': const <Object?>[],
+        'trainerGeohashes': const <Object?>[],
+        'trainerLatitude': null,
+        'trainerLongitude': null,
+        'trainerGeohash': null,
+      },
+      SetOptions(merge: true),
+    );
     await batch.commit();
   }
 

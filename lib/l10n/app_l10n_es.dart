@@ -1482,6 +1482,53 @@ class AppL10nEs extends AppL10n {
       'Agregá al menos una ubicación o activá clases virtuales.';
 
   @override
+  String get trainerLocationConsentSheetTitle => 'PUBLICAR TU UBICACIÓN';
+
+  @override
+  String get trainerLocationConsentSheetBody =>
+      'Los atletas van a poder ver dónde entrenas y a qué distancia les queda. Puedes apagar esto cuando quieras desde tu perfil profesional.';
+
+  @override
+  String get trainerLocationConsentSheetAccept => 'ACEPTAR';
+
+  @override
+  String get trainerLocationConsentSheetRevoke => 'APAGAR LA PUBLICACIÓN';
+
+  @override
+  String get profileEditTrainerConsentConfirmTitle =>
+      '¿Publicar esta ubicación?';
+
+  @override
+  String get profileEditTrainerConsentConfirmBody =>
+      'Al guardar, esta ubicación va a ser visible para los atletas, con su punto en el mapa y la distancia hasta ellos. Puedes apagarla cuando quieras.';
+
+  @override
+  String get profileEditTrainerConsentConfirmAccept => 'PUBLICAR';
+
+  @override
+  String get profileEditTrainerConsentConfirmCancel => 'CANCELAR';
+
+  @override
+  String get profileEditTrainerPublished => 'Visible para los atletas';
+
+  @override
+  String get profileEditTrainerNotPublished => 'No publicada';
+
+  @override
+  String get legacyPrivacyNoticeTitle =>
+      'Actualizamos la Política de Privacidad';
+
+  @override
+  String get legacyPrivacyNoticeBody =>
+      'Aclaramos cómo tratamos tu ubicación. No cambió nada de lo que recolectamos de ti.';
+
+  @override
+  String get legacyPrivacyNoticeAction => 'LEER LA POLÍTICA';
+
+  @override
+  String get legacyPrivacyNoticeDismiss => 'Cerrar';
+
+  @override
   String get athleteDetailPlansSection => 'PLANES ASIGNADOS';
 
   @override
@@ -5759,6 +5806,53 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get profileEditTrainerValidationLocation =>
       'Agregá al menos una ubicación o activá clases virtuales.';
+
+  @override
+  String get trainerLocationConsentSheetTitle => 'PUBLICAR TU UBICACIÓN';
+
+  @override
+  String get trainerLocationConsentSheetBody =>
+      'Los atletas van a poder ver dónde entrenás y a qué distancia les queda. Podés apagar esto cuando quieras desde tu perfil profesional.';
+
+  @override
+  String get trainerLocationConsentSheetAccept => 'ACEPTAR';
+
+  @override
+  String get trainerLocationConsentSheetRevoke => 'APAGAR LA PUBLICACIÓN';
+
+  @override
+  String get profileEditTrainerConsentConfirmTitle =>
+      '¿Publicar esta ubicación?';
+
+  @override
+  String get profileEditTrainerConsentConfirmBody =>
+      'Al guardar, esta ubicación va a ser visible para los atletas, con su punto en el mapa y la distancia hasta ellos. Podés apagarla cuando quieras.';
+
+  @override
+  String get profileEditTrainerConsentConfirmAccept => 'PUBLICAR';
+
+  @override
+  String get profileEditTrainerConsentConfirmCancel => 'CANCELAR';
+
+  @override
+  String get profileEditTrainerPublished => 'Visible para los atletas';
+
+  @override
+  String get profileEditTrainerNotPublished => 'No publicada';
+
+  @override
+  String get legacyPrivacyNoticeTitle =>
+      'Actualizamos la Política de Privacidad';
+
+  @override
+  String get legacyPrivacyNoticeBody =>
+      'Aclaramos cómo tratamos tu ubicación. No cambió nada de lo que recolectamos de vos.';
+
+  @override
+  String get legacyPrivacyNoticeAction => 'LEER LA POLÍTICA';
+
+  @override
+  String get legacyPrivacyNoticeDismiss => 'Cerrar';
 
   @override
   String get athleteDetailPlansSection => 'PLANES ASIGNADOS';
