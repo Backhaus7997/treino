@@ -159,3 +159,149 @@ describe("createMpClient — los errores, y cuáles conviene reintentar", () => 
     ).rejects.toThrow(/no es un objeto JSON/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// createPreapproval — el POST que abre la suscripcion.
+//
+// Lo que se cuida acá es la FORMA del request: MP rechaza con un 400 opaco y
+// depurar eso contra la red es caro. Y las validaciones que fallan ANTES de
+// salir, porque un monto en 0 no es un error de MP, es un bug nuestro.
+// ---------------------------------------------------------------------------
+
+const ALTA = {
+  reason: "TREINO — plan2 (mensual)",
+  externalReference: "uid-42",
+  payerEmail: "pf@x.com",
+  backUrl: "https://app.gettreino.com/ajustes",
+  transactionAmount: 22000,
+  frequencyMonths: 1,
+};
+
+describe("createMpClient — createPreapproval", () => {
+  it("hace POST a /preapproval con el token", async () => {
+    const { fn, llamadas } = fakeFetch({
+      status: 201,
+      body: { id: "2c93", init_point: "https://mp/x" },
+    });
+
+    await createMpClient("TEST-token", fn).createPreapproval(ALTA);
+
+    expect(llamadas[0].url).toBe("https://api.mercadopago.com/preapproval");
+    expect(llamadas[0].init?.method).toBe("POST");
+    expect(
+      (llamadas[0].init?.headers as Record<string, string>).Authorization,
+    ).toBe("Bearer TEST-token");
+  });
+
+  it("manda el cuerpo con la forma que MP espera", async () => {
+    const { fn, llamadas } = fakeFetch({
+      status: 201,
+      body: { id: "2c93", init_point: "https://mp/x" },
+    });
+
+    await createMpClient("t", fn).createPreapproval(ALTA);
+
+    const body = JSON.parse(llamadas[0].init?.body as string);
+    expect(body).toMatchObject({
+      reason: "TREINO — plan2 (mensual)",
+      external_reference: "uid-42",
+      payer_email: "pf@x.com",
+      back_url: "https://app.gettreino.com/ajustes",
+      // `pending` y no `authorized`: la suscripcion nace SIN medio de pago.
+      status: "pending",
+      auto_recurring: {
+        frequency: 1,
+        frequency_type: "months",
+        transaction_amount: 22000,
+        currency_id: "ARS",
+      },
+    });
+  });
+
+  it("el anual son 12 MESES, no un `frequency_type: years`", async () => {
+    // "months" esta en los tipos del SDK oficial; "years" no aparece.
+    const { fn, llamadas } = fakeFetch({
+      status: 201,
+      body: { id: "x", init_point: "https://mp/x" },
+    });
+
+    await createMpClient("t", fn).createPreapproval({
+      ...ALTA,
+      transactionAmount: 220000,
+      frequencyMonths: 12,
+    });
+
+    const body = JSON.parse(llamadas[0].init?.body as string);
+    expect(body.auto_recurring.frequency).toBe(12);
+    expect(body.auto_recurring.frequency_type).toBe("months");
+  });
+
+  it("cobra en PESOS — un currency_id equivocado le cobra otra moneda al PF", async () => {
+    const { fn, llamadas } = fakeFetch({
+      status: 201,
+      body: { id: "x", init_point: "https://mp/x" },
+    });
+
+    await createMpClient("t", fn).createPreapproval(ALTA);
+
+    expect(JSON.parse(llamadas[0].init?.body as string).auto_recurring.currency_id)
+      .toBe("ARS");
+  });
+
+  it("devuelve el preapproval tal cual, sin interpretarlo", async () => {
+    const { fn } = fakeFetch({
+      status: 201,
+      body: { id: "2c93", init_point: "https://mp/x", status: "pending" },
+    });
+
+    const r = await createMpClient("t", fn).createPreapproval(ALTA);
+
+    expect(r.id).toBe("2c93");
+    expect(r.init_point).toBe("https://mp/x");
+    expect(r.status).toBe("pending");
+  });
+
+  // Estas cuatro fallan sin tocar la red: son bugs nuestros, y descubrirlos
+  // por un 400 de MP los disfraza de problema de ellos.
+  const invalidas: [string, Record<string, unknown>, RegExp][] = [
+    ["externalReference vacio", { externalReference: "" }, /externalReference/],
+    ["payerEmail vacio", { payerEmail: "" }, /payerEmail/],
+    ["monto en 0", { transactionAmount: 0 }, /transactionAmount/],
+    ["monto negativo", { transactionAmount: -1 }, /transactionAmount/],
+    ["monto NaN", { transactionAmount: Number.NaN }, /transactionAmount/],
+    ["frecuencia en 0", { frequencyMonths: 0 }, /frequencyMonths/],
+    ["frecuencia fraccionaria", { frequencyMonths: 1.5 }, /frequencyMonths/],
+  ];
+
+  for (const [caso, patch, patron] of invalidas) {
+    it(`${caso} falla SIN salir a la red`, async () => {
+      const { fn, llamadas } = fakeFetch({ status: 201, body: { id: "x" } });
+
+      await expect(
+        createMpClient("t", fn).createPreapproval({ ...ALTA, ...patch } as never),
+      ).rejects.toThrow(patron);
+      expect(llamadas).toHaveLength(0);
+    });
+  }
+
+  it("un 400 de MP viaja con su body recortado para poder depurarlo", async () => {
+    const { fn } = fakeFetch({ status: 400, texto: "y".repeat(2000) });
+
+    const err = await errorDe(() =>
+      createMpClient("t", fn).createPreapproval(ALTA));
+
+    expect(err.status).toBe(400);
+    // Un 400 es nuestro request mal armado: reintentarlo no lo arregla.
+    expect(err.retryable).toBe(false);
+    expect(err.body).toHaveLength(500);
+  });
+
+  it("un 500 al crear SI es reintentable", async () => {
+    const { fn } = fakeFetch({ status: 500, texto: "boom" });
+
+    const err = await errorDe(() =>
+      createMpClient("t", fn).createPreapproval(ALTA));
+
+    expect(err.retryable).toBe(true);
+  });
+});

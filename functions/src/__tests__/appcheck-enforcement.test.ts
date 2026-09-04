@@ -100,6 +100,30 @@ const EXEMPTIONS: Readonly<Record<string, Exemption>> = {
       "a 0.5— asi que las dos transiciones que suben peso van juntas, con o sin " +
       "atestacion. Ver resume-trainer-link.ts:77.",
   },
+  "subscriptions/mp/create-preapproval:createPreapproval": {
+    // `debt` y no `decided`, a diferencia de los dos de arriba, y la diferencia
+    // NO es el motivo —es el mismo: el Coach Hub web no activa App Check y este
+    // callable se llama SOLO desde ahi— sino si lo queremos revertir. En un
+    // endpoint que abre un cobro, si.
+    permanence: "debt",
+    reason:
+      "Mismo motivo de plataforma que acceptTrainerLink: lo llama el Coach Hub " +
+      "web, que no activa App Check, asi que con el flag puesto ningun PF " +
+      "podria contratar. Pero es el unico callable del repo que inicia un " +
+      "COBRO, y por eso vale mas para un atacante que los otros dos. " +
+      "La superficie de abuso queda acotada por diseño, no por atestacion: el " +
+      "uid sale del token, el tier y el ciclo son enums cerrados, el monto sale " +
+      "de TIER_PRICES_ARS, el mail de request.auth.token.email, y la URL de " +
+      "retorno es una constante. Un atacante autenticado solo puede abrir " +
+      "checkouts a nombre PROPIO, y la ventana de idempotencia de " +
+      "mp_checkouts/{uid} los limita a uno por par (tier, ciclo) cada 30 " +
+      "minutos — seis en total. Ver create-preapproval.ts:263.",
+    exitCondition:
+      "Cuando el Coach Hub web active App Check (ReCaptcha v3 + site key en " +
+      "consola), poner el flag ACA PRIMERO, antes que en acceptTrainerLink y " +
+      "addAlias: es el de mayor valor para un atacante de los tres que hoy " +
+      "salen sin atestacion.",
+  },
   "auth/request-auth-email:requestPasswordReset": {
     permanence: "debt",
     reason:
@@ -161,6 +185,7 @@ const EXEMPTIONS: Readonly<Record<string, Exemption>> = {
 const EXPECTED_DEPLOYED = [
   "acceptTrainerLink",
   "addAlias",
+  "createPreapproval",
   "deleteAccount",
   "mintWatchCredential",
   "requestEmailVerification",
@@ -271,6 +296,12 @@ describe("QA-SEC-016: el guard falla cuando tiene que fallar", () => {
       module: "subscriptions/resume-trainer-link",
       symbol: "resumeTrainerLink",
       as: "resumeTrainerLink",
+      attested: false,
+    },
+    {
+      module: "subscriptions/mp/create-preapproval",
+      symbol: "createPreapproval",
+      as: "createPreapproval",
       attested: false,
     },
     { module: "mint-watch-credential", symbol: "mintWatchCredential", as: "mintWatchCredential", attested: false },
