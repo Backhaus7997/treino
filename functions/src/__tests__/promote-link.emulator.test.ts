@@ -24,7 +24,7 @@
  */
 
 import * as admin from "firebase-admin";
-import { App } from "firebase-admin/app";
+import { App, deleteApp } from "firebase-admin/app";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.GCLOUD_PROJECT = "treino-rules-test";
@@ -36,7 +36,7 @@ beforeAll(() => {
 });
 
 afterAll(async () => {
-  await testApp.delete();
+  await deleteApp(testApp);
 });
 
 import { syncTrainerLoad } from "../subscriptions/promote-link";

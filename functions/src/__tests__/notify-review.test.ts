@@ -12,7 +12,7 @@
  */
 
 import * as admin from "firebase-admin";
-import { App } from "firebase-admin/app";
+import { App, deleteApp } from "firebase-admin/app";
 import { Messaging, MulticastMessage } from "firebase-admin/messaging";
 import { notifyOnReviewHandler } from "../notifications/notify-review";
 
@@ -30,7 +30,7 @@ beforeAll(() => {
 });
 
 afterAll(async () => {
-  await testApp.delete();
+  await deleteApp(testApp);
 });
 
 const db = () => admin.firestore(testApp);

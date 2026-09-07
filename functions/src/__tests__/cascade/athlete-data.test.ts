@@ -7,7 +7,7 @@
  */
 
 import * as admin from "firebase-admin";
-import { App } from "firebase-admin/app";
+import { App, deleteApp } from "firebase-admin/app";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
@@ -23,7 +23,7 @@ beforeAll(() => {
 });
 
 afterAll(async () => {
-  await testApp.delete();
+  await deleteApp(testApp);
 });
 
 import { deleteAthleteOwnedData } from "../../cascade/athlete-data";

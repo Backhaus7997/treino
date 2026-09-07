@@ -15,7 +15,7 @@
  */
 
 import * as admin from "firebase-admin";
-import { App } from "firebase-admin/app";
+import { App, deleteApp } from "firebase-admin/app";
 import { BatchResponse, Messaging } from "firebase-admin/messaging";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
@@ -32,7 +32,7 @@ beforeAll(() => {
 });
 
 afterAll(async () => {
-  await testApp.delete();
+  await deleteApp(testApp);
 });
 
 // Import the module under test — will fail until implementation exists

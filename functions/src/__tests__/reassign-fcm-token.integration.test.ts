@@ -1,5 +1,5 @@
 import * as admin from "firebase-admin";
-import { App } from "firebase-admin/app";
+import { App, deleteApp } from "firebase-admin/app";
 import { DocumentReference, Firestore } from "firebase-admin/firestore";
 import { reassignFcmTokenHandler } from "../notifications/reassign-fcm-token";
 
@@ -16,7 +16,7 @@ beforeAll(() => {
 });
 
 afterAll(async () => {
-  await testApp.delete();
+  await deleteApp(testApp);
 });
 
 const db = (): Firestore => admin.firestore(testApp);

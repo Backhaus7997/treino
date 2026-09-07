@@ -33,7 +33,7 @@
  */
 
 import * as admin from "firebase-admin";
-import { App } from "firebase-admin/app";
+import { App, deleteApp } from "firebase-admin/app";
 import { Messaging, MulticastMessage } from "firebase-admin/messaging";
 import { notifyOnExerciseFeedbackHandler } from "../notifications/notify-exercise-feedback";
 import { dedupeKey } from "../mail/enqueue-mail";
@@ -54,7 +54,7 @@ beforeAll(() => {
 });
 
 afterAll(async () => {
-  await testApp.delete();
+  await deleteApp(testApp);
 });
 
 const db = () => admin.firestore(testApp);

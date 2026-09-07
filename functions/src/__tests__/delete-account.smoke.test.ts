@@ -21,7 +21,7 @@
  */
 
 import * as admin from "firebase-admin";
-import { App } from "firebase-admin/app";
+import { App, deleteApp } from "firebase-admin/app";
 
 // Point Admin SDK to emulators — must be set before any firebase-admin import
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
@@ -61,7 +61,7 @@ beforeAll(() => {
 });
 
 afterAll(async () => {
-  await smokeApp.delete();
+  await deleteApp(smokeApp);
 });
 
 // Wrap the callable handler for guard-layer tests
