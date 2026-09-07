@@ -42,7 +42,6 @@
  * Resend: antes habria encolado mail que despues fallaba con 403.
  */
 
-import * as admin from "firebase-admin";
 import { App, getApp, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
@@ -308,8 +307,7 @@ export async function runRequestEmailVerification(
       return OK;
     }
 
-    const link = await admin
-      .auth(app)
+    const link = await getAuth(app)
       .generateEmailVerificationLink(user.email);
 
     await enqueueMail(app, {

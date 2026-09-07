@@ -1,6 +1,11 @@
 # Propuesta — migrar `firebase-admin` de la API namespaced a los subpaths modulares
 
 **Estado:** en curso. PR 1 mergeado (`43a40af3`); PRs 2, 3 y 4 abiertos y en verde, encadenados.
+**⚠️ Cómo contar, o el error se repite:** la regex `admin\.<ns>` **se pierde las cadenas
+multilínea** (`await admin\n  .firestore(app)`). Con ella el PR 4b se saltó 12 sitios en 8 archivos
+y —peor— la verificación reportó «cero» y se publicó como tal. Contar SIEMPRE con
+`rg -oU 'admin\s*\.\s*(firestore|auth|storage|credential|app|apps|messaging|database)\b'`.
+
 **Avance medido:** de los 620 call sites quedan **473** — `functions/src` bajó de 238 a **81** y
 `admin.app.App` quedó en **cero**, o sea que la migración de TIPOS está completa. `functions/src/__tests__`
 y `scripts/` siguen enteros (PRs 5 a 10).
