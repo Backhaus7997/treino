@@ -29,6 +29,7 @@
 import * as admin from "firebase-admin";
 import { App } from "firebase-admin/app";
 import { Messaging } from "firebase-admin/messaging";
+import { Timestamp } from "firebase-admin/firestore";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { logger } from "firebase-functions";
 import { sendFcm } from "../notifications/send-fcm";
@@ -127,7 +128,7 @@ export async function notifyOverduePaymentsHandler(
       .where("trainerId", "==", trainerId)
       .where("athleteId", "==", athleteId)
       .where("status", "==", "pending")
-      .where("dueAt", "<=", admin.firestore.Timestamp.fromDate(now))
+      .where("dueAt", "<=", Timestamp.fromDate(now))
       .get();
 
     if (overdueSnap.empty) {
@@ -161,7 +162,7 @@ export async function notifyOverduePaymentsHandler(
 
       // Anti-spam: skip if notified within the last 7 days.
       const lastNotified = payment.lastOverdueNotifiedAt as
-        | admin.firestore.Timestamp
+        | Timestamp
         | null
         | undefined;
 
@@ -213,14 +214,14 @@ export async function notifyOverduePaymentsHandler(
           trainerName,
           amountLabel: formatArs(payment.amountArs as number | undefined),
           dueLabel: formatShortDateAR(
-            payment.dueAt as admin.firestore.Timestamp,
+            payment.dueAt as Timestamp,
           ),
         },
       });
 
       // ── Write lastOverdueNotifiedAt via Admin SDK (bypasses Firestore rules) ─
       await paymentDoc.ref.update({
-        lastOverdueNotifiedAt: admin.firestore.Timestamp.fromDate(now),
+        lastOverdueNotifiedAt: Timestamp.fromDate(now),
       });
 
       notified++;

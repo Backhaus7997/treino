@@ -61,6 +61,7 @@
 
 import * as admin from "firebase-admin";
 import { App } from "firebase-admin/app";
+import { FieldValue } from "firebase-admin/firestore";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 
@@ -114,7 +115,7 @@ export async function syncSessionShareHandler(
   const grantShare = async (reason: "transition" | "repair"): Promise<void> => {
     await shareRef.set({
       trainerId,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
     });
     logger.info("syncSessionShare: share granted", { trainerId, athleteId, reason });
   };

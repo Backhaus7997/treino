@@ -34,6 +34,7 @@
  */
 
 import * as admin from "firebase-admin";
+import { FieldValue } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 
 import {
@@ -170,7 +171,7 @@ export async function recordPlan(
     .doc(planId)
     .set({
       ...mapping,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
     });
 }
 
