@@ -27,6 +27,8 @@
  */
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
+import { Messaging } from "firebase-admin/messaging";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { logger } from "firebase-functions";
 import { sendFcm } from "../notifications/send-fcm";
@@ -37,7 +39,7 @@ import { artDateKey, formatArs, formatShortDateAR } from "../mail/format";
 // Lazy app singleton (project convention — mirrors generate-due-payments.ts)
 // ---------------------------------------------------------------------------
 
-function getApp(): admin.app.App {
+function getApp(): App {
   try {
     return admin.app();
   } catch {
@@ -77,9 +79,9 @@ export interface NotifyOverdueResult {
  * @returns Counts of notified, skipped, and scanned payment docs.
  */
 export async function notifyOverduePaymentsHandler(
-  app: admin.app.App,
+  app: App,
   now: Date,
-  messaging?: admin.messaging.Messaging,
+  messaging?: Messaging,
 ): Promise<NotifyOverdueResult> {
   const db = admin.firestore(app);
 

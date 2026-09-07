@@ -48,6 +48,7 @@
  */
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
 import * as functions from "firebase-functions/v2/https";
 import { HttpsError } from "firebase-functions/v2/https";
 
@@ -56,7 +57,7 @@ import { HttpsError } from "firebase-functions/v2/https";
  * modulo se pueda importar sin que exista una app previa (los tests crean su
  * propia app nombrada antes de importar). Copiado de add-alias.ts.
  */
-function getApp(): admin.app.App {
+function getApp(): App {
   try {
     return admin.app();
   } catch {
@@ -72,7 +73,7 @@ function getApp(): admin.app.App {
  *                   ESTE uid y ningun otro.
  */
 export async function runMintWatchCredential(
-  app: admin.app.App,
+  app: App,
   callerId: string,
 ): Promise<{ customToken: string }> {
   // Validado aca ademas de en el wrapper, para que el handler sea

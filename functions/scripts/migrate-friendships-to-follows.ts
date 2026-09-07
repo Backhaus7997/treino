@@ -82,6 +82,7 @@ import * as fs from "fs";
 import * as path from "path";
 
 import * as admin from "firebase-admin";
+import { Firestore } from "firebase-admin/firestore";
 
 export type FollowStatus = "pending" | "accepted";
 
@@ -591,7 +592,7 @@ async function main(): Promise<void> {
  * pasan a `skippedPair`.
  */
 async function writeEdges(
-  db: admin.firestore.Firestore,
+  db: Firestore,
   plan: Plan,
 ): Promise<Edge[]> {
   const written: Edge[] = [];

@@ -20,7 +20,9 @@
  */
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
 import { FieldValue } from "firebase-admin/firestore";
+import { Messaging } from "firebase-admin/messaging";
 import { logger } from "firebase-functions";
 
 const STALE_TOKEN_CODES = new Set([
@@ -74,9 +76,9 @@ export interface SendFcmResult {
  *                    Inject a mock in tests to avoid real FCM calls.
  */
 export async function sendFcm(
-  app: admin.app.App,
+  app: App,
   input: SendFcmInput,
-  messaging?: admin.messaging.Messaging,
+  messaging?: Messaging,
 ): Promise<SendFcmResult> {
   const { uids, kind, notification, data, actorUid } = input;
 

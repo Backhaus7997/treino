@@ -7,12 +7,13 @@
  * this trigger again.
  */
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
 import { logger } from "firebase-functions";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 
 type UserData = Record<string, unknown>;
 
-function getApp(): admin.app.App {
+function getApp(): App {
   try {
     return admin.app();
   } catch {
@@ -42,7 +43,7 @@ export function addedFcmTokens(
 
 /** Purely-invokable handler, extracted from the Firestore event wrapper. */
 export async function reassignFcmTokenHandler(
-  app: admin.app.App,
+  app: App,
   uid: string,
   before: UserData | undefined,
   after: UserData | undefined,

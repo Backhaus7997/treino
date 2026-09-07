@@ -56,6 +56,8 @@
  */
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
+import { DocumentData } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 
 import { effectiveWeightLimit } from "./effective-limit";
@@ -126,7 +128,7 @@ export interface SyncEntitlementsResult {
  * nunca toca.
  */
 export async function syncTrainerEntitlements(
-  app: admin.app.App,
+  app: App,
   trainerId: string,
   nowMs?: number,
 ): Promise<SyncEntitlementsResult> {
@@ -145,7 +147,7 @@ export async function syncTrainerEntitlements(
     const limit = effectiveWeightLimit(sub, clock);
 
     const rawLinks: BlockableLink[] = linksSnap.docs.map((doc) => {
-      const d = doc.data() as admin.firestore.DocumentData;
+      const d = doc.data() as DocumentData;
       // `acceptedAt` tampoco puede ir con cast a ciegas. Desde el slice 5
       // firestore.rules SI lo pinnea, y en los dos verbos: el `allow create` de
       // trainer_links solo admite null y el `allow update` lo congela

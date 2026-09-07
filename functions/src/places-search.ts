@@ -41,6 +41,7 @@
  */
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
 import * as functions from "firebase-functions/v2/https";
 import { HttpsError } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions";
@@ -52,7 +53,7 @@ import { FieldValue } from "firebase-admin/firestore";
  * their own named apps before importing).
  * Copied from add-alias.ts / review-aggregate.ts (same pattern).
  */
-function getApp(): admin.app.App {
+function getApp(): App {
   try {
     return admin.app();
   } catch {
@@ -190,7 +191,7 @@ async function fetchPlaceDetails(
  *                       Place Details per the gym-places-search spec
  */
 export async function runResolveGymPlace(
-  app: admin.app.App,
+  app: App,
   placeId: string,
   sessionToken?: string,
 ): Promise<ResolveGymPlaceResult> {

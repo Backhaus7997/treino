@@ -10,6 +10,7 @@
  */
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
 
 /**
  * Deletes the avatar file(s) for the given uid from Storage.
@@ -19,7 +20,7 @@ import * as admin from "firebase-admin";
  * (and other) avatars orphaned. Returns the number of objects deleted.
  */
 export async function deleteAvatar(
-  app: admin.app.App,
+  app: App,
   uid: string
 ): Promise<{ deleted: number }> {
   // Admin SDK bypasses Storage security rules (ADR-ACCDEL-013)
@@ -64,7 +65,7 @@ export async function deleteAvatar(
  * Returns the total number of objects deleted.
  */
 export async function deleteAthleteStorage(
-  app: admin.app.App,
+  app: App,
   uid: string
 ): Promise<{ deleted: number }> {
   const bucket = admin.storage(app).bucket();

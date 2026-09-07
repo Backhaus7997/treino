@@ -24,6 +24,7 @@
  */
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { defineSecret, defineString } from "firebase-functions/params";
 import { logger } from "firebase-functions";
@@ -65,7 +66,7 @@ const MAIL_FROM = defineString("MAIL_FROM", {
 /** Past this many attempts a document is declared permanently failed. */
 const MAX_ATTEMPTS = 5;
 
-function getApp(): admin.app.App {
+function getApp(): App {
   try {
     return admin.app();
   } catch {
@@ -80,7 +81,7 @@ function getApp(): admin.app.App {
  *          permanent conditions, never worth a retry.
  */
 async function resolveAddress(
-  app: admin.app.App,
+  app: App,
   uid: string,
 ): Promise<string | null> {
   try {
@@ -101,7 +102,7 @@ async function resolveAddress(
  * @returns true when the mail may be sent.
  */
 async function emailChannelAllowed(
-  app: admin.app.App,
+  app: App,
   uid: string,
   prefKey: string,
 ): Promise<boolean> {
@@ -127,7 +128,7 @@ async function emailChannelAllowed(
  *                 from the RESEND_API_KEY secret.
  */
 export async function sendQueuedMailHandler(
-  app: admin.app.App,
+  app: App,
   mailId: string,
   // Se reasigna con la lectura fresca de abajo. Ver el bloque que explica por
   // qué el snapshot del evento no alcanza.

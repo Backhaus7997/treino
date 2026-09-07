@@ -10,6 +10,7 @@
  */
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
 
 /** IANA zone for Argentina. No DST since 2009, but let Intl own that. */
 const AR_TIME_ZONE = "America/Argentina/Buenos_Aires";
@@ -113,7 +114,7 @@ export function formatArs(amountArs: number | undefined): string {
  * @param fallback - Copy used when the profile or the field is missing.
  */
 export async function resolveDisplayName(
-  app: admin.app.App,
+  app: App,
   uid: string,
   fallback: string,
 ): Promise<string> {
@@ -131,7 +132,7 @@ export async function resolveDisplayName(
 
 /** `resolveDisplayName` with the trainer-facing fallback. */
 export function resolveTrainerName(
-  app: admin.app.App,
+  app: App,
   uid: string,
 ): Promise<string> {
   return resolveDisplayName(app, uid, TRAINER_FALLBACK);
@@ -139,7 +140,7 @@ export function resolveTrainerName(
 
 /** `resolveDisplayName` with the athlete-facing fallback. */
 export function resolveAthleteName(
-  app: admin.app.App,
+  app: App,
   uid: string,
 ): Promise<string> {
   return resolveDisplayName(app, uid, ATHLETE_FALLBACK);
