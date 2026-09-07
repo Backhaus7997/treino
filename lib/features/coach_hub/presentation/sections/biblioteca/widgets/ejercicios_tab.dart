@@ -21,16 +21,9 @@ import '../../../widgets/empty_state/empty_state.dart';
 import '../providers/biblioteca_providers.dart';
 import 'biblioteca_filter_chips.dart';
 import 'exercise_detail_dialog.dart';
-import 'exercise_detail_panel.dart';
 import 'exercise_grid_card.dart';
 
 const double _filterColumnWidth = 232;
-
-/// Piso de la sección para las tres columnas.
-///
-/// 232 de filtros + 40 de gutters + 420 de panel + 836 de grilla: cuatro
-/// cards de al menos 200 y tres gutters de 12. Total: 1528 px lógicos.
-const double kBibliotecaThreeColumnMinWidth = 1528;
 
 /// Delegate adaptativo del tramo compact, compartido con su skeleton.
 const _adaptiveGridDelegate = SliverGridDelegateWithMaxCrossAxisExtent(
@@ -64,20 +57,17 @@ class EjerciciosTab extends ConsumerWidget {
     final query = ref.watch(bibliotecaQueryProvider);
     final muscles = ref.watch(bibliotecaMuscleFilterProvider);
     final equipment = ref.watch(bibliotecaEquipmentFilterProvider);
-    final selected = ref.watch(bibliotecaSelectedExerciseProvider);
     final filterSignature = _filterSignature(query, muscles, equipment);
     final isDesktop = rsp.viewportFor(MediaQuery.sizeOf(context).width) ==
         rsp.Viewport.desktop;
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final showSideFilters = isDesktop;
-        final showDetailPanel = isDesktop &&
-            constraints.maxWidth >= kBibliotecaThreeColumnMinWidth;
-
+        // El drawer se superpone, asi que el unico gate es "esto es desktop"
+        // (ADR-CHW-004). No hay un ancho minimo extra que alcanzar.
         void openExercise(Exercise exercise) {
           final ownerId = resolveOwnerId(ref, exercise.category);
-          if (showDetailPanel) {
+          if (isDesktop) {
             ref.read(bibliotecaSelectedExerciseProvider.notifier).state = (
               exerciseId: exercise.id,
               ownerId: ownerId,
@@ -96,14 +86,14 @@ class EjerciciosTab extends ConsumerWidget {
         final results = _ExerciseResults(
           exercisesAsync: exercisesAsync,
           filterSignature: filterSignature,
-          fixedFourColumns: showSideFilters,
+          fixedFourColumns: isDesktop,
           onQueryChanged: (value) {
             ref.read(bibliotecaQueryProvider.notifier).state = value;
           },
           onExerciseTap: openExercise,
         );
 
-        if (!showSideFilters) {
+        if (!isDesktop) {
           return Column(
             children: [
               _SearchField(onChanged: results.onQueryChanged),
@@ -116,9 +106,22 @@ class EjerciciosTab extends ConsumerWidget {
           );
         }
 
-        return Row(
+        // Filtros a la DERECHA y contenido al centro: el mismo reparto que el
+        // editor de rutinas, donde el picker vive a la derecha y el plan al
+        // medio. Dos secciones del mismo Hub no pueden mandar la lista
+        // auxiliar a lados distintos.
+        final base = Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Expanded(
+              child: Column(
+                children: [
+                  _SearchField(onChanged: results.onQueryChanged),
+                  Expanded(child: results),
+                ],
+              ),
+            ),
+            const SizedBox(width: AppSpacing.s20),
             Container(
               key: const Key('biblioteca_filter_column'),
               width: _filterColumnWidth,
@@ -133,31 +136,10 @@ class EjerciciosTab extends ConsumerWidget {
                 child: const BibliotecaFilterChips(vertical: true),
               ),
             ),
-            const SizedBox(width: AppSpacing.s20),
-            Expanded(
-              child: Column(
-                children: [
-                  _SearchField(onChanged: results.onQueryChanged),
-                  Expanded(child: results),
-                ],
-              ),
-            ),
-            if (showDetailPanel && selected != null) ...[
-              const SizedBox(width: AppSpacing.s20),
-              ExerciseDetailPanel(
-                key: const Key('biblioteca_detail_panel'),
-                exerciseId: selected.exerciseId,
-                ownerId: selected.ownerId,
-                exerciseName: selected.exerciseName,
-                onClose: () {
-                  ref
-                      .read(bibliotecaSelectedExerciseProvider.notifier)
-                      .state = null;
-                },
-              ),
-            ],
           ],
         );
+
+        return base;
       },
     );
   }
