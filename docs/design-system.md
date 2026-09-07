@@ -574,6 +574,51 @@ ya está.** El único par a 1px de la escala es `bodyDense`/`body` (13/14), y es
 justificado porque TREINO sirve una app de teléfono y un panel de escritorio
 desde el mismo código. Hay un test que lo verifica en `primitives_test.dart`.
 
+### 6. Nunca spacing fuera de la escala
+
+```dart
+// ❌ MAL — 16 y 24 están prohibidos por nombre en AGENTS.md §2
+SizedBox(height: 16);
+EdgeInsets.all(24);
+
+// ✅ BIEN
+SizedBox(height: AppSpacing.s14);
+EdgeInsets.all(AppSpacing.s20);
+```
+
+El test `test/app/theme/tokens/no_off_scale_spacing_scan_test.dart` falla si se
+agrega un valor fuera de `8 · 12 · 14 · 18 · 20` (+ `4` hairline, + `0`) en un
+`SizedBox` de separación o en un `EdgeInsets`. Corre en CI, mismas cuatro reglas
+de ratchet que los otros tres guards.
+
+**Este guard mira el VALOR, no el literal** — y ahí se separa de los otros tres.
+`Radius.circular(16)` está mal aunque 16 sea `AppRadius.md`, porque el objetivo
+de ese guard es que se use el token. Acá `SizedBox(height: 8)` **pasa**: cumple
+la regla tal como está escrita. Usar `AppSpacing.s8` es mejor y se recomienda,
+pero exigirlo sería inventar una regla más estricta que la acordada y convertir
+1407 usos correctos en deuda. Lo que este guard persigue es el daño real: el
+`16` y el `24` que se cuelan.
+
+Al congelarse había **982 valores fuera de escala en 166 archivos**, y los tres
+más usados eran `16` (192), `10` (186) y `24` (180). O sea: 372 ocurrencias de
+una regla escrita en la constitución del repo, sin nadie que la mirara.
+
+#### Excepciones a la escala de spacing
+
+Antes de pedir una excepción, chequeá si tu número es **spacing o layout**. El
+ancho de un panel, el alto de una card, el despeje de la bottom bar: eso no es
+spacing, y meterlo en un `EdgeInsets` es lo que lo hace parecer una violación.
+Sacalo a una constante con nombre —`_kPanelWidth`, `_kBottomBarClearance`— y
+además de salir del scanner, el número pasa a decir qué es.
+
+Si de verdad necesitás un valor de separación fuera de escala, el proceso es el
+mismo que en radios y tipografía: issue con la evidencia, y con el diseño
+aprobado se decide con el reviewer entre ampliar la escala o aceptar la
+excepción subiendo los techos. Ampliar la escala de spacing es **la opción menos
+probable de las tres**: `8 · 12 · 14 · 18 · 20` es corta a propósito, y casi
+todo lo que se pide como `16` entra en `14` o en `18` sin que nadie note la
+diferencia.
+
 ---
 
 ## Componentes base disponibles
