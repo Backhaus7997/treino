@@ -280,7 +280,7 @@ async function borrarEnBatches(db, docs) {
 }
 
 /**
- * Lee los `terminated` PAGINANDO por `requestedAt`.
+ * Lee los `terminated` PAGINANDO por ID DE DOCUMENTO.
  *
  * El `.get()` pelado traía todo de una: el Admin SDK bufferea el resultado
  * entero y acá además se retiene un objeto por doc. Con decenas de miles la
@@ -288,18 +288,29 @@ async function borrarEnBatches(db, docs) {
  * línea — o sea que fallaba justo en el escenario de backlog acumulado para el
  * que este script existe.
  *
- * El cursor va por `requestedAt` porque es el único campo que `firestore.rules`
- * pinea inmutable en el update y que todo doc tiene
- * (`TrainerLinkRepository.request` lo escribe siempre).
+ * POR QUÉ EL CURSOR VA POR `__name__` Y NO POR `requestedAt`, que es lo que
+ * parecía natural: una igualdad + `orderBy` sobre OTRO campo es una query
+ * COMPUESTA y Firestore la rechaza con FAILED_PRECONDITION hasta que exista el
+ * índice. Ordenar por el id de documento la sirve el índice AUTOMÁTICO de un
+ * solo campo —`__name__` es su desempate—, así que no hace falta declarar nada
+ * ni correr `deploy --only firestore:indexes`, que además trae prompt de
+ * borrado de los huérfanos que viven en prod a propósito
+ * (docs/firestore-indexes.md).
+ *
+ * ⚠️  EL EMULADOR NO VALIDA ESTO. La primera versión de esta paginación
+ *     ordenaba por `requestedAt`, pasó una prueba con 1200 docs sembrados en el
+ *     emulador, y reventó contra producción en la primera query: el emulador de
+ *     Firestore NO exige índices compuestos. Para este script, un dry-run
+ *     verde en el emulador no dice nada sobre índices.
  */
-async function leerTerminados(db, onPagina) {
+async function leerTerminados(db, FieldPath, onPagina) {
   let cursor = null;
   let total = 0;
   for (;;) {
     let q = db
       .collection('trainer_links')
       .where('status', '==', 'terminated')
-      .orderBy('requestedAt')
+      .orderBy(FieldPath.documentId())
       .limit(PAGE_SIZE);
     if (cursor) q = q.startAfter(cursor);
 
@@ -355,7 +366,7 @@ async function main() {
   // campo. La lectura va paginada — ver `leerTerminados`.
   console.log('');
   const grupos = { borra: [], ambiguo: [], conserva: [] };
-  const total = await leerTerminados(db, (docs) => {
+  const total = await leerTerminados(db, admin.firestore.FieldPath, (docs) => {
     for (const doc of docs) {
       const data = doc.data();
       grupos[clasificar(data)].push({
