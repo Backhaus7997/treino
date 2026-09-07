@@ -22,6 +22,8 @@ const {
   clasificar,
   desglosePorRazon,
   parseArgs,
+  contarBorradosReales,
+  paginasDe,
 } = require('../cleanup_rejected_links');
 
 test('clasificar — rechazo del PF: acceptedAt null + declined → borra', () => {
@@ -162,4 +164,61 @@ test('parseArgs — --incluir-ambiguos no implica borrar', () => {
     parseArgs(['node', 'x', '--incluir-ambiguos']).incluirAmbiguos,
     true,
   );
+});
+
+// ── El conteo tiene que ser honesto ────────────────────────────────────────
+//
+// `borrados += chunk.length` contaba OPERACIONES EMITIDAS, no documentos que
+// existían: un `batch.delete()` sobre un doc ya borrado resuelve OK. Y desde
+// que la CF purga en paralelo, la ventana entre el `.get()` y los commits es
+// real. La línea final podía afirmar un número mayor al verdadero — un mensaje
+// tranquilizador sin verificar, que es lo que AGENTS.md §11.1 prohíbe.
+
+test('contarBorradosReales — cuenta sólo los que existían', () => {
+  const existian = new Set(['a', 'c']);
+  assert.strictEqual(
+    contarBorradosReales([{ id: 'a' }, { id: 'b' }, { id: 'c' }], existian),
+    2,
+  );
+});
+
+test('contarBorradosReales — ninguno existía: cero, no tres', () => {
+  assert.strictEqual(
+    contarBorradosReales([{ id: 'a' }, { id: 'b' }, { id: 'c' }], new Set()),
+    0,
+  );
+});
+
+test('contarBorradosReales — chunk vacío', () => {
+  assert.strictEqual(contarBorradosReales([], new Set(['a'])), 0);
+});
+
+// ── Paginación ─────────────────────────────────────────────────────────────
+//
+// El `.get()` traía TODO de una. Con decenas de miles de docs muere por
+// DEADLINE_EXCEEDED o por memoria antes de imprimir una línea — o sea que
+// falla exactamente en el escenario de backlog acumulado para el que existe.
+
+test('paginasDe — parte en chunks del tamaño pedido', () => {
+  const docs = Array.from({ length: 5 }, (_, i) => ({ id: `d${i}` }));
+  assert.deepStrictEqual(
+    paginasDe(docs, 2).map((p) => p.map((d) => d.id)),
+    [['d0', 'd1'], ['d2', 'd3'], ['d4']],
+  );
+});
+
+test('paginasDe — un chunk exacto no genera uno vacío al final', () => {
+  const docs = [{ id: 'a' }, { id: 'b' }];
+  assert.strictEqual(paginasDe(docs, 2).length, 1);
+});
+
+test('paginasDe — lista vacía no genera páginas', () => {
+  assert.deepStrictEqual(paginasDe([], 500), []);
+});
+
+test('paginasDe — respeta el límite de 500 de WriteBatch', () => {
+  const docs = Array.from({ length: 1001 }, (_, i) => ({ id: `d${i}` }));
+  const paginas = paginasDe(docs, 500);
+  assert.strictEqual(paginas.length, 3);
+  assert.ok(paginas.every((p) => p.length <= 500));
 });
