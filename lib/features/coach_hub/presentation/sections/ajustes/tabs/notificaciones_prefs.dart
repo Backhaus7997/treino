@@ -53,6 +53,13 @@ class NotifType {
 /// Trazabilidad fila → Cloud Function (`functions/src/`):
 ///   nueva_solicitud    → notifications/notify-link-change.ts, rama `pending`
 ///   vinculo_finalizado → notifications/notify-link-change.ts, rama `terminated`
+///                        — pero YA NO las cuatro causas. Desde que esa rama se
+///                        parte por `terminationReason`, al PF le llega el fin
+///                        de un vínculo real y la cancelación del alumno; su
+///                        PROPIO rechazo (`declined`) ya no, porque avisarle de
+///                        lo que acaba de hacer era ruido. La fila sigue siendo
+///                        honesta: "Vínculo finalizado" es exactamente lo que
+///                        queda debajo.
 ///   resena_nueva       → notifications/notify-review.ts
 ///   sesion_cancelada   → notifications/notify-appointment.ts, rama `cancelled`
 ///   mensaje_nuevo      → notifications/notify-chat-message.ts

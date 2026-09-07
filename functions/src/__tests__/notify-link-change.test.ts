@@ -8,6 +8,8 @@
  *   SCENARIO-637 — new link (pending) → notify trainer
  *   SCENARIO-638 — pending → active → notify athlete
  *   SCENARIO-639 — active → terminated (no reason) → notify BOTH
+ *   SCENARIO-W1-a — pending → terminated 'declined' → notify SOLO al alumno
+ *   SCENARIO-W1-b — pending → terminated 'cancelled-by-athlete' → notify SOLO al PF
  *   SCENARIO-640 — reason === 'account-deleted' → sendFcm NOT called
  *   SCENARIO-641 — before.status === after.status → sendFcm NOT called (no-op)
  *   SCENARIO-642 — active → paused → notify athlete (pausada)
@@ -187,6 +189,148 @@ describe("SCENARIO-639: active→terminated, no reason → notify BOTH parties",
     expect(callArg.tokens).toContain("trainer-token-639");
     expect(callArg.tokens).toContain("athlete-token-639");
     expect(callArg.data?.deepLink).toBe("/coach");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SCENARIO-W1-a / W1-b — `terminated` partido por `terminationReason`
+//
+// Hasta acá las CUATRO causas de `terminated` compartían el texto "La
+// vinculación entre atleta y entrenador fue finalizada". Para un rechazo eso
+// es falso —nunca hubo vinculación— y se lo comía justo el alumno rechazado.
+// ---------------------------------------------------------------------------
+describe("terminated partido por terminationReason", () => {
+  const trainerId = "trainer-link-w1";
+  const athleteId = "athlete-link-w1";
+
+  /**
+   * Borra `users/{uid}/notifications`.
+   *
+   * `cleanup()` borra el doc del usuario, pero Firestore NO cascadea
+   * subcolecciones: las filas de historial sobreviven al padre y se acumulan
+   * entre tests Y entre corridas. Sin esto, la aserción de abajo veía 7 filas
+   * en vez de 1 — y peor, habría pasado en verde el día que el handler dejara
+   * de escribir historial, porque las viejas seguirían ahí.
+   */
+  async function limpiarHistorial(uid: string): Promise<void> {
+    const snap = await db().collection("users").doc(uid)
+      .collection("notifications").get();
+    await Promise.all(snap.docs.map((d) => d.ref.delete()));
+  }
+
+  beforeEach(async () => {
+    await seedUser(trainerId, ["trainer-token-w1"]);
+    await seedUser(athleteId, ["athlete-token-w1"]);
+    await limpiarHistorial(trainerId);
+    await limpiarHistorial(athleteId);
+  });
+
+  afterEach(() => cleanup(trainerId, athleteId));
+
+  it("SCENARIO-W1-a: 'declined' notifica SOLO al alumno, no al PF que rechazó", async () => {
+    const mock = makeMockMessaging();
+
+    await notifyOnLinkChangeHandler(
+      testApp,
+      "link-test",
+      { trainerId, athleteId, status: "pending" },
+      { trainerId, athleteId, status: "terminated", terminationReason: "declined" },
+      mock,
+    );
+
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock
+      .calls[0][0] as admin.messaging.MulticastMessage;
+    expect(callArg.tokens).toEqual(["athlete-token-w1"]);
+    expect(callArg.tokens).not.toContain("trainer-token-w1");
+  });
+
+  it("SCENARIO-W1-a: el copy NO dice 'vinculación finalizada'", async () => {
+    const mock = makeMockMessaging();
+
+    await notifyOnLinkChangeHandler(
+      testApp,
+      "link-test",
+      { trainerId, athleteId, status: "pending" },
+      { trainerId, athleteId, status: "terminated", terminationReason: "declined" },
+      mock,
+    );
+
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock
+      .calls[0][0] as admin.messaging.MulticastMessage;
+    expect(callArg.notification?.title).toBe("Solicitud no aceptada");
+    expect(callArg.notification?.body).toContain("no aceptó tu solicitud");
+    // La mentira vieja, pineada explícitamente para que no vuelva.
+    expect(callArg.notification?.body).not.toContain("vinculación entre atleta");
+  });
+
+  it("SCENARIO-W1-a: la fila de historial del alumno registra QUIÉN lo rechazó", async () => {
+    // La rama `terminated` era la única de las cuatro sin `actorUid`: el
+    // historial no guardaba quién había actuado.
+    const mock = makeMockMessaging();
+
+    await notifyOnLinkChangeHandler(
+      testApp,
+      "link-test",
+      { trainerId, athleteId, status: "pending" },
+      { trainerId, athleteId, status: "terminated", terminationReason: "declined" },
+      mock,
+    );
+
+    const snap = await db()
+      .collection("users")
+      .doc(athleteId)
+      .collection("notifications")
+      .get();
+
+    expect(snap.size).toBe(1);
+    expect(snap.docs[0].data().actorUid).toBe(trainerId);
+    expect(snap.docs[0].data().kind).toBe("link-change");
+  });
+
+  it("SCENARIO-W1-b: 'cancelled-by-athlete' notifica SOLO al PF", async () => {
+    const mock = makeMockMessaging();
+
+    await notifyOnLinkChangeHandler(
+      testApp,
+      "link-test",
+      { trainerId, athleteId, status: "pending" },
+      {
+        trainerId,
+        athleteId,
+        status: "terminated",
+        terminationReason: "cancelled-by-athlete",
+      },
+      mock,
+    );
+
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock
+      .calls[0][0] as admin.messaging.MulticastMessage;
+    expect(callArg.tokens).toEqual(["trainer-token-w1"]);
+    expect(callArg.notification?.title).toBe("Solicitud cancelada");
+  });
+
+  it("un terminate REAL sigue notificando a los dos (ADR-PN-007 intacto)", async () => {
+    const mock = makeMockMessaging();
+
+    await notifyOnLinkChangeHandler(
+      testApp,
+      "link-test",
+      { trainerId, athleteId, status: "active" },
+      {
+        trainerId,
+        athleteId,
+        status: "terminated",
+        terminationReason: "switched_trainer",
+        acceptedAt: new Date(),
+      },
+      mock,
+    );
+
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock
+      .calls[0][0] as admin.messaging.MulticastMessage;
+    expect(callArg.tokens).toContain("trainer-token-w1");
+    expect(callArg.tokens).toContain("athlete-token-w1");
+    expect(callArg.notification?.title).toBe("Vinculación finalizada");
   });
 });
 

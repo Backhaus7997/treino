@@ -13,7 +13,9 @@
  *       pending → active → notify athlete (aceptada), deepLink "/coach"
  *       active → paused → notify athlete (pausada), deepLink "/coach"
  *       paused → active → notify athlete (reanudada), deepLink "/coach"
- *       * → terminated → notify BOTH, deepLink "/coach"
+ *       terminated + reason 'declined' → notify ATHLETE (el PF rechazó)
+ *       terminated + reason 'cancelled-by-athlete' → notify TRAINER
+ *       * → terminated (resto) → notify BOTH, deepLink "/coach"
  *   - All user-facing strings in es-AR.
  *   - Tail effect: a `terminated` link that was NEVER accepted is DELETED after
  *     the notification goes out (purge-rejected-link.ts). It lives here, and
@@ -155,7 +157,7 @@ export async function notifyOnLinkChangeHandler(
     return;
   }
 
-  const deepLink = "/coach"; // i18n: Fase 6 Etapa 2 (deepLink is not user-facing copy)
+  let deepLink = "/coach"; // i18n: Fase 6 Etapa 2 (deepLink is not user-facing copy)
   let recipientUids: string[];
   let title: string;
   let body: string;
@@ -185,10 +187,47 @@ export async function notifyOnLinkChangeHandler(
     title = "Vinculación pausada"; // i18n: Fase 6 Etapa 3
     body = "Tu PF pausó el vínculo."; // i18n: Fase 6 Etapa 3
   } else if (afterStatus === "terminated") {
-    // Link terminated → notify BOTH (ADR-PN-007, locked decision #2).
-    recipientUids = [athleteId, trainerId];
-    title = "Vinculación finalizada"; // i18n: Fase 6 Etapa 2
-    body = "La vinculación entre atleta y entrenador fue finalizada."; // i18n: Fase 6 Etapa 2
+    // `terminated` es el MISMO estado para cuatro cosas, y hasta acá las cuatro
+    // recibían el mismo texto: "La vinculación entre atleta y entrenador fue
+    // finalizada". Para un RECHAZO eso es falso — nunca hubo vinculación. Es el
+    // defecto de AGENTS.md §11.1 (un mensaje que describe mal lo que pasó), y
+    // le llegaba a la persona a la que peor le cae leerlo.
+    //
+    // ADR-PN-007 lockeó "terminated → notify BOTH". Esto lo ANGOSTA para los
+    // dos casos en los que `terminationReason` dice QUIÉN actuó, y ahí manda a
+    // la CONTRAPARTE con `actorUid`, que es exactamente lo que hacen las otras
+    // tres ramas. El notify-BOTH sin actor se conserva para el resto, donde el
+    // modelo sigue sin saber quién terminó el vínculo (`terminate` lo pueden
+    // llamar los dos).
+    const terminationReason = after.terminationReason as string | undefined;
+
+    if (terminationReason === "declined") {
+      // El PF rechazó una solicitud. Avisarle a ÉL de su propia acción es ruido.
+      const trainerName = await resolveTrainerName(app, trainerId);
+      recipientUids = [athleteId];
+      actorUid = trainerId;
+      title = "Solicitud no aceptada"; // i18n: Fase W1
+      // El destino y el texto tienen que decir lo mismo: `/coach` es la
+      // discovery, o sea el lugar donde puede hacer algo. Mandarlo al perfil
+      // del PF que lo rechazó sería un callejón sin salida.
+      body = `${trainerName} no aceptó tu solicitud. ` +
+        "Podés buscar otro entrenador."; // i18n: Fase W1
+    } else if (terminationReason === "cancelled-by-athlete") {
+      // El alumno se arrepintió antes de que el PF contestara. El que necesita
+      // enterarse es el PF: tiene una solicitud menos en la bandeja.
+      const athleteName = await resolveAthleteName(app, athleteId);
+      recipientUids = [trainerId];
+      actorUid = athleteId;
+      title = "Solicitud cancelada"; // i18n: Fase W1
+      body = `${athleteName} canceló su solicitud de vinculación.`; // i18n: Fase W1
+      deepLink = "/coach"; // explícito: la bandeja del PF vive acá
+    } else {
+      // `terminate` y `switched_trainer`: acá SÍ hubo vínculo y el modelo no
+      // sabe quién lo cortó. Se mantiene ADR-PN-007 tal cual.
+      recipientUids = [athleteId, trainerId];
+      title = "Vinculación finalizada"; // i18n: Fase 6 Etapa 2
+      body = "La vinculación entre atleta y entrenador fue finalizada."; // i18n: Fase 6 Etapa 2
+    }
   } else {
     logger.info("notifyOnLinkChange: unhandled status transition, skipping", {
       beforeStatus,
