@@ -99,25 +99,41 @@ export interface MpPreapproval {
 }
 
 /**
- * Lo que hay que decirle a MP para abrir una suscripcion.
+ * Un PLAN de suscripcion. Es a donde se manda al PF, y la razon por la que
+ * existe es de producto, no tecnica.
  *
- * NO lleva `preapproval_plan_id`. Se crea la suscripcion con el monto EXPLICITO
- * y no contra un plan preconfigurado en el panel de MP, por una razon que
- * condiciona todo lo que viene: **MP no devuelve `preapproval_plan_id` en la
- * respuesta**, solo lo acepta en el request. Atarse a planes del panel nos
- * dejaria sin poder preguntar de que plan es una suscripcion — y encima con la
- * tabla de precios viviendo en dos lugares, el panel y `tier-config.ts`.
+ * ── Por que planes y no `/preapproval` directo ──
  *
- * Con monto explicito la tabla queda en UN lugar, el servidor, y el tier se
- * recupera del monto (ver `tier-mapping.ts`).
+ * Crear una suscripcion SIN plan obliga a mandar `payer_email`, y MP ATA el
+ * cobro a ese mail: quien paga tiene que estar logueado con el. Eso dejaba sin
+ * poder pagar a todo PF cuya cuenta de Mercado Pago use otro mail que su cuenta
+ * de TREINO — la mitad de la gente — y el error le aparecia recien adentro del
+ * checkout, donde ya no lo puede corregir. Verificado a mano contra la API.
+ *
+ * El plan NO pide `payer_email`: devuelve su propio `init_point` y **MP le
+ * pregunta al pagador quien es**. Cualquier cuenta, cualquier mail.
+ *
+ * ── Un plan POR CHECKOUT, no seis planes fijos ──
+ *
+ * El `external_reference` vive en el PLAN, no en cada suscripcion. Con seis
+ * planes fijos (3 tiers x 2 ciclos) todos los PF que compren el mismo plan
+ * compartirian ese campo y perderiamos a quien acreditarle el cupo.
+ *
+ * Creando uno por checkout, cada plan lleva el uid de SU comprador.
  */
-export interface CreatePreapprovalInput {
+export interface MpPreapprovalPlan {
+  id?: unknown;
+  init_point?: unknown;
+  external_reference?: unknown;
+  status?: unknown;
+  auto_recurring?: unknown;
+}
+
+export interface CreatePreapprovalPlanInput {
   /** Lo que el PF ve como concepto del cobro en su resumen. */
   reason: string;
-  /** Nuestro enganche: el uid de Firebase. Vuelve en cada GET. */
+  /** Nuestro enganche: el uid de Firebase. */
   externalReference: string;
-  /** MP lo exige. Es el mail con el que el PF paga, no necesariamente el suyo. */
-  payerEmail: string;
   /** A donde vuelve el navegador despues del checkout. */
   backUrl: string;
   transactionAmount: number;
@@ -129,14 +145,22 @@ export interface MpClient {
   /** Lee una suscripcion. Es la FUENTE DE LA VERDAD de todo el sistema. */
   getPreapproval(preapprovalId: string): Promise<MpPreapproval>;
   /**
-   * Abre una suscripcion. Devuelve el preapproval con `id` e `init_point` —
-   * la URL a la que hay que mandar al PF para que autorice el pago.
-   *
-   * NO deja la suscripcion activa: la deja en `pending` hasta que el PF pone
-   * su medio de pago. Por eso quien llame a esto NO puede escribir
-   * `subscription` — eso lo hace el reconciliador cuando MP diga `authorized`.
+   * Crea un plan y devuelve su `init_point`. Ver [MpPreapprovalPlan] para por
+   * que el checkout va por acá y no por `createPreapproval`.
    */
-  createPreapproval(input: CreatePreapprovalInput): Promise<MpPreapproval>;
+  createPreapprovalPlan(
+    input: CreatePreapprovalPlanInput,
+  ): Promise<MpPreapprovalPlan>;
+  /**
+   * Las suscripciones creadas contra un plan. Normalmente 0 (nadie pago
+   * todavia) o 1.
+   *
+   * El reconciliador busca POR PLAN y no por el `external_reference` de la
+   * suscripcion, a proposito: no esta verificado que la suscripcion herede ese
+   * campo del plan, y el plan lo creamos nosotros con un id que ya guardamos.
+   * Buscar por lo que sabemos con certeza en vez de por lo que suponemos.
+   */
+  searchPreapprovalsByPlan(planId: string): Promise<MpPreapproval[]>;
 }
 
 /**
@@ -217,17 +241,14 @@ export function createMpClient(
       );
     },
 
-    async createPreapproval(
-      input: CreatePreapprovalInput,
-    ): Promise<MpPreapproval> {
-      // Chequeos que fallan ANTES de salir a la red. Un monto en 0 o un
-      // externalReference vacio no son errores de MP: son bugs nuestros, y
-      // descubrirlos por un 400 los disfraza de problema de ellos.
+    async createPreapprovalPlan(
+      input: CreatePreapprovalPlanInput,
+    ): Promise<MpPreapprovalPlan> {
+      // Falla ANTES de salir a la red: un monto en 0 o un externalReference
+      // vacio no son errores de MP, son bugs nuestros, y descubrirlos por un
+      // 400 los disfraza de problema de ellos.
       if (!input.externalReference) {
         throw new MpApiError("mp/client: externalReference vacio", 0);
-      }
-      if (!input.payerEmail) {
-        throw new MpApiError("mp/client: payerEmail vacio", 0);
       }
       if (!Number.isFinite(input.transactionAmount) ||
           input.transactionAmount <= 0) {
@@ -244,24 +265,35 @@ export function createMpClient(
         );
       }
 
-      return request("/preapproval", "POST", {
+      // SIN `payer_email`: ese es el punto entero de usar un plan. MP le
+      // pregunta al pagador quien es en el checkout.
+      return request("/preapproval_plan", "POST", {
         reason: input.reason,
         external_reference: input.externalReference,
-        payer_email: input.payerEmail,
         back_url: input.backUrl,
-        // `pending` y no `authorized`: la suscripcion nace SIN medio de pago.
-        // El PF lo carga en el `init_point` y recien ahi MP la mueve.
-        status: "pending",
         auto_recurring: {
           frequency: input.frequencyMonths,
-          // "months" y no "years" para el anual: `months` esta documentado en
-          // los tipos del SDK y `years` no aparece. 12 meses es lo mismo y no
-          // depende de un valor que no pudimos verificar.
           frequency_type: "months",
           transaction_amount: input.transactionAmount,
           currency_id: "ARS",
         },
       });
     },
+
+    async searchPreapprovalsByPlan(planId: string): Promise<MpPreapproval[]> {
+      if (!planId) {
+        throw new MpApiError("mp/client: planId vacio", 0);
+      }
+      const res = await request(
+        `/preapproval/search?preapproval_plan_id=${encodeURIComponent(planId)}`,
+        "GET",
+      );
+      const results = (res as { results?: unknown }).results;
+      // Un `results` que no es array se trata como vacio y NO como error: MP
+      // devolviendo algo raro no puede hacer que el barrido se caiga para
+      // todos los demas PF.
+      return Array.isArray(results) ? (results as MpPreapproval[]) : [];
+    },
+
   };
 }

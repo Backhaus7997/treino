@@ -82,14 +82,22 @@ function fakeApp(seed: Store = {}) {
   return { app: app as never, store, escrituras };
 }
 
-function fakeMp(respuesta: MpPreapproval | Error): { mpClient: MpClient } {
+/**
+ * El reconciliador ya no pide UNA suscripcion por id: pide las que hay contra
+ * un PLAN. `respuesta` es la unica suscripcion del plan, o `null` para el caso
+ * normal de un plan que nadie pago todavia.
+ */
+function fakeMp(
+  respuesta: MpPreapproval | Error | null,
+): { mpClient: MpClient } {
   return {
     mpClient: {
-      getPreapproval: async () => {
+      getPreapproval: async () => ({}),
+      createPreapprovalPlan: async () => ({}),
+      searchPreapprovalsByPlan: async () => {
         if (respuesta instanceof Error) throw respuesta;
-        return respuesta;
+        return respuesta === null ? [] : [respuesta];
       },
-      createPreapproval: async () => ({}),
     },
   };
 }
@@ -97,7 +105,7 @@ function fakeMp(respuesta: MpPreapproval | Error): { mpClient: MpClient } {
 /** Un mundo con el mapeo ya escrito y el PF sin suscripcion todavia. */
 const MUNDO = (): Store => ({
   users: { t1: { role: "trainer", displayName: "Martin" } },
-  mp_preapprovals: { p1: { uid: "t1", tier: "plan2", cycle: "monthly" } },
+  mp_plans: { p1: { uid: "t1", tier: "plan2", cycle: "monthly" } },
 });
 
 const AUTORIZADA: MpPreapproval = {
@@ -163,7 +171,7 @@ describe("reconcileSubscription — el camino que hace que cobrar sirva", () => 
 
     expect((store.users.t1.subscription as Record<string, unknown>).status)
       .toBe("cancelled");
-    expect(store.mp_preapprovals.p1.terminal).toBe(true);
+    expect(store.mp_plans.p1.terminal).toBe(true);
   });
 
   it("una baja SIN proxima fecha conserva la que ya teniamos", async () => {
@@ -193,7 +201,7 @@ describe("reconcileSubscription — el camino que hace que cobrar sirva", () => 
     // lo pone MP en external_reference, que se lo mandamos nosotros al crear.
     const { app, store } = fakeApp({
       users: { t1: { role: "trainer" } },
-      mp_preapprovals: {},
+      mp_plans: {},
     });
 
     const r = await reconcileSubscription(app, "p1", fakeMp(AUTORIZADA));
@@ -246,7 +254,7 @@ describe("reconcileSubscription — cuando NO hay que escribir", () => {
   it("sin plan determinable NO se escribe", async () => {
     const { app, escrituras } = fakeApp({
       users: { t1: { role: "trainer" } },
-      mp_preapprovals: {},
+      mp_plans: {},
     });
 
     const r = await reconcileSubscription(app, "p1", fakeMp({
@@ -261,7 +269,7 @@ describe("reconcileSubscription — cuando NO hay que escribir", () => {
   it("sin uid en ningun lado NO se escribe", async () => {
     const { app, escrituras } = fakeApp({
       users: {},
-      mp_preapprovals: { p1: { tier: "plan2", cycle: "monthly" } },
+      mp_plans: { p1: { tier: "plan2", cycle: "monthly" } },
     });
 
     const r = await reconcileSubscription(app, "p1", fakeMp({
@@ -350,7 +358,7 @@ describe("reconcileAllSubscriptions — el barrido", () => {
   it("saltea los terminales: una baja no se le vuelve a preguntar a MP", async () => {
     const { app } = fakeApp({
       users: { t1: { role: "trainer" } },
-      mp_preapprovals: {
+      mp_plans: {
         p1: { uid: "t1", tier: "plan2", cycle: "monthly", terminal: true },
       },
     });
@@ -362,7 +370,7 @@ describe("reconcileAllSubscriptions — el barrido", () => {
   it("cuenta escritos, sin cambios, salteados y errores por separado", async () => {
     const { app } = fakeApp({
       users: { t1: { role: "trainer" } },
-      mp_preapprovals: {
+      mp_plans: {
         p1: { uid: "t1", tier: "plan2", cycle: "monthly" },
         p2: { uid: "t1", tier: "plan2", cycle: "monthly", terminal: true },
       },
@@ -378,7 +386,7 @@ describe("reconcileAllSubscriptions — el barrido", () => {
     // Misma leccion que el catch por-PF de `entitlement-triggers`.
     const { app } = fakeApp({
       users: { t1: { role: "trainer" }, t2: { role: "trainer" } },
-      mp_preapprovals: {
+      mp_plans: {
         p1: { uid: "t1", tier: "plan2", cycle: "monthly" },
         p2: { uid: "t2", tier: "plan1", cycle: "monthly" },
       },

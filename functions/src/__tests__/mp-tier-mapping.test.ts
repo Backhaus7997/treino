@@ -26,8 +26,8 @@ import {
   PAID_TIERS,
   amountFor,
   frequencyMonthsFor,
-  lookupPreapproval,
-  recordPreapproval,
+  lookupPlan,
+  recordPlan,
   tierFromAmount,
 } from "../subscriptions/mp/tier-mapping";
 import { TIER_PRICES_ARS } from "../subscriptions/tier-config";
@@ -121,32 +121,32 @@ describe("tierFromAmount", () => {
   }
 });
 
-describe("recordPreapproval", () => {
+describe("recordPlan", () => {
   it("guarda uid, tier y cycle bajo el id del preapproval", () => {
     // El id de documento ES el preapprovalId: un webhook trae solo eso, y asi
     // el lookup es directo — sin query, sin indice, sin collection group.
     const { app, store } = fakeApp();
 
-    return recordPreapproval(app, "2c93", {
+    return recordPlan(app, "2c93", {
       uid: "t1", tier: "plan2", cycle: "annual",
     }).then(() => {
-      expect(store.mp_preapprovals).toHaveProperty("2c93");
-      expect((store.mp_preapprovals as Record<string, unknown>)["2c93"])
+      expect(store.mp_plans).toHaveProperty("2c93");
+      expect((store.mp_plans as Record<string, unknown>)["2c93"])
         .toMatchObject({ uid: "t1", tier: "plan2", cycle: "annual" });
     });
   });
 });
 
-describe("lookupPreapproval", () => {
+describe("lookupPlan", () => {
   it("el documento es la fuente PRIMARIA", async () => {
     const { app } = fakeApp({
-      mp_preapprovals: {
+      mp_plans: {
         "2c93": { uid: "t1", tier: "plan3", cycle: "annual" },
       },
     });
 
     // Se le pasa un monto de plan1 a proposito: el documento tiene que ganar.
-    expect(await lookupPreapproval(app, "2c93", 12000)).toEqual({
+    expect(await lookupPlan(app, "2c93", 12000)).toEqual({
       uid: "t1", tier: "plan3", cycle: "annual",
     });
     expect(warnSpy).not.toHaveBeenCalled();
@@ -157,7 +157,7 @@ describe("lookupPreapproval", () => {
     // mapeo fallo despues. Sin la red, ese PF paga y no recibe nada.
     const { app } = fakeApp();
 
-    const r = await lookupPreapproval(app, "2c93", 22000);
+    const r = await lookupPlan(app, "2c93", 22000);
 
     expect(r).toEqual({ uid: "", tier: "plan2", cycle: "monthly" });
     expect(warnSpy).toHaveBeenCalledTimes(1);
@@ -166,7 +166,7 @@ describe("lookupPreapproval", () => {
 
   it("el fallback devuelve uid vacio — el monto sabe el PLAN, no la PERSONA", async () => {
     const { app } = fakeApp();
-    const r = await lookupPreapproval(app, "2c93", 39000);
+    const r = await lookupPlan(app, "2c93", 39000);
     // Quien llame tiene que sacar el uid del `external_reference`.
     expect(r?.uid).toBe("");
   });
@@ -174,8 +174,8 @@ describe("lookupPreapproval", () => {
   it("sin documento y sin monto reconocible da null, no un tier por defecto", async () => {
     const { app } = fakeApp();
 
-    expect(await lookupPreapproval(app, "2c93", 777)).toBeNull();
-    expect(await lookupPreapproval(app, "2c93")).toBeNull();
+    expect(await lookupPlan(app, "2c93", 777)).toBeNull();
+    expect(await lookupPlan(app, "2c93")).toBeNull();
   });
 
   const ilegibles: [string, Record<string, unknown>][] = [
@@ -191,9 +191,9 @@ describe("lookupPreapproval", () => {
     it(`un documento con ${caso} se valida y cae al monto`, async () => {
       // Se valida aunque lo hayamos escrito nosotros: "lo escribimos nosotros"
       // no es una garantia de runtime. Misma leccion que subscription-state.ts.
-      const { app } = fakeApp({ mp_preapprovals: { "2c93": doc } });
+      const { app } = fakeApp({ mp_plans: { "2c93": doc } });
 
-      const r = await lookupPreapproval(app, "2c93", 12000);
+      const r = await lookupPlan(app, "2c93", 12000);
 
       expect(r).toEqual({ uid: "", tier: "plan1", cycle: "monthly" });
       expect(warnSpy).toHaveBeenCalled();
@@ -203,9 +203,9 @@ describe("lookupPreapproval", () => {
 
   it("un documento ilegible SIN monto de respaldo da null", async () => {
     const { app } = fakeApp({
-      mp_preapprovals: { "2c93": { uid: "t1", tier: "plan9" } },
+      mp_plans: { "2c93": { uid: "t1", tier: "plan9" } },
     });
 
-    expect(await lookupPreapproval(app, "2c93")).toBeNull();
+    expect(await lookupPlan(app, "2c93")).toBeNull();
   });
 });

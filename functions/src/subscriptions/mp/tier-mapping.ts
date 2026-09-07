@@ -3,37 +3,34 @@
  *
  * ── El problema que este archivo existe para resolver ──
  *
- * **Mercado Pago no devuelve `preapproval_plan_id` en la respuesta de un
- * preapproval.** Solo lo acepta en el request. Verificado contra los tipos del
- * SDK oficial (`sdk-nodejs/src/clients/preApproval/commonTypes.ts`, 2026-09-02),
- * porque la pagina de referencia de ese endpoint esta caida.
- *
- * O sea: cuando llega un webhook con un id, o cuando el reconciliador barre,
- * podemos preguntarle a MP el ESTADO de la suscripcion pero no de que plan es.
- * Y sin el tier no hay limite que escribir — `subscription` necesita los dos.
+ * MP no nos dice de que plan de TREINO es una suscripcion. El checkout va
+ * contra un PLAN que creamos nosotros (ver `client.ts` para por que planes y no
+ * `/preapproval` directo), y el plan es lo unico cuyo id conocemos en el
+ * momento de abrirlo — de la suscripcion no sabemos nada hasta que alguien
+ * paga. Sin el tier no hay limite que escribir: `subscription` necesita los dos.
  *
  * ── Las dos fuentes, en orden ──
  *
- * 1. **`mp_preapprovals/{preapprovalId}`**, que escribimos nosotros al crear.
- *    Es la fuente primaria y es un lookup directo por id de documento: sin
- *    query, sin indice, sin collection group.
+ * 1. **`mp_plans/{preapprovalPlanId}`**, que escribimos al crear el plan. Es la
+ *    fuente primaria y es un lookup directo por id de documento: sin query, sin
+ *    indice, sin collection group.
  *
  * 2. **El MONTO**, como red de seguridad. Los seis precios de `tier-config.ts`
  *    son distintos entre si, asi que el monto identifica univocamente el par
  *    (tier, ciclo). Existe porque hay una ventana real donde la fuente 1 falta:
- *    MP crea la suscripcion y nuestra escritura del mapeo falla despues. Sin
- *    esta red, ese PF paga y no recibe nada, y el unico arreglo es a mano.
+ *    MP crea el plan y nuestra escritura del mapeo falla despues. Sin esta red,
+ *    ese PF paga y no recibe nada, y el unico arreglo es a mano.
  *
- * La 2 NO reemplaza a la 1: si manana suben los precios, una suscripcion vieja
- * de $12.000 deja de matchear. Por eso el fallback logea WARN — es un parche
- * que grita, no un camino normal.
+ * La 2 NO reemplaza a la 1: si manana suben los precios, un plan viejo de
+ * $12.000 deja de matchear. Por eso el fallback logea WARN — es un parche que
+ * grita, no un camino normal.
  *
  * ── Lo que NO se hace, y es deliberado ──
  *
- * No se usa `preapproval_plan_id` creando planes en el panel de MP. Eso pondria
- * la tabla de precios en DOS lugares (el panel y `tier-config.ts`) y el dia que
- * se desincronicen le cobramos a alguien un precio que nuestro sistema no
- * conoce. La tabla vive en un solo lado: el servidor.
+ * No se crean los planes a mano en el panel de MP. Eso pondria la tabla de
+ * precios en DOS lugares (el panel y `tier-config.ts`) y el dia que se
+ * desincronicen le cobramos a alguien un precio que nuestro sistema no conoce.
+ * Los planes se crean por API, con el monto que dice el servidor.
  */
 
 import * as admin from "firebase-admin";
@@ -45,7 +42,23 @@ import {
   TIER_PRICES_ARS,
 } from "../tier-config";
 
-/** Coleccion del mapeo. Un doc por suscripcion de MP, id = el preapprovalId. */
+/**
+ * Coleccion del mapeo. Un doc por PLAN de MP, id = el preapprovalPlanId.
+ *
+ * Se keyea por plan y no por suscripcion porque el plan es lo que creamos
+ * NOSOTROS: sabemos su id en el momento de abrirlo, y de la suscripcion no
+ * sabemos nada hasta que alguien paga. Ver el encabezado de `client.ts`.
+ */
+export const MP_PLANS_COLLECTION = "mp_plans";
+
+/**
+ * La coleccion del flujo viejo, sin plan asociado. Ya no se escribe.
+ *
+ * La constante se conserva porque `firestore.rules` la cierra explicitamente y
+ * hay documentos de las pruebas manuales: borrar el nombre de acá dejaria esa
+ * regla hablando de algo que el codigo ya no menciona, y en seis meses nadie
+ * sabria si se puede sacar.
+ */
 export const MP_PREAPPROVALS_COLLECTION = "mp_preapprovals";
 
 /** Los tiers que se pueden comprar. `free` no se cobra, no tiene preapproval. */
@@ -146,15 +159,15 @@ export function tierFromAmount(
  * un preapproval NUEVO en MP, con su propio id — nunca se reescribe el viejo,
  * asi que el historial de que compro cada PF queda entero.
  */
-export async function recordPreapproval(
+export async function recordPlan(
   app: admin.app.App,
-  preapprovalId: string,
+  planId: string,
   mapping: PreapprovalMapping,
 ): Promise<void> {
   await app
     .firestore()
-    .collection(MP_PREAPPROVALS_COLLECTION)
-    .doc(preapprovalId)
+    .collection(MP_PLANS_COLLECTION)
+    .doc(planId)
     .set({
       ...mapping,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -172,15 +185,15 @@ export async function recordPreapproval(
  * PERSONA. El uid en ese caso sale del `external_reference` del propio
  * preapproval, que es de donde tiene que salir — quien llame resuelve eso.
  */
-export async function lookupPreapproval(
+export async function lookupPlan(
   app: admin.app.App,
-  preapprovalId: string,
+  planId: string,
   summarizedAmount?: unknown,
 ): Promise<PreapprovalMapping | null> {
   const snap = await app
     .firestore()
-    .collection(MP_PREAPPROVALS_COLLECTION)
-    .doc(preapprovalId)
+    .collection(MP_PLANS_COLLECTION)
+    .doc(planId)
     .get();
 
   const data = snap.data();
@@ -203,7 +216,7 @@ export async function lookupPreapproval(
       };
     }
     logger.warn("mp/tier-mapping: documento de mapeo ilegible — se usa el monto", {
-      preapprovalId,
+      planId,
       tier,
       cycle,
     });
@@ -214,7 +227,7 @@ export async function lookupPreapproval(
 
   logger.warn(
     "mp/tier-mapping: sin documento de mapeo — plan derivado del monto",
-    { preapprovalId, amount: summarizedAmount, ...porMonto },
+    { planId, amount: summarizedAmount, ...porMonto },
   );
   return { uid: "", ...porMonto };
 }
