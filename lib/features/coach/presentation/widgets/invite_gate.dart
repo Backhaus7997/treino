@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../profile/application/user_providers.dart';
 import '../../../profile/domain/user_role.dart';
 import '../../application/pending_invite_providers.dart';
+import '../../data/pending_invite_store.dart';
 import '../../application/trainer_link_providers.dart';
 import '../../domain/invite_outcome.dart';
 import 'invite_dialog.dart';
@@ -43,7 +44,36 @@ class _InviteGateState extends ConsumerState<InviteGate> {
   ///
   /// Va por cuenta y no por `bool` para que un segundo alumno que entre en el
   /// mismo teléfono reciba su propia invitación.
+  /// La invitación YA resuelta, como `'uid:trainerId'`.
+  ///
+  /// Antes era sólo el uid, y se marcaba en `build` —o sea, al INTENTAR, no al
+  /// lograr—. Si en ese instante la invitación no estaba capturada todavía, el
+  /// gate se rendía y quedaba marcado igual: no reintentaba nunca. Ahora se
+  /// marca recién cuando hubo algo real que resolver, y lleva el trainerId
+  /// para que una invitación NUEVA de la misma cuenta vuelva a disparar.
   String? _resueltaPara;
+
+  /// Evita que dos frames seguidos lancen dos resoluciones en paralelo.
+  bool _resolviendo = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Una invitación puede llegar con la home YA montada: es el caso normal
+    // cuando el botón de `/abrir/alumno` abre la app que ya estaba corriendo.
+    // Sin esto, nadie despierta al gate.
+    PendingInviteStore.revision.addListener(_alCambiarLaInvitacion);
+  }
+
+  @override
+  void dispose() {
+    PendingInviteStore.revision.removeListener(_alCambiarLaInvitacion);
+    super.dispose();
+  }
+
+  void _alCambiarLaInvitacion() {
+    if (mounted) setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -51,21 +81,44 @@ class _InviteGateState extends ConsumerState<InviteGate> {
       userProfileProvider.select((a) => a.valueOrNull),
     );
     final uid = perfil?.uid;
+    // Se OBSERVA el store, no se lee: mientras `SharedPreferences` no resolvió
+    // vale `null`, y rendirse en ese estado no puede ser definitivo. Cuando
+    // resuelve, este watch vuelve a construir y el intento se repite.
+    final store = ref.watch(pendingInviteStoreProvider);
 
-    if (uid != null && uid != _resueltaPara) {
-      _resueltaPara = uid;
+    if (uid != null && store != null && !_resolviendo) {
+      _resolviendo = true;
       WidgetsBinding.instance.addPostFrameCallback(
-        (_) => _resolver(uid, perfil!.role),
+        (_) => _resolver(uid, perfil!.role, store),
       );
     }
     return const SizedBox.shrink();
   }
 
-  Future<void> _resolver(String uid, UserRole role) async {
-    final store = ref.read(pendingInviteStoreProvider);
-    if (store == null) return; // prefs sin resolver: no hay nada que aplicar
+  Future<void> _resolver(
+    String uid,
+    UserRole role,
+    PendingInviteStore store,
+  ) async {
+    try {
+      await _resolverInterno(uid, role, store);
+    } finally {
+      _resolviendo = false;
+    }
+  }
+
+  Future<void> _resolverInterno(
+    String uid,
+    UserRole role,
+    PendingInviteStore store,
+  ) async {
     final trainerId = await store.leer();
     if (trainerId == null || !mounted) return;
+
+    // El latch recién acá: hubo una invitación de verdad que resolver.
+    final clave = '$uid:$trainerId';
+    if (clave == _resueltaPara) return;
+    _resueltaPara = clave;
 
     final InviteOutcome outcome;
     if (role == UserRole.trainer) {
