@@ -77,6 +77,7 @@
  */
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
 
 const BATCH_SIZE = 500;
 
@@ -102,7 +103,7 @@ export const ATHLETE_ACCOUNT_DELETED_REASON = "athlete-account-deleted";
  * Returns the count of cancelled documents.
  */
 export async function cancelFutureAppointments(
-  app: admin.app.App,
+  app: App,
   uid: string
 ): Promise<{ count: number }> {
   const db = admin.firestore(app);

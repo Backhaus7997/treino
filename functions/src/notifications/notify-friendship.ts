@@ -46,12 +46,14 @@
  */
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
+import { Messaging } from "firebase-admin/messaging";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 import { sendFcm } from "./send-fcm";
 import type { NotificationKind } from "./send-fcm";
 
-function getApp(): admin.app.App {
+function getApp(): App {
   try {
     return admin.app();
   } catch {
@@ -158,10 +160,10 @@ export function buildFollowCopy(
  * Pure handler extracted for jest testability.
  */
 export async function notifyOnFollowHandler(
-  app: admin.app.App,
+  app: App,
   before: FollowData | undefined,
   after: FollowData | undefined,
-  messaging?: admin.messaging.Messaging,
+  messaging?: Messaging,
 ): Promise<void> {
   const notif = resolveFollowNotif(before, after);
 

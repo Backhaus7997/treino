@@ -19,6 +19,7 @@
  */
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
 
 const BATCH_SIZE = 500;
 
@@ -27,7 +28,7 @@ const BATCH_SIZE = 500;
  * Returns the count of deleted documents.
  */
 export async function sweepFollows(
-  app: admin.app.App,
+  app: App,
   uid: string
 ): Promise<{ count: number }> {
   const db = admin.firestore(app);

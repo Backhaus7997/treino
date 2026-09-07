@@ -32,6 +32,7 @@
  */
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 
@@ -39,7 +40,7 @@ import { logger } from "firebase-functions";
 // Lazy app singleton (project convention — mirrors sync-session-share.ts)
 // ---------------------------------------------------------------------------
 
-function getApp(): admin.app.App {
+function getApp(): App {
   try {
     return admin.app();
   } catch {
@@ -89,7 +90,7 @@ export interface SyncSharedProfileResult {
  * @returns A result object indicating whether the snapshot was updated.
  */
 export async function syncSharedProfileHandler(
-  app: admin.app.App,
+  app: App,
   uid: string,
   userAfter: Record<string, unknown> | null,
   now: Date,

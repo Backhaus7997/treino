@@ -43,6 +43,7 @@
  */
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
 import * as functions from "firebase-functions/v2/https";
 import { HttpsError } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions";
@@ -50,7 +51,7 @@ import { logger } from "firebase-functions";
 import { APP_ENTRY_ATHLETE, APP_ENTRY_TRAINER } from "../mail/templates";
 import { enqueueMail } from "../mail/enqueue-mail";
 
-function getApp(): admin.app.App {
+function getApp(): App {
   try {
     return admin.app();
   } catch {
@@ -186,7 +187,7 @@ export function resetOutcomeFor(
  * es federada, y la respuesta del callable no cambia.
  */
 async function entradaSegunRol(
-  app: admin.app.App,
+  app: App,
   uid: string,
 ): Promise<string> {
   try {
@@ -221,7 +222,7 @@ const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * @param nowMs - Reloj, inyectado para que los tests fijen la ventana.
  */
 export async function runRequestPasswordReset(
-  app: admin.app.App,
+  app: App,
   email: unknown,
   nowMs: number = Date.now(),
 ): Promise<AuthEmailResult> {
@@ -287,7 +288,7 @@ export async function runRequestPasswordReset(
  * @param nowMs - Reloj, inyectado en tests.
  */
 export async function runRequestEmailVerification(
-  app: admin.app.App,
+  app: App,
   uid: string,
   nowMs: number = Date.now(),
 ): Promise<AuthEmailResult> {
