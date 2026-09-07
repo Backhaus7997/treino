@@ -1,0 +1,229 @@
+'use strict';
+
+/**
+ * scripts/cleanup_rejected_links.js
+ *
+ * Limpieza one-shot de las solicitudes RECHAZADAS o CANCELADAS que ya están en
+ * `trainer_links`. De acá en adelante no se acumulan más: la CF las borra apenas
+ * sale la notificación (functions/src/purge-rejected-link.ts). Este script es
+ * sólo para las anteriores a ese cambio.
+ *
+ * ⚠️  `treino-dev` ES PRODUCCIÓN. Ahí viven los pagos, turnos y sesiones de
+ *     usuarios reales. Este script BORRA documentos. Leé AGENTS.md § Entornos
+ *     antes de correrlo con `--apply`.
+ *
+ * ── EL PROBLEMA: `terminated` significa CUATRO cosas ────────────────────────
+ *
+ * `trainer_links.status == 'terminated'` no distingue el origen:
+ *   - `decline`             — el PF rechazó una solicitud    → NUNCA fue vínculo
+ *   - `cancel`              — el alumno canceló la suya      → NUNCA fue vínculo
+ *   - `terminate`           — un vínculo REAL se dio de baja → tiene historia
+ *   - `switched_trainer`    — el alumno cambió de PF         → tiene historia
+ *
+ * Borrar por `status == 'terminated'` a secas destruiría historia real: de esos
+ * vínculos cuelgan pagos y sesiones.
+ *
+ * ── EL DISCRIMINADOR, Y POR QUÉ NO ALCANZA SOLO ─────────────────────────────
+ *
+ * `acceptedAt` sólo lo estampa el servidor
+ * (functions/src/subscriptions/promote-link.ts, al aceptar), y `firestore.rules`
+ * lo pinea inmutable en create y update. Entonces `acceptedAt == null` debería
+ * significar "nunca fue un vínculo".
+ *
+ * DEBERÍA. El propio repo dice que hay excepciones, y por eso este script no
+ * borra sólo por `acceptedAt`:
+ *
+ *   - `functions/src/subscriptions/select-blocked-links.ts:192` — textual: un
+ *     vínculo sin `acceptedAt` «es un DEFECTO DE DATOS, no evidencia de
+ *     lealtad».
+ *   - `functions/src/subscriptions/promote-link.ts:221` — describe un stamp
+ *     faltante que degrada a `requestedAt` en vez de fallar.
+ *
+ * O sea: un vínculo REAL viejo pudo quedar sin `acceptedAt`. Borrarlo sería
+ * exactamente el daño que este script existe para evitar.
+ *
+ * Por eso el criterio de borrado es COMPUESTO — `acceptedAt == null` **y**
+ * `terminationReason` ∈ {declined, cancelled-by-athlete}, que son las dos
+ * únicas razones que el cliente escribe sobre un `pending`
+ * (`lib/features/coach/data/trainer_link_repository.dart`). Todo lo demás con
+ * `acceptedAt == null` se reporta como AMBIGUO y NO SE TOCA, para que lo mire
+ * una persona.
+ *
+ * ── SALIDA: TRES GRUPOS ─────────────────────────────────────────────────────
+ *
+ *   BORRA     acceptedAt == null  Y  reason ∈ {declined, cancelled-by-athlete}
+ *   AMBIGUO   acceptedAt == null  pero reason es otro o falta   → NO se toca
+ *   CONSERVA  acceptedAt != null  (vínculo real terminado)      → NO se toca
+ *
+ * Usage:
+ *   # Dry-run (DEFAULT — no escribe nada, sólo informa):
+ *   node scripts/cleanup_rejected_links.js
+ *
+ *   # Borrar de verdad:
+ *   node scripts/cleanup_rejected_links.js --apply
+ *
+ *   # Sumar los ambiguos al borrado (leé la lista del dry-run ANTES):
+ *   node scripts/cleanup_rejected_links.js --apply --incluir-ambiguos
+ *
+ * Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` falla cerrado con
+ * la migración en el mensaje; contra el emulador no pide nada.
+ * Ver scripts/lib/admin.js.
+ */
+
+const { inicializarAdmin, proyectoDe } = require('./lib/admin');
+
+/** Las dos únicas razones que se escriben sobre un `pending`. */
+const RAZONES_DE_NO_VINCULO = new Set(['declined', 'cancelled-by-athlete']);
+
+const BATCH_SIZE = 500;
+
+function parseArgs(argv) {
+  const flags = new Set(argv.slice(2));
+  const desconocidas = [...flags].filter(
+    (f) => !['--apply', '--incluir-ambiguos', '--dry-run'].includes(f),
+  );
+  if (desconocidas.length) {
+    console.error(`Flags desconocidas: ${desconocidas.join(', ')}`);
+    process.exit(2);
+  }
+  return {
+    apply: flags.has('--apply'),
+    incluirAmbiguos: flags.has('--incluir-ambiguos'),
+  };
+}
+
+/**
+ * Clasifica un doc de `trainer_links` en uno de los tres grupos.
+ *
+ * Puro y exportado para que se pueda testear sin Firestore.
+ *
+ * @param {{acceptedAt?: unknown, terminationReason?: unknown}} data
+ * @returns {'borra'|'ambiguo'|'conserva'}
+ */
+function clasificar(data) {
+  if (data.acceptedAt != null) return 'conserva';
+  const razon = data.terminationReason;
+  return RAZONES_DE_NO_VINCULO.has(razon) ? 'borra' : 'ambiguo';
+}
+
+/** Cuenta por `terminationReason`, con `(sin razón)` para el faltante. */
+function desglosePorRazon(docs) {
+  const conteo = new Map();
+  for (const d of docs) {
+    const razon = d.razon ?? '(sin razón)';
+    conteo.set(razon, (conteo.get(razon) ?? 0) + 1);
+  }
+  return [...conteo.entries()].sort((a, b) => b[1] - a[1]);
+}
+
+function imprimirGrupo(titulo, docs, { detallar = false } = {}) {
+  console.log(`\n${titulo}: ${docs.length}`);
+  if (docs.length === 0) return;
+  for (const [razon, n] of desglosePorRazon(docs)) {
+    console.log(`    ${String(n).padStart(6)}  ${razon}`);
+  }
+  if (detallar) {
+    console.log('    ── ids ──');
+    for (const d of docs) {
+      console.log(`    ${d.id}  reason=${d.razon ?? '(sin razón)'}`);
+    }
+  }
+}
+
+async function borrarEnBatches(db, docs) {
+  let borrados = 0;
+  for (let i = 0; i < docs.length; i += BATCH_SIZE) {
+    const chunk = docs.slice(i, i + BATCH_SIZE);
+    const batch = db.batch();
+    for (const d of chunk) {
+      batch.delete(db.collection('trainer_links').doc(d.id));
+    }
+    await batch.commit();
+    borrados += chunk.length;
+    console.log(`  ✗ borrados ${borrados}/${docs.length}`);
+  }
+  return borrados;
+}
+
+async function main() {
+  const { apply, incluirAmbiguos } = parseArgs(process.argv);
+
+  const { admin, contexto } = inicializarAdmin();
+
+  // AGENTS.md §11.1: el agujero real son los scripts que NO dicen contra qué
+  // proyecto escriben. Esto va primero y en mayúsculas a propósito.
+  const proyecto = contexto ? proyectoDe(contexto) : '(app ya inicializada)';
+  console.log('═'.repeat(66));
+  console.log(`  PROYECTO: ${proyecto}`);
+  console.log(`  MODO:     ${apply ? '⚠️  APPLY — VA A BORRAR' : 'dry-run (no escribe nada)'}`);
+  if (incluirAmbiguos) {
+    console.log('  AMBIGUOS: INCLUIDOS en el borrado');
+  }
+  console.log('═'.repeat(66));
+
+  const db = admin.firestore();
+
+  // Igualdad simple: la sirve el índice automático de un solo campo. `acceptedAt`
+  // se filtra en memoria — Firestore no consulta bien por ausencia de campo.
+  const snap = await db
+    .collection('trainer_links')
+    .where('status', '==', 'terminated')
+    .get();
+
+  console.log(`\nVínculos con status == 'terminated': ${snap.size}`);
+
+  const grupos = { borra: [], ambiguo: [], conserva: [] };
+  for (const doc of snap.docs) {
+    const data = doc.data();
+    grupos[clasificar(data)].push({
+      id: doc.id,
+      razon: data.terminationReason,
+    });
+  }
+
+  imprimirGrupo('BORRA     (acceptedAt null + rechazo/cancelación)', grupos.borra);
+  imprimirGrupo(
+    'AMBIGUO   (acceptedAt null, razón distinta o ausente)',
+    grupos.ambiguo,
+    { detallar: true },
+  );
+  imprimirGrupo('CONSERVA  (acceptedAt presente — vínculo real)', grupos.conserva);
+
+  if (grupos.ambiguo.length && !incluirAmbiguos) {
+    console.log(
+      '\n  ⚠️  Los AMBIGUOS quedan intactos. Un vínculo real viejo pudo perder su\n' +
+      '     `acceptedAt` (ver el header de este archivo). Miralos uno por uno antes\n' +
+      '     de sumarlos con --incluir-ambiguos.',
+    );
+  }
+
+  const aBorrar = incluirAmbiguos
+    ? [...grupos.borra, ...grupos.ambiguo]
+    : grupos.borra;
+
+  if (!apply) {
+    console.log(
+      `\nDRY-RUN: se borrarían ${aBorrar.length} documentos. ` +
+      'Nada se escribió.\nPara ejecutar: --apply',
+    );
+    return;
+  }
+
+  if (aBorrar.length === 0) {
+    console.log('\nNada que borrar.');
+    return;
+  }
+
+  console.log(`\nBorrando ${aBorrar.length} documentos...`);
+  const borrados = await borrarEnBatches(db, aBorrar);
+  console.log(`\nListo. ${borrados} documentos borrados.`);
+}
+
+module.exports = { clasificar, desglosePorRazon };
+
+if (require.main === module) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}
