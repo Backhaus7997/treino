@@ -15,6 +15,10 @@
  *       paused → active → notify athlete (reanudada), deepLink "/coach"
  *       * → terminated → notify BOTH, deepLink "/coach"
  *   - All user-facing strings in es-AR.
+ *   - Tail effect: a `terminated` link that was NEVER accepted is DELETED after
+ *     the notification goes out (purge-rejected-link.ts). It lives here, and
+ *     last, so the ordering against the push is a property of the code instead
+ *     of a property of how Eventarc happens to schedule two triggers.
  *
  * REQ-PN-CF-004. Fase 6 Etapa 2.
  */
@@ -26,6 +30,7 @@ import { sendFcm } from "./send-fcm";
 import { enqueueMail } from "../mail/enqueue-mail";
 import { resolveAthleteName, resolveTrainerName } from "../mail/format";
 import { trainerEntry } from "../mail/templates";
+import { purgeRejectedLinkHandler } from "../purge-rejected-link";
 
 function getApp(): admin.app.App {
   try {
@@ -209,6 +214,27 @@ export async function notifyOnLinkChangeHandler(
     .catch((error: unknown) => {
       logger.warn("notifyOnLinkChange: mail enqueue failed", { linkId, error });
     });
+
+  // Un rechazo (o una cancelacion del alumno) deja de persistirse: el doc se
+  // borra. Ver purge-rejected-link.ts para el discriminador.
+  //
+  // POR QUE VIVE ACA Y NO EN UN TRIGGER PROPIO. El orden contra la notificacion
+  // es el punto entero. Como septimo trigger sobre `trainer_links/{linkId}`,
+  // "primero se notifica y despues se borra" quedaria a merced de como Eventarc
+  // planifique dos invocaciones independientes — que es otra manera de decir
+  // que no seria un orden. Al final de este handler, el orden es una propiedad
+  // del codigo: sendFcm y enqueueLinkMail ya resolvieron.
+  //
+  // (Los dos triggers leen `after` del payload del evento, no de Firestore, asi
+  // que un borrado concurrente tampoco les vaciaria el snapshot. Pero apoyar el
+  // producto en ese detalle del runtime seria confiar en algo que no controlamos
+  // y que no se ve leyendo este archivo.)
+  //
+  // El handler no lanza NUNCA — devuelve false y loguea. Es deliberado: si
+  // propagara, un purge fallido volteria toda la invocacion, y un reintento
+  // duplicaria el push y su fila en `users/{uid}/notifications`. Las que queden
+  // sin borrar las junta el script one-shot (scripts/cleanup_rejected_links.js).
+  await purgeRejectedLinkHandler(app, linkId, after);
 }
 
 /**
