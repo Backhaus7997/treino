@@ -50,6 +50,81 @@ Future<void> _pumpGate(
 }
 
 void main() {
+  group('La invitación despierta al gate —', () {
+    // Reportado en un iPhone 16 con la app instalada: el link abre TREINO,
+    // pero el diálogo NO aparece. Hay que navegar a otra pantalla y volver a
+    // la home para verlo.
+    //
+    // La causa es el latch: se marca en `build`, ANTES de saber si la
+    // resolución pudo hacer algo. Si en ese instante la invitación todavía no
+    // está capturada —o las prefs no resolvieron—, `_resolver` se rinde y el
+    // latch ya quedó puesto: no reintenta nunca. Salir y volver remonta el
+    // widget con el latch limpio, y por eso "se arregla" solo.
+    testWidgets('una invitación que llega DESPUÉS de montado abre el diálogo '
+        'sin remontar nada', (tester) async {
+      final store = await _storeWith(null);
+      await _pumpGate(tester, profile: _trainer('pf-1'), store: store);
+
+      // Todavía nada: no había invitación cuando el gate se montó.
+      expect(find.byType(AlertDialog), findsNothing);
+
+      // Ahora llega el deep link, con la home YA montada. Es el caso real:
+      // el botón de /abrir/alumno abre la app que ya estaba corriendo.
+      await store.guardar('pf-1');
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('ESTE ES TU LINK DE INVITACIÓN'),
+        findsOneWidget,
+        reason: 'el gate tiene que reaccionar a la invitación, no sólo al '
+            'perfil',
+      );
+    });
+
+    testWidgets('las prefs que resuelven tarde no se pierden la invitación',
+        (tester) async {
+      // `pendingInviteStoreProvider` devuelve null mientras SharedPreferences
+      // no resolvió. El gate no puede darse por resuelto en ese estado.
+      SharedPreferences.setMockInitialValues({});
+      final store = PendingInviteStore(await SharedPreferences.getInstance());
+      await store.limpiar();
+      await store.guardar('pf-1');
+
+      final storeProvider = StateProvider<PendingInviteStore?>((_) => null);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            userProfileProvider
+                .overrideWith((_) => Stream.value(_trainer('pf-1'))),
+            pendingInviteStoreProvider.overrideWith(
+              (ref) => ref.watch(storeProvider),
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.dark(),
+            home: const Scaffold(body: InviteGate()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsNothing);
+
+      // Resuelven las prefs.
+      final scope = tester.element(find.byType(InviteGate));
+      ProviderScope.containerOf(scope).read(storeProvider.notifier).state =
+          store;
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('ESTE ES TU LINK DE INVITACIÓN'),
+        findsOneWidget,
+        reason: 'rendirse porque las prefs no estaban listas no puede ser '
+            'definitivo',
+      );
+    });
+  });
+
   testWidgets('un entrenador que tocó un link ajeno recibe feedback',
       (tester) async {
     final store = await _storeWith('pf-otro');

@@ -40,6 +40,11 @@ import 'package:treino/core/utils/argentina_time.dart';
 ///   cirugía de string sobre el mensaje compuesto del alert banner, así que
 ///   se mantiene el label combinado existente en vez de forzar el kit
 ///   `sublabel`).
+/// Ancho por debajo del cual una KPI card deja de leerse y conviene volver al
+/// scroll: el valor va en Barlow Condensed 28 y el label completo —"Por cobrar
+/// (2 vencimientos)"— necesita lugar para no partirse en tres renglones.
+const double _anchoMinimoCard = 180.0;
+
 class DashboardKpiStrip extends ConsumerWidget {
   const DashboardKpiStrip({super.key, this.wide = true});
 
@@ -126,16 +131,48 @@ class DashboardKpiStrip extends ConsumerWidget {
       );
     }
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          for (var i = 0; i < cards.length; i++) ...[
-            if (i > 0) const SizedBox(width: AppSpacing.s12),
-            cards[i],
-          ],
-        ],
-      ),
+    // Las cuatro cards quedaban apretadas a la izquierda con un hueco muerto
+    // al costado, mientras los paneles de abajo sí ocupaban todo el ancho: el
+    // `Row` adentro del scroll dimensiona cada card por su CONTENIDO, y el
+    // contenido de un KPI es corto.
+    //
+    // Reparto en partes iguales con separación FIJA, no `spaceBetween`: el
+    // sobrante repartido entre los huecos hace que la separación cambie según
+    // cuántas cards haya y cuánto midan, y dos filas de la misma pantalla
+    // dejan de alinear.
+    //
+    // El scroll NO se saca: abajo de cierto ancho, cuatro cards en una fila
+    // salen ilegibles. Ahí sigue ganando el gesto de scroll.
+    return LayoutBuilder(
+      builder: (ctx, constraints) {
+        const separacion = AppSpacing.s12;
+        final huecos = separacion * (cards.length - 1);
+        final anchoPorCard =
+            (constraints.maxWidth - huecos) / cards.length;
+
+        if (anchoPorCard >= _anchoMinimoCard) {
+          return Row(
+            children: [
+              for (var i = 0; i < cards.length; i++) ...[
+                if (i > 0) const SizedBox(width: separacion),
+                Expanded(child: cards[i]),
+              ],
+            ],
+          );
+        }
+
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (var i = 0; i < cards.length; i++) ...[
+                if (i > 0) const SizedBox(width: separacion),
+                cards[i],
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 }

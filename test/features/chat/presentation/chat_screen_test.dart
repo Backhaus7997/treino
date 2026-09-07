@@ -348,6 +348,7 @@ void main() {
     Future<FakeFirebaseFirestore> seed({
       Follow? incomingEdge,
       String? linkId,
+      bool inquiry = false,
     }) async {
       final fake = FakeFirebaseFirestore();
       await fake.collection('chats').doc('aaa_bbb').set({
@@ -355,6 +356,7 @@ void main() {
         'members': ['aaa', 'bbb'],
         'createdAt': Timestamp.fromDate(DateTime.utc(2026, 5, 20)),
         if (linkId != null) 'linkId': linkId,
+        if (inquiry) 'kind': 'inquiry',
       });
       if (incomingEdge != null) {
         await fake
@@ -447,6 +449,24 @@ void main() {
     testWidgets('chat de Coach con linkId y CERO aristas → HABILITADO',
         (tester) async {
       await pump(tester, await seed(linkId: 'link-1'));
+
+      expect(composerEnabled(tester), isTrue);
+      expect(find.textContaining('tiene que seguirte'), findsNothing);
+    });
+
+    // EL QUE PROTEGE LA PRE-CONSULTA.
+    //
+    // `senderMayPost` escapa por TRES ramas: `'linkId' in chat`,
+    // `chat.get('kind','') == 'inquiry'` y `followAccepted`. La pantalla sólo
+    // miraba dos. O sea que la app era MÁS ESTRICTA QUE EL SERVIDOR: le tapaba
+    // el composer a alguien a quien Firestore le habría aceptado el mensaje.
+    //
+    // El caso es el que motiva la feature: alguien que quiere consultarle algo
+    // a un entrenador ANTES de pedirle el vínculo. Si no puede escribir, la
+    // pre-consulta no existe.
+    testWidgets('chat de pre-consulta con CERO aristas → HABILITADO',
+        (tester) async {
+      await pump(tester, await seed(inquiry: true));
 
       expect(composerEnabled(tester), isTrue);
       expect(find.textContaining('tiene que seguirte'), findsNothing);
