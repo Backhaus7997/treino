@@ -46,6 +46,27 @@
  * NO chequea `reason === 'account-deleted'`: el único llamador
  * (`notifications/notify-link-change.ts`) ya corta antes, y hay un test que lo
  * pinea. Si algún día se llama desde otro lado, ese guard hay que traerlo.
+ *
+ * ── HUECO CONOCIDO, ABIERTO A PROPÓSITO ─────────────────────────────────────
+ *
+ * Las solicitudes `pending` del atleta que BORRA SU CUENTA no se purgan nunca,
+ * y desde que se sacó el tab «Rechazadas» tampoco se ven. Son basura invisible
+ * que crece.
+ *
+ * Por qué no se cierra acá: `cascade/trainer-links.ts` las deja en `terminated`
+ * con `reason: 'account-deleted'` — ojo, `reason`, NO `terminationReason`. O
+ * sea que aunque el purge llegara a verlas, `clasificarTerminacion` las ve sin
+ * razón y las clasifica `vinculo-real`. Mover el purge antes del guard de
+ * `account-deleted` no cambiaría nada. `scripts/cleanup_rejected_links.js`
+ * tampoco las junta, por lo mismo.
+ *
+ * Y por qué no se arregla en la cascada, que es donde iría: hacer que BORRE en
+ * vez de terminar reintroduce el robo de share que arregló
+ * `sync-session-share.ts`. Su guarda cubre el delete de un `terminated` sin
+ * `acceptedAt`; un delete de un `pending` cae al camino de revocación, y si el
+ * par tiene otro vínculo vivo con el MISMO PF, le borra el share. Cerrar esto
+ * bien pide primero que `session_shares/{athleteId}` sepa de qué `linkId`
+ * viene — que es su propio cambio, no una línea acá.
  */
 import * as admin from "firebase-admin";
 import { logger } from "firebase-functions";

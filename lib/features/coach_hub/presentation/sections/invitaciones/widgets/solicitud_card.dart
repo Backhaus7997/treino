@@ -242,11 +242,19 @@ class _SolicitudActionButton extends StatelessWidget {
 /// Pill de estado read-only para solicitudes ya resueltas (tab Aceptadas,
 /// ADR-F4-02) — sin acciones, solo informativa.
 ///
-/// La rama `terminated` ('RECHAZADA') ya no la alcanza `InvitacionesScreen`:
-/// ningún tab matchea ese status desde que el rechazo dejó de persistirse.
-/// Se queda porque el switch sobre [TrainerLinkStatus] es exhaustivo, y
-/// porque la tarjeta es presentational y reusable — el día que otra pantalla
-/// la monte con un vínculo terminado, tiene que saber pintarlo.
+/// La rama `terminated` ya no la alcanza `InvitacionesScreen`: ningún tab
+/// matchea ese status desde que el rechazo dejó de persistirse. Se queda
+/// porque el switch sobre [TrainerLinkStatus] es exhaustivo, y porque la
+/// tarjeta es presentational y reusable — el día que otra pantalla la monte
+/// con un vínculo terminado, tiene que saber pintarlo.
+///
+/// Y por eso dice FINALIZADA y no «RECHAZADA», que es lo que decía antes: con
+/// el rechazo ya no persistido, el ÚNICO `terminated` que puede llegar acá es
+/// un vínculo REAL que terminó (`terminate` / `switched_trainer`). Etiquetar
+/// «RECHAZADA» en rojo una relación de ocho meses que terminó de común acuerdo
+/// es el mismo defecto de AGENTS.md §11.1 que este cambio arregla en el copy
+/// del push, tres archivos más allá. El color también baja de `danger` a
+/// `textMuted`: terminar un vínculo no es un error.
 class _StatusPill extends StatelessWidget {
   const _StatusPill({required this.status, required this.palette});
 
@@ -257,7 +265,7 @@ class _StatusPill extends StatelessWidget {
         TrainerLinkStatus.pending => ('PENDIENTE', palette.warning),
         TrainerLinkStatus.active => ('ACEPTADA', palette.accent),
         TrainerLinkStatus.paused => ('PAUSADA', palette.warning),
-        TrainerLinkStatus.terminated => ('RECHAZADA', palette.danger),
+        TrainerLinkStatus.terminated => ('FINALIZADA', palette.textMuted),
       }; // i18n: Fase 4 — literales de estado, sin key l10n dedicada (ADR-F4-05).
 
   @override

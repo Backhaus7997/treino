@@ -72,6 +72,28 @@
  * Ante flags en conflicto gana la que NO destruye: `--apply --dry-run` NO
  * borra, y lo dice en pantalla.
  *
+ * ── LO QUE EL BORRADO DESPIERTA (mirar antes de correr con --apply) ─────────
+ *
+ * Cada delete de `trainer_links` dispara CUATRO Cloud Functions, porque son
+ * triggers `onDocumentWritten` y un delete es una escritura:
+ *
+ *   linkAggregate                  query completa `where trainerId ==` +
+ *                                  escritura a trainerPublicProfiles/{trainerId}
+ *   linkLoadReconcile              recompute de weightedLoad + entitlements
+ *   cleanupAssignedPlansOnUnlink   corta con `!after`, pero se invoca igual
+ *   syncSessionShareOnTrainerLink  inerte por su guarda, pero se invoca igual
+ *
+ * Una tanda de 500 son ~2000 invocaciones concurrentes. Y los rechazos se
+ * concentran en los PF populares, así que muchas caen sobre el MISMO doc de
+ * `trainerPublicProfiles`, por encima del límite blando de ~1 escritura/s por
+ * documento. `subscriptions/link-load-reconcile.ts` documenta esa estampida en
+ * su bloque «CORTE DE LA ESTAMPIDA»; este script la produce a escala.
+ *
+ * No se agrega throttle acá a propósito: los contadores se recomputan desde
+ * cero en cada evento (son idempotentes), así que lo que se pierde en una
+ * contención es tiempo, no exactitud. Pero conviene correrlo fuera de hora
+ * pico y mirar los logs de Functions después.
+ *
  * Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` falla cerrado con
  * la migración en el mensaje; contra el emulador no pide nada.
  * Ver scripts/lib/admin.js.

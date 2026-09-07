@@ -784,6 +784,31 @@ service cloud.firestore {
                     && request.resource.data.trainerId == resource.data.trainerId
                     && request.resource.data.athleteId == resource.data.athleteId
                     && request.resource.data.requestedAt == resource.data.requestedAt
+                    // ── terminationReason atado al ACTOR ─────────────────────
+                    //
+                    // El campo no se puede pinear inmutable: decline, cancel y
+                    // terminate lo escriben todos como parte de su transición.
+                    // Lo que se acota son las DOS razones que disparan un
+                    // BORRADO — `clasificarTerminacion`
+                    // (functions/src/purge-rejected-link.ts) decide con ellas
+                    // si el doc se destruye, así que dejaron de ser metadata
+                    // de analytics y pasaron a ser input de un delete.
+                    //
+                    // El ataque que cierra: el PF rechaza una solicitud pero
+                    // estampa `cancelled-by-athlete`. Con eso, notify-link-change
+                    // manda el push y la fila de historial SÓLO al PF, el atleta
+                    // no se entera de nada, y el doc después se purga. La
+                    // solicitud desaparece sin dejar rastro del lado del atleta.
+                    //
+                    // Las otras razones (`athlete-terminated`,
+                    // `trainer-terminated`, `switched_trainer`) NO se acotan:
+                    // no disparan borrado, y el modelo sigue sin saber quién
+                    // cortó un vínculo real. Atarlas sería inventar una regla
+                    // que el producto no tiene.
+                    && (request.resource.data.get('terminationReason', null) != 'declined'
+                        || request.auth.uid == resource.data.trainerId)
+                    && (request.resource.data.get('terminationReason', null) != 'cancelled-by-athlete'
+                        || request.auth.uid == resource.data.athleteId)
                     // acceptedAt: CF-write-only, y este pin es de DAÑO ENTRE
                     // USUARIOS, no de evasión. `acceptedAt` es la ÚNICA clave de
                     // orden de reconcileEntitlements (select-blocked-links.ts):

@@ -228,7 +228,7 @@ export async function notifyOnLinkChangeHandler(
     return;
   }
 
-  let deepLink = "/coach"; // i18n: Fase 6 Etapa 2 (deepLink is not user-facing copy)
+  const deepLink = "/coach"; // i18n: Fase 6 Etapa 2 (deepLink is not user-facing copy)
   let recipientUids: string[];
   let title: string;
   let body: string;
@@ -299,7 +299,6 @@ export async function notifyOnLinkChangeHandler(
       actorUid = athleteId;
       title = "Solicitud cancelada"; // i18n: Fase W1
       body = `${athleteName} canceló su solicitud de vinculación.`; // i18n: Fase W1
-      deepLink = "/coach"; // explícito: la bandeja del PF vive acá
     } else {
       // `vinculo-real`: acá SÍ hubo vínculo y el modelo no sabe quién lo cortó
       // (`terminate` lo pueden llamar los dos). Se mantiene ADR-PN-007 tal cual.
