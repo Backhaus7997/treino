@@ -53,6 +53,35 @@ updates:
         patterns: ['*']
         update-types: [minor, patch]
 
+    # firebase-admin NO sube de major acá hasta que alguien migre los scripts.
+    #
+    # No es prudencia genérica: el bump a 14 ya se propuso y se mergeó DOS veces
+    # (cac2d6fa y de77562a/#901), y las dos veces dejó los 44 scripts de
+    # `scripts/` muertos. v14 borró la API namespaced entera —`admin.apps`,
+    # `admin.credential`, `admin.firestore`, `admin.auth`, `admin.storage`,
+    # `admin.app` pasaron a `undefined`— y los scripts la usan en 89 lugares
+    # repartidos en 48 archivos. Subir el número de este package.json no es la
+    # migración: es romperlos.
+    #
+    # El grupo de arriba ya deja los majors afuera del PR agrupado, pero eso los
+    # manda a un PR SUELTO, que es exactamente por donde entró el #901. Lo que
+    # corta antes es `ignore`.
+    #
+    # OJO CON EL PREFIJO: adentro de `groups` los valores van pelados (`minor`,
+    # `patch`); acá adentro van con prefijo. No son intercambiables.
+    #
+    # QUÉ NO TAPA ESTO: los security updates de Dependabot ignoran `ignore`
+    # cuando la única versión parcheada está arriba. Si eso pasa, el PR va a
+    # llegar igual y va a estar bien que llegue — y `scripts-test` lo va a poner
+    # rojo en `test/firebase_admin_superficie.test.js`, que es la señal de que
+    # hay que hacer la migración, no de que haya que silenciar el test.
+    #
+    # Se levanta este bloque el día que los 48 archivos usen los subpaths
+    # modulares (`firebase-admin/firestore`, `/auth`, `/storage`).
+    ignore:
+      - dependency-name: firebase-admin
+        update-types: ['version-update:semver-major']
+
   # ---------------------------------------------------------------------------
   # Tests de reglas standalone (scripts/rules_test/). @firebase/rules-unit-testing
   # está en ^3 acá y en ^5 en functions/ — Dependabot va a proponer alinearlos.
