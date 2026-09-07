@@ -88,18 +88,6 @@ Widget _harness({
       ),
     );
 
-/// Confirma el diálogo que pregunta con qué mail de Mercado Pago se paga.
-///
-/// Existe porque MP EXIGE  y ata la suscripción a ese valor: si
-/// lo asumiéramos del mail de TREINO, todo PF cuya cuenta de MP use otro mail
-/// quedaría sin poder pagar. El diálogo es parte del camino de compra, así que
-/// los tests lo atraviesan de verdad en vez de saltearlo con un seam.
-Future<void> _confirmarMailDePago(WidgetTester tester) async {
-  await tester.enterText(find.byType(TextFormField), 'pf@mp.com');
-  await tester.tap(find.text('Continuar'));
-  await tester.pumpAndSettle();
-}
-
 void main() {
   // Coach Hub es web/desktop — viewport ancho para el layout de 3 columnas.
   //
@@ -261,7 +249,7 @@ void main() {
 
     Uri? abierta;
     debugPlanCheckoutCreator =
-        ({required tier, required annual, required payerEmail}) async => 'https://mp/desktop';
+        ({required tier, required annual, payerEmail}) async => 'https://mp/desktop';
     debugPlanCheckoutLauncher = (u) async {
       abierta = u;
       return true;
@@ -273,7 +261,6 @@ void main() {
 
     await tester.tap(find.text('ELEGIR PLAN').first);
     await tester.pumpAndSettle();
-    await _confirmarMailDePago(tester);
 
     expect(abierta, Uri.parse('https://mp/desktop'));
   });
@@ -794,7 +781,7 @@ void main() {
       SubscriptionTier? pedido;
       bool? pidioAnual;
       Uri? abierta;
-      debugPlanCheckoutCreator = ({required tier, required annual, required payerEmail}) async {
+      debugPlanCheckoutCreator = ({required tier, required annual, payerEmail}) async {
         pedido = tier;
         pidioAnual = annual;
         return 'https://mp/checkout';
@@ -810,7 +797,6 @@ void main() {
 
       await tester.tap(find.text('ELEGIR PLAN').first);
       await tester.pumpAndSettle();
-      await _confirmarMailDePago(tester);
 
       // Que el tap PIDA el checkout y NAVEGUE. Antes bastaba con un cartel;
       // ahora el test tiene que ver las dos mitades, porque cualquiera de las
@@ -826,7 +812,7 @@ void main() {
       await pump(tester, _kMobileSize);
 
       var navego = false;
-      debugPlanCheckoutCreator = ({required tier, required annual, required payerEmail}) async => null;
+      debugPlanCheckoutCreator = ({required tier, required annual, payerEmail}) async => null;
       debugPlanCheckoutLauncher = (u) async {
         navego = true;
         return true;
@@ -838,7 +824,6 @@ void main() {
 
       await tester.tap(find.text('ELEGIR PLAN').first);
       await tester.pumpAndSettle();
-      await _confirmarMailDePago(tester);
 
       expect(navego, isFalse);
       expect(find.textContaining('No pudimos'), findsOneWidget);
@@ -852,7 +837,7 @@ void main() {
 
       var navego = false;
       debugPlanCheckoutCreator =
-          ({required tier, required annual, required payerEmail}) async => throw Exception('boom');
+          ({required tier, required annual, payerEmail}) async => throw Exception('boom');
       debugPlanCheckoutLauncher = (u) async {
         navego = true;
         return true;
@@ -864,7 +849,6 @@ void main() {
 
       await tester.tap(find.text('ELEGIR PLAN').first);
       await tester.pumpAndSettle();
-      await _confirmarMailDePago(tester);
 
       expect(navego, isFalse);
       expect(find.textContaining('No pudimos'), findsOneWidget);
