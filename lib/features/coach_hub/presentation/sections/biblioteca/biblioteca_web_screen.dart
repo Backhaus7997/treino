@@ -155,8 +155,16 @@ class _BibliotecaWebScreenState extends ConsumerState<BibliotecaWebScreen>
     final seleccion = ref.watch(bibliotecaSelectedExerciseProvider);
     final esDesktop = rsp.viewportFor(MediaQuery.sizeOf(context).width) ==
         rsp.Viewport.desktop;
-    if (seleccion == null || !esDesktop) return columna;
+    final mostrarDrawer = seleccion != null && esDesktop;
 
+    // El `Stack` va SIEMPRE, tambien con el detalle cerrado y tambien en
+    // compact. Antes esto devolvia `columna` pelada cuando no habia seleccion,
+    // y al abrir el detalle el arbol pasaba de `Column` en la raiz a
+    // `Stack > Column`: Flutter ve otro tipo de widget en la misma posicion,
+    // destruye el subarbol y remonta TODO — TabBarView, grilla, scroll y el
+    // texto del buscador. Se veia como si la pantalla se reiniciara al cerrar.
+    // Con la estructura fija, `columna` conserva su elemento y el drawer solo
+    // entra y sale como segundo hijo del Stack.
     return LayoutBuilder(
       builder: (context, constraints) {
         final anchoDrawer = (constraints.maxWidth * kBibliotecaDrawerFraction)
@@ -165,7 +173,8 @@ class _BibliotecaWebScreenState extends ConsumerState<BibliotecaWebScreen>
         return Stack(
           children: [
             Positioned.fill(child: columna),
-            Positioned(
+            if (mostrarDrawer)
+              Positioned(
               top: 0,
               bottom: 0,
               right: 0,

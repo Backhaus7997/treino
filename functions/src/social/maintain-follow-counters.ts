@@ -45,10 +45,12 @@
  */
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
+import { Firestore, Transaction } from "firebase-admin/firestore";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 
-function getApp(): admin.app.App {
+function getApp(): App {
   try {
     return admin.app();
   } catch {
@@ -149,8 +151,8 @@ export function resolveCounterDelta(
  * Justificado en ADR-FOLLOW-007.
  */
 async function countAcceptedFor(
-  tx: admin.firestore.Transaction,
-  db: admin.firestore.Firestore,
+  tx: Transaction,
+  db: Firestore,
   uid: string,
 ): Promise<{ followingCount: number; followersCount: number }> {
   const [followingSnap, followersSnap] = await Promise.all([
@@ -175,7 +177,7 @@ async function countAcceptedFor(
 }
 
 export async function maintainFollowCountersHandler(
-  app: admin.app.App,
+  app: App,
   before: FollowData | undefined,
   after: FollowData | undefined,
 ): Promise<void> {

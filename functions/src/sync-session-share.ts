@@ -73,10 +73,11 @@
  */
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 
-function getApp(): admin.app.App {
+function getApp(): App {
   try {
     return admin.app();
   } catch {
@@ -94,7 +95,7 @@ type LinkData = Record<string, unknown>;
  * @param after  - Snapshot data after the write (undefined for deletes).
  */
 export async function syncSessionShareHandler(
-  app: admin.app.App,
+  app: App,
   before: LinkData | undefined,
   after: LinkData | undefined,
 ): Promise<void> {

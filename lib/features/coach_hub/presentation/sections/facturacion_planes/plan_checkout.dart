@@ -21,11 +21,16 @@ import '../../../../coach/domain/subscription_tier.dart';
 ///
 /// ─── Por qué un tipo sellado y no un `if (kIsWeb)` ───
 ///
-/// Hoy el CTA de la pricing page todavía no cobra: abre un aviso. El día que
-/// alguien cablee la pasarela va a buscar ese punto y va a reemplazar el aviso
-/// por la llamada real. Con un `if` alrededor del botón ese reemplazo habilita
-/// la compra en móvil sin que nada se queje: el `if` sigue ahí, verdadero en
-/// las dos ramas, porque lo único que cambió es lo que hay adentro.
+/// Este tipo se escribió cuando el CTA todavía no cobraba —abría un aviso— y
+/// la apuesta era: el día que alguien cablee la pasarela va a buscar ese punto
+/// y va a reemplazar el aviso por la llamada real. Con un `if` alrededor del
+/// botón, ese reemplazo habilita la compra en móvil sin que nada se queje: el
+/// `if` sigue ahí, verdadero en las dos ramas, porque lo único que cambió es
+/// lo que hay adentro.
+///
+/// **Ya pasó, y el sellado aguantó.** El CTA cobra de verdad desde que se
+/// cableó Mercado Pago, y el cableado fue exactamente eso: cambiar el cuerpo
+/// de `start` y nada más.
 ///
 /// Acá la compra no es un booleano: es una CAPACIDAD que sólo tiene
 /// [PlanCheckoutAvailable]. [PlanCheckoutOnWebOnly] no expone `start` — no es
@@ -88,23 +93,10 @@ final class PlanCheckoutAvailable extends PlanCheckout {
   /// Por eso el guard de la carpeta sigue prohibiendo `WebViewController`,
   /// `InAppBrowser` y `LaunchMode.inAppBrowserView` — también en ESTE archivo.
   /// Lo único que se habilitó es el `launchUrl` de acá.
-  ///
-  /// ─── El mail del pagador ───
-  ///
-  /// [payerEmail] es el mail de la cuenta de Mercado Pago del PF, si configuró
-  /// uno distinto al de TREINO (`users/{uid}.mpPayerEmail`). `null` —el caso
-  /// normal— deja que el servidor use el del token.
-  ///
-  /// Viene por parámetro y NO se pregunta en el momento: una versión anterior
-  /// abría un diálogo acá y era el diseño equivocado. MP exige el dato, pero
-  /// eso es un detalle de la pasarela, y filtrarlo a la cara del usuario le
-  /// cobra fricción al 90% que tiene los dos mails iguales. El que necesita
-  /// otro lo configura una vez en Ajustes → Facturación.
   Future<void> start(
     BuildContext context, {
     required SubscriptionTier tier,
     required bool annual,
-    String? payerEmail,
   }) async {
     final messenger = ScaffoldMessenger.of(context);
 
@@ -112,7 +104,6 @@ final class PlanCheckoutAvailable extends PlanCheckout {
       final initPoint = await (debugPlanCheckoutCreator ?? _crearPreapproval)(
         tier: tier,
         annual: annual,
-        payerEmail: payerEmail,
       );
       if (initPoint == null) {
         _avisar(messenger, 'No pudimos abrir el pago. Probá de nuevo.');
@@ -159,17 +150,12 @@ const String _kRegion = 'southamerica-east1';
 Future<String?> _crearPreapproval({
   required SubscriptionTier tier,
   required bool annual,
-  String? payerEmail,
 }) async {
   final res = await FirebaseFunctions.instanceFor(region: _kRegion)
       .httpsCallable('createPreapproval')
       .call<Map<String, dynamic>>({
     'tier': tier.name,
     'cycle': annual ? 'annual' : 'monthly',
-    // Sólo viaja si el PF configuró uno. Mandar `null` haría que el
-    // servidor lo viera como un payerEmail inválido y cayera al default —
-    // mismo resultado, pero por accidente en vez de por diseño.
-    if (payerEmail != null && payerEmail.isNotEmpty) 'payerEmail': payerEmail,
   });
   final initPoint = res.data['initPoint'];
   return initPoint is String && initPoint.isNotEmpty ? initPoint : null;
@@ -192,7 +178,6 @@ Future<bool> _abrirCheckout(Uri url) =>
 Future<String?> Function({
   required SubscriptionTier tier,
   required bool annual,
-  String? payerEmail,
 })? debugPlanCheckoutCreator;
 
 

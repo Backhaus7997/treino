@@ -171,22 +171,21 @@ describe("createMpClient — los errores, y cuáles conviene reintentar", () => 
 const ALTA = {
   reason: "TREINO — plan2 (mensual)",
   externalReference: "uid-42",
-  payerEmail: "pf@x.com",
   backUrl: "https://app.gettreino.com/ajustes",
   transactionAmount: 22000,
   frequencyMonths: 1,
 };
 
-describe("createMpClient — createPreapproval", () => {
-  it("hace POST a /preapproval con el token", async () => {
+describe("createMpClient — createPreapprovalPlan", () => {
+  it("hace POST a /preapproval_plan con el token", async () => {
     const { fn, llamadas } = fakeFetch({
       status: 201,
       body: { id: "2c93", init_point: "https://mp/x" },
     });
 
-    await createMpClient("TEST-token", fn).createPreapproval(ALTA);
+    await createMpClient("TEST-token", fn).createPreapprovalPlan(ALTA);
 
-    expect(llamadas[0].url).toBe("https://api.mercadopago.com/preapproval");
+    expect(llamadas[0].url).toBe("https://api.mercadopago.com/preapproval_plan");
     expect(llamadas[0].init?.method).toBe("POST");
     expect(
       (llamadas[0].init?.headers as Record<string, string>).Authorization,
@@ -199,16 +198,13 @@ describe("createMpClient — createPreapproval", () => {
       body: { id: "2c93", init_point: "https://mp/x" },
     });
 
-    await createMpClient("t", fn).createPreapproval(ALTA);
+    await createMpClient("t", fn).createPreapprovalPlan(ALTA);
 
     const body = JSON.parse(llamadas[0].init?.body as string);
     expect(body).toMatchObject({
       reason: "TREINO — plan2 (mensual)",
       external_reference: "uid-42",
-      payer_email: "pf@x.com",
       back_url: "https://app.gettreino.com/ajustes",
-      // `pending` y no `authorized`: la suscripcion nace SIN medio de pago.
-      status: "pending",
       auto_recurring: {
         frequency: 1,
         frequency_type: "months",
@@ -225,7 +221,7 @@ describe("createMpClient — createPreapproval", () => {
       body: { id: "x", init_point: "https://mp/x" },
     });
 
-    await createMpClient("t", fn).createPreapproval({
+    await createMpClient("t", fn).createPreapprovalPlan({
       ...ALTA,
       transactionAmount: 220000,
       frequencyMonths: 12,
@@ -242,7 +238,7 @@ describe("createMpClient — createPreapproval", () => {
       body: { id: "x", init_point: "https://mp/x" },
     });
 
-    await createMpClient("t", fn).createPreapproval(ALTA);
+    await createMpClient("t", fn).createPreapprovalPlan(ALTA);
 
     expect(JSON.parse(llamadas[0].init?.body as string).auto_recurring.currency_id)
       .toBe("ARS");
@@ -254,7 +250,7 @@ describe("createMpClient — createPreapproval", () => {
       body: { id: "2c93", init_point: "https://mp/x", status: "pending" },
     });
 
-    const r = await createMpClient("t", fn).createPreapproval(ALTA);
+    const r = await createMpClient("t", fn).createPreapprovalPlan(ALTA);
 
     expect(r.id).toBe("2c93");
     expect(r.init_point).toBe("https://mp/x");
@@ -265,7 +261,6 @@ describe("createMpClient — createPreapproval", () => {
   // por un 400 de MP los disfraza de problema de ellos.
   const invalidas: [string, Record<string, unknown>, RegExp][] = [
     ["externalReference vacio", { externalReference: "" }, /externalReference/],
-    ["payerEmail vacio", { payerEmail: "" }, /payerEmail/],
     ["monto en 0", { transactionAmount: 0 }, /transactionAmount/],
     ["monto negativo", { transactionAmount: -1 }, /transactionAmount/],
     ["monto NaN", { transactionAmount: Number.NaN }, /transactionAmount/],
@@ -278,7 +273,7 @@ describe("createMpClient — createPreapproval", () => {
       const { fn, llamadas } = fakeFetch({ status: 201, body: { id: "x" } });
 
       await expect(
-        createMpClient("t", fn).createPreapproval({ ...ALTA, ...patch } as never),
+        createMpClient("t", fn).createPreapprovalPlan({ ...ALTA, ...patch } as never),
       ).rejects.toThrow(patron);
       expect(llamadas).toHaveLength(0);
     });
@@ -288,7 +283,7 @@ describe("createMpClient — createPreapproval", () => {
     const { fn } = fakeFetch({ status: 400, texto: "y".repeat(2000) });
 
     const err = await errorDe(() =>
-      createMpClient("t", fn).createPreapproval(ALTA));
+      createMpClient("t", fn).createPreapprovalPlan(ALTA));
 
     expect(err.status).toBe(400);
     // Un 400 es nuestro request mal armado: reintentarlo no lo arregla.
@@ -300,7 +295,7 @@ describe("createMpClient — createPreapproval", () => {
     const { fn } = fakeFetch({ status: 500, texto: "boom" });
 
     const err = await errorDe(() =>
-      createMpClient("t", fn).createPreapproval(ALTA));
+      createMpClient("t", fn).createPreapprovalPlan(ALTA));
 
     expect(err.retryable).toBe(true);
   });

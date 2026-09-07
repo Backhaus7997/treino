@@ -40,7 +40,8 @@ import {
   reconcileAllSubscriptions,
   reconcileSubscription,
 } from "../subscriptions/mp/reconcile";
-import { MpApiError, MpClient, MpPreapproval } from "../subscriptions/mp/client";
+import { MpApiError, MpPreapproval } from "../subscriptions/mp/client";
+import { ReconcileDeps } from "../subscriptions/mp/reconcile";
 
 // ---------------------------------------------------------------------------
 
@@ -82,14 +83,27 @@ function fakeApp(seed: Store = {}) {
   return { app: app as never, store, escrituras };
 }
 
-function fakeMp(respuesta: MpPreapproval | Error): { mpClient: MpClient } {
+/**
+ * El reconciliador ya no pide UNA suscripcion por id: pide las que hay contra
+ * un PLAN. `respuesta` es la unica suscripcion del plan, o `null` para el caso
+ * normal de un plan que nadie pago todavia.
+ */
+/** Un "ahora" fijo. El barrido decide abandonos contra el reloj inyectado. */
+const AHORA = Date.parse("2026-09-07T12:00:00.000Z");
+
+function fakeMp(
+  respuesta: MpPreapproval | Error | null,
+  nowMs: number = AHORA,
+): ReconcileDeps {
   return {
+    nowMs,
     mpClient: {
-      getPreapproval: async () => {
+      getPreapproval: async () => ({}),
+      createPreapprovalPlan: async () => ({}),
+      searchPreapprovalsByPlan: async () => {
         if (respuesta instanceof Error) throw respuesta;
-        return respuesta;
+        return respuesta === null ? [] : [respuesta];
       },
-      createPreapproval: async () => ({}),
     },
   };
 }
@@ -97,7 +111,7 @@ function fakeMp(respuesta: MpPreapproval | Error): { mpClient: MpClient } {
 /** Un mundo con el mapeo ya escrito y el PF sin suscripcion todavia. */
 const MUNDO = (): Store => ({
   users: { t1: { role: "trainer", displayName: "Martin" } },
-  mp_preapprovals: { p1: { uid: "t1", tier: "plan2", cycle: "monthly" } },
+  mp_plans: { p1: { uid: "t1", tier: "plan2", cycle: "monthly" } },
 });
 
 const AUTORIZADA: MpPreapproval = {
@@ -163,7 +177,7 @@ describe("reconcileSubscription — el camino que hace que cobrar sirva", () => 
 
     expect((store.users.t1.subscription as Record<string, unknown>).status)
       .toBe("cancelled");
-    expect(store.mp_preapprovals.p1.terminal).toBe(true);
+    expect(store.mp_plans.p1.terminal).toBe(true);
   });
 
   it("una baja SIN proxima fecha conserva la que ya teniamos", async () => {
@@ -193,7 +207,7 @@ describe("reconcileSubscription — el camino que hace que cobrar sirva", () => 
     // lo pone MP en external_reference, que se lo mandamos nosotros al crear.
     const { app, store } = fakeApp({
       users: { t1: { role: "trainer" } },
-      mp_preapprovals: {},
+      mp_plans: {},
     });
 
     const r = await reconcileSubscription(app, "p1", fakeMp(AUTORIZADA));
@@ -246,7 +260,7 @@ describe("reconcileSubscription — cuando NO hay que escribir", () => {
   it("sin plan determinable NO se escribe", async () => {
     const { app, escrituras } = fakeApp({
       users: { t1: { role: "trainer" } },
-      mp_preapprovals: {},
+      mp_plans: {},
     });
 
     const r = await reconcileSubscription(app, "p1", fakeMp({
@@ -261,7 +275,7 @@ describe("reconcileSubscription — cuando NO hay que escribir", () => {
   it("sin uid en ningun lado NO se escribe", async () => {
     const { app, escrituras } = fakeApp({
       users: {},
-      mp_preapprovals: { p1: { tier: "plan2", cycle: "monthly" } },
+      mp_plans: { p1: { tier: "plan2", cycle: "monthly" } },
     });
 
     const r = await reconcileSubscription(app, "p1", fakeMp({
@@ -350,7 +364,7 @@ describe("reconcileAllSubscriptions — el barrido", () => {
   it("saltea los terminales: una baja no se le vuelve a preguntar a MP", async () => {
     const { app } = fakeApp({
       users: { t1: { role: "trainer" } },
-      mp_preapprovals: {
+      mp_plans: {
         p1: { uid: "t1", tier: "plan2", cycle: "monthly", terminal: true },
       },
     });
@@ -362,7 +376,7 @@ describe("reconcileAllSubscriptions — el barrido", () => {
   it("cuenta escritos, sin cambios, salteados y errores por separado", async () => {
     const { app } = fakeApp({
       users: { t1: { role: "trainer" } },
-      mp_preapprovals: {
+      mp_plans: {
         p1: { uid: "t1", tier: "plan2", cycle: "monthly" },
         p2: { uid: "t1", tier: "plan2", cycle: "monthly", terminal: true },
       },
@@ -378,7 +392,7 @@ describe("reconcileAllSubscriptions — el barrido", () => {
     // Misma leccion que el catch por-PF de `entitlement-triggers`.
     const { app } = fakeApp({
       users: { t1: { role: "trainer" }, t2: { role: "trainer" } },
-      mp_preapprovals: {
+      mp_plans: {
         p1: { uid: "t1", tier: "plan2", cycle: "monthly" },
         p2: { uid: "t2", tier: "plan1", cycle: "monthly" },
       },
@@ -389,5 +403,293 @@ describe("reconcileAllSubscriptions — el barrido", () => {
 
     expect(r.total).toBe(2);
     expect(r.errors).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// La cascada del fin de periodo.
+//
+// Sale de una prueba REAL contra Mercado Pago, y la asimetria que encontramos
+// es fea: una suscripcion cancelada que PAGO viene SIN `next_payment_date`,
+// mientras que una cancelada que NUNCA pago SI lo trae. Medido sobre dos
+// suscripciones de la misma cuenta el 2026-09-07.
+//
+// O sea que el dato falta justo cuando importa, y el que se queda sin fecha es
+// el que te pago. Si `currentPeriodEnd` queda en null, `effective-limit` le
+// saca el plan EN EL ACTO a alguien que pago el mes entero.
+// ---------------------------------------------------------------------------
+
+import {
+  finDePeriodoDesdeAltaMs,
+  resolverFinDePeriodo,
+} from "../subscriptions/mp/reconcile";
+
+/** El `auto_recurring` tal cual lo devolvio MP en la prueba real. */
+const AUTO_RECURRING_REAL = {
+  frequency: 1,
+  frequency_type: "months",
+  transaction_amount: 12000.0,
+  currency_id: "ARS",
+  start_date: "2026-09-07T11:52:46.997-04:00",
+  billing_day_proportional: false,
+  has_billing_day: false,
+};
+
+describe("finDePeriodoDesdeAltaMs", () => {
+  it("suma el periodo al alta, con el payload real de MP", () => {
+    const ms = finDePeriodoDesdeAltaMs(AUTO_RECURRING_REAL);
+    expect(ms).toBe(Date.parse("2026-10-07T11:52:46.997-04:00"));
+  });
+
+  it("respeta una frecuencia de 12 meses (el ciclo anual)", () => {
+    const ms = finDePeriodoDesdeAltaMs({
+      ...AUTO_RECURRING_REAL, frequency: 12,
+    });
+    expect(ms).toBe(Date.parse("2027-09-07T11:52:46.997-04:00"));
+  });
+
+  it("el desborde de mes lo normaliza el calendario, no nosotros", () => {
+    // 31 de enero + 1 mes no existe. `setUTCMonth` lo lleva al 3 de marzo, que
+    // es como cuenta el calendario — no hay que corregirlo a mano.
+    const ms = finDePeriodoDesdeAltaMs({
+      ...AUTO_RECURRING_REAL, start_date: "2026-01-31T00:00:00.000Z",
+    });
+    expect(new Date(ms as number).toISOString()).toBe("2026-03-03T00:00:00.000Z");
+  });
+
+  const noDerivables: [string, unknown][] = [
+    ["frequency_type days — no lo entendemos y no lo adivinamos",
+      { ...AUTO_RECURRING_REAL, frequency_type: "days" }],
+    ["sin start_date", { frequency: 1, frequency_type: "months" }],
+    ["start_date que no es fecha",
+      { ...AUTO_RECURRING_REAL, start_date: "mañana" }],
+    ["frequency cero", { ...AUTO_RECURRING_REAL, frequency: 0 }],
+    ["frequency negativa", { ...AUTO_RECURRING_REAL, frequency: -1 }],
+    ["frequency fraccionaria", { ...AUTO_RECURRING_REAL, frequency: 1.5 }],
+    ["frequency absurda (24 meses es el tope)",
+      { ...AUTO_RECURRING_REAL, frequency: 999 }],
+    ["null", null],
+    ["un string", "auto_recurring"],
+  ];
+  for (const [caso, ar] of noDerivables) {
+    it(`da null con ${caso}`, () => {
+      expect(finDePeriodoDesdeAltaMs(ar)).toBeNull();
+    });
+  }
+});
+
+describe("resolverFinDePeriodo — la cascada", () => {
+  const base = {
+    deMp: null,
+    yaGuardada: undefined,
+    autoRecurring: AUTO_RECURRING_REAL,
+    status: "cancelled" as const,
+    planId: "p1",
+  };
+
+  it("1. lo que dijo MP gana sobre todo lo demas", () => {
+    const deMp = ts(1_000);
+    const r = resolverFinDePeriodo({
+      ...base,
+      deMp: deMp as never,
+      yaGuardada: ts(2_000),
+    });
+    expect(r?.toMillis()).toBe(1_000);
+  });
+
+  it("2. sin fecha de MP, gana la que ya teniamos", () => {
+    // El caso del PF que estuvo meses suscripto: el barrido diario le fue
+    // refrescando la fecha mientras estaba activo.
+    const r = resolverFinDePeriodo({ ...base, yaGuardada: ts(9_999) });
+    expect(r?.toMillis()).toBe(9_999);
+  });
+
+  it("3. sin nada guardado, se deriva del alta — la baja el MISMO DIA", () => {
+    // Este es el agujero que encontro la prueba real: se suscribio y cancelo
+    // antes de que el barrido corriera una sola vez, asi que no hay nada que
+    // conservar. Sin esta rama pierde el mes que pago.
+    const r = resolverFinDePeriodo(base);
+    expect(r?.toMillis()).toBe(Date.parse("2026-10-07T11:52:46.997-04:00"));
+  });
+
+  it("4. si no hay ningun camino, null y un warn que lo grita", () => {
+    const r = resolverFinDePeriodo({ ...base, autoRecurring: null });
+    expect(r).toBeNull();
+    expect(errorSpy.mock.calls.length + warnSpy.mock.calls.length)
+      .toBeGreaterThan(0);
+  });
+
+  it("con la suscripcion VIVA no se inventa fecha", () => {
+    // Mientras MP no dijo nada terminal, que falte la fecha es informacion:
+    // no la sabemos. Conservar una vieja seria regalar un periodo que quizas
+    // no se pago.
+    for (const status of ["active", "pending", "grace"] as const) {
+      const r = resolverFinDePeriodo({ ...base, status, yaGuardada: ts(9_999) });
+      expect(r).toBeNull();
+    }
+  });
+
+  it("`paused` tambien conserva: suspender no es no haber pagado", () => {
+    const r = resolverFinDePeriodo({ ...base, status: "paused" });
+    expect(r).not.toBeNull();
+  });
+
+  it("una fecha guardada con forma rota no se usa, se deriva", () => {
+    const r = resolverFinDePeriodo({ ...base, yaGuardada: "2026-10-07" });
+    expect(r?.toMillis()).toBe(Date.parse("2026-10-07T11:52:46.997-04:00"));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// El caso completo, con los DOS payloads reales de la prueba del 2026-09-07.
+// ---------------------------------------------------------------------------
+
+describe("reconcileSubscription — las dos cancelaciones reales", () => {
+  it("la que PAGO y no trae fecha conserva el periodo que compro", async () => {
+    const { app, store } = fakeApp(MUNDO());
+
+    await reconcileSubscription(app, "p1", fakeMp({
+      id: "79e2fbf31595407f839dd772b59ae34a",
+      status: "cancelled",
+      external_reference: "t1",
+      // Vacio, tal cual vino de MP para la suscripcion pagada.
+      next_payment_date: undefined,
+      auto_recurring: { ...AUTO_RECURRING_REAL, transaction_amount: 22000 },
+      summarized: { pending_charge_quantity: 0 },
+    }));
+
+    const sub = store.users.t1.subscription as Record<string, unknown>;
+    expect(sub.status).toBe("cancelled");
+    // No pierde el mes: la fecha sale del alta.
+    expect(sub.currentPeriodEnd).not.toBeNull();
+    expect((sub.currentPeriodEnd as { toMillis(): number }).toMillis())
+      .toBe(Date.parse("2026-10-07T11:52:46.997-04:00"));
+  });
+
+  it("la que NUNCA pago si trae fecha, y se usa esa", async () => {
+    const { app, store } = fakeApp(MUNDO());
+
+    await reconcileSubscription(app, "p1", fakeMp({
+      id: "3af60648011f4deab385043c20b290af",
+      status: "cancelled",
+      external_reference: "t1",
+      // Igual a `date_created`: el "proximo" cobro era el primero, que nunca
+      // ocurrio. Queda en el pasado, y esta bien — no pago nada.
+      next_payment_date: "2026-09-07T11:52:46.000-04:00",
+      auto_recurring: AUTO_RECURRING_REAL,
+      summarized: { pending_charge_quantity: 0 },
+    }));
+
+    const sub = store.users.t1.subscription as Record<string, unknown>;
+    expect((sub.currentPeriodEnd as { toMillis(): number }).toMillis())
+      .toBe(Date.parse("2026-09-07T11:52:46.000-04:00"));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// El abandono de planes.
+//
+// Es el costo del diseño de UN PLAN POR CHECKOUT: cada PF que toca "ELEGIR
+// PLAN" y no paga deja un plan que el barrido consultaria contra MP todas las
+// noches PARA SIEMPRE. Sin esto, el trabajo nocturno crece con la CURIOSIDAD de
+// la gente, no con las ventas.
+// ---------------------------------------------------------------------------
+
+import { esAbandonado } from "../subscriptions/mp/reconcile";
+
+const DIA = 24 * 60 * 60 * 1000;
+
+describe("esAbandonado", () => {
+  it("un plan recien creado NO se abandona", () => {
+    expect(esAbandonado(ts(AHORA - DIA), AHORA)).toBe(false);
+  });
+
+  it("a los 31 dias si", () => {
+    expect(esAbandonado(ts(AHORA - 31 * DIA), AHORA)).toBe(true);
+  });
+
+  it("justo en el limite de 30 dias todavia NO", () => {
+    // El corte es estricto: 30 dias exactos sigue vivo. Es la direccion segura
+    // — esperar de mas cuesta llamadas, cortar temprano cuesta un cobro.
+    expect(esAbandonado(ts(AHORA - 30 * DIA), AHORA)).toBe(false);
+  });
+
+  const sinFecha: [string, unknown][] = [
+    ["sin createdAt", undefined],
+    ["null", null],
+    ["el sentinel de serverTimestamp sin resolver", "__ts__"],
+    ["un numero suelto", 1_700_000_000],
+    ["un string", "2026-09-07"],
+  ];
+  for (const [caso, v] of sinFecha) {
+    it(`NO abandona con ${caso} — ante la duda se sigue mirando`, () => {
+      // Gastar una llamada de mas es infinitamente mas barato que dejar de
+      // mirar una suscripcion que si existe.
+      expect(esAbandonado(v, AHORA)).toBe(false);
+    });
+  }
+});
+
+describe("reconcileAllSubscriptions — saca del barrido lo abandonado", () => {
+  const mundoConPlanViejo = (edadDias: number): Store => ({
+    users: { t1: { role: "trainer" } },
+    mp_plans: {
+      p1: {
+        uid: "t1", tier: "plan2", cycle: "monthly",
+        createdAt: ts(AHORA - edadDias * DIA),
+      },
+    },
+  });
+
+  it("un checkout abandonado hace 31 dias se marca terminal", async () => {
+    const { app, store } = fakeApp(mundoConPlanViejo(31));
+
+    // `null` = el plan no tiene ninguna suscripcion. Nadie pago.
+    const r = await reconcileAllSubscriptions(app, fakeMp(null));
+
+    expect(r.abandonados).toBe(1);
+    expect(store.mp_plans.p1.terminal).toBe(true);
+    expect(store.mp_plans.p1.terminalReason).toContain("abandonado");
+  });
+
+  it("pero conserva el mapeo — sirve para auditar quien compro que", async () => {
+    const { app, store } = fakeApp(mundoConPlanViejo(31));
+
+    await reconcileAllSubscriptions(app, fakeMp(null));
+
+    expect(store.mp_plans.p1.uid).toBe("t1");
+    expect(store.mp_plans.p1.tier).toBe("plan2");
+  });
+
+  it("uno de ayer NO se toca — el init_point puede seguir sirviendo", async () => {
+    const { app, store } = fakeApp(mundoConPlanViejo(1));
+
+    const r = await reconcileAllSubscriptions(app, fakeMp(null));
+
+    expect(r.abandonados).toBe(0);
+    expect(store.mp_plans.p1.terminal).toBeUndefined();
+  });
+
+  it("un plan VIEJO pero CON suscripcion no se abandona jamas", async () => {
+    // El caso que no puede fallar: un PF suscripto hace un año. Marcarlo
+    // terminal lo sacaria del barrido y su suscripcion dejaria de
+    // reconciliarse — se daria de baja y nunca nos enterariamos.
+    const { app, store } = fakeApp(mundoConPlanViejo(400));
+
+    const r = await reconcileAllSubscriptions(app, fakeMp(AUTORIZADA));
+
+    expect(r.abandonados).toBe(0);
+    expect(store.mp_plans.p1.terminal).toBeUndefined();
+    expect(r.written).toBe(1);
+  });
+
+  it("lo marcado deja de consultarse en la corrida siguiente", async () => {
+    const { app } = fakeApp(mundoConPlanViejo(31));
+
+    const primera = await reconcileAllSubscriptions(app, fakeMp(null));
+    const segunda = await reconcileAllSubscriptions(app, fakeMp(null));
+
+    expect(primera.total).toBe(1);
+    expect(segunda.total).toBe(0);
   });
 });

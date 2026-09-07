@@ -111,13 +111,15 @@
  */
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
+import { Messaging } from "firebase-admin/messaging";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 import { sendFcm } from "./send-fcm";
 import { enqueueMail } from "../mail/enqueue-mail";
 import { trainerEntry } from "../mail/templates";
 
-function getApp(): admin.app.App {
+function getApp(): App {
   try {
     return admin.app();
   } catch {
@@ -137,11 +139,11 @@ type FeedbackData = Record<string, unknown>;
  * @param messaging    - Instancia de messaging opcional, para inyección en tests.
  */
 export async function notifyOnExerciseFeedbackHandler(
-  app: admin.app.App,
+  app: App,
   athleteUid: string,
   sessionId: string,
   feedbackData: FeedbackData,
-  messaging?: admin.messaging.Messaging,
+  messaging?: Messaging,
 ): Promise<void> {
   const kind = feedbackData.kind as string | undefined;
 

@@ -24,26 +24,27 @@
  * dejar que el PF elija cuanto pagar, y no hay validacion que arregle eso —
  * cualquier monto que "parezca razonable" tambien lo parece $1.
  *
- * ── El mail SI puede venir del cliente, y esto cambio ──
+ * ── NO se le pregunta el mail a nadie, y esa es la historia de este archivo ──
  *
- * `payer_email` es REQUERIDO por MP para suscripciones sin plan asociado, y MP
- * ata la suscripcion a ese mail: el que paga TIENE que estar logueado con el.
+ * La primera version creaba la suscripcion con `POST /preapproval`, que EXIGE
+ * `payer_email`. Y MP ATA el cobro a ese mail: quien paga tiene que estar
+ * logueado con el. O sea que un PF que se registra en TREINO con
+ * `juan@gmail.com` pero cuya cuenta de Mercado Pago es `jperez@hotmail.com`
+ * **no podia pagar nunca**, y el error le aparecia recien adentro del checkout
+ * —"Tu e-mail no coincide con el de la suscripcion"— donde ya no lo puede
+ * corregir. No es un caso raro: es la mitad de la gente.
  *
- * La primera version lo sacaba de `request.auth.token.email` y no dejaba
- * pisarlo. Eso rompia el caso normal: un PF que se registra en TREINO con
- * `juan@gmail.com` pero cuyo Mercado Pago es `jperez@hotmail.com` no podia
- * pagar NUNCA. No es un caso raro, es la mitad de la gente.
+ * Se intento preguntarselo en un dialogo antes de comprar y era peor: friccion
+ * en el camino de pago para el 90% que tiene los dos mails iguales, por un
+ * detalle de la pasarela que no deberia ver nunca.
  *
- * Ahora el cliente puede mandar `payerEmail`, y el del token es el DEFAULT.
- * Que eso no abre un agujero se ve pensando el peor caso: mandar el mail de un
- * tercero hace que MP le mande la suscripcion A ESA PERSONA PARA QUE LA PAGUE
- * —nadie cobra sin autorizar— y `external_reference` sigue llevando el uid de
- * QUIEN PIDIO, asi que el plan se le acredita a quien corresponde. O sea que el
- * "ataque" es pagarle la suscripcion a otro, que es un caso de uso (un gimnasio
- * pagando por sus profes), no un abuso.
+ * Ahora el checkout va contra un PLAN (`POST /preapproval_plan`), que NO pide
+ * `payer_email`: devuelve su propio `init_point` y MP le pregunta al pagador
+ * quien es. Cualquier cuenta, cualquier mail. Verificado a mano contra la API.
  *
- * Lo que sigue sin poder elegir el cliente es lo que cuesta plata: el MONTO
- * (sale de `TIER_PRICES_ARS`) y A QUIEN se le acredita el plan (sale del token).
+ * Se crea un plan POR CHECKOUT y no seis fijos, porque el `external_reference`
+ * vive en el plan: con planes compartidos perderiamos a quien acreditarle el
+ * cupo. Ver el encabezado de `client.ts`.
  */
 
 import * as admin from "firebase-admin";
@@ -58,7 +59,7 @@ import {
   PAID_TIERS,
   amountFor,
   frequencyMonthsFor,
-  recordPreapproval,
+  recordPlan,
 } from "./tier-mapping";
 import { MpApiError, MpClient, createMpClient } from "./client";
 
@@ -98,7 +99,7 @@ export interface CreatePreapprovalRequest {
 export interface CreatePreapprovalResult {
   /** La URL a la que hay que mandar al PF. Es lo unico que el cliente usa. */
   initPoint: string;
-  preapprovalId: string;
+  planId: string;
   /** `reused` cuando se devolvio un checkout ya abierto (doble click). */
   status: "created" | "reused";
 }
@@ -115,19 +116,6 @@ function getApp(): admin.app.App {
   } catch {
     return admin.initializeApp();
   }
-}
-
-/**
- * Forma de mail, y nada mas. NO se chequea que le pertenezca a quien llama, y
- * es deliberado: pagar por otro es un caso de uso, no un abuso (ver el
- * encabezado). Lo unico que evita esta funcion es mandarle basura a MP y
- * comerse un 400 opaco.
- */
-function esMailValido(raw: unknown): boolean {
-  if (typeof raw !== "string") return false;
-  const v = raw.trim();
-  return v.length > 3 && v.length <= 254 &&
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 }
 
 /** `unknown` → un miembro de la union, o `null`. Nunca un cast a ciegas. */
@@ -148,28 +136,17 @@ function parseCycle(raw: unknown): SubscriptionCycle | null {
  * El handler. Todo lo que decide entra por parametro: el uid y el mail ya
  * verificados, la entrada cruda, y las dependencias.
  *
- * [emailDelToken] es el DEFAULT del pagador, no una imposicion: si el cliente
- * manda `payerEmail` valido, gana ese. Ver el encabezado.
  *
- * Recibe `uid` y `emailDelToken` YA extraidos del token y no el `request` entero para
+ * Recibe el `uid` YA extraido del token y no el `request` entero, para
  * que sea imposible leer del body algo que tiene que salir del token.
  */
 export async function runCreatePreapproval(
   app: admin.app.App,
   uid: string,
-  emailDelToken: string,
   raw: unknown,
   deps: CreatePreapprovalDeps,
 ): Promise<CreatePreapprovalResult> {
   const body = (raw ?? {}) as Record<string, unknown>;
-
-  // El mail del pagador: el del cliente si es valido, si no el del token.
-  // Validacion de FORMA, no de propiedad — no verificamos que sea suyo, y no
-  // hace falta: ver el encabezado. Lo unico que se evita es mandarle basura a
-  // MP y comerse un 400 opaco.
-  const payerEmail = esMailValido(body.payerEmail)
-    ? (body.payerEmail as string).trim()
-    : emailDelToken;
 
   const tier = parseTier(body.tier);
   if (!tier) {
@@ -224,17 +201,17 @@ export async function runCreatePreapproval(
       previo.tier === tier &&
       previo.cycle === cycle &&
       typeof previo.initPoint === "string" && previo.initPoint !== "" &&
-      typeof previo.preapprovalId === "string" && previo.preapprovalId !== ""
+      typeof previo.planId === "string" && previo.planId !== ""
     ) {
       logger.info("mp/create-preapproval: se reusa el checkout abierto", {
         uid,
         tier,
         cycle,
-        preapprovalId: previo.preapprovalId,
+        planId: previo.planId,
       });
       return {
         initPoint: previo.initPoint,
-        preapprovalId: previo.preapprovalId,
+        planId: previo.planId,
         status: "reused",
       };
     }
@@ -242,10 +219,9 @@ export async function runCreatePreapproval(
 
   let creado;
   try {
-    creado = await deps.mpClient.createPreapproval({
+    creado = await deps.mpClient.createPreapprovalPlan({
       reason: `TREINO — ${tier} (${cycle === "annual" ? "anual" : "mensual"})`,
       externalReference: uid,
-      payerEmail,
       backUrl: BACK_URL,
       transactionAmount: amount,
       frequencyMonths: frequencyMonthsFor(cycle),
@@ -268,10 +244,10 @@ export async function runCreatePreapproval(
     );
   }
 
-  const preapprovalId = creado.id;
+  const planId = creado.id;
   const initPoint = (creado as { init_point?: unknown }).init_point;
-  if (typeof preapprovalId !== "string" || preapprovalId === "") {
-    throw new HttpsError("internal", "MP no devolvio un id de preapproval");
+  if (typeof planId !== "string" || planId === "") {
+    throw new HttpsError("internal", "MP no devolvio un id de plan");
   }
   if (typeof initPoint !== "string" || initPoint === "") {
     // Sin `init_point` el PF no tiene a donde ir. Falla ruidoso en vez de
@@ -282,10 +258,10 @@ export async function runCreatePreapproval(
   // El mapeo va PRIMERO, antes del doc de checkout: si algo falla despues, lo
   // que no se puede perder es de que plan es esta suscripcion. El checkout es
   // una comodidad; el mapeo es lo que hace reconciliable el cobro.
-  await recordPreapproval(app, preapprovalId, { uid, tier, cycle });
+  await recordPlan(app, planId, { uid, tier, cycle });
 
   await checkoutRef.set({
-    preapprovalId,
+    planId,
     tier,
     cycle,
     initPoint,
@@ -298,10 +274,10 @@ export async function runCreatePreapproval(
     uid,
     tier,
     cycle,
-    preapprovalId,
+    planId,
   });
 
-  return { initPoint, preapprovalId, status: "created" };
+  return { initPoint, planId, status: "created" };
 }
 
 export const createPreapproval = functions.onCall(
@@ -321,21 +297,12 @@ export const createPreapproval = functions.onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "hay que estar logueado");
     }
-    const emailDelToken = request.auth.token.email;
-    if (typeof emailDelToken !== "string" || emailDelToken === "") {
-      // Sin mail en el token no hay DEFAULT que ofrecer. El cliente igual
-      // puede mandar `payerEmail`, pero si tampoco lo manda no hay con que
-      // llenar un campo que MP exige — y fallar acá es mejor que un 400 de MP.
-      throw new HttpsError(
-        "failed-precondition",
-        "la cuenta no tiene un mail asociado",
-      );
-    }
+    // Ya NO se lee el mail del token: el plan no lo pide y MP le pregunta al
+    // pagador quien es. Un PF sin mail en su token puede comprar igual.
 
     return runCreatePreapproval(
       getApp(),
       request.auth.uid,
-      emailDelToken,
       request.data,
       {
         mpClient: createMpClient(MP_ACCESS_TOKEN.value()),

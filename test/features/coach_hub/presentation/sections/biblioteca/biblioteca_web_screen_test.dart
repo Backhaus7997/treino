@@ -371,6 +371,56 @@ void main() {
       expect(find.byKey(panelKey), findsNothing);
     });
 
+    testWidgets('abrir y cerrar el drawer NO reinicia la pantalla',
+        (tester) async {
+      // El sintoma que reporto el dueño del producto: al cerrar el detalle
+      // "se reinicia la pagina". La causa es estructural — si el arbol pasa de
+      // `Column` en la raiz a `Stack > Column`, Flutter ve otro tipo de widget
+      // en la misma posicion, destruye el subarbol y remonta TODO: el
+      // TabBarView, la grilla, el scroll y la busqueda.
+      _setSurfaceSize(tester, 1600);
+      await tester.pumpWidget(_wrapWithData());
+      await tester.pumpAndSettle();
+
+      // El texto vive en el State del TextField (no se le pasa controller),
+      // asi que si el arbol remonta la caja se vacia sola. Es el sintoma
+      // visible: el buscador se borra pero la lista sigue filtrada.
+      await tester.enterText(find.byType(TextField), 'Press');
+      await tester.pumpAndSettle();
+      expect(find.text('Press'), findsOneWidget);
+
+      // El elemento se captura DESPUES de escribir: `TreinoStateSwitcher`
+      // remonta la grilla a proposito cuando cambia el filtro (es el
+      // cross-fade entre resultados), asi que capturarlo antes mediria ese
+      // remonte legitimo en vez del que estamos cazando.
+      final elementoAntes = tester.element(find.byKey(gridKey));
+
+      await tester.tap(_inside(gridKey, find.text('Press de Banca')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(panelKey), findsOneWidget);
+
+      expect(
+        tester.element(find.byKey(gridKey)),
+        same(elementoAntes),
+        reason: 'abrir el drawer no puede remontar la grilla',
+      );
+
+      await tester.tap(find.byTooltip('Cerrar detalle'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(panelKey), findsNothing);
+
+      expect(
+        tester.element(find.byKey(gridKey)),
+        same(elementoAntes),
+        reason: 'cerrar el drawer tampoco: tiene que quedar todo como estaba',
+      );
+      expect(
+        find.text('Press'),
+        findsOneWidget,
+        reason: 'la busqueda escrita sobrevive a abrir y cerrar el detalle',
+      );
+    });
+
     testWidgets('tema claro: el drawer usa la paleta light', (tester) async {
       _setSurfaceSize(tester, 1600);
       await tester.pumpWidget(_wrapWithData(theme: AppTheme.light()));

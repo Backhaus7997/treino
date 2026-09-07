@@ -16,13 +16,14 @@
  */
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
 import * as functions from "firebase-functions/v2/https";
 import { HttpsError } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions";
 
 import { syncTrainerLoad } from "./promote-link";
 
-function getApp(): admin.app.App {
+function getApp(): App {
   try {
     return admin.app();
   } catch {
@@ -44,7 +45,7 @@ export interface ResumeTrainerLinkResult {
  * pick the paywall branch.
  */
 export async function runResumeTrainerLink(
-  app: admin.app.App,
+  app: App,
   callerUid: string,
   linkId: string,
 ): Promise<ResumeTrainerLinkResult> {
