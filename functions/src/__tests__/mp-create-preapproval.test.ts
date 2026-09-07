@@ -186,21 +186,84 @@ describe("runCreatePreapproval — el cliente no elige nada que cueste plata", (
       .not.toBe(1);
   });
 
-  it("el MAIL sale del token, no del request", async () => {
+  it("el mail del TOKEN es el default cuando el cliente no manda ninguno", async () => {
     const { app } = fakeApp(PF);
     const mp = fakeMp();
 
     await runCreatePreapproval(app, "t1", "real@x.com", {
       tier: "plan1",
       cycle: "monthly",
-      payerEmail: "victima@x.com",
-      payer_email: "victima@x.com",
-      email: "victima@x.com",
     }, { ...OK, mpClient: mp.client });
 
     expect((mp.llamadas[0] as { payerEmail: string }).payerEmail)
       .toBe("real@x.com");
   });
+
+  // ── El mail SI lo elige el cliente, y es deliberado ──
+  //
+  // La primera version lo forzaba al del token, y eso dejaba SIN PODER PAGAR a
+  // cualquier PF cuyo Mercado Pago no usara el mismo mail que TREINO — que es
+  // la mitad de la gente. MP exige `payer_email` y ata la suscripcion a el, asi
+  // que forzarlo al del token es forzar que las dos cuentas coincidan.
+  //
+  // No abre un agujero: el peor caso es mandar el mail de un tercero, y ahi MP
+  // le manda la suscripcion A ESA PERSONA PARA QUE LA PAGUE. Nadie cobra sin
+  // autorizar, y el plan igual se acredita a quien pidio.
+
+  it("un payerEmail valido del cliente PISA al del token", async () => {
+    const { app } = fakeApp(PF);
+    const mp = fakeMp();
+
+    await runCreatePreapproval(app, "t1", "treino@x.com", {
+      tier: "plan1",
+      cycle: "monthly",
+      payerEmail: "mi-mercadopago@otro.com",
+    }, { ...OK, mpClient: mp.client });
+
+    expect((mp.llamadas[0] as { payerEmail: string }).payerEmail)
+      .toBe("mi-mercadopago@otro.com");
+  });
+
+  it("pero el PLAN se le acredita a quien PIDIO, no al mail que pago", async () => {
+    // Esto es lo que de verdad protege, y por eso el mail puede ser libre:
+    // `external_reference` lleva el uid del que llamo. Pagar por otro es un
+    // caso de uso; quedarse con el plan de otro no.
+    const { app, store } = fakeApp(PF);
+    const mp = fakeMp();
+
+    await runCreatePreapproval(app, "t1", "treino@x.com", {
+      tier: "plan2",
+      cycle: "monthly",
+      payerEmail: "el-gimnasio@paga.com",
+    }, { ...OK, mpClient: mp.client });
+
+    expect((mp.llamadas[0] as { externalReference: string }).externalReference)
+      .toBe("t1");
+    expect(store.mp_preapprovals["2c93"]).toMatchObject({ uid: "t1" });
+  });
+
+  const mailesRotos: [string, unknown][] = [
+    ["sin arroba", "no-es-un-mail"],
+    ["vacio", ""],
+    ["solo espacios", "   "],
+    ["sin dominio", "algo@"],
+    ["un numero", 42],
+    ["null", null],
+    ["un objeto", { email: "a@b.com" }],
+  ];
+  for (const [caso, mail] of mailesRotos) {
+    it(`un payerEmail ${caso} cae al del token, no viaja a MP`, async () => {
+      const { app } = fakeApp(PF);
+      const mp = fakeMp();
+
+      await runCreatePreapproval(app, "t1", "real@x.com", {
+        tier: "plan1", cycle: "monthly", payerEmail: mail,
+      }, { ...OK, mpClient: mp.client });
+
+      expect((mp.llamadas[0] as { payerEmail: string }).payerEmail)
+        .toBe("real@x.com");
+    });
+  }
 
   it("la URL de retorno es del servidor — si no, es un open redirect", async () => {
     const { app } = fakeApp(PF);

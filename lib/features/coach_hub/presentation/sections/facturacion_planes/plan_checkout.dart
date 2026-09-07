@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -95,10 +96,19 @@ final class PlanCheckoutAvailable extends PlanCheckout {
   }) async {
     final messenger = ScaffoldMessenger.of(context);
 
+    // Mercado Pago EXIGE `payer_email` y ata la suscripción a ese mail: quien
+    // paga tiene que estar logueado con él. Si mandáramos el de TREINO sin
+    // preguntar, cualquier PF cuyo Mercado Pago use otro mail —la mitad de la
+    // gente— no podría pagar nunca, y el error le llegaría recién adentro del
+    // checkout, sin forma de corregirlo desde acá.
+    final payerEmail = await _pedirMailDePago(context);
+    if (payerEmail == null) return; // canceló
+
     try {
       final initPoint = await (debugPlanCheckoutCreator ?? _crearPreapproval)(
         tier: tier,
         annual: annual,
+        payerEmail: payerEmail,
       );
       if (initPoint == null) {
         _avisar(messenger, 'No pudimos abrir el pago. Probá de nuevo.');
@@ -145,12 +155,14 @@ const String _kRegion = 'southamerica-east1';
 Future<String?> _crearPreapproval({
   required SubscriptionTier tier,
   required bool annual,
+  required String payerEmail,
 }) async {
   final res = await FirebaseFunctions.instanceFor(region: _kRegion)
       .httpsCallable('createPreapproval')
       .call<Map<String, dynamic>>({
     'tier': tier.name,
     'cycle': annual ? 'annual' : 'monthly',
+    'payerEmail': payerEmail,
   });
   final initPoint = res.data['initPoint'];
   return initPoint is String && initPoint.isNotEmpty ? initPoint : null;
@@ -170,8 +182,83 @@ Future<bool> _abrirCheckout(Uri url) =>
 /// «conseguí una URL de checkout, o no», y esa es la frontera que conviene
 /// mover — la de la red, no la del SDK.
 @visibleForTesting
-Future<String?> Function({required SubscriptionTier tier, required bool annual})?
-    debugPlanCheckoutCreator;
+Future<String?> Function({
+  required SubscriptionTier tier,
+  required bool annual,
+  required String payerEmail,
+})? debugPlanCheckoutCreator;
+
+/// Pregunta con qué mail de Mercado Pago va a pagar. `null` si canceló.
+///
+/// Se PREGUNTA en vez de asumir el mail de TREINO porque MP ata la suscripción
+/// a ese valor: quien paga tiene que estar logueado con él. Asumirlo dejaría
+/// sin poder pagar a todo PF cuya cuenta de MP use otro mail, y el error
+/// aparecería recién adentro del checkout — donde ya no se puede corregir.
+///
+/// Viene precargado con el de la sesión, que es lo correcto para la mayoría.
+Future<String?> _pedirMailDePago(BuildContext context) {
+  // El try no es ceremonia: `FirebaseAuth.instance` tira si Firebase no está
+  // inicializado, y quedarse sin default NO es motivo para no dejar pagar. El
+  // campo arranca vacío y el PF lo escribe.
+  String sugerido = '';
+  try {
+    sugerido = FirebaseAuth.instance.currentUser?.email ?? '';
+  } catch (_) {
+    sugerido = '';
+  }
+
+  final ctrl = TextEditingController(text: sugerido);
+  final form = GlobalKey<FormState>();
+
+  return showDialog<String>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('¿Con qué mail vas a pagar?'), // i18n: Fase W3
+      content: Form(
+        key: form,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Tenés que iniciar sesión en Mercado Pago con este mail. '
+              'Si tu cuenta usa otro, cambialo acá.', // i18n: Fase W3
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: ctrl,
+              autofocus: true,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(
+                labelText: 'Mail de Mercado Pago', // i18n: Fase W3
+              ),
+              validator: (v) {
+                final t = (v ?? '').trim();
+                return RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(t)
+                    ? null
+                    : 'Escribí un mail válido'; // i18n: Fase W3
+              },
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: const Text('Cancelar'), // i18n: Fase W3
+        ),
+        FilledButton(
+          onPressed: () {
+            if (form.currentState?.validate() ?? false) {
+              Navigator.of(ctx).pop(ctrl.text.trim());
+            }
+          },
+          child: const Text('Continuar'), // i18n: Fase W3
+        ),
+      ],
+    ),
+  );
+}
 
 /// Inyecta el navegador. SÓLO para tests: sin esto, probar el punto de compra
 /// abriría Mercado Pago de verdad desde la suite.
