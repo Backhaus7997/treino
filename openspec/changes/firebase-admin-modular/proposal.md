@@ -147,6 +147,25 @@ la propiedad que hace seguros los PRs encadenados archivo por archivo.
 **Ojo:** `admin.initializeApp`, `admin.getApp` y `admin.getApps` **sobreviven en v14** — son parte de
 los once símbolos del root. No son urgentes; se migran por consistencia, no por compatibilidad.
 
+### ⚠️ `admin.app.App` → `App` NO es un cambio de tipo puro
+
+Lo encontró `tsc` al implementar el PR 2, y contradice la fila de arriba leída de más:
+
+1. **El `App` modular no tiene los accesores de conveniencia.** El `admin.app.App` namespaced
+   expone `.firestore()`, `.auth()`, `.storage()`, `.messaging()` como métodos; el modular es un
+   handle pelado. Renombrar el tipo rompe todo `app.firestore()` — que es un cambio de **runtime**,
+   no de tipos.
+
+2. **Los dos tipos son mutuamente inasignables.** `TS2345: Argument of type '…/app/core".App' is not
+   assignable to parameter of type '…/firebase-namespace-api".app.App'`. O sea que **el tipo `App`
+   no se puede migrar archivo por archivo si los archivos se pasan un `App` entre sí**: hay que
+   migrar el componente conexo entero, o ninguno.
+
+En este repo el impacto está acotado: **7 sitios en 3 archivos**, todos en `src/subscriptions/mp/`
+(`reconcile.ts`, `tier-mapping.ts`, `create-preapproval.ts`). Se excluyeron del PR 2 —que se define
+por "cero runtime"— y van al PR 4 junto con las conversiones `app.firestore()` → `getFirestore(app)`.
+Verificado que no hay cascada: sacando esos tres, `tsc` queda limpio.
+
 ---
 
 ## 4. El riesgo central, y está probado
@@ -240,9 +259,9 @@ el 11 y el 12.
 | # | PR | dir | escribe en prod | ~líneas | por qué acá |
 |---|---|---|---|---|---|
 | **1** ✅ | Extender los dobles a los subpaths | `scripts/` + `functions/` | no | 661 | **Habilitante — HECHO** (`04821be4` + `2ccc3096`). Sin esto, todo lo que sigue puede salir verde sin medir. Cero cambios de producción: sólo fixtures y tests. |
-| **2** | Tipos de `functions/` (`admin.app.App` → `App`, etc.) | `functions/src` | no | ~200 | **143 sitios, cero riesgo runtime**: los tipos se borran al compilar. `tsc` lo prueba entero. Es el 60% de `functions/src` sin tocar una sola línea que corra. |
+| **2** ✅ | Tipos de `functions/` (`admin.app.App` → `App`, etc.) | `functions/src` + `functions/scripts` | no | 179 | **114 sitios en 47 archivos, cero riesgo runtime**: los tipos se borran al compilar y `tsc` lo prueba entero. Quedan afuera 7 sitios en los 3 archivos de `subscriptions/mp/` que usan `app.firestore()` — ver el ⚠️ del § 3: ahí el rename arrastra runtime, así que van al PR 4. |
 | **3** | `FieldValue` / `Timestamp` de `functions/` | `functions/src` | no | ~60 | Fábricas puras, sin app. Ya hay 5 en producción hace meses — el patrón está probado en campo. |
-| **4** | `ensureApp()` + `getFirestore/getAuth/getStorage/getMessaging` de `functions/` | `functions/src` | **sí** | ~250 | El idiom `admin.app()` / `admin.initializeApp()` se repite en **32 archivos**. Primer PR con riesgo runtime real; entra con los dobles ya arreglados (PR 1). Candidato a partirse por subdirectorio si pasa 400 líneas. |
+| **4** | `ensureApp()` + `getFirestore/getAuth/getStorage/getMessaging` de `functions/` | `functions/src` | **sí** | ~250 | El idiom `admin.app()` / `admin.initializeApp()` se repite en **32 archivos**. Primer PR con riesgo runtime real; entra con los dobles ya arreglados (PR 1). **Arranca por `subscriptions/mp/`**: los 3 archivos que el PR 2 no pudo tocar (7 tipos + 7 `app.firestore()` → `getFirestore(app)`) son el componente conexo más chico y el que ya está aislado. Acá también entra el helper de mocks compartido. Candidato a partirse por subdirectorio si pasa 400 líneas. |
 | **5** | Tests de `functions/` | `functions/src/__tests__` | no | ~350 | 294 sitios en 43 archivos. Va después de que producción esté migrada, así los mocks se escriben contra la forma final. Casi seguro se parte en 2-3 slices. |
 | **6** | `scripts/lib/admin.js` + sus dobles | `scripts/` | **sí** | ~120 | La única puerta de inicialización (#834). `admin.apps` → `getApps()`, `admin.credential.cert` → `cert()`. `test/admin.test.js` inyecta un `adminFalso()` por parámetro (`{ apps, credential, initializeApp }`): **ese doble cambia de forma en el mismo commit.** No se toca `resolverContexto` ni la lógica de credenciales. |
 | **7** | `backfill_*` + `cleanup_*` + `restore_*` | `scripts/` | **sí** | ~150 | 17 archivos, 20 call sites. El bloque más chato: casi todos son un `admin.firestore()` y nada más. |
