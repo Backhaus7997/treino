@@ -72,6 +72,79 @@ export interface EnqueueMailInput {
    * that is not subject to opt-out.
    */
   prefKey?: string;
+  /**
+   * Cuando el dedupe rechaza este mail, ACTUALIZA los params del que ya está
+   * encolado en vez de descartarlo — siempre que siga en `pending`.
+   *
+   * Opt-in, y tiene que seguir siéndolo. Para el 99% de los mails descartar es
+   * lo correcto: una serie de 36 turnos colapsa a UN mail justamente porque
+   * las 36 ocurrencias se descartan, y refrescar ahí sería reescribir el mismo
+   * contenido 36 veces sin ganar nada.
+   *
+   * Existe por los mails que llevan un CÓDIGO DE UN SOLO USO. `generate…Link`
+   * del Admin SDK invalida el código anterior del mismo usuario, así que un
+   * segundo pedido dentro de la ventana de throttle MATA el link que ya está
+   * encolado. Sin esto, el mail sale con un código muerto y el usuario ve
+   * "expired or the link has already been used" sobre un mail recién llegado.
+   *
+   * Medido en producción el 2026-09-04, dos pedidos a un segundo:
+   *
+   *   14:44:06.088  enqueueMail: queued                    ← link A encolado
+   *   14:44:06.532  enqueueMail: already queued, skipping  ← link B lo mató
+   */
+  refreshPendingParams?: boolean;
+}
+
+/**
+ * Pisa los `params` del mail encolado, SÓLO si sigue en `pending`.
+ *
+ * Va en transacción y no en un `update` pelado: entre leer el estado y
+ * escribir, el worker del outbox puede marcarlo `sent`. Sin la transacción se
+ * reescribiría un mail ya enviado, que es la puerta que `create()` cierra a
+ * propósito (ver el docstring de [enqueueMail]).
+ *
+ * No cambia `status`, ni `attempts`, ni `createdAt`. El mail sigue siendo el
+ * mismo — lo único que cambia es que lleva el código vivo en vez del muerto.
+ *
+ * Nunca tira: un refresh fallido deja las cosas como estaban, que es
+ * exactamente el comportamiento anterior a esta función.
+ *
+ * QUEDA UNA CARRERA, y es más angosta que la que cierra: si el worker YA leyó
+ * el doc y está mandando el mail cuando esto corre, el usuario recibe el link
+ * viejo igual. No se puede cerrar desde acá —haría falta que el worker tomara
+ * el doc con un lock— y el resultado en ese caso no es peor que hoy.
+ */
+async function refreshIfPending(
+  app: admin.app.App,
+  id: string,
+  params: MailParams,
+  kind: MailKind,
+  toUid: string,
+): Promise<void> {
+  const ref = admin.firestore(app).collection(MAIL_QUEUE_COLLECTION).doc(id);
+  try {
+    const refreshed = await admin.firestore(app).runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) return false;
+      if (snap.get("status") !== "pending") return false;
+      tx.update(ref, { params });
+      return true;
+    });
+
+    if (refreshed) {
+      logger.info("enqueueMail: refreshed pending params", { id, kind, toUid });
+    } else {
+      // Ya se mandó (o se borró). El link nuevo no llega a ningún lado y el
+      // usuario tiene en la casilla uno que ya no sirve — pero reescribir un
+      // mail enviado lo mandaría dos veces, que es peor.
+      logger.warn("enqueueMail: no se pudo refrescar, ya no estaba pending", {
+        id,
+        kind,
+      });
+    }
+  } catch (error: unknown) {
+    logger.warn("enqueueMail: refresh failed", { id, kind, error });
+  }
 }
 
 /**
@@ -96,7 +169,7 @@ export async function enqueueMail(
   app: admin.app.App,
   input: EnqueueMailInput,
 ): Promise<string | null> {
-  const { toUid, kind, scope, params, prefKey } = input;
+  const { toUid, kind, scope, params, prefKey, refreshPendingParams } = input;
   const id = dedupeKey(kind, scope, toUid);
 
   const doc: Record<string, unknown> = {
@@ -124,6 +197,9 @@ export async function enqueueMail(
     if (code === ALREADY_EXISTS) {
       // Expected on a re-fired trigger and on every occurrence of a batched
       // series after the first. Not a failure — this is the mechanism working.
+      if (refreshPendingParams) {
+        await refreshIfPending(app, id, params, kind, toUid);
+      }
       logger.info("enqueueMail: already queued, skipping", { id, kind });
       return null;
     }

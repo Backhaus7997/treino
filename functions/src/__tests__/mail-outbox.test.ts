@@ -351,6 +351,49 @@ describe("sendQueuedMailHandler", () => {
   });
 
   // Covers the window where the Resend call landed but the status write did not.
+  // ── El snapshot del evento no es la verdad ──────────────────────────────
+  //
+  //  es , así que  congela el
+  // documento tal como nació. Si algo lo actualiza entre la creación y el
+  // envío, renderizar desde ese snapshot manda contenido viejo.
+  //
+  // No es teórico:  existe para
+  // pisarle el link de reseteo al mail encolado cuando un segundo pedido
+  // invalida el anterior. Sin releer, esa actualización se escribe en
+  // Firestore y el mail sale igual con el link muerto — el arreglo del
+  // throttle quedaba en cosmético y los tests que miran SÓLO el documento no
+  // lo veían.
+  it("renderiza los params ACTUALES, no los de la creación", async () => {
+    await seedQueueDoc({ params: { trainerName: "Jose" } });
+    // Lo que el trigger le pasaría al handler: el snapshot de la creación.
+    const snapshotDeLaCreacion = await readQueueDoc(mailId);
+
+    // Alguien actualiza el doc antes de que salga el mail.
+    await db()
+      .collection(MAIL_QUEUE_COLLECTION)
+      .doc(mailId)
+      .update({ params: { trainerName: "Coti" } });
+
+    const sender = makeOkSender();
+    await sendQueuedMailHandler(testApp, mailId, snapshotDeLaCreacion, sender);
+
+    expect(sender.sent).toHaveLength(1);
+    const cuerpo = sender.sent[0].html + sender.sent[0].text;
+    expect(cuerpo).toContain("Coti");
+    expect(cuerpo).not.toContain("Jose");
+  });
+
+  it("no manda nada si el documento fue borrado antes del envío", async () => {
+    await seedQueueDoc();
+    const snapshotDeLaCreacion = await readQueueDoc(mailId);
+    await db().collection(MAIL_QUEUE_COLLECTION).doc(mailId).delete();
+
+    const sender = makeOkSender();
+    await sendQueuedMailHandler(testApp, mailId, snapshotDeLaCreacion, sender);
+
+    expect(sender.sent).toHaveLength(0);
+  });
+
   it("does not re-send a document already marked sent", async () => {
     await seedQueueDoc({ status: "sent" });
     const sender = makeOkSender();
