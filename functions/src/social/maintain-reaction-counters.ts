@@ -15,10 +15,11 @@
  */
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
 import { logger } from "firebase-functions";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 
-function getApp(): admin.app.App {
+function getApp(): App {
   try {
     return admin.app();
   } catch {
@@ -69,7 +70,7 @@ export function aggregateReactionCounts(
  * existing parent post, so a late/redelivered event cannot resurrect a post.
  */
 export async function maintainReactionCountersHandler(
-  app: admin.app.App,
+  app: App,
   postId: string,
 ): Promise<void> {
   const db = admin.firestore(app);

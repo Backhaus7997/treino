@@ -14,6 +14,8 @@
  */
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
+import { DocumentData } from "firebase-admin/firestore";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { logger } from "firebase-functions";
@@ -26,7 +28,7 @@ import {
   enqueueSubscriptionMail,
 } from "./subscription-mail";
 
-function getApp(): admin.app.App {
+function getApp(): App {
   try {
     return admin.app();
   } catch {
@@ -44,8 +46,8 @@ function getApp(): admin.app.App {
  * ciclo: la escritura de `weightedLoad` no lo toca.
  */
 export function subscriptionChanged(
-  before: admin.firestore.DocumentData | undefined,
-  after: admin.firestore.DocumentData | undefined,
+  before: DocumentData | undefined,
+  after: DocumentData | undefined,
 ): boolean {
   const b = before?.subscription;
   const a = after?.subscription;
@@ -124,7 +126,7 @@ export interface SweepResult {
  * siendo `cancelled` cuando vence — lo que cambia es el reloj, no el campo).
  */
 export async function sweepEntitlementsHandler(
-  app: admin.app.App,
+  app: App,
   nowMs?: number,
 ): Promise<SweepResult> {
   const db = admin.firestore(app);

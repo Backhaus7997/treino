@@ -27,6 +27,7 @@
  */
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
 import { logger } from "firebase-functions";
 import { FieldValue } from "firebase-admin/firestore";
 import { MAIL_QUEUE_COLLECTION, MailKind, MailParams } from "./types";
@@ -115,7 +116,7 @@ export interface EnqueueMailInput {
  * el doc con un lock— y el resultado en ese caso no es peor que hoy.
  */
 async function refreshIfPending(
-  app: admin.app.App,
+  app: App,
   id: string,
   params: MailParams,
   kind: MailKind,
@@ -166,7 +167,7 @@ async function refreshIfPending(
  *          was already queued or the write failed.
  */
 export async function enqueueMail(
-  app: admin.app.App,
+  app: App,
   input: EnqueueMailInput,
 ): Promise<string | null> {
   const { toUid, kind, scope, params, prefKey, refreshPendingParams } = input;

@@ -33,7 +33,8 @@
  * Los planes se crean por API, con el monto que dice el servidor.
  */
 
-import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 
 import {
@@ -160,17 +161,16 @@ export function tierFromAmount(
  * asi que el historial de que compro cada PF queda entero.
  */
 export async function recordPlan(
-  app: admin.app.App,
+  app: App,
   planId: string,
   mapping: PreapprovalMapping,
 ): Promise<void> {
-  await app
-    .firestore()
+  await getFirestore(app)
     .collection(MP_PLANS_COLLECTION)
     .doc(planId)
     .set({
       ...mapping,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
     });
 }
 
@@ -186,12 +186,11 @@ export async function recordPlan(
  * preapproval, que es de donde tiene que salir — quien llame resuelve eso.
  */
 export async function lookupPlan(
-  app: admin.app.App,
+  app: App,
   planId: string,
   summarizedAmount?: unknown,
 ): Promise<PreapprovalMapping | null> {
-  const snap = await app
-    .firestore()
+  const snap = await getFirestore(app)
     .collection(MP_PLANS_COLLECTION)
     .doc(planId)
     .get();

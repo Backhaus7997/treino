@@ -20,6 +20,7 @@
  * abre sería atarlo a un detalle que va a cambiar.
  */
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import * as logger from "firebase-functions/logger";
 
@@ -27,7 +28,7 @@ import * as logger from "firebase-functions/logger";
  * Inicializa el Admin SDK de forma perezosa, para que el módulo se pueda
  * importar sin una app ya creada — igual que hace `ranking-aggregate`.
  */
-function getApp(): admin.app.App {
+function getApp(): App {
   try {
     return admin.app();
   } catch {
@@ -62,7 +63,7 @@ export function esArranqueDeEntreno(
 
 /** Los tokens de reloj del atleta, o vacío. */
 async function tokensDeReloj(
-  app: admin.app.App,
+  app: App,
   uid: string,
 ): Promise<string[]> {
   const snap = await admin.firestore(app).collection("users").doc(uid).get();

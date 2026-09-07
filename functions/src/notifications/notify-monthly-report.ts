@@ -26,6 +26,9 @@
  */
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
+import { FieldValue, Query, QueryDocumentSnapshot, Timestamp } from "firebase-admin/firestore";
+import { Messaging } from "firebase-admin/messaging";
 import { logger } from "firebase-functions";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { artDateKey } from "../mail/format";
@@ -47,7 +50,7 @@ const MONTH_NAMES_ES_AR = [
   "diciembre",
 ] as const;
 
-function getApp(): admin.app.App {
+function getApp(): App {
   try {
     return admin.app();
   } catch {
@@ -98,24 +101,24 @@ export function reportedMonthFor(now: Date): ReportedMonth {
 
 /** Handler with clock and Messaging injected so tests never call real FCM. */
 export async function notifyMonthlyReportHandler(
-  app: admin.app.App,
+  app: App,
   now: Date,
-  messaging?: admin.messaging.Messaging,
+  messaging?: Messaging,
 ): Promise<NotifyMonthlyReportResult> {
   const db = admin.firestore(app);
   const month = reportedMonthFor(now);
   const athleteUids = new Set<string>();
   let scannedSessions = 0;
-  let cursor: admin.firestore.QueryDocumentSnapshot | undefined;
+  let cursor: QueryDocumentSnapshot | undefined;
 
   do {
-    let query: admin.firestore.Query = db
+    let query: Query = db
       .collectionGroup("sessions")
-      .where("startedAt", ">=", admin.firestore.Timestamp.fromDate(month.start))
+      .where("startedAt", ">=", Timestamp.fromDate(month.start))
       .where(
         "startedAt",
         "<",
-        admin.firestore.Timestamp.fromDate(month.endExclusive),
+        Timestamp.fromDate(month.endExclusive),
       )
       .orderBy("startedAt", "asc")
       .limit(PAGE_SIZE);
@@ -200,7 +203,7 @@ export async function notifyMonthlyReportHandler(
         await userRef
           .update({
             lastMonthlyReportNotifiedMonth:
-              admin.firestore.FieldValue.delete(),
+              FieldValue.delete(),
           })
           .catch(() => undefined);
         throw sendError;

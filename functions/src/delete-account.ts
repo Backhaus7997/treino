@@ -25,6 +25,7 @@
  */
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
 import * as functions from "firebase-functions/v2/https";
 import { HttpsError } from "firebase-functions/v2/https";
 import { writeStarted, writeFinal } from "./cascade/audit-log";
@@ -46,7 +47,7 @@ import {
  * without an app already existing (e.g. in test environments that set up
  * their own named apps before importing).
  */
-function getApp(): admin.app.App {
+function getApp(): App {
   try {
     return admin.app();
   } catch {
@@ -65,7 +66,7 @@ function getApp(): admin.app.App {
  * audit log and response.
  */
 export async function runDeleteAccount(
-  app: admin.app.App,
+  app: App,
   uid: string,
   provider: string
 ): Promise<DeleteAccountResponse> {

@@ -26,6 +26,8 @@
  */
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
+import { Firestore, Query } from "firebase-admin/firestore";
 
 const CHUNK = 400;
 
@@ -48,8 +50,8 @@ const ATHLETE_FIELD_COLLECTIONS = [
 const ATHLETE_DOC_ID_COLLECTIONS = ["profile_shares", "session_shares"];
 
 async function deleteAllMatching(
-  db: admin.firestore.Firestore,
-  query: admin.firestore.Query
+  db: Firestore,
+  query: Query
 ): Promise<number> {
   const snap = await query.get();
   if (snap.empty) return 0;
@@ -70,7 +72,7 @@ async function deleteAllMatching(
  * Deletes every athlete-owned document for [uid]. Returns the total count.
  */
 export async function deleteAthleteOwnedData(
-  app: admin.app.App,
+  app: App,
   uid: string
 ): Promise<{ deleted: number }> {
   const db = admin.firestore(app);
