@@ -36,6 +36,10 @@ jest.mock("../mail/format", () => ({
 }));
 
 jest.mock("../purge-rejected-link", () => ({
+  // `clasificarTerminacion` va REAL: es la función cuya unificación con la rama
+  // de notificación estamos pineando. Mockearla haría pasar el test aunque el
+  // handler volviera a re-derivar el predicado por su cuenta.
+  ...jest.requireActual("../purge-rejected-link"),
   purgeRejectedLinkHandler: jest.fn(async () => {
     calls.push("purge");
     return true;
@@ -93,7 +97,14 @@ describe("notifyOnLinkChange — orden del purge", () => {
       after,
     );
 
-    expect(purgeRejectedLinkHandler).toHaveBeenCalledWith(APP, "link-1", after);
+    // Recibe la CAUSA ya decidida, no el snapshot: el purge no puede
+    // re-derivar el predicado y volver a divergir de la rama de notificación.
+    expect(purgeRejectedLinkHandler).toHaveBeenCalledWith(
+      APP,
+      "link-1",
+      "rechazo",
+    );
+    void after;
   });
 
   it("un purge que falla NO impide la notificación", async () => {
@@ -126,13 +137,52 @@ describe("notifyOnLinkChange — orden del purge", () => {
       },
     );
 
-    // El handler del purge se llama igual —el filtro vive adentro, no acá— pero
-    // con un `after` que NO califica. Lo que se pinea es que el snapshot que le
-    // llega es el de un vínculo aceptado.
+    // Ya NI SIQUIERA se llama: `causaTerminacion` sólo se setea en la rama
+    // `terminated`. Antes se llamaba siempre y el filtro vivía adentro.
+    expect(purgeRejectedLinkHandler).not.toHaveBeenCalled();
+  });
+
+  it("un terminate REAL sin acceptedAt notifica a los dos y NO se purga", async () => {
+    // El bug del hallazgo #1, pineado desde el llamador: `pending → paused →
+    // resume` deja un vínculo activo sin `acceptedAt`; al terminarlo, la rama
+    // de notificación lo trata como real. El purge tiene que coincidir.
+    await notifyOnLinkChangeHandler(
+      APP,
+      "link-1",
+      { trainerId: TRAINER, athleteId: ATHLETE, status: "active" },
+      {
+        trainerId: TRAINER,
+        athleteId: ATHLETE,
+        status: "terminated",
+        terminationReason: "athlete-terminated",
+      },
+    );
+
+    expect(calls).toEqual(["sendFcm", "purge"]);
     expect(purgeRejectedLinkHandler).toHaveBeenCalledWith(
       APP,
       "link-1",
-      expect.objectContaining({ status: "active" }),
+      "vinculo-real",
+    );
+  });
+
+  it("una cancelación del alumno se clasifica como tal", async () => {
+    await notifyOnLinkChangeHandler(
+      APP,
+      "link-1",
+      { trainerId: TRAINER, athleteId: ATHLETE, status: "pending" },
+      {
+        trainerId: TRAINER,
+        athleteId: ATHLETE,
+        status: "terminated",
+        terminationReason: "cancelled-by-athlete",
+      },
+    );
+
+    expect(purgeRejectedLinkHandler).toHaveBeenCalledWith(
+      APP,
+      "link-1",
+      "cancelacion",
     );
   });
 

@@ -62,24 +62,64 @@ import { logger } from "firebase-functions";
  */
 const RAZONES_DE_NO_VINCULO = new Set(["declined", "cancelled-by-athlete"]);
 
+/** Qué fue, en realidad, este `terminated`. */
+export type CausaDeTerminacion = "rechazo" | "cancelacion" | "vinculo-real";
+
+/**
+ * LA ÚNICA respuesta a «¿qué fue este `terminated`?».
+ *
+ * La consumen DOS decisiones —a quién se le notifica
+ * (`notifications/notify-link-change.ts`) y si el doc se borra (acá abajo)— y
+ * que sea una sola función es el punto, no un detalle de estilo.
+ *
+ * Antes eran dos predicados separados: la rama de notificación miraba sólo
+ * `terminationReason`, y el purge miraba `acceptedAt` y nada más. Divergieron,
+ * y el que decidía el BORRADO era el más flojo de los dos: clasificaba como
+ * basura vínculos que la rama de notificación —tres líneas más arriba, en el
+ * mismo frame— acababa de tratar como reales. Con una sola función esa clase de
+ * bug no vuelve, porque no hay dónde divergir.
+ *
+ * El orden de los chequeos importa: `acceptedAt` gana SIEMPRE. Si hay marca,
+ * hubo relación, sin importar qué diga la razón.
+ *
+ * @param after - Snapshot posterior a la escritura, con `status == 'terminated'`.
+ */
+export function clasificarTerminacion(
+  after: Record<string, unknown>,
+): CausaDeTerminacion {
+  if (after.acceptedAt != null) return "vinculo-real";
+  if (!RAZONES_DE_NO_VINCULO.has(after.terminationReason as string)) {
+    // Razón ausente, desconocida o que no es string. No se puede afirmar que
+    // nunca hubo vínculo, así que se conserva: el modo de falla de todo esto
+    // tiene que ser siempre "no borré", nunca "borré de más".
+    return "vinculo-real";
+  }
+  return after.terminationReason === "declined" ? "rechazo" : "cancelacion";
+}
+
+/**
+ * Borra el doc si la causa dice que nunca hubo vínculo.
+ *
+ * RECIBE LA CAUSA YA DECIDIDA, no el snapshot, y eso es deliberado. Mientras
+ * recibía `after` tenía que re-derivar el predicado por su cuenta — y ahí fue
+ * donde se separó del de `scripts/cleanup_rejected_links.js`. Con un parámetro
+ * de este tipo, el llamador no puede "olvidarse" de un campo: o clasificó, o no
+ * compila.
+ *
+ * @param app    - Admin SDK app.
+ * @param linkId - trainer_links document ID.
+ * @param causa  - Salida de [clasificarTerminacion].
+ * @returns `true` sólo si borró.
+ */
 export async function purgeRejectedLinkHandler(
   app: admin.app.App,
   linkId: string,
-  after: Record<string, unknown> | undefined,
+  causa: CausaDeTerminacion,
 ): Promise<boolean> {
-  if (after?.status !== "terminated" || after.acceptedAt != null) {
-    return false;
-  }
-
-  // El tercer requisito, y el que evita destruir historia real. `acceptedAt`
-  // solo NO alcanza: ver el bloque «POR QUÉ NO ALCANZA CON acceptedAt» del
-  // header. Ante un `terminationReason` ausente, desconocido o que no sea
-  // string, se CONSERVA — el modo de falla de este handler tiene que ser
-  // siempre "no borré", nunca "borré de más".
-  if (!RAZONES_DE_NO_VINCULO.has(after.terminationReason as string)) {
+  if (causa === "vinculo-real") {
     logger.info(
       "purgeRejectedLink: terminated que no es rechazo ni cancelación, se conserva",
-      { linkId, terminationReason: after.terminationReason },
+      { linkId },
     );
     return false;
   }

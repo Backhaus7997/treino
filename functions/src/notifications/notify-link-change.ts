@@ -32,7 +32,11 @@ import { sendFcm } from "./send-fcm";
 import { enqueueMail } from "../mail/enqueue-mail";
 import { resolveAthleteName, resolveTrainerName } from "../mail/format";
 import { trainerEntry } from "../mail/templates";
-import { purgeRejectedLinkHandler } from "../purge-rejected-link";
+import {
+  clasificarTerminacion,
+  purgeRejectedLinkHandler,
+  type CausaDeTerminacion,
+} from "../purge-rejected-link";
 
 function getApp(): admin.app.App {
   try {
@@ -229,6 +233,9 @@ export async function notifyOnLinkChangeHandler(
   let title: string;
   let body: string;
   let actorUid: string | undefined;
+  // Sólo se setea en la rama `terminated`. `undefined` en el resto significa
+  // "no hay nada que purgar", que es lo que lee el efecto de cola.
+  let causaTerminacion: CausaDeTerminacion | undefined;
 
   if (afterStatus === "pending") {
     // New link request → notify trainer.
@@ -266,9 +273,14 @@ export async function notifyOnLinkChangeHandler(
     // tres ramas. El notify-BOTH sin actor se conserva para el resto, donde el
     // modelo sigue sin saber quién terminó el vínculo (`terminate` lo pueden
     // llamar los dos).
-    const terminationReason = after.terminationReason as string | undefined;
+    // UNA sola clasificación para las DOS decisiones que dependen de ella: a
+    // quién se le avisa, y si el doc se borra. Antes esta rama miraba sólo
+    // `terminationReason` y el purge miraba sólo `acceptedAt`, cada uno por su
+    // cuenta — y divergieron: el que decidía el borrado clasificaba como basura
+    // vínculos que ESTA rama, en el mismo frame, acababa de tratar como reales.
+    causaTerminacion = clasificarTerminacion(after);
 
-    if (terminationReason === "declined") {
+    if (causaTerminacion === "rechazo") {
       // El PF rechazó una solicitud. Avisarle a ÉL de su propia acción es ruido.
       const trainerName = await resolveTrainerName(app, trainerId);
       recipientUids = [athleteId];
@@ -279,7 +291,7 @@ export async function notifyOnLinkChangeHandler(
       // del PF que lo rechazó sería un callejón sin salida.
       body = `${trainerName} no aceptó tu solicitud. ` +
         "Podés buscar otro entrenador."; // i18n: Fase W1
-    } else if (terminationReason === "cancelled-by-athlete") {
+    } else if (causaTerminacion === "cancelacion") {
       // El alumno se arrepintió antes de que el PF contestara. El que necesita
       // enterarse es el PF: tiene una solicitud menos en la bandeja.
       const athleteName = await resolveAthleteName(app, athleteId);
@@ -289,8 +301,10 @@ export async function notifyOnLinkChangeHandler(
       body = `${athleteName} canceló su solicitud de vinculación.`; // i18n: Fase W1
       deepLink = "/coach"; // explícito: la bandeja del PF vive acá
     } else {
-      // `terminate` y `switched_trainer`: acá SÍ hubo vínculo y el modelo no
-      // sabe quién lo cortó. Se mantiene ADR-PN-007 tal cual.
+      // `vinculo-real`: acá SÍ hubo vínculo y el modelo no sabe quién lo cortó
+      // (`terminate` lo pueden llamar los dos). Se mantiene ADR-PN-007 tal cual.
+      // Incluye el caso que costó el bug: un `acceptedAt` ausente con razón de
+      // terminate real, que ES un vínculo y NO se borra.
       recipientUids = [athleteId, trainerId];
       title = "Vinculación finalizada"; // i18n: Fase 6 Etapa 2
       body = "La vinculación entre atleta y entrenador fue finalizada."; // i18n: Fase 6 Etapa 2
@@ -353,7 +367,12 @@ export async function notifyOnLinkChangeHandler(
   // propagara, un purge fallido volteria toda la invocacion, y un reintento
   // duplicaria el push y su fila en `users/{uid}/notifications`. Las que queden
   // sin borrar las junta el script one-shot (scripts/cleanup_rejected_links.js).
-  await purgeRejectedLinkHandler(app, linkId, after);
+  //
+  // Recibe la CAUSA, no el snapshot: la decision ya se tomo arriba, una sola
+  // vez, y el purge no puede re-derivarla distinto.
+  if (causaTerminacion !== undefined) {
+    await purgeRejectedLinkHandler(app, linkId, causaTerminacion);
+  }
 }
 
 /**

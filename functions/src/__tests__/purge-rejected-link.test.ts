@@ -8,7 +8,10 @@ jest.mock("firebase-functions", () => ({
 
 import * as admin from "firebase-admin";
 import { logger } from "firebase-functions";
-import { purgeRejectedLinkHandler } from "../purge-rejected-link";
+import {
+  clasificarTerminacion,
+  purgeRejectedLinkHandler,
+} from "../purge-rejected-link";
 
 const APP = {} as admin.app.App;
 
@@ -26,46 +29,99 @@ beforeEach(() => {
   jest.clearAllMocks();
 });
 
-describe("purgeRejectedLinkHandler", () => {
-  it("borra un link terminated que nunca fue aceptado", async () => {
-    const firestore = installFirestore();
-
-    await expect(
-      purgeRejectedLinkHandler(APP, "link-rejected", {
-        status: "terminated",
-        acceptedAt: null,
-        terminationReason: "declined",
-      }),
-    ).resolves.toBe(true);
-
-    expect(firestore.collection).toHaveBeenCalledWith("trainer_links");
-    expect(firestore.doc).toHaveBeenCalledWith("link-rejected");
-    expect(firestore.deleteDoc).toHaveBeenCalledTimes(1);
+// ─── clasificarTerminacion ──────────────────────────────────────────────────
+//
+// La ÚNICA respuesta a «¿qué fue este `terminated`?». La consumen dos lugares
+// —a quién se notifica, y si el doc se borra— y ése es exactamente el punto:
+// mientras fueron dos predicados separados divergieron, y el que decidía el
+// borrado era el más flojo de los dos.
+describe("clasificarTerminacion", () => {
+  it("declined sin acceptedAt → rechazo", () => {
+    expect(
+      clasificarTerminacion({ acceptedAt: null, terminationReason: "declined" }),
+    ).toBe("rechazo");
   });
 
-  it("conserva un vínculo real terminated con acceptedAt", async () => {
-    const firestore = installFirestore();
+  it("cancelled-by-athlete sin acceptedAt → cancelacion", () => {
+    expect(
+      clasificarTerminacion({ terminationReason: "cancelled-by-athlete" }),
+    ).toBe("cancelacion");
+  });
 
-    await expect(
-      purgeRejectedLinkHandler(APP, "link-real", {
-        status: "terminated",
+  it.each([
+    ["athlete-terminated"],
+    ["trainer-terminated"],
+    ["switched_trainer"],
+    ["Alta voluntaria del atleta"],
+  ])("un terminate real sin acceptedAt → vinculo-real (reason=%s)", (reason) => {
+    // EL CASO QUE COSTÓ EL BUG. `pending → paused → resume` da un vínculo
+    // ACTIVO sin la marca: promote-link.ts no estampa `acceptedAt` en la rama
+    // resume, y firestore.rules deja pasar a `paused` desde cualquier status.
+    // Después, cualquier terminate lo dejaba borrable.
+    expect(
+      clasificarTerminacion({ acceptedAt: null, terminationReason: reason }),
+    ).toBe("vinculo-real");
+  });
+
+  it("sin razón alguna → vinculo-real", () => {
+    expect(clasificarTerminacion({ acceptedAt: null })).toBe("vinculo-real");
+  });
+
+  it("acceptedAt presente gana SIEMPRE, aun con razón de rechazo", () => {
+    // Combinación imposible hoy (decline sólo corre sobre `pending`), pero si
+    // aparece en los datos es una anomalía: se conserva, y se avisa a los dos.
+    expect(
+      clasificarTerminacion({
         acceptedAt: { seconds: 1 },
         terminationReason: "declined",
       }),
-    ).resolves.toBe(false);
-
-    expect(firestore.deleteDoc).not.toHaveBeenCalled();
+    ).toBe("vinculo-real");
   });
 
-  it("conserva un link cuyo status no es terminated", async () => {
+  it.each([[42], [{}], [[]], [true]])(
+    "una razón que no es string → vinculo-real (%p)",
+    (basura) => {
+      expect(
+        clasificarTerminacion({ acceptedAt: null, terminationReason: basura }),
+      ).toBe("vinculo-real");
+    },
+  );
+});
+
+// ─── purgeRejectedLinkHandler ───────────────────────────────────────────────
+//
+// Recibe la CAUSA YA DECIDIDA, no el snapshot. Es deliberado: mientras recibía
+// `after` podía —y debía— re-derivar el predicado, y ahí fue donde divergió del
+// de `scripts/cleanup_rejected_links.js`. Con este parámetro tipado, esa clase
+// de bug ni siquiera compila.
+describe("purgeRejectedLinkHandler", () => {
+  it("borra un rechazo", async () => {
     const firestore = installFirestore();
 
     await expect(
-      purgeRejectedLinkHandler(APP, "link-pending", {
-        status: "pending",
-        acceptedAt: null,
-        terminationReason: "declined",
-      }),
+      purgeRejectedLinkHandler(APP, "link-rechazado", "rechazo"),
+    ).resolves.toBe(true);
+
+    expect(firestore.collection).toHaveBeenCalledWith("trainer_links");
+    expect(firestore.doc).toHaveBeenCalledWith("link-rechazado");
+    expect(firestore.deleteDoc).toHaveBeenCalledTimes(1);
+  });
+
+  it("borra una cancelación del alumno", async () => {
+    const firestore = installFirestore();
+
+    await expect(
+      purgeRejectedLinkHandler(APP, "link-cancelado", "cancelacion"),
+    ).resolves.toBe(true);
+
+    expect(firestore.deleteDoc).toHaveBeenCalledTimes(1);
+  });
+
+  it("NO borra un vínculo real", async () => {
+    const firestore = installFirestore();
+
+    await expect(
+      purgeRejectedLinkHandler(APP, "link-real", "vinculo-real"),
     ).resolves.toBe(false);
 
     expect(firestore.deleteDoc).not.toHaveBeenCalled();
@@ -76,102 +132,12 @@ describe("purgeRejectedLinkHandler", () => {
     installFirestore({ deleteError: error });
 
     await expect(
-      purgeRejectedLinkHandler(APP, "link-failed", {
-        status: "terminated",
-        terminationReason: "declined",
-      }),
+      purgeRejectedLinkHandler(APP, "link-failed", "rechazo"),
     ).resolves.toBe(false);
 
     expect(logger.error).toHaveBeenCalledWith(
       "purgeRejectedLink: no se pudo borrar el rechazo",
       { linkId: "link-failed", error },
     );
-  });
-
-  // ── EL CASO QUE FALTABA ────────────────────────────────────────────────
-  //
-  // Estos cuatro son el hallazgo #1 de la revisión. `acceptedAt == null` NO
-  // alcanza como criterio de borrado, por dos razones independientes:
-  //
-  //  1. `promote-link.ts` NO estampa `acceptedAt` en la rama resume, y
-  //     `firestore.rules:781` deja al PF poner `paused` desde CUALQUIER
-  //     status —incluido `pending`—. O sea que pending → paused → resume da
-  //     un vínculo ACTIVO sin la marca, con data completamente nueva.
-  //  2. `select-blocked-links.ts:192` llama «un DEFECTO DE DATOS» a un
-  //     vínculo sin `acceptedAt`: los legacy también existen.
-  //
-  // Después, cualquier `terminate` sobre ese vínculo lo dejaría borrable. De
-  // esos docs cuelgan reviews (`reviews/{linkId}_{athleteId}`) y el `linkId`
-  // estampado en `chats`, y `firestore.rules:811` es `allow delete: if false`
-  // — nada los repone.
-  //
-  // El criterio tiene que ser el MISMO que el de
-  // `scripts/cleanup_rejected_links.js`: las dos razones que sólo se escriben
-  // sobre un `pending`, que son las únicas que garantizan que nunca hubo
-  // vínculo.
-  it.each([
-    ["athlete-terminated"],
-    ["trainer-terminated"],
-    ["switched_trainer"],
-    ["Alta voluntaria del atleta"],
-  ])(
-    "CONSERVA un terminate real sin acceptedAt (reason=%s)",
-    async (reason) => {
-      const firestore = installFirestore();
-
-      await expect(
-        purgeRejectedLinkHandler(APP, "link-real-sin-stamp", {
-          status: "terminated",
-          acceptedAt: null,
-          terminationReason: reason,
-        }),
-      ).resolves.toBe(false);
-
-      expect(firestore.deleteDoc).not.toHaveBeenCalled();
-    },
-  );
-
-  it("CONSERVA un terminated sin razón alguna", async () => {
-    // Sin `terminationReason` no se puede afirmar que nunca hubo vínculo.
-    const firestore = installFirestore();
-
-    await expect(
-      purgeRejectedLinkHandler(APP, "link-sin-razon", {
-        status: "terminated",
-        acceptedAt: null,
-      }),
-    ).resolves.toBe(false);
-
-    expect(firestore.deleteDoc).not.toHaveBeenCalled();
-  });
-
-  it("borra una cancelación del alumno", async () => {
-    const firestore = installFirestore();
-
-    await expect(
-      purgeRejectedLinkHandler(APP, "link-cancelado", {
-        status: "terminated",
-        acceptedAt: null,
-        terminationReason: "cancelled-by-athlete",
-      }),
-    ).resolves.toBe(true);
-
-    expect(firestore.deleteDoc).toHaveBeenCalledTimes(1);
-  });
-
-  it("una razón que no es string no rompe ni borra", async () => {
-    const firestore = installFirestore();
-
-    for (const basura of [42, {}, [], true, null]) {
-      await expect(
-        purgeRejectedLinkHandler(APP, "link-basura", {
-          status: "terminated",
-          acceptedAt: null,
-          terminationReason: basura,
-        }),
-      ).resolves.toBe(false);
-    }
-
-    expect(firestore.deleteDoc).not.toHaveBeenCalled();
   });
 });
