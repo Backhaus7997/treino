@@ -32,7 +32,11 @@ const _kTodosLabel = 'TODOS'; // i18n
 /// REQ-BIBW-06, SCENARIO-BIBW-06a, SCENARIO-BIBW-06b, SCENARIO-BIBW-06c,
 /// SCENARIO-BIBW-06d.
 class BibliotecaFilterChips extends ConsumerWidget {
-  const BibliotecaFilterChips({super.key});
+  const BibliotecaFilterChips({super.key, this.vertical = false});
+
+  /// En la columna lateral el host aporta el padding y este widget ocupa el
+  /// alto disponible con scroll. En compact conserva el bloque inline actual.
+  final bool vertical;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -56,10 +60,9 @@ class BibliotecaFilterChips extends ConsumerWidget {
         ? {_kTodosLabel}
         : selectedEquipment.map((e) => e.label.toUpperCase()).toSet();
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s18),
-      child: Column(
+    final content = Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: vertical ? MainAxisSize.min : MainAxisSize.max,
         children: [
           // ── Muscle row ────────────────────────────────────────────────────
           _SectionLabel(label: 'MÚSCULO', palette: palette), // i18n
@@ -94,7 +97,15 @@ class BibliotecaFilterChips extends ConsumerWidget {
           ),
           const SizedBox(height: AppSpacing.s12),
         ],
-      ),
+      );
+
+    if (vertical) {
+      return SingleChildScrollView(child: content);
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s18),
+      child: content,
     );
   }
 
