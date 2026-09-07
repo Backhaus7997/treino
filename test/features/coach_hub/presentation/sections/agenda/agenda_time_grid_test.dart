@@ -226,6 +226,73 @@ void main() {
     });
   });
 
+  group('Llenar el alto —', () {
+    // Reportado mirando el Coach Hub: con disponibilidad de 9 a 11 y ninguna
+    // sesión, el rango daba 8–12 y la grilla medía 224 px adentro de un panel
+    // de 700. Abajo quedaba un vacío enorme y la pantalla se veía CORTADA A
+    // LA MITAD — porque estaba cortada.
+    //
+    // Un calendario llena su contenedor. Si sobra alto, se muestran más
+    // horas; recién cuando no entran las 24 aparece el scroll.
+    testWidgets('con alto de sobra se muestran más horas en vez de dejar '
+        'un vacío', (tester) async {
+      tester.view.physicalSize = const Size(1200, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.dark(),
+        home: Scaffold(
+          body: SizedBox(
+            height: 700,
+            child: AgendaTimeGrid(
+              firstDay: lunes,
+              dayCount: 7,
+              events: [evento('a', DateTime(2026, 9, 7, 10), 60)],
+            ),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      final columna =
+          tester.getSize(find.byKey(const Key('agenda_day_column_0')));
+
+      // Sin el arreglo la columna mide (12-9)*56 = 168 px y el resto es vacío.
+      expect(columna.height, greaterThan(500),
+          reason: 'la grilla tiene que ocupar el panel, no una franja');
+    });
+
+    testWidgets('si el alto no alcanza para el rango, se scrollea',
+        (tester) async {
+      tester.view.physicalSize = const Size(1200, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.dark(),
+        home: Scaffold(
+          body: SizedBox(
+            height: 200,
+            child: AgendaTimeGrid(
+              firstDay: lunes,
+              dayCount: 7,
+              events: [
+                evento('a', DateTime(2026, 9, 7, 7), 60),
+                evento('b', DateTime(2026, 9, 7, 22), 60),
+              ],
+            ),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SingleChildScrollView), findsOneWidget);
+    });
+  });
+
   group('Rango visible —', () {
     testWidgets('no muestra las 24 horas: se ajusta a lo que hay',
         (tester) async {
