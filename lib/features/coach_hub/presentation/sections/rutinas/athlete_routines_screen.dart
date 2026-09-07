@@ -226,6 +226,7 @@ class _AthleteRoutinesBody extends ConsumerWidget {
             delay: AppMotion.stagger(i),
             child: _RoutineRow(
               routine: visible[i],
+              trainerId: trainerId,
               athleteId: athleteId,
               archived: statusFilter == RoutineStatus.archived,
             ),
@@ -248,11 +249,21 @@ class _AthleteRoutinesBody extends ConsumerWidget {
 class _RoutineRow extends ConsumerStatefulWidget {
   const _RoutineRow({
     required this.routine,
+    required this.trainerId,
     required this.athleteId,
     this.archived = false,
   });
 
   final Routine routine;
+
+  /// Baja por field y NO se relee con `ref.read(currentUidProvider)` acá
+  /// abajo. `archive()` invalida por CLAVE, y la clave tiene que ser la MISMA
+  /// que la pantalla está mirando: una segunda lectura del uid puede devolver
+  /// otro valor (el stream de auth reemitiendo) y entonces la invalidación
+  /// apunta a un provider que nadie observa. Eso no rompe ni tira excepción —
+  /// deja la rutina archivada en pantalla hasta recargar, que es el fallo
+  /// silencioso que `trainerId` existe para hacer imposible.
+  final String trainerId;
   final String athleteId;
   final bool archived;
 
@@ -290,7 +301,7 @@ class _RoutineRowState extends ConsumerState<_RoutineRow> {
 
     final ok = await ref.read(routineActionsProvider.notifier).archive(
           routineId: widget.routine.id,
-          trainerId: ref.read(currentUidProvider) ?? '',
+          trainerId: widget.trainerId,
           athleteId: widget.athleteId,
         );
 

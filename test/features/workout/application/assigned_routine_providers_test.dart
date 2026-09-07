@@ -147,4 +147,49 @@ void main() {
       expect(resultA2[0].id, equals('r-a2'));
     });
   });
+
+  group('assignedRoutinesByTrainerProvider — uid sin resolver', () {
+    // REGRESION. La guarda devolvía `const []` con el trainerId vacío, o sea un
+    // AsyncData: un HECHO. Pero `currentUidProvider` sale de un stream y es
+    // null hasta que emite, así que en un hard reload del Hub la ficha del
+    // alumno le mostraba «Todavía no le asignaste planes.» a un PF que sí le
+    // asignó. Estos dos tests fijan que "no sé todavía" se sirva como loading
+    // y que "no hay" se siga sirviendo como lista vacía.
+    test('trainerId vacío queda en loading, NO resuelve a lista vacía',
+        () async {
+      final repo = RoutineRepository(firestore: FakeFirebaseFirestore());
+      final container = makeContainer(repo);
+      addTearDown(container.dispose);
+
+      final key = (trainerId: '', athleteId: 'athlete-a');
+      final sub = container.listen(
+        assignedRoutinesByTrainerProvider(key),
+        (_, __) {},
+      );
+      addTearDown(sub.close);
+
+      // Un microtask alcanza para que un `return const []` ya hubiera
+      // resuelto. Si esto pasa a AsyncData, la regresión volvió.
+      await Future<void>.delayed(Duration.zero);
+
+      expect(container.read(assignedRoutinesByTrainerProvider(key)).isLoading,
+          isTrue);
+      expect(container.read(assignedRoutinesByTrainerProvider(key)).hasValue,
+          isFalse);
+    });
+
+    test('athleteId vacío SÍ resuelve a lista vacía (no hay a quién pedirle)',
+        () async {
+      final repo = RoutineRepository(firestore: FakeFirebaseFirestore());
+      final container = makeContainer(repo);
+      addTearDown(container.dispose);
+
+      final result = await container.read(
+        assignedRoutinesByTrainerProvider(
+          (trainerId: 'trainer-1', athleteId: ''),
+        ).future,
+      );
+      expect(result, isEmpty);
+    });
+  });
 }
