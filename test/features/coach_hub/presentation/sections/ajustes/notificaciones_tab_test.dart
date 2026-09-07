@@ -105,6 +105,53 @@ void main() {
       expect((prefs['nueva_solicitud'] as Map)['push'], true);
     });
 
+    testWidgets('WhatsApp está deshabilitado pero Email y Push siguen activos',
+        (tester) async {
+      await tester.pumpWidget(
+        _harness(prefsStream: Stream.value(NotifPrefs.fromFirestore(null))),
+      );
+      await tester.pumpAndSettle();
+
+      final checkboxes = tester
+          .widgetList<Checkbox>(find.byType(Checkbox))
+          .toList(growable: false);
+      expect(checkboxes, hasLength(kNotifTypes.length * 3));
+
+      for (var row = 0; row < kNotifTypes.length; row++) {
+        expect(checkboxes[row * 3].onChanged, isNotNull, reason: 'Email');
+        expect(checkboxes[row * 3 + 1].onChanged, isNotNull, reason: 'Push');
+        expect(checkboxes[row * 3 + 2].onChanged, isNull, reason: 'WhatsApp');
+      }
+    });
+
+    // Regresión: la columna se pudo tildar desde W3.2, así que hay PF con
+    // `whatsapp: true` guardado. Deshabilitar la casilla sin bajar el valor la
+    // dejaría tildada Y sin forma de destildarla — o sea, prometiendo entrega
+    // por un canal que no existe y encima trabando el control. Peor que antes.
+    testWidgets('WhatsApp se ve destildado aunque haya un true guardado',
+        (tester) async {
+      final guardado = NotifPrefs.fromFirestore(<String, dynamic>{
+        for (final t in kNotifTypes)
+          t.key: <String, dynamic>{
+            'email': false,
+            'push': true,
+            'whatsapp': true,
+          },
+      });
+
+      await tester.pumpWidget(_harness(prefsStream: Stream.value(guardado)));
+      await tester.pumpAndSettle();
+
+      final checkboxes = tester
+          .widgetList<Checkbox>(find.byType(Checkbox))
+          .toList(growable: false);
+
+      for (var row = 0; row < kNotifTypes.length; row++) {
+        expect(checkboxes[row * 3 + 2].value, isFalse,
+            reason: 'WhatsApp fila $row');
+      }
+    });
+
     testWidgets('error: copy honesto sin crashear', (tester) async {
       await tester.pumpWidget(
         _harness(prefsStream: Stream<NotifPrefs>.error('boom')),

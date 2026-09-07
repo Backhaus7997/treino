@@ -15,8 +15,8 @@ import 'package:treino/features/profile/application/user_providers.dart';
 /// Matriz tipo-de-aviso × canal (Email/Push/WhatsApp). Persiste en
 /// `users/{uid}.notificationPrefs` vía `userRepository.update` (save-on-toggle,
 /// optimista: el stream de Firestore refleja el cambio al instante).
-/// Honesto: las prefs se GUARDAN; la entrega real (CFs que las respeten +
-/// canales email/whatsapp) es follow-up de `functions/`.
+/// Push respeta las cinco filas y email las filas con envío real. WhatsApp no
+/// existe como canal todavía, por eso sus controles están deshabilitados.
 class NotificacionesTab extends ConsumerWidget {
   const NotificacionesTab({super.key});
 
@@ -297,8 +297,10 @@ class _HeaderRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    TextStyle s() => TextStyle(
-          color: palette.textMuted,
+    TextStyle s(NotifChannel ch) => TextStyle(
+          color: ch == NotifChannel.whatsapp
+              ? palette.textMuted.withValues(alpha: 0.45)
+              : palette.textMuted,
           fontSize: 11,
           fontWeight: FontWeight.w600,
           letterSpacing: 0.8,
@@ -309,7 +311,7 @@ class _HeaderRow extends StatelessWidget {
         for (final ch in NotifChannel.values)
           SizedBox(
             width: colW,
-            child: Center(child: Text(ch.label, style: s())),
+            child: Center(child: Text(ch.label, style: s(ch))),
           ),
       ],
     );
@@ -346,6 +348,7 @@ class _Row extends StatelessWidget {
             _ToggleCell(
               value: prefs.isOn(type.key, ch),
               colW: colW,
+              enabled: ch != NotifChannel.whatsapp,
               onChanged: (v) => onSet(ch, v ?? false),
             ),
         ],
@@ -362,17 +365,25 @@ class _ToggleCell extends StatelessWidget {
   const _ToggleCell({
     required this.value,
     required this.colW,
+    required this.enabled,
     required this.onChanged,
   });
 
   final bool value;
   final double colW;
+  final bool enabled;
   final ValueChanged<bool?> onChanged;
 
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    return SizedBox(
+    // La columna de WhatsApp se pudo tildar desde W3.2, asi que hay PF con
+    // `whatsapp: true` guardado. Deshabilitar la casilla mostrando ese valor
+    // la dejaria tildada Y trabada: prometeria entrega por un canal que no
+    // existe, y encima sin forma de bajarla. Una celda muerta se muestra
+    // vacia; el valor persistido no significa nada mientras no haya canal.
+    final shown = enabled && value;
+    final cell = SizedBox(
       width: colW,
       child: Center(
         child: AnimatedContainer(
@@ -380,14 +391,14 @@ class _ToggleCell extends StatelessWidget {
           curve: AppMotion.standard,
           padding: const EdgeInsets.all(AppSpacing.hairline),
           decoration: BoxDecoration(
-            color: value
+            color: shown
                 ? palette.accent.withValues(alpha: 0.12)
                 : TreinoTransparentTokens.value,
             borderRadius: BorderRadius.circular(AppRadius.sm),
           ),
           child: Checkbox(
-            value: value,
-            onChanged: onChanged,
+            value: shown,
+            onChanged: enabled ? onChanged : null,
             activeColor: palette.accent,
             checkColor: palette.bg,
             side: BorderSide(color: palette.border),
@@ -395,6 +406,11 @@ class _ToggleCell extends StatelessWidget {
           ),
         ),
       ),
+    );
+    if (enabled) return cell;
+    return Tooltip(
+      message: 'WhatsApp todavía no está disponible.', // i18n: Fase W3
+      child: cell,
     );
   }
 }
