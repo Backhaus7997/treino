@@ -38,7 +38,26 @@
  * de degradarse a verde vacío.
  */
 
+import { createRequire } from 'node:module';
+
+/**
+ * Los NOMBRES que exporta cada subpath modelado. Se leen acá, en el hilo de los
+ * hooks, porque un módulo ESM **no puede tener exports nombrados dinámicos**:
+ * el identificador tiene que estar en el código que se compila.
+ *
+ * `firebase_admin_subpaths.js` es data pura y sin efectos justamente para poder
+ * requerirlo desde este hilo sin re-ejecutar el preload. El OBJETO, en cambio,
+ * sigue viniendo del hilo principal por `globalThis` — nombres de un lado,
+ * instancia del otro, una sola fuente para cada cosa. Ver el encabezado de ese
+ * archivo.
+ */
+const require = createRequire(import.meta.url);
+const NOMBRES_POR_SUBPATH = require('./firebase_admin_subpaths.js').nombresDeSubpaths();
+
 export const URL_ADMIN_STUB = 'stub:firebase-admin';
+
+/** `stub:firebase-admin/firestore`, `stub:firebase-admin/app`, … */
+const PREFIJO_SUBPATH = 'stub:firebase-admin/';
 
 /**
  * El módulo sintético. Si el preload CJS no corrió, no hay stub que devolver:
@@ -57,9 +76,45 @@ process.stderr.write('STUB_ESM_INTERCEPTED\\n');
 export default stub;
 `;
 
+/**
+ * El módulo sintético de un subpath modular.
+ *
+ * El objeto sale de `globalThis` —o sea, del hilo principal, la MISMA instancia
+ * que ve el lado CJS— y los `export const` se generan con los nombres que trae
+ * `firebase_admin_subpaths.js`. `__STUB_FIREBASE_ADMIN_SUBPATH__` ya emite
+ * `STUB_SUBPATH_INTERCEPTED` por stderr, así que la prueba positiva vale para
+ * los dos caminos sin duplicar nada.
+ *
+ * Un subpath que el doble intercepta pero no modela no tiene nombres, así que
+ * un `import { getAuth } from 'firebase-admin/auth'` falla al LINKEAR, antes de
+ * evaluar. Es ruidoso, que es lo único que se le pide: el modo de falla que hay
+ * que impedir es el silencioso, no el feo.
+ */
+function fuenteDeSubpath(subpath) {
+  const nombres = NOMBRES_POR_SUBPATH[subpath] || [];
+  return `
+const puerta = globalThis.__STUB_FIREBASE_ADMIN_SUBPATH__;
+if (!puerta) {
+  throw new Error(
+    'STUB_ESM_SIN_PRELOAD: se interceptó el import de ${subpath} pero no hay stub en ' +
+      'globalThis. ¿Corriste el script sin --require fixtures/stub_firebase_admin.js?',
+  );
+}
+const mod = puerta(${JSON.stringify(subpath)});
+export default mod;
+${nombres.map((n) => `export const ${n} = mod.${n};`).join('\n')}
+`;
+}
+
 export function resolve(specifier, context, nextResolve) {
   if (specifier === 'firebase-admin') {
     return { url: URL_ADMIN_STUB, shortCircuit: true };
+  }
+  // Misma regla que el lado CJS: TODO `firebase-admin/<algo>`, sin allowlist.
+  // El specifier exacto era el agujero — ver el bloque de los subpaths en
+  // `stub_firebase_admin.js`.
+  if (specifier.startsWith('firebase-admin/')) {
+    return { url: `stub:${specifier}`, shortCircuit: true };
   }
   return nextResolve(specifier, context);
 }
@@ -67,6 +122,10 @@ export function resolve(specifier, context, nextResolve) {
 export function load(url, context, nextLoad) {
   if (url === URL_ADMIN_STUB) {
     return { format: 'module', shortCircuit: true, source: FUENTE_ADMIN_STUB };
+  }
+  if (url.startsWith(PREFIJO_SUBPATH)) {
+    const subpath = url.slice('stub:'.length);
+    return { format: 'module', shortCircuit: true, source: fuenteDeSubpath(subpath) };
   }
   return nextLoad(url, context);
 }
