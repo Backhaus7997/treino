@@ -9,9 +9,8 @@
  *     `notifyOverduePayments` reads, with the same fallback copy.
  */
 
-import * as admin from "firebase-admin";
 import { App } from "firebase-admin/app";
-import { Timestamp } from "firebase-admin/firestore";
+import { Timestamp, getFirestore } from "firebase-admin/firestore";
 
 /** IANA zone for Argentina. No DST since 2009, but let Intl own that. */
 const AR_TIME_ZONE = "America/Argentina/Buenos_Aires";
@@ -120,8 +119,7 @@ export async function resolveDisplayName(
   fallback: string,
 ): Promise<string> {
   try {
-    const snap = await admin
-      .firestore(app)
+    const snap = await getFirestore(app)
       .collection("userPublicProfiles")
       .doc(uid)
       .get();
