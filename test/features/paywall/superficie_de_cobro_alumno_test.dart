@@ -120,6 +120,34 @@ void main() {
       'lib/features/coach_hub/presentation/sections/alumnos/alumno_detail_screen.dart':
           'sólo Coach Hub WEB: abre archivos del alumno. La regla de Apple '
               'no aplica a la web, y esta pantalla no viaja en el binario móvil',
+      // ⚠️ Éste es DISTINTO de los dos de arriba, y conviene tenerlo claro
+      // antes de agregar el próximo con el mismo argumento.
+      //
+      // Los otros dos no son puntos de venta. Éste SÍ: abre el checkout de
+      // Mercado Pago. Y a diferencia de `alumno_detail_screen`, este archivo
+      // VIAJA EN EL BINARIO MÓVIL — la pricing page se muestra en móvil, en
+      // modo informativo, así que la app lo compila.
+      //
+      // Lo que lo hace admisible no es dónde vive el archivo, es que la app
+      // móvil NO PUEDE LLEGAR a esa línea: `launchUrl` está adentro de
+      // `PlanCheckoutAvailable.start`, y en móvil `resolvePlanCheckout()`
+      // devuelve `PlanCheckoutOnWebOnly`, que no expone `start`. Los
+      // constructores son privados a la librería, así que no hay forma de
+      // fabricar la otra variante desde `lib/`.
+      //
+      // Eso NO es una promesa: hay tres tests en `pricing_screen_test.dart`
+      // que prueban que en móvil ningún tap llega a un punto de compra, y una
+      // mutación que los pone en rojo si el sellado se rompe.
+      //
+      // Si algún día hace falta la garantía más fuerte —que el launcher ni
+      // siquiera esté en el binario— el camino es un import condicional que
+      // deje un stub en móvil. Hoy no se hizo porque el sellado ya lo cubre y
+      // el import condicional agrega una superficie que también hay que testear.
+      'lib/features/coach_hub/presentation/sections/facturacion_planes/plan_checkout.dart':
+          'ÚNICO punto de compra de la app: abre el checkout de Mercado Pago. '
+              'Viaja en el binario móvil pero es inalcanzable desde ahí — el '
+              'tipo sellado no expone `start` en la superficie móvil. Ver el '
+              'comentario de arriba y el encabezado de plan_checkout.dart',
     };
 
     test('la lista de archivos que abren URLs es exactamente la declarada',
@@ -128,7 +156,13 @@ void main() {
       for (final f in _dartsDe('lib')) {
         final codigo = _sinComentarios(f);
         if (_aperturasExternas.any(codigo.contains)) {
-          encontrados.add(f.path);
+          // Barras NORMALIZADAS a `/`. En Windows `File.path` usa `\`, así que
+          // sin esto NINGUNA clave de `permitidos` matchea y el test falla
+          // siempre — incluso sobre archivos que ya estaban declarados.
+          //
+          // Un guard que sólo se puede correr en Linux es un guard que te
+          // enterás de que rompiste cuando ya perdiste el ciclo de CI.
+          encontrados.add(f.path.replaceAll(r'\', '/'));
         }
       }
 
