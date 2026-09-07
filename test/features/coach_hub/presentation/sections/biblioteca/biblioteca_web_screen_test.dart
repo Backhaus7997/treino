@@ -275,63 +275,92 @@ void main() {
   });
 
   group('Biblioteca Ejercicios — layout responsivo', () {
-    testWidgets(
-        'tramo A muestra filtros, grilla de 4 columnas y detalle lateral',
+    const filtersKey = Key('biblioteca_filter_column');
+    const gridKey = Key('biblioteca_exercise_grid');
+    const panelKey = Key('biblioteca_detail_panel');
+
+    testWidgets('desktop: los filtros van a la DERECHA de la grilla',
         (tester) async {
-      _setSurfaceSize(tester, 1600);
+      _setSurfaceSize(tester, 1512);
       await tester.pumpWidget(_wrapWithData());
       await tester.pumpAndSettle();
 
-      const filtersKey = Key('biblioteca_filter_column');
-      const gridKey = Key('biblioteca_exercise_grid');
-      const panelKey = Key('biblioteca_detail_panel');
-
       expect(find.byKey(filtersKey), findsOneWidget);
       expect(find.byKey(gridKey), findsOneWidget);
-      final grid = tester.widget<GridView>(find.byKey(gridKey));
-      final delegate = grid.gridDelegate as SliverGridDelegateWithFixedCrossAxisCount;
-      expect(delegate.crossAxisCount, 4);
+      expect(
+        tester.getCenter(find.byKey(filtersKey)).dx,
+        greaterThan(tester.getCenter(find.byKey(gridKey)).dx),
+        reason: 'mismo lado que el picker del editor de rutinas: la lista '
+            'auxiliar a la derecha, el contenido al centro',
+      );
+    });
+
+    testWidgets(
+        'desktop angosto (1512): tocar una card abre el drawer, NO el modal',
+        (tester) async {
+      // 1512 es un MacBook Pro de 14 pulgadas. El diseño anterior exigía 1528
+      // de SECCION —o sea ~1768 de viewport con el sidebar expandido— asi que
+      // en la maquina del dueño del producto el panel no aparecia nunca.
+      _setSurfaceSize(tester, 1512);
+      await tester.pumpWidget(_wrapWithData());
+      await tester.pumpAndSettle();
 
       await tester.tap(_inside(gridKey, find.text('Press de Banca')));
       await tester.pumpAndSettle();
 
       expect(find.byKey(panelKey), findsOneWidget);
       expect(find.byType(TreinoDialog), findsNothing);
-      expect(_inside(panelKey, find.text('Press de Banca')), findsOneWidget);
     });
 
-    testWidgets(
-        'tramo B mantiene filtros laterales y 4 columnas, pero abre modal',
+    testWidgets('el drawer mide un cuarto del ancho y va pegado a la derecha',
         (tester) async {
-      _setSurfaceSize(tester, 1400);
+      _setSurfaceSize(tester, 1600);
       await tester.pumpWidget(_wrapWithData());
       await tester.pumpAndSettle();
-
-      const filtersKey = Key('biblioteca_filter_column');
-      const gridKey = Key('biblioteca_exercise_grid');
-
-      expect(find.byKey(filtersKey), findsOneWidget);
-      final grid = tester.widget<GridView>(find.byKey(gridKey));
-      final delegate = grid.gridDelegate as SliverGridDelegateWithFixedCrossAxisCount;
-      expect(delegate.crossAxisCount, 4);
 
       await tester.tap(_inside(gridKey, find.text('Press de Banca')));
       await tester.pumpAndSettle();
 
-      expect(find.byType(TreinoDialog), findsOneWidget);
-      expect(find.byKey(const Key('biblioteca_detail_panel')), findsNothing);
+      final drawer = tester.getRect(find.byKey(panelKey));
+      expect(drawer.width, closeTo(1600 / 4, 1));
+      expect(drawer.right, closeTo(1600, 1),
+          reason: 'se despliega desde la derecha, pegado al borde');
+      expect(drawer.height, closeTo(900, 1),
+          reason: 'ocupa todo el alto disponible');
     });
 
-    testWidgets('tramo C conserva filtros arriba y abre modal sin panel',
+    testWidgets('el drawer se SUPERPONE: la grilla mantiene 4 columnas',
+        (tester) async {
+      _setSurfaceSize(tester, 1600);
+      await tester.pumpWidget(_wrapWithData());
+      await tester.pumpAndSettle();
+
+      final anchoAntes = tester.getRect(find.byKey(gridKey)).width;
+
+      await tester.tap(_inside(gridKey, find.text('Press de Banca')));
+      await tester.pumpAndSettle();
+
+      final grid = tester.widget<GridView>(find.byKey(gridKey));
+      final delegate =
+          grid.gridDelegate as SliverGridDelegateWithFixedCrossAxisCount;
+      expect(delegate.crossAxisCount, 4);
+      expect(
+        tester.getRect(find.byKey(gridKey)).width,
+        closeTo(anchoAntes, 0.5),
+        reason: 'superpuesto, no en fila: abrir el detalle no puede reflowear '
+            'la grilla',
+      );
+    });
+
+    testWidgets('compact (1100) conserva filtros arriba y abre modal',
         (tester) async {
       _setSurfaceSize(tester, 1100);
       await tester.pumpWidget(_wrapWithData());
       await tester.pumpAndSettle();
 
       expect(find.byType(BibliotecaFilterChips), findsOneWidget);
-      expect(find.byKey(const Key('biblioteca_filter_column')), findsNothing);
+      expect(find.byKey(filtersKey), findsNothing);
 
-      const gridKey = Key('biblioteca_exercise_grid');
       final grid = tester.widget<GridView>(find.byKey(gridKey));
       expect(grid.gridDelegate, isA<SliverGridDelegateWithMaxCrossAxisExtent>());
 
@@ -339,25 +368,16 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(TreinoDialog), findsOneWidget);
-      expect(find.byKey(const Key('biblioteca_detail_panel')), findsNothing);
+      expect(find.byKey(panelKey), findsNothing);
     });
 
-    testWidgets('tramo A en tema claro: el panel usa la paleta light',
-        (tester) async {
-      // El PF navega el Coach Hub en CLARO. Los dos wrappers de este archivo
-      // hardcodeaban dark, asi que el rediseño entero venia sin cobertura del
-      // tema que el usuario realmente mira.
+    testWidgets('tema claro: el drawer usa la paleta light', (tester) async {
       _setSurfaceSize(tester, 1600);
       await tester.pumpWidget(_wrapWithData(theme: AppTheme.light()));
       await tester.pumpAndSettle();
 
-      const gridKey = Key('biblioteca_exercise_grid');
-      const panelKey = Key('biblioteca_detail_panel');
-
       await tester.tap(_inside(gridKey, find.text('Press de Banca')));
       await tester.pumpAndSettle();
-
-      expect(find.byKey(panelKey), findsOneWidget);
 
       final contenedor = tester.widget<Container>(
         find
@@ -365,12 +385,7 @@ void main() {
             .first,
       );
       final decoracion = contenedor.decoration! as BoxDecoration;
-      expect(
-        decoracion.color,
-        AppPalette.mintMagentaLight.bgCard,
-        reason: 'el panel tiene que tomar el color del tema activo, no uno '
-            'fijo del tema oscuro',
-      );
+      expect(decoracion.color, AppPalette.mintMagentaLight.bgCard);
     });
   });
 }

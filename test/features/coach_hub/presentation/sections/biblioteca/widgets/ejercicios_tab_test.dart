@@ -14,6 +14,7 @@ import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/motion/treino_shimmer.dart';
+import 'package:treino/features/coach_hub/presentation/sections/biblioteca/providers/biblioteca_providers.dart';
 import 'package:treino/features/coach_hub/presentation/sections/biblioteca/widgets/biblioteca_filter_chips.dart';
 import 'package:treino/features/coach_hub/presentation/sections/biblioteca/widgets/ejercicios_tab.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
@@ -228,10 +229,48 @@ void main() {
     });
   });
 
-  group('EjerciciosTab — exercise detail dialog', () {
-    testWidgets('tap exercise card opens TreinoDialog — SCENARIO-BIBW-07a',
+  group('EjerciciosTab — destino del detalle', () {
+    // El ancho decide el destino: en desktop el tap marca la seleccion y el
+    // drawer lo hospeda BibliotecaWebScreen (para que ocupe todo el alto, no
+    // solo el del tab); abajo de 1280 no hay drawer y sigue el modal.
+
+    testWidgets('desktop (1280): el tap marca la seleccion, NO abre el modal',
         (tester) async {
       tester.view.physicalSize = const Size(1280, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      // La seleccion se sondea desde adentro del mismo ProviderScope de
+      // `_wrap`: un ProviderContainer aparte duplicaria los overrides y podria
+      // divergir del arbol que se esta pumpeando.
+      BibliotecaExerciseSelection? visto;
+      await tester.pumpWidget(
+        _wrap(
+          Consumer(
+            builder: (context, ref, _) {
+              visto = ref.watch(bibliotecaSelectedExerciseProvider);
+              return const EjerciciosTab();
+            },
+          ),
+          catalog: const [_bench],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(visto, isNull);
+
+      await tester.tap(find.text('Press de Banca'));
+      await tester.pumpAndSettle();
+
+      expect(visto?.exerciseId, 'bench-press');
+      expect(find.byType(TreinoDialog), findsNothing);
+    });
+
+    testWidgets(
+        'compact (1100): abre TreinoDialog — SCENARIO-BIBW-07a',
+        (tester) async {
+      tester.view.physicalSize = const Size(1100, 900);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
@@ -247,17 +286,14 @@ void main() {
       await tester.tap(find.text('Press de Banca'));
       await tester.pumpAndSettle();
 
-      // TreinoDialog (kit) should be present, with the exercise name as
-      // title — no bare AlertDialog anymore.
       expect(find.byType(TreinoDialog), findsOneWidget);
       expect(find.byType(AlertDialog), findsNothing);
-      // No BottomSheet
       expect(find.byType(BottomSheet), findsNothing);
     });
 
-    testWidgets('dialog has Cerrar action button — SCENARIO-BIBW-07b',
+    testWidgets('compact: el modal tiene boton Cerrar — SCENARIO-BIBW-07b',
         (tester) async {
-      tester.view.physicalSize = const Size(1280, 900);
+      tester.view.physicalSize = const Size(1100, 900);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
@@ -275,7 +311,6 @@ void main() {
 
       expect(find.text('Cerrar'), findsOneWidget);
 
-      // Dismiss dialog
       await tester.tap(find.text('Cerrar'));
       await tester.pumpAndSettle();
 
