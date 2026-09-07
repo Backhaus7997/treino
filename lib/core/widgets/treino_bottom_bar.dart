@@ -15,12 +15,17 @@ import 'treino_icon.dart';
 ///
 /// Existe como tipo aparte, y [resolveBarMetrics] como función pura, por una
 /// razón concreta: **el álgebra de esta barra no se puede testear con un widget
-/// test**. El proyecto usa `google_fonts` sin bundlear las tipografías (no hay
-/// sección `fonts:` en el pubspec ni ningún `.ttf` en el repo), así que se
-/// bajan por red en runtime; y `flutter_test` mockea HTTP devolviendo 400 a
-/// todo. Resultado: en test Barlow Condensed NUNCA carga y todo se mide con una
-/// fuente fallback bastante más ancha que la real. Cualquier aserción sobre
+/// test**. En test, Barlow Condensed NUNCA carga y todo se mide con una fuente
+/// fallback bastante más ancha que la real, así que cualquier aserción sobre
 /// "¿entra ENTRENAR?" hecha en un widget test mide la fuente equivocada.
+///
+/// (El motivo cambió, la conclusión no. Este comentario decía que las
+/// tipografías no estaban bundleadas y se bajaban por red, con `flutter_test`
+/// devolviendo 400 — eso dejó de ser cierto: `pubspec.yaml` declara `Barlow`,
+/// `Barlow Condensed` y `Space Grotesk` con sus `.ttf` en `assets/fonts/`. Lo
+/// que las apaga hoy es el runner: `flutter test` corre el tester con
+/// `--use-test-fonts --disable-asset-fonts`. Vale corregirlo porque la premisa
+/// vieja manda a cualquiera a investigar en la dirección equivocada.)
 ///
 /// Tomando `maxLabelWidth` como ENTRADA, la decisión queda testeable con
 /// aritmética exacta y sin fuentes de por medio.

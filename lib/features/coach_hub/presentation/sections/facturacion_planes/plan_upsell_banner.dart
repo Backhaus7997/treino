@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/widgets/motion/treino_tappable.dart';
@@ -73,9 +73,10 @@ class PlanUpsellBanner extends ConsumerWidget {
               children: [
                 Text(
                   'TU PLAN · ${tierLabel(tier).toUpperCase()}', // i18n: Fase W3
-                  style: GoogleFonts.barlowCondensed(
+                  style: TextStyle(
+                    fontFamily: AppFonts.barlowCondensed,
                     color: palette.textPrimary,
-                    fontSize: 18,
+                    fontSize: AppTextSize.title,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0.5,
                   ),
@@ -83,7 +84,9 @@ class PlanUpsellBanner extends ConsumerWidget {
                 const SizedBox(height: AppSpacing.hairline),
                 Text(
                   _pitch(tier, next),
-                  style: TextStyle(color: palette.textMuted, fontSize: 13),
+                  style: TextStyle(
+                      color: palette.textMuted,
+                      fontSize: AppTextSize.bodyDense),
                 ),
               ],
             ),
@@ -146,9 +149,10 @@ class _VerPlanesButton extends StatelessWidget {
             children: [
               Text(
                 'VER PLANES', // i18n: Fase W3
-                style: GoogleFonts.barlowCondensed(
+                style: TextStyle(
+                  fontFamily: AppFonts.barlowCondensed,
                   color: TreinoButtonTokens.foreground(context),
-                  fontSize: 13,
+                  fontSize: AppTextSize.bodyDense,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.6,
                 ),

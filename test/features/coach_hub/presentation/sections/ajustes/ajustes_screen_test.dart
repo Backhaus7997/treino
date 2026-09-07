@@ -305,6 +305,14 @@ void main() {
       ));
       await tester.pump();
 
+      // `ensureVisible` antes del tap: estos tests son sobre el BORRADO, no
+      // sobre dónde cae el botón. `tester.tap` sobre un widget que quedó
+      // fuera del viewport avisa y no hace nada, así que el test se rompía
+      // por cualquier cambio de alto arriba de él — y bajo `flutter test`
+      // eso pasa fácil: el runner corre con `--disable-asset-fonts`, así que
+      // el banner de plan de arriba mide con la fuente de fallback y no con
+      // Barlow Condensed.
+      await tester.ensureVisible(find.text('QUITAR'));
       await tester.tap(find.text('QUITAR'));
       await tester.pump();
       await tester.pump();
@@ -334,6 +342,14 @@ void main() {
       ));
       await tester.pump();
 
+      // `ensureVisible` antes del tap: estos tests son sobre el BORRADO, no
+      // sobre dónde cae el botón. `tester.tap` sobre un widget que quedó
+      // fuera del viewport avisa y no hace nada, así que el test se rompía
+      // por cualquier cambio de alto arriba de él — y bajo `flutter test`
+      // eso pasa fácil: el runner corre con `--disable-asset-fonts`, así que
+      // el banner de plan de arriba mide con la fuente de fallback y no con
+      // Barlow Condensed.
+      await tester.ensureVisible(find.text('QUITAR'));
       await tester.tap(find.text('QUITAR'));
       await tester.pump();
       await tester.pump();
