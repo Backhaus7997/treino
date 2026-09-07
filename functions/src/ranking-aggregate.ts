@@ -45,6 +45,7 @@
  */
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 
@@ -52,7 +53,7 @@ import { logger } from "firebase-functions";
  * Initialize the default Admin SDK app lazily so the module can be imported
  * without an app already existing (e.g. in test environments).
  */
-function getApp(): admin.app.App {
+function getApp(): App {
   try {
     return admin.app();
   } catch {
@@ -134,7 +135,7 @@ const OPTED_OUT_METRICS: RankingMetrics = {
  * regardless of what was there before.
  */
 export async function recomputeMetrics(
-  app: admin.app.App,
+  app: App,
   uid: string,
 ): Promise<void> {
   const db = admin.firestore(app);

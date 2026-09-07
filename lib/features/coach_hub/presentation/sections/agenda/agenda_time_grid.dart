@@ -88,13 +88,11 @@ const double _altoEncabezado = 60.0;
 /// de hora; un turno a las 10:07 no lo quiere nadie.
 const int _granularidadMin = 15;
 
-/// Rango visible cuando no hay ni sesiones ni disponibilidad de dónde
-/// deducirlo.
-const int _horaInicioDefault = 8;
-const int _horaFinDefault = 20;
+/// Hora a la que se abre la grilla cuando no hay nada de dónde deducirlo.
+const int _horaAperturaDefault = 8;
 
 /// Calendario semanal (o diario) con las horas en el eje vertical.
-class AgendaTimeGrid extends StatelessWidget {
+class AgendaTimeGrid extends StatefulWidget {
   const AgendaTimeGrid({
     super.key,
     required this.firstDay,
@@ -124,67 +122,59 @@ class AgendaTimeGrid extends StatelessWidget {
 
   final void Function(AgendaEvent)? onEventTap;
 
-  DateTime _dia(int i) =>
-      DateTime(firstDay.year, firstDay.month, firstDay.day + i);
+  @override
+  State<AgendaTimeGrid> createState() => _AgendaTimeGridState();
+}
+
+class _AgendaTimeGridState extends State<AgendaTimeGrid> {
+  late final ScrollController _scroll = ScrollController(
+    initialScrollOffset: _offsetDeApertura,
+  );
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  /// Dónde arranca el scroll.
+  ///
+  /// El día se dibuja ENTERO —de 00 a 24— para que ninguna hora quede
+  /// inalcanzable. Que no tengas que mirar las 3 de la mañana se resuelve
+  /// abriendo posicionado donde está el contenido, no recortando lo que
+  /// existe: recortar deja horas a las que no se puede llegar de ninguna
+  /// manera, que es peor que tener que scrollear.
+  double get _offsetDeApertura {
+    final marcas = <int>[
+      for (final e in widget.events) e._startMinute,
+      for (final b in widget.availability) b.startMinute,
+    ];
+    final desde = marcas.isEmpty
+        ? _horaAperturaDefault
+        : ((marcas.reduce((a, b) => a < b ? a : b) ~/ 60) - 1).clamp(0, 23);
+    return desde * _altoHora;
+  }
+
+  DateTime _dia(int i) => DateTime(
+        widget.firstDay.year,
+        widget.firstDay.month,
+        widget.firstDay.day + i,
+      );
 
   bool _esDelDia(DateTime d, DateTime dia) =>
       d.year == dia.year && d.month == dia.month && d.day == dia.day;
 
-  /// Rango de horas visible.
-  ///
-  /// Mostrar 24 horas siempre significa que el 70% de la pantalla son filas
-  /// vacías de madrugada y todo lo que importa queda abajo del scroll. El
-  /// rango se deduce de lo que hay —sesiones y disponibilidad— con una hora de
-  /// aire a cada lado.
-  (int, int) get _rango {
-    final marcas = <int>[
-      for (final e in events) e._startMinute,
-      for (final e in events) e._endMinute,
-      for (final b in availability) b.startMinute,
-      for (final b in availability) b.endMinute,
-    ];
-    if (marcas.isEmpty) return (_horaInicioDefault, _horaFinDefault);
-
-    final desde = (marcas.reduce((a, b) => a < b ? a : b) ~/ 60) - 1;
-    final hasta = ((marcas.reduce((a, b) => a > b ? a : b) + 59) ~/ 60) + 1;
-    return (desde.clamp(0, 23), hasta.clamp(1, 24));
-  }
-
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
+    const horaDesde = 0;
+    const horaHasta = 24;
+    const alto = (horaHasta - horaDesde) * _altoHora;
 
     return LayoutBuilder(
       builder: (ctx, constraints) {
-        final anchoDia = (constraints.maxWidth - _anchoGutter) / dayCount;
-        var (horaDesde, horaHasta) = _rango;
-
-        // Un calendario LLENA su contenedor.
-        //
-        // El rango se deduce del contenido, y con poco contenido queda corto:
-        // con disponibilidad de 9 a 11 y ninguna sesión daban cuatro horas,
-        // 224 px adentro de un panel de 700, y abajo un vacío enorme. En
-        // pantalla eso no se lee como "no hay nada más": se lee como que la
-        // agenda está CORTADA A LA MITAD. Reportado mirando el Coach Hub.
-        //
-        // Si sobra alto se muestran más horas. Crece hacia abajo primero
-        // porque en una agenda de entrenamiento la tarde es horario pico y la
-        // madrugada no la mira nadie.
-        if (constraints.maxHeight.isFinite) {
-          final horasQueEntran =
-              ((constraints.maxHeight - _altoEncabezado) / _altoHora).floor();
-          var faltan = horasQueEntran - (horaHasta - horaDesde);
-          while (faltan > 0 && (horaDesde > 0 || horaHasta < 24)) {
-            if (horaHasta < 24) {
-              horaHasta++;
-            } else {
-              horaDesde--;
-            }
-            faltan--;
-          }
-        }
-
-        final alto = (horaHasta - horaDesde) * _altoHora;
+        final anchoDia =
+            (constraints.maxWidth - _anchoGutter) / widget.dayCount;
 
         // El encabezado va FUERA del scroll: si se va con las horas, a los
         // cinco minutos de scrollear no sabés qué columna estás mirando. Es la
@@ -195,21 +185,25 @@ class AgendaTimeGrid extends StatelessWidget {
             SizedBox(
               height: _altoEncabezado,
               child: _Encabezado(
-                dias: [for (var i = 0; i < dayCount; i++) _dia(i)],
-                hoy: now,
+                dias: [for (var i = 0; i < widget.dayCount; i++) _dia(i)],
+                hoy: widget.now,
                 anchoDia: anchoDia,
                 palette: palette,
               ),
             ),
             Expanded(
               child: SingleChildScrollView(
+                controller: _scroll,
                 child: SizedBox(
                   height: alto,
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _Gutter(horaDesde: horaDesde, horaHasta: horaHasta),
-                      for (var i = 0; i < dayCount; i++)
+                      const _Gutter(
+                        horaDesde: horaDesde,
+                        horaHasta: horaHasta,
+                      ),
+                      for (var i = 0; i < widget.dayCount; i++)
                         SizedBox(
                           width: anchoDia,
                           child: _ColumnaDia(
@@ -217,18 +211,17 @@ class AgendaTimeGrid extends StatelessWidget {
                             dia: _dia(i),
                             horaDesde: horaDesde,
                             horaHasta: horaHasta,
-                            eventos: events
+                            eventos: widget.events
                                 .where((e) => _esDelDia(e.startsAt, _dia(i)))
                                 .toList(),
-                            bandas: availability
-                                .where((b) => b.weekday == _dia(i).weekday)
-                                .toList(),
-                            now: now != null && _esDelDia(now!, _dia(i))
-                                ? now
+                            bandas: _bandasDe(_dia(i).weekday),
+                            now: widget.now != null &&
+                                    _esDelDia(widget.now!, _dia(i))
+                                ? widget.now
                                 : null,
                             palette: palette,
-                            onEmptySlotTap: onEmptySlotTap,
-                            onEventTap: onEventTap,
+                            onEmptySlotTap: widget.onEmptySlotTap,
+                            onEventTap: widget.onEventTap,
                           ),
                         ),
                     ],
@@ -240,6 +233,34 @@ class AgendaTimeGrid extends StatelessWidget {
         );
       },
     );
+  }
+
+  /// Las franjas de un día, con las CONTIGUAS FUSIONADAS.
+  ///
+  /// Dos reglas pegadas —9 a 10 y 10 a 11— se dibujaban como dos cajas con
+  /// una costura en el medio, y en pantalla eso se lee como dos cosas
+  /// distintas en vez de "de 9 a 11 atiendo". Reportado mirando el Coach Hub.
+  List<AgendaAvailabilityBand> _bandasDe(int weekday) {
+    final delDia = widget.availability
+        .where((b) => b.weekday == weekday)
+        .toList()
+      ..sort((a, b) => a.startMinute.compareTo(b.startMinute));
+    if (delDia.isEmpty) return const [];
+
+    final fusionadas = <AgendaAvailabilityBand>[delDia.first];
+    for (final b in delDia.skip(1)) {
+      final ultima = fusionadas.last;
+      if (b.startMinute <= ultima.endMinute) {
+        fusionadas[fusionadas.length - 1] = AgendaAvailabilityBand(
+          weekday: weekday,
+          startMinute: ultima.startMinute,
+          endMinute: b.endMinute > ultima.endMinute ? b.endMinute : ultima.endMinute,
+        );
+      } else {
+        fusionadas.add(b);
+      }
+    }
+    return fusionadas;
   }
 }
 

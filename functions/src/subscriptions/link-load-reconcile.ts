@@ -57,13 +57,15 @@
  */
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
+import { DocumentData } from "firebase-admin/firestore";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 
 import { syncTrainerLoad } from "./promote-link";
 import { syncTrainerEntitlements } from "./sync-entitlements";
 
-function getApp(): admin.app.App {
+function getApp(): App {
   try {
     return admin.app();
   } catch {
@@ -80,7 +82,7 @@ function getApp(): admin.app.App {
  * Firestore error, anything — logs, and returns without throwing.
  */
 export async function linkLoadReconcileHandler(
-  app: admin.app.App,
+  app: App,
   trainerId: string,
 ): Promise<void> {
   // ── 1. weightedLoad ───────────────────────────────────────────────────────
@@ -282,8 +284,8 @@ function stableValue(value: unknown): string {
  * worth pinning: a false positive skips a reconciliation that was needed.
  */
 export function isEntitlementOnlyWrite(
-  before: admin.firestore.DocumentData | undefined,
-  after: admin.firestore.DocumentData | undefined,
+  before: DocumentData | undefined,
+  after: DocumentData | undefined,
 ): boolean {
   // Un create o un delete nunca son nuestros: `syncTrainerEntitlements` solo
   // hace tx.update sobre vinculos que ya existen.

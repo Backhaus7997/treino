@@ -17,6 +17,7 @@
  */
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
 import * as functions from "firebase-functions/v2/https";
 import { HttpsError } from "firebase-functions/v2/https";
 import { FieldValue } from "firebase-admin/firestore";
@@ -27,7 +28,7 @@ import { FieldValue } from "firebase-admin/firestore";
  * their own named apps before importing).
  * Copied from review-aggregate.ts (same pattern).
  */
-function getApp(): admin.app.App {
+function getApp(): App {
   try {
     return admin.app();
   } catch {
@@ -93,7 +94,7 @@ function normalize(s: string): string {
  * @returns { status: 'ok' } on write, { status: 'noop' } when alias already exists
  */
 export async function runAddAlias(
-  app: admin.app.App,
+  app: App,
   callerId: string,
   exerciseId: string,
   alias: string,

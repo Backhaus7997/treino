@@ -20,6 +20,8 @@
  */
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
+import { Messaging } from "firebase-admin/messaging";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 import { sendFcm } from "./send-fcm";
@@ -33,7 +35,7 @@ import {
 } from "../mail/format";
 import { trainerEntry } from "../mail/templates";
 
-function getApp(): admin.app.App {
+function getApp(): App {
   try {
     return admin.app();
   } catch {
@@ -107,7 +109,7 @@ function isAthleteAccountDeletedWrite(
  * @param toUids  - Recipients, as already resolved for the push.
  */
 async function enqueueAppointmentMail(
-  app: admin.app.App,
+  app: App,
   apptId: string,
   after: ApptData,
   status: string,
@@ -181,11 +183,11 @@ async function enqueueAppointmentMail(
  * @param messaging - Optional messaging instance for test injection.
  */
 export async function notifyOnAppointmentHandler(
-  app: admin.app.App,
+  app: App,
   apptId: string,
   before: ApptData | undefined,
   after: ApptData | undefined,
-  messaging?: admin.messaging.Messaging,
+  messaging?: Messaging,
 ): Promise<void> {
   // Guard: document deleted — no notification.
   if (!after) {

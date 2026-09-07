@@ -60,10 +60,12 @@
  */
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
+import { FieldValue } from "firebase-admin/firestore";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 
-function getApp(): admin.app.App {
+function getApp(): App {
   try {
     return admin.app();
   } catch {
@@ -81,7 +83,7 @@ type LinkData = Record<string, unknown>;
  * @param after  - Snapshot data after the write (undefined for deletes).
  */
 export async function syncSessionShareHandler(
-  app: admin.app.App,
+  app: App,
   before: LinkData | undefined,
   after: LinkData | undefined,
 ): Promise<void> {
@@ -113,7 +115,7 @@ export async function syncSessionShareHandler(
   const grantShare = async (reason: "transition" | "repair"): Promise<void> => {
     await shareRef.set({
       trainerId,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
     });
     logger.info("syncSessionShare: share granted", { trainerId, athleteId, reason });
   };

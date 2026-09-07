@@ -17,11 +17,13 @@
  */
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
+import { Messaging } from "firebase-admin/messaging";
 import { logger } from "firebase-functions";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { sendFcm } from "./send-fcm";
 
-function getApp(): admin.app.App {
+function getApp(): App {
   try {
     return admin.app();
   } catch {
@@ -96,12 +98,12 @@ export function resolveReactionNotification({
  * Async handler extracted for emulator-backed integration tests.
  */
 export async function notifyOnReactionHandler(
-  app: admin.app.App,
+  app: App,
   postId: string,
   reactorUid: string,
   before: DocumentData | undefined,
   after: DocumentData | undefined,
-  messaging?: admin.messaging.Messaging,
+  messaging?: Messaging,
 ): Promise<void> {
   // Updates and deletes cannot notify and do not need any Firestore reads.
   if (!after || before !== undefined) {

@@ -12,6 +12,8 @@
  */
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
+import { FieldValue } from "firebase-admin/firestore";
 
 const BATCH_SIZE = 500;
 
@@ -20,7 +22,7 @@ const BATCH_SIZE = 500;
  * Returns the count of terminated documents.
  */
 export async function terminateTrainerLinks(
-  app: admin.app.App,
+  app: App,
   uid: string
 ): Promise<{ count: number }> {
   const db = admin.firestore(app);
@@ -46,7 +48,7 @@ export async function terminateTrainerLinks(
       batch.update(doc.ref, {
         status: "terminated",
         reason: "account-deleted",
-        terminatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        terminatedAt: FieldValue.serverTimestamp(),
       });
     }
     await batch.commit();

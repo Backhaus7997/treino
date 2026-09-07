@@ -36,6 +36,53 @@ jest.mock("firebase-admin", () => ({
   initializeApp: jest.fn(),
 }));
 
+// La puerta modular de `firebase-admin/app`, traducida al doble namespaced.
+//
+// Producción dejó de hacer `admin.app()` y ahora usa `getApp()`; el
+// `jest.mock("firebase-admin", …)` de arriba no cubre ese specifier. Los dobles
+// salen del MISMO objeto, así que no pueden driftear.
+//
+// Lo fija `firebase-admin-mock-surface.test.ts`.
+jest.mock("firebase-admin/app", () => {
+  const ns = jest.requireMock("firebase-admin") as {
+    app: () => unknown;
+    initializeApp: () => unknown;
+  };
+  return {
+    getApp: (...args: unknown[]) => (ns.app as (...a: unknown[]) => unknown)(...args),
+    initializeApp: (...args: unknown[]) =>
+      (ns.initializeApp as (...a: unknown[]) => unknown)(...args),
+  };
+});
+
+
+// La puerta modular tiene que dar EL MISMO doble que la namespaced de arriba.
+//
+// `jest.mock("firebase-admin", …)` intercepta el specifier EXACTO. Producción
+// importa Timestamp/FieldValue de `firebase-admin/firestore`, y sin esto le
+// llega el REAL: el Firestore de mentira de este archivo no reconoce sus
+// sentinels, guarda basura en vez de aplicarlos, y el test falla —o peor, pasa—
+// por un motivo que no tiene que ver con lo que quiere probar.
+//
+// Getters y no valores: los factories se evalúan por demanda, así que esto no
+// depende del orden entre los dos `jest.mock`.
+//
+// Lo fija `firebase-admin-mock-surface.test.ts`.
+jest.mock("firebase-admin/firestore", () => {
+  const ns = jest.requireMock("firebase-admin") as {
+    firestore: Record<string, unknown>;
+  };
+  return {
+    getFirestore: (app: { firestore: () => unknown }) => app.firestore(),
+    get Timestamp() {
+      return ns.firestore.Timestamp;
+    },
+    get FieldValue() {
+      return ns.firestore.FieldValue;
+    },
+  };
+});
+
 import {
   reconcileAllSubscriptions,
   reconcileSubscription,

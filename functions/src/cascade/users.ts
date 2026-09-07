@@ -11,13 +11,14 @@
  */
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
 
 /**
  * Deletes all Firestore documents owned by the given user.
  * Idempotent — safe to call when docs are already absent.
  */
 export async function deleteUserDocs(
-  app: admin.app.App,
+  app: App,
   uid: string
 ): Promise<void> {
   const db = admin.firestore(app);

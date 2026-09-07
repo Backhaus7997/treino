@@ -25,6 +25,7 @@
  */
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 
@@ -32,7 +33,7 @@ import { logger } from "firebase-functions";
  * Initialize the default Admin SDK app lazily so the module can be imported
  * without an app already existing (e.g. in test environments).
  */
-function getApp(): admin.app.App {
+function getApp(): App {
   try {
     return admin.app();
   } catch {
@@ -75,7 +76,7 @@ export function athleteCountFromLinks(
  * by test suites.
  */
 export async function recomputeAthleteCount(
-  app: admin.app.App,
+  app: App,
   trainerId: string,
 ): Promise<void> {
   const db = admin.firestore(app);

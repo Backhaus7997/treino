@@ -14,11 +14,13 @@
  */
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
+import { Messaging } from "firebase-admin/messaging";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 import { sendFcm } from "./send-fcm";
 
-function getApp(): admin.app.App {
+function getApp(): App {
   try {
     return admin.app();
   } catch {
@@ -36,9 +38,9 @@ type ReviewData = Record<string, unknown>;
  * @param messaging  - Optional messaging instance for test injection.
  */
 export async function notifyOnReviewHandler(
-  app: admin.app.App,
+  app: App,
   reviewData: ReviewData,
-  messaging?: admin.messaging.Messaging,
+  messaging?: Messaging,
 ): Promise<void> {
   const db = admin.firestore(app);
 
