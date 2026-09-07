@@ -40,7 +40,8 @@ import {
   reconcileAllSubscriptions,
   reconcileSubscription,
 } from "../subscriptions/mp/reconcile";
-import { MpApiError, MpClient, MpPreapproval } from "../subscriptions/mp/client";
+import { MpApiError, MpPreapproval } from "../subscriptions/mp/client";
+import { ReconcileDeps } from "../subscriptions/mp/reconcile";
 
 // ---------------------------------------------------------------------------
 
@@ -87,10 +88,15 @@ function fakeApp(seed: Store = {}) {
  * un PLAN. `respuesta` es la unica suscripcion del plan, o `null` para el caso
  * normal de un plan que nadie pago todavia.
  */
+/** Un "ahora" fijo. El barrido decide abandonos contra el reloj inyectado. */
+const AHORA = Date.parse("2026-09-07T12:00:00.000Z");
+
 function fakeMp(
   respuesta: MpPreapproval | Error | null,
-): { mpClient: MpClient } {
+  nowMs: number = AHORA,
+): ReconcileDeps {
   return {
+    nowMs,
     mpClient: {
       getPreapproval: async () => ({}),
       createPreapprovalPlan: async () => ({}),
@@ -577,5 +583,113 @@ describe("reconcileSubscription — las dos cancelaciones reales", () => {
     const sub = store.users.t1.subscription as Record<string, unknown>;
     expect((sub.currentPeriodEnd as { toMillis(): number }).toMillis())
       .toBe(Date.parse("2026-09-07T11:52:46.000-04:00"));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// El abandono de planes.
+//
+// Es el costo del diseño de UN PLAN POR CHECKOUT: cada PF que toca "ELEGIR
+// PLAN" y no paga deja un plan que el barrido consultaria contra MP todas las
+// noches PARA SIEMPRE. Sin esto, el trabajo nocturno crece con la CURIOSIDAD de
+// la gente, no con las ventas.
+// ---------------------------------------------------------------------------
+
+import { esAbandonado } from "../subscriptions/mp/reconcile";
+
+const DIA = 24 * 60 * 60 * 1000;
+
+describe("esAbandonado", () => {
+  it("un plan recien creado NO se abandona", () => {
+    expect(esAbandonado(ts(AHORA - DIA), AHORA)).toBe(false);
+  });
+
+  it("a los 31 dias si", () => {
+    expect(esAbandonado(ts(AHORA - 31 * DIA), AHORA)).toBe(true);
+  });
+
+  it("justo en el limite de 30 dias todavia NO", () => {
+    // El corte es estricto: 30 dias exactos sigue vivo. Es la direccion segura
+    // — esperar de mas cuesta llamadas, cortar temprano cuesta un cobro.
+    expect(esAbandonado(ts(AHORA - 30 * DIA), AHORA)).toBe(false);
+  });
+
+  const sinFecha: [string, unknown][] = [
+    ["sin createdAt", undefined],
+    ["null", null],
+    ["el sentinel de serverTimestamp sin resolver", "__ts__"],
+    ["un numero suelto", 1_700_000_000],
+    ["un string", "2026-09-07"],
+  ];
+  for (const [caso, v] of sinFecha) {
+    it(`NO abandona con ${caso} — ante la duda se sigue mirando`, () => {
+      // Gastar una llamada de mas es infinitamente mas barato que dejar de
+      // mirar una suscripcion que si existe.
+      expect(esAbandonado(v, AHORA)).toBe(false);
+    });
+  }
+});
+
+describe("reconcileAllSubscriptions — saca del barrido lo abandonado", () => {
+  const mundoConPlanViejo = (edadDias: number): Store => ({
+    users: { t1: { role: "trainer" } },
+    mp_plans: {
+      p1: {
+        uid: "t1", tier: "plan2", cycle: "monthly",
+        createdAt: ts(AHORA - edadDias * DIA),
+      },
+    },
+  });
+
+  it("un checkout abandonado hace 31 dias se marca terminal", async () => {
+    const { app, store } = fakeApp(mundoConPlanViejo(31));
+
+    // `null` = el plan no tiene ninguna suscripcion. Nadie pago.
+    const r = await reconcileAllSubscriptions(app, fakeMp(null));
+
+    expect(r.abandonados).toBe(1);
+    expect(store.mp_plans.p1.terminal).toBe(true);
+    expect(store.mp_plans.p1.terminalReason).toContain("abandonado");
+  });
+
+  it("pero conserva el mapeo — sirve para auditar quien compro que", async () => {
+    const { app, store } = fakeApp(mundoConPlanViejo(31));
+
+    await reconcileAllSubscriptions(app, fakeMp(null));
+
+    expect(store.mp_plans.p1.uid).toBe("t1");
+    expect(store.mp_plans.p1.tier).toBe("plan2");
+  });
+
+  it("uno de ayer NO se toca — el init_point puede seguir sirviendo", async () => {
+    const { app, store } = fakeApp(mundoConPlanViejo(1));
+
+    const r = await reconcileAllSubscriptions(app, fakeMp(null));
+
+    expect(r.abandonados).toBe(0);
+    expect(store.mp_plans.p1.terminal).toBeUndefined();
+  });
+
+  it("un plan VIEJO pero CON suscripcion no se abandona jamas", async () => {
+    // El caso que no puede fallar: un PF suscripto hace un año. Marcarlo
+    // terminal lo sacaria del barrido y su suscripcion dejaria de
+    // reconciliarse — se daria de baja y nunca nos enterariamos.
+    const { app, store } = fakeApp(mundoConPlanViejo(400));
+
+    const r = await reconcileAllSubscriptions(app, fakeMp(AUTORIZADA));
+
+    expect(r.abandonados).toBe(0);
+    expect(store.mp_plans.p1.terminal).toBeUndefined();
+    expect(r.written).toBe(1);
+  });
+
+  it("lo marcado deja de consultarse en la corrida siguiente", async () => {
+    const { app } = fakeApp(mundoConPlanViejo(31));
+
+    const primera = await reconcileAllSubscriptions(app, fakeMp(null));
+    const segunda = await reconcileAllSubscriptions(app, fakeMp(null));
+
+    expect(primera.total).toBe(1);
+    expect(segunda.total).toBe(0);
   });
 });

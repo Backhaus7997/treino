@@ -84,6 +84,8 @@ export interface ReconcileResult {
 
 export interface ReconcileDeps {
   mpClient: MpClient;
+  /** Reloj inyectable: el abandono se testea sin esperar 30 dias. */
+  nowMs: number;
 }
 
 function getApp(): admin.app.App {
@@ -414,6 +416,54 @@ export interface SweepResult {
   unchanged: number;
   skipped: number;
   errors: number;
+  /** Planes que se dieron de baja del barrido por checkout abandonado. */
+  abandonados: number;
+}
+
+/**
+ * Cuanto se espera antes de dar por abandonado un plan que nunca tuvo
+ * suscripcion.
+ *
+ * Existe por el costo del diseño de UN PLAN POR CHECKOUT: cada PF que toca
+ * "ELEGIR PLAN" y no paga deja un plan que el barrido consultaria contra MP
+ * todas las noches PARA SIEMPRE. Con cien PF mirando precios y la mitad
+ * abandonando, en un año son miles de llamadas diarias por suscripciones que
+ * nunca existieron.
+ *
+ * 30 dias y no 1: el `init_point` de un plan no vence en el acto, y alguien
+ * que abrio el checkout el martes y pago el jueves tiene que seguir andando.
+ * El costo de esperar de mas son unas pocas llamadas; el de cortar temprano es
+ * un PF que paga y al que nunca le acreditamos el plan.
+ */
+const ABANDONO_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** Si un plan sin suscripcion ya es viejo como para dejar de consultarlo. */
+export function esAbandonado(createdAt: unknown, nowMs: number): boolean {
+  const ms = comoTimestamp(createdAt)?.toMillis();
+  // Sin fecha NO se abandona. Un documento viejo sin `createdAt` —o con el
+  // sentinel de serverTimestamp todavia sin resolver— se sigue consultando:
+  // gastar una llamada de mas es infinitamente mas barato que dejar de mirar
+  // una suscripcion que si existe.
+  if (ms === undefined) return false;
+  return nowMs - ms > ABANDONO_MS;
+}
+
+/**
+ * Saca un plan del barrido. `merge` porque el resto del mapeo —uid, tier,
+ * cycle— tiene que sobrevivir: sirve para auditar quien compro que, aunque ya
+ * no se consulte.
+ */
+async function marcarTerminal(
+  app: admin.app.App,
+  planId: string,
+  motivo: string,
+): Promise<void> {
+  await app
+    .firestore()
+    .collection(MP_PLANS_COLLECTION)
+    .doc(planId)
+    .set({ terminal: true, terminalReason: motivo }, { merge: true });
+  logger.info("mp/reconcile: plan sacado del barrido", { planId, motivo });
 }
 
 /**
@@ -445,10 +495,12 @@ export async function reconcileAllSubscriptions(
     unchanged: 0,
     skipped: 0,
     errors: 0,
+    abandonados: 0,
   };
 
   for (const doc of snap.docs) {
-    if (doc.data()?.terminal === true) continue;
+    const datos = doc.data();
+    if (datos?.terminal === true) continue;
     r.total += 1;
 
     // El try es por-PF, igual que en `entitlement-triggers`: un documento roto
@@ -459,6 +511,14 @@ export async function reconcileAllSubscriptions(
       else if (res.outcome === "unchanged") r.unchanged += 1;
       else if (res.outcome === "error-mp") r.errors += 1;
       else r.skipped += 1;
+
+      if (
+        res.outcome === "sin-suscripcion" &&
+        esAbandonado(datos?.createdAt, deps.nowMs)
+      ) {
+        await marcarTerminal(app, doc.id, "checkout abandonado");
+        r.abandonados += 1;
+      }
     } catch (err) {
       logger.error("mp/reconcile: error inesperado en un preapproval", {
         planId: doc.id,
@@ -485,6 +545,7 @@ export const reconcileMpSubscriptions = onSchedule(
   async () => {
     const r = await reconcileAllSubscriptions(getApp(), {
       mpClient: createMpClient(MP_ACCESS_TOKEN.value()),
+      nowMs: Date.now(),
     });
     logger.info("reconcileMpSubscriptions: corrida diaria", r);
   },
