@@ -133,6 +133,107 @@ void main() {
     });
   });
 
+  // ─── listAssignedToByTrainer ───────────────────────────────────────────────
+
+  group('RoutineRepository.listAssignedToByTrainer', () {
+    test('returns only plans assigned to the athlete by the trainer', () async {
+      await seedAssignedRoutine(
+        id: 'r-own',
+        assignedTo: 'athlete-1',
+        assignedBy: 'trainer-1',
+      );
+      await seedAssignedRoutine(
+        id: 'r-other-trainer',
+        assignedTo: 'athlete-1',
+        assignedBy: 'trainer-2',
+      );
+      await seedAssignedRoutine(
+        id: 'r-other-athlete',
+        assignedTo: 'athlete-2',
+        assignedBy: 'trainer-1',
+      );
+
+      final result = await repo.listAssignedToByTrainer(
+        trainerId: 'trainer-1',
+        athleteId: 'athlete-1',
+      );
+
+      expect(result.map((routine) => routine.id), equals(['r-own']));
+    });
+
+    test('orders raw documents by createdAt descending', () async {
+      await seedAssignedRoutine(
+        id: 'r-old',
+        assignedTo: 'athlete-1',
+        assignedBy: 'trainer-1',
+        createdAt: Timestamp.fromMillisecondsSinceEpoch(1000000),
+      );
+      await seedAssignedRoutine(
+        id: 'r-new',
+        assignedTo: 'athlete-1',
+        assignedBy: 'trainer-1',
+        createdAt: Timestamp.fromMillisecondsSinceEpoch(2000000),
+      );
+
+      final result = await repo.listAssignedToByTrainer(
+        trainerId: 'trainer-1',
+        athleteId: 'athlete-1',
+      );
+
+      expect(result.map((routine) => routine.id), equals(['r-new', 'r-old']));
+    });
+
+    test('puts a pending null createdAt last without throwing', () async {
+      await seedAssignedRoutine(
+        id: 'r-persisted',
+        assignedTo: 'athlete-1',
+        assignedBy: 'trainer-1',
+        createdAt: Timestamp.fromMillisecondsSinceEpoch(1000000),
+      );
+      await firestore.collection('routines').doc('r-pending').set({
+        'id': 'r-pending',
+        'name': 'Assigned Routine pending',
+        'split': 'Full Body',
+        'level': 'beginner',
+        'days': <dynamic>[],
+        'estimatedMinutesPerDay': null,
+        'imageUrl': null,
+        'source': 'trainer-assigned',
+        'assignedBy': 'trainer-1',
+        'assignedTo': 'athlete-1',
+        'visibility': 'private',
+        'createdAt': null,
+      });
+
+      final result = await repo.listAssignedToByTrainer(
+        trainerId: 'trainer-1',
+        athleteId: 'athlete-1',
+      );
+
+      expect(
+        result.map((routine) => routine.id),
+        equals(['r-persisted', 'r-pending']),
+      );
+    });
+
+    test('returns empty when either id is empty', () async {
+      expect(
+        await repo.listAssignedToByTrainer(
+          trainerId: '',
+          athleteId: 'athlete-1',
+        ),
+        isEmpty,
+      );
+      expect(
+        await repo.listAssignedToByTrainer(
+          trainerId: 'trainer-1',
+          athleteId: '',
+        ),
+        isEmpty,
+      );
+    });
+  });
+
   // ─── createAssigned ───────────────────────────────────────────────────────
 
   group('RoutineRepository.createAssigned', () {

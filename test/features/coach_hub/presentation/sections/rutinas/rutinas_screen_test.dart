@@ -106,6 +106,16 @@ Future<void> _pumpRutinas(
     ProviderScope(
       overrides: [
         trainerLinksStreamProvider.overrideWith((ref) => Stream.value(links)),
+        // El listado de rutinas se overridea UNA sola vez para toda la family
+        // y despacha por `key.athleteId`. Antes era un override por alumno
+        // adentro del `for`, pero `assignedRoutinesByTrainerProvider` se
+        // keyea por el par (trainerId, athleteId) y el trainerId sale de
+        // `currentUidProvider` en tiempo de build — desde el loop no se puede
+        // construir la clave. Un override family-wide no necesita conocerla.
+        assignedRoutinesByTrainerProvider.overrideWith(
+          (ref, key) =>
+              Future.value(routines[key.athleteId] ?? const <Routine>[]),
+        ),
         for (final l in links) ...[
           userPublicProfileProvider(l.athleteId).overrideWith(
             (ref) => Stream.value(
@@ -115,9 +125,6 @@ Future<void> _pumpRutinas(
                 gymName: gymNames[l.athleteId],
               ),
             ),
-          ),
-          assignedRoutinesProvider(l.athleteId).overrideWith(
-            (ref) => Future.value(routines[l.athleteId] ?? const <Routine>[]),
           ),
         ],
       ],
@@ -313,8 +320,8 @@ void main() {
             userPublicProfileProvider(link.athleteId).overrideWith(
               (ref) => Stream.value(_pub(link.athleteId, 'Ana Activa')),
             ),
-            assignedRoutinesProvider(link.athleteId)
-                .overrideWith((ref) => neverResolves.future),
+            assignedRoutinesByTrainerProvider
+                .overrideWith((ref, key) => neverResolves.future),
           ],
           child:
               MaterialApp.router(theme: AppTheme.dark(), routerConfig: router),

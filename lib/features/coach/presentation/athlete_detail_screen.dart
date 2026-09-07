@@ -74,7 +74,9 @@ class AthleteDetailScreen extends ConsumerWidget {
     final trainerUid = ref.watch(currentUidProvider) ?? '';
 
     final profileAsync = ref.watch(userPublicProfileProvider(athleteId));
-    final plansAsync = ref.watch(assignedRoutinesProvider(athleteId));
+    final plansAsync = ref.watch(assignedRoutinesByTrainerProvider(
+      (trainerId: trainerUid, athleteId: athleteId),
+    ));
 
     return Column(
       children: [
@@ -390,7 +392,7 @@ class _PlanesSection extends ConsumerWidget {
               ),
             ),
             data: (allPlans) {
-              // Client-side filter: only show plans assigned by current trainer
+              // Redundante desde que assignedBy también vive en la query.
               final myPlans =
                   allPlans.where((r) => r.assignedBy == trainerUid).toList();
 
@@ -494,7 +496,9 @@ class _PlanesSection extends ConsumerWidget {
     final container = ProviderScope.containerOf(context, listen: false);
     try {
       await ref.read(routineRepositoryProvider).deleteRoutine(plan.id);
-      ref.invalidate(assignedRoutinesProvider(athleteId));
+      ref.invalidate(assignedRoutinesByTrainerProvider(
+        (trainerId: trainerUid, athleteId: athleteId),
+      ));
       // The athlete's list is not the only reader: the one-shot single-doc
       // caches would keep serving the deleted plan for the rest of the
       // process, "empezar sesión" included.

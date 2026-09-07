@@ -4,7 +4,9 @@ import 'package:cloud_firestore/cloud_firestore.dart'
         DocumentSnapshot,
         FieldValue,
         FirebaseException,
-        FirebaseFirestore;
+        FirebaseFirestore,
+        QueryDocumentSnapshot,
+        Timestamp;
 
 import '../../profile/domain/experience_level.dart';
 import '../domain/routine.dart';
@@ -391,6 +393,54 @@ class RoutineRepository {
         .limit(20)
         .get();
     return snap.docs.map(_fromDoc).whereType<Routine>().toList();
+  }
+
+  /// Returns the plans [trainerId] assigned to [athleteId], newest first.
+  ///
+  /// This stays separate from [listAssignedTo] because athlete and trainer
+  /// reads prove different Firestore-rule branches: the athlete query proves
+  /// `uid == assignedTo`, while the trainer query must also constrain
+  /// `assignedBy == uid`. An optional parameter would make that security
+  /// distinction easy for a trainer call site to omit accidentally.
+  ///
+  /// Like [listPublishedTemplates], the Firestore query is equality-only so it
+  /// rides automatic single-field indexes. Adding `orderBy(createdAt)` would
+  /// require a composite index that is not deployed, so ordering happens in
+  /// Dart. [Routine] does not retain `createdAt`; therefore the raw snapshots
+  /// are sorted before [_fromDoc] maps them into domain objects.
+  Future<List<Routine>> listAssignedToByTrainer({
+    required String trainerId,
+    required String athleteId,
+  }) async {
+    if (trainerId.isEmpty || athleteId.isEmpty) return const [];
+
+    final snap = await _collection
+        .where('assignedTo', isEqualTo: athleteId)
+        .where('assignedBy', isEqualTo: trainerId)
+        .where('source', isEqualTo: 'trainer-assigned')
+        .get();
+    // `as Timestamp?` sería un cast, y un cast acá tira `TypeError` y se lleva
+    // puesta la LISTA ENTERA si UN solo doc trae `createdAt` con otra forma
+    // (un import viejo que lo dejó como String, por ejemplo). Sería el mismo
+    // modo de falla que este método viene a arreglar: la pantalla del PF en
+    // blanco por un doc raro. `is Timestamp` degrada ese doc a "sin fecha" y
+    // lo manda al fondo, que es un orden discutible pero nunca una excepción.
+    Timestamp? createdAtOf(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+      final value = doc.data()['createdAt'];
+      return value is Timestamp ? value : null;
+    }
+
+    final docs = snap.docs.toList()
+      ..sort((a, b) {
+        final aCreatedAt = createdAtOf(a);
+        final bCreatedAt = createdAtOf(b);
+        // A pending serverTimestamp cannot be compared honestly. Keep nulls
+        // last until Firestore resolves them instead of guessing their order.
+        if (aCreatedAt == null) return bCreatedAt == null ? 0 : 1;
+        if (bCreatedAt == null) return -1;
+        return bCreatedAt.compareTo(aCreatedAt);
+      });
+    return docs.take(20).map(_fromDoc).whereType<Routine>().toList();
   }
 
   /// Persists a trainer-assigned plan.

@@ -2038,7 +2038,9 @@ class _RoutineEditorWebScreenState
       // needed. The assigned list is a one-shot FutureProvider, so invalidate
       // it so the athlete detail's "Rutina activa" card refreshes on return.
       if (!widget.isTemplate) {
-        ref.invalidate(assignedRoutinesProvider(widget.athleteId!));
+        ref.invalidate(assignedRoutinesByTrainerProvider(
+          (trainerId: trainerUid, athleteId: widget.athleteId!),
+        ));
       }
       if (mounted) context.pop();
     } catch (error) {

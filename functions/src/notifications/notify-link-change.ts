@@ -99,6 +99,73 @@ async function enqueueLinkMail(
 }
 
 /**
+ * Estampa `linkId` en el chat que ya existía entre el PF y el alumno.
+ *
+ * POR QUE HACE FALTA. `senderMayPost` (firestore.rules) deja postear si el DOC
+ * DEL CHAT tiene `linkId`. El cliente lo escribe SÓLO al crear el chat, vía
+ * `ChatRepository._activeLinkIdBetween`. Un par que se escribió primero como
+ * chat social y se vinculó DESPUES nunca lo recibe, y el alumno vinculado a su
+ * PF queda leyendo "Para escribirle, esta persona tiene que seguirte". El
+ * cliente tampoco lo puede completar después: `chats/update` tiene `linkId`
+ * PINEADO INMUTABLE. Por eso vive acá, donde el Admin SDK saltea las reglas.
+ *
+ * CUANDO SE LLAMA, Y POR QUE NO ANTES. Sólo con el link en `active` o
+ * `paused`. Esa no es una preferencia: es la invariante que `chatCreateOk`
+ * exige de todo chat que lleve `linkId` (el link existe, su status está en
+ * ['active','paused'], y los dos miembros son trainerId y athleteId), y que el
+ * cliente espeja en `_activeLinkIdBetween`. Estamparlo en `pending` le daría
+ * escritura al alumno ANTES de que el PF acepte — o sea, desarmaría el gate
+ * que el vínculo representa.
+ *
+ * EL DOC ES UNO SOLO Y SU ID ES DETERMINISTICO: `sortedUids.join('_')`, igual
+ * que `ChatRepository.chatIdFor`. La unicidad por par es estructural (la
+ * documenta el bloque anti-spam de firestore.rules), así que no hay query que
+ * hacer — es un doc directo.
+ *
+ * IDEMPOTENCIA. Va en transacción y NO pisa un `linkId` existente. El trigger
+ * pasa por acá en `pending→active`, en `paused→active` y en `active→paused`,
+ * así que sobre el mismo chat se ejecuta varias veces. Si el par se desvinculó
+ * y volvió a vincularse, el chat conserva el linkId VIEJO a propósito: decidir
+ * la política de re-vinculación excede este arreglo, y pisar es la operación
+ * que no se puede deshacer.
+ *
+ * Si el chat no existe no se crea nada: cuando el par lo abra, el cliente lo
+ * va a estampar solo.
+ *
+ * @param app       - Admin SDK app.
+ * @param linkId    - trainer_links document ID; el valor a estampar.
+ * @param trainerId - uid del PF.
+ * @param athleteId - uid del alumno.
+ */
+async function backfillChatLinkId(
+  app: admin.app.App,
+  linkId: string,
+  trainerId: string,
+  athleteId: string,
+): Promise<void> {
+  const db = app.firestore();
+  const chatId = [trainerId, athleteId].sort().join("_");
+  const ref = db.collection("chats").doc(chatId);
+
+  const stamped = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) return "no-chat";
+
+    const existing = snap.get("linkId");
+    if (typeof existing === "string" && existing.length > 0) return "already";
+
+    tx.update(ref, { linkId });
+    return "stamped";
+  });
+
+  logger.info("notifyOnLinkChange: backfill de linkId", {
+    chatId,
+    linkId,
+    resultado: stamped,
+  });
+}
+
+/**
  * Pure handler extracted for jest testability.
  *
  * @param app       - Admin SDK app.
@@ -209,6 +276,19 @@ export async function notifyOnLinkChangeHandler(
     .catch((error: unknown) => {
       logger.warn("notifyOnLinkChange: mail enqueue failed", { linkId, error });
     });
+
+  // Con el vínculo vigente, el chat preexistente del par tiene que poder
+  // escribir. Mismo criterio best-effort que el mail: si el backfill falla, el
+  // push ya salió y no se lo lleva puesto.
+  if (afterStatus === "active" || afterStatus === "paused") {
+    await backfillChatLinkId(app, linkId, trainerId, athleteId)
+      .catch((error: unknown) => {
+        logger.warn("notifyOnLinkChange: backfill de linkId falló", {
+          linkId,
+          error,
+        });
+      });
+  }
 }
 
 /**

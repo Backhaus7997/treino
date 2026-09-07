@@ -20,19 +20,31 @@ class RoutineActionsNotifier extends AsyncNotifier<void> {
   Future<void> build() async {}
 
   /// Archiva [routineId] (soft-delete, ADR-USR-04) e invalida
-  /// [assignedRoutinesProvider] de [athleteId] para que la fila desaparezca
-  /// de "Activas" en el próximo fetch, más las cachés single-doc de la rutina
-  /// vía [invalidateRoutineById].
+  /// [assignedRoutinesByTrainerProvider] del par [trainerId]/[athleteId] para
+  /// que la fila desaparezca de "Activas" en el próximo fetch, más las cachés
+  /// single-doc de la rutina vía [invalidateRoutineById].
+  ///
+  /// ⚠️  [trainerId] NO es decorativo: es parte de la CLAVE del provider. El
+  /// listado del Coach Hub se mudó a `assignedRoutinesByTrainerProvider`
+  /// porque el `list` del PF necesita `assignedBy` en la query para que las
+  /// reglas lo puedan probar. Si esta invalidación siguiera pegándole a
+  /// `assignedRoutinesProvider(athleteId)` —la clave VIEJA— la llamada no
+  /// fallaría ni compilaría mal: simplemente invalidaría un provider que ya
+  /// nadie mira, y la rutina archivada seguiría en pantalla hasta recargar.
+  /// Un fallo silencioso, que es justo lo que AGENTS.md §11.1 prohíbe.
   ///
   /// Devuelve `true` en éxito, `false` si el repo tira una excepción — la UI
   /// decide cómo comunicar el error (snackbar).
   Future<bool> archive({
     required String routineId,
+    required String trainerId,
     required String athleteId,
   }) async {
     try {
       await ref.read(routineRepositoryProvider).archive(routineId);
-      ref.invalidate(assignedRoutinesProvider(athleteId));
+      ref.invalidate(assignedRoutinesByTrainerProvider(
+        (trainerId: trainerId, athleteId: athleteId),
+      ));
       // El listado no alcanza: los lectores one-shot de la rutina archivada
       // (`routineByIdProvider` / `visibleRoutineByIdProvider`) siguen
       // devolviendo el doc con `status: active` hasta que se reinicie el

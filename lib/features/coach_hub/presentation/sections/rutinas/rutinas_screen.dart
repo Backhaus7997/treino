@@ -20,6 +20,8 @@ import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
+import 'package:treino/features/workout/application/session_providers.dart'
+    show currentUidProvider;
 import 'package:treino/features/workout/domain/routine_status.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
 
@@ -193,7 +195,7 @@ final _rutinaViewModeProvider =
 /// con contador, ej. "SIN RUTINA · 5") hace falta conocer el estado y el
 /// conteo de TODOS los alumnos acá arriba, no fila por fila. Por eso este
 /// widget mira (`.watch`) `userPublicProfileProvider` y
-/// `assignedRoutinesProvider` una vez por alumno — sí, es un `.family`
+/// `assignedRoutinesByTrainerProvider` una vez por alumno — sí, es un `.family`
 /// provider por alumno en un loop en el padre, pero es la única forma de que
 /// el padre conozca todo antes de filtrar (mismo costo de red que antes,
 /// solo que leído un nivel más arriba).
@@ -208,6 +210,7 @@ class _RutinasRosterView extends ConsumerWidget {
     final filtro = ref.watch(_rutinaFiltroProvider);
     final query = ref.watch(_queryProvider).trim().toLowerCase();
     final viewMode = ref.watch(_rutinaViewModeProvider);
+    final trainerId = ref.watch(currentUidProvider) ?? '';
 
     final profileById = <String, UserPublicProfile?>{};
     final countById = <String, int?>{};
@@ -217,7 +220,9 @@ class _RutinasRosterView extends ConsumerWidget {
       profileById[athleteId] =
           ref.watch(userPublicProfileProvider(athleteId)).valueOrNull;
       countById[athleteId] = ref
-          .watch(assignedRoutinesProvider(athleteId))
+          .watch(assignedRoutinesByTrainerProvider(
+            (trainerId: trainerId, athleteId: athleteId),
+          ))
           .valueOrNull
           ?.where((r) => r.status == RoutineStatus.active)
           .length;
