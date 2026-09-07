@@ -1129,7 +1129,7 @@ class _RowActionsState extends ConsumerState<_RowActions> {
       ));
     }
     if (menuItems.isNotEmpty) {
-      buttons.add(PopupMenuButton<VoidCallback>(
+      buttons.add(TreinoPopupMenuButton<VoidCallback>(
         tooltip: l10n.coachHubAlumnosRowActionsA11y,
         icon: Icon(TreinoIcon.dotsThree,
             size: 18, color: widget.palette.textMuted),

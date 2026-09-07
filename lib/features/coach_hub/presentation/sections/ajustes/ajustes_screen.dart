@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_palette.dart';
@@ -11,6 +12,8 @@ import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/cuenta_tab.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/facturacion_tab.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/notificaciones_tab.dart';
+import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/apariencia_tab.dart';
+import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/seguridad_tab.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 
 /// Tabs internos de la sección «Configuración» (Ajustes) del Coach Hub web.
@@ -19,19 +22,23 @@ import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets
 /// cuenta vive en la app mobile (donde se crea la cuenta y donde aplican las
 /// políticas de las stores). Se puede reintroducir si se decide tener el flujo
 /// también en web.
-enum AjustesTab { cuenta, notificaciones, facturacion }
+enum AjustesTab { cuenta, notificaciones, facturacion, apariencia, seguridad }
 
 extension AjustesTabX on AjustesTab {
   String get label => switch (this) {
         AjustesTab.cuenta => 'Cuenta', // i18n: Fase W3
         AjustesTab.notificaciones => 'Notificaciones', // i18n: Fase W3
         AjustesTab.facturacion => 'Facturación TREINO', // i18n: Fase W3
+        AjustesTab.apariencia => 'Apariencia', // i18n: Fase W3
+        AjustesTab.seguridad => 'Seguridad', // i18n: Fase W3
       };
 
   IconData get icon => switch (this) {
         AjustesTab.cuenta => TreinoIcon.users,
         AjustesTab.notificaciones => TreinoIcon.bell,
         AjustesTab.facturacion => TreinoIcon.sidebarPagos,
+        AjustesTab.apariencia => TreinoIcon.appearance,
+        AjustesTab.seguridad => TreinoIcon.lock,
       };
 }
 
@@ -60,8 +67,8 @@ class AjustesScreen extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const CoachHubSectionHero(
-            title: 'Configuración', // i18n: Fase W3
-            subtitle: 'Cuenta · Negocio · Preferencias', // i18n: Fase W3
+            title: 'Mi cuenta', // i18n: Fase W3
+            subtitle: 'Perfil · Plan · Preferencias', // i18n: Fase W3
           ),
           const SizedBox(height: 20),
           Expanded(
@@ -111,6 +118,51 @@ class _SubNav extends StatelessWidget {
                 onTap: () => onSelect(tabs[i]),
               ),
             ),
+          const SizedBox(height: AppSpacing.s8),
+          Container(height: 1, color: AppPalette.of(context).border),
+          const SizedBox(height: AppSpacing.s8),
+          TreinoInteractiveState(
+            onTap: () => FirebaseAuth.instance.signOut(),
+            builder: (ctx, states) => AnimatedContainer(
+              key: const Key('ajustes_sign_out'),
+              duration: AppMotion.resolve(ctx, AppMotion.fast),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.s14,
+                vertical: AppSpacing.s12,
+              ),
+              decoration: BoxDecoration(
+                color: states.hovered
+                    ? AppPalette.of(ctx).danger.withValues(alpha: 0.08)
+                    : TreinoTransparentTokens.value,
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    TreinoIcon.signOut,
+                    size: 18,
+                    color: AppPalette.of(ctx).danger,
+                  ),
+                  const SizedBox(width: AppSpacing.s12),
+                  // `Expanded` y no un `Text` suelto: la sub-nav tiene ancho
+                  // fijo y el renglón se desbordaba 23 px. Un Row que no deja
+                  // ceder a nadie no se acomoda, se rompe — y en la app eso
+                  // sale como la franja amarilla y negra.
+                  Expanded(
+                    child: Text(
+                      'Cerrar sesión', // i18n: Fase W3
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontFamily: AppFonts.barlow,
+                        fontWeight: AppFonts.w600,
+                        color: AppPalette.of(ctx).danger,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -222,6 +274,8 @@ class _TabBody extends StatelessWidget {
         AjustesTab.cuenta => const CuentaTab(),
         AjustesTab.notificaciones => const NotificacionesTab(),
         AjustesTab.facturacion => const FacturacionTab(),
+        AjustesTab.apariencia => const AparienciaTab(),
+        AjustesTab.seguridad => const SeguridadTab(),
       },
     );
   }

@@ -20,8 +20,8 @@ import '../../../../core/widgets/treino_logo.dart';
 /// Sidebar del Coach Hub web (REQ-SH-001..006, ADR-SH-004).
 ///
 /// Renderiza `sidebarRegistry` agrupado por [SidebarGroup] con header por
-/// grupo (oculto al colapsar) y `Ajustes` pinneado al footer, junto al
-/// toggle dedicado y al perfil del usuario. Ancho animado
+/// grupo (oculto al colapsar). El toggle vive junto al wordmark y el perfil
+/// es el único acceso a la cuenta. Ancho animado
 /// 240↔72 px (`CoachHubLayoutTokens`). El estado colapsado viene de
 /// `sidebarCollapsedProvider`, gateado por `sharedPreferencesProvider`
 /// (optimistic-expanded mientras resuelve).
@@ -65,10 +65,6 @@ class CoachHubSidebar extends ConsumerWidget {
       if (items0.isNotEmpty) groups[group] = items0;
     }
     final groupEntries = groups.entries.toList();
-    final ajustesItems =
-        items.where((item) => item.group == SidebarGroup.ajustes).toList();
-    final ajustesItem = ajustesItems.isEmpty ? null : ajustesItems.first;
-
     var staggerIndex = 0;
 
     return AnimatedContainer(
@@ -89,7 +85,12 @@ class CoachHubSidebar extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _SidebarHeader(collapsed: collapsed),
+          _SidebarHeader(
+            collapsed: collapsed,
+            canToggle: canToggle,
+            onToggle: () =>
+                ref.read(sidebarCollapsedProvider.notifier).toggle(),
+          ),
           Container(height: 1, color: palette.border),
           Expanded(
             child: SingleChildScrollView(
@@ -118,12 +119,6 @@ class CoachHubSidebar extends ConsumerWidget {
           ),
           _SidebarFooter(
             collapsed: collapsed,
-            canToggle: canToggle,
-            onToggle: () =>
-                ref.read(sidebarCollapsedProvider.notifier).toggle(),
-            ajustesItem: ajustesItem,
-            ajustesActive:
-                ajustesItem != null && _isActive(location, ajustesItem.route),
           ),
         ],
       ),
@@ -137,17 +132,23 @@ class CoachHubSidebar extends ConsumerWidget {
 /// Header del sidebar: logotipo TREINO (REQ-SH-002). Oculto (sin texto)
 /// cuando el sidebar está colapsado.
 class _SidebarHeader extends StatelessWidget {
-  const _SidebarHeader({required this.collapsed});
+  const _SidebarHeader({
+    required this.collapsed,
+    required this.canToggle,
+    required this.onToggle,
+  });
 
   final bool collapsed;
+  final bool canToggle;
+  final VoidCallback onToggle;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       constraints: const BoxConstraints(minHeight: 60),
-      alignment: collapsed ? Alignment.center : Alignment.centerLeft,
+      alignment: Alignment.center,
       padding: EdgeInsets.symmetric(
-        horizontal: collapsed ? 0 : AppSpacing.s20,
+        horizontal: collapsed ? 0 : AppSpacing.s14,
       ),
       // El wordmark, no la palabra "TREINO" tipeada en Barlow Condensed.
       //
@@ -158,10 +159,24 @@ class _SidebarHeader extends StatelessWidget {
       // `TreinoLogo` es el mismo widget que usan welcome, splash, login y
       // register, y renderiza `assets/logo/treino_logo.svg`.
       child: collapsed
-          ? const SizedBox.shrink()
-          // En accent, no en el blanco por defecto: es el verde con el que la
-          // marca aparece en el resto de la app.
-          : TreinoLogo(size: 26, color: AppPalette.of(context).accent),
+          ? _ToggleButton(
+              collapsed: collapsed,
+              canToggle: canToggle,
+              onToggle: onToggle,
+            )
+          : Row(
+              children: [
+                // En accent, no en el blanco por defecto: es el verde con el
+                // que la marca aparece en el resto de la app.
+                TreinoLogo(size: 26, color: AppPalette.of(context).accent),
+                const Spacer(),
+                _ToggleButton(
+                  collapsed: collapsed,
+                  canToggle: canToggle,
+                  onToggle: onToggle,
+                ),
+              ],
+            ),
     );
   }
 }
@@ -320,22 +335,14 @@ class _Badge extends StatelessWidget {
   }
 }
 
-/// Footer del sidebar: Ajustes pinneado, toggle dedicado y perfil del
-/// usuario (REQ-SH-005/006, ADR-SH-004).
+/// Footer del sidebar: sólo el perfil del usuario. Cuenta no aparece también
+/// como item genérico: la fila con nombre y plan es su único entrypoint.
 class _SidebarFooter extends StatelessWidget {
   const _SidebarFooter({
     required this.collapsed,
-    required this.canToggle,
-    required this.onToggle,
-    required this.ajustesItem,
-    required this.ajustesActive,
   });
 
   final bool collapsed;
-  final bool canToggle;
-  final VoidCallback onToggle;
-  final SidebarItem? ajustesItem;
-  final bool ajustesActive;
 
   @override
   Widget build(BuildContext context) {
@@ -343,17 +350,6 @@ class _SidebarFooter extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (ajustesItem != null)
-          _SidebarItemRow(
-            item: ajustesItem!,
-            collapsed: collapsed,
-            active: ajustesActive,
-            delay: Duration.zero,
-            badgeCount: null,
-          ),
-        Container(height: 1, color: palette.border),
-        _ToggleRow(
-            collapsed: collapsed, canToggle: canToggle, onToggle: onToggle),
         Container(height: 1, color: palette.border),
         _ProfileRow(collapsed: collapsed),
       ],
@@ -363,8 +359,8 @@ class _SidebarFooter extends StatelessWidget {
 
 /// Botón dedicado de contraer/expandir — REQ-SH-006. Tooltip contextual
 /// (cambia según el estado actual).
-class _ToggleRow extends StatelessWidget {
-  const _ToggleRow({
+class _ToggleButton extends StatelessWidget {
+  const _ToggleButton({
     required this.collapsed,
     required this.canToggle,
     required this.onToggle,
@@ -380,7 +376,7 @@ class _ToggleRow extends StatelessWidget {
     final tooltip =
         collapsed ? 'Expandir menú' : 'Contraer menú'; // i18n: Fase W1
 
-    final button = Tooltip(
+    return Tooltip(
       message: tooltip,
       child: IconButton(
         key: const Key('sidebar_toggle_button'),
@@ -390,16 +386,6 @@ class _ToggleRow extends StatelessWidget {
         visualDensity: VisualDensity.compact,
         onPressed: canToggle ? onToggle : null,
       ),
-    );
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: collapsed
-          ? Center(child: button)
-          : Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s14),
-              child: Align(alignment: Alignment.centerLeft, child: button),
-            ),
     );
   }
 }

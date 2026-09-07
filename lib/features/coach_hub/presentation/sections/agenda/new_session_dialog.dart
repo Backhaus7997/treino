@@ -30,6 +30,7 @@ import '../../../../coach/domain/trainer_link_status.dart';
 import '../../../../profile/application/user_public_profile_providers.dart';
 import '../../../../workout/application/session_providers.dart'
     show currentUidProvider;
+import '../../widgets/coach_hub_widgets.dart';
 
 // ─── NewSessionDialog ─────────────────────────────────────────────────────────
 
@@ -535,25 +536,14 @@ class _AthleteDropdown extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return DropdownButtonFormField<String>(
+    return TreinoDropdown<String>(
       initialValue: selectedId,
       hint: Text(
         'Seleccioná un alumno', // i18n
         style: GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
       ),
-      dropdownColor: palette.bgCard,
-      style: GoogleFonts.barlow(fontSize: 14, color: palette.textPrimary),
       decoration: InputDecoration(
-        filled: true,
         fillColor: palette.bg,
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-          borderSide: BorderSide(color: palette.border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-          borderSide: BorderSide(color: palette.accent, width: 1.5),
-        ),
       ),
       items: links.map((link) {
         final profileAsync =
