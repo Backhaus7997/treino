@@ -34,6 +34,9 @@
  */
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
+import { DocumentData } from "firebase-admin/firestore";
+import { Messaging, MulticastMessage } from "firebase-admin/messaging";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
@@ -45,7 +48,7 @@ import {
 } from "../../cascade/appointments";
 import { notifyOnAppointmentHandler } from "../../notifications/notify-appointment";
 
-let testApp: admin.app.App;
+let testApp: App;
 
 beforeAll(() => {
   testApp = admin.initializeApp(
@@ -64,14 +67,14 @@ const athleteId = "athlete-cascade-notify-846";
 const trainerId = "trainer-cascade-notify-846";
 const apptIds = ["appt-cascade-notify-846-a", "appt-cascade-notify-846-b"];
 
-function makeMockMessaging(): admin.messaging.Messaging {
+function makeMockMessaging(): Messaging {
   return {
-    sendEachForMulticast: jest.fn(async (msg: admin.messaging.MulticastMessage) => ({
+    sendEachForMulticast: jest.fn(async (msg: MulticastMessage) => ({
       successCount: msg.tokens.length,
       failureCount: 0,
       responses: msg.tokens.map(() => ({ success: true, messageId: "id" })),
     })),
-  } as unknown as admin.messaging.Messaging;
+  } as unknown as Messaging;
 }
 
 function futureDate(): admin.firestore.Timestamp {
@@ -139,10 +142,10 @@ describe("#846 (secuela): el cascade REAL no dispara la notificación de cancela
 
   it("el write del cascade no llama a sendFcm ni encola mail", async () => {
     // El snapshot de ANTES, como lo entrega `event.data.before.data()`.
-    const before = new Map<string, admin.firestore.DocumentData>();
+    const before = new Map<string, DocumentData>();
     for (const id of apptIds) {
       const snap = await db().collection("appointments").doc(id).get();
-      before.set(id, snap.data() as admin.firestore.DocumentData);
+      before.set(id, snap.data() as DocumentData);
     }
 
     const { count } = await cancelFutureAppointments(testApp, athleteId);
@@ -156,7 +159,7 @@ describe("#846 (secuela): el cascade REAL no dispara la notificación de cancela
         testApp,
         id,
         before.get(id),
-        snap.data() as admin.firestore.DocumentData,
+        snap.data() as DocumentData,
         mock,
       );
     }
@@ -245,7 +248,7 @@ describe("#846: el guard no se puede forjar desde el cliente", () => {
   it("una cancelación con el motivo del cascade FORJADO en el log sí notifica", async () => {
     const id = apptIds[0];
     const ref = db().collection("appointments").doc(id);
-    const before = (await ref.get()).data() as admin.firestore.DocumentData;
+    const before = (await ref.get()).data() as DocumentData;
 
     // Exactamente el update parcial que manda `AppointmentRepository.cancel()`,
     // con el motivo del cascade metido en la entrada del log. Un cliente puede
@@ -261,7 +264,7 @@ describe("#846: el guard no se puede forjar desde el cliente", () => {
       }),
     });
 
-    const after = (await ref.get()).data() as admin.firestore.DocumentData;
+    const after = (await ref.get()).data() as DocumentData;
     // La clave que el guard mira NO está: ningún cliente la puede escribir.
     expect(after.reason).toBeUndefined();
 
@@ -273,10 +276,10 @@ describe("#846: el guard no se puede forjar desde el cliente", () => {
   });
 
   it("y el cascade LEGÍTIMO sigue sin notificar — la otra mitad de la pinza", async () => {
-    const before = new Map<string, admin.firestore.DocumentData>();
+    const before = new Map<string, DocumentData>();
     for (const id of apptIds) {
       before.set(id, (await db().collection("appointments").doc(id).get())
-        .data() as admin.firestore.DocumentData);
+        .data() as DocumentData);
     }
 
     await cancelFutureAppointments(testApp, athleteId);
@@ -288,7 +291,7 @@ describe("#846: el guard no se puede forjar desde el cliente", () => {
         testApp,
         id,
         before.get(id),
-        after as admin.firestore.DocumentData,
+        after as DocumentData,
         mock,
       );
     }

@@ -30,11 +30,13 @@
  */
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
+import { DocumentData } from "firebase-admin/firestore";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.GCLOUD_PROJECT = "treino-dev";
 
-let testApp: admin.app.App;
+let testApp: App;
 
 beforeAll(() => {
   testApp = admin.initializeApp({ projectId: "treino-dev" }, "sync-session-share-emulator-test");
@@ -70,7 +72,7 @@ function blockedBySweep(status: string, trainerId = TRAINER_A): Record<string, u
   });
 }
 
-async function getShare(): Promise<admin.firestore.DocumentData | undefined> {
+async function getShare(): Promise<DocumentData | undefined> {
   const snap = await db().collection("session_shares").doc(ATHLETE).get();
   return snap.exists ? snap.data() : undefined;
 }

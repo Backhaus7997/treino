@@ -44,11 +44,12 @@ jest.mock("firebase-functions", () => ({
 }));
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
 
 import { createFakeFirestore, FakeFirestoreState } from "./helpers/fake-tx-firestore";
 import { syncTrainerEntitlements } from "../subscriptions/sync-entitlements";
 
-const app = {} as admin.app.App;
+const app = {} as App;
 
 function install(seed: Partial<FakeFirestoreState>) {
   const { db, state } = createFakeFirestore(seed);

@@ -15,13 +15,15 @@
  */
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
+import { Messaging, MulticastMessage } from "firebase-admin/messaging";
 import { notifyOnChatMessageHandler } from "../notifications/notify-chat-message";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
 process.env.GCLOUD_PROJECT = "treino-dev";
 
-let testApp: admin.app.App;
+let testApp: App;
 
 beforeAll(() => {
   testApp = admin.initializeApp(
@@ -37,14 +39,14 @@ afterAll(async () => {
 const db = () => admin.firestore(testApp);
 
 /** Minimal mock messaging that tracks sendEachForMulticast calls. */
-function makeMockMessaging(): admin.messaging.Messaging {
+function makeMockMessaging(): Messaging {
   return {
-    sendEachForMulticast: jest.fn(async (msg: admin.messaging.MulticastMessage) => ({
+    sendEachForMulticast: jest.fn(async (msg: MulticastMessage) => ({
       successCount: msg.tokens.length,
       failureCount: 0,
       responses: msg.tokens.map(() => ({ success: true, messageId: "id" })),
     })),
-  } as unknown as admin.messaging.Messaging;
+  } as unknown as Messaging;
 }
 
 async function seedUser(uid: string, fcmTokens: string[]): Promise<void> {
@@ -101,7 +103,7 @@ describe("SCENARIO-629 + SCENARIO-680: new message → sendFcm called with recip
     await notifyOnChatMessageHandler(testApp, chatId, messageData, mock);
 
     expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
-    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as MulticastMessage;
     expect(callArg.tokens).toEqual(["trainer-token"]);
     expect(callArg.data?.kind).toBe("chat-message");
   });
@@ -116,7 +118,7 @@ describe("SCENARIO-629 + SCENARIO-680: new message → sendFcm called with recip
 
     await notifyOnChatMessageHandler(testApp, chatId, messageData, mock);
 
-    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as MulticastMessage;
     // athlete-token should NOT be in the token list
     expect(callArg.tokens).not.toContain("athlete-token");
   });
@@ -153,7 +155,7 @@ describe("SCENARIO-630 + SCENARIO-666: body truncation at 100 chars, total ≤ 2
 
     await notifyOnChatMessageHandler(testApp, chatId, messageData, mock);
 
-    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as MulticastMessage;
     const body = callArg.notification?.body ?? "";
     // Extract the text portion after "Sender Name: "
     const textPart = body.replace(/^[^:]+: /, "");
@@ -172,7 +174,7 @@ describe("SCENARIO-630 + SCENARIO-666: body truncation at 100 chars, total ≤ 2
 
     await notifyOnChatMessageHandler(testApp, chatId, messageData, mock);
 
-    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as MulticastMessage;
     const body = callArg.notification?.body ?? "";
     expect(body.length).toBeLessThanOrEqual(256);
   });
@@ -208,7 +210,7 @@ describe("SCENARIO-631: data.deepLink == /coach/chat/{chatId}?other={senderUid}"
 
     await notifyOnChatMessageHandler(testApp, chatId, messageData, mock);
 
-    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as MulticastMessage;
     expect(callArg.data?.deepLink).toBe(
       `/coach/chat/${chatId}?other=${senderUid}`,
     );
@@ -224,7 +226,7 @@ describe("SCENARIO-631: data.deepLink == /coach/chat/{chatId}?other={senderUid}"
 
     await notifyOnChatMessageHandler(testApp, chatId, messageData, mock);
 
-    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as MulticastMessage;
     expect(callArg.data?.senderId).toBe(senderUid);
   });
 });
@@ -292,7 +294,7 @@ describe("REQ-CHATMEDIA-012: media message notification bodies", () => {
 
     await notifyOnChatMessageHandler(testApp, chatId, messageData, mock);
 
-    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as MulticastMessage;
     expect(callArg.notification?.body).toBe("Sender: 📷 Foto");
   });
 
@@ -307,7 +309,7 @@ describe("REQ-CHATMEDIA-012: media message notification bodies", () => {
 
     await notifyOnChatMessageHandler(testApp, chatId, messageData, mock);
 
-    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as MulticastMessage;
     expect(callArg.notification?.body).toBe("Sender: 🎥 Video");
   });
 
@@ -322,7 +324,7 @@ describe("REQ-CHATMEDIA-012: media message notification bodies", () => {
 
     await notifyOnChatMessageHandler(testApp, chatId, messageData, mock);
 
-    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as MulticastMessage;
     expect(callArg.notification?.body).toBe("Sender: Look at this!");
   });
 
@@ -340,7 +342,7 @@ describe("REQ-CHATMEDIA-012: media message notification bodies", () => {
       notifyOnChatMessageHandler(testApp, chatId, messageData, mock),
     ).resolves.toBeUndefined();
 
-    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as MulticastMessage;
     // Body should be "Sender: " (senderName + empty displayText) — no crash
     expect(callArg.notification?.body).toBe("Sender: ");
   });

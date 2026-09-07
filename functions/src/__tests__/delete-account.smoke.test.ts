@@ -21,6 +21,7 @@
  */
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
 
 // Point Admin SDK to emulators — must be set before any firebase-admin import
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
@@ -53,7 +54,7 @@ const projectConfig = {
   storageBucket: "treino-dev.appspot.com",
 };
 
-let smokeApp: admin.app.App;
+let smokeApp: App;
 
 beforeAll(() => {
   smokeApp = admin.initializeApp(projectConfig, "smoke-test");

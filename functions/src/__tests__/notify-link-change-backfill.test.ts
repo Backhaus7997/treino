@@ -20,6 +20,8 @@
  */
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
+import { Messaging, MulticastMessage } from "firebase-admin/messaging";
 import { notifyOnLinkChangeHandler } from "../notifications/notify-link-change";
 
 // `??=` y no `=`: `emulators:exec` YA exporta estas variables apuntando a los
@@ -31,7 +33,7 @@ process.env.FIRESTORE_EMULATOR_HOST ??= "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST ??= "127.0.0.1:9099";
 process.env.GCLOUD_PROJECT ??= "treino-dev";
 
-let testApp: admin.app.App;
+let testApp: App;
 
 beforeAll(() => {
   testApp = admin.initializeApp(
@@ -53,16 +55,16 @@ afterAll(async () => {
 
 const db = () => admin.firestore(testApp);
 
-function makeMockMessaging(): admin.messaging.Messaging {
+function makeMockMessaging(): Messaging {
   return {
     sendEachForMulticast: jest.fn(
-      async (msg: admin.messaging.MulticastMessage) => ({
+      async (msg: MulticastMessage) => ({
         successCount: msg.tokens.length,
         failureCount: 0,
         responses: msg.tokens.map(() => ({ success: true, messageId: "id" })),
       }),
     ),
-  } as unknown as admin.messaging.Messaging;
+  } as unknown as Messaging;
 }
 
 /// Mismo criterio que `ChatRepository.chatIdFor`: uids ORDENADOS y unidos con

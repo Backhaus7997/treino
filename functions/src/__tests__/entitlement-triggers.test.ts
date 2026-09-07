@@ -43,6 +43,7 @@ jest.mock("../subscriptions/sync-entitlements", () => ({
 }));
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
 import { syncTrainerEntitlements } from "../subscriptions/sync-entitlements";
 import {
   subscriptionChanged,
@@ -116,7 +117,7 @@ describe("sweepEntitlementsHandler", () => {
       .mockResolvedValueOnce({ trainerId: "t2", limit: 7, blocked: [], unblocked: [], weightedLoad: 3, blockedAthleteIds: [] })
       .mockResolvedValueOnce({ trainerId: "t3", limit: 2, blocked: [], unblocked: ["L9"], weightedLoad: 2, blockedAthleteIds: [] });
 
-    const r = await sweepEntitlementsHandler({} as admin.app.App, 1000);
+    const r = await sweepEntitlementsHandler({} as App, 1000);
 
     expect(r).toEqual({ scanned: 3, changed: 2 });
     expect(mockSync).toHaveBeenCalledTimes(3);
@@ -128,7 +129,7 @@ describe("sweepEntitlementsHandler", () => {
       .mockRejectedValueOnce(new Error("doc corrupto"))
       .mockResolvedValueOnce({ trainerId: "sano", limit: 2, blocked: ["L1"], unblocked: [], weightedLoad: 2, blockedAthleteIds: ["a1"] });
 
-    const r = await sweepEntitlementsHandler({} as admin.app.App, 1000);
+    const r = await sweepEntitlementsHandler({} as App, 1000);
 
     expect(r).toEqual({ scanned: 2, changed: 1 });
   });
