@@ -12,7 +12,7 @@
 // - `status == pending && !busy` → botones Aceptar/Rechazar del kit
 //   (TreinoInteractiveState — NO ElevatedButton/TextButton core).
 // - cualquier otro `status` → pill de estado read-only (historial,
-//   ADR-F4-02: Aceptadas/Rechazadas no tienen acciones de gestión).
+//   ADR-F4-02: Aceptadas no tiene acciones de gestión).
 //
 // Reusa `TrainerLinkStatus` (no un enum propio) — la tarjeta es 1:1 con el
 // vínculo real. Keys preservadas para tests/evidencia:
@@ -239,8 +239,14 @@ class _SolicitudActionButton extends StatelessWidget {
   }
 }
 
-/// Pill de estado read-only para solicitudes ya resueltas (Aceptadas/
-/// Rechazadas, ADR-F4-02) — sin acciones, solo informativa.
+/// Pill de estado read-only para solicitudes ya resueltas (tab Aceptadas,
+/// ADR-F4-02) — sin acciones, solo informativa.
+///
+/// La rama `terminated` ('RECHAZADA') ya no la alcanza `InvitacionesScreen`:
+/// ningún tab matchea ese status desde que el rechazo dejó de persistirse.
+/// Se queda porque el switch sobre [TrainerLinkStatus] es exhaustivo, y
+/// porque la tarjeta es presentational y reusable — el día que otra pantalla
+/// la monte con un vínculo terminado, tiene que saber pintarlo.
 class _StatusPill extends StatelessWidget {
   const _StatusPill({required this.status, required this.palette});
 
