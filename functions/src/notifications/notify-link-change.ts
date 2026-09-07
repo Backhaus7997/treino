@@ -20,8 +20,6 @@
  */
 
 import * as admin from "firebase-admin";
-import { App } from "firebase-admin/app";
-import { Messaging } from "firebase-admin/messaging";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 import { sendFcm } from "./send-fcm";
@@ -29,7 +27,7 @@ import { enqueueMail } from "../mail/enqueue-mail";
 import { resolveAthleteName, resolveTrainerName } from "../mail/format";
 import { trainerEntry } from "../mail/templates";
 
-function getApp(): App {
+function getApp(): admin.app.App {
   try {
     return admin.app();
   } catch {
@@ -59,7 +57,7 @@ type LinkData = Record<string, unknown>;
  * @param beforeStatus - Previous status, to tell accept apart from resume.
  */
 async function enqueueLinkMail(
-  app: App,
+  app: admin.app.App,
   linkId: string,
   after: LinkData,
   afterStatus: string,
@@ -178,11 +176,11 @@ async function backfillChatLinkId(
  * @param messaging - Optional messaging instance for test injection.
  */
 export async function notifyOnLinkChangeHandler(
-  app: App,
+  app: admin.app.App,
   linkId: string,
   before: LinkData | undefined,
   after: LinkData | undefined,
-  messaging?: Messaging,
+  messaging?: admin.messaging.Messaging,
 ): Promise<void> {
   // Guard: document deleted — no notification.
   if (!after) {
