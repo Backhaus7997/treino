@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:treino/features/coach_hub/presentation/sections/agenda/agenda_week_view.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/domain/appointment.dart';
@@ -94,6 +95,73 @@ void main() {
 
   group('SCENARIO-101-A — Calendar renders in month view with appointment dots',
       () {
+    // ── El layout ANCHO usa la grilla de tiempo ───────────────────────────
+    //
+    // Los tests de abajo corren al viewport default (800 px), que cae en la
+    // rama angosta: ahí sigue viviendo el selector de fechas + lista del día,
+    // y por eso no cambiaron. Arriba de 900 px la pantalla pasa a la grilla,
+    // y esa rama no la cubría nadie.
+    testWidgets('a partir de 900 px se muestra la grilla de tiempo, no el '
+        'selector de fechas', (tester) async {
+      tester.view.physicalSize = const Size(1400, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        _wrap(const AgendaWebScreen(), overrides: _overrides()),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AgendaWeekView), findsOneWidget);
+      expect(find.byType(TableCalendar<dynamic>), findsNothing);
+    });
+
+    testWidgets('la barra de la grilla trae navegación y acciones',
+        (tester) async {
+      tester.view.physicalSize = const Size(1400, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        _wrap(const AgendaWebScreen(), overrides: _overrides()),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('agenda_prev')), findsOneWidget);
+      expect(find.byKey(const Key('agenda_next')), findsOneWidget);
+      expect(find.byKey(const Key('agenda_today')), findsOneWidget);
+      expect(find.text('Mis horarios'), findsOneWidget);
+      expect(find.text('Nueva sesión'), findsOneWidget);
+    });
+
+    testWidgets('la flecha mueve la semana y el título lo dice',
+        (tester) async {
+      tester.view.physicalSize = const Size(1400, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        _wrap(const AgendaWebScreen(), overrides: _overrides()),
+      );
+      await tester.pumpAndSettle();
+
+      final antes = tester
+          .widget<AgendaWeekView>(find.byType(AgendaWeekView))
+          .firstDay;
+
+      await tester.tap(find.byKey(const Key('agenda_next')));
+      await tester.pumpAndSettle();
+
+      final despues = tester
+          .widget<AgendaWeekView>(find.byType(AgendaWeekView))
+          .firstDay;
+
+      expect(despues.difference(antes).inDays, 7);
+    });
+
     testWidgets('TableCalendar is present and in month view by default',
         (tester) async {
       final appt = _appt();
