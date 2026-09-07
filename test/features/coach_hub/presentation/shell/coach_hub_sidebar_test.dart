@@ -27,7 +27,10 @@ Future<void> _pumpSidebar(
 }) async {
   SharedPreferences.setMockInitialValues(prefs);
   final sp = await SharedPreferences.getInstance();
-  final paths = sidebarRegistry.map((i) => i.route).toSet().toList();
+  final paths = {
+    ...sidebarRegistry.map((i) => i.route),
+    '/ajustes',
+  }.toList();
 
   final router = GoRouter(
     initialLocation: initial,
@@ -75,7 +78,7 @@ void main() {
     expect(find.byType(TreinoLogo), findsOneWidget);
 
     // W2 reduce 2026-07-02: el sidebar pasó a 2 grupos activos (GESTIÓN y
-    // RECURSOS) + Ajustes pinneado abajo. Reportes (grupo CUENTA) también
+    // RECURSOS). Cuenta se abre solamente desde la fila del perfil. Reportes
     // salió del registry — sin scope de producto todavía. Los grupos
     // legacy siguen existiendo en el enum para no romper items futuros
     // pero no se renderean porque no tienen items en el registry.
@@ -97,6 +100,7 @@ void main() {
     for (final item in sidebarRegistry) {
       expect(find.text(item.label), findsOneWidget, reason: item.label);
     }
+    expect(find.text('Ajustes'), findsNothing);
   });
 
   testWidgets(
@@ -175,7 +179,7 @@ void main() {
   });
 
   testWidgets(
-      'el toggle (botón dedicado en footer) contrae/expande al tocarlo — '
+      'el toggle (junto al wordmark) contrae/expande al tocarlo — '
       'REQ-SH-006', (tester) async {
     await _pumpSidebar(tester); // expandido
     expect(
@@ -196,6 +200,21 @@ void main() {
       72,
     );
     expect(find.byTooltip('Expandir menú'), findsOneWidget);
+  });
+
+  testWidgets('el toggle vive arriba, junto al wordmark', (tester) async {
+    await _pumpSidebar(tester);
+
+    final logoTop = tester.getTopLeft(find.byType(TreinoLogo)).dy;
+    final toggleTop = tester
+        .getTopLeft(find.byKey(const Key('sidebar_toggle_button')))
+        .dy;
+    final profileTop = tester
+        .getTopLeft(find.byKey(const Key('sidebar_profile_row')))
+        .dy;
+
+    expect((toggleTop - logoTop).abs(), lessThan(20));
+    expect(toggleTop, lessThan(profileTop));
   });
 
   testWidgets(

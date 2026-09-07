@@ -24,10 +24,26 @@
  * dejar que el PF elija cuanto pagar, y no hay validacion que arregle eso —
  * cualquier monto que "parezca razonable" tambien lo parece $1.
  *
- * ── El mail tampoco ──
+ * ── El mail SI puede venir del cliente, y esto cambio ──
  *
- * `payer_email` sale de `request.auth.token.email`, que lo firma Firebase Auth.
- * Un mail del cliente dejaria abrir suscripciones a nombre de otro.
+ * `payer_email` es REQUERIDO por MP para suscripciones sin plan asociado, y MP
+ * ata la suscripcion a ese mail: el que paga TIENE que estar logueado con el.
+ *
+ * La primera version lo sacaba de `request.auth.token.email` y no dejaba
+ * pisarlo. Eso rompia el caso normal: un PF que se registra en TREINO con
+ * `juan@gmail.com` pero cuyo Mercado Pago es `jperez@hotmail.com` no podia
+ * pagar NUNCA. No es un caso raro, es la mitad de la gente.
+ *
+ * Ahora el cliente puede mandar `payerEmail`, y el del token es el DEFAULT.
+ * Que eso no abre un agujero se ve pensando el peor caso: mandar el mail de un
+ * tercero hace que MP le mande la suscripcion A ESA PERSONA PARA QUE LA PAGUE
+ * —nadie cobra sin autorizar— y `external_reference` sigue llevando el uid de
+ * QUIEN PIDIO, asi que el plan se le acredita a quien corresponde. O sea que el
+ * "ataque" es pagarle la suscripcion a otro, que es un caso de uso (un gimnasio
+ * pagando por sus profes), no un abuso.
+ *
+ * Lo que sigue sin poder elegir el cliente es lo que cuesta plata: el MONTO
+ * (sale de `TIER_PRICES_ARS`) y A QUIEN se le acredita el plan (sale del token).
  */
 
 import * as admin from "firebase-admin";
@@ -101,6 +117,19 @@ function getApp(): admin.app.App {
   }
 }
 
+/**
+ * Forma de mail, y nada mas. NO se chequea que le pertenezca a quien llama, y
+ * es deliberado: pagar por otro es un caso de uso, no un abuso (ver el
+ * encabezado). Lo unico que evita esta funcion es mandarle basura a MP y
+ * comerse un 400 opaco.
+ */
+function esMailValido(raw: unknown): boolean {
+  if (typeof raw !== "string") return false;
+  const v = raw.trim();
+  return v.length > 3 && v.length <= 254 &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+}
+
 /** `unknown` → un miembro de la union, o `null`. Nunca un cast a ciegas. */
 function parseTier(raw: unknown): SubscriptionTier | null {
   return typeof raw === "string" &&
@@ -119,17 +148,28 @@ function parseCycle(raw: unknown): SubscriptionCycle | null {
  * El handler. Todo lo que decide entra por parametro: el uid y el mail ya
  * verificados, la entrada cruda, y las dependencias.
  *
- * Recibe `uid` y `email` YA extraidos del token y no el `request` entero para
+ * [emailDelToken] es el DEFAULT del pagador, no una imposicion: si el cliente
+ * manda `payerEmail` valido, gana ese. Ver el encabezado.
+ *
+ * Recibe `uid` y `emailDelToken` YA extraidos del token y no el `request` entero para
  * que sea imposible leer del body algo que tiene que salir del token.
  */
 export async function runCreatePreapproval(
   app: admin.app.App,
   uid: string,
-  email: string,
+  emailDelToken: string,
   raw: unknown,
   deps: CreatePreapprovalDeps,
 ): Promise<CreatePreapprovalResult> {
   const body = (raw ?? {}) as Record<string, unknown>;
+
+  // El mail del pagador: el del cliente si es valido, si no el del token.
+  // Validacion de FORMA, no de propiedad — no verificamos que sea suyo, y no
+  // hace falta: ver el encabezado. Lo unico que se evita es mandarle basura a
+  // MP y comerse un 400 opaco.
+  const payerEmail = esMailValido(body.payerEmail)
+    ? (body.payerEmail as string).trim()
+    : emailDelToken;
 
   const tier = parseTier(body.tier);
   if (!tier) {
@@ -205,7 +245,7 @@ export async function runCreatePreapproval(
     creado = await deps.mpClient.createPreapproval({
       reason: `TREINO — ${tier} (${cycle === "annual" ? "anual" : "mensual"})`,
       externalReference: uid,
-      payerEmail: email,
+      payerEmail,
       backUrl: BACK_URL,
       transactionAmount: amount,
       frequencyMonths: frequencyMonthsFor(cycle),
@@ -270,8 +310,9 @@ export const createPreapproval = functions.onCall(
   // ahi. Con el flag puesto, todo checkout desde la web seria rechazado.
   //
   // La cerradura es otra: `request.auth`, el rol leido del documento, y el
-  // hecho de que ni el monto ni el mail ni la URL de retorno vengan del
-  // cliente.
+  // hecho de que ni el MONTO ni la URL de retorno vengan del cliente. El mail
+  // del pagador SI puede venir —ver el encabezado—; lo que no puede elegir es
+  // cuanto paga ni a quien se le acredita el plan.
   {
     region: "southamerica-east1",
     secrets: [MP_ACCESS_TOKEN],
@@ -280,11 +321,11 @@ export const createPreapproval = functions.onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "hay que estar logueado");
     }
-    const email = request.auth.token.email;
-    if (typeof email !== "string" || email === "") {
-      // MP exige un mail de pagador. Sin uno verificado por Firebase Auth no
-      // se abre nada: el fallback obvio —pedirselo al cliente— es justo el
-      // agujero que este chequeo cierra.
+    const emailDelToken = request.auth.token.email;
+    if (typeof emailDelToken !== "string" || emailDelToken === "") {
+      // Sin mail en el token no hay DEFAULT que ofrecer. El cliente igual
+      // puede mandar `payerEmail`, pero si tampoco lo manda no hay con que
+      // llenar un campo que MP exige — y fallar acá es mejor que un 400 de MP.
       throw new HttpsError(
         "failed-precondition",
         "la cuenta no tiene un mail asociado",
@@ -294,7 +335,7 @@ export const createPreapproval = functions.onCall(
     return runCreatePreapproval(
       getApp(),
       request.auth.uid,
-      email,
+      emailDelToken,
       request.data,
       {
         mpClient: createMpClient(MP_ACCESS_TOKEN.value()),

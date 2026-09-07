@@ -103,8 +103,8 @@ Future<void> _pump(WidgetTester tester, List<Routine> routines) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
-        assignedRoutinesProvider(_athleteId)
-            .overrideWith((ref) async => routines),
+        assignedRoutinesByTrainerProvider
+            .overrideWith((ref, key) async => routines),
         userPublicProfileProvider(_athleteId).overrideWith(
           (ref) => Stream.value(
             const UserPublicProfile(uid: _athleteId, displayName: 'Vicente'),
@@ -135,8 +135,8 @@ Future<void> _pumpWithFuture(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
-        assignedRoutinesProvider(_athleteId)
-            .overrideWith((ref) => futureFactory()),
+        assignedRoutinesByTrainerProvider
+            .overrideWith((ref, key) => futureFactory()),
         userPublicProfileProvider(_athleteId).overrideWith(
           (ref) => Stream.value(
             const UserPublicProfile(uid: _athleteId, displayName: 'Vicente'),
@@ -169,8 +169,8 @@ Future<void> _pumpWithRepo(
     ProviderScope(
       overrides: [
         routineRepositoryProvider.overrideWithValue(mockRepo),
-        assignedRoutinesProvider(_athleteId)
-            .overrideWith((ref) async => routinesOf()),
+        assignedRoutinesByTrainerProvider
+            .overrideWith((ref, key) async => routinesOf()),
         userPublicProfileProvider(_athleteId).overrideWith(
           (ref) => Stream.value(
             const UserPublicProfile(uid: _athleteId, displayName: 'Vicente'),

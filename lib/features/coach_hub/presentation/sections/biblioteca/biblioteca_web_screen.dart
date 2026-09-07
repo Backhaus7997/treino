@@ -21,9 +21,18 @@ import 'package:treino/features/workout/application/routine_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
 
+import '../../shell/responsive.dart' as rsp;
 import 'providers/biblioteca_providers.dart';
+import 'widgets/exercise_detail_panel.dart';
 import 'widgets/ejercicios_tab.dart';
 import 'widgets/templates_tab.dart';
+
+/// Proporción del ancho disponible que ocupa el drawer de detalle.
+///
+/// Un cuarto de pantalla, como se pidió. Al superponerse no le saca ancho a la
+/// grilla, asi que —a diferencia del layout anterior— no hace falta ningun piso
+/// de ancho para que el detalle pueda aparecer.
+const double kBibliotecaDrawerFraction = 0.25;
 
 /// Sección Biblioteca del Coach Hub web.
 ///
@@ -82,7 +91,7 @@ class _BibliotecaWebScreenState extends ConsumerState<BibliotecaWebScreen>
       'Templates Rutinas · $templatesN', // i18n
     ];
 
-    return Column(
+    final columna = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // ── Section header + subtítulo honesto ──────────────────────────────
@@ -138,6 +147,59 @@ class _BibliotecaWebScreenState extends ConsumerState<BibliotecaWebScreen>
           ),
         ),
       ],
+    );
+
+    // El drawer se hospeda ACA y no adentro del tab a proposito: pedido
+    // explicito de que ocupe todo el alto. Adentro del `TabBarView` arranca
+    // abajo del hero y del TabBar, y se quedaba 193 px corto.
+    final seleccion = ref.watch(bibliotecaSelectedExerciseProvider);
+    final esDesktop = rsp.viewportFor(MediaQuery.sizeOf(context).width) ==
+        rsp.Viewport.desktop;
+    if (seleccion == null || !esDesktop) return columna;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final anchoDrawer = (constraints.maxWidth * kBibliotecaDrawerFraction)
+            .clamp(kExerciseDetailPanelMinWidth, constraints.maxWidth);
+
+        return Stack(
+          children: [
+            Positioned.fill(child: columna),
+            Positioned(
+              top: 0,
+              bottom: 0,
+              right: 0,
+              width: anchoDrawer,
+              // Entra deslizando desde el borde derecho. La key es constante a
+              // proposito: asi anima al abrir, y al pasar de un ejercicio a
+              // otro el contenido se reemplaza en el lugar en vez de salir y
+              // volver a entrar.
+              child: TweenAnimationBuilder<double>(
+                key: const ValueKey('biblioteca_drawer_slide'),
+                tween: Tween<double>(begin: 1, end: 0),
+                duration: AppMotion.resolve(context, AppMotion.base),
+                curve: AppMotion.standard,
+                builder: (context, t, child) => FractionalTranslation(
+                  translation: Offset(t, 0),
+                  child: child,
+                ),
+                child: ExerciseDetailPanel(
+                  key: const Key('biblioteca_detail_panel'),
+                  width: anchoDrawer,
+                  exerciseId: seleccion.exerciseId,
+                  ownerId: seleccion.ownerId,
+                  exerciseName: seleccion.exerciseName,
+                  onClose: () {
+                    ref
+                        .read(bibliotecaSelectedExerciseProvider.notifier)
+                        .state = null;
+                  },
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

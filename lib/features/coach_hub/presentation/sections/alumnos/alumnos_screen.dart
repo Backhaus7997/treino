@@ -733,7 +733,7 @@ class _EstadoBadge extends StatelessWidget {
 }
 
 /// Celda «Rutina»: chip compacto (dot + label) que deriva su estado de
-/// `assignedRoutinesProvider(athleteId)` — "Activa" si el alumno tiene al
+/// `assignedRoutinesByTrainerProvider` — "Activa" si el alumno tiene al
 /// menos una rutina con `status == active` asignada, "Sin rutina" en
 /// cualquier otro caso (incluye loading/error, `valueOrNull` — mismo
 /// criterio "barato" que la celda de último entreno). Tap navega al detalle
@@ -749,8 +749,13 @@ class _RutinaCell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final routines =
-        ref.watch(assignedRoutinesProvider(athleteId)).valueOrNull ?? const [];
+    final trainerId = ref.watch(currentUidProvider) ?? '';
+    final routines = ref
+            .watch(assignedRoutinesByTrainerProvider(
+              (trainerId: trainerId, athleteId: athleteId),
+            ))
+            .valueOrNull ??
+        const [];
     final activa = routines.any((r) => r.status == RoutineStatus.active);
     return _TappableDotLabel(
       color: activa ? palette.accent : palette.textMuted,
@@ -1124,7 +1129,7 @@ class _RowActionsState extends ConsumerState<_RowActions> {
       ));
     }
     if (menuItems.isNotEmpty) {
-      buttons.add(PopupMenuButton<VoidCallback>(
+      buttons.add(TreinoPopupMenuButton<VoidCallback>(
         tooltip: l10n.coachHubAlumnosRowActionsA11y,
         icon: Icon(TreinoIcon.dotsThree,
             size: 18, color: widget.palette.textMuted),

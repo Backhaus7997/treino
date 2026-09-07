@@ -189,6 +189,68 @@ configuración.
 cd scripts && npm install   # firebase-admin
 ```
 
+#### 🔒 `firebase-admin` está clavado en 13.x, y no es por comodidad
+
+**v14 borra la API contra la que están escritos estos scripts.** El root export
+de `firebase-admin@14` son once símbolos —`initializeApp`, `getApp`, `getApps`,
+`deleteApp`, `applicationDefault`, `cert`, `refreshToken`, `FirebaseError`,
+`FirebaseAppError`, `AppErrorCode`, `SDK_VERSION`— y la API namespaced quedó
+afuera entera:
+
+| API | v13 | v14 |
+| --- | --- | --- |
+| `admin.apps` / `admin.app()` | ✅ | ❌ `undefined` |
+| `admin.credential.cert` / `.applicationDefault` | ✅ | ❌ `undefined` |
+| `admin.firestore()` / `.Timestamp` / `.FieldValue` | ✅ | ❌ `undefined` |
+| `admin.auth()` | ✅ | ❌ `undefined` |
+| `admin.storage()` | ✅ | ❌ `undefined` |
+
+Los scripts de este directorio usan esa API en **89 lugares repartidos en 48
+archivos**. Con 14.3.0 instalada no arranca ninguno: `lib/admin.js` muere en la
+línea 86, que es la PRIMERA que toca el SDK.
+
+```sh
+# La lista, para no confiar en el número:
+rg -o 'admin\.(firestore|auth|storage|credential|app|apps)\b' --glob '*.js' --glob '*.mjs' scripts/ | rg -v '/test/' | wc -l
+```
+
+Ya se mergeó dos veces (`cac2d6fa` y `de77562a`/#901) y las dos veces pasó
+inadvertido, por dos motivos que se tapaban entre sí:
+
+1. **El job `scripts-test` de CI no instalaba nada.** Iba directo a
+   `npm --prefix scripts test`. Medido el 2026-09-07: con `scripts/node_modules`
+   borrado la suite daba **469/469 en verde**. CI validaba 469 cosas sobre un
+   paquete que jamás descargaba.
+2. **Los tests que cargan scripts de verdad usan el stub**
+   (`test/fixtures/stub_firebase_admin.js`), que devuelve un `firebase-admin` de
+   mentira. Correcto para lo que ese fixture prueba, pero significa que la suite
+   no podía ver la superficie real del SDK.
+
+Las dos cosas están cerradas: el job ahora corre `npm ci`, y
+`test/firebase_admin_superficie.test.js` hace el único
+`require('firebase-admin')` sin stub de toda la suite y **extrae del código** la
+lista de APIs a chequear, así que cubre también los scripts que todavía no
+existen. Y `.github/dependabot.yml` tiene un `ignore` de majors para
+`firebase-admin` en `/scripts`.
+
+**Subir a 14 no es cambiar el número del `package.json`**: es migrar los 48
+archivos a los subpaths modulares (`firebase-admin/firestore`, `/auth`,
+`/storage`). Hasta entonces, el rojo de ese test es la respuesta correcta.
+
+**Lo que cuesta el candado, medido y no estimado** (`npm audit`, 2026-09-07):
+
+| | moderate | high | critical |
+| --- | --- | --- | --- |
+| `firebase-admin@14.3.0` | 6 | 0 | 0 |
+| `firebase-admin@13.10.0` ← el candado | **8** | 0 | 0 |
+
+Son **dos moderate de más**, las dos transitivas y las dos de la misma familia
+`gaxios`/`teeny-request`/`uuid` que ya arrastran las dos versiones:
+`@google-cloud/firestore` y `google-gax`. Ni high ni critical de ningún lado. Va
+escrito acá porque un candado de dependencia que no dice qué cuesta es la clase
+de mensaje tranquilizador que este repo aprendió a no escribir (AGENTS.md §11.1):
+el precio existe, es chico, y quien lo quiera revisar tiene el comando arriba.
+
 ---
 
 ## Lo que sólo puede hacer un humano (#834)
@@ -584,10 +646,19 @@ alguno de ellos empieza a tocar Storage.
 
 Los tests del cableado —que cada script llame al guard, y que lo llame antes de
 tocar Storage— están en `test/storage_scripts_destination.test.js`. Corren con
-`firebase-admin` stubbeado, cero red y sin `node_modules`:
-`npm --prefix scripts test`. Los corre el job **`Scripts Test (scripts/test)`**
-de `.github/workflows/ci.yml`, así que borrar una línea de cableado pone el PR
-en rojo — antes de ese job la suite entera dependía de que alguien se acordara.
+`firebase-admin` stubbeado y cero red: `npm --prefix scripts test`. Los corre el
+job **`Scripts Test (scripts/test)`** de `.github/workflows/ci.yml`, así que
+borrar una línea de cableado pone el PR en rojo — antes de ese job la suite
+entera dependía de que alguien se acordara.
+
+⚠️ **Que anden sin `node_modules` es una propiedad del stub, no una virtud de la
+suite, y durante un tiempo estuvo escrito acá como si fuera lo segundo.** Esa
+frase describía un agujero: el job de CI no instalaba nada, así que ningún test
+podía observar el `firebase-admin` real y dependabot lo subió a una major que
+mata los 44 scripts sin que nada se pusiera rojo (dos veces). Hoy el job corre
+`npm ci` antes de la suite, y `test/firebase_admin_superficie.test.js` es el
+único test que carga el SDK de verdad — si tira `MODULE_NOT_FOUND`, alguien le
+sacó el install al job. Ver el candado de `firebase-admin` más arriba.
 
 El stub (`test/fixtures/stub_firebase_admin.js`) tapa los **dos** caminos de
 carga, porque los scripts de `migrations/` son `.mjs` y su `import` no pasa por

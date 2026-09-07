@@ -35,6 +35,7 @@ import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/chat/widgets/avatar_color.dart';
 import 'package:treino/features/coach_hub/presentation/sections/chat/widgets/chat_detail_pane.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/gyms/application/gym_providers.dart';
 import 'package:treino/features/insights/domain/chart_period.dart';
 import 'package:treino/features/insights/presentation/widgets/daily_heatmap_section.dart';
@@ -688,7 +689,9 @@ class _ResumenTab extends ConsumerWidget {
     final trainerUid = ref.watch(currentUidProvider);
     final sessionsAsync = ref.watch(sessionsByUidProvider(athleteId));
     final measAsync = ref.watch(measurementsForAthleteProvider(athleteId));
-    final routinesAsync = ref.watch(assignedRoutinesProvider(athleteId));
+    final routinesAsync = ref.watch(assignedRoutinesByTrainerProvider(
+      (trainerId: trainerUid ?? '', athleteId: athleteId),
+    ));
 
     // El resumen combina tres fuentes async: spinner hasta que las tres tengan
     // valor, y un único error si alguna falla. Si leyéramos routines/measurements
@@ -1717,7 +1720,8 @@ class _PagosTab extends ConsumerWidget {
 }
 
 /// Tab Entrenamiento (W2 PR3): rutina activa + historial de sesiones + evolución
-/// por ejercicio. Reusa `assignedRoutinesProvider`, `sessionsByUidProvider`,
+/// por ejercicio. Reusa `assignedRoutinesByTrainerProvider`,
+/// `sessionsByUidProvider`,
 /// `athleteExerciseListProvider` y `exerciseProgressionProvider`.
 class _EntrenamientoTab extends ConsumerWidget {
   const _EntrenamientoTab({required this.athleteId});
@@ -1727,7 +1731,9 @@ class _EntrenamientoTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final trainerUid = ref.watch(currentUidProvider);
-    final routinesAsync = ref.watch(assignedRoutinesProvider(athleteId));
+    final routinesAsync = ref.watch(assignedRoutinesByTrainerProvider(
+      (trainerId: trainerUid ?? '', athleteId: athleteId),
+    ));
     final sessionsAsync = ref.watch(sessionsByUidProvider(athleteId));
 
     return SingleChildScrollView(
@@ -5434,7 +5440,7 @@ class _NuevaEntradaSeguimientoDialogState
                   ),
                 ),
                 const SizedBox(height: 16),
-                DropdownButtonFormField<FollowUpTag>(
+                TreinoDropdown<FollowUpTag>(
                   initialValue: _tag,
                   onChanged: (v) {
                     if (v != null) setState(() => _tag = v);
@@ -5442,15 +5448,7 @@ class _NuevaEntradaSeguimientoDialogState
                   decoration: InputDecoration(
                     labelText: 'Categoría', // i18n: Fase W2
                     labelStyle: TextStyle(color: palette.textMuted),
-                    filled: true,
-                    fillColor: palette.bgCard,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: palette.border),
-                    ),
                   ),
-                  style: TextStyle(color: palette.textPrimary, fontSize: 14),
-                  dropdownColor: palette.bgCard,
                   items: [
                     for (final t in FollowUpTag.values)
                       DropdownMenuItem(

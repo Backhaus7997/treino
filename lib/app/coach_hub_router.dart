@@ -30,6 +30,7 @@ import '../features/coach_hub/presentation/sections/rutinas/routes.dart';
 import '../features/coach_hub/presentation/sections/suplementos/routes.dart';
 import '../features/coach_hub/presentation/sections/templates/routes.dart';
 import '../features/coach_hub/presentation/shell/coach_hub_scaffold.dart';
+import '../features/coach_hub/presentation/shell/content_max_width.dart';
 import '../features/profile/application/user_providers.dart';
 import '../features/profile/domain/user_role.dart';
 
@@ -55,7 +56,9 @@ const _coachHubPublicRoutes = {'/login'};
 /// plano, y eso no es un detalle: esta función lo APAGA (`box.value = null`)
 /// apenas el gate de abajo lo consulta — no solo cuando produce un path
 /// no-nulo. Sin esa distinción quedaba un bug real, encontrado en revisión:
-/// "Salir" (`coach_hub_top_bar.dart`) es `FirebaseAuth.signOut()` puro, SIN
+/// "Cerrar sesión" (`sections/ajustes/ajustes_screen.dart`, antes en el top
+/// bar, que dejó de tener menú propio cuando los tres accesos a cuenta se
+/// unificaron en uno) es `FirebaseAuth.signOut()` puro, SIN
 /// reload de página, así que `isPublic` (`location == '/login'`) SÍ vuelve
 /// a ser cierto dentro de la MISMA pestaña en cuanto alguien cierra sesión.
 /// Con un valor plano, el PF (u otro PF, en una compu compartida) que se
@@ -238,7 +241,10 @@ GoRouter buildCoachHubRouter({
       ),
       ShellRoute(
         pageBuilder: (ctx, state, child) => NoTransitionPage(
-          child: CoachHubScaffold(child: child),
+          child: CoachHubScaffold(
+            contentMaxWidth: contentMaxWidthForRoute(state.uri.path),
+            child: child,
+          ),
         ),
         routes: _signedInRoutes,
       ),

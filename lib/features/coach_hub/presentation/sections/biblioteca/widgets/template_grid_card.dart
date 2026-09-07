@@ -13,6 +13,7 @@ import 'package:treino/features/coach_hub/presentation/sections/biblioteca/widge
 import 'package:treino/features/coach_hub/presentation/widgets/treino_interactive_state.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/workout/domain/routine.dart';
+import 'package:treino/features/workout/domain/routine_visibility.dart';
 
 /// Grid card for a trainer template in the Biblioteca web section.
 ///
@@ -21,6 +22,9 @@ import 'package:treino/features/workout/domain/routine.dart';
 /// - Template name (bold, maxLines 2).
 /// - "N días/sem · N semanas" subtitle (from routine.days.length + numWeeks).
 /// - Level chip (routine.level.displayNameEs).
+/// - Badge PUBLICADA cuando `visibility == public` — sólo el estado publicado
+///   lleva marca, igual que en la card del teléfono. Publicar/despublicar se
+///   hace desde el editor, no desde acá.
 /// - NO "alumnos" count (not denormalized — REQ-BIBW-09).
 ///
 /// Hover/press vía [TreinoInteractiveState] (fuente única de verdad,
@@ -112,8 +116,27 @@ class TemplateGridCard extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              // ── Level chip ───────────────────────────────────────────────────
-              _LevelChip(label: routine.level.displayNameEs, palette: palette),
+              // ── Nivel + estado de publicación ────────────────────────────────
+              // Wrap y no Row: la card real mide ~360px pero se monta más
+              // angosta en tests y en pantallas chicas, y dos pastillas en una
+              // fila rígida desbordan. Espaciado FIJO —nada de spaceBetween
+              // repartiendo el ancho sobrante.
+              Wrap(
+                spacing: AppSpacing.s8,
+                runSpacing: AppSpacing.hairline,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  _LevelChip(
+                    label: routine.level.displayNameEs,
+                    palette: palette,
+                  ),
+                  // Sólo el estado publicado lleva marca, igual que en la card
+                  // del teléfono: "no publicada" es lo normal y no merece
+                  // ruido visual. El control para cambiarlo vive en el editor.
+                  if (routine.visibility == RoutineVisibility.public)
+                    _PublishedBadge(palette: palette),
+                ],
+              ),
             ],
           ),
         );
@@ -123,6 +146,50 @@ class TemplateGridCard extends StatelessWidget {
 }
 
 // ── Private helpers ───────────────────────────────────────────────────────────
+
+/// Marca de "esta plantilla está en el catálogo de la comunidad".
+///
+/// Mismo tratamiento que el badge del bloque PUBLICACIÓN del editor web y que
+/// el del teléfono (`trainer_workout_view.dart`): globo + PUBLICADA en acento.
+/// Pastilla tintada y NO acento sólido: sobre `accent` como fondo el texto
+/// necesitaría `TreinoButtonTokens.foreground`, porque `palette.bg` sobre
+/// acento da 1.57:1 en el tema claro (AGENTS.md §2).
+class _PublishedBadge extends StatelessWidget {
+  const _PublishedBadge({required this.palette});
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.s8,
+        vertical: AppSpacing.hairline,
+      ),
+      decoration: BoxDecoration(
+        color: palette.accent.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        border: Border.all(color: palette.accent.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(TreinoIcon.globe, size: 11, color: palette.accent),
+          const SizedBox(width: AppSpacing.hairline),
+          Text(
+            'PUBLICADA', // i18n
+            style: TextStyle(
+              fontFamily: AppFonts.barlowCondensed,
+              fontWeight: AppFonts.w700,
+              fontSize: 10,
+              color: palette.accent,
+              letterSpacing: 0.8,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _LevelChip extends StatelessWidget {
   const _LevelChip({required this.label, required this.palette});

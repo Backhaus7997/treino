@@ -9,9 +9,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_motion.dart';
+import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/features/coach_hub/presentation/sections/biblioteca/biblioteca_web_screen.dart';
+import 'package:treino/features/coach_hub/presentation/sections/biblioteca/widgets/biblioteca_filter_chips.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/workout/application/custom_exercise_providers.dart';
@@ -105,7 +107,7 @@ Widget _wrap() {
 /// Wraps BibliotecaWebScreen with resolved (non-loading) providers so the
 /// counts settle to real values — 2 catalog + 1 custom = 3 ejercicios,
 /// 2 templates.
-Widget _wrapWithData() {
+Widget _wrapWithData({ThemeData? theme}) {
   return ProviderScope(
     overrides: [
       currentUidProvider.overrideWithValue(_kTrainerId),
@@ -118,7 +120,7 @@ Widget _wrapWithData() {
       ),
     ],
     child: MaterialApp(
-      theme: AppTheme.dark(),
+      theme: theme ?? AppTheme.dark(),
       home: const Scaffold(
         body: BibliotecaWebScreen(),
       ),
@@ -126,9 +128,26 @@ Widget _wrapWithData() {
   );
 }
 
+void _setSurfaceSize(WidgetTester tester, double width) {
+  tester.view.physicalSize = Size(width, 900);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+}
+
+Finder _inside(Key hostKey, Finder matching) => find.descendant(
+      of: find.byKey(hostKey),
+      matching: matching,
+    );
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 void main() {
+  // AppTheme.* toca GoogleFonts. Si algun ThemeData llegara a construirse
+  // fuera del cuerpo de un testWidgets, sin esto revienta con "Binding has
+  // not yet been initialized" antes de la primera asercion.
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   setUp(() {
     TestWidgetsFlutterBinding.ensureInitialized();
   });
@@ -252,6 +271,121 @@ void main() {
       expect(find.byType(Tab), findsNWidgets(2));
       expect(find.byType(Scaffold), findsOneWidget);
       expect(find.byType(SafeArea), findsNothing);
+    });
+  });
+
+  group('Biblioteca Ejercicios — layout responsivo', () {
+    const filtersKey = Key('biblioteca_filter_column');
+    const gridKey = Key('biblioteca_exercise_grid');
+    const panelKey = Key('biblioteca_detail_panel');
+
+    testWidgets('desktop: los filtros van a la DERECHA de la grilla',
+        (tester) async {
+      _setSurfaceSize(tester, 1512);
+      await tester.pumpWidget(_wrapWithData());
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(filtersKey), findsOneWidget);
+      expect(find.byKey(gridKey), findsOneWidget);
+      expect(
+        tester.getCenter(find.byKey(filtersKey)).dx,
+        greaterThan(tester.getCenter(find.byKey(gridKey)).dx),
+        reason: 'mismo lado que el picker del editor de rutinas: la lista '
+            'auxiliar a la derecha, el contenido al centro',
+      );
+    });
+
+    testWidgets(
+        'desktop angosto (1512): tocar una card abre el drawer, NO el modal',
+        (tester) async {
+      // 1512 es un MacBook Pro de 14 pulgadas. El diseño anterior exigía 1528
+      // de SECCION —o sea ~1768 de viewport con el sidebar expandido— asi que
+      // en la maquina del dueño del producto el panel no aparecia nunca.
+      _setSurfaceSize(tester, 1512);
+      await tester.pumpWidget(_wrapWithData());
+      await tester.pumpAndSettle();
+
+      await tester.tap(_inside(gridKey, find.text('Press de Banca')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(panelKey), findsOneWidget);
+      expect(find.byType(TreinoDialog), findsNothing);
+    });
+
+    testWidgets('el drawer mide un cuarto del ancho y va pegado a la derecha',
+        (tester) async {
+      _setSurfaceSize(tester, 1600);
+      await tester.pumpWidget(_wrapWithData());
+      await tester.pumpAndSettle();
+
+      await tester.tap(_inside(gridKey, find.text('Press de Banca')));
+      await tester.pumpAndSettle();
+
+      final drawer = tester.getRect(find.byKey(panelKey));
+      expect(drawer.width, closeTo(1600 / 4, 1));
+      expect(drawer.right, closeTo(1600, 1),
+          reason: 'se despliega desde la derecha, pegado al borde');
+      expect(drawer.height, closeTo(900, 1),
+          reason: 'ocupa todo el alto disponible');
+    });
+
+    testWidgets('el drawer se SUPERPONE: la grilla mantiene 4 columnas',
+        (tester) async {
+      _setSurfaceSize(tester, 1600);
+      await tester.pumpWidget(_wrapWithData());
+      await tester.pumpAndSettle();
+
+      final anchoAntes = tester.getRect(find.byKey(gridKey)).width;
+
+      await tester.tap(_inside(gridKey, find.text('Press de Banca')));
+      await tester.pumpAndSettle();
+
+      final grid = tester.widget<GridView>(find.byKey(gridKey));
+      final delegate =
+          grid.gridDelegate as SliverGridDelegateWithFixedCrossAxisCount;
+      expect(delegate.crossAxisCount, 4);
+      expect(
+        tester.getRect(find.byKey(gridKey)).width,
+        closeTo(anchoAntes, 0.5),
+        reason: 'superpuesto, no en fila: abrir el detalle no puede reflowear '
+            'la grilla',
+      );
+    });
+
+    testWidgets('compact (1100) conserva filtros arriba y abre modal',
+        (tester) async {
+      _setSurfaceSize(tester, 1100);
+      await tester.pumpWidget(_wrapWithData());
+      await tester.pumpAndSettle();
+
+      expect(find.byType(BibliotecaFilterChips), findsOneWidget);
+      expect(find.byKey(filtersKey), findsNothing);
+
+      final grid = tester.widget<GridView>(find.byKey(gridKey));
+      expect(grid.gridDelegate, isA<SliverGridDelegateWithMaxCrossAxisExtent>());
+
+      await tester.tap(_inside(gridKey, find.text('Press de Banca')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TreinoDialog), findsOneWidget);
+      expect(find.byKey(panelKey), findsNothing);
+    });
+
+    testWidgets('tema claro: el drawer usa la paleta light', (tester) async {
+      _setSurfaceSize(tester, 1600);
+      await tester.pumpWidget(_wrapWithData(theme: AppTheme.light()));
+      await tester.pumpAndSettle();
+
+      await tester.tap(_inside(gridKey, find.text('Press de Banca')));
+      await tester.pumpAndSettle();
+
+      final contenedor = tester.widget<Container>(
+        find
+            .descendant(of: find.byKey(panelKey), matching: find.byType(Container))
+            .first,
+      );
+      final decoracion = contenedor.decoration! as BoxDecoration;
+      expect(decoracion.color, AppPalette.mintMagentaLight.bgCard);
     });
   });
 }

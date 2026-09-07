@@ -20,8 +20,8 @@ final List<RouteBase> ajustesRoutes = [
 
 const List<SidebarItem> ajustesSidebarItems = [
   SidebarItem(
-    id: 'ajustes',
-    label: 'Ajustes', // i18n: Fase W1
+    id: 'cuenta',
+    label: 'Mi cuenta', // i18n: Fase W1
     route: '/ajustes',
     iconBuilder: _ajustesIcon,
     group: SidebarGroup.ajustes,

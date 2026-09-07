@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/utils/app_clock.dart';
@@ -42,6 +43,20 @@ class PendingInviteStore {
   static String? _enMemoria;
   static DateTime? _enMemoriaDesde;
 
+  /// Sube cada vez que la invitación pendiente cambia.
+  ///
+  /// Guardar en disco y en memoria no alcanza: alguien tiene que ENTERARSE.
+  /// El gate se montaba una sola vez por cuenta, y si en ese instante la
+  /// invitación todavía no estaba capturada se daba por resuelto para
+  /// siempre. Reportado en un iPhone 16: el link abría la app, el diálogo no
+  /// aparecía, y sólo salía después de navegar a otra pantalla y volver —lo
+  /// que remonta el widget y limpia su latch—.
+  ///
+  /// Estático por la misma razón que [_enMemoria]: las dos puntas son
+  /// instancias distintas. El router escribe desde la suya, el gate escucha
+  /// desde la suya.
+  static final ValueNotifier<int> revision = ValueNotifier<int>(0);
+
   static const _kTrainerId = 'pending_invite_trainer_id';
   static const _kRecibidaEn = 'pending_invite_received_at';
 
@@ -65,6 +80,7 @@ class PendingInviteStore {
     // Primero memoria, SIN await: quien lea en este mismo turno la encuentra.
     _enMemoria = trainerId;
     _enMemoriaDesde = ahora ?? AppClock.now();
+    revision.value++;
     await _prefs.setString(_kTrainerId, trainerId);
     await _prefs.setInt(
       _kRecibidaEn,
@@ -111,6 +127,7 @@ class PendingInviteStore {
   Future<void> limpiar() async {
     _enMemoria = null;
     _enMemoriaDesde = null;
+    revision.value++;
     await _prefs.remove(_kTrainerId);
     await _prefs.remove(_kRecibidaEn);
   }

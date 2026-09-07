@@ -25,9 +25,18 @@ import 'sidebar_item.dart';
 ///   escribe, así el valor guardado se preserva al volver a desktop.
 /// - `>= 1280 px` (desktop) → el sidebar respeta `sidebarCollapsedProvider`.
 class CoachHubScaffold extends ConsumerWidget {
-  const CoachHubScaffold({super.key, required this.child, this.itemsOverride});
+  const CoachHubScaffold({
+    super.key,
+    required this.child,
+    this.itemsOverride,
+    this.contentMaxWidth = CoachHubLayoutTokens.contentMaxWidth,
+  });
 
   final Widget child;
+
+  /// Techo del slot de contenido. Las secciones comunes conservan 1240;
+  /// Biblioteca lo eleva desde el router porque necesita alojar su catálogo.
+  final double contentMaxWidth;
 
   /// Si es no-nulo, reemplaza `sidebarRegistry` en el `CoachHubSidebar` —
   /// solo para tests/evidencia (eg. demostrar badges sin depender del
@@ -62,7 +71,7 @@ class CoachHubScaffold extends ConsumerWidget {
                   const CoachHubTourGate(),
                   Expanded(
                     child: ContentMaxWidth(
-                      maxWidth: CoachHubLayoutTokens.contentMaxWidth,
+                      maxWidth: contentMaxWidth,
                       child: child,
                     ),
                   ),

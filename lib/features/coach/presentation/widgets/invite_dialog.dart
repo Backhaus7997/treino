@@ -100,10 +100,18 @@ class _InviteDialogState extends ConsumerState<_InviteDialog> {
             _primario('Vincularme', () => _vincular()), // i18n
           ],
         ),
+      // "Escribiste" era el verbo equivocado: suena a mandar un mensaje de
+      // chat, no a pedir un vínculo, y desentonaba al lado de los otros dos
+      // avisos de esta misma familia, que son neutros y factuales.
+      //
+      // Y NO dice "ya estás vinculado", aunque se parezca: acá la solicitud
+      // está enviada y sin aceptar. Prometer un vínculo que todavía no existe
+      // deja a la persona buscando un entrenador que no le va a aparecer en
+      // ningún lado. Ese caso es `InviteYaVinculado`, y tiene su propio texto.
       InviteYaSolicitado() => (
-          'YA LE ESCRIBISTE', // i18n
-          'Ya le enviaste una solicitud a $quien. Te avisamos cuando '
-              'responda.', // i18n
+          'SOLICITUD PENDIENTE', // i18n
+          'Ya le pediste vincularte a $quien. Te avisamos cuando la '
+              'acepte.', // i18n
           [_primario('Entendido', _cerrar)], // i18n
         ),
       InviteYaVinculado() => (

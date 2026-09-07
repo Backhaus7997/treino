@@ -16,6 +16,8 @@ import 'package:treino/features/workout/domain/routine_status.dart';
 class _MockRoutineRepository extends Mock implements RoutineRepository {}
 
 const _athleteId = 'athlete-1';
+const _trainerId = 'trainer-1';
+const _key = (trainerId: _trainerId, athleteId: _athleteId);
 
 void main() {
   late _MockRoutineRepository mockRepo;
@@ -25,7 +27,7 @@ void main() {
     return ProviderContainer(
       overrides: [
         routineRepositoryProvider.overrideWithValue(mockRepo),
-        assignedRoutinesProvider(_athleteId).overrideWith((ref) async {
+        assignedRoutinesByTrainerProvider(_key).overrideWith((ref) async {
           listCalls++;
           return const <Routine>[];
         }),
@@ -39,7 +41,7 @@ void main() {
   });
 
   group('RoutineActionsNotifier.archive', () {
-    test('llama a repo.archive(routineId) e invalida assignedRoutinesProvider',
+    test('llama a repo.archive(routineId) e invalida assignedRoutinesByTrainerProvider',
         () async {
       when(() => mockRepo.archive(any())).thenAnswer((_) async {});
       final container = makeContainer();
@@ -47,21 +49,21 @@ void main() {
 
       // Mantiene vivo el FutureProvider.autoDispose durante el test.
       final sub =
-          container.listen(assignedRoutinesProvider(_athleteId), (_, __) {});
+          container.listen(assignedRoutinesByTrainerProvider(_key), (_, __) {});
       addTearDown(sub.close);
 
-      await container.read(assignedRoutinesProvider(_athleteId).future);
+      await container.read(assignedRoutinesByTrainerProvider(_key).future);
       expect(listCalls, 1);
 
       final ok = await container
           .read(routineActionsProvider.notifier)
-          .archive(routineId: 'r1', athleteId: _athleteId);
+          .archive(routineId: 'r1', trainerId: _trainerId, athleteId: _athleteId);
 
       expect(ok, isTrue);
       verify(() => mockRepo.archive('r1')).called(1);
 
       // El invalidate dispara un nuevo fetch en la próxima lectura.
-      await container.read(assignedRoutinesProvider(_athleteId).future);
+      await container.read(assignedRoutinesByTrainerProvider(_key).future);
       expect(listCalls, 2);
     });
 
@@ -94,7 +96,7 @@ void main() {
       archived = true;
       await container
           .read(routineActionsProvider.notifier)
-          .archive(routineId: 'r1', athleteId: _athleteId);
+          .archive(routineId: 'r1', trainerId: _trainerId, athleteId: _athleteId);
 
       // Sin la invalidación esto seguiría dando `active`: el keepAlive de
       // `_cacheOnlyOnSuccess` sólo se suelta si el fetch TIRA, así que el doc
@@ -113,7 +115,7 @@ void main() {
 
       final ok = await container
           .read(routineActionsProvider.notifier)
-          .archive(routineId: 'r1', athleteId: _athleteId);
+          .archive(routineId: 'r1', trainerId: _trainerId, athleteId: _athleteId);
 
       expect(ok, isFalse);
     });

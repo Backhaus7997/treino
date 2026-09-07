@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../coach/domain/subscription_tier.dart';
 
@@ -43,7 +45,12 @@ import '../../../../coach/domain/subscription_tier.dart';
 ///     (cubre los dos carteles, no sólo el del CTA — ése fue el agujero);
 ///   - disparar todos los taps de la pantalla no puede navegar, abrir un
 ///     SnackBar ni abrir una ruta modal;
-///   - en la carpeta del paywall no puede aparecer un `url_launcher`.
+///   - en la carpeta del paywall no puede aparecer una forma de abrir algo
+///     afuera, con UNA excepción: el `launchUrl` de ESTE archivo, que es el
+///     que abre el checkout. `WebViewController`, `InAppBrowser` y
+///     `LaunchMode.inAppBrowserView` siguen prohibidos en toda la carpeta,
+///     acá incluido — un checkout en un WebView es una venta ADENTRO de la
+///     app para 3.1.3(c), que es justo lo que esto evita.
 sealed class PlanCheckout {
   const PlanCheckout._();
 }
@@ -55,27 +62,144 @@ final class PlanCheckoutAvailable extends PlanCheckout {
   /// Arranca el alta o el cambio de plan. ÚNICO camino a un cobro en toda la
   /// app: no hay otro método en esta jerarquía que inicie nada.
   ///
-  /// Recibe [tier] y [annual] aunque el aviso de hoy no los use. Son los datos
-  /// que un checkout real necesita, y tenerlos ya en la firma hace que cablear
-  /// la pasarela sea cambiar ESTE cuerpo y nada más — ningún call-site tiene
-  /// que enterarse.
-  void start(
+  /// Llama a `createPreapproval`, que abre la suscripción en Mercado Pago y
+  /// devuelve el `initPoint`, y navega ahí.
+  ///
+  /// La firma ya recibía [tier] y [annual] desde antes de que existiera la
+  /// pasarela, apostando a que cablearla iba a ser cambiar este cuerpo y nada
+  /// más. Se cumplió a medias: el único call-site no tuvo que cambiar sus
+  /// argumentos, pero `start` pasó de sincrónico a `Future`. Un método que
+  /// habla por red no puede no serlo, y eso no se puede esconder detrás de una
+  /// firma.
+  ///
+  /// ─── Por qué esto SACA al usuario de la app, y no puede no hacerlo ───
+  ///
+  /// El checkout se abre con una navegación de PÁGINA COMPLETA en la misma
+  /// pestaña (`webOnlyWindowName: '_self'`). No es una preferencia estética:
+  ///
+  ///   1. Un WebView o un browser in-app sigue siendo, para la App Store
+  ///      Review Guideline 3.1.3(c), una venta ADENTRO de la app. Abrirlo así
+  ///      reintroduciría exactamente el problema que este archivo existe para
+  ///      evitar, y encima de una forma que el tipo sellado no ve.
+  ///   2. El `back_url` que le mandamos a Mercado Pago trae al PF de vuelta a
+  ///      `/ajustes`. Con una pestaña nueva volvería a una pestaña huérfana y
+  ///      la original quedaría mostrando el plan viejo.
+  ///
+  /// Por eso el guard de la carpeta sigue prohibiendo `WebViewController`,
+  /// `InAppBrowser` y `LaunchMode.inAppBrowserView` — también en ESTE archivo.
+  /// Lo único que se habilitó es el `launchUrl` de acá.
+  ///
+  /// ─── El mail del pagador ───
+  ///
+  /// [payerEmail] es el mail de la cuenta de Mercado Pago del PF, si configuró
+  /// uno distinto al de TREINO (`users/{uid}.mpPayerEmail`). `null` —el caso
+  /// normal— deja que el servidor use el del token.
+  ///
+  /// Viene por parámetro y NO se pregunta en el momento: una versión anterior
+  /// abría un diálogo acá y era el diseño equivocado. MP exige el dato, pero
+  /// eso es un detalle de la pasarela, y filtrarlo a la cara del usuario le
+  /// cobra fricción al 90% que tiene los dos mails iguales. El que necesita
+  /// otro lo configura una vez en Ajustes → Facturación.
+  Future<void> start(
     BuildContext context, {
     required SubscriptionTier tier,
     required bool annual,
-  }) {
-    // MOCK: la pasarela todavía no está cableada. Cuando lo esté, el checkout
-    // se abre desde acá. En web «muy pronto» es cierto — lo que falta es la
-    // cuenta de cobro, no una decisión de plataforma.
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'El pago con Mercado Pago se habilita muy pronto.', // i18n: Fase W3
-        ),
-      ),
+    String? payerEmail,
+  }) async {
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      final initPoint = await (debugPlanCheckoutCreator ?? _crearPreapproval)(
+        tier: tier,
+        annual: annual,
+        payerEmail: payerEmail,
+      );
+      if (initPoint == null) {
+        _avisar(messenger, 'No pudimos abrir el pago. Probá de nuevo.');
+        return;
+      }
+
+      final abrio = await (debugPlanCheckoutLauncher ?? _abrirCheckout)(
+        Uri.parse(initPoint),
+      );
+      if (!abrio) {
+        _avisar(messenger, 'No pudimos abrir Mercado Pago. Probá de nuevo.');
+      }
+    } on FirebaseFunctionsException catch (e) {
+      // `unavailable` es el único donde reintentar sirve — el servidor lo
+      // reserva para fallos de MP que se arreglan solos. Prometer «probá de
+      // nuevo» en un 401 nuestro sería mandar al PF a golpear una puerta que
+      // no se va a abrir.
+      _avisar(
+        messenger,
+        e.code == 'unavailable'
+            ? 'Mercado Pago no responde en este momento. Probá en unos minutos.'
+            : 'No pudimos iniciar el pago. Escribinos y lo resolvemos.',
+      );
+    } catch (_) {
+      _avisar(messenger, 'No pudimos iniciar el pago. Probá de nuevo.');
+    }
+  }
+
+  void _avisar(ScaffoldMessengerState messenger, String texto) {
+    messenger.showSnackBar(
+      SnackBar(content: Text(texto)), // i18n: Fase W3
     );
   }
 }
+
+const String _kRegion = 'southamerica-east1';
+
+/// Abre la suscripción en Mercado Pago y devuelve la URL del checkout, o `null`
+/// si el servidor no la mandó.
+///
+/// Manda SÓLO el plan y el ciclo. El monto lo pone el servidor desde
+/// `TIER_PRICES_ARS`: mandarlo desde acá sería dejar que el cliente elija
+/// cuánto paga, y no hay validación que arregle eso.
+Future<String?> _crearPreapproval({
+  required SubscriptionTier tier,
+  required bool annual,
+  String? payerEmail,
+}) async {
+  final res = await FirebaseFunctions.instanceFor(region: _kRegion)
+      .httpsCallable('createPreapproval')
+      .call<Map<String, dynamic>>({
+    'tier': tier.name,
+    'cycle': annual ? 'annual' : 'monthly',
+    // Sólo viaja si el PF configuró uno. Mandar `null` haría que el
+    // servidor lo viera como un payerEmail inválido y cayera al default —
+    // mismo resultado, pero por accidente en vez de por diseño.
+    if (payerEmail != null && payerEmail.isNotEmpty) 'payerEmail': payerEmail,
+  });
+  final initPoint = res.data['initPoint'];
+  return initPoint is String && initPoint.isNotEmpty ? initPoint : null;
+}
+
+/// Navega a la URL del checkout SACANDO al usuario de la app.
+///
+/// `_self` y no una pestaña nueva: ver el dartdoc de [PlanCheckoutAvailable.start].
+Future<bool> _abrirCheckout(Uri url) =>
+    launchUrl(url, webOnlyWindowName: '_self');
+
+/// Inyecta la creación del preapproval. SÓLO para tests.
+///
+/// El seam va ACÁ y no sobre `FirebaseFunctions` a propósito: un doble del
+/// cliente de Cloud Functions obliga a fingir `HttpsCallable` y
+/// `HttpsCallableResult` para probar UI. Lo que a la pantalla le importa es
+/// «conseguí una URL de checkout, o no», y esa es la frontera que conviene
+/// mover — la de la red, no la del SDK.
+@visibleForTesting
+Future<String?> Function({
+  required SubscriptionTier tier,
+  required bool annual,
+  String? payerEmail,
+})? debugPlanCheckoutCreator;
+
+
+/// Inyecta el navegador. SÓLO para tests: sin esto, probar el punto de compra
+/// abriría Mercado Pago de verdad desde la suite.
+@visibleForTesting
+Future<bool> Function(Uri)? debugPlanCheckoutLauncher;
 
 /// Superficie que NO cobra: la app móvil. El alta se hace en TREINO web.
 ///

@@ -7,6 +7,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
+import 'package:treino/features/auth/application/auth_providers.dart';
+import 'package:treino/features/auth/data/auth_service.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/ajustes_screen.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/avatar_web_uploader.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/notificaciones_prefs.dart';
@@ -18,6 +20,8 @@ import 'package:treino/features/profile/domain/user_role.dart';
 class _MockUserRepo extends Mock implements UserRepository {}
 
 class _MockUploader extends Mock implements AvatarWebUploader {}
+
+class _MockAuthService extends Mock implements AuthService {}
 
 UserProfile _trainer() => UserProfile(
       uid: 'pf1',
@@ -32,6 +36,7 @@ Widget _harness({
   UserProfile? profile,
   UserRepository? repo,
   AvatarWebUploader? uploader,
+  AuthService? authService,
 }) =>
     ProviderScope(
       overrides: [
@@ -46,6 +51,8 @@ Widget _harness({
         if (repo != null) userRepositoryProvider.overrideWithValue(repo),
         if (uploader != null)
           avatarWebUploaderProvider.overrideWithValue(uploader),
+        if (authService != null)
+          authServiceProvider.overrideWithValue(authService),
       ],
       child: const MaterialApp(home: Scaffold(body: AjustesScreen())),
     );
@@ -66,17 +73,54 @@ void main() {
   setUpAll(() => registerFallbackValue(<String, Object?>{}));
 
   group('AjustesScreen (W3.1)', () {
-    testWidgets('renderiza el header y las 3 tabs de Configuración',
+    testWidgets('reúne cuenta, notificaciones, facturación y preferencias',
         (tester) async {
       await tester.pumpWidget(_harness());
       await tester.pump();
 
-      expect(find.text('CONFIGURACIÓN'), findsOneWidget);
+      expect(find.text('MI CUENTA'), findsOneWidget);
       expect(find.text('Cuenta'), findsOneWidget);
       expect(find.text('Notificaciones'), findsOneWidget);
       expect(find.text('Facturación TREINO'), findsOneWidget);
+      expect(find.text('Apariencia'), findsOneWidget);
+      expect(find.text('Seguridad'), findsOneWidget);
+      expect(find.text('Cerrar sesión'), findsOneWidget);
       // «Datos y privacidad» se removió del nav (eliminar vive en mobile).
       expect(find.text('Datos y privacidad'), findsNothing);
+    });
+
+    testWidgets('Apariencia reúne Sistema, Claro y Oscuro', (tester) async {
+      await tester.pumpWidget(_harness());
+      await tester.pump();
+
+      await tester.tap(find.text('Apariencia'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('APARIENCIA'), findsOneWidget);
+      expect(find.text('Sistema'), findsOneWidget);
+      expect(find.text('Claro'), findsOneWidget);
+      expect(find.text('Oscuro'), findsOneWidget);
+    });
+
+    testWidgets('Seguridad reutiliza el flujo de cambio de contraseña',
+        (tester) async {
+      final auth = _MockAuthService();
+      when(() => auth.sendPasswordResetEmail(email: any(named: 'email')))
+          .thenAnswer((_) async {});
+      await tester.pumpWidget(_harness(authService: auth));
+      await tester.pump();
+
+      await tester.tap(find.text('Seguridad'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Cambiar contraseña'), findsOneWidget);
+      expect(find.text('ENVIAR ENLACE'), findsOneWidget);
+
+      await tester.tap(find.text('ENVIAR ENLACE'));
+      await tester.pump();
+
+      verify(() => auth.sendPasswordResetEmail(email: 'sofia@treino.app'))
+          .called(1);
     });
 
     testWidgets('la tab Cuenta muestra los datos del PF logueado',
