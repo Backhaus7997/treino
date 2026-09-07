@@ -399,3 +399,183 @@ describe("reconcileAllSubscriptions — el barrido", () => {
     expect(r.errors).toBe(2);
   });
 });
+
+// ---------------------------------------------------------------------------
+// La cascada del fin de periodo.
+//
+// Sale de una prueba REAL contra Mercado Pago, y la asimetria que encontramos
+// es fea: una suscripcion cancelada que PAGO viene SIN `next_payment_date`,
+// mientras que una cancelada que NUNCA pago SI lo trae. Medido sobre dos
+// suscripciones de la misma cuenta el 2026-09-07.
+//
+// O sea que el dato falta justo cuando importa, y el que se queda sin fecha es
+// el que te pago. Si `currentPeriodEnd` queda en null, `effective-limit` le
+// saca el plan EN EL ACTO a alguien que pago el mes entero.
+// ---------------------------------------------------------------------------
+
+import {
+  finDePeriodoDesdeAltaMs,
+  resolverFinDePeriodo,
+} from "../subscriptions/mp/reconcile";
+
+/** El `auto_recurring` tal cual lo devolvio MP en la prueba real. */
+const AUTO_RECURRING_REAL = {
+  frequency: 1,
+  frequency_type: "months",
+  transaction_amount: 12000.0,
+  currency_id: "ARS",
+  start_date: "2026-09-07T11:52:46.997-04:00",
+  billing_day_proportional: false,
+  has_billing_day: false,
+};
+
+describe("finDePeriodoDesdeAltaMs", () => {
+  it("suma el periodo al alta, con el payload real de MP", () => {
+    const ms = finDePeriodoDesdeAltaMs(AUTO_RECURRING_REAL);
+    expect(ms).toBe(Date.parse("2026-10-07T11:52:46.997-04:00"));
+  });
+
+  it("respeta una frecuencia de 12 meses (el ciclo anual)", () => {
+    const ms = finDePeriodoDesdeAltaMs({
+      ...AUTO_RECURRING_REAL, frequency: 12,
+    });
+    expect(ms).toBe(Date.parse("2027-09-07T11:52:46.997-04:00"));
+  });
+
+  it("el desborde de mes lo normaliza el calendario, no nosotros", () => {
+    // 31 de enero + 1 mes no existe. `setUTCMonth` lo lleva al 3 de marzo, que
+    // es como cuenta el calendario — no hay que corregirlo a mano.
+    const ms = finDePeriodoDesdeAltaMs({
+      ...AUTO_RECURRING_REAL, start_date: "2026-01-31T00:00:00.000Z",
+    });
+    expect(new Date(ms as number).toISOString()).toBe("2026-03-03T00:00:00.000Z");
+  });
+
+  const noDerivables: [string, unknown][] = [
+    ["frequency_type days — no lo entendemos y no lo adivinamos",
+      { ...AUTO_RECURRING_REAL, frequency_type: "days" }],
+    ["sin start_date", { frequency: 1, frequency_type: "months" }],
+    ["start_date que no es fecha",
+      { ...AUTO_RECURRING_REAL, start_date: "mañana" }],
+    ["frequency cero", { ...AUTO_RECURRING_REAL, frequency: 0 }],
+    ["frequency negativa", { ...AUTO_RECURRING_REAL, frequency: -1 }],
+    ["frequency fraccionaria", { ...AUTO_RECURRING_REAL, frequency: 1.5 }],
+    ["frequency absurda (24 meses es el tope)",
+      { ...AUTO_RECURRING_REAL, frequency: 999 }],
+    ["null", null],
+    ["un string", "auto_recurring"],
+  ];
+  for (const [caso, ar] of noDerivables) {
+    it(`da null con ${caso}`, () => {
+      expect(finDePeriodoDesdeAltaMs(ar)).toBeNull();
+    });
+  }
+});
+
+describe("resolverFinDePeriodo — la cascada", () => {
+  const base = {
+    deMp: null,
+    yaGuardada: undefined,
+    autoRecurring: AUTO_RECURRING_REAL,
+    status: "cancelled" as const,
+    planId: "p1",
+  };
+
+  it("1. lo que dijo MP gana sobre todo lo demas", () => {
+    const deMp = ts(1_000);
+    const r = resolverFinDePeriodo({
+      ...base,
+      deMp: deMp as never,
+      yaGuardada: ts(2_000),
+    });
+    expect(r?.toMillis()).toBe(1_000);
+  });
+
+  it("2. sin fecha de MP, gana la que ya teniamos", () => {
+    // El caso del PF que estuvo meses suscripto: el barrido diario le fue
+    // refrescando la fecha mientras estaba activo.
+    const r = resolverFinDePeriodo({ ...base, yaGuardada: ts(9_999) });
+    expect(r?.toMillis()).toBe(9_999);
+  });
+
+  it("3. sin nada guardado, se deriva del alta — la baja el MISMO DIA", () => {
+    // Este es el agujero que encontro la prueba real: se suscribio y cancelo
+    // antes de que el barrido corriera una sola vez, asi que no hay nada que
+    // conservar. Sin esta rama pierde el mes que pago.
+    const r = resolverFinDePeriodo(base);
+    expect(r?.toMillis()).toBe(Date.parse("2026-10-07T11:52:46.997-04:00"));
+  });
+
+  it("4. si no hay ningun camino, null y un warn que lo grita", () => {
+    const r = resolverFinDePeriodo({ ...base, autoRecurring: null });
+    expect(r).toBeNull();
+    expect(errorSpy.mock.calls.length + warnSpy.mock.calls.length)
+      .toBeGreaterThan(0);
+  });
+
+  it("con la suscripcion VIVA no se inventa fecha", () => {
+    // Mientras MP no dijo nada terminal, que falte la fecha es informacion:
+    // no la sabemos. Conservar una vieja seria regalar un periodo que quizas
+    // no se pago.
+    for (const status of ["active", "pending", "grace"] as const) {
+      const r = resolverFinDePeriodo({ ...base, status, yaGuardada: ts(9_999) });
+      expect(r).toBeNull();
+    }
+  });
+
+  it("`paused` tambien conserva: suspender no es no haber pagado", () => {
+    const r = resolverFinDePeriodo({ ...base, status: "paused" });
+    expect(r).not.toBeNull();
+  });
+
+  it("una fecha guardada con forma rota no se usa, se deriva", () => {
+    const r = resolverFinDePeriodo({ ...base, yaGuardada: "2026-10-07" });
+    expect(r?.toMillis()).toBe(Date.parse("2026-10-07T11:52:46.997-04:00"));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// El caso completo, con los DOS payloads reales de la prueba del 2026-09-07.
+// ---------------------------------------------------------------------------
+
+describe("reconcileSubscription — las dos cancelaciones reales", () => {
+  it("la que PAGO y no trae fecha conserva el periodo que compro", async () => {
+    const { app, store } = fakeApp(MUNDO());
+
+    await reconcileSubscription(app, "p1", fakeMp({
+      id: "79e2fbf31595407f839dd772b59ae34a",
+      status: "cancelled",
+      external_reference: "t1",
+      // Vacio, tal cual vino de MP para la suscripcion pagada.
+      next_payment_date: undefined,
+      auto_recurring: { ...AUTO_RECURRING_REAL, transaction_amount: 22000 },
+      summarized: { pending_charge_quantity: 0 },
+    }));
+
+    const sub = store.users.t1.subscription as Record<string, unknown>;
+    expect(sub.status).toBe("cancelled");
+    // No pierde el mes: la fecha sale del alta.
+    expect(sub.currentPeriodEnd).not.toBeNull();
+    expect((sub.currentPeriodEnd as { toMillis(): number }).toMillis())
+      .toBe(Date.parse("2026-10-07T11:52:46.997-04:00"));
+  });
+
+  it("la que NUNCA pago si trae fecha, y se usa esa", async () => {
+    const { app, store } = fakeApp(MUNDO());
+
+    await reconcileSubscription(app, "p1", fakeMp({
+      id: "3af60648011f4deab385043c20b290af",
+      status: "cancelled",
+      external_reference: "t1",
+      // Igual a `date_created`: el "proximo" cobro era el primero, que nunca
+      // ocurrio. Queda en el pasado, y esta bien — no pago nada.
+      next_payment_date: "2026-09-07T11:52:46.000-04:00",
+      auto_recurring: AUTO_RECURRING_REAL,
+      summarized: { pending_charge_quantity: 0 },
+    }));
+
+    const sub = store.users.t1.subscription as Record<string, unknown>;
+    expect((sub.currentPeriodEnd as { toMillis(): number }).toMillis())
+      .toBe(Date.parse("2026-09-07T11:52:46.000-04:00"));
+  });
+});

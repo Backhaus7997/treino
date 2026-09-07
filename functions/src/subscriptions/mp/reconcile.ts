@@ -125,6 +125,108 @@ export function parsePeriodEnd(
   return admin.firestore.Timestamp.fromMillis(ms);
 }
 
+/** `unknown` → Timestamp si tiene la forma, si no `null`. */
+function comoTimestamp(v: unknown): admin.firestore.Timestamp | null {
+  return v != null && typeof (v as { toMillis?: unknown }).toMillis === "function"
+    ? (v as admin.firestore.Timestamp)
+    : null;
+}
+
+/**
+ * Un periodo de `auto_recurring` sumado a su `start_date`.
+ *
+ * Existe por un hallazgo de la prueba real contra MP, y la asimetria es fea:
+ * una suscripcion CANCELADA que **pago** viene SIN `next_payment_date`,
+ * mientras que una cancelada que **nunca pago** SI lo trae. O sea que el dato
+ * esta justo cuando no importa y falta justo cuando si — y el que se queda sin
+ * fecha es el que te pago.
+ *
+ * `start_date + frequency` es exactamente el periodo que esa persona compro.
+ */
+export function finDePeriodoDesdeAltaMs(autoRecurring: unknown): number | null {
+  if (autoRecurring === null || typeof autoRecurring !== "object") return null;
+  const ar = autoRecurring as {
+    start_date?: unknown;
+    frequency?: unknown;
+    frequency_type?: unknown;
+  };
+
+  if (typeof ar.start_date !== "string") return null;
+  const inicio = Date.parse(ar.start_date);
+  if (!Number.isFinite(inicio)) return null;
+
+  const n = ar.frequency;
+  if (typeof n !== "number" || !Number.isInteger(n) || n <= 0 || n > 24) {
+    return null;
+  }
+
+  // Solo se entiende "months". `days` existe en la API de MP pero TREINO no lo
+  // usa, y sumar un periodo cuyo tipo no conocemos seria inventar una fecha —
+  // el mismo error que `parsePeriodEnd` evita con las fechas mal formadas.
+  if (ar.frequency_type !== "months") return null;
+
+  // `setUTCMonth` normaliza el desborde de mes solo: enero 31 + 1 mes cae en
+  // marzo 3, que es como cuenta el calendario y no hay que arreglarlo.
+  const d = new Date(inicio);
+  d.setUTCMonth(d.getUTCMonth() + n);
+  return d.getTime();
+}
+
+interface FinDePeriodoInput {
+  /** Lo que dijo MP en `next_payment_date`, ya parseado. */
+  deMp: admin.firestore.Timestamp | null;
+  /** Lo que ya teniamos escrito en `subscription.currentPeriodEnd`. */
+  yaGuardada: unknown;
+  autoRecurring: unknown;
+  status: SubscriptionStatus;
+  planId: string;
+}
+
+/**
+ * Hasta cuando le dura el plan PAGO a este PF.
+ *
+ * `effective-limit` le da el tier pago a un `cancelled` HASTA esta fecha. Que
+ * quede en `null` significa sacarle el plan EN EL ACTO a alguien que pago el
+ * periodo entero, asi que la cascada existe para no llegar nunca ahi:
+ *
+ *   1. `next_payment_date`, si MP lo mando.
+ *   2. La que ya teniamos. Cubre al PF que estuvo meses suscripto: el barrido
+ *      diario la fue refrescando mientras estaba activo.
+ *   3. `start_date + frequency`. Cubre la baja el MISMO DIA, antes de que el
+ *      barrido corriera una sola vez — ahi no hay nada guardado que conservar,
+ *      y "me suscribi, me arrepenti, cancelo" es un comportamiento normal.
+ *   4. `null`, y recien ahi nos rendimos.
+ *
+ * Los pasos 2 y 3 solo corren si MP ya dijo algo terminal. Mientras la
+ * suscripcion sigue viva, que falte la fecha es informacion —no la sabemos— y
+ * conservar una vieja seria inventar un periodo que quizas no se pago.
+ */
+export function resolverFinDePeriodo(
+  i: FinDePeriodoInput,
+): admin.firestore.Timestamp | null {
+  if (i.deMp !== null) return i.deMp;
+  if (i.status !== "cancelled" && i.status !== "paused") return null;
+
+  const previa = comoTimestamp(i.yaGuardada);
+  if (previa !== null) return previa;
+
+  const derivada = finDePeriodoDesdeAltaMs(i.autoRecurring);
+  if (derivada === null) {
+    logger.warn(
+      "mp/reconcile: sin fecha de fin de periodo por ningun camino — el PF " +
+        "pierde el plan pago en el acto",
+      { planId: i.planId, status: i.status },
+    );
+    return null;
+  }
+
+  logger.info("mp/reconcile: fin de periodo derivado del alta", {
+    planId: i.planId,
+    status: i.status,
+  });
+  return admin.firestore.Timestamp.fromMillis(derivada);
+}
+
 /** Los dos Timestamp son el mismo instante. Tolera nulls de los dos lados. */
 function mismaFecha(
   a: admin.firestore.Timestamp | null,
@@ -248,20 +350,13 @@ export async function reconcileSubscription(
     | Record<string, unknown>
     | undefined;
 
-  let periodEnd = parsePeriodEnd(mp.next_payment_date, planId);
-  if (periodEnd === null && status === "cancelled") {
-    // Una baja normalmente deja de tener proximo cobro. Si nos quedamos sin
-    // fecha, `effective-limit` le saca el plan pago EN EL ACTO a alguien que
-    // pago el periodo entero. Se conserva la que ya teniamos: la baja es
-    // efectiva igual cuando esa fecha vence.
-    const previa = actual?.currentPeriodEnd;
-    if (
-      previa != null &&
-      typeof (previa as { toMillis?: unknown }).toMillis === "function"
-    ) {
-      periodEnd = previa as admin.firestore.Timestamp;
-    }
-  }
+  const periodEnd = resolverFinDePeriodo({
+    deMp: parsePeriodEnd(mp.next_payment_date, planId),
+    yaGuardada: actual?.currentPeriodEnd,
+    autoRecurring: mp.auto_recurring,
+    status,
+    planId,
+  });
 
   const sinCambios =
     actual != null &&
