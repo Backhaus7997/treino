@@ -15,19 +15,18 @@
  * matching what the repository method did (a resumed link is not a new one).
  */
 
-import * as admin from "firebase-admin";
-import { App } from "firebase-admin/app";
+import { App, getApp, initializeApp } from "firebase-admin/app";
 import * as functions from "firebase-functions/v2/https";
 import { HttpsError } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions";
 
 import { syncTrainerLoad } from "./promote-link";
 
-function getApp(): App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -99,6 +98,6 @@ export const resumeTrainerLink = functions.onCall(
       throw new HttpsError("invalid-argument", "linkId is required.");
     }
 
-    return runResumeTrainerLink(getApp(), request.auth.uid, linkId);
+    return runResumeTrainerLink(ensureApp(), request.auth.uid, linkId);
   },
 );

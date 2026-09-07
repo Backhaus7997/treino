@@ -45,19 +45,19 @@
  *   All user-facing strings in es-AR.
  */
 
-import * as admin from "firebase-admin";
-import { App } from "firebase-admin/app";
+import { App, getApp, initializeApp } from "firebase-admin/app";
 import { Messaging } from "firebase-admin/messaging";
+import { getFirestore } from "firebase-admin/firestore";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 import { sendFcm } from "./send-fcm";
 import type { NotificationKind } from "./send-fcm";
 
-function getApp(): App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -172,7 +172,7 @@ export async function notifyOnFollowHandler(
     return;
   }
 
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
 
   // Read the actor's display name for the push body.
   const profileSnap = await db
@@ -225,6 +225,6 @@ export const notifyOnFollow = onDocumentWritten(
   async (event) => {
     const before = event.data?.before?.data() as FollowData | undefined;
     const after = event.data?.after?.data() as FollowData | undefined;
-    await notifyOnFollowHandler(getApp(), before, after);
+    await notifyOnFollowHandler(ensureApp(), before, after);
   },
 );

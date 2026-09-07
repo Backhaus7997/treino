@@ -19,8 +19,9 @@
  * desde el panel del PF, el reloj se entera igual. Atarlo al cliente que hoy lo
  * abre sería atarlo a un detalle que va a cambiar.
  */
-import * as admin from "firebase-admin";
-import { App } from "firebase-admin/app";
+import { App, getApp, initializeApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
+import { getMessaging } from "firebase-admin/messaging";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import * as logger from "firebase-functions/logger";
 
@@ -28,11 +29,11 @@ import * as logger from "firebase-functions/logger";
  * Inicializa el Admin SDK de forma perezosa, para que el módulo se pueda
  * importar sin una app ya creada — igual que hace `ranking-aggregate`.
  */
-function getApp(): App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -66,7 +67,7 @@ async function tokensDeReloj(
   app: App,
   uid: string,
 ): Promise<string[]> {
-  const snap = await admin.firestore(app).collection("users").doc(uid).get();
+  const snap = await getFirestore(app).collection("users").doc(uid).get();
   const raw = snap.get(WEAR_TOKENS_FIELD);
   if (!Array.isArray(raw)) return [];
   return raw.filter((t): t is string => typeof t === "string" && t.length > 0);
@@ -92,7 +93,7 @@ export const notifyWearOnWorkoutStarted = onDocumentWritten(
     const sessionId = event.params.sessionId;
     if (!uid) return;
 
-    const app = getApp();
+    const app = ensureApp();
     const tokens = await tokensDeReloj(app, uid);
     if (tokens.length === 0) {
       // No es un error: la enorme mayoría de los atletas no tiene reloj.
@@ -101,7 +102,7 @@ export const notifyWearOnWorkoutStarted = onDocumentWritten(
     }
 
     try {
-      const res = await admin.messaging(app).sendEachForMulticast({
+      const res = await getMessaging(app).sendEachForMulticast({
         tokens,
         // DATA-ONLY a propósito: un mensaje con `notification` lo dibuja el
         // sistema y NO llega al service, así que el reloj no podría abrirse

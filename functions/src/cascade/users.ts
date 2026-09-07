@@ -10,8 +10,8 @@
  * REQ-ACCDEL-CF-004 | ADR-ACCDEL-001
  */
 
-import * as admin from "firebase-admin";
 import { App } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 
 /**
  * Deletes all Firestore documents owned by the given user.
@@ -21,7 +21,7 @@ export async function deleteUserDocs(
   app: App,
   uid: string
 ): Promise<void> {
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
 
   // Step 1: Recursively delete users/{uid} including all sub-collections
   // (sessions, sessions/*/setLogs, checkIns, etc.)

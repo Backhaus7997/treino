@@ -34,9 +34,8 @@
  * transaction that writes it.
  */
 
-import * as admin from "firebase-admin";
 import { App } from "firebase-admin/app";
-import { DocumentData, DocumentReference, FieldValue, Timestamp } from "firebase-admin/firestore";
+import { DocumentData, DocumentReference, FieldValue, Timestamp, getFirestore } from "firebase-admin/firestore";
 import { HttpsError } from "firebase-functions/v2/https";
 
 import { computeWeightedLoad, WeightedLink } from "./weighted-load";
@@ -104,7 +103,7 @@ export async function syncTrainerLoad(
   app: App,
   input: SyncTrainerLoadInput,
 ): Promise<SyncTrainerLoadResult> {
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
   const nowMs = input.nowMs ?? Date.now();
   const promotion = input.promotion;
 

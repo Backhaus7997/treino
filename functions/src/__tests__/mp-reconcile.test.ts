@@ -43,17 +43,12 @@ jest.mock("firebase-admin", () => ({
 // salen del MISMO objeto, así que no pueden driftear.
 //
 // Lo fija `firebase-admin-mock-surface.test.ts`.
-jest.mock("firebase-admin/app", () => {
-  const ns = jest.requireMock("firebase-admin") as {
-    app: () => unknown;
-    initializeApp: () => unknown;
-  };
-  return {
-    getApp: (...args: unknown[]) => (ns.app as (...a: unknown[]) => unknown)(...args),
-    initializeApp: (...args: unknown[]) =>
-      (ns.initializeApp as (...a: unknown[]) => unknown)(...args),
-  };
-});
+jest.mock("firebase-admin/app", () => (
+    jest.requireActual("./helpers/modular-from-namespaced") as Record<
+      string,
+      () => unknown
+    >
+).app());
 
 
 // La puerta modular tiene que dar EL MISMO doble que la namespaced de arriba.
@@ -68,20 +63,12 @@ jest.mock("firebase-admin/app", () => {
 // depende del orden entre los dos `jest.mock`.
 //
 // Lo fija `firebase-admin-mock-surface.test.ts`.
-jest.mock("firebase-admin/firestore", () => {
-  const ns = jest.requireMock("firebase-admin") as {
-    firestore: Record<string, unknown>;
-  };
-  return {
-    getFirestore: (app: { firestore: () => unknown }) => app.firestore(),
-    get Timestamp() {
-      return ns.firestore.Timestamp;
-    },
-    get FieldValue() {
-      return ns.firestore.FieldValue;
-    },
-  };
-});
+jest.mock("firebase-admin/firestore", () => (
+    jest.requireActual("./helpers/modular-from-namespaced") as Record<
+      string,
+      () => unknown
+    >
+).firestoreDesdeApp());
 
 import {
   reconcileAllSubscriptions,

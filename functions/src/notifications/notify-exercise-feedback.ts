@@ -110,20 +110,20 @@
  * #628.
  */
 
-import * as admin from "firebase-admin";
-import { App } from "firebase-admin/app";
+import { App, getApp, initializeApp } from "firebase-admin/app";
 import { Messaging } from "firebase-admin/messaging";
+import { getFirestore } from "firebase-admin/firestore";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 import { sendFcm } from "./send-fcm";
 import { enqueueMail } from "../mail/enqueue-mail";
 import { trainerEntry } from "../mail/templates";
 
-function getApp(): App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -172,7 +172,7 @@ export async function notifyOnExerciseFeedbackHandler(
     return;
   }
 
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
 
   // Destinatario CANDIDATO: el PF que el grant dice. Candidato y no destinatario
   // a secas — este doc es client-writable y el alumno lo apunta a quien quiera
@@ -317,6 +317,6 @@ export const notifyOnExerciseFeedback = onDocumentCreated(
     }
 
     const { uid: athleteUid, sessionId } = event.params;
-    await notifyOnExerciseFeedbackHandler(getApp(), athleteUid, sessionId, feedbackData);
+    await notifyOnExerciseFeedbackHandler(ensureApp(), athleteUid, sessionId, feedbackData);
   },
 );

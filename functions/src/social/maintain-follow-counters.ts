@@ -44,17 +44,16 @@
  * Region southamerica-east1 per ADR-PN-005.
  */
 
-import * as admin from "firebase-admin";
-import { App } from "firebase-admin/app";
-import { Firestore, Transaction } from "firebase-admin/firestore";
+import { App, getApp, initializeApp } from "firebase-admin/app";
+import { Firestore, Transaction, getFirestore } from "firebase-admin/firestore";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 
-function getApp(): App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -187,7 +186,7 @@ export async function maintainFollowCountersHandler(
     return;
   }
 
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
   const { requesterUid, otherUid, delta } = outcome;
   const requesterRef = db.collection("userPublicProfiles").doc(requesterUid);
   const otherRef = db.collection("userPublicProfiles").doc(otherUid);
@@ -237,6 +236,6 @@ export const maintainFollowCounters = onDocumentWritten(
   async (event) => {
     const before = event.data?.before?.data() as FollowData | undefined;
     const after = event.data?.after?.data() as FollowData | undefined;
-    await maintainFollowCountersHandler(getApp(), before, after);
+    await maintainFollowCountersHandler(ensureApp(), before, after);
   },
 );

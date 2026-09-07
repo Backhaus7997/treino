@@ -118,6 +118,48 @@ const SIMBOLOS_QUE_EXIGEN_APP = new Set([
  * Se chequean las dos cosas. La de app cubre el símbolo que el test NO falsea
  * pero igual revienta; ésta cubre el que no revienta y miente.
  */
+/**
+ * Los dobles modulares se escriben con una línea que delega en
+ * `helpers/modular-from-namespaced.ts`:
+ *
+ *     jest.mock("firebase-admin/app", () =>
+ *       (
+    jest.requireActual("./helpers/modular-from-namespaced") as Record<
+      string,
+      () => unknown
+    >
+  ).app());
+ *
+ * El factory ya no NOMBRA los símbolos, así que mirar su texto no alcanza: el
+ * gate tiene que seguir esa indirección un nivel. Si no, el helper —que existe
+ * justamente para que los 13 dobles no drifteen— apagaría el trinquete que los
+ * vigila, y eso es peor que el problema que resuelve.
+ */
+const HELPER = "modular-from-namespaced";
+const CUERPOS_DEL_HELPER: Record<string, string> = (() => {
+  const ruta = path.join(TESTS, "helpers", `${HELPER}.ts`);
+  if (!fs.existsSync(ruta)) return {};
+  const fuente = fs.readFileSync(ruta, "utf8");
+  const out: Record<string, string> = {};
+  for (const m of fuente.matchAll(/export function (\w+)\([^)]*\)[^{]*\{([\s\S]*?)\n\}/g)) {
+    out[m[1]] = m[2];
+  }
+  return out;
+})();
+
+/** Resuelve el cuerpo real de un mock, siguiendo el helper si delega en él. */
+function cuerpoEfectivo(cuerpo: string): string {
+  const m = cuerpo.match(new RegExp(`${HELPER}[\\s\\S]*?\\)\\.(\\w+)\\(`));
+  if (!m) return cuerpo;
+  const delHelper = CUERPOS_DEL_HELPER[m[1]];
+  if (delHelper === undefined) {
+    throw new Error(
+      `El mock delega en ${HELPER}.${m[1]}(), que no existe en el helper. ` +
+        "¿Se renombró la función y quedó un test apuntando al nombre viejo?",
+    );
+  }
+  return delHelper;
+}
 function cuerpoDelMock(codigo: string, specifier: string): string {
   const inicio = codigo.indexOf(`jest.mock("${specifier}"`);
   if (inicio < 0) return "";
@@ -248,7 +290,7 @@ describe("la superficie mockeada de firebase-admin cubre lo que el código impor
       const mockeados = new Set([...codigo.matchAll(JEST_MOCK)].map((m) => m[1]));
       if (!mockeados.has("firebase-admin")) continue;
 
-      const cuerpoNs = cuerpoDelMock(codigo, "firebase-admin");
+      const cuerpoNs = cuerpoEfectivo(cuerpoDelMock(codigo, "firebase-admin"));
       const { relativos } = analizar(test);
 
       for (const [subpath, porNombre] of subpathsAlcanzados(relativos)) {
@@ -257,7 +299,7 @@ describe("la superficie mockeada de firebase-admin cubre lo que el código impor
         // `mp-reconcile.test.ts` ya mockeaba `firebase-admin/firestore` (con
         // `FieldValue`/`Timestamp`, del PR 3) cuando producción empezó a pedirle
         // `getFirestore`. El subpath estaba mockeado y el símbolo no existía.
-        const cuerpoSub = mockeados.has(subpath) ? cuerpoDelMock(codigo, subpath) : null;
+        const cuerpoSub = mockeados.has(subpath) ? cuerpoEfectivo(cuerpoDelMock(codigo, subpath)) : null;
 
         const culpables: string[] = [];
         for (const [nombre, archivos] of porNombre) {

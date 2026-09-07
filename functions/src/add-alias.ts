@@ -16,11 +16,10 @@
  *   ADR-CXP-007 — HttpsError message strings locked (English, operator-facing)
  */
 
-import * as admin from "firebase-admin";
-import { App } from "firebase-admin/app";
+import { App, getApp, initializeApp } from "firebase-admin/app";
 import * as functions from "firebase-functions/v2/https";
 import { HttpsError } from "firebase-functions/v2/https";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
 
 /**
  * Initialize the default Admin SDK app lazily so the module can be imported
@@ -28,12 +27,12 @@ import { FieldValue } from "firebase-admin/firestore";
  * their own named apps before importing).
  * Copied from review-aggregate.ts (same pattern).
  */
-function getApp(): App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
     // No default app yet — initialize one.
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -99,7 +98,7 @@ export async function runAddAlias(
   exerciseId: string,
   alias: string,
 ): Promise<{ status: "ok" | "noop" }> {
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
 
   // ── Guard: inputs must be non-empty ──────────────────────────────────────
   // Validated here (not only in the callable wrapper) so runAddAlias is
@@ -166,6 +165,6 @@ export const addAlias = functions.onCall(
       );
     }
 
-    return runAddAlias(getApp(), request.auth.uid, exerciseId, alias);
+    return runAddAlias(ensureApp(), request.auth.uid, exerciseId, alias);
   },
 );

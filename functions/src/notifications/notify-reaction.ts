@@ -16,18 +16,18 @@
  * functions.
  */
 
-import * as admin from "firebase-admin";
-import { App } from "firebase-admin/app";
+import { App, getApp, initializeApp } from "firebase-admin/app";
 import { Messaging } from "firebase-admin/messaging";
+import { getFirestore } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { sendFcm } from "./send-fcm";
 
-function getApp(): App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -120,7 +120,7 @@ export async function notifyOnReactionHandler(
     return;
   }
 
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
   const postRef = db.collection("posts").doc(postId);
   const postSnap = await postRef.get();
   const post = postSnap.exists ? postSnap.data() : undefined;
@@ -193,7 +193,7 @@ export const notifyOnReaction = onDocumentWritten(
       : undefined;
 
     await notifyOnReactionHandler(
-      getApp(),
+      ensureApp(),
       event.params.postId,
       event.params.reactorUid,
       before,

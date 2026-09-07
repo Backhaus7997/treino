@@ -21,6 +21,20 @@ jest.mock("firebase-admin", () => ({
   initializeApp: jest.fn(() => ({})),
 }));
 
+jest.mock("firebase-admin/firestore", () => (
+    jest.requireActual("./helpers/modular-from-namespaced") as Record<
+      string,
+      () => unknown
+    >
+).firestoreDesdeNamespaced());
+
+jest.mock("firebase-admin/app", () => (
+    jest.requireActual("./helpers/modular-from-namespaced") as Record<
+      string,
+      () => unknown
+    >
+).app());
+
 import { syncTrainerLoad } from "../subscriptions/promote-link";
 import { runAcceptTrainerLink } from "../subscriptions/accept-trainer-link";
 

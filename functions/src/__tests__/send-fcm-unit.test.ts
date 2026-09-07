@@ -1,9 +1,33 @@
 /** Pure unit tests for history persistence in sendFcm (no emulator). */
 
+// `FieldValue` va acá y no en el doble modular: la puerta modular REEXPORTA de
+// ésta, así que una sola fuente de verdad. Hasta que este PR mockeó
+// `firebase-admin/firestore`, `send-fcm.ts` leía el `FieldValue` REAL por el
+// subpath — era el drift que el trinquete existe para cerrar, y que acá era
+// inocuo sólo porque `serverTimestamp()` es una fábrica pura.
 jest.mock("firebase-admin", () => ({
-  firestore: jest.fn(),
+  firestore: Object.assign(jest.fn(), {
+    FieldValue: {
+      serverTimestamp: () => "__ts__",
+      arrayRemove: (...v: unknown[]) => ({ __arrayRemove: v }),
+    },
+  }),
   messaging: jest.fn(),
 }));
+
+jest.mock("firebase-admin/messaging", () => (
+    jest.requireActual("./helpers/modular-from-namespaced") as Record<
+      string,
+      () => unknown
+    >
+).messaging());
+
+jest.mock("firebase-admin/firestore", () => (
+    jest.requireActual("./helpers/modular-from-namespaced") as Record<
+      string,
+      () => unknown
+    >
+).firestoreDesdeNamespaced());
 
 import * as admin from "firebase-admin";
 import { sendFcm } from "../notifications/send-fcm";

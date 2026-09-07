@@ -38,8 +38,8 @@
  * product decision 2026-07-16 changed this to full deletion).
  */
 
-import * as admin from "firebase-admin";
 import { App } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 
 /**
  * Deletes all posts authored by the given uid, together with their
@@ -52,7 +52,7 @@ export async function deletePosts(
   app: App,
   uid: string
 ): Promise<{ count: number }> {
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
 
   const snapshot = await db
     .collection("posts")

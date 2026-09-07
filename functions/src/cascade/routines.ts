@@ -69,9 +69,8 @@
  * remove these). Server-side (Cloud Function) only. ADR-ACCDEL-013.
  */
 
-import * as admin from "firebase-admin";
 import { App } from "firebase-admin/app";
-import { DocumentReference } from "firebase-admin/firestore";
+import { DocumentReference, getFirestore } from "firebase-admin/firestore";
 
 /**
  * Deletes every routine document that belongs to [uid], with its
@@ -87,7 +86,7 @@ export async function deleteAthleteRoutines(
   app: App,
   uid: string
 ): Promise<{ deleted: number }> {
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
   const routines = db.collection("routines");
 
   const [assigned, authored] = await Promise.all([

@@ -28,18 +28,18 @@
  *   - after.status !== 'terminated' → skip.
  */
 
-import * as admin from "firebase-admin";
-import { App } from "firebase-admin/app";
+import { App, getApp, initializeApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 
 const BATCH_SIZE = 500;
 
-function getApp(): App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -57,7 +57,7 @@ export async function deleteAssignedPlansForPair(
   trainerId: string,
   athleteId: string,
 ): Promise<{ count: number }> {
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
 
   const snapshot = await db
     .collection("routines")
@@ -150,6 +150,6 @@ export const cleanupAssignedPlansOnUnlink = onDocumentWritten(
   async (event) => {
     const before = event.data?.before?.data() as LinkData | undefined;
     const after = event.data?.after?.data() as LinkData | undefined;
-    await cleanupAssignedPlansOnUnlinkHandler(getApp(), before, after);
+    await cleanupAssignedPlansOnUnlinkHandler(ensureApp(), before, after);
   },
 );

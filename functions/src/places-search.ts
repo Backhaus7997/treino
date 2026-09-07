@@ -40,12 +40,11 @@
  * Spec:   sdd/gym-google-places/spec — gym-places-search (#347).
  */
 
-import * as admin from "firebase-admin";
-import { App } from "firebase-admin/app";
+import { App, getApp, initializeApp } from "firebase-admin/app";
 import * as functions from "firebase-functions/v2/https";
 import { HttpsError } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
 
 /**
  * Initialize the default Admin SDK app lazily so the module can be imported
@@ -53,12 +52,12 @@ import { FieldValue } from "firebase-admin/firestore";
  * their own named apps before importing).
  * Copied from add-alias.ts / review-aggregate.ts (same pattern).
  */
-function getApp(): App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
     // No default app yet — initialize one.
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -202,7 +201,7 @@ export async function runResolveGymPlace(
     throw new HttpsError("invalid-argument", "placeId is required.");
   }
 
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
   const gymRef = db.collection("gyms").doc(placeId);
 
   // ── Read-through cache ────────────────────────────────────────────────────
@@ -296,6 +295,6 @@ export const resolveGymPlace = functions.onCall(
       throw new HttpsError("invalid-argument", "placeId is required.");
     }
 
-    return runResolveGymPlace(getApp(), placeId, sessionToken);
+    return runResolveGymPlace(ensureApp(), placeId, sessionToken);
   },
 );
