@@ -118,8 +118,8 @@ const SIMBOLOS_QUE_EXIGEN_APP = new Set([
  * Se chequean las dos cosas. La de app cubre el símbolo que el test NO falsea
  * pero igual revienta; ésta cubre el que no revienta y miente.
  */
-function cuerpoDelMockNamespaced(codigo: string): string {
-  const inicio = codigo.indexOf("jest.mock(\"firebase-admin\"");
+function cuerpoDelMock(codigo: string, specifier: string): string {
+  const inicio = codigo.indexOf(`jest.mock("${specifier}"`);
   if (inicio < 0) return "";
   let nivel = 0;
   for (let i = codigo.indexOf("(", inicio); i < codigo.length; i++) {
@@ -248,27 +248,51 @@ describe("la superficie mockeada de firebase-admin cubre lo que el código impor
       const mockeados = new Set([...codigo.matchAll(JEST_MOCK)].map((m) => m[1]));
       if (!mockeados.has("firebase-admin")) continue;
 
-      const cuerpo = cuerpoDelMockNamespaced(codigo);
+      const cuerpoNs = cuerpoDelMock(codigo, "firebase-admin");
       const { relativos } = analizar(test);
 
       for (const [subpath, porNombre] of subpathsAlcanzados(relativos)) {
-        if (mockeados.has(subpath)) continue;
+        // Mockear el subpath NO alcanza: el doble tiene que TRAER los símbolos que
+        // producción le pide. Es un hueco real, no teórico — en el PR 4
+        // `mp-reconcile.test.ts` ya mockeaba `firebase-admin/firestore` (con
+        // `FieldValue`/`Timestamp`, del PR 3) cuando producción empezó a pedirle
+        // `getFirestore`. El subpath estaba mockeado y el símbolo no existía.
+        const cuerpoSub = mockeados.has(subpath) ? cuerpoDelMock(codigo, subpath) : null;
 
         const culpables: string[] = [];
         for (const [nombre, archivos] of porNombre) {
+          // PRIMERO el filtro de peligrosidad. Al revés, el gate empieza a pedir
+          // que se mockeen TIPOS (`DocumentData`, `DocumentReference`), que se
+          // borran al compilar y no pueden driftear — ruido puro, y el ruido en un
+          // gate es lo que lleva a que alguien lo silencie.
           const exigeApp = SIMBOLOS_QUE_EXIGEN_APP.has(nombre);
           // ¿Este test se tomó el trabajo de falsear este símbolo en su mock
           // namespaced? Entonces le importa, y leer el real es drift.
-          const falseado = new RegExp(`\\b${nombre}\\b`).test(cuerpo);
+          const falseado = new RegExp(`\\b${nombre}\\b`).test(cuerpoNs);
           if (!exigeApp && !falseado) continue;
+
+          // Con el subpath ya mockeado, lo único que falta es que ESTE símbolo
+          // esté adentro del doble.
+          if (cuerpoSub !== null) {
+            if (new RegExp(`\\b${nombre}\\b`).test(cuerpoSub)) continue;
+            culpables.push(
+              `${nombre} — el mock de "${subpath}" existe pero no lo trae ← ${[...archivos].sort().join(", ")}`,
+            );
+            continue;
+          }
+
           const motivo = exigeApp ? "necesita una app" : "lo falsea este mismo test";
           culpables.push(`${nombre} (${motivo}) ← ${[...archivos].sort().join(", ")}`);
         }
         if (culpables.length === 0) continue;
 
+        const cabecera =
+          cuerpoSub === null
+            ? `    mockea "firebase-admin" pero NO "${subpath}", del que su grafo importa:`
+            : `    mockea "${subpath}" pero su doble no cubre lo que el grafo importa:`;
         violaciones.push(
           `${path.relative(TESTS, test)}\n` +
-            `    mockea "firebase-admin" pero NO "${subpath}", del que su grafo importa:\n` +
+            `${cabecera}\n` +
             culpables.sort().map((c) => `      · ${c}`).join("\n"),
         );
       }

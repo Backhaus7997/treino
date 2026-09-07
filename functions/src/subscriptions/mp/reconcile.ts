@@ -49,8 +49,8 @@
  * deteccion de transiciones se convertiria en una tormenta de mails.
  */
 
-import * as admin from "firebase-admin";
-import { Timestamp } from "firebase-admin/firestore";
+import { App, getApp, initializeApp } from "firebase-admin/app";
+import { Timestamp, getFirestore } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { defineSecret } from "firebase-functions/params";
@@ -89,11 +89,11 @@ export interface ReconcileDeps {
   nowMs: number;
 }
 
-function getApp(): admin.app.App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -249,7 +249,7 @@ function mismaFecha(
  * que se cae por un PF deja a todos los demas sin reconciliar.
  */
 export async function reconcileSubscription(
-  app: admin.app.App,
+  app: App,
   planId: string,
   deps: ReconcileDeps,
 ): Promise<ReconcileResult> {
@@ -348,7 +348,7 @@ export async function reconcileSubscription(
     return { planId, outcome: "skipped-degraded", uid, tier: mapping.tier };
   }
 
-  const userRef = app.firestore().collection("users").doc(uid);
+  const userRef = getFirestore(app).collection("users").doc(uid);
   const actual = (await userRef.get()).data()?.subscription as
     | Record<string, unknown>
     | undefined;
@@ -394,8 +394,7 @@ export async function reconcileSubscription(
   // uno nuevo con otro id. Marcarlo saca este id del barrido y le ahorra una
   // llamada diaria a MP para siempre.
   if (status === "cancelled") {
-    await app
-      .firestore()
+    await getFirestore(app)
       .collection(MP_PLANS_COLLECTION)
       .doc(planId)
       .set({ terminal: true }, { merge: true });
@@ -455,12 +454,11 @@ export function esAbandonado(createdAt: unknown, nowMs: number): boolean {
  * no se consulte.
  */
 async function marcarTerminal(
-  app: admin.app.App,
+  app: App,
   planId: string,
   motivo: string,
 ): Promise<void> {
-  await app
-    .firestore()
+  await getFirestore(app)
     .collection(MP_PLANS_COLLECTION)
     .doc(planId)
     .set({ terminal: true, terminalReason: motivo }, { merge: true });
@@ -482,11 +480,10 @@ async function marcarTerminal(
  * toda la madrugada.
  */
 export async function reconcileAllSubscriptions(
-  app: admin.app.App,
+  app: App,
   deps: ReconcileDeps,
 ): Promise<SweepResult> {
-  const snap = await app
-    .firestore()
+  const snap = await getFirestore(app)
     .collection(MP_PLANS_COLLECTION)
     .get();
 
@@ -544,7 +541,7 @@ export const reconcileMpSubscriptions = onSchedule(
     secrets: [MP_ACCESS_TOKEN],
   },
   async () => {
-    const r = await reconcileAllSubscriptions(getApp(), {
+    const r = await reconcileAllSubscriptions(ensureApp(), {
       mpClient: createMpClient(MP_ACCESS_TOKEN.value()),
       nowMs: Date.now(),
     });
