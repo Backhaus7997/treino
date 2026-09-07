@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../app/theme/app_palette.dart';
 import '../../../../coach/application/agenda_providers.dart';
+import '../../../../coach/domain/wall_clock.dart';
 import '../../../../coach/domain/appointment.dart';
 import 'agenda_time_grid.dart';
 
@@ -63,7 +64,16 @@ class AgendaWeekView extends ConsumerWidget {
     return AgendaTimeGrid(
       firstDay: firstDay,
       dayCount: dayCount,
-      now: now ?? DateTime.now(),
+      // `nowWall()` y no el reloj crudo: la línea de "ahora" se compara
+      // contra `Appointment.startsAt`, que es wall-clock de Argentina. Con el
+      // instante UTC real la línea se dibuja 3 horas corrida — el mismo modo
+      // de falla de #671.
+      //
+      // (El comentario NO nombra la llamada prohibida a propósito: el scanner
+      // del ratchet `no_raw_clock_scan` es TEXTUAL y cuenta los comentarios
+      // igual que el código. Escribirla acá, aunque fuera para explicar por
+      // qué no se usa, rompe el ratchet lo mismo.)
+      now: now ?? nowWall(),
       onEmptySlotTap: onEmptySlotTap,
       onEventTap: onEventTap == null
           ? null

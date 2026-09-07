@@ -19,6 +19,7 @@ import '../../../../workout/application/session_providers.dart'
 import 'agenda_web_calendar.dart';
 import 'agenda_web_day_list.dart';
 import 'agenda_web_helpers.dart';
+import '../../../../../core/utils/argentina_time.dart';
 import '../../../../../core/widgets/treino_icon.dart';
 import '../../../../coach/domain/wall_clock.dart';
 import '../../widgets/coach_hub_widgets.dart' show TreinoFilterChips;
@@ -54,7 +55,11 @@ class _AgendaWebScreenState extends ConsumerState<AgendaWebScreen> {
 
   /// Primer día de la semana visible en la grilla (desktop). Se mueve con las
   /// flechas; el `TableCalendar` del layout angosto no lo usa.
-  DateTime _weekStart = _lunesDe(DateTime.now());
+  /// `argentinaNow()` y no el reloj crudo: acá se decide EN QUÉ SEMANA
+  /// estamos, que es un bucket de día. Con el instante UTC real, las últimas
+  /// 3 horas del domingo caen en la semana siguiente y el PF abre la agenda
+  /// en la semana equivocada.
+  DateTime _weekStart = _lunesDe(argentinaNow());
 
   /// 7 = semana, 1 = día. Sólo aplica a la grilla.
   int _gridDays = 7;
@@ -145,8 +150,8 @@ class _AgendaWebScreenState extends ConsumerState<AgendaWebScreen> {
                   onNext: () => setState(() =>
                       _weekStart = _weekStart.add(Duration(days: _gridDays))),
                   onToday: () => setState(() => _weekStart = _gridDays == 7
-                      ? _lunesDe(DateTime.now())
-                      : DateTime.now()),
+                      ? _lunesDe(argentinaNow())
+                      : argentinaNow()),
                   onDayCount: (n) => setState(() {
                     _gridDays = n;
                     _weekStart =
