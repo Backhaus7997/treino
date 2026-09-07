@@ -6,19 +6,18 @@
  * trigger more work, which makes the function safe when its own writes fire
  * this trigger again.
  */
-import * as admin from "firebase-admin";
-import { App } from "firebase-admin/app";
-import { FieldValue } from "firebase-admin/firestore";
+import { App, getApp, initializeApp } from "firebase-admin/app";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 
 type UserData = Record<string, unknown>;
 
-function getApp(): App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -55,7 +54,7 @@ export async function reassignFcmTokenHandler(
   const addedTokens = addedFcmTokens(before, after);
   if (addedTokens.length === 0) return;
 
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
   const removalsByUser = new Map<string, Set<string>>();
 
   for (const token of addedTokens) {
@@ -105,7 +104,7 @@ export const reassignFcmToken = onDocumentWritten(
     const before = event.data?.before?.data() as UserData | undefined;
     const after = event.data?.after?.data() as UserData | undefined;
     await reassignFcmTokenHandler(
-      getApp(),
+      ensureApp(),
       event.params.uid as string,
       before,
       after,

@@ -31,9 +31,8 @@
  * Deployed to southamerica-east1 (matches all other TREINO CFs).
  */
 
-import * as admin from "firebase-admin";
-import { App } from "firebase-admin/app";
-import { FieldValue, Timestamp } from "firebase-admin/firestore";
+import { App, getApp, initializeApp } from "firebase-admin/app";
+import { FieldValue, Timestamp, getFirestore } from "firebase-admin/firestore";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 
@@ -41,11 +40,11 @@ import { logger } from "firebase-functions";
 // Lazy app singleton (project convention — mirrors sync-session-share.ts)
 // ---------------------------------------------------------------------------
 
-function getApp(): App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -102,7 +101,7 @@ export async function syncSharedProfileHandler(
     return { updated: false, reason: "user-deleted" };
   }
 
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
   const shareRef = db.collection("profile_shares").doc(uid);
 
   // ── 2. Read existing profile_shares/{uid} ─────────────────────────────────
@@ -257,7 +256,7 @@ export const syncSharedProfile = onDocumentWritten(
       (event.data?.after?.data() as Record<string, unknown> | undefined) ??
       null;
     const result = await syncSharedProfileHandler(
-      getApp(),
+      ensureApp(),
       uid,
       userAfter,
       new Date(),

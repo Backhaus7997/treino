@@ -55,9 +55,8 @@
  * carga inconsistente.
  */
 
-import * as admin from "firebase-admin";
 import { App } from "firebase-admin/app";
-import { DocumentData, FieldValue, Timestamp } from "firebase-admin/firestore";
+import { DocumentData, FieldValue, Timestamp, getFirestore } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 
 import { effectiveWeightLimit } from "./effective-limit";
@@ -132,7 +131,7 @@ export async function syncTrainerEntitlements(
   trainerId: string,
   nowMs?: number,
 ): Promise<SyncEntitlementsResult> {
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
   const clock = nowMs ?? Date.now();
 
   return db.runTransaction(async (tx) => {

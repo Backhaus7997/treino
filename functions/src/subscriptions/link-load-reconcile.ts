@@ -56,8 +56,7 @@
  *     client-side accept()/resume() traffic after the CF migration ships.
  */
 
-import * as admin from "firebase-admin";
-import { App } from "firebase-admin/app";
+import { App, getApp, initializeApp } from "firebase-admin/app";
 import { DocumentData } from "firebase-admin/firestore";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
@@ -65,11 +64,11 @@ import { logger } from "firebase-functions";
 import { syncTrainerLoad } from "./promote-link";
 import { syncTrainerEntitlements } from "./sync-entitlements";
 
-function getApp(): App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -374,6 +373,6 @@ export const linkLoadReconcile = onDocumentWritten(
       return;
     }
 
-    await linkLoadReconcileHandler(getApp(), trainerId);
+    await linkLoadReconcileHandler(ensureApp(), trainerId);
   },
 );

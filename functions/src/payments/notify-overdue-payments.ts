@@ -26,10 +26,9 @@
  * Deployed to southamerica-east1 (matches all other TREINO CFs).
  */
 
-import * as admin from "firebase-admin";
-import { App } from "firebase-admin/app";
+import { App, getApp, initializeApp } from "firebase-admin/app";
 import { Messaging } from "firebase-admin/messaging";
-import { Timestamp } from "firebase-admin/firestore";
+import { Timestamp, getFirestore } from "firebase-admin/firestore";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { logger } from "firebase-functions";
 import { sendFcm } from "../notifications/send-fcm";
@@ -40,11 +39,11 @@ import { artDateKey, formatArs, formatShortDateAR } from "../mail/format";
 // Lazy app singleton (project convention — mirrors generate-due-payments.ts)
 // ---------------------------------------------------------------------------
 
-function getApp(): App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -84,7 +83,7 @@ export async function notifyOverduePaymentsHandler(
   now: Date,
   messaging?: Messaging,
 ): Promise<NotifyOverdueResult> {
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
 
   let notified = 0;
   let skipped = 0;
@@ -257,7 +256,7 @@ export const notifyOverduePayments = onSchedule(
     region: "southamerica-east1",
   },
   async () => {
-    const result = await notifyOverduePaymentsHandler(getApp(), new Date());
+    const result = await notifyOverduePaymentsHandler(ensureApp(), new Date());
     logger.info("notifyOverduePayments: scheduled run done", result);
   },
 );

@@ -12,6 +12,13 @@ jest.mock("firebase-admin", () => {
   return { firestore, app: jest.fn(), initializeApp: jest.fn() };
 });
 
+jest.mock("firebase-admin/app", () => (
+    jest.requireActual("./helpers/modular-from-namespaced") as Record<
+      string,
+      () => unknown
+    >
+).app());
+
 // La puerta modular tiene que dar EL MISMO doble que la namespaced de arriba.
 //
 // `jest.mock("firebase-admin", …)` intercepta el specifier EXACTO. Producción
@@ -24,19 +31,12 @@ jest.mock("firebase-admin", () => {
 // depende del orden entre los dos `jest.mock`.
 //
 // Lo fija `firebase-admin-mock-surface.test.ts`.
-jest.mock("firebase-admin/firestore", () => {
-  const ns = jest.requireMock("firebase-admin") as {
-    firestore: Record<string, unknown>;
-  };
-  return {
-    get Timestamp() {
-      return ns.firestore.Timestamp;
-    },
-    get FieldValue() {
-      return ns.firestore.FieldValue;
-    },
-  };
-});
+jest.mock("firebase-admin/firestore", () => (
+    jest.requireActual("./helpers/modular-from-namespaced") as Record<
+      string,
+      () => unknown
+    >
+).firestoreDesdeNamespaced());
 
 jest.mock("../subscriptions/sync-entitlements", () => ({
   syncTrainerEntitlements: jest.fn(),

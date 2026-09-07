@@ -24,11 +24,12 @@
  */
 
 import * as admin from "firebase-admin";
-import { App } from "firebase-admin/app";
+import { App, getApp, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { defineSecret, defineString } from "firebase-functions/params";
 import { logger } from "firebase-functions";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
 
 import { MAIL_QUEUE_COLLECTION, MailQueueDoc } from "./types";
 import { renderMail } from "./templates";
@@ -66,11 +67,11 @@ const MAIL_FROM = defineString("MAIL_FROM", {
 /** Past this many attempts a document is declared permanently failed. */
 const MAX_ATTEMPTS = 5;
 
-function getApp(): App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -85,7 +86,7 @@ async function resolveAddress(
   uid: string,
 ): Promise<string | null> {
   try {
-    const user = await admin.auth(app).getUser(uid);
+    const user = await getAuth(app).getUser(uid);
     return user.email ?? null;
   } catch (error: unknown) {
     logger.warn("sendQueuedMail: cannot resolve address", { uid, error });
@@ -106,7 +107,7 @@ async function emailChannelAllowed(
   uid: string,
   prefKey: string,
 ): Promise<boolean> {
-  const snap = await admin.firestore(app).collection("users").doc(uid).get();
+  const snap = await getFirestore(app).collection("users").doc(uid).get();
   const prefs = snap.data()?.notificationPrefs as
     | Record<string, Record<string, boolean> | undefined>
     | undefined;
@@ -273,6 +274,6 @@ export const sendQueuedMail = onDocumentCreated(
   async (event) => {
     const data = event.data?.data() as MailQueueDoc | undefined;
     const sender = createResendSender(RESEND_API_KEY.value(), MAIL_FROM.value());
-    await sendQueuedMailHandler(getApp(), event.params.mailId, data, sender);
+    await sendQueuedMailHandler(ensureApp(), event.params.mailId, data, sender);
   },
 );

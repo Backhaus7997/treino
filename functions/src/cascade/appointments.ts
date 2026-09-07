@@ -76,9 +76,8 @@
  * `cancelledBy` y la entrada del `cancellationLog`.
  */
 
-import * as admin from "firebase-admin";
 import { App } from "firebase-admin/app";
-import { FieldValue, Timestamp } from "firebase-admin/firestore";
+import { FieldValue, Timestamp, getFirestore } from "firebase-admin/firestore";
 
 const BATCH_SIZE = 500;
 
@@ -107,7 +106,7 @@ export async function cancelFutureAppointments(
   app: App,
   uid: string
 ): Promise<{ count: number }> {
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
   const now = Timestamp.now();
 
   // Query future appointments for this athlete that are not already cancelled.

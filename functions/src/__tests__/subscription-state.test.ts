@@ -47,19 +47,12 @@ jest.mock("firebase-admin", () => {
 // depende del orden entre los dos `jest.mock`.
 //
 // Lo fija `firebase-admin-mock-surface.test.ts`.
-jest.mock("firebase-admin/firestore", () => {
-  const ns = jest.requireMock("firebase-admin") as {
-    firestore: Record<string, unknown>;
-  };
-  return {
-    get FieldValue() {
-      return ns.firestore.FieldValue;
-    },
-    get Timestamp() {
-      return ns.firestore.Timestamp;
-    },
-  };
-});
+jest.mock("firebase-admin/firestore", () => (
+    jest.requireActual("./helpers/modular-from-namespaced") as Record<
+      string,
+      () => unknown
+    >
+).firestoreDesdeNamespaced());
 
 const warnSpy = jest.fn();
 const infoSpy = jest.fn();

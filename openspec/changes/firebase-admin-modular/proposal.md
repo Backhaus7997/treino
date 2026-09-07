@@ -159,10 +159,14 @@ Lo encontró `tsc` al implementar el PR 2, y contradice la fila de arriba leída
    handle pelado. Renombrar el tipo rompe todo `app.firestore()` — que es un cambio de **runtime**,
    no de tipos.
 
-2. **Los dos tipos son mutuamente inasignables.** `TS2345: Argument of type '…/app/core".App' is not
+2. **La asignabilidad va en UNA sola dirección** — la primera versión de esta nota decía
+   «mutuamente inasignables» y era falso. `TS2345: Argument of type '…/app/core".App' is not
    assignable to parameter of type '…/firebase-namespace-api".app.App'`. O sea que **el tipo `App`
-   no se puede migrar archivo por archivo si los archivos se pasan un `App` entre sí**: hay que
-   migrar el componente conexo entero, o ninguno.
+   no se puede migrar archivo por archivo si un archivo migrado le pasa su `App` a uno sin migrar**.
+   Al revés SÍ anda: el namespaced tiene más miembros, así que se asigna a un `App` modular sin
+   problema —hubo 29 archivos con `function getApp(): App { return admin.app(); }` compilando—. Por
+   eso el PR 4b no tuvo componente conexo: con `admin.app.App` ya en cero no quedaba un solo
+   parámetro namespaced al que pasarle un `App` modular.
 
 En este repo son **4 archivos**: los tres de `src/subscriptions/mp/` (`reconcile.ts`,
 `tier-mapping.ts`, `create-preapproval.ts`) y `src/notifications/notify-link-change.ts`. Se

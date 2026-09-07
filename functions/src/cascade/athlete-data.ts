@@ -25,9 +25,8 @@
  * ADR-ACCDEL-013.
  */
 
-import * as admin from "firebase-admin";
 import { App } from "firebase-admin/app";
-import { Firestore, Query } from "firebase-admin/firestore";
+import { Firestore, Query, getFirestore } from "firebase-admin/firestore";
 
 const CHUNK = 400;
 
@@ -75,7 +74,7 @@ export async function deleteAthleteOwnedData(
   app: App,
   uid: string
 ): Promise<{ deleted: number }> {
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
   let deleted = 0;
 
   for (const collection of ATHLETE_FIELD_COLLECTIONS) {

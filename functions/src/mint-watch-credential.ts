@@ -47,8 +47,8 @@
  * (mintWatchCredential). Mismo que addAlias / deleteAccount en este codebase.
  */
 
-import * as admin from "firebase-admin";
-import { App } from "firebase-admin/app";
+import { App, getApp, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
 import * as functions from "firebase-functions/v2/https";
 import { HttpsError } from "firebase-functions/v2/https";
 
@@ -57,11 +57,11 @@ import { HttpsError } from "firebase-functions/v2/https";
  * modulo se pueda importar sin que exista una app previa (los tests crean su
  * propia app nombrada antes de importar). Copiado de add-alias.ts.
  */
-function getApp(): App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -82,7 +82,7 @@ export async function runMintWatchCredential(
     throw new HttpsError("unauthenticated", "Authentication required.");
   }
 
-  const customToken = await admin.auth(app).createCustomToken(callerId);
+  const customToken = await getAuth(app).createCustomToken(callerId);
 
   return { customToken };
 }
@@ -148,6 +148,6 @@ export const mintWatchCredential = functions.onCall(
 
     // `request.data` se ignora a proposito y por completo. Ver la nota de
     // seguridad del encabezado: el uid sale UNICAMENTE del token verificado.
-    return runMintWatchCredential(getApp(), request.auth.uid);
+    return runMintWatchCredential(ensureApp(), request.auth.uid);
   },
 );

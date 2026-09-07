@@ -9,8 +9,9 @@
  * REQ-ACCDEL-CF-010 | ADR-ACCDEL-013
  */
 
-import * as admin from "firebase-admin";
 import { App } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 
 /**
  * Deletes the avatar file(s) for the given uid from Storage.
@@ -24,7 +25,7 @@ export async function deleteAvatar(
   uid: string
 ): Promise<{ deleted: number }> {
   // Admin SDK bypasses Storage security rules (ADR-ACCDEL-013)
-  const bucket = admin.storage(app).bucket();
+  const bucket = getStorage(app).bucket();
   const [files] = await bucket.getFiles({ prefix: `avatars/${uid}` });
   // Guard against a different uid that merely has this uid as a prefix: only
   // `avatars/{uid}.<ext>` counts (the file name is exactly the uid + extension).
@@ -68,7 +69,7 @@ export async function deleteAthleteStorage(
   app: App,
   uid: string
 ): Promise<{ deleted: number }> {
-  const bucket = admin.storage(app).bucket();
+  const bucket = getStorage(app).bucket();
   let deleted = 0;
 
   const deleteByPrefix = async (prefix: string): Promise<void> => {
@@ -84,7 +85,7 @@ export async function deleteAthleteStorage(
 
   // chatMedia is keyed chatMedia/{chatId}/{uid}/… — the uid is the SECOND
   // segment, so there is no single prefix. Scope by the athlete's chats.
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
   const chats = await db
     .collection("chats")
     .where("members", "array-contains", uid)

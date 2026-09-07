@@ -11,9 +11,8 @@
  * REQ-ACCDEL-CF-008 | ADR-ACCDEL-006
  */
 
-import * as admin from "firebase-admin";
 import { App } from "firebase-admin/app";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
 
 const BATCH_SIZE = 500;
 
@@ -25,7 +24,7 @@ export async function terminateTrainerLinks(
   app: App,
   uid: string
 ): Promise<{ count: number }> {
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
 
   // Query only non-terminated links — already-terminated ones are left as-is
   const snapshot = await db
