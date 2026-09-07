@@ -12,8 +12,13 @@ import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_day.dart';
 import 'package:treino/features/workout/domain/routine_source.dart';
+import 'package:treino/features/workout/domain/routine_visibility.dart';
 
-Routine _makeRoutine({int days = 3, int weeks = 8}) {
+Routine _makeRoutine({
+  int days = 3,
+  int weeks = 8,
+  RoutineVisibility visibility = RoutineVisibility.private,
+}) {
   return Routine(
     id: 'tpl-a',
     name: 'Fuerza Total',
@@ -25,6 +30,7 @@ Routine _makeRoutine({int days = 3, int weeks = 8}) {
     ),
     numWeeks: weeks,
     source: RoutineSource.trainerTemplate,
+    visibility: visibility,
   );
 }
 
@@ -140,6 +146,37 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('una plantilla publicada muestra el badge PUBLICADA',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        TemplateGridCard(
+          routine: _makeRoutine(visibility: RoutineVisibility.public),
+          onTap: () {},
+        ),
+      ));
+      await tester.pump();
+
+      expect(find.text('PUBLICADA'), findsOneWidget);
+      // El fixture monta la card en 240px — más angosto que los ~360 reales
+      // de la grilla. Si el badge y el chip de nivel comparten una fila
+      // rígida, acá revienta el layout.
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('una plantilla privada no muestra badge', (tester) async {
+      await tester.pumpWidget(_wrap(
+        TemplateGridCard(
+          routine: _makeRoutine(visibility: RoutineVisibility.private),
+          onTap: () {},
+        ),
+      ));
+      await tester.pump();
+
+      expect(find.text('PUBLICADA'), findsNothing);
+      // El nivel sigue estando: el badge se suma, no reemplaza.
+      expect(find.textContaining('INTERMEDIO'), findsOneWidget);
     });
 
     testWidgets('smoke dark+light sin crash', (tester) async {
