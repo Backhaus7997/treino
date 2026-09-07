@@ -42,6 +42,15 @@ void main() {
   });
 
   group('Página de fallback —', () {
+    // OJO con `profe`: hoy `vercel.json` redirige `/abrir/profe` a la home con
+    // un 307, así que esa página NO se renderiza en producción —verificado con
+    // curl contra app.gettreino.com—. La decisión tiene sentido: para un
+    // entrenador el destino es el Coach Hub web, no la app.
+    //
+    // El botón se agrega igual, y se testea igual, porque las dos páginas
+    // comparten diseño y la que se deja atrás es la que se desincroniza. Pero
+    // que quede dicho: hoy sólo `/abrir/alumno` llega a un ojo humano, y es la
+    // única que arregla el bug que motivó esto.
     for (final pagina in ['alumno', 'profe']) {
       test('$pagina.html ofrece abrir la app por el esquema propio', () {
         final html = File('$raiz/web/abrir/$pagina.html').readAsStringSync();
