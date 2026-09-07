@@ -47,7 +47,8 @@
  * cupo. Ver el encabezado de `client.ts`.
  */
 
-import * as admin from "firebase-admin";
+import { App, getApp, initializeApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 import * as functions from "firebase-functions/v2/https";
 import { HttpsError } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions";
@@ -110,11 +111,11 @@ export interface CreatePreapprovalDeps {
   nowMs: number;
 }
 
-function getApp(): admin.app.App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -141,7 +142,7 @@ function parseCycle(raw: unknown): SubscriptionCycle | null {
  * que sea imposible leer del body algo que tiene que salir del token.
  */
 export async function runCreatePreapproval(
-  app: admin.app.App,
+  app: App,
   uid: string,
   raw: unknown,
   deps: CreatePreapprovalDeps,
@@ -169,7 +170,7 @@ export async function runCreatePreapproval(
   // El rol se lee del documento, no del token: `role` es intrinseco y se
   // provisiona server-side (AGENTS.md regla 3). Un custom claim viejo en un
   // token sin refrescar seria una fuente mas debil.
-  const userSnap = await app.firestore().collection("users").doc(uid).get();
+  const userSnap = await getFirestore(app).collection("users").doc(uid).get();
   if (!userSnap.exists || userSnap.data()?.role !== "trainer") {
     throw new HttpsError(
       "permission-denied",
@@ -185,8 +186,7 @@ export async function runCreatePreapproval(
     throw new HttpsError("internal", `sin precio para ${tier}/${cycle}`);
   }
 
-  const checkoutRef = app
-    .firestore()
+  const checkoutRef = getFirestore(app)
     .collection(MP_CHECKOUTS_COLLECTION)
     .doc(uid);
 
@@ -301,7 +301,7 @@ export const createPreapproval = functions.onCall(
     // pagador quien es. Un PF sin mail en su token puede comprar igual.
 
     return runCreatePreapproval(
-      getApp(),
+      ensureApp(),
       request.auth.uid,
       request.data,
       {

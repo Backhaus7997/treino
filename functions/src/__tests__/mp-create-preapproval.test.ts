@@ -21,6 +21,26 @@ jest.mock("firebase-admin", () => ({
   initializeApp: jest.fn(),
 }));
 
+// La puerta modular de `firebase-admin/app`, traducida al doble namespaced.
+//
+// Producción dejó de hacer `admin.app()` y ahora usa `getApp()`; el
+// `jest.mock("firebase-admin", …)` de arriba no cubre ese specifier. Los dobles
+// salen del MISMO objeto, así que no pueden driftear.
+//
+// Lo fija `firebase-admin-mock-surface.test.ts`.
+jest.mock("firebase-admin/app", () => {
+  const ns = jest.requireMock("firebase-admin") as {
+    app: () => unknown;
+    initializeApp: () => unknown;
+  };
+  return {
+    getApp: (...args: unknown[]) => (ns.app as (...a: unknown[]) => unknown)(...args),
+    initializeApp: (...args: unknown[]) =>
+      (ns.initializeApp as (...a: unknown[]) => unknown)(...args),
+  };
+});
+
+
 // La puerta modular tiene que dar EL MISMO doble que la namespaced de arriba.
 //
 // `jest.mock("firebase-admin", …)` intercepta el specifier EXACTO. Producción
@@ -38,6 +58,7 @@ jest.mock("firebase-admin/firestore", () => {
     firestore: Record<string, unknown>;
   };
   return {
+    getFirestore: (app: { firestore: () => unknown }) => app.firestore(),
     get FieldValue() {
       return ns.firestore.FieldValue;
     },
