@@ -16,151 +16,266 @@ import '../../../../../../core/widgets/treino_icon.dart';
 import '../../../../../workout/domain/equipment_type.dart';
 import '../../../../../workout/domain/exercise.dart';
 import '../../../../../workout/domain/muscle_group.dart';
+import '../../../shell/responsive.dart' as rsp;
 import '../../../widgets/empty_state/empty_state.dart';
 import '../providers/biblioteca_providers.dart';
 import 'biblioteca_filter_chips.dart';
 import 'exercise_detail_dialog.dart';
+import 'exercise_detail_panel.dart';
 import 'exercise_grid_card.dart';
 
-/// Grid delegate compartido entre la grilla real y el skeleton de carga —
-/// mismas proporciones para que el cross-fade loading→data no "salte".
-const _gridDelegate = SliverGridDelegateWithMaxCrossAxisExtent(
+const double _filterColumnWidth = 232;
+
+/// Piso de la sección para las tres columnas.
+///
+/// 232 de filtros + 40 de gutters + 420 de panel + 836 de grilla: cuatro
+/// cards de al menos 200 y tres gutters de 12. Total: 1528 px lógicos.
+const double kBibliotecaThreeColumnMinWidth = 1528;
+
+/// Delegate adaptativo del tramo compact, compartido con su skeleton.
+const _adaptiveGridDelegate = SliverGridDelegateWithMaxCrossAxisExtent(
   maxCrossAxisExtent: 260,
   childAspectRatio: 0.82,
-  crossAxisSpacing: 12,
-  mainAxisSpacing: 12,
+  crossAxisSpacing: AppSpacing.s12,
+  mainAxisSpacing: AppSpacing.s12,
+);
+
+/// Los tramos desktop mantienen exactamente cuatro columnas.
+const _desktopGridDelegate = SliverGridDelegateWithFixedCrossAxisCount(
+  crossAxisCount: 4,
+  childAspectRatio: 0.82,
+  crossAxisSpacing: AppSpacing.s12,
+  mainAxisSpacing: AppSpacing.s12,
 );
 
 const _gridPadding = EdgeInsets.fromLTRB(16, 0, 16, 24);
 
-/// Tab body for the "Ejercicios" tab of [BibliotecaWebScreen].
+/// Tab body de "Ejercicios" con tres tramos responsivos.
 ///
-/// Layout: search field → [BibliotecaFilterChips] → Expanded state-switched
-/// grid ([TreinoStateSwitcher] con skeleton shimmer / error / empty / data).
-///
-/// REQ-BIBW-03, REQ-BIBW-04, REQ-BIBW-05, REQ-BIBW-06, REQ-BIBW-11.
-/// SCENARIO-BIBW-03a, SCENARIO-BIBW-03b, SCENARIO-BIBW-11a.
+/// El gate desktop usa el viewport del ADR-CHW-004. Dentro de desktop, el
+/// [LayoutBuilder] mide el ancho real de la sección —no el viewport— porque el
+/// sidebar puede ocupar 72 o 240 px sin cambiar `MediaQuery`.
 class EjerciciosTab extends ConsumerWidget {
   const EjerciciosTab({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final palette = AppPalette.of(context);
     final exercisesAsync = ref.watch(bibliotecaExercisesProvider);
     final query = ref.watch(bibliotecaQueryProvider);
     final muscles = ref.watch(bibliotecaMuscleFilterProvider);
     final equipment = ref.watch(bibliotecaEquipmentFilterProvider);
+    final selected = ref.watch(bibliotecaSelectedExerciseProvider);
     final filterSignature = _filterSignature(query, muscles, equipment);
+    final isDesktop = rsp.viewportFor(MediaQuery.sizeOf(context).width) ==
+        rsp.Viewport.desktop;
 
-    return Column(
-      children: [
-        // ── Search field ───────────────────────────────────────────────────
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.s18,
-            AppSpacing.s18,
-            AppSpacing.s18,
-            AppSpacing.s8,
-          ),
-          child: TextField(
-            decoration: InputDecoration(
-              hintText: 'Buscar ejercicios...', // i18n
-              hintStyle: TextStyle(
-                fontFamily: AppFonts.barlow,
-                color: palette.textMuted,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final showSideFilters = isDesktop;
+        final showDetailPanel = isDesktop &&
+            constraints.maxWidth >= kBibliotecaThreeColumnMinWidth;
+
+        void openExercise(Exercise exercise) {
+          final ownerId = resolveOwnerId(ref, exercise.category);
+          if (showDetailPanel) {
+            ref.read(bibliotecaSelectedExerciseProvider.notifier).state = (
+              exerciseId: exercise.id,
+              ownerId: ownerId,
+              exerciseName: exercise.name,
+            );
+            return;
+          }
+          showExerciseDetailDialog(
+            context,
+            exerciseId: exercise.id,
+            ownerId: ownerId,
+            exerciseName: exercise.name,
+          );
+        }
+
+        final results = _ExerciseResults(
+          exercisesAsync: exercisesAsync,
+          filterSignature: filterSignature,
+          fixedFourColumns: showSideFilters,
+          onQueryChanged: (value) {
+            ref.read(bibliotecaQueryProvider.notifier).state = value;
+          },
+          onExerciseTap: openExercise,
+        );
+
+        if (!showSideFilters) {
+          return Column(
+            children: [
+              _SearchField(onChanged: results.onQueryChanged),
+              TreinoFadeSlideIn(
+                delay: AppMotion.stagger(1),
+                child: const BibliotecaFilterChips(),
               ),
-              prefixIcon: Icon(
-                TreinoIcon.search,
-                color: palette.textMuted,
-                size: 20,
+              Expanded(child: results),
+            ],
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              key: const Key('biblioteca_filter_column'),
+              width: _filterColumnWidth,
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.s18,
+                AppSpacing.s18,
+                AppSpacing.s18,
+                AppSpacing.s20,
               ),
-              filled: true,
-              fillColor: palette.bgCard,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.s14,
-                vertical: AppSpacing.s12,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-                borderSide: BorderSide(color: palette.border),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-                borderSide: BorderSide(color: palette.border),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-                borderSide: BorderSide(color: palette.accent, width: 1.5),
+              child: TreinoFadeSlideIn(
+                delay: AppMotion.stagger(1),
+                child: const BibliotecaFilterChips(vertical: true),
               ),
             ),
-            style: TextStyle(
-              fontFamily: AppFonts.barlow,
-              color: palette.textPrimary,
-            ),
-            onChanged: (v) {
-              ref.read(bibliotecaQueryProvider.notifier).state = v;
-            },
-          ),
-        ),
-        // ── Filter chips ───────────────────────────────────────────────────
-        // Bloque eager con stagger real (ADR-B7-03): chips = índice 1,
-        // continúa el header (índice 0) de BibliotecaWebScreen.
-        TreinoFadeSlideIn(
-          delay: AppMotion.stagger(1),
-          child: const BibliotecaFilterChips(),
-        ),
-        // ── Exercise grid (loading/error/empty/data) ──────────────────────
-        Expanded(
-          child: TreinoStateSwitcher(
-            childKey: ValueKey(_stateKey(exercisesAsync, filterSignature)),
-            child: exercisesAsync.when(
-              loading: () => const _ExercisesGridSkeleton(),
-              error: (e, _) => const TreinoEmptyState(
-                icon: TreinoIcon.errorState,
-                title: 'Error al cargar ejercicios.', // i18n
-                description: 'Volvé a intentar en unos segundos.', // i18n
+            const SizedBox(width: AppSpacing.s20),
+            Expanded(
+              child: Column(
+                children: [
+                  _SearchField(onChanged: results.onQueryChanged),
+                  Expanded(child: results),
+                ],
               ),
-              data: (exercises) {
-                if (exercises.isEmpty) {
-                  return const TreinoEmptyState(
-                    icon: TreinoIcon.emptyState,
-                    title: 'No se encontraron ejercicios', // i18n
-                    description:
-                        'Probá con otra búsqueda o ajustá los filtros.', // i18n
-                  );
-                }
-                return GridView.builder(
-                  padding: _gridPadding,
-                  gridDelegate: _gridDelegate,
-                  itemCount: exercises.length,
-                  itemBuilder: (context, index) {
-                    final exercise = exercises[index];
-                    return ExerciseGridCard(
-                      exercise: exercise,
-                      onTap: () {
-                        showExerciseDetailDialog(
-                          context,
-                          exerciseId: exercise.id,
-                          ownerId: resolveOwnerId(ref, exercise.category),
-                          exerciseName: exercise.name,
-                        );
-                      },
-                    );
-                  },
-                );
-              },
             ),
-          ),
-        ),
-      ],
+            if (showDetailPanel && selected != null) ...[
+              const SizedBox(width: AppSpacing.s20),
+              ExerciseDetailPanel(
+                key: const Key('biblioteca_detail_panel'),
+                exerciseId: selected.exerciseId,
+                ownerId: selected.ownerId,
+                exerciseName: selected.exerciseName,
+                onClose: () {
+                  ref
+                      .read(bibliotecaSelectedExerciseProvider.notifier)
+                      .state = null;
+                },
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 }
 
-/// Firma estable de la combinación de filtros activos — se usa como parte de
-/// la key del branch `data` del [TreinoStateSwitcher] para que cambiar de
-/// búsqueda/músculo/equipamiento dispare un cross-fade entre resultados en
-/// vez de un swap seco.
+class _SearchField extends StatelessWidget {
+  const _SearchField({required this.onChanged});
+
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.s18,
+        AppSpacing.s18,
+        AppSpacing.s18,
+        AppSpacing.s8,
+      ),
+      child: TextField(
+        decoration: InputDecoration(
+          hintText: 'Buscar ejercicios...', // i18n
+          hintStyle: TextStyle(
+            fontFamily: AppFonts.barlow,
+            color: palette.textMuted,
+          ),
+          prefixIcon: Icon(
+            TreinoIcon.search,
+            color: palette.textMuted,
+            size: 20,
+          ),
+          filled: true,
+          fillColor: palette.bgCard,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.s14,
+            vertical: AppSpacing.s12,
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            borderSide: BorderSide(color: palette.border),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            borderSide: BorderSide(color: palette.border),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppRadius.sm),
+            borderSide: BorderSide(color: palette.accent, width: 1.5),
+          ),
+        ),
+        style: TextStyle(
+          fontFamily: AppFonts.barlow,
+          color: palette.textPrimary,
+        ),
+        onChanged: onChanged,
+      ),
+    );
+  }
+}
+
+class _ExerciseResults extends StatelessWidget {
+  const _ExerciseResults({
+    required this.exercisesAsync,
+    required this.filterSignature,
+    required this.fixedFourColumns,
+    required this.onQueryChanged,
+    required this.onExerciseTap,
+  });
+
+  final AsyncValue<List<Exercise>> exercisesAsync;
+  final String filterSignature;
+  final bool fixedFourColumns;
+  final ValueChanged<String> onQueryChanged;
+  final ValueChanged<Exercise> onExerciseTap;
+
+  SliverGridDelegate get gridDelegate =>
+      fixedFourColumns ? _desktopGridDelegate : _adaptiveGridDelegate;
+
+  @override
+  Widget build(BuildContext context) {
+    return TreinoStateSwitcher(
+      childKey: ValueKey(_stateKey(exercisesAsync, filterSignature)),
+      child: exercisesAsync.when(
+        loading: () => _ExercisesGridSkeleton(gridDelegate: gridDelegate),
+        error: (e, _) => const TreinoEmptyState(
+          icon: TreinoIcon.errorState,
+          title: 'Error al cargar ejercicios.', // i18n
+          description: 'Volvé a intentar en unos segundos.', // i18n
+        ),
+        data: (exercises) {
+          if (exercises.isEmpty) {
+            return const TreinoEmptyState(
+              icon: TreinoIcon.emptyState,
+              title: 'No se encontraron ejercicios', // i18n
+              description:
+                  'Probá con otra búsqueda o ajustá los filtros.', // i18n
+            );
+          }
+          return GridView.builder(
+            key: const Key('biblioteca_exercise_grid'),
+            padding: _gridPadding,
+            gridDelegate: gridDelegate,
+            itemCount: exercises.length,
+            itemBuilder: (context, index) {
+              final exercise = exercises[index];
+              return ExerciseGridCard(
+                exercise: exercise,
+                onTap: () => onExerciseTap(exercise),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
 String _filterSignature(
   String query,
   Set<MuscleGroup> muscles,
@@ -173,9 +288,6 @@ String _filterSignature(
   return '$query|$muscleKey|$equipmentKey';
 }
 
-/// Discrimina el estado actual para [TreinoStateSwitcher]. `loading`/`error`/
-/// `empty` son keys fijas (no re-animan entre sí al cambiar filtros); `data`
-/// incluye [filterSignature] para que resultados distintos crossfadeen.
 String _stateKey(
   AsyncValue<List<Exercise>> exercisesAsync,
   String filterSignature,
@@ -187,13 +299,11 @@ String _stateKey(
   return 'data_$filterSignature';
 }
 
-/// Skeleton de carga de la grilla de ejercicios — mismo [_gridDelegate] que
-/// la grilla real (para que el cross-fade no "salte") con cajas placeholder
-/// envueltas en [TreinoShimmer].
 class _ExercisesGridSkeleton extends StatelessWidget {
-  const _ExercisesGridSkeleton();
+  const _ExercisesGridSkeleton({required this.gridDelegate});
 
   static const _placeholderCount = 8;
+  final SliverGridDelegate gridDelegate;
 
   @override
   Widget build(BuildContext context) {
@@ -201,7 +311,7 @@ class _ExercisesGridSkeleton extends StatelessWidget {
     return TreinoShimmer(
       child: GridView.builder(
         padding: _gridPadding,
-        gridDelegate: _gridDelegate,
+        gridDelegate: gridDelegate,
         itemCount: _placeholderCount,
         itemBuilder: (context, index) => Container(
           decoration: BoxDecoration(

@@ -16,6 +16,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
@@ -112,6 +113,75 @@ List<Override> _dataOverrides({
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 void main() {
+  group('La tira llena el ancho —', () {
+    /// Monta la tira en un ancho fijo, sin depender del tamaño de la ventana
+    /// de test.
+    Future<void> pumpEnAncho(WidgetTester tester, double ancho) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: _dataOverrides(),
+          child: MaterialApp(
+            theme: AppTheme.dark(),
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
+            locale: const Locale('es', 'AR'),
+            home: Scaffold(
+              body: Center(
+                child: SizedBox(width: ancho, child: const DashboardKpiStrip()),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+    }
+
+    // En el dashboard las cuatro cards quedaban apretadas a la izquierda con
+    // un hueco muerto al costado, mientras los paneles de abajo sí ocupaban
+    // todo el ancho. La causa: `Row` dentro de un `SingleChildScrollView`
+    // horizontal, donde cada card se dimensiona por su contenido.
+    testWidgets('en desktop las cuatro cards llegan al borde derecho',
+        (tester) async {
+      const ancho = 1200.0;
+      await pumpEnAncho(tester, ancho);
+
+      final cards = find.byType(KpiCard);
+      expect(cards, findsNWidgets(4));
+
+      final primera = tester.getRect(cards.at(0));
+      final ultima = tester.getRect(cards.at(3));
+      final tira = tester.getRect(find.byType(DashboardKpiStrip));
+
+      expect(ultima.right, moreOrLessEquals(tira.right, epsilon: 0.5),
+          reason: 'la última card tiene que cerrar contra el borde');
+      expect(primera.left, moreOrLessEquals(tira.left, epsilon: 0.5));
+    });
+
+    testWidgets('y se reparten en partes iguales, con separación fija',
+        (tester) async {
+      await pumpEnAncho(tester, 1200);
+
+      final anchos = [
+        for (var i = 0; i < 4; i++) tester.getRect(find.byType(KpiCard).at(i)).width,
+      ];
+      for (final w in anchos) {
+        expect(w, moreOrLessEquals(anchos.first, epsilon: 0.5),
+            reason: 'partes iguales, no repartir el sobrante');
+      }
+
+      final a = tester.getRect(find.byType(KpiCard).at(0));
+      final b = tester.getRect(find.byType(KpiCard).at(1));
+      expect(b.left - a.right, moreOrLessEquals(AppSpacing.s12, epsilon: 0.5),
+          reason: 'la separación es fija, no proporcional');
+    });
+
+    testWidgets('en un ancho que no da, sigue habiendo scroll en vez de '
+        'cards ilegibles', (tester) async {
+      await pumpEnAncho(tester, 420);
+      expect(find.byType(SingleChildScrollView), findsOneWidget);
+    });
+  });
+
   group('SCENARIO-KPI-01 — 4 tiles reales vía KpiCard', () {
     testWidgets('alumnos activos cuenta solo links con status active',
         (tester) async {

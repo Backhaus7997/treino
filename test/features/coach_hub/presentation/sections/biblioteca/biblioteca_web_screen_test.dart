@@ -9,9 +9,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_motion.dart';
+import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/features/coach_hub/presentation/sections/biblioteca/biblioteca_web_screen.dart';
+import 'package:treino/features/coach_hub/presentation/sections/biblioteca/widgets/biblioteca_filter_chips.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/workout/application/custom_exercise_providers.dart';
@@ -105,7 +107,7 @@ Widget _wrap() {
 /// Wraps BibliotecaWebScreen with resolved (non-loading) providers so the
 /// counts settle to real values — 2 catalog + 1 custom = 3 ejercicios,
 /// 2 templates.
-Widget _wrapWithData() {
+Widget _wrapWithData({ThemeData? theme}) {
   return ProviderScope(
     overrides: [
       currentUidProvider.overrideWithValue(_kTrainerId),
@@ -118,7 +120,7 @@ Widget _wrapWithData() {
       ),
     ],
     child: MaterialApp(
-      theme: AppTheme.dark(),
+      theme: theme ?? AppTheme.dark(),
       home: const Scaffold(
         body: BibliotecaWebScreen(),
       ),
@@ -126,9 +128,26 @@ Widget _wrapWithData() {
   );
 }
 
+void _setSurfaceSize(WidgetTester tester, double width) {
+  tester.view.physicalSize = Size(width, 900);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+}
+
+Finder _inside(Key hostKey, Finder matching) => find.descendant(
+      of: find.byKey(hostKey),
+      matching: matching,
+    );
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 void main() {
+  // AppTheme.* toca GoogleFonts. Si algun ThemeData llegara a construirse
+  // fuera del cuerpo de un testWidgets, sin esto revienta con "Binding has
+  // not yet been initialized" antes de la primera asercion.
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   setUp(() {
     TestWidgetsFlutterBinding.ensureInitialized();
   });
@@ -252,6 +271,106 @@ void main() {
       expect(find.byType(Tab), findsNWidgets(2));
       expect(find.byType(Scaffold), findsOneWidget);
       expect(find.byType(SafeArea), findsNothing);
+    });
+  });
+
+  group('Biblioteca Ejercicios — layout responsivo', () {
+    testWidgets(
+        'tramo A muestra filtros, grilla de 4 columnas y detalle lateral',
+        (tester) async {
+      _setSurfaceSize(tester, 1600);
+      await tester.pumpWidget(_wrapWithData());
+      await tester.pumpAndSettle();
+
+      const filtersKey = Key('biblioteca_filter_column');
+      const gridKey = Key('biblioteca_exercise_grid');
+      const panelKey = Key('biblioteca_detail_panel');
+
+      expect(find.byKey(filtersKey), findsOneWidget);
+      expect(find.byKey(gridKey), findsOneWidget);
+      final grid = tester.widget<GridView>(find.byKey(gridKey));
+      final delegate = grid.gridDelegate as SliverGridDelegateWithFixedCrossAxisCount;
+      expect(delegate.crossAxisCount, 4);
+
+      await tester.tap(_inside(gridKey, find.text('Press de Banca')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(panelKey), findsOneWidget);
+      expect(find.byType(TreinoDialog), findsNothing);
+      expect(_inside(panelKey, find.text('Press de Banca')), findsOneWidget);
+    });
+
+    testWidgets(
+        'tramo B mantiene filtros laterales y 4 columnas, pero abre modal',
+        (tester) async {
+      _setSurfaceSize(tester, 1400);
+      await tester.pumpWidget(_wrapWithData());
+      await tester.pumpAndSettle();
+
+      const filtersKey = Key('biblioteca_filter_column');
+      const gridKey = Key('biblioteca_exercise_grid');
+
+      expect(find.byKey(filtersKey), findsOneWidget);
+      final grid = tester.widget<GridView>(find.byKey(gridKey));
+      final delegate = grid.gridDelegate as SliverGridDelegateWithFixedCrossAxisCount;
+      expect(delegate.crossAxisCount, 4);
+
+      await tester.tap(_inside(gridKey, find.text('Press de Banca')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TreinoDialog), findsOneWidget);
+      expect(find.byKey(const Key('biblioteca_detail_panel')), findsNothing);
+    });
+
+    testWidgets('tramo C conserva filtros arriba y abre modal sin panel',
+        (tester) async {
+      _setSurfaceSize(tester, 1100);
+      await tester.pumpWidget(_wrapWithData());
+      await tester.pumpAndSettle();
+
+      expect(find.byType(BibliotecaFilterChips), findsOneWidget);
+      expect(find.byKey(const Key('biblioteca_filter_column')), findsNothing);
+
+      const gridKey = Key('biblioteca_exercise_grid');
+      final grid = tester.widget<GridView>(find.byKey(gridKey));
+      expect(grid.gridDelegate, isA<SliverGridDelegateWithMaxCrossAxisExtent>());
+
+      await tester.tap(_inside(gridKey, find.text('Press de Banca')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TreinoDialog), findsOneWidget);
+      expect(find.byKey(const Key('biblioteca_detail_panel')), findsNothing);
+    });
+
+    testWidgets('tramo A en tema claro: el panel usa la paleta light',
+        (tester) async {
+      // El PF navega el Coach Hub en CLARO. Los dos wrappers de este archivo
+      // hardcodeaban dark, asi que el rediseño entero venia sin cobertura del
+      // tema que el usuario realmente mira.
+      _setSurfaceSize(tester, 1600);
+      await tester.pumpWidget(_wrapWithData(theme: AppTheme.light()));
+      await tester.pumpAndSettle();
+
+      const gridKey = Key('biblioteca_exercise_grid');
+      const panelKey = Key('biblioteca_detail_panel');
+
+      await tester.tap(_inside(gridKey, find.text('Press de Banca')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(panelKey), findsOneWidget);
+
+      final contenedor = tester.widget<Container>(
+        find
+            .descendant(of: find.byKey(panelKey), matching: find.byType(Container))
+            .first,
+      );
+      final decoracion = contenedor.decoration! as BoxDecoration;
+      expect(
+        decoracion.color,
+        AppPalette.mintMagentaLight.bgCard,
+        reason: 'el panel tiene que tomar el color del tema activo, no uno '
+            'fijo del tema oscuro',
+      );
     });
   });
 }
