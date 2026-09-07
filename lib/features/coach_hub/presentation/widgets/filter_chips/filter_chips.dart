@@ -196,13 +196,24 @@ class _ChipItem extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontFamily: AppFonts.barlow,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                  fontSize: 14,
-                  color: fg,
+              // Flexible + ellipsis: sin esto un label mas ancho que el
+              // constraint que baja desborda el Row y pinta la franja amarilla
+              // y negra. No se veia mientras todos los consumidores pusieron
+              // los chips en filas de ancho completo; la columna de filtros de
+              // Biblioteca (232 px) es la primera que aprieta. Donde hay lugar
+              // de sobra esto no cambia nada: un Flexible loose en un Row
+              // mainAxisSize.min le da al hijo su tamaño natural.
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: AppFonts.barlow,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                    fontSize: 14,
+                    color: fg,
+                  ),
                 ),
               ),
               if (badgeCount != null) ...[
