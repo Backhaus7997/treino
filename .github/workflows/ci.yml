@@ -607,5 +607,25 @@ jobs:
         with:
           node-version: '20'
 
+      # Este paso NO estaba, y esa ausencia es la que dejó pasar el #901.
+      #
+      # La suite corría igual —sale verde con `scripts/node_modules` borrado,
+      # medido: 469/469— porque `lib/admin.js` recibe el SDK por parámetro
+      # (`admin = require('firebase-admin')` es un default, se evalúa sólo si
+      # nadie inyecta) y los tests que cargan scripts de verdad lo interceptan
+      # con `fixtures/stub_firebase_admin.js`. O sea: CI validaba 469 cosas
+      # sobre un paquete que nunca descargaba, y dependabot podía subir
+      # `firebase-admin` a cualquier versión sin ponerse rojo. Lo hizo dos veces
+      # (cac2d6fa y de77562a), y la segunda dejó los 44 scripts de `scripts/`
+      # muertos con un `TypeError` en la primera línea de `lib/admin.js`.
+      #
+      # Con el install puesto, `test/firebase_admin_superficie.test.js` tiene
+      # por fin un módulo real que mirar. Sin él, ese test tira MODULE_NOT_FOUND.
+      #
+      # `npm ci` y no `npm install`: instala exactamente el lockfile, que es la
+      # versión que este job tiene que estar probando.
+      - name: Install scripts deps
+        run: npm --prefix scripts ci
+
       - name: Run scripts test suite
         run: npm --prefix scripts test
