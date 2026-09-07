@@ -79,6 +79,11 @@ const double _altoHora = 56.0;
 /// Ancho de la columna de horas.
 const double _anchoGutter = 56.0;
 
+/// Alto del encabezado de días. Fijo y no medido: el cálculo de cuántas horas
+/// entran necesita restarlo con exactitud, y una altura que dependa del
+/// contenido lo vuelve un número aproximado.
+const double _altoEncabezado = 60.0;
+
 /// Granularidad al tocar un hueco. Google Calendar y Teams redondean al cuarto
 /// de hora; un turno a las 10:07 no lo quiere nadie.
 const int _granularidadMin = 15;
@@ -148,12 +153,38 @@ class AgendaTimeGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final (horaDesde, horaHasta) = _rango;
-    final alto = (horaHasta - horaDesde) * _altoHora;
 
     return LayoutBuilder(
       builder: (ctx, constraints) {
         final anchoDia = (constraints.maxWidth - _anchoGutter) / dayCount;
+        var (horaDesde, horaHasta) = _rango;
+
+        // Un calendario LLENA su contenedor.
+        //
+        // El rango se deduce del contenido, y con poco contenido queda corto:
+        // con disponibilidad de 9 a 11 y ninguna sesión daban cuatro horas,
+        // 224 px adentro de un panel de 700, y abajo un vacío enorme. En
+        // pantalla eso no se lee como "no hay nada más": se lee como que la
+        // agenda está CORTADA A LA MITAD. Reportado mirando el Coach Hub.
+        //
+        // Si sobra alto se muestran más horas. Crece hacia abajo primero
+        // porque en una agenda de entrenamiento la tarde es horario pico y la
+        // madrugada no la mira nadie.
+        if (constraints.maxHeight.isFinite) {
+          final horasQueEntran =
+              ((constraints.maxHeight - _altoEncabezado) / _altoHora).floor();
+          var faltan = horasQueEntran - (horaHasta - horaDesde);
+          while (faltan > 0 && (horaDesde > 0 || horaHasta < 24)) {
+            if (horaHasta < 24) {
+              horaHasta++;
+            } else {
+              horaDesde--;
+            }
+            faltan--;
+          }
+        }
+
+        final alto = (horaHasta - horaDesde) * _altoHora;
 
         // El encabezado va FUERA del scroll: si se va con las horas, a los
         // cinco minutos de scrollear no sabés qué columna estás mirando. Es la
@@ -161,11 +192,14 @@ class AgendaTimeGrid extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _Encabezado(
-              dias: [for (var i = 0; i < dayCount; i++) _dia(i)],
-              hoy: now,
-              anchoDia: anchoDia,
-              palette: palette,
+            SizedBox(
+              height: _altoEncabezado,
+              child: _Encabezado(
+                dias: [for (var i = 0; i < dayCount; i++) _dia(i)],
+                hoy: now,
+                anchoDia: anchoDia,
+                palette: palette,
+              ),
             ),
             Expanded(
               child: SingleChildScrollView(
