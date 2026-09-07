@@ -10,12 +10,20 @@
  * La verdad se le PREGUNTA a MP con un GET usando nuestro token. Nunca se
  * asume, nunca se lee de un body entrante. Ver el encabezado de `client.ts`.
  *
- * Consecuencia practica: esta funcion recibe UN preapprovalId y nada mas. El
- * webhook —cuando exista— va a usar exactamente esta misma funcion pasandole el
- * id que trajo el evento y descartando todo el resto del payload. El barrido
- * agendado la llama con los ids que ya conocemos. Las dos entradas convergen
- * acá, y por eso el producto anda aunque el webhook no llegue nunca: se pierde
- * latencia, no correccion.
+ * Consecuencia practica: esta funcion recibe UN id de PLAN y nada mas, y le
+ * pregunta a MP que suscripciones existen contra el.
+ *
+ * Se busca por plan y no por id de suscripcion porque el plan lo creamos
+ * NOSOTROS —su id ya esta en `mp_plans` desde que el PF toco comprar— mientras
+ * que de la suscripcion no sabemos nada hasta que alguien paga. Ademas no esta
+ * verificado que la suscripcion herede el `external_reference` del plan, asi
+ * que buscarla por ahi seria apostar a lo que no sabemos.
+ *
+ * El webhook —cuando exista— trae un id de SUSCRIPCION, no de plan. Va a tener
+ * que resolver el plan primero (el preapproval trae `preapproval_plan_id`) y
+ * despues llamar acá. El barrido agendado la llama con los planes que ya
+ * conocemos. Por eso el producto anda aunque el webhook no llegue nunca: se
+ * pierde latencia, no correccion.
  *
  * ── CUANDO NO ESCRIBE, que es la parte que importa ──
  *
@@ -51,8 +59,8 @@ import { SubscriptionTier } from "../tier-config";
 import { MpApiError, MpClient, createMpClient } from "./client";
 import { hayCobroPendiente, mapMpStatus } from "./map-status";
 import {
-  MP_PREAPPROVALS_COLLECTION,
-  lookupPreapproval,
+  MP_PLANS_COLLECTION,
+  lookupPlan,
 } from "./tier-mapping";
 
 const MP_ACCESS_TOKEN = defineSecret("MP_ACCESS_TOKEN");
@@ -63,10 +71,11 @@ export type ReconcileOutcome =
   | "skipped-degraded"
   | "skipped-sin-plan"
   | "skipped-uid-no-coincide"
+  | "sin-suscripcion"
   | "error-mp";
 
 export interface ReconcileResult {
-  preapprovalId: string;
+  planId: string;
   outcome: ReconcileOutcome;
   uid?: string;
   tier?: SubscriptionTier;
@@ -75,6 +84,8 @@ export interface ReconcileResult {
 
 export interface ReconcileDeps {
   mpClient: MpClient;
+  /** Reloj inyectable: el abandono se testea sin esperar 30 dias. */
+  nowMs: number;
 }
 
 function getApp(): admin.app.App {
@@ -95,12 +106,12 @@ function getApp(): admin.app.App {
  */
 export function parsePeriodEnd(
   raw: unknown,
-  preapprovalId: string,
+  planId: string,
 ): admin.firestore.Timestamp | null {
   if (raw == null) return null;
   if (typeof raw !== "string") {
     logger.warn("mp/reconcile: next_payment_date no es un string — se ignora", {
-      preapprovalId,
+      planId,
       received: typeof raw,
     });
     return null;
@@ -108,12 +119,114 @@ export function parsePeriodEnd(
   const ms = Date.parse(raw);
   if (!Number.isFinite(ms)) {
     logger.warn("mp/reconcile: next_payment_date no es una fecha ISO valida", {
-      preapprovalId,
+      planId,
       received: raw.slice(0, 40),
     });
     return null;
   }
   return admin.firestore.Timestamp.fromMillis(ms);
+}
+
+/** `unknown` → Timestamp si tiene la forma, si no `null`. */
+function comoTimestamp(v: unknown): admin.firestore.Timestamp | null {
+  return v != null && typeof (v as { toMillis?: unknown }).toMillis === "function"
+    ? (v as admin.firestore.Timestamp)
+    : null;
+}
+
+/**
+ * Un periodo de `auto_recurring` sumado a su `start_date`.
+ *
+ * Existe por un hallazgo de la prueba real contra MP, y la asimetria es fea:
+ * una suscripcion CANCELADA que **pago** viene SIN `next_payment_date`,
+ * mientras que una cancelada que **nunca pago** SI lo trae. O sea que el dato
+ * esta justo cuando no importa y falta justo cuando si — y el que se queda sin
+ * fecha es el que te pago.
+ *
+ * `start_date + frequency` es exactamente el periodo que esa persona compro.
+ */
+export function finDePeriodoDesdeAltaMs(autoRecurring: unknown): number | null {
+  if (autoRecurring === null || typeof autoRecurring !== "object") return null;
+  const ar = autoRecurring as {
+    start_date?: unknown;
+    frequency?: unknown;
+    frequency_type?: unknown;
+  };
+
+  if (typeof ar.start_date !== "string") return null;
+  const inicio = Date.parse(ar.start_date);
+  if (!Number.isFinite(inicio)) return null;
+
+  const n = ar.frequency;
+  if (typeof n !== "number" || !Number.isInteger(n) || n <= 0 || n > 24) {
+    return null;
+  }
+
+  // Solo se entiende "months". `days` existe en la API de MP pero TREINO no lo
+  // usa, y sumar un periodo cuyo tipo no conocemos seria inventar una fecha —
+  // el mismo error que `parsePeriodEnd` evita con las fechas mal formadas.
+  if (ar.frequency_type !== "months") return null;
+
+  // `setUTCMonth` normaliza el desborde de mes solo: enero 31 + 1 mes cae en
+  // marzo 3, que es como cuenta el calendario y no hay que arreglarlo.
+  const d = new Date(inicio);
+  d.setUTCMonth(d.getUTCMonth() + n);
+  return d.getTime();
+}
+
+interface FinDePeriodoInput {
+  /** Lo que dijo MP en `next_payment_date`, ya parseado. */
+  deMp: admin.firestore.Timestamp | null;
+  /** Lo que ya teniamos escrito en `subscription.currentPeriodEnd`. */
+  yaGuardada: unknown;
+  autoRecurring: unknown;
+  status: SubscriptionStatus;
+  planId: string;
+}
+
+/**
+ * Hasta cuando le dura el plan PAGO a este PF.
+ *
+ * `effective-limit` le da el tier pago a un `cancelled` HASTA esta fecha. Que
+ * quede en `null` significa sacarle el plan EN EL ACTO a alguien que pago el
+ * periodo entero, asi que la cascada existe para no llegar nunca ahi:
+ *
+ *   1. `next_payment_date`, si MP lo mando.
+ *   2. La que ya teniamos. Cubre al PF que estuvo meses suscripto: el barrido
+ *      diario la fue refrescando mientras estaba activo.
+ *   3. `start_date + frequency`. Cubre la baja el MISMO DIA, antes de que el
+ *      barrido corriera una sola vez — ahi no hay nada guardado que conservar,
+ *      y "me suscribi, me arrepenti, cancelo" es un comportamiento normal.
+ *   4. `null`, y recien ahi nos rendimos.
+ *
+ * Los pasos 2 y 3 solo corren si MP ya dijo algo terminal. Mientras la
+ * suscripcion sigue viva, que falte la fecha es informacion —no la sabemos— y
+ * conservar una vieja seria inventar un periodo que quizas no se pago.
+ */
+export function resolverFinDePeriodo(
+  i: FinDePeriodoInput,
+): admin.firestore.Timestamp | null {
+  if (i.deMp !== null) return i.deMp;
+  if (i.status !== "cancelled" && i.status !== "paused") return null;
+
+  const previa = comoTimestamp(i.yaGuardada);
+  if (previa !== null) return previa;
+
+  const derivada = finDePeriodoDesdeAltaMs(i.autoRecurring);
+  if (derivada === null) {
+    logger.warn(
+      "mp/reconcile: sin fecha de fin de periodo por ningun camino — el PF " +
+        "pierde el plan pago en el acto",
+      { planId: i.planId, status: i.status },
+    );
+    return null;
+  }
+
+  logger.info("mp/reconcile: fin de periodo derivado del alta", {
+    planId: i.planId,
+    status: i.status,
+  });
+  return admin.firestore.Timestamp.fromMillis(derivada);
 }
 
 /** Los dos Timestamp son el mismo instante. Tolera nulls de los dos lados. */
@@ -136,35 +249,58 @@ function mismaFecha(
  */
 export async function reconcileSubscription(
   app: admin.app.App,
-  preapprovalId: string,
+  planId: string,
   deps: ReconcileDeps,
 ): Promise<ReconcileResult> {
-  let mp;
+  // Se busca POR PLAN y no por id de suscripcion, y esa es la diferencia con la
+  // version anterior: el plan lo creamos NOSOTROS y su id ya esta guardado en
+  // `mp_plans`. De la suscripcion no sabemos nada hasta que alguien paga — y no
+  // esta verificado que herede el `external_reference` del plan, asi que
+  // buscarla por ahi seria apostar a lo que no sabemos.
+  let subs;
   try {
-    mp = await deps.mpClient.getPreapproval(preapprovalId);
+    subs = await deps.mpClient.searchPreapprovalsByPlan(planId);
   } catch (e) {
     const err = e as MpApiError;
-    logger.error("mp/reconcile: no se pudo leer el preapproval", {
-      preapprovalId,
+    logger.error("mp/reconcile: no se pudieron buscar las suscripciones del plan", {
+      planId: planId,
       status: err.status,
       retryable: err.retryable,
     });
-    return { preapprovalId, outcome: "error-mp" };
+    return { planId, outcome: "error-mp" };
   }
+
+  // Cero suscripciones es el estado NORMAL de un plan recien creado: el PF
+  // abrio el checkout y todavia no pago, o lo abandono. No es un error y no se
+  // logea — con un plan por checkout, la mayoria de los planes viejos van a
+  // estar asi para siempre.
+  if (subs.length === 0) {
+    return { planId, outcome: "sin-suscripcion" };
+  }
+  // Mas de una sobre el mismo plan no deberia pasar —cada checkout crea el
+  // suyo— pero si pasa se toma la primera y se avisa, en vez de elegir en
+  // silencio.
+  if (subs.length > 1) {
+    logger.warn("mp/reconcile: el plan tiene mas de una suscripcion", {
+      planId: planId,
+      cuantas: subs.length,
+    });
+  }
+  const mp = subs[0];
 
   const monto = (mp.auto_recurring as { transaction_amount?: unknown } | undefined)
     ?.transaction_amount;
-  const mapping = await lookupPreapproval(app, preapprovalId, monto);
+  const mapping = await lookupPlan(app, planId, monto);
 
   if (!mapping) {
     // Ni el documento ni el monto nos dicen de que plan es. Escribir un tier
     // adivinado seria regalar o robar cupo; no escribir deja el estado anterior,
     // que es el ultimo que SI entendimos.
     logger.error("mp/reconcile: no se pudo determinar el plan — no se escribe", {
-      preapprovalId,
+      planId,
       monto,
     });
-    return { preapprovalId, outcome: "skipped-sin-plan" };
+    return { planId, outcome: "skipped-sin-plan" };
   }
 
   // El uid sale del mapeo; si el mapeo cayo al fallback por monto no lo trae, y
@@ -173,9 +309,9 @@ export async function reconcileSubscription(
   const uid = mapping.uid || (typeof externo === "string" ? externo : "");
   if (!uid) {
     logger.error("mp/reconcile: sin uid ni en el mapeo ni en external_reference", {
-      preapprovalId,
+      planId,
     });
-    return { preapprovalId, outcome: "skipped-sin-plan" };
+    return { planId, outcome: "skipped-sin-plan" };
   }
 
   // Los dos existen y NO coinciden: o alguien toco el documento de mapeo, o MP
@@ -189,9 +325,9 @@ export async function reconcileSubscription(
   ) {
     logger.error(
       "mp/reconcile: el uid del mapeo no coincide con external_reference",
-      { preapprovalId, mapeo: mapping.uid, externalReference: externo },
+      { planId, mapeo: mapping.uid, externalReference: externo },
     );
-    return { preapprovalId, outcome: "skipped-uid-no-coincide" };
+    return { planId, outcome: "skipped-uid-no-coincide" };
   }
 
   const { status, degraded } = mapMpStatus({
@@ -204,11 +340,11 @@ export async function reconcileSubscription(
     // Ver el encabezado: escribir el fallback bajaria al PF a Free y el barrido
     // de las 04:00 le bloquearia alumnos por un dato que no entendimos.
     logger.error("mp/reconcile: estado de MP ininteligible — NO se escribe", {
-      preapprovalId,
+      planId,
       uid,
       recibido: mp.status,
     });
-    return { preapprovalId, outcome: "skipped-degraded", uid, tier: mapping.tier };
+    return { planId, outcome: "skipped-degraded", uid, tier: mapping.tier };
   }
 
   const userRef = app.firestore().collection("users").doc(uid);
@@ -216,20 +352,13 @@ export async function reconcileSubscription(
     | Record<string, unknown>
     | undefined;
 
-  let periodEnd = parsePeriodEnd(mp.next_payment_date, preapprovalId);
-  if (periodEnd === null && status === "cancelled") {
-    // Una baja normalmente deja de tener proximo cobro. Si nos quedamos sin
-    // fecha, `effective-limit` le saca el plan pago EN EL ACTO a alguien que
-    // pago el periodo entero. Se conserva la que ya teniamos: la baja es
-    // efectiva igual cuando esa fecha vence.
-    const previa = actual?.currentPeriodEnd;
-    if (
-      previa != null &&
-      typeof (previa as { toMillis?: unknown }).toMillis === "function"
-    ) {
-      periodEnd = previa as admin.firestore.Timestamp;
-    }
-  }
+  const periodEnd = resolverFinDePeriodo({
+    deMp: parsePeriodEnd(mp.next_payment_date, planId),
+    yaGuardada: actual?.currentPeriodEnd,
+    autoRecurring: mp.auto_recurring,
+    status,
+    planId,
+  });
 
   const sinCambios =
     actual != null &&
@@ -239,7 +368,7 @@ export async function reconcileSubscription(
 
   if (sinCambios) {
     return {
-      preapprovalId,
+      planId,
       outcome: "unchanged",
       uid,
       tier: mapping.tier,
@@ -266,19 +395,19 @@ export async function reconcileSubscription(
   if (status === "cancelled") {
     await app
       .firestore()
-      .collection(MP_PREAPPROVALS_COLLECTION)
-      .doc(preapprovalId)
+      .collection(MP_PLANS_COLLECTION)
+      .doc(planId)
       .set({ terminal: true }, { merge: true });
   }
 
   logger.info("mp/reconcile: suscripcion actualizada", {
-    preapprovalId,
+    planId,
     uid,
     tier: mapping.tier,
     status,
   });
 
-  return { preapprovalId, outcome: "written", uid, tier: mapping.tier, status };
+  return { planId, outcome: "written", uid, tier: mapping.tier, status };
 }
 
 export interface SweepResult {
@@ -287,6 +416,54 @@ export interface SweepResult {
   unchanged: number;
   skipped: number;
   errors: number;
+  /** Planes que se dieron de baja del barrido por checkout abandonado. */
+  abandonados: number;
+}
+
+/**
+ * Cuanto se espera antes de dar por abandonado un plan que nunca tuvo
+ * suscripcion.
+ *
+ * Existe por el costo del diseño de UN PLAN POR CHECKOUT: cada PF que toca
+ * "ELEGIR PLAN" y no paga deja un plan que el barrido consultaria contra MP
+ * todas las noches PARA SIEMPRE. Con cien PF mirando precios y la mitad
+ * abandonando, en un año son miles de llamadas diarias por suscripciones que
+ * nunca existieron.
+ *
+ * 30 dias y no 1: el `init_point` de un plan no vence en el acto, y alguien
+ * que abrio el checkout el martes y pago el jueves tiene que seguir andando.
+ * El costo de esperar de mas son unas pocas llamadas; el de cortar temprano es
+ * un PF que paga y al que nunca le acreditamos el plan.
+ */
+const ABANDONO_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** Si un plan sin suscripcion ya es viejo como para dejar de consultarlo. */
+export function esAbandonado(createdAt: unknown, nowMs: number): boolean {
+  const ms = comoTimestamp(createdAt)?.toMillis();
+  // Sin fecha NO se abandona. Un documento viejo sin `createdAt` —o con el
+  // sentinel de serverTimestamp todavia sin resolver— se sigue consultando:
+  // gastar una llamada de mas es infinitamente mas barato que dejar de mirar
+  // una suscripcion que si existe.
+  if (ms === undefined) return false;
+  return nowMs - ms > ABANDONO_MS;
+}
+
+/**
+ * Saca un plan del barrido. `merge` porque el resto del mapeo —uid, tier,
+ * cycle— tiene que sobrevivir: sirve para auditar quien compro que, aunque ya
+ * no se consulte.
+ */
+async function marcarTerminal(
+  app: admin.app.App,
+  planId: string,
+  motivo: string,
+): Promise<void> {
+  await app
+    .firestore()
+    .collection(MP_PLANS_COLLECTION)
+    .doc(planId)
+    .set({ terminal: true, terminalReason: motivo }, { merge: true });
+  logger.info("mp/reconcile: plan sacado del barrido", { planId, motivo });
 }
 
 /**
@@ -309,7 +486,7 @@ export async function reconcileAllSubscriptions(
 ): Promise<SweepResult> {
   const snap = await app
     .firestore()
-    .collection(MP_PREAPPROVALS_COLLECTION)
+    .collection(MP_PLANS_COLLECTION)
     .get();
 
   const r: SweepResult = {
@@ -318,10 +495,12 @@ export async function reconcileAllSubscriptions(
     unchanged: 0,
     skipped: 0,
     errors: 0,
+    abandonados: 0,
   };
 
   for (const doc of snap.docs) {
-    if (doc.data()?.terminal === true) continue;
+    const datos = doc.data();
+    if (datos?.terminal === true) continue;
     r.total += 1;
 
     // El try es por-PF, igual que en `entitlement-triggers`: un documento roto
@@ -332,9 +511,17 @@ export async function reconcileAllSubscriptions(
       else if (res.outcome === "unchanged") r.unchanged += 1;
       else if (res.outcome === "error-mp") r.errors += 1;
       else r.skipped += 1;
+
+      if (
+        res.outcome === "sin-suscripcion" &&
+        esAbandonado(datos?.createdAt, deps.nowMs)
+      ) {
+        await marcarTerminal(app, doc.id, "checkout abandonado");
+        r.abandonados += 1;
+      }
     } catch (err) {
       logger.error("mp/reconcile: error inesperado en un preapproval", {
-        preapprovalId: doc.id,
+        planId: doc.id,
         err,
       });
       r.errors += 1;
@@ -358,6 +545,7 @@ export const reconcileMpSubscriptions = onSchedule(
   async () => {
     const r = await reconcileAllSubscriptions(getApp(), {
       mpClient: createMpClient(MP_ACCESS_TOKEN.value()),
+      nowMs: Date.now(),
     });
     logger.info("reconcileMpSubscriptions: corrida diaria", r);
   },

@@ -3766,6 +3766,13 @@ service cloud.firestore {
     match /mp_checkouts/{uid} {
       allow read, write: if false;
     }
+    // El mapeo VIGENTE: plan de MP → (PF, tier, ciclo). Escribirlo es elegirse
+    // el plan — el reconciliador lee de acá para saber qué límite otorgar.
+    match /mp_plans/{planId} {
+      allow read, write: if false;
+    }
+    // El del flujo anterior, sin plan asociado. Ya no se escribe, pero quedaron
+    // documentos de las pruebas manuales y siguen teniendo el uid de un PF.
     match /mp_preapprovals/{preapprovalId} {
       allow read, write: if false;
     }
