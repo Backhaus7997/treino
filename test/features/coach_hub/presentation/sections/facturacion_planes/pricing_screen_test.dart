@@ -247,13 +247,22 @@ void main() {
   testWidgets('en web, tap en ELEGIR PLAN arranca el checkout', (tester) async {
     await pumpDesktop(tester);
 
-    await tester.tap(find.text('ELEGIR PLAN').first);
-    await tester.pump();
+    Uri? abierta;
+    debugPlanCheckoutCreator =
+        ({required tier, required annual}) async => 'https://mp/desktop';
+    debugPlanCheckoutLauncher = (u) async {
+      abierta = u;
+      return true;
+    };
+    addTearDown(() {
+      debugPlanCheckoutCreator = null;
+      debugPlanCheckoutLauncher = null;
+    });
 
-    expect(
-      find.textContaining('Mercado Pago se habilita'),
-      findsOneWidget,
-    );
+    await tester.tap(find.text('ELEGIR PLAN').first);
+    await tester.pumpAndSettle();
+
+    expect(abierta, Uri.parse('https://mp/desktop'));
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -766,10 +775,83 @@ void main() {
       expect(find.text('SE CONTRATA EN TREINO WEB'), findsNothing);
       expect(find.textContaining('desde TREINO web'), findsNothing);
 
-      await tester.tap(find.text('ELEGIR PLAN').first);
-      await tester.pump();
+      // El punto de compra AHORA cobra de verdad: pide el checkout al servidor
+      // y navega. Los dos seams cortan antes de la red y antes del navegador —
+      // sin ellos este test abriría Mercado Pago desde la suite.
+      SubscriptionTier? pedido;
+      bool? pidioAnual;
+      Uri? abierta;
+      debugPlanCheckoutCreator = ({required tier, required annual}) async {
+        pedido = tier;
+        pidioAnual = annual;
+        return 'https://mp/checkout';
+      };
+      debugPlanCheckoutLauncher = (u) async {
+        abierta = u;
+        return true;
+      };
+      addTearDown(() {
+        debugPlanCheckoutCreator = null;
+        debugPlanCheckoutLauncher = null;
+      });
 
-      expect(find.textContaining('Mercado Pago se habilita'), findsOneWidget);
+      await tester.tap(find.text('ELEGIR PLAN').first);
+      await tester.pumpAndSettle();
+
+      // Que el tap PIDA el checkout y NAVEGUE. Antes bastaba con un cartel;
+      // ahora el test tiene que ver las dos mitades, porque cualquiera de las
+      // dos rota deja al PF sin poder pagar y la pantalla igual de linda.
+      expect(pedido, isNotNull);
+      expect(pidioAnual, isNotNull);
+      expect(abierta, Uri.parse('https://mp/checkout'));
+    });
+
+    testWidgets('si el servidor no devuelve checkout, avisa y NO navega',
+        (tester) async {
+      _superficieWeb();
+      await pump(tester, _kMobileSize);
+
+      var navego = false;
+      debugPlanCheckoutCreator = ({required tier, required annual}) async => null;
+      debugPlanCheckoutLauncher = (u) async {
+        navego = true;
+        return true;
+      };
+      addTearDown(() {
+        debugPlanCheckoutCreator = null;
+        debugPlanCheckoutLauncher = null;
+      });
+
+      await tester.tap(find.text('ELEGIR PLAN').first);
+      await tester.pumpAndSettle();
+
+      expect(navego, isFalse);
+      expect(find.textContaining('No pudimos'), findsOneWidget);
+    });
+
+    testWidgets('si la llamada explota, avisa y NO navega', (tester) async {
+      // El PF tiene que enterarse de que no pasó nada. Tragarse el error deja
+      // un botón que no hace absolutamente nada al tocarlo.
+      _superficieWeb();
+      await pump(tester, _kMobileSize);
+
+      var navego = false;
+      debugPlanCheckoutCreator =
+          ({required tier, required annual}) async => throw Exception('boom');
+      debugPlanCheckoutLauncher = (u) async {
+        navego = true;
+        return true;
+      };
+      addTearDown(() {
+        debugPlanCheckoutCreator = null;
+        debugPlanCheckoutLauncher = null;
+      });
+
+      await tester.tap(find.text('ELEGIR PLAN').first);
+      await tester.pumpAndSettle();
+
+      expect(navego, isFalse);
+      expect(find.textContaining('No pudimos'), findsOneWidget);
     });
 
     // La salida que NINGÚN test de widgets ve.
@@ -799,14 +881,35 @@ void main() {
             ' — si se movió, movete este test con ella en vez de borrarlo',
       );
 
-      const prohibidos = <String>[
-        'package:url_launcher',
-        'launchUrl(',
-        'launchUrlString(',
+      // ── Prohibido SIEMPRE, `plan_checkout.dart` incluido ──
+      //
+      // Todo esto abre el checkout ADENTRO de la app, y para 3.1.3(c) eso es
+      // una venta in-app: exactamente lo que el tipo sellado existe para
+      // evitar, y por un camino que el sellado NO ve. Que el archivo del
+      // punto de compra pueda navegar afuera no lo habilita a traerse el
+      // checkout adentro.
+      const prohibidosSiempre = <String>[
         'WebViewController',
         'WebViewWidget',
         'InAppBrowser',
+        'LaunchMode.inAppBrowserView',
+        'LaunchMode.inAppWebView',
       ];
+
+      // ── Prohibido en toda la carpeta MENOS en el punto de compra ──
+      //
+      // `plan_checkout.dart` navega al `init_point` de Mercado Pago, y eso es
+      // legítimo: es el ÚNICO archivo del que `PlanCheckoutAvailable.start`
+      // puede salir, y saca al usuario de la app en vez de traer el pago
+      // adentro. En cualquier OTRO archivo de la carpeta sigue siendo el
+      // agujero de siempre — un camino de cobro al lado del cartel, en la
+      // rama móvil, que el sellado no atrapa.
+      const prohibidosSalvoEnElPuntoDeCompra = <String>[
+        'package:url_launcher',
+        'launchUrl(',
+        'launchUrlString(',
+      ];
+      const puntoDeCompra = 'plan_checkout.dart';
       final hallazgos = <String>[];
       // `recursive: true` a propósito: sin eso, un `launchUrl` metido en
       // `facturacion_planes/<subcarpeta>/` era invisible para este test — que
@@ -820,8 +923,13 @@ void main() {
           final i = l.indexOf('//');
           return i == -1 ? l : l.substring(0, i);
         }).join('\n');
-        for (final aguja in prohibidos) {
+        for (final aguja in prohibidosSiempre) {
           if (codigo.contains(aguja)) hallazgos.add('${f.path}: $aguja');
+        }
+        if (!f.path.endsWith(puntoDeCompra)) {
+          for (final aguja in prohibidosSalvoEnElPuntoDeCompra) {
+            if (codigo.contains(aguja)) hallazgos.add('${f.path}: $aguja');
+          }
         }
       }
 
