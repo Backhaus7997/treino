@@ -21,16 +21,16 @@
  *     unrelated field edit on a live link)
  *     → read the share first and write ONLY when nobody else holds it: rebuild
  *       it when it is missing, leave it untouched when it names another trainer.
- *   - `after` absent (delete) of a `terminated` link that was NEVER accepted
- *     (`before.status === 'terminated' && before.acceptedAt == null`) — exactly
- *     the set purge-rejected-link.ts deletes, and nothing else: deleting an
- *     `active` link is the account cascade, and that still revokes
- *     → INERT. The share is only ever granted on the `active` branch, and
- *       `active` is unreachable without promote-link.ts stamping `acceptedAt`,
- *       so such a link never wrote `session_shares` and has nothing of its own
- *       to revoke. Without this exit, purging a rejected request would delete
- *       the share held by a LIVE link of the SAME pair — same trainerId, so the
- *       ownership check below cannot tell them apart.
+ *   - `after` absent (delete) of a `terminated` link with no `acceptedAt`
+ *     → INERT. Only purge-rejected-link.ts and scripts/cleanup_rejected_links.js
+ *       delete from this collection, both only delete rejections and
+ *       cancellations, and `decline`/`cancel` require `status == pending` — so a
+ *       deleted doc was never `active`, and the share is only ever granted
+ *       inside the `active` branch. It has nothing of its own to revoke.
+ *       Without this exit, purging a rejected request would delete the share
+ *       held by a LIVE link of the SAME pair — same trainerId, so the ownership
+ *       check below cannot tell them apart. The full chain, with the command
+ *       that reproduces step 1, is on the guard itself.
  *   - any other `after` absent (delete) OR status is not `active`
  *     → read the share and delete it, but only while it still carries THIS
  *       trainerId. Pointing at a different trainer → leave it alone.
@@ -236,9 +236,31 @@ export async function syncSessionShareHandler(
   // fue aceptado no tiene share que revocar, y dejarlo caer al camino de abajo
   // le ROBA el share a un vinculo VIVO del mismo par.
   //
-  // El share se otorga UNICAMENTE en la rama `status === "active"` de arriba, y
-  // a `active` no se llega sin que promote-link.ts estampe `acceptedAt`. O sea:
-  // `acceptedAt == null` ⇒ este vinculo jamas escribio `session_shares`.
+  // POR QUE ES SEGURO SALTEAR LA REVOCACION. La cadena, y ninguno de sus
+  // eslabones pasa por `acceptedAt`:
+  //
+  //   1. Lo UNICO que borra docs de `trainer_links` son `purge-rejected-link.ts`
+  //      y `scripts/cleanup_rejected_links.js`. Reproducible:
+  //        rg -n 'trainer_links' functions/src scripts --type ts --type js \
+  //          -g '!**/__tests__/**' -g '!**/test/**' | rg '\.delete\(|batch\.delete'
+  //   2. Los dos borran SOLO rechazos y cancelaciones (`clasificarTerminacion`).
+  //   3. `decline()` y `cancel()` exigen `status == pending`
+  //      (trainer_link_repository.dart:58 y :87), asi que un doc borrado NUNCA
+  //      estuvo en `active`.
+  //   4. El share se otorga UNICAMENTE dentro de la rama `status === "active"`
+  //      (las dos llamadas a `grantShare`).
+  //
+  //   → un doc borrado jamas escribio `session_shares`. No hay nada suyo que
+  //     revocar.
+  //
+  // UNA VERSION ANTERIOR DE ESTE COMENTARIO decia que «a `active` no se llega
+  // sin que promote-link.ts estampe `acceptedAt`, o sea `acceptedAt == null` ⇒
+  // este vinculo jamas escribio session_shares». ES FALSO, y conviene dejarlo
+  // escrito para que nadie lo reconstruya: `promote-link.ts` (~231) NO estampa
+  // `acceptedAt` en la rama RESUME, y `firestore.rules` (~781) deja poner
+  // `paused` desde CUALQUIER status. `pending → paused → resume` da un vinculo
+  // ACTIVO sin la marca, que SI puede haber escrito el share. La guarda estaba
+  // bien; su justificacion, no.
   //
   // Sin esta guarda el escenario real es: el alumno le pide a PF-A, PF-A
   // rechaza (doc1: terminated, acceptedAt null, sin share). Mas tarde el alumno
@@ -250,16 +272,29 @@ export async function syncSessionShareHandler(
   // recien vuelve en la proxima escritura sobre doc2.
   //
   // El chequeo de trainerId de abajo NO alcanza justamente porque el par es el
-  // mismo. Por eso la guarda va por `acceptedAt`, no por identidad.
+  // mismo. Por eso la guarda no puede ir por identidad.
   //
-  // La condicion es EXACTAMENTE el conjunto que borra el purge, ni un doc mas.
-  // Por eso pide tambien `status === "terminated"`: un DELETE de un vinculo
-  // `active` es la cascada de borrado de cuenta (cascade/trainer-links.ts), ahi
-  // el share SI es nuestro y SI hay que revocarlo — y hay vinculos `active`
-  // legacy sin `acceptedAt` (select-blocked-links.ts:192 lo llama un defecto de
-  // datos), asi que guardar solo por `acceptedAt` los dejaria con el share
-  // colgado para siempre. Y un `terminated` que se queda como doc revoca como
-  // siempre: esto no toca el camino de terminate.
+  // POR QUE PIDE `status === "terminated"` Y NO SOLO `acceptedAt == null`: para
+  // que un DELETE de un vinculo `active` siga revocando. Hoy nada borra un
+  // `active` —el borrado de cuenta hace `batch.update` a `terminated`
+  // (cascade/trainer-links.ts:46), NO borra—, asi que ese medio conjunto es
+  // inalcanzable. Se queda igual: es la mitad barata de un guard cuyo costo de
+  // equivocarse es un share colgado para siempre.
+  //
+  // (El comentario anterior afirmaba que ese DELETE de un `active` ERA la
+  // cascada de borrado de cuenta. Falso, por lo de arriba. Es el §11.1 de
+  // AGENTS.md: un cartel que le ensena al proximo lector una mecanica que no
+  // existe, en el archivo equivocado para aprenderla.)
+  //
+  // La guarda es mas ANCHA que el conjunto que el purge borra hoy: no mira la
+  // razon, asi que tambien cubriria el delete de un `terminated` con razon de
+  // terminate real. Nada produce ese delete, o sea que la diferencia es codigo
+  // muerto y no un agujero. Si algun dia hace falta cerrarla exacto, la forma
+  // es `clasificarTerminacion(before) !== "vinculo-real"` — la misma funcion que
+  // ya decide el borrado, no un tercer predicado.
+  //
+  // Un `terminated` que se QUEDA como doc revoca como siempre: esto no toca el
+  // camino de terminate.
   if (!after && before?.status === "terminated" && before.acceptedAt == null) {
     logger.info(
       "syncSessionShare: delete de un vinculo nunca aceptado — no hay share propio que revocar",

@@ -352,11 +352,20 @@ export async function notifyOnLinkChangeHandler(
   // borra. Ver purge-rejected-link.ts para el discriminador.
   //
   // POR QUE VIVE ACA Y NO EN UN TRIGGER PROPIO. El orden contra la notificacion
-  // es el punto entero. Como septimo trigger sobre `trainer_links/{linkId}`,
+  // es el punto entero. Como SEXTO trigger sobre `trainer_links/{linkId}`,
   // "primero se notifica y despues se borra" quedaria a merced de como Eventarc
   // planifique dos invocaciones independientes — que es otra manera de decir
   // que no seria un orden. Al final de este handler, el orden es una propiedad
   // del codigo: sendFcm y enqueueLinkMail ya resolvieron.
+  //
+  // Hoy hay CINCO (notifyOnLinkChange, linkAggregate, syncSessionShareOnTrainerLink,
+  // cleanupAssignedPlansOnUnlink, linkLoadReconcile). El comando, porque una
+  // afirmacion de conteo sin el al lado no cuenta (AGENTS.md §11.1):
+  //
+  //   rg -n 'document: "trainer_links' functions/src --type ts -g '!__tests__'
+  //
+  // (Una version anterior de este comentario decia "septimo". Estaba mal, y de
+  // ese numero colgaba el razonamiento de fan-out.)
   //
   // (Los dos triggers leen `after` del payload del evento, no de Firestore, asi
   // que un borrado concurrente tampoco les vaciaria el snapshot. Pero apoyar el
