@@ -102,7 +102,7 @@ class TreinoEmptyState extends StatelessWidget {
                 key: const Key('empty_state_medallion'),
                 padding: const EdgeInsets.all(AppSpacing.s18),
                 decoration: BoxDecoration(
-                  color: AppPalette.of(context).accent.withValues(alpha: 0.10),
+                  color: AppPalette.of(context).accent.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(

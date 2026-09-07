@@ -236,7 +236,7 @@ class TreinoSegmentedPillTokens {
       // 12% de opacidad sobre el acento.
       pressedOverlay: p.textPrimary.withValues(alpha: 0.12),
       // 20% de opacidad sobre el acento.
-      focusOverlay: p.textPrimary.withValues(alpha: 0.20),
+      focusOverlay: p.textPrimary.withValues(alpha: 0.2),
     );
   }
 }
