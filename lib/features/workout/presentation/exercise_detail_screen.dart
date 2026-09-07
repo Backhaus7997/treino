@@ -990,7 +990,7 @@ class _VideoHeroStripState extends State<_VideoHeroStrip> {
               // fades out while playing so nothing covers the technique.
               AnimatedOpacity(
                 opacity: showChrome ? 1 : 0,
-                duration: AppMotion.fast,
+                duration: AppMotion.resolve(context, AppMotion.fast),
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
@@ -1023,7 +1023,7 @@ class _VideoHeroStripState extends State<_VideoHeroStrip> {
                 ),
               AnimatedOpacity(
                 opacity: showChrome && !_initializing ? 1 : 0,
-                duration: AppMotion.fast,
+                duration: AppMotion.resolve(context, AppMotion.fast),
                 child: Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,

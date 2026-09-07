@@ -1408,7 +1408,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       if (key.currentContext == null) return;
       Scrollable.ensureVisible(
         key.currentContext!,
-        duration: AppMotion.slow,
+        duration: AppMotion.resolve(context, AppMotion.slow),
         curve: AppMotion.emphasized,
         alignment: 0.1,
       );
@@ -2525,7 +2525,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             if (key.currentContext != null) {
               Scrollable.ensureVisible(
                 key.currentContext!,
-                duration: AppMotion.slow,
+                duration: AppMotion.resolve(context, AppMotion.slow),
                 curve: AppMotion.emphasized,
                 alignment: 0.1,
               );
