@@ -218,9 +218,9 @@ Future<void> _pump(
               sessionsInWindowByAthleteId[key.athleteId] ?? const <Session>[],
         ),
         gymsProvider.overrideWith((ref) => const <Gym>[]),
-        assignedRoutinesProvider.overrideWith(
-          (ref, athleteId) async =>
-              routinesByAthleteId[athleteId] ?? const <Routine>[],
+        assignedRoutinesByTrainerProvider.overrideWith(
+          (ref, key) async =>
+              routinesByAthleteId[key.athleteId] ?? const <Routine>[],
         ),
         currentUidProvider.overrideWithValue(_trainerId),
         // Botón «Chat» del roster: resuelve/crea el chat 1-1 con el alumno

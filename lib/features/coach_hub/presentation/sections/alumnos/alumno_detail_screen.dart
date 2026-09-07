@@ -688,7 +688,9 @@ class _ResumenTab extends ConsumerWidget {
     final trainerUid = ref.watch(currentUidProvider);
     final sessionsAsync = ref.watch(sessionsByUidProvider(athleteId));
     final measAsync = ref.watch(measurementsForAthleteProvider(athleteId));
-    final routinesAsync = ref.watch(assignedRoutinesProvider(athleteId));
+    final routinesAsync = ref.watch(assignedRoutinesByTrainerProvider(
+      (trainerId: trainerUid ?? '', athleteId: athleteId),
+    ));
 
     // El resumen combina tres fuentes async: spinner hasta que las tres tengan
     // valor, y un único error si alguna falla. Si leyéramos routines/measurements
@@ -1717,7 +1719,8 @@ class _PagosTab extends ConsumerWidget {
 }
 
 /// Tab Entrenamiento (W2 PR3): rutina activa + historial de sesiones + evolución
-/// por ejercicio. Reusa `assignedRoutinesProvider`, `sessionsByUidProvider`,
+/// por ejercicio. Reusa `assignedRoutinesByTrainerProvider`,
+/// `sessionsByUidProvider`,
 /// `athleteExerciseListProvider` y `exerciseProgressionProvider`.
 class _EntrenamientoTab extends ConsumerWidget {
   const _EntrenamientoTab({required this.athleteId});
@@ -1727,7 +1730,9 @@ class _EntrenamientoTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final trainerUid = ref.watch(currentUidProvider);
-    final routinesAsync = ref.watch(assignedRoutinesProvider(athleteId));
+    final routinesAsync = ref.watch(assignedRoutinesByTrainerProvider(
+      (trainerId: trainerUid ?? '', athleteId: athleteId),
+    ));
     final sessionsAsync = ref.watch(sessionsByUidProvider(athleteId));
 
     return SingleChildScrollView(

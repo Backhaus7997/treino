@@ -99,7 +99,7 @@ List<Override> _baseOverrides({
       gymsProvider.overrideWith((ref) => const <Gym>[]),
       athleteBillingProvider.overrideWith((ref, id) => Stream.value(null)),
       sessionsByUidProvider.overrideWith((ref, id) => const <Session>[]),
-      assignedRoutinesProvider.overrideWith((ref, id) => const <Routine>[]),
+      assignedRoutinesByTrainerProvider.overrideWith((ref, key) => const <Routine>[]),
       athleteNoteProvider(
         (trainerId: _trainerUid, athleteId: _athleteUid),
       ).overrideWith((ref) => noteStream),
@@ -286,7 +286,7 @@ void main() {
       gymsProvider.overrideWith((ref) => const <Gym>[]),
       athleteBillingProvider.overrideWith((ref, id) => Stream.value(null)),
       sessionsByUidProvider.overrideWith((ref, id) => const <Session>[]),
-      assignedRoutinesProvider.overrideWith((ref, id) => const <Routine>[]),
+      assignedRoutinesByTrainerProvider.overrideWith((ref, key) => const <Routine>[]),
       athleteNoteProvider(
         (trainerId: _trainerUid, athleteId: _athleteUid),
       ).overrideWith((ref) => Stream.value(AthleteNote(

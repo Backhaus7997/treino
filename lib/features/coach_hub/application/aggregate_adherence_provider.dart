@@ -4,9 +4,9 @@ import '../../coach/application/trainer_link_providers.dart'
     show trainerLinksStreamProvider;
 import '../../coach/domain/trainer_link_status.dart';
 import '../../workout/application/assigned_routine_providers.dart'
-    show assignedRoutinesProvider;
+    show assignedRoutinesByTrainerProvider;
 import '../../workout/application/session_providers.dart'
-    show finishedInWindowByUidProvider;
+    show currentUidProvider, finishedInWindowByUidProvider;
 import '../../workout/domain/routine.dart';
 import '../../workout/domain/routine_status.dart';
 import '../presentation/sections/alumnos/resumen_metrics.dart'
@@ -57,6 +57,14 @@ final aggregateAdherenceProvider =
   // No active athletes → no data.
   if (sharingAthleteIds.isEmpty) return null;
 
+  // El PF logueado es la otra mitad de la clave del listado de rutinas: el
+  // `list` del entrenador filtra por `assignedBy` para que las reglas lo
+  // puedan probar (ver `RoutineRepository.listAssignedToByTrainer`). Sin uid
+  // no hay lectura posible, y devolver null es lo mismo que hace el resto del
+  // provider cuando no tiene con qué calcular.
+  final trainerId = ref.watch(currentUidProvider);
+  if (trainerId == null || trainerId.isEmpty) return null;
+
   // Day-truncated stable window boundaries (30-day adherence window).
   // NEVER use DateTime.now() at full precision as a .family key — it creates
   // a new key every build → infinite rebuild → pumpAndSettle hang in CI.
@@ -73,8 +81,9 @@ final aggregateAdherenceProvider =
         await ref.watch(finishedInWindowByUidProvider(windowKey).future);
 
     // 2. Active routine's weeklyTarget (days.length of first active plan).
-    final routines =
-        await ref.watch(assignedRoutinesProvider(athleteId).future);
+    final routines = await ref.watch(assignedRoutinesByTrainerProvider(
+      (trainerId: trainerId, athleteId: athleteId),
+    ).future);
     final Routine? activeRoutine =
         routines.where((r) => r.status == RoutineStatus.active).firstOrNull;
 

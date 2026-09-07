@@ -17,6 +17,8 @@ import 'package:treino/features/coach_hub/presentation/sections/rutinas/routine_
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
+import 'package:treino/features/workout/application/session_providers.dart'
+    show currentUidProvider;
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_status.dart';
 
@@ -52,7 +54,10 @@ class AthleteRoutinesScreen extends ConsumerWidget {
     final profileAsync = ref.watch(userPublicProfileProvider(athleteId));
     final rawName = profileAsync.valueOrNull?.displayName ?? '';
     final name = rawName.isEmpty ? 'el alumno' : rawName; // i18n
-    final routinesAsync = ref.watch(assignedRoutinesProvider(athleteId));
+    final trainerId = ref.watch(currentUidProvider) ?? '';
+    final routinesKey = (trainerId: trainerId, athleteId: athleteId);
+    final routinesAsync =
+        ref.watch(assignedRoutinesByTrainerProvider(routinesKey));
     final statusFilter = ref.watch(_statusFilterProvider);
     final allRoutines = routinesAsync.valueOrNull ?? const <Routine>[];
     final active =
@@ -128,6 +133,7 @@ class AthleteRoutinesScreen extends ConsumerWidget {
               routinesAsync: routinesAsync,
               visible: visible,
               statusFilter: statusFilter,
+              trainerId: trainerId,
               athleteId: athleteId,
             ),
           ),
@@ -159,12 +165,18 @@ class _AthleteRoutinesBody extends ConsumerWidget {
     required this.routinesAsync,
     required this.visible,
     required this.statusFilter,
+    required this.trainerId,
     required this.athleteId,
   });
 
   final AsyncValue<List<Routine>> routinesAsync;
   final List<Routine> visible;
   final RoutineStatus statusFilter;
+
+  /// Mitad del par que forma la clave de `assignedRoutinesByTrainerProvider`.
+  /// Baja como field en vez de releerse acá para que el "Reintentar" invalide
+  /// EXACTAMENTE la misma clave que el padre está mirando.
+  final String trainerId;
   final String athleteId;
 
   @override
@@ -186,7 +198,9 @@ class _AthleteRoutinesBody extends ConsumerWidget {
         icon: TreinoIcon.errorState,
         title: 'No pudimos cargar las rutinas.', // i18n
         ctaLabel: 'Reintentar', // i18n
-        onCtaTap: () => ref.invalidate(assignedRoutinesProvider(athleteId)),
+        onCtaTap: () => ref.invalidate(assignedRoutinesByTrainerProvider(
+          (trainerId: trainerId, athleteId: athleteId),
+        )),
       );
     }
 
@@ -276,6 +290,7 @@ class _RoutineRowState extends ConsumerState<_RoutineRow> {
 
     final ok = await ref.read(routineActionsProvider.notifier).archive(
           routineId: widget.routine.id,
+          trainerId: ref.read(currentUidProvider) ?? '',
           athleteId: widget.athleteId,
         );
 

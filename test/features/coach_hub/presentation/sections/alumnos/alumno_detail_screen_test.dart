@@ -363,7 +363,7 @@ Future<void> _pump(
                 ? Stream.error(performanceError)
                 : Stream.value(performanceTests)),
         currentUidProvider.overrideWithValue('t1'),
-        assignedRoutinesProvider.overrideWith((ref, id) => routines),
+        assignedRoutinesByTrainerProvider.overrideWith((ref, key) => routines),
         sessionsByUidProvider.overrideWith((ref, id) {
           if (sessionsError != null) throw sessionsError;
           return sessions;
@@ -1441,8 +1441,8 @@ void main() {
             trainerLinkRepositoryProvider.overrideWithValue(repo),
             // El detalle abre en Resumen (W2 PR4), que lee estos providers.
             sessionsByUidProvider.overrideWith((ref, id) => const <Session>[]),
-            assignedRoutinesProvider
-                .overrideWith((ref, id) => const <Routine>[]),
+            assignedRoutinesByTrainerProvider
+                .overrideWith((ref, key) => const <Routine>[]),
             currentUidProvider.overrideWithValue('t1'),
             // El header (W2 PR7) lee el billing del alumno.
             athleteBillingProvider

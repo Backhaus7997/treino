@@ -68,8 +68,8 @@ Future<void> _pumpScreen(
         currentUidProvider.overrideWithValue(_kTrainer),
         userPublicProfileProvider(_kAthlete)
             .overrideWith((ref) => Stream.value(_profile())),
-        assignedRoutinesProvider(_kAthlete)
-            .overrideWith((ref) async => const []),
+        assignedRoutinesByTrainerProvider
+            .overrideWith((ref, key) async => const []),
         ...extraOverrides,
       ],
       child: MaterialApp.router(

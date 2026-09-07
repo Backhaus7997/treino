@@ -220,6 +220,17 @@ Future<ProviderContainer> pumpGate(
     assignedRoutinesProvider.overrideWith((ref, athleteId) async {
       return const <Routine>[];
     }),
+    // Los DOS providers, a propósito. El listado del PF se mudó a
+    // `assignedRoutinesByTrainerProvider` (el `list` del entrenador necesita
+    // `assignedBy` en la query para que las reglas lo puedan probar), pero las
+    // pantallas del ATLETA siguen en `assignedRoutinesProvider`. El gate
+    // renderiza las dos familias de pantallas, así que overridear una sola
+    // dejaría a la otra pegándole a Firestore de verdad — y el golden saldría
+    // siendo una captura del estado de error, que es exactamente el modo de
+    // falla que el comentario de arriba viene a evitar.
+    assignedRoutinesByTrainerProvider.overrideWith((ref, key) async {
+      return const <Routine>[];
+    }),
     // Las sesiones quedan vacías a propósito, no por olvido: la propia pantalla
     // documenta que un permission-denied acá NO es un error del resumen (el CF
     // borra `session_shares` cuando el link no está activo), así que degrada a
