@@ -57,7 +57,7 @@
 
 import * as admin from "firebase-admin";
 import { App } from "firebase-admin/app";
-import { DocumentData } from "firebase-admin/firestore";
+import { DocumentData, FieldValue, Timestamp } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 
 import { effectiveWeightLimit } from "./effective-limit";
@@ -304,15 +304,15 @@ export async function syncTrainerEntitlements(
     for (const id of blockNow) {
       tx.update(db.collection("trainer_links").doc(id), {
         entitlement: "blocked",
-        blockedAt: admin.firestore.Timestamp.fromMillis(clock),
+        blockedAt: Timestamp.fromMillis(clock),
         blockedReason: "over-limit",
       });
     }
     for (const id of unblock) {
       tx.update(db.collection("trainer_links").doc(id), {
         entitlement: "entitled",
-        blockedAt: admin.firestore.FieldValue.delete(),
-        blockedReason: admin.firestore.FieldValue.delete(),
+        blockedAt: FieldValue.delete(),
+        blockedReason: FieldValue.delete(),
       });
     }
     // `merge: true` con un array REEMPLAZA el array entero, que es justo lo

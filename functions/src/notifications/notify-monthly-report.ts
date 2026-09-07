@@ -27,8 +27,8 @@
 
 import * as admin from "firebase-admin";
 import { App } from "firebase-admin/app";
+import { FieldValue, Query, QueryDocumentSnapshot, Timestamp } from "firebase-admin/firestore";
 import { Messaging } from "firebase-admin/messaging";
-import { Query, QueryDocumentSnapshot } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { artDateKey } from "../mail/format";
@@ -114,11 +114,11 @@ export async function notifyMonthlyReportHandler(
   do {
     let query: Query = db
       .collectionGroup("sessions")
-      .where("startedAt", ">=", admin.firestore.Timestamp.fromDate(month.start))
+      .where("startedAt", ">=", Timestamp.fromDate(month.start))
       .where(
         "startedAt",
         "<",
-        admin.firestore.Timestamp.fromDate(month.endExclusive),
+        Timestamp.fromDate(month.endExclusive),
       )
       .orderBy("startedAt", "asc")
       .limit(PAGE_SIZE);
@@ -203,7 +203,7 @@ export async function notifyMonthlyReportHandler(
         await userRef
           .update({
             lastMonthlyReportNotifiedMonth:
-              admin.firestore.FieldValue.delete(),
+              FieldValue.delete(),
           })
           .catch(() => undefined);
         throw sendError;

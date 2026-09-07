@@ -8,6 +8,7 @@
  */
 import * as admin from "firebase-admin";
 import { App } from "firebase-admin/app";
+import { FieldValue } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 
@@ -76,7 +77,7 @@ export async function reassignFcmTokenHandler(
     for (const [sourceUid, tokens] of removalsByUser) {
       batch.update(
         db.collection("users").doc(sourceUid),
-        { fcmTokens: admin.firestore.FieldValue.arrayRemove(...tokens) },
+        { fcmTokens: FieldValue.arrayRemove(...tokens) },
       );
     }
     await batch.commit();
