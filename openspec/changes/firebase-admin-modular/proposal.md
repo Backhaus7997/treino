@@ -187,6 +187,26 @@ El mismo agujero existe en `functions/`: los 43 tests hacen `jest.mock("firebase
 explota porque `FieldValue`/`Timestamp` son fábricas puras que no necesitan app. `getFirestore()` sí
 la necesita — ese es el que rompe.
 
+**Y en `functions/` también termina en verde, no en rojo.** Era la duda razonable —en jest, un
+módulo real sin mockear suele fallar ruidosamente— y la medición dice que no siempre:
+
+- **39 aserciones por AUSENCIA** (`not.toHaveBeenCalled`) en la suite, **21 de ellas sobre
+  `sendEachForMulticast`**: o sea «no se mandó la notificación».
+- Los **nueve** archivos que hacen esa aserción **no espían el logger** (`warnSpy` / `errorSpy` /
+  `spyOn(logger…)`: cero hits en los nueve).
+- Producción tiene **`catch all → log + no rethrow` como política escrita**:
+  `review-aggregate.ts:144`, `link-aggregate.ts:119`, `template-rating-aggregate.ts:109`,
+  `notify-wear-workout.ts:124` («Un aviso perdido no puede hacer fallar la escritura de la sesión»).
+
+Encadenado: archivo migrado llama al `getFirestore()` real → tira porque no hay app → el catch-all
+se lo traga y loguea → nunca se llega al `sendEachForMulticast` → `expect(…).not.toHaveBeenCalled()`
+**pasa**.
+
+*(No todo caso con aserción por ausencia es de estos: `link-load-reconcile.test.ts` tiene cinco y su
+módulo tiene un catch que se traga el error, pero ahí las aserciones son sobre `warnSpy`, así que el
+catch **sí** se observa y el test se pondría rojo. Los nueve son los que asertan sobre el mock de
+FCM.)*
+
 ---
 
 ## 5. El gate NO se achica solo del todo
@@ -219,7 +239,7 @@ el 11 y el 12.
 
 | # | PR | dir | escribe en prod | ~líneas | por qué acá |
 |---|---|---|---|---|---|
-| **1** | Extender los dobles a los subpaths | `scripts/` + `functions/` | no | ~150 | **Habilitante.** Sin esto, todo lo que sigue puede salir verde sin medir. Cero cambios de producción: sólo fixtures y mocks. |
+| **1** ✅ | Extender los dobles a los subpaths | `scripts/` + `functions/` | no | 661 | **Habilitante — HECHO** (`04821be4` + `2ccc3096`). Sin esto, todo lo que sigue puede salir verde sin medir. Cero cambios de producción: sólo fixtures y tests. |
 | **2** | Tipos de `functions/` (`admin.app.App` → `App`, etc.) | `functions/src` | no | ~200 | **143 sitios, cero riesgo runtime**: los tipos se borran al compilar. `tsc` lo prueba entero. Es el 60% de `functions/src` sin tocar una sola línea que corra. |
 | **3** | `FieldValue` / `Timestamp` de `functions/` | `functions/src` | no | ~60 | Fábricas puras, sin app. Ya hay 5 en producción hace meses — el patrón está probado en campo. |
 | **4** | `ensureApp()` + `getFirestore/getAuth/getStorage/getMessaging` de `functions/` | `functions/src` | **sí** | ~250 | El idiom `admin.app()` / `admin.initializeApp()` se repite en **32 archivos**. Primer PR con riesgo runtime real; entra con los dobles ya arreglados (PR 1). Candidato a partirse por subdirectorio si pasa 400 líneas. |
@@ -271,6 +291,28 @@ migración**, no por criticidad del código:
 
 Y el 60% de `functions/` (los 143 tipos) es la parte de todo el trabajo con **menos riesgo posible**:
 código que no existe en runtime.
+
+---
+
+### Qué entregó el PR 1, y qué NO
+
+Commits `04821be4` (scripts) y `2ccc3096` (functions). 661 líneas, ningún archivo de producción.
+
+- `scripts/`: la intercepción de todo `firebase-admin/*` en las dos mitades (CJS y ESM), la segunda
+  puerta del doble en `fixtures/firebase_admin_subpaths.js` —armada con las MISMAS piezas que
+  `adminStub`, para que no puedan driftear—, el marcador positivo `STUB_SUBPATH_INTERCEPTED`, y
+  `subpath_stub_interception.test.js` con control negativo. Suite: 472 → **478**, cero fallas.
+- `functions/`: `firebase-admin-mock-surface.test.ts`, el trinquete que recorre el grafo de imports
+  transitivo de cada test y exige el `jest.mock` del subpath cuando el grafo importa un símbolo que
+  necesita app. **Verificado que no pasa en vacío**: se simuló el estado post-PR-4 agregando
+  `getFirestore` al import de `send-fcm.ts` y el gate se puso rojo nombrando los dos tests, el
+  símbolo y el archivo del que viene — incluido uno que llega por transitividad. Revertido.
+
+**Lo que se decidió NO hacer en el PR 1:** el helper compartido de mocks para `functions/`. Hoy no
+tendría un solo consumidor —el gate está verde y ningún test necesita mockear un subpath todavía—, y
+un helper sin uso es superficie que se desactualiza sola. Va en el **PR 4**, que es donde aparece el
+primer `getFirestore()` de verdad y con él la necesidad de que los 43 tests no inventen 43 fakes
+distintos.
 
 ---
 
