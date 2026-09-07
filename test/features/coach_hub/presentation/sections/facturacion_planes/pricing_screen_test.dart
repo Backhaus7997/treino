@@ -249,7 +249,7 @@ void main() {
 
     Uri? abierta;
     debugPlanCheckoutCreator =
-        ({required tier, required annual, payerEmail}) async => 'https://mp/desktop';
+        ({required tier, required annual}) async => 'https://mp/desktop';
     debugPlanCheckoutLauncher = (u) async {
       abierta = u;
       return true;
@@ -781,7 +781,7 @@ void main() {
       SubscriptionTier? pedido;
       bool? pidioAnual;
       Uri? abierta;
-      debugPlanCheckoutCreator = ({required tier, required annual, payerEmail}) async {
+      debugPlanCheckoutCreator = ({required tier, required annual}) async {
         pedido = tier;
         pidioAnual = annual;
         return 'https://mp/checkout';
@@ -812,7 +812,7 @@ void main() {
       await pump(tester, _kMobileSize);
 
       var navego = false;
-      debugPlanCheckoutCreator = ({required tier, required annual, payerEmail}) async => null;
+      debugPlanCheckoutCreator = ({required tier, required annual}) async => null;
       debugPlanCheckoutLauncher = (u) async {
         navego = true;
         return true;
@@ -837,7 +837,7 @@ void main() {
 
       var navego = false;
       debugPlanCheckoutCreator =
-          ({required tier, required annual, payerEmail}) async => throw Exception('boom');
+          ({required tier, required annual}) async => throw Exception('boom');
       debugPlanCheckoutLauncher = (u) async {
         navego = true;
         return true;
