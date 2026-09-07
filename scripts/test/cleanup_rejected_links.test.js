@@ -18,7 +18,11 @@
 const test = require('node:test');
 const assert = require('node:assert');
 
-const { clasificar, desglosePorRazon } = require('../cleanup_rejected_links');
+const {
+  clasificar,
+  desglosePorRazon,
+  parseArgs,
+} = require('../cleanup_rejected_links');
 
 test('clasificar — rechazo del PF: acceptedAt null + declined → borra', () => {
   assert.strictEqual(
@@ -113,4 +117,49 @@ test('requerir el módulo NO inicializa el Admin SDK ni toca la red', () => {
   // producción con sólo importarlo.
   assert.strictEqual(typeof clasificar, 'function');
   assert.strictEqual(typeof desglosePorRazon, 'function');
+});
+
+// ── parseArgs: la compuerta del borrado ─────────────────────────────────────
+//
+// `--dry-run` estaba en la allowlist del validador y NUNCA se leía, así que
+// `--apply --dry-run` borraba. Es la peor forma de fallar: el validador acepta
+// el flag —le confirma al operador que lo entendió— y después lo ignora.
+//
+// Ocho scripts hermanos de este directorio (backfill_gym_ids, backfill_gym_names,
+// backfill_athlete_counts, backfill_racha_freshness, backfill_trainer_links_shared,
+// backfill_custom_exercise_name_lowercase, upload_drive_exercise_videos,
+// upload_enriched_videos) usan `--dry-run` como LA flag que frena las
+// escrituras. El único script del directorio que BORRA documentos no puede ser
+// el único donde esa palabra no significa nada.
+//
+// Regla: ante flags en conflicto, gana la que NO destruye.
+
+test('parseArgs — sin flags: dry-run (no borra)', () => {
+  assert.strictEqual(parseArgs(['node', 'x']).apply, false);
+});
+
+test('parseArgs — --apply solo: borra', () => {
+  assert.strictEqual(parseArgs(['node', 'x', '--apply']).apply, true);
+});
+
+test('parseArgs — EL BUG: --apply --dry-run NO borra', () => {
+  const args = parseArgs(['node', 'x', '--apply', '--dry-run']);
+  assert.strictEqual(args.apply, false, '--dry-run tiene que ganarle a --apply');
+  assert.strictEqual(args.dryRunExplicito, true);
+});
+
+test('parseArgs — el orden de las flags no cambia nada', () => {
+  assert.strictEqual(parseArgs(['node', 'x', '--dry-run', '--apply']).apply, false);
+});
+
+test('parseArgs — --dry-run solo es válido y no borra', () => {
+  assert.strictEqual(parseArgs(['node', 'x', '--dry-run']).apply, false);
+});
+
+test('parseArgs — --incluir-ambiguos no implica borrar', () => {
+  assert.strictEqual(parseArgs(['node', 'x', '--incluir-ambiguos']).apply, false);
+  assert.strictEqual(
+    parseArgs(['node', 'x', '--incluir-ambiguos']).incluirAmbiguos,
+    true,
+  );
 });

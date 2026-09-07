@@ -58,12 +58,16 @@
  * Usage:
  *   # Dry-run (DEFAULT — no escribe nada, sólo informa):
  *   node scripts/cleanup_rejected_links.js
+ *   node scripts/cleanup_rejected_links.js --dry-run   # explícito, mismo efecto
  *
  *   # Borrar de verdad:
  *   node scripts/cleanup_rejected_links.js --apply
  *
  *   # Sumar los ambiguos al borrado (leé la lista del dry-run ANTES):
  *   node scripts/cleanup_rejected_links.js --apply --incluir-ambiguos
+ *
+ * Ante flags en conflicto gana la que NO destruye: `--apply --dry-run` NO
+ * borra, y lo dice en pantalla.
  *
  * Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` falla cerrado con
  * la migración en el mensaje; contra el emulador no pide nada.
@@ -77,6 +81,27 @@ const RAZONES_DE_NO_VINCULO = new Set(['declined', 'cancelled-by-athlete']);
 
 const BATCH_SIZE = 500;
 
+/**
+ * Parsea las flags. Puro y exportado para poder testear la compuerta del
+ * borrado sin tocar Firestore.
+ *
+ * REGLA: ante flags en conflicto, GANA LA QUE NO DESTRUYE.
+ *
+ * `--dry-run` estaba antes en la allowlist del validador y NUNCA se leía, así
+ * que `node cleanup_rejected_links.js --apply --dry-run` BORRABA. Es la peor
+ * forma de fallar que puede tener un script destructivo: el validador acepta
+ * el flag —le confirma al operador que lo entendió— y después lo ignora.
+ *
+ * Y no es una palabra cualquiera. Ocho scripts de este mismo directorio
+ * (`backfill_gym_ids`, `backfill_gym_names`, `backfill_athlete_counts`,
+ * `backfill_racha_freshness`, `backfill_trainer_links_shared`,
+ * `backfill_custom_exercise_name_lowercase`, `upload_drive_exercise_videos`,
+ * `upload_enriched_videos`) usan `--dry-run` como LA flag que frena las
+ * escrituras. El único que borra documentos no puede ser el único donde esa
+ * palabra no significa nada.
+ *
+ * @param {string[]} argv - `process.argv` completo.
+ */
 function parseArgs(argv) {
   const flags = new Set(argv.slice(2));
   const desconocidas = [...flags].filter(
@@ -86,8 +111,10 @@ function parseArgs(argv) {
     console.error(`Flags desconocidas: ${desconocidas.join(', ')}`);
     process.exit(2);
   }
+  const dryRunExplicito = flags.has('--dry-run');
   return {
-    apply: flags.has('--apply'),
+    apply: flags.has('--apply') && !dryRunExplicito,
+    dryRunExplicito,
     incluirAmbiguos: flags.has('--incluir-ambiguos'),
   };
 }
@@ -146,7 +173,7 @@ async function borrarEnBatches(db, docs) {
 }
 
 async function main() {
-  const { apply, incluirAmbiguos } = parseArgs(process.argv);
+  const { apply, dryRunExplicito, incluirAmbiguos } = parseArgs(process.argv);
 
   const { admin, contexto } = inicializarAdmin();
 
@@ -156,6 +183,10 @@ async function main() {
   console.log('═'.repeat(66));
   console.log(`  PROYECTO: ${proyecto}`);
   console.log(`  MODO:     ${apply ? '⚠️  APPLY — VA A BORRAR' : 'dry-run (no escribe nada)'}`);
+  if (dryRunExplicito && process.argv.includes('--apply')) {
+    // Decirlo fuerte: alguien pidió las dos cosas y se le concedió la segura.
+    console.log('  NOTA:     pediste --apply Y --dry-run. Gana --dry-run: NO se borra nada.');
+  }
   if (incluirAmbiguos) {
     console.log('  AMBIGUOS: INCLUIDOS en el borrado');
   }
@@ -219,7 +250,7 @@ async function main() {
   console.log(`\nListo. ${borrados} documentos borrados.`);
 }
 
-module.exports = { clasificar, desglosePorRazon };
+module.exports = { clasificar, desglosePorRazon, parseArgs };
 
 if (require.main === module) {
   main().catch((err) => {
