@@ -148,6 +148,36 @@ inline. Ver [Excepciones a la escala de radios](#excepciones-a-la-escala-de-radi
 | `AppFonts.w700` | `FontWeight.w700` | Bold (headings, CTAs) |
 | `AppFonts.headingTracking` | `0.5` | Letter-spacing de headings |
 
+### AppTextSize
+
+Escala **cerrada** de tamaños. Ver [regla 5](#5-nunca-fontsize-crudo-en-widgets)
+y [Excepciones a la escala tipográfica](#excepciones-a-la-escala-tipográfica).
+
+| Token | Valor | Uso |
+|---|---|---|
+| `AppTextSize.micro` | `10` | Contadores de badge, timestamps, legales al pie |
+| `AppTextSize.caption` | `12` | Labels de campo, chips, metadatos, texto de ayuda |
+| `AppTextSize.bodyDense` | `13` | Cuerpo denso: filas de tabla y listas del Coach Hub web |
+| `AppTextSize.body` | `14` | **Cuerpo por defecto** — si dudás, es este |
+| `AppTextSize.bodyLarge` | `16` | Cuerpo destacado y texto de input |
+| `AppTextSize.title` | `18` | Título de card |
+| `AppTextSize.titleLarge` | `20` | Título de sección |
+| `AppTextSize.heading` | `24` | Heading de pantalla |
+| `AppTextSize.display` | `28` | Número hero dentro de una card (KPI, racha) |
+| `AppTextSize.displayLarge` | `32` | Número hero a nivel pantalla |
+
+**El racimo `12 · 13 · 14` está apretado a propósito, y se cierra ahí.** TREINO
+sirve una app de teléfono y un panel de escritorio desde el mismo código: un
+label (`caption`), una fila de tabla del Coach Hub (`bodyDense`) y un párrafo en
+un celular (`body`) son tres roles reales que se pisan justo en el rango del
+texto chico. De `body` para arriba esa excusa no existe — son títulos y números
+hero, y ahí todos los saltos son de 2px o más. Un escalón nuevo pegado a otro en
+ese tramo es deriva, no un rol. Los dos invariantes tienen test en
+`primitives_test.dart`.
+
+`bodyLarge` es 16 y no 15 por una razón concreta: abajo de 16px los navegadores
+móviles hacen zoom al enfocar un campo de texto.
+
 ---
 
 ## Capa 2 — Tokens semánticos (AppPalette)
@@ -492,6 +522,57 @@ Cuando necesitás un radio que no está en la escala:
 
 Lo que **no** se hace: agregar el archivo a la allowlist en silencio, o subir
 un techo sin que nadie lo mire. Los techos son la memoria del sistema.
+
+### 5. Nunca `fontSize` crudo en widgets
+
+```dart
+// ❌ MAL
+TextStyle(fontFamily: AppFonts.barlow, fontSize: 14);
+
+// ✅ BIEN
+TextStyle(fontFamily: AppFonts.barlow, fontSize: AppTextSize.body);
+```
+
+El test `test/app/theme/tokens/no_raw_font_size_scan_test.dart` falla si se
+agrega un `fontSize: <literal>` fuera de la allowlist. Corre en CI. Mismas
+cuatro reglas que el de radios, incluido el ratchet de deuda total.
+
+**Por qué llegó tan tarde.** Color, spacing, radios, íconos y motion tuvieron
+token *y* guard desde temprano, y se respetan con cero excepciones en todo el
+repo. Tipografía tenía `AppFonts` —familias, pesos, tracking— pero **ningún
+token de tamaño**: el dartdoc mandaba los `TextStyle` completos a
+`app_theme.dart`, y ahí sólo vive el `textTheme` de Material, que ningún widget
+lee. Entre "el tema define estilos" y "el widget necesita un número" quedó un
+hueco, y lo llenaron **1879 literales en 271 archivos con 31 tamaños
+distintos**, medios píxeles incluidos (`9.5`, `11.5`, `12.5`).
+
+Nadie se salteó una regla. No había regla.
+
+#### Excepciones a la escala tipográfica
+
+`AppTextSize` cubre 1609 de esas 1879 ocurrencias **sin mover un píxel**, así
+que la mayor parte de la migración es mecánica. Lo que queda:
+
+- **Deriva migrable, con cambio visual**: `11` (146 usos, un píxel abajo de
+  `caption` y haciendo el mismo trabajo), `15` (54, entre `body` y `bodyLarge`)
+  y los medios píxeles. Van al escalón más cercano. Como mueven píxeles, se
+  migran mirando la pantalla, no con un `sed`.
+- **Tamaños de ilustración** (`features/onboarding/presentation/`): los decks
+  del tour **dibujan** la app en vez de mostrarla, igual que
+  `AppDecorativeRadii` para los radios. Forzarles la escala deforma el dibujo.
+  Si hace falta, se les da su propio primitivo decorativo — no entran a
+  `AppTextSize`.
+
+Para cualquier otro caso, el proceso es el mismo que en la sección de radios:
+issue con evidencia, y con el diseño aprobado se decide con el reviewer entre
+ampliar la escala o aceptar la excepción subiendo los techos. Ampliar es la
+opción por defecto si el valor se repite.
+
+Ojo con un antipatrón particular de tipografía: **si tu tamaño nuevo queda a un
+píxel de un escalón existente, casi seguro lo que necesitás es el escalón que
+ya está.** El único par a 1px de la escala es `bodyDense`/`body` (13/14), y está
+justificado porque TREINO sirve una app de teléfono y un panel de escritorio
+desde el mismo código. Hay un test que lo verifica en `primitives_test.dart`.
 
 ---
 
