@@ -33,3 +33,4 @@ export 'list_row/list_row.dart';
 export 'section_header/section_header.dart';
 export 'section_hero/section_hero.dart';
 export 'treino_interactive_state.dart';
+export 'treino_dropdown.dart';

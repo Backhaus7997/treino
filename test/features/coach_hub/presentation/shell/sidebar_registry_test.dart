@@ -6,10 +6,10 @@ import 'package:treino/features/coach_hub/presentation/shell/sidebar_registry.da
 void main() {
   group('sidebarRegistry (REQ-CHW-SIDEBAR-001)', () {
     test(
-        'tiene exactamente 11 items (7 post-W2 reduce + Rutinas + Solicitudes '
+        'tiene exactamente 10 items (7 post-W2 reduce + Rutinas + Solicitudes '
         '+ Nutrición + Perfil público): Dashboard, Alumnos, Solicitudes, '
         'Agenda, Chat, Perfil público, Biblioteca, Nutrición, Rutinas, '
-        'Pagos, Ajustes', () {
+        'Pagos; cuenta se abre desde la fila de usuario', () {
       // W2 reduce 2026-07-02: se removieron 12 items del sidebar que
       // duplicaban funcionalidad del alumno_detail o pertenecen a una
       // futura Biblioteca (sub-tabs). Reportes también sale (sin scope
@@ -31,7 +31,7 @@ void main() {
       // Fase 11 WU-01 (ADR-F11-01): Perfil público se agrega al grupo
       // GESTIÓN, inmediatamente después de Chat — llevando el total de 10
       // a 11.
-      expect(sidebarRegistry.length, 11);
+      expect(sidebarRegistry.length, 10);
     });
 
     test('cubre los 2 grupos activos post-reduce, cada uno no vacío', () {
@@ -71,11 +71,10 @@ void main() {
       }
     });
 
-    test('el grupo ajustes tiene exactamente 1 item [SCENARIO-751]', () {
+    test('el grupo ajustes no agrega un segundo acceso a cuenta', () {
       final ajustes =
           sidebarRegistry.where((i) => i.group == SidebarGroup.ajustes);
-      expect(ajustes.length, 1);
-      expect(ajustes.single.id, 'ajustes');
+      expect(ajustes, isEmpty);
     });
 
     test('los ids son únicos', () {
@@ -100,7 +99,6 @@ void main() {
           '/nutricion',
           '/rutinas',
           '/pagos',
-          '/ajustes',
         },
       );
     });
@@ -142,7 +140,6 @@ void main() {
 
       // Equivalentes en castellano que DEBEN estar (subset post-reduce).
       for (final esLabel in [
-        'Ajustes',
         'Alumnos',
         'Solicitudes',
         'Pagos',
@@ -167,6 +164,12 @@ void main() {
       ]) {
         expect(labels, isNot(contains(enLabel)));
       }
+    });
+
+    test('la metadata de /ajustes sigue titulando el top bar', () {
+      final item = activeSidebarItem('/ajustes');
+      expect(item?.id, 'cuenta');
+      expect(item?.label, 'Mi cuenta');
     });
 
     test('cada iconBuilder devuelve un IconData no nulo', () {

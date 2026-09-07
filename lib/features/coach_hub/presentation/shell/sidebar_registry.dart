@@ -70,8 +70,6 @@ final List<SidebarItem> sidebarRegistry = [
   ...rutinasSidebarItems,
   ...pagosSidebarItems,
 
-  // AJUSTES (pinneado al fondo, fuera de grupo visual)
-  ...ajustesSidebarItems,
 ];
 
 /// Devuelve el [SidebarItem] de `sidebarRegistry` cuya `route` matchea
@@ -79,7 +77,10 @@ final List<SidebarItem> sidebarRegistry = [
 /// matchea. Misma regla de "activo" que usa el sidebar para resaltar el
 /// ítem; el top bar la reusa para el título de sección (REQ-SH-007).
 SidebarItem? activeSidebarItem(String location) {
-  for (final item in sidebarRegistry) {
+  // Cuenta no forma parte del menú: la fila de usuario es el único acceso.
+  // Su metadata sigue separada para que el top bar pueda titular `/ajustes`
+  // sin reintroducir un segundo entrypoint visual.
+  for (final item in [...sidebarRegistry, ...ajustesSidebarItems]) {
     if (location == item.route || location.startsWith('${item.route}/')) {
       return item;
     }

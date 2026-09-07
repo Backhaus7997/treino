@@ -35,6 +35,7 @@ import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/chat/widgets/avatar_color.dart';
 import 'package:treino/features/coach_hub/presentation/sections/chat/widgets/chat_detail_pane.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/gyms/application/gym_providers.dart';
 import 'package:treino/features/insights/domain/chart_period.dart';
 import 'package:treino/features/insights/presentation/widgets/daily_heatmap_section.dart';
@@ -5434,7 +5435,7 @@ class _NuevaEntradaSeguimientoDialogState
                   ),
                 ),
                 const SizedBox(height: 16),
-                DropdownButtonFormField<FollowUpTag>(
+                TreinoDropdown<FollowUpTag>(
                   initialValue: _tag,
                   onChanged: (v) {
                     if (v != null) setState(() => _tag = v);
@@ -5442,15 +5443,7 @@ class _NuevaEntradaSeguimientoDialogState
                   decoration: InputDecoration(
                     labelText: 'Categoría', // i18n: Fase W2
                     labelStyle: TextStyle(color: palette.textMuted),
-                    filled: true,
-                    fillColor: palette.bgCard,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: palette.border),
-                    ),
                   ),
-                  style: TextStyle(color: palette.textPrimary, fontSize: 14),
-                  dropdownColor: palette.bgCard,
                   items: [
                     for (final t in FollowUpTag.values)
                       DropdownMenuItem(

@@ -53,6 +53,7 @@ import '../../../../workout/domain/set_enums.dart';
 import '../../../../workout/domain/set_spec.dart';
 import '../../shell/responsive.dart' as rsp;
 import '../../widgets/create_custom_exercise_dialog.dart';
+import '../../widgets/coach_hub_widgets.dart';
 import '../../widgets/exercise_picker_dialog.dart';
 
 /// Editor de rutinas web — crea o edita la rutina de UN alumno (mirrors
@@ -3733,9 +3734,8 @@ class _SetTypeChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final typed = type != SetType.normal;
-    return PopupMenuButton<SetType>(
+    return TreinoPopupMenuButton<SetType>(
       tooltip: 'Tipo de serie', // i18n
-      color: palette.bgCard,
       padding: EdgeInsets.zero,
       initialValue: type,
       onSelected: onChanged,

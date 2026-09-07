@@ -1,69 +1,21 @@
 // Tests for CoachHubTopBar (REQ-SH-007, SCENARIO-760).
-//
-// Pumped inside a GoRouter + ProviderScope for parity with how the real shell
-// mounts it (userProfileProvider drives the avatar initial, GoRouterState
-// drives the section title).
 
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:treino/app/theme/app_theme.dart';
-import 'package:treino/app/theme/theme_mode_provider.dart';
-import 'package:treino/core/persistence/shared_prefs_provider.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
-import 'package:treino/features/coach/domain/subscription_tier.dart';
-import 'package:treino/features/coach/domain/trainer_subscription.dart';
 import 'package:treino/features/coach_hub/presentation/shell/coach_hub_top_bar.dart';
-import 'package:treino/features/profile/application/user_providers.dart';
-import 'package:treino/features/profile/domain/user_profile.dart';
-import 'package:treino/features/profile/domain/user_role.dart';
 
-UserProfile _profile(String displayName, {SubscriptionTier? tier}) =>
-    UserProfile(
-      uid: 'trainer-1',
-      email: 'trainer@example.com',
-      displayName: displayName,
-      role: UserRole.trainer,
-      createdAt: DateTime.utc(2026, 1, 1),
-      updatedAt: DateTime.utc(2026, 1, 1),
-      // Sin `subscription` el PF es Free por definición (sin backfill).
-      subscription: tier == null
-          ? null
-          : TrainerSubscription(
-              tier: tier,
-              status: SubscriptionStatus.active,
-              weightLimit: tier.weightLimit,
-            ),
-    );
-
-/// Devuelve el [ProviderContainer] usado, por si el test necesita leer/
-/// escribir providers directamente (eg. `themeModeProvider`).
-Future<ProviderContainer> _pumpTopBar(
+Future<void> _pumpTopBar(
   WidgetTester tester, {
-  UserProfile? profile,
   String initial = '/dashboard',
   ThemeData? theme,
 }) async {
-  tester.view.physicalSize = const Size(1400, 900); // desktop → toggle enabled
+  tester.view.physicalSize = const Size(1400, 900);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
-
-  SharedPreferences.setMockInitialValues({});
-  final sp = await SharedPreferences.getInstance();
-
-  final container = ProviderContainer(overrides: [
-    sharedPreferencesProvider.overrideWith((ref) => Future.value(sp)),
-    userProfileProvider
-        .overrideWith((ref) => Stream<UserProfile?>.value(profile)),
-  ]);
-  addTearDown(container.dispose);
-  // themeModeProvider hace `.requireValue` sobre sharedPreferencesProvider
-  // (ADR-LM-009: se asume resuelto antes de `runApp`) — en test hay que
-  // esperar el future explícitamente antes del primer pump síncrono.
-  await container.read(sharedPreferencesProvider.future);
 
   final router = GoRouter(
     initialLocation: initial,
@@ -76,37 +28,32 @@ Future<ProviderContainer> _pumpTopBar(
         path: '/alumnos',
         builder: (_, __) => const Scaffold(body: CoachHubTopBar()),
       ),
-      // Destinos del menú de cuenta: sin estas rutas el tap moriría contra
-      // una ruta inexistente y el test no probaría nada.
-      GoRoute(path: '/ajustes', builder: (_, __) => const Text('page:ajustes')),
       GoRoute(
-        path: '/facturacion/planes',
-        builder: (_, __) => const Text('page:planes'),
+        path: '/ajustes',
+        builder: (_, __) => const Scaffold(body: CoachHubTopBar()),
       ),
     ],
   );
 
   await tester.pumpWidget(
-    UncontrolledProviderScope(
-      container: container,
-      child: MaterialApp.router(
-        theme: theme ?? AppTheme.dark(),
-        routerConfig: router,
-      ),
+    MaterialApp.router(
+      theme: theme ?? AppTheme.dark(),
+      routerConfig: router,
     ),
   );
   await tester.pumpAndSettle();
-  return container;
 }
 
 void main() {
   group('CoachHubTopBar (REQ-SH-007)', () {
     testWidgets(
-        'el toggle del sidebar ya NO vive en el top bar (se movió al '
-        'footer del sidebar)', (tester) async {
+        'la cuenta ya no se duplica en el top bar: no hay avatar ni menu',
+        (tester) async {
       await _pumpTopBar(tester);
-      expect(find.byTooltip('Contraer/expandir menú'), findsNothing);
-      expect(find.byTooltip('Contraer menú'), findsNothing);
+
+      expect(find.byType(PopupMenuButton<String>), findsNothing);
+      expect(find.byIcon(TreinoIcon.chevronDown), findsNothing);
+      expect(find.byType(CircleAvatar), findsNothing);
     });
 
     testWidgets('campana presente a la derecha (inerte)', (tester) async {
@@ -114,78 +61,10 @@ void main() {
       expect(find.byTooltip('Notificaciones'), findsOneWidget);
     });
 
-    testWidgets('menú de usuario presente, con chevron junto al avatar',
-        (tester) async {
-      await _pumpTopBar(tester);
-      expect(find.byType(PopupMenuButton<String>), findsOneWidget);
-      expect(find.byIcon(TreinoIcon.chevronDown), findsOneWidget);
-    });
-
-    testWidgets('avatar muestra la inicial del displayName', (tester) async {
-      await _pumpTopBar(tester, profile: _profile('Ana'));
-      expect(find.text('A'), findsOneWidget);
-    });
-
-    testWidgets('avatar cae a "?" sin profile', (tester) async {
-      await _pumpTopBar(tester); // profile null
-      expect(find.text('?'), findsOneWidget);
-    });
-
-    testWidgets('al abrir el menú aparece "Salir"', (tester) async {
-      await _pumpTopBar(tester, profile: _profile('Ana'));
-      await tester.tap(find.byType(PopupMenuButton<String>));
-      await tester.pumpAndSettle();
-      expect(find.text('Salir'), findsOneWidget);
-    });
-
-    testWidgets('«Mi cuenta» navega a /ajustes sin perder tema ni Salir',
-        (tester) async {
-      await _pumpTopBar(tester, profile: _profile('Ana'));
-      await tester.tap(find.byType(PopupMenuButton<String>));
-      await tester.pumpAndSettle();
-
-      // El menú sigue siendo el único acceso a tema y logout del hub web:
-      // agregar «Mi cuenta» no puede haberlos desplazado.
-      expect(find.text('Sistema'), findsOneWidget);
-      expect(find.text('Salir'), findsOneWidget);
-
-      await tester.tap(find.text('Mi cuenta'));
-      await tester.pumpAndSettle();
-      expect(find.text('page:ajustes'), findsOneWidget);
-    });
-
-    testWidgets('«Mejorar plan» muestra el tier real y va a la pricing page',
-        (tester) async {
-      await _pumpTopBar(tester, profile: _profile('Ana')); // sin sub → Free
-      await tester.tap(find.byType(PopupMenuButton<String>));
-      await tester.pumpAndSettle();
-
-      final upgrade = find.text('Mejorar plan · Plan Free');
-      expect(upgrade, findsOneWidget);
-
-      await tester.tap(upgrade);
-      await tester.pumpAndSettle();
-      expect(find.text('page:planes'), findsOneWidget);
-    });
-
-    testWidgets('en plan3 no se ofrece mejorar — no hay tier superior',
-        (tester) async {
-      await _pumpTopBar(
-        tester,
-        profile: _profile('Ana', tier: SubscriptionTier.plan3),
-      );
-      await tester.tap(find.byType(PopupMenuButton<String>));
-      await tester.pumpAndSettle();
-
-      expect(find.textContaining('Mejorar plan'), findsNothing);
-      // «Mi cuenta» sí sigue: el entrypoint no depende del tier.
-      expect(find.text('Mi cuenta'), findsOneWidget);
-    });
-
     testWidgets(
         'título de sección Barlow Condensed 700 UPPERCASE en /dashboard',
         (tester) async {
-      await _pumpTopBar(tester, initial: '/dashboard');
+      await _pumpTopBar(tester);
       expect(find.text('DASHBOARD'), findsOneWidget);
     });
 
@@ -195,42 +74,25 @@ void main() {
       expect(find.text('ALUMNOS'), findsOneWidget);
     });
 
-    testWidgets('campo de búsqueda decorativo presente (placeholder, Fase 1)',
+    testWidgets('la ruta de cuenta conserva un título sin sumar otro acceso',
         (tester) async {
+      await _pumpTopBar(tester, initial: '/ajustes');
+      expect(find.text('MI CUENTA'), findsOneWidget);
+      expect(find.byType(PopupMenuButton<String>), findsNothing);
+    });
+
+    testWidgets('campo de búsqueda decorativo presente', (tester) async {
       await _pumpTopBar(tester);
-      expect(
-        find.text('Buscar alumnos, rutinas, plan...'),
-        findsOneWidget,
-      );
+      expect(find.text('Buscar alumnos, rutinas, plan...'), findsOneWidget);
       expect(find.byIcon(TreinoIcon.search), findsOneWidget);
-      // Decorativo: es un TextField deshabilitado, no navega ni filtra en Fase 1.
-      final field = tester.widget<TextField>(find.byType(TextField));
-      expect(field.enabled, isFalse);
+      expect(tester.widget<TextField>(find.byType(TextField)).enabled, isFalse);
     });
 
-    testWidgets(
-        'menú de cuenta expone Sistema/Claro/Oscuro y escribe themeModeProvider '
-        '(REQ-SH-007, ADR-SH-005)', (tester) async {
-      final container = await _pumpTopBar(tester);
-
-      await tester.tap(find.byType(PopupMenuButton<String>));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Sistema'), findsOneWidget);
-      expect(find.text('Claro'), findsOneWidget);
-      expect(find.text('Oscuro'), findsOneWidget);
-
-      await tester.tap(find.text('Oscuro'));
-      await tester.pumpAndSettle();
-
-      expect(container.read(themeModeProvider), ThemeMode.dark);
-    });
-
-    testWidgets('smoke visual en tema claro (mintMagentaLight) — REQ-SH-011',
+    testWidgets('smoke visual en tema claro (mintMagentaLight)',
         (tester) async {
       await _pumpTopBar(tester, theme: AppTheme.light());
       expect(find.text('DASHBOARD'), findsOneWidget);
-      expect(find.byType(PopupMenuButton<String>), findsOneWidget);
+      expect(find.byType(CircleAvatar), findsNothing);
     });
   });
 }
