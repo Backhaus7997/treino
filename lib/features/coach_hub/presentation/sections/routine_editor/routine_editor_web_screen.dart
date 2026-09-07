@@ -38,6 +38,7 @@ import '../../../../onboarding/domain/onboarding_surface.dart';
 import '../../../../onboarding/presentation/custom_exercise_onboarding_gate.dart';
 import '../../../../profile/application/user_public_profile_providers.dart';
 import '../../../../profile/domain/experience_level.dart';
+import '../../../../reviews/presentation/widgets/star_rating_display.dart';
 import '../../../../workout/application/assigned_routine_providers.dart';
 import '../../../../workout/application/routine_providers.dart'
     show invalidateRoutineById, routineRepositoryProvider;
@@ -279,6 +280,7 @@ class _RoutineEditorWebScreenState
     _EditorDay(dayNumber: 1, name: 'Día 1'),
   ]; // i18n
   bool _submitting = false;
+  bool _publishing = false;
   bool _isDirty = false;
   String? _errorMessage;
 
@@ -720,9 +722,112 @@ class _RoutineEditorWebScreenState
     });
   }
 
-  // Deliberately no setState here (mirrors mobile's own _markDirty): callers
-  // already rebuild via their own setState or a TextField's onChanged.
-  void _markDirty() => _isDirty = true;
+  // The publication control depends on dirty state, so the first edit must
+  // rebuild even when it came from a plain TextField.onChanged.
+  void _markDirty() {
+    if (_isDirty) return;
+    setState(() => _isDirty = true);
+  }
+
+  Future<void> _onTogglePublished() async {
+    if (_publishing || _submitting || _isDirty || _loadedRoutine == null) {
+      return;
+    }
+
+    // Capturado ANTES del await del diálogo: los providers one-shot guardan
+    // la visibilidad vieja durante todo el proceso si no se invalidan.
+    final container = ProviderScope.containerOf(context, listen: false);
+    final template = _loadedRoutine!;
+    final isPublished = template.visibility == RoutineVisibility.public;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppPalette.of(dialogContext).bgCard,
+        title: Text(
+          isPublished
+              ? 'Despublicar plantilla' // i18n
+              : 'Publicar plantilla', // i18n
+          style: GoogleFonts.barlowCondensed(
+            fontWeight: FontWeight.w700,
+            color: AppPalette.of(dialogContext).textPrimary,
+          ),
+        ),
+        content: Text(
+          isPublished
+              ? '"${template.name}" va a salir del catálogo público. '
+                  'Las calificaciones que ya recibió se conservan.' // i18n
+              : '"${template.name}" va a quedar visible para toda la '
+                  'comunidad de TREINO, que va a poder usarla y calificarla.', // i18n
+          style: GoogleFonts.barlow(
+            fontSize: 13,
+            color: AppPalette.of(dialogContext).textPrimary,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(
+              'Cancelar', // i18n
+              style: GoogleFonts.barlowCondensed(
+                color: AppPalette.of(dialogContext).textMuted,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(
+              isPublished ? 'Despublicar' : 'Publicar', // i18n
+              style: GoogleFonts.barlowCondensed(
+                fontWeight: FontWeight.w700,
+                color: AppPalette.of(dialogContext).accent,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _publishing = true);
+    try {
+      final repo = ref.read(routineRepositoryProvider);
+      final nextVisibility = isPublished
+          ? RoutineVisibility.private
+          : RoutineVisibility.public;
+      if (isPublished) {
+        await repo.unpublishTemplate(template.id);
+      } else {
+        await repo.publishTemplate(template.id);
+      }
+      invalidateRoutineById(container, template.id);
+      if (!mounted) return;
+      setState(() {
+        _loadedRoutine = _loadedRoutine!.copyWith(
+          visibility: nextVisibility,
+        );
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isPublished
+                ? 'Tu plantilla salió del catálogo público.' // i18n
+                : '¡Tu plantilla ya está en el catálogo público!', // i18n
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No pudimos actualizar la publicación.', // i18n
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _publishing = false);
+    }
+  }
 
   // ── Week operations (periodización, Fase 4b) ────────────────────────────
 
@@ -1505,8 +1610,11 @@ class _RoutineEditorWebScreenState
     });
   }
 
-  // No setState: the notes TextField holds its own text and notes isn't
-  // rendered anywhere else (mirrors _markDirty's own no-rebuild rationale).
+  // No setState here: the notes TextField holds its own text and notes isn't
+  // rendered anywhere else. `_markDirty` DOES rebuild now — once, on the very
+  // first edit — so the PUBLICACIÓN block learns the form went dirty. Leaving
+  // this comment pointing at a "no-rebuild rationale" that no longer exists is
+  // exactly the reassuring-but-false note AGENTS.md §11.1 is about.
   void _onNotesChanged(int dayIndex, int slotIndex, String value) {
     _markDirty();
     _days[dayIndex].slots[slotIndex].notes = value;
@@ -2340,6 +2448,242 @@ class _RoutineEditorWebScreenState
                                             },
                                           ),
                                       ],
+                                    ),
+                                  ],
+                                  if (widget.isTemplate &&
+                                      _isEditing &&
+                                      _loadedRoutine != null) ...[
+                                    const SizedBox(height: AppSpacing.s18),
+                                    _FieldLabel(
+                                      'PUBLICACIÓN',
+                                      palette,
+                                    ), // i18n
+                                    const SizedBox(
+                                      height: AppSpacing.hairline,
+                                    ),
+                                    Text(
+                                      'Definí si esta plantilla aparece en el '
+                                      'catálogo de la comunidad.', // i18n
+                                      style: GoogleFonts.barlow(
+                                        color: palette.textMuted,
+                                        fontSize: 12,
+                                        height: 1.35,
+                                      ),
+                                    ),
+                                    const SizedBox(height: AppSpacing.s8),
+                                    Builder(
+                                      builder: (context) {
+                                        final routine = _loadedRoutine!;
+                                        final isPublished =
+                                            routine.visibility ==
+                                                RoutineVisibility.public;
+                                        final count = routine.ratingsCount;
+                                        final hasRatings = isPublished &&
+                                            count != null &&
+                                            count > 0;
+                                        final disabled = _isDirty ||
+                                            _submitting ||
+                                            _publishing;
+                                        final ratingText = routine.ratingAvg
+                                                ?.toStringAsFixed(1)
+                                                .replaceAll('.', ',') ??
+                                            '0,0';
+
+                                        return Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Wrap(
+                                              spacing: AppSpacing.s8,
+                                              runSpacing: AppSpacing.s8,
+                                              crossAxisAlignment:
+                                                  WrapCrossAlignment.center,
+                                              children: [
+                                                Container(
+                                                  key: isPublished
+                                                      ? const Key(
+                                                          'routine_editor_published_badge',
+                                                        )
+                                                      : null,
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
+                                                    horizontal: AppSpacing.s8,
+                                                    vertical:
+                                                        AppSpacing.hairline,
+                                                  ),
+                                                  decoration: BoxDecoration(
+                                                    color: isPublished
+                                                        ? palette.accent
+                                                            .withValues(
+                                                              alpha: 0.14,
+                                                            )
+                                                        : palette.bgElevated,
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                      AppRadius.full,
+                                                    ),
+                                                    border: Border.all(
+                                                      color: isPublished
+                                                          ? palette.accent
+                                                          : palette.border,
+                                                    ),
+                                                  ),
+                                                  child: Row(
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
+                                                    children: [
+                                                      Icon(
+                                                        isPublished
+                                                            ? TreinoIcon.globe
+                                                            : TreinoIcon.eyeOff,
+                                                        size: 14,
+                                                        color: isPublished
+                                                            ? palette.accent
+                                                            : palette.textMuted,
+                                                      ),
+                                                      const SizedBox(
+                                                        width: AppSpacing
+                                                            .hairline,
+                                                      ),
+                                                      Text(
+                                                        isPublished
+                                                            ? 'PUBLICADA' // i18n
+                                                            : 'NO PUBLICADA', // i18n
+                                                        style: GoogleFonts
+                                                            .barlowCondensed(
+                                                          color: isPublished
+                                                              ? palette.accent
+                                                              : palette
+                                                                  .textMuted,
+                                                          fontSize: 12,
+                                                          fontWeight:
+                                                              FontWeight.w700,
+                                                          letterSpacing: 0.8,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                                OutlinedButton.icon(
+                                                  key: const Key(
+                                                    'routine_editor_publish_toggle',
+                                                  ),
+                                                  onPressed: disabled
+                                                      ? null
+                                                      : _onTogglePublished,
+                                                  // El flip es una escritura
+                                                  // de red: sin spinner el
+                                                  // botón sólo se apaga y no
+                                                  // se distingue de estar
+                                                  // deshabilitado por form
+                                                  // sucio. El teléfono muestra
+                                                  // uno por el mismo motivo.
+                                                  icon: _publishing
+                                                      ? SizedBox(
+                                                          width: 18,
+                                                          height: 18,
+                                                          child:
+                                                              CircularProgressIndicator(
+                                                            strokeWidth: 2,
+                                                            color:
+                                                                palette.accent,
+                                                          ),
+                                                        )
+                                                      : Icon(
+                                                          isPublished
+                                                              ? TreinoIcon
+                                                                  .eyeOff
+                                                              : TreinoIcon
+                                                                  .globe,
+                                                          size: 18,
+                                                        ),
+                                                  label: Text(
+                                                    isPublished
+                                                        ? 'DESPUBLICAR' // i18n
+                                                        : 'PUBLICAR', // i18n
+                                                    style: GoogleFonts
+                                                        .barlowCondensed(
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                    ),
+                                                  ),
+                                                  style:
+                                                      OutlinedButton.styleFrom(
+                                                    foregroundColor:
+                                                        palette.accent,
+                                                    side: BorderSide(
+                                                      color: disabled
+                                                          ? palette.border
+                                                          : palette.accent,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            if (_isDirty) ...[
+                                              const SizedBox(
+                                                height: AppSpacing.s8,
+                                              ),
+                                              Text(
+                                                isPublished
+                                                    ? 'Guardá los cambios '
+                                                        'antes de '
+                                                        'despublicar.' // i18n
+                                                    : 'Guardá los cambios '
+                                                        'antes de publicar.', // i18n
+                                                style: GoogleFonts.barlow(
+                                                  color: palette.warning,
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ],
+                                            if (hasRatings) ...[
+                                              const SizedBox(
+                                                height: AppSpacing.s8,
+                                              ),
+                                              Row(
+                                                key: const Key(
+                                                  'routine_editor_rating_aggregate',
+                                                ),
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  StarRatingDisplay(
+                                                    rating: routine.ratingAvg,
+                                                    starSize: 14,
+                                                  ),
+                                                  const SizedBox(
+                                                    width: AppSpacing.s8,
+                                                  ),
+                                                  // Flexible + ellipsis: la
+                                                  // fila es informativa y en
+                                                  // una columna angosta tiene
+                                                  // que degradar, no
+                                                  // desbordar. Mismo criterio
+                                                  // que el badge PUBLICADA del
+                                                  // teléfono.
+                                                  Flexible(
+                                                    child: Text(
+                                                      '$ratingText · $count '
+                                                      '${count == 1 ? 'calificación' : 'calificaciones'}', // i18n
+                                                      maxLines: 1,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      style: GoogleFonts.barlow(
+                                                        color:
+                                                            palette.textMuted,
+                                                        fontSize: 12,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ],
+                                        );
+                                      },
                                     ),
                                   ],
                                   const SizedBox(height: 16),
