@@ -54,7 +54,6 @@ class PerfilPublicoScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final palette = AppPalette.of(context);
     final profileAsync = ref.watch(userProfileProvider);
 
     return SingleChildScrollView(
@@ -67,19 +66,10 @@ class PerfilPublicoScreen extends ConsumerWidget {
         children: [
           TreinoFadeSlideIn(
             delay: AppMotion.stagger(0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const TreinoSectionHeader(
-                  title: 'Perfil público', // i18n: Fase 11
-                ),
-                const SizedBox(height: AppSpacing.hairline),
-                Text(
-                  'Así te ven los alumnos potenciales en TREINO Coach '
+            child: const CoachHubSectionHero(
+              title: 'Perfil público', // i18n: Fase 11
+              subtitle: 'Así te ven los alumnos potenciales en TREINO Coach '
                   'Discovery.', // i18n: Fase 11
-                  style: TextStyle(color: palette.textMuted, fontSize: 13),
-                ),
-              ],
             ),
           ),
           const SizedBox(height: AppSpacing.s18),

@@ -30,7 +30,7 @@ import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
 
 import '../../widgets/coach_hub_widgets.dart'
-    show TreinoFilterChips, TreinoInteractiveState, TreinoSectionHeader;
+    show CoachHubSectionHero, TreinoFilterChips, TreinoInteractiveState;
 import 'widgets/registrar_pago_dialog.dart';
 import 'widgets/marcar_pagado_actions.dart';
 import 'widgets/pagos_buckets_provider.dart';
@@ -146,7 +146,6 @@ class _PagosScreenState extends ConsumerState<PagosScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
     final bucketsAsync = ref.watch(pagosBucketsProvider);
     final filtro = ref.watch(pagosFiltroProvider);
 
@@ -182,27 +181,10 @@ class _PagosScreenState extends ConsumerState<PagosScreen> {
           padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
           child: TreinoFadeSlideIn(
             delay: AppMotion.stagger(0),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const TreinoSectionHeader(title: 'Pagos'), // i18n
-                      const SizedBox(height: AppSpacing.hairline),
-                      Text(
-                        'Cobros, vencimientos e ingresos', // i18n
-                        style: TextStyle(
-                          color: palette.textMuted,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                _RegistrarPagoButton(onTap: _onRegistrarPago),
-              ],
+            child: CoachHubSectionHero(
+              title: 'Pagos', // i18n
+              subtitle: 'Cobros, vencimientos e ingresos', // i18n
+              trailing: _RegistrarPagoButton(onTap: _onRegistrarPago),
             ),
           ),
         ),

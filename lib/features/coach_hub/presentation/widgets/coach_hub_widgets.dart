@@ -17,6 +17,7 @@
 /// - [TreinoFilterChips] (`filter_chips/`)
 /// - [TreinoListRow] (`list_row/`)
 /// - [TreinoSectionHeader] (`section_header/`)
+/// - [CoachHubSectionHero] (`section_hero/`)
 /// - [TreinoEmptyState] (`empty_state/`)
 /// - [TreinoDialog] / [showTreinoDialog] (`dialog/`)
 /// - [TreinoInteractiveState] (resolver de interacción, fuente única de verdad)
@@ -30,4 +31,5 @@ export 'filter_chips/filter_chips.dart';
 export 'kpi_card/kpi_card.dart';
 export 'list_row/list_row.dart';
 export 'section_header/section_header.dart';
+export 'section_hero/section_hero.dart';
 export 'treino_interactive_state.dart';

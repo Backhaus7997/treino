@@ -124,6 +124,21 @@ flutter_launcher_icons:
 
   remove_alpha_ios: true
 
+  # Web. Faltaba, y es el MISMO agujero que el comentario de arriba documenta
+  # para Android una plataforma antes: sin la clave, `web/icons/*` y
+  # `web/favicon.png` se quedaron como los dejó `flutter create` —el logo de
+  # Flutter— y eso es lo que se veía en la pestaña del navegador y al instalar
+  # el Coach Hub como PWA.
+  #
+  # `background_color`/`theme_color` replican los que ya tenía
+  # `web/manifest.json` a mano: el generador reescribe ese archivo, así que si
+  # no coinciden, regenerar cambia el color de la PWA sin que nadie lo pida.
+  web:
+    generate: true
+    image_path: "assets/icon/app_icon.png"
+    background_color: "#0A0A0A"
+    theme_color: "#0A0A0A"
+
 flutter:
   generate: true
   uses-material-design: true
@@ -140,3 +155,55 @@ flutter:
     # Flutter las registraría, pero google_fonts no las encontraría y las
     # bajaría por red igual, que es justo lo que esto viene a evitar.
     - assets/fonts/
+
+  # Las MISMAS familias, además, registradas en Flutter.
+  #
+  # Estaban SÓLO bajo `assets:` para que google_fonts las encontrara, y eso
+  # funciona para los 217 sitios que llaman `GoogleFonts.barlow*()`. Pero hay
+  # 32 que escriben `fontFamily: AppFonts.barlowCondensed` crudo en un
+  # `TextStyle`, y esos pedían una familia que Flutter nunca había registrado:
+  # caían en silencio a la fuente del sistema. Se veía en el título del Coach
+  # Hub —"DASHBOARD" salía en una sans ancha en vez de Barlow Condensed— y en
+  # cualquier otro de los 32.
+  #
+  # Declararlas en los dos lados no es duplicar: `assets:` es lo que mira
+  # google_fonts en el AssetManifest, y `fonts:` es lo que registra el motor.
+  # El mismo archivo sirve a los dos, y ninguna de las dos vías se cae.
+  fonts:
+    - family: Barlow
+      fonts:
+        - asset: assets/fonts/Barlow-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Barlow-Italic.ttf
+          weight: 400
+          style: italic
+        - asset: assets/fonts/Barlow-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Barlow-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Barlow-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Barlow-ExtraBold.ttf
+          weight: 800
+        - asset: assets/fonts/Barlow-Black.ttf
+          weight: 900
+    - family: Barlow Condensed
+      fonts:
+        - asset: assets/fonts/BarlowCondensed-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/BarlowCondensed-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/BarlowCondensed-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/BarlowCondensed-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/BarlowCondensed-ExtraBold.ttf
+          weight: 800
+        - asset: assets/fonts/BarlowCondensed-Black.ttf
+          weight: 900
+    - family: Space Grotesk
+      fonts:
+        - asset: assets/fonts/SpaceGrotesk-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/SpaceGrotesk-Bold.ttf
+          weight: 700

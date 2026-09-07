@@ -15,6 +15,7 @@ import 'package:treino/features/profile/application/user_providers.dart';
 
 import 'sidebar_item.dart';
 import 'sidebar_registry.dart';
+import '../../../../core/widgets/treino_logo.dart';
 
 /// Sidebar del Coach Hub web (REQ-SH-001..006, ADR-SH-004).
 ///
@@ -142,25 +143,25 @@ class _SidebarHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
     return Container(
       constraints: const BoxConstraints(minHeight: 60),
       alignment: collapsed ? Alignment.center : Alignment.centerLeft,
       padding: EdgeInsets.symmetric(
         horizontal: collapsed ? 0 : AppSpacing.s20,
       ),
+      // El wordmark, no la palabra "TREINO" tipeada en Barlow Condensed.
+      //
+      // Eran dos marcas distintas: la app mobile abre con el logotipo real y
+      // el Coach Hub lo reescribía con la fuente del sistema de diseño. Un PF
+      // que entra desde el teléfono a la web veía otra marca.
+      //
+      // `TreinoLogo` es el mismo widget que usan welcome, splash, login y
+      // register, y renderiza `assets/logo/treino_logo.svg`.
       child: collapsed
           ? const SizedBox.shrink()
-          : Text(
-              'TREINO',
-              style: TextStyle(
-                fontFamily: AppFonts.barlowCondensed,
-                fontWeight: AppFonts.w700,
-                fontSize: 20,
-                letterSpacing: 1,
-                color: palette.accent,
-              ),
-            ),
+          // En accent, no en el blanco por defecto: es el verde con el que la
+          // marca aparece en el resto de la app.
+          : TreinoLogo(size: 26, color: AppPalette.of(context).accent),
     );
   }
 }

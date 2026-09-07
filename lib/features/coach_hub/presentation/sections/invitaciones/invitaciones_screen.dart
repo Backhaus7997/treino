@@ -56,9 +56,10 @@ class InvitacionesScreen extends ConsumerWidget {
         children: [
           TreinoFadeSlideIn(
             delay: AppMotion.stagger(0),
-            child: TreinoSectionHeader(
+            child: CoachHubSectionHero(
               title: 'Solicitudes', // i18n: Fase W1
               count: pendingCount,
+              subtitle: 'Alumnos que pidieron entrenar con vos.', // i18n: Fase W1
             ),
           ),
           const SizedBox(height: AppSpacing.s18),

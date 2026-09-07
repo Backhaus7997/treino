@@ -87,7 +87,7 @@
   "authForgotSuccess": "Si tu email está registrado, te enviamos un link para resetear la contraseña.",
   "authForgotBackToLogin": "Volver al login",
   "authTrainerInquiryDialogTitle": "Acceso de entrenador",
-  "authTrainerInquiryDialogBody": "Para alta de entrenador, escribinos a equipo@treino.app",
+  "authTrainerInquiryDialogBody": "Para alta de entrenador, escribinos a treino@gettreino.com",
   "authTrainerInquiryDialogClose": "Cerrar",
   "authTermsPlaceholder": "Próximamente",
   "authGoogleLabel": "GOOGLE",

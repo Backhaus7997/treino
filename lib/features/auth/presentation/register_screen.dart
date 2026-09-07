@@ -20,7 +20,7 @@ import 'widgets/auth_pill_button.dart';
 import 'widgets/auth_secondary_button.dart';
 import 'widgets/password_strength_bar.dart';
 import 'widgets/terms_checkbox.dart';
-import 'widgets/treino_logo.dart';
+import '../../../core/widgets/treino_logo.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});

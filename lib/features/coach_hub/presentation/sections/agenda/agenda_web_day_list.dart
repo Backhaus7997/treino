@@ -26,6 +26,7 @@ import '../../../../profile/application/user_public_profile_providers.dart';
 import 'agenda_web_helpers.dart';
 import 'appointment_detail_dialog.dart';
 import 'batch_cobrar_dialog.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
 
 // ─── AgendaWebDayList ─────────────────────────────────────────────────────────
 
@@ -182,11 +183,9 @@ class _AgendaWebDayListState extends ConsumerState<AgendaWebDayList> {
         data: (_) => 'data',
       )),
       child: apptAsync.when(
-        loading: () => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 32),
-          child: Center(
-            child: CircularProgressIndicator(color: palette.accent),
-          ),
+        loading: () => const CoachHubSkeleton(
+          filas: 3,
+          padding: EdgeInsets.symmetric(vertical: 16, horizontal: 12),
         ),
         error: (_, __) => Padding(
           padding: const EdgeInsets.symmetric(vertical: 24),

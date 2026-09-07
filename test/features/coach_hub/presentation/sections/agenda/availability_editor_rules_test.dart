@@ -14,6 +14,7 @@ import 'package:treino/features/coach_hub/presentation/sections/agenda/agenda_we
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
 import 'package:treino/l10n/app_l10n.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -166,7 +167,7 @@ void main() {
         await tester.tap(btn);
         await tester.pump();
         // Debe mostrar spinner, no el hint de vacío
-        expect(find.byType(CircularProgressIndicator), findsWidgets);
+        expect(find.byType(CoachHubSkeleton), findsWidgets);
         expect(find.textContaining('Sin horarios configurados'), findsNothing);
       }
     });

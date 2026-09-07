@@ -503,7 +503,7 @@ abstract class AppL10n {
   /// No description provided for @authTrainerInquiryDialogBody.
   ///
   /// In es_AR, this message translates to:
-  /// **'Para alta de entrenador, escribinos a equipo@treino.app'**
+  /// **'Para alta de entrenador, escribinos a treino@gettreino.com'**
   String get authTrainerInquiryDialogBody;
 
   /// No description provided for @authTrainerInquiryDialogClose.

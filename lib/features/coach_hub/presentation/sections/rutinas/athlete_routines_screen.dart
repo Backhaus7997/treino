@@ -77,13 +77,17 @@ class AthleteRoutinesScreen extends ConsumerWidget {
                 ),
                 const SizedBox(width: AppSpacing.hairline),
                 Expanded(
-                  child: TreinoSectionHeader(
+                  child: CoachHubSectionHero(
                     title: 'Rutinas de $name', // i18n
                     count: routinesAsync.hasValue ? visible.length : null,
-                    action: TreinoSectionHeaderAction(
-                      label: 'Nueva rutina', // i18n
-                      onTap: () => context.push('/routine-editor/$athleteId'),
-                    ),
+                    actions: [
+                      CoachHubHeroAction(
+                        label: 'Nueva rutina', // i18n
+                        icon: TreinoIcon.plus,
+                        onTap: () => context.push('/routine-editor/$athleteId'),
+                        primary: true,
+                      ),
+                    ],
                   ),
                 ),
               ],

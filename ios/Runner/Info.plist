@@ -29,6 +29,21 @@
 		ios/Runner/GoogleService-Info.plist. If you re-download that plist,
 		copy the new REVERSED_CLIENT_ID value here.
 	-->
+	<!--
+		Universal links: sin esto, iOS abre la app cuando alguien toca un
+		`app.gettreino.com/abrir/...` pero NO le entrega la URL a Flutter, así
+		que el link se pierde y el alumno aterriza en la home sin invitación.
+		Android ya lo hacía por su `intent-filter` con `autoVerify`; esta era la
+		mitad que faltaba.
+
+		Con el flag, el motor le pasa el path a go_router. Las dos rutas que lo
+		reciben —`/abrir/alumno` y `/abrir/profe`— ya existen y redirigen, y
+		cualquier otra cae en `NotFoundScreen` por el `errorBuilder`, no en la
+		pantalla roja de go_router. Habilitarlo SIN esas rutas hubiera sido peor
+		que dejarlo apagado.
+	-->
+	<key>FlutterDeepLinkingEnabled</key>
+	<true/>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -37,6 +52,35 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>com.googleusercontent.apps.1079774251763-rbcocukjq4mc8onmohitp65jualmvmo5</string>
+			</array>
+		</dict>
+		<!--
+			Esquema propio, el rescate de los universal links.
+
+			Un universal link NO dispara cuando se toca dentro del navegador
+			embebido de otra app: WhatsApp abre los links en
+			`SFSafariViewController`, y ahí iOS le entrega la URL al navegador,
+			no a TREINO. Verificado en un iPhone 16 real — la app procesa el
+			link perfecto cuando se lo pasás directo, y no lo recibe nunca
+			cuando el link llega por WhatsApp.
+
+			Quien cae en ese caso aterriza en la página `/abrir/alumno`, y
+			desde ahí un link al MISMO dominio tampoco sirve: iOS ignora los
+			universal links cuando la navegación sale de una página del propio
+			dominio. Por eso hace falta un esquema que no dependa de esa
+			resolución.
+
+			`treino:///abrir/alumno?...` — tres barras a propósito: con dos,
+			"abrir" se parsea como HOST y el path queda en `/alumno`.
+		-->
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.backhaus.treino</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>treino</string>
 			</array>
 		</dict>
 	</array>

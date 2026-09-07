@@ -7,7 +7,7 @@
 // repository that captures setNote calls without hitting Firestore.
 //
 // Covered:
-//   - loading state → CircularProgressIndicator
+//   - loading state → CoachHubSkeleton (shimmer del kit)
 //   - error state → localized error text
 //   - empty note → save disabled until first keystroke
 //   - typing + save → repository receives the buffered content
@@ -43,6 +43,7 @@ import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/l10n/app_l10n.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
 
 const _trainerUid = 't1';
 const _athleteUid = 'a1';
@@ -155,7 +156,7 @@ void main() {
     )));
     await _selectNotasTab(tester);
 
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.byType(CoachHubSkeleton), findsOneWidget);
   });
 
   testWidgets('error state shows localized error copy', (tester) async {

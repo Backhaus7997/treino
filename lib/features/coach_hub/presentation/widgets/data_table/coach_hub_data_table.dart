@@ -11,6 +11,7 @@ import '../../../../../core/widgets/treino_icon.dart';
 import '../empty_state/empty_state.dart';
 import '../preview_wrapper.dart';
 import '../treino_interactive_state.dart';
+import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 
 /// Previews del kit — Finding W3.
 @Preview(name: 'DataTable — normal', wrapper: coachHubPreviewWrapper)
@@ -385,12 +386,28 @@ class _DataRows extends StatelessWidget {
         for (var i = 0; i < rows.length; i++) ...[
           if (i > 0)
             Divider(height: 1, thickness: 1, color: tokens.borderColor),
-          _DataRow(
-            row: rows[i],
-            columns: columns,
-            tokens: tokens,
-            isAlt: i.isOdd,
-            onTap: onRowTap != null ? () => onRowTap!(rows[i].id) : null,
+          // Entrada escalonada, la misma del resto del hub.
+          //
+          // Las filas aparecían todas de golpe: un bloque que se materializa
+          // entero no deja leer de dónde salió. Con el escalonado el ojo sigue
+          // el orden en el que llegan los datos, que es el mismo en el que se
+          // van a leer.
+          //
+          // `AppMotion.stagger` topea el retardo a los primeros 8 (maxItems),
+          // así que una tabla de cien filas no tarda cuatro segundos en
+          // terminar de aparecer: las de más abajo entran juntas, y de todas
+          // formas están fuera de pantalla.
+          //
+          // `TreinoFadeSlideIn` resuelve reduce-motion por dentro.
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(i),
+            child: _DataRow(
+              row: rows[i],
+              columns: columns,
+              tokens: tokens,
+              isAlt: i.isOdd,
+              onTap: onRowTap != null ? () => onRowTap!(rows[i].id) : null,
+            ),
           ),
         ],
       ],

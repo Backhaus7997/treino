@@ -7,7 +7,7 @@
 // that captures upload/delete calls without hitting Firestore/Storage.
 //
 // Covered:
-//   - loading state → CircularProgressIndicator
+//   - loading state → CoachHubSkeleton (shimmer del kit)
 //   - error state → localized error copy
 //   - empty state → localized empty copy
 //   - populated list → one row per file with size + date subtitle
@@ -49,6 +49,7 @@ import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/l10n/app_l10n.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
 
 const _trainerUid = 't1';
 const _athleteUid = 'a1';
@@ -212,7 +213,7 @@ void main() {
     ]));
     await _selectArchivosTab(tester);
 
-    expect(find.byType(CircularProgressIndicator), findsAtLeast(1));
+    expect(find.byType(CoachHubSkeleton), findsAtLeast(1));
   });
 
   testWidgets('empty state shows localized copy', (tester) async {

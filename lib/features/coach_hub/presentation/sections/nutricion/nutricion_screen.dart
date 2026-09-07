@@ -18,7 +18,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../../app/theme/app_motion.dart';
-import '../../../../../app/theme/app_palette.dart';
 import '../../../../../app/theme/tokens/primitives.dart';
 import '../../../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../../../core/widgets/motion/treino_state_switcher.dart';
@@ -34,7 +33,6 @@ class NutricionScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final palette = AppPalette.of(context);
     final entriesAsync = ref.watch(nutricionEntriesProvider);
     final filtro = ref.watch(nutricionFiltroProvider);
     final counts = nutricionFiltroCounts(entriesAsync.valueOrNull ?? const []);
@@ -49,19 +47,11 @@ class NutricionScreen extends ConsumerWidget {
         children: [
           TreinoFadeSlideIn(
             delay: AppMotion.stagger(0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TreinoSectionHeader(
-                  title: 'Nutrición', // i18n: Fase W6
-                  count: counts[NutricionFiltro.todos],
-                ),
-                const SizedBox(height: AppSpacing.hairline),
-                Text(
+            child: CoachHubSectionHero(
+              title: 'Nutrición', // i18n: Fase W6
+              count: counts[NutricionFiltro.todos],
+              subtitle:
                   'Planes de alimentación de tus alumnos activos.', // i18n: Fase W6
-                  style: TextStyle(color: palette.textMuted, fontSize: 13),
-                ),
-              ],
             ),
           ),
           const SizedBox(height: AppSpacing.s18),

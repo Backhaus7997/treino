@@ -20,6 +20,7 @@ import 'package:treino/features/workout/domain/routine.dart';
 
 import 'template_detail_dialog.dart';
 import 'template_grid_card.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
 
 /// Tab body for the "Templates Rutinas" tab of [BibliotecaWebScreen].
 ///
@@ -59,8 +60,7 @@ class TemplatesTab extends ConsumerWidget {
               data: (templates) => templates.isEmpty ? 'empty' : 'data',
             )),
             child: templatesAsync.when(
-              loading: () => Center(
-                  child: CircularProgressIndicator(color: palette.accent)),
+              loading: () => const CoachHubSkeleton(filas: 5),
               error: (e, _) => Center(
                 child: Text(
                   'Error al cargar plantillas.', // i18n

@@ -23,6 +23,7 @@ import '../../../workout/domain/muscle_group.dart';
 import '../sections/biblioteca/widgets/exercise_detail_dialog.dart'
     show showExerciseDetailDialog;
 import 'create_custom_exercise_dialog.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
 
 /// Web equivalent of [showExercisePicker] (mobile's `exercise_picker_sheet.dart`
 /// bottom sheet) — a multi-select exercise picker for the Coach Hub routine
@@ -513,7 +514,7 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
     required AsyncValue<List<CustomExercise>> customs,
   }) {
     if (defaults.isLoading || customs.isLoading) {
-      return Center(child: CircularProgressIndicator(color: palette.accent));
+      return const CoachHubSkeleton(filas: 6);
     }
     if (defaults.hasError) {
       return Center(

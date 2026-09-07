@@ -24,6 +24,7 @@ import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pa
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pagos_estado.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/payment_format.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/invite_athlete_dialog.dart';
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_limit_paywall.dart';
 import 'package:treino/features/gyms/application/gym_providers.dart';
 import '../../../../../l10n/app_l10n.dart';
@@ -251,7 +252,6 @@ class _RosterFrame extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     final filtro = ref.watch(_filtroProvider);
     final query = ref.watch(_queryProvider).trim().toLowerCase();
@@ -292,17 +292,19 @@ class _RosterFrame extends ConsumerWidget {
             children: [
               TreinoFadeSlideIn(
                 delay: AppMotion.stagger(0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TreinoSectionHeader(
-                      title: l10n.coachHubAlumnosTitle,
-                      count: roster.length,
-                    ),
-                    const SizedBox(height: AppSpacing.hairline),
-                    Text(
-                      l10n.coachHubAlumnosSummary(roster.length, activos),
-                      style: TextStyle(color: palette.textMuted, fontSize: 13),
+                child: CoachHubSectionHero(
+                  title: l10n.coachHubAlumnosTitle,
+                  count: roster.length,
+                  subtitle: l10n.coachHubAlumnosSummary(roster.length, activos),
+                  actions: [
+                    CoachHubHeroAction(
+                      label: l10n.dashboardQuickActionNuevoAlumno,
+                      icon: TreinoIcon.plus,
+                      // Mismo destino que la quick action del dashboard: el
+                      // alta arranca por el link de invitación, no por la
+                      // lista de los que ya tenés.
+                      onTap: () => showInviteAthleteDialog(context),
+                      primary: true,
                     ),
                   ],
                 ),

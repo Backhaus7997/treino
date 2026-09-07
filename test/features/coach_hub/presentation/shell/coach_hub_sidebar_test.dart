@@ -13,6 +13,7 @@ import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/features/coach_hub/presentation/shell/coach_hub_sidebar.dart';
 import 'package:treino/features/coach_hub/presentation/shell/sidebar_item.dart';
 import 'package:treino/features/coach_hub/presentation/shell/sidebar_registry.dart';
+import 'package:treino/core/widgets/treino_logo.dart';
 
 /// Monta el sidebar dentro de un `ShellRoute` real (necesita `GoRouterState`).
 /// Resuelve las prefs en el cuerpo del test y overridea
@@ -62,7 +63,7 @@ Future<void> _pumpSidebar(
 
 void main() {
   testWidgets(
-      'expandido → 240px, header TREINO, 2 headers (GESTIÓN, RECURSOS) y '
+      'expandido → 240px, header con el wordmark, 2 headers (GESTIÓN, RECURSOS) y '
       'todos los labels del registry [SCENARIO-750]', (tester) async {
     await _pumpSidebar(tester);
 
@@ -71,7 +72,7 @@ void main() {
     expect(size.width, CoachHubLayoutTokens.sidebarExpandedWidth);
     expect(size.width, 240);
 
-    expect(find.text('TREINO'), findsOneWidget);
+    expect(find.byType(TreinoLogo), findsOneWidget);
 
     // W2 reduce 2026-07-02: el sidebar pasó a 2 grupos activos (GESTIÓN y
     // RECURSOS) + Ajustes pinneado abajo. Reportes (grupo CUENTA) también
@@ -108,7 +109,7 @@ void main() {
     expect(size.width, CoachHubLayoutTokens.sidebarCollapsedWidth);
     expect(size.width, 72);
 
-    expect(find.text('TREINO'), findsNothing);
+    expect(find.byType(TreinoLogo), findsNothing);
     expect(find.text('RESUMEN'), findsNothing);
     expect(find.text('Dashboard'), findsNothing);
     expect(find.byType(Icon), findsWidgets);
@@ -277,7 +278,7 @@ void main() {
   testWidgets('smoke visual en tema claro (mintMagentaLight) — REQ-SH-011',
       (tester) async {
     await _pumpSidebar(tester, theme: AppTheme.light());
-    expect(find.text('TREINO'), findsOneWidget);
+    expect(find.byType(TreinoLogo), findsOneWidget);
     expect(find.text('Dashboard'), findsOneWidget);
   });
 

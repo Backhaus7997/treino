@@ -29,7 +29,17 @@ const String kTermsLastUpdated = '12 de junio de 2026';
 const String kPrivacyLastUpdated = '3 de septiembre de 2026';
 
 /// Email de contacto para consultas legales / de privacidad.
-const String kLegalContactEmail = 'equipo@treino.app';
+///
+/// `equipo@treino.app` NO EXISTE. Estuvo acá —y por lo tanto en las tres
+/// páginas legales públicas que este archivo genera— hasta que se verificó
+/// contra producción: quien intentaba ejercer sus derechos de habeas data o
+/// pedir el borrado de su cuenta por esa vía recibía un rebote. La casilla
+/// real de BACKHAUSTIN S.A.S. es la de abajo.
+///
+/// Es una constante y no un literal repetido justamente por esto: el mail de
+/// contacto legal aparece en privacidad, términos y eliminar-cuenta, y tenerlo
+/// en un solo lugar es lo que hizo que corregirlo fuera una línea.
+const String kLegalContactEmail = 'treino@gettreino.com';
 
 /// Términos y Condiciones de uso.
 const List<LegalSection> kTermsSections = <LegalSection>[

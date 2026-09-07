@@ -7,7 +7,7 @@ import 'package:treino/features/auth/presentation/welcome_screen.dart';
 import 'package:treino/features/auth/presentation/widgets/auth_pill_button.dart';
 import 'package:treino/features/auth/presentation/widgets/auth_secondary_button.dart';
 import 'package:treino/features/auth/presentation/widgets/terms_notice_text.dart';
-import 'package:treino/features/auth/presentation/widgets/treino_logo.dart';
+import 'package:treino/core/widgets/treino_logo.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 GoRouter _makeRouter(Widget home) => GoRouter(

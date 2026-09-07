@@ -163,7 +163,7 @@
   "authForgotEditEmail": "Usar otra dirección",
   "@authForgotEditEmail": {"description": "Forgot-password success state: return to the form to correct a mistyped address. Needed because the anti-enumeration success copy hides a typo (ux-audit-2026-06-16)."},
   "authTrainerInquiryDialogTitle": "Acceso de entrenador",
-  "authTrainerInquiryDialogBody": "Para alta de entrenador, escribinos a equipo@treino.app",
+  "authTrainerInquiryDialogBody": "Para alta de entrenador, escribinos a treino@gettreino.com",
   "authTrainerInquiryDialogClose": "Cerrar",
   "authTermsPlaceholder": "Próximamente",
   "authGoogleLabel": "GOOGLE",
