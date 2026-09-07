@@ -55,8 +55,16 @@ function makeMockMessaging(): Messaging {
   } as unknown as Messaging;
 }
 
-async function seedUser(uid: string, fcmTokens: string[]): Promise<void> {
-  await db().collection("users").doc(uid).set({ uid, fcmTokens });
+async function seedUser(
+  uid: string,
+  fcmTokens: string[],
+  notificationPrefs?: Record<string, Record<string, boolean>>,
+): Promise<void> {
+  await db().collection("users").doc(uid).set({
+    uid,
+    fcmTokens,
+    ...(notificationPrefs ? { notificationPrefs } : {}),
+  });
 }
 
 async function cleanup(...uids: string[]): Promise<void> {
@@ -104,6 +112,23 @@ describe("SCENARIO-637: new link status=pending → notify trainer", () => {
     expect(callArg.tokens).not.toContain("athlete-token-637");
     expect(callArg.data?.deepLink).toBe("/coach");
     expect(callArg.data?.kind).toBe("link-change");
+  });
+
+  it("respects nueva_solicitud push=false for the trainer", async () => {
+    await seedUser(trainerId, ["trainer-token-637"], {
+      nueva_solicitud: { push: false },
+    });
+    const mock = makeMockMessaging();
+
+    await notifyOnLinkChangeHandler(
+      testApp,
+      "link-test",
+      undefined,
+      { trainerId, athleteId, status: "pending" },
+      mock,
+    );
+
+    expect(mock.sendEachForMulticast as jest.Mock).not.toHaveBeenCalled();
   });
 
   // Encontrado en revisión adversarial: este archivo tocaba `ctaUrl` en el
@@ -158,6 +183,24 @@ describe("SCENARIO-638: pending→active → notify athlete", () => {
     expect(callArg.tokens).not.toContain("trainer-token-638");
     expect(callArg.data?.deepLink).toBe("/coach");
   });
+
+  it("does not gate the non-matrix active branch", async () => {
+    await seedUser(athleteId, ["athlete-token-638"], {
+      nueva_solicitud: { push: false },
+      vinculo_finalizado: { push: false },
+    });
+    const mock = makeMockMessaging();
+
+    await notifyOnLinkChangeHandler(
+      testApp,
+      "link-test",
+      { trainerId, athleteId, status: "pending" },
+      { trainerId, athleteId, status: "active" },
+      mock,
+    );
+
+    expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -191,6 +234,26 @@ describe("SCENARIO-639: active→terminated, no reason → notify BOTH parties",
     expect(callArg.tokens).toContain("trainer-token-639");
     expect(callArg.tokens).toContain("athlete-token-639");
     expect(callArg.data?.deepLink).toBe("/coach");
+  });
+
+  it("respects vinculo_finalizado push=false for each recipient", async () => {
+    await seedUser(trainerId, ["trainer-token-639"], {
+      vinculo_finalizado: { push: false },
+    });
+    await seedUser(athleteId, ["athlete-token-639"], {
+      vinculo_finalizado: { push: false },
+    });
+    const mock = makeMockMessaging();
+
+    await notifyOnLinkChangeHandler(
+      testApp,
+      "link-test",
+      { trainerId, athleteId, status: "active" },
+      { trainerId, athleteId, status: "terminated" },
+      mock,
+    );
+
+    expect(mock.sendEachForMulticast as jest.Mock).not.toHaveBeenCalled();
   });
 });
 

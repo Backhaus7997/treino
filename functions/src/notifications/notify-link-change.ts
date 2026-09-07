@@ -238,11 +238,13 @@ export async function notifyOnLinkChangeHandler(
   // Sólo se setea en la rama `terminated`. `undefined` en el resto significa
   // "no hay nada que purgar", que es lo que lee el efecto de cola.
   let causaTerminacion: CausaDeTerminacion | undefined;
+  let prefKey: string | undefined;
 
   if (afterStatus === "pending") {
     // New link request → notify trainer.
     recipientUids = [trainerId];
     actorUid = athleteId;
+    prefKey = "nueva_solicitud";
     title = "Nueva solicitud de vinculación"; // i18n: Fase 6 Etapa 2
     body = "Un atleta quiere vincularse contigo."; // i18n: Fase 6 Etapa 2
   } else if (afterStatus === "active") {
@@ -307,6 +309,20 @@ export async function notifyOnLinkChangeHandler(
       // Incluye el caso que costó el bug: un `acceptedAt` ausente con razón de
       // terminate real, que ES un vínculo y NO se borra.
       recipientUids = [athleteId, trainerId];
+      // El `prefKey` va SÓLO acá, y no en las otras dos causas de
+      // `terminated`. La fila de la matriz se llama "Vínculo finalizado", y
+      // ésta es la única de las tres que describe: `rechazo` le avisa al
+      // ATLETA que su solicitud no fue aceptada, y `cancelacion` le avisa al
+      // PF que el alumno se arrepintió — ninguna es un vínculo que terminó.
+      // Gatearlas con esta fila sería apagar un aviso con un control que dice
+      // otra cosa, que es la deshonestidad que este cambio vino a sacar.
+      //
+      // A diferencia de `enqueueMail`, `sendFcm` no PERSISTE el prefKey como
+      // afirmación durable sobre un destinatario: lo evalúa en vivo, por uid.
+      // Y como sólo el Coach Hub escribe `notificationPrefs`, el atleta no
+      // tiene la fila, cae en "ausente" y recibe el push igual — equivalente
+      // a chequear el rol, con la mitad del código.
+      prefKey = "vinculo_finalizado";
       title = "Vinculación finalizada"; // i18n: Fase 6 Etapa 2
       body = "La vinculación entre atleta y entrenador fue finalizada."; // i18n: Fase 6 Etapa 2
     }
@@ -326,6 +342,7 @@ export async function notifyOnLinkChangeHandler(
       notification: { title, body },
       data: { deepLink },
       actorUid,
+      prefKey,
     },
     messaging,
   );

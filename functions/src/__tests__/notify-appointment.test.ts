@@ -70,8 +70,16 @@ function makeMockMessaging(): Messaging {
   } as unknown as Messaging;
 }
 
-async function seedUser(uid: string, fcmTokens: string[]): Promise<void> {
-  await db().collection("users").doc(uid).set({ uid, fcmTokens });
+async function seedUser(
+  uid: string,
+  fcmTokens: string[],
+  notificationPrefs?: Record<string, Record<string, boolean>>,
+): Promise<void> {
+  await db().collection("users").doc(uid).set({
+    uid,
+    fcmTokens,
+    ...(notificationPrefs ? { notificationPrefs } : {}),
+  });
 }
 
 async function cleanup(...uids: string[]): Promise<void> {
@@ -126,6 +134,23 @@ describe("SCENARIO-632: new appointment status=requested → notify trainer", ()
     // atleta /coach/agenda que le mostraba "Necesitás un vínculo con un PF".
     expect(callArg.data?.deepLink).toBe("/coach?tab=agenda");
     expect(callArg.data?.kind).toBe("appointment");
+  });
+
+  it("does not gate the non-matrix requested branch", async () => {
+    await seedUser(trainerId, ["trainer-token-632"], {
+      sesion_cancelada: { push: false },
+    });
+    const mock = makeMockMessaging();
+
+    await notifyOnAppointmentHandler(
+      testApp,
+      APPT_ID,
+      undefined,
+      { trainerId, athleteId, status: "requested", startsAt: APPT_STARTS_AT },
+      mock,
+    );
+
+    expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -232,6 +257,31 @@ describe("SCENARIO-634: confirmed→cancelled, no cancelledBy → notify both pa
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as MulticastMessage;
     expect(callArg.tokens).toContain("trainer-token-634");
     expect(callArg.tokens).toContain("athlete-token-634");
+  });
+
+  it("respects sesion_cancelada push=false for each recipient", async () => {
+    await seedUser(trainerId, ["trainer-token-634"], {
+      sesion_cancelada: { push: false },
+    });
+    await seedUser(athleteId, ["athlete-token-634"], {
+      sesion_cancelada: { push: false },
+    });
+    const mock = makeMockMessaging();
+
+    await notifyOnAppointmentHandler(
+      testApp,
+      APPT_ID,
+      { trainerId, athleteId, status: "confirmed" },
+      {
+        trainerId,
+        athleteId,
+        status: "cancelled",
+        startsAt: APPT_STARTS_AT,
+      },
+      mock,
+    );
+
+    expect(mock.sendEachForMulticast as jest.Mock).not.toHaveBeenCalled();
   });
 
   // Encontrado en revisión adversarial: notify-link-change.ts y este archivo

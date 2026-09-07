@@ -6,8 +6,10 @@ import 'package:treino/features/profile/application/user_providers.dart';
 ///
 /// ESTADO REAL DE CADA CANAL (mantener sincronizado con `functions/`):
 ///
-/// - `push`   — implementado (FCM). Las CFs mandan SIEMPRE, sin leer estas
-///              preferencias todavía. Ese es el follow-up pendiente del canal.
+/// - `push`   — implementado (FCM). `send-fcm.ts` lee
+///              `notificationPrefs[fila].push`; sólo `false` explícito frena
+///              el envío y una preferencia ausente manda. Las cinco filas de
+///              [kPushBackedTypes] están cableadas desde sus productores.
 /// - `email`  — implementado para los dos tipos que el outbox transaccional
 ///              cubre hoy: `nueva_solicitud` y `sesion_cancelada`. Esos dos SÍ
 ///              respetan el toggle: `enqueueMail` recibe el `prefKey` y
@@ -77,6 +79,18 @@ const kNotifTypes = <NotifType>[
 /// `functions/src/notifications/`. Si agregás un mail nuevo con `prefKey`,
 /// sumá la clave acá también.
 const kEmailBackedTypes = <String>{'nueva_solicitud', 'sesion_cancelada'};
+
+/// Filas cuyo canal `push` está cableado a `sendFcm`.
+///
+/// Este conjunto tiene que coincidir con los `prefKey` que pasan los
+/// productores en `functions/src/notifications/`.
+const kPushBackedTypes = <String>{
+  'nueva_solicitud',
+  'vinculo_finalizado',
+  'resena_nueva',
+  'sesion_cancelada',
+  'mensaje_nuevo',
+};
 
 /// Preferencias de notificación: matriz `tipo -> canal -> bool`.
 ///

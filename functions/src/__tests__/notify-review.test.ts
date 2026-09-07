@@ -45,8 +45,16 @@ function makeMockMessaging(): Messaging {
   } as unknown as Messaging;
 }
 
-async function seedUser(uid: string, fcmTokens: string[]): Promise<void> {
-  await db().collection("users").doc(uid).set({ uid, fcmTokens });
+async function seedUser(
+  uid: string,
+  fcmTokens: string[],
+  notificationPrefs?: Record<string, Record<string, boolean>>,
+): Promise<void> {
+  await db().collection("users").doc(uid).set({
+    uid,
+    fcmTokens,
+    ...(notificationPrefs ? { notificationPrefs } : {}),
+  });
 }
 
 async function seedUserPublicProfile(uid: string, displayName: string): Promise<void> {
@@ -91,6 +99,26 @@ describe("SCENARIO-642: new review → sendFcm called with trainerId, correct bo
     expect(callArg.tokens).toContain("trainer-token-642");
     expect(callArg.tokens).not.toContain("athlete-token-642");
     expect(callArg.data?.kind).toBe("review");
+  });
+
+  it("respects resena_nueva push=false for the trainer", async () => {
+    await seedUser(trainerId, ["trainer-token-642"], {
+      resena_nueva: { push: false },
+    });
+    const mock = makeMockMessaging();
+
+    await notifyOnReviewHandler(
+      testApp,
+      {
+        trainerId,
+        athleteId,
+        rating: 5,
+        createdAt: admin.firestore.Timestamp.now(),
+      },
+      mock,
+    );
+
+    expect(mock.sendEachForMulticast as jest.Mock).not.toHaveBeenCalled();
   });
 
   it("body is '${athleteName} dejó una reseña de ${rating}⭐'", async () => {

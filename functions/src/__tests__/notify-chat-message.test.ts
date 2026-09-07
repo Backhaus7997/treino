@@ -49,8 +49,16 @@ function makeMockMessaging(): Messaging {
   } as unknown as Messaging;
 }
 
-async function seedUser(uid: string, fcmTokens: string[]): Promise<void> {
-  await db().collection("users").doc(uid).set({ uid, fcmTokens });
+async function seedUser(
+  uid: string,
+  fcmTokens: string[],
+  notificationPrefs?: Record<string, Record<string, boolean>>,
+): Promise<void> {
+  await db().collection("users").doc(uid).set({
+    uid,
+    fcmTokens,
+    ...(notificationPrefs ? { notificationPrefs } : {}),
+  });
 }
 
 async function seedUserPublicProfile(uid: string, displayName: string): Promise<void> {
@@ -121,6 +129,26 @@ describe("SCENARIO-629 + SCENARIO-680: new message → sendFcm called with recip
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as MulticastMessage;
     // athlete-token should NOT be in the token list
     expect(callArg.tokens).not.toContain("athlete-token");
+  });
+
+  it("respects mensaje_nuevo push=false for the recipient", async () => {
+    await seedUser(trainerUid, ["trainer-token"], {
+      mensaje_nuevo: { push: false },
+    });
+    const mock = makeMockMessaging();
+
+    await notifyOnChatMessageHandler(
+      testApp,
+      chatId,
+      {
+        senderId: athleteUid,
+        text: "Hola entrenador!",
+        createdAt: admin.firestore.Timestamp.now(),
+      },
+      mock,
+    );
+
+    expect(mock.sendEachForMulticast as jest.Mock).not.toHaveBeenCalled();
   });
 });
 
