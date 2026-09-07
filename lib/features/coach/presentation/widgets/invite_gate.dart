@@ -52,35 +52,48 @@ class _InviteGateState extends ConsumerState<InviteGate> {
     );
     final uid = perfil?.uid;
 
-    // Sólo alumnos. Un PF no se vincula con otro PF, y el repositorio lo
-    // rechaza igual.
-    if (uid != null && perfil?.role == UserRole.athlete && uid != _resueltaPara) {
+    if (uid != null && uid != _resueltaPara) {
       _resueltaPara = uid;
-      WidgetsBinding.instance.addPostFrameCallback((_) => _resolver(uid));
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _resolver(uid, perfil!.role),
+      );
     }
     return const SizedBox.shrink();
   }
 
-  Future<void> _resolver(String uid) async {
+  Future<void> _resolver(String uid, UserRole role) async {
     final store = ref.read(pendingInviteStoreProvider);
     if (store == null) return; // prefs sin resolver: no hay nada que aplicar
     final trainerId = await store.leer();
     if (trainerId == null || !mounted) return;
 
-    final vinculo =
-        await ref.read(currentAthleteLinkAnyStatusProvider.future);
-    if (!mounted) return;
-
-    final outcome = resolveInvite(
-      inviteTrainerId: trainerId,
-      athleteId: uid,
-      vinculoActual: vinculo,
-    );
+    final InviteOutcome outcome;
+    if (role == UserRole.trainer) {
+      // Un PF también puede tocar un link a propósito. No intentamos
+      // vincularlo: preservamos el motivo para confirmar que el link sí llegó.
+      outcome = resolveTrainerInvite(
+        inviteTrainerId: trainerId,
+        trainerId: uid,
+      );
+    } else {
+      final vinculo =
+          await ref.read(currentAthleteLinkAnyStatusProvider.future);
+      if (!mounted) return;
+      outcome = resolveInvite(
+        inviteTrainerId: trainerId,
+        athleteId: uid,
+        vinculoActual: vinculo,
+      );
+    }
 
     // Se limpia SIEMPRE, haya terminado en vínculo o no. Una invitación que el
     // alumno ya vio y canceló no puede volver a aparecer en el próximo
-    // arranque; y una que no aplica —el PF abriendo su propio link— tampoco
-    // tiene nada que esperar.
+    // arranque, y una que no aplica tampoco tiene nada que esperar.
+    //
+    // El PF que abre su propio link YA NO cae acá en silencio: es
+    // `InviteLinkPropio` y le muestra "el link funciona, compartilo". Lo que
+    // queda en `InviteNoAplica` es sólo la invitación sin PF — una entrada que
+    // nadie pidió a propósito y sobre la que no hay nada honesto que decir.
     await store.limpiar();
     if (!mounted || outcome is InviteNoAplica) return;
 

@@ -58,11 +58,28 @@ class InviteRequiereDesvincular extends InviteOutcome {
   final TrainerLink vinculoActual;
 }
 
+/// El entrenador abrió un link generado por otra cuenta.
+///
+/// No se puede aplicar porque las invitaciones crean vínculos desde el lado
+/// del alumno. Conservar el motivo permite que la presentación explique el
+/// rechazo en vez de hacer parecer que el deep link falló.
+class InviteSoloParaAlumnos extends InviteOutcome {
+  const InviteSoloParaAlumnos();
+}
+
+/// El entrenador abrió el link que él mismo comparte con sus alumnos.
+///
+/// Es distinto de una invitación inválida: la captura funcionó y confirmarlo
+/// evita que una prueba legítima del link termine pareciendo un fallo.
+class InviteLinkPropio extends InviteOutcome {
+  const InviteLinkPropio();
+}
+
 /// La invitación no aplica y no hay nada que preguntar.
 ///
-/// Hoy es un solo caso: el PF abriendo el link que él mismo generó, probando
-/// que anda o porque se lo reenviaron. Ofrecerle vincularse consigo mismo sería
-/// absurdo, y el repositorio lo rechaza igual con un `ArgumentError`.
+/// Se reserva para entradas sin entrenador. No hay una acción explícita que la
+/// UI pueda atribuir a la persona, así que tampoco hay un mensaje honesto para
+/// mostrarle.
 class InviteNoAplica extends InviteOutcome {
   const InviteNoAplica();
 }
@@ -76,9 +93,8 @@ InviteOutcome resolveInvite({
   required String athleteId,
   required TrainerLink? vinculoActual,
 }) {
-  if (inviteTrainerId.isEmpty || inviteTrainerId == athleteId) {
-    return const InviteNoAplica();
-  }
+  if (inviteTrainerId.isEmpty) return const InviteNoAplica();
+  if (inviteTrainerId == athleteId) return const InviteLinkPropio();
   if (vinculoActual == null) {
     return InvitePuedeVincular(inviteTrainerId);
   }
@@ -93,4 +109,15 @@ InviteOutcome resolveInvite({
     nuevoTrainerId: inviteTrainerId,
     vinculoActual: vinculoActual,
   );
+}
+
+/// Resuelve una invitación capturada mientras hay una sesión de entrenador.
+InviteOutcome resolveTrainerInvite({
+  required String inviteTrainerId,
+  required String trainerId,
+}) {
+  if (inviteTrainerId.isEmpty) return const InviteNoAplica();
+  return inviteTrainerId == trainerId
+      ? const InviteLinkPropio()
+      : const InviteSoloParaAlumnos();
 }

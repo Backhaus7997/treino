@@ -83,7 +83,7 @@ void main() {
   });
 
   group('no aplica', () {
-    test('el PF abriendo su propio link', () {
+    test('el PF abriendo su propio link conserva el motivo', () {
       // Pasa de verdad: el PF prueba que el link anda. Ofrecerle vincularse
       // consigo mismo sería absurdo, y el repositorio lo rechaza igual.
       final r = resolveInvite(
@@ -92,7 +92,7 @@ void main() {
         vinculoActual: null,
       );
 
-      expect(r, isA<InviteNoAplica>());
+      expect(r, isA<InviteLinkPropio>());
     });
 
     test('invitación sin PF', () {
@@ -100,6 +100,28 @@ void main() {
         resolveInvite(
             inviteTrainerId: '', athleteId: 'atleta', vinculoActual: null),
         isA<InviteNoAplica>(),
+      );
+    });
+  });
+
+  group('sesión de entrenador', () {
+    test('un link ajeno explica que es exclusivo para alumnos', () {
+      expect(
+        resolveTrainerInvite(
+          inviteTrainerId: 'pf-otro',
+          trainerId: 'pf-1',
+        ),
+        isA<InviteSoloParaAlumnos>(),
+      );
+    });
+
+    test('su propio link conserva el motivo específico', () {
+      expect(
+        resolveTrainerInvite(
+          inviteTrainerId: 'pf-1',
+          trainerId: 'pf-1',
+        ),
+        isA<InviteLinkPropio>(),
       );
     });
   });

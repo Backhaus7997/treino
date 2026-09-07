@@ -34,12 +34,13 @@ class _InviteDialogState extends ConsumerState<_InviteDialog> {
   String? _error;
 
   /// El PF que la invitación propone, sea cual sea el caso.
-  String get _trainerId => switch (widget.outcome) {
+  String? get _trainerId => switch (widget.outcome) {
         InvitePuedeVincular(:final trainerId) => trainerId,
         InviteYaSolicitado(:final trainerId) => trainerId,
         InviteYaVinculado(:final trainerId) => trainerId,
         InviteRequiereDesvincular(:final nuevoTrainerId) => nuevoTrainerId,
-        InviteNoAplica() => '',
+        InviteSoloParaAlumnos() || InviteLinkPropio() || InviteNoAplica() =>
+          null,
       };
 
   Future<void> _vincular({String? terminarPrimero}) async {
@@ -59,7 +60,7 @@ class _InviteDialogState extends ConsumerState<_InviteDialog> {
       if (terminarPrimero != null) {
         await repo.terminate(terminarPrimero, reason: 'switched_trainer');
       }
-      await repo.request(trainerId: _trainerId, athleteId: athleteId);
+      await repo.request(trainerId: _trainerId!, athleteId: athleteId);
       ref.invalidate(currentAthleteLinkProvider);
       ref.invalidate(currentAthleteLinkAnyStatusProvider);
       if (mounted) Navigator.of(context).pop();
@@ -79,11 +80,15 @@ class _InviteDialogState extends ConsumerState<_InviteDialog> {
     final palette = AppPalette.of(context);
     // El nombre es decorativo: si no llega, el diálogo funciona igual. Una
     // vinculación no puede depender de que cargue un perfil público.
-    final nombre = ref
-        .watch(userPublicProfileProvider(_trainerId))
-        .valueOrNull
-        ?.displayName;
-    final quien = (nombre == null || nombre.isEmpty) ? 'este entrenador' : nombre;
+    final trainerId = _trainerId;
+    final nombre = trainerId == null
+        ? null
+        : ref
+            .watch(userPublicProfileProvider(trainerId))
+            .valueOrNull
+            ?.displayName;
+    final quien =
+        (nombre == null || nombre.isEmpty) ? 'este entrenador' : nombre;
 
     final (titulo, cuerpo, acciones) = switch (widget.outcome) {
       InvitePuedeVincular() => (
@@ -118,6 +123,18 @@ class _InviteDialogState extends ConsumerState<_InviteDialog> {
               () => _vincular(terminarPrimero: vinculoActual.id),
             ),
           ],
+        ),
+      InviteSoloParaAlumnos() => (
+          'ESTE LINK ES PARA ALUMNOS', // i18n
+          'Las invitaciones vinculan alumnos con entrenadores. Como tu cuenta '
+              'es de entrenador, este link no se puede aplicar.', // i18n
+          [_primario('Entendido', _cerrar)], // i18n
+        ),
+      InviteLinkPropio() => (
+          'ESTE ES TU LINK DE INVITACIÓN', // i18n
+          'El link funciona. Compartilo con tus alumnos para que puedan '
+              'vincularse con vos.', // i18n
+          [_primario('Entendido', _cerrar)], // i18n
         ),
       InviteNoAplica() => ('', '', <Widget>[]),
     };

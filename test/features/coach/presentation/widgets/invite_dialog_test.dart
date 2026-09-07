@@ -206,4 +206,38 @@ void main() {
           ));
     });
   });
+
+  group('links abiertos por un entrenador', () {
+    testWidgets('un link ajeno explica que sólo sirve para alumnos',
+        (tester) async {
+      final repo = _MockRepo();
+      await _pump(tester, const InviteSoloParaAlumnos(), repo: repo);
+
+      expect(find.text('ESTE LINK ES PARA ALUMNOS'), findsOneWidget);
+      expect(
+        find.text(
+          'Las invitaciones vinculan alumnos con entrenadores. Como tu cuenta '
+          'es de entrenador, este link no se puede aplicar.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Entendido'), findsOneWidget);
+    });
+
+    testWidgets('su propio link confirma que funciona y para qué sirve',
+        (tester) async {
+      final repo = _MockRepo();
+      await _pump(tester, const InviteLinkPropio(), repo: repo);
+
+      expect(find.text('ESTE ES TU LINK DE INVITACIÓN'), findsOneWidget);
+      expect(
+        find.text(
+          'El link funciona. Compartilo con tus alumnos para que puedan '
+          'vincularse con vos.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Entendido'), findsOneWidget);
+    });
+  });
 }
