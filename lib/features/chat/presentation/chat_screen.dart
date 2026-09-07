@@ -206,7 +206,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               Follow.edgeId(widget.otherUid, currentUid),
             ))
             .valueOrNull;
+    // Las TRES ramas por las que escapa `senderMayPost` en las reglas
+    // (`firestore.rules`): vínculo, pre-consulta, y arista social aceptada.
+    //
+    // La pre-consulta faltaba, y la asimetría siempre cae para el mismo lado:
+    // la app quedaba MÁS ESTRICTA QUE EL SERVIDOR y le tapaba el composer a
+    // alguien a quien Firestore le habría aceptado el mensaje. Justo el caso
+    // que motiva la feature — consultarle algo a un entrenador ANTES de
+    // pedirle el vínculo—, que sin escribir no existe.
     final canWrite = isCoachChat ||
+        chat?.isInquiry == true ||
         incomingEdge?.status == FollowStatus.accepted ||
         currentUid == null;
     final pubAsync = ref.watch(userPublicProfileProvider(widget.otherUid));
