@@ -228,14 +228,16 @@ void main() {
 
   group('Llenar el alto —', () {
     // Reportado mirando el Coach Hub: con disponibilidad de 9 a 11 y ninguna
-    // sesión, el rango daba 8–12 y la grilla medía 224 px adentro de un panel
-    // de 700. Abajo quedaba un vacío enorme y la pantalla se veía CORTADA A
-    // LA MITAD — porque estaba cortada.
+    // sesión, la grilla medía 224 px adentro de un panel de 700 y abajo
+    // quedaba un vacío enorme. Se veía CORTADA A LA MITAD — porque lo estaba.
     //
-    // Un calendario llena su contenedor. Si sobra alto, se muestran más
-    // horas; recién cuando no entran las 24 aparece el scroll.
-    testWidgets('con alto de sobra se muestran más horas en vez de dejar '
-        'un vacío', (tester) async {
+    // El primer arreglo estiraba el RANGO hasta llenar el panel, y eso trajo
+    // el bug siguiente: sin sobrante no había scroll, y las horas fuera del
+    // rango quedaban inalcanzables. Ahora se dibuja el día ENTERO, que llena
+    // cualquier panel y además se puede recorrer. Este test sigue siendo el
+    // que impide volver a la franja de 224 px.
+    testWidgets('nunca se dibuja en una franja: el día entero llena el panel',
+        (tester) async {
       tester.view.physicalSize = const Size(1200, 900);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -264,8 +266,7 @@ void main() {
           reason: 'la grilla tiene que ocupar el panel, no una franja');
     });
 
-    testWidgets('si el alto no alcanza para el rango, se scrollea',
-        (tester) async {
+    testWidgets('si el alto no alcanza, se scrollea', (tester) async {
       tester.view.physicalSize = const Size(1200, 900);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -293,17 +294,95 @@ void main() {
     });
   });
 
-  group('Rango visible —', () {
-    testWidgets('no muestra las 24 horas: se ajusta a lo que hay',
-        (tester) async {
+  group('Todas las horas son alcanzables —', () {
+    // Reportado mirando el Coach Hub: "no tiene scroll el calendario, no
+    // puedo mover las horas".
+    //
+    // El arreglo anterior estiraba el RANGO hasta llenar el panel. Con eso la
+    // grilla dejaba de tener sobrante, así que dejaba de scrollear — y las
+    // horas fuera del rango quedaban INALCANZABLES. Se cambió un vacío por
+    // una jaula.
+    //
+    // El día entero se dibuja siempre. Que no tengas que mirar las 3 de la
+    // mañana se resuelve abriendo POSICIONADO donde está el contenido, no
+    // recortando lo que existe.
+    testWidgets('el día entero está en la grilla, de 00 a 23', (tester) async {
       await pump(tester, eventos: [
         evento('a', DateTime(2026, 9, 7, 10), 60),
       ]);
 
-      expect(find.text('03:00'), findsNothing,
-          reason: 'nadie entrena a las 3 de la mañana y esa fila sólo agrega '
-              'scroll');
+      expect(find.text('00:00'), findsOneWidget);
+      expect(find.text('23:00'), findsOneWidget);
       expect(find.text('10:00'), findsOneWidget);
+    });
+
+    testWidgets('y se puede scrollear', (tester) async {
+      await pump(tester, eventos: [
+        evento('a', DateTime(2026, 9, 7, 10), 60),
+      ]);
+
+      final scroll = tester.widget<SingleChildScrollView>(
+        find.byType(SingleChildScrollView),
+      );
+      expect(scroll.controller, isNotNull,
+          reason: 'hace falta controlar la posición para abrir donde importa');
+      expect(scroll.controller!.position.maxScrollExtent, greaterThan(0),
+          reason: 'sin sobrante no hay scroll, y el resto del día queda '
+              'inalcanzable');
+    });
+
+    testWidgets('abre posicionada en el contenido, no a la medianoche',
+        (tester) async {
+      await pump(tester, eventos: [
+        evento('a', DateTime(2026, 9, 7, 14), 60),
+      ]);
+
+      final scroll = tester.widget<SingleChildScrollView>(
+        find.byType(SingleChildScrollView),
+      );
+      expect(scroll.controller!.offset, greaterThan(0),
+          reason: 'abrir a las 00:00 con la primera sesión a las 14 obliga a '
+              'scrollear en cada apertura');
+    });
+  });
+
+  group('Bandas contiguas —', () {
+    testWidgets('dos franjas pegadas se dibujan como UNA', (tester) async {
+      await pump(
+        tester,
+        eventos: const [],
+        bandas: const [
+          AgendaAvailabilityBand(weekday: 1, startMinute: 540, endMinute: 600),
+          AgendaAvailabilityBand(weekday: 1, startMinute: 600, endMinute: 660),
+        ],
+      );
+
+      // Dos cajas pegadas dejan una costura visible y se leen como dos cosas
+      // distintas. De 9 a 11 sin corte es UN bloque de disponibilidad.
+      expect(find.byKey(const Key('agenda_band_1_540')), findsOneWidget);
+      expect(find.byKey(const Key('agenda_band_1_600')), findsNothing);
+
+      final banda = tester.getSize(find.byKey(const Key('agenda_band_1_540')));
+      final unaHora = tester.getSize(
+            find.byKey(const Key('agenda_day_column_0')),
+          ).height /
+          24;
+      expect(banda.height, moreOrLessEquals(unaHora * 2, epsilon: 2),
+          reason: 'la banda fusionada tiene que medir las dos horas');
+    });
+
+    testWidgets('dos franjas separadas siguen siendo dos', (tester) async {
+      await pump(
+        tester,
+        eventos: const [],
+        bandas: const [
+          AgendaAvailabilityBand(weekday: 1, startMinute: 540, endMinute: 660),
+          AgendaAvailabilityBand(weekday: 1, startMinute: 900, endMinute: 1020),
+        ],
+      );
+
+      expect(find.byKey(const Key('agenda_band_1_540')), findsOneWidget);
+      expect(find.byKey(const Key('agenda_band_1_900')), findsOneWidget);
     });
   });
 }
