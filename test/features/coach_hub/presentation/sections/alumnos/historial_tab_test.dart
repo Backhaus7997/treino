@@ -2,7 +2,7 @@
 // (alumno_detail_screen.dart, W2+).
 //
 // The tab is a private _HistorialTab class inside alumno_detail_screen —
-// we exercise it end-to-end via AlumnoDetailScreen with the Historial tab
+// we exercise it end-to-end via Entrenamiento › Sesiones
 // selected, using ProviderScope overrides for sessionsByUidProvider.
 //
 // Covered:
@@ -10,8 +10,7 @@
 //   - full timeline with N sessions (count string + N rows)
 //   - status pill differentiates completada / incompleta / en curso
 //   - active sessions show startedAt fallback (not "—") in the date column
-//   - the tab shows ALL sessions (no take(20) or completed-only filter as
-//     the Entrenamientos tab has)
+//   - the sub-view shows ALL sessions, without the old shortened duplicate
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -26,6 +25,8 @@ import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/alumnos/alumno_detail_screen.dart';
 import 'package:treino/features/gyms/application/gym_providers.dart';
 import 'package:treino/features/gyms/domain/gym.dart';
+import 'package:treino/features/insights/application/day_insights_providers.dart';
+import 'package:treino/features/insights/domain/day_insights.dart';
 import 'package:treino/features/measurements/application/measurement_providers.dart';
 import 'package:treino/features/measurements/domain/measurement.dart';
 import 'package:treino/features/payments/application/billing_providers.dart';
@@ -35,11 +36,14 @@ import 'package:treino/features/performance/domain/performance_test.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
+import 'package:treino/features/workout/application/exercise_progression_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
 import 'package:treino/l10n/app_l10n.dart';
+
+import 'alumno_detail_test_navigation.dart';
 
 const _trainerUid = 't1';
 const _athleteUid = 'a1';
@@ -91,6 +95,9 @@ class _StubNoteRepo implements AthleteNoteRepository {
 
 List<Override> _baseOverrides({required List<Session> sessions}) => [
       currentUidProvider.overrideWithValue(_trainerUid),
+      alumnoDetailIndicatorsProvider(_athleteUid).overrideWithValue(
+        const AlumnoDetailIndicators(),
+      ),
       trainerLinksStreamProvider.overrideWith((ref) => Stream.value([_link()])),
       userPublicProfilesBatchProvider
           .overrideWith((ref, key) => {_athleteUid: _profile()}),
@@ -107,6 +114,16 @@ List<Override> _baseOverrides({required List<Session> sessions}) => [
       athleteBillingProvider.overrideWith((ref, id) => Stream.value(null)),
       sessionsByUidProvider.overrideWith((ref, id) => sessions),
       assignedRoutinesByTrainerProvider.overrideWith((ref, key) => const <Routine>[]),
+      athleteLast7DaysInsightsProvider
+          .overrideWith((ref, uid) async => const <DayInsights>[]),
+      athleteDayInsightsProvider.overrideWith(
+        (ref, key) async => DayInsights(
+          day: key.day,
+          setsByGroup: const {},
+          sessionsCount: 0,
+        ),
+      ),
+      athleteExerciseListProvider.overrideWith((ref, uid) async => const []),
       athleteNoteProvider(
         (trainerId: _trainerUid, athleteId: _athleteUid),
       ).overrideWith((ref) => const Stream.empty()),
@@ -134,15 +151,11 @@ void _useDesktopViewport(WidgetTester tester) {
 }
 
 Future<void> _selectHistorialTab(WidgetTester tester) async {
-  try {
-    await tester.pumpAndSettle(const Duration(milliseconds: 500));
-  } catch (_) {
-    // Stream never resolves — enough frames already pumped.
-  }
-  await tester.tap(find.text('Historial'));
-  try {
-    await tester.pumpAndSettle(const Duration(milliseconds: 500));
-  } catch (_) {}
+  await navigateAlumnoDetail(
+    tester,
+    group: 'Entrenamiento',
+    subview: 'Sesiones',
+  );
 }
 
 void main() {
@@ -194,6 +207,28 @@ void main() {
     expect(find.text('PPL Push'), findsOneWidget);
     expect(find.text('PPL Pull'), findsOneWidget);
     expect(find.text('PPL Legs'), findsOneWidget);
+    expect(find.text('HISTORIAL DE SESIONES'), findsNothing);
+  });
+
+  testWidgets('Sesiones muestra la tabla completa sin límite de 20',
+      (tester) async {
+    final sessions = [
+      for (var i = 0; i < 21; i++)
+        _session(
+          id: 's$i',
+          startedAt: DateTime(2026, 5, 21 - i),
+          finishedAt: DateTime(2026, 5, 21 - i, 1),
+          routineName: 'Sesión $i',
+        ),
+    ];
+
+    _useDesktopViewport(tester);
+    await tester.pumpWidget(_wrap(_baseOverrides(sessions: sessions)));
+    await _selectHistorialTab(tester);
+
+    expect(find.text('Sesión 0'), findsOneWidget);
+    expect(find.text('Sesión 20'), findsOneWidget);
+    expect(find.text('COMPLETA'), findsNWidgets(21));
   });
 
   testWidgets(

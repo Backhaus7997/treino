@@ -114,6 +114,7 @@ export async function notifyOnChatMessageHandler(
       },
       data: { deepLink, senderId },
       actorUid: senderId,
+      prefKey: "mensaje_nuevo",
     },
     messaging,
   );

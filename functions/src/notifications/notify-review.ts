@@ -79,6 +79,7 @@ export async function notifyOnReviewHandler(
       },
       data: { deepLink },
       actorUid: athleteId,
+      prefKey: "resena_nueva",
     },
     messaging,
   );

@@ -229,6 +229,7 @@ export async function notifyOnAppointmentHandler(
   let body: string;
   let deepLink: string;
   let actorUid: string | undefined;
+  let prefKey: string | undefined;
 
   if (afterStatus === "requested") {
     // New appointment request → notify trainer.
@@ -263,6 +264,11 @@ export async function notifyOnAppointmentHandler(
       // cancelledBy not yet in appointments schema — defaults to both.
       recipientUids = [athleteId, trainerId];
     }
+    // Unlike enqueueMail, sendFcm does not persist prefKey as a durable claim
+    // about a recipient. It evaluates each uid live. Only the Coach Hub writes
+    // notificationPrefs, so athletes have no row and default to receiving;
+    // passing the key to every recipient is equivalent to a role check.
+    prefKey = "sesion_cancelada";
     title = "Sesión cancelada"; // i18n: Fase 6 Etapa 2
     body = "Una sesión fue cancelada."; // i18n: Fase 6 Etapa 2
     deepLink = "/coach?tab=agenda";
@@ -282,6 +288,7 @@ export async function notifyOnAppointmentHandler(
       notification: { title, body },
       data: { deepLink },
       actorUid,
+      prefKey,
     },
     messaging,
   );

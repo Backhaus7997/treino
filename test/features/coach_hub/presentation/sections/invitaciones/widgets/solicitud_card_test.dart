@@ -162,7 +162,7 @@ void main() {
     });
 
     testWidgets(
-        'status terminated → pill read-only "RECHAZADA" [SCENARIO-SC-03c]',
+        'status terminated → pill read-only "FINALIZADA" [SCENARIO-SC-03c]',
         (tester) async {
       await tester.pumpWidget(_wrap(
         SolicitudCard(
@@ -174,7 +174,11 @@ void main() {
       ));
       await tester.pump();
 
-      expect(find.text('RECHAZADA'), findsOneWidget);
+      // FINALIZADA, no «RECHAZADA»: desde que el rechazo no persiste, el único
+      // `terminated` que puede llegar a esta tarjeta es un vínculo REAL que
+      // terminó. La etiqueta vieja mentía sobre esa relación.
+      expect(find.text('FINALIZADA'), findsOneWidget);
+      expect(find.text('RECHAZADA'), findsNothing);
     });
 
     testWidgets(
