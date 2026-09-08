@@ -393,6 +393,172 @@ describe("reconcileSubscription — cuando NO hay que escribir", () => {
 });
 
 // ---------------------------------------------------------------------------
+// LA GUARDA DE NO-REGRESION: un `pending` no pisa un entitlement pago.
+//
+// El caso que la motiva es el PF que CAMBIA DE PLAN. Nada impide abrir un
+// checkout estando ya suscripto, asi que queda con DOS documentos en `mp_plans`
+// con su uid: el viejo (`authorized`) y el nuevo (`pending` hasta que carga el
+// medio de pago). El barrido recorre los dos y escribe por cada uno.
+//
+// Como `effective-limit` le da el limite FREE a un `pending`, sin la guarda el
+// plan nuevo le bajaba el limite a 2 y `syncEntitlementsOnSubscription` le
+// bloqueaba alumnos EN LA MISMA INVOCACION — mas un mail de degradacion. A
+// alguien que acababa de intentar pagarnos mas.
+// ---------------------------------------------------------------------------
+
+/** El plan nuevo, abierto y todavia sin autorizar. */
+const PENDIENTE: MpPreapproval = {
+  ...AUTORIZADA,
+  id: "p2",
+  status: "pending",
+  auto_recurring: { transaction_amount: 39000 },
+};
+
+/** Mundo del upgrade: plan2 vigente y un checkout de plan3 recien abierto. */
+const UPGRADE = (): Store => ({
+  users: {
+    t1: {
+      role: "trainer",
+      displayName: "Martin",
+      subscription: { tier: "plan2", status: "active", currentPeriodEnd: null },
+    },
+  },
+  mp_plans: {
+    p1: { uid: "t1", tier: "plan2", cycle: "monthly" },
+    p2: { uid: "t1", tier: "plan3", cycle: "monthly" },
+  },
+});
+
+describe("reconcileSubscription — un `pending` no pisa un entitlement pago", () => {
+  it("el upgrade en curso NO le baja el plan al que ya paga", async () => {
+    const { app, store, escrituras } = fakeApp(UPGRADE());
+
+    const r = await reconcileSubscription(app, "p2", fakeMp(PENDIENTE));
+
+    expect(r.outcome).toBe("skipped-pending-no-pisa");
+    expect(escrituras).toHaveLength(0);
+    const sub = store.users.t1.subscription as Record<string, unknown>;
+    expect(sub.tier).toBe("plan2");
+    expect(sub.status).toBe("active");
+  });
+
+  it("tambien protege a plan3, que no tiene tope y valia 0 al comparar", async () => {
+    // `effectiveWeightLimit` devuelve `null` para plan3 = SIN TOPE. Comparado
+    // con `>` a secas, `null` se trata como 0 y la guarda no protegia justo al
+    // PF que mas paga. Es el mismo pozo que documenta `limitRank`.
+    const mundo = UPGRADE();
+    mundo.users.t1.subscription = {
+      tier: "plan3", status: "active", currentPeriodEnd: null,
+    };
+    const { app, store } = fakeApp(mundo);
+
+    const r = await reconcileSubscription(app, "p2", fakeMp(PENDIENTE));
+
+    expect(r.outcome).toBe("skipped-pending-no-pisa");
+    expect((store.users.t1.subscription as Record<string, unknown>).tier)
+      .toBe("plan3");
+  });
+
+  it("un `grace` tambien esta protegido: el cobro se esta reintentando", async () => {
+    const mundo = UPGRADE();
+    mundo.users.t1.subscription = {
+      tier: "plan2", status: "grace", currentPeriodEnd: null,
+    };
+    const { app } = fakeApp(mundo);
+
+    const r = await reconcileSubscription(app, "p2", fakeMp(PENDIENTE));
+
+    expect(r.outcome).toBe("skipped-pending-no-pisa");
+  });
+
+  it("un `cancelled` DENTRO del periodo pago tambien esta protegido", async () => {
+    // Se dio de baja pero le queda mes comprado: `effective-limit` le sigue
+    // dando el tier pago hasta `currentPeriodEnd`. Un `pending` de un checkout
+    // nuevo no puede quitarselo antes de tiempo.
+    const mundo = UPGRADE();
+    mundo.users.t1.subscription = {
+      tier: "plan2", status: "cancelled", currentPeriodEnd: ts(AHORA + 86_400_000),
+    };
+    const { app } = fakeApp(mundo);
+
+    const r = await reconcileSubscription(app, "p2", fakeMp(PENDIENTE));
+
+    expect(r.outcome).toBe("skipped-pending-no-pisa");
+  });
+
+  it("sobre un PF sin suscripcion SI escribe: ahi `pending` es informacion", async () => {
+    // Su limite ya era Free, asi que no le saca nada — y deja registrado que
+    // hay un alta en curso. La guarda frena la REGRESION, no el `pending`.
+    const { app, store } = fakeApp(MUNDO());
+
+    const r = await reconcileSubscription(app, "p1", fakeMp({
+      ...AUTORIZADA,
+      status: "pending",
+    }));
+
+    expect(r.outcome).toBe("written");
+    expect((store.users.t1.subscription as Record<string, unknown>).status)
+      .toBe("pending");
+  });
+
+  it("un `cancelled` VENCIDO no esta protegido: su limite ya era Free", async () => {
+    const mundo = UPGRADE();
+    mundo.users.t1.subscription = {
+      tier: "plan2", status: "cancelled", currentPeriodEnd: ts(AHORA - 1),
+    };
+    const { app } = fakeApp(mundo);
+
+    const r = await reconcileSubscription(app, "p2", fakeMp(PENDIENTE));
+
+    expect(r.outcome).toBe("written");
+  });
+
+  for (const status of ["paused", "cancelled"] as const) {
+    it(`\`${status}\` SI puede bajar el limite: MP dijo algo terminal`, async () => {
+      // La guarda es solo para `pending`. Un estado terminal habla de la
+      // suscripcion que el PF TENIA, no de una que esta naciendo — si no
+      // pudiera bajar el limite, nadie perderia nunca el plan.
+      const { app, store } = fakeApp(UPGRADE());
+
+      const r = await reconcileSubscription(app, "p1", fakeMp({
+        ...AUTORIZADA,
+        status,
+        auto_recurring: { transaction_amount: 22000 },
+      }));
+
+      expect(r.outcome).toBe("written");
+      expect((store.users.t1.subscription as Record<string, unknown>).status)
+        .toBe(status);
+    });
+  }
+
+  it("el BARRIDO completo deja el plan vigente, sin importar el orden", async () => {
+    // El bug entero en una corrida: los dos planes del mismo uid se recorren en
+    // el orden en que Firestore los devuelva, y antes ganaba el ultimo. El PF
+    // terminaba en el tier que decidiera el id opaco que MP le dio al plan.
+    const { app, store } = fakeApp(UPGRADE());
+
+    const r = await reconcileAllSubscriptions(app, {
+      nowMs: AHORA,
+      mpClient: {
+        getPreapproval: async () => ({}),
+        createPreapprovalPlan: async () => ({}),
+        searchPreapprovalsByPlan: async (planId: string) => [
+          planId === "p1"
+            ? { ...AUTORIZADA, auto_recurring: { transaction_amount: 22000 } }
+            : PENDIENTE,
+        ],
+      },
+    });
+
+    expect(r.total).toBe(2);
+    const sub = store.users.t1.subscription as Record<string, unknown>;
+    expect(sub.tier).toBe("plan2");
+    expect(sub.status).toBe("active");
+  });
+});
+
+// ---------------------------------------------------------------------------
 
 describe("reconcileAllSubscriptions — el barrido", () => {
   it("saltea los terminales: una baja no se le vuelve a preguntar a MP", async () => {
