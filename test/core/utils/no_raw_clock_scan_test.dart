@@ -318,7 +318,22 @@ void main() {
     /// passthrough de `DateTime.now()`"*, con un sándwich temporal. Medido:
     /// cambiándole el cuerpo a `AppClock.now()`, ese test se pone rojo con un
     /// delta de 233.940 horas.
+    ///
+    /// PERO EL ARCHIVO NO VA EXENTO ENTERO, y ésta es la parte que importa.
+    /// Saltearlo completo dejaba un agujero real: un método NUEVO acá que
+    /// llamara al reloj sin pasar por `_frozen` —`static DateTime nowUtc() =>
+    /// DateTime.now().toUtc()`, digamos— sería infreezable, y no lo cazaba
+    /// nadie. Este guard no, porque el archivo estaba exento; y
+    /// `app_clock_test.dart` tampoco, porque prueba `now()` y los helpers de
+    /// hoy, no un método que todavía no existe. El seam se escanea como
+    /// cualquier otro archivo y se permite **exactamente una** lectura: el
+    /// passthrough. Lo levantó Codex en la review del PR de este guard.
     const seam = 'core/utils/app_clock.dart';
+
+    /// Marca del passthrough legítimo dentro del seam: `_frozen ?? …`. Es lo
+    /// que distingue "leer el reloj respetando el congelamiento" de "leer el
+    /// reloj a secas", que es justo lo que este guard existe para impedir.
+    const marcaDelPassthrough = '_frozen ??';
 
     /// Líneas de CÓDIGO con reloj crudo, por archivo.
     ///
@@ -332,6 +347,19 @@ void main() {
     /// perder un hit real en cualquier línea que además tenga una URL
     /// (`'https://…'`), y este guard prefiere gritar de más a callarse de
     /// menos. Si te toca, movelo a su propia línea.
+    /// Una línea que ARRANCA con comilla es la continuación de un string
+    /// multilínea, no una lectura de reloj. Es el caso de `app_clock.dart:74`,
+    /// que cita `DateTime.now()` dentro del mensaje de un assert.
+    ///
+    /// Se mira el arranque y no "¿el hit está dentro de comillas?" a propósito:
+    /// lo segundo pide un parser, y equivocarlo silenciaría hits reales. Así,
+    /// un `foo('… DateTime.now() …')` en UNA sola línea se cuenta igual —
+    /// ruidoso, pero del lado seguro. Si te toca, partí el string.
+    bool esContinuacionDeString(String linea) {
+      final s = linea.trimLeft();
+      return s.startsWith("'") || s.startsWith('"');
+    }
+
     List<String> hitsDeCodigo(String contenido) {
       final hits = <String>[];
       var enBloque = false;
@@ -348,6 +376,7 @@ void main() {
           continue;
         }
         if (s.startsWith('//')) continue;
+        if (esContinuacionDeString(linea)) continue;
         if (rawClockPattern.hasMatch(linea)) hits.add('$nro: ${linea.trim()}');
       }
       return hits;
@@ -355,9 +384,13 @@ void main() {
 
     late Map<String, List<String>> offenders;
 
+    /// Líneas del seam que leen el reloj de verdad (ni comentario ni string).
+    late List<String> lecturasDelSeam;
+
     setUpAll(() {
       final libDir = Directory('lib');
       offenders = {};
+      lecturasDelSeam = const [];
       if (!libDir.existsSync()) return;
 
       for (final entity in libDir.listSync(recursive: true)) {
@@ -371,9 +404,18 @@ void main() {
 
         if (!relativePath.startsWith(scannedRoot)) continue;
 
-        if (relativePath == seam) continue;
-
         final hits = hitsDeCodigo(entity.readAsStringSync());
+
+        if (relativePath == seam) {
+          // El seam NO va exento entero: se le permite exactamente el
+          // passthrough, y cualquier otra lectura cae en `offenders`.
+          lecturasDelSeam = hits;
+          final ilegitimas =
+              hits.where((h) => !h.contains(marcaDelPassthrough)).toList();
+          if (ilegitimas.isNotEmpty) offenders[relativePath] = ilegitimas;
+          continue;
+        }
+
         if (hits.isNotEmpty) offenders[relativePath] = hits;
       }
     });
@@ -396,6 +438,24 @@ void main() {
             '08/09/2026. Si de verdad necesitás el reloj real (medir un '
             '`difference`, un timeout), pasá por AppClock igual — en '
             'producción es el mismo valor.',
+      );
+    });
+
+    test('el seam tiene UNA sola lectura de reloj: el passthrough', () {
+      expect(
+        lecturasDelSeam,
+        hasLength(1),
+        reason: 'El seam (`$seam`) debe leer el reloj real en exactamente UN '
+            'lugar — `now() => _frozen ?? DateTime.now()`. Encontradas '
+            '${lecturasDelSeam.length}:\n'
+            '${lecturasDelSeam.map((h) => '      $h').join('\n')}\n\n'
+            'Si son MÁS: un helper nuevo acá que no pase por `_frozen` es '
+            'infreezable, y no lo caza nadie más — `app_clock_test.dart` '
+            'prueba `now()` y los helpers de hoy, no uno que acabás de '
+            'agregar. Hacelo derivar de `AppClock.now()`.\n'
+            'Si son MENOS: o se movió el seam —actualizá `seam`— o alguien '
+            'lo rompió y `AppClock.now()` dejó de leer la hora real. Eso '
+            'último lo confirma `app_clock_test.dart`.',
       );
     });
 
