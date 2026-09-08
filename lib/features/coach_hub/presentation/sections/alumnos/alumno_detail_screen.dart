@@ -84,15 +84,152 @@ import 'resumen_metrics.dart';
 import 'package:treino/core/widgets/treino_segmented_pill.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
 
+/// Estado de un grupo de la ficha, para su marca en la barra.
+///
+/// Tiene un cuarto valor —[desconocido]— y ése es el punto de todo el enum.
+/// Con un `bool` "hay contenido", el `false` significa a la vez «está vacío» y
+/// «todavía no cargó», y la marca queda igual en los dos casos. Visualmente
+/// pasa (no hay punto, y no hay punto es ambiguo), pero el anuncio del lector
+/// de pantalla NO: decir «Progreso, sin contenido» sobre un stream que sigue
+/// cargando es afirmar algo falso justo en la pregunta que estas marcas
+/// existen para contestar. `AGENTS.md` §11.1: una advertencia falsa es peor
+/// que ninguna. Con [desconocido] no se afirma nada — se anuncia el nombre del
+/// grupo pelado.
+enum AlumnoGrupoEstado {
+  /// Alguna de las fuentes del grupo está cargando o falló. Sin marca y sin
+  /// afirmación.
+  desconocido,
+
+  /// Se sabe, y adentro no hay nada. Sin marca, pero el anuncio SÍ lo dice.
+  vacio,
+
+  /// Hay contenido. Punto neutro.
+  conContenido,
+
+  /// Hay algo esperando una acción del PF. Punto de acento.
+  requiereAtencion,
+}
+
+/// Qué mostrar en la barra por cada grupo de la ficha.
+@immutable
+class AlumnoDetailIndicators {
+  const AlumnoDetailIndicators({
+    this.entrenamiento = AlumnoGrupoEstado.desconocido,
+    this.progreso = AlumnoGrupoEstado.desconocido,
+    this.plan = AlumnoGrupoEstado.desconocido,
+    this.chat = AlumnoGrupoEstado.desconocido,
+    this.privado = AlumnoGrupoEstado.desconocido,
+    this.pagos = AlumnoGrupoEstado.desconocido,
+  });
+
+  final AlumnoGrupoEstado entrenamiento;
+  final AlumnoGrupoEstado progreso;
+  final AlumnoGrupoEstado plan;
+  final AlumnoGrupoEstado chat;
+  final AlumnoGrupoEstado privado;
+  final AlumnoGrupoEstado pagos;
+
+  @override
+  bool operator ==(Object other) =>
+      other is AlumnoDetailIndicators &&
+      other.entrenamiento == entrenamiento &&
+      other.progreso == progreso &&
+      other.plan == plan &&
+      other.chat == chat &&
+      other.privado == privado &&
+      other.pagos == pagos;
+
+  @override
+  int get hashCode =>
+      Object.hash(entrenamiento, progreso, plan, chat, privado, pagos);
+}
+
+/// Traduce dos fuentes async a un estado de grupo, sin inventar certeza.
+///
+/// [hayContenido] sólo se llama cuando las DOS tienen valor; si alguna está
+/// cargando o falló, el grupo queda [AlumnoGrupoEstado.desconocido].
+AlumnoGrupoEstado _estadoDeFuentes(
+  List<AsyncValue<Object?>> fuentes,
+  bool Function() hayContenido,
+) {
+  if (fuentes.any((f) => !f.hasValue)) return AlumnoGrupoEstado.desconocido;
+  return hayContenido()
+      ? AlumnoGrupoEstado.conContenido
+      : AlumnoGrupoEstado.vacio;
+}
+
+/// Único punto de composición para responder, por grupo, si hay algo adentro y
+/// si eso reclama acción.
+///
+/// **Está centralizado a propósito.** Contestar «¿cargó mediciones?» sin entrar
+/// obliga a suscribir streams que hoy no se abren, porque `TabBarView` sólo
+/// construye la pestaña montada. No hay forma de evitar ese costo —es el precio
+/// de la pregunta—, pero teniéndolo en un solo provider queda UN lugar donde
+/// medirlo y optimizarlo, y se puede testear sin levantar la pantalla.
+final alumnoDetailIndicatorsProvider =
+    Provider.autoDispose.family<AlumnoDetailIndicators, String>(
+  (ref, athleteId) {
+    final trainerId = ref.watch(currentUidProvider);
+    if (trainerId == null) return const AlumnoDetailIndicators();
+
+    final key = (trainerId: trainerId, athleteId: athleteId);
+    final sessions = ref.watch(sessionsByUidProvider(athleteId));
+    final routines = ref.watch(assignedRoutinesByTrainerProvider(key));
+    final measurements = ref.watch(measurementsForAthleteProvider(athleteId));
+    final performance =
+        ref.watch(performanceTestsForAthleteProvider(athleteId));
+    final nutrition = ref.watch(nutritionPlanProvider(key));
+    final files = ref.watch(athleteFilesProvider(key));
+    final note = ref.watch(athleteNoteProvider(key));
+    final followUp = ref.watch(followUpEntriesProvider(key));
+    final pagos = ref.watch(pagosPorCobrarProvider);
+
+    return AlumnoDetailIndicators(
+      entrenamiento: _estadoDeFuentes(
+        [sessions, routines],
+        () =>
+            sessions.requireValue.isNotEmpty ||
+            routines.requireValue
+                .any((routine) => routine.status == RoutineStatus.active),
+      ),
+      progreso: _estadoDeFuentes(
+        [measurements, performance],
+        () =>
+            measurements.requireValue.isNotEmpty ||
+            performance.requireValue.isNotEmpty,
+      ),
+      plan: _estadoDeFuentes(
+        [nutrition, files],
+        () => nutrition.requireValue != null || files.requireValue.isNotEmpty,
+      ),
+      // `hasUnreadFromProvider` ya colapsa loading y error a false y deriva de
+      // un stream que el hub tiene abierto — sin listener nuevo. Su "no hay sin
+      // leer" no distingue desconocido de vacío, así que acá tampoco se afirma
+      // más de lo que se sabe.
+      chat: ref.watch(hasUnreadFromProvider(athleteId))
+          ? AlumnoGrupoEstado.requiereAtencion
+          : AlumnoGrupoEstado.desconocido,
+      privado: _estadoDeFuentes(
+        [note, followUp],
+        () =>
+            (note.requireValue?.note.trim().isNotEmpty ?? false) ||
+            followUp.requireValue.isNotEmpty,
+      ),
+      pagos: !pagos.hasValue
+          ? AlumnoGrupoEstado.desconocido
+          : pagos.requireValue.any((cobro) => cobro.athleteId == athleteId)
+              ? AlumnoGrupoEstado.requiereAtencion
+              : AlumnoGrupoEstado.vacio,
+    );
+  },
+);
+
 /// Detalle del alumno (`/alumnos/:id`, Fase W2 PR2).
 ///
-/// Header (identidad + estado + métricas denormalizadas) + tab bar de 10
-/// secciones. En PR2 sólo **Progreso › Antropometría** está implementado
-/// (reusa `measurementsForAthleteProvider` + `MeasurementProgressChart`); el
-/// resto de tabs son placeholder. Rendimiento (performance), Nutrición,
-/// Historial, Notas, Archivos, Seguimiento y los botones de acción del header
-/// llegan en PRs siguientes (varios necesitan backend nuevo / l10n en
-/// CoachHubApp). Renderiza DENTRO del shell — sin Scaffold (ADR-CHW-005).
+/// Header (identidad + estado + métricas denormalizadas) y siete grupos
+/// orientados a las tareas del PF. Entrenamiento, Progreso, Plan y Privado
+/// contienen un segundo nivel segmentado. Renderiza DENTRO del shell, sin
+/// Scaffold (ADR-CHW-005).
 class AlumnoDetailScreen extends ConsumerWidget {
   const AlumnoDetailScreen({super.key, required this.athleteId});
 
@@ -100,32 +237,73 @@ class AlumnoDetailScreen extends ConsumerWidget {
 
   static const _tabs = <String>[
     'Resumen', // i18n: Fase W2
-    'Entrenamientos',
-    'Nutrición',
+    'Entrenamiento',
     'Progreso',
-    'Pagos',
-    'Historial',
+    'Plan',
     'Chat',
-    'Notas privadas',
-    'Archivos',
-    'Seguimiento',
-    'Mediciones',
+    'Privado',
+    'Pagos',
   ];
   static const _resumenIndex = 0;
   static const _entrenamientoIndex = 1;
-  static const _nutricionIndex = 2;
-  static const _progresoIndex = 3;
-  static const _pagosIndex = 4;
-  static const _historialIndex = 5;
-  static const _chatIndex = 6;
-  static const _notasPrivadasIndex = 7;
-  static const _archivosIndex = 8;
-  static const _seguimientoIndex = 9;
-  static const _medicionesIndex = 10;
+  static const _progresoIndex = 2;
+  static const _planIndex = 3;
+  static const _chatIndex = 4;
+  static const _privadoIndex = 5;
+  static const _pagosIndex = 6;
+
+  /// El estado de cada grupo, en el orden EXACTO de [_tabs].
+  ///
+  /// Indexado por posición y no por el texto del label: un `switch` sobre el
+  /// string haría que renombrar una pestaña apagara su marca en silencio, sin
+  /// que ningún test lo notara —el test también usaría el nombre nuevo—. Acá
+  /// un desalineo es un desborde de índice, que sí se ve.
+  static List<AlumnoGrupoEstado> _estados(AlumnoDetailIndicators i) => [
+        AlumnoGrupoEstado.desconocido, // Resumen: derivado, nunca lleva marca.
+        i.entrenamiento,
+        i.progreso,
+        i.plan,
+        i.chat,
+        i.privado,
+        i.pagos,
+      ];
+
+  static List<TreinoSegmentMark> _marks(AlumnoDetailIndicators i) => [
+        for (final estado in _estados(i))
+          switch (estado) {
+            AlumnoGrupoEstado.conContenido => TreinoSegmentMark.content,
+            AlumnoGrupoEstado.requiereAtencion => TreinoSegmentMark.attention,
+            _ => TreinoSegmentMark.none,
+          },
+      ];
+
+  /// Lo que el punto dice, en palabras. El color solo no es información
+  /// accesible (WCAG 1.4.1).
+  ///
+  /// Con el estado en [AlumnoGrupoEstado.desconocido] se anuncia el nombre
+  /// pelado: mientras el stream carga NO se afirma que no haya nada.
+  static List<String> _semanticsLabels(AlumnoDetailIndicators i) {
+    final estados = _estados(i);
+    return [
+      for (var n = 0; n < _tabs.length; n++)
+        switch ((_tabs[n], estados[n])) {
+          (final label, AlumnoGrupoEstado.desconocido) => label,
+          ('Chat', AlumnoGrupoEstado.requiereAtencion) =>
+            'Chat, con mensajes sin leer', // i18n: Fase W2
+          ('Pagos', AlumnoGrupoEstado.requiereAtencion) =>
+            'Pagos, con cobro pendiente', // i18n: Fase W2
+          ('Pagos', _) => 'Pagos, sin cobros pendientes', // i18n: Fase W2
+          (final label, AlumnoGrupoEstado.conContenido) =>
+            '$label, con contenido', // i18n: Fase W2
+          (final label, _) => '$label, sin contenido', // i18n: Fase W2
+        },
+    ];
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final indicators = ref.watch(alumnoDetailIndicatorsProvider(athleteId));
     final profile = ref.watch(userPublicProfileProvider(athleteId)).valueOrNull;
     // Mismo criterio que el roster: el link más reciente NO-pending del alumno
     // (el stream viene requestedAt DESC). Sin el filtro de pending, un alumno
@@ -171,7 +349,11 @@ class AlumnoDetailScreen extends ConsumerWidget {
                   palette: palette,
                 ),
                 const SizedBox(height: 14),
-                const TreinoSegmentedPill(labels: _tabs, scrollable: true),
+                TreinoSegmentedPill(
+                  labels: _tabs,
+                  marks: _marks(indicators),
+                  semanticsLabels: _semanticsLabels(indicators),
+                ),
               ],
             ),
           ),
@@ -185,24 +367,16 @@ class AlumnoDetailScreen extends ConsumerWidget {
                     _ResumenTab(athleteId: athleteId)
                   else if (i == _entrenamientoIndex)
                     _EntrenamientoTab(athleteId: athleteId)
-                  else if (i == _nutricionIndex)
-                    _NutricionTab(athleteId: athleteId)
                   else if (i == _progresoIndex)
                     _ProgresoTab(athleteId: athleteId)
-                  else if (i == _pagosIndex)
-                    _PagosTab(athleteId: athleteId)
-                  else if (i == _historialIndex)
-                    _HistorialTab(athleteId: athleteId)
+                  else if (i == _planIndex)
+                    _PlanTab(athleteId: athleteId)
                   else if (i == _chatIndex)
                     _ChatTab(athleteId: athleteId)
-                  else if (i == _notasPrivadasIndex)
-                    _NotasPrivadasTab(athleteId: athleteId)
-                  else if (i == _archivosIndex)
-                    _ArchivosTab(athleteId: athleteId)
-                  else if (i == _seguimientoIndex)
-                    _SeguimientoTab(athleteId: athleteId)
-                  else if (i == _medicionesIndex)
-                    _MedicionesTab(athleteId: athleteId)
+                  else if (i == _privadoIndex)
+                    _PrivadoTab(athleteId: athleteId)
+                  else if (i == _pagosIndex)
+                    _PagosTab(athleteId: athleteId)
                   else
                     const SizedBox.shrink(),
               ],
@@ -507,99 +681,474 @@ class _ChatTab extends ConsumerWidget {
   }
 }
 
-class _ProgresoTab extends ConsumerWidget {
+class _PlanTab extends StatelessWidget {
+  const _PlanTab({required this.athleteId});
+
+  final String athleteId;
+
+  @override
+  Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: 2,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 24),
+            child: TreinoSegmentedPill(
+              labels: ['Nutrición', 'Archivos'], // i18n: Fase W2
+            ),
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: TabBarView(
+              physics: const NeverScrollableScrollPhysics(),
+              children: [
+                _NutricionTab(athleteId: athleteId),
+                _ArchivosTab(athleteId: athleteId),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PrivadoTab extends StatelessWidget {
+  const _PrivadoTab({required this.athleteId});
+
+  final String athleteId;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return DefaultTabController(
+      length: 2,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Row(
+              children: [
+                Icon(TreinoIcon.lock, size: 16, color: palette.textMuted),
+                const SizedBox(width: 8),
+                Text(
+                  'Nada de esto lo ve el alumno.', // i18n: Fase W2
+                  style: TextStyle(color: palette.textMuted, fontSize: 13),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 24),
+            child: TreinoSegmentedPill(
+              labels: ['Notas', 'Seguimiento'], // i18n: Fase W2
+            ),
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: TabBarView(
+              physics: const NeverScrollableScrollPhysics(),
+              children: [
+                _NotasPrivadasTab(athleteId: athleteId),
+                _SeguimientoTab(athleteId: athleteId),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProgresoTab extends ConsumerStatefulWidget {
   const _ProgresoTab({required this.athleteId});
   final String athleteId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final palette = AppPalette.of(context);
-    final measAsync = ref.watch(measurementsForAthleteProvider(athleteId));
-    final perfAsync = ref.watch(performanceTestsForAthleteProvider(athleteId));
+  ConsumerState<_ProgresoTab> createState() => _ProgresoTabState();
+}
 
+class _ProgresoTabState extends ConsumerState<_ProgresoTab> {
+  Future<void> _openAntropoDialog({Measurement? initial}) async {
+    final trainerUid = ref.read(currentUidProvider);
+    if (trainerUid == null) return;
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _NuevaMedicionDialog(
+        athleteId: widget.athleteId,
+        trainerUid: trainerUid,
+        initial: initial,
+      ),
+    );
+  }
+
+  Future<void> _openRendimientoDialog({PerformanceTest? initial}) async {
+    final trainerUid = ref.read(currentUidProvider);
+    if (trainerUid == null) return;
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _NuevoRendimientoDialog(
+        athleteId: widget.athleteId,
+        trainerUid: trainerUid,
+        initial: initial,
+      ),
+    );
+  }
+
+  Future<void> _confirmDeleteMedicion(Measurement m) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('¿Eliminar medición?'), // i18n: Fase W2
+        content: Text(
+          'La medición del ${fmtDate(m.recordedAt)} se va a borrar. '
+          'No se puede deshacer.', // i18n: Fase W2
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'), // i18n: Fase W2
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Confirmar'), // i18n: Fase W2
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ref.read(measurementRepositoryProvider).delete(m.id);
+    } catch (_) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('No pudimos eliminar la medición.'), // i18n: Fase W2
+        ),
+      );
+    }
+  }
+
+  Future<void> _confirmDeleteRendimiento(PerformanceTest t) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('¿Eliminar prueba?'), // i18n: Fase W2
+        content: Text(
+          'La prueba del ${fmtDate(t.recordedAt)} se va a borrar. '
+          'No se puede deshacer.', // i18n: Fase W2
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'), // i18n: Fase W2
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Confirmar'), // i18n: Fase W2
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ref.read(performanceTestRepositoryProvider).delete(t.id);
+    } catch (_) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('No pudimos eliminar la prueba.'), // i18n: Fase W2
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final measAsync =
+        ref.watch(measurementsForAthleteProvider(widget.athleteId));
+    final perfAsync =
+        ref.watch(performanceTestsForAthleteProvider(widget.athleteId));
+
+    return DefaultTabController(
+      length: 2,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 24),
+            child: TreinoSegmentedPill(
+              labels: ['Antropometría', 'Rendimiento'], // i18n: Fase W2
+            ),
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: TabBarView(
+              physics: const NeverScrollableScrollPhysics(),
+              children: [
+                _buildAntropometria(palette, measAsync, perfAsync),
+                _buildRendimiento(palette, measAsync, perfAsync),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAntropometria(
+    AppPalette palette,
+    AsyncValue<List<Measurement>> measAsync,
+    AsyncValue<List<PerformanceTest>> perfAsync,
+  ) {
+    // CustomScrollView y no SingleChildScrollView + Column: la lista de abajo
+    // puede tener cientos de filas (un alumno con dos años de tomas), y cada
+    // fila es un StatefulWidget con detalle expandible. Adentro de un
+    // SingleChildScrollView la lista queda obligada a `shrinkWrap: true` con el
+    // scroll propio apagado, que construye TODAS las filas al abrir la
+    // sub-vista. Antes de unir Progreso con Mediciones esto no pasaba: la lista
+    // colgaba de un `Expanded` y tenía su propio viewport perezoso.
+    //
+    // Con slivers hay un solo viewport, el header y el chart scrollean junto a
+    // la lista, y `SliverList` vuelve a construir sólo lo que se ve
+    // (AGENTS.md §6: «ListView.builder para listas largas»).
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
+          sliver: SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _ProgressHeader(
+                  title: 'Mediciones antropométricas', // i18n: Fase W2
+                  subtitle: 'Peso, composición corporal y circunferencias.', // i18n: Fase W2
+                  actionLabel: 'NUEVA MEDICIÓN', // i18n: Fase W2
+                  onPressed: _openAntropoDialog,
+                  palette: palette,
+                ),
+                const SizedBox(height: 20),
+                _ProgressReading(
+                  measurements: measAsync,
+                  performanceTests: perfAsync,
+                  palette: palette,
+                  view: _ProgressView.antropometria,
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+          sliver: _AntropoList(
+            measurements: measAsync,
+            palette: palette,
+            onDelete: _confirmDeleteMedicion,
+            onEdit: (m) => _openAntropoDialog(initial: m),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRendimiento(
+    AppPalette palette,
+    AsyncValue<List<Measurement>> measAsync,
+    AsyncValue<List<PerformanceTest>> perfAsync,
+  ) {
+    // CustomScrollView y no SingleChildScrollView + Column: la lista de abajo
+    // puede tener cientos de filas (un alumno con dos años de tomas), y cada
+    // fila es un StatefulWidget con detalle expandible. Adentro de un
+    // SingleChildScrollView la lista queda obligada a `shrinkWrap: true` con el
+    // scroll propio apagado, que construye TODAS las filas al abrir la
+    // sub-vista. Antes de unir Progreso con Mediciones esto no pasaba: la lista
+    // colgaba de un `Expanded` y tenía su propio viewport perezoso.
+    //
+    // Con slivers hay un solo viewport, el header y el chart scrollean junto a
+    // la lista, y `SliverList` vuelve a construir sólo lo que se ve
+    // (AGENTS.md §6: «ListView.builder para listas largas»).
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
+          sliver: SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _ProgressHeader(
+                  title: 'Pruebas de rendimiento', // i18n: Fase W2
+                  subtitle: 'Saltos, sprints, 1RM y resistencia.', // i18n: Fase W2
+                  actionLabel: 'NUEVA PRUEBA', // i18n: Fase W2
+                  onPressed: _openRendimientoDialog,
+                  palette: palette,
+                ),
+                const SizedBox(height: 20),
+                _ProgressReading(
+                  measurements: measAsync,
+                  performanceTests: perfAsync,
+                  palette: palette,
+                  view: _ProgressView.rendimiento,
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+          sliver: _RendimientoList(
+            performanceTests: perfAsync,
+            palette: palette,
+            onDelete: _confirmDeleteRendimiento,
+            onEdit: (t) => _openRendimientoDialog(initial: t),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+enum _ProgressView { antropometria, rendimiento }
+
+class _ProgressHeader extends StatelessWidget {
+  const _ProgressHeader({
+    required this.title,
+    required this.subtitle,
+    required this.actionLabel,
+    required this.onPressed,
+    required this.palette,
+  });
+
+  final String title;
+  final String subtitle;
+  final String actionLabel;
+  final VoidCallback onPressed;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  color: palette.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.hairline),
+              Text(
+                subtitle,
+                style: TextStyle(color: palette.textMuted, fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+        ElevatedButton.icon(
+          onPressed: onPressed,
+          icon: const Icon(TreinoIcon.plus, size: 16),
+          label: Text(actionLabel),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: palette.accent,
+            foregroundColor: TreinoButtonTokens.foreground(context),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            shape: const StadiumBorder(),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProgressReading extends StatelessWidget {
+  const _ProgressReading({
+    required this.measurements,
+    required this.performanceTests,
+    required this.palette,
+    required this.view,
+  });
+
+  final AsyncValue<List<Measurement>> measurements;
+  final AsyncValue<List<PerformanceTest>> performanceTests;
+  final AppPalette palette;
+  final _ProgressView view;
+
+  @override
+  Widget build(BuildContext context) {
     // Antropometría y Rendimiento son fuentes independientes: gateamos juntas
-    // (spinner hasta que ambas tengan valor, error si alguna falla) y mostramos
-    // cada sección por separado según haya datos.
-    if (measAsync.isLoading || perfAsync.isLoading) {
+    // (spinner hasta que ambas tengan valor, error si alguna falla). Así nunca
+    // afirmamos que falta progreso cuando una de las fuentes es desconocida.
+    if (measurements.isLoading || performanceTests.isLoading) {
       return const TreinoStateSwitcher(
-        childKey: ValueKey('loading'),
+        childKey: ValueKey('reading-loading'),
         child: CoachHubSkeleton(filas: 3),
       );
     }
-    if (measAsync.hasError || perfAsync.hasError) {
+    if (measurements.hasError || performanceTests.hasError) {
       return TreinoStateSwitcher(
-        childKey: const ValueKey('error'),
+        childKey: const ValueKey('reading-error'),
         child:
             _muted(palette, 'No se pudo cargar el progreso.'), // i18n: Fase W2
       );
     }
 
-    final ms = measAsync.requireValue;
-    final tests = perfAsync.requireValue;
+    final ms = measurements.requireValue;
+    final tests = performanceTests.requireValue;
     if (ms.isEmpty && tests.isEmpty) {
-      return TreinoStateSwitcher(
-        childKey: const ValueKey('empty'),
-        child:
-            _muted(palette, 'Sin datos de progreso todavía.'), // i18n: Fase W2
-      );
+      return const SizedBox.shrink();
     }
 
-    final latest = ms.isEmpty ? null : ms.last;
+    if (view == _ProgressView.rendimiento) {
+      return tests.length >= 2
+          ? PerformanceProgressChart(tests: tests)
+          : const SizedBox.shrink();
+    }
 
-    return TreinoStateSwitcher(
-      childKey: const ValueKey('data'),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+    if (ms.isEmpty) return const SizedBox.shrink();
+    final latest = ms.last;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
           children: [
-            if (latest != null) ...[
-              _sectionLabel(palette, 'ANTROPOMETRÍA'), // i18n: Fase W2
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  _MeasCard(
-                      label: 'Peso',
-                      value: latest.weightKg,
-                      unit: 'kg',
-                      palette: palette), // i18n: Fase W2
-                  const SizedBox(width: 10),
-                  _MeasCard(
-                      label: '% Graso',
-                      value: latest.fatPercentage,
-                      unit: '%',
-                      palette: palette), // i18n: Fase W2
-                  const SizedBox(width: 10),
-                  _MeasCard(
-                      label: 'Cintura',
-                      value: latest.waistCm,
-                      unit: 'cm',
-                      palette: palette), // i18n: Fase W2
-                ],
-              ),
-              if (ms.length >= 2) ...[
-                const SizedBox(height: 16),
-                // El chart trae su propia card + heading; no lo re-envolvemos.
-                MeasurementProgressChart(measurements: ms),
-              ],
-            ],
-            // ── Rendimiento (W2 PR8) ──────────────────────────────────────────
-            // Ambos casos lideran con la misma sección «RENDIMIENTO» (consistencia
-            // con el módulo coach legacy). Con ≥2 tests el chart agrega ABAJO su
-            // propia card interna (heading l10n «PROGRESO»).
-            if (tests.isNotEmpty) ...[
-              if (latest != null) const SizedBox(height: 20),
-              _sectionLabel(palette, 'RENDIMIENTO'), // i18n: Fase W2
-              const SizedBox(height: 10),
-              if (tests.length >= 2)
-                PerformanceProgressChart(tests: tests)
-              else
-                _muted(palette,
-                    'Cargá al menos 2 tests para ver la evolución.'), // i18n: Fase W2
-            ],
+            _MeasCard(
+              label: 'Peso',
+              value: latest.weightKg,
+              unit: 'kg',
+              palette: palette,
+            ), // i18n: Fase W2
+            const SizedBox(width: 12),
+            _MeasCard(
+              label: '% Graso',
+              value: latest.fatPercentage,
+              unit: '%',
+              palette: palette,
+            ), // i18n: Fase W2
+            const SizedBox(width: 12),
+            _MeasCard(
+              label: 'Cintura',
+              value: latest.waistCm,
+              unit: 'cm',
+              palette: palette,
+            ), // i18n: Fase W2
           ],
         ),
-      ),
+        if (ms.length >= 2) ...[
+          const SizedBox(height: 20),
+          MeasurementProgressChart(measurements: ms),
+        ],
+      ],
     );
   }
 }
@@ -1719,12 +2268,43 @@ class _PagosTab extends ConsumerWidget {
   }
 }
 
-/// Tab Entrenamiento (W2 PR3): rutina activa + historial de sesiones + evolución
-/// por ejercicio. Reusa `assignedRoutinesByTrainerProvider`,
-/// `sessionsByUidProvider`,
-/// `athleteExerciseListProvider` y `exerciseProgressionProvider`.
-class _EntrenamientoTab extends ConsumerWidget {
+/// Grupo Entrenamiento: separa lo que el PF arma (Rutina) de lo que el alumno
+/// hizo (Sesiones y sus análisis).
+class _EntrenamientoTab extends StatelessWidget {
   const _EntrenamientoTab({required this.athleteId});
+  final String athleteId;
+
+  @override
+  Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: 2,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 24),
+            child: TreinoSegmentedPill(
+              labels: ['Rutina', 'Sesiones'], // i18n: Fase W2
+            ),
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: TabBarView(
+              physics: const NeverScrollableScrollPhysics(),
+              children: [
+                _RutinaTab(athleteId: athleteId),
+                _HistorialTab(athleteId: athleteId),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RutinaTab extends ConsumerWidget {
+  const _RutinaTab({required this.athleteId});
   final String athleteId;
 
   @override
@@ -1734,10 +2314,9 @@ class _EntrenamientoTab extends ConsumerWidget {
     final routinesAsync = ref.watch(assignedRoutinesByTrainerProvider(
       (trainerId: trainerUid ?? '', athleteId: athleteId),
     ));
-    final sessionsAsync = ref.watch(sessionsByUidProvider(athleteId));
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1786,41 +2365,6 @@ class _EntrenamientoTab extends ConsumerWidget {
               },
             ),
           ),
-          const SizedBox(height: 20),
-          _sectionLabel(palette, 'HISTORIAL DE SESIONES'), // i18n: Fase W2
-          const SizedBox(height: 10),
-          TreinoStateSwitcher(
-            childKey: ValueKey(sessionsAsync.when(
-              loading: () => 'loading',
-              error: (_, __) => 'error',
-              data: (_) => 'data',
-            )),
-            child: sessionsAsync.when(
-              loading: () => _muted(palette, 'Cargando…'), // i18n: Fase W2
-              error: (e, _) => _muted(
-                  palette,
-                  e is FirebaseException && e.code == 'permission-denied'
-                      ? 'El alumno no compartió su historial.' // i18n: Fase W2
-                      : 'No se pudo cargar el historial.'), // i18n: Fase W2
-              data: (sessions) {
-                // isCompletedSession excluye sesiones abandonadas (status=finished
-                // pero wasFullyCompleted=false) para no divergir del historial del
-                // propio alumno ni de los contadores públicos. // i18n: Fase W2
-                final finished =
-                    sessions.where(isCompletedSession).take(20).toList();
-                if (finished.isEmpty) {
-                  return _muted(palette,
-                      'Sin sesiones registradas todavía.'); // i18n: Fase W2
-                }
-                return _HistorialTable(
-                    sessions: finished, palette: palette, athleteId: athleteId);
-              },
-            ),
-          ),
-          const SizedBox(height: 24),
-          _DailyHeatmapTabSection(athleteId: athleteId),
-          const SizedBox(height: 24),
-          _ProgressionTabSection(athleteId: athleteId, palette: palette),
         ],
       ),
     );
@@ -2108,6 +2652,7 @@ class _RutinaCard extends StatelessWidget {
 
 class _HistorialTable extends StatelessWidget {
   const _HistorialTable({
+    super.key,
     required this.sessions,
     required this.palette,
     required this.athleteId,
@@ -2118,9 +2663,7 @@ class _HistorialTable extends StatelessWidget {
   final String athleteId;
 
   /// If true, the row prefixes the session name with a small status pill
-  /// (Completada / Incompleta / En curso). Used by the Historial tab where
-  /// non-completed sessions are shown; the Entrenamientos tab filters to
-  /// completed and doesn't need it.
+  /// (Completada / Incompleta / En curso).
   final bool showStatusBadge;
 
   @override
@@ -2665,20 +3208,14 @@ class _NotasPrivadasTabState extends ConsumerState<_NotasPrivadasTab> {
 
 // ── _HistorialTab ─────────────────────────────────────────────────────────────
 
-/// Coach Hub web — Tab «Historial» del alumno detail.
+/// Coach Hub web — sub-vista «Sesiones» del alumno detail.
 ///
 /// Timeline cronológico de TODAS las sesiones del alumno (finished OK,
 /// finished incompleta/abandonada, y active). Ordenadas más nuevas arriba,
 /// vienen así del `sessionsByUidProvider`.
 ///
-/// Diferencia con el tab «Entrenamientos»:
-/// - Entrenamientos: últimas 20 sesiones COMPLETAS (isCompletedSession) +
-///   evolución por ejercicio.
-/// - Historial: TODAS las sesiones (sin límite, sin filtro) con badge de
-///   status para que el PF distinga completadas, incompletas y activas.
-///
-/// Reusa el mismo `_HistorialTable` + `_ExpandableSessionRow` que
-/// Entrenamientos, activando el flag `showStatusBadge`.
+/// Muestra TODAS las sesiones (sin límite, sin filtro) con badge de estado,
+/// más los análisis del heatmap diario y la progresión por ejercicio.
 class _HistorialTab extends ConsumerWidget {
   const _HistorialTab({required this.athleteId});
 
@@ -2688,68 +3225,66 @@ class _HistorialTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final sessionsAsync = ref.watch(sessionsByUidProvider(athleteId));
-    return TreinoStateSwitcher(
-      childKey: ValueKey(sessionsAsync.when(
-        loading: () => 'loading',
-        error: (_, __) => 'error',
-        data: (_) => 'data',
-      )),
-      child: sessionsAsync.when(
-        loading: () => const CoachHubSkeleton(filas: 3),
-        // Un link pausado borra session_shares → permission-denied. No es un
-        // fallo de carga: el alumno dejó de compartir. Lo decimos claro, igual
-        // que Entrenamientos y el card de última sesión del Resumen.
-        error: (e, _) => Center(
-          child: Text(
-            e is FirebaseException && e.code == 'permission-denied'
-                ? 'El alumno no compartió su historial.' // i18n: Fase W2
-                : 'No pudimos cargar el historial.', // i18n: Fase W2
-            style: TextStyle(color: palette.textMuted, fontSize: 14),
-          ),
-        ),
-        data: (sessions) {
-          if (sessions.isEmpty) {
-            return Center(
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-                child: Text(
-                  'Este alumno todavía no registró sesiones.', // i18n: Fase W2
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: palette.textMuted, fontSize: 14),
-                ),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TreinoStateSwitcher(
+            childKey: ValueKey(sessionsAsync.when(
+              loading: () => 'sessions-loading',
+              error: (_, __) => 'sessions-error',
+              data: (_) => 'sessions-data',
+            )),
+            child: sessionsAsync.when(
+              loading: () => const CoachHubSkeleton(filas: 3),
+              error: (e, _) => _muted(
+                palette,
+                e is FirebaseException && e.code == 'permission-denied'
+                    ? 'El alumno no compartió su historial.' // i18n: Fase W2
+                    : 'No pudimos cargar el historial.', // i18n: Fase W2
               ),
-            );
-          }
-          return SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'Historial completo · ${sessions.length} sesiones', // i18n: Fase W2
-                  style: TextStyle(
-                    color: palette.textPrimary,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Todas las sesiones que registró — completas, incompletas y en curso.', // i18n: Fase W2
-                  style: TextStyle(color: palette.textMuted, fontSize: 13),
-                ),
-                const SizedBox(height: 16),
-                _HistorialTable(
-                  sessions: sessions,
-                  palette: palette,
-                  athleteId: athleteId,
-                  showStatusBadge: true,
-                ),
-              ],
+              data: (sessions) {
+                if (sessions.isEmpty) {
+                  return _muted(
+                    palette,
+                    'Este alumno todavía no registró sesiones.', // i18n: Fase W2
+                  );
+                }
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Historial completo · ${sessions.length} sesiones', // i18n: Fase W2
+                      style: TextStyle(
+                        color: palette.textPrimary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Todas las sesiones que registró — completas, incompletas y en curso.', // i18n: Fase W2
+                      style: TextStyle(color: palette.textMuted, fontSize: 13),
+                    ),
+                    const SizedBox(height: 20),
+                    _HistorialTable(
+                      key: const ValueKey('sesiones-table-completa'),
+                      sessions: sessions,
+                      palette: palette,
+                      athleteId: athleteId,
+                      showStatusBadge: true,
+                    ),
+                  ],
+                );
+              },
             ),
-          );
-        },
+          ),
+          const SizedBox(height: 20),
+          _DailyHeatmapTabSection(athleteId: athleteId),
+          const SizedBox(height: 20),
+          _ProgressionTabSection(athleteId: athleteId, palette: palette),
+        ],
       ),
     );
   }
@@ -3172,398 +3707,146 @@ class _ArchivoRow extends StatelessWidget {
   }
 }
 
-// ── _MedicionesTab ────────────────────────────────────────────────────────────
-
-/// Vistas del tab Mediciones. PR#2 (2026-07-03) sumó `rendimiento` como
-/// segunda subvista con el toggle en el header.
-enum _MedicionView { antropometricas, rendimiento }
-
-/// Coach Hub web — Tab «Mediciones» del alumno detail.
-///
-/// PR#1: CRUD antropométricas.
-/// PR#2 (2026-07-03): toggle Antropo/Rendimiento + subvista Rendimiento
-/// con el mismo pattern (ver + agregar + borrar). Reusa
-/// `performanceTestsForAthleteProvider` + `PerformanceTestRepository`.
-/// PR#3 sumará editar.
-///
-/// **Diferencia con tab Progreso**: Progreso muestra CHARTS (evolución).
-/// Mediciones muestra la DATA cruda con opción de gestionar entradas.
-class _MedicionesTab extends ConsumerStatefulWidget {
-  const _MedicionesTab({required this.athleteId});
-
-  final String athleteId;
-
-  @override
-  ConsumerState<_MedicionesTab> createState() => _MedicionesTabState();
-}
-
-class _MedicionesTabState extends ConsumerState<_MedicionesTab> {
-  _MedicionView _view = _MedicionView.antropometricas;
-
-  Future<void> _openAntropoDialog({Measurement? initial}) async {
-    final trainerUid = ref.read(currentUidProvider);
-    if (trainerUid == null) return;
-    await showDialog<void>(
-      context: context,
-      builder: (_) => _NuevaMedicionDialog(
-        athleteId: widget.athleteId,
-        trainerUid: trainerUid,
-        initial: initial,
-      ),
-    );
-  }
-
-  Future<void> _openRendimientoDialog({PerformanceTest? initial}) async {
-    final trainerUid = ref.read(currentUidProvider);
-    if (trainerUid == null) return;
-    await showDialog<void>(
-      context: context,
-      builder: (_) => _NuevoRendimientoDialog(
-        athleteId: widget.athleteId,
-        trainerUid: trainerUid,
-        initial: initial,
-      ),
-    );
-  }
-
-  Future<void> _confirmDeleteMedicion(Measurement m) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('¿Eliminar medición?'), // i18n: Fase W2
-        content: Text(
-          'La medición del ${fmtDate(m.recordedAt)} se va a borrar. '
-          'No se puede deshacer.', // i18n: Fase W2
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'), // i18n: Fase W2
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Confirmar'), // i18n: Fase W2
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    try {
-      await ref.read(measurementRepositoryProvider).delete(m.id);
-    } catch (_) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos eliminar la medición.'), // i18n: Fase W2
-        ),
-      );
-    }
-  }
-
-  Future<void> _confirmDeleteRendimiento(PerformanceTest t) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('¿Eliminar prueba?'), // i18n: Fase W2
-        content: Text(
-          'La prueba del ${fmtDate(t.recordedAt)} se va a borrar. '
-          'No se puede deshacer.', // i18n: Fase W2
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'), // i18n: Fase W2
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Confirmar'), // i18n: Fase W2
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    try {
-      await ref.read(performanceTestRepositoryProvider).delete(t.id);
-    } catch (_) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos eliminar la prueba.'), // i18n: Fase W2
-        ),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    final isAntropo = _view == _MedicionView.antropometricas;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // ── Header con toggle ──────────────────────────────────────────
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      isAntropo
-                          ? 'Mediciones antropométricas' // i18n: Fase W2
-                          : 'Pruebas de rendimiento', // i18n: Fase W2
-                      style: TextStyle(
-                        color: palette.textPrimary,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      isAntropo
-                          ? 'Peso, composición corporal y circunferencias.' // i18n: Fase W2
-                          : 'Saltos, sprints, 1RM y resistencia.', // i18n: Fase W2
-                      style: TextStyle(color: palette.textMuted, fontSize: 13),
-                    ),
-                  ],
-                ),
-              ),
-              ElevatedButton.icon(
-                onPressed: isAntropo
-                    ? () => _openAntropoDialog()
-                    : () => _openRendimientoDialog(),
-                icon: const Icon(Icons.add, size: 16),
-                label: Text(isAntropo
-                    ? 'NUEVA MEDICIÓN' // i18n: Fase W2
-                    : 'NUEVA PRUEBA'), // i18n: Fase W2
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: palette.accent,
-                  foregroundColor: TreinoButtonTokens.foreground(context),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                  shape: const StadiumBorder(),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          // ── Toggle segmented ────────────────────────────────────────────
-          _MedicionesToggle(
-            view: _view,
-            palette: palette,
-            onChanged: (v) => setState(() => _view = v),
-          ),
-          const SizedBox(height: 20),
-          Expanded(
-            child: isAntropo
-                ? _AntropoList(
-                    athleteId: widget.athleteId,
-                    palette: palette,
-                    onDelete: _confirmDeleteMedicion,
-                    onEdit: (m) => _openAntropoDialog(initial: m),
-                  )
-                : _RendimientoList(
-                    athleteId: widget.athleteId,
-                    palette: palette,
-                    onDelete: _confirmDeleteRendimiento,
-                    onEdit: (t) => _openRendimientoDialog(initial: t),
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Toggle segmented del header — Antropométricas / Rendimiento.
-class _MedicionesToggle extends StatelessWidget {
-  const _MedicionesToggle({
-    required this.view,
-    required this.palette,
-    required this.onChanged,
-  });
-
-  final _MedicionView view;
-  final AppPalette palette;
-  final ValueChanged<_MedicionView> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    Widget seg(_MedicionView v, String label) {
-      final active = view == v;
-      // MouseRegion(cursor): call-site web — InkWell daba cursor de mano al
-      // hover, TreinoTappable no trae MouseRegion. Fix local seguro.
-      return Expanded(
-        child: MouseRegion(
-          cursor: SystemMouseCursors.click,
-          child: TreinoTappable(
-            onTap: () => onChanged(v),
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              decoration: BoxDecoration(
-                color: active ? palette.accent.withValues(alpha: 0.15) : null,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: active ? palette.accent : palette.border,
-                  width: active ? 1.5 : 1,
-                ),
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: active ? palette.accent : palette.textMuted,
-                  fontSize: 13,
-                  fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                  letterSpacing: 0.4,
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    return Row(
-      children: [
-        seg(_MedicionView.antropometricas, 'ANTROPOMÉTRICAS'), // i18n: Fase W2
-        const SizedBox(width: 8),
-        seg(_MedicionView.rendimiento, 'RENDIMIENTO'), // i18n: Fase W2
-      ],
-    );
-  }
-}
-
 /// Subvista de mediciones antropométricas.
-class _AntropoList extends ConsumerWidget {
+class _AntropoList extends StatelessWidget {
   const _AntropoList({
-    required this.athleteId,
+    required this.measurements,
     required this.palette,
     required this.onDelete,
     required this.onEdit,
   });
 
-  final String athleteId;
+  final AsyncValue<List<Measurement>> measurements;
   final AppPalette palette;
   final Future<void> Function(Measurement) onDelete;
   final Future<void> Function(Measurement) onEdit;
 
+  /// Devuelve un SLIVER, no una caja.
+  ///
+  /// Es lo que le devuelve el renderizado perezoso a esta lista. Como caja,
+  /// adentro del scroll de la sub-vista, la lista quedaba obligada a
+  /// `shrinkWrap: true` y construía las cientos de filas de un alumno con
+  /// historial largo apenas se abría la pestaña. `SliverList` construye sólo
+  /// lo que entra en pantalla, y comparte el viewport con el header y el chart.
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final measAsync = ref.watch(measurementsForAthleteProvider(athleteId));
-    if (measAsync.hasValue) {
-      final all = measAsync.requireValue;
+  Widget build(BuildContext context) {
+    if (measurements.hasValue) {
+      final all = measurements.requireValue;
       // Provider ordena ASC — queremos DESC para "más nuevas arriba".
       final ms = all.reversed.toList();
       if (ms.isEmpty) {
-        return TreinoStateSwitcher(
-          childKey: const ValueKey('empty'),
-          child: Center(
-            child: Text(
-              'Este alumno todavía no tiene mediciones cargadas.', // i18n: Fase W2
-              textAlign: TextAlign.center,
-              style: TextStyle(color: palette.textMuted, fontSize: 14),
+        return SliverToBoxAdapter(
+          child: TreinoStateSwitcher(
+            childKey: const ValueKey('empty'),
+            child: Center(
+              child: Text(
+                'Este alumno todavía no tiene mediciones cargadas.', // i18n: Fase W2
+                textAlign: TextAlign.center,
+                style: TextStyle(color: palette.textMuted, fontSize: 14),
+              ),
             ),
           ),
         );
       }
-      return TreinoStateSwitcher(
-        childKey: const ValueKey('data'),
-        child: ListView.separated(
-          itemCount: ms.length,
-          separatorBuilder: (_, __) =>
-              Divider(height: 1, color: palette.border),
-          itemBuilder: (_, i) => _MedicionRow(
-            measurement: ms[i],
-            palette: palette,
-            onDelete: () => onDelete(ms[i]),
-            onEdit: () => onEdit(ms[i]),
+      // Sin TreinoStateSwitcher en esta rama, a propósito: envuelve una caja y
+      // acá el hijo es un sliver. Las transiciones de estado siguen animadas en
+      // las ramas de vacío, error y carga, que son las que se alternan.
+      return SliverList.separated(
+        itemCount: ms.length,
+        separatorBuilder: (_, __) => Divider(height: 1, color: palette.border),
+        itemBuilder: (_, i) => _MedicionRow(
+          measurement: ms[i],
+          palette: palette,
+          onDelete: () => onDelete(ms[i]),
+          onEdit: () => onEdit(ms[i]),
+        ),
+      );
+    }
+    if (measurements.hasError) {
+      return SliverToBoxAdapter(
+        child: TreinoStateSwitcher(
+          childKey: const ValueKey('error'),
+          child: Center(
+            child: Text(
+              'No pudimos cargar las mediciones.', // i18n: Fase W2
+              style: TextStyle(color: palette.textMuted, fontSize: 14),
+            ),
           ),
         ),
       );
     }
-    if (measAsync.hasError) {
-      return TreinoStateSwitcher(
-        childKey: const ValueKey('error'),
-        child: Center(
-          child: Text(
-            'No pudimos cargar las mediciones.', // i18n: Fase W2
-            style: TextStyle(color: palette.textMuted, fontSize: 14),
-          ),
-        ),
-      );
-    }
-    return const TreinoStateSwitcher(
-      childKey: ValueKey('loading'),
-      child: CoachHubSkeleton(filas: 3),
+    return const SliverToBoxAdapter(
+      child: TreinoStateSwitcher(
+        childKey: ValueKey('loading'),
+        child: CoachHubSkeleton(filas: 3),
+      ),
     );
   }
 }
 
 /// Subvista de pruebas de rendimiento.
-class _RendimientoList extends ConsumerWidget {
+class _RendimientoList extends StatelessWidget {
   const _RendimientoList({
-    required this.athleteId,
+    required this.performanceTests,
     required this.palette,
     required this.onDelete,
     required this.onEdit,
   });
 
-  final String athleteId;
+  final AsyncValue<List<PerformanceTest>> performanceTests;
   final AppPalette palette;
   final Future<void> Function(PerformanceTest) onDelete;
   final Future<void> Function(PerformanceTest) onEdit;
 
+  /// Devuelve un SLIVER, no una caja — ver el dartdoc de [_AntropoList.build].
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final testsAsync = ref.watch(performanceTestsForAthleteProvider(athleteId));
-    if (testsAsync.hasValue) {
-      final all = testsAsync.requireValue;
+  Widget build(BuildContext context) {
+    if (performanceTests.hasValue) {
+      final all = performanceTests.requireValue;
       final tests = all.reversed.toList();
       if (tests.isEmpty) {
-        return TreinoStateSwitcher(
-          childKey: const ValueKey('empty'),
-          child: Center(
-            child: Text(
-              'Este alumno todavía no tiene pruebas de rendimiento cargadas.', // i18n: Fase W2
-              textAlign: TextAlign.center,
-              style: TextStyle(color: palette.textMuted, fontSize: 14),
+        return SliverToBoxAdapter(
+          child: TreinoStateSwitcher(
+            childKey: const ValueKey('empty'),
+            child: Center(
+              child: Text(
+                'Este alumno todavía no tiene pruebas de rendimiento cargadas.', // i18n: Fase W2
+                textAlign: TextAlign.center,
+                style: TextStyle(color: palette.textMuted, fontSize: 14),
+              ),
             ),
           ),
         );
       }
-      return TreinoStateSwitcher(
-        childKey: const ValueKey('data'),
-        child: ListView.separated(
-          itemCount: tests.length,
-          separatorBuilder: (_, __) =>
-              Divider(height: 1, color: palette.border),
-          itemBuilder: (_, i) => _RendimientoRow(
-            test: tests[i],
-            palette: palette,
-            onDelete: () => onDelete(tests[i]),
-            onEdit: () => onEdit(tests[i]),
+      return SliverList.separated(
+        itemCount: tests.length,
+        separatorBuilder: (_, __) => Divider(height: 1, color: palette.border),
+        itemBuilder: (_, i) => _RendimientoRow(
+          test: tests[i],
+          palette: palette,
+          onDelete: () => onDelete(tests[i]),
+          onEdit: () => onEdit(tests[i]),
+        ),
+      );
+    }
+    if (performanceTests.hasError) {
+      return SliverToBoxAdapter(
+        child: TreinoStateSwitcher(
+          childKey: const ValueKey('error'),
+          child: Center(
+            child: Text(
+              'No pudimos cargar las pruebas.', // i18n: Fase W2
+              style: TextStyle(color: palette.textMuted, fontSize: 14),
+            ),
           ),
         ),
       );
     }
-    if (testsAsync.hasError) {
-      return TreinoStateSwitcher(
-        childKey: const ValueKey('error'),
-        child: Center(
-          child: Text(
-            'No pudimos cargar las pruebas.', // i18n: Fase W2
-            style: TextStyle(color: palette.textMuted, fontSize: 14),
-          ),
-        ),
-      );
-    }
-    return const TreinoStateSwitcher(
-      childKey: ValueKey('loading'),
-      child: CoachHubSkeleton(filas: 3),
+    return const SliverToBoxAdapter(
+      child: TreinoStateSwitcher(
+        childKey: ValueKey('loading'),
+        child: CoachHubSkeleton(filas: 3),
+      ),
     );
   }
 }

@@ -189,7 +189,7 @@ class TreinoDialog extends StatelessWidget {
                           errorMessage!,
                           style: TextStyle(
                             fontFamily: AppFonts.barlow,
-                            fontSize: 13,
+                            fontSize: AppTextSize.bodyDense,
                             color: palette.danger,
                           ),
                         ),
@@ -236,7 +236,7 @@ class _Header extends StatelessWidget {
             style: TextStyle(
               fontFamily: AppFonts.barlowCondensed,
               fontWeight: FontWeight.w700,
-              fontSize: 20,
+              fontSize: AppTextSize.titleLarge,
               color: tokens.titleColor,
             ),
           ),
@@ -361,7 +361,7 @@ class _DialogActionButton extends StatelessWidget {
                   style: TextStyle(
                     fontFamily: AppFonts.barlow,
                     fontWeight: FontWeight.w600,
-                    fontSize: 14,
+                    fontSize: AppTextSize.body,
                     color: color,
                   ),
                 ),

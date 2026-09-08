@@ -37,13 +37,14 @@ import '../../app_palette.dart';
 /// tema claro. Lo tiene, y arranca en `ThemeMode.system`. Todo par de tokens
 /// donde `accent` sea fondo se mide en LAS DOS paletas.
 ///
-/// ALCANCE: se migraron las cuatro copias mobile. La quinta —`_Tabs` en
-/// `alumno_detail_screen.dart`, Coach Hub web— sigue con `labelColor:
-/// palette.bg` y alto 38, o sea que TODAVÍA arrastra las dos fallas de arriba.
-/// Y no es sólo dark: `coach_hub_app.dart` también resuelve `AppTheme.light()`
-/// contra `ThemeMode.system`. Quedó afuera a propósito, no por olvido: ese
-/// archivo está bajo el rediseño `kit v2` que se está mergeando. Migrarla es un
-/// PR aparte y es lo que cierra #646 del todo.
+/// ALCANCE: las cinco copias están migradas. La quinta —la ficha de alumno del
+/// Coach Hub web— ya usa [TreinoSegmentedPill], así que ninguna arrastra el
+/// `labelColor: palette.bg` ni el alto 38 originales.
+///
+/// (Este párrafo decía que la quinta "TODAVÍA" los arrastraba mucho después de
+/// que dejara de ser cierto. Un aviso que sobrevive a su causa manda a revisar
+/// un problema que no existe, y peor, sugiere que #646 sigue abierto cuando no
+/// lo está — el patrón de `AGENTS.md` §11.1.)
 ///
 /// Uso:
 /// ```dart
@@ -67,6 +68,8 @@ class TreinoSegmentedPillTokens {
     required this.hoverOverlay,
     required this.pressedOverlay,
     required this.focusOverlay,
+    required this.markContent,
+    required this.markAttention,
   });
 
   /// Relleno de la pista — delega a `AppPalette.bgCard`.
@@ -132,6 +135,28 @@ class TreinoSegmentedPillTokens {
   /// Si algún consumidor futuro usa estos tokens sin ese anillo, hereda el
   /// hueco. No es opcional.
   final Color focusOverlay;
+
+  /// Punto de "hay contenido" en una celda INACTIVA — `AppPalette.textMuted`.
+  ///
+  /// Es el mismo color que [inactiveLabel] a propósito: el punto es parte del
+  /// label, no una insignia aparte. Informa, no apura.
+  final Color markContent;
+
+  /// Punto de "esto reclama acción" en una celda INACTIVA —
+  /// `AppPalette.accentText`.
+  ///
+  /// **`accentText`, NO `accent`.** El mint pleno es un color de FONDO: como
+  /// tinta compone 1,57:1 contra el fondo claro, así que un punto de `accent`
+  /// sobre una celda inactiva es invisible en tema claro — que es justo el que
+  /// usa el Coach Hub. `accentText` resuelve la bifurcación (mint en dark,
+  /// `mintText700` en light) y es la misma regla que ya documenta el dartdoc de
+  /// `AppPalette.accentText`: acento como fondo → `accent`, como tinta →
+  /// `accentText`.
+  ///
+  /// Sobre la celda ACTIVA ninguno de los dos se usa: ahí manda [activeInk]
+  /// (12,10:1 sobre el mint), porque los dos anteriores caerían sobre el
+  /// relleno de acento. Ver `_SegmentMark` en `treino_segmented_pill.dart`.
+  final Color markAttention;
 
   /// Ink del segmento activo: label Y keyline del thumb.
   ///
@@ -218,6 +243,20 @@ class TreinoSegmentedPillTokens {
   /// `feed_screen.dart`.
   static const double minSegmentHeight = 44.0;
 
+  /// Diámetro del punto de marca.
+  ///
+  /// `AppSpacing.s8` — el valor más chico de la escala cerrada, que acá es el
+  /// correcto: es una marca al lado de un label de 14, no un badge. Va como
+  /// tamaño y no como separación, pero sale de la misma escala para que no
+  /// nazca un 6 o un 10 sueltos.
+  static const double markSize = AppSpacing.s8;
+
+  /// Separación entre el label y su punto — [AppSpacing.hairline] (4).
+  ///
+  /// Gutter interno de un componente del kit, que es exactamente el caso que
+  /// `hairline` cubre. Mismo criterio que [trackPadding].
+  static const double markGap = AppSpacing.hairline;
+
   /// Escala de texto a partir de la cual la pista scrollea en vez de repartir
   /// el ancho. Heurística heredada de `_AthleteWorkout`, ya probada en device.
   static const double scrollTextScaleThreshold = 1.3;
@@ -236,7 +275,10 @@ class TreinoSegmentedPillTokens {
       // 12% de opacidad sobre el acento.
       pressedOverlay: p.textPrimary.withValues(alpha: 0.12),
       // 20% de opacidad sobre el acento.
-      focusOverlay: p.textPrimary.withValues(alpha: 0.20),
+      focusOverlay: p.textPrimary.withValues(alpha: 0.2),
+      markContent: p.textMuted,
+      // accentText y no accent — ver el dartdoc de [markAttention].
+      markAttention: p.accentText,
     );
   }
 }

@@ -59,7 +59,8 @@
 
 import * as fs from "fs";
 
-import * as admin from "firebase-admin";
+import { getFirestore } from "firebase-admin/firestore";
+import { initializeApp } from "firebase-admin/app";
 
 import {
   classifyFriendship,
@@ -855,8 +856,8 @@ async function main(): Promise<void> {
   const { mode, manifestPath } = parseArgs(process.argv);
   const manifest = manifestPath ? loadManifest(manifestPath) : null;
 
-  admin.initializeApp();
-  const db = admin.firestore();
+  initializeApp();
+  const db = getFirestore();
 
   console.log(
     `\n=== verify-follows-migration (${mode.toUpperCase()}` +

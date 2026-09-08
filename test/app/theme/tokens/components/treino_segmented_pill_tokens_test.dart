@@ -135,6 +135,46 @@ void main() {
         );
       });
 
+      testWidgets(
+          'las dos marcas se perciben sobre la pista, y son distintas entre sí',
+          (tester) async {
+        // Esto NO se puede testear desde la pantalla que las usa. Su harness
+        // pumpea el tema oscuro, y en dark `accentText` y `accent` son el mismo
+        // mint: una marca de atención cableada al `accent` pleno pasaría verde
+        // ahí y sería invisible en LIGHT, que es el tema que el PF usa en el
+        // Coach Hub. El defecto sólo existe en una de las dos paletas, así que
+        // el candado tiene que vivir donde las dos se miden.
+        final t = await _resolve(tester, palette);
+        final track = _on(t.trackFill, palette.bg);
+
+        // 3:1 y NO un delta perceptual: el punto es un componente gráfico que
+        // transmite información, o sea WCAG 1.4.11 — el mismo umbral que este
+        // archivo ya le exige al contorno de la pista. La diferencia importa:
+        // el mint pleno sobre una pista clara SE DISTINGUE (es verde contra
+        // blanco) pero compone ~1,6:1, que es el defecto exacto que
+        // `accentText` existe para evitar. Un delta perceptual lo daba por
+        // bueno; el ratio no.
+        for (final entry in {
+          'contenido': t.markContent,
+          'atención': t.markAttention,
+        }.entries) {
+          expect(
+            _ratio(_on(entry.value, track), track),
+            greaterThanOrEqualTo(3.0),
+            reason: 'la marca de ${entry.key} no llega a 3:1 sobre la pista',
+          );
+        }
+
+        // Y que se distingan ENTRE SÍ: si convergieran, "hay contenido" y
+        // "requiere acción" se verían igual y el punto dejaría de decir cuál
+        // es cuál.
+        expect(
+          _delta(_on(t.markContent, track), _on(t.markAttention, track)),
+          greaterThanOrEqualTo(8),
+          reason: 'las dos marcas se ven iguales sobre la pista',
+        );
+      });
+
       testWidgets('los overlays se perciben sobre la pista', (tester) async {
         // Sólo sobre la PISTA, a propósito: la tinta de Material se pinta
         // debajo de todo el subárbol y TabBar mete el indicador en un

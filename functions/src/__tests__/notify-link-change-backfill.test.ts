@@ -19,7 +19,9 @@
  * Corre contra el emulador de Firestore, igual que notify-link-change.test.ts.
  */
 
-import * as admin from "firebase-admin";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
+import { Messaging, MulticastMessage } from "firebase-admin/messaging";
 import { notifyOnLinkChangeHandler } from "../notifications/notify-link-change";
 
 // `??=` y no `=`: `emulators:exec` YA exporta estas variables apuntando a los
@@ -31,10 +33,10 @@ process.env.FIRESTORE_EMULATOR_HOST ??= "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST ??= "127.0.0.1:9099";
 process.env.GCLOUD_PROJECT ??= "treino-dev";
 
-let testApp: admin.app.App;
+let testApp: App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp(
+  testApp = initializeApp(
     { projectId: "treino-dev" },
     "notify-link-change-backfill-test",
   );
@@ -48,21 +50,21 @@ afterAll(async () => {
     .doc(chatIdFor(TRAINER, ATHLETE))
     .delete()
     .catch(() => undefined);
-  await testApp.delete();
+  await deleteApp(testApp);
 });
 
-const db = () => admin.firestore(testApp);
+const db = () => getFirestore(testApp);
 
-function makeMockMessaging(): admin.messaging.Messaging {
+function makeMockMessaging(): Messaging {
   return {
     sendEachForMulticast: jest.fn(
-      async (msg: admin.messaging.MulticastMessage) => ({
+      async (msg: MulticastMessage) => ({
         successCount: msg.tokens.length,
         failureCount: 0,
         responses: msg.tokens.map(() => ({ success: true, messageId: "id" })),
       }),
     ),
-  } as unknown as admin.messaging.Messaging;
+  } as unknown as Messaging;
 }
 
 /// Mismo criterio que `ChatRepository.chatIdFor`: uids ORDENADOS y unidos con
@@ -86,7 +88,7 @@ async function seedChat(fields: Record<string, unknown>): Promise<string> {
     .set({
       chatId: id,
       members: [ATHLETE, TRAINER].sort(),
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
       ...fields,
     });
   return id;

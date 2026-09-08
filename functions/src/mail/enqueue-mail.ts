@@ -26,7 +26,6 @@
  * protects against duplicate triggers is the guard that groups the series.
  */
 
-import * as admin from "firebase-admin";
 import { App } from "firebase-admin/app";
 import { logger } from "firebase-functions";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
@@ -184,8 +183,7 @@ export async function enqueueMail(
   if (prefKey) doc.prefKey = prefKey;
 
   try {
-    await admin
-      .firestore(app)
+    await getFirestore(app)
       .collection(MAIL_QUEUE_COLLECTION)
       .doc(id)
       .create(doc);

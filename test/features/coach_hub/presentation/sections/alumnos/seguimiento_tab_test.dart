@@ -41,6 +41,8 @@ import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
+import 'alumno_detail_test_navigation.dart';
+
 const _trainerUid = 't1';
 const _athleteUid = 'a1';
 
@@ -141,6 +143,9 @@ List<Override> _baseOverrides({
 }) =>
     [
       currentUidProvider.overrideWithValue(_trainerUid),
+      alumnoDetailIndicatorsProvider(_athleteUid).overrideWithValue(
+        const AlumnoDetailIndicators(),
+      ),
       trainerLinksStreamProvider.overrideWith((ref) => Stream.value([_link()])),
       userPublicProfilesBatchProvider
           .overrideWith((ref, key) => {_athleteUid: _profile()}),
@@ -192,16 +197,11 @@ void _useDesktopViewport(WidgetTester tester) {
 }
 
 Future<void> _selectSeguimientoTab(WidgetTester tester) async {
-  try {
-    await tester.pumpAndSettle(const Duration(milliseconds: 500));
-  } catch (_) {}
-  // "Seguimiento" es tab 9. En viewport 1400 puede estar off-screen a la
-  // derecha, saltamos via TabController como en mediciones.
-  final tabBarContext = tester.element(find.byType(TabBar));
-  DefaultTabController.of(tabBarContext).animateTo(9);
-  try {
-    await tester.pumpAndSettle(const Duration(milliseconds: 500));
-  } catch (_) {}
+  await navigateAlumnoDetail(
+    tester,
+    group: 'Privado',
+    subview: 'Seguimiento',
+  );
 }
 
 void main() {

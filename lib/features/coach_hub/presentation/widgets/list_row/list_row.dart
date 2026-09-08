@@ -118,7 +118,7 @@ class TreinoListRow extends StatelessWidget {
                         style: TextStyle(
                           fontFamily: AppFonts.barlow,
                           fontWeight: FontWeight.w400,
-                          fontSize: 14,
+                          fontSize: AppTextSize.body,
                           color: states.disabled
                               ? tokens.disabledColor
                               : tokens.titleColor,
@@ -132,7 +132,7 @@ class TreinoListRow extends StatelessWidget {
                           style: TextStyle(
                             fontFamily: AppFonts.barlow,
                             fontWeight: FontWeight.w400,
-                            fontSize: 12,
+                            fontSize: AppTextSize.caption,
                             color: states.disabled
                                 ? tokens.disabledColor
                                 : tokens.subtitleColor,

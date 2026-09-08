@@ -30,9 +30,15 @@ jest.mock("firebase-admin/firestore", () => (
 ).firestoreDesdeNamespaced());
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
+import { Messaging } from "firebase-admin/messaging";
 import { sendFcm } from "../notifications/send-fcm";
 
-type UserState = { tokens: string[]; add: jest.Mock };
+type UserState = {
+  tokens: string[];
+  add: jest.Mock;
+  notificationPrefs?: Record<string, Record<string, boolean | undefined>>;
+};
 
 function installFirestore(users: Record<string, UserState>): void {
   const firestore = {
@@ -42,7 +48,10 @@ function installFirestore(users: Record<string, UserState>): void {
         doc: (uid: string) => ({
           get: jest.fn(async () => ({
             exists: true,
-            data: () => ({ fcmTokens: users[uid].tokens }),
+            data: () => ({
+              fcmTokens: users[uid].tokens,
+              notificationPrefs: users[uid].notificationPrefs,
+            }),
           })),
           collection: (subcollectionName: string) => {
             if (subcollectionName !== "notifications") {
@@ -59,14 +68,14 @@ function installFirestore(users: Record<string, UserState>): void {
   (admin.firestore as unknown as jest.Mock).mockReturnValue(firestore);
 }
 
-function mockMessaging(): admin.messaging.Messaging {
+function mockMessaging(): Messaging {
   return {
     sendEachForMulticast: jest.fn(async (message) => ({
       successCount: message.tokens.length,
       failureCount: 0,
       responses: message.tokens.map(() => ({ success: true, messageId: "id" })),
     })),
-  } as unknown as admin.messaging.Messaging;
+  } as unknown as Messaging;
 }
 
 const baseInput = {
@@ -88,7 +97,7 @@ describe("sendFcm notification history", () => {
     });
 
     await sendFcm(
-      {} as admin.app.App,
+      {} as App,
       { ...baseInput, uids: ["user-1", "user-2"] },
       mockMessaging(),
     );
@@ -113,7 +122,7 @@ describe("sendFcm notification history", () => {
 
     await expect(
       sendFcm(
-        {} as admin.app.App,
+        {} as App,
         { ...baseInput, uids: ["user"] },
         messaging,
       ),
@@ -129,7 +138,7 @@ describe("sendFcm notification history", () => {
 
     await expect(
       sendFcm(
-        {} as admin.app.App,
+        {} as App,
         { ...baseInput, uids: ["user"] },
         messaging,
       ),
@@ -146,15 +155,168 @@ describe("sendFcm notification history", () => {
       sendEachForMulticast: jest.fn(async () =>
         Promise.reject(new Error("fcm down")),
       ),
-    } as unknown as admin.messaging.Messaging;
+    } as unknown as Messaging;
 
     await expect(
       sendFcm(
-        {} as admin.app.App,
+        {} as App,
         { ...baseInput, uids: ["user"] },
         messaging,
       ),
     ).rejects.toThrow("fcm down");
+
+    expect(add).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("sendFcm push preferences", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  const pushInput = {
+    ...baseInput,
+    kind: "chat-message" as const,
+    prefKey: "mensaje_nuevo",
+  };
+
+  it("does not dispatch when the recipient explicitly disabled push", async () => {
+    const add = jest.fn(async () => ({ id: "history" }));
+    installFirestore({
+      user: {
+        tokens: ["token"],
+        add,
+        notificationPrefs: { mensaje_nuevo: { push: false } },
+      },
+    });
+    const messaging = mockMessaging();
+
+    await expect(
+      sendFcm(
+        {} as App,
+        { ...pushInput, uids: ["user"] },
+        messaging,
+      ),
+    ).resolves.toEqual({ successCount: 0, failureCount: 0 });
+
+    expect(messaging.sendEachForMulticast).not.toHaveBeenCalled();
+  });
+
+  it("dispatches when push is explicitly enabled", async () => {
+    const add = jest.fn(async () => ({ id: "history" }));
+    installFirestore({
+      user: {
+        tokens: ["token"],
+        add,
+        notificationPrefs: { mensaje_nuevo: { push: true } },
+      },
+    });
+    const messaging = mockMessaging();
+
+    await sendFcm(
+      {} as App,
+      { ...pushInput, uids: ["user"] },
+      messaging,
+    );
+
+    expect(messaging.sendEachForMulticast).toHaveBeenCalledTimes(1);
+  });
+
+  it("defaults to dispatch when notificationPrefs is absent", async () => {
+    const add = jest.fn(async () => ({ id: "history" }));
+    installFirestore({ user: { tokens: ["token"], add } });
+    const messaging = mockMessaging();
+
+    await sendFcm(
+      {} as App,
+      { ...pushInput, uids: ["user"] },
+      messaging,
+    );
+
+    expect(messaging.sendEachForMulticast).toHaveBeenCalledTimes(1);
+  });
+
+  it("defaults to dispatch when the row has no push key", async () => {
+    const add = jest.fn(async () => ({ id: "history" }));
+    installFirestore({
+      user: {
+        tokens: ["token"],
+        add,
+        notificationPrefs: { mensaje_nuevo: { email: false } },
+      },
+    });
+    const messaging = mockMessaging();
+
+    await sendFcm(
+      {} as App,
+      { ...pushInput, uids: ["user"] },
+      messaging,
+    );
+
+    expect(messaging.sendEachForMulticast).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not gate notifications without a prefKey", async () => {
+    const add = jest.fn(async () => ({ id: "history" }));
+    installFirestore({
+      user: {
+        tokens: ["token"],
+        add,
+        notificationPrefs: { mensaje_nuevo: { push: false } },
+      },
+    });
+    const messaging = mockMessaging();
+
+    await sendFcm(
+      {} as App,
+      { ...baseInput, uids: ["user"] },
+      messaging,
+    );
+
+    expect(messaging.sendEachForMulticast).toHaveBeenCalledTimes(1);
+  });
+
+  it("dispatches only the enabled recipient tokens", async () => {
+    const disabledAdd = jest.fn(async () => ({ id: "history-disabled" }));
+    const enabledAdd = jest.fn(async () => ({ id: "history-enabled" }));
+    installFirestore({
+      disabled: {
+        tokens: ["disabled-token"],
+        add: disabledAdd,
+        notificationPrefs: { mensaje_nuevo: { push: false } },
+      },
+      enabled: {
+        tokens: ["enabled-token"],
+        add: enabledAdd,
+        notificationPrefs: { mensaje_nuevo: { push: true } },
+      },
+    });
+    const messaging = mockMessaging();
+
+    await sendFcm(
+      {} as App,
+      { ...pushInput, uids: ["disabled", "enabled"] },
+      messaging,
+    );
+
+    expect(messaging.sendEachForMulticast).toHaveBeenCalledWith(
+      expect.objectContaining({ tokens: ["enabled-token"] }),
+    );
+  });
+
+  it("still writes history when push is disabled", async () => {
+    const add = jest.fn(async () => ({ id: "history" }));
+    installFirestore({
+      user: {
+        tokens: ["token"],
+        add,
+        notificationPrefs: { mensaje_nuevo: { push: false } },
+      },
+    });
+
+    await sendFcm(
+      {} as App,
+      { ...pushInput, uids: ["user"] },
+      mockMessaging(),
+    );
 
     expect(add).toHaveBeenCalledTimes(1);
   });

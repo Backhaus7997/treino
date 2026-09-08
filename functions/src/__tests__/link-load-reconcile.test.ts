@@ -87,6 +87,7 @@ jest.mock("firebase-functions", () => ({
 }));
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
 import {
   createFakeFirestore,
   FakeCollectionName,
@@ -150,7 +151,7 @@ function install(seed: Partial<FakeFirestoreState>): FakeFirestoreState {
   return installRecording(seed).state;
 }
 
-const app = {} as admin.app.App;
+const app = {} as App;
 
 const ts = (ms: number) => ({ __fakeTimestampMs: ms, toMillis: () => ms });
 

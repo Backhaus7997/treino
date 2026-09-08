@@ -1796,5 +1796,7 @@
   "workoutRoutineFollowSuccess": "",
   "@workoutRoutineFollowSuccess": {},
   "workoutRoutineFollowError": "",
-  "@workoutRoutineFollowError": {}
+  "@workoutRoutineFollowError": {},
+  "paywallFreePlanLimitRoutineCountBody": "",
+  "@paywallFreePlanLimitRoutineCountBody": {}
 }

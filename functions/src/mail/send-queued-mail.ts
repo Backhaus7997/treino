@@ -23,7 +23,6 @@
  * volume justifies it.
  */
 
-import * as admin from "firebase-admin";
 import { App, getApp, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
@@ -142,8 +141,7 @@ export async function sendQueuedMailHandler(
     return;
   }
 
-  const ref = admin
-    .firestore(app)
+  const ref = getFirestore(app)
     .collection(MAIL_QUEUE_COLLECTION)
     .doc(mailId);
 

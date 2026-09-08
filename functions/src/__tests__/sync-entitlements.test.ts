@@ -44,11 +44,13 @@ jest.mock("firebase-functions", () => ({
 }));
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
+import { FieldValue } from "firebase-admin/firestore";
 
 import { createFakeFirestore, FakeFirestoreState } from "./helpers/fake-tx-firestore";
 import { syncTrainerEntitlements } from "../subscriptions/sync-entitlements";
 
-const app = {} as admin.app.App;
+const app = {} as App;
 
 function install(seed: Partial<FakeFirestoreState>) {
   const { db, state } = createFakeFirestore(seed);
@@ -136,7 +138,7 @@ describe("syncTrainerEntitlements", () => {
     expect(r.unblocked).toEqual(["L1"]);
     expect(state.trainer_links.L1.entitlement).toBe("entitled");
     expect(state.trainer_links.L1.blockedAt).toBe(
-      admin.firestore.FieldValue.delete(),
+      FieldValue.delete(),
     );
     // El array anterior se REEMPLAZA entero: si sobreviviera al merge, el
     // enforcement futuro seguiria viendo bloqueado a alguien ya devuelto.

@@ -14,28 +14,29 @@
  * library.
  */
 
-import * as admin from "firebase-admin";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
 process.env.GCLOUD_PROJECT = "treino-dev";
 
-let testApp: admin.app.App;
+let testApp: App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp(
+  testApp = initializeApp(
     { projectId: "treino-dev" },
     "routines-cascade-test"
   );
 });
 
 afterAll(async () => {
-  await testApp.delete();
+  await deleteApp(testApp);
 });
 
 import { deleteAthleteRoutines } from "../../cascade/routines";
 
-const db = () => admin.firestore(testApp);
+const db = () => getFirestore(testApp);
 
 const UID = "athlete-routines-cmp";
 const OTHER_ATHLETE = "athlete-routines-other";

@@ -345,7 +345,7 @@ class _HeaderCell extends StatelessWidget {
             style: TextStyle(
               fontFamily: AppFonts.barlow,
               fontWeight: FontWeight.w600,
-              fontSize: 12,
+              fontSize: AppTextSize.caption,
               color: tokens.headerTextColor,
             ),
           ),
@@ -495,7 +495,7 @@ class _DataRow extends StatelessWidget {
                           style: TextStyle(
                             fontFamily: AppFonts.barlow,
                             fontWeight: FontWeight.w400,
-                            fontSize: 14,
+                            fontSize: AppTextSize.body,
                             color: AppPalette.of(ctx).textPrimary,
                           ),
                           overflow: TextOverflow.ellipsis,
@@ -590,7 +590,7 @@ class _ErrorState extends StatelessWidget {
             message,
             style: TextStyle(
               fontFamily: AppFonts.barlow,
-              fontSize: 14,
+              fontSize: AppTextSize.body,
               color: palette.textMuted,
             ),
             textAlign: TextAlign.center,

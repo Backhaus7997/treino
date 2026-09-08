@@ -41,6 +41,8 @@ import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
+import 'alumno_detail_test_navigation.dart';
+
 const _trainerUid = 't1';
 const _athleteUid = 'a1';
 
@@ -107,6 +109,9 @@ List<Override> _baseOverrides({
 }) =>
     [
       currentUidProvider.overrideWithValue(_trainerUid),
+      alumnoDetailIndicatorsProvider(_athleteUid).overrideWithValue(
+        const AlumnoDetailIndicators(),
+      ),
       trainerLinksStreamProvider
           .overrideWith((ref) => Stream.value([_link(athleteUid)])),
       userPublicProfilesBatchProvider
@@ -162,15 +167,11 @@ void _useDesktopViewport(WidgetTester tester) {
 }
 
 Future<void> _selectNutricionTab(WidgetTester tester) async {
-  try {
-    await tester.pumpAndSettle(const Duration(milliseconds: 500));
-  } catch (_) {}
-  final tabBarContext = tester.element(find.byType(TabBar));
-  // "Nutrición" es tab 2. Salteamos por TabController por si está off-screen.
-  DefaultTabController.of(tabBarContext).animateTo(2);
-  try {
-    await tester.pumpAndSettle(const Duration(milliseconds: 500));
-  } catch (_) {}
+  await navigateAlumnoDetail(
+    tester,
+    group: 'Plan',
+    subview: 'Nutrición',
+  );
 }
 
 void main() {

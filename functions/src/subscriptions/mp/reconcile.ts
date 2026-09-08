@@ -36,12 +36,20 @@
  * Free y el barrido de las 04:00 le bloquearia alumnos. O sea que un dato raro
  * de MP terminaria cortandole el servicio a alumnos que no tienen nada que ver.
  *
- * Por eso hay cuatro casos donde esta funcion NO toca el documento:
+ * Por eso hay cinco casos donde esta funcion NO toca el documento:
  *
  *   1. El estado de MP no se entiende (`degraded`).
  *   2. No sabemos de que plan es la suscripcion.
  *   3. El uid del mapeo no coincide con el `external_reference` de MP.
  *   4. Lo que ibamos a escribir es identico a lo que ya esta.
+ *   5. Es un `pending` y el PF ya tiene un entitlement pago vigente.
+ *
+ * El (5) protege al PF que cambia de plan. Nada impide abrir un checkout
+ * estando ya suscripto, asi que un plan2 que quiere pasar a plan3 queda con DOS
+ * documentos en `mp_plans` con su uid, y el barrido escribe por cada uno. Como
+ * `effective-limit` le da el limite FREE a un `pending`, sin esa guarda el plan
+ * nuevo —todavia sin autorizar— le bajaba el limite a 2 y le bloqueaba alumnos
+ * a alguien que acababa de intentar pagarnos mas. Ver la guarda para el detalle.
  *
  * El (4) no es una optimizacion: cada escritura de `users/{uid}` dispara
  * `syncEntitlementsOnSubscription`, que decide MAIL por transicion. Reescribir
@@ -55,7 +63,8 @@ import { logger } from "firebase-functions";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { defineSecret } from "firebase-functions/params";
 
-import { SubscriptionStatus } from "../effective-limit";
+import { SubscriptionStatus, effectiveWeightLimit } from "../effective-limit";
+import { toSubscriptionState } from "../subscription-state";
 import { SubscriptionTier } from "../tier-config";
 import { MpApiError, MpClient, createMpClient } from "./client";
 import { hayCobroPendiente, mapMpStatus } from "./map-status";
@@ -72,6 +81,11 @@ export type ReconcileOutcome =
   | "skipped-degraded"
   | "skipped-sin-plan"
   | "skipped-uid-no-coincide"
+  /**
+   * El plan esta `pending` y el PF YA tiene un entitlement pago vigente. Ver
+   * la guarda de no-regresion mas abajo: escribirlo seria bajarlo a Free.
+   */
+  | "skipped-pending-no-pisa"
   | "sin-suscripcion"
   | "error-mp";
 
@@ -230,6 +244,20 @@ export function resolverFinDePeriodo(
   return Timestamp.fromMillis(derivada);
 }
 
+/**
+ * El limite, como numero comparable.
+ *
+ * `null` es plan3 = SIN TOPE, o sea el MAYOR de todos, no una ausencia. Un `>`
+ * a secas con `null` de un lado compara contra 0 en JS y da la respuesta al
+ * reves — y justo para el PF que mas paga. Es el mismo pozo que documenta
+ * `limitRank` en `subscription-mail.ts`; se repite acá y no se importa porque
+ * aquel es privado de ese modulo y exportarlo ataria dos archivos que hoy no se
+ * conocen.
+ */
+function rangoDelLimite(limite: number | null): number {
+  return limite === null ? Number.POSITIVE_INFINITY : limite;
+}
+
 /** Los dos Timestamp son el mismo instante. Tolera nulls de los dos lados. */
 function mismaFecha(
   a: Timestamp | null,
@@ -349,9 +377,56 @@ export async function reconcileSubscription(
   }
 
   const userRef = getFirestore(app).collection("users").doc(uid);
-  const actual = (await userRef.get()).data()?.subscription as
+  const userData = (await userRef.get()).data();
+  const actual = userData?.subscription as
     | Record<string, unknown>
     | undefined;
+
+  // ── GUARDA DE NO-REGRESION: un `pending` NUNCA pisa un entitlement pago ──
+  //
+  // `effective-limit.ts` le da el limite FREE a un `pending`, asi que escribirlo
+  // sobre alguien que hoy tiene plan pago no es informativo: es un DOWNGRADE. Y
+  // no espera al barrido de las 04:00 — el write dispara
+  // `syncEntitlementsOnSubscription`, que en la misma invocacion le bloquea
+  // alumnos y le manda un mail de degradacion.
+  //
+  // El caso no es teorico y es justo el del PF que MAS nos paga: nada impide
+  // abrir un checkout estando ya suscripto (`create-preapproval.ts` solo valida
+  // el rol), asi que un plan2 que quiere pasar a plan3 queda con DOS documentos
+  // en `mp_plans` con su uid. El barrido los recorre a los dos y escribe por
+  // cada uno; sin esta guarda, el `pending` del plan nuevo le vacia el padron a
+  // alguien que acaba de intentar pagarnos mas.
+  //
+  // Es la misma politica que ya gobierna `degraded` y que documenta
+  // `subscription-state.ts`: **frenar trabajo nuevo nunca puede revocar
+  // relaciones existentes.** Un `pending` es exactamente eso — trabajo nuevo
+  // que todavia no se confirmo.
+  //
+  // Solo aplica a `pending`. `paused` y `cancelled` SI bajan el limite, y tienen
+  // que poder hacerlo: ahi MP dijo algo terminal sobre la suscripcion que el PF
+  // tenia, no sobre una que esta naciendo.
+  if (status === "pending") {
+    const { state: previo } = toSubscriptionState(userData, uid);
+    const limitePrevio = effectiveWeightLimit(previo, deps.nowMs);
+    // Se compara contra el limite de un PF SIN suscripcion, no contra un 2
+    // escrito a mano: si algun dia Free cambia de tope, la guarda lo sigue sola.
+    if (
+      rangoDelLimite(limitePrevio) >
+      rangoDelLimite(effectiveWeightLimit(null, deps.nowMs))
+    ) {
+      logger.info(
+        "mp/reconcile: `pending` que no pisa un entitlement pago vigente",
+        { planId, uid, tierEntrante: mapping.tier, limitePrevio },
+      );
+      return {
+        planId,
+        outcome: "skipped-pending-no-pisa",
+        uid,
+        tier: mapping.tier,
+        status,
+      };
+    }
+  }
 
   const periodEnd = resolverFinDePeriodo({
     deMp: parsePeriodEnd(mp.next_payment_date, planId),
