@@ -43,20 +43,28 @@
  *   - `terminal` SIN motivo lo puso el reconciliador al ver `cancelled`. Una
  *     baja no se revierte en MP —se crea un preapproval nuevo con otro id—, asi
  *     que volver a preguntar por ese id no puede traer nada nuevo NUNCA.
- *   - `terminal` CON motivo (hoy solo "checkout abandonado") lo puso el barrido
- *     porque el plan cumplio 30 dias sin suscripcion. Eso es una apuesta sobre
- *     el futuro, no un hecho: si el PF guardo el `init_point` y paga al dia 31,
- *     el barrido no lo va a ver nunca mas. Este callable es el UNICO rescate
+ *   - `terminal` con motivo **"checkout abandonado"** lo puso el barrido porque
+ *     el plan cumplio 30 dias sin suscripcion. Eso es una apuesta sobre el
+ *     futuro, no un hecho: si el PF guardo el `init_point` y paga al dia 31, el
+ *     barrido no lo va a ver nunca mas. Este callable es el UNICO rescate
  *     posible de ese caso, y por eso si los consulta.
+ *
+ * OJO: la regla NO es "con motivo se consulta". Hay un segundo motivo,
+ * **"reemplazado por otro plan"**, que pone la baja del cambio de plan
+ * (`reconcile.ts`), y ese SI es un hecho — MP confirmo la cancelacion. Consultar
+ * esos planes no rompe nada, porque la guarda de reemplazo los corta antes de
+ * salir a la red, pero la distincion que importa vive en `puedeSeguirCobrando`
+ * de `reconcile.ts` y es por MOTIVO, no por "tiene o no tiene".
  *
  * ── El cooldown va ACA, y no se puede delegar ──
  *
- * `reconcileSubscription` arranca con `searchPreapprovalsByPlan`: el GET a MP es
- * lo PRIMERO que hace, antes de leer nada y antes del corto-circuito
- * `sinCambios`. O sea que las tres capas que ya protegen contra la tormenta de
- * mails no cubren nada de esto: un F5 en un SPA es un aterrizaje, y N
- * aterrizajes son N llamadas a MP con nuestro token aunque el outcome sea
- * `unchanged` las N veces.
+ * `reconcileSubscription` sale a MP con `searchPreapprovalsByPlan` antes del
+ * corto-circuito `sinCambios`. (Desde la baja del cambio de plan hay UN read de
+ * Firestore antes —la guarda de reemplazo—, pero solo corta los planes que ya
+ * dimos de baja nosotros: para todo lo demas el GET sigue siendo lo primero.) O
+ * sea que las tres capas que ya protegen contra la tormenta de mails no cubren
+ * nada de esto: un F5 en un SPA es un aterrizaje, y N aterrizajes son N llamadas
+ * a MP con nuestro token aunque el outcome sea `unchanged` las N veces.
  *
  * Y a MP eso le importa: el barrido se escribio SECUENCIAL a proposito porque
  * "en paralelo son N requests simultaneos a MP, que responde 429". Quemarle el
@@ -207,8 +215,12 @@ export function estadoDesdeResultados(
     return { estado: "no-disponible" };
   }
 
-  // Todo lo demas —`sin-suscripcion`, `pending`, y los tres `skipped-*`— es lo
+  // Todo lo demas —`sin-suscripcion`, `pending`, y CUALQUIER `skipped-*`— es lo
   // mismo para el PF: hay un alta en curso que todavia no se pudo acreditar.
+  //
+  // Sin enumerarlos ni contarlos a proposito: la lista crece (el ultimo fue
+  // `skipped-reemplazado`, con la baja de la suscripcion vieja al cambiar de
+  // plan) y un cartel que dice "los tres" envejece mal sin que nadie lo note.
   // Los `skipped-*` son bugs nuestros o datos raros de MP, y ya se logearon con
   // detalle adentro del reconciliador; al PF no le sirve saber cual fue.
   return { estado: "pendiente" };

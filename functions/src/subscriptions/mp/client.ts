@@ -39,6 +39,45 @@
 const MP_API = "https://api.mercadopago.com";
 
 /**
+ * El valor de `status` que da de BAJA una suscripcion.
+ *
+ * Es la unica constante de este archivo que hay que justificar con tres fuentes,
+ * porque **la documentacion oficial de MP se contradice con su propio SDK** y
+ * elegir mal significa un 400 silencioso — o sea el cobro doble que esto viene a
+ * cerrar, intacto y sin que nadie se entere.
+ *
+ * Las tres fuentes, consultadas el 2026-09-08:
+ *
+ *   1. La guia en prosa dice `canceled`, con UNA ele:
+ *      https://www.mercadopago.com.ar/developers/en/docs/subscriptions/subscription-management
+ *      «To cancel a subscription, send a PUT with the `status` attribute and the
+ *      `canceled` value to the /preapproval/{id} endpoint».
+ *
+ *   2. El SDK oficial de Node documenta el campo del REQUEST —no el de la
+ *      respuesta— con DOS eles:
+ *      https://github.com/mercadopago/sdk-nodejs/blob/master/src/clients/preApproval/commonTypes.ts
+ *      `PreApprovalRequest.status?: string`, comentado
+ *      «Desired subscription status (e.g. `authorized`, `paused`, `cancelled`)».
+ *
+ *   3. La API REAL, medida contra dos suscripciones de la misma cuenta el
+ *      2026-09-07 (los payloads estan en `mp-reconcile.test.ts`): devuelve
+ *      `cancelled`, con dos eles. Es el mismo valor que `map-status.ts` sabe
+ *      traducir.
+ *
+ * **Gana `cancelled`**: dos de las tres fuentes son el sistema hablando de si
+ * mismo, y la tercera es una guia traducida. Escribir el vocabulario de la
+ * lectura tambien vale por si solo — un dominio partido en dos ortografias es
+ * como se cuelan los bugs que `effective-limit.ts` documenta haber pagado con un
+ * `"canceled"` de una sola ele que se caia por afuera de un switch.
+ *
+ * Y si igual estuviera mal, el diseño lo absorbe: la baja NO se da por hecha
+ * porque el PUT haya salido bien. `reconcile.ts` no marca nada terminal hasta
+ * que la llamada resuelve, y el barrido de la noche siguiente vuelve a
+ * intentarlo. Un 400 acá se ve en Cloud Logging con el body de MP adentro.
+ */
+const STATUS_BAJA = "cancelled";
+
+/**
  * Corto a proposito. Esto corre adentro de una Cloud Function, y una llamada
  * colgada consume el timeout de la funcion entera. Si MP no contesta en 10s,
  * el reconciliador lo va a reintentar en su proxima corrida — que es
@@ -161,6 +200,41 @@ export interface MpClient {
    * Buscar por lo que sabemos con certeza en vez de por lo que suponemos.
    */
   searchPreapprovalsByPlan(planId: string): Promise<MpPreapproval[]>;
+  /**
+   * Da de BAJA una suscripcion. Es lo unico que frena un cobro recurrente.
+   *
+   * ── Por que este metodo tuvo que existir ──
+   *
+   * Hasta que aparecio, `MpClient` solo hacia GET y POST: sabia ABRIR cobros y
+   * LEERLOS, y no sabia cerrarlos. Como `create-preapproval.ts` no mira si el PF
+   * ya tiene una suscripcion viva, un entrenador que pasaba de plan1 a plan2
+   * quedaba con DOS suscripciones autorizadas en MP —la vieja nunca se daba de
+   * baja— **y MP le cobraba las dos**. No es un caso raro: es exactamente lo que
+   * pasa cuando a alguien le va bien y quiere pagarnos mas.
+   *
+   * ── Es TERMINAL, y por eso quien la llama tiene que estar seguro ──
+   *
+   * Un preapproval cancelado no se reactiva: para volver atras hay que crear uno
+   * NUEVO, con otro id, y el PF tiene que pasar por el checkout de nuevo. Es la
+   * misma propiedad que `reconcile.ts` ya usa para sacar del barrido lo que MP
+   * dio de baja.
+   *
+   * Corolario de diseño, y esta escrito en el encabezado de `reconcile.ts`: esto
+   * NO se llama al abrir un checkout. Se llama cuando la suscripcion NUEVA ya
+   * quedo confirmada por MP. Cancelar antes deja sin plan a quien todavia no
+   * compro nada.
+   *
+   * ── Se cancela la SUSCRIPCION, no el plan ──
+   *
+   * El `preapproval_plan` no cobra: es una plantilla con un `init_point`. Lo que
+   * cobra es el `preapproval` que nace cuando alguien paga contra ese plan, y es
+   * lo unico que hay que dar de baja. La doc de MP para gestionar planes
+   * (`/docs/subscription-plans/manage-subscription-plan`, consultada el
+   * 2026-09-08) solo describe el panel web: **no hay baja de plan por API**, y no
+   * hace falta. Un plan viejo que queda vivo no le cuesta un peso a nadie, y del
+   * barrido lo saca `terminal` en `mp_plans`.
+   */
+  cancelPreapproval(preapprovalId: string): Promise<MpPreapproval>;
 }
 
 /**
@@ -179,13 +253,13 @@ export function createMpClient(
   }
 
   /**
-   * El unico lugar que toca la red. Las dos operaciones comparten timeout,
-   * clasificacion de errores y validacion de la respuesta — tenerlo dos veces
+   * El unico lugar que toca la red. Las cuatro operaciones comparten timeout,
+   * clasificacion de errores y validacion de la respuesta — tenerlo repetido
    * garantizaba que un dia divergieran.
    */
   async function request(
     path: string,
-    method: "GET" | "POST",
+    method: "GET" | "POST" | "PUT",
     body?: unknown,
   ): Promise<MpPreapproval> {
     let response: Response;
@@ -293,6 +367,31 @@ export function createMpClient(
       // devolviendo algo raro no puede hacer que el barrido se caiga para
       // todos los demas PF.
       return Array.isArray(results) ? (results as MpPreapproval[]) : [];
+    },
+
+    async cancelPreapproval(preapprovalId: string): Promise<MpPreapproval> {
+      // Falla ANTES de salir a la red, igual que las otras. Y acá pesa mas que
+      // en un GET: con el id vacio la ruta queda en `/preapproval/`, que no
+      // identifica ninguna suscripcion, y lo que MP hace con un PUT ahi no lo
+      // sabemos. Un request cuyo efecto no conocemos no se manda — menos uno
+      // cuyo cuerpo dice "dar de baja".
+      if (!preapprovalId) {
+        throw new MpApiError("mp/client: preapprovalId vacio", 0);
+      }
+      // `PUT /preapproval/{id}` con `{ status }` es el endpoint de actualizacion
+      // de suscripciones; la baja es un caso particular de el. Verificado en la
+      // referencia oficial el 2026-09-08:
+      // https://www.mercadopago.com.ar/developers/en/reference/online-payments/subscriptions/update-preapproval/put
+      //
+      // Se manda SOLO `status`: el body de ese endpoint tambien acepta `reason`,
+      // `auto_recurring`, `back_url` y los tokens de tarjeta, y mandar cualquiera
+      // de esos de mas seria reescribir el cobro de alguien en el mismo request
+      // en el que lo damos de baja.
+      return request(
+        `/preapproval/${encodeURIComponent(preapprovalId)}`,
+        "PUT",
+        { status: STATUS_BAJA },
+      );
     },
 
   };

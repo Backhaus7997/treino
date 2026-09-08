@@ -36,13 +36,14 @@
  * Free y el barrido de las 04:00 le bloquearia alumnos. O sea que un dato raro
  * de MP terminaria cortandole el servicio a alumnos que no tienen nada que ver.
  *
- * Por eso hay cinco casos donde esta funcion NO toca el documento:
+ * Por eso hay seis casos donde esta funcion NO toca el documento:
  *
  *   1. El estado de MP no se entiende (`degraded`).
  *   2. No sabemos de que plan es la suscripcion.
  *   3. El uid del mapeo no coincide con el `external_reference` de MP.
  *   4. Lo que ibamos a escribir es identico a lo que ya esta.
  *   5. Es un `pending` y el PF ya tiene un entitlement pago vigente.
+ *   6. El plan fue REEMPLAZADO por otro y lo dimos de baja nosotros.
  *
  * El (5) protege al PF que cambia de plan. Nada impide abrir un checkout
  * estando ya suscripto, asi que un plan2 que quiere pasar a plan3 queda con DOS
@@ -55,6 +56,93 @@
  * `syncEntitlementsOnSubscription`, que decide MAIL por transicion. Reescribir
  * el mismo valor gasta invocaciones al pedo, y una regresion futura en la
  * deteccion de transiciones se convertiria en una tormenta de mails.
+ *
+ * ── EL CAMBIO DE PLAN, Y POR QUE LA BAJA DE LA VIEJA SE DECIDE ACA ──
+ *
+ * La guarda (5) le salvo el padron al PF que cambia de plan, pero tapaba la
+ * mitad del problema: **la suscripcion vieja seguia viva en Mercado Pago y le
+ * cobraba igual.** Un plan2 que pasaba a plan3 terminaba con DOS suscripciones
+ * autorizadas y DOS debitos por mes. Nada en el repo las daba de baja —
+ * `MpClient` no sabia cancelar, y `create-preapproval.ts` solo valida el rol.
+ *
+ * La pregunta de diseño no es COMO cancelar, es CUANDO. Hay dos momentos
+ * posibles y uno de los dos le rompe el producto a alguien:
+ *
+ *   **Al abrir el checkout nuevo.** Es el momento obvio y es el equivocado.
+ *   Abrir un checkout NO es pagar: `create-preapproval.ts` documenta que MP deja
+ *   la suscripcion en `pending` hasta que el PF carga su medio de pago. O sea
+ *   que el PF que toca "ELEGIR PLAN", mira el precio y cierra la pestaña se
+ *   quedaria SIN PLAN y sin haber comprado nada — le dimos de baja lo que ya
+ *   pagaba a cambio de una intencion. Y como la baja es TERMINAL en MP, no
+ *   alcanza con arrepentirse: hay que hacerlo pasar por el checkout de nuevo.
+ *
+ *   **Cuando la NUEVA queda confirmada.** Es acá, y es el unico momento en que
+ *   la informacion existe: la confirmacion es un `authorized` que solo se sabe
+ *   preguntandole a MP, y este archivo es el unico que pregunta. Mientras la
+ *   nueva no este confirmada, la vieja es lo unico que el PF tiene y se toca
+ *   con cero razones.
+ *
+ * Es el mismo principio que gobierna todo lo demas, aplicado a una escritura que
+ * sale del sistema en vez de entrar: **no se actua sobre una intencion, se actua
+ * sobre lo que MP confirmo.**
+ *
+ * Tres detalles que no son de adorno:
+ *
+ *   - Se cancela lo ESTRICTAMENTE MAS VIEJO, por `mp_plans.createdAt`, y nunca
+ *     "las otras del uid". El barrido recorre los planes en el orden que
+ *     Firestore devuelva: con los dos autorizados a la vez, "cancelar las otras"
+ *     le daria de baja al PF el plan que ACABA de comprar si el viejo se
+ *     procesaba primero. Sin las dos fechas no se cancela nada.
+ *
+ *   - Corre tambien cuando el resultado es `unchanged`, no solo en el `written`.
+ *     Si la baja falla una noche —MP caido, un 429— la nueva ya quedo escrita y
+ *     la corrida siguiente la ve sin cambios. Colgar la cancelacion del `written`
+ *     dejaba el cobro doble vivo para siempre despues de un unico fallo
+ *     transitorio.
+ *
+ *   - **Se marca ANTES de cancelar, no despues**, y los dos campos que se
+ *     escriben significan cosas distintas:
+ *
+ *       `supersededBy` es una decision NUESTRA —sale de comparar dos fechas que
+ *       ya tenemos— y se escribe ANTES del PUT. Activa el caso (6).
+ *
+ *       `terminal` es un hecho de MP y se escribe DESPUES, solo si la baja
+ *       confirmo.
+ *
+ *     El orden es el arreglo de un agujero real: escribiendo `supersededBy`
+ *     despues del PUT, cualquier RESPUESTA PERDIDA lo desarmaba. No hacia falta
+ *     que MP fallara — un 204, un 2xx con body vacio, el timeout de 10s con la
+ *     baja ya aplicada, o la instancia muriendo entre las dos operaciones dejaba
+ *     la suscripcion cancelada en MP y el plan sin marcar. Y ahi el caso (6) es
+ *     necesario: dentro de la MISMA corrida el barrido tiene el snapshot viejo
+ *     en la mano, reconcilia ese plan, MP contesta `cancelled` —que SI puede
+ *     bajar el limite— y la ultima escritura de la noche termina siendo un
+ *     downgrade encima del plan recien comprado, con su mail y sus alumnos
+ *     bloqueados.
+ *
+ *   - `terminal` NO significa "muerto", y la baja no puede filtrar por el a
+ *     secas. Ver `puedeSeguirCobrando`: un terminal por ABANDONO es una apuesta
+ *     sobre el futuro, no un hecho — el `init_point` no vence y el PF lo puede
+ *     pagar al dia 35. Saltearlo dejaba a ese PF con cobro doble PARA SIEMPRE,
+ *     porque el barrido tampoco lo reconcilia.
+ *
+ * ── LO QUE ESTE ARCHIVO DECIDE SIN QUE NADIE LO HAYA DECIDIDO ──
+ *
+ * La regla es "cancelar todo lo estrictamente mas viejo", y es CIEGA al ciclo y
+ * a la direccion del cambio. Dos consecuencias que no son bugs pero tampoco
+ * fueron elegidas, y que conviene mirar antes de que pasen:
+ *
+ *   - **El ANUAL.** Un plan3 anual son $390.000 en UN cobro que cubre 12 meses
+ *     (`tier-config.ts`). Si el PF hace upgrade en marzo, acá se cancela ese
+ *     preapproval: MP no reembolsa y una baja no se revierte, asi que los meses
+ *     que le quedaban se evaporan. Cancelar igual es mejor que no cancelar —si
+ *     no, en enero le cobran el anual DE NUEVO mas el plan nuevo— pero la
+ *     opcion buena de verdad seria diferir la baja hasta el fin del periodo
+ *     pago, y eso todavia no existe.
+ *
+ *   - **El DOWNGRADE.** plan3 -> plan1 entra por el mismo camino: se cancela el
+ *     caro y se escribe el barato, con lo cual el limite baja EN EL ACTO aunque
+ *     al PF le queden meses pagos del caro.
  */
 
 import { App, getApp, initializeApp } from "firebase-admin/app";
@@ -66,7 +154,12 @@ import { defineSecret } from "firebase-functions/params";
 import { SubscriptionStatus, effectiveWeightLimit } from "../effective-limit";
 import { toSubscriptionState } from "../subscription-state";
 import { SubscriptionTier } from "../tier-config";
-import { MpApiError, MpClient, createMpClient } from "./client";
+import {
+  MpApiError,
+  MpClient,
+  MpPreapproval,
+  createMpClient,
+} from "./client";
 import { hayCobroPendiente, mapMpStatus } from "./map-status";
 import {
   MP_PLANS_COLLECTION,
@@ -86,6 +179,12 @@ export type ReconcileOutcome =
    * la guarda de no-regresion mas abajo: escribirlo seria bajarlo a Free.
    */
   | "skipped-pending-no-pisa"
+  /**
+   * El plan fue reemplazado por otro y NOSOTROS lo dimos de baja. Ver la guarda
+   * de reemplazo: su `cancelled` no habla del PF, habla de nuestra propia
+   * escritura, y pisaria el plan que acaba de comprar.
+   */
+  | "skipped-reemplazado"
   | "sin-suscripcion"
   | "error-mp";
 
@@ -95,6 +194,12 @@ export interface ReconcileResult {
   uid?: string;
   tier?: SubscriptionTier;
   status?: SubscriptionStatus;
+  /**
+   * Cuantas suscripciones VIEJAS se dieron de baja en MP porque este plan las
+   * reemplaza. Casi siempre 0; un 1 es un cambio de plan que dejo de cobrarse
+   * dos veces.
+   */
+  dadosDeBaja?: number;
 }
 
 export interface ReconcileDeps {
@@ -271,6 +376,270 @@ function mismaFecha(
 }
 
 /**
+ * El campo de `mp_plans` que dice "a este plan lo dimos de baja NOSOTROS, porque
+ * el PF se paso a este otro".
+ *
+ * Es distinto de `terminal` a proposito, y no alcanza con aquel: `terminal`
+ * tambien lo pone una baja que hizo el PF, y esa SI tiene que poder escribir
+ * `cancelled` sobre su `subscription`. Este campo marca la unica baja cuyo
+ * `cancelled` no habla del entrenador sino de nuestra propia escritura.
+ */
+const CAMPO_REEMPLAZO = "supersededBy";
+
+/**
+ * Los dos motivos de `terminal` que escribe este archivo. Son constantes y no
+ * literales sueltos porque `puedeSeguirCobrando` COMPARA contra uno de ellos:
+ * escritos a mano en dos lados, el dia que alguien cambie una redaccion el
+ * filtro deja de reconocer su propio motivo y el bug es silencioso.
+ *
+ * (El tercer `terminal` que existe no tiene motivo: el de `status === cancelled`
+ * mas abajo. Que la baja del PF sea la unica SIN motivo es deliberado — ver
+ * `puedeSeguirCobrando`.)
+ */
+const MOTIVO_ABANDONO = "checkout abandonado";
+const MOTIVO_REEMPLAZO = "reemplazado por otro plan";
+
+/**
+ * Este plan todavia PUEDE estar cobrandole al PF, asi que hay que mirarlo.
+ *
+ * `terminal` NO significa "muerto", y confundir las dos cosas fue un bug real de
+ * la primera version de la baja: filtraba con `terminal === true` pelado y
+ * dejaba afuera al checkout ABANDONADO que despues se pago.
+ *
+ * Esa poblacion existe y el repo la construyo a proposito. `esAbandonado` marca
+ * terminal a los 30 dias, pero el `init_point` de un plan NO VENCE: el PF puede
+ * encontrar la pestaña vieja al dia 35 y pagarla. `reconcile-my-checkout.ts` lo
+ * documenta y lo rescata justamente por eso — su `planesDelPf` sigue
+ * consultando los terminal CON motivo porque «un terminal con motivo es una
+ * apuesta sobre el futuro, no un hecho».
+ *
+ * Con el filtro pelado, ese PF hacia upgrade y su plan viejo —vivo y
+ * cobrando— quedaba fuera de la baja PARA SIEMPRE: el barrido tampoco lo
+ * reconcilia, asi que ninguna corrida futura lo reintentaba. Cobro doble
+ * permanente, justo en el caso que este archivo existe para cerrar.
+ *
+ * Los otros dos terminal si son hechos y se saltean: una baja del PF (que MP ya
+ * confirmo con `cancelled`) y una baja NUESTRA que MP acepto.
+ */
+export function puedeSeguirCobrando(datos: Record<string, unknown> | undefined): boolean {
+  if (datos?.terminal !== true) return true;
+  return datos?.terminalReason === MOTIVO_ABANDONO;
+}
+
+/**
+ * Deja escrito que este plan quedo REEMPLAZADO por otro.
+ *
+ * Se llama ANTES de pedirle la baja a MP — ver el comentario de
+ * `darDeBajaUnPlan` para por que el orden es el punto entero. NO marca
+ * `terminal`: eso es un hecho de MP y se escribe recien cuando la baja confirma.
+ */
+async function marcarReemplazado(
+  app: App,
+  planViejo: string,
+  planVigente: string,
+): Promise<void> {
+  await getFirestore(app)
+    .collection(MP_PLANS_COLLECTION)
+    .doc(planViejo)
+    .set({ [CAMPO_REEMPLAZO]: planVigente }, { merge: true });
+}
+
+/**
+ * La suscripcion todavia puede cobrar, o sea que hay que darla de baja.
+ *
+ * Solo `cancelled` queda afuera, y un estado que NO conocemos cae adentro — al
+ * reves que en el resto del archivo. La asimetria es deliberada y la decide la
+ * consecuencia de equivocarse: acá ya sabemos que esta suscripcion quedo
+ * reemplazada, asi que no cancelarla es seguir cobrandole dos veces a alguien.
+ * Un PUT de mas sobre algo ya muerto da un error que se ve en el log; un PUT de
+ * menos es plata del PF, todos los meses, en silencio.
+ */
+export function sigueViva(raw: unknown): boolean {
+  return raw !== "cancelled";
+}
+
+/**
+ * Da de baja en MP todas las suscripciones de UN plan viejo y, si MP acepto, lo
+ * saca del barrido marcandolo reemplazado.
+ *
+ * Total: nunca tira. Devuelve cuantas cancelo.
+ */
+async function darDeBajaUnPlan(
+  app: App,
+  planViejo: string,
+  planVigente: string,
+  deps: ReconcileDeps,
+): Promise<number> {
+  // ── PRIMERO SE MARCA, DESPUES SE CANCELA. El orden es el arreglo ──
+  //
+  // La version anterior escribia `supersededBy` DESPUES del PUT, y eso dejaba
+  // desarmada justo la guarda que este diseño necesita. El agujero no pedia que
+  // MP fallara: alcanzaba con que la RESPUESTA se perdiera. `cancelPreapproval`
+  // tira igual si MP contesta 204 o un 2xx con body vacio (`request` exige un
+  // objeto JSON), si se agota el `AbortSignal.timeout` de 10s con la baja ya
+  // aplicada, o si la instancia muere entre el PUT y el write. En los tres casos
+  // la suscripcion quedaba CANCELADA en MP y el plan viejo sin marcar — y a la
+  // corrida siguiente MP contestaba `cancelled`, que si puede bajar el limite.
+  // O sea: el downgrade sobre el que acaba de pagar, que es exactamente lo que
+  // la guarda existe para impedir.
+  //
+  // Marcando antes, los dos campos dicen cosas distintas y cada uno se escribe
+  // cuando de verdad se sabe:
+  //
+  //   `supersededBy` — **una decision NUESTRA**, y no depende de MP para nada:
+  //   sale de comparar dos `createdAt` que ya tenemos. Significa "el estado de
+  //   este plan ya no es el del PF". Vale igual si la baja falla: el PF compro
+  //   el plan nuevo, y el viejo no puede definir su entitlement pase lo que pase.
+  //
+  //   `terminal` — **un hecho de MP**, y por eso sigue escribiendose recien
+  //   cuando la baja resolvio bien. Significa "dejá de preguntar por este plan".
+  //
+  // Con eso los dos finales feos convergen solos: si el PUT salio y no nos
+  // enteramos, mañana el search devuelve `cancelled`, no se manda ningun PUT y
+  // se marca terminal. Si el PUT no salio, mañana se reintenta. En los dos
+  // casos el PF conserva el plan que compro mientras tanto.
+  await marcarReemplazado(app, planViejo, planVigente);
+
+  let subs: MpPreapproval[];
+  try {
+    subs = await deps.mpClient.searchPreapprovalsByPlan(planViejo);
+  } catch (e) {
+    const err = e as MpApiError;
+    logger.error(
+      "mp/reconcile: no se pudo buscar que dar de baja del plan reemplazado",
+      { planViejo, planVigente, status: err.status, retryable: err.retryable },
+    );
+    return 0;
+  }
+
+  // Un plan sin ninguna suscripcion nunca cobro: es un checkout que el PF abrio
+  // y abandono antes de comprar otro. NO se marca terminal acá. Un `[]` tambien
+  // puede ser MP contestando raro, y sacarlo del barrido por eso seria dejar de
+  // mirar —y de intentar cancelar— una suscripcion que si existe y si cobra. De
+  // los abandonados de verdad se encarga `esAbandonado` a los 30 dias.
+  if (subs.length === 0) return 0;
+
+  let cancelados = 0;
+  for (const sub of subs) {
+    if (!sigueViva(sub.status)) continue;
+
+    const preapprovalId = sub.id;
+    if (typeof preapprovalId !== "string" || preapprovalId === "") {
+      logger.error("mp/reconcile: una suscripcion a dar de baja vino sin id", {
+        planViejo,
+        planVigente,
+      });
+      // Sin marcar terminal: quedo algo vivo que no supimos tocar.
+      return cancelados;
+    }
+
+    try {
+      await deps.mpClient.cancelPreapproval(preapprovalId);
+    } catch (e) {
+      const err = e as MpApiError;
+      logger.error(
+        "mp/reconcile: la baja de la suscripcion vieja no confirmo — puede " +
+          "haber un COBRO DOBLE vivo",
+        {
+          planViejo,
+          planVigente,
+          preapprovalId,
+          status: err.status,
+          retryable: err.retryable,
+          body: err.body,
+        },
+      );
+      // "No confirmo" y no "MP la rechazo": desde acá NO se puede distinguir un
+      // 400 —donde la baja no ocurrio— de un timeout con la baja ya aplicada.
+      // Por eso se sale sin marcar terminal: el plan sigue en el barrido y la
+      // corrida de mañana averigua cual de las dos fue, preguntandole a MP.
+      return cancelados;
+    }
+
+    cancelados += 1;
+    logger.info("mp/reconcile: suscripcion vieja dada de baja en MP", {
+      planViejo,
+      planVigente,
+      preapprovalId,
+    });
+  }
+
+  // Se llega acá con todo lo vivo cancelado, o con un plan cuyas suscripciones
+  // MP ya daba por muertas. En los dos casos no queda nada que cobre.
+  await marcarTerminal(app, planViejo, MOTIVO_REEMPLAZO);
+  return cancelados;
+}
+
+/**
+ * Da de baja lo que el plan [planVigente] —recien confirmado por MP— reemplaza.
+ *
+ * Ver el encabezado para POR QUE es acá y no al abrir el checkout. Lo que se
+ * decide en esta funcion es CUALES: solo los planes del mismo uid ESTRICTAMENTE
+ * MAS VIEJOS que el confirmado.
+ *
+ * Total: nunca tira. Devuelve cuantas suscripciones se cancelaron.
+ */
+async function darDeBajaLosReemplazados(
+  app: App,
+  uid: string,
+  planVigente: string,
+  altaVigente: Timestamp | null,
+  deps: ReconcileDeps,
+): Promise<number> {
+  if (altaVigente === null) {
+    // Sin la fecha de alta del plan confirmado no hay forma de saber cual es el
+    // viejo, y "el otro" no sirve: el barrido los recorre en el orden que
+    // Firestore devuelva, asi que adivinar es cancelarle al PF el plan que
+    // ACABA de comprar. Se prefiere el cobro doble —que se ve, se reclama y se
+    // devuelve— a una baja equivocada, que en MP es irreversible.
+    logger.warn(
+      "mp/reconcile: el plan confirmado no tiene createdAt legible — no se da " +
+        "de baja nada",
+      { planVigente, uid },
+    );
+    return 0;
+  }
+
+  // `where` sobre un solo campo: Firestore lo resuelve con el indice automatico,
+  // sin indice compuesto que crear ni desplegar. Se filtra por uid y no se
+  // recorre la coleccion entera porque esto corre una vez POR PLAN CONFIRMADO.
+  //
+  // El costo hay que decirlo, porque esta funcion no corre solo de madrugada:
+  // `reconcile-my-checkout.ts` llama a `reconcileSubscription` cuando el PF
+  // VUELVE del checkout, y ahi cada plan viejo que se visite son dos llamadas a
+  // MP en el camino de una pantalla que alguien esta mirando. Queda acotado por
+  // tres cosas que ya existen: los terminales se saltean, `esAbandonado` marca
+  // terminal a los 30 dias todo checkout que nadie pago, y la ventana de reuso
+  // de `create-preapproval.ts` evita que dos clicks abran dos planes. O sea que
+  // el peor caso realista son los pocos checkouts que ese PF abrio en el ultimo
+  // mes, no su historial entero.
+  const otros = await getFirestore(app)
+    .collection(MP_PLANS_COLLECTION)
+    .where("uid", "==", uid)
+    .get();
+
+  let cancelados = 0;
+  for (const doc of otros.docs) {
+    if (doc.id === planVigente) continue;
+
+    const datos = doc.data();
+    // NO es `terminal === true`: ver `puedeSeguirCobrando`. Un terminal por
+    // ABANDONO puede tener una suscripcion viva —el `init_point` no vence— y
+    // saltearlo dejaba ese cobro doble sin cerrar para siempre.
+    if (!puedeSeguirCobrando(datos)) continue;
+
+    const alta = comoTimestamp(datos?.createdAt);
+    // Sin fecha no se toca, y el `>=` es estricto a proposito: solo lo ANTERIOR
+    // al plan confirmado se da de baja.
+    if (alta === null || alta.toMillis() >= altaVigente.toMillis()) continue;
+
+    cancelados += await darDeBajaUnPlan(app, doc.id, planVigente, deps);
+  }
+
+  return cancelados;
+}
+
+/**
  * Reconcilia UNA suscripcion contra MP.
  *
  * Total: nunca tira. Cualquier fallo se reporta en el `outcome` — un barrido
@@ -281,6 +650,37 @@ export async function reconcileSubscription(
   planId: string,
   deps: ReconcileDeps,
 ): Promise<ReconcileResult> {
+  // ── GUARDA DE REEMPLAZO: lo que dimos de baja nosotros no escribe nada ──
+  //
+  // Se lee el documento del plan ANTES de salir a la red, y esa lectura de mas
+  // —`lookupPlan` mas abajo vuelve a leerlo— se paga a proposito por dos cosas
+  // que valen mas que un get de Firestore: acá ahorra una llamada a MP, y este
+  // campo es de CONTROL del barrido, no parte del mapeo. Metérselo a `lookupPlan`
+  // mezclaria "de que plan es esta suscripcion" con "hay que seguir mirandola",
+  // que son dos preguntas distintas.
+  //
+  // El caso ocurre DENTRO de la misma corrida: `reconcileAllSubscriptions` toma
+  // el snapshot de `mp_plans` una sola vez, al principio. Cuando el plan nuevo
+  // se confirma y damos de baja el viejo, el barrido todavia tiene el viejo en
+  // la mano como no-terminal — lo va a reconciliar, MP le va a contestar
+  // `cancelled`, y `cancelled` SI puede bajar el limite. Sin esta guarda, la
+  // ultima escritura de la noche seria un `cancelled` encima del plan que el PF
+  // acaba de comprar, con su mail de degradacion y sus alumnos bloqueados.
+  const planSnap = await getFirestore(app)
+    .collection(MP_PLANS_COLLECTION)
+    .doc(planId)
+    .get();
+  const planDoc = planSnap.data();
+
+  const reemplazadoPor = planDoc?.[CAMPO_REEMPLAZO];
+  if (typeof reemplazadoPor === "string" && reemplazadoPor !== "") {
+    logger.info("mp/reconcile: plan reemplazado — su estado ya no es el del PF", {
+      planId,
+      reemplazadoPor,
+    });
+    return { planId, outcome: "skipped-reemplazado" };
+  }
+
   // Se busca POR PLAN y no por id de suscripcion, y esa es la diferencia con la
   // version anterior: el plan lo creamos NOSOTROS y su id ya esta guardado en
   // `mp_plans`. De la suscripcion no sabemos nada hasta que alguien paga — y no
@@ -442,47 +842,71 @@ export async function reconcileSubscription(
     actual.status === status &&
     mismaFecha(periodEnd, actual.currentPeriodEnd);
 
-  if (sinCambios) {
-    return {
+  if (!sinCambios) {
+    await userRef.set(
+      {
+        subscription: {
+          tier: mapping.tier,
+          status,
+          currentPeriodEnd: periodEnd,
+        },
+      },
+      // `merge` y no `set` pelado: el documento de usuario tiene el perfil
+      // entero. Sin merge, reconciliar una suscripcion borraria la cuenta.
+      { merge: true },
+    );
+
+    // La baja es terminal en MP: no se reactiva un preapproval cancelado, se
+    // crea uno nuevo con otro id. Marcarlo saca este id del barrido y le ahorra
+    // una llamada diaria a MP para siempre.
+    if (status === "cancelled") {
+      await getFirestore(app)
+        .collection(MP_PLANS_COLLECTION)
+        .doc(planId)
+        .set({ terminal: true }, { merge: true });
+    }
+
+    logger.info("mp/reconcile: suscripcion actualizada", {
       planId,
-      outcome: "unchanged",
       uid,
       tier: mapping.tier,
       status,
-    };
+    });
   }
 
-  await userRef.set(
-    {
-      subscription: {
-        tier: mapping.tier,
-        status,
-        currentPeriodEnd: periodEnd,
-      },
-    },
-    // `merge` y no `set` pelado: el documento de usuario tiene el perfil
-    // entero. Sin merge, reconciliar una suscripcion borraria la cuenta.
-    { merge: true },
-  );
+  // ── LA BAJA DE LO QUE ESTE PLAN REEMPLAZA ──
+  //
+  // Va DESPUES de escribir y fuera del `if`, por dos razones que son la misma:
+  //
+  //   - Corre tambien con `unchanged`. Si una noche MP rechaza la baja, la
+  //     suscripcion nueva ya quedo escrita y la corrida siguiente la ve sin
+  //     cambios. Colgada del `written`, un unico 429 dejaba el cobro doble vivo
+  //     para siempre.
+  //
+  //   - Solo con la nueva CONFIRMADA. `active` y `grace` son las dos caras del
+  //     `authorized` de MP: en las dos hay medio de pago cargado y la nueva va a
+  //     cobrar. Un `pending` no — ahi el PF todavia no compro nada, y darle de
+  //     baja lo que ya paga a cambio de una intencion es justo el error que este
+  //     diseño evita.
+  const dadosDeBaja =
+    status === "active" || status === "grace"
+      ? await darDeBajaLosReemplazados(
+        app,
+        uid,
+        planId,
+        comoTimestamp(planDoc?.createdAt),
+        deps,
+      )
+      : 0;
 
-  // La baja es terminal en MP: no se reactiva un preapproval cancelado, se crea
-  // uno nuevo con otro id. Marcarlo saca este id del barrido y le ahorra una
-  // llamada diaria a MP para siempre.
-  if (status === "cancelled") {
-    await getFirestore(app)
-      .collection(MP_PLANS_COLLECTION)
-      .doc(planId)
-      .set({ terminal: true }, { merge: true });
-  }
-
-  logger.info("mp/reconcile: suscripcion actualizada", {
+  return {
     planId,
+    outcome: sinCambios ? "unchanged" : "written",
     uid,
     tier: mapping.tier,
     status,
-  });
-
-  return { planId, outcome: "written", uid, tier: mapping.tier, status };
+    dadosDeBaja,
+  };
 }
 
 export interface SweepResult {
@@ -493,6 +917,12 @@ export interface SweepResult {
   errors: number;
   /** Planes que se dieron de baja del barrido por checkout abandonado. */
   abandonados: number;
+  /**
+   * Suscripciones VIEJAS canceladas en MP por un cambio de plan. Cada una es un
+   * cobro doble que dejo de ocurrir, asi que vale la pena verlo en el log de la
+   * corrida: si empieza a subir, algo esta creando checkouts de mas.
+   */
+  dadosDeBaja: number;
 }
 
 /**
@@ -569,6 +999,7 @@ export async function reconcileAllSubscriptions(
     skipped: 0,
     errors: 0,
     abandonados: 0,
+    dadosDeBaja: 0,
   };
 
   for (const doc of snap.docs) {
@@ -584,12 +1015,13 @@ export async function reconcileAllSubscriptions(
       else if (res.outcome === "unchanged") r.unchanged += 1;
       else if (res.outcome === "error-mp") r.errors += 1;
       else r.skipped += 1;
+      r.dadosDeBaja += res.dadosDeBaja ?? 0;
 
       if (
         res.outcome === "sin-suscripcion" &&
         esAbandonado(datos?.createdAt, deps.nowMs)
       ) {
-        await marcarTerminal(app, doc.id, "checkout abandonado");
+        await marcarTerminal(app, doc.id, MOTIVO_ABANDONO);
         r.abandonados += 1;
       }
     } catch (err) {
