@@ -251,20 +251,40 @@ void main() {
       'renders the workout-days streak calendar below the summary cards '
       'for the selected month', (tester) async {
     final repo = MockSessionRepository();
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    // El bucket de semana se calcula en el frame ART (`mondayOfWeekArt`), y
+    // `toArgentina` RESTA tres horas asumiendo que recibe un instante
+    // UTC-flagged — que es lo que garantiza `TimestampConverter` en el camino
+    // de produccion. Este fixture pasaba un `DateTime(...)` LOCAL, o sea
+    // violaba ese contrato, y cada sesion se corria un dia para atras en el
+    // calendario ART: el martes pasaba a lunes y el lunes a domingo. Con
+    // semanas lunes-domingo, ese domingo cae en la semana ANTERIOR, la racha
+    // daba 2 y el test fallaba TODOS LOS MARTES — verde los otros seis dias,
+    // que es la peor forma de estar roto.
+    //
+    // Anclarlo al lunes de la semana ART en curso lo vuelve independiente del
+    // dia en que corra CI: las dos sesiones caen siempre en la misma semana,
+    // y nunca en el futuro. El mediodia deja margen para que el corrimiento
+    // de tres horas no cruce la medianoche.
+    //
+    // No es un patron nuevo: `racha_parity_test.dart` ya ancla asi sus
+    // fixtures (`_artNoonWeeksAgo`) y documenta la misma trampa — "si hoy es
+    // lunes, 'ayer' ya es la semana pasada". Este test simplemente no la
+    // seguia.
+    final lunesArt = mondayOfWeekArt(toArgentina(DateTime.now().toUtc()));
+    final manana = DateTime.utc(lunesArt.year, lunesArt.month, lunesArt.day, 12);
+    final tarde = DateTime.utc(lunesArt.year, lunesArt.month, lunesArt.day, 18);
     when(() => repo.listByUid('u1', limit: any(named: 'limit')))
         .thenAnswer((_) async => [
               makeSession(
                 id: 's1',
-                startedAt: today,
+                startedAt: manana,
                 status: SessionStatus.finished,
                 wasFullyCompleted: true,
                 durationMin: 45,
               ),
               makeSession(
                 id: 's2',
-                startedAt: today.subtract(const Duration(days: 1)),
+                startedAt: tarde,
                 status: SessionStatus.finished,
                 wasFullyCompleted: true,
               ),
