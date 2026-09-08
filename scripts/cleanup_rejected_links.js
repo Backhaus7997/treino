@@ -42,16 +42,24 @@
  * O sea: un vínculo REAL viejo pudo quedar sin `acceptedAt`. Borrarlo sería
  * exactamente el daño que este script existe para evitar.
  *
- * Por eso el criterio de borrado es COMPUESTO — `acceptedAt == null` **y**
- * `terminationReason` ∈ {declined, cancelled-by-athlete}, que son las dos
- * únicas razones que el cliente escribe sobre un `pending`
- * (`lib/features/coach/data/trainer_link_repository.dart`). Todo lo demás con
- * `acceptedAt == null` se reporta como AMBIGUO y NO SE TOCA, para que lo mire
- * una persona.
+ * Por eso el criterio de borrado es COMPUESTO — `acceptedAt == null` **y** una
+ * señal positiva de que nunca hubo vínculo:
+ *
+ *   · `terminationReason` ∈ {declined, cancelled-by-athlete} — las dos únicas
+ *     razones que el cliente escribe sobre un `pending`
+ *     (`lib/features/coach/data/trainer_link_repository.dart`).
+ *   · `reason == 'account-deleted'` — lo escribe
+ *     `functions/src/cascade/trainer-links.ts` cuando el atleta borra su
+ *     cuenta. OJO: `reason`, NO `terminationReason`. Son campos distintos, y
+ *     confundirlos dejó estos docs sin juntar por ninguna de las dos puertas.
+ *
+ * Todo lo demás con `acceptedAt == null` se reporta como AMBIGUO y NO SE TOCA,
+ * para que lo mire una persona.
  *
  * ── SALIDA: TRES GRUPOS ─────────────────────────────────────────────────────
  *
- *   BORRA     acceptedAt == null  Y  reason ∈ {declined, cancelled-by-athlete}
+ *   BORRA     acceptedAt == null  Y  (terminationReason ∈ {declined,
+ *             cancelled-by-athlete}  O  reason == 'account-deleted')
  *   AMBIGUO   acceptedAt == null  pero reason es otro o falta   → NO se toca
  *   CONSERVA  acceptedAt != null  (vínculo real terminado)      → NO se toca
  *
@@ -200,9 +208,18 @@ function parseArgs(argv) {
  * @returns {'borra'|'ambiguo'|'conserva'}
  */
 function clasificar(data) {
+  // `acceptedAt` gana ANTES que cualquier razón: si hubo relación, se conserva.
+  // Vale también para la cuenta borrada — el atleta se fue, pero los pagos y
+  // las sesiones que le cuelgan al PF siguen existiendo.
   if (data.acceptedAt != null) return 'conserva';
-  const razon = data.terminationReason;
-  return RAZONES_DE_NO_VINCULO.has(razon) ? 'borra' : 'ambiguo';
+
+  // `reason` (NO `terminationReason`) es lo que escribe
+  // `functions/src/cascade/trainer-links.ts` cuando el atleta borra su cuenta.
+  // Son campos DISTINTOS y confundirlos dejó el agujero: estos docs caían en
+  // AMBIGUO y no los juntaba nadie. Hubo uno real en producción.
+  if (data.reason === 'account-deleted') return 'borra';
+
+  return RAZONES_DE_NO_VINCULO.has(data.terminationReason) ? 'borra' : 'ambiguo';
 }
 
 /** Cuenta por `terminationReason`, con `(sin razón)` para el faltante. */

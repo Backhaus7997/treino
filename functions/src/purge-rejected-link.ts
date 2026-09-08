@@ -47,26 +47,24 @@
  * (`notifications/notify-link-change.ts`) ya corta antes, y hay un test que lo
  * pinea. Si algún día se llama desde otro lado, ese guard hay que traerlo.
  *
- * ── HUECO CONOCIDO, ABIERTO A PROPÓSITO ─────────────────────────────────────
+ * ── LA CUENTA BORRADA, Y POR QUÉ NO SE ARREGLÓ EN LA CASCADA ────────────────
  *
- * Las solicitudes `pending` del atleta que BORRA SU CUENTA no se purgan nunca,
- * y desde que se sacó el tab «Rechazadas» tampoco se ven. Son basura invisible
- * que crece.
+ * `cascade/trainer-links.ts` termina las solicitudes del atleta que borra su
+ * cuenta con `reason: 'account-deleted'` — OJO: `reason`, NO
+ * `terminationReason`. Son dos campos distintos, y confundirlos fue justo lo
+ * que dejó el agujero: el clasificador miraba sólo `terminationReason`, así que
+ * estos docs no entraban por ninguna puerta y se acumulaban invisibles.
  *
- * Por qué no se cierra acá: `cascade/trainer-links.ts` las deja en `terminated`
- * con `reason: 'account-deleted'` — ojo, `reason`, NO `terminationReason`. O
- * sea que aunque el purge llegara a verlas, `clasificarTerminacion` las ve sin
- * razón y las clasifica `vinculo-real`. Mover el purge antes del guard de
- * `account-deleted` no cambiaría nada. `scripts/cleanup_rejected_links.js`
- * tampoco las junta, por lo mismo.
+ * Se cierra ACÁ, en el clasificador, y no en la cascada, por una razón concreta:
+ * hacer que la cascada BORRE en vez de terminar significaría borrar un doc en
+ * `pending`, y la guarda de `sync-session-share.ts` sólo cubre el delete de un
+ * `terminated` sin `acceptedAt`. Un delete de `pending` cae al camino de
+ * revocación y puede llevarse el share de otro vínculo del mismo par.
  *
- * Y por qué no se arregla en la cascada, que es donde iría: hacer que BORRE en
- * vez de terminar reintroduce el robo de share que arregló
- * `sync-session-share.ts`. Su guarda cubre el delete de un `terminated` sin
- * `acceptedAt`; un delete de un `pending` cae al camino de revocación, y si el
- * par tiene otro vínculo vivo con el MISMO PF, le borra el share. Cerrar esto
- * bien pide primero que `session_shares/{athleteId}` sepa de qué `linkId`
- * viene — que es su propio cambio, no una línea acá.
+ * Dejando que la cascada termine como siempre, el doc que se borra YA es
+ * `terminated` sin `acceptedAt` — exactamente el conjunto que esa guarda cubre.
+ * Y sigue habiendo UNA sola vía de borrado y UN solo clasificador, que es lo
+ * que este módulo entero existe para sostener.
  */
 import { App } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
@@ -85,7 +83,11 @@ import { logger } from "firebase-functions";
 const RAZONES_DE_NO_VINCULO = new Set(["declined", "cancelled-by-athlete"]);
 
 /** Qué fue, en realidad, este `terminated`. */
-export type CausaDeTerminacion = "rechazo" | "cancelacion" | "vinculo-real";
+export type CausaDeTerminacion =
+  | "rechazo"
+  | "cancelacion"
+  | "cuenta-borrada"
+  | "vinculo-real";
 
 /**
  * LA ÚNICA respuesta a «¿qué fue este `terminated`?».
@@ -109,7 +111,20 @@ export type CausaDeTerminacion = "rechazo" | "cancelacion" | "vinculo-real";
 export function clasificarTerminacion(
   after: Record<string, unknown>,
 ): CausaDeTerminacion {
+  // `acceptedAt` gana ANTES que cualquier razón: si hubo relación, se conserva.
+  // Vale también para la cuenta borrada — el atleta se fue, pero los pagos y
+  // las sesiones que le cuelgan al PF siguen existiendo.
   if (after.acceptedAt != null) return "vinculo-real";
+
+  // `reason` (NO `terminationReason`) es el campo que escribe
+  // `cascade/trainer-links.ts` cuando el atleta borra su cuenta. Son dos campos
+  // distintos y confundirlos fue justo lo que dejó este agujero abierto: el
+  // clasificador miraba sólo `terminationReason`, la cascada escribe `reason`,
+  // y estos docs no entraban por ninguna de las dos puertas.
+  //
+  // Una solicitud que nunca fue aceptada, de alguien que ya no existe, es
+  // basura por la misma definición que un rechazo.
+  if (after.reason === "account-deleted") return "cuenta-borrada";
   if (!RAZONES_DE_NO_VINCULO.has(after.terminationReason as string)) {
     // Razón ausente, desconocida o que no es string. No se puede afirmar que
     // nunca hubo vínculo, así que se conserva: el modo de falla de todo esto

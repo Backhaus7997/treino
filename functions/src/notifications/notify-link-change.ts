@@ -13,6 +13,7 @@
  *       pending → active → notify athlete (aceptada), deepLink "/coach"
  *       active → paused → notify athlete (pausada), deepLink "/coach"
  *       paused → active → notify athlete (reanudada), deepLink "/coach"
+ *       terminated + reason 'account-deleted' → NO notifica, pero purga
  *       terminated + reason 'declined' → notify ATHLETE (el PF rechazó)
  *       terminated + reason 'cancelled-by-athlete' → notify TRAINER
  *       * → terminated (resto) → notify BOTH, deepLink "/coach"
@@ -207,9 +208,20 @@ export async function notifyOnLinkChangeHandler(
   const trainerId = after.trainerId as string | undefined;
   const athleteId = after.athleteId as string | undefined;
 
-  // Guard: cascade delete — account deleted.
+  // Guard: cascade delete — account deleted. NO se notifica, pero SÍ se purga.
+  //
+  // Esta rama devolvía antes sin más, y con eso cancelaba el efecto de cola:
+  // las solicitudes `pending` del atleta que borraba su cuenta quedaban
+  // `terminated` para siempre, sin que las juntara nadie y —desde que se sacó
+  // el tab «Rechazadas»— sin que se vieran. Basura invisible que crecía.
+  //
+  // Lo que el guard protege es el SPAM: nadie tiene que recibir un push por la
+  // cascada. Eso se mantiene. Lo que no tenía por qué arrastrar era el borrado.
   if (reason === "account-deleted") {
-    logger.info("notifyOnLinkChange: skipping cascade reason=account-deleted");
+    logger.info("notifyOnLinkChange: cascada account-deleted — sin push, con purga");
+    if (afterStatus === "terminated") {
+      await purgeRejectedLinkHandler(app, linkId, clasificarTerminacion(after));
+    }
     return;
   }
 
