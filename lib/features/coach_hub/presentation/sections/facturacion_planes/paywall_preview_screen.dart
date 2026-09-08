@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
+
+import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../../app/theme/app_palette.dart';
 import '../../../../../core/widgets/motion/treino_tappable.dart';
@@ -28,9 +29,10 @@ class PaywallPreviewScreen extends StatelessWidget {
         children: [
           Text(
             'PAYWALL — PREVIEW (dev)',
-            style: GoogleFonts.barlowCondensed(
+            style: TextStyle(
+              fontFamily: AppFonts.barlowCondensed,
               color: palette.textPrimary,
-              fontSize: 24,
+              fontSize: AppTextSize.heading,
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -38,7 +40,8 @@ class PaywallPreviewScreen extends StatelessWidget {
           Text(
             'Dispara cada pantalla del paywall en sus distintos estados. '
             'Solo para smoke — el trigger real llega con PR4/PR5.',
-            style: TextStyle(color: palette.textMuted, fontSize: 13),
+            style: TextStyle(
+                color: palette.textMuted, fontSize: AppTextSize.bodyDense),
           ),
           const SizedBox(height: 24),
           _PreviewButton(
@@ -103,9 +106,10 @@ class _PreviewButton extends StatelessWidget {
           ),
           child: Text(
             label,
-            style: GoogleFonts.barlowCondensed(
+            style: TextStyle(
+              fontFamily: AppFonts.barlowCondensed,
               color: palette.accent,
-              fontSize: 14,
+              fontSize: AppTextSize.body,
               fontWeight: FontWeight.w700,
             ),
           ),

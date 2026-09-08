@@ -67,10 +67,10 @@ void main() {
 
     /// Techo de archivos permitidos, congelado con el PR que trae el guard.
     /// NUNCA subirlo: cada migración lo baja.
-    const allowlistCeiling = 260;
+    const allowlistCeiling = 258;
 
     /// Techo de ocurrencias totales en `lib/`. Mismo contrato: sólo baja.
-    const rawFontSizeDebtCeiling = 1825;
+    const rawFontSizeDebtCeiling = 1784;
 
     /// Allowlist de rutas relativas a `lib/` que todavía tienen `fontSize`
     /// crudo. Es un REGISTRO DE DEUDA, no una licencia.
@@ -164,9 +164,7 @@ void main() {
       'features/coach_hub/presentation/sections/dashboard/widgets/dashboard_right_column.dart',
       'features/coach_hub/presentation/sections/facturacion_planes/blocked_students_screen.dart',
       'features/coach_hub/presentation/sections/facturacion_planes/keep_students_screen.dart',
-      'features/coach_hub/presentation/sections/facturacion_planes/paywall_preview_screen.dart',
       'features/coach_hub/presentation/sections/facturacion_planes/plan_limit_paywall.dart',
-      'features/coach_hub/presentation/sections/facturacion_planes/plan_upsell_banner.dart',
       'features/coach_hub/presentation/sections/facturacion_planes/pricing_screen.dart',
       'features/coach_hub/presentation/sections/invitaciones/widgets/solicitud_card.dart',
       'features/coach_hub/presentation/sections/pagos/pagos_web_screen.dart',

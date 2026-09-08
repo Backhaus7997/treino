@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../../app/theme/app_palette.dart';
@@ -259,9 +259,10 @@ class _PlanLimitPaywallContent extends StatelessWidget {
               ? 'TU SUSCRIPCIÓN ESTÁ SUSPENDIDA' // i18n: Fase W3
               : 'LLEGASTE AL LÍMITE DE TU PLAN', // i18n: Fase W3
           textAlign: TextAlign.center,
-          style: GoogleFonts.barlowCondensed(
+          style: TextStyle(
+            fontFamily: AppFonts.barlowCondensed,
             color: palette.textPrimary,
-            fontSize: 24,
+            fontSize: AppTextSize.heading,
             fontWeight: FontWeight.w800,
             letterSpacing: 0.5,
           ),
@@ -278,7 +279,8 @@ class _PlanLimitPaywallContent extends StatelessWidget {
                   '${cupoTexto(currentTier)}. Para sumar más, '
                   'subí de plan.', // i18n: Fase W3
           textAlign: TextAlign.center,
-          style: TextStyle(color: palette.textMuted, fontSize: 14),
+          style:
+              TextStyle(color: palette.textMuted, fontSize: AppTextSize.body),
         ),
         const SizedBox(height: 22),
         if (isInactive)
@@ -309,7 +311,7 @@ class _PlanLimitPaywallContent extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: palette.textMuted,
-                fontSize: 13,
+                fontSize: AppTextSize.bodyDense,
               ),
             ),
           ),
@@ -341,7 +343,8 @@ class _UpsellBox extends StatelessWidget {
         children: [
           Text(
             'PASATE A ${tierName(nextTier).toUpperCase()}', // i18n: Fase W3
-            style: GoogleFonts.barlowCondensed(
+            style: TextStyle(
+              fontFamily: AppFonts.barlowCondensed,
               color: palette.accent,
               fontSize: 15,
               fontWeight: FontWeight.w700,
@@ -365,16 +368,18 @@ class _UpsellBox extends StatelessWidget {
                   padding: const EdgeInsets.only(top: 6, right: 2),
                   child: Text(
                     '\$',
-                    style: GoogleFonts.barlowCondensed(
+                    style: TextStyle(
+                      fontFamily: AppFonts.barlowCondensed,
                       color: palette.textPrimary,
-                      fontSize: 20,
+                      fontSize: AppTextSize.titleLarge,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
                 Text(
                   _formatArs(price.monthly),
-                  style: GoogleFonts.barlowCondensed(
+                  style: TextStyle(
+                    fontFamily: AppFonts.barlowCondensed,
                     color: palette.textPrimary,
                     fontSize: 40,
                     fontWeight: FontWeight.w800,
@@ -385,7 +390,9 @@ class _UpsellBox extends StatelessWidget {
                   padding: const EdgeInsets.only(top: 18, left: 4),
                   child: Text(
                     '/mes', // i18n: Fase W3
-                    style: TextStyle(color: palette.textMuted, fontSize: 13),
+                    style: TextStyle(
+                        color: palette.textMuted,
+                        fontSize: AppTextSize.bodyDense),
                   ),
                 ),
               ],
@@ -398,7 +405,7 @@ class _UpsellBox extends StatelessWidget {
                 : 'Hasta ${nextTier.weightLimit} alumnos', // i18n: Fase W3
             style: TextStyle(
               color: palette.textMuted,
-              fontSize: 13,
+              fontSize: AppTextSize.bodyDense,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -427,7 +434,8 @@ class _CustomPlanBox extends StatelessWidget {
         children: [
           Text(
             'PLAN A MEDIDA', // i18n: Fase W3
-            style: GoogleFonts.barlowCondensed(
+            style: TextStyle(
+              fontFamily: AppFonts.barlowCondensed,
               color: palette.textPrimary,
               fontSize: 15,
               fontWeight: FontWeight.w700,
@@ -439,7 +447,8 @@ class _CustomPlanBox extends StatelessWidget {
             'Estás en el plan más grande. Para más de 15 alumnos '
             'estamos preparando un plan a tu medida.', // i18n: Fase W3
             textAlign: TextAlign.center,
-            style: TextStyle(color: palette.textMuted, fontSize: 13),
+            style: TextStyle(
+                color: palette.textMuted, fontSize: AppTextSize.bodyDense),
           ),
         ],
       ),
@@ -474,7 +483,8 @@ class _ReactivateBox extends StatelessWidget {
         children: [
           Text(
             'TU PLAN: ${tierName(currentTier).toUpperCase()}', // i18n: Fase W3
-            style: GoogleFonts.barlowCondensed(
+            style: TextStyle(
+              fontFamily: AppFonts.barlowCondensed,
               color: palette.textPrimary,
               fontSize: 15,
               fontWeight: FontWeight.w700,
@@ -487,13 +497,15 @@ class _ReactivateBox extends StatelessWidget {
             'Reactivalo y volvés a tus ${cupoTexto(currentTier)} '
             'al instante.', // i18n: Fase W3
             textAlign: TextAlign.center,
-            style: TextStyle(color: palette.textMuted, fontSize: 13),
+            style: TextStyle(
+                color: palette.textMuted, fontSize: AppTextSize.bodyDense),
           ),
           if (status != null) ...[
             const SizedBox(height: 8),
             Text(
               'Estado: ${_statusName(status!)}', // i18n: Fase W3
-              style: TextStyle(color: palette.textMuted, fontSize: 12),
+              style: TextStyle(
+                  color: palette.textMuted, fontSize: AppTextSize.caption),
             ),
           ],
         ],
@@ -579,9 +591,10 @@ class _PrimaryCta extends StatelessWidget {
           ),
           child: Text(
             'REGULARIZAR', // i18n: Fase W3
-            style: GoogleFonts.barlowCondensed(
+            style: TextStyle(
+              fontFamily: AppFonts.barlowCondensed,
               color: TreinoButtonTokens.foreground(context),
-              fontSize: 14,
+              fontSize: AppTextSize.body,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.6,
             ),
@@ -615,9 +628,10 @@ class _PrimaryCta extends StatelessWidget {
         ),
         child: Text(
           hasNext ? 'VER PLANES' : 'CONTACTANOS', // i18n: Fase W3
-          style: GoogleFonts.barlowCondensed(
+          style: TextStyle(
+            fontFamily: AppFonts.barlowCondensed,
             color: TreinoButtonTokens.foreground(context),
-            fontSize: 14,
+            fontSize: AppTextSize.body,
             fontWeight: FontWeight.w700,
             letterSpacing: 0.6,
           ),

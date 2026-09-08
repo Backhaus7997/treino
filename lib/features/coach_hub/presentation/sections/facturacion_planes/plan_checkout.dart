@@ -180,7 +180,6 @@ Future<String?> Function({
   required bool annual,
 })? debugPlanCheckoutCreator;
 
-
 /// Inyecta el navegador. SÓLO para tests: sin esto, probar el punto de compra
 /// abriría Mercado Pago de verdad desde la suite.
 @visibleForTesting
