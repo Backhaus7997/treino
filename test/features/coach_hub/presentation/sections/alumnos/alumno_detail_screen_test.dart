@@ -13,6 +13,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/locale_resolver.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/core/widgets/treino_segmented_pill.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
@@ -522,6 +523,37 @@ void main() {
       expect(find.text('· Mensual'), findsNothing);
       // El botón Pago está siempre (no depende de billing).
       expect(find.widgetWithText(OutlinedButton, 'Pago'), findsOneWidget);
+    });
+
+    testWidgets(
+        'ningún nivel de navegación usa TreinoSegmentedPill — ni el primero '
+        'ni las sub-vistas de los cuatro grupos que la tienen',
+        (tester) async {
+      // El guard que faltó. La migración de la sub-navegación se hizo con un
+      // reemplazo de texto que NO matcheaba —una coma de más en el patrón— y
+      // como el script usaba `if patrón in texto` en vez de `assert`, falló en
+      // silencio: migró sólo el grupo Privado, el único escrito con un literal.
+      // Los otros tres se mergearon con la píldora intacta y lo encontró el
+      // usuario mirando la pantalla, no el CI.
+      //
+      // Este test recorre los cuatro grupos con sub-vista. Que la píldora sea
+      // del kit y siga siendo correcta en Feed, Entrenar, Coach y el discovery
+      // es justamente por qué su ausencia acá no se puede afirmar mirando un
+      // solo lugar.
+      await _pump(tester,
+          profile: _prof(), link: _link(TrainerLinkStatus.active));
+
+      expect(find.byType(TreinoSegmentedPill), findsNothing,
+          reason: 'el primer nivel volvió a la píldora');
+
+      for (final grupo in ['Entrenamiento', 'Progreso', 'Plan', 'Privado']) {
+        await navigateAlumnoDetail(tester, group: grupo);
+        expect(
+          find.byType(TreinoSegmentedPill),
+          findsNothing,
+          reason: 'la sub-navegación de $grupo volvió a la píldora',
+        );
+      }
     });
 
     testWidgets(

@@ -81,7 +81,6 @@ import '../pagos/widgets/pagos_table.dart';
 import '../pagos/widgets/payment_format.dart';
 import 'alumnos_screen.dart' show AlumnoEstado, AlumnoEstadoX, estadoForLink;
 import 'resumen_metrics.dart';
-import 'package:treino/core/widgets/treino_segmented_pill.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
 
 /// Estado de un grupo de la ficha, para su marca en la barra.
@@ -638,7 +637,7 @@ class _SubNav extends StatelessWidget {
         // con pesos distintos la tira se re-layoutea en cada cambio.
         unselectedLabelStyle: estilo,
         labelPadding: const EdgeInsets.symmetric(
-          horizontal: TreinoSegmentedPillTokens.labelPadding,
+          horizontal: AppSpacing.s8,
         ),
         tabs: [for (final l in labels) Tab(height: 34, text: l)],
       ),
@@ -695,7 +694,7 @@ class _SeccionesTabBar extends StatelessWidget {
       // desborda antes de los 900px de ancho. Mismo valor que usa el pill del
       // kit por la misma razón.
       labelPadding: const EdgeInsets.symmetric(
-        horizontal: TreinoSegmentedPillTokens.labelPadding,
+        horizontal: AppSpacing.s8,
       ),
       labelStyle: const TextStyle(
         fontFamily: AppFonts.barlow,
@@ -937,10 +936,8 @@ class _PlanTab extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 24),
-            child: TreinoSegmentedPill(
-              labels: ['Nutrición', 'Archivos'], // i18n: Fase W2
-            ),
+            padding: EdgeInsets.fromLTRB(24, 12, 24, 0),
+            child: _SubNav(labels: ['Nutrición', 'Archivos']), // i18n: Fase W2
           ),
           const SizedBox(height: 12),
           Expanded(
@@ -1133,10 +1130,8 @@ class _ProgresoTabState extends ConsumerState<_ProgresoTab> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 24),
-            child: TreinoSegmentedPill(
-              labels: ['Antropometría', 'Rendimiento'], // i18n: Fase W2
-            ),
+            padding: EdgeInsets.fromLTRB(24, 12, 24, 0),
+            child: _SubNav(labels: ['Antropometría', 'Rendimiento']), // i18n: Fase W2
           ),
           const SizedBox(height: 12),
           Expanded(
@@ -2534,10 +2529,8 @@ class _EntrenamientoTab extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 24),
-            child: TreinoSegmentedPill(
-              labels: ['Rutina', 'Sesiones'], // i18n: Fase W2
-            ),
+            padding: EdgeInsets.fromLTRB(24, 12, 24, 0),
+            child: _SubNav(labels: ['Rutina', 'Sesiones']), // i18n: Fase W2
           ),
           const SizedBox(height: 12),
           Expanded(
