@@ -33,9 +33,8 @@
  * el par de snapshots que esa escritura produce.
  */
 
-import * as admin from "firebase-admin";
-import { App, deleteApp } from "firebase-admin/app";
-import { DocumentData } from "firebase-admin/firestore";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
+import { DocumentData, FieldValue, Timestamp, getFirestore } from "firebase-admin/firestore";
 import { Messaging, MulticastMessage } from "firebase-admin/messaging";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
@@ -51,7 +50,7 @@ import { notifyOnAppointmentHandler } from "../../notifications/notify-appointme
 let testApp: App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp(
+  testApp = initializeApp(
     { projectId: "treino-dev" },
     "appointments-notify-contract-test",
   );
@@ -61,7 +60,7 @@ afterAll(async () => {
   await deleteApp(testApp);
 });
 
-const db = () => admin.firestore(testApp);
+const db = () => getFirestore(testApp);
 
 const athleteId = "athlete-cascade-notify-846";
 const trainerId = "trainer-cascade-notify-846";
@@ -77,8 +76,8 @@ function makeMockMessaging(): Messaging {
   } as unknown as Messaging;
 }
 
-function futureDate(): admin.firestore.Timestamp {
-  return admin.firestore.Timestamp.fromDate(
+function futureDate(): Timestamp {
+  return Timestamp.fromDate(
     new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
   );
 }
@@ -256,8 +255,8 @@ describe("#846: el guard no se puede forjar desde el cliente", () => {
     await ref.update({
       status: "cancelled",
       cancelledBy: athleteId,
-      cancelledAt: admin.firestore.Timestamp.now(),
-      cancellationLog: admin.firestore.FieldValue.arrayUnion({
+      cancelledAt: Timestamp.now(),
+      cancellationLog: FieldValue.arrayUnion({
         byUid: athleteId,
         atMs: Date.now(),
         reason: ATHLETE_ACCOUNT_DELETED_REASON,

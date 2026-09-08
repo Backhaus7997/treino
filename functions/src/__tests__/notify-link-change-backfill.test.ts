@@ -19,8 +19,8 @@
  * Corre contra el emulador de Firestore, igual que notify-link-change.test.ts.
  */
 
-import * as admin from "firebase-admin";
-import { App, deleteApp } from "firebase-admin/app";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { Messaging, MulticastMessage } from "firebase-admin/messaging";
 import { notifyOnLinkChangeHandler } from "../notifications/notify-link-change";
 
@@ -36,7 +36,7 @@ process.env.GCLOUD_PROJECT ??= "treino-dev";
 let testApp: App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp(
+  testApp = initializeApp(
     { projectId: "treino-dev" },
     "notify-link-change-backfill-test",
   );
@@ -53,7 +53,7 @@ afterAll(async () => {
   await deleteApp(testApp);
 });
 
-const db = () => admin.firestore(testApp);
+const db = () => getFirestore(testApp);
 
 function makeMockMessaging(): Messaging {
   return {
@@ -88,7 +88,7 @@ async function seedChat(fields: Record<string, unknown>): Promise<string> {
     .set({
       chatId: id,
       members: [ATHLETE, TRAINER].sort(),
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
       ...fields,
     });
   return id;

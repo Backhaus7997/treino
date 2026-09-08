@@ -16,9 +16,9 @@
  * REQ-PN-CF-004. Fase 6 Etapa 2 + Etapa 3.
  */
 
-import * as admin from "firebase-admin";
-import { App, deleteApp } from "firebase-admin/app";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
 import { Messaging, MulticastMessage } from "firebase-admin/messaging";
+import { getFirestore } from "firebase-admin/firestore";
 import { notifyOnLinkChangeHandler } from "../notifications/notify-link-change";
 import { dedupeKey } from "../mail/enqueue-mail";
 import { MAIL_QUEUE_COLLECTION } from "../mail/types";
@@ -31,7 +31,7 @@ process.env.GCLOUD_PROJECT = "treino-dev";
 let testApp: App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp(
+  testApp = initializeApp(
     { projectId: "treino-dev" },
     "notify-link-change-test",
   );
@@ -41,7 +41,7 @@ afterAll(async () => {
   await deleteApp(testApp);
 });
 
-const db = () => admin.firestore(testApp);
+const db = () => getFirestore(testApp);
 
 function makeMockMessaging(): Messaging {
   return {

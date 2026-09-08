@@ -6,8 +6,8 @@
  *   SCENARIO-544 — Future appointment cancelled, past appointment unchanged (REQ-ACCDEL-CF-009)
  */
 
-import * as admin from "firebase-admin";
-import { App, deleteApp } from "firebase-admin/app";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
+import { FieldValue, Timestamp, getFirestore } from "firebase-admin/firestore";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
@@ -16,7 +16,7 @@ process.env.GCLOUD_PROJECT = "treino-dev";
 let testApp: App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp({ projectId: "treino-dev" }, "appointments-cascade-test");
+  testApp = initializeApp({ projectId: "treino-dev" }, "appointments-cascade-test");
 });
 
 afterAll(async () => {
@@ -26,16 +26,16 @@ afterAll(async () => {
 // Import the module under test — will fail until implementation exists
 import { cancelFutureAppointments } from "../../cascade/appointments";
 
-const db = () => admin.firestore(testApp);
+const db = () => getFirestore(testApp);
 
-function futureDate(): admin.firestore.Timestamp {
-  return admin.firestore.Timestamp.fromDate(
+function futureDate(): Timestamp {
+  return Timestamp.fromDate(
     new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days ahead
   );
 }
 
-function pastDate(): admin.firestore.Timestamp {
-  return admin.firestore.Timestamp.fromDate(
+function pastDate(): Timestamp {
+  return Timestamp.fromDate(
     new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) // 7 days ago
   );
 }
@@ -53,7 +53,7 @@ async function seedAppointment(
     // `scheduledAt`, matching the buggy query and masking the defect.
     startsAt: opts.isFuture ? futureDate() : pastDate(),
     status: opts.status ?? "confirmed",
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    createdAt: FieldValue.serverTimestamp(),
   });
 }
 

@@ -41,6 +41,7 @@ jest.mock("firebase-admin/firestore", () => (
 
 import * as admin from "firebase-admin";
 import { App } from "firebase-admin/app";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import {
   createFakeFirestore,
   FakeDoc,
@@ -218,12 +219,12 @@ describe("syncTrainerLoad — gate boundary (strict <=)", () => {
 
     expect(state.trainer_links.L1.status).toBe("active");
     expect(state.trainer_links.L1.acceptedAt).toEqual(
-      admin.firestore.Timestamp.fromMillis(1_700_000_000_000),
+      Timestamp.fromMillis(1_700_000_000_000),
     );
   });
 
   it("resume clears pausedAt and does NOT restamp acceptedAt (replaces repository.resume)", async () => {
-    const originalAcceptedAt = admin.firestore.Timestamp.fromMillis(1_600_000_000_000);
+    const originalAcceptedAt = Timestamp.fromMillis(1_600_000_000_000);
     const state = install({
       trainer_links: {
         ...seedActiveLinks(2),
@@ -231,7 +232,7 @@ describe("syncTrainerLoad — gate boundary (strict <=)", () => {
           athleteId: "paused-1",
           status: "paused",
           acceptedAt: originalAcceptedAt,
-          pausedAt: admin.firestore.Timestamp.fromMillis(1_650_000_000_000),
+          pausedAt: Timestamp.fromMillis(1_650_000_000_000),
         }),
       },
       users: { "trainer-1": { subscription: plan1Active } },
@@ -243,7 +244,7 @@ describe("syncTrainerLoad — gate boundary (strict <=)", () => {
     });
 
     expect(state.trainer_links.L1.status).toBe("active");
-    expect(state.trainer_links.L1.pausedAt).toBe(admin.firestore.FieldValue.delete());
+    expect(state.trainer_links.L1.pausedAt).toBe(FieldValue.delete());
     // Preserved — a resumed link is NOT a new one (repository.resume contract).
     expect(state.trainer_links.L1.acceptedAt).toEqual(originalAcceptedAt);
   });

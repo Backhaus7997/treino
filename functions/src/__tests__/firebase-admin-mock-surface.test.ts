@@ -291,9 +291,23 @@ describe("la superficie mockeada de firebase-admin cubre lo que el código impor
       if (!mockeados.has("firebase-admin")) continue;
 
       const cuerpoNs = cuerpoEfectivo(cuerpoDelMock(codigo, "firebase-admin"));
-      const { relativos } = analizar(test);
+      const propio = analizar(test);
 
-      for (const [subpath, porNombre] of subpathsAlcanzados(relativos)) {
+      // El grafo de PRODUCCIÓN no es lo único que importa subpaths: desde el PR 5b
+      // los tests los importan por su cuenta (`getFirestore(testApp)` en su propio
+      // cuerpo). Un test que mockea `firebase-admin` y encima importa `getAuth` del
+      // subpath sin mockearlo recibe el SDK REAL — mismo agujero, otra puerta.
+      const alcanzados = subpathsAlcanzados(propio.relativos);
+      for (const [subpath, nombres] of Object.entries(propio.subpaths)) {
+        if (!alcanzados.has(subpath)) alcanzados.set(subpath, new Map());
+        const porNombre = alcanzados.get(subpath) as Map<string, Set<string>>;
+        for (const nombre of nombres) {
+          if (!porNombre.has(nombre)) porNombre.set(nombre, new Set());
+          (porNombre.get(nombre) as Set<string>).add(`${path.relative(TESTS, test)} (el test mismo)`);
+        }
+      }
+
+      for (const [subpath, porNombre] of alcanzados) {
         // Mockear el subpath NO alcanza: el doble tiene que TRAER los símbolos que
         // producción le pide. Es un hueco real, no teórico — en el PR 4
         // `mp-reconcile.test.ts` ya mockeaba `firebase-admin/firestore` (con

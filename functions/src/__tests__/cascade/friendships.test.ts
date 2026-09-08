@@ -13,8 +13,8 @@
  *   SCENARIO-539 — cero documentos es un no-op (REQ-ACCDEL-CF-005)
  */
 
-import * as admin from "firebase-admin";
-import { App, deleteApp } from "firebase-admin/app";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
@@ -23,7 +23,7 @@ process.env.GCLOUD_PROJECT = "treino-dev";
 let testApp: App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp({ projectId: "treino-dev" }, "follows-cascade-test");
+  testApp = initializeApp({ projectId: "treino-dev" }, "follows-cascade-test");
 });
 
 afterAll(async () => {
@@ -33,7 +33,7 @@ afterAll(async () => {
 // Import the module under test — will fail until implementation exists
 import { sweepFollows } from "../../cascade/friendships";
 
-const db = () => admin.firestore(testApp);
+const db = () => getFirestore(testApp);
 
 const edgeId = (follower: string, followee: string) => `${follower}_${followee}`;
 
@@ -44,7 +44,7 @@ function edgeBody(follower: string, followee: string) {
     followeeUid: followee,
     status: "accepted",
     members: [follower, followee],
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    createdAt: FieldValue.serverTimestamp(),
   };
 }
 
