@@ -13,14 +13,14 @@ jest.mock("firebase-admin/app", () => (
       string,
       () => unknown
     >
-  ).app());
+).app());
 
 jest.mock("firebase-admin/firestore", () => (
     jest.requireActual("./helpers/modular-from-namespaced") as Record<
       string,
       () => unknown
     >
-  ).firestoreDesdeNamespaced());
+).firestoreDesdeNamespaced());
 
 jest.mock("firebase-functions", () => ({
   logger: { error: jest.fn(), info: jest.fn(), warn: jest.fn() },
