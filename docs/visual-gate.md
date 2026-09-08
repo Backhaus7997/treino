@@ -184,26 +184,37 @@ En el PR, contá **qué cambió y por qué** — el commit de los PNG lo firma u
 bot, así que el único lugar donde queda la intención es tu descripción. El log
 del job lista los archivos que cambiaron.
 
-> **Si el commit del bot no dispara CI, no es porque lo haya hecho un bot.** Que
-> el push venga de `GITHUB_TOKEN` no bloquea nada: los commits de goldens del bot
-> en los PR #987 y #959 corrieron `ci.yml` completo, con `actor=github-actions[bot]`.
+> **La guarda de recursión del `GITHUB_TOKEN` bloquea una mitad, no las dos.**
+> GitHub no crea runs nuevos para eventos causados por `GITHUB_TOKEN` — es real,
+> y acá se mide: **ninguno** de los 8 commits de goldens del bot generó un run de
+> evento `push`, contra 1 de 1 en cada push humano a la misma rama.
+>
+> Pero `ci.yml` **no escucha `push` en ramas** (sólo en `main`): sobre una rama
+> escucha `pull_request`, y ese evento **sí se dispara** con el push del bot. En
+> los PR #987 y #959 el run nació 6 segundos después del commit del bot, con
+> `actor=github-actions[bot]` y el PR abierto desde hacía media hora.
 >
 > ```bash
-> gh api "repos/Backhaus7997/treino/actions/runs?head_sha=$(git rev-parse bb3c87a5)" \
->   --jq '.workflow_runs[] | "\(.name) | \(.event) | actor=\(.actor.login)"'
+> git log --all --author='github-actions' --format='%H %h' | while read full short; do
+>   runs="repos/Backhaus7997/treino/actions/runs?head_sha=$full"
+>   echo "$short push:$(gh api "$runs" --jq '[.workflow_runs[]|select(.event=="push")]|length')" \
+>        "pull_request:$(gh api "$runs" --jq '[.workflow_runs[]|select(.event=="pull_request")]|length')"
+> done
 > ```
 >
-> `ci.yml` corre en dos casos y sólo dos: `push` a `main`, y `pull_request`. Sobre
-> una rama depende, entonces, del PR — y hay dos formas de quedarse sin checks,
-> ninguna relacionada con quién pushea:
+> `push:0` en los 8 —ahí está la guarda— y `pull_request:2` en los 6 que tenían un
+> PR abierto y sano. Los dos que dan `0 0` son los que se regeneraron **antes** de
+> abrir el PR.
 >
-> - **El PR todavía no está abierto.** Si regenerás antes de abrirlo, el push del
->   bot no tiene `pull_request` al que colgarse. Pasó en el #998 (bot 12:37, PR
+> De ahí que quedarse sin checks tenga dos causas, y ninguna sea quién pushea:
+>
+> - **El PR todavía no está abierto.** Sin PR no hay `pull_request` al que
+>   colgarse, y el `push` lo come la guarda. Pasó en el #998 (bot 12:37, PR
 >   abierto 12:44) y en el #949 (bot 18:00, PR abierto 18:11).
 > - **El PR está en conflicto con la base.** `pull_request` no valida tu rama
 >   sola: valida el **merge** de tu rama con `main` — es la misma distinción de la
->   tabla de acá abajo. Si ese merge no se puede calcular, no hay árbol que
->   validar y el run no se crea.
+>   tabla de acá abajo. Sin `refs/pull/N/merge` no hay árbol que validar y el run
+>   no se crea.
 >
 > En los dos casos **el run no existe**: no está en rojo, no está encolado y no
 > está en `action_required` esperando aprobación. Por eso tampoco hay nada que
@@ -215,11 +226,16 @@ del job lista los archivos que cambiaron.
 > corre todo.
 >
 > ```bash
-> gh pr view --json mergeable,mergeStateStatus   # sin MERGEABLE/CLEAN no hay CI
+> gh pr view --json mergeable --jq .mergeable   # CONFLICTING = no va a haber run
 > gh run list --branch "$(git branch --show-current)"
 > ```
 >
-> Que la autoría no es lo que importa lo probó el #998 sin querer, con dos pushes
+> Mirá **`mergeable`, no `mergeStateStatus`**: este último dice `UNSTABLE` con
+> checks corriendo o fallando, `BEHIND` si la rama quedó atrás y `BLOCKED` si
+> falta un approve. Ninguno de esos tres es un conflicto, y en los tres el run ya
+> existe — usar `CLEAN` como criterio manda a buscar un conflicto que no está.
+>
+> Que la autoría no es lo que destraba lo probó el #998 sin querer, con dos pushes
 > humanos a la misma rama: el `git commit --allow-empty` de las 12:47 **no corrió
 > nada** —el conflicto seguía en pie— y el merge de `origin/main` de las 12:52
 > corrió CI a las 12:53. Hasta este texto el doc decía que los runs quedaban en

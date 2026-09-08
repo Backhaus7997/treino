@@ -116,19 +116,28 @@ jobs:
           # El mensaje del commit NO lleva el marcador, así que el push que
           # esto genera no vuelve a disparar este workflow: no hay bucle.
           #
-          # Que este push arranque ci.yml NO depende de quién lo hace. Venir
-          # de GITHUB_TOKEN no lo bloquea: los commits de goldens del bot en
-          # #987 y #959 corrieron ci.yml completo, con actor=github-actions[bot].
-          # Depende del PR. ci.yml sólo escucha `push` a main y `pull_request`,
-          # así que este push corre CI si —y sólo si— ya hay un PR abierto Y sin
-          # conflicto con la base: el run de `pull_request` valida el MERGE con
-          # main, y si ese merge no se puede calcular, no se crea.
+          # La guarda de recursión del GITHUB_TOKEN bloquea UNA mitad, no las
+          # dos. Es real y se mide: ninguno de los 8 commits de goldens del bot
+          # generó un run de evento `push` (contra 1 de 1 en cada push humano a
+          # la misma rama). Por eso este push no se redispara a sí mismo — el
+          # marcador ausente en el mensaje es cinturón, no tirantes.
+          #
+          # Pero ci.yml NO escucha `push` en ramas, sólo en main: sobre una rama
+          # escucha `pull_request`, y ESE evento sí se dispara con este push. En
+          # #987 y #959 el run de ci.yml nació 6 segundos después del commit del
+          # bot, con actor=github-actions[bot]. O sea que los goldens SÍ quedan
+          # validados, siempre que haya un PR abierto Y sin conflicto con la
+          # base: el run de `pull_request` valida el MERGE con main, y si ese
+          # merge no se puede calcular, no se crea.
           #
           # Si falta cualquiera de las dos, el run NO EXISTE: nada encolado,
           # nada en `action_required` esperando aprobación, nada que aprobar en
           # la pestaña Actions. Y ci.yml no tiene workflow_dispatch, así que
           # tampoco hay botón para lanzarlo a mano. Lo destraba abrir el PR o
-          # resolver el conflicto — no un commit vacío. Documentado en
+          # resolver el conflicto — no un commit vacío. Para diagnosticarlo va
+          # `gh pr view --json mergeable` (CONFLICTING), NO mergeStateStatus:
+          # ese dice UNSTABLE/BEHIND/BLOCKED en PRs sanos con el run ya creado.
+          # Documentado en
           # docs/visual-gate.md §7, porque es el tipo de detalle que sin
           # escribirlo se descubre a la mala: el gate en rojo, los goldens ya
           # correctos en la rama, y nadie entendiendo por qué CI no dice nada.
