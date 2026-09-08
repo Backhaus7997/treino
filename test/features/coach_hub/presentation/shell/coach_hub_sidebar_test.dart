@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/app/theme/tokens/components/coach_hub_layout_tokens.dart';
 import 'package:treino/app/theme/tokens/components/coach_hub_sidebar_item_tokens.dart';
@@ -68,6 +69,30 @@ Future<void> _pumpSidebar(
   await tester.pumpAndSettle();
 }
 
+/// Borde izquierdo del bloque de label de un item, en coordenadas del sidebar.
+///
+/// Colapsado el label sigue MONTADO: no desaparece, se DESLIZA hasta pasar el
+/// borde de los 72px, donde el `clipBehavior` del contenedor lo tapa. O sea que
+/// `findsNothing` dejó de ser la pregunta correcta — lo que importa no es si
+/// está en el árbol, es dónde está parado respecto del borde que lo recorta.
+///
+/// Se mide posición y no opacidad a propósito. Un `AnimatedOpacity` parece la
+/// respuesta obvia y no lo es: su valor actual vive en un `FadeTransition`
+/// interno, y leerlo desde el test obliga a adivinar cuál de los seis fades que
+/// hay encima de este texto —`Tooltip` trae los suyos, `TreinoFadeSlideIn` el
+/// suyo— es el que corresponde. Adivinar mal da 0.0, que es indistinguible de
+/// una animación rota: el test pasaría a mentir en la dirección peligrosa. La
+/// posición se lee de la geometría, sin ambigüedad posible.
+double _labelLeft(WidgetTester tester, String label) {
+  return tester.getTopLeft(find.text(label)).dx;
+}
+
+/// `true` si el label quedó del lado de afuera del clip del sidebar colapsado.
+bool _labelOculto(WidgetTester tester, String label) {
+  return _labelLeft(tester, label) >=
+      CoachHubLayoutTokens.sidebarCollapsedWidth;
+}
+
 void main() {
   testWidgets(
       'expandido → 240px, header con el wordmark, 2 headers (GESTIÓN, RECURSOS) y '
@@ -119,7 +144,9 @@ void main() {
 
     expect(find.byType(TreinoLogo), findsNothing);
     expect(find.text('RESUMEN'), findsNothing);
-    expect(find.text('Dashboard'), findsNothing);
+    // El label no se VE —quedó afuera del clip— aunque siga en el árbol para
+    // poder deslizarse. Ver `_labelOculto`.
+    expect(_labelOculto(tester, 'Dashboard'), isTrue);
     expect(find.byType(Icon), findsWidgets);
     // El avatar del perfil sigue visible, centrado, sin nombre/subtítulo.
     expect(find.byType(CircleAvatar), findsOneWidget);
@@ -210,12 +237,10 @@ void main() {
     await _pumpSidebar(tester);
 
     final logoTop = tester.getTopLeft(find.byType(TreinoLogo)).dy;
-    final toggleTop = tester
-        .getTopLeft(find.byKey(const Key('sidebar_toggle_button')))
-        .dy;
-    final profileTop = tester
-        .getTopLeft(find.byKey(const Key('sidebar_profile_row')))
-        .dy;
+    final toggleTop =
+        tester.getTopLeft(find.byKey(const Key('sidebar_toggle_button'))).dy;
+    final profileTop =
+        tester.getTopLeft(find.byKey(const Key('sidebar_profile_row'))).dy;
 
     expect((toggleTop - logoTop).abs(), lessThan(20));
     expect(toggleTop, lessThan(profileTop));
@@ -402,9 +427,11 @@ void main() {
     );
 
     // El número no cabe en 72px: el badge se degrada a punto.
-    expect(find.text('3'), findsNothing);
+    // El número del badge viaja con el label: montado, pero invisible.
+    expect(_labelOculto(tester, '3'), isTrue);
 
-    final tokens = TreinoBadgeTokens.of(tester.element(find.byType(Icon).first));
+    final tokens =
+        TreinoBadgeTokens.of(tester.element(find.byType(Icon).first));
     final dot = find.byWidgetPredicate(
       (w) =>
           w is Container &&
@@ -419,7 +446,8 @@ void main() {
       (tester) async {
     await _pumpSidebar(tester, prefs: {'coach_hub.sidebar.collapsed': true});
 
-    final tokens = TreinoBadgeTokens.of(tester.element(find.byType(Icon).first));
+    final tokens =
+        TreinoBadgeTokens.of(tester.element(find.byType(Icon).first));
     expect(
       find.byWidgetPredicate(
         (w) =>
@@ -439,8 +467,8 @@ void main() {
 
     // Precondición: el label NO se pinta. Sin tooltip, el item es un glifo
     // anónimo — y entre 768 y 1279 px el colapso lo fuerza el shell.
-    expect(find.text('Dashboard'), findsNothing);
-    expect(find.text('Alumnos'), findsNothing);
+    expect(_labelOculto(tester, 'Dashboard'), isTrue);
+    expect(_labelOculto(tester, 'Alumnos'), isTrue);
 
     for (final item in sidebarRegistry) {
       expect(
@@ -526,6 +554,70 @@ void main() {
     expect(find.bySemanticsLabel('${item.label}, 3'), findsOneWidget);
 
     handle.dispose();
+  });
+
+  // ─── El colapso ANIMA ─────────────────────────────────────────────────────
+  //
+  // El ancho del sidebar ya animaba sus 240→72px, pero el contenido cambiaba en
+  // el primer frame: el contenedor se deslizaba suave sobre un label que ya no
+  // estaba, y el conjunto se leía como un salto con un deslizamiento al lado.
+
+  testWidgets('el label se desliza afuera en vez de desaparecer de golpe',
+      (tester) async {
+    await _pumpSidebar(tester);
+    final expandido = _labelLeft(tester, 'Dashboard');
+    expect(_labelOculto(tester, 'Dashboard'), isFalse);
+
+    await tester.tap(find.byKey(const Key('sidebar_toggle_button')));
+    await tester.pump();
+    await tester.pump(AppMotion.base ~/ 2);
+
+    final medio = _labelLeft(tester, 'Dashboard');
+
+    await tester.pumpAndSettle();
+    final colapsado = _labelLeft(tester, 'Dashboard');
+    expect(_labelOculto(tester, 'Dashboard'), isTrue);
+
+    // A mitad de camino el label TIENE que estar entre su lugar y su destino.
+    // Si saltara al final en un frame, acá ya estaría en `colapsado` — que es
+    // exactamente el salto que este cambio vino a sacar.
+    //
+    // La cota de arriba es el destino y NO el borde de los 72px: el recorrido
+    // es 54→94, así que su punto medio cae en ~74 y ya pasó el borde estando
+    // todavía en viaje. Medir contra el borde haría fallar una animación sana.
+    expect(medio, greaterThan(expandido));
+    expect(medio, lessThan(colapsado));
+  });
+
+  testWidgets('el ícono viaja al centro, no salta', (tester) async {
+    await _pumpSidebar(tester);
+    final expandido = tester.getCenter(find.byType(Icon).first).dx;
+
+    await tester.tap(find.byKey(const Key('sidebar_toggle_button')));
+    await tester.pump();
+    await tester.pump(AppMotion.base ~/ 2);
+    final medio = tester.getCenter(find.byType(Icon).first).dx;
+
+    await tester.pumpAndSettle();
+    final colapsado = tester.getCenter(find.byType(Icon).first).dx;
+
+    // Colapsado el ícono queda centrado en los 72px, así que se movió; y a
+    // mitad de camino está ENTRE los dos, no ya en el destino.
+    expect(colapsado, isNot(closeTo(expandido, 0.5)));
+    expect(medio, isNot(closeTo(colapsado, 0.5)));
+  });
+
+  testWidgets('con reduce-motion no hay tramo intermedio', (tester) async {
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(disableAnimations: true);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+
+    await _pumpSidebar(tester);
+    await tester.tap(find.byKey(const Key('sidebar_toggle_button')));
+    await tester.pump();
+
+    // Un solo frame y ya está en el final: `resolve` devuelve Duration.zero.
+    expect(_labelOculto(tester, 'Dashboard'), isTrue);
   });
 
   testWidgets('expandido → sin tooltip: el label ya está en pantalla',
