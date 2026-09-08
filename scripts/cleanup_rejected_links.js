@@ -113,6 +113,7 @@
 const { bannerDeProduccion } = require('./lib/firebase_projects');
 const { contraEmuladorDe, projectIdObjetivo } = require('./lib/target_project');
 const { inicializarAdmin, proyectoDe } = require('./lib/admin');
+const { FieldPath, getFirestore } = require('firebase-admin/firestore');
 
 /** Las dos únicas razones que se escriben sobre un `pending`. */
 const RAZONES_DE_NO_VINCULO = new Set(['declined', 'cancelled-by-athlete']);
@@ -359,7 +360,7 @@ async function main() {
   });
   if (bannerProd) console.warn(bannerProd);
 
-  const { admin, contexto } = inicializarAdmin();
+  const { app, contexto } = inicializarAdmin();
 
   // Y además el proyecto RESUELTO, que puede no coincidir con el que estimó
   // `projectIdObjetivo()` de arriba: éste sale de la credencial que realmente
@@ -377,13 +378,13 @@ async function main() {
   }
   console.log('═'.repeat(66));
 
-  const db = admin.firestore();
+  const db = getFirestore(app);
 
   // `acceptedAt` se filtra en memoria: Firestore no consulta por ausencia de
   // campo. La lectura va paginada — ver `leerTerminados`.
   console.log('');
   const grupos = { borra: [], ambiguo: [], conserva: [] };
-  const total = await leerTerminados(db, admin.firestore.FieldPath, (docs) => {
+  const total = await leerTerminados(db, FieldPath, (docs) => {
     for (const doc of docs) {
       const data = doc.data();
       grupos[clasificar(data)].push({
