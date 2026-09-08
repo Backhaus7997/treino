@@ -152,3 +152,15 @@ export { createPreapproval } from "./subscriptions/mp/create-preapproval";
 // entera. Corre a las 03:00 ART, una hora ANTES que `sweepEntitlements`, para
 // que el barrido decida bloqueos sobre datos de hoy y no de ayer.
 export { reconcileMpSubscriptions } from "./subscriptions/mp/reconcile";
+
+// Paywall del entrenador — la acreditacion EN EL ACTO. El barrido de arriba
+// tarda hasta 24 horas, y esas son 24 horas de "pague y no paso nada" para el
+// PF que acaba de comprar. Este callable reconcilia SOLO los planes del que
+// llama, cuando vuelve del checkout de Mercado Pago.
+//
+// No reemplaza al barrido: es latencia, no correccion. El barrido sigue siendo
+// lo que agarra al que paga y cierra la pestaña. Ver el encabezado de
+// `subscriptions/mp/reconcile-my-checkout.ts`.
+//
+// Usa el mismo secreto MP_ACCESS_TOKEN que los dos de arriba.
+export { reconcileMyCheckout } from "./subscriptions/mp/reconcile-my-checkout";

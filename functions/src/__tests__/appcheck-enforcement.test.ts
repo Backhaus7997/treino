@@ -113,16 +113,39 @@ const EXEMPTIONS: Readonly<Record<string, Exemption>> = {
       "COBRO, y por eso vale mas para un atacante que los otros dos. " +
       "La superficie de abuso queda acotada por diseño, no por atestacion: el " +
       "uid sale del token, el tier y el ciclo son enums cerrados, el monto sale " +
-      "de TIER_PRICES_ARS, el mail de request.auth.token.email, y la URL de " +
-      "retorno es una constante. Un atacante autenticado solo puede abrir " +
+      "de TIER_PRICES_ARS, y la URL de retorno es una constante. El mail ya no " +
+      "entra en la cuenta: desde que el checkout va contra un PLAN, no se lee " +
+      "de ningun lado — MP le pregunta al pagador quien es. Ver " +
+      "create-preapproval.ts:329. Un atacante autenticado solo puede abrir " +
       "checkouts a nombre PROPIO, y la ventana de idempotencia de " +
       "mp_checkouts/{uid} los limita a uno por par (tier, ciclo) cada 30 " +
       "minutos — seis en total. Ver create-preapproval.ts:263.",
     exitCondition:
       "Cuando el Coach Hub web active App Check (ReCaptcha v3 + site key en " +
       "consola), poner el flag ACA PRIMERO, antes que en acceptTrainerLink y " +
-      "addAlias: es el de mayor valor para un atacante de los tres que hoy " +
-      "salen sin atestacion.",
+      "resumeTrainerLink: es el de mayor valor para un atacante de los que hoy " +
+      "salen sin atestacion. (Decia `addAlias` y estaba mal: addAlias es el " +
+      "unico callable del repo que YA tiene enforceAppCheck: true, " +
+      "add-alias.ts:148.)",
+  },
+  "subscriptions/mp/reconcile-my-checkout:reconcileMyCheckout": {
+    // `decided` y no `debt`, a diferencia de createPreapproval, y la diferencia
+    // es real: aquel ABRE un cobro, este solo pregunta por el estado de uno que
+    // ya existe. No hay nada que un atacante autenticado pueda mover desde acá.
+    permanence: "decided",
+    reason:
+      "Mismo motivo de plataforma que acceptTrainerLink y createPreapproval: " +
+      "lo llama el Coach Hub web, que no activa App Check, asi que con el flag " +
+      "puesto ningun PF veria acreditado su pago al volver de Mercado Pago. " +
+      "La superficie es la mas chica de todos los callables del repo: NO HAY " +
+      "BODY. La entrada es el uid del token y nada mas — el planId no viaja, " +
+      "sale de consultar mp_plans filtrado por ese uid, asi que no se puede " +
+      "pedir la reconciliacion de un plan ajeno ni enumerar quien compro que. " +
+      "Y no escribe nada que el llamador elija: lo que se escribe es lo que " +
+      "MP conteste por GET con nuestro token. Lo unico que un atacante " +
+      "autenticado puede hacer es preguntar por sus propios planes, y para eso " +
+      "esta el cooldown de RECONCILE_COOLDOWN_MS, que corta ANTES de la llamada " +
+      "a MP. Ver reconcile-my-checkout.ts.",
   },
   "auth/request-auth-email:requestPasswordReset": {
     permanence: "debt",
@@ -188,6 +211,7 @@ const EXPECTED_DEPLOYED = [
   "createPreapproval",
   "deleteAccount",
   "mintWatchCredential",
+  "reconcileMyCheckout",
   "requestEmailVerification",
   "requestPasswordReset",
   "resumeTrainerLink",
@@ -302,6 +326,12 @@ describe("QA-SEC-016: el guard falla cuando tiene que fallar", () => {
       module: "subscriptions/mp/create-preapproval",
       symbol: "createPreapproval",
       as: "createPreapproval",
+      attested: false,
+    },
+    {
+      module: "subscriptions/mp/reconcile-my-checkout",
+      symbol: "reconcileMyCheckout",
+      as: "reconcileMyCheckout",
       attested: false,
     },
     { module: "mint-watch-credential", symbol: "mintWatchCredential", as: "mintWatchCredential", attested: false },
