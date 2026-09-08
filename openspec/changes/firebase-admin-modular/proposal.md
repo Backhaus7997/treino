@@ -271,7 +271,7 @@ FCM.)*
 | test | ¿se achica solo? |
 |---|---|
 | 2 — «el `firebase-admin` instalado tiene TODA la API que usan los scripts» | **Sí.** Extrae la lista del código. A cero call sites, la lista es vacía y pasa trivialmente. |
-| 1 — «el escaneo encuentra scripts y APIs» | **No.** Assertea `USOS.size >= 8` y `USOS.has('firestore')`. A migración completa, `USOS` está vacío → **rojo**. |
+| 1 — «el escaneo encuentra scripts y APIs» | **No se achicaba, pero SE SALVÓ.** Asserteaba `USOS.size >= 8`: un umbral que convierte el éxito de la migración en un rojo, y que se puso rojo en el PR 9. Se reemplazó por un **autotest del extractor** contra un fuente sintético — custodia lo mismo (que el escaneo no pase en vacío) y vale igual con 88 usos que con ninguno. Ya no hay que retirarlo. |
 | 3 — «`admin.apps` es un array» | **No.** `assert.ok(Array.isArray(admin.apps))` está escrito a mano contra el SDK, sin depender del escaneo. En v14 `admin.apps` es `undefined` → **rojo para siempre**. |
 
 Los tests 1 y 3 son correctos hoy (el 1 es la defensa contra un escaneo vacuo, el 3 es el que

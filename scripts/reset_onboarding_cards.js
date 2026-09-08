@@ -32,10 +32,12 @@
 'use strict';
 
 const { inicializarAdmin } = require('./lib/admin');
+const { getAuth } = require('firebase-admin/auth');
+const { FieldValue, Timestamp, getFirestore } = require('firebase-admin/firestore');
 // Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla cerrado
 // con la migración; contra el emulador no pide nada. Ver scripts/lib/admin.js.
-const { admin } = inicializarAdmin();
-const db = admin.firestore();
+const { app } = inicializarAdmin();
+const db = getFirestore(app);
 
 async function run() {
   const [email, ...modules] = process.argv.slice(2);
@@ -46,7 +48,7 @@ async function run() {
     process.exit(1);
   }
 
-  const user = await admin.auth().getUserByEmail(email);
+  const user = await getAuth(app).getUserByEmail(email);
   const ref = db.collection('users').doc(user.uid);
   const snap = await ref.get();
 
@@ -68,8 +70,8 @@ async function run() {
 
   if (modules.length === 0) {
     await ref.update({
-      onboardingSeen: admin.firestore.FieldValue.delete(),
-      updatedAt: admin.firestore.Timestamp.now(),
+      onboardingSeen: FieldValue.delete(),
+      updatedAt: Timestamp.now(),
     });
     console.log(`  cleared ALL ${seenKeys.length} module(s)`);
   } else {
@@ -87,7 +89,7 @@ async function run() {
     );
     await ref.update({
       onboardingSeen: after,
-      updatedAt: admin.firestore.Timestamp.now(),
+      updatedAt: Timestamp.now(),
     });
     console.log(`  seen after:  ${JSON.stringify(after)}`);
   }

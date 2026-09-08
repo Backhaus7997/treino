@@ -20,8 +20,10 @@
  * `applicationDefault`, `cert`, `refreshToken`, `FirebaseError`,
  * `FirebaseAppError`, `AppErrorCode`, `SDK_VERSION`— y `admin.apps`,
  * `admin.app`, `admin.credential`, `admin.firestore`, `admin.auth` y
- * `admin.storage` quedaron TODOS `undefined`. Los scripts usan esa API en 89
- * lugares repartidos en 48 archivos.
+ * `admin.storage` quedaron TODOS `undefined`. Cuando esto se escribió, los
+ * scripts usaban esa API en 88 lugares repartidos en 46 archivos; la migración
+ * a los subpaths modulares los viene bajando y hoy quedan pocos. No hay número
+ * fijo acá a propósito: el escaneo lo cuenta solo en cada corrida.
  *
  * Y NADIE SE ENTERÓ, dos veces (`cac2d6fa` y `de77562a`/#901). Por dos motivos
  * que se tapaban entre sí, y los dos son parte de lo que arregla este archivo:
@@ -52,9 +54,17 @@
  * `admin.messaging()`, este test lo empieza a chequear solo.
  *
  * SI ESTE TEST SE PONE ROJO no toques la lista: o volvés la versión de
- * `firebase-admin` a la que tiene esa API, o migrás los 48 archivos a los
- * subpaths modulares (`firebase-admin/firestore`, `/auth`, `/storage`). El
+ * `firebase-admin` a la que tiene esa API, o migrás los archivos que faltan a
+ * los subpaths modulares (`firebase-admin/firestore`, `/auth`, `/storage`). El
  * rojo es la pregunta "¿migraste?", no un detalle de configuración.
+ *
+ * EL PRIMER TEST CAMBIÓ DE FORMA, y vale saber por qué. Exigía que el escaneo
+ * encontrara al menos 8 APIs distintas — un guard contra "esto pasa en vacío"
+ * que era correcto ANTES de empezar a migrar. Dejó de serlo: `USOS` se vacía a
+ * propósito a medida que la migración avanza, así que ese umbral convertía el
+ * ÉXITO en un rojo. Ahora se custodia lo que de verdad importa —que el
+ * EXTRACTOR sepa encontrar la API— con un autotest contra un fuente sintético,
+ * que vale igual con 88 usos que con ninguno.
  */
 
 'use strict';
@@ -117,13 +127,20 @@ function fuentesDeScripts(dir = RAIZ_SCRIPTS, prefijo = '') {
   return encontrados;
 }
 
+/** Las rutas `admin.<algo>[.<algo>]` que aparecen en un fuente. Pura, para autotestearla. */
+function apisEn(fuente) {
+  const rutas = [];
+  for (const [, primero, segundo] of sinComentarios(fuente).matchAll(USO_DE_ADMIN)) {
+    rutas.push(segundo ? `${primero}.${segundo}` : primero);
+  }
+  return rutas;
+}
+
 /** `Map<'firestore.Timestamp', Set<archivo>>` — qué API usa cada script. */
 function apisUsadas() {
   const usos = new Map();
   for (const nombre of fuentesDeScripts()) {
-    const codigo = sinComentarios(fs.readFileSync(path.join(RAIZ_SCRIPTS, nombre), 'utf8'));
-    for (const [, primero, segundo] of codigo.matchAll(USO_DE_ADMIN)) {
-      const ruta = segundo ? `${primero}.${segundo}` : primero;
+    for (const ruta of apisEn(fs.readFileSync(path.join(RAIZ_SCRIPTS, nombre), 'utf8'))) {
       if (!usos.has(ruta)) usos.set(ruta, new Set());
       usos.get(ruta).add(nombre);
     }
@@ -140,18 +157,35 @@ const USOS = apisUsadas();
 
 // ── El trinquete ───────────────────────────────────────────────────────────
 
-test('el escaneo encuentra scripts y APIs (si no, esto estaría pasando en vacío)', () => {
+test('el escaneo encuentra scripts y el extractor funciona (si no, esto pasaría en vacío)', () => {
   // El modo de falla que hay que descartar primero: un test que no mide nada y
   // sale verde. Es la lección del stub ESM del #846.
   assert.ok(
     fuentesDeScripts().length >= 40,
     `sólo ${fuentesDeScripts().length} archivos escaneados — se rompió el listado`,
   );
-  assert.ok(
-    USOS.size >= 8,
-    `sólo ${USOS.size} APIs detectadas — la regex dejó de matchear:\n  ${[...USOS.keys()].join('\n  ')}`,
+
+  // ANTES esto exigía `USOS.size >= 8` y que apareciera `admin.firestore`, y
+  // era correcto mientras la migración no había empezado. Dejó de serlo: a
+  // medida que los scripts pasan a los subpaths modulares, `USOS` se vacía A
+  // PROPÓSITO, y el día que quede en cero ese umbral convierte el ÉXITO de la
+  // migración en un rojo.
+  //
+  // Lo que hay que custodiar no es cuántas APIs quedan —eso baja solo, y que
+  // baje es la meta— sino que el EXTRACTOR siga sabiendo encontrarlas. Se
+  // prueba contra un fuente sintético, así el guard vale igual con 88 usos que
+  // con ninguno.
+  const sonda = [
+    "const db = admin.firestore();",
+    "const t = admin.firestore.Timestamp.now();",
+    "// admin.auth() en un comentario NO cuenta",
+    "const x = require('./lib/admin.js');",
+  ].join('\n');
+  assert.deepStrictEqual(
+    apisEn(sonda),
+    ['firestore', 'firestore.Timestamp'],
+    'el extractor dejó de matchear la API namespaced, o empezó a contar comentarios y rutas',
   );
-  assert.ok(USOS.has('firestore'), 'admin.firestore no apareció en el escaneo — algo anda mal');
 });
 
 test('el firebase-admin instalado tiene TODA la API que usan los scripts', () => {
