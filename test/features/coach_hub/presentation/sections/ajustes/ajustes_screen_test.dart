@@ -1,5 +1,6 @@
 import 'dart:ui' show Tristate;
 
+import 'package:firebase_core/firebase_core.dart' show FirebaseException;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -331,8 +332,15 @@ void main() {
       // usuario veía "Foto quitada" y el objeto seguía en el bucket.
       final repo = _MockUserRepo();
       final uploader = _MockUploader();
-      when(() => uploader.deleteStored())
-          .thenAnswer((_) async => throw Exception('storage denied'));
+      // `FirebaseException` y no un `Exception` pelado: es lo que Storage
+      // tira de verdad, y el `code` es justamente lo que ahora viaja al
+      // mensaje para poder diagnosticar desde el campo.
+      when(() => uploader.deleteStored()).thenAnswer(
+        (_) async => throw FirebaseException(
+          plugin: 'firebase_storage',
+          code: 'unauthorized',
+        ),
+      );
       when(() => repo.update(any(), any())).thenAnswer((_) async {});
 
       await tester.pumpWidget(_harness(
@@ -355,10 +363,16 @@ void main() {
       await tester.pump();
 
       expect(find.text('Foto quitada'), findsNothing);
+
+      // El mensaje dice CUÁL de los dos pasos falló y con qué código. Antes
+      // los dos backends —Storage y Firestore— compartían un «probá de nuevo»
+      // genérico, y un PF que reportó «no me funciona sacar la foto» no dejaba
+      // nada con qué diagnosticar.
       expect(
-        find.text('No se pudo quitar la foto. Probá de nuevo.'),
+        find.textContaining('No se pudo borrar la imagen del servidor'),
         findsOneWidget,
       );
+      expect(find.textContaining('unauthorized'), findsOneWidget);
       verifyNever(() => repo.update(any(), any()));
     });
   });

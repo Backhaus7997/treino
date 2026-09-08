@@ -252,10 +252,19 @@ class _SidebarItemRow extends StatelessWidget {
                 : Colors.transparent;
 
         return AnimatedContainer(
-          duration: AppMotionTokens.resolve(
-            ctx,
-            AppMotionTokens.cardStateChange,
-          ),
+          // `tapFeedback` (120ms) y no `cardStateChange` (180): esto es el
+          // hover de una LISTA que se barre con el mouse, no el cambio de
+          // estado de una card suelta.
+          //
+          // A 180ms, al pasar de un item al siguiente el fondo del anterior
+          // todavía se está apagando cuando el nuevo ya se encendió, y durante
+          // ese solapamiento se ven DOS filas resaltadas. No es que el hover
+          // esté en dos lados: es que la salida dura más que el gesto.
+          //
+          // Barrer una lista de 11 items es de las cosas que más veces por día
+          // hace el PF, y a esa frecuencia lo que se quiere es respuesta, no
+          // suavidad.
+          duration: AppMotionTokens.resolve(ctx, AppMotionTokens.tapFeedback),
           curve: AppMotionTokens.enter,
           height: CoachHubLayoutTokens.sidebarItemHeight,
           margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

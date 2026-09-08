@@ -37,6 +37,13 @@ import 'package:treino/features/profile/domain/user_profile.dart';
 const double _bannerHeight = 56;
 const double _avatarSize = 64;
 
+/// Cuánto del avatar cuelga POR DEBAJO del banner.
+///
+/// El avatar se posiciona en `_bannerHeight - _avatarSize / 2` dentro de un
+/// `Stack` que mide sólo `_bannerHeight`, con `clipBehavior: Clip.none`: esta
+/// es la parte que se sale y que el contenido de abajo tiene que despejar.
+const double _avatarOverhang = _avatarSize / 2;
+
 /// Card "PREVIEW EN TREINO COACH DISCOVERY" — WU-02.
 class CoachDiscoveryPreviewCard extends ConsumerWidget {
   const CoachDiscoveryPreviewCard({super.key, required this.profile});
@@ -114,9 +121,22 @@ class CoachDiscoveryPreviewCard extends ConsumerWidget {
                   ],
                 ),
                 Padding(
+                  // El aire de arriba tiene que despejar el AVATAR, no el
+                  // banner.
+                  //
+                  // El `Stack` mide lo que mide el banner (56px), pero el
+                  // avatar está posicionado en `56 - 64/2` con
+                  // `clipBehavior: Clip.none`: **32px suyos cuelgan por debajo
+                  // del Stack** y caen encima de lo que venga después. Con 18
+                  // de padding, el nombre se comía 14px de la foto — que es
+                  // exactamente lo que se veía.
+                  //
+                  // Ahora el padding se DERIVA del voladizo en vez de ser un
+                  // número suelto que hay que acordarse de mover: si mañana
+                  // cambia `_avatarSize` o `_bannerHeight`, esto acompaña solo.
                   padding: const EdgeInsets.fromLTRB(
                     AppSpacing.s18,
-                    AppSpacing.s18,
+                    _avatarOverhang + AppSpacing.s12,
                     AppSpacing.s18,
                     AppSpacing.s18,
                   ),

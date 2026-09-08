@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_palette.dart';
@@ -53,7 +54,7 @@ void main() {
   });
 
   group('KpiCard —', () {
-    testWidgets('lleva el glow, más suave que el hero', (tester) async {
+    testWidgets('EN REPOSO no lleva glow: fondo plano', (tester) async {
       await tester.pumpWidget(wrap(
         const KpiCard(value: '2', label: 'Alumnos activos'),
       ));
@@ -62,13 +63,38 @@ void main() {
         find.byKey(const Key('kpi_card_root')),
       );
       final d = box.decoration! as BoxDecoration;
+
+      // Bajarle el alpha no alcanzaba: el problema de cuatro KPIs en fila no
+      // es la intensidad, es la REPETICIÓN. Cuatro degradados idénticos uno al
+      // lado del otro dejan de leerse como acento y pasan a leerse como
+      // textura de fondo — y le comen la jerarquía al hero, que es lo que el
+      // dartdoc de `TreinoCardTokens.glow` dice que hay que evitar.
+      expect(d.gradient, isNull, reason: 'el acento se gasta en el hero');
+      expect(d.color, palette.bgCard);
+    });
+
+    testWidgets('con hover SÍ lleva glow: una card encendida entre cuatro',
+        (tester) async {
+      await tester.pumpWidget(wrap(
+        KpiCard(value: '2', label: 'Alumnos activos', onTap: () {}),
+      ));
+
+      final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await gesture.addPointer();
+      addTearDown(gesture.removePointer);
+      await gesture.moveTo(tester.getCenter(find.byType(KpiCard)));
+      await tester.pumpAndSettle();
+
+      final box = tester.widget<AnimatedContainer>(
+        find.byKey(const Key('kpi_card_root')),
+      );
+      final d = box.decoration! as BoxDecoration;
       final g = d.gradient! as LinearGradient;
 
+      // Acá el glow SÍ informa: es UNA card iluminándose entre cuatro
+      // apagadas, no una textura repetida.
       expect(d.color, isNull, reason: 'gradient y color se excluyen');
-      expect(g.colors.last, palette.bgCard);
-      final alpha = g.colors.first.a;
-      expect(alpha, lessThan(0.12), reason: 'no compite con la welcome card');
-      expect(alpha, greaterThan(0.0));
+      expect(g.colors.first.a, greaterThan(0.0));
     });
   });
 
@@ -105,8 +131,8 @@ void main() {
       ));
 
       expect(find.text('Sin alumnos todavía'), findsOneWidget);
-      expect(find.text('Invitá a tu primer alumno para empezar.'),
-          findsOneWidget);
+      expect(
+          find.text('Invitá a tu primer alumno para empezar.'), findsOneWidget);
     });
   });
 
