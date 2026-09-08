@@ -19,8 +19,9 @@
  * REQ-PN-CF-001. Fase 6 Etapa 2.
  */
 
-import * as admin from "firebase-admin";
-import { FieldValue } from "firebase-admin/firestore";
+import { App } from "firebase-admin/app";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
+import { Messaging, getMessaging } from "firebase-admin/messaging";
 import { logger } from "firebase-functions";
 
 const STALE_TOKEN_CODES = new Set([
@@ -74,9 +75,9 @@ export interface SendFcmResult {
  *                    Inject a mock in tests to avoid real FCM calls.
  */
 export async function sendFcm(
-  app: admin.app.App,
+  app: App,
   input: SendFcmInput,
-  messaging?: admin.messaging.Messaging,
+  messaging?: Messaging,
 ): Promise<SendFcmResult> {
   const { uids, kind, notification, data, actorUid } = input;
 
@@ -85,8 +86,8 @@ export async function sendFcm(
     return { successCount: 0, failureCount: 0 };
   }
 
-  const db = admin.firestore(app);
-  const msg = messaging ?? admin.messaging(app);
+  const db = getFirestore(app);
+  const msg = messaging ?? getMessaging(app);
 
   // Start history persistence before reading tokens. It is deliberately
   // isolated from FCM: no-token users still get history, and history failures

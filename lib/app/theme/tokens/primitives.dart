@@ -489,3 +489,78 @@ abstract final class AppFonts {
   /// `0.5` — Letter-spacing de headings condensados.
   static const double headingTracking = 0.5;
 }
+
+/// Capa 1 — Escala de tamaños de texto del sistema de diseño TREINO.
+///
+/// **Por qué existe.** [AppFonts] define familias, pesos y tracking, pero
+/// nunca definió tamaños: el dartdoc de arriba manda los `TextStyle` completos
+/// a `app_theme.dart` (ADR-DS2-009), y `app_theme.dart` sólo declara el
+/// `textTheme` de Material. Eso dejó un hueco exacto entre "el tema define
+/// estilos" y "el widget necesita un número", y el hueco se llenó a mano:
+/// **1879 `fontSize:` literales en 271 archivos, con 31 tamaños distintos**,
+/// medios píxeles incluidos (`11.5`, `12.5`, `9.5`). No fue descuido — color,
+/// spacing, radios, íconos y motion tienen todos su token y su guard, y se
+/// respetan. Tipografía no tenía ninguno de los dos.
+///
+/// **Cómo se eligieron los escalones.** No de una escala tipográfica de
+/// libro: de la distribución real del codebase. Los diez valores de abajo
+/// cubren 1609 de las 1879 ocurrencias, así que migrar es sobre todo
+/// mecánico y no un rediseño encubierto. Los que quedan afuera son deriva
+/// declarada — `11` (146 usos, un píxel abajo de [caption], haciendo el mismo
+/// trabajo), `15` (54, entre [body] y [bodyLarge]) y los medios píxeles.
+/// Migran al escalón más cercano, y eso SÍ cambia píxeles: por eso van como
+/// deuda registrada en `no_raw_font_size_scan_test.dart` y no de un saque.
+///
+/// **El racimo [caption]·[bodyDense]·[body] (12·13·14) está apretado a
+/// propósito, y se cierra ahí.** TREINO sirve una app de teléfono y un panel
+/// de escritorio desde el mismo código: un label, una fila de tabla del Coach
+/// Hub y un párrafo en un celular son tres roles reales que se pisan justo en
+/// el rango del texto chico. De [body] para arriba esa excusa no existe —son
+/// títulos y números hero— y todos los saltos son de 2px o más. Un escalón
+/// nuevo pegado a otro en ese tramo es deriva, no un rol; y un cuarto miembro
+/// del racimo reabre el problema que la escala vino a cerrar (`11` tenía 146
+/// usos un píxel abajo de [caption], haciendo su mismo trabajo). Los dos
+/// invariantes tienen test en `primitives_test.dart`.
+///
+/// ```dart
+/// Text(label, style: TextStyle(
+///   fontFamily: AppFonts.barlow,
+///   fontSize: AppTextSize.caption,
+///   fontWeight: AppFonts.w600,
+/// ))
+/// ```
+abstract final class AppTextSize {
+  /// `10` — Contadores de badge, timestamps, texto legal al pie.
+  /// El piso: abajo de esto no se lee en un teléfono.
+  static const double micro = 10;
+
+  /// `12` — Labels de campo, chips, metadatos, texto de ayuda.
+  static const double caption = 12;
+
+  /// `13` — Cuerpo denso: filas de tabla y listas del Coach Hub web, donde
+  /// entra un tercio más de contenido por pantalla. Ver la nota de clase
+  /// sobre por qué convive con [body].
+  static const double bodyDense = 13;
+
+  /// `14` — Cuerpo por defecto. Si dudás, es este.
+  static const double body = 14;
+
+  /// `16` — Cuerpo destacado y texto de input (abajo de 16 los navegadores
+  /// móviles hacen zoom al enfocar un campo).
+  static const double bodyLarge = 16;
+
+  /// `18` — Título de card.
+  static const double title = 18;
+
+  /// `20` — Título de sección.
+  static const double titleLarge = 20;
+
+  /// `24` — Heading de pantalla.
+  static const double heading = 24;
+
+  /// `28` — Número hero dentro de una card (KPI, racha).
+  static const double display = 28;
+
+  /// `32` — Número hero a nivel pantalla.
+  static const double displayLarge = 32;
+}

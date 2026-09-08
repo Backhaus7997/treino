@@ -18,16 +18,18 @@
  * REQ-PN-CF-002, REQ-CHATMEDIA-012. Fase 6 Etapa 2.
  */
 
-import * as admin from "firebase-admin";
+import { App, getApp, initializeApp } from "firebase-admin/app";
+import { Messaging } from "firebase-admin/messaging";
+import { getFirestore } from "firebase-admin/firestore";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 import { sendFcm } from "./send-fcm";
 
-function getApp(): admin.app.App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -48,12 +50,12 @@ function truncate(text: string, maxLen: number): string {
  * @param messaging   - Optional messaging instance for test injection.
  */
 export async function notifyOnChatMessageHandler(
-  app: admin.app.App,
+  app: App,
   chatId: string,
   messageData: Record<string, unknown>,
-  messaging?: admin.messaging.Messaging,
+  messaging?: Messaging,
 ): Promise<void> {
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
 
   const senderId = messageData.senderId as string | undefined;
   const text = (messageData.text as string | undefined) ?? "";
@@ -134,6 +136,6 @@ export const notifyOnChatMessage = onDocumentCreated(
     }
 
     const { chatId } = event.params;
-    await notifyOnChatMessageHandler(getApp(), chatId, messageData);
+    await notifyOnChatMessageHandler(ensureApp(), chatId, messageData);
   },
 );

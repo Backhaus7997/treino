@@ -24,7 +24,8 @@
  *     UserRepository._trainerPublicFields (same contract as ADR-RV-005).
  */
 
-import * as admin from "firebase-admin";
+import { App, getApp, initializeApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 
@@ -32,11 +33,11 @@ import { logger } from "firebase-functions";
  * Initialize the default Admin SDK app lazily so the module can be imported
  * without an app already existing (e.g. in test environments).
  */
-function getApp(): admin.app.App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -75,10 +76,10 @@ export function athleteCountFromLinks(
  * by test suites.
  */
 export async function recomputeAthleteCount(
-  app: admin.app.App,
+  app: App,
   trainerId: string,
 ): Promise<void> {
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
 
   try {
     // 1. Query ALL links for this trainer; the pure helper filters `active`.
@@ -149,6 +150,6 @@ export const linkAggregate = onDocumentWritten(
       return;
     }
 
-    await recomputeAthleteCount(getApp(), trainerId);
+    await recomputeAthleteCount(ensureApp(), trainerId);
   },
 );

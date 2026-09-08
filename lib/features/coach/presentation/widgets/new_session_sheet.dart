@@ -930,7 +930,7 @@ class _Pill extends StatelessWidget {
         child: TreinoTappable(
           onTap: onTap,
           child: AnimatedContainer(
-            duration: AppMotion.fast,
+            duration: AppMotion.resolve(context, AppMotion.fast),
             curve: AppMotion.emphasized,
             padding: const EdgeInsets.symmetric(vertical: 10),
             decoration: BoxDecoration(
@@ -1004,7 +1004,7 @@ class _WeekdayChips extends StatelessWidget {
               height: 44,
               child: Center(
                 child: AnimatedContainer(
-                  duration: AppMotion.fast,
+                  duration: AppMotion.resolve(context, AppMotion.fast),
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(

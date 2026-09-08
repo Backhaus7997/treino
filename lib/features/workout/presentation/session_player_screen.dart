@@ -2948,7 +2948,7 @@ class _RepsSetRowState extends State<_RepsSetRow> {
         children: [
           summaryRow,
           AnimatedSize(
-            duration: AppMotion.base,
+            duration: AppMotion.resolve(context, AppMotion.base),
             curve: AppMotion.emphasized,
             alignment: Alignment.topCenter,
             child: widget.isExpanded

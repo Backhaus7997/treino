@@ -39,6 +39,32 @@ jest.mock("firebase-admin", () => {
   return { firestore, app: jest.fn(), initializeApp: jest.fn() };
 });
 
+jest.mock("firebase-admin/app", () => (
+    jest.requireActual("./helpers/modular-from-namespaced") as Record<
+      string,
+      () => unknown
+    >
+).app());
+
+// La puerta modular tiene que dar EL MISMO doble que la namespaced de arriba.
+//
+// `jest.mock("firebase-admin", …)` intercepta el specifier EXACTO. Producción
+// importa FieldValue de `firebase-admin/firestore`, y sin esto le
+// llega el REAL: el Firestore de mentira de este archivo no reconoce sus
+// sentinels, guarda basura en vez de aplicarlos, y el test falla —o peor, pasa—
+// por un motivo que no tiene que ver con lo que quiere probar.
+//
+// Getters y no valores: los factories se evalúan por demanda, así que esto no
+// depende del orden entre los dos `jest.mock`.
+//
+// Lo fija `firebase-admin-mock-surface.test.ts`.
+jest.mock("firebase-admin/firestore", () => (
+    jest.requireActual("./helpers/modular-from-namespaced") as Record<
+      string,
+      () => unknown
+    >
+).firestoreDesdeNamespaced());
+
 /**
  * The logger is mocked because ONE assertion genuinely needs it: the two exits
  * below the `get()` ("share is already ours" / "share is another trainer's")
@@ -51,6 +77,7 @@ jest.mock("firebase-functions", () => ({
 }));
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
 import { logger } from "firebase-functions";
 import { syncSessionShareHandler } from "../sync-session-share";
 
@@ -64,7 +91,7 @@ const TRAINER_A = "trainer-A";
 const TRAINER_B = "trainer-B";
 const ATHLETE = "athlete-X";
 
-const APP = {} as admin.app.App;
+const APP = {} as App;
 
 type LinkData = Record<string, unknown>;
 

@@ -14,7 +14,7 @@ import 'package:treino/features/coach_hub/presentation/shell/sidebar_item.dart';
 final List<RouteBase> agendaRoutes = [
   GoRoute(
     path: '/agenda',
-    pageBuilder: (_, __) => coachHubPage(const AgendaWebScreen()), // i18n
+    pageBuilder: (_, __) => coachHubPageAnimated(const AgendaWebScreen()), // i18n
   ),
 ];
 

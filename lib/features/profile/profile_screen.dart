@@ -259,7 +259,7 @@ class _A11ySectionGroup extends StatelessWidget {
           ExcludeSemantics(
             child: Container(
               height: 1,
-              color: palette.textMuted.withValues(alpha: 0.10),
+              color: palette.textMuted.withValues(alpha: 0.1),
             ),
           ),
         );

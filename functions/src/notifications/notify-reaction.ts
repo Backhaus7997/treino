@@ -16,16 +16,18 @@
  * functions.
  */
 
-import * as admin from "firebase-admin";
+import { App, getApp, initializeApp } from "firebase-admin/app";
+import { Messaging } from "firebase-admin/messaging";
+import { getFirestore } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { sendFcm } from "./send-fcm";
 
-function getApp(): admin.app.App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -96,12 +98,12 @@ export function resolveReactionNotification({
  * Async handler extracted for emulator-backed integration tests.
  */
 export async function notifyOnReactionHandler(
-  app: admin.app.App,
+  app: App,
   postId: string,
   reactorUid: string,
   before: DocumentData | undefined,
   after: DocumentData | undefined,
-  messaging?: admin.messaging.Messaging,
+  messaging?: Messaging,
 ): Promise<void> {
   // Updates and deletes cannot notify and do not need any Firestore reads.
   if (!after || before !== undefined) {
@@ -118,7 +120,7 @@ export async function notifyOnReactionHandler(
     return;
   }
 
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
   const postRef = db.collection("posts").doc(postId);
   const postSnap = await postRef.get();
   const post = postSnap.exists ? postSnap.data() : undefined;
@@ -191,7 +193,7 @@ export const notifyOnReaction = onDocumentWritten(
       : undefined;
 
     await notifyOnReactionHandler(
-      getApp(),
+      ensureApp(),
       event.params.postId,
       event.params.reactorUid,
       before,

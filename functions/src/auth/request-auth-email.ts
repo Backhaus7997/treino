@@ -42,7 +42,9 @@
  * Resend: antes habria encolado mail que despues fallaba con 403.
  */
 
-import * as admin from "firebase-admin";
+import { App, getApp, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+import { getFirestore } from "firebase-admin/firestore";
 import * as functions from "firebase-functions/v2/https";
 import { HttpsError } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions";
@@ -50,11 +52,11 @@ import { logger } from "firebase-functions";
 import { APP_ENTRY_ATHLETE, APP_ENTRY_TRAINER } from "../mail/templates";
 import { enqueueMail } from "../mail/enqueue-mail";
 
-function getApp(): admin.app.App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -186,11 +188,11 @@ export function resetOutcomeFor(
  * es federada, y la respuesta del callable no cambia.
  */
 async function entradaSegunRol(
-  app: admin.app.App,
+  app: App,
   uid: string,
 ): Promise<string> {
   try {
-    const snap = await admin.firestore(app).collection("users").doc(uid).get();
+    const snap = await getFirestore(app).collection("users").doc(uid).get();
     return snap.data()?.role === "trainer"
       ? APP_ENTRY_TRAINER
       : APP_ENTRY_ATHLETE;
@@ -221,7 +223,7 @@ const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * @param nowMs - Reloj, inyectado para que los tests fijen la ventana.
  */
 export async function runRequestPasswordReset(
-  app: admin.app.App,
+  app: App,
   email: unknown,
   nowMs: number = Date.now(),
 ): Promise<AuthEmailResult> {
@@ -234,7 +236,7 @@ export async function runRequestPasswordReset(
     // El uid primero: el outbox guarda destinatarios por uid y resuelve la
     // direccion recien al enviar, asi que un cambio de email entre el pedido y
     // el envio sigue llegando a donde tiene que llegar.
-    const user = await admin.auth(app).getUserByEmail(normalized);
+    const user = await getAuth(app).getUserByEmail(normalized);
     const kind = resetOutcomeFor(user.providerData.map((p) => p.providerId));
     const scope = `${user.uid}_${throttleWindow(nowMs)}`;
 
@@ -251,7 +253,7 @@ export async function runRequestPasswordReset(
       return OK;
     }
 
-    const link = await admin.auth(app).generatePasswordResetLink(normalized);
+    const link = await getAuth(app).generatePasswordResetLink(normalized);
 
     await enqueueMail(app, {
       toUid: user.uid,
@@ -287,12 +289,12 @@ export async function runRequestPasswordReset(
  * @param nowMs - Reloj, inyectado en tests.
  */
 export async function runRequestEmailVerification(
-  app: admin.app.App,
+  app: App,
   uid: string,
   nowMs: number = Date.now(),
 ): Promise<AuthEmailResult> {
   try {
-    const user = await admin.auth(app).getUser(uid);
+    const user = await getAuth(app).getUser(uid);
 
     if (!user.email) {
       logger.info("requestEmailVerification: el usuario no tiene email", { uid });
@@ -305,8 +307,7 @@ export async function runRequestEmailVerification(
       return OK;
     }
 
-    const link = await admin
-      .auth(app)
+    const link = await getAuth(app)
       .generateEmailVerificationLink(user.email);
 
     await enqueueMail(app, {
@@ -398,7 +399,7 @@ export const requestPasswordReset = functions.onCall(
   { region: "southamerica-east1" },
   async (request) => {
     const email = (request.data ?? {}).email;
-    return runRequestPasswordReset(getApp(), email);
+    return runRequestPasswordReset(ensureApp(), email);
   },
 );
 
@@ -409,6 +410,6 @@ export const requestEmailVerification = functions.onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Authentication required.");
     }
-    return runRequestEmailVerification(getApp(), request.auth.uid);
+    return runRequestEmailVerification(ensureApp(), request.auth.uid);
   },
 );

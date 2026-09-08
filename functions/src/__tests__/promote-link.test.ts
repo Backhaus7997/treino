@@ -20,7 +20,28 @@ jest.mock("firebase-admin", () => {
   return { firestore };
 });
 
+// La puerta modular tiene que dar EL MISMO doble que la namespaced de arriba.
+//
+// `jest.mock("firebase-admin", …)` intercepta el specifier EXACTO. Producción
+// importa FieldValue/Timestamp de `firebase-admin/firestore`, y sin esto le
+// llega el REAL: el Firestore de mentira de este archivo no reconoce sus
+// sentinels, guarda basura en vez de aplicarlos, y el test falla —o peor, pasa—
+// por un motivo que no tiene que ver con lo que quiere probar.
+//
+// Getters y no valores: los factories se evalúan por demanda, así que esto no
+// depende del orden entre los dos `jest.mock`.
+//
+// Lo fija `firebase-admin-mock-surface.test.ts`.
+jest.mock("firebase-admin/firestore", () => (
+    jest.requireActual("./helpers/modular-from-namespaced") as Record<
+      string,
+      () => unknown
+    >
+).firestoreDesdeNamespaced());
+
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import {
   createFakeFirestore,
   FakeDoc,
@@ -37,7 +58,7 @@ function install(seed: Partial<FakeFirestoreState>): FakeFirestoreState {
   return state;
 }
 
-const app = {} as admin.app.App;
+const app = {} as App;
 
 const link = (overrides: Record<string, unknown> = {}) => ({
   trainerId: "trainer-1",
@@ -198,12 +219,12 @@ describe("syncTrainerLoad — gate boundary (strict <=)", () => {
 
     expect(state.trainer_links.L1.status).toBe("active");
     expect(state.trainer_links.L1.acceptedAt).toEqual(
-      admin.firestore.Timestamp.fromMillis(1_700_000_000_000),
+      Timestamp.fromMillis(1_700_000_000_000),
     );
   });
 
   it("resume clears pausedAt and does NOT restamp acceptedAt (replaces repository.resume)", async () => {
-    const originalAcceptedAt = admin.firestore.Timestamp.fromMillis(1_600_000_000_000);
+    const originalAcceptedAt = Timestamp.fromMillis(1_600_000_000_000);
     const state = install({
       trainer_links: {
         ...seedActiveLinks(2),
@@ -211,7 +232,7 @@ describe("syncTrainerLoad — gate boundary (strict <=)", () => {
           athleteId: "paused-1",
           status: "paused",
           acceptedAt: originalAcceptedAt,
-          pausedAt: admin.firestore.Timestamp.fromMillis(1_650_000_000_000),
+          pausedAt: Timestamp.fromMillis(1_650_000_000_000),
         }),
       },
       users: { "trainer-1": { subscription: plan1Active } },
@@ -223,7 +244,7 @@ describe("syncTrainerLoad — gate boundary (strict <=)", () => {
     });
 
     expect(state.trainer_links.L1.status).toBe("active");
-    expect(state.trainer_links.L1.pausedAt).toBe(admin.firestore.FieldValue.delete());
+    expect(state.trainer_links.L1.pausedAt).toBe(FieldValue.delete());
     // Preserved — a resumed link is NOT a new one (repository.resume contract).
     expect(state.trainer_links.L1.acceptedAt).toEqual(originalAcceptedAt);
   });

@@ -20,22 +20,23 @@
  * termination via transition-equality guard).
  */
 
-import * as admin from "firebase-admin";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
+import { DocumentData, Timestamp, getFirestore } from "firebase-admin/firestore";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.GCLOUD_PROJECT = "treino-dev";
 
-let testApp: admin.app.App;
+let testApp: App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp(
+  testApp = initializeApp(
     { projectId: "treino-dev" },
     "ranking-aggregate-test",
   );
 });
 
 afterAll(async () => {
-  await testApp.delete();
+  await deleteApp(testApp);
 });
 
 // Import the module under test — will fail until implementation exists (RED)
@@ -46,7 +47,7 @@ import {
   rankingAggregateOnOptIn,
 } from "../ranking-aggregate";
 
-const db = () => admin.firestore(testApp);
+const db = () => getFirestore(testApp);
 
 const COL_USERS = "users";
 const COL_PROFILES = "userPublicProfiles";
@@ -82,7 +83,7 @@ async function seedSession(
   await sessionRef.set({
     id: sessionId,
     uid,
-    startedAt: admin.firestore.Timestamp.fromDate(opts.startedAt),
+    startedAt: Timestamp.fromDate(opts.startedAt),
     status: opts.status ?? "finished",
     wasFullyCompleted: opts.wasFullyCompleted ?? true,
     totalVolumeKg: opts.totalVolumeKg ?? 0,
@@ -97,14 +98,14 @@ async function seedSession(
       setNumber: i + 1,
       reps: 5,
       weightKg: logs[i].weightKg,
-      completedAt: admin.firestore.Timestamp.fromDate(opts.startedAt),
+      completedAt: Timestamp.fromDate(opts.startedAt),
     });
   }
 }
 
 async function getProfile(
   uid: string,
-): Promise<admin.firestore.DocumentData | undefined> {
+): Promise<DocumentData | undefined> {
   const snap = await db().collection(COL_PROFILES).doc(uid).get();
   return snap.exists ? snap.data() : undefined;
 }

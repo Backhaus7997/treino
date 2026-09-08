@@ -18,7 +18,8 @@ import '../section_header/section_header.dart';
 import '../treino_interactive_state.dart';
 
 /// Previews del kit.
-@Preview(name: 'SectionHero — título + subtítulo', wrapper: coachHubPreviewWrapper)
+@Preview(
+    name: 'SectionHero — título + subtítulo', wrapper: coachHubPreviewWrapper)
 Widget sectionHeroPreview() => const CoachHubSectionHero(
       title: 'Mis alumnos',
       count: 24,
@@ -144,7 +145,7 @@ class CoachHubSectionHero extends StatelessWidget {
                         style: TextStyle(
                           fontFamily: AppFonts.barlow,
                           color: palette.textMuted,
-                          fontSize: 13,
+                          fontSize: AppTextSize.bodyDense,
                         ),
                       ),
                     ],
@@ -192,7 +193,7 @@ class _HeroActionPill extends StatelessWidget {
     final palette = AppPalette.of(context);
     const labelStyle = TextStyle(
       fontFamily: AppFonts.barlowCondensed,
-      fontSize: 12,
+      fontSize: AppTextSize.caption,
       fontWeight: FontWeight.w700,
       letterSpacing: 1.1,
     );

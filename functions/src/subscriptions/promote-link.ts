@@ -34,7 +34,8 @@
  * transaction that writes it.
  */
 
-import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
+import { DocumentData, DocumentReference, FieldValue, Timestamp, getFirestore } from "firebase-admin/firestore";
 import { HttpsError } from "firebase-functions/v2/https";
 
 import { computeWeightedLoad, WeightedLink } from "./weighted-load";
@@ -99,16 +100,16 @@ export function promotionDenialReason(
 type LinkDoc = WeightedLink & { id: string; status: string };
 
 export async function syncTrainerLoad(
-  app: admin.app.App,
+  app: App,
   input: SyncTrainerLoadInput,
 ): Promise<SyncTrainerLoadResult> {
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
   const nowMs = input.nowMs ?? Date.now();
   const promotion = input.promotion;
 
   return db.runTransaction(async (tx) => {
     let trainerId = input.trainerId;
-    let linkRef: admin.firestore.DocumentReference | null = null;
+    let linkRef: DocumentReference | null = null;
     let alreadyActive = false;
 
     // ── 1-2. Read + validate the promoted link FIRST (design D-1 step 1-2) ──
@@ -123,7 +124,7 @@ export async function syncTrainerLoad(
         throw new HttpsError("not-found", "Link not found.");
       }
 
-      const linkData = linkSnap.data() as admin.firestore.DocumentData;
+      const linkData = linkSnap.data() as DocumentData;
       trainerId = linkData.trainerId as string;
 
       if (promotion.callerUid !== trainerId) {
@@ -170,7 +171,7 @@ export async function syncTrainerLoad(
     const limit = effectiveWeightLimit(sub, nowMs);
 
     const currentLinks: LinkDoc[] = linksSnap.docs.map((doc) => {
-      const data = doc.data() as admin.firestore.DocumentData;
+      const data = doc.data() as DocumentData;
       return {
         id: doc.id,
         athleteId: data.athleteId as string,
@@ -226,10 +227,10 @@ export async function syncTrainerLoad(
         status: "active",
         ...(promotion.expectedFromStatus === "pending"
           // accept: stamp the start of the relationship.
-          ? { acceptedAt: admin.firestore.Timestamp.fromMillis(nowMs) }
+          ? { acceptedAt: Timestamp.fromMillis(nowMs) }
           // resume: clear the pause marker; acceptedAt is PRESERVED — a
           // resumed link is not a new one.
-          : { pausedAt: admin.firestore.FieldValue.delete() }),
+          : { pausedAt: FieldValue.delete() }),
       });
     }
     // Step 6 ALWAYS runs (design D-1) — this read-write pair on

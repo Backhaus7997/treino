@@ -19,26 +19,27 @@
  *   SCENARIO-SSP-06 — user doc deleted (userAfter null) → no write (user-deleted)
  */
 
-import * as admin from "firebase-admin";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
+import { DocumentReference, Timestamp, getFirestore } from "firebase-admin/firestore";
 import { syncSharedProfileHandler } from "../profile/sync-shared-profile";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.GCLOUD_PROJECT = "treino-dev";
 
-let testApp: admin.app.App;
+let testApp: App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp(
+  testApp = initializeApp(
     { projectId: "treino-dev" },
     "sync-shared-profile-test",
   );
 });
 
 afterAll(async () => {
-  await testApp.delete();
+  await deleteApp(testApp);
 });
 
-const db = () => admin.firestore(testApp);
+const db = () => getFirestore(testApp);
 
 // ---------------------------------------------------------------------------
 // Seed helpers
@@ -59,7 +60,7 @@ async function seedProfileShare(
 }
 
 async function cleanupDocs(
-  ...refs: Array<admin.firestore.DocumentReference>
+  ...refs: Array<DocumentReference>
 ): Promise<void> {
   for (const ref of refs) {
     await ref.delete().catch(() => undefined);
@@ -122,7 +123,7 @@ describe("SCENARIO-SSP-02: bodyWeightKg changed → snapshot updated, trainerId 
   });
 
   it("updates bodyWeightKg, preserves trainerId, bumps updatedAt", async () => {
-    const oldUpdatedAt = admin.firestore.Timestamp.fromDate(
+    const oldUpdatedAt = Timestamp.fromDate(
       new Date(Date.UTC(2026, 5, 1, 0, 0, 0)),
     );
 
@@ -158,7 +159,7 @@ describe("SCENARIO-SSP-02: bodyWeightKg changed → snapshot updated, trainerId 
     expect(data["bodyWeightKg"]).toBe(75.5);
 
     // updatedAt bumped to `now`
-    const updatedAtTs = data["updatedAt"] as admin.firestore.Timestamp;
+    const updatedAtTs = data["updatedAt"] as Timestamp;
     expect(updatedAtTs.toDate().getTime()).toBe(now.getTime());
   });
 });
@@ -180,7 +181,7 @@ describe("SCENARIO-SSP-03: shared fields unchanged → no write", () => {
   });
 
   it("returns no-change when shared fields are identical", async () => {
-    const oldUpdatedAt = admin.firestore.Timestamp.fromDate(
+    const oldUpdatedAt = Timestamp.fromDate(
       new Date(Date.UTC(2026, 5, 1, 0, 0, 0)),
     );
 
@@ -209,7 +210,7 @@ describe("SCENARIO-SSP-03: shared fields unchanged → no write", () => {
     // updatedAt must NOT have changed
     const shareSnap = await db().collection("profile_shares").doc(uid).get();
     const data = shareSnap.data()!;
-    const updatedAtTs = data["updatedAt"] as admin.firestore.Timestamp;
+    const updatedAtTs = data["updatedAt"] as Timestamp;
     expect(updatedAtTs.seconds).toBe(oldUpdatedAt.seconds);
   });
 });
@@ -231,7 +232,7 @@ describe("SCENARIO-SSP-04: only non-shared field changed → no write", () => {
   });
 
   it("returns no-change when only displayName (non-shared) changed", async () => {
-    const oldUpdatedAt = admin.firestore.Timestamp.fromDate(
+    const oldUpdatedAt = Timestamp.fromDate(
       new Date(Date.UTC(2026, 5, 1, 0, 0, 0)),
     );
 
@@ -279,7 +280,7 @@ describe("SCENARIO-SSP-05: gender + experienceLevel wire format matches grant()"
       trainerId,
       gender: "male",
       experienceLevel: "beginner",
-      updatedAt: admin.firestore.Timestamp.fromDate(
+      updatedAt: Timestamp.fromDate(
         new Date(Date.UTC(2026, 5, 1, 0, 0, 0)),
       ),
     });
@@ -329,7 +330,7 @@ describe("SCENARIO-SSP-06: user doc deleted (userAfter null) → no write", () =
   });
 
   it("returns user-deleted and does NOT touch profile_shares", async () => {
-    const originalUpdatedAt = admin.firestore.Timestamp.fromDate(
+    const originalUpdatedAt = Timestamp.fromDate(
       new Date(Date.UTC(2026, 5, 1, 0, 0, 0)),
     );
 
@@ -348,7 +349,7 @@ describe("SCENARIO-SSP-06: user doc deleted (userAfter null) → no write", () =
     // profile_shares doc must be UNTOUCHED
     const shareSnap = await db().collection("profile_shares").doc(uid).get();
     const data = shareSnap.data()!;
-    const updatedAtTs = data["updatedAt"] as admin.firestore.Timestamp;
+    const updatedAtTs = data["updatedAt"] as Timestamp;
     expect(updatedAtTs.seconds).toBe(originalUpdatedAt.seconds);
   });
 });

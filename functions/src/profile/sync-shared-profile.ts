@@ -31,7 +31,8 @@
  * Deployed to southamerica-east1 (matches all other TREINO CFs).
  */
 
-import * as admin from "firebase-admin";
+import { App, getApp, initializeApp } from "firebase-admin/app";
+import { FieldValue, Timestamp, getFirestore } from "firebase-admin/firestore";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 
@@ -39,11 +40,11 @@ import { logger } from "firebase-functions";
 // Lazy app singleton (project convention — mirrors sync-session-share.ts)
 // ---------------------------------------------------------------------------
 
-function getApp(): admin.app.App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -89,7 +90,7 @@ export interface SyncSharedProfileResult {
  * @returns A result object indicating whether the snapshot was updated.
  */
 export async function syncSharedProfileHandler(
-  app: admin.app.App,
+  app: App,
   uid: string,
   userAfter: Record<string, unknown> | null,
   now: Date,
@@ -100,7 +101,7 @@ export async function syncSharedProfileHandler(
     return { updated: false, reason: "user-deleted" };
   }
 
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
   const shareRef = db.collection("profile_shares").doc(uid);
 
   // ── 2. Read existing profile_shares/{uid} ─────────────────────────────────
@@ -131,11 +132,11 @@ export async function syncSharedProfileHandler(
   if (bornAt !== null && bornAt !== undefined) {
     // Could be a Firestore Timestamp (from Admin SDK read) or a raw object.
     if (
-      typeof (bornAt as admin.firestore.Timestamp).toDate === "function"
+      typeof (bornAt as Timestamp).toDate === "function"
     ) {
       newSnapshot["bornAt"] = bornAt; // already a Timestamp — use as-is
     } else if (bornAt instanceof Date) {
-      newSnapshot["bornAt"] = admin.firestore.Timestamp.fromDate(bornAt);
+      newSnapshot["bornAt"] = Timestamp.fromDate(bornAt);
     }
   }
 
@@ -164,8 +165,8 @@ export async function syncSharedProfileHandler(
   //   - it is present in both but its value differs
 
   function timestampSeconds(v: unknown): number | undefined {
-    if (v && typeof (v as admin.firestore.Timestamp).seconds === "number") {
-      return (v as admin.firestore.Timestamp).seconds;
+    if (v && typeof (v as Timestamp).seconds === "number") {
+      return (v as Timestamp).seconds;
     }
     return undefined;
   }
@@ -176,8 +177,8 @@ export async function syncSharedProfileHandler(
     if (aTs !== undefined && bTs !== undefined) {
       return (
         aTs === bTs &&
-        (a as admin.firestore.Timestamp).nanoseconds ===
-          (b as admin.firestore.Timestamp).nanoseconds
+        (a as Timestamp).nanoseconds ===
+          (b as Timestamp).nanoseconds
       );
     }
     return a === b;
@@ -211,7 +212,7 @@ export async function syncSharedProfileHandler(
   // gaps (same semantics as grant()).
   const writePayload: Record<string, unknown> = {
     ...newSnapshot,
-    updatedAt: admin.firestore.Timestamp.fromDate(now),
+    updatedAt: Timestamp.fromDate(now),
   };
 
   // QA-507 (PRIVACIDAD): con `merge: true`, una clave AUSENTE significa "no
@@ -225,7 +226,7 @@ export async function syncSharedProfileHandler(
       newSnapshot[field] === undefined &&
       existingShare[field] !== undefined
     ) {
-      writePayload[field] = admin.firestore.FieldValue.delete();
+      writePayload[field] = FieldValue.delete();
     }
   }
 
@@ -255,7 +256,7 @@ export const syncSharedProfile = onDocumentWritten(
       (event.data?.after?.data() as Record<string, unknown> | undefined) ??
       null;
     const result = await syncSharedProfileHandler(
-      getApp(),
+      ensureApp(),
       uid,
       userAfter,
       new Date(),

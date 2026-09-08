@@ -12,6 +12,49 @@ void main() {
     });
   });
 
+  group('AppMotion curvas', () {
+    // Las curvas built-in de Flutter son flojas para UI. Lo que las separa se
+    // ve en el primer cuarto de la animación, que es donde el ojo decide si
+    // algo respondió rápido: `standard` ya recorrió el 78% del camino y
+    // `easeOutCubic` apenas el 60%. Esa diferencia es todo el cambio — así que
+    // se fija con números, no con el nombre de la constante.
+    test('standard es mucho más fuerte que la easeOutCubic que reemplazó', () {
+      expect(AppMotion.standard.transform(0.25), greaterThan(0.75));
+      expect(Curves.easeOutCubic.transform(0.25), lessThan(0.62));
+    });
+
+    test('standard a la mitad ya está prácticamente asentada', () {
+      expect(AppMotion.standard.transform(0.5), greaterThan(0.95));
+    });
+
+    test('standard empieza y termina donde debe', () {
+      expect(AppMotion.standard.transform(0), 0);
+      expect(AppMotion.standard.transform(1), 1);
+    });
+
+    test(
+        'emphasized arranca casi quieta — es para movimiento que el ojo sigue, '
+        'no para una entrada', () {
+      expect(AppMotion.emphasized.transform(0.1), lessThan(0.05));
+      expect(
+        AppMotion.emphasized.transform(0.25),
+        lessThan(AppMotion.standard.transform(0.25)),
+      );
+    });
+
+    test('emphasized cierra fuerte: al 75% del tiempo, >95% del camino', () {
+      expect(AppMotion.emphasized.transform(0.75), greaterThan(0.95));
+    });
+
+    // `exit` sólo alimenta `switchOutCurve`, donde el controller va de 1 a 0.
+    // Con `t³` sobre un parámetro que baja, la opacidad cae rápido y después
+    // se apaga despacio: el que se va libera la escena enseguida. Si alguien
+    // la "corrige" a una ease-out, esto se pone rojo.
+    test('exit hace que el saliente se vaya rápido (t=0.5 → <0.2)', () {
+      expect(AppMotion.exit.transform(0.5), lessThan(0.2));
+    });
+  });
+
   group('AppMotion.stagger', () {
     test('el ítem 0 no tiene delay', () {
       expect(AppMotion.stagger(0), Duration.zero);

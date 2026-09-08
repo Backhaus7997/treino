@@ -24,7 +24,9 @@
  *       ACCDEL-014 (anti-spoofing).
  */
 
-import * as admin from "firebase-admin";
+import { App, getApp, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+import { getFirestore } from "firebase-admin/firestore";
 import * as functions from "firebase-functions/v2/https";
 import { HttpsError } from "firebase-functions/v2/https";
 import { writeStarted, writeFinal } from "./cascade/audit-log";
@@ -46,12 +48,12 @@ import {
  * without an app already existing (e.g. in test environments that set up
  * their own named apps before importing).
  */
-function getApp(): admin.app.App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
     // No default app yet — initialize one.
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -65,11 +67,11 @@ function getApp(): admin.app.App {
  * audit log and response.
  */
 export async function runDeleteAccount(
-  app: admin.app.App,
+  app: App,
   uid: string,
   provider: string
 ): Promise<DeleteAccountResponse> {
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
 
   // ── Guard: trainers cannot self-delete (REQ-ACCDEL-CF-003) ─────────────
   const userSnap = await db.collection("users").doc(uid).get();
@@ -173,7 +175,7 @@ export async function runDeleteAccount(
   // ── Step 10-11: Auth user deletion (REQ-ACCDEL-CF-012) ─────────────────
   // MUST be last — so role guard still works if retry happens mid-cascade.
   try {
-    await admin.auth(app).deleteUser(uid);
+    await getAuth(app).deleteUser(uid);
     deletedCollections.push("users-auth");
   } catch (authErr: unknown) {
     // Idempotency (REQ-ACCDEL-CF-013): if the user was already deleted
@@ -280,7 +282,7 @@ export const deleteAccountHandler = functions.onCall(
       | undefined;
     const provider = tokenFirebase?.sign_in_provider ?? "unknown";
 
-    const app = getApp();
+    const app = ensureApp();
     return runDeleteAccount(app, data.uid, provider);
   }
 );

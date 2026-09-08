@@ -1094,7 +1094,7 @@ class _AssignedByChip extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
-        color: palette.accent.withValues(alpha: 0.20),
+        color: palette.accent.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(AppRadius.full),
       ),
       child: Text(

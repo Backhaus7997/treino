@@ -194,7 +194,7 @@ class _CustomExerciseFormDialogState
                     child: Text(
                       _isEdit ? 'Editar ejercicio' : 'Nuevo ejercicio', // i18n
                       style: GoogleFonts.barlowCondensed(
-                        fontSize: 20,
+                        fontSize: AppTextSize.titleLarge,
                         fontWeight: FontWeight.w700,
                         color: palette.textPrimary,
                       ),
@@ -220,7 +220,7 @@ class _CustomExerciseFormDialogState
                 textCapitalization: TextCapitalization.sentences,
                 style: GoogleFonts.barlow(
                   color: palette.textPrimary,
-                  fontSize: 14,
+                  fontSize: AppTextSize.body,
                 ),
                 decoration: _inputDecoration(
                   palette,
@@ -260,7 +260,7 @@ class _CustomExerciseFormDialogState
                 enabled: !_saving && !_uploadingVideo,
                 style: GoogleFonts.barlow(
                   color: palette.textPrimary,
-                  fontSize: 14,
+                  fontSize: AppTextSize.body,
                 ),
                 decoration: _inputDecoration(
                   palette,
@@ -290,7 +290,7 @@ class _CustomExerciseFormDialogState
                   style: GoogleFonts.barlowCondensed(
                     color: palette.accent,
                     fontWeight: FontWeight.w700,
-                    fontSize: 13,
+                    fontSize: AppTextSize.bodyDense,
                   ),
                 ),
                 style: OutlinedButton.styleFrom(
@@ -311,7 +311,7 @@ class _CustomExerciseFormDialogState
                   _error!,
                   style: GoogleFonts.barlow(
                     color: palette.danger,
-                    fontSize: 13,
+                    fontSize: AppTextSize.bodyDense,
                   ),
                 ),
               ],
@@ -356,7 +356,7 @@ class _CustomExerciseFormDialogState
                             _isEdit ? 'Guardar' : 'Crear', // i18n
                             style: GoogleFonts.barlowCondensed(
                               fontWeight: FontWeight.w700,
-                              fontSize: 14,
+                              fontSize: AppTextSize.body,
                             ),
                           ),
                   ),
@@ -376,7 +376,8 @@ class _CustomExerciseFormDialogState
         );
     return InputDecoration(
       hintText: hint,
-      hintStyle: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
+      hintStyle: GoogleFonts.barlow(
+          color: palette.textMuted, fontSize: AppTextSize.body),
       filled: true,
       fillColor: palette.bg,
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -399,7 +400,7 @@ class _FieldLabel extends StatelessWidget {
     return Text(
       text,
       style: GoogleFonts.barlowCondensed(
-        fontSize: 11,
+        fontSize: AppTextSize.caption,
         fontWeight: FontWeight.w700,
         color: palette.textMuted,
         letterSpacing: 1,
@@ -449,7 +450,7 @@ class _SelectChips<T> extends StatelessWidget {
               child: Text(
                 labelOf(value).toUpperCase(),
                 style: GoogleFonts.barlowCondensed(
-                  fontSize: 11,
+                  fontSize: AppTextSize.caption,
                   fontWeight: FontWeight.w700,
                   color: selected == value ? palette.accent : palette.textMuted,
                   letterSpacing: 0.6,

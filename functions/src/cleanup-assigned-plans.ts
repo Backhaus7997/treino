@@ -28,17 +28,18 @@
  *   - after.status !== 'terminated' → skip.
  */
 
-import * as admin from "firebase-admin";
+import { App, getApp, initializeApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 
 const BATCH_SIZE = 500;
 
-function getApp(): admin.app.App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -52,11 +53,11 @@ type LinkData = Record<string, unknown>;
  * queries from automatic single-field indexes).
  */
 export async function deleteAssignedPlansForPair(
-  app: admin.app.App,
+  app: App,
   trainerId: string,
   athleteId: string,
 ): Promise<{ count: number }> {
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
 
   const snapshot = await db
     .collection("routines")
@@ -91,7 +92,7 @@ export async function deleteAssignedPlansForPair(
  * @param after  - Snapshot data after the write (undefined for deletes).
  */
 export async function cleanupAssignedPlansOnUnlinkHandler(
-  app: admin.app.App,
+  app: App,
   before: LinkData | undefined,
   after: LinkData | undefined,
 ): Promise<{ count: number }> {
@@ -149,6 +150,6 @@ export const cleanupAssignedPlansOnUnlink = onDocumentWritten(
   async (event) => {
     const before = event.data?.before?.data() as LinkData | undefined;
     const after = event.data?.after?.data() as LinkData | undefined;
-    await cleanupAssignedPlansOnUnlinkHandler(getApp(), before, after);
+    await cleanupAssignedPlansOnUnlinkHandler(ensureApp(), before, after);
   },
 );

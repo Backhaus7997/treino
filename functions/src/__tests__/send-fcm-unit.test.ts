@@ -1,11 +1,37 @@
 /** Pure unit tests for history persistence in sendFcm (no emulator). */
 
+// `FieldValue` va acá y no en el doble modular: la puerta modular REEXPORTA de
+// ésta, así que una sola fuente de verdad. Hasta que este PR mockeó
+// `firebase-admin/firestore`, `send-fcm.ts` leía el `FieldValue` REAL por el
+// subpath — era el drift que el trinquete existe para cerrar, y que acá era
+// inocuo sólo porque `serverTimestamp()` es una fábrica pura.
 jest.mock("firebase-admin", () => ({
-  firestore: jest.fn(),
+  firestore: Object.assign(jest.fn(), {
+    FieldValue: {
+      serverTimestamp: () => "__ts__",
+      arrayRemove: (...v: unknown[]) => ({ __arrayRemove: v }),
+    },
+  }),
   messaging: jest.fn(),
 }));
 
+jest.mock("firebase-admin/messaging", () => (
+    jest.requireActual("./helpers/modular-from-namespaced") as Record<
+      string,
+      () => unknown
+    >
+).messaging());
+
+jest.mock("firebase-admin/firestore", () => (
+    jest.requireActual("./helpers/modular-from-namespaced") as Record<
+      string,
+      () => unknown
+    >
+).firestoreDesdeNamespaced());
+
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
+import { Messaging } from "firebase-admin/messaging";
 import { sendFcm } from "../notifications/send-fcm";
 
 type UserState = { tokens: string[]; add: jest.Mock };
@@ -35,14 +61,14 @@ function installFirestore(users: Record<string, UserState>): void {
   (admin.firestore as unknown as jest.Mock).mockReturnValue(firestore);
 }
 
-function mockMessaging(): admin.messaging.Messaging {
+function mockMessaging(): Messaging {
   return {
     sendEachForMulticast: jest.fn(async (message) => ({
       successCount: message.tokens.length,
       failureCount: 0,
       responses: message.tokens.map(() => ({ success: true, messageId: "id" })),
     })),
-  } as unknown as admin.messaging.Messaging;
+  } as unknown as Messaging;
 }
 
 const baseInput = {
@@ -64,7 +90,7 @@ describe("sendFcm notification history", () => {
     });
 
     await sendFcm(
-      {} as admin.app.App,
+      {} as App,
       { ...baseInput, uids: ["user-1", "user-2"] },
       mockMessaging(),
     );
@@ -89,7 +115,7 @@ describe("sendFcm notification history", () => {
 
     await expect(
       sendFcm(
-        {} as admin.app.App,
+        {} as App,
         { ...baseInput, uids: ["user"] },
         messaging,
       ),
@@ -105,7 +131,7 @@ describe("sendFcm notification history", () => {
 
     await expect(
       sendFcm(
-        {} as admin.app.App,
+        {} as App,
         { ...baseInput, uids: ["user"] },
         messaging,
       ),
@@ -122,11 +148,11 @@ describe("sendFcm notification history", () => {
       sendEachForMulticast: jest.fn(async () =>
         Promise.reject(new Error("fcm down")),
       ),
-    } as unknown as admin.messaging.Messaging;
+    } as unknown as Messaging;
 
     await expect(
       sendFcm(
-        {} as admin.app.App,
+        {} as App,
         { ...baseInput, uids: ["user"] },
         messaging,
       ),

@@ -17,7 +17,7 @@ import 'package:treino/features/coach_hub/presentation/shell/coach_hub_page.dart
 final List<RouteBase> facturacionPlanesRoutes = [
   GoRoute(
     path: '/facturacion/planes',
-    pageBuilder: (_, __) => coachHubPage(const PricingScreen()),
+    pageBuilder: (_, __) => coachHubPageAnimated(const PricingScreen()),
   ),
   // Autoservicio del PF cuando el enforcement le frena una escritura: qué
   // alumnos quedaron fuera de su cupo y qué significa. Sin item de sidebar a
@@ -26,14 +26,14 @@ final List<RouteBase> facturacionPlanesRoutes = [
   // permanente instalaría en TODO PF la idea de que tiene alumnos frenados.
   GoRoute(
     path: kBlockedStudentsRoutePath,
-    pageBuilder: (_, __) => coachHubPage(const BlockedStudentsScreen()),
+    pageBuilder: (_, __) => coachHubPageAnimated(const BlockedStudentsScreen()),
   ),
   GoRoute(
     path: '/facturacion/preview',
-    pageBuilder: (_, __) => coachHubPage(const PaywallPreviewScreen()),
+    pageBuilder: (_, __) => coachHubPageAnimated(const PaywallPreviewScreen()),
   ),
   GoRoute(
     path: '/facturacion/preview/keep2',
-    pageBuilder: (_, __) => coachHubPage(const KeepStudentsPreview()),
+    pageBuilder: (_, __) => coachHubPageAnimated(const KeepStudentsPreview()),
   ),
 ];

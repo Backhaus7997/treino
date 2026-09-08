@@ -9,37 +9,39 @@
  * NOTE: Admin SDK bypasses Storage security rules (ADR-ACCDEL-013).
  */
 
-import * as admin from "firebase-admin";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
 process.env.FIREBASE_STORAGE_EMULATOR_HOST = "127.0.0.1:9199";
 process.env.GCLOUD_PROJECT = "treino-dev";
 
-let testApp: admin.app.App;
+let testApp: App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp(
+  testApp = initializeApp(
     { projectId: "treino-dev", storageBucket: "treino-dev.appspot.com" },
     "storage-cascade-test"
   );
 });
 
 afterAll(async () => {
-  await testApp.delete();
+  await deleteApp(testApp);
 });
 
 // Import the module under test — will fail until implementation exists
 import { deleteAvatar, deleteAthleteStorage } from "../../cascade/storage";
 
 async function uploadFakeAvatar(uid: string): Promise<void> {
-  const bucket = admin.storage(testApp).bucket();
+  const bucket = getStorage(testApp).bucket();
   const file = bucket.file(`avatars/${uid}.jpg`);
   await file.save(Buffer.from("fake-image-data"), { contentType: "image/jpeg" });
 }
 
 async function avatarExists(uid: string): Promise<boolean> {
-  const bucket = admin.storage(testApp).bucket();
+  const bucket = getStorage(testApp).bucket();
   const file = bucket.file(`avatars/${uid}.jpg`);
   const [exists] = await file.exists();
   return exists;
@@ -50,7 +52,7 @@ describe("SCENARIO-545: avatar file deleted when it exists", () => {
 
   beforeEach(() => uploadFakeAvatar(uid));
   afterEach(async () => {
-    const bucket = admin.storage(testApp).bucket();
+    const bucket = getStorage(testApp).bucket();
     await bucket.file(`avatars/${uid}.jpg`).delete().catch(() => undefined);
   });
 
@@ -65,7 +67,7 @@ describe("SCENARIO-546: missing avatar file is a no-op", () => {
 
   it("SCENARIO-546: no error thrown when avatar does not exist", async () => {
     // Ensure file does not exist
-    const bucket = admin.storage(testApp).bucket();
+    const bucket = getStorage(testApp).bucket();
     await bucket.file(`avatars/${uid}.jpg`).delete().catch(() => undefined);
 
     await expect(deleteAvatar(testApp, uid)).resolves.not.toThrow();
@@ -77,12 +79,12 @@ describe("QA-CMP-002: deleteAvatar removes non-jpg avatars too", () => {
   const uid = "storage-cascade-heic";
 
   afterEach(async () => {
-    const bucket = admin.storage(testApp).bucket();
+    const bucket = getStorage(testApp).bucket();
     await bucket.file(`avatars/${uid}.heic`).delete().catch(() => undefined);
   });
 
   it("deletes avatars/{uid}.heic", async () => {
-    const bucket = admin.storage(testApp).bucket();
+    const bucket = getStorage(testApp).bucket();
     await bucket
       .file(`avatars/${uid}.heic`)
       .save(Buffer.from("fake"), { contentType: "image/heic" });
@@ -102,19 +104,18 @@ describe("QA-CMP-002: deleteAthleteStorage removes the athlete's objects", () =>
   const chatId = `${uid}_trainer-x`;
 
   async function save(path: string): Promise<void> {
-    await admin
-      .storage(testApp)
+    await getStorage(testApp)
       .bucket()
       .file(path)
       .save(Buffer.from("x"), { contentType: "application/octet-stream" });
   }
   async function exists(path: string): Promise<boolean> {
-    const [e] = await admin.storage(testApp).bucket().file(path).exists();
+    const [e] = await getStorage(testApp).bucket().file(path).exists();
     return e;
   }
 
   afterEach(async () => {
-    const bucket = admin.storage(testApp).bucket();
+    const bucket = getStorage(testApp).bucket();
     const [files] = await bucket.getFiles();
     await Promise.all(files.map((f) => f.delete().catch(() => undefined)));
     await db()
@@ -162,19 +163,18 @@ describe("QA-CMP-004b: deleteAthleteStorage removes the athlete's post photos", 
   const other = "storage-postphotos-other";
 
   async function save(path: string): Promise<void> {
-    await admin
-      .storage(testApp)
+    await getStorage(testApp)
       .bucket()
       .file(path)
       .save(Buffer.from("x"), { contentType: "image/jpeg" });
   }
   async function exists(path: string): Promise<boolean> {
-    const [e] = await admin.storage(testApp).bucket().file(path).exists();
+    const [e] = await getStorage(testApp).bucket().file(path).exists();
     return e;
   }
 
   afterEach(async () => {
-    const bucket = admin.storage(testApp).bucket();
+    const bucket = getStorage(testApp).bucket();
     const [files] = await bucket.getFiles({ prefix: "postPhotos/" });
     await Promise.all(files.map((f) => f.delete().catch(() => undefined)));
   });
@@ -198,8 +198,7 @@ describe("QA-CMP-004b: deleteAthleteStorage removes the athlete's post photos", 
 
     await deleteAthleteStorage(testApp, uid);
 
-    const [left] = await admin
-      .storage(testApp)
+    const [left] = await getStorage(testApp)
       .bucket()
       .getFiles({ prefix: `postPhotos/${uid}/` });
     expect(left).toHaveLength(0);
@@ -230,19 +229,18 @@ describe("#628: deleteAthleteStorage removes the athlete's session feedback phot
   const other = "storage-sessionfeedback-other";
 
   async function save(path: string): Promise<void> {
-    await admin
-      .storage(testApp)
+    await getStorage(testApp)
       .bucket()
       .file(path)
       .save(Buffer.from("x"), { contentType: "image/jpeg" });
   }
   async function exists(path: string): Promise<boolean> {
-    const [e] = await admin.storage(testApp).bucket().file(path).exists();
+    const [e] = await getStorage(testApp).bucket().file(path).exists();
     return e;
   }
 
   afterEach(async () => {
-    const bucket = admin.storage(testApp).bucket();
+    const bucket = getStorage(testApp).bucket();
     const [files] = await bucket.getFiles({ prefix: "sessionFeedback/" });
     await Promise.all(files.map((f) => f.delete().catch(() => undefined)));
   });
@@ -266,8 +264,7 @@ describe("#628: deleteAthleteStorage removes the athlete's session feedback phot
 
     await deleteAthleteStorage(testApp, uid);
 
-    const [left] = await admin
-      .storage(testApp)
+    const [left] = await getStorage(testApp)
       .bucket()
       .getFiles({ prefix: `sessionFeedback/${uid}/` });
     expect(left).toHaveLength(0);
@@ -282,4 +279,4 @@ describe("#628: deleteAthleteStorage removes the athlete's session feedback phot
   });
 });
 
-const db = () => admin.firestore(testApp);
+const db = () => getFirestore(testApp);

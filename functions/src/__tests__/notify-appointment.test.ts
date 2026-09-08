@@ -14,7 +14,9 @@
  * REQ-PN-CF-003. Fase 6 Etapa 2.
  */
 
-import * as admin from "firebase-admin";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
+import { Messaging, MulticastMessage } from "firebase-admin/messaging";
+import { Timestamp, getFirestore } from "firebase-admin/firestore";
 import { notifyOnAppointmentHandler } from "../notifications/notify-appointment";
 import { dedupeKey } from "../mail/enqueue-mail";
 import { MAIL_QUEUE_COLLECTION } from "../mail/types";
@@ -24,20 +26,20 @@ process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
 process.env.GCLOUD_PROJECT = "treino-dev";
 
-let testApp: admin.app.App;
+let testApp: App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp(
+  testApp = initializeApp(
     { projectId: "treino-dev" },
     "notify-appointment-test",
   );
 });
 
 afterAll(async () => {
-  await testApp.delete();
+  await deleteApp(testApp);
 });
 
-const db = () => admin.firestore(testApp);
+const db = () => getFirestore(testApp);
 
 /** Id del turno de todos los fixtures. Es el `scope` del dedupe del mail. */
 const APPT_ID = "appt-test";
@@ -54,18 +56,18 @@ const APPT_ID = "appt-test";
  * así que `formatDateAR(undefined)` devolvía `""` y el mail salía sin fecha ni
  * hora. Nadie lo asserteaba y el test quedaba verde.
  */
-const APPT_STARTS_AT = admin.firestore.Timestamp.fromDate(
+const APPT_STARTS_AT = Timestamp.fromDate(
   new Date("2026-08-26T22:00:00Z"),
 );
 
-function makeMockMessaging(): admin.messaging.Messaging {
+function makeMockMessaging(): Messaging {
   return {
-    sendEachForMulticast: jest.fn(async (msg: admin.messaging.MulticastMessage) => ({
+    sendEachForMulticast: jest.fn(async (msg: MulticastMessage) => ({
       successCount: msg.tokens.length,
       failureCount: 0,
       responses: msg.tokens.map(() => ({ success: true, messageId: "id" })),
     })),
-  } as unknown as admin.messaging.Messaging;
+  } as unknown as Messaging;
 }
 
 async function seedUser(uid: string, fcmTokens: string[]): Promise<void> {
@@ -117,7 +119,7 @@ describe("SCENARIO-632: new appointment status=requested → notify trainer", ()
     await notifyOnAppointmentHandler(testApp, APPT_ID, undefined, afterData, mock);
 
     expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
-    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as MulticastMessage;
     expect(callArg.tokens).toContain("trainer-token-632");
     expect(callArg.tokens).not.toContain("athlete-token-632");
     // QA-NOT-002: el trainer va a SU agenda (ruta role-aware), no al host de
@@ -154,7 +156,7 @@ describe("SCENARIO-633: requested→confirmed → notify athlete", () => {
     await notifyOnAppointmentHandler(testApp, APPT_ID, beforeData, afterData, mock);
 
     expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
-    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as MulticastMessage;
     expect(callArg.tokens).toContain("athlete-token-633");
     expect(callArg.tokens).not.toContain("trainer-token-633");
     expect(callArg.data?.deepLink).toBe("/coach?tab=agenda");
@@ -227,7 +229,7 @@ describe("SCENARIO-634: confirmed→cancelled, no cancelledBy → notify both pa
     await notifyOnAppointmentHandler(testApp, APPT_ID, beforeData, afterData, mock);
 
     expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
-    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as MulticastMessage;
     expect(callArg.tokens).toContain("trainer-token-634");
     expect(callArg.tokens).toContain("athlete-token-634");
   });

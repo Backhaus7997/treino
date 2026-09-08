@@ -44,15 +44,16 @@
  * Region southamerica-east1 per ADR-PN-005.
  */
 
-import * as admin from "firebase-admin";
+import { App, getApp, initializeApp } from "firebase-admin/app";
+import { Firestore, Transaction, getFirestore } from "firebase-admin/firestore";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 
-function getApp(): admin.app.App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -149,8 +150,8 @@ export function resolveCounterDelta(
  * Justificado en ADR-FOLLOW-007.
  */
 async function countAcceptedFor(
-  tx: admin.firestore.Transaction,
-  db: admin.firestore.Firestore,
+  tx: Transaction,
+  db: Firestore,
   uid: string,
 ): Promise<{ followingCount: number; followersCount: number }> {
   const [followingSnap, followersSnap] = await Promise.all([
@@ -175,7 +176,7 @@ async function countAcceptedFor(
 }
 
 export async function maintainFollowCountersHandler(
-  app: admin.app.App,
+  app: App,
   before: FollowData | undefined,
   after: FollowData | undefined,
 ): Promise<void> {
@@ -185,7 +186,7 @@ export async function maintainFollowCountersHandler(
     return;
   }
 
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
   const { requesterUid, otherUid, delta } = outcome;
   const requesterRef = db.collection("userPublicProfiles").doc(requesterUid);
   const otherRef = db.collection("userPublicProfiles").doc(otherUid);
@@ -235,6 +236,6 @@ export const maintainFollowCounters = onDocumentWritten(
   async (event) => {
     const before = event.data?.before?.data() as FollowData | undefined;
     const after = event.data?.after?.data() as FollowData | undefined;
-    await maintainFollowCountersHandler(getApp(), before, after);
+    await maintainFollowCountersHandler(ensureApp(), before, after);
   },
 );

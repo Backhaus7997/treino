@@ -14,29 +14,31 @@
  * REQ-PN-CF-001. Fase 6 Etapa 2.
  */
 
-import * as admin from "firebase-admin";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
+import { BatchResponse, Messaging } from "firebase-admin/messaging";
+import { getFirestore } from "firebase-admin/firestore";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
 process.env.GCLOUD_PROJECT = "treino-dev";
 
-let testApp: admin.app.App;
+let testApp: App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp(
+  testApp = initializeApp(
     { projectId: "treino-dev" },
     "send-fcm-test",
   );
 });
 
 afterAll(async () => {
-  await testApp.delete();
+  await deleteApp(testApp);
 });
 
 // Import the module under test — will fail until implementation exists
 import { sendFcm, SendFcmInput } from "../notifications/send-fcm";
 
-const db = () => admin.firestore(testApp);
+const db = () => getFirestore(testApp);
 
 const COL_USERS = "users";
 
@@ -72,7 +74,7 @@ async function deleteUser(uid: string): Promise<void> {
 }
 
 // Build a mock messaging object that returns a canned BatchResponse
-function buildMockMessaging(responses: Array<{ error?: { code: string } }>): admin.messaging.Messaging {
+function buildMockMessaging(responses: Array<{ error?: { code: string } }>): Messaging {
   const sendEachForMulticast = jest.fn().mockResolvedValue({
     responses: responses.map((r) => ({
       success: !r.error,
@@ -82,9 +84,9 @@ function buildMockMessaging(responses: Array<{ error?: { code: string } }>): adm
     })),
     successCount: responses.filter((r) => !r.error).length,
     failureCount: responses.filter((r) => r.error).length,
-  } as admin.messaging.BatchResponse);
+  } as BatchResponse);
 
-  return { sendEachForMulticast } as unknown as admin.messaging.Messaging;
+  return { sendEachForMulticast } as unknown as Messaging;
 }
 
 // ---------------------------------------------------------------------------

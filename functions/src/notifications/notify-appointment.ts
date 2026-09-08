@@ -19,7 +19,8 @@
  * REQ-PN-CF-003. Fase 6 Etapa 2.
  */
 
-import * as admin from "firebase-admin";
+import { App, getApp, initializeApp } from "firebase-admin/app";
+import { Messaging } from "firebase-admin/messaging";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 import { sendFcm } from "./send-fcm";
@@ -33,11 +34,11 @@ import {
 } from "../mail/format";
 import { trainerEntry } from "../mail/templates";
 
-function getApp(): admin.app.App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -107,7 +108,7 @@ function isAthleteAccountDeletedWrite(
  * @param toUids  - Recipients, as already resolved for the push.
  */
 async function enqueueAppointmentMail(
-  app: admin.app.App,
+  app: App,
   apptId: string,
   after: ApptData,
   status: string,
@@ -181,11 +182,11 @@ async function enqueueAppointmentMail(
  * @param messaging - Optional messaging instance for test injection.
  */
 export async function notifyOnAppointmentHandler(
-  app: admin.app.App,
+  app: App,
   apptId: string,
   before: ApptData | undefined,
   after: ApptData | undefined,
-  messaging?: admin.messaging.Messaging,
+  messaging?: Messaging,
 ): Promise<void> {
   // Guard: document deleted — no notification.
   if (!after) {
@@ -302,6 +303,6 @@ export const notifyOnAppointment = onDocumentWritten(
   async (event) => {
     const before = event.data?.before?.data() as ApptData | undefined;
     const after = event.data?.after?.data() as ApptData | undefined;
-    await notifyOnAppointmentHandler(getApp(), event.params.apptId, before, after);
+    await notifyOnAppointmentHandler(ensureApp(), event.params.apptId, before, after);
   },
 );

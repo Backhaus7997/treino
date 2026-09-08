@@ -240,6 +240,7 @@ class _SidebarItemRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = CoachHubSidebarItemTokens.of(context);
     final fg = active ? tokens.activeForeground : tokens.inactiveForeground;
+    final hasBadge = badgeCount != null && badgeCount! > 0;
 
     final row = TreinoInteractiveState(
       onTap: () => context.go(item.route),
@@ -270,7 +271,14 @@ class _SidebarItemRow extends StatelessWidget {
             mainAxisAlignment:
                 collapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
             children: [
-              Icon(item.iconBuilder(), size: 20, color: fg),
+              _ItemIcon(
+                icon: item.iconBuilder(),
+                color: fg,
+                // Colapsado el número no entra: el badge se degrada a un punto
+                // pegado al ícono. Expandido el punto sobra — el número va al
+                // final de la fila, que es donde se lee mejor.
+                dot: collapsed && hasBadge,
+              ),
               if (!collapsed) ...[
                 const SizedBox(width: 12),
                 Expanded(
@@ -285,8 +293,7 @@ class _SidebarItemRow extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (badgeCount != null && badgeCount! > 0)
-                  _Badge(count: badgeCount!),
+                if (hasBadge) _Badge(count: badgeCount!),
               ],
             ],
           ),
@@ -294,8 +301,84 @@ class _SidebarItemRow extends StatelessWidget {
       },
     );
 
+    // Colapsado el label desaparece del render, así que el ítem queda sin
+    // nombre para el mouse Y para un lector de pantalla. El tooltip cubre lo
+    // primero; el `Semantics(label:)` explícito, lo segundo —
+    // `TreinoInteractiveState` marca `button: true` pero no tiene con qué
+    // nombrarlo.
+    // `MergeSemantics` y no un `Semantics` suelto: `TreinoInteractiveState` ya
+    // aporta su propio `Semantics(button: true)` sin label, y dos anotaciones
+    // encadenadas no se combinan solas — el label quedaba en un nodo aparte
+    // que el lector nunca ata al botón. Merged, el ítem se anuncia como una
+    // sola cosa: «Pagos, 3, botón».
+    final labelled = collapsed
+        ? MergeSemantics(
+            child: Semantics(
+            label: hasBadge ? '${item.label}, $badgeCount' : item.label,
+            child: Tooltip(
+              message: hasBadge ? '${item.label} ($badgeCount)' : item.label,
+              // El sidebar colapsado tiene 23 íconos y el tooltip es la única
+              // forma de leerlos: 200 ms alcanzan para no dispararlo mientras
+              // el mouse cruza la columna, y se sienten instantáneos al frenar.
+              waitDuration: const Duration(milliseconds: 200),
+              // El label ya lo pone el `Semantics` de arriba; sin esto el
+              // lector lo diría dos veces.
+              excludeFromSemantics: true,
+              child: row,
+            ),
+          ))
+        : row;
+
     return TreinoFadeSlideIn(
-        delay: delay, distance: AppMotion.slideSm, child: row);
+        delay: delay, distance: AppMotion.slideSm, child: labelled);
+  }
+}
+
+/// Ícono del ítem, con el punto de badge opcional para el estado colapsado.
+///
+/// El punto no anima: aparecer y desaparecer acá es un cambio de estado que se
+/// lee solo, y el sidebar es de las superficies que el PF más mira por día.
+class _ItemIcon extends StatelessWidget {
+  const _ItemIcon({
+    required this.icon,
+    required this.color,
+    required this.dot,
+  });
+
+  final IconData icon;
+  final Color color;
+  final bool dot;
+
+  /// Diámetro del punto — la mitad del badge numérico (`TreinoBadgeTokens.size`).
+  static const double _dotSize = 8;
+
+  @override
+  Widget build(BuildContext context) {
+    final glyph = Icon(icon, size: 20, color: color);
+    if (!dot) return glyph;
+
+    final palette = AppPalette.of(context);
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        glyph,
+        Positioned(
+          top: -1,
+          right: -2,
+          child: Container(
+            width: _dotSize,
+            height: _dotSize,
+            decoration: BoxDecoration(
+              color: TreinoBadgeTokens.of(context).background,
+              shape: BoxShape.circle,
+              // Anillo del color del sidebar: sin él el punto se pega al glifo
+              // y los dos se leen como una sola forma sucia.
+              border: Border.all(color: palette.bg, width: 1.5),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 
