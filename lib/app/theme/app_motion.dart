@@ -57,14 +57,35 @@ class AppMotion {
   // ---------------------------------------------------------------------------
 
   /// Curva por defecto: desacelera al final. Para entradas y la mayoría de la
-  /// UI. Era la curva más usada del codebase (`easeOutCubic`, 6 usos).
-  static const Curve standard = Curves.easeOutCubic;
+  /// UI.
+  ///
+  /// **Por qué no `Curves.easeOutCubic`** (lo que había): las curvas built-in
+  /// son demasiado débiles para UI. `easeOutCubic` es `(0.215, 0.61, 0.355, 1)`
+  /// — a mitad de la animación recorrió ~78% del camino. Esta recorre ~94%: el
+  /// movimiento arranca de golpe y el resto es asentarse. La diferencia no se
+  /// describe, se siente — a igual duración, esta se percibe más rápida.
+  ///
+  /// Valor de la biblioteca de curvas de Emil Kowalski (animations.dev),
+  /// equivalente al `cubic-bezier(0.23, 1, 0.32, 1)` de CSS.
+  static const Curve standard = Cubic(0.23, 1, 0.32, 1);
 
   /// Acelera y desacelera: para movimientos más grandes o que piden atención
   /// (toggle de sidebar, transiciones de página con desplazamiento notable).
-  static const Curve emphasized = Curves.easeInOutCubic;
+  ///
+  /// Mismo criterio que [standard]: reemplaza a `Curves.easeInOutCubic`, que
+  /// es plana de más para un desplazamiento que el ojo sigue.
+  /// `cubic-bezier(0.77, 0, 0.175, 1)`.
+  static const Curve emphasized = Cubic(0.77, 0, 0.175, 1);
 
   /// Acelera hacia el final: para salidas (algo que se va de pantalla).
+  ///
+  /// **Se ve como ease-in y se comporta como ease-out, a propósito.** Su único
+  /// consumidor es el `switchOutCurve` de un `AnimatedSwitcher`, cuyo hijo
+  /// saliente recorre su controller de `1.0` a `0.0`. Con `t³` sobre un
+  /// parámetro que baja, la opacidad cae rápido y después se apaga despacio
+  /// (1 → 0.73 → 0.13 → 0): el que se va libera la escena enseguida en vez de
+  /// quedarse tapando al que entra. Cambiarla por una ease-out "porque la
+  /// regla dice ease-out" invierte justamente eso.
   static const Curve exit = Curves.easeInCubic;
 
   // ---------------------------------------------------------------------------

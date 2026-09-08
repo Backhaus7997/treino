@@ -365,4 +365,176 @@ void main() {
     final badgeText = tester.widget<Text>(find.text('3'));
     expect(badgeText.style?.color, badgeTokens.foreground);
   });
+
+  // ─── Sidebar colapsado: nombre y aviso ────────────────────────────────────
+  //
+  // Colapsado, el `if (!collapsed)` que oculta el label ocultaba TAMBIÉN el
+  // badge, sin nada que lo reemplace. Los dos únicos items que lo exponen son
+  // Invitaciones (solicitudes pendientes) y Pagos (cobros), y entre 768 y
+  // 1279 px el colapso lo FUERZA el shell (`Viewport.compact`): el PF no
+  // eligió colapsar, no puede expandir, y perdía el único aviso de la
+  // pantalla. Estos tests fijan las dos ramas que faltaban.
+
+  testWidgets(
+      'colapsado con badge → punto sobre el ícono; el número no entra pero el '
+      'aviso no se pierde', (tester) async {
+    final testBadgeProvider = StateProvider<int?>((ref) => 3);
+    final item = sidebarRegistry.firstWhere((i) => i.id == 'pagos');
+
+    await _pumpSidebarWithItems(
+      tester,
+      items: [
+        SidebarItem(
+          id: item.id,
+          label: item.label,
+          route: item.route,
+          iconBuilder: item.iconBuilder,
+          group: item.group,
+          badgeProvider: testBadgeProvider,
+        ),
+      ],
+      prefs: {'coach_hub.sidebar.collapsed': true},
+      initial: '/pagos',
+    );
+
+    // El número no cabe en 72px: el badge se degrada a punto.
+    expect(find.text('3'), findsNothing);
+
+    final tokens = TreinoBadgeTokens.of(tester.element(find.byType(Icon).first));
+    final dot = find.byWidgetPredicate(
+      (w) =>
+          w is Container &&
+          w.decoration is BoxDecoration &&
+          (w.decoration as BoxDecoration).shape == BoxShape.circle &&
+          (w.decoration as BoxDecoration).color == tokens.background,
+    );
+    expect(dot, findsOneWidget);
+  });
+
+  testWidgets('colapsado sin badge → el ícono va pelado, sin punto fantasma',
+      (tester) async {
+    await _pumpSidebar(tester, prefs: {'coach_hub.sidebar.collapsed': true});
+
+    final tokens = TreinoBadgeTokens.of(tester.element(find.byType(Icon).first));
+    expect(
+      find.byWidgetPredicate(
+        (w) =>
+            w is Container &&
+            w.decoration is BoxDecoration &&
+            (w.decoration as BoxDecoration).shape == BoxShape.circle &&
+            (w.decoration as BoxDecoration).color == tokens.background,
+      ),
+      findsNothing,
+    );
+  });
+
+  testWidgets(
+      'colapsado → cada item se nombra por tooltip (el label no está en '
+      'pantalla)', (tester) async {
+    await _pumpSidebar(tester, prefs: {'coach_hub.sidebar.collapsed': true});
+
+    // Precondición: el label NO se pinta. Sin tooltip, el item es un glifo
+    // anónimo — y entre 768 y 1279 px el colapso lo fuerza el shell.
+    expect(find.text('Dashboard'), findsNothing);
+    expect(find.text('Alumnos'), findsNothing);
+
+    for (final item in sidebarRegistry) {
+      expect(
+        find.byTooltip(item.label),
+        findsOneWidget,
+        reason: 'sin tooltip, «${item.label}» es un ícono sin nombre',
+      );
+    }
+  });
+
+  testWidgets('colapsado con badge → el conteo viaja en el tooltip',
+      (tester) async {
+    final testBadgeProvider = StateProvider<int?>((ref) => 3);
+    final item = sidebarRegistry.firstWhere((i) => i.id == 'pagos');
+
+    await _pumpSidebarWithItems(
+      tester,
+      items: [
+        SidebarItem(
+          id: item.id,
+          label: item.label,
+          route: item.route,
+          iconBuilder: item.iconBuilder,
+          group: item.group,
+          badgeProvider: testBadgeProvider,
+        ),
+      ],
+      prefs: {'coach_hub.sidebar.collapsed': true},
+      initial: '/pagos',
+    );
+
+    // El punto dice «hay algo»; el número solo lo dice el tooltip.
+    expect(find.byTooltip('${item.label} (3)'), findsOneWidget);
+  });
+
+  // NOTA — por qué acá no hay assert de `bySemanticsLabel`.
+  //
+  // El `MergeSemantics`/`Semantics(label:)` del item está puesto y es
+  // correcto, pero hoy no se puede verificar: al volcar el árbol de semántica
+  // de este mismo harness, TODO el sidebar aporta CERO nodos etiquetados
+  // —colapsado y expandido, filas, toggle y footer por igual—, mientras el
+  // área de contenido al lado sí los aporta. `tester.getSemantics()` sobre
+  // `find.text('Dashboard')` con el sidebar expandido devuelve `label: ""`:
+  // ni siquiera los `Text` visibles llegan al árbol.
+  //
+  // Es un bug PREEXISTENTE y más grande que este cambio (el sidebar entero es
+  // invisible para un lector de pantalla), así que se investiga aparte en vez
+  // de escribir acá un assert que quede rojo o, peor, uno laxo que tape el
+  // problema. Cuando se arregle la causa raíz, este es el lugar del assert.
+
+  testWidgets('expandido → sin tooltip: el label ya está en pantalla',
+      (tester) async {
+    await _pumpSidebar(tester);
+
+    expect(find.text('Dashboard'), findsOneWidget);
+    expect(find.byTooltip('Dashboard'), findsNothing);
+  });
+}
+
+/// Igual que [_pumpSidebar] pero con `itemsOverride`, para los casos que
+/// necesitan un `badgeProvider` fake.
+Future<void> _pumpSidebarWithItems(
+  WidgetTester tester, {
+  required List<SidebarItem> items,
+  Map<String, Object> prefs = const {},
+  String initial = '/dashboard',
+}) async {
+  SharedPreferences.setMockInitialValues(prefs);
+  final sp = await SharedPreferences.getInstance();
+
+  final router = GoRouter(
+    initialLocation: initial,
+    routes: [
+      ShellRoute(
+        builder: (ctx, state, child) => Scaffold(
+          body: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              CoachHubSidebar(itemsOverride: items),
+              Expanded(child: child),
+            ],
+          ),
+        ),
+        routes: [
+          for (final p in {...items.map((i) => i.route), initial})
+            GoRoute(path: p, builder: (_, __) => Text('page:$p')),
+        ],
+      ),
+    ],
+  );
+
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        sharedPreferencesProvider.overrideWith((ref) => Future.value(sp)),
+      ],
+      child: MaterialApp.router(theme: AppTheme.dark(), routerConfig: router),
+    ),
+  );
+  await tester.pumpAndSettle();
 }

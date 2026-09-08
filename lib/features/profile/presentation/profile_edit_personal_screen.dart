@@ -904,7 +904,7 @@ class _GenderSelector extends StatelessWidget {
         return GestureDetector(
           onTap: () => onChanged(isSelected ? null : choice.value),
           child: AnimatedContainer(
-            duration: AppMotion.fast,
+            duration: AppMotion.resolve(context, AppMotion.fast),
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
             decoration: BoxDecoration(
               color: isSelected ? palette.accent : Colors.transparent,
@@ -974,7 +974,7 @@ class _ExperienceLevelSelector extends StatelessWidget {
           child: GestureDetector(
             onTap: () => onChanged(isSelected ? null : choice.value),
             child: AnimatedContainer(
-              duration: AppMotion.fast,
+              duration: AppMotion.resolve(context, AppMotion.fast),
               width: double.infinity,
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
