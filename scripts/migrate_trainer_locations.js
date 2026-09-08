@@ -23,12 +23,14 @@
  */
 
 const { inicializarAdmin } = require('./lib/admin');
+const { getAuth } = require('firebase-admin/auth');
+const { getFirestore } = require('firebase-admin/firestore');
 const crypto = require('crypto');
 
 // Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla cerrado
 // con la migración; contra el emulador no pide nada. Ver scripts/lib/admin.js.
-const { admin } = inicializarAdmin();
-const db = admin.firestore();
+const { app } = inicializarAdmin();
+const db = getFirestore(app);
 
 function uuid() {
   return crypto.randomUUID();
@@ -46,7 +48,7 @@ function parseArgs() {
 async function fetchMateoUid(email) {
   if (!email) return null;
   try {
-    const user = await admin.auth().getUserByEmail(email);
+    const user = await getAuth(app).getUserByEmail(email);
     return user.uid;
   } catch (_) {
     console.warn(`No user found for email "${email}". Skipping Mateo override.`);

@@ -17,6 +17,7 @@
  */
 
 const { inicializarAdmin } = require('./lib/admin');
+const { getFirestore } = require('firebase-admin/firestore');
 const { equipmentMap } = require('./_equipment_map.js');
 const { videoMap } = require('./_video_map.js');
 
@@ -39,8 +40,8 @@ const bannerProd = bannerDeProduccion(projectIdObjetivo(), {
 if (bannerProd) console.warn(bannerProd);
 
 // Credenciales: la única puerta (#834).
-const { admin } = inicializarAdmin();
-const db = admin.firestore();
+const { app } = inicializarAdmin();
+const db = getFirestore(app);
 
 // -- DATA ------------------------------------------------------------------
 

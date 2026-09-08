@@ -164,3 +164,16 @@ export { reconcileMpSubscriptions } from "./subscriptions/mp/reconcile";
 //
 // Usa el mismo secreto MP_ACCESS_TOKEN que los dos de arriba.
 export { reconcileMyCheckout } from "./subscriptions/mp/reconcile-my-checkout";
+
+// Paywall del entrenador — la notificacion de Mercado Pago. **El PRIMER
+// endpoint HTTP publico del repo**: todo lo demas es onCall con request.auth o
+// un trigger de Firestore, esto lo puede POSTear cualquiera.
+//
+// Lo que lo hace seguro no es la firma —que puede no existir, ver el
+// encabezado— sino que del evento se usa UN solo dato, el id, y la verdad se le
+// pregunta a MP con nuestro token.
+//
+// Requiere DOS secretos. El de firma puede quedar vacio si MP no da uno para
+// aplicaciones de Suscripciones, pero tiene que EXISTIR o el deploy falla:
+//   firebase functions:secrets:set MP_WEBHOOK_SECRET --project prod
+export { mpWebhook } from "./subscriptions/mp/webhook";

@@ -1598,6 +1598,28 @@ con token la sigue pudiendo bajar aunque acá diga DENY.
 | A6 | **Anónimo / sin auth** | `request.auth == null` | Nada. Un cliente HTTP |
 | A7 | **Cloud Function (Admin SDK)** | **no la ve** — bypassea las reglas por diseño (ADR-ACCDEL-013) | Deploy. Es la TCB del sistema |
 
+> **Actualización 2026-09-08 — A6 dejó de ser sólo un actor de `firestore.rules`.**
+>
+> Esta tabla describe a los siete actores **como los ve una regla de Firestore**,
+> y mientras todo `functions/` fue `onCall` (con `request.auth`) o trigger, A6 no
+> tenía ninguna superficie de cómputo: llegaba al SDK de Firestore y ahí lo
+> frenaban las reglas.
+>
+> `mpWebhook` (`functions/src/subscriptions/mp/webhook.ts`) es el **primer
+> endpoint HTTP público del repo**: cualquiera puede POSTearlo sin cuenta. O sea
+> que A6 ahora puede hacer que corra código nuestro.
+>
+> Lo que eso NO le da, y es deliberado: del evento entrante se usa **un solo
+> dato, el id del recurso**, y el estado se le pregunta a Mercado Pago con
+> nuestro token. Un body forjado no decide nada — el payload no se mira. Lo que
+> SÍ le da es la posibilidad de gastarnos cuota de la API de MP mandando ids al
+> azar; contra eso están el chequeo de forma del id, el dedupe y un
+> `maxInstances: 3` que es el único tope de instancias de todo el repo.
+>
+> La firma `x-signature` se valida **si hay secreto configurado**, y puede no
+> haberlo: la doc de MP se contradice sobre si una aplicación de Suscripciones
+> puede generar clave. El encabezado del archivo tiene la cita textual.
+
 A2 y A5 se parecen pero **no son el mismo actor y conviene no fusionarlos**. A2
 es una persona concreta que intenta llegar al dato de otra persona concreta; A5
 es la audiencia que una regla se dio a sí misma cuando escribió

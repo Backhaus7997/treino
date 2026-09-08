@@ -872,6 +872,72 @@ abstract class AppL10n {
   /// **'VER AGENDA DEL PF'**
   String get agendaButtonLabel;
 
+  /// Botón de la tab Coach que abre el plan nutricional del alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MI PLAN NUTRICIONAL'**
+  String get athleteNutritionPlanButtonLabel;
+
+  /// Botón de la tab Coach que abre los archivos compartidos con el alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MIS ARCHIVOS'**
+  String get athleteFilesButtonLabel;
+
+  /// Título de la pantalla read-only del plan nutricional del alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PLAN NUTRICIONAL'**
+  String get athleteNutritionPlanScreenTitle;
+
+  /// Indica que el alumno debe elegir una sola opción del grupo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Elegí una'**
+  String get athleteNutritionChooseOneHint;
+
+  /// Indica que el alumno debe incluir todas las opciones del grupo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Va todo'**
+  String get athleteNutritionAllHint;
+
+  /// Estado vacío cuando el PF todavía no creó un plan nutricional.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu PF todavía no cargó tu plan nutricional.'**
+  String get athleteNutritionPlanEmpty;
+
+  /// Error al cargar el plan nutricional del alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar tu plan nutricional.'**
+  String get athleteNutritionPlanLoadError;
+
+  /// Estado de la ruta nutricional cuando el alumno no tiene un vínculo activo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Necesitás un vínculo activo con un PF para ver tu plan nutricional.'**
+  String get athleteNutritionNeedsActiveLink;
+
+  /// Título de la pantalla de archivos compartidos con el alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MIS ARCHIVOS'**
+  String get athleteFilesScreenTitle;
+
+  /// Estado vacío cuando ningún PF compartió archivos con el alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu PF todavía no compartió archivos con vos.'**
+  String get athleteFilesEmpty;
+
+  /// Error al cargar los archivos compartidos con el alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar tus archivos.'**
+  String get athleteFilesLoadError;
+
   /// No description provided for @agendaScreenTitle.
   ///
   /// In es_AR, this message translates to:
@@ -4727,13 +4793,13 @@ abstract class AppL10n {
   /// Coach Hub web alumno detail — title of the Archivos tab body.
   ///
   /// In es_AR, this message translates to:
-  /// **'Archivos privados'**
+  /// **'Archivos del alumno'**
   String get coachHubAlumnoDetailArchivosTitle;
 
-  /// Coach Hub web alumno detail — subtitle explaining privacy: only the trainer sees these files, the athlete never does.
+  /// Coach Hub web alumno detail — explica que el PF controla qué archivos comparte con el alumno.
   ///
   /// In es_AR, this message translates to:
-  /// **'PDFs y fotos que subís sobre este alumno. Solo vos los ves.'**
+  /// **'PDFs y fotos que subís sobre este alumno. Elegí cuáles compartís con él.'**
   String get coachHubAlumnoDetailArchivosSubtitle;
 
   /// Coach Hub web alumno detail — primary CTA to open the file picker.
@@ -4801,6 +4867,36 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'No pudimos eliminar el archivo.'**
   String get coachHubAlumnoDetailArchivosDeleteError;
+
+  /// Estado visible de un archivo compartido con el alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'COMPARTIDO'**
+  String get coachHubAlumnoDetailArchivosSharedLabel;
+
+  /// Estado visible de un archivo que el alumno no puede ver.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PRIVADO'**
+  String get coachHubAlumnoDetailArchivosPrivateLabel;
+
+  /// Tooltip para habilitar el acceso del alumno a un archivo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Compartir con el alumno'**
+  String get coachHubAlumnoDetailArchivosShareTooltip;
+
+  /// Tooltip para quitarle al alumno el acceso a un archivo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Dejar de compartir con el alumno'**
+  String get coachHubAlumnoDetailArchivosUnshareTooltip;
+
+  /// Snackbar cuando falla el cambio de visibilidad de un archivo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cambiar quién ve el archivo.'**
+  String get coachHubAlumnoDetailArchivosShareError;
 
   /// Feed error branch text, replacing the hardcoded literal repeated 3x in feed_screen.dart (finding 9). Pair with coachRetryLabel for the retry CTA.
   ///
