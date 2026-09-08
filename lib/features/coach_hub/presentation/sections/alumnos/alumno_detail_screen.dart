@@ -240,7 +240,6 @@ class AlumnoDetailScreen extends ConsumerWidget {
     'Entrenamiento',
     'Progreso',
     'Plan',
-    'Chat',
     'Privado',
     'Pagos',
   ];
@@ -248,9 +247,8 @@ class AlumnoDetailScreen extends ConsumerWidget {
   static const _entrenamientoIndex = 1;
   static const _progresoIndex = 2;
   static const _planIndex = 3;
-  static const _chatIndex = 4;
-  static const _privadoIndex = 5;
-  static const _pagosIndex = 6;
+  static const _privadoIndex = 4;
+  static const _pagosIndex = 5;
 
   /// El estado de cada grupo, en el orden EXACTO de [_tabs].
   ///
@@ -263,18 +261,8 @@ class AlumnoDetailScreen extends ConsumerWidget {
         i.entrenamiento,
         i.progreso,
         i.plan,
-        i.chat,
         i.privado,
         i.pagos,
-      ];
-
-  static List<TreinoSegmentMark> _marks(AlumnoDetailIndicators i) => [
-        for (final estado in _estados(i))
-          switch (estado) {
-            AlumnoGrupoEstado.conContenido => TreinoSegmentMark.content,
-            AlumnoGrupoEstado.requiereAtencion => TreinoSegmentMark.attention,
-            _ => TreinoSegmentMark.none,
-          },
       ];
 
   /// Lo que el punto dice, en palabras. El color solo no es información
@@ -288,8 +276,6 @@ class AlumnoDetailScreen extends ConsumerWidget {
       for (var n = 0; n < _tabs.length; n++)
         switch ((_tabs[n], estados[n])) {
           (final label, AlumnoGrupoEstado.desconocido) => label,
-          ('Chat', AlumnoGrupoEstado.requiereAtencion) =>
-            'Chat, con mensajes sin leer', // i18n: Fase W2
           ('Pagos', AlumnoGrupoEstado.requiereAtencion) =>
             'Pagos, con cobro pendiente', // i18n: Fase W2
           ('Pagos', _) => 'Pagos, sin cobros pendientes', // i18n: Fase W2
@@ -346,18 +332,21 @@ class AlumnoDetailScreen extends ConsumerWidget {
                   gymName: gymName,
                   billing: billing,
                   onPago: () => registrarPago(context, ref, athleteId),
+                  onChat: () => _abrirChat(context, athleteId),
+                  chatSinLeer:
+                      indicators.chat == AlumnoGrupoEstado.requiereAtencion,
                   palette: palette,
                 ),
-                const SizedBox(height: 14),
-                TreinoSegmentedPill(
+                const SizedBox(height: 12),
+                _SeccionesTabBar(
                   labels: _tabs,
-                  marks: _marks(indicators),
+                  estados: _estados(indicators),
                   semanticsLabels: _semanticsLabels(indicators),
+                  palette: palette,
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 8),
           Expanded(
             child: TabBarView(
               physics: const NeverScrollableScrollPhysics(),
@@ -371,8 +360,6 @@ class AlumnoDetailScreen extends ConsumerWidget {
                     _ProgresoTab(athleteId: athleteId)
                   else if (i == _planIndex)
                     _PlanTab(athleteId: athleteId)
-                  else if (i == _chatIndex)
-                    _ChatTab(athleteId: athleteId)
                   else if (i == _privadoIndex)
                     _PrivadoTab(athleteId: athleteId)
                   else if (i == _pagosIndex)
@@ -420,6 +407,8 @@ class _Header extends StatelessWidget {
     required this.gymName,
     required this.billing,
     required this.onPago,
+    required this.onChat,
+    required this.chatSinLeer,
     required this.palette,
   });
 
@@ -430,6 +419,8 @@ class _Header extends StatelessWidget {
   final String? gymName;
   final AthleteBilling? billing;
   final VoidCallback onPago;
+  final VoidCallback onChat;
+  final bool chatSinLeer;
   final AppPalette palette;
 
   @override
@@ -455,7 +446,7 @@ class _Header extends StatelessWidget {
     final avatarColor = avatarColorFor(link?.athleteId ?? athleteId);
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: palette.bgCard,
         border: Border.all(color: palette.border),
@@ -468,7 +459,7 @@ class _Header extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               CircleAvatar(
-                radius: 26,
+                radius: 22,
                 backgroundColor: hasNetworkAvatar ? palette.bg : avatarColor,
                 backgroundImage:
                     hasNetworkAvatar ? NetworkImage(avatarUrl) : null,
@@ -489,7 +480,7 @@ class _Header extends StatelessWidget {
                       name,
                       style: GoogleFonts.barlowCondensed(
                         color: palette.textPrimary,
-                        fontSize: 24,
+                        fontSize: 20,
                         fontWeight: FontWeight.w700,
                         height: 1,
                       ),
@@ -539,12 +530,39 @@ class _Header extends StatelessWidget {
                             style: TextStyle(
                                 color: palette.textMuted, fontSize: 13),
                           ),
+                        // Sesiones y racha entran ACÁ y no en cards propias.
+                        // Como cards costaban ~85px de alto en una pantalla
+                        // cuyo contenido es lo que el PF vino a mirar: dos
+                        // números de dos dígitos no justifican una fila
+                        // entera. El número en negrita mantiene la jerarquía
+                        // sin la caja.
+                        _MetricInline(
+                          value: '$sesiones',
+                          label: 'sesiones', // i18n: Fase W2
+                          palette: palette,
+                        ),
+                        _MetricInline(
+                          value: '$racha d',
+                          label: 'de racha', // i18n: Fase W2
+                          palette: palette,
+                        ),
                       ],
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: 12),
+              // El chat vive ACÁ y no en una pestaña. Como pestaña ocupaba un
+              // destino de primer nivel para algo que ya tiene su propia
+              // sección en el sidebar; como acción del header no gasta alto y
+              // conserva el acceso de un click a ESTE alumno — que la sección
+              // no da, porque `/chat` no toma parámetro de alumno.
+              _ChatAction(
+                onTap: onChat,
+                sinLeer: chatSinLeer,
+                palette: palette,
+              ),
+              const SizedBox(width: 8),
               OutlinedButton(
                 onPressed: onPago,
                 style: OutlinedButton.styleFrom(
@@ -561,20 +579,259 @@ class _Header extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          Row(
+        ],
+      ),
+    );
+  }
+}
+
+/// Sub-navegación de un grupo — la píldora del kit, a su tamaño real.
+///
+/// El ancho va acotado y alineado a la izquierda a propósito. `TabBar` reparte
+/// el ancho disponible entre sus celdas, así que dentro de un contenedor de
+/// 2000px la píldora se estira de punta a punta y se lee como una barra de
+/// navegación principal, compitiendo con la de arriba. El Feed ya la encierra
+/// en un `maxWidth` por la misma razón (ver el dartdoc de
+/// `TreinoSegmentedPillTokens.labelPadding`). Acotada, vuelve a leerse como lo
+/// que es: el segundo nivel.
+class _SubNav extends StatelessWidget {
+  const _SubNav({required this.labels});
+
+  final List<String> labels;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 320),
+        child: TreinoSegmentedPill(labels: labels),
+      ),
+    );
+  }
+}
+
+/// Key estable del punto de la pestaña [index].
+///
+/// Pública y de nivel superior porque el widget que la usa es privado, y lo que
+/// hace falta afirmar desde un test es el COLOR del punto — lo único de esto
+/// que puede romperse en silencio, y sólo en tema claro.
+Key alumnoDetailMarcaKey(int index) => Key('alumno-detail-marca-$index');
+
+/// Navegación de primer nivel de la ficha — `TabBar` con subrayado.
+///
+/// **Por qué no `TreinoSegmentedPill`.** Ese control es la sub-navegación
+/// MOBILE: una pista con contorno y un thumb relleno, pensada para dos o tres
+/// celdas angostas. Estirado a seis celdas a lo ancho de un desktop, su
+/// contorno y su relleno pesan más que el contenido que encabezan, y no se
+/// parece a ninguna otra pantalla del Coach Hub web. La Biblioteca —la otra
+/// sección web con pestañas— usa exactamente esto: `labelColor: accent`,
+/// `indicatorColor: accent`, `indicatorWeight: 2`. Este es el idioma de acá.
+///
+/// El contorno de la píldora NO era un capricho: sale de #646 (WCAG 1.4.11,
+/// 3:1 para identificar un control) y ahí resolvía que el pill se leyera como
+/// un badge decorativo. Acá ese riesgo no aplica del mismo modo — una fila de
+/// pestañas con subrayado es un patrón que el usuario ya reconoce, y el
+/// indicador de 2px en acento marca la selección con contraste de sobra.
+class _SeccionesTabBar extends StatelessWidget {
+  const _SeccionesTabBar({
+    required this.labels,
+    required this.estados,
+    required this.semanticsLabels,
+    required this.palette,
+  });
+
+  final List<String> labels;
+  final List<AlumnoGrupoEstado> estados;
+  final List<String> semanticsLabels;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return TabBar(
+      isScrollable: false,
+      labelColor: palette.accentText,
+      unselectedLabelColor: palette.textMuted,
+      indicatorColor: palette.accentText,
+      indicatorWeight: 2,
+      indicatorSize: TabBarIndicatorSize.label,
+      dividerColor: palette.border,
+      // El default de `TabBar` son 16 por lado, que con seis celdas y un punto
+      // desborda antes de los 900px de ancho. Mismo valor que usa el pill del
+      // kit por la misma razón.
+      labelPadding: const EdgeInsets.symmetric(
+        horizontal: TreinoSegmentedPillTokens.labelPadding,
+      ),
+      labelStyle: const TextStyle(
+        fontFamily: AppFonts.barlow,
+        fontWeight: FontWeight.w700,
+        fontSize: 14,
+      ),
+      // El MISMO estilo en los dos estados: `TabBar` interpola entre ambos, y
+      // con pesos distintos la tira entera se re-layoutea en cada cambio.
+      unselectedLabelStyle: const TextStyle(
+        fontFamily: AppFonts.barlow,
+        fontWeight: FontWeight.w700,
+        fontSize: 14,
+      ),
+      tabs: [
+        for (var i = 0; i < labels.length; i++)
+          Tab(
+            height: 40,
+            child: Semantics(
+              label: semanticsLabels[i],
+              excludeSemantics: true,
+              // `FittedBox` y no `Expanded`+ellipsis: es la estrategia que el
+              // kit ya eligió para este problema —encoger antes que
+              // desbordar— y la que mantiene legible la etiqueta más larga
+              // («Entrenamiento») cuando el navegador está angosto. Sin esto
+              // la fila desborda 23px a 800 de ancho.
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(labels[i]),
+                  if (_colorDeMarca(context, estados[i]) case final color?) ...[
+                    const SizedBox(width: TreinoNavMarkTokens.gap),
+                    Container(
+                      key: alumnoDetailMarcaKey(i),
+                      width: TreinoNavMarkTokens.size,
+                      height: TreinoNavMarkTokens.size,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ],
+                ],
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// Sin marca cuando el estado se desconoce — un punto sobre un stream que
+  /// todavía carga afirmaría algo que no sabemos.
+  Color? _colorDeMarca(BuildContext ctx, AlumnoGrupoEstado estado) {
+    final t = TreinoNavMarkTokens.of(ctx);
+    return switch (estado) {
+      AlumnoGrupoEstado.conContenido => t.content,
+      AlumnoGrupoEstado.requiereAtencion => t.attention,
+      _ => null,
+    };
+  }
+}
+
+/// Abre el chat con el alumno en un panel, sin salir de la ficha.
+Future<void> _abrirChat(BuildContext context, String athleteId) {
+  return showDialog<void>(
+    context: context,
+    builder: (ctx) {
+      final palette = AppPalette.of(ctx);
+      return Dialog(
+        backgroundColor: palette.bgCard,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720, maxHeight: 640),
+          child: _ChatTab(athleteId: athleteId),
+        ),
+      );
+    },
+  );
+}
+
+/// Botón de chat del header, con punto cuando hay mensajes sin leer.
+class _ChatAction extends StatelessWidget {
+  const _ChatAction({
+    required this.onTap,
+    required this.sinLeer,
+    required this.palette,
+  });
+
+  final VoidCallback onTap;
+  final bool sinLeer;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: sinLeer
+          ? 'Chat, con mensajes sin leer' // i18n: Fase W2
+          : 'Chat', // i18n: Fase W2
+      button: true,
+      excludeSemantics: true,
+      child: Tooltip(
+        message: 'Chat', // i18n: Fase W2
+        child: OutlinedButton(
+          onPressed: onTap,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: palette.textPrimary,
+            side: BorderSide(color: palette.border),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            minimumSize: Size.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              _MetricChip(
-                  label: 'Sesiones',
-                  value: '$sesiones',
-                  palette: palette), // i18n: Fase W2
-              const SizedBox(width: 10),
-              _MetricChip(
-                  label: 'Racha',
-                  value: '$racha d',
-                  palette: palette), // i18n: Fase W2
+              Icon(TreinoIcon.chat, size: 16, color: palette.textPrimary),
+              if (sinLeer) ...[
+                const SizedBox(width: AppSpacing.hairline),
+                Container(
+                  width: TreinoNavMarkTokens.size,
+                  height: TreinoNavMarkTokens.size,
+                  decoration: BoxDecoration(
+                    color: TreinoNavMarkTokens.of(context).attention,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Un número del header con su etiqueta, en línea.
+///
+/// Reemplaza a las cards de «Sesiones» y «Racha», que ocupaban una fila propia
+/// de ~85px arriba de la navegación. En esta pantalla el alto es el recurso
+/// escaso: todo lo que gasta el encabezado se lo saca al contenido.
+class _MetricInline extends StatelessWidget {
+  const _MetricInline({
+    required this.value,
+    required this.label,
+    required this.palette,
+  });
+
+  final String value;
+  final String label;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    // `Text.rich` y NO `RichText`: el segundo no hereda el `DefaultTextStyle`
+    // ambiente, así que su span queda sin familia tipográfica y el texto sale
+    // en tofu (cuadraditos) cuando la fuente por defecto no tiene los glifos.
+    // Se vio renderizando la pantalla contra el seed del gate visual, al lado
+    // del golden de CI que sí los mostraba bien.
+    return Text.rich(
+      TextSpan(
+        style: TextStyle(color: palette.textMuted, fontSize: 13),
+        children: [
+          TextSpan(
+            text: value,
+            style: TextStyle(
+              color: palette.textPrimary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          TextSpan(text: ' $label'),
         ],
       ),
     );
@@ -592,55 +849,6 @@ class _Dot extends StatelessWidget {
       );
 }
 
-class _MetricChip extends StatelessWidget {
-  const _MetricChip(
-      {required this.label, required this.value, required this.palette});
-  final String label;
-  final String value;
-  final AppPalette palette;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: palette.bg,
-        border: Border.all(color: palette.border),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: TextStyle(color: palette.textMuted, fontSize: 11)),
-          const SizedBox(height: 2),
-          Text(value,
-              style: TextStyle(
-                  color: palette.textPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700)),
-        ],
-      ),
-    );
-  }
-}
-
-/// Tab «Chat» del Alumno detalle: reusa el [ChatDetailPane] del chat web
-/// global (split-pane sidebar), resolviendo el [Chat] entre PF y este alumno
-/// puntual vía [chatForOtherUidProvider]. Sin lista de conversaciones — el
-/// alumno YA está fijado por el route, no hay nada que elegir.
-///
-/// V1 (2026-06-30): solo texto. La V2 con media reusa el mismo upgrade que
-/// la sección de chat global del sidebar.
-///
-/// Name-flash fix: [AlumnoDetailScreen.build] ya watchea
-/// `userPublicProfileProvider(athleteId)` para el header de arriba (misma
-/// pantalla, línea 117) — ese watch mantiene el stream warm mientras este
-/// tab está montado. Volver a watchearlo acá es una lectura cacheada
-/// (autoDispose cuenta listeners activos, no reinicia el stream), NO un
-/// fetch nuevo. Pasamos `athleteId` + el nombre ya resuelto a
-/// [ChatDetailPane] para que su header muestre el nombre real desde el
-/// primer frame en vez de re-derivarlo en frío vía
-/// `chatsForCurrentUserProvider` (issue: flash "Usuario eliminado" → "…").
 class _ChatTab extends ConsumerWidget {
   const _ChatTab({required this.athleteId});
   final String athleteId;
@@ -729,23 +937,32 @@ class _PrivadoTab extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
+            padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
             child: Row(
               children: [
-                Icon(TreinoIcon.lock, size: 16, color: palette.textMuted),
-                const SizedBox(width: 8),
-                Text(
-                  'Nada de esto lo ve el alumno.', // i18n: Fase W2
-                  style: TextStyle(color: palette.textMuted, fontSize: 13),
+                const _SubNav(labels: ['Notas', 'Seguimiento']), // i18n: Fase W2
+                const SizedBox(width: 18),
+                // El aviso comparte fila con la sub-navegación en vez de
+                // gastar una línea propia: dice lo mismo y no le come alto al
+                // contenido, que es lo que el PF vino a leer.
+                Flexible(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(TreinoIcon.lock, size: 14, color: palette.textMuted),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          'Nada de esto lo ve el alumno.', // i18n: Fase W2
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              color: palette.textMuted, fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 24),
-            child: TreinoSegmentedPill(
-              labels: ['Notas', 'Seguimiento'], // i18n: Fase W2
             ),
           ),
           const SizedBox(height: 12),
