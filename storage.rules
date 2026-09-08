@@ -174,13 +174,17 @@ service firebase.storage {
       allow delete: if request.auth != null && request.auth.uid == userId;
     }
 
-    // Coach Hub — archivos privados que el PF sube sobre un alumno.
+    // Coach Hub — archivos que el PF sube para un alumno.
     //
     // Path: /athleteFiles/{trainerId}_{athleteId}/{file}
     //
-    // Trainer-only. El alumno NUNCA lee estos archivos. Nadie más los ve.
-    // Enforce del par en el prefijo del path (`trainerId_athleteId`) para
-    // que un attacker no pueda listar archivos de otro PF.
+    // Storage queda trainer-only. El alumno abre `downloadUrl` desde
+    // `_ArchivoRow._open()` con `LaunchMode.externalApplication`: esas URLs
+    // llevan un token de descarga y no pasan por estas rules. Autorizar por
+    // `pairId.split('_')[1] == uid` también abriría los archivos no compartidos
+    // a quien conozca su path; la visibilidad se decide en el doc de Firestore.
+    // Enforce del par en el prefijo del path (`trainerId_athleteId`) evita que
+    // otro PF liste archivos ajenos.
     //
     // Content types permitidos: PDF + imágenes. Videos y otros formatos
     // se rechazan explícitamente para MVP.
