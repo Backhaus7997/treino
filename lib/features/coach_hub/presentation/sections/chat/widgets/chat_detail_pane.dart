@@ -6,6 +6,8 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../../../../app/theme/app_palette.dart';
 import '../../../../../../app/theme/tokens/primitives.dart';
+import '../../../../../../core/telemetry/non_fatal.dart';
+import '../../../../../../core/utils/firestore_error.dart';
 import '../../../../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../../../core/widgets/treino_icon.dart';
@@ -122,12 +124,40 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
             text: text,
           );
       _composerCtrl.clear();
-    } catch (_) {
+    } catch (e, st) {
+      // Antes acá había un `catch (_)`. El PF veía "Reintentá", reintentaba,
+      // volvía a fallar, y del lado nuestro no quedaba NADA: ni el código de
+      // Firestore ni el chat en el que pasó. Un chat que no envía y encima no
+      // deja rastro es indistinguible de un problema de red del usuario, que
+      // es justo la conclusión equivocada.
+      //
+      // En web `reportNonFatal` corta antes de Crashlytics (no lo soporta) y
+      // esto termina en la consola del navegador. Es menos de lo que llega en
+      // mobile y sigue siendo infinitamente más que nada: alcanza para que el
+      // PF abra DevTools y nos diga el código.
+      unawaited(
+        reportNonFatal(
+          e,
+          st,
+          reason: 'ChatDetailPane._send: falló el envío en el chat '
+              '${widget.chatId}',
+        ).catchError((_) {
+          // Telemetría rota no es un chat roto.
+        }),
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
+            // El `permission-denied` NO es un problema de red y decirle
+            // "reintentá" es mandarlo a repetir algo que va a fallar siempre.
+            // La distinción se hace en runtime sobre el código real, no sobre
+            // una sospecha: cuando este texto aparece, es porque las reglas
+            // denegaron la escritura.
             content: Text(
-                'No pudimos enviar el mensaje. Reintentá.'), // i18n: Fase W2
+              isPermissionDenied(e)
+                  ? 'No tenés permiso para escribir en este chat.'
+                  : 'No pudimos enviar el mensaje. Reintentá.',
+            ), // i18n: Fase W2
           ),
         );
       }
