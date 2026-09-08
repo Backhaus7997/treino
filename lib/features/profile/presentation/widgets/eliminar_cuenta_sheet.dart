@@ -32,18 +32,43 @@ class EliminarCuentaSheet extends ConsumerWidget {
     ref.listen<bool>(
       accountDeletedFlagProvider,
       (previous, next) {
-        if (next == true) {
-          context.go('/welcome');
-        }
+        if (next != true) return;
+
+        // CERRAR EL SHEET A MANO. `context.go()` NO se lo lleva.
+        //
+        // El comentario de abajo daba por hecho que la redirección del router
+        // desmontaba este modal «naturalmente». No: `go()` reemplaza el stack
+        // de PÁGINAS de GoRouter, y un `showModalBottomSheet` vive como ruta
+        // del Navigator RAÍZ, por encima de todo eso. La cuenta se borraba
+        // bien, la app navegaba a /welcome, y el sheet quedaba flotando arriba
+        // —con su título «Eliminar cuenta» y su botón ELIMINAR— sobre la
+        // pantalla de bienvenida de una cuenta que ya no existe.
+        //
+        // `Navigator.of(context)` PELADO, sin `rootNavigator: true`.
+        //
+        // El sheet se abre desde `profile_screen`, que vive adentro del
+        // `ShellRoute`, así que `showModalBottomSheet` lo empuja al navigator
+        // del SHELL — no al raíz (lo documenta `router.dart` en el dartdoc de
+        // `_shellNavigatorKey`). Pedir el raíz desde acá popea el navigator
+        // equivocado. Sin argumento, resuelve el navigator que es dueño de
+        // esta ruta, que es exactamente lo que ya hace CANCELAR unas líneas
+        // más abajo y funciona.
+        //
+        // El router se captura ANTES del pop: después, el `context` de esta
+        // ruta ya está desmontado y `context.go` sobre él revienta.
+        final router = GoRouter.of(context);
+        Navigator.of(context).pop();
+        router.go('/welcome');
       },
     );
 
     ref.listen<AsyncValue<void>>(
       accountDeletionNotifierProvider,
       (previous, next) {
-        // On success, the notifier signs out and GoRouter redirects to
-        // WelcomeScreen — the modal route is naturally removed by the
-        // navigator pop that the redirect performs. No explicit pop here.
+        // El cierre del sheet en el camino feliz lo hace el listener de
+        // `accountDeletedFlagProvider` de arriba, a mano. Acá sólo queda el
+        // error: si el borrado falla el sheet TIENE que seguir abierto, con su
+        // snackbar y su "Reintentar".
 
         next.whenOrNull(
           error: (e, _) {
