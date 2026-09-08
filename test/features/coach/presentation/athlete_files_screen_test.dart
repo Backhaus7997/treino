@@ -47,6 +47,8 @@ Widget _wrap(List<AthleteFile> files) => ProviderScope(
     );
 
 void main() {
+  _guardaDeHost();
+
   testWidgets('renderiza los archivos compartidos con tamaño y fecha',
       (tester) async {
     await tester.pumpWidget(_wrap([
@@ -80,5 +82,44 @@ void main() {
       find.text('Tu PF todavía no compartió archivos con vos.'),
       findsOneWidget,
     );
+  });
+}
+
+// ── esDescargaDeStorage ───────────────────────────────────────────────────────
+//
+// `downloadUrl` lo escribe el PF y la regla de Firestore sólo valida que sea un
+// string, así que un cliente modificado puede poner ahí cualquier destino. Esta
+// guarda es lo único que separa «el alumno abre el PDF que le compartieron» de
+// «el alumno abre lo que el PF quiera», y en iOS además sostiene la entrada de
+// esta pantalla en la allowlist de `superficie_de_cobro_alumno_test.dart`
+// (Guideline 3.1.3(f)).
+
+void _guardaDeHost() {
+  group('esDescargaDeStorage', () {
+    test('acepta los tres hosts que Firebase Storage usa en la práctica', () {
+      for (final url in [
+        'https://firebasestorage.googleapis.com/v0/b/treino-dev.appspot.com/o/f.pdf?alt=media&token=abc',
+        'https://treino-dev.firebasestorage.app/o/f.pdf?alt=media&token=abc',
+        'https://treino-dev.appspot.com/o/f.pdf?alt=media&token=abc',
+      ]) {
+        expect(esDescargaDeStorage(Uri.parse(url)), isTrue, reason: url);
+      }
+    });
+
+    test('rechaza cualquier otro destino, que es el vector real', () {
+      for (final url in [
+        // Una pasarela de pago: el caso que cruza la Guideline 3.1.3(f).
+        'https://checkout.mercadopago.com.ar/pagar',
+        // Un host que sólo TERMINA parecido al bueno.
+        'https://firebasestorage.googleapis.com.attacker.test/f.pdf',
+        // El host correcto pero sin TLS.
+        'http://firebasestorage.googleapis.com/v0/b/x/o/f.pdf',
+        // Otros esquemas.
+        'javascript:alert(1)',
+        'file:///etc/passwd',
+      ]) {
+        expect(esDescargaDeStorage(Uri.parse(url)), isFalse, reason: url);
+      }
+    });
   });
 }

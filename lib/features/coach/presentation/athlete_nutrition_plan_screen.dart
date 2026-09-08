@@ -90,7 +90,7 @@ class _Header extends StatelessWidget {
               title,
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
-                fontSize: 24,
+                fontSize: AppTextSize.heading,
                 letterSpacing: 1.2,
                 color: palette.textPrimary,
               ),
@@ -122,7 +122,7 @@ class _PlanList extends StatelessWidget {
         Text(
           plan.title.toUpperCase(),
           style: GoogleFonts.barlowCondensed(
-            fontSize: 20,
+            fontSize: AppTextSize.titleLarge,
             fontWeight: FontWeight.w700,
             letterSpacing: 1.2,
             color: palette.textPrimary,
@@ -163,7 +163,7 @@ class _MealCard extends StatelessWidget {
                 child: Text(
                   meal.name.toUpperCase(),
                   style: GoogleFonts.barlowCondensed(
-                    fontSize: 18,
+                    fontSize: AppTextSize.title,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 1.2,
                     color: palette.textPrimary,
@@ -174,7 +174,7 @@ class _MealCard extends StatelessWidget {
                 Text(
                   time,
                   style: GoogleFonts.barlow(
-                    fontSize: 13,
+                    fontSize: AppTextSize.bodyDense,
                     fontWeight: FontWeight.w600,
                     color: palette.textMuted,
                   ),
@@ -211,7 +211,7 @@ class _FoodGroupSection extends StatelessWidget {
         Text(
           group.name.toUpperCase(),
           style: GoogleFonts.barlowCondensed(
-            fontSize: 14,
+            fontSize: AppTextSize.body,
             fontWeight: FontWeight.w700,
             letterSpacing: 1.2,
             color: palette.textPrimary,
@@ -221,7 +221,7 @@ class _FoodGroupSection extends StatelessWidget {
         Text(
           hint,
           style: GoogleFonts.barlow(
-            fontSize: 12,
+            fontSize: AppTextSize.caption,
             fontWeight: FontWeight.w600,
             color: palette.accentText,
           ),
@@ -263,7 +263,7 @@ class _FoodOptionRow extends StatelessWidget {
               Text(
                 option.name,
                 style: GoogleFonts.barlow(
-                  fontSize: 14,
+                  fontSize: AppTextSize.body,
                   fontWeight: FontWeight.w600,
                   color: palette.textPrimary,
                 ),
@@ -273,7 +273,7 @@ class _FoodOptionRow extends StatelessWidget {
                 Text(
                   '$quantity $unit',
                   style: GoogleFonts.barlow(
-                    fontSize: 13,
+                    fontSize: AppTextSize.bodyDense,
                     color: palette.textMuted,
                   ),
                 ),
@@ -283,7 +283,7 @@ class _FoodOptionRow extends StatelessWidget {
                 Text(
                   notes,
                   style: GoogleFonts.barlow(
-                    fontSize: 12,
+                    fontSize: AppTextSize.caption,
                     color: palette.textFaint,
                   ),
                 ),
@@ -320,7 +320,7 @@ class _MessageState extends StatelessWidget {
               message,
               textAlign: TextAlign.center,
               style: GoogleFonts.barlow(
-                fontSize: 14,
+                fontSize: AppTextSize.body,
                 color: palette.textMuted,
               ),
             ),
