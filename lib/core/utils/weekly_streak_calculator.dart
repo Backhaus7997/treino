@@ -1,5 +1,6 @@
 import '../../features/workout/domain/routine.dart';
 import '../../features/workout/domain/session.dart';
+import 'app_clock.dart';
 import 'argentina_time.dart';
 
 /// Fallback de objetivo semanal cuando el atleta no tiene rutina activa, o la
@@ -64,6 +65,15 @@ int weeklyTargetFromRoutine(Routine? routine) {
 /// internamente. NO le pases `argentinaNow()`, sería doble corrimiento. Mismo
 /// contrato que `computeStreak`.
 ///
+/// Omitirlo cae en [AppClock.now()], NO en `DateTime.now()` crudo: ningún
+/// caller de producción pasa [now], así que ésta era la última lectura del
+/// reloj real en el camino de render de Insights y de Perfil. Congelar
+/// [AppClock] ahora congela también la racha — el resto de ese camino ya
+/// leía de ahí vía `argentinaNow()`. Antes no: un widget test que armaba su
+/// fixture con `DateTime.now()` daba 1 o 2 semanas según el día de la semana
+/// en que corriera, y volvió `main` rojo un martes sin que cambiara una línea
+/// de código.
+///
 /// O(n) para bucketear + O(racha) para contar.
 int computeWeeklyStreak({
   required List<Session> sessions,
@@ -98,7 +108,7 @@ int computeWeeklyStreak({
   // la racha se volvería "semanas desde que existe el mundo".
   final target = weeklyTarget > 0 ? weeklyTarget : weeklyStreakFallbackTarget;
 
-  final nowArt = toArgentina((now ?? DateTime.now()).toUtc());
+  final nowArt = toArgentina((now ?? AppClock.now()).toUtc());
   final currentWeek = mondayOfWeekArt(nowArt);
 
   // Sesiones que califican, contadas por lunes de su semana ART.

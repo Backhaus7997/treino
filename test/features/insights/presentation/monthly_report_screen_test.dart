@@ -5,6 +5,7 @@ import 'package:treino/core/utils/date_labels.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/utils/app_clock.dart';
 import 'package:treino/core/utils/argentina_time.dart';
 import 'package:treino/features/insights/presentation/monthly_report_screen.dart';
 import 'package:treino/features/insights/presentation/widgets/monthly_report_chart.dart';
@@ -20,11 +21,52 @@ import '../../workout/application/stub_factories.dart';
 
 class MockSessionRepository extends Mock implements SessionRepository {}
 
+/// Reloj congelado del archivo: **miércoles 16/09/2026, 10:30**.
+///
+/// Este archivo rompió `main` DOS VECES por leerle la fecha al runner, y las
+/// dos veces sin que cambiara una línea de código:
+///
+///   1. **01/09/2026** — el label del radar se comparaba con
+///      `DateFormat('MMM yyyy')`, que en es-AR devuelve `sept` (4 chars) sólo
+///      para septiembre. Los otros once meses coincidían de casualidad. Se
+///      arregló el formato (`monthAbbrev`), no la causa: el test seguía
+///      preguntándole la fecha al reloj.
+///   2. **08/09/2026** — el fixture de la racha armaba "hoy" y "ayer" con el
+///      reloj real. El lunes 07 los dos caían en semanas ART distintas y la
+///      racha valía 1; el martes 08 caen en la misma y vale 2. Verde un día,
+///      rojo al siguiente, con `main` bloqueado en el medio.
+///
+/// Un test que pasa o falla según el día no prueba nada — dice la verdad por
+/// casualidad. Ahora el reloj es un dato del test: [AppClock] es el seam que
+/// ya leen `argentinaNow()` y el default de `computeWeeklyStreak`, así que
+/// congelarlo acá congela TODO el camino de render de esta pantalla.
+///
+/// **Miércoles a propósito**: con "hoy" en lunes, "ayer" cae en la semana ART
+/// anterior y el fixture de la racha cambia de significado. Un día del medio
+/// de la semana deja margen por los dos lados.
+///
+/// **Septiembre a propósito**: es el mes que rompió el CI el 01/09. Anclado
+/// acá, un `DateFormat('MMM')` que se vuelva a colar falla SIEMPRE en vez de
+/// una vez al año.
+DateTime get _frozenNow => DateTime(2026, 9, 16, 10, 30);
+
+/// Mediodía UTC del día [y]-[m]-[d], para usar como `Session.startedAt`.
+///
+/// **UTC-flagged y no local**: `startedAt` llega siempre UTC desde el
+/// `TimestampConverter`, y los agregadores lo bucketean con `toArgentina()`,
+/// que resta 3h sin mirar el flag. Un `DateTime(y, m, d)` local se corre al
+/// día ANTERIOR — y en el día 1 de un mes, al mes anterior. Mediodía deja
+/// ±12h de margen, así que el bucket ART no depende de la timezone del runner.
+DateTime _utcNoon(int y, int m, int d) => DateTime.utc(y, m, d, 12);
+
 void main() {
   setUpAll(() {
     registerFallbackValue(makeSession());
     registerFallbackValue(makeSetLog());
   });
+
+  setUp(() => AppClock.freeze(_frozenNow));
+  tearDown(AppClock.unfreeze);
 
   Widget wrap(
     Widget child, {
@@ -53,12 +95,12 @@ void main() {
 
   testWidgets('renders chart + summary cards when data loads', (tester) async {
     final repo = MockSessionRepository();
-    final now = DateTime.now();
+    final now = _frozenNow;
     when(() => repo.listByUid('u1', limit: any(named: 'limit')))
         .thenAnswer((_) async => [
               makeSession(
                 id: 's1',
-                startedAt: now,
+                startedAt: _utcNoon(now.year, now.month, now.day),
                 status: SessionStatus.finished,
                 wasFullyCompleted: true,
                 durationMin: 45,
@@ -156,12 +198,12 @@ void main() {
       'QA-498: Reintentar en el radar RECUPERA — re-fetchea el catálogo, '
       'no repite su error cacheado', (tester) async {
     final repo = MockSessionRepository();
-    final now = DateTime.now();
+    final now = _frozenNow;
     when(() => repo.listByUid('u1', limit: any(named: 'limit')))
         .thenAnswer((_) async => [
               makeSession(
                 id: 's1',
-                startedAt: now,
+                startedAt: _utcNoon(now.year, now.month, now.day),
                 status: SessionStatus.finished,
                 wasFullyCompleted: true,
                 routineId: 'r1',
@@ -219,8 +261,8 @@ void main() {
   testWidgets('switching to POR DÍA renders the daily duration chart',
       (tester) async {
     final repo = MockSessionRepository();
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    final now = _frozenNow;
+    final today = _utcNoon(now.year, now.month, now.day);
 
     when(() => repo.listByUid('u1', limit: any(named: 'limit')))
         .thenAnswer((_) async => [
@@ -251,8 +293,8 @@ void main() {
       'renders the workout-days streak calendar below the summary cards '
       'for the selected month', (tester) async {
     final repo = MockSessionRepository();
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    final now = _frozenNow;
+    final today = _utcNoon(now.year, now.month, now.day);
     when(() => repo.listByUid('u1', limit: any(named: 'limit')))
         .thenAnswer((_) async => [
               makeSession(
@@ -290,9 +332,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(streakFinder, findsOneWidget);
-    // Sin rutina activa el objetivo cae al fallback de 1 sesión por
-    // semana, y las dos sesiones del fixture caen en la MISMA semana:
-    // eso es una semana cumplida, no dos.
+    // Sin rutina activa el objetivo cae al fallback de 1 sesión por semana.
+    // Con el reloj congelado en MIÉRCOLES, "hoy" y "ayer" son miércoles 16 y
+    // martes 15 — la misma semana ART (lunes 14). Eso es UNA semana cumplida,
+    // no dos. Ver el dartdoc de `_frozenNow`: con el reloj real este número
+    // valía 1 o 2 según el día en que corriera el CI.
     expect(find.text('Racha de 1 semana'), findsOneWidget);
   });
 
@@ -300,7 +344,7 @@ void main() {
       'selecting a different month re-fetches and updates the calendar '
       "trained-day marks (not just a no-crash smoke check)", (tester) async {
     final repo = MockSessionRepository();
-    final now = DateTime.now();
+    final now = _frozenNow;
     final olderMonth = DateTime(now.year, now.month - 2);
 
     when(() => repo.listByUid('u1', limit: any(named: 'limit')))
@@ -309,7 +353,7 @@ void main() {
               // selection) has zero trained days.
               makeSession(
                 id: 's1',
-                startedAt: DateTime(olderMonth.year, olderMonth.month, 10),
+                startedAt: _utcNoon(olderMonth.year, olderMonth.month, 10),
                 status: SessionStatus.finished,
                 wasFullyCompleted: true,
               ),
@@ -370,14 +414,14 @@ void main() {
       'workout-days calendar, with month-name legend labels (AD6/PR5c)',
       (tester) async {
     final repo = MockSessionRepository();
-    final now = DateTime.now();
+    final now = _frozenNow;
     final currentMonthStart = DateTime(now.year, now.month, 1);
 
     when(() => repo.listByUid('u1', limit: any(named: 'limit')))
         .thenAnswer((_) async => [
               makeSession(
                 id: 's1',
-                startedAt: currentMonthStart,
+                startedAt: _utcNoon(now.year, now.month, 1),
                 status: SessionStatus.finished,
                 wasFullyCompleted: true,
                 durationMin: 45,
@@ -425,14 +469,14 @@ void main() {
       'volume-by-group card (real data-delta, not a smoke check)',
       (tester) async {
     final repo = MockSessionRepository();
-    final now = DateTime.now();
+    final now = _frozenNow;
     final olderMonth = DateTime(now.year, now.month - 2);
 
     when(() => repo.listByUid('u1', limit: any(named: 'limit')))
         .thenAnswer((_) async => [
               makeSession(
                 id: 's1',
-                startedAt: DateTime(olderMonth.year, olderMonth.month, 10),
+                startedAt: _utcNoon(olderMonth.year, olderMonth.month, 10),
                 status: SessionStatus.finished,
                 wasFullyCompleted: true,
               ),
@@ -497,7 +541,7 @@ void main() {
   testWidgets('initialMonth abre la pantalla en ese mes, no en el más reciente',
       (tester) async {
     final repo = MockSessionRepository();
-    final now = DateTime.now();
+    final now = _frozenNow;
     final currentMonthStart = DateTime(now.year, now.month, 1);
     // El mes que el push reportaría: el que cerró.
     final reportedMonth = DateTime(now.year, now.month - 1, 1);
@@ -506,8 +550,8 @@ void main() {
         .thenAnswer((_) async => [
               makeSession(
                 id: 's-actual',
-                startedAt: DateTime(
-                    currentMonthStart.year, currentMonthStart.month, 1, 12),
+                startedAt: _utcNoon(
+                    currentMonthStart.year, currentMonthStart.month, 1),
                 status: SessionStatus.finished,
                 wasFullyCompleted: true,
                 durationMin: 45,
@@ -515,7 +559,7 @@ void main() {
               makeSession(
                 id: 's-reportado',
                 startedAt:
-                    DateTime(reportedMonth.year, reportedMonth.month, 15, 12),
+                    _utcNoon(reportedMonth.year, reportedMonth.month, 15),
                 status: SessionStatus.finished,
                 wasFullyCompleted: true,
                 durationMin: 60,
@@ -556,15 +600,15 @@ void main() {
       'un initialMonth fuera de la ventana de 12 meses cae al más reciente, '
       'no a una pantalla vacía', (tester) async {
     final repo = MockSessionRepository();
-    final now = DateTime.now();
+    final now = _frozenNow;
     final currentMonthStart = DateTime(now.year, now.month, 1);
 
     when(() => repo.listByUid('u1', limit: any(named: 'limit')))
         .thenAnswer((_) async => [
               makeSession(
                 id: 's1',
-                startedAt: DateTime(
-                    currentMonthStart.year, currentMonthStart.month, 1, 12),
+                startedAt: _utcNoon(
+                    currentMonthStart.year, currentMonthStart.month, 1),
                 status: SessionStatus.finished,
                 wasFullyCompleted: true,
                 durationMin: 45,
