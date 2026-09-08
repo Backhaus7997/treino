@@ -131,8 +131,10 @@ const AUTORIZADA: MpPreapproval = {
 
 function fakeMp(respuesta: MpPreapproval | Error) {
   const consultados: string[] = [];
+  const bajas: string[] = [];
   return {
     consultados,
+    bajas,
     mpClient: {
       getPreapproval: async (id: string) => {
         consultados.push(id);
@@ -143,6 +145,15 @@ function fakeMp(respuesta: MpPreapproval | Error) {
       searchPreapprovalsByPlan: async () => {
         if (respuesta instanceof Error) throw respuesta;
         return [respuesta];
+      },
+      // La baja de la suscripcion vieja al cambiar de plan. El webhook no la
+      // pide por su cuenta, pero llama a `reconcileSubscription`, que si: un
+      // aviso de MP sobre el plan NUEVO ya confirmado cierra el cobro doble en
+      // el acto, sin esperar al barrido de las 03:00. Se anota en vez de tirar
+      // para que se pueda afirmar cuando NO se cancela nada.
+      cancelPreapproval: async (preapprovalId: string) => {
+        bajas.push(preapprovalId);
+        return { id: preapprovalId, status: "cancelled" };
       },
     },
   };
