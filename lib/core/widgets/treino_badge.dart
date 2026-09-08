@@ -25,34 +25,49 @@ import '../../app/theme/tokens/tokens.dart';
 ///
 /// ## Quién estiraba el badge: el `alignment`, no el `minHeight`
 ///
-/// La lectura obvia de la cápsula es "declara mínimos y no declara techos". Es
-/// la lectura equivocada, y las dos soluciones que salen de ella fallan:
+/// La lectura obvia de la cápsula es "declara mínimos y no declara techos", y
+/// lleva a poner un `maxHeight: 16`. La causa real es otra: **un [Container]
+/// con `alignment` se expande a llenar las constraints acotadas que reciba** —
+/// comportamiento documentado del widget, no un bug. En un `Row` el eje
+/// horizontal viene sin acotar y por eso a lo ancho no se vio nunca; en el
+/// vertical, con la fila ajustada a 48, se comió los 48 enteros. Y el
+/// `alignment` no se puede sacar: es lo que centra el dígito cuando el
+/// `minWidth` agranda la caja más que el texto.
 ///
-/// - **Agregar `maxHeight: 16` no arregla nada.** `BoxConstraints.enforce`
-///   clampea las constraints propias **dentro** del rango del padre: bajo un
-///   padre con alto ajustado en 48, ese techo de 16 se sube a 48 solo.
-/// - **Aflojar con un [Align] tampoco alcanza**, y ese fue el segundo intento.
-///   `Align` pasa `constraints.loosen()`, que sigue siendo un rango **acotado**
-///   (`0..48`).
+/// Las cinco configuraciones, medidas —no razonadas— corriendo el test de este
+/// widget contra cada una:
 ///
-/// La causa real es que **un [Container] con `alignment` se expande a llenar
-/// las constraints acotadas que reciba** — comportamiento documentado del
-/// widget, no un bug. En un `Row` el eje horizontal viene sin acotar y por eso
-/// nadie lo vio nunca a lo ancho; en el vertical, con la fila ajustada a 48, se
-/// comió los 48 enteros. Y el `alignment` no se puede sacar: es lo que centra
-/// el dígito cuando el `minWidth` agranda la caja más que el texto.
+/// | envoltorio + constraints | alto bajo padre ajustado a 48 | ancho con constraints sueltas de 800 |
+/// | --- | --- | --- |
+/// | ninguno (las dos copias viejas) | **48** ✗ | **800** ✗ |
+/// | `maxHeight: 16`, sin envoltorio | **48** ✗ — `enforce` lo sube | **800** ✗ |
+/// | `Align(widthFactor: 1, heightFactor: 1)` | **48** ✗ | **800** ✗ |
+/// | `Align` + `maxHeight: 16` | 16 ✓ | **800** ✗ |
+/// | [UnconstrainedBox] | 16 ✓ | 16 ✓ |
 ///
-/// Por eso el envoltorio es [UnconstrainedBox] y no `Align`: es el único que le
-/// pasa al hijo constraints **sin acotar**, y contra un infinito el "expandirse
-/// a llenar" no tiene nada que llenar. El badge se mide entonces por su
-/// contenido y sus mínimos —16×16 con un dígito— y si el padre igual le impone
-/// una caja más grande, el `UnconstrainedBox` la ocupa y centra adentro un
-/// badge que sigue redondo.
+/// Dos cosas que la tabla deja claras y el razonamiento a mano no:
 ///
-/// Lo fija `test/core/widgets/treino_badge_test.dart`, que lo mete bajo un
-/// padre con altura ajustada de 48px y verifica que siga midiendo 16. Ese test
-/// falla —en 800×600, no en 48— contra cualquiera de los dos intentos de
-/// arriba.
+/// 1. **El `maxHeight` solo no alcanza, pero no por lo que parece.** Sin
+///    envoltorio lo clampea `BoxConstraints.enforce`, que sube las constraints
+///    propias al rango del padre: `16` bajo un padre ajustado en `48` da `48`.
+///    Debajo de un `Align` —que ya aflojó a `0..48`— el mismo `maxHeight` sí
+///    funciona. O sea que el techo depende de quién esté arriba, que es
+///    exactamente la clase de arreglo que se rompe cuando alguien mueve el
+///    widget de lugar.
+/// 2. **El ancho no admite techo, y ahí se cae toda la familia de soluciones
+///    con `max*`.** Un badge de tres dígitos TIENE que crecer, así que no hay
+///    `maxWidth` que poner. La fila `Align + maxHeight` es la trampa: arregla
+///    el eje que el gate visual mostró y deja vivo el otro.
+///
+/// Por eso el envoltorio es [UnconstrainedBox]: es el único que le pasa al hijo
+/// constraints **sin acotar**, y contra un infinito el "expandirse a llenar" no
+/// tiene nada que llenar. El badge se mide entonces por su contenido y sus
+/// mínimos —16×16 con un dígito— y si el padre igual le impone una caja más
+/// grande, el `UnconstrainedBox` la ocupa y centra adentro un badge que sigue
+/// redondo.
+///
+/// Todo esto lo fija `test/core/widgets/treino_badge_test.dart`: los números de
+/// la tabla salen de correrlo contra cada configuración.
 class TreinoBadge extends StatelessWidget {
   const TreinoBadge({super.key, required this.count});
 
