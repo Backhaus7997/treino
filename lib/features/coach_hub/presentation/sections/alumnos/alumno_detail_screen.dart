@@ -585,15 +585,30 @@ class _Header extends StatelessWidget {
   }
 }
 
-/// Sub-navegación de un grupo — la píldora del kit, a su tamaño real.
+/// Sub-navegación de un grupo — el mismo subrayado que arriba, en chico.
 ///
-/// El ancho va acotado y alineado a la izquierda a propósito. `TabBar` reparte
-/// el ancho disponible entre sus celdas, así que dentro de un contenedor de
-/// 2000px la píldora se estira de punta a punta y se lee como una barra de
-/// navegación principal, compitiendo con la de arriba. El Feed ya la encierra
-/// en un `maxWidth` por la misma razón (ver el dartdoc de
-/// `TreinoSegmentedPillTokens.labelPadding`). Acotada, vuelve a leerse como lo
-/// que es: el segundo nivel.
+/// **Por qué no la píldora del kit.** Era lo que había acá, y su contorno
+/// oscuro es lo que se pidió ablandar. No se puede: ese contorno sale de #646
+/// (cinco participantes de las pruebas de usabilidad no detectaron el control)
+/// y su opacidad ya está en el mínimo que cruza 3:1 —WCAG 1.4.11— en las dos
+/// paletas. Medido, componiendo el borde sobre la pista contra el fondo de
+/// página:
+///
+/// | borde | dark | light |
+/// |---|---|---|
+/// | `textMuted@45` (el actual) | 4,84 | 3,21 |
+/// | `textMuted@30` | 2,88 | 2,02 |
+/// | `AppPalette.border` | 1,41 | 1,21 |
+///
+/// Y un relleno no lo reemplaza: `bgCard` contra `bg` da 1,04 en light. O sea
+/// que aflojar el contorno ES bajar de 3:1. En vez de debilitar un guard con
+/// pruebas de usuario atrás —y en un widget que comparten otras cuatro
+/// pantallas— acá se cambia de control: el subrayado no depende de un contorno
+/// para leerse como navegación, y es el patrón que esta pantalla ya usa arriba.
+///
+/// Subordinado a propósito: 13px contra 14, `isScrollable` para que abrace su
+/// contenido en vez de repartir el ancho, y sin divisor. Dos barras de
+/// subrayado apiladas sólo confunden si pesan igual.
 class _SubNav extends StatelessWidget {
   const _SubNav({required this.labels});
 
@@ -601,11 +616,31 @@ class _SubNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    const estilo = TextStyle(
+      fontFamily: AppFonts.barlow,
+      fontWeight: FontWeight.w600,
+      fontSize: 13,
+    );
     return Align(
       alignment: Alignment.centerLeft,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 320),
-        child: TreinoSegmentedPill(labels: labels),
+      child: TabBar(
+        isScrollable: true,
+        tabAlignment: TabAlignment.start,
+        labelColor: palette.accentText,
+        unselectedLabelColor: palette.textMuted,
+        indicatorColor: palette.accentText,
+        indicatorWeight: 2,
+        indicatorSize: TabBarIndicatorSize.label,
+        dividerColor: Colors.transparent,
+        labelStyle: estilo,
+        // El MISMO estilo en los dos estados: `TabBar` interpola entre ambos y
+        // con pesos distintos la tira se re-layoutea en cada cambio.
+        unselectedLabelStyle: estilo,
+        labelPadding: const EdgeInsets.symmetric(
+          horizontal: TreinoSegmentedPillTokens.labelPadding,
+        ),
+        tabs: [for (final l in labels) Tab(height: 34, text: l)],
       ),
     );
   }
