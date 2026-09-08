@@ -3719,5 +3719,9 @@
   "paywallFreePlanLimitRoutineCountBody": "Con el plan gratis guardás hasta 3 rutinas propias. Las plantillas del catálogo que seguís no ocupan lugar.",
   "@paywallFreePlanLimitRoutineCountBody": {
     "description": "Cuerpo de la hoja cuando el alumno free intenta guardar una rutina propia mas alla del tope. Aclara que seguir plantillas no consume cupo, porque desde #963 seguir no copia."
+  },
+  "paywallFreePlanLimitChartHistoryBody": "Con el plan gratis mirás hasta un mes de historial. Los períodos de 3 meses y 1 año son del plan pago.",
+  "@paywallFreePlanLimitChartHistoryBody": {
+    "description": "Cuerpo de la hoja cuando el alumno free toca un periodo de grafico del plan pago. Es el unico limite que no restringe lo que puede HACER sino hasta donde puede MIRAR lo que ya hizo."
   }
 }

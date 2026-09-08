@@ -14,6 +14,8 @@ import '../application/wellbeing_trend_providers.dart';
 import '../domain/chart_period.dart';
 import '../domain/wellbeing_trend.dart';
 import 'widgets/wellbeing_trend_chart.dart';
+import '../../paywall/application/athlete_entitlement_provider.dart';
+import '../../paywall/presentation/free_plan_limit_sheet.dart';
 
 /// CÓMO ME SENTÍ — la serie subjetiva del atleta en el tiempo (#643 slice 3).
 ///
@@ -90,10 +92,15 @@ class _WellbeingTrendScreenState extends ConsumerState<WellbeingTrendScreen> {
                         last30dLabel: l10n.progressionPeriodLast30Days,
                         thisWeekLabel: l10n.progressionPeriodThisWeek,
                         monthLabel: l10n.progressionPeriodMonth,
-last3mLabel: l10n.progressionPeriodLast3Months,
-last1yLabel: l10n.progressionPeriodLast1Year,
+                        last3mLabel: l10n.progressionPeriodLast3Months,
+                        last1yLabel: l10n.progressionPeriodLast1Year,
                       ),
                       onSelect: (p) => setState(() => _period = p),
+                      lockedPeriods: ref.watch(lockedChartPeriodsProvider),
+                      onLockedTap: (_) => showFreePlanLimitSheet(
+                        context,
+                        limit: FreePlanLimit.chartHistory,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 14),

@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../insights/domain/chart_period.dart';
 import '../../coach/application/trainer_link_providers.dart'
     show currentAthleteLinkProvider;
 import '../../profile/application/user_providers.dart' show firestoreProvider;
@@ -110,6 +111,39 @@ final athleteEntitlementProvider = Provider.autoDispose<AthleteEntitlement>(
 final catalogLockActiveProvider = Provider.autoDispose<bool>((ref) {
   if (!ref.watch(athletePaywallEnabledProvider)) return false;
   return ref.watch(athleteEntitlementProvider).gatesFreeLimits;
+});
+
+/// Los períodos de gráfico que son del plan pago.
+///
+/// El corte es "hasta un mes" gratis. `month` entra en free aunque sea
+/// calendario: son 31 días como mucho, y sacarlo dejaría al free sin la vista
+/// que la mayoría usa para mirar el mes en curso.
+///
+/// Ojo con el nombre: NO es "all-time vs 3 meses" como decía la spec §4.2. El
+/// historial de sesiones está acotado a `kSessionHistoryFetchLimit` (365), así
+/// que el techo real —y el máximo que se puede ofrecer sin mentir— es un año.
+const Set<ChartPeriod> kPaidChartPeriods = {
+  ChartPeriod.last3m,
+  ChartPeriod.last1y,
+};
+
+/// Los períodos de gráfico bloqueados para el alumno actual. Vacío si no hay
+/// nada bloqueado.
+///
+/// Una sola fuente para las cinco pantallas del alumno que muestran el
+/// selector, por el mismo motivo que [catalogLockActiveProvider]: si una pinta
+/// candado y otra deja pasar, el alumno ve una promesa rota.
+///
+/// **Las pantallas del PF no lo consultan, y es deliberado.** El entrenador ve
+/// el historial completo de su alumno siempre: el paywall del alumno no puede
+/// recortarle a su PF lo que ve de él. Por eso el gate se decide en el CALL
+/// SITE y no adentro de `ChartPeriodSelector`, que es un widget compartido
+/// entre las dos superficies.
+final lockedChartPeriodsProvider =
+    Provider.autoDispose<Set<ChartPeriod>>((ref) {
+  if (!ref.watch(athletePaywallEnabledProvider)) return const {};
+  if (!ref.watch(athleteEntitlementProvider).gatesFreeLimits) return const {};
+  return kPaidChartPeriods;
 });
 
 /// El `status` crudo de `users/{uid}.athleteSubscription`, o `null` si el mapa

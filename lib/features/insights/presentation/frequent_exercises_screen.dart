@@ -14,6 +14,8 @@ import '../../workout/presentation/widgets/exercise_progression_section.dart'
     show ChartPeriodLabels;
 import '../../workout/presentation/widgets/most_frequent_exercises_list.dart';
 import '../domain/chart_period.dart';
+import '../../paywall/application/athlete_entitlement_provider.dart';
+import '../../paywall/presentation/free_plan_limit_sheet.dart';
 
 /// [stats-hub] Athlete-side "Ejercicios frecuentes" screen — reuses the
 /// coach-only [MostFrequentExercisesList] widget (PR4) with the athlete's
@@ -101,6 +103,11 @@ class _FrequentExercisesScreenState
                       '/home/insights/exercise-progression?exerciseId=$exerciseId',
                     ),
                     onSelectPeriod: (p) => setState(() => _selectedPeriod = p),
+                    lockedPeriods: ref.watch(lockedChartPeriodsProvider),
+                    onLockedPeriodTap: (_) => showFreePlanLimitSheet(
+                      context,
+                      limit: FreePlanLimit.chartHistory,
+                    ),
                     labels: MostFrequentExercisesListLabels(
                       sectionTitle: l10n.mostFrequentExercisesSectionTitle,
                       sessionCountLabel: (n) =>
@@ -110,8 +117,8 @@ class _FrequentExercisesScreenState
                         last30dLabel: l10n.progressionPeriodLast30Days,
                         thisWeekLabel: l10n.progressionPeriodThisWeek,
                         monthLabel: l10n.progressionPeriodMonth,
-last3mLabel: l10n.progressionPeriodLast3Months,
-last1yLabel: l10n.progressionPeriodLast1Year,
+                        last3mLabel: l10n.progressionPeriodLast3Months,
+                        last1yLabel: l10n.progressionPeriodLast1Year,
                       ),
                     ),
                   ),
