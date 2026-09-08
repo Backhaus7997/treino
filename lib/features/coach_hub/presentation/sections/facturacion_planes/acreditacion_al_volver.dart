@@ -32,14 +32,14 @@ enum EstadoAcreditacion {
 }
 
 EstadoAcreditacion _parsear(Object? crudo) => switch (crudo) {
-      'acreditado' => EstadoAcreditacion.acreditado,
-      'pendiente' => EstadoAcreditacion.pendiente,
-      'sin-checkout' => EstadoAcreditacion.sinCheckout,
-      // Cualquier cosa que no reconozcamos cae en «no pudimos preguntar», que
-      // es lo único honesto: no sabemos si pagó. Nunca en `acreditado`, que
-      // sería afirmar sobre plata algo que el servidor no dijo.
-      _ => EstadoAcreditacion.noDisponible,
-    };
+  'acreditado' => EstadoAcreditacion.acreditado,
+  'pendiente' => EstadoAcreditacion.pendiente,
+  'sin-checkout' => EstadoAcreditacion.sinCheckout,
+  // Cualquier cosa que no reconozcamos cae en «no pudimos preguntar», que
+  // es lo único honesto: no sabemos si pagó. Nunca en `acreditado`, que
+  // sería afirmar sobre plata algo que el servidor no dijo.
+  _ => EstadoAcreditacion.noDisponible,
+};
 
 /// Le pregunta al servidor si el pago ya está acreditado.
 ///
@@ -162,8 +162,9 @@ class _AcreditacionAlVolverBannerState
   }
 
   Future<EstadoAcreditacion> _checkerReal() async {
-    final fn =
-        ref.read(cloudFunctionsProvider).httpsCallable('reconcileMyCheckout');
+    final fn = ref
+        .read(cloudFunctionsProvider)
+        .httpsCallable('reconcileMyCheckout');
     final res = await fn.call<Object?>();
     final data = res.data;
     return _parsear(data is Map ? data['estado'] : null);
@@ -183,7 +184,8 @@ class _AcreditacionAlVolverBannerState
     // `acreditado` y `sinCheckout` no dicen nada: el primero lo cuenta la
     // grilla sola, el segundo no es noticia. Y un fallo que nadie pidió
     // tampoco — ver el docstring de la clase.
-    final mostrar = pendiente ||
+    final mostrar =
+        pendiente ||
         (estado == EstadoAcreditacion.noDisponible && _loPidioElPf);
     if (!mostrar) return const SizedBox.shrink();
 
@@ -216,7 +218,7 @@ class _AcreditacionAlVolverBannerState
                       : 'NO PUDIMOS CONSULTAR A MERCADO PAGO', // i18n: Fase W3
                   style: GoogleFonts.barlowCondensed(
                     color: palette.textPrimary,
-                    fontSize: 18,
+                    fontSize: AppTextSize.title,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0.5,
                   ),
@@ -227,11 +229,14 @@ class _AcreditacionAlVolverBannerState
                       // Se promete lo que el barrido garantiza, no una hora:
                       // no tenemos medida de cuánto tarda MP en autorizar.
                       ? 'Mercado Pago todavía no nos confirmó la suscripción. '
-                          'Se acredita sola apenas la confirme; si querés, '
-                          'consultá de nuevo.' // i18n: Fase W3
+                            'Se acredita sola apenas la confirme; si querés, '
+                            'consultá de nuevo.' // i18n: Fase W3
                       : 'Si ya pagaste, no perdiste nada: lo acreditamos '
-                          'igual apenas podamos consultarlo.', // i18n: Fase W3
-                  style: TextStyle(color: palette.textMuted, fontSize: 13),
+                            'igual apenas podamos consultarlo.', // i18n: Fase W3
+                  style: TextStyle(
+                    color: palette.textMuted,
+                    fontSize: AppTextSize.bodyDense,
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.s12),
                 TreinoTappable(
@@ -242,7 +247,7 @@ class _AcreditacionAlVolverBannerState
                         : 'CONSULTAR DE NUEVO', // i18n: Fase W3
                     style: GoogleFonts.barlowCondensed(
                       color: palette.accent,
-                      fontSize: 15,
+                      fontSize: AppTextSize.bodyLarge,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.5,
                     ),
