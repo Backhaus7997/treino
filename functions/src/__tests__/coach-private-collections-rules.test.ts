@@ -157,7 +157,12 @@ function planDoc(
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("athlete_files — trainer-only dossier the athlete never sees", () => {
+// El título decía "trainer-only dossier the athlete never sees" y dejó de ser
+// cierto: el alumno lee los archivos que el PF marcó `sharedWithAthlete`. Lo
+// que NO cambió —y es lo que estos tests protegen— es todo lo demás: sin ese
+// flag el archivo sigue siendo invisible para él, incluidos los que se
+// subieron antes de que el flag existiera y por eso no lo tienen.
+describe("athlete_files — dossier del PF, con lo compartido abierto al alumno", () => {
   describe("read / list", () => {
     beforeEach(async () => {
       await seedDoc(COL_FILES, FILE_ID, fileDoc());
@@ -178,8 +183,29 @@ describe("athlete_files — trainer-only dossier the athlete never sees", () => 
       );
     });
 
-    it("DENIES the subject athlete reading the file about them", async () => {
+    it("DENIES the subject athlete reading a file with no shared flag", async () => {
+      // `fileDoc()` no trae `sharedWithAthlete`: es exactamente la forma de
+      // los documentos que ya están en producción, subidos cuando la promesa
+      // era que el alumno no los vería nunca. Siguen invisibles.
       await assertFails(
+        ctxDb(ATHLETE).collection(COL_FILES).doc(FILE_ID).get(),
+      );
+    });
+
+    it("DENIES the subject athlete reading a file explicitly NOT shared", async () => {
+      await seedDoc(
+        COL_FILES,
+        FILE_ID,
+        fileDoc({ sharedWithAthlete: false }),
+      );
+      await assertFails(
+        ctxDb(ATHLETE).collection(COL_FILES).doc(FILE_ID).get(),
+      );
+    });
+
+    it("allows the subject athlete to read a file the trainer shared", async () => {
+      await seedDoc(COL_FILES, FILE_ID, fileDoc({ sharedWithAthlete: true }));
+      await assertSucceeds(
         ctxDb(ATHLETE).collection(COL_FILES).doc(FILE_ID).get(),
       );
     });
@@ -475,11 +501,19 @@ describe("nutrition_plans — one plan per PF↔athlete pair, trainer-only", () 
       );
     });
 
-    it("DENIES the subject athlete reading their own plan doc", async () => {
-      // Deliberate today: the athlete surface is a separate, unshipped
-      // feature. If that changes, this test is the one that must change WITH
-      // the rule — not silently drift.
-      await assertFails(
+    it("allows the subject athlete to read their own plan doc", async () => {
+      // Esto ERA un assertFails, con la nota de que el día que la superficie
+      // del alumno se construyera, este test tenía que cambiar CON la regla y
+      // no quedar drifteando. Ese día es hoy: el plan nutricional se expone al
+      // alumno del par. La regla vieja ya lo decía — "el alumno NO lo ve en
+      // mobile todavía (feature scoped aparte)" —, así que exponerlo siempre
+      // fue la intención, sólo faltaba hacerlo.
+      //
+      // Ojo con el contraste que sigue vivo dos bloques más arriba:
+      // `athlete_files` NO se abre así. Ahí la lectura del alumno está gateada
+      // por `sharedWithAthlete` porque esos docs SÍ se escribieron bajo la
+      // promesa de que nunca los vería.
+      await assertSucceeds(
         ctxDb(ATHLETE).collection(COL_NUTRITION).doc(PLAN_ID).get(),
       );
     });

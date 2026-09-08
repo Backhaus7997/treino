@@ -3498,7 +3498,14 @@ service cloud.firestore {
                   && request.resource.data.sizeBytes is int
                   && request.resource.data.sizeBytes > 0
                   && request.resource.data.sizeBytes <= 10 * 1024 * 1024
-                  && request.resource.data.sharedWithAthlete is bool;
+                  // OPCIONAL a propósito, y el tipo se valida sólo si viene.
+                  // Exigirlo rompía a cualquier cliente sin actualizar: una
+                  // versión vieja de la app en la calle sube el doc sin el
+                  // campo y quedaba bloqueada para subir archivos. Lo encontró
+                  // coach-private-collections-rules.test.ts, cuyo fileDoc() es
+                  // exactamente ese cliente viejo.
+                  && (!request.resource.data.keys().hasAny(['sharedWithAthlete'])
+                      || request.resource.data.sharedWithAthlete is bool);
       // ⚠️ ACOPLAMIENTO: este hasOnly debe coincidir exactamente con las keys
       // de AthleteFile.toJson(). Si el modelo suma un campo y esta lista no,
       // todos los updates del flag fallan con permission-denied.
