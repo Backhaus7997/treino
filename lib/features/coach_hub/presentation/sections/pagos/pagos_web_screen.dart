@@ -88,12 +88,13 @@ class _PagosScreenState extends ConsumerState<PagosScreen> {
             .toLowerCase();
 
     int cmp(Payment a, Payment b) => switch (key) {
-          'alumno' => nameOf(a).compareTo(nameOf(b)),
-          'monto' => a.amountArs.compareTo(b.amountArs),
-          'vencimiento' =>
-            (a.dueAt ?? a.createdAt).compareTo(b.dueAt ?? b.createdAt),
-          _ => 0,
-        };
+      'alumno' => nameOf(a).compareTo(nameOf(b)),
+      'monto' => a.amountArs.compareTo(b.amountArs),
+      'vencimiento' => (a.dueAt ?? a.createdAt).compareTo(
+        b.dueAt ?? b.createdAt,
+      ),
+      _ => 0,
+    };
 
     final sorted = List<Payment>.of(payments);
     sorted.sort(_sortAscending ? cmp : (a, b) => cmp(b, a));
@@ -150,8 +151,9 @@ class _PagosScreenState extends ConsumerState<PagosScreen> {
     final filtro = ref.watch(pagosFiltroProvider);
 
     // Alias de pago del trainer, para el mensaje de recordatorio (WU-07).
-    final paymentAlias = ref
-        .watch(userProfileProvider.select((s) => s.valueOrNull?.paymentAlias));
+    final paymentAlias = ref.watch(
+      userProfileProvider.select((s) => s.valueOrNull?.paymentAlias),
+    );
 
     // Counts for chip badges (reactive).
     int vencidosN = 0;
@@ -172,66 +174,89 @@ class _PagosScreenState extends ConsumerState<PagosScreen> {
     final profilesAsync = ref.watch(userPublicProfilesBatchProvider(batchKey));
     final profiles = profilesAsync.valueOrNull ?? const {};
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // ── Section header + action (staggered, ADR-F9-04: sin "Exportar" —
-        // no hay exportador real) ────────────────────────────────────────────
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-          child: TreinoFadeSlideIn(
-            delay: AppMotion.stagger(0),
-            child: CoachHubSectionHero(
-              title: 'Pagos', // i18n
-              subtitle: 'Cobros, vencimientos e ingresos', // i18n
-              trailing: _RegistrarPagoButton(onTap: _onRegistrarPago),
+    // Scrolleable, como Alumnos.
+    //
+    // Antes esto era un `Column` con la tabla adentro de un `Expanded`, y ahí
+    // se perdía el scroll: `CoachHubDataTable` NO tiene scroller propio (es un
+    // `Column` de filas), así que el `Expanded` le daba una caja del alto de
+    // la pantalla y las filas que no entraban quedaban afuera. No se veía como
+    // un overflow de Flutter —nada de las rayas amarillas— porque el
+    // `ClipRRect` de la tabla las recorta en silencio: simplemente la lista se
+    // cortaba abajo y no había forma de bajar. Con 11 pagos, el PF veía 7.
+    //
+    // El fix es scrollear la página entera y no la tabla, que es lo que hace
+    // `alumnos_screen` con el mismo widget. La alternativa —meterle un
+    // `ListView` adentro a `CoachHubDataTable`— rompería a Alumnos, que lo
+    // monta dentro de su propio `SingleChildScrollView` y quedaría con un
+    // scrollable sin alto acotado.
+    //
+    // Se van con el scroll el hero, los KPI y los chips. Es lo mismo que pasa
+    // en Alumnos, y son ~200px de chrome fijo que en una laptop se comen media
+    // tabla.
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Section header + action (staggered, ADR-F9-04: sin "Exportar" —
+          // no hay exportador real) ────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+            child: TreinoFadeSlideIn(
+              delay: AppMotion.stagger(0),
+              child: CoachHubSectionHero(
+                title: 'Pagos', // i18n
+                subtitle: 'Cobros, vencimientos e ingresos', // i18n
+                trailing: _RegistrarPagoButton(onTap: _onRegistrarPago),
+              ),
             ),
           ),
-        ),
 
-        // ── KPI row ─────────────────────────────────────────────────────────
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
-          child: TreinoFadeSlideIn(
-            delay: AppMotion.stagger(1),
-            child: const PagosKpiRow(),
+          // ── KPI row ─────────────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+            child: TreinoFadeSlideIn(
+              delay: AppMotion.stagger(1),
+              child: const PagosKpiRow(),
+            ),
           ),
-        ),
 
-        // ── Filtro (chips) ──────────────────────────────────────────────────
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-          child: TreinoFadeSlideIn(
-            delay: AppMotion.stagger(2),
-            child: TreinoFilterChips(
-              options: _kFiltroLabels.values.toList(),
-              selected: {_kFiltroLabels[filtro]!},
-              badgeCounts: {
-                _kFiltroLabels[PagosFiltro.vencidos]!: vencidosN,
-                _kFiltroLabels[PagosFiltro.porVencer]!: porVencerN,
-                _kFiltroLabels[PagosFiltro.pagados]!: pagadosN,
-              },
-              onChanged: (newSelected) {
-                // Single-select: un tap que vacía la selección (chip activo
-                // desmarcado) es un no-op — siempre necesitamos un filtro
-                // activo (mismo patrón que solicitudTabProvider).
-                if (newSelected.isEmpty) return;
-                final label = newSelected.first;
-                for (final entry in _kFiltroLabels.entries) {
-                  if (entry.value == label) {
-                    ref.read(pagosFiltroProvider.notifier).state = entry.key;
-                    break;
+          // ── Filtro (chips) ──────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+            child: TreinoFadeSlideIn(
+              delay: AppMotion.stagger(2),
+              child: TreinoFilterChips(
+                options: _kFiltroLabels.values.toList(),
+                selected: {_kFiltroLabels[filtro]!},
+                badgeCounts: {
+                  _kFiltroLabels[PagosFiltro.vencidos]!: vencidosN,
+                  _kFiltroLabels[PagosFiltro.porVencer]!: porVencerN,
+                  _kFiltroLabels[PagosFiltro.pagados]!: pagadosN,
+                },
+                onChanged: (newSelected) {
+                  // Single-select: un tap que vacía la selección (chip activo
+                  // desmarcado) es un no-op — siempre necesitamos un filtro
+                  // activo (mismo patrón que solicitudTabProvider).
+                  if (newSelected.isEmpty) return;
+                  final label = newSelected.first;
+                  for (final entry in _kFiltroLabels.entries) {
+                    if (entry.value == label) {
+                      ref.read(pagosFiltroProvider.notifier).state = entry.key;
+                      break;
+                    }
                   }
-                }
-              },
+                },
+              ),
             ),
           ),
-        ),
 
-        // ── Tabla (según filtro activo) ────────────────────────────────────
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(0, 20, 0, 0),
+          // ── Tabla (según filtro activo) ────────────────────────────────────
+          //
+          // `Padding` y no `Expanded`: adentro de un scroll view el alto lo pone
+          // el contenido. Se agrega aire abajo para que la última fila no quede
+          // pegada al borde al llegar al final.
+          Padding(
+            padding: const EdgeInsets.fromLTRB(0, 20, 0, AppSpacing.s20),
             child: TreinoStateSwitcher(
               childKey: ValueKey('pagos_filtro_${filtro.name}'),
               child: _tabBody(
@@ -256,8 +281,8 @@ class _PagosScreenState extends ConsumerState<PagosScreen> {
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -284,18 +309,21 @@ class _PagosScreenState extends ConsumerState<PagosScreen> {
     // Se conserva envolviendo la tabla nueva del kit (fase 9), que ademas trae
     // loading/error/retry, ordenamiento y acciones de fila propias.
     return TreinoStateSwitcher(
-      childKey: ValueKey(bucketsAsync.when(
-        loading: () => 'loading',
-        error: (_, __) => 'error',
-        data: (b) => getPayments(b).isEmpty ? 'empty' : 'data',
-      )),
+      childKey: ValueKey(
+        bucketsAsync.when(
+          loading: () => 'loading',
+          error: (_, __) => 'error',
+          data: (b) => getPayments(b).isEmpty ? 'empty' : 'data',
+        ),
+      ),
       child: PagosWebTable(
         payments: _sorted(payments, profiles),
         profiles: profiles,
         emptyMessage: emptyMessage,
         loading: bucketsAsync.isLoading,
-        errorMessage:
-            bucketsAsync.hasError ? 'Error al cargar pagos.' : null, // i18n
+        errorMessage: bucketsAsync.hasError
+            ? 'Error al cargar pagos.'
+            : null, // i18n
         onRetry: () => ref.invalidate(trainerPaymentsProvider),
         sortColumnKey: _sortColumnKey,
         sortAscending: _sortAscending,
@@ -356,8 +384,11 @@ class _RegistrarPagoButton extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(TreinoIcon.plus,
-                  size: 16, color: TreinoButtonTokens.foreground(context)),
+              Icon(
+                TreinoIcon.plus,
+                size: 16,
+                color: TreinoButtonTokens.foreground(context),
+              ),
               const SizedBox(width: AppSpacing.hairline),
               Text(
                 'Registrar pago', // i18n

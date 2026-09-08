@@ -124,6 +124,26 @@ class CoachHubRow {
 ///
 /// Tokens: [TreinoTableTokens.of(context)] — nunca hex inline.
 ///
+/// ## ESTA TABLA NO SCROLLEA. El scroll lo pone el consumidor.
+///
+/// Es un `Column` de filas: crece con el contenido y no tiene viewport propio.
+/// Montala adentro de algo que scrollee —un `SingleChildScrollView`, como hacen
+/// `alumnos_screen` y `pagos_web_screen`— y nunca adentro de un `Expanded` o de
+/// una caja de alto fijo.
+///
+/// **Y si te equivocás, no te vas a enterar por un error.** El `ClipRRect` que
+/// redondea las esquinas recorta el excedente **en silencio**: no hay rayas
+/// amarillas de `RenderFlex overflowed`, no hay log, no hay test que se ponga
+/// rojo. La pantalla se ve impecable y le faltan filas.
+///
+/// Pasó en producción: `pagos_web_screen` la tenía adentro de un `Expanded` y
+/// con 11 pagos cargados el PF veía 7. Lo reportó un usuario, no la suite.
+///
+/// Si necesitás que la tabla llene el alto y scrollee ella sola, eso todavía no
+/// existe — hay que agregarlo con un flag opt-in (el patrón de
+/// `AgendaWebDayList.fillHeight`), no envolviéndola en un `Expanded` y
+/// esperando lo mejor.
+///
 /// Uso:
 /// ```dart
 /// CoachHubDataTable(
