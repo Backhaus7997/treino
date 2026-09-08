@@ -361,7 +361,11 @@ class KeyboardAccessorySlot extends StatelessWidget {
   Widget build(BuildContext context) {
     return AnimatedSize(
       duration: AppMotion.resolve(context, AppMotion.fast),
-      curve: Curves.easeOut,
+      // Era `Curves.easeOut` cruda: además de saltearse el token, la built-in
+      // es floja justo donde importa. Esta barra aparece cuando el teclado ya
+      // está subiendo, así que tiene que estar puesta antes de que el usuario
+      // termine de mirar para abajo.
+      curve: AppMotion.standard,
       alignment: Alignment.topCenter,
       child: cell == null
           ? const SizedBox(width: double.infinity)

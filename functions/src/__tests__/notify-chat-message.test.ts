@@ -14,9 +14,9 @@
  * REQ-PN-CF-002. Fase 6 Etapa 2.
  */
 
-import * as admin from "firebase-admin";
-import { App, deleteApp } from "firebase-admin/app";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
 import { Messaging, MulticastMessage } from "firebase-admin/messaging";
+import { Timestamp, getFirestore } from "firebase-admin/firestore";
 import { notifyOnChatMessageHandler } from "../notifications/notify-chat-message";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
@@ -26,7 +26,7 @@ process.env.GCLOUD_PROJECT = "treino-dev";
 let testApp: App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp(
+  testApp = initializeApp(
     { projectId: "treino-dev" },
     "notify-chat-message-test",
   );
@@ -36,7 +36,7 @@ afterAll(async () => {
   await deleteApp(testApp);
 });
 
-const db = () => admin.firestore(testApp);
+const db = () => getFirestore(testApp);
 
 /** Minimal mock messaging that tracks sendEachForMulticast calls. */
 function makeMockMessaging(): Messaging {
@@ -97,7 +97,7 @@ describe("SCENARIO-629 + SCENARIO-680: new message → sendFcm called with recip
     const messageData = {
       senderId: athleteUid,
       text: "Hola entrenador!",
-      createdAt: admin.firestore.Timestamp.now(),
+      createdAt: Timestamp.now(),
     };
 
     await notifyOnChatMessageHandler(testApp, chatId, messageData, mock);
@@ -113,7 +113,7 @@ describe("SCENARIO-629 + SCENARIO-680: new message → sendFcm called with recip
     const messageData = {
       senderId: athleteUid,
       text: "Mensaje de prueba",
-      createdAt: admin.firestore.Timestamp.now(),
+      createdAt: Timestamp.now(),
     };
 
     await notifyOnChatMessageHandler(testApp, chatId, messageData, mock);
@@ -150,7 +150,7 @@ describe("SCENARIO-630 + SCENARIO-666: body truncation at 100 chars, total ≤ 2
     const messageData = {
       senderId: senderUid,
       text: longText,
-      createdAt: admin.firestore.Timestamp.now(),
+      createdAt: Timestamp.now(),
     };
 
     await notifyOnChatMessageHandler(testApp, chatId, messageData, mock);
@@ -169,7 +169,7 @@ describe("SCENARIO-630 + SCENARIO-666: body truncation at 100 chars, total ≤ 2
     const messageData = {
       senderId: senderUid,
       text: longText,
-      createdAt: admin.firestore.Timestamp.now(),
+      createdAt: Timestamp.now(),
     };
 
     await notifyOnChatMessageHandler(testApp, chatId, messageData, mock);
@@ -205,7 +205,7 @@ describe("SCENARIO-631: data.deepLink == /coach/chat/{chatId}?other={senderUid}"
     const messageData = {
       senderId: senderUid,
       text: "Mensaje con deeplink",
-      createdAt: admin.firestore.Timestamp.now(),
+      createdAt: Timestamp.now(),
     };
 
     await notifyOnChatMessageHandler(testApp, chatId, messageData, mock);
@@ -221,7 +221,7 @@ describe("SCENARIO-631: data.deepLink == /coach/chat/{chatId}?other={senderUid}"
     const messageData = {
       senderId: senderUid,
       text: "Mensaje con senderId",
-      createdAt: admin.firestore.Timestamp.now(),
+      createdAt: Timestamp.now(),
     };
 
     await notifyOnChatMessageHandler(testApp, chatId, messageData, mock);
@@ -254,7 +254,7 @@ describe("no-op: message in chat where sender is the only member", () => {
     const messageData = {
       senderId: senderUid,
       text: "Hola?",
-      createdAt: admin.firestore.Timestamp.now(),
+      createdAt: Timestamp.now(),
     };
 
     await notifyOnChatMessageHandler(testApp, chatId, messageData, mock);
@@ -289,7 +289,7 @@ describe("REQ-CHATMEDIA-012: media message notification bodies", () => {
       senderId: senderUid,
       text: "",
       mediaType: "image",
-      createdAt: admin.firestore.Timestamp.now(),
+      createdAt: Timestamp.now(),
     };
 
     await notifyOnChatMessageHandler(testApp, chatId, messageData, mock);
@@ -304,7 +304,7 @@ describe("REQ-CHATMEDIA-012: media message notification bodies", () => {
       senderId: senderUid,
       text: "",
       mediaType: "video",
-      createdAt: admin.firestore.Timestamp.now(),
+      createdAt: Timestamp.now(),
     };
 
     await notifyOnChatMessageHandler(testApp, chatId, messageData, mock);
@@ -319,7 +319,7 @@ describe("REQ-CHATMEDIA-012: media message notification bodies", () => {
       senderId: senderUid,
       text: "Look at this!",
       mediaType: "image",
-      createdAt: admin.firestore.Timestamp.now(),
+      createdAt: Timestamp.now(),
     };
 
     await notifyOnChatMessageHandler(testApp, chatId, messageData, mock);
@@ -334,7 +334,7 @@ describe("REQ-CHATMEDIA-012: media message notification bodies", () => {
       senderId: senderUid,
       text: "",
       mediaType: "unknown",
-      createdAt: admin.firestore.Timestamp.now(),
+      createdAt: Timestamp.now(),
     };
 
     // Must not throw

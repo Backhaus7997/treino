@@ -170,4 +170,91 @@ void main() {
       () => expect(AppFonts.barlowCondensed, 'Barlow Condensed'),
     );
   });
+
+  group('AppTextSize — escala tipográfica', () {
+    test('micro == 10', () => expect(AppTextSize.micro, 10));
+    test('caption == 12', () => expect(AppTextSize.caption, 12));
+    test('bodyDense == 13', () => expect(AppTextSize.bodyDense, 13));
+    test('body == 14', () => expect(AppTextSize.body, 14));
+    test('bodyLarge == 16', () => expect(AppTextSize.bodyLarge, 16));
+    test('title == 18', () => expect(AppTextSize.title, 18));
+    test('titleLarge == 20', () => expect(AppTextSize.titleLarge, 20));
+    test('heading == 24', () => expect(AppTextSize.heading, 24));
+    test('display == 28', () => expect(AppTextSize.display, 28));
+    test('displayLarge == 32', () => expect(AppTextSize.displayLarge, 32));
+
+    test('la escala es monótona creciente, sin escalones repetidos', () {
+      const scale = [
+        AppTextSize.micro,
+        AppTextSize.caption,
+        AppTextSize.bodyDense,
+        AppTextSize.body,
+        AppTextSize.bodyLarge,
+        AppTextSize.title,
+        AppTextSize.titleLarge,
+        AppTextSize.heading,
+        AppTextSize.display,
+        AppTextSize.displayLarge,
+      ];
+      for (var i = 1; i < scale.length; i++) {
+        expect(
+          scale[i],
+          greaterThan(scale[i - 1]),
+          reason: 'El escalón $i (${scale[i]}) no es mayor que el anterior '
+              '(${scale[i - 1]}). Una escala con un empate o un retroceso deja '
+              'de servir para elegir: dos nombres para el mismo número son dos '
+              'formas de escribir lo mismo, que es justo lo que el token viene '
+              'a sacar.',
+        );
+      }
+    });
+
+    test('arriba de body la escala respira: todos los saltos son >= 2px', () {
+      // Los escalones apretados están permitidos SÓLO en el racimo de texto
+      // chico (12·13·14), y por una razón concreta: TREINO sirve una app de
+      // teléfono y un panel de escritorio desde el mismo código. `caption` es
+      // un label, `bodyDense` es una fila de tabla del Coach Hub y `body` es un
+      // párrafo en un celular — tres roles reales que se pisan en el rango
+      // donde el texto chico vive.
+      //
+      // De `body` para arriba esa excusa no existe: son títulos y números hero,
+      // y ahí dos escalones a un píxel no son dos roles, son deriva. Es lo que
+      // pasó con `26` (5 usos) al lado de `28`, o `17` y `19` al lado de `18`.
+      const above = [
+        AppTextSize.body,
+        AppTextSize.bodyLarge,
+        AppTextSize.title,
+        AppTextSize.titleLarge,
+        AppTextSize.heading,
+        AppTextSize.display,
+        AppTextSize.displayLarge,
+      ];
+      final tight = <String>[];
+      for (var i = 1; i < above.length; i++) {
+        if (above[i] - above[i - 1] < 2) {
+          tight.add('${above[i - 1]}→${above[i]}');
+        }
+      }
+      expect(
+        tight,
+        isEmpty,
+        reason: 'Escalones a menos de 2px arriba de body: $tight. Si el valor '
+            'que necesitás queda pegado a uno existente, lo que necesitás es '
+            'el que ya está.',
+      );
+    });
+
+    test('el racimo de texto chico es exactamente 12·13·14, ni uno más', () {
+      // El racimo tiene tres escalones y se cierra ahí. Agregar un cuarto —un
+      // `11` con nombre, digamos— reabre exactamente el problema que la escala
+      // vino a cerrar: `11` tenía 146 usos un píxel abajo de `caption`,
+      // haciendo su mismo trabajo, y nadie podía decir cuál correspondía.
+      expect(
+        [AppTextSize.caption, AppTextSize.bodyDense, AppTextSize.body],
+        [12, 13, 14],
+      );
+      // El piso del racimo se despega de `micro`: 10 y 12 no compiten.
+      expect(AppTextSize.caption - AppTextSize.micro, greaterThanOrEqualTo(2));
+    });
+  });
 }

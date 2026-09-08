@@ -12,9 +12,10 @@
  * re-throw so the platform redelivers; permanent ones land on `failed` and stop.
  */
 
-import * as admin from "firebase-admin";
-import { App, deleteApp } from "firebase-admin/app";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { Messaging } from "firebase-admin/messaging";
+import { getAuth } from "firebase-admin/auth";
 import { enqueueMail, dedupeKey } from "../mail/enqueue-mail";
 import { sendQueuedMailHandler } from "../mail/send-queued-mail";
 import { MAIL_QUEUE_COLLECTION, MailQueueDoc } from "../mail/types";
@@ -29,14 +30,14 @@ process.env.GCLOUD_PROJECT = "treino-dev";
 let testApp: App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp({ projectId: "treino-dev" }, "mail-outbox-test");
+  testApp = initializeApp({ projectId: "treino-dev" }, "mail-outbox-test");
 });
 
 afterAll(async () => {
   await deleteApp(testApp);
 });
 
-const db = () => admin.firestore(testApp);
+const db = () => getFirestore(testApp);
 
 async function readQueueDoc(id: string): Promise<MailQueueDoc | undefined> {
   const snap = await db().collection(MAIL_QUEUE_COLLECTION).doc(id).get();
@@ -318,21 +319,20 @@ describe("sendQueuedMailHandler", () => {
         params: { trainerName: "Jose" },
         status: "pending",
         attempts: 0,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(),
         ...overrides,
       });
   }
 
   beforeEach(async () => {
-    await admin
-      .auth(testApp)
+    await getAuth(testApp)
       .createUser({ uid, email: "consumer1@example.com" })
       .catch(() => undefined);
   });
 
   afterEach(async () => {
     await purge(mailId);
-    await admin.auth(testApp).deleteUser(uid).catch(() => undefined);
+    await getAuth(testApp).deleteUser(uid).catch(() => undefined);
   });
 
   it("sends and marks the document sent", async () => {
@@ -461,7 +461,7 @@ describe("sendQueuedMailHandler", () => {
   });
 
   it("fails permanently when the recipient has no address", async () => {
-    await admin.auth(testApp).deleteUser(uid).catch(() => undefined);
+    await getAuth(testApp).deleteUser(uid).catch(() => undefined);
     await seedQueueDoc();
     const sender = makeOkSender();
 

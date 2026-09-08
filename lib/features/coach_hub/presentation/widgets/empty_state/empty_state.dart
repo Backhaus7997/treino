@@ -102,7 +102,7 @@ class TreinoEmptyState extends StatelessWidget {
                 key: const Key('empty_state_medallion'),
                 padding: const EdgeInsets.all(AppSpacing.s18),
                 decoration: BoxDecoration(
-                  color: AppPalette.of(context).accent.withValues(alpha: 0.10),
+                  color: AppPalette.of(context).accent.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
@@ -118,7 +118,7 @@ class TreinoEmptyState extends StatelessWidget {
                 style: TextStyle(
                   fontFamily: AppFonts.barlow,
                   fontWeight: FontWeight.w600,
-                  fontSize: 16,
+                  fontSize: AppTextSize.bodyLarge,
                   color: tokens.titleColor,
                 ),
               ),
@@ -130,7 +130,7 @@ class TreinoEmptyState extends StatelessWidget {
                   style: TextStyle(
                     fontFamily: AppFonts.barlow,
                     fontWeight: FontWeight.w400,
-                    fontSize: 14,
+                    fontSize: AppTextSize.body,
                     color: tokens.descriptionColor,
                   ),
                 ),
@@ -144,7 +144,7 @@ class TreinoEmptyState extends StatelessWidget {
                     style: TextStyle(
                       fontFamily: AppFonts.barlow,
                       fontWeight: FontWeight.w600,
-                      fontSize: 14,
+                      fontSize: AppTextSize.body,
                       color: tokens.ctaColor,
                     ),
                   ),

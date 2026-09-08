@@ -9,8 +9,9 @@
  * tests se pone rojo, el endpoint se convirtió en un oráculo de cuentas.
  */
 
-import * as admin from "firebase-admin";
-import { App, deleteApp } from "firebase-admin/app";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+import { getFirestore } from "firebase-admin/firestore";
 import {
   runRequestPasswordReset,
   runRequestEmailVerification,
@@ -28,14 +29,14 @@ process.env.GCLOUD_PROJECT = "treino-dev";
 let testApp: App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp({ projectId: "treino-dev" }, "auth-email-test");
+  testApp = initializeApp({ projectId: "treino-dev" }, "auth-email-test");
 });
 
 afterAll(async () => {
   await deleteApp(testApp);
 });
 
-const db = () => admin.firestore(testApp);
+const db = () => getFirestore(testApp);
 
 // Reloj fijo para que la ventana de throttling sea determinista.
 const NOW = Date.UTC(2026, 7, 21, 12, 0, 0);
@@ -74,8 +75,8 @@ async function seedUser(opts: {
   email: string;
   emailVerified?: boolean;
 }): Promise<void> {
-  await admin.auth(testApp).deleteUser(opts.uid).catch(() => undefined);
-  await admin.auth(testApp).createUser({
+  await getAuth(testApp).deleteUser(opts.uid).catch(() => undefined);
+  await getAuth(testApp).createUser({
     uid: opts.uid,
     email: opts.email,
     emailVerified: opts.emailVerified ?? false,
@@ -101,12 +102,12 @@ async function seedUser(opts: {
  * cuenta cae en la rama federada, que es justo lo que el test prohibe.
  */
 async function seedPasswordUser(uid: string, email: string): Promise<void> {
-  await admin.auth(testApp).deleteUser(uid).catch(() => undefined);
-  await admin.auth(testApp).createUser({ uid, email, password: "Passw0rd!" });
+  await getAuth(testApp).deleteUser(uid).catch(() => undefined);
+  await getAuth(testApp).createUser({ uid, email, password: "Passw0rd!" });
 
   // Verificado, no asumido — igual que en el seed federado, porque de esto
   // depende que el test signifique algo.
-  const u = await admin.auth(testApp).getUser(uid);
+  const u = await getAuth(testApp).getUser(uid);
   const ids = u.providerData.map((x) => x.providerId);
   if (!ids.includes("password")) {
     throw new Error(`seed roto: la cuenta no quedo con password (${ids})`);
@@ -115,9 +116,9 @@ async function seedPasswordUser(uid: string, email: string): Promise<void> {
 
 /** Siembra una cuenta cuyo unico proveedor es Google, sin password hash. */
 async function seedFederatedUser(uid: string, email: string): Promise<void> {
-  await admin.auth(testApp).deleteUser(uid).catch(() => undefined);
-  await admin.auth(testApp).createUser({ uid, email });
-  await admin.auth(testApp).updateUser(uid, {
+  await getAuth(testApp).deleteUser(uid).catch(() => undefined);
+  await getAuth(testApp).createUser({ uid, email });
+  await getAuth(testApp).updateUser(uid, {
     providerToLink: {
       providerId: "google.com",
       uid: `${uid}-google`,
@@ -126,7 +127,7 @@ async function seedFederatedUser(uid: string, email: string): Promise<void> {
   });
   // `createUser` sin password deja providerData con solo el federado — pero se
   // verifica en vez de asumirlo, porque de eso depende todo el bloque.
-  const u = await admin.auth(testApp).getUser(uid);
+  const u = await getAuth(testApp).getUser(uid);
   const ids = u.providerData.map((x) => x.providerId);
   if (ids.includes("password")) {
     throw new Error(`seed roto: la cuenta quedo con password (${ids})`);
@@ -240,7 +241,7 @@ describe("REQ-AUTH-011: requestPasswordReset nunca revela si la cuenta existe", 
 
   afterEach(async () => {
     await purgeQueueFor(uid);
-    await admin.auth(testApp).deleteUser(uid).catch(() => undefined);
+    await getAuth(testApp).deleteUser(uid).catch(() => undefined);
   });
 
   it("devuelve la MISMA respuesta para una cuenta que existe y una que no", async () => {
@@ -293,7 +294,7 @@ describe("requestPasswordReset: cuenta que existe", () => {
 
   afterEach(async () => {
     await purgeQueueFor(uid);
-    await admin.auth(testApp).deleteUser(uid).catch(() => undefined);
+    await getAuth(testApp).deleteUser(uid).catch(() => undefined);
   });
 
   it("encola el mail con el link de un solo uso", async () => {
@@ -343,7 +344,7 @@ describe("requestPasswordReset: limita la tasa por ventana", () => {
 
   afterEach(async () => {
     await purgeQueueFor(uid);
-    await admin.auth(testApp).deleteUser(uid).catch(() => undefined);
+    await getAuth(testApp).deleteUser(uid).catch(() => undefined);
   });
 
   it("diez pedidos en la misma ventana producen UN solo mail", async () => {
@@ -405,7 +406,7 @@ describe("el segundo pedido no puede matar el link del primero", () => {
 
   afterEach(async () => {
     await purgeQueueFor(uid);
-    await admin.auth(testApp).deleteUser(uid).catch(() => undefined);
+    await getAuth(testApp).deleteUser(uid).catch(() => undefined);
   });
 
   it("el mail encolado se queda con el link del ÚLTIMO pedido", async () => {
@@ -481,7 +482,7 @@ describe("requestEmailVerification", () => {
   afterEach(async () => {
     for (const uid of uids) {
       await purgeQueueFor(uid);
-      await admin.auth(testApp).deleteUser(uid).catch(() => undefined);
+      await getAuth(testApp).deleteUser(uid).catch(() => undefined);
     }
   });
 
@@ -536,7 +537,7 @@ describe("cuenta sin contraseña: manda el hint, no un link de reseteo", () => {
 
   afterEach(async () => {
     await purgeQueueFor(uid);
-    await admin.auth(testApp).deleteUser(uid).catch(() => undefined);
+    await getAuth(testApp).deleteUser(uid).catch(() => undefined);
   });
 
   it("encola `federated-signin-hint` y NO `password-reset`", async () => {
@@ -609,7 +610,7 @@ describe("una cuenta CON contraseña recibe el link, no el hint", () => {
 
   afterEach(async () => {
     await purgeQueueFor(uid);
-    await admin.auth(testApp).deleteUser(uid).catch(() => undefined);
+    await getAuth(testApp).deleteUser(uid).catch(() => undefined);
   });
 
   it("el provider `password` la manda por la rama de reseteo", async () => {
@@ -641,7 +642,7 @@ describe("una cuenta CON contraseña recibe el link, no el hint", () => {
   // arriba seguirian pasando por el fallback y volveriamos a no cubrir nada.
   // Este test avisa.
   it("la cuenta sembrada expone el provider `password`", async () => {
-    const u = await admin.auth(testApp).getUser(uid);
+    const u = await getAuth(testApp).getUser(uid);
 
     expect(u.providerData.map((p) => p.providerId)).toContain("password");
   });
@@ -652,10 +653,10 @@ describe("el emulador no es oráculo para el caso federado", () => {
   const email = "emu-miente@example.com";
 
   beforeEach(() => seedFederatedUser(uid, email));
-  afterEach(() => admin.auth(testApp).deleteUser(uid).catch(() => undefined));
+  afterEach(() => getAuth(testApp).deleteUser(uid).catch(() => undefined));
 
   it("genera link para una cuenta SIN contraseña — por eso no alcanza", async () => {
-    const link = await admin.auth(testApp).generatePasswordResetLink(email);
+    const link = await getAuth(testApp).generatePasswordResetLink(email);
 
     // Si esto algun dia se pone ROJO, es una buena noticia: el emulador
     // empezo a gatear por proveedor y se volvio fiel. Recien ahi tendria

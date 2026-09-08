@@ -91,7 +91,7 @@ class _InviteAthleteDialogState extends ConsumerState<InviteAthleteDialog> {
               Text(
                 'INVITÁ A UN ALUMNO', // i18n
                 style: GoogleFonts.barlowCondensed(
-                  fontSize: 18,
+                  fontSize: AppTextSize.title,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 1.2,
                   height: 1.0,
@@ -108,7 +108,7 @@ class _InviteAthleteDialogState extends ConsumerState<InviteAthleteDialog> {
                     : 'Compartile este link. Cuando lo abra va a poder '
                         'vincularse con vos desde la app.', // i18n
                 style: GoogleFonts.barlow(
-                  fontSize: 13,
+                  fontSize: AppTextSize.bodyDense,
                   height: 1.4,
                   color: palette.textMuted,
                 ),
@@ -133,7 +133,7 @@ class _InviteAthleteDialogState extends ConsumerState<InviteAthleteDialog> {
                       child: Text(
                         'Listo', // i18n
                         style: GoogleFonts.barlowCondensed(
-                          fontSize: 14,
+                          fontSize: AppTextSize.body,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 0.8,
                           color: palette.textPrimary,
@@ -152,7 +152,7 @@ class _InviteAthleteDialogState extends ConsumerState<InviteAthleteDialog> {
                     child: Text(
                       'Cerrar', // i18n
                       style: GoogleFonts.barlowCondensed(
-                        fontSize: 14,
+                        fontSize: AppTextSize.body,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0.8,
                         color: palette.textPrimary,
@@ -198,7 +198,7 @@ class _CajaDelLink extends StatelessWidget {
         link,
         maxLines: 2,
         style: GoogleFonts.barlow(
-          fontSize: 12,
+          fontSize: AppTextSize.caption,
           height: 1.3,
           color: palette.textPrimary,
         ),
@@ -245,7 +245,7 @@ class _BotonCopiar extends StatelessWidget {
       label: Text(
         copiado ? '¡Copiado!' : 'Copiar link', // i18n
         style: GoogleFonts.barlowCondensed(
-          fontSize: 14,
+          fontSize: AppTextSize.body,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.8,
         ),

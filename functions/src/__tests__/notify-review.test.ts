@@ -11,9 +11,9 @@
  * REQ-PN-CF-005. Fase 6 Etapa 2.
  */
 
-import * as admin from "firebase-admin";
-import { App, deleteApp } from "firebase-admin/app";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
 import { Messaging, MulticastMessage } from "firebase-admin/messaging";
+import { Timestamp, getFirestore } from "firebase-admin/firestore";
 import { notifyOnReviewHandler } from "../notifications/notify-review";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
@@ -23,7 +23,7 @@ process.env.GCLOUD_PROJECT = "treino-dev";
 let testApp: App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp(
+  testApp = initializeApp(
     { projectId: "treino-dev" },
     "notify-review-test",
   );
@@ -33,7 +33,7 @@ afterAll(async () => {
   await deleteApp(testApp);
 });
 
-const db = () => admin.firestore(testApp);
+const db = () => getFirestore(testApp);
 
 function makeMockMessaging(): Messaging {
   return {
@@ -81,7 +81,7 @@ describe("SCENARIO-642: new review → sendFcm called with trainerId, correct bo
       trainerId,
       athleteId,
       rating: 5,
-      createdAt: admin.firestore.Timestamp.now(),
+      createdAt: Timestamp.now(),
     };
 
     await notifyOnReviewHandler(testApp, reviewData, mock);
@@ -99,7 +99,7 @@ describe("SCENARIO-642: new review → sendFcm called with trainerId, correct bo
       trainerId,
       athleteId,
       rating: 5,
-      createdAt: admin.firestore.Timestamp.now(),
+      createdAt: Timestamp.now(),
     };
 
     await notifyOnReviewHandler(testApp, reviewData, mock);
@@ -114,7 +114,7 @@ describe("SCENARIO-642: new review → sendFcm called with trainerId, correct bo
       trainerId,
       athleteId,
       rating: 5,
-      createdAt: admin.firestore.Timestamp.now(),
+      createdAt: Timestamp.now(),
     };
 
     await notifyOnReviewHandler(testApp, reviewData, mock);
@@ -132,7 +132,7 @@ describe("SCENARIO-642: new review → sendFcm called with trainerId, correct bo
       trainerId,
       athleteId: noProfileAthleteId,
       rating: 4,
-      createdAt: admin.firestore.Timestamp.now(),
+      createdAt: Timestamp.now(),
     };
 
     await notifyOnReviewHandler(testApp, reviewData, mock);
@@ -165,7 +165,7 @@ describe("SCENARIO-681: trainer with empty fcmTokens → sendFcm silently skips"
       trainerId,
       athleteId,
       rating: 3,
-      createdAt: admin.firestore.Timestamp.now(),
+      createdAt: Timestamp.now(),
     };
 
     await expect(

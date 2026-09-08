@@ -1,6 +1,16 @@
 # Propuesta — migrar `firebase-admin` de la API namespaced a los subpaths modulares
 
 **Estado:** en curso. PR 1 mergeado (`43a40af3`); PRs 2, 3 y 4 abiertos y en verde, encadenados.
+**⚠️ Cómo VERIFICAR los tests, o el error se repite (bis):** `npm run lint` **NO** es prueba de que
+los tests compilen. ESLint con type information reporta violaciones de sus REGLAS, no todos los
+errores de `tsc` — un `TS2339` no es ninguna regla, así que el lint salió limpio con 35 archivos
+rotos en el PR 5a. Y correr las suites unitarias tampoco alcanza: las que rompieron eran las de
+EMULADOR. El único oráculo que type-chequea los tests sin correrlos:
+
+```bash
+npx tsc --noEmit -p tsconfig.eslint.json   # ese tsconfig existe porque tsconfig.json excluye los tests
+```
+
 **⚠️ Cómo contar, o el error se repite:** la regex `admin\.<ns>` **se pierde las cadenas
 multilínea** (`await admin\n  .firestore(app)`). Con ella el PR 4b se saltó 12 sitios en 8 archivos
 y —peor— la verificación reportó «cero» y se publicó como tal. Contar SIEMPRE con

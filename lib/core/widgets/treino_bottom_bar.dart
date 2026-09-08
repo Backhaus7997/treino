@@ -442,7 +442,7 @@ class TreinoBottomBar extends StatelessWidget {
             ),
             child: TweenAnimationBuilder<double>(
               tween: Tween<double>(end: expanded ? 1 : 0),
-              duration: AppMotion.base,
+              duration: AppMotion.resolve(context, AppMotion.base),
               curve: AppMotion.standard,
               builder: (context, expansion, _) {
                 return DecoratedBox(
@@ -524,11 +524,27 @@ class TreinoBottomBar extends StatelessWidget {
                                 // animar la magnitud LÓGICA que cambia por
                                 // decisión del usuario, nunca la geometría
                                 // que el layout puede redefinir sola.
+                                // 240ms, no los 320 de `AppMotion.slow` que
+                                // había: la tab bar es lo que más se toca en
+                                // toda la app —decenas de veces por día— y el
+                                // escalón `slow` está pensado para
+                                // transiciones de página y celebraciones, que
+                                // se ven una vez. A esta frecuencia, 320ms se
+                                // acumulan como sensación de lentitud general
+                                // aunque ninguna animación suelta se sienta
+                                // lenta. `base` deja el pill abajo del techo
+                                // de 300ms para UI.
                                 TweenAnimationBuilder<double>(
                                   tween: Tween<double>(
                                     end: currentIndex.toDouble(),
                                   ),
-                                  duration: AppMotion.slow,
+                                  // `resolve` faltaba: el pill era la única
+                                  // animación de la barra que ignoraba
+                                  // reduce-motion.
+                                  duration: AppMotion.resolve(
+                                    context,
+                                    AppMotion.base,
+                                  ),
                                   curve: AppMotion.standard,
                                   builder: (context, position, child) {
                                     return Positioned(
@@ -666,7 +682,7 @@ class _TabContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = active ? palette.bg : palette.textMuted;
     return AnimatedDefaultTextStyle(
-      duration: AppMotion.base,
+      duration: AppMotion.resolve(context, AppMotion.base),
       style: GoogleFonts.barlowCondensed(
         color: color,
         fontSize: 10,
@@ -690,7 +706,7 @@ class _TabContent extends StatelessWidget {
               clipBehavior: Clip.none,
               children: [
                 AnimatedSwitcher(
-                  duration: AppMotion.base,
+                  duration: AppMotion.resolve(context, AppMotion.base),
                   switchInCurve: AppMotion.standard,
                   switchOutCurve: AppMotion.exit,
                   child: Icon(

@@ -52,7 +52,7 @@ class TreinoDropdown<T> extends StatelessWidget {
       style: TextStyle(
         fontFamily: AppFonts.barlow,
         fontWeight: AppFonts.w400,
-        fontSize: 14,
+        fontSize: AppTextSize.body,
         color: palette.textPrimary,
       ),
       decoration: baseDecoration.copyWith(
@@ -104,7 +104,7 @@ class TreinoPopupMenuButton<T> extends StatelessWidget {
     final textStyle = TextStyle(
       fontFamily: AppFonts.barlow,
       fontWeight: AppFonts.w400,
-      fontSize: 14,
+      fontSize: AppTextSize.body,
       color: palette.textPrimary,
     );
 
@@ -116,8 +116,7 @@ class TreinoPopupMenuButton<T> extends StatelessWidget {
           textStyle: textStyle,
           shape: RoundedRectangleBorder(
             side: BorderSide(color: TreinoCardTokens.border(context)),
-            borderRadius:
-                BorderRadius.circular(TreinoCardTokens.borderRadius),
+            borderRadius: BorderRadius.circular(TreinoCardTokens.borderRadius),
           ),
         ),
       ),

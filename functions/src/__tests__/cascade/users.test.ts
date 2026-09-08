@@ -8,8 +8,8 @@
  *   SCENARIO-643 — wellbeingCheckIns leaves no residue (#643, docs/security.md §2.2)
  */
 
-import * as admin from "firebase-admin";
-import { App, deleteApp } from "firebase-admin/app";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
@@ -18,7 +18,7 @@ process.env.GCLOUD_PROJECT = "treino-dev";
 let testApp: App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp({ projectId: "treino-dev" }, "users-cascade-test");
+  testApp = initializeApp({ projectId: "treino-dev" }, "users-cascade-test");
 });
 
 afterAll(async () => {
@@ -28,7 +28,7 @@ afterAll(async () => {
 // Import the module under test — will fail until implementation exists
 import { deleteUserDocs } from "../../cascade/users";
 
-const db = () => admin.firestore(testApp);
+const db = () => getFirestore(testApp);
 
 async function seed(uid: string): Promise<void> {
   const batch = db().batch();

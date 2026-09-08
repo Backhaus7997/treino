@@ -63,6 +63,7 @@ jest.mock("../notifications/send-fcm", () => ({
 import * as admin from "firebase-admin";
 import { App } from "firebase-admin/app";
 import { Messaging } from "firebase-admin/messaging";
+import { Timestamp } from "firebase-admin/firestore";
 import { sendFcm } from "../notifications/send-fcm";
 import {
   notifyMonthlyReportHandler,
@@ -110,7 +111,7 @@ function installFirestore(
     .map((session, index) => ({
       __index: index,
       data: () => ({
-        startedAt: admin.firestore.Timestamp.fromDate(session.startedAt),
+        startedAt: Timestamp.fromDate(session.startedAt),
         status: session.status ?? "finished",
         wasFullyCompleted: session.wasFullyCompleted ?? true,
       }),

@@ -18,7 +18,7 @@ import 'routine_editor_web_screen.dart';
 final List<RouteBase> routineEditorRoutes = [
   GoRoute(
     path: '/routine-editor/:athleteId',
-    pageBuilder: (_, state) => coachHubPage(
+    pageBuilder: (_, state) => coachHubPageAnimated(
       RoutineEditorWebScreen(
         athleteId: state.pathParameters['athleteId']!,
       ),
@@ -26,7 +26,7 @@ final List<RouteBase> routineEditorRoutes = [
   ),
   GoRoute(
     path: '/routine-editor/:athleteId/:routineId',
-    pageBuilder: (_, state) => coachHubPage(
+    pageBuilder: (_, state) => coachHubPageAnimated(
       RoutineEditorWebScreen(
         athleteId: state.pathParameters['athleteId']!,
         routineId: state.pathParameters['routineId'],
@@ -36,11 +36,11 @@ final List<RouteBase> routineEditorRoutes = [
   GoRoute(
     path: '/template-editor',
     pageBuilder: (_, __) =>
-        coachHubPage(const RoutineEditorWebScreen.template()),
+        coachHubPageAnimated(const RoutineEditorWebScreen.template()),
   ),
   GoRoute(
     path: '/template-editor/:templateId',
-    pageBuilder: (_, state) => coachHubPage(
+    pageBuilder: (_, state) => coachHubPageAnimated(
       RoutineEditorWebScreen.template(
         routineId: state.pathParameters['templateId'],
       ),

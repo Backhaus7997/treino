@@ -1,6 +1,5 @@
-import * as admin from "firebase-admin";
-import { App, deleteApp } from "firebase-admin/app";
-import { DocumentReference, Firestore } from "firebase-admin/firestore";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
+import { DocumentReference, Firestore, getFirestore } from "firebase-admin/firestore";
 import { reassignFcmTokenHandler } from "../notifications/reassign-fcm-token";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
@@ -9,7 +8,7 @@ process.env.GCLOUD_PROJECT = "treino-dev";
 let testApp: App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp(
+  testApp = initializeApp(
     { projectId: "treino-dev" },
     "reassign-fcm-token-test",
   );
@@ -19,7 +18,7 @@ afterAll(async () => {
   await deleteApp(testApp);
 });
 
-const db = (): Firestore => admin.firestore(testApp);
+const db = (): Firestore => getFirestore(testApp);
 const user = (uid: string): DocumentReference =>
   db().collection("users").doc(uid);
 

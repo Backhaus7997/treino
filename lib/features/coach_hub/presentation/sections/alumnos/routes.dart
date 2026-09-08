@@ -20,7 +20,7 @@ final List<RouteBase> alumnosRoutes = [
   ),
   GoRoute(
     path: '/alumnos/:id',
-    pageBuilder: (_, state) => coachHubPage(
+    pageBuilder: (_, state) => coachHubPageAnimated(
         AlumnoDetailScreen(athleteId: state.pathParameters['id']!)),
   ),
 ];

@@ -15,7 +15,7 @@ import 'package:treino/features/coach_hub/presentation/shell/sidebar_item.dart';
 final List<RouteBase> chatRoutes = [
   GoRoute(
     path: '/chat',
-    pageBuilder: (_, __) => coachHubPage(const ChatSectionScreen()),
+    pageBuilder: (_, __) => coachHubPageAnimated(const ChatSectionScreen()),
   ),
 ];
 

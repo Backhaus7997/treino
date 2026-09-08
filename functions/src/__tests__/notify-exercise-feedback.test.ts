@@ -32,9 +32,9 @@
  * #628.
  */
 
-import * as admin from "firebase-admin";
-import { App, deleteApp } from "firebase-admin/app";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
 import { Messaging, MulticastMessage } from "firebase-admin/messaging";
+import { Timestamp, getFirestore } from "firebase-admin/firestore";
 import { notifyOnExerciseFeedbackHandler } from "../notifications/notify-exercise-feedback";
 import { dedupeKey } from "../mail/enqueue-mail";
 import { MAIL_QUEUE_COLLECTION, MailQueueDoc } from "../mail/types";
@@ -47,7 +47,7 @@ process.env.GCLOUD_PROJECT = "treino-dev";
 let testApp: App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp(
+  testApp = initializeApp(
     { projectId: "treino-dev" },
     "notify-exercise-feedback-test",
   );
@@ -57,7 +57,7 @@ afterAll(async () => {
   await deleteApp(testApp);
 });
 
-const db = () => admin.firestore(testApp);
+const db = () => getFirestore(testApp);
 
 /** Minimal mock messaging that tracks sendEachForMulticast calls. */
 function makeMockMessaging(): Messaging {
@@ -170,7 +170,7 @@ function makeFeedback(overrides: Partial<Record<string, unknown>> = {}): Record<
     text: "Me tiró la rodilla derecha en la última serie",
     photoUrl: "https://firebasestorage.googleapis.com/v0/b/x/o/sessionFeedback%2Fsecret?alt=media&token=abc123",
     photoPath: "sessionFeedback/athlete-1/session-1/feedback-1.jpg",
-    createdAt: admin.firestore.Timestamp.now(),
+    createdAt: Timestamp.now(),
     ...overrides,
   };
 }

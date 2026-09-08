@@ -8,8 +8,8 @@
  * skip).
  */
 
-import * as admin from "firebase-admin";
-import { App, deleteApp } from "firebase-admin/app";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.GCLOUD_PROJECT = "treino-dev";
@@ -17,7 +17,7 @@ process.env.GCLOUD_PROJECT = "treino-dev";
 let testApp: App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp({ projectId: "treino-dev" }, "cleanup-plans-test");
+  testApp = initializeApp({ projectId: "treino-dev" }, "cleanup-plans-test");
 });
 
 afterAll(async () => {
@@ -29,7 +29,7 @@ import {
   cleanupAssignedPlansOnUnlinkHandler,
 } from "../cleanup-assigned-plans";
 
-const db = () => admin.firestore(testApp);
+const db = () => getFirestore(testApp);
 
 const TRAINER = "trainer-T";
 const ATHLETE = "athlete-A";

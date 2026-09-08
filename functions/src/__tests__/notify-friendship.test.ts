@@ -28,9 +28,9 @@
  * REQ: REQ-FOLLOW-014
  */
 
-import * as admin from "firebase-admin";
-import { App, deleteApp } from "firebase-admin/app";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
 import { Messaging, MulticastMessage } from "firebase-admin/messaging";
+import { getFirestore } from "firebase-admin/firestore";
 import {
   buildFollowCopy,
   notifyOnFollowHandler,
@@ -196,7 +196,7 @@ process.env.GCLOUD_PROJECT = "treino-dev";
 let testApp: App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp(
+  testApp = initializeApp(
     { projectId: "treino-dev" },
     "notify-follow-test",
   );
@@ -206,7 +206,7 @@ afterAll(async () => {
   await deleteApp(testApp);
 });
 
-const db = () => admin.firestore(testApp);
+const db = () => getFirestore(testApp);
 
 function makeMockMessaging(): Messaging {
   return {

@@ -7,8 +7,8 @@
  *   SCENARIO-541 — No posts authored is a no-op (REQ-ACCDEL-CF-006)
  */
 
-import * as admin from "firebase-admin";
-import { App, deleteApp } from "firebase-admin/app";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
@@ -17,7 +17,7 @@ process.env.GCLOUD_PROJECT = "treino-dev";
 let testApp: App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp({ projectId: "treino-dev" }, "posts-cascade-test");
+  testApp = initializeApp({ projectId: "treino-dev" }, "posts-cascade-test");
 });
 
 afterAll(async () => {
@@ -27,7 +27,7 @@ afterAll(async () => {
 // Import the module under test — will fail until implementation exists
 import { deletePosts } from "../../cascade/posts";
 
-const db = () => admin.firestore(testApp);
+const db = () => getFirestore(testApp);
 
 async function seedPosts(uid: string, count: number): Promise<string[]> {
   const batch = db().batch();
@@ -40,7 +40,7 @@ async function seedPosts(uid: string, count: number): Promise<string[]> {
       authorDisplayName: "Real Name",
       authorAvatarUrl: "https://example.com/avatar.jpg",
       content: `Post content ${i}`,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
     });
   }
   await batch.commit();

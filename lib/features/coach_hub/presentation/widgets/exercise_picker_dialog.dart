@@ -110,7 +110,8 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
     super.dispose();
   }
 
-  int get _cantidadDeFiltros => _muscleFilters.length + _equipmentFilters.length;
+  int get _cantidadDeFiltros =>
+      _muscleFilters.length + _equipmentFilters.length;
 
   bool _matches(Exercise e) => exerciseMatchesFilters(
         e,
@@ -146,9 +147,8 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
         result.add(customToExercise(fromCustom));
       }
     }
-    final alAgregar = enSuperserie
-        ? widget.onAgregarEnSuperserie
-        : widget.onAgregar;
+    final alAgregar =
+        enSuperserie ? widget.onAgregarEnSuperserie : widget.onAgregar;
     if (alAgregar == null) {
       Navigator.of(context).pop(result);
       return;
@@ -187,7 +187,7 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
           style: GoogleFonts.barlowCondensed(
             color: palette.textPrimary,
             fontWeight: FontWeight.w700,
-            fontSize: 18,
+            fontSize: AppTextSize.title,
           ),
         ),
         content: Text(
@@ -195,7 +195,8 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
           // routines keep working after the library entry is gone.
           'Se borra "${exercise.name}" de tu biblioteca. Las rutinas que ya lo '
           'usan no se tocan.', // i18n
-          style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 13),
+          style: GoogleFonts.barlow(
+              color: palette.textMuted, fontSize: AppTextSize.bodyDense),
         ),
         actions: [
           TextButton(
@@ -266,7 +267,7 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
                 child: Text(
                   'Elegir ejercicios', // i18n
                   style: GoogleFonts.barlowCondensed(
-                    fontSize: 18,
+                    fontSize: AppTextSize.title,
                     fontWeight: FontWeight.w700,
                     color: palette.textPrimary,
                   ),
@@ -287,7 +288,7 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
             controller: _searchController,
             style: GoogleFonts.barlow(
               color: palette.textPrimary,
-              fontSize: 14,
+              fontSize: AppTextSize.body,
             ),
             decoration: InputDecoration(
               prefixIcon: Icon(TreinoIcon.search, color: palette.textMuted),
@@ -308,7 +309,7 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
               hintText: 'Buscar ejercicio…', // i18n
               hintStyle: GoogleFonts.barlow(
                 color: palette.textMuted,
-                fontSize: 14,
+                fontSize: AppTextSize.body,
               ),
               filled: true,
               fillColor: palette.bg,
@@ -361,7 +362,7 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
                       ? palette.textMuted
                       : palette.accentText,
                   fontWeight: FontWeight.w700,
-                  fontSize: 13,
+                  fontSize: AppTextSize.bodyDense,
                 ),
               ),
             ),
@@ -375,8 +376,7 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
               muscleFilters: _muscleFilters,
               equipmentFilters: _equipmentFilters,
               onMuscleChanged: (v) => setState(() => _muscleFilters = v),
-              onEquipmentChanged: (v) =>
-                  setState(() => _equipmentFilters = v),
+              onEquipmentChanged: (v) => setState(() => _equipmentFilters = v),
             ),
           ),
         const Divider(height: 1),
@@ -446,7 +446,7 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
                       style: GoogleFonts.barlowCondensed(
                         color: palette.textPrimary,
                         fontWeight: FontWeight.w700,
-                        fontSize: 13,
+                        fontSize: AppTextSize.bodyDense,
                       ),
                     ),
                   ),
@@ -475,7 +475,7 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
                       : 'Agregar (${_selected.length})', // i18n
                   style: GoogleFonts.barlowCondensed(
                     fontWeight: FontWeight.w700,
-                    fontSize: 14,
+                    fontSize: AppTextSize.body,
                   ),
                 ),
               ),
@@ -520,7 +520,8 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
       return Center(
         child: Text(
           'No pudimos cargar ejercicios.', // i18n
-          style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
+          style: GoogleFonts.barlow(
+              color: palette.textMuted, fontSize: AppTextSize.body),
         ),
       );
     }
@@ -538,7 +539,8 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
           child: Text(
             'No encontramos ejercicios con esos filtros.', // i18n
             textAlign: TextAlign.center,
-            style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
+            style: GoogleFonts.barlow(
+                color: palette.textMuted, fontSize: AppTextSize.body),
           ),
         ),
       );
@@ -694,7 +696,7 @@ class _Chip extends StatelessWidget {
         child: Text(
           label,
           style: GoogleFonts.barlowCondensed(
-            fontSize: 11,
+            fontSize: AppTextSize.caption,
             fontWeight: FontWeight.w700,
             color: active ? palette.accent : palette.textMuted,
             letterSpacing: 0.6,
@@ -840,7 +842,7 @@ class _ExerciseRow extends StatelessWidget {
             name,
             style: GoogleFonts.barlow(
               color: palette.textPrimary,
-              fontSize: 14,
+              fontSize: AppTextSize.body,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -849,7 +851,7 @@ class _ExerciseRow extends StatelessWidget {
                   subtitle!,
                   style: GoogleFonts.barlow(
                     color: palette.textMuted,
-                    fontSize: 12,
+                    fontSize: AppTextSize.caption,
                   ),
                 )
               : null,
@@ -870,7 +872,7 @@ class _ExerciseRow extends StatelessWidget {
                     badge!,
                     style: GoogleFonts.barlowCondensed(
                       color: palette.accent,
-                      fontSize: 10,
+                      fontSize: AppTextSize.micro,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.8,
                     ),
@@ -937,7 +939,7 @@ class _SectionHeader extends StatelessWidget {
         label.toUpperCase(),
         style: GoogleFonts.barlowCondensed(
           color: palette.textMuted,
-          fontSize: 11,
+          fontSize: AppTextSize.caption,
           fontWeight: FontWeight.w700,
           letterSpacing: 1.2,
         ),
@@ -969,7 +971,7 @@ class _CreateNewExerciseButton extends StatelessWidget {
               'Crear ejercicio nuevo', // i18n
               style: GoogleFonts.barlow(
                 color: palette.accent,
-                fontSize: 14,
+                fontSize: AppTextSize.body,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -1075,7 +1077,7 @@ class ExercisePickerPanel extends StatelessWidget {
                   style: GoogleFonts.barlowCondensed(
                     color: palette.textMuted,
                     fontWeight: FontWeight.w700,
-                    fontSize: 12,
+                    fontSize: AppTextSize.caption,
                     letterSpacing: 1.1,
                   ),
                 ),
@@ -1156,7 +1158,7 @@ class _ChipDeDia extends StatelessWidget {
                   ? TreinoButtonTokens.foreground(context)
                   : palette.textMuted,
               fontWeight: FontWeight.w700,
-              fontSize: 12.5,
+              fontSize: AppTextSize.caption,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -1166,4 +1168,3 @@ class _ChipDeDia extends StatelessWidget {
     );
   }
 }
-

@@ -15,8 +15,8 @@
  * Fase W3 (template publishing).
  */
 
-import * as admin from "firebase-admin";
-import { App, deleteApp } from "firebase-admin/app";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
+import { Timestamp, getFirestore } from "firebase-admin/firestore";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
@@ -25,7 +25,7 @@ process.env.GCLOUD_PROJECT = "treino-dev";
 let testApp: App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp(
+  testApp = initializeApp(
     { projectId: "treino-dev" },
     "template-rating-aggregate-test",
   );
@@ -37,7 +37,7 @@ afterAll(async () => {
 
 import { recomputeTemplateRating } from "../template-rating-aggregate";
 
-const db = () => admin.firestore(testApp);
+const db = () => getFirestore(testApp);
 
 function ratingsCol(routineId: string) {
   return db().collection("routines").doc(routineId).collection("ratings");
@@ -54,7 +54,7 @@ async function seedRoutine(routineId: string): Promise<void> {
     assignedBy: "trainer-agg",
     assignedTo: null,
     status: "active",
-    createdAt: admin.firestore.Timestamp.now(),
+    createdAt: Timestamp.now(),
   });
 }
 
@@ -63,7 +63,7 @@ async function seedRating(
   uid: string,
   rating: number,
 ): Promise<void> {
-  const now = admin.firestore.Timestamp.now();
+  const now = Timestamp.now();
   await ratingsCol(routineId).doc(uid).set({
     userId: uid,
     rating,
