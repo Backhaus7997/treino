@@ -29,9 +29,10 @@ const fs = require('fs');
 // Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla cerrado
 // con la migración; contra el emulador no pide nada. Ver scripts/lib/admin.js.
 const { inicializarAdmin } = require('./lib/admin');
+const { Timestamp, getFirestore } = require('firebase-admin/firestore');
 
-const { admin } = inicializarAdmin();
-const db = admin.firestore();
+const { app } = inicializarAdmin();
+const db = getFirestore(app);
 
 const ARCHIVO = process.argv[2];
 const APPLY = process.argv.includes('--apply');
@@ -60,7 +61,7 @@ const rehidratar = (data) => {
   const out = {};
   for (const [k, v] of Object.entries(data)) {
     out[k] = v && typeof v === 'object' && typeof v.__timestamp__ === 'string'
-      ? admin.firestore.Timestamp.fromDate(new Date(v.__timestamp__))
+      ? Timestamp.fromDate(new Date(v.__timestamp__))
       : v;
   }
   return out;
