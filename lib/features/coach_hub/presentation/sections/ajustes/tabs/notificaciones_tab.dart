@@ -377,11 +377,14 @@ class _ToggleCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    // La columna de WhatsApp se pudo tildar desde W3.2, asi que hay PF con
-    // `whatsapp: true` guardado. Deshabilitar la casilla mostrando ese valor
-    // la dejaria tildada Y trabada: prometeria entrega por un canal que no
-    // existe, y encima sin forma de bajarla. Una celda muerta se muestra
-    // vacia; el valor persistido no significa nada mientras no haya canal.
+    // Una celda muerta se muestra vacia: un `whatsapp: true` viejo (la columna
+    // se pudo tildar desde W3.2) la dejaria tildada Y trabada, prometiendo
+    // entrega por un canal que no existe y sin forma de bajarla.
+    //
+    // Esto es la SEGUNDA linea de defensa, no la unica: quien de verdad neutra-
+    // liza el valor viejo es `NotifPrefs.fromFirestore`, que fuerza a `false`
+    // todo canal de `kUnimplementedChannels` al leer. Sin eso, ocultar la
+    // casilla arreglaba lo que se ve y dejaba el opt-in vivo en Firestore.
     final shown = enabled && value;
     final cell = SizedBox(
       width: colW,

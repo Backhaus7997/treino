@@ -92,6 +92,15 @@ const kPushBackedTypes = <String>{
   'mensaje_nuevo',
 };
 
+/// Canales que todavía no entregan nada.
+///
+/// Sus casillas van deshabilitadas en la UI (ver `notificaciones_tab.dart`) y
+/// su valor se fuerza a `false` al LEER — ver [NotifPrefs.fromFirestore].
+///
+/// Cuando WhatsApp entregue de verdad, sacarlo de acá es todo el cambio:
+/// vuelven a ser casillas normales y el valor persistido vuelve a mandar.
+const kUnimplementedChannels = <NotifChannel>{NotifChannel.whatsapp};
+
 /// Preferencias de notificación: matriz `tipo -> canal -> bool`.
 ///
 /// Inmutable; `toggle` devuelve una copia. `fromFirestore` completa los huecos
@@ -122,13 +131,29 @@ class NotifPrefs {
           },
       };
 
+  /// Un canal de [kUnimplementedChannels] se lee SIEMPRE como `false`, ignore
+  /// lo que haya guardado.
+  ///
+  /// La columna de WhatsApp se pudo tildar desde W3.2, así que hay documentos
+  /// con `whatsapp: true`. Deshabilitar la casilla arregla lo que se VE, y
+  /// nada más: [toFirestore] serializa desde la matriz, no desde lo que la UI
+  /// muestra, así que ese `true` sobrevivía a cada guardado. El PF apagaba
+  /// Email en una fila y sin querer volvía a firmar el opt-in de un canal que
+  /// la pantalla le mostraba apagado — y el día que WhatsApp entregue, recibe
+  /// mensajes que creía haber apagado. La UI decía una cosa y el dato otra.
+  ///
+  /// Va en la LECTURA y no en [toFirestore] a propósito: desde acá quedan
+  /// consistentes de una sola vez el render, [toggle] y el guardado, y el
+  /// primer save del PF limpia el valor viejo en vez de arrastrarlo.
   factory NotifPrefs.fromFirestore(Map<String, dynamic>? raw) {
     return NotifPrefs({
       for (final t in kNotifTypes)
         t.key: {
           for (final c in NotifChannel.values)
-            c: ((raw?[t.key] as Map?)?[c.name] as bool?) ??
-                _defaultFor(t.key, c),
+            c: kUnimplementedChannels.contains(c)
+                ? false
+                : ((raw?[t.key] as Map?)?[c.name] as bool?) ??
+                    _defaultFor(t.key, c),
         },
     });
   }
