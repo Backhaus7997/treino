@@ -14,12 +14,15 @@
  */
 
 import * as admin from "firebase-admin";
+import { App, deleteApp } from "firebase-admin/app";
+import { BatchResponse, Messaging, MulticastMessage } from "firebase-admin/messaging";
+import { DocumentReference } from "firebase-admin/firestore";
 import { notifyOverduePaymentsHandler } from "../payments/notify-overdue-payments";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.GCLOUD_PROJECT = "treino-dev";
 
-let testApp: admin.app.App;
+let testApp: App;
 
 beforeAll(() => {
   testApp = admin.initializeApp(
@@ -29,7 +32,7 @@ beforeAll(() => {
 });
 
 afterAll(async () => {
-  await testApp.delete();
+  await deleteApp(testApp);
 });
 
 const db = () => admin.firestore(testApp);
@@ -38,8 +41,8 @@ const db = () => admin.firestore(testApp);
 // Mock messaging factory
 // ---------------------------------------------------------------------------
 
-type MockMessaging = admin.messaging.Messaging & {
-  calls: Array<admin.messaging.MulticastMessage>;
+type MockMessaging = Messaging & {
+  calls: Array<MulticastMessage>;
 };
 
 /**
@@ -47,12 +50,12 @@ type MockMessaging = admin.messaging.Messaging & {
  * to sendEachForMulticast.
  */
 function makeMockMessaging(): MockMessaging {
-  const calls: Array<admin.messaging.MulticastMessage> = [];
+  const calls: Array<MulticastMessage> = [];
   const mock = {
     calls,
     sendEachForMulticast: async (
-      message: admin.messaging.MulticastMessage,
-    ): Promise<admin.messaging.BatchResponse> => {
+      message: MulticastMessage,
+    ): Promise<BatchResponse> => {
       calls.push(message);
       return {
         responses: message.tokens.map(() => ({
@@ -120,7 +123,7 @@ async function seedPayment(
 }
 
 async function cleanupDocs(
-  ...refs: Array<admin.firestore.DocumentReference>
+  ...refs: Array<DocumentReference>
 ): Promise<void> {
   for (const ref of refs) {
     await ref.delete().catch(() => undefined);

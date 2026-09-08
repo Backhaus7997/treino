@@ -21,6 +21,7 @@
  */
 
 import * as admin from "firebase-admin";
+import { App, deleteApp } from "firebase-admin/app";
 import {
   maintainFollowCountersHandler,
   resolveCounterDelta,
@@ -174,7 +175,7 @@ describe("resolveCounterDelta — la dirección sale de la arista, no de members
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.GCLOUD_PROJECT = "treino-dev";
 
-let testApp: admin.app.App;
+let testApp: App;
 
 beforeAll(() => {
   testApp = admin.initializeApp(
@@ -184,7 +185,7 @@ beforeAll(() => {
 });
 
 afterAll(async () => {
-  await testApp.delete();
+  await deleteApp(testApp);
 });
 
 const db = () => admin.firestore(testApp);

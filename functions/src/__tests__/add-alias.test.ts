@@ -20,12 +20,13 @@
  */
 
 import * as admin from "firebase-admin";
+import { App, deleteApp } from "firebase-admin/app";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
 process.env.GCLOUD_PROJECT = "treino-dev";
 
-let testApp: admin.app.App;
+let testApp: App;
 
 beforeAll(() => {
   testApp = admin.initializeApp(
@@ -35,7 +36,7 @@ beforeAll(() => {
 });
 
 afterAll(async () => {
-  await testApp.delete();
+  await deleteApp(testApp);
 });
 
 // Module under test — will fail to resolve until add-alias.ts is created (RED)

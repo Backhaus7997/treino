@@ -9,18 +9,19 @@
  */
 
 import * as admin from "firebase-admin";
+import { App, deleteApp } from "firebase-admin/app";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.GCLOUD_PROJECT = "treino-dev";
 
-let testApp: admin.app.App;
+let testApp: App;
 
 beforeAll(() => {
   testApp = admin.initializeApp({ projectId: "treino-dev" }, "cleanup-plans-test");
 });
 
 afterAll(async () => {
-  await testApp.delete();
+  await deleteApp(testApp);
 });
 
 import {

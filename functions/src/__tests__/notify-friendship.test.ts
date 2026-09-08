@@ -29,6 +29,8 @@
  */
 
 import * as admin from "firebase-admin";
+import { App, deleteApp } from "firebase-admin/app";
+import { Messaging, MulticastMessage } from "firebase-admin/messaging";
 import {
   buildFollowCopy,
   notifyOnFollowHandler,
@@ -191,7 +193,7 @@ process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
 process.env.GCLOUD_PROJECT = "treino-dev";
 
-let testApp: admin.app.App;
+let testApp: App;
 
 beforeAll(() => {
   testApp = admin.initializeApp(
@@ -201,21 +203,21 @@ beforeAll(() => {
 });
 
 afterAll(async () => {
-  await testApp.delete();
+  await deleteApp(testApp);
 });
 
 const db = () => admin.firestore(testApp);
 
-function makeMockMessaging(): admin.messaging.Messaging {
+function makeMockMessaging(): Messaging {
   return {
     sendEachForMulticast: jest.fn(
-      async (msg: admin.messaging.MulticastMessage) => ({
+      async (msg: MulticastMessage) => ({
         successCount: msg.tokens.length,
         failureCount: 0,
         responses: msg.tokens.map(() => ({ success: true, messageId: "id" })),
       }),
     ),
-  } as unknown as admin.messaging.Messaging;
+  } as unknown as Messaging;
 }
 
 async function seedUser(uid: string, tokens: string[]): Promise<void> {
@@ -263,7 +265,7 @@ describe("notifyOnFollowHandler — integración", () => {
 
     expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock
-      .calls[0][0] as admin.messaging.MulticastMessage;
+      .calls[0][0] as MulticastMessage;
     expect(callArg.tokens).toContain("bob-token");
     expect(callArg.tokens).not.toContain("alice-token");
     expect(callArg.notification?.body).toBe(
@@ -279,7 +281,7 @@ describe("notifyOnFollowHandler — integración", () => {
     await notifyOnFollowHandler(testApp, undefined, edge("accepted"), mock);
 
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock
-      .calls[0][0] as admin.messaging.MulticastMessage;
+      .calls[0][0] as MulticastMessage;
     expect(callArg.tokens).toContain("bob-token");
     expect(callArg.notification?.body).toBe("Alicia empezó a seguirte");
     expect(callArg.data?.kind).toBe("friend-follow");
@@ -291,7 +293,7 @@ describe("notifyOnFollowHandler — integración", () => {
     await notifyOnFollowHandler(testApp, edge("pending"), edge("accepted"), mock);
 
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock
-      .calls[0][0] as admin.messaging.MulticastMessage;
+      .calls[0][0] as MulticastMessage;
     expect(callArg.tokens).toContain("alice-token");
     expect(callArg.tokens).not.toContain("bob-token");
     expect(callArg.notification?.body).toBe("Bruno aceptó tu solicitud");
@@ -323,7 +325,7 @@ describe("notifyOnFollowHandler — integración", () => {
     await notifyOnFollowHandler(testApp, undefined, edge("pending"), mock);
 
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock
-      .calls[0][0] as admin.messaging.MulticastMessage;
+      .calls[0][0] as MulticastMessage;
     expect(callArg.notification?.body).toBe(
       "Alguien te envió una solicitud de seguidor",
     );

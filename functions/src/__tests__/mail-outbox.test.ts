@@ -13,6 +13,8 @@
  */
 
 import * as admin from "firebase-admin";
+import { App, deleteApp } from "firebase-admin/app";
+import { Messaging } from "firebase-admin/messaging";
 import { enqueueMail, dedupeKey } from "../mail/enqueue-mail";
 import { sendQueuedMailHandler } from "../mail/send-queued-mail";
 import { MAIL_QUEUE_COLLECTION, MailQueueDoc } from "../mail/types";
@@ -24,14 +26,14 @@ process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
 process.env.GCLOUD_PROJECT = "treino-dev";
 
-let testApp: admin.app.App;
+let testApp: App;
 
 beforeAll(() => {
   testApp = admin.initializeApp({ projectId: "treino-dev" }, "mail-outbox-test");
 });
 
 afterAll(async () => {
-  await testApp.delete();
+  await deleteApp(testApp);
 });
 
 const db = () => admin.firestore(testApp);
@@ -224,14 +226,14 @@ describe("producers: prefKey is set only for recipients who have a screen", () =
   const trainerId = "trainer-prefkey";
   const athleteId = "athlete-prefkey";
 
-  function noopMessaging(): admin.messaging.Messaging {
+  function noopMessaging(): Messaging {
     return {
       sendEachForMulticast: jest.fn(async () => ({
         successCount: 0,
         failureCount: 0,
         responses: [],
       })),
-    } as unknown as admin.messaging.Messaging;
+    } as unknown as Messaging;
   }
 
   // The trainer's Coach Hub settings expose the `nueva_solicitud` row, so their

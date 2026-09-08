@@ -30,6 +30,8 @@ jest.mock("firebase-admin/firestore", () => (
 ).firestoreDesdeNamespaced());
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
+import { Messaging } from "firebase-admin/messaging";
 import { sendFcm } from "../notifications/send-fcm";
 
 type UserState = { tokens: string[]; add: jest.Mock };
@@ -59,14 +61,14 @@ function installFirestore(users: Record<string, UserState>): void {
   (admin.firestore as unknown as jest.Mock).mockReturnValue(firestore);
 }
 
-function mockMessaging(): admin.messaging.Messaging {
+function mockMessaging(): Messaging {
   return {
     sendEachForMulticast: jest.fn(async (message) => ({
       successCount: message.tokens.length,
       failureCount: 0,
       responses: message.tokens.map(() => ({ success: true, messageId: "id" })),
     })),
-  } as unknown as admin.messaging.Messaging;
+  } as unknown as Messaging;
 }
 
 const baseInput = {
@@ -88,7 +90,7 @@ describe("sendFcm notification history", () => {
     });
 
     await sendFcm(
-      {} as admin.app.App,
+      {} as App,
       { ...baseInput, uids: ["user-1", "user-2"] },
       mockMessaging(),
     );
@@ -113,7 +115,7 @@ describe("sendFcm notification history", () => {
 
     await expect(
       sendFcm(
-        {} as admin.app.App,
+        {} as App,
         { ...baseInput, uids: ["user"] },
         messaging,
       ),
@@ -129,7 +131,7 @@ describe("sendFcm notification history", () => {
 
     await expect(
       sendFcm(
-        {} as admin.app.App,
+        {} as App,
         { ...baseInput, uids: ["user"] },
         messaging,
       ),
@@ -146,11 +148,11 @@ describe("sendFcm notification history", () => {
       sendEachForMulticast: jest.fn(async () =>
         Promise.reject(new Error("fcm down")),
       ),
-    } as unknown as admin.messaging.Messaging;
+    } as unknown as Messaging;
 
     await expect(
       sendFcm(
-        {} as admin.app.App,
+        {} as App,
         { ...baseInput, uids: ["user"] },
         messaging,
       ),

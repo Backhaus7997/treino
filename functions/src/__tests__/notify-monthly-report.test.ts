@@ -61,6 +61,8 @@ jest.mock("../notifications/send-fcm", () => ({
 }));
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
+import { Messaging } from "firebase-admin/messaging";
 import { sendFcm } from "../notifications/send-fcm";
 import {
   notifyMonthlyReportHandler,
@@ -198,8 +200,8 @@ function installFirestore(
   (admin.firestore as unknown as jest.Mock).mockReturnValue(firestore);
 }
 
-const app = {} as admin.app.App;
-const messaging = {} as admin.messaging.Messaging;
+const app = {} as App;
+const messaging = {} as Messaging;
 const mockedSendFcm = sendFcm as jest.MockedFunction<typeof sendFcm>;
 
 beforeEach(() => {

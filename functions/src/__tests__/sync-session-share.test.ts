@@ -77,6 +77,7 @@ jest.mock("firebase-functions", () => ({
 }));
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
 import { logger } from "firebase-functions";
 import { syncSessionShareHandler } from "../sync-session-share";
 
@@ -90,7 +91,7 @@ const TRAINER_A = "trainer-A";
 const TRAINER_B = "trainer-B";
 const ATHLETE = "athlete-X";
 
-const APP = {} as admin.app.App;
+const APP = {} as App;
 
 type LinkData = Record<string, unknown>;
 

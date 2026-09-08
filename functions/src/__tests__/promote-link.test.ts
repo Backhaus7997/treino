@@ -40,6 +40,7 @@ jest.mock("firebase-admin/firestore", () => (
 ).firestoreDesdeNamespaced());
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
 import {
   createFakeFirestore,
   FakeDoc,
@@ -56,7 +57,7 @@ function install(seed: Partial<FakeFirestoreState>): FakeFirestoreState {
   return state;
 }
 
-const app = {} as admin.app.App;
+const app = {} as App;
 
 const link = (overrides: Record<string, unknown> = {}) => ({
   trainerId: "trainer-1",

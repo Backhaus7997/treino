@@ -1,10 +1,12 @@
 import * as admin from "firebase-admin";
+import { App, deleteApp } from "firebase-admin/app";
+import { DocumentReference, Firestore } from "firebase-admin/firestore";
 import { reassignFcmTokenHandler } from "../notifications/reassign-fcm-token";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.GCLOUD_PROJECT = "treino-dev";
 
-let testApp: admin.app.App;
+let testApp: App;
 
 beforeAll(() => {
   testApp = admin.initializeApp(
@@ -14,11 +16,11 @@ beforeAll(() => {
 });
 
 afterAll(async () => {
-  await testApp.delete();
+  await deleteApp(testApp);
 });
 
-const db = (): admin.firestore.Firestore => admin.firestore(testApp);
-const user = (uid: string): admin.firestore.DocumentReference =>
+const db = (): Firestore => admin.firestore(testApp);
+const user = (uid: string): DocumentReference =>
   db().collection("users").doc(uid);
 
 async function cleanup(...uids: string[]): Promise<void> {
