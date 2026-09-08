@@ -77,6 +77,7 @@ AthleteFile _file({
   AthleteFileKind kind = AthleteFileKind.pdf,
   int sizeBytes = 512 * 1024,
   DateTime? uploadedAt,
+  bool sharedWithAthlete = false,
 }) =>
     AthleteFile(
       id: id,
@@ -90,6 +91,7 @@ AthleteFile _file({
       storagePath: 'athleteFiles/${_trainerUid}_$_athleteUid/$id.pdf',
       downloadUrl: 'https://example.com/$id',
       uploadedAt: uploadedAt ?? DateTime(2026, 3, 10, 14, 30),
+      sharedWithAthlete: sharedWithAthlete,
     );
 
 class _StubNoteRepo implements AthleteNoteRepository {
@@ -329,5 +331,23 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repo.deleted, isEmpty);
+  });
+
+  testWidgets('el control de visibilidad comparte un archivo privado',
+      (tester) async {
+    final repo = _StubFileRepo();
+    final files = [_file(id: 'f1', fileName: 'análisis.pdf')];
+    _useDesktopViewport(tester);
+    await tester.pumpWidget(_wrap(_baseOverrides(
+      filesState: AsyncData(files),
+      repo: repo,
+    )));
+    await _selectArchivosTab(tester);
+
+    expect(find.text('PRIVADO'), findsOneWidget);
+    await tester.tap(find.text('PRIVADO'));
+    await tester.pump();
+
+    expect(repo.sharedToggles, [('f1', true)]);
   });
 }
