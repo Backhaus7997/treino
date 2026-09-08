@@ -216,10 +216,43 @@ del job lista los archivos que cambiaron.
 >   tabla de acá abajo. Sin `refs/pull/N/merge` no hay árbol que validar y el run
 >   no se crea.
 >
-> En los dos casos **el run no existe**: no está en rojo, no está encolado y no
+> En esos dos casos **el run no existe**: no está en rojo, no está encolado y no
 > está en `action_required` esperando aprobación. Por eso tampoco hay nada que
 > aprobar en la pestaña Actions, y `ci.yml` no tiene `workflow_dispatch` para
 > lanzarlo a mano.
+>
+> **Hay un TERCER caso, y ahí el run sí existe: queda esperando aprobación.**
+>
+> Medido el 2026-09-08 en los PR #1030 y #1031. El commit de goldens del bot
+> creó sus dos runs de `pull_request` —CI y Security— y los dos quedaron
+> `status: completed`, `conclusion: action_required`, **duración 0s**, con el PR
+> abierto y `mergeable: MERGEABLE`. O sea: ninguna de las dos causas de arriba
+> aplicaba. GitHub los creó y los frenó pidiendo aprobación, porque el actor es
+> `github-actions[bot]`.
+>
+> Se ven así —y NO aparecen en `gh pr checks`, que es lo que despista: el PR
+> reporta dos checks de Vercel y nada más, como si CI no existiera—:
+>
+> ```bash
+> gh run list --branch "$(git branch --show-current)" --limit 5
+> # completed  action_required  <título>  CI  ...  pull_request  <id>  0s
+> ```
+>
+> Se destraban aprobándolos:
+>
+> ```bash
+> gh api "repos/Backhaus7997/treino/actions/runs/<id>/approve" -X POST
+> ```
+>
+> **Cómo distinguir los tres casos sin adivinar**: si `gh run list` no muestra
+> ningún run de `pull_request` para el commit, es una de las dos causas de
+> arriba —falta el PR, o hay conflicto—. Si lo muestra con `action_required` y
+> 0s, es este tercero y se aprueba. El síntoma que comparten los tres es el
+> mismo (`gh pr checks` casi vacío), así que mirar sólo el PR no alcanza para
+> saber cuál es.
+>
+> La frase de arriba sigue siendo correcta **para sus dos casos**. Lo que no era
+> cierto es leerla como que un run del bot nunca queda en `action_required`.
 >
 > **Lo que destraba es el PR, no el push.** Abrilo si falta; si está en conflicto,
 > resolvelo — el `git merge origin/main` genera por sí mismo el `synchronize` que
@@ -238,10 +271,16 @@ del job lista los archivos que cambiaron.
 > Que la autoría no es lo que destraba lo probó el #998 sin querer, con dos pushes
 > humanos a la misma rama: el `git commit --allow-empty` de las 12:47 **no corrió
 > nada** —el conflicto seguía en pie— y el merge de `origin/main` de las 12:52
-> corrió CI a las 12:53. Hasta este texto el doc decía que los runs quedaban en
-> `action_required` y mandaba a aprobarlos desde Actions: un remedio imposible
-> sobre un run que no existe, que es exactamente la advertencia falsa que
-> AGENTS.md §11.1 prohíbe.
+> corrió CI a las 12:53. Hasta ese texto el doc decía, en general, que los runs
+> quedaban en `action_required` y mandaba a aprobarlos desde Actions: un remedio
+> imposible sobre un run que no existe, que es exactamente la advertencia falsa
+> que AGENTS.md §11.1 prohíbe.
+>
+> La corrección era buena y sigue en pie. Lo que faltaba —y lo agrega el bloque
+> del tercer caso— es que «aprobar» SÍ es el remedio cuando el run existe. Las
+> dos versiones del doc daban una regla universal sobre algo que tiene tres
+> caminos, y por eso las dos mandaban a hacer lo equivocado la mitad de las
+> veces.
 
 ### Traé `main` a tu rama ANTES de regenerar
 
