@@ -3,9 +3,9 @@ import 'package:flutter/widget_previews.dart';
 
 import '../../../../../app/theme/app_motion.dart';
 import '../../../../../app/theme/tokens/components/treino_chip_tokens.dart';
-import '../../../../../app/theme/tokens/components/treino_badge_tokens.dart';
 import '../../../../../app/theme/tokens/components/treino_focus_tokens.dart';
 import '../../../../../app/theme/tokens/primitives.dart';
+import '../../../../../core/widgets/treino_badge.dart';
 import '../preview_wrapper.dart';
 import '../treino_interactive_state.dart';
 
@@ -136,7 +136,6 @@ class _ChipItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = TreinoChipTokens.of(context);
-    final badgeTokens = TreinoBadgeTokens.of(context);
     final focusTokens = TreinoFocusTokens.of(context);
 
     return TreinoInteractiveState(
@@ -218,25 +217,7 @@ class _ChipItem extends StatelessWidget {
               ),
               if (badgeCount != null) ...[
                 const SizedBox(width: AppSpacing.hairline),
-                Container(
-                  width: TreinoBadgeTokens.size,
-                  height: TreinoBadgeTokens.size,
-                  decoration: BoxDecoration(
-                    color: badgeTokens.background,
-                    borderRadius:
-                        BorderRadius.circular(TreinoBadgeTokens.borderRadius),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    badgeCount!.toString(),
-                    style: TextStyle(
-                      fontFamily: AppFonts.barlow,
-                      fontWeight: FontWeight.w700,
-                      fontSize: AppTextSize.micro,
-                      color: badgeTokens.foreground,
-                    ),
-                  ),
-                ),
+                TreinoBadge(count: badgeCount!),
               ],
             ],
           ),

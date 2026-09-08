@@ -6,6 +6,7 @@ import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/persistence/shared_prefs_provider.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
+import 'package:treino/core/widgets/treino_badge.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/domain/subscription_tier.dart';
 import 'package:treino/features/coach_hub/application/sidebar_collapsed_provider.dart';
@@ -365,7 +366,13 @@ class _SidebarItemRow extends StatelessWidget {
                             ),
                           ),
                         ),
-                        if (hasBadge) _Badge(count: badgeCount!),
+                        // La separación con el label es de esta fila, no del
+                        // badge: al lado de un chip de filtro la distancia es
+                        // otra. El badge sólo se ocupa de su propia forma.
+                        if (hasBadge) ...[
+                          const SizedBox(width: AppSpacing.s8),
+                          TreinoBadge(count: badgeCount!),
+                        ],
                       ],
                     ),
                   ),
@@ -516,42 +523,6 @@ class _ItemIcon extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-/// Badge numérico (Pagos/Chat) — 16px círculo `highlight`, Barlow 700 10px.
-class _Badge extends StatelessWidget {
-  const _Badge({required this.count});
-
-  final int count;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = TreinoBadgeTokens.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(left: 8),
-      child: Container(
-        constraints: const BoxConstraints(
-          minWidth: TreinoBadgeTokens.size,
-          minHeight: TreinoBadgeTokens.size,
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: tokens.background,
-          borderRadius: BorderRadius.circular(TreinoBadgeTokens.borderRadius),
-        ),
-        child: Text(
-          '$count',
-          style: TextStyle(
-            fontFamily: AppFonts.barlow,
-            fontWeight: AppFonts.w700,
-            fontSize: 10,
-            color: tokens.foreground,
-          ),
-        ),
-      ),
     );
   }
 }

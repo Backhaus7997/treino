@@ -70,7 +70,7 @@ void main() {
     const allowlistCeiling = 257;
 
     /// Techo de ocurrencias totales en `lib/`. Mismo contrato: sólo baja.
-    const rawFontSizeDebtCeiling = 1777;
+    const rawFontSizeDebtCeiling = 1775;
 
     /// Allowlist de rutas relativas a `lib/` que todavía tienen `fontSize`
     /// crudo. Es un REGISTRO DE DEUDA, no una licencia.
