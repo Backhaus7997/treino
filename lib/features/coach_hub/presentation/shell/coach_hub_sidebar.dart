@@ -334,8 +334,12 @@ class _SidebarItemRow extends StatelessWidget {
                     ? CoachHubLayoutTokens.sidebarCollapsedWidth
                     : _kIconSize + 12,
                 width: _labelWidth,
-                top: 0,
-                bottom: 0,
+                // SIN `top`/`bottom` a propósito. Con verticales el label se
+                // estira a los 48px de la fila y lo centra el `Row`; sin
+                // ellas se dimensiona por su altura intrínseca y lo centra el
+                // `Stack`. El centro es el mismo en teoría y el redondeo no:
+                // ponerlas corrió cada label 1px y movió 374px en TODOS los
+                // goldens del gate a la vez.
                 duration:
                     AppMotionTokens.resolve(ctx, AppMotionTokens.contentEnter),
                 curve: AppMotionTokens.reposition,

@@ -69,6 +69,23 @@ Future<void> _pumpSidebar(
   await tester.pumpAndSettle();
 }
 
+/// Finder del ícono de la PRIMERA fila de navegación.
+///
+/// Anclado a la key de la fila y no a `find.byType(Icon).first`: ese primer
+/// ícono del árbol es el toggle del header, que está a 114px de acá y también
+/// se mueve al colapsar. O sea que un test escrito contra él pasa —pero por el
+/// widget equivocado, y dejaría de proteger lo que dice proteger.
+Finder _primerItemIcono() => find.descendant(
+      of: find.byKey(ValueKey(sidebarRegistry.first.route)),
+      matching: find.byType(Icon),
+    );
+
+/// Finder del label de la primera fila de navegación, por la misma razón.
+Finder _primerItemLabel() => find.descendant(
+      of: find.byKey(ValueKey(sidebarRegistry.first.route)),
+      matching: find.byType(Text),
+    );
+
 /// Borde izquierdo del bloque de label de un item, en coordenadas del sidebar.
 ///
 /// Colapsado el label sigue MONTADO: no desaparece, se DESLIZA hasta pasar el
@@ -589,17 +606,31 @@ void main() {
     expect(medio, lessThan(colapsado));
   });
 
+  testWidgets('el label queda centrado con el ícono de su fila',
+      (tester) async {
+    await _pumpSidebar(tester);
+
+    // Candado contra el bug que rompió el gate visual: darle `top`/`bottom` al
+    // `AnimatedPositioned` del label lo estira a la altura de la fila y cambia
+    // quién lo centra —el `Row` en vez del `Stack`—. El centro teórico es el
+    // mismo; el redondeo no. Corrió cada label 1px y movió 374px en los cuatro
+    // goldens, que es justo el tamaño de error que nadie ve revisando el diff.
+    final label = tester.getRect(_primerItemLabel().first).center.dy;
+    final icono = tester.getRect(_primerItemIcono()).center.dy;
+    expect(label, closeTo(icono, 0.5));
+  });
+
   testWidgets('el ícono viaja al centro, no salta', (tester) async {
     await _pumpSidebar(tester);
-    final expandido = tester.getCenter(find.byType(Icon).first).dx;
+    final expandido = tester.getCenter(_primerItemIcono()).dx;
 
     await tester.tap(find.byKey(const Key('sidebar_toggle_button')));
     await tester.pump();
     await tester.pump(AppMotion.base ~/ 2);
-    final medio = tester.getCenter(find.byType(Icon).first).dx;
+    final medio = tester.getCenter(_primerItemIcono()).dx;
 
     await tester.pumpAndSettle();
-    final colapsado = tester.getCenter(find.byType(Icon).first).dx;
+    final colapsado = tester.getCenter(_primerItemIcono()).dx;
 
     // Colapsado el ícono queda centrado en los 72px, así que se movió; y a
     // mitad de camino está ENTRE los dos, no ya en el destino.
