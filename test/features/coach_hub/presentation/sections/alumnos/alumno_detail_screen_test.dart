@@ -527,8 +527,7 @@ void main() {
 
     testWidgets(
         'ningún nivel de navegación usa TreinoSegmentedPill — ni el primero '
-        'ni las sub-vistas de los cuatro grupos que la tienen',
-        (tester) async {
+        'ni las sub-vistas de los cuatro grupos que la tienen', (tester) async {
       // El guard que faltó. La migración de la sub-navegación se hizo con un
       // reemplazo de texto que NO matcheaba —una coma de más en el patrón— y
       // como el script usaba `if patrón in texto` en vez de `assert`, falló en
@@ -1069,10 +1068,15 @@ void main() {
     // `_TabPlaceholder`. Todos los tabs tienen su implementación real.
 
     testWidgets(
-        'Resumen (tab default) muestra las 4 métricas + heatmap (W2 PR4)',
+        'Resumen CON rutina asignada muestra las 4 métricas + heatmap (W2 PR4)',
         (tester) async {
+      // El fixture ahora trae rutina: sin ella tres de las cuatro métricas no
+      // existen, y este test decía "las 4 métricas" mientras montaba un alumno
+      // sin plan. Medía el caso equivocado.
       await _pump(tester,
-          profile: _prof(), link: _link(TrainerLinkStatus.active));
+          profile: _prof(),
+          link: _link(TrainerLinkStatus.active),
+          routines: [_routine()]);
 
       // Resumen es el tab por defecto: no hace falta tapear.
       expect(find.text('ADHERENCIA 30D'), findsOneWidget);
@@ -1082,15 +1086,46 @@ void main() {
       expect(find.text('ADHERENCIA · 12 SEMANAS'), findsOneWidget);
     });
 
-    testWidgets('Resumen sin plan ni mediciones → estados neutros (W2 PR4)',
+    testWidgets(
+        'Resumen SIN rutina no muestra tres métricas en cero: lo dice una vez',
         (tester) async {
       await _pump(tester,
           profile: _prof(), link: _link(TrainerLinkStatus.active));
 
-      // Sin rutina activa → ambas cards (adherencia + sesiones/sem) dicen
-      // "Sin plan" con el mismo wording.
-      expect(find.text('Sin plan'), findsNWidgets(2));
-      expect(find.text('Sin plan asignado'), findsNothing);
+      // Adherencia, sesiones/sem y volumen se miden CONTRA el plan: sin plan no
+      // son cero, son indefinidas. Mostrarlas en cero se lee como un alumno que
+      // no entrena, y no es lo mismo que un alumno al que todavía no le
+      // asignaron nada.
+      expect(find.text('ADHERENCIA 30D'), findsNothing);
+      expect(find.text('SESIONES / SEM'), findsNothing);
+      expect(find.text('VOLUMEN'), findsNothing);
+
+      // Se dice UNA vez, no susurrado dos veces en los captions.
+      expect(find.text('Sin rutina asignada'), findsOneWidget);
+      expect(find.text('Sin plan'), findsNothing);
+
+      // El peso NO depende del plan: el alumno se pesa igual, así que su
+      // tarjeta se queda.
+      expect(find.text('PESO CORPORAL'), findsOneWidget);
+
+      // Y la salida está al lado del problema.
+      expect(find.text('Asignar rutina'), findsWidgets);
+    });
+
+    testWidgets('heatmap sin una sola sesión no pinta 84 celdas grises',
+        (tester) async {
+      await _pump(tester,
+          profile: _prof(), link: _link(TrainerLinkStatus.active));
+
+      // Con actividad esporádica la grilla informa (se ve dónde entrenó y dónde
+      // no). Con CERO, las 84 celdas caen al nivel 0 y la card se vuelve un
+      // rectángulo gris del ancho de la pantalla: se lee como un componente
+      // roto, no como un alumno que todavía no arrancó.
+      expect(find.text('ADHERENCIA · 12 SEMANAS'), findsOneWidget);
+      expect(
+        find.text('Sin sesiones en las últimas 12 semanas.'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('tab Pagos: al día + sin historial (W2 PR5)', (tester) async {
@@ -1541,8 +1576,7 @@ void main() {
       expect(find.text('EN CURSO'), findsOneWidget);
     });
 
-    testWidgets(
-        'Sesiones conserva una sesión incompleta con su badge',
+    testWidgets('Sesiones conserva una sesión incompleta con su badge',
         (tester) async {
       await _pump(
         tester,
@@ -1563,8 +1597,7 @@ void main() {
       expect(find.text('INCOMPLETA'), findsOneWidget);
     });
 
-    testWidgets(
-        'Sesiones usa startedAt cuando finishedAt falta',
+    testWidgets('Sesiones usa startedAt cuando finishedAt falta',
         (tester) async {
       await _pump(
         tester,

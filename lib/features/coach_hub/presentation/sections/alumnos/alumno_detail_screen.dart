@@ -723,22 +723,23 @@ class _SeccionesTabBar extends StatelessWidget {
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(labels[i]),
-                  if (_colorDeMarca(context, estados[i]) case final color?) ...[
-                    const SizedBox(width: TreinoNavMarkTokens.gap),
-                    Container(
-                      key: alumnoDetailMarcaKey(i),
-                      width: TreinoNavMarkTokens.size,
-                      height: TreinoNavMarkTokens.size,
-                      decoration: BoxDecoration(
-                        color: color,
-                        shape: BoxShape.circle,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(labels[i]),
+                    if (_colorDeMarca(context, estados[i])
+                        case final color?) ...[
+                      const SizedBox(width: TreinoNavMarkTokens.gap),
+                      Container(
+                        key: alumnoDetailMarcaKey(i),
+                        width: TreinoNavMarkTokens.size,
+                        height: TreinoNavMarkTokens.size,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                        ),
                       ),
-                    ),
+                    ],
                   ],
-                ],
                 ),
               ),
             ),
@@ -972,7 +973,8 @@ class _PrivadoTab extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
             child: Row(
               children: [
-                const _SubNav(labels: ['Notas', 'Seguimiento']), // i18n: Fase W2
+                const _SubNav(
+                    labels: ['Notas', 'Seguimiento']), // i18n: Fase W2
                 const SizedBox(width: 18),
                 // El aviso comparte fila con la sub-navegación en vez de
                 // gastar una línea propia: dice lo mismo y no le come alto al
@@ -987,8 +989,8 @@ class _PrivadoTab extends StatelessWidget {
                         child: Text(
                           'Nada de esto lo ve el alumno.', // i18n: Fase W2
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              color: palette.textMuted, fontSize: 13),
+                          style:
+                              TextStyle(color: palette.textMuted, fontSize: 13),
                         ),
                       ),
                     ],
@@ -1131,7 +1133,8 @@ class _ProgresoTabState extends ConsumerState<_ProgresoTab> {
         children: [
           const Padding(
             padding: EdgeInsets.fromLTRB(24, 12, 24, 0),
-            child: _SubNav(labels: ['Antropometría', 'Rendimiento']), // i18n: Fase W2
+            child: _SubNav(
+                labels: ['Antropometría', 'Rendimiento']), // i18n: Fase W2
           ),
           const SizedBox(height: 12),
           Expanded(
@@ -1174,7 +1177,8 @@ class _ProgresoTabState extends ConsumerState<_ProgresoTab> {
               children: [
                 _ProgressHeader(
                   title: 'Mediciones antropométricas', // i18n: Fase W2
-                  subtitle: 'Peso, composición corporal y circunferencias.', // i18n: Fase W2
+                  subtitle:
+                      'Peso, composición corporal y circunferencias.', // i18n: Fase W2
                   actionLabel: 'NUEVA MEDICIÓN', // i18n: Fase W2
                   onPressed: _openAntropoDialog,
                   palette: palette,
@@ -1230,7 +1234,8 @@ class _ProgresoTabState extends ConsumerState<_ProgresoTab> {
               children: [
                 _ProgressHeader(
                   title: 'Pruebas de rendimiento', // i18n: Fase W2
-                  subtitle: 'Saltos, sprints, 1RM y resistencia.', // i18n: Fase W2
+                  subtitle:
+                      'Saltos, sprints, 1RM y resistencia.', // i18n: Fase W2
                   actionLabel: 'NUEVA PRUEBA', // i18n: Fase W2
                   onPressed: _openRendimientoDialog,
                   palette: palette,
@@ -1536,61 +1541,85 @@ class _ResumenTab extends ConsumerWidget {
     final peso = m.pesoActualKg;
     final pesoDelta = m.pesoDelta30dKg;
 
+    // El peso corporal es la única de las cuatro métricas que NO depende de que
+    // haya una rutina asignada: el alumno se pesa igual.
+    final pesoCard = _MetricCard(
+      palette: palette,
+      icon: TreinoIcon.scales,
+      label: 'PESO CORPORAL', // i18n: Fase W2
+      value: peso == null ? '—' : '${_trimNum(peso)} kg',
+      delta: pesoDelta == null
+          ? null
+          : '${pesoDelta >= 0 ? '+' : ''}${pesoDelta.toStringAsFixed(1)} kg',
+      deltaColor: pesoDelta == null
+          ? null
+          : (pesoDelta >= 0 ? palette.accent : palette.danger),
+      caption: pesoDelta == null ? null : '30 días',
+    );
+
+    // Sin rutina asignada, las otras tres no son cero: son indefinidas.
+    //
+    // La fila mostraba «—», «0.0» y «0 kg», con «Sin plan» susurrado dos veces
+    // en los captions. Un PF que abre la ficha ve cuatro tarjetas y tres en
+    // cero: eso se lee como un alumno que no entrena, no como un alumno al que
+    // todavía no le asignaron nada. Y la diferencia entre esas dos lecturas es
+    // de quién es el problema.
+    //
+    // Se dice una vez, con el tamaño que corresponde, y con la salida al lado.
     final kpiRow = IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _MetricCard(
-            palette: palette,
-            icon: TreinoIcon.checkCircleFill,
-            label: 'ADHERENCIA 30D', // i18n: Fase W2
-            value: adh == null ? '—' : '${adh.round()}%',
-            delta: adhDelta == null
-                ? null
-                : '${adhDelta >= 0 ? '↑' : '↓'} ${adhDelta.abs().round()} pts',
-            deltaColor: adhDelta == null
-                ? null
-                : (adhDelta >= 0 ? palette.accent : palette.danger),
-            caption: adh == null ? 'Sin plan' : 'vs 30 días previos',
-          ),
-          const SizedBox(width: 10),
-          _MetricCard(
-            palette: palette,
-            icon: TreinoIcon.calendar,
-            label: 'SESIONES / SEM', // i18n: Fase W2
-            value: m.sesionesPorSemana.toStringAsFixed(1),
-            caption:
-                m.weeklyTarget > 0 ? 'Plan: ${m.weeklyTarget}' : 'Sin plan',
-          ),
-          const SizedBox(width: 10),
-          _MetricCard(
-            palette: palette,
-            icon: TreinoIcon.dumbbell,
-            label: 'VOLUMEN', // i18n: Fase W2
-            value: _fmtVolKg(m.volumenSemanaActualKg),
-            delta: volDelta == null
-                ? null
-                : '${volDelta >= 0 ? '+' : ''}${volDelta.round()}%',
-            deltaColor: volDelta == null
-                ? null
-                : (volDelta >= 0 ? palette.accent : palette.danger),
-            caption: volDelta == null ? 'esta semana' : 'vs semana pasada',
-          ),
-          const SizedBox(width: 10),
-          _MetricCard(
-            palette: palette,
-            icon: TreinoIcon.scales,
-            label: 'PESO CORPORAL', // i18n: Fase W2
-            value: peso == null ? '—' : '${_trimNum(peso)} kg',
-            delta: pesoDelta == null
-                ? null
-                : '${pesoDelta >= 0 ? '+' : ''}${pesoDelta.toStringAsFixed(1)} kg',
-            deltaColor: pesoDelta == null
-                ? null
-                : (pesoDelta >= 0 ? palette.accent : palette.danger),
-            caption: pesoDelta == null ? null : '30 días',
-          ),
-        ],
+        children: active == null
+            ? [
+                _SinRutinaNotice(
+                  palette: palette,
+                  onAsignar: () => context.push('/routine-editor/$athleteId'),
+                ),
+                const SizedBox(width: 10),
+                pesoCard,
+              ]
+            : [
+                _MetricCard(
+                  palette: palette,
+                  icon: TreinoIcon.checkCircleFill,
+                  label: 'ADHERENCIA 30D', // i18n: Fase W2
+                  value: adh == null ? '—' : '${adh.round()}%',
+                  delta: adhDelta == null
+                      ? null
+                      : '${adhDelta >= 0 ? '↑' : '↓'} '
+                          '${adhDelta.abs().round()} pts',
+                  deltaColor: adhDelta == null
+                      ? null
+                      : (adhDelta >= 0 ? palette.accent : palette.danger),
+                  caption:
+                      adh == null ? 'Todavía sin datos' : 'vs 30 días previos',
+                ),
+                const SizedBox(width: 10),
+                _MetricCard(
+                  palette: palette,
+                  icon: TreinoIcon.calendar,
+                  label: 'SESIONES / SEM', // i18n: Fase W2
+                  value: m.sesionesPorSemana.toStringAsFixed(1),
+                  caption: 'Plan: ${m.weeklyTarget}',
+                ),
+                const SizedBox(width: 10),
+                _MetricCard(
+                  palette: palette,
+                  icon: TreinoIcon.dumbbell,
+                  label: 'VOLUMEN', // i18n: Fase W2
+                  value: _fmtVolKg(m.volumenSemanaActualKg),
+                  delta: volDelta == null
+                      ? null
+                      : '${volDelta >= 0 ? '+' : ''}${volDelta.round()}%',
+                  deltaColor: volDelta == null
+                      ? null
+                      : (volDelta >= 0 ? palette.accent : palette.danger),
+                  caption:
+                      volDelta == null ? 'esta semana' : 'vs semana pasada',
+                ),
+                const SizedBox(width: 10),
+                pesoCard,
+              ],
       ),
     );
 
@@ -1661,6 +1690,84 @@ class _ResumenTab extends ConsumerWidget {
             noteBlock,
             const SizedBox(height: 20),
             proxSesionBlock,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Reemplaza a las tres métricas que dependen de una rutina cuando no hay
+/// ninguna asignada.
+///
+/// Ocupa el ancho de las tres (`flex: 3`) para que la fila mantenga su ritmo:
+/// la tarjeta de peso, que sí tiene dato, sigue midiendo lo mismo que antes y
+/// no se estira a media pantalla.
+///
+/// Es explicación, no error: borde y fondo de tarjeta normal, sin `danger`. Que
+/// un alumno todavía no tenga rutina es un paso pendiente del PF, no una falla
+/// del alumno — pintarlo en rojo se lo cobraría a quien no corresponde.
+class _SinRutinaNotice extends StatelessWidget {
+  const _SinRutinaNotice({required this.palette, required this.onAsignar});
+
+  final AppPalette palette;
+  final VoidCallback onAsignar;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      flex: 3,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: palette.bgCard,
+          border: Border.all(color: palette.border),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+        ),
+        child: Row(
+          children: [
+            Icon(TreinoIcon.dumbbell, size: 20, color: palette.textMuted),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Sin rutina asignada', // i18n
+                    style: TextStyle(
+                      fontFamily: AppFonts.barlow,
+                      fontSize: AppTextSize.body,
+                      fontWeight: AppFonts.w600,
+                      color: palette.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.hairline),
+                  Text(
+                    'Adherencia, sesiones y volumen se miden contra el plan.', // i18n
+                    style: TextStyle(
+                      fontFamily: AppFonts.barlow,
+                      fontSize: AppTextSize.caption,
+                      color: palette.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: AppSpacing.s12),
+            TextButton.icon(
+              onPressed: onAsignar,
+              icon: Icon(TreinoIcon.plus, size: 16, color: palette.accent),
+              label: Text(
+                'Asignar rutina', // i18n
+                style: TextStyle(
+                  fontFamily: AppFonts.barlow,
+                  color: palette.accent,
+                  fontWeight: AppFonts.w700,
+                  fontSize: AppTextSize.bodyDense,
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -2258,9 +2365,47 @@ class _AdherenciaHeatmap extends StatelessWidget {
       ? palette.border.withValues(alpha: 0.4)
       : palette.accent.withValues(alpha: 0.28 + level * 0.18);
 
+  /// `true` si en las 12 semanas no hay UNA sola sesión.
+  ///
+  /// No es lo mismo que una grilla poco poblada: con actividad esporádica la
+  /// grilla informa (se ve dónde entrenó y dónde no). Con cero, las 84 celdas
+  /// caen todas al nivel 0 y la card se convierte en un rectángulo gris del
+  /// ancho de la pantalla, que se lee como un componente roto y no como un
+  /// alumno que todavía no arrancó.
+  bool get _sinActividad =>
+      data.every((semana) => semana.every((nivel) => nivel <= 0));
+
   @override
   Widget build(BuildContext context) {
     final axisStyle = TextStyle(color: palette.textMuted, fontSize: 9);
+
+    if (_sinActividad) {
+      return Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: palette.bgCard,
+          border: Border.all(color: palette.border),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+        ),
+        child: Row(
+          children: [
+            Icon(TreinoIcon.calendar, size: 20, color: palette.textMuted),
+            const SizedBox(width: AppSpacing.s12),
+            Expanded(
+              child: Text(
+                'Sin sesiones en las últimas 12 semanas.', // i18n
+                style: TextStyle(
+                  fontFamily: AppFonts.barlow,
+                  fontSize: AppTextSize.bodyDense,
+                  color: palette.textMuted,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(

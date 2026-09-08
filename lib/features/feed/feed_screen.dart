@@ -677,10 +677,29 @@ class _FeedScrollViewState extends State<_FeedScrollView> {
           )
         else
           SliverPadding(
-            padding: EdgeInsets.only(bottom: bottomInset),
+            // El vacío arranca ARRIBA, no en el medio del alto sobrante.
+            //
+            // `SliverFillRemaining` entrega todo lo que queda de viewport, y el
+            // `Center` de `FeedEmptyState` lo usaba entero: en un teléfono el
+            // mensaje caía a ~480px de los chips de filtro, con un pozo negro
+            // en el medio que no era ni separación ni contenido. Y con
+            // «Seguidores» arrastraba abajo a las sugerencias, que son
+            // justamente la salida del estado vacío.
+            //
+            // `align: start` lo sube; el padding de arriba es la separación
+            // deliberada respecto de los filtros. Se mantiene
+            // `hasScrollBody: false` para que la pantalla siga sin scroll
+            // cuando no hay nada.
+            padding: EdgeInsets.only(
+              top: AppSpacing.s20,
+              bottom: bottomInset,
+            ),
             sliver: SliverFillRemaining(
               hasScrollBody: false,
-              child: widget.content.emptyState,
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: widget.content.emptyState,
+              ),
             ),
           ),
       ],
@@ -913,7 +932,10 @@ class _AmigosBody extends ConsumerWidget {
         if (posts.isEmpty) {
           return _FeedContent.empty(
             Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              // `min` y no el `center` que había: el alineado vertical lo
+              // decide el `Align` del sliver, y centrar acá adentro volvía a
+              // empujar el par al medio del alto sobrante.
+              mainAxisSize: MainAxisSize.min,
               children: [
                 FeedEmptyState(
                   message: AppL10n.of(context).feedEmptyFollowing,
