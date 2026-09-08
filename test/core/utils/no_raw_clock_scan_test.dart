@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -56,6 +57,52 @@ import 'package:flutter_test/flutter_test.dart';
 /// pendiente de revisar"**, no "exento". Lo que el ratchet impide es que la
 /// próxima pantalla nazca con el mismo defecto sin que nadie lo vea.
 ///
+/// ## DOS REGÍMENES, porque son dos realidades
+///
+/// Las cuatro reglas de arriba son el **ratchet** de Coach: deuda alta (80
+/// ocurrencias), allowlist grande, y el único contrato posible es "no crece".
+///
+/// `core/` es al revés y por eso tiene su propio grupo, con **regla cero**:
+///
+/// | | Coach | `core/` |
+/// |---|---|---|
+/// | deuda al escribir esto | 80 ocurrencias, 37 archivos | **0 líneas de código** |
+/// | contrato | ratchet (sólo baja) | **cero, sin allowlist** |
+/// | qué se cuenta | texto crudo (prosa incluida) | **sólo código** (los `//` se saltean) |
+/// | excepción | 37 archivos | **una**: `app_clock.dart`, el seam |
+///
+/// Que el segundo grupo cuente sólo código no es un detalle: en `core/` viven
+/// los dartdocs que EXPLICAN por qué no usar el reloj crudo —`argentina_time`,
+/// `appointment_window`, el propio `app_clock`— y son 12 de las 14 menciones.
+/// Un scanner textual ahí castigaría justo a la documentación que enseña la
+/// regla, y la salida sería borrarla. Con el strip de comentarios se puede
+/// exigir CERO en código sin pagar ese precio.
+///
+/// ## Por qué `core/` y no todo `lib/` (medido, no estimado)
+///
+/// ```bash
+/// rg -c 'DateTime\.now\(\)|\.toLocal\(\)' -g '*.dart' lib \
+///   | awk -F: '{split($1,p,"/"); k=p[2]"/"p[3]; s[k]+=$2} \
+///              END {for (i in s) printf "%6d  %s\n", s[i], i}' | sort -rn
+/// ```
+///
+/// `features/coach` 46 · `features/coach_hub` 34 · `features/workout` 27 ·
+/// **`core/utils` 14** · `features/profile` 8 · el resto, cola larga. Total
+/// `lib/`: 178 en 91 archivos.
+///
+/// `core/` no entra por ser chico: entra porque es donde viven los seams
+/// (`app_clock`, `argentina_time`, `wall_clock`) y una fuga ahí **se propaga a
+/// toda la app**. Es exactamente lo que pasó: el default de
+/// `computeWeeklyStreak` leía `DateTime.now()` crudo, ningún caller de
+/// producción pasaba `now:`, y eso volvió indeterminista el camino de render
+/// de Insights y de Perfil enteros. `main` quedó en rojo el 08/09/2026 con un
+/// test que pasaba seis días de siete. Este guard escaneaba `coach/` y
+/// `coach_hub/`; la fuga vivía en `core/utils/` y por eso nadie la vio.
+///
+/// `features/workout` y los demás quedan afuera **a propósito**: 27+ de deuda
+/// real necesitarían allowlist y ratchet, que es otro PR y otra discusión. Lo
+/// que no se puede es dejar `core/` sin cubrir por analogía con ellos.
+///
 /// ## El seam: `AppClock.now()` (#761)
 ///
 /// `lib/core/utils/app_clock.dart` es el único lugar del repo que llama a
@@ -86,8 +133,10 @@ void main() {
     /// (`argentinaNow`, `nowWall`) NO matchean: ese es el objetivo.
     final rawClockPattern = RegExp(r'DateTime\.now\(\)|\.toLocal\(\)');
 
-    /// Sólo el módulo Coach. El resto de `lib/` tiene su propia realidad y
-    /// meterlo acá haría la allowlist inmanejable de entrada.
+    /// Sólo el módulo Coach: es el que tiene la deuda alta y el que necesita
+    /// un ratchet. `core/` NO va acá — tiene deuda cero y lo cubre el grupo de
+    /// abajo, con regla cero y contando sólo código. Ver los DOS REGÍMENES en
+    /// el dartdoc de la librería.
     const scannedRoots = ['features/coach/', 'features/coach_hub/'];
 
     /// Techo de archivos permitidos, congelado al mergear este guard. NUNCA
@@ -242,6 +291,124 @@ void main() {
         reason: 'Estos archivos ya no usan reloj crudo (o no existen) pero '
             'siguen en la allowlist:\n${staleEntries.join('\n')}\n\n'
             'Sacalos y bajá allowlistCeiling.',
+      );
+    });
+  });
+
+  group('no_raw_clock_scan — CERO reloj crudo en core/', () {
+    /// Mismo patrón que el ratchet de Coach.
+    final rawClockPattern = RegExp(r'DateTime\.now\(\)|\.toLocal\(\)');
+
+    /// `core/` entero: ahí viven los seams, y una fuga ahí se propaga a toda
+    /// la app. Ver "Por qué `core/` y no todo `lib/`" en el dartdoc.
+    const scannedRoot = 'core/';
+
+    /// LA ÚNICA excepción, y es estructural: `AppClock` ES el seam. Alguien
+    /// tiene que llamar a `DateTime.now()` de verdad, y el diseño de #761 es
+    /// que sea exactamente un lugar. Esto NO es una allowlist que pueda
+    /// crecer: si aparece un segundo archivo acá, el diseño se rompió.
+    ///
+    /// Que el seam SIGA leyendo la hora real no se prueba acá y no se puede
+    /// probar con un scanner: `app_clock.dart` menciona `DateTime.now()` tres
+    /// veces —la llamada, el mensaje de un assert y el dartdoc— y ningún
+    /// grep sabe cuál es cuál. Un test textual que lo intentara diría "el
+    /// seam está sano" con el seam roto, que es la advertencia falsa de
+    /// AGENTS.md §11.1. Lo prueba por COMPORTAMIENTO
+    /// `test/core/utils/app_clock_test.dart` — *"sin congelar es un
+    /// passthrough de `DateTime.now()`"*, con un sándwich temporal. Medido:
+    /// cambiándole el cuerpo a `AppClock.now()`, ese test se pone rojo con un
+    /// delta de 233.940 horas.
+    const seam = 'core/utils/app_clock.dart';
+
+    /// Líneas de CÓDIGO con reloj crudo, por archivo.
+    ///
+    /// Se saltean las líneas que ARRANCAN con `//` o `///` y los bloques
+    /// `/* … */`. En `core/` la prosa que explica por qué no usar el reloj
+    /// crudo es 12 de las 14 menciones: contarla obligaría a borrarla para
+    /// que el guard pase, que es el peor final posible para un guard.
+    ///
+    /// LIMITACIÓN, a propósito: un comentario al FINAL de una línea de código
+    /// (`foo(); // ojo con DateTime.now()`) sí cuenta. Cortar desde `//` haría
+    /// perder un hit real en cualquier línea que además tenga una URL
+    /// (`'https://…'`), y este guard prefiere gritar de más a callarse de
+    /// menos. Si te toca, movelo a su propia línea.
+    List<String> hitsDeCodigo(String contenido) {
+      final hits = <String>[];
+      var enBloque = false;
+      var nro = 0;
+      for (final linea in const LineSplitter().convert(contenido)) {
+        nro++;
+        final s = linea.trimLeft();
+        if (enBloque) {
+          if (s.contains('*/')) enBloque = false;
+          continue;
+        }
+        if (s.startsWith('/*')) {
+          if (!s.contains('*/')) enBloque = true;
+          continue;
+        }
+        if (s.startsWith('//')) continue;
+        if (rawClockPattern.hasMatch(linea)) hits.add('$nro: ${linea.trim()}');
+      }
+      return hits;
+    }
+
+    late Map<String, List<String>> offenders;
+
+    setUpAll(() {
+      final libDir = Directory('lib');
+      offenders = {};
+      if (!libDir.existsSync()) return;
+
+      for (final entity in libDir.listSync(recursive: true)) {
+        if (entity is! File) continue;
+        if (!entity.path.endsWith('.dart')) continue;
+
+        final normalized = entity.path.replaceAll(r'\', '/');
+        final libIndex = normalized.indexOf('lib/');
+        if (libIndex == -1) continue;
+        final relativePath = normalized.substring(libIndex + 4);
+
+        if (!relativePath.startsWith(scannedRoot)) continue;
+
+        if (relativePath == seam) continue;
+
+        final hits = hitsDeCodigo(entity.readAsStringSync());
+        if (hits.isNotEmpty) offenders[relativePath] = hits;
+      }
+    });
+
+    test('ningún archivo de core/ usa DateTime.now() ni .toLocal()', () {
+      expect(
+        offenders,
+        isEmpty,
+        reason: 'Reloj crudo en core/ — acá NO hay allowlist, el contrato es '
+            'CERO:\n'
+            '${offenders.entries.map((e) => '  ${e.key}\n'
+                '${e.value.map((h) => '      $h').join('\n')}').join('\n')}\n\n'
+            'Elegí según QUÉ estás comparando:\n'
+            '  • contra Appointment.startsAt  →  nowWall()\n'
+            '  • bucket de día/mes/semana     →  argentinaNow()\n'
+            '  • instante real (createdAt…)   →  AppClock.now()\n\n'
+            'Los tres leen de AppClock, así que un test los puede congelar. '
+            'Un `DateTime.now()` acá NO se congela, y en core/ eso se propaga '
+            'a toda la app: es literalmente cómo `main` quedó en rojo el '
+            '08/09/2026. Si de verdad necesitás el reloj real (medir un '
+            '`difference`, un timeout), pasá por AppClock igual — en '
+            'producción es el mismo valor.',
+      );
+    });
+
+    test('la exención del seam no está muerta', () {
+      expect(
+        File('lib/$seam').existsSync(),
+        isTrue,
+        reason: 'La única exención de este guard apunta a `$seam`, que ya no '
+            'existe. Si el seam se movió, actualizá la constante: mientras '
+            'apunte a un archivo fantasma, el lugar NUEVO se reporta como '
+            'ofensor y nadie sabe por qué.\n\n'
+            'Ojo: este test NO dice que el seam funcione — para eso está '
+            '`test/core/utils/app_clock_test.dart`. Ver el dartdoc de `seam`.',
       );
     });
   });
