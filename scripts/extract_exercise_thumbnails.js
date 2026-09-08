@@ -54,6 +54,8 @@ const crypto = require('crypto');
 const { execFileSync, execFile } = require('child_process');
 
 const { exigirDestinoCoherente } = require('./lib/storage_target');
+const { getFirestore } = require('firebase-admin/firestore');
+const { getStorage } = require('firebase-admin/storage');
 
 const args = process.argv.slice(2);
 const flag = (name) => args.includes(`--${name}`);
@@ -170,12 +172,12 @@ async function upload() {
   // Por eso `contraEmulador` ya no se destructura: existía sólo para ese `if`.
   // `projectId` sí sigue explícito, por el motivo de #838 — contra el emulador
   // no hay credencial de donde sacarlo.
-  const { admin } = require('./lib/admin').inicializarAdmin({
+  const { app } = require('./lib/admin').inicializarAdmin({
     projectId: destino.projectId,
     extra: { storageBucket: BUCKET },
   });
-  const db = admin.firestore();
-  const bucket = admin.storage().bucket();
+  const db = getFirestore(app);
+  const bucket = getStorage(app).bucket();
 
   const jpgs = fs.readdirSync(thumbsDir).filter((f) => f.endsWith('.jpg'));
   console.log(`thumbs a subir: ${jpgs.length} · destino: ${destino.etiquetaDestino}${dryRun ? ' · DRY-RUN' : ''}`);

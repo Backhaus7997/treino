@@ -41,6 +41,8 @@ const { execFileSync } = require('child_process');
 const { randomUUID } = require('crypto');
 const { exigirDestinoCoherente } = require('./lib/storage_target');
 const { inicializarAdmin } = require('./lib/admin');
+const { getStorage } = require('firebase-admin/storage');
+const { getFirestore } = require('firebase-admin/firestore');
 
 const args = process.argv.slice(2);
 const DRY = args.includes('--dry-run');
@@ -61,12 +63,12 @@ if (DRY) console.log('DRY-RUN: no se escribe nada.');
 // El `projectId` sale del DESTINO de #838 y no de la credencial: el guard ya lo
 // validó contra el bucket, y son la misma decisión — dos fuentes serían dos
 // verdades posibles, que es el bug que #838 cerró.
-const { admin } = inicializarAdmin({
+const { app } = inicializarAdmin({
   projectId: DESTINO.projectId,
   extra: { storageBucket: BUCKET },
 });
-const db = admin.firestore();
-const bucket = admin.storage().bucket();
+const db = getFirestore(app);
+const bucket = getStorage(app).bucket();
 
 const FROM_MATCHES = args.includes('--from-matches');
 
