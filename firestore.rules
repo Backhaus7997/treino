@@ -3478,14 +3478,15 @@ service cloud.firestore {
       allow delete: if request.auth != null && resource.data.trainerId == request.auth.uid;
     }
 
-    // Archivos privados que el PF sube sobre un alumno (PDFs, imágenes).
-    // Mismo pattern que /athlete_notes: doc id es `{trainerId}_{athleteId}_{ts}`,
-    // trainer-only R/W, alumno NUNCA los ve. Query paginable por
-    // (trainerId, athleteId, uploadedAt desc). List gate garantiza que solo
-    // el PF vinculado lista los archivos del alumno.
+    // Archivos que el PF sube para un alumno (PDFs, imágenes).
+    // El PF ve los del par y el alumno sólo los que tengan
+    // sharedWithAthlete == true. La query del alumno debe filtrar por su
+    // athleteId Y por ese flag para que el list sea demostrablemente válido.
     match /athlete_files/{docId} {
       allow read, list: if request.auth != null
-                  && request.auth.uid == resource.data.trainerId;
+                  && (request.auth.uid == resource.data.trainerId
+                      || (request.auth.uid == resource.data.athleteId
+                          && resource.data.sharedWithAthlete == true));
       allow create: if request.auth != null
                   && request.resource.data.trainerId == request.auth.uid
                   && request.resource.data.athleteId is string
@@ -3496,10 +3497,29 @@ service cloud.firestore {
                   && request.resource.data.downloadUrl is string
                   && request.resource.data.sizeBytes is int
                   && request.resource.data.sizeBytes > 0
-                  && request.resource.data.sizeBytes <= 10 * 1024 * 1024;
-      // Update no habilitado — para reemplazar contenido se borra y sube
-      // de nuevo. Evita drift entre downloadUrl y storagePath.
-      allow update: if false;
+                  && request.resource.data.sizeBytes <= 10 * 1024 * 1024
+                  && request.resource.data.sharedWithAthlete is bool;
+      // ⚠️ ACOPLAMIENTO: este hasOnly debe coincidir exactamente con las keys
+      // de AthleteFile.toJson(). Si el modelo suma un campo y esta lista no,
+      // todos los updates del flag fallan con permission-denied.
+      allow update: if request.auth != null
+                  && request.auth.uid == resource.data.trainerId
+                  && request.resource.data.keys().hasOnly([
+                       'id', 'trainerId', 'athleteId', 'fileName', 'kind',
+                       'contentType', 'sizeBytes', 'storagePath', 'downloadUrl',
+                       'uploadedAt', 'sharedWithAthlete'
+                     ])
+                  && request.resource.data.id == resource.data.id
+                  && request.resource.data.trainerId == resource.data.trainerId
+                  && request.resource.data.athleteId == resource.data.athleteId
+                  && request.resource.data.fileName == resource.data.fileName
+                  && request.resource.data.kind == resource.data.kind
+                  && request.resource.data.contentType == resource.data.contentType
+                  && request.resource.data.sizeBytes == resource.data.sizeBytes
+                  && request.resource.data.storagePath == resource.data.storagePath
+                  && request.resource.data.downloadUrl == resource.data.downloadUrl
+                  && request.resource.data.uploadedAt == resource.data.uploadedAt
+                  && request.resource.data.sharedWithAthlete is bool;
       allow delete: if request.auth != null
                   && request.auth.uid == resource.data.trainerId;
     }
@@ -3533,12 +3553,13 @@ service cloud.firestore {
     }
 
     // Nutrition plan — un plan por par PF↔alumno, docId `{trainerId}_{athleteId}`.
-    // Trainer-only R/W. El alumno NO lo ve en mobile todavía (feature scoped
-    // aparte). Update preserva trainerId y athleteId. `meals` es un list —
-    // no validamos la estructura en rules (validación se hace client-side).
+    // El PF y el alumno del plan pueden leerlo. Sólo el PF escribe. Update
+    // preserva trainerId y athleteId. `meals` es un list — no validamos la
+    // estructura en rules (validación se hace client-side).
     match /nutrition_plans/{docId} {
       allow read, list: if request.auth != null
-                  && request.auth.uid == resource.data.trainerId;
+                  && (request.auth.uid == resource.data.trainerId
+                      || request.auth.uid == resource.data.athleteId);
       allow create: if request.auth != null
                   && request.resource.data.trainerId == request.auth.uid
                   && request.resource.data.athleteId is string
