@@ -306,7 +306,26 @@ el 11 y el 12.
 | **9** | El resto sin Storage | `scripts/` | **sí** | ~150 | 13 archivos: `import_*`, `migrate_trainer_locations`, `apply_technique`, `audit_*`, `build_catalog_proposal`, `dedup_exercise_generics`, `match_drive_videos_to_catalog`, `promote_user_to_trainer`, `accept_pending_link`, `reset_onboarding_cards`, `migrations/strip_appointment_reason.mjs`. El `.mjs` va acá porque es el único ESM y necesita la mitad ESM del stub (§ 4). |
 | **10** | Los 4 que suben a Storage | `scripts/` | **sí** | ~80 | `apply_catalog_video_fill`, `extract_exercise_thumbnails`, `upload_drive_exercise_videos`, `upload_enriched_videos` — los † de AGENTS.md, 9 call sites. **Últimos a propósito: lo que escriben NO lo cubre el backup diario de Firestore.** Pasan por `exigirDestinoCoherente`; hay que verificar con el marcador del stub que el guard sigue disparando **antes** de la primera subida. |
 | **11** | `scripts/` a `firebase-admin@14` | `scripts/` | no | ~40 | Retirar los tests 1 y 3 del gate (§ 5), levantar el `ignore` de dependabot, y borrar el candado documentado en `scripts/package.json` y `scripts/README.md`. |
-| **12** | `functions/` a `firebase-admin@14` | `functions/` | no | ~10 | Una línea de `package.json` + lockfile. Cierra el #889, que se cierra sin mergear. |
+| **12** | `functions/` a `firebase-admin@14` | `functions/` | no | ~10 | **NO es una línea.** `firebase-functions@5.1.1` declara `peer firebase-admin@"^11 \|\| ^12"`; la ÚNICA versión que acepta la 14 es `firebase-functions@7.3.2`, o sea **dos majors**. `npm install` lo resuelve en silencio, `npm ci` lo rechaza — y CI corre `npm ci`. Necesita PR propio, con la migración de la API de `firebase-functions` que ese salto implique. |
+
+### ⚠️ Dos cosas que sólo aparecen al subir de verdad, y las descubrió el PR 11
+
+1. **El peer de `firebase-functions`** (arriba). Es lo que parte el bump en dos: `scripts/` puede
+   subir hoy porque no depende de `firebase-functions`; `functions/` no.
+
+2. **`firebase-admin@14` arrastra `jose@6`, que es ESM PURO** (`"type": "module"`, sin build CJS).
+   Jest corre en CommonJS, así que toda suite que toque el SDK muere con `Must use import to load
+   ES Module`. Con admin 12 el problema no existe —trae `jose@4`, compatible con CJS— así que el
+   arreglo queda para el PR de `functions/`:
+
+   ```js
+   // jest.config.js
+   transform: { "^.+\\.js$": ["ts-jest", { tsconfig: { allowJs: true, module: "commonjs" } }] },
+   transformIgnorePatterns: ["/node_modules/(?!jose/)"],
+   ```
+
+   **Transformarlo, no mockearlo**: `jose` es lo que el SDK usa para verificar tokens, y un doble
+   ahí apagaría justo lo que los tests de credenciales miran.
 
 ### Por qué el criterio «read-only primero» NO se puede aplicar dentro de `scripts/`
 

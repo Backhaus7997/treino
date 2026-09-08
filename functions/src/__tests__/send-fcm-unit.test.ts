@@ -29,10 +29,10 @@ jest.mock("firebase-admin/firestore", () => (
     >
 ).firestoreDesdeNamespaced());
 
-import * as admin from "firebase-admin";
 import { App } from "firebase-admin/app";
 import { Messaging } from "firebase-admin/messaging";
 import { sendFcm } from "../notifications/send-fcm";
+import { dobleNamespaced } from "./helpers/modular-from-namespaced";
 
 type UserState = {
   tokens: string[];
@@ -65,7 +65,7 @@ function installFirestore(users: Record<string, UserState>): void {
     }),
   };
 
-  (admin.firestore as unknown as jest.Mock).mockReturnValue(firestore);
+  (dobleNamespaced().firestore as unknown as jest.Mock).mockReturnValue(firestore);
 }
 
 function mockMessaging(): Messaging {

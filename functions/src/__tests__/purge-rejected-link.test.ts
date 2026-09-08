@@ -26,14 +26,15 @@ jest.mock("firebase-functions", () => ({
   logger: { error: jest.fn(), info: jest.fn(), warn: jest.fn() },
 }));
 
-import * as admin from "firebase-admin";
 import { logger } from "firebase-functions";
+import { dobleNamespaced } from "./helpers/modular-from-namespaced";
+import { App } from "firebase-admin/app";
 import {
   clasificarTerminacion,
   purgeRejectedLinkHandler,
 } from "../purge-rejected-link";
 
-const APP = {} as admin.app.App;
+const APP = {} as App;
 
 function installFirestore({ deleteError }: { deleteError?: Error } = {}) {
   const deleteDoc = jest.fn(async () => {
@@ -41,7 +42,7 @@ function installFirestore({ deleteError }: { deleteError?: Error } = {}) {
   });
   const doc = jest.fn(() => ({ delete: deleteDoc }));
   const collection = jest.fn(() => ({ doc }));
-  (admin.firestore as unknown as jest.Mock).mockReturnValue({ collection });
+  (dobleNamespaced().firestore as unknown as jest.Mock).mockReturnValue({ collection });
   return { collection, doc, deleteDoc };
 }
 

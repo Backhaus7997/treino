@@ -5,7 +5,7 @@
  * Java 21 / the Firestore emulator.
  */
 
-// `admin.firestore` is both a factory AND the namespace holding the
+// `dobleNamespaced().firestore` is both a factory AND the namespace holding the
 // `Timestamp`/`FieldValue` sentinels the gate writes. The double has to carry
 // both, or the write path silently can't be exercised.
 jest.mock("firebase-admin", () => {
@@ -39,9 +39,9 @@ jest.mock("firebase-admin/firestore", () => (
     >
 ).firestoreDesdeNamespaced());
 
-import * as admin from "firebase-admin";
 import { App } from "firebase-admin/app";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
+import { dobleNamespaced } from "./helpers/modular-from-namespaced";
 import {
   createFakeFirestore,
   FakeDoc,
@@ -54,7 +54,7 @@ import {
 
 function install(seed: Partial<FakeFirestoreState>): FakeFirestoreState {
   const { db, state } = createFakeFirestore(seed);
-  (admin.firestore as unknown as jest.Mock).mockReturnValue(db);
+  (dobleNamespaced().firestore as unknown as jest.Mock).mockReturnValue(db);
   return state;
 }
 

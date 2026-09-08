@@ -42,9 +42,9 @@ jest.mock("../subscriptions/sync-entitlements", () => ({
   syncTrainerEntitlements: jest.fn(),
 }));
 
-import * as admin from "firebase-admin";
 import { App } from "firebase-admin/app";
 import { syncTrainerEntitlements } from "../subscriptions/sync-entitlements";
+import { dobleNamespaced } from "./helpers/modular-from-namespaced";
 import {
   subscriptionChanged,
   sweepEntitlementsHandler,
@@ -96,7 +96,7 @@ describe("subscriptionChanged — guarda anti-loop", () => {
 
 describe("sweepEntitlementsHandler", () => {
   function installUsers(ids: string[]) {
-    (admin.firestore as unknown as jest.Mock).mockReturnValue({
+    (dobleNamespaced().firestore as unknown as jest.Mock).mockReturnValue({
       collection: () => ({
         where: () => ({
           get: async () => ({

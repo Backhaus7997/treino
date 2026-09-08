@@ -19,8 +19,7 @@
     "seed:emulator": "FIREBASE_AUTH_EMULATOR_HOST=localhost:9099 FIRESTORE_EMULATOR_HOST=localhost:8080 node seed_emulator_full.js",
     "seed:emulator:clear": "FIREBASE_AUTH_EMULATOR_HOST=localhost:9099 FIRESTORE_EMULATOR_HOST=localhost:8080 node seed_emulator_full.js --clear"
   },
-  "//  🔒 firebase-admin QUEDA EN 13.x A PROPÓSITO — NO ACEPTAR EL BUMP A 14": "v14 borró la API namespaced entera. El root export pasó a ser 11 símbolos (`initializeApp`, `getApps`, `cert`, …) y `admin.apps`, `admin.credential`, `admin.firestore`, `admin.auth`, `admin.storage` y `admin.app` quedaron TODOS `undefined`. Los scripts de este directorio están escritos contra esa API: 89 call sites en 48 archivos. Con 14.3.0 instalada, `node scripts/seed_emulator_full.js` muere en la primera línea de `lib/admin.js` y NINGÚN script de `scripts/` arranca. Ya pasó dos veces (cac2d6fa y de77562a/#901): dependabot lo bumpeó y `npm test` siguió en verde, porque la suite stubea `firebase-admin` en `Module._load` y por construcción no puede ver la superficie real del SDK. Lo que sí lo ve ahora es `test/firebase_admin_superficie.test.js`, que carga el módulo DE VERDAD. Antes de subir a 14 hay que migrar los 48 archivos a los subpaths modulares (`firebase-admin/firestore`, `/auth`, `/storage`), no sólo cambiar este número.",
   "dependencies": {
-    "firebase-admin": "^13.10.0"
+    "firebase-admin": "^14.3.0"
   }
 }

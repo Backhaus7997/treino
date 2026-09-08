@@ -43,7 +43,7 @@ beforeAll(() => {
 });
 
 afterAll(async () => {
-  // El borrado del chat va ANTES de tirar la app: `admin.firestore(testApp)`
+  // El borrado del chat va ANTES de tirar la app: `dobleNamespaced().firestore(testApp)`
   // sobre una app destruida tira "app deleted" y ensucia el resultado.
   await db()
     .collection("chats")
