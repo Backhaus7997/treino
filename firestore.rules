@@ -3801,5 +3801,13 @@ service cloud.firestore {
     match /mp_preapprovals/{preapprovalId} {
       allow read, write: if false;
     }
+    // El dedupe del webhook: un doc por evento de Mercado Pago ya procesado.
+    // Escribirlo es hacerle creer al sistema que un evento REAL ya se atendio,
+    // y como el dedupe corta ANTES de consultarle a MP, eso alcanza para que a
+    // un PF no se le acredite el plan que pago. Leerlo filtra que ids de
+    // suscripcion existen y cuando se movieron.
+    match /mp_webhook_events/{eventId} {
+      allow read, write: if false;
+    }
   }
 }
