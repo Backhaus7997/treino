@@ -18,6 +18,11 @@ enum FreePlanLimit {
   /// Plantilla del catálogo marcada `isPremium`. Eje distinto: acá el límite
   /// no es la forma de lo que armó, es el contenido curado al que accede.
   premiumTemplate,
+
+  /// Llegó al tope de rutinas propias del plan free. A diferencia de los otros
+  /// tres, este límite se toca al GUARDAR: la cuenta sólo se conoce contra la
+  /// lista existente.
+  routineCount,
 }
 
 /// Hoja que explica por qué no se pudo agregar un día (o una semana) más.
@@ -106,6 +111,8 @@ class _FreePlanLimitBody extends StatelessWidget {
                 FreePlanLimit.weeks => l10n.paywallFreePlanLimitWeeksBody,
                 FreePlanLimit.premiumTemplate =>
                   l10n.paywallFreePlanLimitTemplateBody,
+                FreePlanLimit.routineCount =>
+                  l10n.paywallFreePlanLimitRoutineCountBody,
               },
               style: GoogleFonts.inter(
                 fontSize: 14,

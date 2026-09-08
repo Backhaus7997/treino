@@ -1536,10 +1536,31 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       // detalle de la plantilla — si el alumno llegó hasta acá con una copia,
       // es porque tenía derecho a copiarla. `null` = este límite no aplica.
       FreePlanLimit.premiumTemplate => null,
+      // El tope de rutinas no es un contador de la pantalla: se mide contra la
+      // lista guardada, así que lo resuelve `_freePlanBlocksNewRoutine` al
+      // guardar. Acá no aplica.
+      FreePlanLimit.routineCount => null,
     };
     if (max == null || next <= max) return false;
     if (!ref.read(athleteEntitlementProvider).gatesFreeLimits) return false;
     showFreePlanLimitSheet(context, limit: limit);
+    return true;
+  }
+
+  /// `true` si el plan free frena la creación de UNA RUTINA MÁS — y en ese
+  /// caso ya abrió la hoja que lo explica.
+  ///
+  /// [actuales] es cuántas rutinas propias ACTIVAS tiene hoy. Archivadas no
+  /// cuentan, igual que en el tope estructural: `listUserCreated` filtra por
+  /// `status == 'active'`. Es el agujero conocido de este cap —documentado en
+  /// [kFreeMaxOwnRoutines]— y se mantiene igual a propósito, para no tener dos
+  /// semánticas de "cuántas tengo" conviviendo en la misma pantalla.
+  bool _freePlanBlocksNewRoutine(int actuales) {
+    if (!ref.read(athletePaywallEnabledProvider)) return false;
+    if (!_isAthleteOwnedMode) return false;
+    if (actuales < kFreeMaxOwnRoutines) return false;
+    if (!ref.read(athleteEntitlementProvider).gatesFreeLimits) return false;
+    showFreePlanLimitSheet(context, limit: FreePlanLimit.routineCount);
     return true;
   }
 
@@ -2678,9 +2699,25 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         // construction, not by a field-stripping step someone can forget.
         case SelfCreating(existingRoutineId: null) || SelfCustomizing():
           // Client-side cap check (ADR-USR-02).
+          //
+          // Son DOS topes con significados distintos, y por eso avisan
+          // distinto: el del plan free se puede levantar pagando y abre la
+          // hoja; el estructural es el techo del producto y muestra el aviso
+          // de siempre. Mostrar la hoja de plan pago a alguien que ya paga y
+          // llegó a las 10 sería venderle algo que ya tiene.
+          //
+          // Va al GUARDAR y no al tocar "+", al revés que los topes de días y
+          // semanas: la cuenta sólo se conoce contra la lista existente, no
+          // contra lo que hay en pantalla.
           final userRoutines =
               ref.read(userCreatedRoutinesProvider(uid)).valueOrNull ?? [];
-          if (userRoutines.length >= 10) {
+          if (_freePlanBlocksNewRoutine(userRoutines.length)) {
+            if (!mounted) return;
+            _isDirty = true;
+            setState(() => _submitting = false);
+            return;
+          }
+          if (userRoutines.length >= kMaxOwnRoutines) {
             if (!mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(l10n.workoutSelfEditorCapReached)),
@@ -2969,7 +3006,23 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     // este watch, cada read lo crea en frío, el stream todavía no emitió,
     // devuelve `unknown` — y el gate no muerde NUNCA. Con el watch queda vivo
     // mientras el editor está montado y el read ve el valor real.
-    if (_isAthleteOwnedMode) ref.watch(athleteEntitlementProvider);
+    if (_isAthleteOwnedMode) {
+      ref.watch(athleteEntitlementProvider);
+      // Y el cupo de rutinas, por el MISMO motivo — pero acá el síntoma ya
+      // existía antes de este cambio. `_submit` lee
+      // `userCreatedRoutinesProvider` con un `read`, y es autoDispose: sin
+      // nadie mirándolo, el read lo crea en frío, el stream todavía no emitió,
+      // `valueOrNull` da null y el `?? []` lo vuelve CERO rutinas. El cap no
+      // muerde.
+      //
+      // Venía zafando de casualidad: al editor se llega desde MIS RUTINAS, que
+      // lo tiene vivo. Por cualquier otro camino —deep link, la CTA del home—
+      // el tope de 10 nunca se aplicaba. Ahora que además decide un límite de
+      // plan, depender de qué pantalla quedó montada abajo no alcanza.
+      if (uidCatalogo.isNotEmpty) {
+        ref.watch(userCreatedRoutinesProvider(uidCatalogo));
+      }
+    }
 
     // Loading state: hydrating from Firestore.
     if (_loading) {
