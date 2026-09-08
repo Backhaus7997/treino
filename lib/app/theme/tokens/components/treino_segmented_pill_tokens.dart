@@ -68,8 +68,6 @@ class TreinoSegmentedPillTokens {
     required this.hoverOverlay,
     required this.pressedOverlay,
     required this.focusOverlay,
-    required this.markContent,
-    required this.markAttention,
   });
 
   /// Relleno de la pista — delega a `AppPalette.bgCard`.
@@ -135,28 +133,6 @@ class TreinoSegmentedPillTokens {
   /// Si algún consumidor futuro usa estos tokens sin ese anillo, hereda el
   /// hueco. No es opcional.
   final Color focusOverlay;
-
-  /// Punto de "hay contenido" en una celda INACTIVA — `AppPalette.textMuted`.
-  ///
-  /// Es el mismo color que [inactiveLabel] a propósito: el punto es parte del
-  /// label, no una insignia aparte. Informa, no apura.
-  final Color markContent;
-
-  /// Punto de "esto reclama acción" en una celda INACTIVA —
-  /// `AppPalette.accentText`.
-  ///
-  /// **`accentText`, NO `accent`.** El mint pleno es un color de FONDO: como
-  /// tinta compone 1,57:1 contra el fondo claro, así que un punto de `accent`
-  /// sobre una celda inactiva es invisible en tema claro — que es justo el que
-  /// usa el Coach Hub. `accentText` resuelve la bifurcación (mint en dark,
-  /// `mintText700` en light) y es la misma regla que ya documenta el dartdoc de
-  /// `AppPalette.accentText`: acento como fondo → `accent`, como tinta →
-  /// `accentText`.
-  ///
-  /// Sobre la celda ACTIVA ninguno de los dos se usa: ahí manda [activeInk]
-  /// (12,10:1 sobre el mint), porque los dos anteriores caerían sobre el
-  /// relleno de acento. Ver `_SegmentMark` en `treino_segmented_pill.dart`.
-  final Color markAttention;
 
   /// Ink del segmento activo: label Y keyline del thumb.
   ///
@@ -243,20 +219,6 @@ class TreinoSegmentedPillTokens {
   /// `feed_screen.dart`.
   static const double minSegmentHeight = 44.0;
 
-  /// Diámetro del punto de marca.
-  ///
-  /// `AppSpacing.s8` — el valor más chico de la escala cerrada, que acá es el
-  /// correcto: es una marca al lado de un label de 14, no un badge. Va como
-  /// tamaño y no como separación, pero sale de la misma escala para que no
-  /// nazca un 6 o un 10 sueltos.
-  static const double markSize = AppSpacing.s8;
-
-  /// Separación entre el label y su punto — [AppSpacing.hairline] (4).
-  ///
-  /// Gutter interno de un componente del kit, que es exactamente el caso que
-  /// `hairline` cubre. Mismo criterio que [trackPadding].
-  static const double markGap = AppSpacing.hairline;
-
   /// Escala de texto a partir de la cual la pista scrollea en vez de repartir
   /// el ancho. Heurística heredada de `_AthleteWorkout`, ya probada en device.
   static const double scrollTextScaleThreshold = 1.3;
@@ -276,9 +238,6 @@ class TreinoSegmentedPillTokens {
       pressedOverlay: p.textPrimary.withValues(alpha: 0.12),
       // 20% de opacidad sobre el acento.
       focusOverlay: p.textPrimary.withValues(alpha: 0.2),
-      markContent: p.textMuted,
-      // accentText y no accent — ver el dartdoc de [markAttention].
-      markAttention: p.accentText,
     );
   }
 }

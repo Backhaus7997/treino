@@ -8,27 +8,6 @@ import 'package:flutter/material.dart';
 // barrel también reexporta pero es insumo exclusivo de `AppPalette`.
 import '../../app/theme/tokens/tokens.dart';
 
-/// Marca opcional de una celda: si adentro hay algo, y si eso reclama acción.
-///
-/// Es un enum y no un builder **a propósito**. Este control existe porque
-/// cuatro copias del mismo `TabBar` divergieron en radio, alto, tipografía y
-/// overflow; un `Widget Function(...)` por celda reabre los cuatro ejes de una
-/// y devuelve el problema. Acá el call site decide **si** va marca y de qué
-/// tipo, y el kit decide **cómo** se ve — tamaño, color y separación salen de
-/// [TreinoSegmentedPillTokens], iguales en los cinco call sites para siempre.
-enum TreinoSegmentMark {
-  /// Sin marca. También es el estado para "todavía no sé si hay contenido":
-  /// un punto sólo se pinta cuando la respuesta se conoce.
-  none,
-
-  /// Hay contenido adentro. Neutro — informa, no apura.
-  content,
-
-  /// Reclama acción ahora. Va en acento, y por eso tiene que ser raro: si
-  /// todo lleva acento, el acento deja de señalar algo.
-  attention,
-}
-
 /// Control segmentado de sub-navegación — la pista con dos o más celdas que
 /// vive arriba de Entrenar, Feed, Coach y el discovery de PFs.
 ///
@@ -72,8 +51,6 @@ class TreinoSegmentedPill extends StatefulWidget {
     required this.labels,
     this.onTap,
     this.scrollable = false,
-    this.marks = const [],
-    this.semanticsLabels,
   });
 
   /// Las etiquetas, en orden. La cantidad tiene que coincidir con el `length`
@@ -109,38 +86,6 @@ class TreinoSegmentedPill extends StatefulWidget {
   /// cambiar una decisión de accesibilidad por una de layout.
   final bool scrollable;
 
-  /// Marca por celda, en el mismo orden que [labels].
-  ///
-  /// Vacía (el default) = ninguna celda lleva marca. Una lista más corta que
-  /// [labels] deja sin marca a las celdas que sobran, así que el call site no
-  /// necesita rellenar con `none` los tramos finales.
-  final List<TreinoSegmentMark> marks;
-
-  /// Qué anuncia un lector de pantalla por celda, en el orden de [labels].
-  ///
-  /// Existe porque el punto es **color**, y el color solo no es información
-  /// accesible (WCAG 1.4.1): el estado tiene que estar también en palabras.
-  /// El texto es del call site y no del kit porque la frase es copy de
-  /// producto ("sin leer" no es lo mismo que "sin contenido"), pero la regla
-  /// que la gobierna es dura y vale para todos: **si el estado no se conoce,
-  /// no se afirma nada** — se pasa el label pelado. Un "sin contenido"
-  /// anunciado sobre un stream que todavía carga es una afirmación falsa, y
-  /// hablada es peor que en pantalla, donde al menos la ausencia de punto es
-  /// ambigua.
-  ///
-  /// `null` (el default) = se anuncia [labels] tal cual.
-  final List<String>? semanticsLabels;
-
-  /// Key estable de la marca de la celda [index], para que un test pueda
-  /// afirmar su COLOR.
-  ///
-  /// Vive acá y no en el call site a propósito: quién decide el color es este
-  /// widget —según el tipo de marca y si la celda está activa—, así que el
-  /// punto de observación tiene que estar donde vive la decisión. Si cada
-  /// pantalla pusiera su propia key, cada una testearía su cableado y ninguna
-  /// el contraste, que es lo único que puede romperse en silencio.
-  static Key markKey(int index) => Key('treino-segment-mark-$index');
-
   @override
   State<TreinoSegmentedPill> createState() => _TreinoSegmentedPillState();
 }
@@ -171,16 +116,6 @@ class _TreinoSegmentedPillState extends State<TreinoSegmentedPill> {
   /// importar, y no hace falta abandonar el `indicator` de `TabBar` ni saber
   /// cuál de las celdas tiene el foco.
   bool _hasFocus = false;
-
-  /// La marca de la celda [index], o null si no lleva.
-  ///
-  /// Tolera una lista de marcas más corta que la de labels para que el call
-  /// site no tenga que rellenar con `none` los tramos finales.
-  TreinoSegmentMark? _markAt(int index) {
-    if (index >= widget.marks.length) return null;
-    final mark = widget.marks[index];
-    return mark == TreinoSegmentMark.none ? null : mark;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -299,35 +234,14 @@ class _TreinoSegmentedPillState extends State<TreinoSegmentedPill> {
                 // asertea desde antes de esta migración, y porque describen la
                 // intención si alguien saca el `FittedBox`. No agregues tests
                 // sobre ellas: pasarían por construcción sin verificar nada.
-                child: Semantics(
-                  label: widget.semanticsLabels == null ||
-                          index >= widget.semanticsLabels!.length
-                      ? null
-                      : widget.semanticsLabels![index],
-                  // El label de arriba REEMPLAZA al del `Text`; sin esto el
-                  // lector leería el nombre dos veces, la segunda sin estado.
-                  excludeSemantics: widget.semanticsLabels != null &&
-                      index < widget.semanticsLabels!.length,
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          widget.labels[index],
-                          maxLines: 1,
-                          softWrap: false,
-                          overflow: TextOverflow.fade,
-                          textAlign: TextAlign.center,
-                        ),
-                        if (_markAt(index) case final mark?) ...[
-                          const SizedBox(
-                            width: TreinoSegmentedPillTokens.markGap,
-                          ),
-                          _SegmentMark(index: index, mark: mark, tokens: t),
-                        ],
-                      ],
-                    ),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    widget.labels[index],
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.fade,
+                    textAlign: TextAlign.center,
                   ),
                 ),
               ),
@@ -336,62 +250,4 @@ class _TreinoSegmentedPillState extends State<TreinoSegmentedPill> {
       ),
     );
   }
-}
-
-/// El punto de [TreinoSegmentMark], pintado según la celda esté activa o no.
-///
-/// **Por qué necesita saber si está seleccionada.** El punto vive DENTRO del
-/// `Tab`, y el fondo debajo cambia con la selección: en las inactivas es la
-/// pista (`bgCard`), en la activa es el thumb de acento. Ningún color sirve
-/// para las tres superficies — `bgCard` es casi negro en dark y casi blanco en
-/// light, y el thumb es el mismo mint en los dos temas. Sobre el thumb manda
-/// [TreinoSegmentedPillTokens.activeInk], el mismo ink que ya usa el label
-/// activo (12,10:1 sobre el mint).
-///
-/// Sobre la celda activa los dos tipos de marca se pintan IGUAL, y está bien:
-/// la marca existe para decirte qué hay en las pestañas donde NO estás. En la
-/// que estás mirando, la distinción la hace el contenido.
-///
-/// **El punto no se esconde en la celda activa**, aunque ahí no informe nada:
-/// sacarlo cambiaría el ancho de la celda al seleccionarla y re-layoutearía la
-/// tira entera en cada cambio de pestaña — el mismo defecto que el dartdoc de
-/// [TreinoSegmentedPill] documenta para `unselectedLabelStyle`.
-class _SegmentMark extends StatelessWidget {
-  const _SegmentMark({
-    required this.index,
-    required this.mark,
-    required this.tokens,
-  });
-
-  final int index;
-  final TreinoSegmentMark mark;
-  final TreinoSegmentedPillTokens tokens;
-
-  @override
-  Widget build(BuildContext context) {
-    final controller = DefaultTabController.maybeOf(context);
-    final animation = controller?.animation;
-    if (animation == null) return _dot(selected: false);
-    // El build de la tira NO se re-ejecuta al cambiar de índice —`TabBar` se
-    // repinta solo—, así que sin escuchar la animación el punto se quedaría con
-    // el color de la selección anterior.
-    return AnimatedBuilder(
-      animation: animation,
-      builder: (_, __) => _dot(selected: animation.value.round() == index),
-    );
-  }
-
-  Widget _dot({required bool selected}) => Container(
-        key: TreinoSegmentedPill.markKey(index),
-        width: TreinoSegmentedPillTokens.markSize,
-        height: TreinoSegmentedPillTokens.markSize,
-        decoration: BoxDecoration(
-          color: selected
-              ? TreinoSegmentedPillTokens.activeInk
-              : mark == TreinoSegmentMark.attention
-                  ? tokens.markAttention
-                  : tokens.markContent,
-          shape: BoxShape.circle,
-        ),
-      );
 }

@@ -13,7 +13,6 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/locale_resolver.dart';
 import 'package:treino/app/theme/app_palette.dart';
-import 'package:treino/core/widgets/treino_segmented_pill.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
@@ -453,8 +452,24 @@ void main() {
 
       expect(find.text('Sofía'), findsOneWidget);
       expect(find.text('Activo'), findsOneWidget);
-      expect(find.text('38'), findsOneWidget); // sesiones
-      expect(find.text('14 d'), findsOneWidget); // racha
+      // Sesiones y racha dejaron de ser cards propias —costaban una fila de
+      // ~85px en la pantalla donde el alto es el recurso escaso— y viven en
+      // línea con el resto de los metadatos. `find.text` no las ve porque son
+      // spans de un RichText, así que se afirma sobre el texto plano del span.
+      // `Text.rich`, no `RichText`: el segundo no hereda el DefaultTextStyle y
+      // el texto sale en tofu. Se afirma sobre el texto plano del span.
+      expect(
+        find.byWidgetPredicate(
+          (w) => w is Text && w.textSpan?.toPlainText() == '38 sesiones',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byWidgetPredicate(
+          (w) => w is Text && w.textSpan?.toPlainText() == '14 d de racha',
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets(
@@ -509,16 +524,27 @@ void main() {
       expect(find.widgetWithText(OutlinedButton, 'Pago'), findsOneWidget);
     });
 
-    testWidgets('tab bar muestra exactamente los 7 grupos', (tester) async {
+    testWidgets(
+        'tab bar muestra exactamente los 6 grupos — Chat NO es uno de ellos',
+        (tester) async {
       await _pump(tester,
           profile: _prof(), link: _link(TrainerLinkStatus.active));
-      expect(find.byType(Tab), findsNWidgets(7));
+      expect(find.byType(Tab), findsNWidgets(6));
+      // Chat salió de la navegación: ya tiene su propia sección en el sidebar,
+      // y como pestaña gastaba un destino de primer nivel. Vive en el header
+      // como acción, que conserva el acceso de un click a ESTE alumno —
+      // `/chat` no toma parámetro de alumno, así que borrarla sin más lo
+      // habría perdido.
+      expect(
+        find.descendant(of: find.byType(TabBar), matching: find.text('Chat')),
+        findsNothing,
+        reason: 'Chat volvió a ser una pestaña',
+      );
       for (final t in [
         'Resumen',
         'Entrenamiento',
         'Progreso',
         'Plan',
-        'Chat',
         'Privado',
         'Pagos',
       ]) {
@@ -528,7 +554,10 @@ void main() {
           reason: 'falta el tab $t',
         );
       }
-      expect(tester.widget<TabBar>(find.byType(TabBar)).isScrollable, isFalse);
+      expect(
+        tester.widget<TabBar>(find.byType(TabBar).first).isScrollable,
+        isFalse,
+      );
     });
 
     testWidgets('Privado explicita que el alumno no ve su contenido',
@@ -567,22 +596,21 @@ void main() {
 
       Color colorDeMarca(int index) {
         final dot = tester.widget<Container>(
-          find.byKey(TreinoSegmentedPill.markKey(index)),
+          find.byKey(alumnoDetailMarcaKey(index)),
         );
         return (dot.decoration! as BoxDecoration).color!;
       }
 
-      // Índices de _tabs: 1 Entrenamiento, 2 Progreso, 3 Plan, 4 Chat,
-      // 5 Privado, 6 Pagos. Resumen (0) nunca lleva marca.
-      expect(find.byKey(TreinoSegmentedPill.markKey(0)), findsNothing);
-      for (final index in [1, 2, 3, 5]) {
+      // Índices de _tabs: 1 Entrenamiento, 2 Progreso, 3 Plan, 4 Privado,
+      // 5 Pagos. Resumen (0) nunca lleva marca. Chat ya no es una pestaña —
+      // su punto de sin-leer vive en la acción del header.
+      expect(find.byKey(alumnoDetailMarcaKey(0)), findsNothing);
+      for (final index in [1, 2, 3, 4]) {
         expect(colorDeMarca(index), palette.textMuted,
             reason: 'la celda $index es contenido, va neutra');
       }
-      for (final index in [4, 6]) {
-        expect(colorDeMarca(index), palette.accentText,
-            reason: 'la celda $index reclama acción, va en acento');
-      }
+      expect(colorDeMarca(5), palette.accentText,
+          reason: 'Pagos reclama acción, va en acento');
 
       // El que importa, y por qué se mide contra la paleta LIGHT a mano: este
       // harness pumpea el tema oscuro, donde `accentText` y `accent` son el
@@ -621,8 +649,8 @@ void main() {
         indicators: const AlumnoDetailIndicators(),
       );
 
-      for (var index = 0; index < 7; index++) {
-        expect(find.byKey(TreinoSegmentedPill.markKey(index)), findsNothing,
+      for (var index = 0; index < 6; index++) {
+        expect(find.byKey(alumnoDetailMarcaKey(index)), findsNothing,
             reason: 'un estado desconocido no pinta punto');
       }
       expect(anuncio('Progreso'), findsOneWidget);
@@ -652,7 +680,6 @@ void main() {
       expect(anuncio('Entrenamiento, con contenido'), findsOneWidget);
       expect(anuncio('Progreso, sin contenido'), findsOneWidget);
       expect(anuncio('Plan, con contenido'), findsOneWidget);
-      expect(anuncio('Chat, con mensajes sin leer'), findsOneWidget);
       expect(anuncio('Privado, sin contenido'), findsOneWidget);
       expect(anuncio('Pagos, con cobro pendiente'), findsOneWidget);
       handle.dispose();
@@ -680,7 +707,9 @@ void main() {
         ],
       );
 
-      await navigateAlumnoDetail(tester, group: 'Chat');
+      // El chat dejó de ser pestaña: se abre desde la acción del header.
+      await tester.tap(find.byTooltip('Chat'));
+      await tester.pumpAndSettle();
 
       // Scoped a ChatDetailPane: el header de arriba (misma pantalla)
       // TAMBIÉN muestra "Agustín" — sería un false-positive si buscáramos
