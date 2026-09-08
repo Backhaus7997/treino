@@ -17,6 +17,7 @@
  *   - active  → active, share MISSING            → REPAIR  ← the lost grant
  *   - active  → paused / terminated              → revoke
  *   - delete (after undefined)                   → revoke
+ *   - delete de un `terminated` NUNCA aceptado   → INERT   ← el purge
  *   - before AND after undefined                 → skipped
  *   - share owned by a different trainer         → never removed
  *
@@ -345,6 +346,55 @@ describe("status leaves active → share revoked", () => {
     const store = installFirestore({ [ATHLETE]: TRAINER_A });
 
     await syncSessionShareHandler(APP, link("active"), undefined);
+
+    expect(store.docs.has(ATHLETE)).toBe(false);
+    expect(store.ops).toEqual([`get:${ATHLETE}`, `delete:${ATHLETE}`]);
+  });
+
+  it("is INERT on delete of a terminated link that was never accepted", async () => {
+    // El purge (purge-rejected-link.ts) borra exactamente estos docs: rechazos
+    // y cancelaciones, `terminated` con `acceptedAt` nunca estampado.
+    //
+    // ESTO ES LO QUE PASARÍA SIN LA GUARDA, y es un robo de datos: el share que
+    // hay en el store es del vínculo VIVO del MISMO par, y como el trainerId
+    // coincide, el chequeo de propiedad de más abajo lo deja pasar y lo borra.
+    // El PF pierde sessions, setLogs y measurements del alumno hasta la próxima
+    // escritura sobre el vínculo vivo.
+    const store = installFirestore({ [ATHLETE]: TRAINER_A });
+
+    await syncSessionShareHandler(
+      APP,
+      link("terminated", TRAINER_A, { acceptedAt: null }),
+      undefined,
+    );
+
+    expect(shareOwner(store)).toBe(TRAINER_A);
+    // Ni siquiera lee: sale antes del `get()`.
+    expect(store.ops).toEqual([]);
+  });
+
+  it("is INERT on delete of a terminated link with acceptedAt absent (not null)", async () => {
+    // Un doc viejo puede no traer la clave. `!= null` cubre los dos.
+    const store = installFirestore({ [ATHLETE]: TRAINER_A });
+
+    await syncSessionShareHandler(APP, link("terminated"), undefined);
+
+    expect(shareOwner(store)).toBe(TRAINER_A);
+    expect(store.ops).toEqual([]);
+  });
+
+  it("STILL revokes on delete of a terminated link that WAS accepted", async () => {
+    // La guarda es del ancho del purge y ni un doc más: un vínculo real
+    // terminado que alguien borra a mano sí tiene un share propio que soltar.
+    const store = installFirestore({ [ATHLETE]: TRAINER_A });
+
+    await syncSessionShareHandler(
+      APP,
+      link("terminated", TRAINER_A, {
+        acceptedAt: { __fakeTimestampMs: 1_700_000_000_000 },
+      }),
+      undefined,
+    );
 
     expect(store.docs.has(ATHLETE)).toBe(false);
     expect(store.ops).toEqual([`get:${ATHLETE}`, `delete:${ATHLETE}`]);

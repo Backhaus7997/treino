@@ -2,7 +2,7 @@
 // Fase 4). Reemplaza `ProximamenteScreen` en `/invitaciones`.
 //
 // Sigue el patrón de `alumnos_screen.dart` (screen de sección Riverpod, sin
-// Scaffold — ADR-CHW-005): TreinoSectionHeader + TreinoFilterChips (3 tabs
+// Scaffold — ADR-CHW-005): TreinoSectionHeader + TreinoFilterChips (2 tabs
 // con badges de conteo) entran con `TreinoFadeSlideIn` staggered; la lista
 // queda fuera del stagger, su cross-fade lo resuelve TreinoStateSwitcher
 // sobre `trainerLinksStreamProvider.when` (plan-fase4.md §3).
@@ -125,7 +125,7 @@ String _stateKeyOf(AsyncValue<Object?> value) {
   return 'data';
 }
 
-/// Chips de tab (Pendientes/Aceptadas/Rechazadas) con badges de conteo real
+/// Chips de tab (Pendientes/Aceptadas) con badges de conteo real
 /// (ADR-F4-02) — single-select, default Pendientes.
 class _TabChips extends ConsumerWidget {
   const _TabChips({required this.tab, required this.counts});
@@ -136,7 +136,6 @@ class _TabChips extends ConsumerWidget {
   static const _labels = {
     SolicitudTab.pendientes: 'Pendientes', // i18n: Fase W1
     SolicitudTab.aceptadas: 'Aceptadas', // i18n: Fase W1
-    SolicitudTab.rechazadas: 'Rechazadas', // i18n: Fase W1
   };
 
   @override
@@ -226,8 +225,6 @@ class _EmptyForTab extends StatelessWidget {
           'No tenés solicitudes pendientes.', // i18n: Fase W1
         SolicitudTab.aceptadas =>
           'Todavía no aceptaste ninguna solicitud.', // i18n: Fase W1
-        SolicitudTab.rechazadas =>
-          'No rechazaste ninguna solicitud.', // i18n: Fase W1
       };
 
   @override
