@@ -21,8 +21,9 @@ import '../../workout/application/stub_factories.dart';
 
 class MockSessionRepository extends Mock implements SessionRepository {}
 
-/// Ancla FIJA para los dos tests cuyo resultado depende de en qué semana ART
-/// caen las sesiones. No se deriva de `DateTime.now()` a propósito.
+/// Ancla FIJA de TODO el archivo — el `setUp` de `main()` la congela para
+/// cada test, no sólo para los dos que dependen de en qué semana ART caen las
+/// sesiones. No se deriva de `DateTime.now()` a propósito.
 ///
 /// ## Por qué (el flake real, no uno hipotético)
 ///
@@ -64,6 +65,25 @@ void main() {
     registerFallbackValue(makeSetLog());
   });
 
+  // Reloj congelado para TODO el archivo, no sólo para los dos tests de racha.
+  //
+  // #999 dejó el seam puesto y arregló el test que estaba rojo. Pero los otros
+  // nueve seguían armando su fixture con `DateTime.now()`, y este archivo ya
+  // rompió `main` DOS veces por leerle la fecha al runner, por causas
+  // distintas:
+  //
+  //   1. 01/09 — el label del radar se comparaba contra `DateFormat('MMM yyyy')`,
+  //      que en es-AR devuelve `sept` (4 chars) sólo para septiembre. Los otros
+  //      once meses coincidían de casualidad.
+  //   2. 08/09 — el fixture de la racha. Es el que arregló #999.
+  //
+  // Cerrar sólo (2) deja la puerta de (1) abierta. Con el `setUp` acá, ningún
+  // test del archivo puede volver a preguntarle la fecha al almanaque: los
+  // fixtures leen `AppClock.now()`, que es el mismo seam que ya usan
+  // `argentinaNow()` y el default de `computeWeeklyStreak`.
+  setUp(() => AppClock.freeze(_anchorNow));
+  tearDown(AppClock.unfreeze);
+
   Widget wrap(
     Widget child, {
     required List<Override> overrides,
@@ -91,7 +111,7 @@ void main() {
 
   testWidgets('renders chart + summary cards when data loads', (tester) async {
     final repo = MockSessionRepository();
-    final now = DateTime.now();
+    final now = AppClock.now();
     when(() => repo.listByUid('u1', limit: any(named: 'limit')))
         .thenAnswer((_) async => [
               makeSession(
@@ -194,7 +214,7 @@ void main() {
       'QA-498: Reintentar en el radar RECUPERA — re-fetchea el catálogo, '
       'no repite su error cacheado', (tester) async {
     final repo = MockSessionRepository();
-    final now = DateTime.now();
+    final now = AppClock.now();
     when(() => repo.listByUid('u1', limit: any(named: 'limit')))
         .thenAnswer((_) async => [
               makeSession(
@@ -256,9 +276,6 @@ void main() {
 
   testWidgets('switching to POR DÍA renders the daily duration chart',
       (tester) async {
-    AppClock.freeze(_anchorNow);
-    addTearDown(AppClock.unfreeze);
-
     final repo = MockSessionRepository();
 
     when(() => repo.listByUid('u1', limit: any(named: 'limit')))
@@ -289,9 +306,6 @@ void main() {
   testWidgets(
       'renders the workout-days streak calendar below the summary cards '
       'for the selected month', (tester) async {
-    AppClock.freeze(_anchorNow);
-    addTearDown(AppClock.unfreeze);
-
     final repo = MockSessionRepository();
     when(() => repo.listByUid('u1', limit: any(named: 'limit')))
         .thenAnswer((_) async => [
@@ -341,7 +355,7 @@ void main() {
       'selecting a different month re-fetches and updates the calendar '
       "trained-day marks (not just a no-crash smoke check)", (tester) async {
     final repo = MockSessionRepository();
-    final now = DateTime.now();
+    final now = AppClock.now();
     final olderMonth = DateTime(now.year, now.month - 2);
 
     when(() => repo.listByUid('u1', limit: any(named: 'limit')))
@@ -411,7 +425,7 @@ void main() {
       'workout-days calendar, with month-name legend labels (AD6/PR5c)',
       (tester) async {
     final repo = MockSessionRepository();
-    final now = DateTime.now();
+    final now = AppClock.now();
     final currentMonthStart = DateTime(now.year, now.month, 1);
 
     when(() => repo.listByUid('u1', limit: any(named: 'limit')))
@@ -466,7 +480,7 @@ void main() {
       'volume-by-group card (real data-delta, not a smoke check)',
       (tester) async {
     final repo = MockSessionRepository();
-    final now = DateTime.now();
+    final now = AppClock.now();
     final olderMonth = DateTime(now.year, now.month - 2);
 
     when(() => repo.listByUid('u1', limit: any(named: 'limit')))
@@ -538,7 +552,7 @@ void main() {
   testWidgets('initialMonth abre la pantalla en ese mes, no en el más reciente',
       (tester) async {
     final repo = MockSessionRepository();
-    final now = DateTime.now();
+    final now = AppClock.now();
     final currentMonthStart = DateTime(now.year, now.month, 1);
     // El mes que el push reportaría: el que cerró.
     final reportedMonth = DateTime(now.year, now.month - 1, 1);
@@ -597,7 +611,7 @@ void main() {
       'un initialMonth fuera de la ventana de 12 meses cae al más reciente, '
       'no a una pantalla vacía', (tester) async {
     final repo = MockSessionRepository();
-    final now = DateTime.now();
+    final now = AppClock.now();
     final currentMonthStart = DateTime(now.year, now.month, 1);
 
     when(() => repo.listByUid('u1', limit: any(named: 'limit')))
