@@ -2,6 +2,26 @@ jest.mock("firebase-admin", () => ({
   firestore: jest.fn(),
 }));
 
+// La puerta MODULAR tiene que dar el MISMO doble que la namespaced de arriba.
+// Sin esto, producción —que importa `getFirestore` de `firebase-admin/firestore`—
+// se lleva el SDK REAL por la puerta de al lado, y esta suite NO se pone roja:
+// sale verde, porque el handler tiene catch-all y varias aserciones prueban por
+// AUSENCIA (`deleteDoc` no llamado). Lo caza `firebase-admin-mock-surface.test.ts`,
+// que es el trinquete de esta migración.
+jest.mock("firebase-admin/app", () => (
+    jest.requireActual("./helpers/modular-from-namespaced") as Record<
+      string,
+      () => unknown
+    >
+  ).app());
+
+jest.mock("firebase-admin/firestore", () => (
+    jest.requireActual("./helpers/modular-from-namespaced") as Record<
+      string,
+      () => unknown
+    >
+  ).firestoreDesdeNamespaced());
+
 jest.mock("firebase-functions", () => ({
   logger: { error: jest.fn(), info: jest.fn(), warn: jest.fn() },
 }));

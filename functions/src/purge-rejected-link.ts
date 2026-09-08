@@ -68,7 +68,8 @@
  * bien pide primero que `session_shares/{athleteId}` sepa de qué `linkId`
  * viene — que es su propio cambio, no una línea acá.
  */
-import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 
 /**
@@ -133,7 +134,7 @@ export function clasificarTerminacion(
  * @returns `true` sólo si borró.
  */
 export async function purgeRejectedLinkHandler(
-  app: admin.app.App,
+  app: App,
   linkId: string,
   causa: CausaDeTerminacion,
 ): Promise<boolean> {
@@ -146,7 +147,7 @@ export async function purgeRejectedLinkHandler(
   }
 
   try {
-    await admin.firestore(app).collection("trainer_links").doc(linkId).delete();
+    await getFirestore(app).collection("trainer_links").doc(linkId).delete();
     return true;
   } catch (error: unknown) {
     logger.error("purgeRejectedLink: no se pudo borrar el rechazo", {
