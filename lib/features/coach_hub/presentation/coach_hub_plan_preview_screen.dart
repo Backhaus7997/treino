@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/analytics/analytics_service.dart';
@@ -952,9 +953,10 @@ class _AthletePicker extends ConsumerWidget {
     // accepted/paused/terminated elsewhere updates the list live. ADR-CHLM-03.
     final linksAsync = ref.watch(trainerLinksStreamProvider);
     return linksAsync.when(
-      loading: () => Center(
-        child: CircularProgressIndicator(color: palette.accent),
-      ),
+      // Skeleton y no spinner: lo que viene es una LISTA de alumnos y su forma
+      // ya la conocemos. El spinner medía 36px y la lista mide varios cientos,
+      // así que al llegar los datos el bloque saltaba.
+      loading: () => const CoachHubSkeleton(filas: 3),
       error: (_, __) => Text(
         'No pudimos cargar tus alumnos.',
         style: TextStyle(color: palette.textMuted),
