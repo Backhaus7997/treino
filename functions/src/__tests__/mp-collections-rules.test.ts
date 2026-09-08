@@ -58,6 +58,8 @@ const RULES_PATH = path.resolve(__dirname, "../../../firestore.rules");
 const TRAINER = "trainer-mp";
 const OTRO = "otro-pf";
 const PLAN = "2c938084";
+/** El id de un evento de webhook ya procesado (= el id del preapproval). */
+const EVENTO = "2c938084726fca480172750000000000";
 
 let testEnv: RulesTestEnvironment;
 
@@ -95,6 +97,11 @@ beforeEach(async () => {
       uid: TRAINER,
       tier: "plan2",
       cycle: "monthly",
+    });
+    await db.collection("mp_webhook_events").doc(EVENTO).set({
+      procesadoMs: 1_000_000,
+      outcome: "written",
+      planId: PLAN,
     });
   });
 });
@@ -205,6 +212,39 @@ describe("mp_plans — escribir acá es elegirse el plan", () => {
     // logea warn — ruido, y un paso más cerca de que no se pueda determinar el
     // plan.
     await assertFails(col.doc(PLAN).delete());
+  });
+});
+
+describe("mp_webhook_events — escribirlo es hacer desaparecer un pago", () => {
+  it("nadie lo lee: ni un PF, ni un tercero, ni un anónimo", async () => {
+    // Leerlo filtra qué ids de suscripción existen y cuándo se movieron.
+    const p = (db: firebase.firestore.Firestore) =>
+      db.collection("mp_webhook_events").doc(EVENTO).get();
+    await assertFails(p(dbDe(TRAINER)));
+    await assertFails(p(dbDe(OTRO)));
+    await assertFails(p(anonimo()));
+  });
+
+  it("el listado tampoco", async () => {
+    await assertFails(dbDe(TRAINER).collection("mp_webhook_events").get());
+  });
+
+  it("nadie puede marcar un evento como ya procesado", async () => {
+    // Es el ataque que esta colección habilita si se abre: el dedupe corta
+    // ANTES de consultarle a Mercado Pago, así que plantar el doc de un evento
+    // que todavía no llegó hace que el webhook lo descarte — y al PF que pagó
+    // no se le acredita el plan hasta el barrido de las 03:00.
+    await assertFails(
+      dbDe(OTRO).collection("mp_webhook_events").doc("evento-que-viene").set({
+        procesadoMs: 9_999_999_999,
+      }),
+    );
+  });
+
+  it("ni empujar hacia adelante el de uno que ya existe, ni borrarlo", async () => {
+    const col = dbDe(TRAINER).collection("mp_webhook_events");
+    await assertFails(col.doc(EVENTO).update({ procesadoMs: 9_999_999_999 }));
+    await assertFails(col.doc(EVENTO).delete());
   });
 });
 

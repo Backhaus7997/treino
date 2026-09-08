@@ -90,6 +90,15 @@ export interface MpPreapproval {
   init_point?: unknown;
   /** Nuestro enganche al uid de Firebase. Lo mandamos nosotros al crear. */
   external_reference?: unknown;
+  /**
+   * El plan contra el que se creo la suscripcion.
+   *
+   * Es lo que hace posible el webhook: un evento trae un id de SUSCRIPCION, y
+   * este campo es el unico puente hasta el plan —que es lo que `mp_plans`
+   * keyea y lo que `reconcileSubscription` recibe—. Verificado en la respuesta
+   * de ejemplo de `GET /preapproval/{id}` de la referencia oficial.
+   */
+  preapproval_plan_id?: unknown;
   /** ISO 8601 del proximo cobro programado. */
   next_payment_date?: unknown;
   payer_id?: unknown;
