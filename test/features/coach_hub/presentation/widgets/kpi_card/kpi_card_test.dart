@@ -107,17 +107,21 @@ void main() {
       ));
       await tester.pump();
 
-      // El fondo pasó de color plano al glow mint de la welcome card, así que
-      // lo que cambia en hover es la intensidad del degradé, no un `color`.
-      Color decorationColor() {
+      // En reposo la card es fondo PLANO —el glow se sacó porque cuatro
+      // degradados idénticos en fila se leen como textura, no como acento— y
+      // con hover aparece el degradé. O sea que lo que cambia entre los dos
+      // estados no es un valor: es cuál de los dos campos de `BoxDecoration`
+      // está poblado.
+      BoxDecoration decoration() {
         final container = tester.widget<AnimatedContainer>(
           find.byKey(const Key('kpi_card_root')),
         );
-        final decoration = container.decoration! as BoxDecoration;
-        return (decoration.gradient! as LinearGradient).colors.first;
+        return container.decoration! as BoxDecoration;
       }
 
-      final normalColor = decorationColor();
+      final reposo = decoration();
+      expect(reposo.gradient, isNull);
+      expect(reposo.color, isNotNull);
 
       final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
       await gesture.addPointer(location: Offset.zero);
@@ -126,9 +130,16 @@ void main() {
           .moveTo(tester.getCenter(find.byKey(const Key('kpi_card_root'))));
       await tester.pump();
 
-      final hoverColor = decorationColor();
-      expect(hoverColor, isNot(equals(normalColor)),
-          reason: 'el color de fondo debe cambiar realmente en hover');
+      final hover = decoration();
+      expect(
+        hover.gradient,
+        isNotNull,
+        reason: 'con hover el glow aparece: una card encendida entre cuatro '
+            'apagadas SÍ informa, cuatro encendidas a la vez no',
+      );
+      expect(hover.color, isNull, reason: 'gradient y color se excluyen');
+      expect(hover.border, isNot(equals(reposo.border)),
+          reason: 'el borde también acompaña el hover');
     });
 
     // -------------------------------------------------------------------------

@@ -139,14 +139,24 @@ class KpiCard extends StatelessWidget {
           duration: AppMotion.resolve(ctx, AppMotion.fast),
           curve: AppMotion.standard,
           decoration: BoxDecoration(
-            // El glow de la welcome card, al 6% en vez del 12%: son cuatro
-            // en fila y a intensidad plena la tira compite con el hero en vez
-            // de acompañarlo. El hover lo sube — es el mismo gesto de siempre
-            // (la card se aclara), contado en el idioma de la pantalla.
-            gradient: TreinoCardTokens.glow(
-              ctx,
-              alpha: highlighted ? 0.14 : 0.06,
-            ),
+            // EN REPOSO NO HAY GLOW. Sólo aparece con el hover.
+            //
+            // Bajarlo al 6% no alcanzaba: el problema de cuatro KPIs en fila
+            // no es la intensidad, es la REPETICIÓN. Cuatro degradados
+            // idénticos uno al lado del otro dejan de leerse como un acento y
+            // pasan a leerse como una textura de fondo — y encima le comen la
+            // jerarquía al hero, que es exactamente lo que el dartdoc de
+            // `TreinoCardTokens.glow` dice que hay que evitar.
+            //
+            // El acento se gasta en UN lugar. Ese lugar es el hero, que es uno
+            // solo y domina la pantalla; la tira de KPIs se apoya en el borde,
+            // que ya la separa del fondo.
+            //
+            // Con el hover sí vuelve, y ahí sirve: es UNA card iluminándose
+            // entre cuatro apagadas, o sea información, no decoración.
+            gradient:
+                highlighted ? TreinoCardTokens.glow(ctx, alpha: 0.14) : null,
+            color: highlighted ? null : tokens.background,
             border: Border.all(
               color: highlighted ? p.borderHover : tokens.border,
             ),
