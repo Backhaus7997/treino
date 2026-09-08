@@ -104,6 +104,9 @@ class _StubFileRepo implements AthleteFileRepository {
   final List<AthleteFile> deleted = [];
   final List<Uint8List> uploadedBytes = [];
 
+  /// Toggles de visibilidad pedidos, en orden: `(id del archivo, compartido)`.
+  final List<(String, bool)> sharedToggles = [];
+
   @override
   Future<AthleteFile> upload({
     required String trainerId,
@@ -111,6 +114,7 @@ class _StubFileRepo implements AthleteFileRepository {
     required String fileName,
     required String contentType,
     required Uint8List bytes,
+    bool sharedWithAthlete = true,
   }) async {
     uploadedBytes.add(bytes);
     return _file(id: 'new-${uploadedBytes.length}', fileName: fileName);
@@ -119,6 +123,15 @@ class _StubFileRepo implements AthleteFileRepository {
   @override
   Stream<List<AthleteFile>> watch(String trainerId, String athleteId) =>
       const Stream.empty();
+
+  @override
+  Stream<List<AthleteFile>> watchSharedForAthlete(String athleteId) =>
+      const Stream.empty();
+
+  @override
+  Future<void> setShared(AthleteFile file, bool shared) async {
+    sharedToggles.add((file.id, shared));
+  }
 
   @override
   Future<void> delete(AthleteFile file) async {

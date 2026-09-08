@@ -101,11 +101,17 @@ class _StubFileRepo implements AthleteFileRepository {
     required String fileName,
     required String contentType,
     required dynamic bytes,
+    bool sharedWithAthlete = true,
   }) async =>
       throw UnimplementedError();
   @override
   Stream<List<AthleteFile>> watch(String trainerId, String athleteId) =>
       const Stream.empty();
+  @override
+  Stream<List<AthleteFile>> watchSharedForAthlete(String athleteId) =>
+      const Stream.empty();
+  @override
+  Future<void> setShared(AthleteFile file, bool shared) async {}
   @override
   Future<void> delete(AthleteFile file) async {}
 }

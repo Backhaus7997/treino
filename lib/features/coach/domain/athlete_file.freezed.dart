@@ -31,6 +31,7 @@ mixin _$AthleteFile {
   String get downloadUrl => throw _privateConstructorUsedError;
   @TimestampConverter()
   DateTime get uploadedAt => throw _privateConstructorUsedError;
+  bool get sharedWithAthlete => throw _privateConstructorUsedError;
 
   /// Serializes this AthleteFile to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -58,7 +59,8 @@ abstract class $AthleteFileCopyWith<$Res> {
       int sizeBytes,
       String storagePath,
       String downloadUrl,
-      @TimestampConverter() DateTime uploadedAt});
+      @TimestampConverter() DateTime uploadedAt,
+      bool sharedWithAthlete});
 }
 
 /// @nodoc
@@ -86,6 +88,7 @@ class _$AthleteFileCopyWithImpl<$Res, $Val extends AthleteFile>
     Object? storagePath = null,
     Object? downloadUrl = null,
     Object? uploadedAt = null,
+    Object? sharedWithAthlete = null,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -128,6 +131,10 @@ class _$AthleteFileCopyWithImpl<$Res, $Val extends AthleteFile>
           ? _value.uploadedAt
           : uploadedAt // ignore: cast_nullable_to_non_nullable
               as DateTime,
+      sharedWithAthlete: null == sharedWithAthlete
+          ? _value.sharedWithAthlete
+          : sharedWithAthlete // ignore: cast_nullable_to_non_nullable
+              as bool,
     ) as $Val);
   }
 }
@@ -150,7 +157,8 @@ abstract class _$$AthleteFileImplCopyWith<$Res>
       int sizeBytes,
       String storagePath,
       String downloadUrl,
-      @TimestampConverter() DateTime uploadedAt});
+      @TimestampConverter() DateTime uploadedAt,
+      bool sharedWithAthlete});
 }
 
 /// @nodoc
@@ -176,6 +184,7 @@ class __$$AthleteFileImplCopyWithImpl<$Res>
     Object? storagePath = null,
     Object? downloadUrl = null,
     Object? uploadedAt = null,
+    Object? sharedWithAthlete = null,
   }) {
     return _then(_$AthleteFileImpl(
       id: null == id
@@ -218,6 +227,10 @@ class __$$AthleteFileImplCopyWithImpl<$Res>
           ? _value.uploadedAt
           : uploadedAt // ignore: cast_nullable_to_non_nullable
               as DateTime,
+      sharedWithAthlete: null == sharedWithAthlete
+          ? _value.sharedWithAthlete
+          : sharedWithAthlete // ignore: cast_nullable_to_non_nullable
+              as bool,
     ));
   }
 }
@@ -235,7 +248,8 @@ class _$AthleteFileImpl implements _AthleteFile {
       required this.sizeBytes,
       required this.storagePath,
       required this.downloadUrl,
-      @TimestampConverter() required this.uploadedAt});
+      @TimestampConverter() required this.uploadedAt,
+      this.sharedWithAthlete = false});
 
   factory _$AthleteFileImpl.fromJson(Map<String, dynamic> json) =>
       _$$AthleteFileImplFromJson(json);
@@ -261,10 +275,13 @@ class _$AthleteFileImpl implements _AthleteFile {
   @override
   @TimestampConverter()
   final DateTime uploadedAt;
+  @override
+  @JsonKey()
+  final bool sharedWithAthlete;
 
   @override
   String toString() {
-    return 'AthleteFile(id: $id, trainerId: $trainerId, athleteId: $athleteId, fileName: $fileName, kind: $kind, contentType: $contentType, sizeBytes: $sizeBytes, storagePath: $storagePath, downloadUrl: $downloadUrl, uploadedAt: $uploadedAt)';
+    return 'AthleteFile(id: $id, trainerId: $trainerId, athleteId: $athleteId, fileName: $fileName, kind: $kind, contentType: $contentType, sizeBytes: $sizeBytes, storagePath: $storagePath, downloadUrl: $downloadUrl, uploadedAt: $uploadedAt, sharedWithAthlete: $sharedWithAthlete)';
   }
 
   @override
@@ -289,7 +306,9 @@ class _$AthleteFileImpl implements _AthleteFile {
             (identical(other.downloadUrl, downloadUrl) ||
                 other.downloadUrl == downloadUrl) &&
             (identical(other.uploadedAt, uploadedAt) ||
-                other.uploadedAt == uploadedAt));
+                other.uploadedAt == uploadedAt) &&
+            (identical(other.sharedWithAthlete, sharedWithAthlete) ||
+                other.sharedWithAthlete == sharedWithAthlete));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -305,7 +324,8 @@ class _$AthleteFileImpl implements _AthleteFile {
       sizeBytes,
       storagePath,
       downloadUrl,
-      uploadedAt);
+      uploadedAt,
+      sharedWithAthlete);
 
   /// Create a copy of AthleteFile
   /// with the given fields replaced by the non-null parameter values.
@@ -325,17 +345,17 @@ class _$AthleteFileImpl implements _AthleteFile {
 
 abstract class _AthleteFile implements AthleteFile {
   const factory _AthleteFile(
-          {required final String id,
-          required final String trainerId,
-          required final String athleteId,
-          required final String fileName,
-          required final AthleteFileKind kind,
-          required final String contentType,
-          required final int sizeBytes,
-          required final String storagePath,
-          required final String downloadUrl,
-          @TimestampConverter() required final DateTime uploadedAt}) =
-      _$AthleteFileImpl;
+      {required final String id,
+      required final String trainerId,
+      required final String athleteId,
+      required final String fileName,
+      required final AthleteFileKind kind,
+      required final String contentType,
+      required final int sizeBytes,
+      required final String storagePath,
+      required final String downloadUrl,
+      @TimestampConverter() required final DateTime uploadedAt,
+      final bool sharedWithAthlete}) = _$AthleteFileImpl;
 
   factory _AthleteFile.fromJson(Map<String, dynamic> json) =
       _$AthleteFileImpl.fromJson;
@@ -361,6 +381,8 @@ abstract class _AthleteFile implements AthleteFile {
   @override
   @TimestampConverter()
   DateTime get uploadedAt;
+  @override
+  bool get sharedWithAthlete;
 
   /// Create a copy of AthleteFile
   /// with the given fields replaced by the non-null parameter values.
