@@ -242,6 +242,10 @@ class LinkStateCard extends ConsumerWidget {
                 _ShareInfo(palette: palette),
                 const SizedBox(height: 12),
                 _AgendaButton(trainerId: link.trainerId),
+                const SizedBox(height: 12),
+                const _NutritionPlanButton(),
+                const SizedBox(height: 12),
+                const _AthleteFilesButton(),
                 const SizedBox(height: 16),
                 _CuotaSection(link: link),
               ],
@@ -637,6 +641,76 @@ class _AgendaButton extends StatelessWidget {
         icon: Icon(TreinoIcon.tabWorkout, size: 18, color: palette.accent),
         label: Text(
           l10n.agendaButtonLabel,
+          style: GoogleFonts.barlowCondensed(
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
+            letterSpacing: 0.8,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NutritionPlanButton extends StatelessWidget {
+  const _NutritionPlanButton();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
+    final palette = AppPalette.of(context);
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: () => context.push('/coach/nutricion'),
+        style: OutlinedButton.styleFrom(
+          side: BorderSide(color: palette.accent, width: 1),
+          foregroundColor: palette.accent,
+          minimumSize: const Size.fromHeight(48),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.full),
+          ),
+        ),
+        icon: Icon(
+          TreinoIcon.sidebarNutricion,
+          size: 18,
+          color: palette.accent,
+        ),
+        label: Text(
+          l10n.athleteNutritionPlanButtonLabel,
+          style: GoogleFonts.barlowCondensed(
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
+            letterSpacing: 0.8,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AthleteFilesButton extends StatelessWidget {
+  const _AthleteFilesButton();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppL10n.of(context);
+    final palette = AppPalette.of(context);
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: () => context.push('/coach/archivos'),
+        style: OutlinedButton.styleFrom(
+          side: BorderSide(color: palette.accent, width: 1),
+          foregroundColor: palette.accent,
+          minimumSize: const Size.fromHeight(48),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.full),
+          ),
+        ),
+        icon: Icon(TreinoIcon.file, size: 18, color: palette.accent),
+        label: Text(
+          l10n.athleteFilesButtonLabel,
           style: GoogleFonts.barlowCondensed(
             fontWeight: FontWeight.w700,
             fontSize: 13,

@@ -22,6 +22,8 @@ import '../features/chat/presentation/chat_screen.dart';
 import '../features/coach/coach_screen.dart';
 import '../features/coach/application/trainer_link_providers.dart';
 import '../features/coach/presentation/athlete_agenda_screen.dart';
+import '../features/coach/presentation/athlete_files_screen.dart';
+import '../features/coach/presentation/athlete_nutrition_plan_screen.dart';
 import '../features/coach/presentation/athlete_detail_screen.dart';
 import '../features/coach/presentation/availability_editor_screen.dart';
 import '../features/coach/presentation/trainer_public_profile_screen.dart';
@@ -79,6 +81,7 @@ import 'theme/app_background.dart';
 import 'theme/app_motion.dart';
 import '../features/coach/application/pending_invite_providers.dart';
 import '../features/coach/domain/invite_capture.dart';
+import '../l10n/app_l10n.dart';
 
 const _kTabs = ['/workout', '/feed', '/home', '/coach', '/profile'];
 
@@ -848,6 +851,15 @@ GoRouter buildRouter({
                 builder: (_, __) => _withBg(const _AthleteAgendaRouteHost()),
               ),
               GoRoute(
+                path: 'nutricion',
+                builder: (_, __) =>
+                    _withBg(const _AthleteNutritionPlanRouteHost()),
+              ),
+              GoRoute(
+                path: 'archivos',
+                builder: (_, __) => _withBg(const _AthleteFilesRouteHost()),
+              ),
+              GoRoute(
                 path: 'availability-editor',
                 builder: (context, state) {
                   final uid = state.uri.queryParameters['trainerId'] ?? '';
@@ -1186,6 +1198,59 @@ class _AthleteAgendaRouteHost extends ConsumerWidget {
         );
       },
     );
+  }
+}
+
+/// Resuelve el vínculo activo y el uid del alumno para abrir su plan.
+class _AthleteNutritionPlanRouteHost extends ConsumerWidget {
+  const _AthleteNutritionPlanRouteHost();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final athleteId = ref.watch(currentUidProvider) ?? '';
+    final linkAsync = ref.watch(currentAthleteLinkProvider);
+
+    return linkAsync.when(
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      error: (_, __) => Scaffold(
+        body: Center(
+          child: Text(AppL10n.of(context).athleteNutritionPlanLoadError),
+        ),
+      ),
+      data: (link) {
+        final trainerId = link?.trainerId ?? '';
+        if (trainerId.isEmpty || athleteId.isEmpty) {
+          return Scaffold(
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Text(
+                  AppL10n.of(context).athleteNutritionNeedsActiveLink,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+          );
+        }
+        return AthleteNutritionPlanScreen(
+          trainerId: trainerId,
+          athleteId: athleteId,
+        );
+      },
+    );
+  }
+}
+
+/// El alumno ve todos sus archivos compartidos, sin scope por entrenador.
+class _AthleteFilesRouteHost extends ConsumerWidget {
+  const _AthleteFilesRouteHost();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final athleteId = ref.watch(currentUidProvider) ?? '';
+    return AthleteFilesScreen(athleteId: athleteId);
   }
 }
 
