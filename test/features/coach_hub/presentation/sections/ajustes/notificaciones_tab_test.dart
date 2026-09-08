@@ -52,6 +52,47 @@ Widget _harness({
 void main() {
   setUpAll(() => registerFallbackValue(<String, Object?>{}));
 
+  // Encontrado en revisión automática (Codex, P2 sobre el PR #997): ocultar la
+  // casilla no alcanzaba. `toFirestore` serializa desde `_matrix`, no desde lo
+  // que la UI muestra, así que un `whatsapp: true` viejo sobrevivía a cada
+  // guardado y el día que el canal exista esos PF recibirían mensajes que
+  // creían haber apagado. La UI decía "off" y el dato decía "on".
+  group('NotifPrefs — WhatsApp no se persiste mientras el canal no exista', () {
+    Map<String, dynamic> conWhatsappPrendido() => {
+          for (final t in kNotifTypes)
+            t.key: {'email': false, 'push': true, 'whatsapp': true},
+        };
+
+    test('un true guardado se lee como false', () {
+      final prefs = NotifPrefs.fromFirestore(conWhatsappPrendido());
+      for (final t in kNotifTypes) {
+        expect(prefs.isOn(t.key, NotifChannel.whatsapp), isFalse,
+            reason: t.key);
+      }
+    });
+
+    test('guardar de nuevo NO re-serializa el true viejo: lo limpia', () {
+      final prefs = NotifPrefs.fromFirestore(conWhatsappPrendido());
+      // Togglear OTRA columna es lo que dispara el guardado real en la UI.
+      final guardado = prefs
+          .toggle(kNotifTypes.first.key, NotifChannel.email, true)
+          .toFirestore();
+
+      for (final t in kNotifTypes) {
+        expect((guardado[t.key] as Map)['whatsapp'], false, reason: t.key);
+      }
+    });
+
+    test('email y push conservan lo que el PF eligió', () {
+      final prefs = NotifPrefs.fromFirestore(conWhatsappPrendido());
+      final guardado = prefs.toFirestore();
+      for (final t in kNotifTypes) {
+        expect((guardado[t.key] as Map)['email'], false, reason: t.key);
+        expect((guardado[t.key] as Map)['push'], true, reason: t.key);
+      }
+    });
+  });
+
   group('NotificacionesTab — estados async y motion (Fase 12 WU-05)', () {
     testWidgets('loading: muestra el skeleton de la matriz, no el spinner',
         (tester) async {
@@ -103,6 +144,53 @@ void main() {
       final prefs = captured['notificationPrefs'] as Map<String, dynamic>;
       expect((prefs['nueva_solicitud'] as Map)['email'], false);
       expect((prefs['nueva_solicitud'] as Map)['push'], true);
+    });
+
+    testWidgets('WhatsApp está deshabilitado pero Email y Push siguen activos',
+        (tester) async {
+      await tester.pumpWidget(
+        _harness(prefsStream: Stream.value(NotifPrefs.fromFirestore(null))),
+      );
+      await tester.pumpAndSettle();
+
+      final checkboxes = tester
+          .widgetList<Checkbox>(find.byType(Checkbox))
+          .toList(growable: false);
+      expect(checkboxes, hasLength(kNotifTypes.length * 3));
+
+      for (var row = 0; row < kNotifTypes.length; row++) {
+        expect(checkboxes[row * 3].onChanged, isNotNull, reason: 'Email');
+        expect(checkboxes[row * 3 + 1].onChanged, isNotNull, reason: 'Push');
+        expect(checkboxes[row * 3 + 2].onChanged, isNull, reason: 'WhatsApp');
+      }
+    });
+
+    // Regresión: la columna se pudo tildar desde W3.2, así que hay PF con
+    // `whatsapp: true` guardado. Deshabilitar la casilla sin bajar el valor la
+    // dejaría tildada Y sin forma de destildarla — o sea, prometiendo entrega
+    // por un canal que no existe y encima trabando el control. Peor que antes.
+    testWidgets('WhatsApp se ve destildado aunque haya un true guardado',
+        (tester) async {
+      final guardado = NotifPrefs.fromFirestore(<String, dynamic>{
+        for (final t in kNotifTypes)
+          t.key: <String, dynamic>{
+            'email': false,
+            'push': true,
+            'whatsapp': true,
+          },
+      });
+
+      await tester.pumpWidget(_harness(prefsStream: Stream.value(guardado)));
+      await tester.pumpAndSettle();
+
+      final checkboxes = tester
+          .widgetList<Checkbox>(find.byType(Checkbox))
+          .toList(growable: false);
+
+      for (var row = 0; row < kNotifTypes.length; row++) {
+        expect(checkboxes[row * 3 + 2].value, isFalse,
+            reason: 'WhatsApp fila $row');
+      }
     });
 
     testWidgets('error: copy honesto sin crashear', (tester) async {

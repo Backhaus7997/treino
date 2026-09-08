@@ -9,6 +9,9 @@
  *   - Stale token cleanup on `messaging/registration-token-not-registered` and
  *     `messaging/invalid-registration-token` per BatchResponse inspection.
  *   - Empty or absent `fcmTokens` arrays are skipped silently with a log line.
+ *   - When a producer supplies `prefKey`, an explicit
+ *     `notificationPrefs[prefKey].push === false` skips FCM for that uid;
+ *     absent preferences default to sending.
  *   - History persistence and FCM dispatch are independent effects: either may
  *     fail without preventing the other from being attempted.
  *   - Body length enforcement lives in the per-trigger CFs, NOT here.
@@ -58,6 +61,8 @@ export interface SendFcmInput {
   data: Record<string, string>;
   /** User who caused the event, when the source event has one. */
   actorUid?: string;
+  /** Coach Hub preference row that gates only the operating-system push. */
+  prefKey?: string;
 }
 
 /** Aggregated send result returned by sendFcm. */
@@ -79,7 +84,7 @@ export async function sendFcm(
   input: SendFcmInput,
   messaging?: Messaging,
 ): Promise<SendFcmResult> {
-  const { uids, kind, notification, data, actorUid } = input;
+  const { uids, kind, notification, data, actorUid, prefKey } = input;
 
   // Short-circuit: no recipients.
   if (uids.length === 0) {
@@ -90,8 +95,10 @@ export async function sendFcm(
   const msg = messaging ?? getMessaging(app);
 
   // Start history persistence before reading tokens. It is deliberately
-  // isolated from FCM: no-token users still get history, and history failures
-  // are warned but never reject sendFcm.
+  // isolated from FCM: no-token users and users who disabled push still get
+  // history in the in-app notification center. The preference gates the OS
+  // banner only; removing history would remove information, not change its
+  // delivery channel. History failures are warned but never reject sendFcm.
   const historyWrite = Promise.all(
     uids.map(async (uid) => {
       const historyData: Record<string, unknown> = {
@@ -121,9 +128,22 @@ export async function sendFcm(
   const perUidTokens = await Promise.all(
     uids.map(async (uid): Promise<TokenEntry[]> => {
       const snap = await db.collection("users").doc(uid).get();
-      const tokens: string[] = snap.exists
-        ? ((snap.data()?.fcmTokens as string[] | undefined) ?? [])
-        : [];
+      const userData = snap.exists ? snap.data() : undefined;
+      const prefs = userData?.notificationPrefs as
+        | Record<string, Record<string, boolean> | undefined>
+        | undefined;
+
+      // Match the email channel contract: only an explicit false opts out.
+      // Existing users usually have no notificationPrefs field, so absence
+      // must keep sending. This reuses the same user snapshot as fcmTokens and
+      // therefore adds no Firestore reads.
+      if (prefKey && prefs?.[prefKey]?.push === false) {
+        logger.info("sendFcm: push channel off, skipping", { uid, prefKey });
+        return [];
+      }
+
+      const tokens: string[] =
+        (userData?.fcmTokens as string[] | undefined) ?? [];
 
       if (tokens.length === 0) {
         logger.info(`sendFcm: no tokens for uid=${uid}, skipping`);
