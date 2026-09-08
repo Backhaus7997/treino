@@ -29,6 +29,8 @@ import 'widgets/exercise_video_player.dart';
 import 'widgets/personal_records_list.dart';
 import 'widgets/stat_tile.dart';
 import 'widgets/technique_instruction_item.dart';
+import '../../paywall/application/athlete_entitlement_provider.dart';
+import '../../paywall/presentation/free_plan_limit_sheet.dart';
 
 // Display-name maps. Data from Firestore is stored in English (e.g. 'chest',
 // 'compound') so the UI translates to Spanish at render time. Unknown values
@@ -343,10 +345,15 @@ class _PersonalStatsBlockState extends ConsumerState<_PersonalStatsBlock> {
                 last30dLabel: l10n.progressionPeriodLast30Days,
                 thisWeekLabel: l10n.progressionPeriodThisWeek,
                 monthLabel: l10n.progressionPeriodMonth,
-last3mLabel: l10n.progressionPeriodLast3Months,
-last1yLabel: l10n.progressionPeriodLast1Year,
+                last3mLabel: l10n.progressionPeriodLast3Months,
+                last1yLabel: l10n.progressionPeriodLast1Year,
               ),
               onSelect: (p) => setState(() => _period = p),
+              lockedPeriods: ref.watch(lockedChartPeriodsProvider),
+              onLockedTap: (_) => showFreePlanLimitSheet(
+                context,
+                limit: FreePlanLimit.chartHistory,
+              ),
             ),
           ],
         ),
