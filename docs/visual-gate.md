@@ -184,11 +184,64 @@ En el PR, contá **qué cambió y por qué** — el commit de los PNG lo firma u
 bot, así que el único lugar donde queda la intención es tu descripción. El log
 del job lista los archivos que cambiaron.
 
-> **El commit del bot no dispara CI por sí solo.** GitHub deja los runs de un
-> push hecho con `GITHUB_TOKEN` en `action_required`, esperando aprobación
-> manual: es su guardia contra bucles de automatización. Después del `git pull`,
-> tu próximo push —aunque sea el que actualiza la descripción— los corre
-> normalmente. Si no tenés nada que pushear, aprobalos desde la pestaña Actions.
+> **La guarda de recursión del `GITHUB_TOKEN` bloquea una mitad, no las dos.**
+> GitHub no crea runs nuevos para eventos causados por `GITHUB_TOKEN` — es real,
+> y acá se mide: **ninguno** de los 8 commits de goldens del bot generó un run de
+> evento `push`, contra 1 de 1 en cada push humano a la misma rama.
+>
+> Pero `ci.yml` **no escucha `push` en ramas** (sólo en `main`): sobre una rama
+> escucha `pull_request`, y ese evento **sí se dispara** con el push del bot. En
+> los PR #987 y #959 el run nació 6 segundos después del commit del bot, con
+> `actor=github-actions[bot]` y el PR abierto desde hacía media hora.
+>
+> ```bash
+> git log --all --author='github-actions' --format='%H %h' | while read full short; do
+>   runs="repos/Backhaus7997/treino/actions/runs?head_sha=$full"
+>   echo "$short push:$(gh api "$runs" --jq '[.workflow_runs[]|select(.event=="push")]|length')" \
+>        "pull_request:$(gh api "$runs" --jq '[.workflow_runs[]|select(.event=="pull_request")]|length')"
+> done
+> ```
+>
+> `push:0` en los 8 —ahí está la guarda— y `pull_request:2` en los 6 que tenían un
+> PR abierto y sano. Los dos que dan `0 0` son los que se regeneraron **antes** de
+> abrir el PR.
+>
+> De ahí que quedarse sin checks tenga dos causas, y ninguna sea quién pushea:
+>
+> - **El PR todavía no está abierto.** Sin PR no hay `pull_request` al que
+>   colgarse, y el `push` lo come la guarda. Pasó en el #998 (bot 12:37, PR
+>   abierto 12:44) y en el #949 (bot 18:00, PR abierto 18:11).
+> - **El PR está en conflicto con la base.** `pull_request` no valida tu rama
+>   sola: valida el **merge** de tu rama con `main` — es la misma distinción de la
+>   tabla de acá abajo. Sin `refs/pull/N/merge` no hay árbol que validar y el run
+>   no se crea.
+>
+> En los dos casos **el run no existe**: no está en rojo, no está encolado y no
+> está en `action_required` esperando aprobación. Por eso tampoco hay nada que
+> aprobar en la pestaña Actions, y `ci.yml` no tiene `workflow_dispatch` para
+> lanzarlo a mano.
+>
+> **Lo que destraba es el PR, no el push.** Abrilo si falta; si está en conflicto,
+> resolvelo — el `git merge origin/main` genera por sí mismo el `synchronize` que
+> corre todo.
+>
+> ```bash
+> gh pr view --json mergeable --jq .mergeable   # CONFLICTING = no va a haber run
+> gh run list --branch "$(git branch --show-current)"
+> ```
+>
+> Mirá **`mergeable`, no `mergeStateStatus`**: este último dice `UNSTABLE` con
+> checks corriendo o fallando, `BEHIND` si la rama quedó atrás y `BLOCKED` si
+> falta un approve. Ninguno de esos tres es un conflicto, y en los tres el run ya
+> existe — usar `CLEAN` como criterio manda a buscar un conflicto que no está.
+>
+> Que la autoría no es lo que destraba lo probó el #998 sin querer, con dos pushes
+> humanos a la misma rama: el `git commit --allow-empty` de las 12:47 **no corrió
+> nada** —el conflicto seguía en pie— y el merge de `origin/main` de las 12:52
+> corrió CI a las 12:53. Hasta este texto el doc decía que los runs quedaban en
+> `action_required` y mandaba a aprobarlos desde Actions: un remedio imposible
+> sobre un run que no existe, que es exactamente la advertencia falsa que
+> AGENTS.md §11.1 prohíbe.
 
 ### Traé `main` a tu rama ANTES de regenerar
 
