@@ -77,7 +77,7 @@ class CustomExerciseOnboardingArt extends StatelessWidget {
             // `textPrimary` inverts with the theme for free.
             color: palette.textPrimary.withValues(alpha: 0.05),
             border: Border.all(
-              color: palette.textPrimary.withValues(alpha: 0.10),
+              color: palette.textPrimary.withValues(alpha: 0.1),
             ),
             borderRadius: BorderRadius.circular(AppRadius.md),
           ),
@@ -317,7 +317,7 @@ class _VideoBody extends StatelessWidget {
         const SizedBox(height: 12),
         _DashedBox(
           color: palette.accent,
-          fill: palette.accent.withValues(alpha: 0.10),
+          fill: palette.accent.withValues(alpha: 0.1),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(
@@ -390,7 +390,7 @@ class _VideoPlayer extends StatelessWidget {
           Icon(
             TreinoIcon.play,
             size: 24,
-            color: AppColors.bone.withValues(alpha: 0.90),
+            color: AppColors.bone.withValues(alpha: 0.9),
           ),
           Positioned(
             top: 8,
@@ -803,7 +803,7 @@ class _FieldLabel extends StatelessWidget {
         fontSize: 10,
         fontWeight: FontWeight.w600,
         height: 1.0,
-        color: palette.textPrimary.withValues(alpha: 0.50),
+        color: palette.textPrimary.withValues(alpha: 0.5),
       ),
     );
   }

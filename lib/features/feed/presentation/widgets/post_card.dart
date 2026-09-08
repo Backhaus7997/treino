@@ -79,7 +79,7 @@ class PostCard extends ConsumerWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: palette.accent.withValues(alpha: 0.10),
+            color: palette.accent.withValues(alpha: 0.1),
             blurRadius: 10,
             spreadRadius: 0,
             offset: Offset.zero,

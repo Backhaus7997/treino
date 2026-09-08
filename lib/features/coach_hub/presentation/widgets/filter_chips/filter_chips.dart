@@ -211,7 +211,7 @@ class _ChipItem extends StatelessWidget {
                   style: TextStyle(
                     fontFamily: AppFonts.barlow,
                     fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                    fontSize: 14,
+                    fontSize: AppTextSize.body,
                     color: fg,
                   ),
                 ),
@@ -232,7 +232,7 @@ class _ChipItem extends StatelessWidget {
                     style: TextStyle(
                       fontFamily: AppFonts.barlow,
                       fontWeight: FontWeight.w700,
-                      fontSize: 10,
+                      fontSize: AppTextSize.micro,
                       color: badgeTokens.foreground,
                     ),
                   ),

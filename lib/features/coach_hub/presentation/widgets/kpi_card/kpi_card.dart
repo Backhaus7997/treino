@@ -239,7 +239,7 @@ class _CardContent extends StatelessWidget {
           style: TextStyle(
             fontFamily: AppFonts.barlow,
             fontWeight: FontWeight.w400,
-            fontSize: 12,
+            fontSize: AppTextSize.caption,
             color: tokens.titleColor,
           ),
         ),
@@ -249,7 +249,7 @@ class _CardContent extends StatelessWidget {
             final valueStyle = TextStyle(
               fontFamily: AppFonts.barlowCondensed,
               fontWeight: FontWeight.w700,
-              fontSize: 28,
+              fontSize: AppTextSize.display,
               color: tokens.valueColor,
             );
             return valueBuilder?.call(ctx, valueStyle) ??
@@ -263,7 +263,7 @@ class _CardContent extends StatelessWidget {
             style: TextStyle(
               fontFamily: AppFonts.barlow,
               fontWeight: FontWeight.w600,
-              fontSize: 12,
+              fontSize: AppTextSize.caption,
               color: deltaPositive == true
                   ? tokens.variationPositiveColor
                   : tokens.variationNegativeColor,
@@ -277,7 +277,7 @@ class _CardContent extends StatelessWidget {
             style: TextStyle(
               fontFamily: AppFonts.barlow,
               fontWeight: FontWeight.w400,
-              fontSize: 11,
+              fontSize: AppTextSize.caption,
               color: tokens.titleColor,
             ),
           ),
