@@ -251,20 +251,55 @@ void main() {
       'renders the workout-days streak calendar below the summary cards '
       'for the selected month', (tester) async {
     final repo = MockSessionRepository();
+
+    // ── POR QUÉ ESTE FIXTURE NO SALE DE `DateTime.now()` ────────────────────
+    //
+    // Antes sembraba `today` y `today - 1 día` a MEDIANOCHE LOCAL, y este test
+    // fallaba TODOS LOS MARTES. El screen convierte a hora argentina
+    // (`toArgentina`, −3h), así que medianoche local se corre al día ANTERIOR:
+    //
+    //   mar 00:00 local → lun 21:00 ART
+    //   lun 00:00 local → dom 21:00 ART   ← domingo es la semana ANTERIOR
+    //
+    // La semana arranca el lunes (`chart_period.dart`), así que las dos
+    // sesiones caían en semanas distintas y el screen renderizaba «Racha de 2
+    // semanas» en vez de 1. El martes es el único día en que `today - 1`
+    // aterriza en lunes, que es justo el borde — por eso pasaba los otros seis
+    // y se veía como un test sano.
+    //
+    // El archivo YA documentaba este corrimiento unas líneas más arriba, pero
+    // sólo para el borde de MES. El mismo −3h cruza también el de SEMANA.
+    //
+    // Dos cambios, y los dos hacen falta:
+    //   · MEDIODÍA en vez de medianoche → el −3h ya no cambia el día.
+    //   · Días DETERMINISTAS (el primer lunes del mes y su martes) en vez de
+    //     relativos a hoy → caen siempre en la misma semana Y en el mismo mes
+    //     (día 1..7 y 2..8), sin importar qué día se corra el CI.
+    //
+    // El mes se deriva de `now` y no se fija: `initialMonth` fuera de la
+    // ventana de 12 meses cae al más reciente (lo pinea otro test de este
+    // archivo), así que una fecha hardcodeada se rompería sola con el tiempo.
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    final mesDelReporte = DateTime(now.year, now.month);
+    final primerLunes = mesDelReporte.add(
+      Duration(days: (DateTime.monday - mesDelReporte.weekday + 7) % 7),
+    );
+    final lunes =
+        DateTime(primerLunes.year, primerLunes.month, primerLunes.day, 12);
+    final martes = lunes.add(const Duration(days: 1));
+
     when(() => repo.listByUid('u1', limit: any(named: 'limit')))
         .thenAnswer((_) async => [
               makeSession(
                 id: 's1',
-                startedAt: today,
+                startedAt: martes,
                 status: SessionStatus.finished,
                 wasFullyCompleted: true,
                 durationMin: 45,
               ),
               makeSession(
                 id: 's2',
-                startedAt: today.subtract(const Duration(days: 1)),
+                startedAt: lunes,
                 status: SessionStatus.finished,
                 wasFullyCompleted: true,
               ),
@@ -275,6 +310,7 @@ void main() {
     await tester.pumpWidget(wrap(
       const SizedBox.shrink(),
       overrides: [sessionRepositoryProvider.overrideWithValue(repo)],
+      initialMonth: mesDelReporte,
     ));
     await tester.pumpAndSettle();
 
