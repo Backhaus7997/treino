@@ -77,10 +77,10 @@ jest.mock("firebase-functions", () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
 }));
 
-import * as admin from "firebase-admin";
 import { App } from "firebase-admin/app";
 import { logger } from "firebase-functions";
 import { syncSessionShareHandler } from "../sync-session-share";
+import { dobleNamespaced } from "./helpers/modular-from-namespaced";
 
 /** Log assertions are per-test; without this they would see previous tests' calls. */
 beforeEach(() => {
@@ -125,7 +125,7 @@ interface FakeStore {
 }
 
 /**
- * Installs an in-memory Firestore behind `admin.firestore(app)`.
+ * Installs an in-memory Firestore behind `dobleNamespaced().firestore(app)`.
  * `seed` maps athleteId → trainerId for pre-existing share docs.
  */
 function installFirestore(seed: Record<string, string> = {}): FakeStore {
@@ -165,7 +165,7 @@ function installFirestore(seed: Record<string, string> = {}): FakeStore {
     },
   };
 
-  (admin.firestore as unknown as jest.Mock).mockReturnValue(db);
+  (dobleNamespaced().firestore as unknown as jest.Mock).mockReturnValue(db);
   return { docs, ops };
 }
 

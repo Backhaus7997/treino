@@ -213,16 +213,3 @@ test('el firebase-admin instalado tiene TODA la API que usan los scripts', () =>
       'o migrás esos archivos a los subpaths modulares de `firebase-admin/*`.',
   );
 });
-
-test('`admin.apps` es un array — la idempotencia de lib/admin.js depende de eso', () => {
-  // Se testea aparte porque es la que rompió, y porque el error que produce
-  // —`Cannot read properties of undefined (reading 'length')`— no dice
-  // "cambió la API": parece un bug del script. Que el rojo lo diga.
-  const admin = require('firebase-admin');
-  assert.ok(
-    Array.isArray(admin.apps),
-    '`admin.apps` no es un array. `lib/admin.js` lo usa para no inicializar dos ' +
-      'veces cuando `seed_emulator_full.js` requiere `seed_workout_catalog.js`. ' +
-      'En v14 el reemplazo es `admin.getApps()`.',
-  );
-});

@@ -189,69 +189,57 @@ configuración.
 cd scripts && npm install   # firebase-admin
 ```
 
-#### 🔒 `firebase-admin` está clavado en 13.x, y no es por comodidad
+#### ✅ `firebase-admin` está en 14.x — el candado se levantó
 
-**v14 borra la API contra la que están escritos estos scripts.** El root export
-de `firebase-admin@14` son once símbolos —`initializeApp`, `getApp`, `getApps`,
+Durante meses este archivo decía **«clavado en 13.x, y no es por comodidad»**.
+Ya no: `scripts/` usa los subpaths modulares y corre contra la v14.
+
+**Qué había pasado.** `firebase-admin@14` borró la API namespaced entera. El
+root export son once símbolos —`initializeApp`, `getApp`, `getApps`,
 `deleteApp`, `applicationDefault`, `cert`, `refreshToken`, `FirebaseError`,
-`FirebaseAppError`, `AppErrorCode`, `SDK_VERSION`— y la API namespaced quedó
-afuera entera:
+`FirebaseAppError`, `AppErrorCode`, `SDK_VERSION`— y `admin.apps`, `admin.app`,
+`admin.credential`, `admin.firestore`, `admin.auth`, `admin.storage` y
+`admin.messaging` quedaron todos `undefined`. Los scripts estaban escritos
+contra esa API en 88 lugares repartidos en 46 archivos, así que con la 14
+instalada ninguno arrancaba.
 
-| API | v13 | v14 |
+El bump se mergeó **dos veces** (`cac2d6fa` y `de77562a`/#901) sin que nada se
+pusiera rojo, por dos motivos que se tapaban entre sí: el job `scripts-test` no
+corría `npm ci` —validaba sobre un paquete que jamás descargaba— y los tests que
+sí cargan un script lo hacen con un doble que tiene la API que el doble decide
+tener. El #971 arregló lo primero y agregó
+`test/firebase_admin_superficie.test.js`, que carga el SDK **de verdad**.
+
+**Cómo se migró.** Por PRs encadenados, en `openspec/changes/firebase-admin-modular/`,
+con un criterio: primero lo que no escribe en producción. `functions/` (que se
+deploya, o sea que su riesgo está gateado) antes que `scripts/` (que se corre a
+mano con la credencial de producción), y dentro de `scripts/` la puerta de
+inicialización primero y los cuatro que suben a Storage último — porque lo que
+Storage escribe no lo cubre el backup diario de Firestore.
+
+**Las equivalencias**, verificadas con `===` contra el paquete instalado, no de
+memoria:
+
+| namespaced | modular | subpath |
 | --- | --- | --- |
-| `admin.apps` / `admin.app()` | ✅ | ❌ `undefined` |
-| `admin.credential.cert` / `.applicationDefault` | ✅ | ❌ `undefined` |
-| `admin.firestore()` / `.Timestamp` / `.FieldValue` | ✅ | ❌ `undefined` |
-| `admin.auth()` | ✅ | ❌ `undefined` |
-| `admin.storage()` | ✅ | ❌ `undefined` |
+| `admin.firestore()` | `getFirestore(app)` | `firebase-admin/firestore` |
+| `admin.firestore.Timestamp` / `.FieldValue` | `Timestamp` / `FieldValue` | `firebase-admin/firestore` |
+| `admin.auth()` | `getAuth(app)` | `firebase-admin/auth` |
+| `admin.storage()` | `getStorage(app)` | `firebase-admin/storage` |
+| `admin.apps` | `getApps()` | `firebase-admin/app` |
+| `admin.app()` | `getApp()` | `firebase-admin/app` |
+| `admin.credential.cert(x)` | `cert(x)` | `firebase-admin/app` |
 
-Los scripts de este directorio usan esa API en **89 lugares repartidos en 48
-archivos**. Con 14.3.0 instalada no arranca ninguno: `lib/admin.js` muere en la
-línea 86, que es la PRIMERA que toca el SDK.
+`admin.firestore() === getFirestore()` y `admin.firestore.Timestamp === Timestamp`
+daban **`true`** ya en la 13: son los mismos objetos. Por eso la migración se
+pudo hacer archivo por archivo, con los dos estilos conviviendo, y sin que un
+`instanceof Timestamp` cruzado dejara de andar.
 
-```sh
-# La lista, para no confiar en el número:
-rg -o 'admin\.(firestore|auth|storage|credential|app|apps)\b' --glob '*.js' --glob '*.mjs' scripts/ | rg -v '/test/' | wc -l
-```
-
-Ya se mergeó dos veces (`cac2d6fa` y `de77562a`/#901) y las dos veces pasó
-inadvertido, por dos motivos que se tapaban entre sí:
-
-1. **El job `scripts-test` de CI no instalaba nada.** Iba directo a
-   `npm --prefix scripts test`. Medido el 2026-09-07: con `scripts/node_modules`
-   borrado la suite daba **469/469 en verde**. CI validaba 469 cosas sobre un
-   paquete que jamás descargaba.
-2. **Los tests que cargan scripts de verdad usan el stub**
-   (`test/fixtures/stub_firebase_admin.js`), que devuelve un `firebase-admin` de
-   mentira. Correcto para lo que ese fixture prueba, pero significa que la suite
-   no podía ver la superficie real del SDK.
-
-Las dos cosas están cerradas: el job ahora corre `npm ci`, y
-`test/firebase_admin_superficie.test.js` hace el único
-`require('firebase-admin')` sin stub de toda la suite y **extrae del código** la
-lista de APIs a chequear, así que cubre también los scripts que todavía no
-existen. Y `.github/dependabot.yml` tiene un `ignore` de majors para
-`firebase-admin` en `/scripts`.
-
-**Subir a 14 no es cambiar el número del `package.json`**: es migrar los 48
-archivos a los subpaths modulares (`firebase-admin/firestore`, `/auth`,
-`/storage`). Hasta entonces, el rojo de ese test es la respuesta correcta.
-
-**Lo que cuesta el candado, medido y no estimado** (`npm audit`, 2026-09-07):
-
-| | moderate | high | critical |
-| --- | --- | --- | --- |
-| `firebase-admin@14.3.0` | 6 | 0 | 0 |
-| `firebase-admin@13.10.0` ← el candado | **8** | 0 | 0 |
-
-Son **dos moderate de más**, las dos transitivas y las dos de la misma familia
-`gaxios`/`teeny-request`/`uuid` que ya arrastran las dos versiones:
-`@google-cloud/firestore` y `google-gax`. Ni high ni critical de ningún lado. Va
-escrito acá porque un candado de dependencia que no dice qué cuesta es la clase
-de mensaje tranquilizador que este repo aprendió a no escribir (AGENTS.md §11.1):
-el precio existe, es chico, y quien lo quiera revisar tiene el comando arriba.
-
----
+**Lo que queda vigilando.** `test/firebase_admin_superficie.test.js` sigue ahí y
+sigue extrayendo del código la lista de APIs que le exige al SDK instalado. Hoy
+esa lista está **vacía**, y ese cero es la señal de que la migración terminó. Si
+mañana alguien escribe `admin.messaging()` en un script nuevo, el trinquete lo
+empieza a chequear solo y se pone rojo contra la v14.
 
 ## Lo que sólo puede hacer un humano (#834)
 

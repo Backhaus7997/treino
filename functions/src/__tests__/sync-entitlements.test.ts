@@ -43,18 +43,18 @@ jest.mock("firebase-functions", () => ({
   },
 }));
 
-import * as admin from "firebase-admin";
 import { App } from "firebase-admin/app";
 import { FieldValue } from "firebase-admin/firestore";
 
 import { createFakeFirestore, FakeFirestoreState } from "./helpers/fake-tx-firestore";
 import { syncTrainerEntitlements } from "../subscriptions/sync-entitlements";
+import { dobleNamespaced } from "./helpers/modular-from-namespaced";
 
 const app = {} as App;
 
 function install(seed: Partial<FakeFirestoreState>) {
   const { db, state } = createFakeFirestore(seed);
-  (admin.firestore as unknown as jest.Mock).mockReturnValue(db);
+  (dobleNamespaced().firestore as unknown as jest.Mock).mockReturnValue(db);
   return state;
 }
 
@@ -191,7 +191,7 @@ describe("syncTrainerEntitlements", () => {
     const primera = await syncTrainerEntitlements(app, "t1", 5_000);
     expect(primera.blocked).toEqual(["L2"]);
 
-    (admin.firestore as unknown as jest.Mock).mockReturnValue(
+    (dobleNamespaced().firestore as unknown as jest.Mock).mockReturnValue(
       createFakeFirestore(state).db,
     );
     const segunda = await syncTrainerEntitlements(app, "t1", 5_000);

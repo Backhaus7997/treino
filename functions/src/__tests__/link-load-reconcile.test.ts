@@ -86,7 +86,6 @@ jest.mock("firebase-functions", () => ({
   },
 }));
 
-import * as admin from "firebase-admin";
 import { App } from "firebase-admin/app";
 import {
   createFakeFirestore,
@@ -103,6 +102,7 @@ import {
   linkLoadReconcileHandler,
 } from "../subscriptions/link-load-reconcile";
 import { subscriptionChanged } from "../subscriptions/entitlement-triggers";
+import { dobleNamespaced } from "./helpers/modular-from-namespaced";
 
 /** Una escritura observada, en orden. Es lo que hace contables los saltos. */
 interface RecordedWrite {
@@ -143,7 +143,7 @@ function installRecording(seed: Partial<FakeFirestoreState>): {
       return fn(recorder as unknown as FakeTransaction);
     });
 
-  (admin.firestore as unknown as jest.Mock).mockReturnValue(db);
+  (dobleNamespaced().firestore as unknown as jest.Mock).mockReturnValue(db);
   return { state, writes };
 }
 
@@ -262,7 +262,7 @@ describe("linkLoadReconcileHandler", () => {
   });
 
   it("never rethrows on unexpected errors (error-safe, mirrors link-aggregate.ts)", async () => {
-    (admin.firestore as unknown as jest.Mock).mockImplementation(() => {
+    (dobleNamespaced().firestore as unknown as jest.Mock).mockImplementation(() => {
       throw new Error("boom");
     });
 

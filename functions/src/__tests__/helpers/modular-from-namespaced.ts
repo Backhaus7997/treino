@@ -99,3 +99,22 @@ export function messaging(): Record<string, unknown> {
     getMessaging: (...args: unknown[]) => ns().messaging(...args),
   };
 }
+
+/**
+ * El doble namespaced en crudo, para CONFIGURARLO desde un test:
+ *
+ *     (dobleNamespaced().firestore as jest.Mock).mockReturnValue(db);
+ *
+ * Antes esto se escribía `admin.firestore as unknown as jest.Mock`, con un
+ * `import * as admin from "firebase-admin"` arriba. Desde `firebase-admin@14`
+ * eso no compila: el root export son once símbolos y `firestore` no está entre
+ * ellos, ni en runtime ni en los TIPOS.
+ *
+ * `jest.requireMock` esquiva la tipificación del módulo real justamente porque
+ * lo que devuelve NO es el módulo real: es el objeto que el factory de
+ * `jest.mock("firebase-admin", …)` construyó, y ese objeto tiene la forma que
+ * el test le dio.
+ */
+export function dobleNamespaced(): Record<string, unknown> {
+  return jest.requireMock("firebase-admin") as Record<string, unknown>;
+}

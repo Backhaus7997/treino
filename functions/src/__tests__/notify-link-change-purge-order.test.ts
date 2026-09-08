@@ -50,12 +50,12 @@ jest.mock("firebase-functions", () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
 }));
 
-import * as admin from "firebase-admin";
 import { sendFcm } from "../notifications/send-fcm";
 import { purgeRejectedLinkHandler } from "../purge-rejected-link";
 import { notifyOnLinkChangeHandler } from "../notifications/notify-link-change";
+import { App } from "firebase-admin/app";
 
-const APP = {} as admin.app.App;
+const APP = {} as App;
 
 const TRAINER = "trainer-A";
 const ATHLETE = "athlete-X";

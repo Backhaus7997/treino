@@ -60,11 +60,11 @@ jest.mock("../notifications/send-fcm", () => ({
   sendFcm: jest.fn(async () => ({ successCount: 1, failureCount: 0 })),
 }));
 
-import * as admin from "firebase-admin";
 import { App } from "firebase-admin/app";
 import { Messaging } from "firebase-admin/messaging";
 import { Timestamp } from "firebase-admin/firestore";
 import { sendFcm } from "../notifications/send-fcm";
+import { dobleNamespaced } from "./helpers/modular-from-namespaced";
 import {
   notifyMonthlyReportHandler,
   reportedMonthFor,
@@ -122,7 +122,7 @@ function installFirestore(
     }));
 
   const DELETE = (
-    admin.firestore as unknown as { __DELETE?: symbol; FieldValue: { __DELETE: symbol } }
+    dobleNamespaced().firestore as unknown as { __DELETE?: symbol; FieldValue: { __DELETE: symbol } }
   ).FieldValue.__DELETE;
 
   function applyUpdate(uid: string, update: Record<string, unknown>): void {
@@ -198,7 +198,7 @@ function installFirestore(
     ),
   };
 
-  (admin.firestore as unknown as jest.Mock).mockReturnValue(firestore);
+  (dobleNamespaced().firestore as unknown as jest.Mock).mockReturnValue(firestore);
 }
 
 const app = {} as App;
