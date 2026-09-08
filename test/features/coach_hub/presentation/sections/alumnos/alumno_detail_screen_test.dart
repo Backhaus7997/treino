@@ -1,7 +1,7 @@
 // Tests for the Coach Hub web Alumno detail (W2 PR2).
 //
-// Header (name + estado + denormalized metrics), the 10-tab bar, the Progreso
-// tab (Antropometría: measurement cards + chart), and placeholder tabs —
+// Header (name + estado + denormalized metrics), the seven groups, and their
+// nested navigation —
 // pumped with stubbed providers (no Firestore, no GoRouter needed since we
 // don't tap the back link).
 
@@ -12,6 +12,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/locale_resolver.dart';
+import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/core/widgets/treino_segmented_pill.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
@@ -69,6 +71,8 @@ import 'package:treino/features/profile/application/user_providers.dart'
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/l10n/app_l10n.dart';
+
+import 'alumno_detail_test_navigation.dart';
 
 class _MockRepo extends Mock implements TrainerLinkRepository {}
 
@@ -334,6 +338,7 @@ Future<void> _pump(
   // tab actually builds.
   Chat? chat,
   List<Message> chatMessages = const [],
+  AlumnoDetailIndicators indicators = const AlumnoDetailIndicators(),
   // Escape hatch for id-specific overrides (e.g. a delayed
   // `userPublicProfileProvider('a1')`) that must win over the family-wide
   // defaults above — Riverpod resolves instance-specific overrides before
@@ -409,6 +414,7 @@ Future<void> _pump(
         messagesProvider.overrideWith(
           (ref, chatId) => Stream.value(chatMessages),
         ),
+        alumnoDetailIndicatorsProvider('a1').overrideWithValue(indicators),
         ...extraOverrides,
       ],
       child: MaterialApp(
@@ -503,22 +509,18 @@ void main() {
       expect(find.widgetWithText(OutlinedButton, 'Pago'), findsOneWidget);
     });
 
-    testWidgets('tab bar muestra exactamente las 11 secciones', (tester) async {
+    testWidgets('tab bar muestra exactamente los 7 grupos', (tester) async {
       await _pump(tester,
           profile: _prof(), link: _link(TrainerLinkStatus.active));
-      expect(find.byType(Tab), findsNWidgets(11));
+      expect(find.byType(Tab), findsNWidgets(7));
       for (final t in [
         'Resumen',
-        'Entrenamientos',
+        'Entrenamiento',
         'Progreso',
-        'Nutrición',
-        'Pagos',
-        'Historial',
+        'Plan',
         'Chat',
-        'Notas privadas',
-        'Archivos',
-        'Seguimiento',
-        'Mediciones',
+        'Privado',
+        'Pagos',
       ]) {
         expect(
           find.descendant(of: find.byType(TabBar), matching: find.text(t)),
@@ -526,6 +528,134 @@ void main() {
           reason: 'falta el tab $t',
         );
       }
+      expect(tester.widget<TabBar>(find.byType(TabBar)).isScrollable, isFalse);
+    });
+
+    testWidgets('Privado explicita que el alumno no ve su contenido',
+        (tester) async {
+      await _pump(tester,
+          profile: _prof(), link: _link(TrainerLinkStatus.active));
+
+      await navigateAlumnoDetail(tester, group: 'Privado');
+
+      expect(find.byIcon(TreinoIcon.lock), findsOneWidget);
+      expect(find.text('Nada de esto lo ve el alumno.'), findsOneWidget);
+      expect(find.text('Notas'), findsOneWidget);
+      expect(find.text('Seguimiento'), findsOneWidget);
+    });
+
+    testWidgets(
+        'la marca neutra y la de acento salen de tokens distintos — el acento '
+        'usa accentText, que es el que se ve en tema CLARO', (tester) async {
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        indicators: const AlumnoDetailIndicators(
+          entrenamiento: AlumnoGrupoEstado.conContenido,
+          progreso: AlumnoGrupoEstado.conContenido,
+          plan: AlumnoGrupoEstado.conContenido,
+          chat: AlumnoGrupoEstado.requiereAtencion,
+          privado: AlumnoGrupoEstado.conContenido,
+          pagos: AlumnoGrupoEstado.requiereAtencion,
+        ),
+      );
+
+      final palette = AppPalette.of(
+        tester.element(find.byType(AlumnoDetailScreen)),
+      );
+
+      Color colorDeMarca(int index) {
+        final dot = tester.widget<Container>(
+          find.byKey(TreinoSegmentedPill.markKey(index)),
+        );
+        return (dot.decoration! as BoxDecoration).color!;
+      }
+
+      // Índices de _tabs: 1 Entrenamiento, 2 Progreso, 3 Plan, 4 Chat,
+      // 5 Privado, 6 Pagos. Resumen (0) nunca lleva marca.
+      expect(find.byKey(TreinoSegmentedPill.markKey(0)), findsNothing);
+      for (final index in [1, 2, 3, 5]) {
+        expect(colorDeMarca(index), palette.textMuted,
+            reason: 'la celda $index es contenido, va neutra');
+      }
+      for (final index in [4, 6]) {
+        expect(colorDeMarca(index), palette.accentText,
+            reason: 'la celda $index reclama acción, va en acento');
+      }
+
+      // El que importa, y por qué se mide contra la paleta LIGHT a mano: este
+      // harness pumpea el tema oscuro, donde `accentText` y `accent` son el
+      // mismo mint. O sea que las aserciones de arriba pasarían igual si la
+      // marca de atención usara `accent` — el bug que se quiere impedir es
+      // invisible en dark. En light NO son el mismo color, y ésa es la razón
+      // de que el token exista: el mint pleno compone 1,57:1 como tinta sobre
+      // fondo claro, que es el tema que el PF usa en el Coach Hub.
+      expect(
+        AppPalette.mintMagentaLight.accentText,
+        isNot(AppPalette.mintMagentaLight.accent),
+        reason: 'si en light dejaran de divergir, la marca de atención sería '
+            'invisible en el tema del Coach Hub y ningún test lo vería',
+      );
+    });
+
+    /// Lo que anuncia una pestaña, como patrón anclado al principio.
+    ///
+    /// `TabBar` le agrega al label su propia pista de posición, así que la
+    /// etiqueta real es `"<lo nuestro>\nPestaña N de 7"`. Comparar por
+    /// igualdad exacta contra `"Progreso"` da falso negativo, y comparar sin
+    /// anclar haría que `"Progreso"` matcheara también `"Progreso, sin
+    /// contenido"` — justo la distinción que estos tests existen para probar.
+    Finder anuncio(String label) =>
+        find.bySemanticsLabel(RegExp('^${RegExp.escape(label)}\n'));
+
+    testWidgets(
+        'un grupo cuyo stream todavía carga NO lleva marca ni afirma vacío',
+        (tester) async {
+      final handle = tester.ensureSemantics();
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        // Todo en desconocido = el estado real mientras los streams cargan.
+        indicators: const AlumnoDetailIndicators(),
+      );
+
+      for (var index = 0; index < 7; index++) {
+        expect(find.byKey(TreinoSegmentedPill.markKey(index)), findsNothing,
+            reason: 'un estado desconocido no pinta punto');
+      }
+      expect(anuncio('Progreso'), findsOneWidget);
+      expect(anuncio('Progreso, sin contenido'), findsNothing);
+      expect(anuncio('Pagos, sin cobros pendientes'), findsNothing);
+      handle.dispose();
+    });
+
+    testWidgets('Semantics anuncia en palabras el estado de cada grupo',
+        (tester) async {
+      final handle = tester.ensureSemantics();
+      await _pump(
+        tester,
+        profile: _prof(),
+        link: _link(TrainerLinkStatus.active),
+        indicators: const AlumnoDetailIndicators(
+          entrenamiento: AlumnoGrupoEstado.conContenido,
+          progreso: AlumnoGrupoEstado.vacio,
+          plan: AlumnoGrupoEstado.conContenido,
+          chat: AlumnoGrupoEstado.requiereAtencion,
+          privado: AlumnoGrupoEstado.vacio,
+          pagos: AlumnoGrupoEstado.requiereAtencion,
+        ),
+      );
+
+      expect(anuncio('Resumen'), findsOneWidget);
+      expect(anuncio('Entrenamiento, con contenido'), findsOneWidget);
+      expect(anuncio('Progreso, sin contenido'), findsOneWidget);
+      expect(anuncio('Plan, con contenido'), findsOneWidget);
+      expect(anuncio('Chat, con mensajes sin leer'), findsOneWidget);
+      expect(anuncio('Privado, sin contenido'), findsOneWidget);
+      expect(anuncio('Pagos, con cobro pendiente'), findsOneWidget);
+      handle.dispose();
     });
 
     testWidgets(
@@ -550,9 +680,7 @@ void main() {
         ],
       );
 
-      await tester.tap(find.descendant(
-          of: find.byType(TabBar), matching: find.text('Chat')));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(tester, group: 'Chat');
 
       // Scoped a ChatDetailPane: el header de arriba (misma pantalla)
       // TAMBIÉN muestra "Agustín" — sería un false-positive si buscáramos
@@ -586,9 +714,11 @@ void main() {
         setLogs: [_setLog(exerciseName: 'Sentadilla', reps: 5, weightKg: 100)],
       );
 
-      await tester.tap(find.descendant(
-          of: find.byType(TabBar), matching: find.text('Entrenamientos')));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(
+        tester,
+        group: 'Entrenamiento',
+        subview: 'Sesiones',
+      );
 
       // Colapsado: los sets no se ven todavía.
       expect(find.text('Sentadilla'), findsNothing);
@@ -611,9 +741,11 @@ void main() {
             plugin: 'cloud_firestore', code: 'permission-denied'),
       );
 
-      await tester.tap(find.descendant(
-          of: find.byType(TabBar), matching: find.text('Entrenamientos')));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(
+        tester,
+        group: 'Entrenamiento',
+        subview: 'Sesiones',
+      );
 
       expect(find.text('El alumno no compartió su historial.'), findsOneWidget);
       expect(find.text('No se pudo cargar el historial.'), findsNothing);
@@ -637,9 +769,11 @@ void main() {
         ],
       );
 
-      await tester.tap(find.descendant(
-          of: find.byType(TabBar), matching: find.text('Entrenamientos')));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(
+        tester,
+        group: 'Entrenamiento',
+        subview: 'Sesiones',
+      );
       await tester.tap(find.text('Hipertrofia 4 días'));
       await tester.pumpAndSettle();
 
@@ -663,9 +797,11 @@ void main() {
         ],
       );
 
-      await tester.tap(find.descendant(
-          of: find.byType(TabBar), matching: find.text('Entrenamientos')));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(
+        tester,
+        group: 'Entrenamiento',
+        subview: 'Sesiones',
+      );
       await tester.tap(find.text('Hipertrofia 4 días'));
       await tester.pumpAndSettle();
 
@@ -691,9 +827,11 @@ void main() {
         ],
       );
 
-      await tester.tap(find.descendant(
-          of: find.byType(TabBar), matching: find.text('Entrenamientos')));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(
+        tester,
+        group: 'Entrenamiento',
+        subview: 'Sesiones',
+      );
       await tester.tap(find.text('Hipertrofia 4 días'));
       await tester.pumpAndSettle();
 
@@ -718,9 +856,11 @@ void main() {
         ],
       );
 
-      await tester.tap(find.descendant(
-          of: find.byType(TabBar), matching: find.text('Entrenamientos')));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(
+        tester,
+        group: 'Entrenamiento',
+        subview: 'Sesiones',
+      );
       await tester.tap(find.text('Hipertrofia 4 días'));
       await tester.pumpAndSettle();
 
@@ -738,10 +878,9 @@ void main() {
         measurements: [_meas(60.5, fat: 22.4, waist: 71)],
       );
 
-      await tester.tap(find.text('Progreso'));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(tester, group: 'Progreso');
 
-      expect(find.text('ANTROPOMETRÍA'), findsOneWidget);
+      expect(find.text('Mediciones antropométricas'), findsOneWidget);
       expect(find.text('Peso'), findsOneWidget);
       expect(find.text('60.5 kg'), findsOneWidget);
     });
@@ -756,10 +895,12 @@ void main() {
         performanceTests: const [],
       );
 
-      await tester.tap(find.text('Progreso'));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(tester, group: 'Progreso');
 
-      expect(find.text('Sin datos de progreso todavía.'), findsOneWidget);
+      expect(
+        find.text('Este alumno todavía no tiene mediciones cargadas.'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('Progreso con ≥2 mediciones renderiza el gráfico',
@@ -771,8 +912,7 @@ void main() {
         measurements: [_meas(62, day: 1), _meas(60.5, day: 20)],
       );
 
-      await tester.tap(find.text('Progreso'));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(tester, group: 'Progreso');
 
       expect(find.byType(MeasurementProgressChart), findsOneWidget);
     });
@@ -787,11 +927,16 @@ void main() {
         performanceTests: [_perf(cmjCm: 28, day: 1), _perf(cmjCm: 32, day: 20)],
       );
 
-      await tester.tap(find.text('Progreso'));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(
+        tester,
+        group: 'Progreso',
+        subview: 'Rendimiento',
+      );
 
       expect(find.byType(PerformanceProgressChart), findsOneWidget);
-      expect(find.text('RENDIMIENTO'), findsOneWidget); // mi heading de sección
+      // El heading dejó de ser el «RENDIMIENTO» suelto del viejo tab Progreso:
+      // ahora la sub-vista lleva el header propio que venía de Mediciones.
+      expect(find.text('Pruebas de rendimiento'), findsOneWidget);
       // El chart renderea su label l10n («PROGRESO») en es-AR, NO en blanco:
       // prueba que el localeResolutionCallback del harness resuelve es-AR.
       expect(find.text('PROGRESO'), findsOneWidget);
@@ -806,19 +951,18 @@ void main() {
         performanceTests: [_perf(cmjCm: 30, day: 1)],
       );
 
-      await tester.tap(find.text('Progreso'));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(
+        tester,
+        group: 'Progreso',
+        subview: 'Rendimiento',
+      );
 
-      expect(find.text('RENDIMIENTO'), findsOneWidget);
-      expect(find.text('Cargá al menos 2 tests para ver la evolución.'),
-          findsOneWidget);
+      expect(find.text('Pruebas de rendimiento'), findsOneWidget);
       expect(find.byType(PerformanceProgressChart), findsNothing);
-      // Sin mediciones → la sección Antropometría queda totalmente suprimida.
-      expect(find.text('ANTROPOMETRÍA'), findsNothing);
       expect(find.byType(MeasurementProgressChart), findsNothing);
     });
 
-    testWidgets('Progreso muestra antropometría + rendimiento juntos (W2 PR8)',
+    testWidgets('Progreso separa antropometría y rendimiento sin perder datos',
         (tester) async {
       await _pump(
         tester,
@@ -828,11 +972,18 @@ void main() {
         performanceTests: [_perf(cmjCm: 28, day: 1), _perf(cmjCm: 32, day: 20)],
       );
 
-      await tester.tap(find.text('Progreso'));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(tester, group: 'Progreso');
 
-      expect(find.text('ANTROPOMETRÍA'), findsOneWidget);
       expect(find.byType(MeasurementProgressChart), findsOneWidget);
+      expect(find.byType(PerformanceProgressChart), findsNothing);
+
+      await navigateAlumnoDetail(
+        tester,
+        group: 'Progreso',
+        subview: 'Rendimiento',
+      );
+
+      expect(find.byType(MeasurementProgressChart), findsNothing);
       expect(find.byType(PerformanceProgressChart), findsOneWidget);
     });
 
@@ -846,12 +997,10 @@ void main() {
         performanceError: 'boom', // performance falla
       );
 
-      await tester.tap(find.text('Progreso'));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(tester, group: 'Progreso');
 
       expect(find.text('No se pudo cargar el progreso.'), findsOneWidget);
-      expect(
-          find.text('ANTROPOMETRÍA'), findsNothing); // gateado, no se muestra
+      expect(find.text('Peso'), findsNothing); // gateado, no se muestra
     });
 
     // Removed: "tab placeholder muestra 'Próximamente.'" — al implementar
@@ -887,8 +1036,7 @@ void main() {
       await _pump(tester,
           profile: _prof(), link: _link(TrainerLinkStatus.active));
 
-      await tester.tap(find.text('Pagos'));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(tester, group: 'Pagos');
 
       expect(find.text('ESTADO DE CUENTA'), findsOneWidget);
       expect(find.text('Al día'), findsOneWidget);
@@ -924,8 +1072,7 @@ void main() {
         ],
       );
 
-      await tester.tap(find.text('Pagos'));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(tester, group: 'Pagos');
 
       // Estado de cuenta: el total (24px) + la línea del único cobro (mismo
       // monto) → el texto aparece 2 veces; más el botón Marcar pagado.
@@ -961,8 +1108,7 @@ void main() {
         ],
       );
 
-      await tester.tap(find.text('Pagos'));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(tester, group: 'Pagos');
 
       expect(find.text('\$30.000'), findsOneWidget); // total 18.000 + 12.000
       expect(find.text('Mensual'), findsOneWidget); // un concepto por cobro
@@ -980,8 +1126,7 @@ void main() {
         payments: [_pago(concept: 'Plan anual', amountArs: 1200000)],
       );
 
-      await tester.tap(find.text('Pagos'));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(tester, group: 'Pagos');
 
       expect(find.text('\$1.200.000'), findsOneWidget);
     });
@@ -996,8 +1141,7 @@ void main() {
           link: _link(TrainerLinkStatus.active),
           paymentRepo: repo);
 
-      await tester.tap(find.text('Pagos'));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(tester, group: 'Pagos');
       await tester.tap(find.text('+ Registrar pago'));
       await tester.pumpAndSettle();
 
@@ -1023,8 +1167,7 @@ void main() {
           link: _link(TrainerLinkStatus.active),
           paymentRepo: repo);
 
-      await tester.tap(find.text('Pagos'));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(tester, group: 'Pagos');
       await tester.tap(find.text('+ Registrar pago'));
       await tester.pumpAndSettle();
 
@@ -1046,8 +1189,7 @@ void main() {
           link: _link(TrainerLinkStatus.active),
           paymentRepo: repo);
 
-      await tester.tap(find.text('Pagos'));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(tester, group: 'Pagos');
       await tester.tap(find.text('+ Registrar pago'));
       await tester.pumpAndSettle();
 
@@ -1080,8 +1222,7 @@ void main() {
         ],
       );
 
-      await tester.tap(find.text('Pagos'));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(tester, group: 'Pagos');
       await tester.tap(find.text('Marcar pagado'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Cobrado')); // confirma
@@ -1105,8 +1246,7 @@ void main() {
         pendingCobros: [_cobro(concept: 'Mensual', amountArs: 18000)],
       );
 
-      await tester.tap(find.text('Pagos'));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(tester, group: 'Pagos');
       await tester.tap(find.text('Marcar pagado'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Cobrado'));
@@ -1140,8 +1280,7 @@ void main() {
         ],
       );
 
-      await tester.tap(find.text('Pagos'));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(tester, group: 'Pagos');
       await tester.tap(find.text('Marcar pagado'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Cobrado'));
@@ -1171,8 +1310,7 @@ void main() {
         ],
       );
 
-      await tester.tap(find.text('Pagos'));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(tester, group: 'Pagos');
       await tester.tap(find.text('Marcar pagado'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Cobrado'));
@@ -1196,8 +1334,7 @@ void main() {
         pendingCobros: [_cobro(concept: 'Mensual', amountArs: 18000)],
       );
 
-      await tester.tap(find.text('Pagos'));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(tester, group: 'Pagos');
       await tester.tap(find.text('Marcar pagado'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Cancelar'));
@@ -1207,17 +1344,26 @@ void main() {
       verifyNever(() => repo.markManyPaid(any(), any()));
     });
 
-    testWidgets('tab Entrenamientos: estados vacíos (W2 PR3)', (tester) async {
+    testWidgets('Entrenamiento separa los estados vacíos por sub-vista',
+        (tester) async {
       await _pump(tester,
           profile: _prof(), link: _link(TrainerLinkStatus.active));
 
-      await tester.tap(find.text('Entrenamientos'));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(tester, group: 'Entrenamiento');
 
       expect(find.text('RUTINA ACTIVA'), findsOneWidget);
       expect(find.text('Sin rutina activa asignada.'), findsOneWidget);
-      expect(find.text('HISTORIAL DE SESIONES'), findsOneWidget);
-      expect(find.text('Sin sesiones registradas todavía.'), findsOneWidget);
+
+      await navigateAlumnoDetail(
+        tester,
+        group: 'Entrenamiento',
+        subview: 'Sesiones',
+      );
+      expect(find.text('HISTORIAL DE SESIONES'), findsNothing);
+      expect(
+        find.text('Este alumno todavía no registró sesiones.'),
+        findsOneWidget,
+      );
     });
 
     testWidgets(
@@ -1231,14 +1377,19 @@ void main() {
         sessions: [_session(totalVolumeKg: 7839.6)],
       );
 
-      await tester.tap(find.text('Entrenamientos'));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(tester, group: 'Entrenamiento');
 
       expect(find.text('Hipertrofia 4 días'), findsOneWidget); // rutina activa
       expect(
           find.text('2 días · 4 semanas'), findsOneWidget); // resumen (plural)
       expect(find.text('Lunes - Push'), findsOneWidget); // día
       expect(find.text('0 ejercicios'), findsNWidgets(2)); // 2 días sin slots
+
+      await navigateAlumnoDetail(
+        tester,
+        group: 'Entrenamiento',
+        subview: 'Sesiones',
+      );
       expect(find.text('Push - Pecho'), findsOneWidget); // fila de sesión
       expect(find.text('10/01/2026'), findsOneWidget); // fecha formateada
       expect(find.text('52 min'), findsOneWidget);
@@ -1259,8 +1410,7 @@ void main() {
         ],
       );
 
-      await tester.tap(find.text('Entrenamientos'));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(tester, group: 'Entrenamiento');
 
       expect(find.text('1 días · 1 semana'), findsOneWidget); // semana singular
       expect(find.text('1 ejercicio'), findsOneWidget); // ejercicio singular
@@ -1279,8 +1429,7 @@ void main() {
         ],
       );
 
-      await tester.tap(find.text('Entrenamientos'));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(tester, group: 'Entrenamiento');
 
       expect(find.text('Mi plan'), findsOneWidget);
       expect(find.text('Plan de otro coach'), findsNothing);
@@ -1296,15 +1445,14 @@ void main() {
         routines: [_routine(name: 'Plan heredado', assignedBy: 't2')],
       );
 
-      await tester.tap(find.text('Entrenamientos'));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(tester, group: 'Entrenamiento');
 
       expect(find.text('Plan heredado'), findsOneWidget);
       expect(find.text('Sin rutina activa asignada.'), findsNothing);
     });
 
     testWidgets(
-        'tab Entrenamientos: rutina archivada y sesión en curso quedan excluidas (W2 PR3)',
+        'Entrenamiento excluye rutina archivada y conserva sesión en curso',
         (tester) async {
       await _pump(
         tester,
@@ -1318,17 +1466,22 @@ void main() {
         ],
       );
 
-      await tester.tap(find.text('Entrenamientos'));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(tester, group: 'Entrenamiento');
 
       expect(find.text('Sin rutina activa asignada.'), findsOneWidget);
       expect(find.text('Rutina vieja'), findsNothing);
-      expect(find.text('Sin sesiones registradas todavía.'), findsOneWidget);
-      expect(find.text('En curso'), findsNothing);
+
+      await navigateAlumnoDetail(
+        tester,
+        group: 'Entrenamiento',
+        subview: 'Sesiones',
+      );
+      expect(find.text('En curso'), findsOneWidget);
+      expect(find.text('EN CURSO'), findsOneWidget);
     });
 
     testWidgets(
-        'tab Entrenamientos: sesión abandonada (wasFullyCompleted=false) queda excluida (W2 PR3)',
+        'Sesiones conserva una sesión incompleta con su badge',
         (tester) async {
       await _pump(
         tester,
@@ -1339,15 +1492,18 @@ void main() {
         ],
       );
 
-      await tester.tap(find.text('Entrenamientos'));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(
+        tester,
+        group: 'Entrenamiento',
+        subview: 'Sesiones',
+      );
 
-      expect(find.text('Abandonada'), findsNothing);
-      expect(find.text('Sin sesiones registradas todavía.'), findsOneWidget);
+      expect(find.text('Abandonada'), findsOneWidget);
+      expect(find.text('INCOMPLETA'), findsOneWidget);
     });
 
     testWidgets(
-        'tab Entrenamientos: sesión sin finishedAt muestra "—" (W2 PR3)',
+        'Sesiones usa startedAt cuando finishedAt falta',
         (tester) async {
       await _pump(
         tester,
@@ -1359,7 +1515,11 @@ void main() {
             uid: 'a1',
             routineId: 'r1',
             routineName: 'Sin fecha',
-            startedAt: DateTime.utc(2026, 1, 10),
+            // Local, no `.utc`: la tabla formatea instantes reales y los
+            // localiza (#380), así que un `DateTime.utc(2026,1,10)` se
+            // renderiza 09/01 en ART y el test mediría el huso, no el fallback
+            // a startedAt que quiere probar.
+            startedAt: DateTime(2026, 1, 10),
             status: SessionStatus.finished,
             wasFullyCompleted: true,
             durationMin: 30,
@@ -1368,14 +1528,17 @@ void main() {
         ],
       );
 
-      await tester.tap(find.text('Entrenamientos'));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(
+        tester,
+        group: 'Entrenamiento',
+        subview: 'Sesiones',
+      );
 
       expect(find.text('Sin fecha'), findsOneWidget);
-      expect(find.text('—'), findsOneWidget);
+      expect(find.text('10/01/2026'), findsOneWidget);
     });
 
-    testWidgets('tab Entrenamientos: historial se topa en 20 filas (W2 PR3)',
+    testWidgets('Sesiones no conserva el viejo límite de 20 filas',
         (tester) async {
       final many = [
         for (var i = 0; i < 21; i++)
@@ -1388,13 +1551,16 @@ void main() {
         sessions: many,
       );
 
-      await tester.tap(find.text('Entrenamientos'));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(
+        tester,
+        group: 'Entrenamiento',
+        subview: 'Sesiones',
+      );
 
-      // El .take(20) descarta la 21.ª (índice 20); las primeras 20 entran.
       expect(find.text('Sesión 0'), findsOneWidget);
       expect(find.text('Sesión 19'), findsOneWidget);
-      expect(find.text('Sesión 20'), findsNothing);
+      expect(find.text('Sesión 20'), findsOneWidget);
+      expect(find.text('HISTORIAL DE SESIONES'), findsNothing);
     });
   });
 
@@ -1444,6 +1610,9 @@ void main() {
             assignedRoutinesByTrainerProvider
                 .overrideWith((ref, key) => const <Routine>[]),
             currentUidProvider.overrideWithValue('t1'),
+            alumnoDetailIndicatorsProvider('a1').overrideWithValue(
+              const AlumnoDetailIndicators(),
+            ),
             // El header (W2 PR7) lee el billing del alumno.
             athleteBillingProvider
                 .overrideWith((ref, id) => Stream.value(null)),
@@ -1572,9 +1741,11 @@ void main() {
         link: _link(TrainerLinkStatus.active),
       );
 
-      await tester.tap(find.descendant(
-          of: find.byType(TabBar), matching: find.text('Entrenamientos')));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(
+        tester,
+        group: 'Entrenamiento',
+        subview: 'Sesiones',
+      );
 
       // SCENARIO-PROG-11A: placeholder gone.
       expect(
@@ -1593,9 +1764,11 @@ void main() {
         exerciseList: const [], // no exercises
       );
 
-      await tester.tap(find.descendant(
-          of: find.byType(TabBar), matching: find.text('Entrenamientos')));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(
+        tester,
+        group: 'Entrenamiento',
+        subview: 'Sesiones',
+      );
 
       // Empty state label (SCENARIO-PROG-08A).
       expect(find.text('EVOLUCIÓN POR EJERCICIO'), findsOneWidget);
@@ -1642,9 +1815,11 @@ void main() {
         exerciseProgression: progression,
       );
 
-      await tester.tap(find.descendant(
-          of: find.byType(TabBar), matching: find.text('Entrenamientos')));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(
+        tester,
+        group: 'Entrenamiento',
+        subview: 'Sesiones',
+      );
 
       // Section header always present.
       expect(find.text('EVOLUCIÓN POR EJERCICIO'), findsOneWidget);
@@ -1664,9 +1839,11 @@ void main() {
         link: _link(TrainerLinkStatus.active),
       );
 
-      await tester.tap(find.descendant(
-          of: find.byType(TabBar), matching: find.text('Entrenamientos')));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(
+        tester,
+        group: 'Entrenamiento',
+        subview: 'Sesiones',
+      );
 
       // The section label is always rendered as hardcoded 'EVOLUCIÓN POR EJERCICIO'
       // regardless of locale — never sourced from AppL10n.
@@ -1692,9 +1869,11 @@ void main() {
         sessionRepository: repo,
       );
 
-      await tester.tap(find.descendant(
-          of: find.byType(TabBar), matching: find.text('Entrenamientos')));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(
+        tester,
+        group: 'Entrenamiento',
+        subview: 'Sesiones',
+      );
 
       // Web wrapper injects hardcoded Spanish labels — distinct bag from the
       // mobile wrapper's AppL10n-sourced strings (dedup-contract style).
@@ -1909,9 +2088,7 @@ void main() {
         trainerProfile: _trainerProfile(),
       );
 
-      await tester.tap(find.descendant(
-          of: find.byType(TabBar), matching: find.text('Pagos')));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(tester, group: 'Pagos');
 
       expect(
         find.textContaining('Próximamente: recordatorios y exportar.'),
@@ -1930,9 +2107,7 @@ void main() {
         trainerProfile: _trainerProfile(),
       );
 
-      await tester.tap(find.descendant(
-          of: find.byType(TabBar), matching: find.text('Pagos')));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(tester, group: 'Pagos');
 
       expect(find.text('Exportar CSV'), findsOneWidget);
     });
@@ -1947,9 +2122,7 @@ void main() {
         trainerProfile: _trainerProfile(),
       );
 
-      await tester.tap(find.descendant(
-          of: find.byType(TabBar), matching: find.text('Pagos')));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(tester, group: 'Pagos');
 
       // Button always present (even with empty history, 0-row CSV is valid)
       expect(find.text('Exportar CSV'), findsOneWidget);
@@ -1973,9 +2146,7 @@ void main() {
         trainerProfile: _trainerProfile(),
       );
 
-      await tester.tap(find.descendant(
-          of: find.byType(TabBar), matching: find.text('Pagos')));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(tester, group: 'Pagos');
 
       expect(find.text('Recordar'), findsOneWidget);
     });
@@ -1997,9 +2168,7 @@ void main() {
         trainerProfile: _trainerProfile(),
       );
 
-      await tester.tap(find.descendant(
-          of: find.byType(TabBar), matching: find.text('Pagos')));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(tester, group: 'Pagos');
 
       expect(find.text('Recordar'), findsNothing);
     });
@@ -2028,9 +2197,7 @@ void main() {
         trainerProfile: _trainerProfile(),
       );
 
-      await tester.tap(find.descendant(
-          of: find.byType(TabBar), matching: find.text('Pagos')));
-      await tester.pumpAndSettle();
+      await navigateAlumnoDetail(tester, group: 'Pagos');
 
       // Exactly one Recordar button (only the pending row)
       expect(find.text('Recordar'), findsOneWidget);
