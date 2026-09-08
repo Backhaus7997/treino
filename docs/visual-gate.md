@@ -184,11 +184,48 @@ En el PR, contá **qué cambió y por qué** — el commit de los PNG lo firma u
 bot, así que el único lugar donde queda la intención es tu descripción. El log
 del job lista los archivos que cambiaron.
 
-> **El commit del bot no dispara CI por sí solo.** GitHub deja los runs de un
-> push hecho con `GITHUB_TOKEN` en `action_required`, esperando aprobación
-> manual: es su guardia contra bucles de automatización. Después del `git pull`,
-> tu próximo push —aunque sea el que actualiza la descripción— los corre
-> normalmente. Si no tenés nada que pushear, aprobalos desde la pestaña Actions.
+> **Si el commit del bot no dispara CI, no es porque lo haya hecho un bot.** Que
+> el push venga de `GITHUB_TOKEN` no bloquea nada: los commits de goldens del bot
+> en los PR #987 y #959 corrieron `ci.yml` completo, con `actor=github-actions[bot]`.
+>
+> ```bash
+> gh api "repos/Backhaus7997/treino/actions/runs?head_sha=$(git rev-parse bb3c87a5)" \
+>   --jq '.workflow_runs[] | "\(.name) | \(.event) | actor=\(.actor.login)"'
+> ```
+>
+> `ci.yml` corre en dos casos y sólo dos: `push` a `main`, y `pull_request`. Sobre
+> una rama depende, entonces, del PR — y hay dos formas de quedarse sin checks,
+> ninguna relacionada con quién pushea:
+>
+> - **El PR todavía no está abierto.** Si regenerás antes de abrirlo, el push del
+>   bot no tiene `pull_request` al que colgarse. Pasó en el #998 (bot 12:37, PR
+>   abierto 12:44) y en el #949 (bot 18:00, PR abierto 18:11).
+> - **El PR está en conflicto con la base.** `pull_request` no valida tu rama
+>   sola: valida el **merge** de tu rama con `main` — es la misma distinción de la
+>   tabla de acá abajo. Si ese merge no se puede calcular, no hay árbol que
+>   validar y el run no se crea.
+>
+> En los dos casos **el run no existe**: no está en rojo, no está encolado y no
+> está en `action_required` esperando aprobación. Por eso tampoco hay nada que
+> aprobar en la pestaña Actions, y `ci.yml` no tiene `workflow_dispatch` para
+> lanzarlo a mano.
+>
+> **Lo que destraba es el PR, no el push.** Abrilo si falta; si está en conflicto,
+> resolvelo — el `git merge origin/main` genera por sí mismo el `synchronize` que
+> corre todo.
+>
+> ```bash
+> gh pr view --json mergeable,mergeStateStatus   # sin MERGEABLE/CLEAN no hay CI
+> gh run list --branch "$(git branch --show-current)"
+> ```
+>
+> Que la autoría no es lo que importa lo probó el #998 sin querer, con dos pushes
+> humanos a la misma rama: el `git commit --allow-empty` de las 12:47 **no corrió
+> nada** —el conflicto seguía en pie— y el merge de `origin/main` de las 12:52
+> corrió CI a las 12:53. Hasta este texto el doc decía que los runs quedaban en
+> `action_required` y mandaba a aprobarlos desde Actions: un remedio imposible
+> sobre un run que no existe, que es exactamente la advertencia falsa que
+> AGENTS.md §11.1 prohíbe.
 
 ### Traé `main` a tu rama ANTES de regenerar
 

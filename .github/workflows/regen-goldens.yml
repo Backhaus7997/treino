@@ -116,10 +116,19 @@ jobs:
           # El mensaje del commit NO lleva el marcador, así que el push que
           # esto genera no vuelve a disparar este workflow: no hay bucle.
           #
-          # OJO: tampoco arranca ci.yml solo. GitHub deja los runs de un push
-          # hecho con GITHUB_TOKEN en `action_required`, esperando aprobación
-          # manual — su guardia contra bucles de automatización. El próximo
-          # push humano a la rama los corre normalmente. Documentado en
+          # Que este push arranque ci.yml NO depende de quién lo hace. Venir
+          # de GITHUB_TOKEN no lo bloquea: los commits de goldens del bot en
+          # #987 y #959 corrieron ci.yml completo, con actor=github-actions[bot].
+          # Depende del PR. ci.yml sólo escucha `push` a main y `pull_request`,
+          # así que este push corre CI si —y sólo si— ya hay un PR abierto Y sin
+          # conflicto con la base: el run de `pull_request` valida el MERGE con
+          # main, y si ese merge no se puede calcular, no se crea.
+          #
+          # Si falta cualquiera de las dos, el run NO EXISTE: nada encolado,
+          # nada en `action_required` esperando aprobación, nada que aprobar en
+          # la pestaña Actions. Y ci.yml no tiene workflow_dispatch, así que
+          # tampoco hay botón para lanzarlo a mano. Lo destraba abrir el PR o
+          # resolver el conflicto — no un commit vacío. Documentado en
           # docs/visual-gate.md §7, porque es el tipo de detalle que sin
           # escribirlo se descubre a la mala: el gate en rojo, los goldens ya
           # correctos en la rama, y nadie entendiendo por qué CI no dice nada.
