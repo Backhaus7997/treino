@@ -5,6 +5,7 @@ import 'package:treino/core/utils/date_labels.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/utils/app_clock.dart';
 import 'package:treino/core/utils/argentina_time.dart';
 import 'package:treino/features/insights/presentation/monthly_report_screen.dart';
 import 'package:treino/features/insights/presentation/widgets/monthly_report_chart.dart';
@@ -19,6 +20,43 @@ import 'package:treino/l10n/app_l10n.dart';
 import '../../workout/application/stub_factories.dart';
 
 class MockSessionRepository extends Mock implements SessionRepository {}
+
+/// Ancla FIJA para los dos tests cuyo resultado depende de en qué semana ART
+/// caen las sesiones. No se deriva de `DateTime.now()` a propósito.
+///
+/// ## Por qué (el flake real, no uno hipotético)
+///
+/// El fixture armaba las sesiones con `DateTime(now.year, now.month, now.day)`
+/// —medianoche LOCAL— y las ponía en `today` y `today - 1 día`, esperando que
+/// las dos cayeran en la misma semana. Pero `Session.startedAt` viene SIEMPRE
+/// UTC-flagged (lo garantiza `TimestampConverter`) y por eso `weeklyStreakOf`
+/// hace `toArgentina(session.startedAt)` **sin** un `.toUtc()` previo — a
+/// diferencia de lo que hace con su `now`, dos líneas más arriba. Con un
+/// `DateTime` local esa resta de 3 h no convierte nada: corre el día
+/// calendario para atrás (00:00 → 21:00 del día anterior).
+///
+/// Con las dos sesiones corridas un día, el par cruza el borde del lunes
+/// **según qué día de la semana sea hoy**. Medido el martes 2026-09-08 sobre
+/// `main` limpio: la sesión de hoy caía en la semana en curso y la de ayer en
+/// la anterior → "Racha de 2 semanas". El lunes anterior las dos caían en la
+/// misma → "Racha de 1 semana" y el CI pasaba. Un test que cambia de veredicto
+/// con el almanaque no está midiendo la pantalla.
+///
+/// ## El ancla
+///
+/// Semana ART lunes 16/03/2026 – domingo 22/03/2026.
+///
+/// [_anchorNow] es LOCAL-flagged porque `AppClock.freeze` reemplaza a
+/// `DateTime.now()`, que devuelve local (lo assertea). Jueves al mediodía: aun
+/// con el offset de zona más extremo el instante no se sale de esa semana, así
+/// que la semana en curso es la misma corra donde corra el CI.
+final _anchorNow = DateTime(2026, 3, 19, 12);
+
+/// Martes y miércoles de la semana de [_anchorNow], como instantes UTC reales
+/// —que es lo que el dominio garantiza— a las 12:00: `toArgentina` los deja en
+/// las 09:00 ART del MISMO día, lejos de los dos bordes de medianoche.
+final _anchorTuesday = DateTime.utc(2026, 3, 17, 12);
+final _anchorWednesday = DateTime.utc(2026, 3, 18, 12);
 
 void main() {
   setUpAll(() {
@@ -218,15 +256,16 @@ void main() {
 
   testWidgets('switching to POR DÍA renders the daily duration chart',
       (tester) async {
+    AppClock.freeze(_anchorNow);
+    addTearDown(AppClock.unfreeze);
+
     final repo = MockSessionRepository();
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
 
     when(() => repo.listByUid('u1', limit: any(named: 'limit')))
         .thenAnswer((_) async => [
               makeSession(
                 id: 's1',
-                startedAt: today,
+                startedAt: _anchorTuesday,
                 status: SessionStatus.finished,
                 wasFullyCompleted: true,
                 durationMin: 45,
@@ -250,21 +289,22 @@ void main() {
   testWidgets(
       'renders the workout-days streak calendar below the summary cards '
       'for the selected month', (tester) async {
+    AppClock.freeze(_anchorNow);
+    addTearDown(AppClock.unfreeze);
+
     final repo = MockSessionRepository();
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
     when(() => repo.listByUid('u1', limit: any(named: 'limit')))
         .thenAnswer((_) async => [
               makeSession(
                 id: 's1',
-                startedAt: today,
+                startedAt: _anchorTuesday,
                 status: SessionStatus.finished,
                 wasFullyCompleted: true,
                 durationMin: 45,
               ),
               makeSession(
                 id: 's2',
-                startedAt: today.subtract(const Duration(days: 1)),
+                startedAt: _anchorWednesday,
                 status: SessionStatus.finished,
                 wasFullyCompleted: true,
               ),
@@ -291,8 +331,9 @@ void main() {
 
     expect(streakFinder, findsOneWidget);
     // Sin rutina activa el objetivo cae al fallback de 1 sesión por
-    // semana, y las dos sesiones del fixture caen en la MISMA semana:
-    // eso es una semana cumplida, no dos.
+    // semana, y las dos sesiones del fixture caen en la MISMA semana ART
+    // (martes y miércoles del lunes ancla): eso es una semana cumplida, no
+    // dos. La semana anterior está vacía, así que la racha corta ahí.
     expect(find.text('Racha de 1 semana'), findsOneWidget);
   });
 
