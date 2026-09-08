@@ -47,9 +47,10 @@
 // Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla cerrado
 // con la migración; contra el emulador no pide nada. Ver scripts/lib/admin.js.
 const { inicializarAdmin, proyectoDe } = require('./lib/admin');
+const { FieldValue, getFirestore } = require('firebase-admin/firestore');
 const { bannerDeProduccion } = require('./lib/firebase_projects');
 
-const { admin, contexto } = inicializarAdmin();
+const { app, contexto } = inicializarAdmin();
 
 // El cartel, antes del primer write. El destino ya no se lee del key a mano: lo
 // da el contexto que resolvió la frontera, que mira la identidad EFECTIVA de la
@@ -58,7 +59,7 @@ const { admin, contexto } = inicializarAdmin();
 const bannerProd = contexto.modo === 'emulador' ? null : bannerDeProduccion(proyectoDe(contexto));
 if (bannerProd) console.warn(bannerProd);
 
-const db = admin.firestore();
+const db = getFirestore(app);
 
 // ──────────────────────────────────────────────────────────────────────────
 // Geohash5 implementation (port of lib/core/utils/geohash.dart)
@@ -174,7 +175,7 @@ const TRAINERS = [
 
 function userDoc(t) {
   const geohash = geohash5(t.trainerLatitude, t.trainerLongitude);
-  const now = admin.firestore.FieldValue.serverTimestamp();
+  const now = FieldValue.serverTimestamp();
   return {
     uid: t.uid,
     email: t.email,
