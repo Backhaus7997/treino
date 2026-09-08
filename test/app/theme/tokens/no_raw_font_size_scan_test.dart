@@ -67,10 +67,10 @@ void main() {
 
     /// Techo de archivos permitidos, congelado con el PR que trae el guard.
     /// NUNCA subirlo: cada migración lo baja.
-    const allowlistCeiling = 258;
+    const allowlistCeiling = 257;
 
     /// Techo de ocurrencias totales en `lib/`. Mismo contrato: sólo baja.
-    const rawFontSizeDebtCeiling = 1784;
+    const rawFontSizeDebtCeiling = 1777;
 
     /// Allowlist de rutas relativas a `lib/` que todavía tienen `fontSize`
     /// crudo. Es un REGISTRO DE DEUDA, no una licencia.
@@ -283,7 +283,6 @@ void main() {
       'features/watch/presentation/wear/wear_workout_screen.dart',
       'features/workout/presentation/custom_exercise_editor_screen.dart',
       'features/workout/presentation/exercise_detail_screen.dart',
-      'features/workout/presentation/my_exercises_screen.dart',
       'features/workout/presentation/onboarding/templates_onboarding_view.dart',
       'features/workout/presentation/post_workout_summary_screen.dart',
       'features/workout/presentation/routine_detail_screen.dart',
