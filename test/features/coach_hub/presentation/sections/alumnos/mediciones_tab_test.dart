@@ -1,4 +1,4 @@
-// Widget tests for the Coach Hub web "Mediciones" tab
+// Widget tests for Coach Hub web Progreso › Antropometría/Rendimiento
 // (alumno_detail_screen.dart, W2+).
 //
 // El tab es una clase privada _MedicionesTab en alumno_detail_screen — la
@@ -36,6 +36,7 @@ import 'package:treino/features/gyms/domain/gym.dart';
 import 'package:treino/features/measurements/application/measurement_providers.dart';
 import 'package:treino/features/measurements/data/measurement_repository.dart';
 import 'package:treino/features/measurements/domain/measurement.dart';
+import 'package:treino/features/measurements/presentation/widgets/measurement_progress_chart.dart';
 import 'package:treino/features/payments/application/billing_providers.dart';
 import 'package:treino/features/payments/application/pagos_por_cobrar_provider.dart';
 import 'package:treino/features/performance/application/performance_test_providers.dart';
@@ -47,6 +48,8 @@ import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/l10n/app_l10n.dart';
+
+import 'alumno_detail_test_navigation.dart';
 
 const _trainerUid = 't1';
 const _athleteUid = 'a1';
@@ -154,6 +157,9 @@ List<Override> _baseOverrides({
 }) =>
     [
       currentUidProvider.overrideWithValue(_trainerUid),
+      alumnoDetailIndicatorsProvider(_athleteUid).overrideWithValue(
+        const AlumnoDetailIndicators(),
+      ),
       trainerLinksStreamProvider.overrideWith((ref) => Stream.value([_link()])),
       userPublicProfilesBatchProvider
           .overrideWith((ref, key) => {_athleteUid: _profile()}),
@@ -202,18 +208,11 @@ void _useDesktopViewport(WidgetTester tester) {
 }
 
 Future<void> _selectMedicionesTab(WidgetTester tester) async {
-  try {
-    await tester.pumpAndSettle(const Duration(milliseconds: 500));
-  } catch (_) {}
-  // "Mediciones" es el tab #10 (último). En viewport 1400 el TabBar hace
-  // scroll horizontal; el tab queda off-screen a la derecha así que `tap`
-  // no llega. Usamos el DefaultTabController del BuildContext del TabBar
-  // para saltar al índice 10 directamente.
-  final tabBarContext = tester.element(find.byType(TabBar));
-  DefaultTabController.of(tabBarContext).animateTo(10);
-  try {
-    await tester.pumpAndSettle(const Duration(milliseconds: 500));
-  } catch (_) {}
+  await navigateAlumnoDetail(
+    tester,
+    group: 'Progreso',
+    subview: 'Antropometría',
+  );
 }
 
 void main() {
@@ -256,6 +255,31 @@ void main() {
     expect(find.textContaining('cintura 82.0 cm'), findsOneWidget);
   });
 
+  testWidgets('Antropometría reúne gráfico de lectura y lista editable',
+      (tester) async {
+    final measurements = [
+      _measurement(
+        id: 'm1',
+        recordedAt: DateTime(2026, 6, 1),
+        weightKg: 72,
+      ),
+      _measurement(
+        id: 'm2',
+        recordedAt: DateTime(2026, 7, 1),
+        weightKg: 70,
+      ),
+    ];
+
+    _useDesktopViewport(tester);
+    await tester.pumpWidget(_wrap(_baseOverrides(measurements: measurements)));
+    await _selectMedicionesTab(tester);
+
+    expect(find.byType(MeasurementProgressChart), findsOneWidget);
+    expect(find.text('70 kg'), findsWidgets);
+    // Icons.edit, no TreinoIcon.edit: es el que el row usa de verdad.
+    expect(find.byIcon(Icons.edit), findsNWidgets(2));
+  });
+
   testWidgets('tap en row expande el detalle con todos los campos cargados',
       (tester) async {
     final m = _measurement(
@@ -276,10 +300,16 @@ void main() {
     await tester.tap(find.byIcon(Icons.keyboard_arrow_right));
     await tester.pumpAndSettle();
 
-    // Post-expansión: aparecen labels del detalle.
-    expect(find.text('Peso'), findsOneWidget);
+    // Post-expansión: aparecen labels y valores que SÓLO renderiza el detalle.
+    //
+    // Ojo con qué se afirma acá. Desde que Progreso y Mediciones son una sola
+    // vista, la card de lectura de arriba (`_MeasCard`) también rotula 'Peso' y
+    // 'Cintura': afirmar esos dos daría verde aunque la expansión no hubiera
+    // abierto nada. Los dos de abajo no tienen esa ambigüedad — '% grasa' es
+    // minúscula sólo en el detalle (la card dice '% Graso'), y el detalle
+    // imprime el double crudo ('82.0 cm') donde la card lo recorta ('82 cm').
     expect(find.text('% grasa'), findsOneWidget);
-    expect(find.text('Cintura'), findsOneWidget);
+    expect(find.text('82.0 cm'), findsOneWidget);
   });
 
   testWidgets('tap en trash → confirm dialog → repository.delete llamado',
@@ -347,8 +377,11 @@ void main() {
     expect(find.text('Pruebas de rendimiento'), findsNothing);
 
     // Toggle a Rendimiento.
-    await tester.tap(find.text('RENDIMIENTO'));
-    await tester.pumpAndSettle();
+    await navigateAlumnoDetail(
+      tester,
+      group: 'Progreso',
+      subview: 'Rendimiento',
+    );
 
     // Post-toggle: header rendimiento + empty state de pruebas.
     expect(find.text('Pruebas de rendimiento'), findsOneWidget);
@@ -438,8 +471,11 @@ void main() {
           .overrideWith((ref, id) => Stream.value(tests)),
     ]));
     await _selectMedicionesTab(tester);
-    await tester.tap(find.text('RENDIMIENTO'));
-    await tester.pumpAndSettle();
+    await navigateAlumnoDetail(
+      tester,
+      group: 'Progreso',
+      subview: 'Rendimiento',
+    );
 
     // Summary line muestra los 3 markers: CMJ, Sprint 10m, Sentadilla 1RM.
     expect(find.textContaining('CMJ 42.0 cm'), findsOneWidget);

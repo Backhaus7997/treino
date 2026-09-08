@@ -22,6 +22,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/application/athlete_note_providers.dart';
+import 'package:treino/features/coach/application/follow_up_entry_providers.dart';
 import 'package:treino/features/coach/data/athlete_note_repository.dart';
 import 'package:treino/features/coach/domain/athlete_note.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
@@ -43,6 +44,8 @@ import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/l10n/app_l10n.dart';
+
+import 'alumno_detail_test_navigation.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
 
 const _trainerUid = 't1';
@@ -84,6 +87,9 @@ List<Override> _baseOverrides({
 }) =>
     [
       currentUidProvider.overrideWithValue(_trainerUid),
+      alumnoDetailIndicatorsProvider(_athleteUid).overrideWithValue(
+        const AlumnoDetailIndicators(),
+      ),
       trainerLinksStreamProvider.overrideWith((ref) => Stream.value([_link()])),
       userPublicProfilesBatchProvider
           .overrideWith((ref, key) => {_athleteUid: _profile()}),
@@ -103,6 +109,9 @@ List<Override> _baseOverrides({
       athleteNoteProvider(
         (trainerId: _trainerUid, athleteId: _athleteUid),
       ).overrideWith((ref) => noteStream),
+      followUpEntriesProvider(
+        (trainerId: _trainerUid, athleteId: _athleteUid),
+      ).overrideWith((ref) => const Stream.empty()),
       if (repo != null) athleteNoteRepositoryProvider.overrideWithValue(repo),
     ];
 
@@ -129,22 +138,13 @@ void _useDesktopViewport(WidgetTester tester) {
   addTearDown(tester.view.resetDevicePixelRatio);
 }
 
-/// Selects the "Notas privadas" tab by title. Wraps `pumpAndSettle` in a
-/// try/catch because the loading-state test uses a stream that never emits,
-/// so pumpAndSettle would time out — swallow the timeout, we've already
-/// pumped enough frames for the tab body to lay out.
+/// Selecciona Privado › Notas con el helper compartido de la ficha.
 Future<void> _selectNotasTab(WidgetTester tester) async {
-  try {
-    await tester.pumpAndSettle(const Duration(milliseconds: 500));
-  } catch (_) {
-    // Stream never resolves — the frames we've already pumped are enough.
-  }
-  await tester.tap(find.text('Notas privadas'));
-  try {
-    await tester.pumpAndSettle(const Duration(milliseconds: 500));
-  } catch (_) {
-    // Same rationale — tab body is laid out already.
-  }
+  await navigateAlumnoDetail(
+    tester,
+    group: 'Privado',
+    subview: 'Notas',
+  );
 }
 
 void main() {
@@ -255,6 +255,9 @@ void main() {
     const otherAthleteUid = 'a2';
     final overrides = <Override>[
       currentUidProvider.overrideWithValue(_trainerUid),
+      alumnoDetailIndicatorsProvider(_athleteUid).overrideWithValue(
+        const AlumnoDetailIndicators(),
+      ),
       trainerLinksStreamProvider.overrideWith((ref) => Stream.value([
             _link(),
             TrainerLink(
