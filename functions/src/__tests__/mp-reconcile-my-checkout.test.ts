@@ -124,8 +124,10 @@ const AUTORIZADA: MpPreapproval = {
  */
 function fakeMp(porPlan: Record<string, MpPreapproval | Error | null>) {
   const llamadas: string[] = [];
+  const bajas: string[] = [];
   return {
     llamadas,
+    bajas,
     deps: (nowMs: number = AHORA) => ({
       nowMs,
       mpClient: {
@@ -136,6 +138,13 @@ function fakeMp(porPlan: Record<string, MpPreapproval | Error | null>) {
           const r = porPlan[planId];
           if (r instanceof Error) throw r;
           return r == null ? [] : [r];
+        },
+        // La baja de la suscripcion vieja al cambiar de plan. Se anota en vez
+        // de tirar: lo que estos tests miran es el cooldown y a que plan se le
+        // pregunto, y una excepcion acá se veria como un fallo de la red.
+        cancelPreapproval: async (preapprovalId: string) => {
+          bajas.push(preapprovalId);
+          return { id: preapprovalId, status: "cancelled" };
         },
       },
     }),

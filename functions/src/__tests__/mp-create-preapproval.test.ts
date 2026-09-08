@@ -104,6 +104,7 @@ function fakeMp(
   respuesta: MpPreapprovalPlan | Error = { id: "2c93", init_point: "https://mp/x" },
 ) {
   const llamadas: unknown[] = [];
+  const bajas: string[] = [];
   const client: MpClient = {
     getPreapproval: async () => ({}),
     searchPreapprovalsByPlan: async () => [],
@@ -112,8 +113,15 @@ function fakeMp(
       if (respuesta instanceof Error) throw respuesta;
       return respuesta;
     },
+    // Se anota en vez de tirar: lo que estos tests fijan es que NUNCA se llame,
+    // y una excepcion se veria como un fallo del checkout en vez de como lo que
+    // seria — una baja que no correspondia.
+    cancelPreapproval: async (id) => {
+      bajas.push(id);
+      return { id, status: "cancelled" };
+    },
   };
-  return { client, llamadas };
+  return { client, llamadas, bajas };
 }
 
 const PF = { users: { t1: { role: "trainer" } } };
@@ -145,6 +153,33 @@ describe("runCreatePreapproval — el camino feliz", () => {
       planId: "2c93",
       status: "created",
     });
+  });
+
+  it("abrir un checkout NO da de baja la suscripcion que el PF ya tiene", async () => {
+    // Es la mitad de la decision de diseño del cobro doble, y la que se puede
+    // fijar desde acá. Abrir un checkout no es pagar: MP deja la suscripcion en
+    // `pending` hasta que el PF carga el medio de pago. Cancelar la vieja en
+    // este momento dejaria SIN PLAN al que mira el precio y cierra la pestaña —
+    // y la baja en MP es terminal, no se deshace arrepintiendose.
+    //
+    // La vieja se cancela cuando la nueva queda CONFIRMADA, desde el
+    // reconciliador. Ver el encabezado de `mp/reconcile.ts`.
+    const { app } = fakeApp({
+      users: {
+        t1: {
+          role: "trainer",
+          subscription: { tier: "plan2", status: "active" },
+        },
+      },
+    });
+    const mp = fakeMp();
+
+    await runCreatePreapproval(app, "t1", {
+      tier: "plan3",
+      cycle: "monthly",
+    }, { ...OK, mpClient: mp.client });
+
+    expect(mp.bajas).toEqual([]);
   });
 
   it("guarda el mapeo preapproval → (PF, plan), que es lo unico irrecuperable", async () => {
