@@ -26,10 +26,9 @@
  * protects against duplicate triggers is the guard that groups the series.
  */
 
-import * as admin from "firebase-admin";
 import { App } from "firebase-admin/app";
 import { logger } from "firebase-functions";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { MAIL_QUEUE_COLLECTION, MailKind, MailParams } from "./types";
 
 /** Firestore gRPC status code for a `create()` on an existing document. */
@@ -122,9 +121,9 @@ async function refreshIfPending(
   kind: MailKind,
   toUid: string,
 ): Promise<void> {
-  const ref = admin.firestore(app).collection(MAIL_QUEUE_COLLECTION).doc(id);
+  const ref = getFirestore(app).collection(MAIL_QUEUE_COLLECTION).doc(id);
   try {
-    const refreshed = await admin.firestore(app).runTransaction(async (tx) => {
+    const refreshed = await getFirestore(app).runTransaction(async (tx) => {
       const snap = await tx.get(ref);
       if (!snap.exists) return false;
       if (snap.get("status") !== "pending") return false;
@@ -184,8 +183,7 @@ export async function enqueueMail(
   if (prefKey) doc.prefKey = prefKey;
 
   try {
-    await admin
-      .firestore(app)
+    await getFirestore(app)
       .collection(MAIL_QUEUE_COLLECTION)
       .doc(id)
       .create(doc);

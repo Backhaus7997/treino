@@ -9,8 +9,8 @@
  *     `notifyOverduePayments` reads, with the same fallback copy.
  */
 
-import * as admin from "firebase-admin";
 import { App } from "firebase-admin/app";
+import { Timestamp, getFirestore } from "firebase-admin/firestore";
 
 /** IANA zone for Argentina. No DST since 2009, but let Intl own that. */
 const AR_TIME_ZONE = "America/Argentina/Buenos_Aires";
@@ -22,7 +22,7 @@ const ATHLETE_FALLBACK = "un atleta";
 
 /** Accepts the several shapes a Firestore date arrives in across triggers. */
 export type DateLike =
-  | admin.firestore.Timestamp
+  | Timestamp
   | Date
   | number
   | { _seconds: number }
@@ -33,7 +33,7 @@ export function toDate(value: DateLike): Date | null {
   if (value == null) return null;
   if (value instanceof Date) return value;
   if (typeof value === "number") return new Date(value);
-  if (value instanceof admin.firestore.Timestamp) return value.toDate();
+  if (value instanceof Timestamp) return value.toDate();
   // Plain object shape — how a Timestamp looks after a JSON round-trip.
   if (typeof value === "object" && "_seconds" in value) {
     return new Date(value._seconds * 1000);
@@ -119,8 +119,7 @@ export async function resolveDisplayName(
   fallback: string,
 ): Promise<string> {
   try {
-    const snap = await admin
-      .firestore(app)
+    const snap = await getFirestore(app)
       .collection("userPublicProfiles")
       .doc(uid)
       .get();

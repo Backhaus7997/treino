@@ -44,8 +44,8 @@
  * `sdd/rankings-integrity` Phase 1 (PR#1).
  */
 
-import * as admin from "firebase-admin";
-import { App } from "firebase-admin/app";
+import { App, getApp, initializeApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 
@@ -53,11 +53,11 @@ import { logger } from "firebase-functions";
  * Initialize the default Admin SDK app lazily so the module can be imported
  * without an app already existing (e.g. in test environments).
  */
-function getApp(): App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -138,7 +138,7 @@ export async function recomputeMetrics(
   app: App,
   uid: string,
 ): Promise<void> {
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
 
   try {
     const profileRef = db.collection("userPublicProfiles").doc(uid);
@@ -244,7 +244,7 @@ export const rankingAggregateOnSession = onDocumentWritten(
       });
       return;
     }
-    await recomputeMetrics(getApp(), uid);
+    await recomputeMetrics(ensureApp(), uid);
   },
 );
 
@@ -300,6 +300,6 @@ export const rankingAggregateOnOptIn = onDocumentWritten(
       });
       return;
     }
-    await recomputeMetrics(getApp(), uid);
+    await recomputeMetrics(ensureApp(), uid);
   },
 );

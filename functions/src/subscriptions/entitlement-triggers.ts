@@ -13,9 +13,8 @@
  *    conserva sus 7 alumnos para siempre.
  */
 
-import * as admin from "firebase-admin";
-import { App } from "firebase-admin/app";
-import { DocumentData } from "firebase-admin/firestore";
+import { App, getApp, initializeApp } from "firebase-admin/app";
+import { DocumentData, getFirestore } from "firebase-admin/firestore";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { logger } from "firebase-functions";
@@ -28,11 +27,11 @@ import {
   enqueueSubscriptionMail,
 } from "./subscription-mail";
 
-function getApp(): App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -69,7 +68,7 @@ export const syncEntitlementsOnSubscription = onDocumentWritten(
     // reconciliaria con un limite y se anunciaria con el otro.
     const nowMs = Date.now();
     try {
-      const r = await syncTrainerEntitlements(getApp(), uid, nowMs);
+      const r = await syncTrainerEntitlements(ensureApp(), uid, nowMs);
       logger.info("syncEntitlementsOnSubscription: reconciliado", {
         trainerId: uid,
         limit: r.limit,
@@ -98,7 +97,7 @@ export const syncEntitlementsOnSubscription = onDocumentWritten(
       );
       if (plan) {
         await enqueueSubscriptionMail(
-          getApp(),
+          ensureApp(),
           uid,
           plan,
           r.blockedAthleteIds.length,
@@ -129,7 +128,7 @@ export async function sweepEntitlementsHandler(
   app: App,
   nowMs?: number,
 ): Promise<SweepResult> {
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
   const snap = await db
     .collection("users")
     .where("role", "==", "trainer")
@@ -191,7 +190,7 @@ export const sweepEntitlements = onSchedule(
     region: "southamerica-east1",
   },
   async () => {
-    const r = await sweepEntitlementsHandler(getApp());
+    const r = await sweepEntitlementsHandler(ensureApp());
     logger.info("sweepEntitlements: corrida diaria", r);
   },
 );

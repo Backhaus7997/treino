@@ -1,6 +1,14 @@
 # Propuesta — migrar `firebase-admin` de la API namespaced a los subpaths modulares
 
-**Estado:** en curso — PR 1 mergeado (`43a40af3`), PR 2 en review ([#981](https://github.com/Backhaus7997/treino/pull/981)).
+**Estado:** en curso. PR 1 mergeado (`43a40af3`); PRs 2, 3 y 4 abiertos y en verde, encadenados.
+**⚠️ Cómo contar, o el error se repite:** la regex `admin\.<ns>` **se pierde las cadenas
+multilínea** (`await admin\n  .firestore(app)`). Con ella el PR 4b se saltó 12 sitios en 8 archivos
+y —peor— la verificación reportó «cero» y se publicó como tal. Contar SIEMPRE con
+`rg -oU 'admin\s*\.\s*(firestore|auth|storage|credential|app|apps|messaging|database)\b'`.
+
+**Avance medido:** de los 620 call sites quedan **473** — `functions/src` bajó de 238 a **81** y
+`admin.app.App` quedó en **cero**, o sea que la migración de TIPOS está completa. `functions/src/__tests__`
+y `scripts/` siguen enteros (PRs 5 a 10).
 **Origen:** el trabajo de fondo que dejó pendiente el [#971](https://github.com/Backhaus7997/treino/pull/971) (`8ee4e298`).
 **Issue relacionada:** [#889](https://github.com/Backhaus7997/treino/pull/889) — el PR de dependabot que
 está rojo desde el 2026-08-31. Es el **síntoma**, no la tarea. No se mergea.
@@ -156,10 +164,14 @@ Lo encontró `tsc` al implementar el PR 2, y contradice la fila de arriba leída
    handle pelado. Renombrar el tipo rompe todo `app.firestore()` — que es un cambio de **runtime**,
    no de tipos.
 
-2. **Los dos tipos son mutuamente inasignables.** `TS2345: Argument of type '…/app/core".App' is not
+2. **La asignabilidad va en UNA sola dirección** — la primera versión de esta nota decía
+   «mutuamente inasignables» y era falso. `TS2345: Argument of type '…/app/core".App' is not
    assignable to parameter of type '…/firebase-namespace-api".app.App'`. O sea que **el tipo `App`
-   no se puede migrar archivo por archivo si los archivos se pasan un `App` entre sí**: hay que
-   migrar el componente conexo entero, o ninguno.
+   no se puede migrar archivo por archivo si un archivo migrado le pasa su `App` a uno sin migrar**.
+   Al revés SÍ anda: el namespaced tiene más miembros, así que se asigna a un `App` modular sin
+   problema —hubo 29 archivos con `function getApp(): App { return admin.app(); }` compilando—. Por
+   eso el PR 4b no tuvo componente conexo: con `admin.app.App` ya en cero no quedaba un solo
+   parámetro namespaced al que pasarle un `App` modular.
 
 En este repo son **4 archivos**: los tres de `src/subscriptions/mp/` (`reconcile.ts`,
 `tier-mapping.ts`, `create-preapproval.ts`) y `src/notifications/notify-link-change.ts`. Se
@@ -275,7 +287,8 @@ el 11 y el 12.
 | **1** ✅ | Extender los dobles a los subpaths | `scripts/` + `functions/` | no | 661 | **Habilitante — HECHO** (`04821be4` + `2ccc3096`). Sin esto, todo lo que sigue puede salir verde sin medir. Cero cambios de producción: sólo fixtures y tests. |
 | **2** ✅ | Tipos de `functions/` (`admin.app.App` → `App`, etc.) | `functions/src` + `functions/scripts` | no | 175 | **101 sitios en 46 archivos, cero riesgo runtime**: los tipos se borran al compilar y `tsc` lo prueba entero. Quedan afuera los 4 archivos que usan `app.firestore()` (los 3 de `subscriptions/mp/` + `notify-link-change.ts`) — ver el ⚠️ del § 3: ahí el rename arrastra runtime, así que van al PR 4. |
 | **3** | `FieldValue` / `Timestamp` de `functions/` | `functions/src` | no | ~60 | Fábricas puras, sin app. Ya hay 5 en producción hace meses — el patrón está probado en campo. |
-| **4** | `ensureApp()` + `getFirestore/getAuth/getStorage/getMessaging` de `functions/` | `functions/src` | **sí** | ~250 | El idiom `admin.app()` / `admin.initializeApp()` se repite en **32 archivos**. Primer PR con riesgo runtime real; entra con los dobles ya arreglados (PR 1). **Arranca por los 4 archivos que el PR 2 no pudo tocar** (`subscriptions/mp/` ×3 + `notify-link-change.ts`): son el componente conexo más chico y ya está aislado. Enumerarlo con `tsc`, NO con regex — ver el ⚠️ del § 3. Acá también entra el helper de mocks compartido. Candidato a partirse por subdirectorio si pasa 400 líneas. |
+| **4** ✅ | El componente conexo del `App` | `functions/src` | **sí** | 133 | **HECHO** ([#985](https://github.com/Backhaus7997/treino/pull/985)). Los 4 archivos que el PR 2 no pudo tocar (`subscriptions/mp/` ×3 + `notify-link-change.ts`), 33 sitios. Hay que moverlos **enteros o nada**: los dos tipos de `App` son mutuamente inasignables. Primer PR con runtime real. |
+| **4b** | El resto del idiom `ensureApp()` + los accesores | `functions/src` | **sí** | ~400 | Lo que queda de producción: **81 sitios**, con el idiom `admin.app()` repetido en **29 archivos** y 39 `admin.firestore(`. Acá entra el helper de mocks compartido, que ahora sí va a tener consumidores. Candidato seguro a partirse en dos o tres slices por subdirectorio. |
 | **5** | Tests de `functions/` | `functions/src/__tests__` | no | ~350 | 294 sitios en 43 archivos. Va después de que producción esté migrada, así los mocks se escriben contra la forma final. Casi seguro se parte en 2-3 slices. |
 | **6** | `scripts/lib/admin.js` + sus dobles | `scripts/` | **sí** | ~120 | La única puerta de inicialización (#834). `admin.apps` → `getApps()`, `admin.credential.cert` → `cert()`. `test/admin.test.js` inyecta un `adminFalso()` por parámetro (`{ apps, credential, initializeApp }`): **ese doble cambia de forma en el mismo commit.** No se toca `resolverContexto` ni la lógica de credenciales. |
 | **7** | `backfill_*` + `cleanup_*` + `restore_*` | `scripts/` | **sí** | ~150 | 17 archivos, 20 call sites. El bloque más chato: casi todos son un `admin.firestore()` y nada más. |

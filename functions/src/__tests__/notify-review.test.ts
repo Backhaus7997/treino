@@ -12,13 +12,15 @@
  */
 
 import * as admin from "firebase-admin";
+import { App, deleteApp } from "firebase-admin/app";
+import { Messaging, MulticastMessage } from "firebase-admin/messaging";
 import { notifyOnReviewHandler } from "../notifications/notify-review";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
 process.env.GCLOUD_PROJECT = "treino-dev";
 
-let testApp: admin.app.App;
+let testApp: App;
 
 beforeAll(() => {
   testApp = admin.initializeApp(
@@ -28,19 +30,19 @@ beforeAll(() => {
 });
 
 afterAll(async () => {
-  await testApp.delete();
+  await deleteApp(testApp);
 });
 
 const db = () => admin.firestore(testApp);
 
-function makeMockMessaging(): admin.messaging.Messaging {
+function makeMockMessaging(): Messaging {
   return {
-    sendEachForMulticast: jest.fn(async (msg: admin.messaging.MulticastMessage) => ({
+    sendEachForMulticast: jest.fn(async (msg: MulticastMessage) => ({
       successCount: msg.tokens.length,
       failureCount: 0,
       responses: msg.tokens.map(() => ({ success: true, messageId: "id" })),
     })),
-  } as unknown as admin.messaging.Messaging;
+  } as unknown as Messaging;
 }
 
 async function seedUser(uid: string, fcmTokens: string[]): Promise<void> {
@@ -85,7 +87,7 @@ describe("SCENARIO-642: new review → sendFcm called with trainerId, correct bo
     await notifyOnReviewHandler(testApp, reviewData, mock);
 
     expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
-    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as MulticastMessage;
     expect(callArg.tokens).toContain("trainer-token-642");
     expect(callArg.tokens).not.toContain("athlete-token-642");
     expect(callArg.data?.kind).toBe("review");
@@ -102,7 +104,7 @@ describe("SCENARIO-642: new review → sendFcm called with trainerId, correct bo
 
     await notifyOnReviewHandler(testApp, reviewData, mock);
 
-    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as MulticastMessage;
     expect(callArg.notification?.body).toBe("Juan dejó una reseña de 5⭐");
   });
 
@@ -117,7 +119,7 @@ describe("SCENARIO-642: new review → sendFcm called with trainerId, correct bo
 
     await notifyOnReviewHandler(testApp, reviewData, mock);
 
-    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as MulticastMessage;
     expect(callArg.data?.deepLink).toBe(`/coach/trainer/${trainerId}`);
   });
 
@@ -135,7 +137,7 @@ describe("SCENARIO-642: new review → sendFcm called with trainerId, correct bo
 
     await notifyOnReviewHandler(testApp, reviewData, mock);
 
-    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as MulticastMessage;
     // Fallback is "Un atleta"
     expect(callArg.notification?.body).toBe("Un atleta dejó una reseña de 4⭐");
     await db().collection("users").doc(noProfileAthleteId).delete().catch(() => undefined);

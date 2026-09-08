@@ -40,23 +40,33 @@
  *
  * Para cada test que mockea `firebase-admin`: recorre el grafo de imports de los
  * módulos de `src/` que ese test carga y junta los subpaths de los que se
- * importa algún símbolo QUE NECESITA UNA APP. Si alguno no está mockeado en ese
- * archivo, falla y dice cuál.
+ * importa un símbolo peligroso. Si alguno no está mockeado en ese archivo, falla
+ * y dice cuál, por qué, y de qué archivo de producción viene.
  *
  * La lista de subpaths NO está escrita a mano: sale del código en cada corrida,
  * igual que en `scripts/test/firebase_admin_superficie.test.js`. Una lista a mano
  * se desactualiza y termina prometiendo una cobertura que no tiene — el patrón
  * del #826.
  *
- * ─── Por qué sólo los símbolos que necesitan app ────────────────────────────
+ * ─── Qué cuenta como peligroso: DOS vectores ──────────────────────────────
  *
- * `FieldValue` y `Timestamp` son fábricas puras: andan sin app y devuelven el
- * mismo sentinel que el mock devolvería. Exigir que se mockeen sería ruido, y el
- * ruido en un gate es lo que lleva a que alguien lo silencie.
+ * 1. **Necesita una app** (`SIMBOLOS_QUE_EXIGEN_APP`). Tiran si no hay app
+ *    inicializada, y ese throw es el que un catch-all convierte en verde.
  *
- * Los de `SIMBOLOS_QUE_EXIGEN_APP` TIRAN cuando no hay app inicializada, y ese
- * throw es el que se convierte en verde al pasar por un catch-all. Esos son los
- * que importan.
+ * 2. **El test lo falsea en su propio mock namespaced.** Si se tomó el trabajo
+ *    de escribir un `FieldValue` de mentira, le importa; que producción lea el
+ *    real es drift, con app o sin app.
+ *
+ * El vector 2 se agregó DESPUÉS y no por prolijidad: la primera versión de este
+ * archivo sólo tenía el 1, argumentando que `FieldValue`/`Timestamp` son
+ * fábricas puras. Al migrarlas (PR 3) se rompieron DOS suites
+ * —`notify-monthly-report` y `promote-link`— con este gate en verde. Ver el
+ * comentario de `cuerpoDelMockNamespaced`.
+ *
+ * Lo que NO se exige, para que el gate no sea ruido: los símbolos que son sólo
+ * TIPOS (`App`, `DocumentData`, `Messaging`…). Se borran al compilar y no
+ * pueden driftear. Con la regla estricta serían 24 violaciones en vez de las
+ * reales; el ruido en un gate es lo que lleva a que alguien lo silencie.
  *
  * SI ESTE TEST SE PONE ROJO: no lo silencies ni saques el símbolo de la lista.
  * Agregá el `jest.mock("firebase-admin/<sub>", …)` que falta en el test que
@@ -85,6 +95,84 @@ const SIMBOLOS_QUE_EXIGEN_APP = new Set([
   "getDatabase",
   "getApp",
 ]);
+
+/**
+ * EL SEGUNDO VECTOR, y lo encontró un test roto, no un razonamiento.
+ *
+ * La primera versión de este archivo sólo miraba `SIMBOLOS_QUE_EXIGEN_APP`,
+ * con el argumento de que `FieldValue` y `Timestamp` son fábricas puras que
+ * andan sin app. Eso es cierto y **no alcanza**: al migrar `functions/` a
+ * `FieldValue` del subpath (PR 3), DOS suites se rompieron —
+ * `notify-monthly-report` y `promote-link`— y este gate estaba verde.
+ *
+ * El mecanismo: esos tests falsean `firestore.FieldValue` en su propio
+ * `jest.mock("firebase-admin", …)` —p. ej. `delete: () => Symbol("…")`— y su
+ * Firestore de mentira reconoce ESE sentinel. Cuando producción empieza a
+ * importar `FieldValue` del subpath, le llega el REAL, el fake no lo reconoce y
+ * guarda el sentinel en vez de aplicarlo. No hace falta ninguna app para eso.
+ *
+ * O sea que la condición no es "necesita app": es **"el test se tomó el trabajo
+ * de falsear este símbolo"**. Si lo falseó, le importa; que producción lea el
+ * real es drift, con app o sin app.
+ *
+ * Se chequean las dos cosas. La de app cubre el símbolo que el test NO falsea
+ * pero igual revienta; ésta cubre el que no revienta y miente.
+ */
+/**
+ * Los dobles modulares se escriben con una línea que delega en
+ * `helpers/modular-from-namespaced.ts`:
+ *
+ *     jest.mock("firebase-admin/app", () =>
+ *       (
+    jest.requireActual("./helpers/modular-from-namespaced") as Record<
+      string,
+      () => unknown
+    >
+  ).app());
+ *
+ * El factory ya no NOMBRA los símbolos, así que mirar su texto no alcanza: el
+ * gate tiene que seguir esa indirección un nivel. Si no, el helper —que existe
+ * justamente para que los 13 dobles no drifteen— apagaría el trinquete que los
+ * vigila, y eso es peor que el problema que resuelve.
+ */
+const HELPER = "modular-from-namespaced";
+const CUERPOS_DEL_HELPER: Record<string, string> = (() => {
+  const ruta = path.join(TESTS, "helpers", `${HELPER}.ts`);
+  if (!fs.existsSync(ruta)) return {};
+  const fuente = fs.readFileSync(ruta, "utf8");
+  const out: Record<string, string> = {};
+  for (const m of fuente.matchAll(/export function (\w+)\([^)]*\)[^{]*\{([\s\S]*?)\n\}/g)) {
+    out[m[1]] = m[2];
+  }
+  return out;
+})();
+
+/** Resuelve el cuerpo real de un mock, siguiendo el helper si delega en él. */
+function cuerpoEfectivo(cuerpo: string): string {
+  const m = cuerpo.match(new RegExp(`${HELPER}[\\s\\S]*?\\)\\.(\\w+)\\(`));
+  if (!m) return cuerpo;
+  const delHelper = CUERPOS_DEL_HELPER[m[1]];
+  if (delHelper === undefined) {
+    throw new Error(
+      `El mock delega en ${HELPER}.${m[1]}(), que no existe en el helper. ` +
+        "¿Se renombró la función y quedó un test apuntando al nombre viejo?",
+    );
+  }
+  return delHelper;
+}
+function cuerpoDelMock(codigo: string, specifier: string): string {
+  const inicio = codigo.indexOf(`jest.mock("${specifier}"`);
+  if (inicio < 0) return "";
+  let nivel = 0;
+  for (let i = codigo.indexOf("(", inicio); i < codigo.length; i++) {
+    if (codigo[i] === "(") nivel++;
+    else if (codigo[i] === ")") {
+      nivel--;
+      if (nivel === 0) return codigo.slice(inicio, i + 1);
+    }
+  }
+  return "";
+}
 
 /** `import … from "algo"` / `export … from "algo"`, con lo que se importa. */
 const IMPORT = /(?:import|export)\s+([\s\S]*?)\s*from\s*["']([^"']+)["']/g;
@@ -152,8 +240,8 @@ const GRAFO = new Map<string, Analisis>(
  * directo. Mirar sólo el primer salto dejaría afuera justo los casos que
  * importan.
  */
-function subpathsAlcanzados(desde: string[]): Map<string, Set<string>> {
-  const alcanzados = new Map<string, Set<string>>();
+function subpathsAlcanzados(desde: string[]): Map<string, Map<string, Set<string>>> {
+  const alcanzados = new Map<string, Map<string, Set<string>>>();
   const vistos = new Set<string>();
   const pendientes = [...desde];
 
@@ -166,10 +254,12 @@ function subpathsAlcanzados(desde: string[]): Map<string, Set<string>> {
     if (!analisis) continue;
 
     for (const [subpath, nombres] of Object.entries(analisis.subpaths)) {
-      const exigen = nombres.filter((n) => SIMBOLOS_QUE_EXIGEN_APP.has(n));
-      if (exigen.length === 0) continue;
-      if (!alcanzados.has(subpath)) alcanzados.set(subpath, new Set());
-      exigen.forEach((n) => (alcanzados.get(subpath) as Set<string>).add(`${n} (${path.relative(SRC, actual)})`));
+      if (!alcanzados.has(subpath)) alcanzados.set(subpath, new Map());
+      const porNombre = alcanzados.get(subpath) as Map<string, Set<string>>;
+      for (const nombre of nombres) {
+        if (!porNombre.has(nombre)) porNombre.set(nombre, new Set());
+        (porNombre.get(nombre) as Set<string>).add(path.relative(SRC, actual));
+      }
     }
 
     pendientes.push(...analisis.relativos);
@@ -200,13 +290,52 @@ describe("la superficie mockeada de firebase-admin cubre lo que el código impor
       const mockeados = new Set([...codigo.matchAll(JEST_MOCK)].map((m) => m[1]));
       if (!mockeados.has("firebase-admin")) continue;
 
+      const cuerpoNs = cuerpoEfectivo(cuerpoDelMock(codigo, "firebase-admin"));
       const { relativos } = analizar(test);
-      for (const [subpath, quienes] of subpathsAlcanzados(relativos)) {
-        if (mockeados.has(subpath)) continue;
+
+      for (const [subpath, porNombre] of subpathsAlcanzados(relativos)) {
+        // Mockear el subpath NO alcanza: el doble tiene que TRAER los símbolos que
+        // producción le pide. Es un hueco real, no teórico — en el PR 4
+        // `mp-reconcile.test.ts` ya mockeaba `firebase-admin/firestore` (con
+        // `FieldValue`/`Timestamp`, del PR 3) cuando producción empezó a pedirle
+        // `getFirestore`. El subpath estaba mockeado y el símbolo no existía.
+        const cuerpoSub = mockeados.has(subpath) ? cuerpoEfectivo(cuerpoDelMock(codigo, subpath)) : null;
+
+        const culpables: string[] = [];
+        for (const [nombre, archivos] of porNombre) {
+          // PRIMERO el filtro de peligrosidad. Al revés, el gate empieza a pedir
+          // que se mockeen TIPOS (`DocumentData`, `DocumentReference`), que se
+          // borran al compilar y no pueden driftear — ruido puro, y el ruido en un
+          // gate es lo que lleva a que alguien lo silencie.
+          const exigeApp = SIMBOLOS_QUE_EXIGEN_APP.has(nombre);
+          // ¿Este test se tomó el trabajo de falsear este símbolo en su mock
+          // namespaced? Entonces le importa, y leer el real es drift.
+          const falseado = new RegExp(`\\b${nombre}\\b`).test(cuerpoNs);
+          if (!exigeApp && !falseado) continue;
+
+          // Con el subpath ya mockeado, lo único que falta es que ESTE símbolo
+          // esté adentro del doble.
+          if (cuerpoSub !== null) {
+            if (new RegExp(`\\b${nombre}\\b`).test(cuerpoSub)) continue;
+            culpables.push(
+              `${nombre} — el mock de "${subpath}" existe pero no lo trae ← ${[...archivos].sort().join(", ")}`,
+            );
+            continue;
+          }
+
+          const motivo = exigeApp ? "necesita una app" : "lo falsea este mismo test";
+          culpables.push(`${nombre} (${motivo}) ← ${[...archivos].sort().join(", ")}`);
+        }
+        if (culpables.length === 0) continue;
+
+        const cabecera =
+          cuerpoSub === null
+            ? `    mockea "firebase-admin" pero NO "${subpath}", del que su grafo importa:`
+            : `    mockea "${subpath}" pero su doble no cubre lo que el grafo importa:`;
         violaciones.push(
           `${path.relative(TESTS, test)}\n` +
-            `    mockea "firebase-admin" pero NO "${subpath}", del que su grafo importa:\n` +
-            [...quienes].sort().map((q) => `      · ${q}`).join("\n"),
+            `${cabecera}\n` +
+            culpables.sort().map((c) => `      · ${c}`).join("\n"),
         );
       }
     }

@@ -76,8 +76,8 @@
  * `cancelledBy` y la entrada del `cancellationLog`.
  */
 
-import * as admin from "firebase-admin";
 import { App } from "firebase-admin/app";
+import { FieldValue, Timestamp, getFirestore } from "firebase-admin/firestore";
 
 const BATCH_SIZE = 500;
 
@@ -106,8 +106,8 @@ export async function cancelFutureAppointments(
   app: App,
   uid: string
 ): Promise<{ count: number }> {
-  const db = admin.firestore(app);
-  const now = admin.firestore.Timestamp.now();
+  const db = getFirestore(app);
+  const now = Timestamp.now();
 
   // Query future appointments for this athlete that are not already cancelled.
   // QA-API-001: the field is `startsAt` (what appointment_repository writes and
@@ -168,7 +168,7 @@ export async function cancelFutureAppointments(
         // (`CancellationEntry.reason`, `appointment.dart:25`). No es la señal:
         // el contenido de una entrada del log lo puede forjar cualquier
         // miembro del turno, porque las reglas no iteran listas.
-        cancellationLog: admin.firestore.FieldValue.arrayUnion({
+        cancellationLog: FieldValue.arrayUnion({
           byUid: uid,
           atMs,
           reason: ATHLETE_ACCOUNT_DELETED_REASON,

@@ -33,6 +33,8 @@
  */
 
 import * as admin from "firebase-admin";
+import { App, deleteApp } from "firebase-admin/app";
+import { Messaging, MulticastMessage } from "firebase-admin/messaging";
 import { notifyOnExerciseFeedbackHandler } from "../notifications/notify-exercise-feedback";
 import { dedupeKey } from "../mail/enqueue-mail";
 import { MAIL_QUEUE_COLLECTION, MailQueueDoc } from "../mail/types";
@@ -42,7 +44,7 @@ process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
 process.env.GCLOUD_PROJECT = "treino-dev";
 
-let testApp: admin.app.App;
+let testApp: App;
 
 beforeAll(() => {
   testApp = admin.initializeApp(
@@ -52,20 +54,20 @@ beforeAll(() => {
 });
 
 afterAll(async () => {
-  await testApp.delete();
+  await deleteApp(testApp);
 });
 
 const db = () => admin.firestore(testApp);
 
 /** Minimal mock messaging that tracks sendEachForMulticast calls. */
-function makeMockMessaging(): admin.messaging.Messaging {
+function makeMockMessaging(): Messaging {
   return {
-    sendEachForMulticast: jest.fn(async (msg: admin.messaging.MulticastMessage) => ({
+    sendEachForMulticast: jest.fn(async (msg: MulticastMessage) => ({
       successCount: msg.tokens.length,
       failureCount: 0,
       responses: msg.tokens.map(() => ({ success: true, messageId: "id" })),
     })),
-  } as unknown as admin.messaging.Messaging;
+  } as unknown as Messaging;
 }
 
 async function seedUser(uid: string, fcmTokens: string[]): Promise<void> {
@@ -206,7 +208,7 @@ describe("kind: discomfort with a live session_shares grant → sends the push",
 
     expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock
-      .calls[0][0] as admin.messaging.MulticastMessage;
+      .calls[0][0] as MulticastMessage;
     expect(callArg.tokens).toEqual(["trainer-token"]);
     expect(callArg.data?.kind).toBe("discomfort");
   });
@@ -223,7 +225,7 @@ describe("kind: discomfort with a live session_shares grant → sends the push",
     );
 
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock
-      .calls[0][0] as admin.messaging.MulticastMessage;
+      .calls[0][0] as MulticastMessage;
     expect(callArg.notification?.body).toContain("Ana Atleta");
     expect(callArg.notification?.body).toContain("Sentadilla");
   });
@@ -350,7 +352,7 @@ describe("session_shares points to a specific trainer → only that trainer is n
     );
 
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock
-      .calls[0][0] as admin.messaging.MulticastMessage;
+      .calls[0][0] as MulticastMessage;
     expect(callArg.tokens).toEqual(["linked-token"]);
     expect(callArg.tokens).not.toContain("other-token");
   });
@@ -391,7 +393,7 @@ describe("FCM payload excludes the report's free text and photoUrl (health data)
     );
 
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock
-      .calls[0][0] as admin.messaging.MulticastMessage;
+      .calls[0][0] as MulticastMessage;
 
     const serialized = JSON.stringify(callArg);
     expect(serialized).not.toContain(secretText);
@@ -610,7 +612,7 @@ describe("legitimate active trainer_link → still dispatches", () => {
 
     expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock
-      .calls[0][0] as admin.messaging.MulticastMessage;
+      .calls[0][0] as MulticastMessage;
     expect(callArg.tokens).toEqual(["legit-token"]);
   });
 

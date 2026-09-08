@@ -19,10 +19,9 @@
  * REQ-PN-CF-001. Fase 6 Etapa 2.
  */
 
-import * as admin from "firebase-admin";
 import { App } from "firebase-admin/app";
-import { FieldValue } from "firebase-admin/firestore";
-import { Messaging } from "firebase-admin/messaging";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
+import { Messaging, getMessaging } from "firebase-admin/messaging";
 import { logger } from "firebase-functions";
 
 const STALE_TOKEN_CODES = new Set([
@@ -87,8 +86,8 @@ export async function sendFcm(
     return { successCount: 0, failureCount: 0 };
   }
 
-  const db = admin.firestore(app);
-  const msg = messaging ?? admin.messaging(app);
+  const db = getFirestore(app);
+  const msg = messaging ?? getMessaging(app);
 
   // Start history persistence before reading tokens. It is deliberately
   // isolated from FCM: no-token users still get history, and history failures

@@ -25,7 +25,9 @@
  * REQ-PN-CF-004. Fase 6 Etapa 2.
  */
 
-import * as admin from "firebase-admin";
+import { App, getApp, initializeApp } from "firebase-admin/app";
+import { Messaging } from "firebase-admin/messaging";
+import { getFirestore } from "firebase-admin/firestore";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 import { sendFcm } from "./send-fcm";
@@ -38,11 +40,11 @@ import {
   type CausaDeTerminacion,
 } from "../purge-rejected-link";
 
-function getApp(): admin.app.App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -68,7 +70,7 @@ type LinkData = Record<string, unknown>;
  * @param beforeStatus - Previous status, to tell accept apart from resume.
  */
 async function enqueueLinkMail(
-  app: admin.app.App,
+  app: App,
   linkId: string,
   after: LinkData,
   afterStatus: string,
@@ -149,12 +151,12 @@ async function enqueueLinkMail(
  * @param athleteId - uid del alumno.
  */
 async function backfillChatLinkId(
-  app: admin.app.App,
+  app: App,
   linkId: string,
   trainerId: string,
   athleteId: string,
 ): Promise<void> {
-  const db = app.firestore();
+  const db = getFirestore(app);
   const chatId = [trainerId, athleteId].sort().join("_");
   const ref = db.collection("chats").doc(chatId);
 
@@ -187,11 +189,11 @@ async function backfillChatLinkId(
  * @param messaging - Optional messaging instance for test injection.
  */
 export async function notifyOnLinkChangeHandler(
-  app: admin.app.App,
+  app: App,
   linkId: string,
   before: LinkData | undefined,
   after: LinkData | undefined,
-  messaging?: admin.messaging.Messaging,
+  messaging?: Messaging,
 ): Promise<void> {
   // Guard: document deleted — no notification.
   if (!after) {
@@ -392,6 +394,6 @@ export const notifyOnLinkChange = onDocumentWritten(
   async (event) => {
     const before = event.data?.before?.data() as LinkData | undefined;
     const after = event.data?.after?.data() as LinkData | undefined;
-    await notifyOnLinkChangeHandler(getApp(), event.params.linkId, before, after);
+    await notifyOnLinkChangeHandler(ensureApp(), event.params.linkId, before, after);
   },
 );

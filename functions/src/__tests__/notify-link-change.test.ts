@@ -19,6 +19,8 @@
  */
 
 import * as admin from "firebase-admin";
+import { App, deleteApp } from "firebase-admin/app";
+import { Messaging, MulticastMessage } from "firebase-admin/messaging";
 import { notifyOnLinkChangeHandler } from "../notifications/notify-link-change";
 import { dedupeKey } from "../mail/enqueue-mail";
 import { MAIL_QUEUE_COLLECTION } from "../mail/types";
@@ -28,7 +30,7 @@ process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
 process.env.GCLOUD_PROJECT = "treino-dev";
 
-let testApp: admin.app.App;
+let testApp: App;
 
 beforeAll(() => {
   testApp = admin.initializeApp(
@@ -38,19 +40,19 @@ beforeAll(() => {
 });
 
 afterAll(async () => {
-  await testApp.delete();
+  await deleteApp(testApp);
 });
 
 const db = () => admin.firestore(testApp);
 
-function makeMockMessaging(): admin.messaging.Messaging {
+function makeMockMessaging(): Messaging {
   return {
-    sendEachForMulticast: jest.fn(async (msg: admin.messaging.MulticastMessage) => ({
+    sendEachForMulticast: jest.fn(async (msg: MulticastMessage) => ({
       successCount: msg.tokens.length,
       failureCount: 0,
       responses: msg.tokens.map(() => ({ success: true, messageId: "id" })),
     })),
-  } as unknown as admin.messaging.Messaging;
+  } as unknown as Messaging;
 }
 
 async function seedUser(uid: string, fcmTokens: string[]): Promise<void> {
@@ -97,7 +99,7 @@ describe("SCENARIO-637: new link status=pending → notify trainer", () => {
     await notifyOnLinkChangeHandler(testApp, "link-test", undefined, afterData, mock);
 
     expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
-    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as MulticastMessage;
     expect(callArg.tokens).toContain("trainer-token-637");
     expect(callArg.tokens).not.toContain("athlete-token-637");
     expect(callArg.data?.deepLink).toBe("/coach");
@@ -151,7 +153,7 @@ describe("SCENARIO-638: pending→active → notify athlete", () => {
     await notifyOnLinkChangeHandler(testApp, "link-test", beforeData, afterData, mock);
 
     expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
-    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as MulticastMessage;
     expect(callArg.tokens).toContain("athlete-token-638");
     expect(callArg.tokens).not.toContain("trainer-token-638");
     expect(callArg.data?.deepLink).toBe("/coach");
@@ -185,7 +187,7 @@ describe("SCENARIO-639: active→terminated, no reason → notify BOTH parties",
     await notifyOnLinkChangeHandler(testApp, "link-test", beforeData, afterData, mock);
 
     expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
-    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as MulticastMessage;
     expect(callArg.tokens).toContain("trainer-token-639");
     expect(callArg.tokens).toContain("athlete-token-639");
     expect(callArg.data?.deepLink).toBe("/coach");
@@ -424,7 +426,7 @@ describe("SCENARIO-642: active→paused → notify athlete", () => {
     await notifyOnLinkChangeHandler(testApp, "link-test", beforeData, afterData, mock);
 
     expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
-    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as MulticastMessage;
     expect(callArg.tokens).toContain("athlete-token-642");
     expect(callArg.tokens).not.toContain("trainer-token-642");
     expect(callArg.notification?.title).toBe("Vinculación pausada");
@@ -455,7 +457,7 @@ describe("SCENARIO-643: paused→active (resume) → notify athlete", () => {
     await notifyOnLinkChangeHandler(testApp, "link-test", beforeData, afterData, mock);
 
     expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
-    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as admin.messaging.MulticastMessage;
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as MulticastMessage;
     expect(callArg.tokens).toContain("athlete-token-643");
     expect(callArg.tokens).not.toContain("trainer-token-643");
     expect(callArg.notification?.title).toBe("Vinculación reanudada");

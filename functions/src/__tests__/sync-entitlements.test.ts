@@ -13,6 +13,25 @@ jest.mock("firebase-admin", () => {
   return { firestore };
 });
 
+// La puerta modular tiene que dar EL MISMO doble que la namespaced de arriba.
+//
+// `jest.mock("firebase-admin", …)` intercepta el specifier EXACTO. Producción
+// importa FieldValue/Timestamp de `firebase-admin/firestore`, y sin esto le
+// llega el REAL: el Firestore de mentira de este archivo no reconoce sus
+// sentinels, guarda basura en vez de aplicarlos, y el test falla —o peor, pasa—
+// por un motivo que no tiene que ver con lo que quiere probar.
+//
+// Getters y no valores: los factories se evalúan por demanda, así que esto no
+// depende del orden entre los dos `jest.mock`.
+//
+// Lo fija `firebase-admin-mock-surface.test.ts`.
+jest.mock("firebase-admin/firestore", () => (
+    jest.requireActual("./helpers/modular-from-namespaced") as Record<
+      string,
+      () => unknown
+    >
+).firestoreDesdeNamespaced());
+
 // El barrido logea (error cuando saltea por degradacion). Sin este mock el
 // suite escupe ruido y el test de la valvula no tendria como observarlo.
 const errorSpy = jest.fn();
@@ -25,11 +44,12 @@ jest.mock("firebase-functions", () => ({
 }));
 
 import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
 
 import { createFakeFirestore, FakeFirestoreState } from "./helpers/fake-tx-firestore";
 import { syncTrainerEntitlements } from "../subscriptions/sync-entitlements";
 
-const app = {} as admin.app.App;
+const app = {} as App;
 
 function install(seed: Partial<FakeFirestoreState>) {
   const { db, state } = createFakeFirestore(seed);

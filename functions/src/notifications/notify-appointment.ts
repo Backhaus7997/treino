@@ -19,8 +19,7 @@
  * REQ-PN-CF-003. Fase 6 Etapa 2.
  */
 
-import * as admin from "firebase-admin";
-import { App } from "firebase-admin/app";
+import { App, getApp, initializeApp } from "firebase-admin/app";
 import { Messaging } from "firebase-admin/messaging";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
@@ -35,11 +34,11 @@ import {
 } from "../mail/format";
 import { trainerEntry } from "../mail/templates";
 
-function getApp(): App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -304,6 +303,6 @@ export const notifyOnAppointment = onDocumentWritten(
   async (event) => {
     const before = event.data?.before?.data() as ApptData | undefined;
     const after = event.data?.after?.data() as ApptData | undefined;
-    await notifyOnAppointmentHandler(getApp(), event.params.apptId, before, after);
+    await notifyOnAppointmentHandler(ensureApp(), event.params.apptId, before, after);
   },
 );

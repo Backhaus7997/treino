@@ -72,16 +72,16 @@
  * Deployed to southamerica-east1 per ADR-PN-005.
  */
 
-import * as admin from "firebase-admin";
-import { App } from "firebase-admin/app";
+import { App, getApp, initializeApp } from "firebase-admin/app";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 
-function getApp(): App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -99,7 +99,7 @@ export async function syncSessionShareHandler(
   before: LinkData | undefined,
   after: LinkData | undefined,
 ): Promise<void> {
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
 
   // Derive identity from whichever snapshot is present.
   const source = after ?? before;
@@ -127,7 +127,7 @@ export async function syncSessionShareHandler(
   const grantShare = async (reason: "transition" | "repair"): Promise<void> => {
     await shareRef.set({
       trainerId,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
     });
     logger.info("syncSessionShare: share granted", { trainerId, athleteId, reason });
   };
@@ -346,6 +346,6 @@ export const syncSessionShareOnTrainerLink = onDocumentWritten(
   async (event) => {
     const before = event.data?.before?.data() as LinkData | undefined;
     const after = event.data?.after?.data() as LinkData | undefined;
-    await syncSessionShareHandler(getApp(), before, after);
+    await syncSessionShareHandler(ensureApp(), before, after);
   },
 );
