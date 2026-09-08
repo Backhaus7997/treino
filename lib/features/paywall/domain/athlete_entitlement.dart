@@ -66,6 +66,35 @@ const bool kAthletePaywallEnabled = false;
 /// por nivel, no por días (§4.1.1 de la spec).
 const int kFreeMaxRoutineDays = 2;
 
+/// Rutinas PROPIAS que puede tener guardadas un alumno del plan free.
+///
+/// Tres y no dos: con el tope de [kFreeMaxRoutineDays] días, la diferencia
+/// entre dos y tres es casi nula en la práctica —nadie arma tres rutinas
+/// distintas de dos días— pero tres da la sensación de que hay lugar para
+/// probar. Como palanca de conversión rinden lo mismo, y la de tres no se
+/// siente mezquina.
+///
+/// **No cuenta las plantillas del catálogo que el alumno sigue**: seguir no
+/// copia (#963), así que no crea un doc `user-created` y no ocupa cupo. Un
+/// free puede seguir las 3 de principiante Y tener sus 3 rutinas propias.
+///
+/// Igual que [kMaxOwnRoutines], esto es **client-side y evadible archivando**:
+/// `listUserCreated` filtra `status == 'active'`, y las reglas de Firestore no
+/// tienen agregación — no pueden contar documentos de una colección. Cerrarlo
+/// de verdad exige un contador denormalizado escrito por una Cloud Function.
+/// Se aceptó el agujero a conciencia: el límite que de verdad muerde es el de
+/// días, y ese SÍ es verificable en la regla porque `days` es un campo del
+/// mismo documento que se está escribiendo.
+const int kFreeMaxOwnRoutines = 3;
+
+/// Tope estructural de rutinas propias, para cualquiera — pague o no.
+///
+/// Preexistente (ADR-USR-02); acá sólo se le pone nombre, porque vivía como un
+/// `10` suelto en el editor. NO es un límite de paywall: es el techo del
+/// producto, y por eso quien lo toca ve el aviso de siempre y no la hoja de
+/// plan pago.
+const int kMaxOwnRoutines = 10;
+
 /// Semanas máximas de una rutina PROPIA en el plan free.
 ///
 /// Una semana significa: sin periodización. Los campos `weeklySets` y

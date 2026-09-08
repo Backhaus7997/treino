@@ -71,10 +71,39 @@ const MP_ACCESS_TOKEN = defineSecret("MP_ACCESS_TOKEN");
  * proposito: si viniera del cliente seria un open redirect firmado por nosotros
  * — MP mandaria al PF a donde diga el atacante, saliendo de una URL nuestra.
  *
- * `/ajustes` es la seccion de Facturacion del Coach Hub, el mismo destino que
- * usan los callsites web del paywall (`billingRoute: '/ajustes'`).
+ * ── Por que NO es `https://app.gettreino.com/ajustes` ──
+ *
+ * Porque esa URL no lleva a Facturacion. **El Coach Hub web usa HASH routing**:
+ * no hay una sola llamada a `usePathUrlStrategy` en el repo, asi que Flutter cae
+ * al `HashUrlStrategy` por default y el PATH se ignora entero. Verificado contra
+ * produccion el 2026-09-08: pedir `/ajustes` termina en
+ * `https://app.gettreino.com/ajustes#/login`, con el path intacto en la barra y
+ * la app resolviendo por el fragmento. Con el hash vacio, go_router arranca en
+ * su `initialLocation: '/dashboard'` (`coach_hub_router.dart`).
+ *
+ * O sea: durante toda la vida de esta constante, el PF que pagaba volvia al
+ * DASHBOARD. El `/ajustes` era decorativo.
+ *
+ * ── Por que `/abrir/profe?to=facturacion` SI funciona ──
+ *
+ * Es la misma entrada que ya usan los mails al PF (`APP_ENTRY_TRAINER` en
+ * `mail/templates.ts`), y anda por tres piezas que ya existen y estan probadas:
+ *
+ *   1. `vercel.json` redirige `/abrir/profe` a la raiz PRESERVANDO el query
+ *      string. Verificado en produccion: queda `/?to=facturacion`.
+ *   2. `buildCoachHubRouter` lee `Uri.base.queryParameters` —o sea
+ *      `location.search`, que el hash no toca— una vez al construir el router.
+ *   3. `DeepLinkDestination.fromQuery` ya entiende `to=facturacion`, y
+ *      `coachHubRedirect` lo aplica porque la landing es `location == '/'`.
+ *
+ * MP le agrega SUS parametros (`collection_status`, etc.) a este mismo query
+ * string, sin pisar el nuestro.
+ *
+ * La leccion general, que vale para cualquier link que entre desde afuera —
+ * mail, pasarela, QR—: al Coach Hub se entra por `/abrir/profe?to=...`, NUNCA
+ * por el path directo.
  */
-const BACK_URL = "https://app.gettreino.com/ajustes";
+const BACK_URL = "https://app.gettreino.com/abrir/profe?to=facturacion";
 
 /** Coleccion del checkout en curso por PF. Un doc por uid, se pisa. */
 export const MP_CHECKOUTS_COLLECTION = "mp_checkouts";

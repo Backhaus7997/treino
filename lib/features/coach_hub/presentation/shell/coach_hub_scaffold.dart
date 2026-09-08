@@ -10,6 +10,7 @@ import 'content_max_width.dart';
 import 'coach_hub_sidebar.dart';
 import 'coach_hub_top_bar.dart';
 import 'mobile_banner.dart';
+import 'navigator_semantics_boundary.dart';
 import 'responsive.dart' as rsp;
 import 'sidebar_item.dart';
 
@@ -72,7 +73,12 @@ class CoachHubScaffold extends ConsumerWidget {
                   Expanded(
                     child: ContentMaxWidth(
                       maxWidth: contentMaxWidth,
-                      child: child,
+                      // El `child` es el `Navigator` del `ShellRoute`, y sin
+                      // esta frontera su `ModalBarrier` borraba la semántica
+                      // de todos sus hermanos anteriores: la top bar de acá
+                      // arriba y el sidebar entero. Ver
+                      // [NavigatorSemanticsBoundary].
+                      child: NavigatorSemanticsBoundary(child: child),
                     ),
                   ),
                 ],

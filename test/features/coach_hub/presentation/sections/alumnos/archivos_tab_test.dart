@@ -26,6 +26,7 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/athlete_file_providers.dart';
 import 'package:treino/features/coach/application/athlete_note_providers.dart';
+import 'package:treino/features/coach/application/nutrition_plan_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/data/athlete_file_repository.dart';
 import 'package:treino/features/coach/data/athlete_note_repository.dart';
@@ -49,6 +50,8 @@ import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/l10n/app_l10n.dart';
+
+import 'alumno_detail_test_navigation.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
 
 const _trainerUid = 't1';
@@ -129,6 +132,9 @@ List<Override> _baseOverrides({
 }) =>
     [
       currentUidProvider.overrideWithValue(_trainerUid),
+      alumnoDetailIndicatorsProvider(_athleteUid).overrideWithValue(
+        const AlumnoDetailIndicators(),
+      ),
       trainerLinksStreamProvider.overrideWith((ref) => Stream.value([_link()])),
       userPublicProfilesBatchProvider
           .overrideWith((ref, key) => {_athleteUid: _profile()}),
@@ -149,6 +155,9 @@ List<Override> _baseOverrides({
         (trainerId: _trainerUid, athleteId: _athleteUid),
       ).overrideWith((ref) => const Stream.empty()),
       athleteNoteRepositoryProvider.overrideWithValue(_StubNoteRepo()),
+      nutritionPlanProvider(
+        (trainerId: _trainerUid, athleteId: _athleteUid),
+      ).overrideWith((ref) => Stream.value(null)),
       if (filesState != null)
         athleteFilesProvider(
           (trainerId: _trainerUid, athleteId: _athleteUid),
@@ -190,13 +199,11 @@ void _useDesktopViewport(WidgetTester tester) {
 }
 
 Future<void> _selectArchivosTab(WidgetTester tester) async {
-  try {
-    await tester.pumpAndSettle(const Duration(milliseconds: 500));
-  } catch (_) {}
-  await tester.tap(find.text('Archivos'));
-  try {
-    await tester.pumpAndSettle(const Duration(milliseconds: 500));
-  } catch (_) {}
+  await navigateAlumnoDetail(
+    tester,
+    group: 'Plan',
+    subview: 'Archivos',
+  );
 }
 
 void main() {

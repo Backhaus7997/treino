@@ -276,7 +276,28 @@ describe("runCreatePreapproval — el cliente no elige nada que cueste plata", (
     }, { ...OK, mpClient: mp.client });
 
     expect((mp.llamadas[0] as { backUrl: string }).backUrl)
-      .toBe("https://app.gettreino.com/ajustes");
+      .toBe("https://app.gettreino.com/abrir/profe?to=facturacion");
+  });
+
+  it("la URL de retorno entra por `/abrir/profe`, no por el path directo", async () => {
+    // El Coach Hub web usa HASH routing: el path se ignora entero, asi que
+    // `https://app.gettreino.com/ajustes` dejaba al PF que pago en el DASHBOARD.
+    // Se entra por la misma puerta que los mails, que Vercel redirige a la raiz
+    // preservando el query, y ahi `DeepLinkDestination` resuelve el destino.
+    // Ver el encabezado de BACK_URL en `create-preapproval.ts`.
+    const { app } = fakeApp(PF);
+    const mp = fakeMp();
+
+    await runCreatePreapproval(
+      app, "t1", { tier: "plan1", cycle: "monthly" },
+      { ...OK, mpClient: mp.client },
+    );
+
+    const { backUrl } = mp.llamadas[0] as { backUrl: string };
+    expect(backUrl).toContain("/abrir/profe");
+    expect(backUrl).toContain("to=facturacion");
+    // El path pelado es exactamente lo que NO funciona.
+    expect(backUrl).not.toBe("https://app.gettreino.com/ajustes");
   });
 
   it("el ciclo anual cobra 12 meses, no 1", async () => {
