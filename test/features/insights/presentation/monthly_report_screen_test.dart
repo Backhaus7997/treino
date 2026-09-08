@@ -59,6 +59,39 @@ final _anchorNow = DateTime(2026, 3, 19, 12);
 final _anchorTuesday = DateTime.utc(2026, 3, 17, 12);
 final _anchorWednesday = DateTime.utc(2026, 3, 18, 12);
 
+/// Ancla propia del test del radar: **septiembre**, y es a propósito.
+///
+/// Ese test es el único del archivo cuyo veredicto depende del NOMBRE del mes,
+/// y es justo el que rompió `main` el 01/09/2026 comparando el label contra
+/// `DateFormat('MMM yyyy')` en vez de `monthAbbrev`. Medido mes por mes en
+/// `es_AR`:
+///
+///     meses 1-8 y 10-12:  monthAbbrev == DateFormat('MMM')
+///     mes 9:              monthAbbrev="sep"   DateFormat="sept"  ← difieren
+///
+/// Once de doce coinciden **por casualidad**. Con el ancla en marzo —la de
+/// [_anchorNow], que comparte el resto del archivo— un `DateFormat` que se
+/// vuelva a colar volvería a pasar desapercibido once meses al año. En
+/// septiembre falla siempre: el bug estacional se vuelve determinístico.
+///
+/// El comentario que ya estaba adentro del test explica el mecanismo. Lo que
+/// faltaba era que el test lo COMPROBARA en vez de sólo advertirlo.
+///
+/// Jueves al mediodía, igual que [_anchorNow]: ni el offset de zona más
+/// extremo lo saca de septiembre. Re-congelar pisa el instante del `setUp`
+/// —está en el dartdoc de [AppClock] y lo fija `app_clock_test.dart`—, así que
+/// alcanza con llamar a `freeze` de nuevo adentro del test.
+final _septemberAnchorNow = DateTime(2026, 9, 17, 12);
+
+/// El día 1 del mes ancla del radar, **UTC a mediodía**.
+///
+/// UTC y no local, y esto no es cosmético: `toArgentina` resta 3 h sin mirar
+/// el flag, así que `DateTime(2026, 9, 1)` local aterriza en **31/08 21:00
+/// ART**. Medido sobre el fixture que había —`DateTime(2026, 3, 1)`— da
+/// `2026-02-28 21:00`: la sesión caía en FEBRERO mientras el test verificaba
+/// el label de MARZO. Pasaba sin medir el radar que dice medir.
+final _septemberAnchorDay1 = DateTime.utc(2026, 9, 1, 12);
+
 void main() {
   setUpAll(() {
     registerFallbackValue(makeSession());
@@ -424,6 +457,10 @@ void main() {
       'renders the month-vs-month muscle distribution radar below the '
       'workout-days calendar, with month-name legend labels (AD6/PR5c)',
       (tester) async {
+    // Ancla propia, en septiembre, y con el día 1 en UTC: ver los dartdocs de
+    // [_septemberAnchorNow] y [_septemberAnchorDay1].
+    AppClock.freeze(_septemberAnchorNow);
+
     final repo = MockSessionRepository();
     final now = AppClock.now();
     final currentMonthStart = DateTime(now.year, now.month, 1);
@@ -432,7 +469,7 @@ void main() {
         .thenAnswer((_) async => [
               makeSession(
                 id: 's1',
-                startedAt: currentMonthStart,
+                startedAt: _septemberAnchorDay1,
                 status: SessionStatus.finished,
                 wasFullyCompleted: true,
                 durationMin: 45,
