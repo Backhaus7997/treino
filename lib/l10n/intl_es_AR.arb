@@ -234,6 +234,50 @@
   "coachUpdatePlanSuccess": "Plan actualizado.",
   "coachExercisePicker": "Buscar ejercicio",
   "agendaButtonLabel": "VER AGENDA DEL PF",
+  "athleteNutritionPlanButtonLabel": "MI PLAN NUTRICIONAL",
+  "@athleteNutritionPlanButtonLabel": {
+    "description": "Botón de la tab Coach que abre el plan nutricional del alumno."
+  },
+  "athleteFilesButtonLabel": "MIS ARCHIVOS",
+  "@athleteFilesButtonLabel": {
+    "description": "Botón de la tab Coach que abre los archivos compartidos con el alumno."
+  },
+  "athleteNutritionPlanScreenTitle": "PLAN NUTRICIONAL",
+  "@athleteNutritionPlanScreenTitle": {
+    "description": "Título de la pantalla read-only del plan nutricional del alumno."
+  },
+  "athleteNutritionChooseOneHint": "Elegí una",
+  "@athleteNutritionChooseOneHint": {
+    "description": "Indica que el alumno debe elegir una sola opción del grupo."
+  },
+  "athleteNutritionAllHint": "Va todo",
+  "@athleteNutritionAllHint": {
+    "description": "Indica que el alumno debe incluir todas las opciones del grupo."
+  },
+  "athleteNutritionPlanEmpty": "Tu PF todavía no cargó tu plan nutricional.",
+  "@athleteNutritionPlanEmpty": {
+    "description": "Estado vacío cuando el PF todavía no creó un plan nutricional."
+  },
+  "athleteNutritionPlanLoadError": "No pudimos cargar tu plan nutricional.",
+  "@athleteNutritionPlanLoadError": {
+    "description": "Error al cargar el plan nutricional del alumno."
+  },
+  "athleteNutritionNeedsActiveLink": "Necesitás un vínculo activo con un PF para ver tu plan nutricional.",
+  "@athleteNutritionNeedsActiveLink": {
+    "description": "Estado de la ruta nutricional cuando el alumno no tiene un vínculo activo."
+  },
+  "athleteFilesScreenTitle": "MIS ARCHIVOS",
+  "@athleteFilesScreenTitle": {
+    "description": "Título de la pantalla de archivos compartidos con el alumno."
+  },
+  "athleteFilesEmpty": "Tu PF todavía no compartió archivos con vos.",
+  "@athleteFilesEmpty": {
+    "description": "Estado vacío cuando ningún PF compartió archivos con el alumno."
+  },
+  "athleteFilesLoadError": "No pudimos cargar tus archivos.",
+  "@athleteFilesLoadError": {
+    "description": "Error al cargar los archivos compartidos con el alumno."
+  },
   "agendaScreenTitle": "Agenda",
   "agendaEmptyAvailability": "Tu PF todavía no configuró horarios.",
   "agendaBookingConfirmTitle": "Confirmar reserva",
@@ -1982,13 +2026,13 @@
   "@coachHubAlumnoDetailNotasLoadError": {
     "description": "Coach Hub web alumno detail — error state when the note stream errors."
   },
-  "coachHubAlumnoDetailArchivosTitle": "Archivos privados",
+  "coachHubAlumnoDetailArchivosTitle": "Archivos del alumno",
   "@coachHubAlumnoDetailArchivosTitle": {
     "description": "Coach Hub web alumno detail — title of the Archivos tab body."
   },
-  "coachHubAlumnoDetailArchivosSubtitle": "PDFs y fotos que subís sobre este alumno. Solo vos los ves.",
+  "coachHubAlumnoDetailArchivosSubtitle": "PDFs y fotos que subís sobre este alumno. Elegí cuáles compartís con él.",
   "@coachHubAlumnoDetailArchivosSubtitle": {
-    "description": "Coach Hub web alumno detail — subtitle explaining privacy: only the trainer sees these files, the athlete never does."
+    "description": "Coach Hub web alumno detail — explica que el PF controla qué archivos comparte con el alumno."
   },
   "coachHubAlumnoDetailArchivosUploadButton": "SUBIR ARCHIVO",
   "@coachHubAlumnoDetailArchivosUploadButton": {
@@ -2039,6 +2083,26 @@
   "coachHubAlumnoDetailArchivosDeleteError": "No pudimos eliminar el archivo.",
   "@coachHubAlumnoDetailArchivosDeleteError": {
     "description": "Coach Hub web alumno detail — snackbar when the delete flow fails."
+  },
+  "coachHubAlumnoDetailArchivosSharedLabel": "COMPARTIDO",
+  "@coachHubAlumnoDetailArchivosSharedLabel": {
+    "description": "Estado visible de un archivo compartido con el alumno."
+  },
+  "coachHubAlumnoDetailArchivosPrivateLabel": "PRIVADO",
+  "@coachHubAlumnoDetailArchivosPrivateLabel": {
+    "description": "Estado visible de un archivo que el alumno no puede ver."
+  },
+  "coachHubAlumnoDetailArchivosShareTooltip": "Compartir con el alumno",
+  "@coachHubAlumnoDetailArchivosShareTooltip": {
+    "description": "Tooltip para habilitar el acceso del alumno a un archivo."
+  },
+  "coachHubAlumnoDetailArchivosUnshareTooltip": "Dejar de compartir con el alumno",
+  "@coachHubAlumnoDetailArchivosUnshareTooltip": {
+    "description": "Tooltip para quitarle al alumno el acceso a un archivo."
+  },
+  "coachHubAlumnoDetailArchivosShareError": "No pudimos cambiar quién ve el archivo.",
+  "@coachHubAlumnoDetailArchivosShareError": {
+    "description": "Snackbar cuando falla el cambio de visibilidad de un archivo."
   },
   "feedLoadError": "No pudimos cargar tu feed. Probá de nuevo.",
   "@feedLoadError": {

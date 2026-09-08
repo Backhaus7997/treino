@@ -421,7 +421,44 @@ class AppL10nEn extends AppL10n {
   String get coachExercisePicker => '';
 
   @override
-  String get agendaButtonLabel => '';
+  String get agendaButtonLabel => 'VIEW TRAINER AGENDA';
+
+  @override
+  String get athleteNutritionPlanButtonLabel => 'MY NUTRITION PLAN';
+
+  @override
+  String get athleteFilesButtonLabel => 'MY FILES';
+
+  @override
+  String get athleteNutritionPlanScreenTitle => 'NUTRITION PLAN';
+
+  @override
+  String get athleteNutritionChooseOneHint => 'Choose one';
+
+  @override
+  String get athleteNutritionAllHint => 'Include all';
+
+  @override
+  String get athleteNutritionPlanEmpty =>
+      'Your trainer hasn\'t added your nutrition plan yet.';
+
+  @override
+  String get athleteNutritionPlanLoadError =>
+      'We couldn\'t load your nutrition plan.';
+
+  @override
+  String get athleteNutritionNeedsActiveLink =>
+      'You need an active trainer link to view your nutrition plan.';
+
+  @override
+  String get athleteFilesScreenTitle => 'MY FILES';
+
+  @override
+  String get athleteFilesEmpty =>
+      'Your trainer hasn\'t shared any files with you yet.';
+
+  @override
+  String get athleteFilesLoadError => 'We couldn\'t load your files.';
 
   @override
   String get agendaScreenTitle => '';
@@ -2575,11 +2612,11 @@ class AppL10nEn extends AppL10n {
       'We couldn\'t load the note.';
 
   @override
-  String get coachHubAlumnoDetailArchivosTitle => 'Private files';
+  String get coachHubAlumnoDetailArchivosTitle => 'Athlete files';
 
   @override
   String get coachHubAlumnoDetailArchivosSubtitle =>
-      'PDFs and photos you upload about this athlete. Only you can see them.';
+      'PDFs and photos you upload about this athlete. Choose which ones you share.';
 
   @override
   String get coachHubAlumnoDetailArchivosUploadButton => 'UPLOAD FILE';
@@ -2620,6 +2657,23 @@ class AppL10nEn extends AppL10n {
   @override
   String get coachHubAlumnoDetailArchivosDeleteError =>
       'We couldn\'t delete the file.';
+
+  @override
+  String get coachHubAlumnoDetailArchivosSharedLabel => 'SHARED';
+
+  @override
+  String get coachHubAlumnoDetailArchivosPrivateLabel => 'PRIVATE';
+
+  @override
+  String get coachHubAlumnoDetailArchivosShareTooltip => 'Share with athlete';
+
+  @override
+  String get coachHubAlumnoDetailArchivosUnshareTooltip =>
+      'Stop sharing with athlete';
+
+  @override
+  String get coachHubAlumnoDetailArchivosShareError =>
+      'We couldn\'t change who can see the file.';
 
   @override
   String get feedLoadError => 'We couldn\'t load your feed. Please try again.';

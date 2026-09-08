@@ -432,6 +432,43 @@ class AppL10nEs extends AppL10n {
   String get agendaButtonLabel => 'VER AGENDA DEL PF';
 
   @override
+  String get athleteNutritionPlanButtonLabel => 'MI PLAN NUTRICIONAL';
+
+  @override
+  String get athleteFilesButtonLabel => 'MIS ARCHIVOS';
+
+  @override
+  String get athleteNutritionPlanScreenTitle => 'PLAN NUTRICIONAL';
+
+  @override
+  String get athleteNutritionChooseOneHint => 'Elegí una';
+
+  @override
+  String get athleteNutritionAllHint => 'Va todo';
+
+  @override
+  String get athleteNutritionPlanEmpty =>
+      'Tu PF todavía no cargó tu plan nutricional.';
+
+  @override
+  String get athleteNutritionPlanLoadError =>
+      'No pudimos cargar tu plan nutricional.';
+
+  @override
+  String get athleteNutritionNeedsActiveLink =>
+      'Necesitás un vínculo activo con un PF para ver tu plan nutricional.';
+
+  @override
+  String get athleteFilesScreenTitle => 'MIS ARCHIVOS';
+
+  @override
+  String get athleteFilesEmpty =>
+      'Tu PF todavía no compartió archivos con vos.';
+
+  @override
+  String get athleteFilesLoadError => 'No pudimos cargar tus archivos.';
+
+  @override
   String get agendaScreenTitle => 'Agenda';
 
   @override
@@ -2626,11 +2663,11 @@ class AppL10nEs extends AppL10n {
   String get coachHubAlumnoDetailNotasLoadError => 'No pudimos cargar la nota.';
 
   @override
-  String get coachHubAlumnoDetailArchivosTitle => 'Archivos privados';
+  String get coachHubAlumnoDetailArchivosTitle => 'Archivos del alumno';
 
   @override
   String get coachHubAlumnoDetailArchivosSubtitle =>
-      'PDFs y fotos que subes sobre este alumno. Solo tú los ves.';
+      'PDFs y fotos que subís sobre este alumno. Elegí cuáles compartís con él.';
 
   @override
   String get coachHubAlumnoDetailArchivosUploadButton => 'SUBIR ARCHIVO';
@@ -2671,6 +2708,24 @@ class AppL10nEs extends AppL10n {
   @override
   String get coachHubAlumnoDetailArchivosDeleteError =>
       'No pudimos eliminar el archivo.';
+
+  @override
+  String get coachHubAlumnoDetailArchivosSharedLabel => 'COMPARTIDO';
+
+  @override
+  String get coachHubAlumnoDetailArchivosPrivateLabel => 'PRIVADO';
+
+  @override
+  String get coachHubAlumnoDetailArchivosShareTooltip =>
+      'Compartir con el alumno';
+
+  @override
+  String get coachHubAlumnoDetailArchivosUnshareTooltip =>
+      'Dejar de compartir con el alumno';
+
+  @override
+  String get coachHubAlumnoDetailArchivosShareError =>
+      'No pudimos cambiar quién ve el archivo.';
 
   @override
   String get feedLoadError => 'No pudimos cargar tu feed. Inténtalo de nuevo.';
@@ -4761,6 +4816,43 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get agendaButtonLabel => 'VER AGENDA DEL PF';
+
+  @override
+  String get athleteNutritionPlanButtonLabel => 'MI PLAN NUTRICIONAL';
+
+  @override
+  String get athleteFilesButtonLabel => 'MIS ARCHIVOS';
+
+  @override
+  String get athleteNutritionPlanScreenTitle => 'PLAN NUTRICIONAL';
+
+  @override
+  String get athleteNutritionChooseOneHint => 'Elegí una';
+
+  @override
+  String get athleteNutritionAllHint => 'Va todo';
+
+  @override
+  String get athleteNutritionPlanEmpty =>
+      'Tu PF todavía no cargó tu plan nutricional.';
+
+  @override
+  String get athleteNutritionPlanLoadError =>
+      'No pudimos cargar tu plan nutricional.';
+
+  @override
+  String get athleteNutritionNeedsActiveLink =>
+      'Necesitás un vínculo activo con un PF para ver tu plan nutricional.';
+
+  @override
+  String get athleteFilesScreenTitle => 'MIS ARCHIVOS';
+
+  @override
+  String get athleteFilesEmpty =>
+      'Tu PF todavía no compartió archivos con vos.';
+
+  @override
+  String get athleteFilesLoadError => 'No pudimos cargar tus archivos.';
 
   @override
   String get agendaScreenTitle => 'Agenda';
@@ -6958,11 +7050,11 @@ class AppL10nEsAr extends AppL10nEs {
   String get coachHubAlumnoDetailNotasLoadError => 'No pudimos cargar la nota.';
 
   @override
-  String get coachHubAlumnoDetailArchivosTitle => 'Archivos privados';
+  String get coachHubAlumnoDetailArchivosTitle => 'Archivos del alumno';
 
   @override
   String get coachHubAlumnoDetailArchivosSubtitle =>
-      'PDFs y fotos que subís sobre este alumno. Solo vos los ves.';
+      'PDFs y fotos que subís sobre este alumno. Elegí cuáles compartís con él.';
 
   @override
   String get coachHubAlumnoDetailArchivosUploadButton => 'SUBIR ARCHIVO';
@@ -7003,6 +7095,24 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get coachHubAlumnoDetailArchivosDeleteError =>
       'No pudimos eliminar el archivo.';
+
+  @override
+  String get coachHubAlumnoDetailArchivosSharedLabel => 'COMPARTIDO';
+
+  @override
+  String get coachHubAlumnoDetailArchivosPrivateLabel => 'PRIVADO';
+
+  @override
+  String get coachHubAlumnoDetailArchivosShareTooltip =>
+      'Compartir con el alumno';
+
+  @override
+  String get coachHubAlumnoDetailArchivosUnshareTooltip =>
+      'Dejar de compartir con el alumno';
+
+  @override
+  String get coachHubAlumnoDetailArchivosShareError =>
+      'No pudimos cambiar quién ve el archivo.';
 
   @override
   String get feedLoadError => 'No pudimos cargar tu feed. Probá de nuevo.';
