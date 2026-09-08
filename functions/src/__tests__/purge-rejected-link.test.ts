@@ -87,6 +87,40 @@ describe("clasificarTerminacion", () => {
     expect(clasificarTerminacion({ acceptedAt: null })).toBe("vinculo-real");
   });
 
+  // ── Cuenta borrada ────────────────────────────────────────────────────────
+  //
+  // `cascade/trainer-links.ts` termina las solicitudes del atleta que borra su
+  // cuenta con `reason: 'account-deleted'` — OJO, `reason`, NO
+  // `terminationReason`. Una solicitud que nunca fue aceptada, de alguien que
+  // ya no existe, es basura por la misma definición que un rechazo.
+  it("account-deleted sin acceptedAt → cuenta-borrada", () => {
+    expect(
+      clasificarTerminacion({ acceptedAt: null, reason: "account-deleted" }),
+    ).toBe("cuenta-borrada");
+  });
+
+  it("account-deleted CON acceptedAt → vinculo-real: la historia se conserva", () => {
+    // El atleta se fue, pero la relación existió y de ella cuelgan los pagos y
+    // las sesiones que el PF necesita. Se conserva.
+    expect(
+      clasificarTerminacion({
+        acceptedAt: { seconds: 1 },
+        reason: "account-deleted",
+      }),
+    ).toBe("vinculo-real");
+  });
+
+  it("`reason` no se confunde con `terminationReason`", () => {
+    // Son campos DISTINTOS: la cascada escribe `reason`, el cliente escribe
+    // `terminationReason`. Un `reason` cualquiera no habilita nada.
+    expect(
+      clasificarTerminacion({ acceptedAt: null, reason: "otra-cosa" }),
+    ).toBe("vinculo-real");
+    expect(
+      clasificarTerminacion({ acceptedAt: null, terminationReason: "account-deleted" }),
+    ).toBe("vinculo-real");
+  });
+
   it("acceptedAt presente gana SIEMPRE, aun con razón de rechazo", () => {
     // Combinación imposible hoy (decline sólo corre sobre `pending`), pero si
     // aparece en los datos es una anomalía: se conserva, y se avisa a los dos.
@@ -132,6 +166,16 @@ describe("purgeRejectedLinkHandler", () => {
 
     await expect(
       purgeRejectedLinkHandler(APP, "link-cancelado", "cancelacion"),
+    ).resolves.toBe(true);
+
+    expect(firestore.deleteDoc).toHaveBeenCalledTimes(1);
+  });
+
+  it("borra una solicitud de cuenta borrada", async () => {
+    const firestore = installFirestore();
+
+    await expect(
+      purgeRejectedLinkHandler(APP, "link-cuenta-borrada", "cuenta-borrada"),
     ).resolves.toBe(true);
 
     expect(firestore.deleteDoc).toHaveBeenCalledTimes(1);

@@ -186,16 +186,58 @@ describe("notifyOnLinkChange — orden del purge", () => {
     );
   });
 
-  it("la cascada de borrado de cuenta corta antes: ni push ni purge", async () => {
+  it("cuenta borrada: NO notifica, pero SÍ purga", async () => {
+    // El guard de `account-deleted` existe para no spamear a nadie con la
+    // cascada — eso se mantiene. Lo que cambia es que ya no cancela el efecto
+    // de cola: una solicitud que nunca fue aceptada, de alguien que ya no
+    // existe, es basura y hay que juntarla.
+    //
+    // Antes este test afirmaba «ni push ni purge», y ESO era el agujero: esos
+    // docs no los junta nadie y desde que se sacó el tab «Rechazadas» tampoco
+    // se ven.
+    await notifyOnLinkChangeHandler(
+      APP,
+      "link-1",
+      { trainerId: TRAINER, athleteId: ATHLETE, status: "pending" },
+      {
+        trainerId: TRAINER,
+        athleteId: ATHLETE,
+        status: "terminated",
+        reason: "account-deleted",
+      },
+    );
+
+    expect(calls).toEqual(["purge"]);
+    expect(sendFcm).not.toHaveBeenCalled();
+    expect(purgeRejectedLinkHandler).toHaveBeenCalledWith(
+      APP,
+      "link-1",
+      "cuenta-borrada",
+    );
+  });
+
+  it("cuenta borrada de un vínculo REAL: ni notifica ni borra", async () => {
+    // El atleta se fue, pero la relación existió: los pagos y las sesiones que
+    // le cuelgan al PF siguen ahí.
     await notifyOnLinkChangeHandler(
       APP,
       "link-1",
       { trainerId: TRAINER, athleteId: ATHLETE, status: "active" },
-      { ...rechazo(), reason: "account-deleted" },
+      {
+        trainerId: TRAINER,
+        athleteId: ATHLETE,
+        status: "terminated",
+        reason: "account-deleted",
+        acceptedAt: { __ts: 1 },
+      },
     );
 
-    expect(calls).toEqual([]);
-    expect(purgeRejectedLinkHandler).not.toHaveBeenCalled();
+    expect(sendFcm).not.toHaveBeenCalled();
+    expect(purgeRejectedLinkHandler).toHaveBeenCalledWith(
+      APP,
+      "link-1",
+      "vinculo-real",
+    );
   });
 
   it("un delete (after ausente) corta antes: no se re-dispara el purge", async () => {

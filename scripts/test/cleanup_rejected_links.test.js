@@ -222,3 +222,32 @@ test('paginasDe — respeta el límite de 500 de WriteBatch', () => {
   assert.strictEqual(paginas.length, 3);
   assert.ok(paginas.every((p) => p.length <= 500));
 });
+
+// ── Cuenta borrada ──────────────────────────────────────────────────────────
+//
+// `cascade/trainer-links.ts` termina las solicitudes del atleta que borra su
+// cuenta con `reason: 'account-deleted'` — OJO, `reason`, NO
+// `terminationReason`. El clasificador miraba sólo el segundo, así que estos
+// docs caían en AMBIGUO y no los juntaba nadie. Hubo uno real en producción.
+
+test('clasificar — account-deleted sin acceptedAt → borra', () => {
+  assert.strictEqual(
+    clasificar({ acceptedAt: null, reason: 'account-deleted' }),
+    'borra',
+  );
+});
+
+test('clasificar — account-deleted CON acceptedAt → conserva la historia', () => {
+  assert.strictEqual(
+    clasificar({ acceptedAt: { _seconds: 1 }, reason: 'account-deleted' }),
+    'conserva',
+  );
+});
+
+test('clasificar — `reason` no se confunde con `terminationReason`', () => {
+  assert.strictEqual(clasificar({ acceptedAt: null, reason: 'otra-cosa' }), 'ambiguo');
+  assert.strictEqual(
+    clasificar({ acceptedAt: null, terminationReason: 'account-deleted' }),
+    'ambiguo',
+  );
+});
