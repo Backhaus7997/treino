@@ -98,12 +98,29 @@ class CoachHubSidebar extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // Todos los hijos van con `key`. NO es cosmética: los
+                  // `_GroupHeader` se van de la lista al colapsar, y sin keys
+                  // Flutter re-matchea por índice, así que cada fila se monta
+                  // DE NUEVO en cada toggle. Un widget recién montado no tiene
+                  // de dónde interpolar: sus animaciones implícitas nacen en el
+                  // valor final. Es decir que el `AnimatedPositioned` del label
+                  // saltaba, y parecía un bug de la animación cuando el bug
+                  // estaba acá, dos archivos más arriba en el árbol.
                   for (var i = 0; i < groupEntries.length; i++) ...[
-                    if (i > 0) Container(height: 1, color: palette.border),
+                    if (i > 0)
+                      Container(
+                        key: ValueKey('sep_${groupEntries[i].key.label}'),
+                        height: 1,
+                        color: palette.border,
+                      ),
                     if (!collapsed)
-                      _GroupHeader(label: groupEntries[i].key.label),
+                      _GroupHeader(
+                        key: ValueKey('hdr_${groupEntries[i].key.label}'),
+                        label: groupEntries[i].key.label,
+                      ),
                     for (final item in groupEntries[i].value)
                       _SidebarItemRow(
+                        key: ValueKey(item.route),
                         item: item,
                         collapsed: collapsed,
                         active: _isActive(location, item.route),
@@ -184,7 +201,7 @@ class _SidebarHeader extends StatelessWidget {
 /// Header de grupo (GESTIÓN, RECURSOS, …). Solo visible expandido — ya NO
 /// aloja el toggle (REQ-SH-004/006: el toggle se mudó al footer).
 class _GroupHeader extends StatelessWidget {
-  const _GroupHeader({required this.label});
+  const _GroupHeader({required this.label, super.key});
 
   final String label;
 
@@ -223,6 +240,7 @@ class _GroupHeader extends StatelessWidget {
 /// respeta reduce-motion vía `AppMotionTokens.resolve`).
 class _SidebarItemRow extends StatelessWidget {
   const _SidebarItemRow({
+    super.key,
     required this.item,
     required this.collapsed,
     required this.active,
@@ -276,34 +294,101 @@ class _SidebarItemRow extends StatelessWidget {
             borderRadius:
                 BorderRadius.circular(CoachHubSidebarItemTokens.borderRadius),
           ),
-          child: Row(
-            mainAxisAlignment:
-                collapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
+          // `Stack` y no `Row`: el label tiene que quedar MONTADO al colapsar
+          // para poder desvanecerse —sin widget no hay nada que animar— pero
+          // sin que su ancho intrínseco participe del layout de la fila.
+          //
+          // Un intento anterior lo hizo con `Row` + `AnimatedAlign(widthFactor)`
+          // y voló: adentro de un `Row`, un `Text` sin ancho acotado pide
+          // infinito y tira excepción de layout. Acá el `Positioned` con `left`
+          // Y `right` deja el label completamente acotado, y el `AnimatedAlign`
+          // sólo mueve un ícono de 20px, que es tamaño fijo.
+          child: Stack(
+            alignment: Alignment.centerLeft,
+            // El label sale de su caja a propósito mientras se desliza: quien
+            // lo recorta es el `clipBehavior` del `AnimatedContainer` del
+            // sidebar, contra el borde que se está moviendo. Si clipeara acá
+            // se cortaría contra la fila —que mide 28px colapsada— y quedaría
+            // un muñón de texto visible en vez de nada.
+            clipBehavior: Clip.none,
             children: [
-              _ItemIcon(
-                icon: item.iconBuilder(),
-                color: fg,
-                // Colapsado el número no entra: el badge se degrada a un punto
-                // pegado al ícono. Expandido el punto sobra — el número va al
-                // final de la fila, que es donde se lee mejor.
-                dot: collapsed && hasBadge,
-              ),
-              if (!collapsed) ...[
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    item.label,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontFamily: AppFonts.barlow,
-                      color: fg,
-                      fontSize: 14,
-                      fontWeight: active ? AppFonts.w600 : AppFonts.w400,
+              // El label se apaga y se enciende; NO se mueve. Moverlo además
+              // de fundirlo compite con el ancho del sidebar, que ya se está
+              // desplazando abajo suyo.
+              // El label NO se desmonta al colapsar: se DESLIZA hacia
+              // afuera, empujado por el mismo borde que ya animaba sus
+              // 240→72px. Sale de cuadro justo cuando el sidebar termina de
+              // cerrarse, así que el contenido acompaña al contenedor en vez
+              // de desaparecer en el primer frame mientras el ancho sigue
+              // viajando —que era exactamente el salto que se veía.
+              //
+              // Su ancho es FIJO (`_labelWidth`) y no `right: 0`. Atado al
+              // borde derecho se iría angostando hasta ~16px y el texto
+              // colapsaría a puntos suspensivos antes de irse: el ojo lee eso
+              // como el label rompiéndose, no como el panel cerrándose.
+              //
+              // Va a `sidebarCollapsedWidth` y no a un valor menor porque ese
+              // es el punto exacto donde el clip lo tapa entero.
+              AnimatedPositioned(
+                left: collapsed
+                    ? CoachHubLayoutTokens.sidebarCollapsedWidth
+                    : _kIconSize + 12,
+                width: _labelWidth,
+                // SIN `top`/`bottom` a propósito. Con verticales el label se
+                // estira a los 48px de la fila y lo centra el `Row`; sin
+                // ellas se dimensiona por su altura intrínseca y lo centra el
+                // `Stack`. El centro es el mismo en teoría y el redondeo no:
+                // ponerlas corrió cada label 1px y movió 374px en TODOS los
+                // goldens del gate a la vez.
+                duration:
+                    AppMotionTokens.resolve(ctx, AppMotionTokens.contentEnter),
+                curve: AppMotionTokens.reposition,
+                child: IgnorePointer(
+                  // Fuera de cuadro el texto sigue en el árbol: que no reciba
+                  // el mouse. Colapsado, quien nombra al item es el Tooltip.
+                  ignoring: collapsed,
+                  child: ExcludeSemantics(
+                    excluding: collapsed,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item.label,
+                            overflow: TextOverflow.ellipsis,
+                            softWrap: false,
+                            style: TextStyle(
+                              fontFamily: AppFonts.barlow,
+                              color: fg,
+                              fontSize: AppTextSize.body,
+                              fontWeight:
+                                  active ? AppFonts.w600 : AppFonts.w400,
+                            ),
+                          ),
+                        ),
+                        if (hasBadge) _Badge(count: badgeCount!),
+                      ],
                     ),
                   ),
                 ),
-                if (hasBadge) _Badge(count: badgeCount!),
-              ],
+              ),
+              // El ícono viaja de la izquierda al centro con el mismo escalón
+              // que el ancho del sidebar, así las dos cosas cuentan lo mismo.
+              AnimatedAlign(
+                alignment: collapsed ? Alignment.center : Alignment.centerLeft,
+                duration: AppMotionTokens.resolve(
+                  ctx,
+                  AppMotionTokens.contentEnter,
+                ),
+                curve: AppMotionTokens.enter,
+                child: _ItemIcon(
+                  icon: item.iconBuilder(),
+                  color: fg,
+                  // Colapsado el número no entra: el badge se degrada a un
+                  // punto pegado al ícono. Expandido el punto sobra — el número
+                  // va al final de la fila, que es donde se lee mejor.
+                  dot: collapsed && hasBadge,
+                ),
+              ),
             ],
           ),
         );
@@ -320,28 +405,72 @@ class _SidebarItemRow extends StatelessWidget {
     // encadenadas no se combinan solas — el label quedaba en un nodo aparte
     // que el lector nunca ata al botón. Merged, el ítem se anuncia como una
     // sola cosa: «Pagos, 3, botón».
-    final labelled = collapsed
-        ? MergeSemantics(
-            child: Semantics(
-            label: hasBadge ? '${item.label}, $badgeCount' : item.label,
-            child: Tooltip(
-              message: hasBadge ? '${item.label} ($badgeCount)' : item.label,
-              // El sidebar colapsado tiene 23 íconos y el tooltip es la única
-              // forma de leerlos: 200 ms alcanzan para no dispararlo mientras
-              // el mouse cruza la columna, y se sienten instantáneos al frenar.
-              waitDuration: const Duration(milliseconds: 200),
-              // El label ya lo pone el `Semantics` de arriba; sin esto el
-              // lector lo diría dos veces.
-              excludeFromSemantics: true,
-              child: row,
-            ),
-          ))
-        : row;
+    // LA FORMA DEL ÁRBOL NO CAMBIA CON `collapsed`. Lo que cambia son sus
+    // propiedades.
+    //
+    // Antes esto era `collapsed ? MergeSemantics(...Tooltip(row)) : row`, o sea
+    // dos árboles distintos en la misma posición. Flutter no los reconcilia:
+    // destruye el subárbol y monta uno nuevo, y con él el `State` del
+    // `AnimatedPositioned` del label — que entonces nace ya en su valor final y
+    // NUNCA anima. Es la misma trampa que las keys del `Column` de arriba
+    // resuelven un nivel más afuera: para que una animación implícita sirva,
+    // su elemento tiene que SOBREVIVIR al rebuild. Las dos condiciones son
+    // necesarias; con una sola, el label sigue saltando.
+    //
+    // Ahora los wrappers están siempre. El `Tooltip` con mensaje vacío no se
+    // muestra —expandido el label ya está en pantalla y un tooltip sería
+    // redundante— y el `Semantics` lleva el mismo label en los dos estados,
+    // que es correcto en ambos.
+    final labelled = MergeSemantics(
+      child: Semantics(
+        label: hasBadge ? '${item.label}, $badgeCount' : item.label,
+        child: Tooltip(
+          message: collapsed
+              ? (hasBadge ? '${item.label} ($badgeCount)' : item.label)
+              : '',
+          // El sidebar colapsado tiene 23 íconos y el tooltip es la única
+          // forma de leerlos: 200 ms alcanzan para no dispararlo mientras
+          // el mouse cruza la columna, y se sienten instantáneos al frenar.
+          waitDuration: const Duration(milliseconds: 200),
+          // El label ya lo pone el `Semantics` de arriba; sin esto el
+          // lector lo diría dos veces.
+          excludeFromSemantics: true,
+          child: row,
+        ),
+      ),
+    );
 
     return TreinoFadeSlideIn(
         delay: delay, distance: AppMotion.slideSm, child: labelled);
   }
 }
+
+/// Lado del ícono de un item del sidebar.
+///
+/// Vive como constante porque el `Positioned` del label lo necesita para saber
+/// desde dónde arrancar: si el ícono cambia de tamaño y este número no, el
+/// label se le monta encima.
+const double _kIconSize = 20;
+
+/// Ancho del label de un item con el sidebar expandido.
+///
+/// Se calcula una vez y queda fijo: 240 de sidebar, menos el margen de la fila
+/// (8 por lado), menos su padding (14 por lado), menos el hueco del ícono
+/// (20 + 12). Ese resto es lo que el texto ocupa cuando está en su lugar, y es
+/// lo que conserva mientras se desliza hacia afuera.
+const double _labelWidth = CoachHubLayoutTokens.sidebarExpandedWidth -
+    _kSidebarBorderWidth -
+    8 * 2 -
+    CoachHubSidebarItemTokens.paddingH * 2 -
+    (_kIconSize + 12);
+
+/// Ancho del borde derecho del sidebar. Entra en la cuenta de `_labelWidth`
+/// porque el `Border` del `BoxDecoration` se come ese píxel del content box.
+///
+/// Olvidarlo dejaba el label 1px más ancho de lo que era con `right: 0`, lo que
+/// corría dónde ellipsiza cada texto: 374px de diferencia en los cuatro
+/// goldens del gate visual, por un píxel de aritmética.
+const double _kSidebarBorderWidth = 1;
 
 /// Ícono del ítem, con el punto de badge opcional para el estado colapsado.
 ///
@@ -363,7 +492,7 @@ class _ItemIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final glyph = Icon(icon, size: 20, color: color);
+    final glyph = Icon(icon, size: _kIconSize, color: color);
     if (!dot) return glyph;
 
     final palette = AppPalette.of(context);
