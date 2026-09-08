@@ -3587,19 +3587,20 @@ class _SessionStatusPill extends StatelessWidget {
 
 /// Coach Hub web — Tab «Archivos» del alumno detail.
 ///
-/// Carpeta privada del PF por alumno para subir PDFs e imágenes (estudios
-/// médicos, fotos de postura/lesión, planes impresos). El alumno NUNCA los
-/// ve — es una herramienta interna del PF.
+/// Carpeta del PF por alumno para subir PDFs e imágenes (estudios médicos,
+/// fotos de postura/lesión, planes impresos). Cada fila deja claro si el
+/// archivo sigue privado o está compartido con el alumno.
 ///
 /// Data: reusa `athleteFilesProvider` + `AthleteFileRepository` (Firestore
-/// para metadata + Firebase Storage para el binario). Rules trainer-only en
-/// ambos lados.
+/// para metadata + Firebase Storage para el binario). El PF administra todos;
+/// el alumno sólo puede leer los que tienen `sharedWithAthlete == true`.
 ///
 /// V1 scope:
 /// - Solo PDF + imágenes (10 MB max).
 /// - Lista simple (más nuevos arriba).
 /// - Subir → file picker → upload + set doc.
 /// - Descargar → abre `downloadUrl` en tab nueva.
+/// - Compartir → prende o apaga el acceso read-only del alumno.
 /// - Borrar → confirm dialog → borra Storage + Firestore.
 class _ArchivosTab extends ConsumerStatefulWidget {
   const _ArchivosTab({required this.athleteId});
@@ -3853,7 +3854,7 @@ class _ArchivosTabState extends ConsumerState<_ArchivosTab> {
 }
 
 /// Row de un archivo dentro del tab Archivos.
-class _ArchivoRow extends StatelessWidget {
+class _ArchivoRow extends ConsumerWidget {
   const _ArchivoRow({
     required this.file,
     required this.palette,
@@ -3870,8 +3871,24 @@ class _ArchivoRow extends StatelessWidget {
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
+  Future<void> _toggleShared(BuildContext context, WidgetRef ref) async {
+    final l10n = AppL10n.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref
+          .read(athleteFileRepositoryProvider)
+          .setShared(file, !file.sharedWithAthlete);
+    } catch (_) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(l10n.coachHubAlumnoDetailArchivosShareError),
+        ),
+      );
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppL10n.of(context);
     final icon = switch (file.kind) {
       AthleteFileKind.pdf => TreinoIcon.filePdf,
@@ -3922,6 +3939,33 @@ class _ArchivoRow extends StatelessWidget {
                       ),
                     ),
                   ],
+                ),
+              ),
+            ),
+            Tooltip(
+              message: file.sharedWithAthlete
+                  ? l10n.coachHubAlumnoDetailArchivosUnshareTooltip
+                  : l10n.coachHubAlumnoDetailArchivosShareTooltip,
+              child: TextButton.icon(
+                onPressed: () => _toggleShared(context, ref),
+                icon: Icon(
+                  file.sharedWithAthlete ? TreinoIcon.eye : TreinoIcon.eyeOff,
+                  size: 18,
+                ),
+                label: Text(
+                  file.sharedWithAthlete
+                      ? l10n.coachHubAlumnoDetailArchivosSharedLabel
+                      : l10n.coachHubAlumnoDetailArchivosPrivateLabel,
+                ),
+                style: TextButton.styleFrom(
+                  foregroundColor: file.sharedWithAthlete
+                      ? palette.accentText
+                      : palette.textMuted,
+                  textStyle: GoogleFonts.barlowCondensed(
+                    fontWeight: FontWeight.w700,
+                    fontSize: AppTextSize.caption,
+                    letterSpacing: 0.8,
+                  ),
                 ),
               ),
             ),
