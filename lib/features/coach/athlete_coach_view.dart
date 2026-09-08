@@ -680,7 +680,7 @@ class _NutritionPlanButton extends StatelessWidget {
           l10n.athleteNutritionPlanButtonLabel,
           style: GoogleFonts.barlowCondensed(
             fontWeight: FontWeight.w700,
-            fontSize: 13,
+            fontSize: AppTextSize.bodyDense,
             letterSpacing: 0.8,
           ),
         ),
@@ -713,7 +713,7 @@ class _AthleteFilesButton extends StatelessWidget {
           l10n.athleteFilesButtonLabel,
           style: GoogleFonts.barlowCondensed(
             fontWeight: FontWeight.w700,
-            fontSize: 13,
+            fontSize: AppTextSize.bodyDense,
             letterSpacing: 0.8,
           ),
         ),

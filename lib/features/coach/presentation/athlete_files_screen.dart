@@ -13,6 +13,29 @@ import '../../../l10n/app_l10n.dart';
 import '../application/athlete_file_providers.dart';
 import '../domain/athlete_file.dart';
 
+/// ¿[uri] es una URL de descarga de Firebase Storage?
+///
+/// Gobierna qué puede abrir la pantalla afuera de la app, y la guarda no es
+/// paranoia de más: `downloadUrl` lo escribe el PF y la regla de Firestore
+/// sólo valida que sea un string, así que un cliente modificado podía poner
+/// ahí una pasarela de pago y el alumno la abría de un tap. En iOS eso además
+/// cruza la Guideline 3.1.3(f) — ver
+/// `test/features/paywall/superficie_de_cobro_alumno_test.dart`, que declara
+/// quién puede abrir URLs en todo el repo.
+///
+/// El camino legítimo siempre pasa por `getDownloadURL()` de Storage, así que
+/// restringir el host no le saca nada al alumno y cierra el vector.
+///
+/// Los tres hosts conviven en la práctica: el clásico de `googleapis.com`, el
+/// bucket `*.firebasestorage.app` de los proyectos nuevos, y el
+/// `*.appspot.com` de los viejos. Público para que sea testeable sin montar
+/// la pantalla ni mockear `url_launcher`.
+bool esDescargaDeStorage(Uri uri) =>
+    uri.scheme == 'https' &&
+    (uri.host == 'firebasestorage.googleapis.com' ||
+        uri.host.endsWith('.firebasestorage.app') ||
+        uri.host.endsWith('.appspot.com'));
+
 /// Archivos que cualquier PF, actual o anterior, compartió con el alumno.
 class AthleteFilesScreen extends ConsumerWidget {
   const AthleteFilesScreen({super.key, required this.athleteId});
@@ -81,7 +104,7 @@ class _Header extends StatelessWidget {
               title,
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
-                fontSize: 24,
+                fontSize: AppTextSize.heading,
                 letterSpacing: 1.2,
                 color: palette.textPrimary,
               ),
@@ -122,7 +145,7 @@ class _FileRow extends StatelessWidget {
 
   Future<void> _open() async {
     final uri = Uri.tryParse(file.downloadUrl);
-    if (uri == null) return;
+    if (uri == null || !esDescargaDeStorage(uri)) return;
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
@@ -161,7 +184,7 @@ class _FileRow extends StatelessWidget {
                       file.fileName,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.barlow(
-                        fontSize: 14,
+                        fontSize: AppTextSize.body,
                         fontWeight: FontWeight.w600,
                         color: palette.textPrimary,
                       ),
@@ -170,7 +193,7 @@ class _FileRow extends StatelessWidget {
                     Text(
                       '${_formatSize(file.sizeBytes)} · $date',
                       style: GoogleFonts.barlow(
-                        fontSize: 12,
+                        fontSize: AppTextSize.caption,
                         color: palette.textMuted,
                       ),
                     ),
@@ -217,7 +240,7 @@ class _MessageState extends StatelessWidget {
               message,
               textAlign: TextAlign.center,
               style: GoogleFonts.barlow(
-                fontSize: 14,
+                fontSize: AppTextSize.body,
                 color: palette.textMuted,
               ),
             ),

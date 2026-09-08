@@ -120,6 +120,26 @@ void main() {
       'lib/features/coach_hub/presentation/sections/alumnos/alumno_detail_screen.dart':
           'sólo Coach Hub WEB: abre archivos del alumno. La regla de Apple '
               'no aplica a la web, y esta pantalla no viaja en el binario móvil',
+      // Éste NO se puede justificar con el argumento del de arriba, y la
+      // diferencia importa: es la pantalla del alumno y **sí viaja en el
+      // binario móvil**.
+      //
+      // Lo que lo hace admisible es el destino. Abre el `downloadUrl` de un
+      // archivo que su PF le compartió, y esa URL la genera
+      // `getDownloadURL()` de Firebase Storage — contenido, nunca una compra.
+      //
+      // Pero eso último NO alcanzaba solo, y conviene decir por qué en vez de
+      // afirmar que estaba cubierto: `downloadUrl` lo escribe el PF y la regla
+      // de Firestore sólo valida que sea un string, así que un cliente
+      // modificado podía poner ahí una pasarela de pago y el alumno la abría
+      // de un tap. Por eso `_FileRow._open()` no abre nada que no venga de un
+      // host de Storage. Ese chequeo es la garantía; este renglón sólo la
+      // declara.
+      'lib/features/coach/presentation/athlete_files_screen.dart':
+          'abre el archivo que el PF le compartió al alumno. Viaja en móvil, '
+              'pero `_open()` sólo lanza URLs con host de Firebase Storage '
+              '(el `downloadUrl` lo escribe el PF y las rules no validan su '
+              'forma) — contenido, no compra',
       // ⚠️ Éste es DISTINTO de los dos de arriba, y conviene tenerlo claro
       // antes de agregar el próximo con el mismo argumento.
       //
