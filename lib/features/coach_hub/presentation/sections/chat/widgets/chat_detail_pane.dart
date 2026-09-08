@@ -131,10 +131,11 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
       // deja rastro es indistinguible de un problema de red del usuario, que
       // es justo la conclusión equivocada.
       //
-      // En web `reportNonFatal` corta antes de Crashlytics (no lo soporta) y
-      // esto termina en la consola del navegador. Es menos de lo que llega en
-      // mobile y sigue siendo infinitamente más que nada: alcanza para que el
-      // PF abra DevTools y nos diga el código.
+      // En web `reportNonFatal` NO llega a Crashlytics (no lo soporta) y sale
+      // por `debugPrint`, o sea la consola del navegador. Hasta este PR ni eso:
+      // el `log()` de `dart:developer` tiene el cuerpo vacío en el patch de JS,
+      // así que la función era muda en web y la consola del PF salía limpia
+      // aunque el envío fallara. Ver la nota del `kIsWeb` en `non_fatal.dart`.
       unawaited(
         reportNonFatal(
           e,
