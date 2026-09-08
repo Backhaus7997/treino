@@ -906,34 +906,54 @@ class _ProgresoTabState extends ConsumerState<_ProgresoTab> {
     AsyncValue<List<Measurement>> measAsync,
     AsyncValue<List<PerformanceTest>> perfAsync,
   ) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _ProgressHeader(
-            title: 'Mediciones antropométricas', // i18n: Fase W2
-            subtitle: 'Peso, composición corporal y circunferencias.', // i18n: Fase W2
-            actionLabel: 'NUEVA MEDICIÓN', // i18n: Fase W2
-            onPressed: _openAntropoDialog,
-            palette: palette,
+    // CustomScrollView y no SingleChildScrollView + Column: la lista de abajo
+    // puede tener cientos de filas (un alumno con dos años de tomas), y cada
+    // fila es un StatefulWidget con detalle expandible. Adentro de un
+    // SingleChildScrollView la lista queda obligada a `shrinkWrap: true` con el
+    // scroll propio apagado, que construye TODAS las filas al abrir la
+    // sub-vista. Antes de unir Progreso con Mediciones esto no pasaba: la lista
+    // colgaba de un `Expanded` y tenía su propio viewport perezoso.
+    //
+    // Con slivers hay un solo viewport, el header y el chart scrollean junto a
+    // la lista, y `SliverList` vuelve a construir sólo lo que se ve
+    // (AGENTS.md §6: «ListView.builder para listas largas»).
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
+          sliver: SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _ProgressHeader(
+                  title: 'Mediciones antropométricas', // i18n: Fase W2
+                  subtitle: 'Peso, composición corporal y circunferencias.', // i18n: Fase W2
+                  actionLabel: 'NUEVA MEDICIÓN', // i18n: Fase W2
+                  onPressed: _openAntropoDialog,
+                  palette: palette,
+                ),
+                const SizedBox(height: 20),
+                _ProgressReading(
+                  measurements: measAsync,
+                  performanceTests: perfAsync,
+                  palette: palette,
+                  view: _ProgressView.antropometria,
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
           ),
-          const SizedBox(height: 20),
-          _ProgressReading(
-            measurements: measAsync,
-            performanceTests: perfAsync,
-            palette: palette,
-            view: _ProgressView.antropometria,
-          ),
-          const SizedBox(height: 20),
-          _AntropoList(
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+          sliver: _AntropoList(
             measurements: measAsync,
             palette: palette,
             onDelete: _confirmDeleteMedicion,
             onEdit: (m) => _openAntropoDialog(initial: m),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -942,34 +962,54 @@ class _ProgresoTabState extends ConsumerState<_ProgresoTab> {
     AsyncValue<List<Measurement>> measAsync,
     AsyncValue<List<PerformanceTest>> perfAsync,
   ) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _ProgressHeader(
-            title: 'Pruebas de rendimiento', // i18n: Fase W2
-            subtitle: 'Saltos, sprints, 1RM y resistencia.', // i18n: Fase W2
-            actionLabel: 'NUEVA PRUEBA', // i18n: Fase W2
-            onPressed: _openRendimientoDialog,
-            palette: palette,
+    // CustomScrollView y no SingleChildScrollView + Column: la lista de abajo
+    // puede tener cientos de filas (un alumno con dos años de tomas), y cada
+    // fila es un StatefulWidget con detalle expandible. Adentro de un
+    // SingleChildScrollView la lista queda obligada a `shrinkWrap: true` con el
+    // scroll propio apagado, que construye TODAS las filas al abrir la
+    // sub-vista. Antes de unir Progreso con Mediciones esto no pasaba: la lista
+    // colgaba de un `Expanded` y tenía su propio viewport perezoso.
+    //
+    // Con slivers hay un solo viewport, el header y el chart scrollean junto a
+    // la lista, y `SliverList` vuelve a construir sólo lo que se ve
+    // (AGENTS.md §6: «ListView.builder para listas largas»).
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
+          sliver: SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _ProgressHeader(
+                  title: 'Pruebas de rendimiento', // i18n: Fase W2
+                  subtitle: 'Saltos, sprints, 1RM y resistencia.', // i18n: Fase W2
+                  actionLabel: 'NUEVA PRUEBA', // i18n: Fase W2
+                  onPressed: _openRendimientoDialog,
+                  palette: palette,
+                ),
+                const SizedBox(height: 20),
+                _ProgressReading(
+                  measurements: measAsync,
+                  performanceTests: perfAsync,
+                  palette: palette,
+                  view: _ProgressView.rendimiento,
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
           ),
-          const SizedBox(height: 20),
-          _ProgressReading(
-            measurements: measAsync,
-            performanceTests: perfAsync,
-            palette: palette,
-            view: _ProgressView.rendimiento,
-          ),
-          const SizedBox(height: 20),
-          _RendimientoList(
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+          sliver: _RendimientoList(
             performanceTests: perfAsync,
             palette: palette,
             onDelete: _confirmDeleteRendimiento,
             onEdit: (t) => _openRendimientoDialog(initial: t),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -3681,6 +3721,13 @@ class _AntropoList extends StatelessWidget {
   final Future<void> Function(Measurement) onDelete;
   final Future<void> Function(Measurement) onEdit;
 
+  /// Devuelve un SLIVER, no una caja.
+  ///
+  /// Es lo que le devuelve el renderizado perezoso a esta lista. Como caja,
+  /// adentro del scroll de la sub-vista, la lista quedaba obligada a
+  /// `shrinkWrap: true` y construía las cientos de filas de un alumno con
+  /// historial largo apenas se abría la pestaña. `SliverList` construye sólo
+  /// lo que entra en pantalla, y comparte el viewport con el header y el chart.
   @override
   Widget build(BuildContext context) {
     if (measurements.hasValue) {
@@ -3688,48 +3735,51 @@ class _AntropoList extends StatelessWidget {
       // Provider ordena ASC — queremos DESC para "más nuevas arriba".
       final ms = all.reversed.toList();
       if (ms.isEmpty) {
-        return TreinoStateSwitcher(
-          childKey: const ValueKey('empty'),
-          child: Center(
-            child: Text(
-              'Este alumno todavía no tiene mediciones cargadas.', // i18n: Fase W2
-              textAlign: TextAlign.center,
-              style: TextStyle(color: palette.textMuted, fontSize: 14),
+        return SliverToBoxAdapter(
+          child: TreinoStateSwitcher(
+            childKey: const ValueKey('empty'),
+            child: Center(
+              child: Text(
+                'Este alumno todavía no tiene mediciones cargadas.', // i18n: Fase W2
+                textAlign: TextAlign.center,
+                style: TextStyle(color: palette.textMuted, fontSize: 14),
+              ),
             ),
           ),
         );
       }
-      return TreinoStateSwitcher(
-        childKey: const ValueKey('data'),
-        child: ListView.separated(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: ms.length,
-          separatorBuilder: (_, __) =>
-              Divider(height: 1, color: palette.border),
-          itemBuilder: (_, i) => _MedicionRow(
-            measurement: ms[i],
-            palette: palette,
-            onDelete: () => onDelete(ms[i]),
-            onEdit: () => onEdit(ms[i]),
-          ),
+      // Sin TreinoStateSwitcher en esta rama, a propósito: envuelve una caja y
+      // acá el hijo es un sliver. Las transiciones de estado siguen animadas en
+      // las ramas de vacío, error y carga, que son las que se alternan.
+      return SliverList.separated(
+        itemCount: ms.length,
+        separatorBuilder: (_, __) => Divider(height: 1, color: palette.border),
+        itemBuilder: (_, i) => _MedicionRow(
+          measurement: ms[i],
+          palette: palette,
+          onDelete: () => onDelete(ms[i]),
+          onEdit: () => onEdit(ms[i]),
         ),
       );
     }
     if (measurements.hasError) {
-      return TreinoStateSwitcher(
-        childKey: const ValueKey('error'),
-        child: Center(
-          child: Text(
-            'No pudimos cargar las mediciones.', // i18n: Fase W2
-            style: TextStyle(color: palette.textMuted, fontSize: 14),
+      return SliverToBoxAdapter(
+        child: TreinoStateSwitcher(
+          childKey: const ValueKey('error'),
+          child: Center(
+            child: Text(
+              'No pudimos cargar las mediciones.', // i18n: Fase W2
+              style: TextStyle(color: palette.textMuted, fontSize: 14),
+            ),
           ),
         ),
       );
     }
-    return const TreinoStateSwitcher(
-      childKey: ValueKey('loading'),
-      child: CoachHubSkeleton(filas: 3),
+    return const SliverToBoxAdapter(
+      child: TreinoStateSwitcher(
+        childKey: ValueKey('loading'),
+        child: CoachHubSkeleton(filas: 3),
+      ),
     );
   }
 }
@@ -3748,54 +3798,55 @@ class _RendimientoList extends StatelessWidget {
   final Future<void> Function(PerformanceTest) onDelete;
   final Future<void> Function(PerformanceTest) onEdit;
 
+  /// Devuelve un SLIVER, no una caja — ver el dartdoc de [_AntropoList.build].
   @override
   Widget build(BuildContext context) {
     if (performanceTests.hasValue) {
       final all = performanceTests.requireValue;
       final tests = all.reversed.toList();
       if (tests.isEmpty) {
-        return TreinoStateSwitcher(
-          childKey: const ValueKey('empty'),
-          child: Center(
-            child: Text(
-              'Este alumno todavía no tiene pruebas de rendimiento cargadas.', // i18n: Fase W2
-              textAlign: TextAlign.center,
-              style: TextStyle(color: palette.textMuted, fontSize: 14),
+        return SliverToBoxAdapter(
+          child: TreinoStateSwitcher(
+            childKey: const ValueKey('empty'),
+            child: Center(
+              child: Text(
+                'Este alumno todavía no tiene pruebas de rendimiento cargadas.', // i18n: Fase W2
+                textAlign: TextAlign.center,
+                style: TextStyle(color: palette.textMuted, fontSize: 14),
+              ),
             ),
           ),
         );
       }
-      return TreinoStateSwitcher(
-        childKey: const ValueKey('data'),
-        child: ListView.separated(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: tests.length,
-          separatorBuilder: (_, __) =>
-              Divider(height: 1, color: palette.border),
-          itemBuilder: (_, i) => _RendimientoRow(
-            test: tests[i],
-            palette: palette,
-            onDelete: () => onDelete(tests[i]),
-            onEdit: () => onEdit(tests[i]),
-          ),
+      return SliverList.separated(
+        itemCount: tests.length,
+        separatorBuilder: (_, __) => Divider(height: 1, color: palette.border),
+        itemBuilder: (_, i) => _RendimientoRow(
+          test: tests[i],
+          palette: palette,
+          onDelete: () => onDelete(tests[i]),
+          onEdit: () => onEdit(tests[i]),
         ),
       );
     }
     if (performanceTests.hasError) {
-      return TreinoStateSwitcher(
-        childKey: const ValueKey('error'),
-        child: Center(
-          child: Text(
-            'No pudimos cargar las pruebas.', // i18n: Fase W2
-            style: TextStyle(color: palette.textMuted, fontSize: 14),
+      return SliverToBoxAdapter(
+        child: TreinoStateSwitcher(
+          childKey: const ValueKey('error'),
+          child: Center(
+            child: Text(
+              'No pudimos cargar las pruebas.', // i18n: Fase W2
+              style: TextStyle(color: palette.textMuted, fontSize: 14),
+            ),
           ),
         ),
       );
     }
-    return const TreinoStateSwitcher(
-      childKey: ValueKey('loading'),
-      child: CoachHubSkeleton(filas: 3),
+    return const SliverToBoxAdapter(
+      child: TreinoStateSwitcher(
+        childKey: ValueKey('loading'),
+        child: CoachHubSkeleton(filas: 3),
+      ),
     );
   }
 }

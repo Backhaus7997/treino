@@ -200,6 +200,30 @@ Widget _wrap(List<Override> overrides) => ProviderScope(
       ),
     );
 
+/// Scrollea la sub-vista hasta que [target] esté construido.
+///
+/// Hace falta desde que la lista es perezosa: el header y el chart ocupan la
+/// primera pantalla, así que las filas de abajo NO están en el árbol hasta que
+/// se scrollea. Antes estas aserciones pasaban sin scrollear, pero pasaban
+/// *gracias* a un defecto —la lista construía todas las filas de una— y no
+/// porque la fila fuera alcanzable.
+Future<void> _scrollHasta(WidgetTester tester, Finder target) async {
+  // El Scrollable del CustomScrollView y no `find.byType(Scrollable).last`:
+  // en esta pantalla conviven cuatro (los dos TabBar, entre otros), y el
+  // último no es el de la sub-vista.
+  await tester.scrollUntilVisible(
+    target,
+    200,
+    scrollable: find
+        .descendant(
+          of: find.byType(CustomScrollView),
+          matching: find.byType(Scrollable),
+        )
+        .first,
+  );
+  await tester.pumpAndSettle();
+}
+
 void _useDesktopViewport(WidgetTester tester) {
   tester.view.physicalSize = const Size(1400, 900);
   tester.view.devicePixelRatio = 1.0;
@@ -248,9 +272,11 @@ void main() {
     await _selectMedicionesTab(tester);
 
     // Summary de m1 → peso + %grasa (double `78` renderiza como "78.0")
+    await _scrollHasta(tester, find.textContaining('78.0 kg'));
     expect(find.textContaining('78.0 kg'), findsOneWidget);
     expect(find.textContaining('15.0% grasa'), findsOneWidget);
     // Summary de m2 → peso + cintura
+    await _scrollHasta(tester, find.textContaining('80.0 kg'));
     expect(find.textContaining('80.0 kg'), findsOneWidget);
     expect(find.textContaining('cintura 82.0 cm'), findsOneWidget);
   });
@@ -277,7 +303,56 @@ void main() {
     expect(find.byType(MeasurementProgressChart), findsOneWidget);
     expect(find.text('70 kg'), findsWidgets);
     // Icons.edit, no TreinoIcon.edit: es el que el row usa de verdad.
+    //
+    // Se scrollea al final porque la lista es perezosa: con el chart arriba, la
+    // segunda fila no está en el árbol hasta llegar. Que haya que scrollear ES
+    // la prueba de que el viewport quedó perezoso.
+    // La lista va DESC, así que la segunda fila es m1 (72). Su summary usa el
+    // double crudo — '72.0 kg' — a diferencia de la card de lectura, que lo
+    // recorta a '72 kg'.
+    await _scrollHasta(tester, find.textContaining('72.0 kg'));
     expect(find.byIcon(Icons.edit), findsNWidgets(2));
+  });
+
+  testWidgets(
+      'con historial largo la lista NO construye todas las filas de una '
+      '(renderizado perezoso)', (tester) async {
+    // El defecto que este test existe para impedir: al unir Progreso con
+    // Mediciones, la lista pasó a vivir adentro del scroll de la sub-vista, lo
+    // que la obligaba a `shrinkWrap: true` con su scroll propio apagado — y eso
+    // construye TODAS las filas al abrir la pestaña. Un alumno con dos años de
+    // tomas son cientos de `_MedicionRow`, cada una un StatefulWidget con
+    // detalle expandible. AGENTS.md §6 pide listas largas perezosas.
+    //
+    // Ningún check lo agarraba: analyze limpio, los otros tests en verde y la
+    // pantalla se ve idéntica. La única diferencia observable es cuántas filas
+    // hay en el árbol.
+    final muchas = [
+      for (var i = 0; i < 60; i++)
+        _measurement(
+          id: 'm$i',
+          recordedAt: DateTime(2026, 1, 1).add(Duration(days: i)),
+          weightKg: 70 + i.toDouble(),
+        ),
+    ];
+
+    _useDesktopViewport(tester);
+    await tester.pumpWidget(_wrap(_baseOverrides(measurements: muchas)));
+    await _selectMedicionesTab(tester);
+
+    // El lápiz de editar es uno por fila, y es público (Icons.edit) a
+    // diferencia de la clase privada de la row.
+    final filasConstruidas = find.byIcon(Icons.edit).evaluate().length;
+
+    expect(
+      filasConstruidas,
+      lessThan(muchas.length),
+      reason: 'se construyeron las $filasConstruidas filas de golpe: la lista '
+          'volvió a ser shrinkWrap dentro de un scroll padre',
+    );
+    // Y que efectivamente renderice algo — un cero acá sería un falso verde:
+    // la aserción de arriba pasaría con la lista rota o vacía.
+    expect(filasConstruidas, greaterThan(0));
   });
 
   testWidgets('tap en row expande el detalle con todos los campos cargados',
