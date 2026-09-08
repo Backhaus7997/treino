@@ -84,7 +84,7 @@ class _MyExercisesScreenState extends ConsumerState<MyExercisesScreen> {
           n == 1 ? 'Borrar ejercicio' : 'Borrar $n ejercicios', // i18n
           style: GoogleFonts.barlowCondensed(
             fontWeight: FontWeight.w700,
-            fontSize: 18,
+            fontSize: AppTextSize.title,
             color: palette.textPrimary,
           ),
         ),
@@ -94,7 +94,8 @@ class _MyExercisesScreenState extends ConsumerState<MyExercisesScreen> {
           'Esta acción no se puede deshacer. Los planes que ya tienen '
           '${n == 1 ? 'este ejercicio asignado no se ve' : 'estos ejercicios asignados no se ven'} '
           'afectados (guardan el nombre por separado).', // i18n
-          style: GoogleFonts.barlow(fontSize: 14, color: palette.textPrimary),
+          style: GoogleFonts.barlow(
+              fontSize: AppTextSize.body, color: palette.textPrimary),
         ),
         actions: [
           OutlinedButton(
@@ -103,7 +104,7 @@ class _MyExercisesScreenState extends ConsumerState<MyExercisesScreen> {
               'Cancelar', // i18n
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
-                fontSize: 13,
+                fontSize: AppTextSize.bodyDense,
                 color: palette.textPrimary,
               ),
             ),
@@ -118,7 +119,7 @@ class _MyExercisesScreenState extends ConsumerState<MyExercisesScreen> {
               'Borrar', // i18n
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
-                fontSize: 13,
+                fontSize: AppTextSize.bodyDense,
               ),
             ),
           ),
@@ -216,7 +217,7 @@ class _MyExercisesScreenState extends ConsumerState<MyExercisesScreen> {
                           : 'MIS EJERCICIOS', // i18n
                       style: GoogleFonts.barlowCondensed(
                         fontWeight: FontWeight.w700,
-                        fontSize: 16,
+                        fontSize: AppTextSize.bodyLarge,
                         letterSpacing: 1.0,
                         color: palette.textPrimary,
                       ),
@@ -241,7 +242,7 @@ class _MyExercisesScreenState extends ConsumerState<MyExercisesScreen> {
                           : 'SELECCIONAR', // i18n
                       style: GoogleFonts.barlowCondensed(
                         fontWeight: FontWeight.w700,
-                        fontSize: 13,
+                        fontSize: AppTextSize.bodyDense,
                         letterSpacing: 0.8,
                         color: palette.accentText,
                       ),
@@ -264,7 +265,7 @@ class _MyExercisesScreenState extends ConsumerState<MyExercisesScreen> {
                   child: Text(
                     'No pudimos cargar tus ejercicios.',
                     style: GoogleFonts.barlow(
-                        fontSize: 14, color: palette.textMuted),
+                        fontSize: AppTextSize.body, color: palette.textMuted),
                   ),
                 ),
                 data: (items) => items.isEmpty
@@ -323,7 +324,7 @@ class _MyExercisesScreenState extends ConsumerState<MyExercisesScreen> {
                           '+ NUEVO EJERCICIO', // i18n
                           style: GoogleFonts.barlowCondensed(
                             fontWeight: FontWeight.w700,
-                            fontSize: 13,
+                            fontSize: AppTextSize.bodyDense,
                             letterSpacing: 0.8,
                           ),
                         ),
@@ -385,7 +386,7 @@ class _DeleteSelectedButton extends StatelessWidget {
                   : 'BORRAR ($count)', // i18n
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
-                fontSize: 13,
+                fontSize: AppTextSize.bodyDense,
                 letterSpacing: 0.8,
               ),
             ),
@@ -414,7 +415,7 @@ class _EmptyState extends StatelessWidget {
               'Tu biblioteca está vacía.',
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
-                fontSize: 16,
+                fontSize: AppTextSize.bodyLarge,
                 color: palette.textPrimary,
               ),
               textAlign: TextAlign.center,
@@ -424,7 +425,7 @@ class _EmptyState extends StatelessWidget {
               'Creá ejercicios con el nombre que vos usás y un video de referencia. Quedan guardados solo para vos.',
               style: GoogleFonts.barlow(
                 fontWeight: FontWeight.w400,
-                fontSize: 13,
+                fontSize: AppTextSize.bodyDense,
                 color: palette.textMuted,
               ),
               textAlign: TextAlign.center,
@@ -519,7 +520,7 @@ class _ExerciseCard extends StatelessWidget {
                           exercise.name,
                           style: GoogleFonts.barlow(
                             fontWeight: FontWeight.w600,
-                            fontSize: 14,
+                            fontSize: AppTextSize.body,
                             color: palette.textPrimary,
                           ),
                           overflow: TextOverflow.ellipsis,
@@ -530,7 +531,7 @@ class _ExerciseCard extends StatelessWidget {
                             muscleGroupLabel(exercise.muscleGroup),
                             style: GoogleFonts.barlow(
                               fontWeight: FontWeight.w400,
-                              fontSize: 12,
+                              fontSize: AppTextSize.caption,
                               color: palette.textMuted,
                             ),
                           ),
