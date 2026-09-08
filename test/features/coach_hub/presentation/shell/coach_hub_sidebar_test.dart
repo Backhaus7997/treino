@@ -615,9 +615,24 @@ void main() {
     // quién lo centra —el `Row` en vez del `Stack`—. El centro teórico es el
     // mismo; el redondeo no. Corrió cada label 1px y movió 374px en los cuatro
     // goldens, que es justo el tamaño de error que nadie ve revisando el diff.
-    final label = tester.getRect(_primerItemLabel().first).center.dy;
-    final icono = tester.getRect(_primerItemIcono()).center.dy;
-    expect(label, closeTo(icono, 0.5));
+    final label = tester.getRect(_primerItemLabel().first);
+    final icono = tester.getRect(_primerItemIcono());
+    expect(label.center.dy, closeTo(icono.center.dy, 0.5));
+
+    // Y el label tiene que quedar metido hacia adentro lo MISMO que el ícono,
+    // que es donde lo dejaba `right: 0` antes de ser un ancho calculado.
+    //
+    // `_labelWidth` es aritmética a mano y por lo tanto se equivoca en
+    // silencio: la primera versión se olvidó del `Border` del sidebar, quedó
+    // 1px más ancha, y ese píxel corrió dónde ellipsiza cada texto. No rompió
+    // ningún test — sólo los cuatro goldens, y recién en CI.
+    //
+    // Se compara simetría y no un número: cualquier constante que se copie acá
+    // (el margen de 8, el padding de 14, el borde) puede driftear del lib y
+    // dejar de proteger nada.
+    final fila =
+        tester.getRect(find.byKey(ValueKey(sidebarRegistry.first.route)));
+    expect(fila.right - label.right, closeTo(icono.left - fila.left, 0.5));
   });
 
   testWidgets('el ícono viaja al centro, no salta', (tester) async {

@@ -459,9 +459,18 @@ const double _kIconSize = 20;
 /// (20 + 12). Ese resto es lo que el texto ocupa cuando está en su lugar, y es
 /// lo que conserva mientras se desliza hacia afuera.
 const double _labelWidth = CoachHubLayoutTokens.sidebarExpandedWidth -
+    _kSidebarBorderWidth -
     8 * 2 -
     CoachHubSidebarItemTokens.paddingH * 2 -
     (_kIconSize + 12);
+
+/// Ancho del borde derecho del sidebar. Entra en la cuenta de `_labelWidth`
+/// porque el `Border` del `BoxDecoration` se come ese píxel del content box.
+///
+/// Olvidarlo dejaba el label 1px más ancho de lo que era con `right: 0`, lo que
+/// corría dónde ellipsiza cada texto: 374px de diferencia en los cuatro
+/// goldens del gate visual, por un píxel de aritmética.
+const double _kSidebarBorderWidth = 1;
 
 /// Ícono del ítem, con el punto de badge opcional para el estado colapsado.
 ///
