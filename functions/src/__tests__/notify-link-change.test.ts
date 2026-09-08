@@ -241,7 +241,7 @@ describe("terminated partido por terminationReason", () => {
     );
 
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock
-      .calls[0][0] as admin.messaging.MulticastMessage;
+      .calls[0][0] as MulticastMessage;
     expect(callArg.tokens).toEqual(["athlete-token-w1"]);
     expect(callArg.tokens).not.toContain("trainer-token-w1");
   });
@@ -258,7 +258,7 @@ describe("terminated partido por terminationReason", () => {
     );
 
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock
-      .calls[0][0] as admin.messaging.MulticastMessage;
+      .calls[0][0] as MulticastMessage;
     expect(callArg.notification?.title).toBe("Solicitud no aceptada");
     expect(callArg.notification?.body).toContain("no aceptó tu solicitud");
     // La mentira vieja, pineada explícitamente para que no vuelva.
@@ -306,7 +306,7 @@ describe("terminated partido por terminationReason", () => {
     );
 
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock
-      .calls[0][0] as admin.messaging.MulticastMessage;
+      .calls[0][0] as MulticastMessage;
     expect(callArg.tokens).toEqual(["trainer-token-w1"]);
     expect(callArg.notification?.title).toBe("Solicitud cancelada");
   });
@@ -329,7 +329,7 @@ describe("terminated partido por terminationReason", () => {
     );
 
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock
-      .calls[0][0] as admin.messaging.MulticastMessage;
+      .calls[0][0] as MulticastMessage;
     expect(callArg.tokens).toContain("trainer-token-w1");
     expect(callArg.tokens).toContain("athlete-token-w1");
     expect(callArg.notification?.title).toBe("Vinculación finalizada");
