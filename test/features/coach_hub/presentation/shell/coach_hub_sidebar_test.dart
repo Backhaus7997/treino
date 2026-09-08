@@ -11,6 +11,7 @@ import 'package:treino/core/persistence/shared_prefs_provider.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/features/coach_hub/presentation/shell/coach_hub_sidebar.dart';
+import 'package:treino/features/coach_hub/presentation/shell/navigator_semantics_boundary.dart';
 import 'package:treino/features/coach_hub/presentation/shell/sidebar_item.dart';
 import 'package:treino/features/coach_hub/presentation/shell/sidebar_registry.dart';
 import 'package:treino/core/widgets/treino_logo.dart';
@@ -39,7 +40,10 @@ Future<void> _pumpSidebar(
         builder: (ctx, state, child) => Scaffold(
           body: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [const CoachHubSidebar(), Expanded(child: child)],
+            children: [
+              const CoachHubSidebar(),
+              Expanded(child: NavigatorSemanticsBoundary(child: child))
+            ],
           ),
         ),
         routes: [
@@ -326,7 +330,7 @@ void main() {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 CoachHubSidebar(itemsOverride: [badgedItem]),
-                Expanded(child: child),
+                Expanded(child: NavigatorSemanticsBoundary(child: child)),
               ],
             ),
           ),
@@ -472,20 +476,57 @@ void main() {
     expect(find.byTooltip('${item.label} (3)'), findsOneWidget);
   });
 
-  // NOTA — por qué acá no hay assert de `bySemanticsLabel`.
+  // Estos dos asserts estuvieron un tiempo escritos como una NOTA que explicaba
+  // por qué no se podían escribir: el sidebar entero aportaba CERO nodos al
+  // árbol de semántica, así que `bySemanticsLabel` no encontraba nada ni
+  // colapsado ni expandido. No era del sidebar — el `Navigator` de la sección
+  // le borraba la semántica a todos sus hermanos anteriores. Ver
+  // [NavigatorSemanticsBoundary], que es lo que el harness de acá arriba monta
+  // igual que el `CoachHubScaffold` de producción.
   //
-  // El `MergeSemantics`/`Semantics(label:)` del item está puesto y es
-  // correcto, pero hoy no se puede verificar: al volcar el árbol de semántica
-  // de este mismo harness, TODO el sidebar aporta CERO nodos etiquetados
-  // —colapsado y expandido, filas, toggle y footer por igual—, mientras el
-  // área de contenido al lado sí los aporta. `tester.getSemantics()` sobre
-  // `find.text('Dashboard')` con el sidebar expandido devuelve `label: ""`:
-  // ni siquiera los `Text` visibles llegan al árbol.
-  //
-  // Es un bug PREEXISTENTE y más grande que este cambio (el sidebar entero es
-  // invisible para un lector de pantalla), así que se investiga aparte en vez
-  // de escribir acá un assert que quede rojo o, peor, uno laxo que tape el
-  // problema. Cuando se arregle la causa raíz, este es el lugar del assert.
+  // El guard de que producción tiene esa frontera vive en
+  // `coach_hub_scaffold_test.dart`, montando el shell real: sin él, estos dos
+  // asserts sólo probarían el harness.
+
+  testWidgets('colapsado → el label del ítem llega al árbol de semántica',
+      (tester) async {
+    final handle = tester.ensureSemantics();
+    await _pumpSidebar(tester, prefs: {'coach_hub.sidebar.collapsed': true});
+
+    // Colapsado no hay un solo `Text` en la fila: el nombre existe únicamente
+    // como label de semántica. Si esto se rompe, el ítem es un ícono anónimo.
+    expect(find.bySemanticsLabel('Dashboard'), findsOneWidget);
+
+    handle.dispose();
+  });
+
+  testWidgets('colapsado con badge → el conteo también entra en el label',
+      (tester) async {
+    final handle = tester.ensureSemantics();
+    final testBadgeProvider = StateProvider<int?>((ref) => 3);
+    final item = sidebarRegistry.firstWhere((i) => i.id == 'pagos');
+
+    await _pumpSidebarWithItems(
+      tester,
+      items: [
+        SidebarItem(
+          id: item.id,
+          label: item.label,
+          route: item.route,
+          iconBuilder: item.iconBuilder,
+          group: item.group,
+          badgeProvider: testBadgeProvider,
+        ),
+      ],
+      prefs: {'coach_hub.sidebar.collapsed': true},
+      initial: '/pagos',
+    );
+
+    // El tooltip dice el conteo al mouse; el label lo dice al lector.
+    expect(find.bySemanticsLabel('${item.label}, 3'), findsOneWidget);
+
+    handle.dispose();
+  });
 
   testWidgets('expandido → sin tooltip: el label ya está en pantalla',
       (tester) async {
@@ -516,7 +557,7 @@ Future<void> _pumpSidebarWithItems(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               CoachHubSidebar(itemsOverride: items),
-              Expanded(child: child),
+              Expanded(child: NavigatorSemanticsBoundary(child: child)),
             ],
           ),
         ),
