@@ -89,17 +89,20 @@ List<Override> _overrides({
   String uid = 'athlete-1',
   bool? paywallEnabled,
   AthleteEntitlement? entitlement,
+  List<Routine> userRoutines = const [],
+  RoutineRepository? repo,
 }) {
   return [
     currentUidProvider.overrideWithValue(uid),
-    routineRepositoryProvider.overrideWithValue(_MockRoutineRepository()),
+    routineRepositoryProvider
+        .overrideWithValue(repo ?? _MockRoutineRepository()),
     exercisesProvider.overrideWith((ref) async => kExerciseSeed),
     customExercisesForTrainerStreamProvider(uid).overrideWith(
       (ref) => Stream<List<CustomExercise>>.value(const <CustomExercise>[]),
     ),
     analyticsServiceProvider.overrideWithValue(FakeAnalyticsService()),
     userCreatedRoutinesProvider(uid).overrideWith(
-      (ref) => Stream<List<Routine>>.value(const []),
+      (ref) => Stream<List<Routine>>.value(userRoutines),
     ),
     if (paywallEnabled != null)
       athletePaywallEnabledProvider.overrideWithValue(paywallEnabled),
@@ -127,6 +130,43 @@ Future<void> _tapAgregarSemana(WidgetTester tester) async {
 }
 
 Finder get _sheet => find.byKey(const Key('free_plan_limit_grabber'));
+
+/// [n] rutinas propias ya guardadas, para sembrar el cupo.
+List<Routine> _rutinas(int n) => [
+      for (var i = 0; i < n; i++)
+        Routine(
+          id: 'mia-$i',
+          name: 'Mi rutina $i',
+          split: null,
+          level: ExperienceLevel.beginner,
+          days: const [],
+          source: RoutineSource.userCreated,
+          visibility: RoutineVisibility.private,
+          createdBy: 'athlete-1',
+        ),
+    ];
+
+/// Lo mínimo que habilita el botón de guardar: nombre, un ejercicio y sus reps.
+/// Misma receta que routine_editor_athlete_mode_test.
+Future<void> _completarRutinaMinima(WidgetTester tester) async {
+  await tester.enterText(
+      find.byKey(const Key('editor_name_field')), 'Mi rutina');
+  await tester.pumpAndSettle();
+  await desplazarHastaAgregarEjercicio(tester);
+  await tester.tap(find.text('Agregar ejercicio'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Press de Banca').first);
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Agregar 1 ejercicio'));
+  await tester.pumpAndSettle();
+  await expandirEjercicios(tester);
+  final vacios = find.byType(TextField).evaluate().where((e) {
+    final w = e.widget as TextField;
+    return w.controller != null && w.controller!.text.isEmpty;
+  }).toList();
+  await tester.enterText(find.byWidget(vacios.last.widget as TextField), '10');
+  await tester.pumpAndSettle();
+}
 
 void main() {
   setUpAll(() {
@@ -287,6 +327,90 @@ void main() {
       await abrirDatosDelPlan(tester);
       expect(find.byKey(const Key('week_tab_1')), findsNothing,
           reason: 'la semana no se agregó');
+    });
+    testWidgets(
+        'alumno free con 3 rutinas: guardar la cuarta abre la hoja y no crea',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.createUserOwned(
+                uid: any(named: 'uid'),
+                draft: any(named: 'draft'),
+              ))
+          .thenAnswer((inv) async =>
+              (inv.namedArguments[const Symbol('draft')] as Routine)
+                  .copyWith(id: 'no-deberia-llegar'));
+
+      await _pumpEditor(
+        tester,
+        mode: const SelfCreating(),
+        overrides: _overrides(
+          paywallEnabled: true,
+          entitlement: AthleteEntitlement.free,
+          userRoutines: _rutinas(kFreeMaxOwnRoutines),
+        ),
+      );
+      await _completarRutinaMinima(tester);
+      await tester.tap(find.widgetWithText(ElevatedButton, 'CREAR RUTINA'));
+      await tester.pumpAndSettle();
+
+      expect(_sheet, findsOneWidget);
+      verifyNever(() => repo.createUserOwned(
+            uid: any(named: 'uid'),
+            draft: any(named: 'draft'),
+          ));
+    });
+
+    testWidgets('con 2 rutinas todavía puede crear', (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.createUserOwned(
+                uid: any(named: 'uid'),
+                draft: any(named: 'draft'),
+              ))
+          .thenAnswer((inv) async =>
+              (inv.namedArguments[const Symbol('draft')] as Routine)
+                  .copyWith(id: 'gen'));
+
+      await _pumpEditor(
+        tester,
+        mode: const SelfCreating(),
+        overrides: _overrides(
+          paywallEnabled: true,
+          entitlement: AthleteEntitlement.free,
+          userRoutines: _rutinas(kFreeMaxOwnRoutines - 1),
+          repo: repo,
+        ),
+      );
+      await _completarRutinaMinima(tester);
+      await tester.tap(find.widgetWithText(ElevatedButton, 'CREAR RUTINA'));
+      await tester.pumpAndSettle();
+
+      expect(_sheet, findsNothing);
+      verify(() => repo.createUserOwned(
+            uid: any(named: 'uid'),
+            draft: any(named: 'draft'),
+          )).called(1);
+    });
+
+    testWidgets('el que paga llega hasta el techo estructural, no a la hoja',
+        (tester) async {
+      // A las 10 ve el aviso de siempre, NO la hoja de plan pago: venderle el
+      // plan a quien ya lo tiene es una promesa rota.
+      await _pumpEditor(
+        tester,
+        mode: const SelfCreating(),
+        overrides: _overrides(
+          paywallEnabled: true,
+          entitlement: AthleteEntitlement.entitled,
+          userRoutines: _rutinas(kMaxOwnRoutines),
+        ),
+      );
+      await _completarRutinaMinima(tester);
+      await tester.tap(find.widgetWithText(ElevatedButton, 'CREAR RUTINA'));
+      await tester.pumpAndSettle();
+
+      expect(_sheet, findsNothing);
+      expect(find.text('Llegaste al máximo de 10 rutinas activas.'),
+          findsOneWidget);
     });
   });
 }
