@@ -152,13 +152,11 @@ class AvailabilityEditorPanel extends ConsumerWidget {
 
                     // ── Overrides list ─────────────────────────────────────────
                     overridesAsync.when(
-                      loading: () => Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child:
-                              CircularProgressIndicator(color: palette.accent),
-                        ),
-                      ),
+                      // Skeleton y no spinner: lo que viene es la lista de
+                      // excepciones, con su forma conocida. Además el padding
+                      // de 24 estaba fuera de la escala 8·12·14·18·20 — el
+                      // componente ya trae el suyo.
+                      loading: () => const CoachHubSkeleton(filas: 3),
                       error: (e, _) => _ErrorState(
                         palette: palette,
                         onRetry: () => ref
