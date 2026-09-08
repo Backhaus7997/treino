@@ -143,7 +143,7 @@ describe("SCENARIO-629 + SCENARIO-680: new message → sendFcm called with recip
       {
         senderId: athleteUid,
         text: "Hola entrenador!",
-        createdAt: admin.firestore.Timestamp.now(),
+        createdAt: Timestamp.now(),
       },
       mock,
     );

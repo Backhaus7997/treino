@@ -191,7 +191,7 @@ describe("sendFcm push preferences", () => {
 
     await expect(
       sendFcm(
-        {} as admin.app.App,
+        {} as App,
         { ...pushInput, uids: ["user"] },
         messaging,
       ),
@@ -212,7 +212,7 @@ describe("sendFcm push preferences", () => {
     const messaging = mockMessaging();
 
     await sendFcm(
-      {} as admin.app.App,
+      {} as App,
       { ...pushInput, uids: ["user"] },
       messaging,
     );
@@ -226,7 +226,7 @@ describe("sendFcm push preferences", () => {
     const messaging = mockMessaging();
 
     await sendFcm(
-      {} as admin.app.App,
+      {} as App,
       { ...pushInput, uids: ["user"] },
       messaging,
     );
@@ -246,7 +246,7 @@ describe("sendFcm push preferences", () => {
     const messaging = mockMessaging();
 
     await sendFcm(
-      {} as admin.app.App,
+      {} as App,
       { ...pushInput, uids: ["user"] },
       messaging,
     );
@@ -266,7 +266,7 @@ describe("sendFcm push preferences", () => {
     const messaging = mockMessaging();
 
     await sendFcm(
-      {} as admin.app.App,
+      {} as App,
       { ...baseInput, uids: ["user"] },
       messaging,
     );
@@ -292,7 +292,7 @@ describe("sendFcm push preferences", () => {
     const messaging = mockMessaging();
 
     await sendFcm(
-      {} as admin.app.App,
+      {} as App,
       { ...pushInput, uids: ["disabled", "enabled"] },
       messaging,
     );
@@ -313,7 +313,7 @@ describe("sendFcm push preferences", () => {
     });
 
     await sendFcm(
-      {} as admin.app.App,
+      {} as App,
       { ...pushInput, uids: ["user"] },
       mockMessaging(),
     );

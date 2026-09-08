@@ -113,7 +113,7 @@ describe("SCENARIO-642: new review → sendFcm called with trainerId, correct bo
         trainerId,
         athleteId,
         rating: 5,
-        createdAt: admin.firestore.Timestamp.now(),
+        createdAt: Timestamp.now(),
       },
       mock,
     );
