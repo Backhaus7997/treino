@@ -14,9 +14,9 @@
  * REQ-PN-CF-003. Fase 6 Etapa 2.
  */
 
-import * as admin from "firebase-admin";
-import { App, deleteApp } from "firebase-admin/app";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
 import { Messaging, MulticastMessage } from "firebase-admin/messaging";
+import { Timestamp, getFirestore } from "firebase-admin/firestore";
 import { notifyOnAppointmentHandler } from "../notifications/notify-appointment";
 import { dedupeKey } from "../mail/enqueue-mail";
 import { MAIL_QUEUE_COLLECTION } from "../mail/types";
@@ -29,7 +29,7 @@ process.env.GCLOUD_PROJECT = "treino-dev";
 let testApp: App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp(
+  testApp = initializeApp(
     { projectId: "treino-dev" },
     "notify-appointment-test",
   );
@@ -39,7 +39,7 @@ afterAll(async () => {
   await deleteApp(testApp);
 });
 
-const db = () => admin.firestore(testApp);
+const db = () => getFirestore(testApp);
 
 /** Id del turno de todos los fixtures. Es el `scope` del dedupe del mail. */
 const APPT_ID = "appt-test";
@@ -56,7 +56,7 @@ const APPT_ID = "appt-test";
  * así que `formatDateAR(undefined)` devolvía `""` y el mail salía sin fecha ni
  * hora. Nadie lo asserteaba y el test quedaba verde.
  */
-const APPT_STARTS_AT = admin.firestore.Timestamp.fromDate(
+const APPT_STARTS_AT = Timestamp.fromDate(
   new Date("2026-08-26T22:00:00Z"),
 );
 

@@ -6,8 +6,8 @@
  * the target uid, and that another athlete's data is left untouched.
  */
 
-import * as admin from "firebase-admin";
-import { App, deleteApp } from "firebase-admin/app";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
@@ -16,7 +16,7 @@ process.env.GCLOUD_PROJECT = "treino-dev";
 let testApp: App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp(
+  testApp = initializeApp(
     { projectId: "treino-dev" },
     "athlete-data-cascade-test"
   );
@@ -28,7 +28,7 @@ afterAll(async () => {
 
 import { deleteAthleteOwnedData } from "../../cascade/athlete-data";
 
-const db = () => admin.firestore(testApp);
+const db = () => getFirestore(testApp);
 
 const FIELD_COLLECTIONS = [
   "measurements",
@@ -50,12 +50,12 @@ async function seedFor(uid: string): Promise<void> {
     batch.set(db().collection(coll).doc(`${coll}-${uid}-1`), {
       athleteId: uid,
       trainerId: "trainer-x",
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
     });
     batch.set(db().collection(coll).doc(`${coll}-${uid}-2`), {
       athleteId: uid,
       trainerId: "trainer-x",
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
     });
   }
   for (const coll of DOC_ID_COLLECTIONS) {

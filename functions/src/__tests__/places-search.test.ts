@@ -35,8 +35,8 @@
  * (sdd/gym-google-places/spec — gym-places-search).
  */
 
-import * as admin from "firebase-admin";
-import { App, deleteApp } from "firebase-admin/app";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
+import { Timestamp, getFirestore } from "firebase-admin/firestore";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
@@ -46,7 +46,7 @@ process.env.PLACES_API_KEY = "test-dummy-places-key";
 let testApp: App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp(
+  testApp = initializeApp(
     { projectId: "treino-dev" },
     "places-search-test",
   );
@@ -67,7 +67,7 @@ type FftInstance = {
 const fft = (firebaseFunctionsTest as unknown as () => FftInstance)();
 const wrappedResolveGymPlace = fft.wrap(resolveGymPlace);
 
-const db = () => admin.firestore(testApp);
+const db = () => getFirestore(testApp);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -138,7 +138,7 @@ describe("SCENARIO-751: read-through HIT returns cached doc without calling Plac
     brandId: null,
     brandName: null,
     branchName: null,
-    createdAt: admin.firestore.Timestamp.now(),
+    createdAt: Timestamp.now(),
   };
 
   beforeEach(async () => {

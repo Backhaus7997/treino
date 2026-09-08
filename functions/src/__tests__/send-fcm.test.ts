@@ -14,9 +14,9 @@
  * REQ-PN-CF-001. Fase 6 Etapa 2.
  */
 
-import * as admin from "firebase-admin";
-import { App, deleteApp } from "firebase-admin/app";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
 import { BatchResponse, Messaging } from "firebase-admin/messaging";
+import { getFirestore } from "firebase-admin/firestore";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
@@ -25,7 +25,7 @@ process.env.GCLOUD_PROJECT = "treino-dev";
 let testApp: App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp(
+  testApp = initializeApp(
     { projectId: "treino-dev" },
     "send-fcm-test",
   );
@@ -38,7 +38,7 @@ afterAll(async () => {
 // Import the module under test — will fail until implementation exists
 import { sendFcm, SendFcmInput } from "../notifications/send-fcm";
 
-const db = () => admin.firestore(testApp);
+const db = () => getFirestore(testApp);
 
 const COL_USERS = "users";
 
