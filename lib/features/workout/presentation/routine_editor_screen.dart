@@ -1540,6 +1540,9 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       // lista guardada, así que lo resuelve `_freePlanBlocksNewRoutine` al
       // guardar. Acá no aplica.
       FreePlanLimit.routineCount => null,
+      // El historial de gráficos no se toca desde el editor: vive en las
+      // pantallas de Insights.
+      FreePlanLimit.chartHistory => null,
     };
     if (max == null || next <= max) return false;
     if (!ref.read(athleteEntitlementProvider).gatesFreeLimits) return false;

@@ -15,6 +15,8 @@ import '../../workout/presentation/widgets/exercise_progression_section.dart'
 import '../application/muscle_distribution_providers.dart';
 import '../domain/chart_period.dart';
 import 'widgets/muscle_distribution_radar.dart';
+import '../../paywall/application/athlete_entitlement_provider.dart';
+import '../../paywall/presentation/free_plan_limit_sheet.dart';
 
 /// [stats-hub] Dedicated screen for the current-vs-previous 6-axis muscle
 /// distribution radar — promoted out of the InsightsScreen's inline
@@ -48,8 +50,8 @@ class _MuscleDistributionScreenState
       last30dLabel: l10n.progressionPeriodLast30Days,
       thisWeekLabel: l10n.progressionPeriodThisWeek,
       monthLabel: l10n.progressionPeriodMonth,
-last3mLabel: l10n.progressionPeriodLast3Months,
-last1yLabel: l10n.progressionPeriodLast1Year,
+      last3mLabel: l10n.progressionPeriodLast3Months,
+      last1yLabel: l10n.progressionPeriodLast1Year,
     );
 
     final radarLabels = MuscleDistributionLabels(
@@ -106,6 +108,11 @@ last1yLabel: l10n.progressionPeriodLast1Year,
                           selected: _selectedPeriod,
                           labels: periodLabels,
                           onSelect: (p) => setState(() => _selectedPeriod = p),
+                          lockedPeriods: ref.watch(lockedChartPeriodsProvider),
+                          onLockedTap: (_) => showFreePlanLimitSheet(
+                            context,
+                            limit: FreePlanLimit.chartHistory,
+                          ),
                         ),
                       ],
                     ),

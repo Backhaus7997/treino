@@ -1995,10 +1995,7 @@ class AppL10nEs extends AppL10n {
 
   @override
   String routineEditorAccessoryContext(
-    String ejercicio,
-    int set,
-    String campo,
-  ) {
+      String ejercicio, int set, String campo) {
     return '$ejercicio · set $set · $campo';
   }
 
@@ -3135,10 +3132,7 @@ class AppL10nEs extends AppL10n {
 
   @override
   String dashboardAlertBannerSummary(
-    int vencidos,
-    int solicitudes,
-    int inactivos,
-  ) {
+      int vencidos, int solicitudes, int inactivos) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,
@@ -4335,6 +4329,10 @@ class AppL10nEs extends AppL10n {
   @override
   String get paywallFreePlanLimitRoutineCountBody =>
       'Con el plan gratis guardás hasta 3 rutinas propias. Las plantillas del catálogo que seguís no ocupan lugar.';
+
+  @override
+  String get paywallFreePlanLimitChartHistoryBody =>
+      'Con el plan gratis mirás hasta un mes de historial. Los períodos de 3 meses y 1 año son del plan pago.';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -6328,10 +6326,7 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String routineEditorAccessoryContext(
-    String ejercicio,
-    int set,
-    String campo,
-  ) {
+      String ejercicio, int set, String campo) {
     return '$ejercicio · set $set · $campo';
   }
 
@@ -7466,10 +7461,7 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String dashboardAlertBannerSummary(
-    int vencidos,
-    int solicitudes,
-    int inactivos,
-  ) {
+      int vencidos, int solicitudes, int inactivos) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,
@@ -8665,4 +8657,8 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get paywallFreePlanLimitRoutineCountBody =>
       'Con el plan gratis guardás hasta 3 rutinas propias. Las plantillas del catálogo que seguís no ocupan lugar.';
+
+  @override
+  String get paywallFreePlanLimitChartHistoryBody =>
+      'Con el plan gratis mirás hasta un mes de historial. Los períodos de 3 meses y 1 año son del plan pago.';
 }

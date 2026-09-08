@@ -23,6 +23,11 @@ enum FreePlanLimit {
   /// tres, este límite se toca al GUARDAR: la cuenta sólo se conoce contra la
   /// lista existente.
   routineCount,
+
+  /// Tocó un período de gráfico que es del plan pago. Es el único límite que
+  /// no restringe lo que el alumno PUEDE HACER, sino hasta dónde puede MIRAR
+  /// lo que ya hizo.
+  chartHistory,
 }
 
 /// Hoja que explica por qué no se pudo agregar un día (o una semana) más.
@@ -113,6 +118,8 @@ class _FreePlanLimitBody extends StatelessWidget {
                   l10n.paywallFreePlanLimitTemplateBody,
                 FreePlanLimit.routineCount =>
                   l10n.paywallFreePlanLimitRoutineCountBody,
+                FreePlanLimit.chartHistory =>
+                  l10n.paywallFreePlanLimitChartHistoryBody,
               },
               style: GoogleFonts.inter(
                 fontSize: 14,

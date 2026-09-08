@@ -1798,5 +1798,7 @@
   "workoutRoutineFollowError": "",
   "@workoutRoutineFollowError": {},
   "paywallFreePlanLimitRoutineCountBody": "",
-  "@paywallFreePlanLimitRoutineCountBody": {}
+  "@paywallFreePlanLimitRoutineCountBody": {},
+  "paywallFreePlanLimitChartHistoryBody": "",
+  "@paywallFreePlanLimitChartHistoryBody": {}
 }

@@ -9,6 +9,8 @@ import '../../../l10n/app_l10n.dart';
 import '../../workout/presentation/widgets/exercise_progression_chart.dart';
 import '../../workout/presentation/widgets/exercise_progression_section.dart';
 import '../../workout/presentation/widgets/personal_records_list.dart';
+import '../../paywall/application/athlete_entitlement_provider.dart';
+import '../../paywall/presentation/free_plan_limit_sheet.dart';
 
 /// Evolución por ejercicio del PROPIO atleta — el gráfico de progresión (peso
 /// máximo / 1RM / volumen) más sus records personales, por ejercicio.
@@ -61,6 +63,11 @@ class ExerciseProgressionScreen extends ConsumerWidget {
               ExerciseProgressionSection(
                 athleteId: uid,
                 initialExerciseId: initialExerciseId,
+                lockedPeriods: ref.watch(lockedChartPeriodsProvider),
+                onLockedPeriodTap: (_) => showFreePlanLimitSheet(
+                  context,
+                  limit: FreePlanLimit.chartHistory,
+                ),
                 labels: ExerciseProgressionSectionLabels(
                   // null a propósito: el header de la pantalla ya dice
                   // "EVOLUCIÓN POR EJERCICIO". Repetirlo dentro de la sección
@@ -93,8 +100,8 @@ class ExerciseProgressionScreen extends ConsumerWidget {
                     last30dLabel: l10n.progressionPeriodLast30Days,
                     thisWeekLabel: l10n.progressionPeriodThisWeek,
                     monthLabel: l10n.progressionPeriodMonth,
-last3mLabel: l10n.progressionPeriodLast3Months,
-last1yLabel: l10n.progressionPeriodLast1Year,
+                    last3mLabel: l10n.progressionPeriodLast3Months,
+                    last1yLabel: l10n.progressionPeriodLast1Year,
                   ),
                   localeName: l10n.localeName,
                   personalRecordsLabels: PersonalRecordsListLabels(
