@@ -8,6 +8,7 @@ import '../../../../../core/widgets/treino_icon.dart';
 import '../../../../coach/domain/subscription_tier.dart';
 import '../../../../profile/application/user_providers.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
+import 'acreditacion_al_volver.dart';
 import 'plan_checkout.dart';
 
 /// Umbral entre el layout ancho (Coach Hub web) y el apilado del teléfono.
@@ -219,6 +220,12 @@ class _WideBody extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(24, 32, 24, 48),
       child: Column(
         children: [
+          // Sólo donde se puede comprar. Preguntar por el estado de un pago en
+          // una superficie que no vende no tiene sentido, y montarlo igual lo
+          // pondria en el arbol de los tests que fijan que la rama movil no
+          // ofrece nada. El widget decide solo si tiene algo que decir.
+          if (checkout is PlanCheckoutAvailable)
+            const AcreditacionAlVolverBanner(),
           Text(
             'PLANES Y PRECIOS', // i18n: Fase W3
             style: TextStyle(
@@ -397,6 +404,10 @@ class _NarrowBody extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
       child: Column(
         children: [
+          // Angosto NO es movil: una ventana de navegador chica llega acá y SI
+          // puede comprar. La condicion es la superficie, nunca el ancho.
+          if (checkout is PlanCheckoutAvailable)
+            const AcreditacionAlVolverBanner(),
           Text(
             // Dos líneas a propósito (artboard D). En una sola, "PLANES Y
             // PRECIOS" en Barlow Condensed 30 cruza la pantalla como una tira
