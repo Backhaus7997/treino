@@ -15,19 +15,33 @@ import 'package:treino/features/profile/application/user_providers.dart';
 ///              respetan el toggle: `enqueueMail` recibe el `prefKey` y
 ///              `sendQueuedMail` descarta el envío si el canal está apagado.
 ///              El resto de las filas no tienen envío por email.
-/// - `whatsapp` — sin implementar. Queda como placeholder de roadmap y arranca
-///              apagado en todas las filas, así no promete nada.
+/// WHATSAPP YA NO ES UNA COLUMNA. Existió desde W3.2 como placeholder de
+/// roadmap: cinco casillas tildeables, indistinguibles de las dos que sí
+/// entregan, detrás de las cuales no había ningún canal. Una casilla que se
+/// tilda y no hace nada es un botón roto, y el pie de la pantalla admitiendo
+/// "se activa próximamente" no arregla lo que el usuario toca.
+///
+/// ⚠️ QUEDA DATO MUERTO EN FIRESTORE, y quien implemente el canal tiene que
+/// saberlo. Los documentos escritos entre W3.2 y hoy pueden llevar
+/// `notificationPrefs.<fila>.whatsapp: true`. Ese valor NO se limpia solo:
+/// `UserRepository.update` escribe con `SetOptions(merge: true)`, que mergea
+/// en profundidad, así que al sacar el campo del modelo nada vuelve a pisarlo.
+///
+/// Ese `true` NO ES UN OPT-IN. Nadie eligió recibir WhatsApp: eligieron tildar
+/// una casilla que no entregaba nada. Tratarlo como consentimiento el día que
+/// el canal exista sería mandarle mensajes a gente que nunca los pidió — y por
+/// WhatsApp, que es el canal más invasivo de los tres. Al reimplementar:
+/// arrancar de cero, no leer lo persistido.
 ///
 /// Las preferencias se persisten en `users/{uid}.notificationPrefs`, un campo
 /// libremente escribible por el dueño del doc (`firestore.rules`, regla update
 /// de `users`: solo pinea uid/role/email/createdAt/subscription/weightedLoad).
-enum NotifChannel { email, push, whatsapp }
+enum NotifChannel { email, push }
 
 extension NotifChannelX on NotifChannel {
   String get label => switch (this) {
         NotifChannel.email => 'EMAIL', // i18n: Fase W3
         NotifChannel.push => 'PUSH', // i18n: Fase W3
-        NotifChannel.whatsapp => 'WHATSAPP', // i18n: Fase W3
       };
 }
 
@@ -92,19 +106,10 @@ const kPushBackedTypes = <String>{
   'mensaje_nuevo',
 };
 
-/// Canales que todavía no entregan nada.
-///
-/// Sus casillas van deshabilitadas en la UI (ver `notificaciones_tab.dart`) y
-/// su valor se fuerza a `false` al LEER — ver [NotifPrefs.fromFirestore].
-///
-/// Cuando WhatsApp entregue de verdad, sacarlo de acá es todo el cambio:
-/// vuelven a ser casillas normales y el valor persistido vuelve a mandar.
-const kUnimplementedChannels = <NotifChannel>{NotifChannel.whatsapp};
-
 /// Preferencias de notificación: matriz `tipo -> canal -> bool`.
 ///
 /// Inmutable; `toggle` devuelve una copia. `fromFirestore` completa los huecos
-/// con los defaults para que la UI siempre tenga las 5 filas × 3 canales.
+/// con los defaults para que la UI siempre tenga las 5 filas × 2 canales.
 class NotifPrefs {
   const NotifPrefs(this._matrix);
 
@@ -145,21 +150,22 @@ class NotifPrefs {
   /// Va en la LECTURA y no en [toFirestore] a propósito: desde acá quedan
   /// consistentes de una sola vez el render, [toggle] y el guardado, y el
   /// primer save del PF limpia el valor viejo en vez de arrastrarlo.
+  /// Una clave `whatsapp` guardada se ignora sola: el `for` recorre
+  /// [NotifChannel.values], que ya no la incluye. No hace falta filtrarla — y
+  /// tampoco se puede limpiar desde acá, ver el ⚠️ del docstring de
+  /// [NotifChannel].
   factory NotifPrefs.fromFirestore(Map<String, dynamic>? raw) {
     return NotifPrefs({
       for (final t in kNotifTypes)
         t.key: {
           for (final c in NotifChannel.values)
-            c: kUnimplementedChannels.contains(c)
-                ? false
-                : ((raw?[t.key] as Map?)?[c.name] as bool?) ??
-                    _defaultFor(t.key, c),
+            c: ((raw?[t.key] as Map?)?[c.name] as bool?) ??
+                _defaultFor(t.key, c),
         },
     });
   }
 
-  /// Defaults: push siempre on; email on SOLO donde hay envío real; whatsapp
-  /// off en todo (sin canal implementado).
+  /// Defaults: push siempre on; email on SOLO donde hay envío real.
   ///
   /// El default anterior dejaba `mensaje_nuevo` con email en ON. Eso era una
   /// bomba de tiempo: el día que alguien conectara la matriz al backend, cada
@@ -172,8 +178,6 @@ class NotifPrefs {
         return true;
       case NotifChannel.email:
         return kEmailBackedTypes.contains(typeKey);
-      case NotifChannel.whatsapp:
-        return false;
     }
   }
 }
