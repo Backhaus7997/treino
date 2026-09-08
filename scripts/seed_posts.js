@@ -16,11 +16,12 @@
  */
 
 const { inicializarAdmin } = require('./lib/admin');
+const { Timestamp, getFirestore } = require('firebase-admin/firestore');
 
 // Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla cerrado
 // con la migración; contra el emulador no pide nada. Ver scripts/lib/admin.js.
-const { admin } = inicializarAdmin();
-const db = admin.firestore();
+const { app } = inicializarAdmin();
+const db = getFirestore(app);
 
 // ---------------------------------------------------------------------------
 // Seed data — 10 posts, mix of privacy levels
@@ -67,7 +68,7 @@ const posts = [
     text: 'Acabo de terminar mi primer entrenamiento del año. ¡Vamos!',
     routineTag: null,
     privacy: 'public',
-    createdAt: admin.firestore.Timestamp.fromDate(new Date('2026-01-15T08:00:00Z')),
+    createdAt: Timestamp.fromDate(new Date('2026-01-15T08:00:00Z')),
   },
   {
     id: 'seed_post_002',
@@ -80,7 +81,7 @@ const posts = [
       routineName: 'Lower Strength',
     },
     privacy: 'public',
-    createdAt: admin.firestore.Timestamp.fromDate(new Date('2026-01-15T09:00:00Z')),
+    createdAt: Timestamp.fromDate(new Date('2026-01-15T09:00:00Z')),
   },
   {
     id: 'seed_post_003',
@@ -90,7 +91,7 @@ const posts = [
     text: 'Rutina de cardio completada. 5 km en 22 minutos.',
     routineTag: null,
     privacy: 'public',
-    createdAt: admin.firestore.Timestamp.fromDate(new Date('2026-01-14T07:30:00Z')),
+    createdAt: Timestamp.fromDate(new Date('2026-01-14T07:30:00Z')),
   },
   {
     id: 'seed_post_004',
@@ -103,7 +104,7 @@ const posts = [
       routineName: 'Upper Strength',
     },
     privacy: 'public',
-    createdAt: admin.firestore.Timestamp.fromDate(new Date('2026-01-13T10:00:00Z')),
+    createdAt: Timestamp.fromDate(new Date('2026-01-13T10:00:00Z')),
   },
 
   // --- friends (3 posts) --------------------------------------------------
@@ -115,7 +116,7 @@ const posts = [
     text: 'Entrené con resaca, no me pregunten cómo salió.',
     routineTag: null,
     privacy: 'friends',
-    createdAt: admin.firestore.Timestamp.fromDate(new Date('2026-01-12T08:15:00Z')),
+    createdAt: Timestamp.fromDate(new Date('2026-01-12T08:15:00Z')),
   },
   {
     id: 'seed_post_006',
@@ -125,7 +126,7 @@ const posts = [
     text: 'Lesión leve en el hombro. Tomando la semana tranquilo.',
     routineTag: null,
     privacy: 'friends',
-    createdAt: admin.firestore.Timestamp.fromDate(new Date('2026-01-11T16:00:00Z')),
+    createdAt: Timestamp.fromDate(new Date('2026-01-11T16:00:00Z')),
   },
   {
     id: 'seed_post_007',
@@ -138,7 +139,7 @@ const posts = [
       routineName: 'Full Body Hypertrophy',
     },
     privacy: 'friends',
-    createdAt: admin.firestore.Timestamp.fromDate(new Date('2026-01-10T11:00:00Z')),
+    createdAt: Timestamp.fromDate(new Date('2026-01-10T11:00:00Z')),
   },
 
   // --- gym (3 posts) -------------------------------------------------------
@@ -150,7 +151,7 @@ const posts = [
     text: 'Los viernes a las 7am somos cuatro gatos. Mejor horario.',
     routineTag: null,
     privacy: 'gym',
-    createdAt: admin.firestore.Timestamp.fromDate(new Date('2026-01-10T07:10:00Z')),
+    createdAt: Timestamp.fromDate(new Date('2026-01-10T07:10:00Z')),
   },
   {
     id: 'seed_post_009',
@@ -160,7 +161,7 @@ const posts = [
     text: 'Clase de spinning con el profe Martín. Brutal como siempre.',
     routineTag: null,
     privacy: 'gym',
-    createdAt: admin.firestore.Timestamp.fromDate(new Date('2026-01-09T18:00:00Z')),
+    createdAt: Timestamp.fromDate(new Date('2026-01-09T18:00:00Z')),
   },
   {
     id: 'seed_post_010',
@@ -170,7 +171,7 @@ const posts = [
     text: '¿Alguien más probó el nuevo rack de mancuernas? Una joya.',
     routineTag: null,
     privacy: 'gym',
-    createdAt: admin.firestore.Timestamp.fromDate(new Date('2026-01-08T09:30:00Z')),
+    createdAt: Timestamp.fromDate(new Date('2026-01-08T09:30:00Z')),
   },
 ];
 
