@@ -109,6 +109,25 @@ Future<void> _elegirEnPanel(WidgetTester tester, String nombre) async {
   await tester.pumpAndSettle();
 }
 
+/// Suma una semana Y le copia la anterior, dejando las dos cargadas.
+///
+/// Desde que la semana nueva nace PELADA, un `tap('+')` pelado ya no deja un
+/// plan de dos semanas con contenido en ambas: deja la segunda vacía. Los
+/// tests que necesitan las dos llenas —prescripción por semana, chips de
+/// presencia, el dot de validación— pasan por acá, que es el camino que el PF
+/// hace ahora: sumar y copiar, dos actos explícitos.
+///
+/// Sumar auto-navega a la semana nueva, así que el destino de la copia ya es
+/// la correcta y la fuente es la única otra (no hay selector con dos semanas).
+Future<void> _agregarSemanaCopiandoLaAnterior(WidgetTester tester) async {
+  await tester.tap(find.text('+'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const Key('duplicate_week_button')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const Key('duplicate_week_confirm_button')));
+  await tester.pumpAndSettle();
+}
+
 Future<void> _pumpEditor(
   WidgetTester tester, {
   RoutineRepository? repo,
@@ -1280,8 +1299,9 @@ void main() {
     ) async {
       await _pumpEditor(tester);
       await addPressDeBanca(tester);
-      await tester.tap(find.text('+')); // 2 semanas
-      await tester.pumpAndSettle();
+      // Sumar + copiar: la semana nueva nace pelada, así que sin la copia la
+      // Semana 2 no tendría el ejercicio y no habría tacho que tocar.
+      await _agregarSemanaCopiandoLaAnterior(tester);
 
       await tester.tap(find.byTooltip('Quitar ejercicio'));
       await tester.pumpAndSettle();
@@ -1296,8 +1316,7 @@ void main() {
     ) async {
       await _pumpEditor(tester);
       await addPressDeBanca(tester);
-      await tester.tap(find.text('+'));
-      await tester.pumpAndSettle();
+      await _agregarSemanaCopiandoLaAnterior(tester);
 
       await tester.tap(find.byTooltip('Quitar ejercicio'));
       await tester.pumpAndSettle();
@@ -1316,10 +1335,14 @@ void main() {
         ).thenAnswer((i) async => i.positionalArguments.first as Routine);
         await _pumpEditor(tester, repo: repo);
 
-        // Llena reps en la semana 1 ANTES de sumar semanas, así la semana 2
-        // se siembra con esa prescripción válida (_normalizeSlotWeeks).
+        // Llena reps en la semana 1 ANTES de sumar, y después COPIA: la
+        // semana nueva nace pelada, la copia le lleva ejercicio y prescripción.
         await _fillMinimalValidForm(tester);
-        await tester.tap(find.text('+')); // 2 semanas
+        await _agregarSemanaCopiandoLaAnterior(tester);
+
+        // Copiar deja parado en la semana 2; se vuelve a la 1, que es de la
+        // que este test saca el ejercicio.
+        await tester.tap(find.byKey(const Key('week_tab_0')));
         await tester.pumpAndSettle();
 
         // Estamos en la semana 1 (índice 0): "Solo esta semana" la saca.
@@ -1354,7 +1377,8 @@ void main() {
       (tester) async {
         await _pumpEditor(tester);
         await _fillMinimalValidForm(tester);
-        await tester.tap(find.text('+')); // 2 semanas
+        await _agregarSemanaCopiandoLaAnterior(tester);
+        await tester.tap(find.byKey(const Key('week_tab_0')));
         await tester.pumpAndSettle();
 
         // Saca la semana 2 → el ejercicio queda presente SOLO en la semana 1.
@@ -1422,14 +1446,18 @@ void main() {
       await _pumpEditor(tester);
       await addPressDeBanca(tester);
 
-      // 2 semanas, ambas en blanco (reps vacías) → dot en las dos pestañas.
-      await tester.tap(find.text('+'));
-      await tester.pumpAndSettle();
+      // 2 semanas con el MISMO ejercicio, ambas en blanco (reps vacías) → dot
+      // en las dos pestañas. Se copia porque la semana nueva nace pelada: sin
+      // la copia, el dot de la Semana 2 sería por estar vacía y este test
+      // mide otra cosa, que le falten las reps.
+      await _agregarSemanaCopiandoLaAnterior(tester);
       expect(find.byKey(const Key('week_tab_warning_0')), findsOneWidget);
       expect(find.byKey(const Key('week_tab_warning_1')), findsOneWidget);
 
       // Cargar la semana 1 apaga su dot; la semana 2 sigue marcada y el motivo
       // del ejercicio nombra la semana que falta.
+      await tester.tap(find.byKey(const Key('week_tab_0')));
+      await tester.pumpAndSettle();
       await tester.enterText(
         find.ancestor(
           of: find.text('reps'),
@@ -1445,6 +1473,131 @@ void main() {
         find.text('Falta cargar las reps de una serie (Semana 2).'),
         findsOneWidget,
       );
+    });
+
+    testWidgets('una semana SIN ejercicios también marca el dot',
+        (tester) async {
+      // Causa nueva del dot. Antes no podía pasar —la semana nueva heredaba el
+      // plan entero—, pero desde que nace pelada es el estado inicial de toda
+      // semana agregada, y una semana en la que el alumno no tiene nada que
+      // hacer no puede pasar desapercibida.
+      await _pumpEditor(tester);
+      await addPressDeBanca(tester);
+      await tester.enterText(
+        find.ancestor(
+          of: find.text('reps'),
+          matching: find.byType(TextFormField),
+        ),
+        '10',
+      );
+      await tester.pumpAndSettle();
+      // Semana 1 completa: sin dot.
+      expect(find.byKey(const Key('week_tab_warning_0')), findsNothing);
+
+      await tester.tap(find.text('+'));
+      await tester.pumpAndSettle();
+
+      // La 1 sigue limpia; la 2 nace pelada y avisa.
+      expect(find.byKey(const Key('week_tab_warning_0')), findsNothing);
+      expect(find.byKey(const Key('week_tab_warning_1')), findsOneWidget);
+    });
+  });
+
+  group('RoutineEditorWebScreen — la semana nueva nace PELADA', () {
+    // El PF: «cuando agrego una semana nueva, automáticamente viene copiada de
+    // la anterior y siempre se mueven en conjunto — si agrego un ejercicio en
+    // una, se agrega solo en la otra».
+    //
+    // Las dos mitades tenían la misma causa: una máscara de presencia VACÍA
+    // significa "en todas las semanas", y tanto los slots viejos al crecer el
+    // plan como los slots recién dados de alta la tenían vacía. Ahora la
+    // semana nueva nace sin nadie, y un alta entra sólo donde se la agrega.
+
+    testWidgets('sumar una semana no arrastra los ejercicios', (tester) async {
+      await _pumpEditor(tester);
+      await _fillMinimalValidForm(tester);
+      expect(enElEditor(find.text('Press de Banca')), findsOneWidget);
+
+      await tester.tap(find.text('+'));
+      await tester.pumpAndSettle();
+
+      // Sumar salta a la semana nueva, que está vacía.
+      expect(find.text('2 semanas'), findsOneWidget);
+      expect(enElEditor(find.text('Press de Banca')), findsNothing);
+
+      // Y la semana 1 quedó intacta: pelada no es "se borró".
+      await tester.tap(find.byKey(const Key('week_tab_0')));
+      await tester.pumpAndSettle();
+      expect(enElEditor(find.text('Press de Banca')), findsOneWidget);
+    });
+
+    testWidgets('un alta entra SÓLO en la semana que se está mirando',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(
+        () => repo.createAssigned(any()),
+      ).thenAnswer((i) async => i.positionalArguments.first as Routine);
+      await _pumpEditor(tester, repo: repo);
+
+      await _fillMinimalValidForm(tester); // Press de Banca en la Semana 1
+      await tester.tap(find.text('+')); // salta a la Semana 2, pelada
+      await tester.pumpAndSettle();
+
+      // Agrega OTRO ejercicio, parado en la Semana 2.
+      await _elegirEnPanel(tester, 'Peso Muerto');
+      await tester.tap(find.text('Agregar (1)'));
+      await tester.pumpAndSettle();
+      expect(enElEditor(find.text('Peso Muerto')), findsOneWidget);
+
+      // La Semana 1 NO se enteró. Ésta es la queja textual del PF.
+      await tester.tap(find.byKey(const Key('week_tab_0')));
+      await tester.pumpAndSettle();
+      expect(enElEditor(find.text('Peso Muerto')), findsNothing);
+      expect(enElEditor(find.text('Press de Banca')), findsOneWidget);
+    });
+
+    testWidgets('con más de dos semanas, copiar PREGUNTA de cuál',
+        (tester) async {
+      await _pumpEditor(tester);
+      await _fillMinimalValidForm(tester);
+      await tester.tap(find.text('+'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('+')); // 3 semanas, parado en la 3
+      await tester.pumpAndSettle();
+      expect(find.text('3 semanas'), findsOneWidget);
+
+      // Con tres semanas el botón ya no puede prometer la fuente.
+      expect(find.text('Copiar otra semana acá'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('duplicate_week_button')));
+      await tester.pumpAndSettle();
+
+      // Selector con las OTRAS dos, y sin la actual: copiarse a sí misma no
+      // es una opción.
+      expect(find.text('¿Copiar a la Semana 3 desde cuál?'), findsOneWidget);
+      expect(find.byKey(const Key('copy_source_week_0')), findsOneWidget);
+      expect(find.byKey(const Key('copy_source_week_1')), findsOneWidget);
+      expect(find.byKey(const Key('copy_source_week_2')), findsNothing);
+
+      // Elegir la Semana 1 la trae.
+      await tester.tap(find.byKey(const Key('copy_source_week_0')));
+      await tester.pumpAndSettle();
+      expect(enElEditor(find.text('Press de Banca')), findsOneWidget);
+    });
+
+    testWidgets('con DOS semanas no pregunta: la fuente es forzosa',
+        (tester) async {
+      // El selector es para elegir, y con una sola opción no hay elección.
+      await _pumpEditor(tester);
+      await _fillMinimalValidForm(tester);
+      await tester.tap(find.text('+'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('duplicate_week_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('desde cuál'), findsNothing);
+      expect(find.byKey(const Key('duplicate_week_confirm_button')),
+          findsOneWidget);
     });
   });
 
@@ -2444,13 +2597,12 @@ void main() {
       ).thenAnswer((i) async => i.positionalArguments.first as Routine);
       await _pumpEditor(tester, repo: repo);
 
-      // Bump 1 → 2 weeks (stepper is near the top, before adding exercises).
-      await tester.tap(find.text('+'));
-      await tester.pumpAndSettle();
-      expect(find.text('2 semanas'), findsOneWidget);
-
-      // Fills the form and sets week 1's (Sem 1) reps to 10.
+      // Se carga la semana 1 y RECIÉN AHÍ se suma la 2, copiándola: desde que
+      // la semana nueva nace pelada, sumar primero dejaría la 2 sin ejercicio
+      // y sin campo de reps que editar.
       await _fillMinimalValidForm(tester);
+      await _agregarSemanaCopiandoLaAnterior(tester);
+      expect(find.text('2 semanas'), findsOneWidget);
 
       // Switch to week 2 and give it a DIFFERENT rep count — only that
       // week's (empty) field renders while "Sem 2" is selected, so the
@@ -2530,16 +2682,15 @@ void main() {
         ).thenAnswer((i) async => i.positionalArguments.first as Routine);
         await _pumpEditor(tester, repo: repo);
 
-        // Fill week 1 FIRST, then bump to 2 weeks — the new week is seeded with
-        // a deep copy of week 1's (now-filled) sets (_normalizeSlotWeeks, Fase
-        // 4b), so both weeks start with a valid prescription; only the
-        // presence mask changes below (bumping first would leave week 2 blank
-        // and block submit, mirroring the Fase 4a stepper test).
+        // Se carga la semana 1 y se COPIA a la 2, así el ejercicio arranca
+        // presente en ambas y el chip tiene algo real que apagar. (Sumar sin
+        // copiar dejaría la máscara en {0} de entrada y el test probaría el
+        // default en vez del chip.)
         await _fillMinimalValidForm(tester);
-
-        await tester.tap(find.text('+'));
-        await tester.pumpAndSettle();
+        await _agregarSemanaCopiandoLaAnterior(tester);
         expect(find.text('2 semanas'), findsOneWidget);
+        await tester.tap(find.byKey(const Key('week_tab_0')));
+        await tester.pumpAndSettle();
 
         // Exclude week 2 (0-based index 1) via its presence chip.
         await tester.ensureVisible(find.byKey(const Key('presence_chip_1')));
@@ -2559,10 +2710,14 @@ void main() {
     testWidgets(
       'a blank week does NOT block submit when the exercise is absent from it',
       (tester) async {
-        // Regression: the trainer bumps the week count FIRST and then adds the
-        // exercise, so weeks 2..N start blank. Excluding week 2 via its presence
-        // chip must let the plan save — those rows are never executed, so
-        // demanding reps for them blocked a perfectly valid routine.
+        // El PF carga la semana 1 y suma una semana que —desde este cambio—
+        // nace PELADA y se queda así. Guardar tiene que funcionar igual: los
+        // sets en blanco de una semana donde el ejercicio no está nunca se
+        // ejecutan, y exigir reps para ellos bloqueaba un plan válido.
+        //
+        // También fija la decisión de que una semana vacía AVISA (dot en la
+        // pestaña) pero NO bloquea: ya hay planes así en producción, y
+        // bloquear le sacaría el guardar a quien abrió uno viejo.
         final repo = _MockRoutineRepository();
         when(
           () => repo.createAssigned(any()),
@@ -2570,18 +2725,16 @@ void main() {
         await _pumpEditor(tester, repo: repo);
 
         // Bump FIRST → the exercise added below gets 2 BLANK weeks.
+        // Carga la semana 1 y suma la 2, que queda pelada.
+        await _fillMinimalValidForm(tester);
         await tester.tap(find.text('+'));
         await tester.pumpAndSettle();
         expect(find.text('2 semanas'), findsOneWidget);
 
-        // Adds the exercise and fills ONLY week 1's reps — week 2 stays blank.
-        await _fillMinimalValidForm(tester);
+        // La Semana 2 no tiene ejercicios y AVISA con el dot...
+        expect(find.byKey(const Key('week_tab_warning_1')), findsOneWidget);
 
-        // Exclude week 2 (0-based 1): its blank sets must not be validated.
-        await tester.ensureVisible(find.byKey(const Key('presence_chip_1')));
-        await tester.tap(find.byKey(const Key('presence_chip_1')));
-        await tester.pumpAndSettle();
-
+        // ...pero se guarda igual.
         await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
         await tester.pumpAndSettle();
 
@@ -2602,9 +2755,12 @@ void main() {
         await _pumpEditor(tester, repo: repo);
 
         await _fillMinimalValidForm(tester);
-        await tester.tap(find.text('+'));
-        await tester.pumpAndSettle();
+        // Copiar deja el ejercicio en las DOS semanas, o sea máscara vacía:
+        // el estado desde el que apagar y volver a prender tiene sentido.
+        await _agregarSemanaCopiandoLaAnterior(tester);
         expect(find.text('2 semanas'), findsOneWidget);
+        await tester.tap(find.byKey(const Key('week_tab_0')));
+        await tester.pumpAndSettle();
 
         await tester.ensureVisible(find.byKey(const Key('presence_chip_1')));
         await tester.tap(find.byKey(const Key('presence_chip_1'))); // exclude
@@ -2746,8 +2902,10 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Agregar (1)'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('+')); // 2 semanas
-      await tester.pumpAndSettle();
+      // Sumar + copiar: la semana nueva nace pelada, y este test necesita el
+      // ejercicio presente en las dos para que «Solo esta semana» tenga la
+      // otra rama (si estuviera en una sola, el borrado sería estructural).
+      await _agregarSemanaCopiandoLaAnterior(tester);
 
       await tester.tap(find.byTooltip('Quitar ejercicio'));
       await tester.pumpAndSettle();
@@ -2789,18 +2947,18 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Agregar (1)'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('+')); // 2 semanas
-      await tester.pumpAndSettle();
+      await _agregarSemanaCopiandoLaAnterior(tester);
       // Los chips viven DENTRO de la card, que nace colapsada.
       await expandirEjercicios(tester);
 
-      // Apaga la semana 1 (índice 0), que es la que se está mirando.
-      await tester.ensureVisible(find.byKey(const Key('presence_chip_0')));
-      await tester.tap(find.byKey(const Key('presence_chip_0')));
+      // Copiar deja parado en la Semana 2: apaga el chip de ESA, la que se
+      // está mirando.
+      await tester.ensureVisible(find.byKey(const Key('presence_chip_1')));
+      await tester.tap(find.byKey(const Key('presence_chip_1')));
       await tester.pumpAndSettle();
 
       expect(enElEditor(find.text('Press de Banca')), findsNothing);
-      expect(find.textContaining('sale de la Semana 1'), findsOneWidget);
+      expect(find.textContaining('sale de la Semana 2'), findsOneWidget);
       expect(find.text('Deshacer'), findsOneWidget);
     });
 
@@ -2814,13 +2972,12 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Agregar (1)'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('+')); // 2 semanas
-      await tester.pumpAndSettle();
+      await _agregarSemanaCopiandoLaAnterior(tester);
       await expandirEjercicios(tester);
 
-      // Mirando la semana 1, apaga la 2.
-      await tester.ensureVisible(find.byKey(const Key('presence_chip_1')));
-      await tester.tap(find.byKey(const Key('presence_chip_1')));
+      // Parado en la Semana 2, apaga la 1: es OTRA semana, nada se mueve acá.
+      await tester.ensureVisible(find.byKey(const Key('presence_chip_0')));
+      await tester.tap(find.byKey(const Key('presence_chip_0')));
       await tester.pumpAndSettle();
 
       expect(enElEditor(find.text('Press de Banca')), findsOneWidget);
@@ -3181,7 +3338,7 @@ void main() {
       ).captured.single as Routine;
     }
 
-    testWidgets('the button is hidden on week 1 and labelled with the source', (
+    testWidgets('está en TODA semana y nombra la fuente cuando hay una sola', (
       tester,
     ) async {
       await _pumpEditor(
@@ -3196,8 +3353,16 @@ void main() {
         routineId: 'r10',
       );
 
-      // Week 1 is selected by default — nothing to copy from.
-      expect(find.byKey(const Key('duplicate_week_button')), findsNothing);
+      // Antes el botón se escondía en la Semana 1: la fuente era siempre «la
+      // anterior», y la primera no tiene. Con la fuente elegible cualquier
+      // semana puede RECIBIR una copia, así que la 1 puede tomar de la 2.
+      //
+      // Y no es un detalle de simetría: desde que la semana nueva nace pelada,
+      // copiar dejó de ser un rescate ocasional y es LA forma de replicar un
+      // bloque.
+      expect(find.byKey(const Key('duplicate_week_button')), findsOneWidget);
+      // Con dos semanas la fuente es forzosa, así que el botón la nombra.
+      expect(find.text('Copiar Sem 2 acá'), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('week_tab_1')));
       await tester.pumpAndSettle();
