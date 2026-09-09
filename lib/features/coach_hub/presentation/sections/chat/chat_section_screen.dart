@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../app/theme/app_palette.dart';
+import '../../../../chat/application/chat_providers.dart'
+    show chatsForCurrentUserProvider;
+import '../../../../workout/application/session_providers.dart'
+    show currentUidProvider;
 import '../../../../../core/widgets/motion/treino_state_switcher.dart';
 import 'widgets/chat_detail_pane.dart';
 import 'widgets/chat_empty_pane.dart';
@@ -39,6 +43,16 @@ class ChatSectionScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final selectedChatId = ref.watch(selectedChatIdProvider);
+    // El uid del interlocutor, resuelto ACÁ y pasado al pane.
+    //
+    // `ChatDetailPane` acepta `peerUid` para arrancar en caliente y no
+    // mostrar «Usuario eliminado» mientras resuelve el nombre. El parámetro
+    // existía, estaba cableado adentro y lo cubrían siete tests — y ninguna
+    // pantalla se lo pasaba: su único consumidor era un modal que se sacó.
+    //
+    // Sale de los mismos datos que ya usa la lista de la izquierda
+    // (`chatsForCurrentUserProvider`), así que no cuesta una lectura nueva.
+    final peerUid = _peerUidDe(ref, selectedChatId);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -61,10 +75,33 @@ class ChatSectionScreen extends ConsumerWidget {
             childKey: ValueKey(selectedChatId == null),
             child: selectedChatId == null
                 ? const ChatEmptyPane()
-                : ChatDetailPane(chatId: selectedChatId),
+                : ChatDetailPane(
+                    chatId: selectedChatId,
+                    peerUid: peerUid,
+                  ),
           ),
         ),
       ],
     );
+  }
+
+  /// El otro miembro de [chatId], o `null` si todavía no hay chats cargados.
+  ///
+  /// Misma regla que la lista (`_otherUidOf`): el primer miembro que no soy
+  /// yo, con fallback al primero para no romper el render si un chat quedara
+  /// con un solo miembro.
+  String? _peerUidDe(WidgetRef ref, String? chatId) {
+    if (chatId == null) return null;
+    final selfUid = ref.watch(currentUidProvider);
+    if (selfUid == null) return null;
+    final chats = ref.watch(chatsForCurrentUserProvider).valueOrNull;
+    if (chats == null) return null;
+    for (final c in chats) {
+      if (c.chatId != chatId) continue;
+      final otros = c.members.where((m) => m != selfUid);
+      if (otros.isNotEmpty) return otros.first;
+      return c.members.isNotEmpty ? c.members.first : null;
+    }
+    return null;
   }
 }
