@@ -1169,102 +1169,30 @@ void main() {
     });
   });
 
-  group('RoutineEditorWebScreen — reemplazar ejercicio (in-place)', () {
-    // Picks [name] inside the open picker. [query] is a SUBSTRING of the
-    // name typed into the search field so the row is on-screen regardless of
-    // seed size — it must differ from the full name, otherwise find.text([name])
-    // would also match the text the search field now holds.
+  group('RoutineEditorWebScreen — el lápiz de «Cambiar ejercicio» NO está', () {
+    // Lo sacó el PF: «este modal que se abre cuando toco editar ejercicio,
+    // vamos a sacar el lápiz de ahí, no me parece 100% útil».
     //
-    // El scope es el HOSPEDAJE, y desde el #860 hay dos: panel lateral en
-    // desktop (>= 1280, que es el ancho de estos tests) y `Dialog` abajo de
-    // eso. Buscar sólo dentro de `Dialog` dejaba de encontrar cualquier cosa
-    // con el panel abierto. Scopearlo sigue siendo necesario: sin eso el tap
-    // le pega a la card del ejercicio que está DETRÁS.
-    Future<void> pickInDialog(
-      WidgetTester tester,
-      String name,
-      String query,
-    ) async {
-      // El `Dialog` primero: cuando hay uno abierto (el flujo "Cambiar
-      // ejercicio" lo usa) está ENCIMA del panel con un AbsorbPointer, así
-      // que tapear la fila del panel de abajo le pega al aire. Sin panel
-      // —abajo de 1280— el modal es igual el único hospedaje.
-      final modal = find.byType(Dialog);
-      final host = modal.evaluate().isNotEmpty
-          ? modal
-          : find.byType(ExercisePickerPanel);
-      await tester.enterText(
-        find.descendant(of: host, matching: find.byType(TextField)),
-        query,
-      );
-      await tester.pumpAndSettle();
-      final fila = find.descendant(of: host, matching: find.text(name));
-      // El panel es alto fijo y la fila puede caer abajo del pliegue. El
-      // hit-test sólo AVISA cuando el tap le pega al aire: sin esto no se
-      // seleccionaba nada y el test moría tres pasos después buscando
-      // "Agregar (1)", que era el síntoma y no la causa.
-      await tester.ensureVisible(fila);
-      await tester.pumpAndSettle();
-      await tester.tap(fila);
-      await tester.pumpAndSettle();
-      await tester.tap(find.descendant(of: host, matching: find.text('Agregar (1)')));
-      await tester.pumpAndSettle();
-      // El panel NO se cierra: es el punto del #860 y ya no tiene con qué.
-      // Lo que sigue mira el EDITOR, así que scopea con [enElEditor].
-      // La card nace PLEGADA desde que la web usa `ExerciseCard`: los campos
-      // de sets no están en el árbol hasta abrirla.
-      await expandirEjercicios(tester);
-    }
+    // Y tenía un motivo visible: en desktop el picker YA vive en el panel
+    // lateral, siempre abierto (#860). El lápiz abría el MISMO picker como
+    // modal ENCIMA del panel — dos «Elegir ejercicios» en pantalla a la vez,
+    // que es lo que muestra su captura.
+    //
+    // Lo que se va con él: cambiar un ejercicio conservando sus series,
+    // descanso, notas y enlace de superserie. Sin el lápiz eso es borrar y
+    // volver a agregar, y la configuración se pierde. Queda anotado acá para
+    // que la próxima persona sepa que fue una decisión y no un descuido.
 
-    testWidgets('cambia el ejercicio conservando las series ya cargadas', (
-      tester,
-    ) async {
+    testWidgets('la card no ofrece cambiar el ejercicio', (tester) async {
       await _pumpEditor(tester);
-
-      // Agrega "Press de Banca" y le carga reps 10.
-      // El panel lateral está SIEMPRE abierto en desktop (#860): el botón
-      // "Agregar ejercicio" del día no existe ahí, lo reemplaza el panel.
-      await pickInDialog(tester, 'Press de Banca', 'Banca');
-      await tester.enterText(
-        find.ancestor(
-          of: find.text('reps'),
-          matching: find.byType(TextFormField),
-        ),
-        '10',
-      );
+      await _elegirEnPanel(tester, 'Press de Banca');
+      await tester.tap(find.text('Agregar (1)'));
       await tester.pumpAndSettle();
 
       expect(enElEditor(find.text('Press de Banca')), findsOneWidget);
-      expect(find.text('10'), findsOneWidget);
-
-      // "Cambiar ejercicio" → elegir "Sentadilla con Barra".
-      await tester.tap(find.byTooltip('Cambiar ejercicio'));
-      await tester.pumpAndSettle();
-      await pickInDialog(tester, 'Sentadilla con Barra', 'Sentadilla');
-
-      // El ejercicio cambió en el mismo slot (no se agregó otro) y las reps
-      // siguen cargadas: la config sobrevive al swap.
-      expect(enElEditor(find.text('Sentadilla con Barra')), findsOneWidget);
-      expect(enElEditor(find.text('Press de Banca')), findsNothing);
-      expect(find.text('10'), findsOneWidget);
-    });
-
-    testWidgets('elegir el mismo ejercicio es un no-op', (tester) async {
-      await _pumpEditor(tester);
-
-      // El panel lateral está SIEMPRE abierto en desktop (#860): el botón
-      // "Agregar ejercicio" del día no existe ahí, lo reemplaza el panel.
-      await pickInDialog(tester, 'Press de Banca', 'Banca');
-
-      await tester.tap(find.byTooltip('Cambiar ejercicio'));
-      await tester.pumpAndSettle();
-      await pickInDialog(tester, 'Press de Banca', 'Banca');
-
-      // Sigue habiendo un único slot con el mismo ejercicio.
-      expect(enElEditor(find.text('Press de Banca')), findsOneWidget);
+      expect(find.byTooltip('Cambiar ejercicio'), findsNothing);
     });
   });
-
   group('RoutineEditorWebScreen — borrar ejercicio con scope (Fase 6)', () {
     Future<void> addPressDeBanca(WidgetTester tester) async {
       // El panel lateral está SIEMPRE abierto en desktop (#860): el botón

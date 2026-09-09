@@ -1454,22 +1454,6 @@ class _RoutineEditorWebScreenState
       ));
   }
 
-  /// Swaps ONLY the exercise on a slot, keeping its sets, rest, notes,
-  /// superset link and week presence intact — mirrors mobile's in-place
-  /// "Cambiar ejercicio" (`_SlotEditorState._replaceExercise`). Reuses the
-  /// multi-select picker and takes the first pick as the replacement, so
-  /// correcting a wrong choice no longer means deleting the slot and losing
-  /// everything already configured.
-  Future<void> _replaceSlotExercise(int dayIndex, int slotIndex) async {
-    final picked = await showExercisePickerDialog(context);
-    if (picked == null || picked.isEmpty || !mounted) return;
-    final replacement = picked.first;
-    final slot = _days[dayIndex].slots[slotIndex];
-    if (slot.exercise?.id == replacement.id) return; // same exercise → no-op
-    _markDirty();
-    setState(() => slot.exercise = replacement);
-  }
-
   // ── Copiar prescripción entre ejercicios (#655) ──────────────────────────
 
   /// The nearest slot BEFORE [slotIndex] that can act as a copy source: it must
@@ -3055,8 +3039,6 @@ class _RoutineEditorWebScreenState
                                       quickEntryPanel: _quickEntryDia == i
                                           ? _panelDeEntradaRapida(i)
                                           : null,
-                                      onReplaceSlot: (s) =>
-                                          _replaceSlotExercise(i, s),
                                       onMoveSlot: (s, dir) =>
                                           _moveSlot(i, s, dir),
                                       copyPreviousCallbackFor: (s) =>
@@ -3609,7 +3591,6 @@ class _DayCard extends StatelessWidget {
     required this.onAddSuperset,
     required this.panelPresente,
     this.quickEntryPanel,
-    required this.onReplaceSlot,
     required this.onMoveSlot,
     required this.copyPreviousCallbackFor,
     required this.onSetTypeChanged,
@@ -3679,7 +3660,6 @@ class _DayCard extends StatelessWidget {
   /// El panel ya construido, o null cuando este día lo tiene cerrado. Lo arma
   /// el `State` porque el controller y el foco viven allá.
   final Widget? quickEntryPanel;
-  final void Function(int slotIndex) onReplaceSlot;
   final void Function(int slotIndex, int dir) onMoveSlot;
 
   /// Per-slot "copiar sets del anterior" callback (#655), or null when the
@@ -3958,7 +3938,6 @@ class _DayCard extends StatelessWidget {
                 (i < day.slots.length - 1 && day.slots[i].linkedToNext) ||
                     (i > 0 && day.slots[i - 1].linkedToNext),
             onRemove: () => onRemoveSlot(i),
-            onReplace: () => onReplaceSlot(i),
             onMoveUp: () => onMoveSlot(i, -1),
             onMoveDown: () => onMoveSlot(i, 1),
             onCopyPrevious: copyPreviousCallbackFor(i),
@@ -3999,7 +3978,6 @@ class _SlotCard extends StatelessWidget {
     required this.linkedToNext,
     required this.inSuperset,
     required this.onRemove,
-    required this.onReplace,
     required this.onMoveUp,
     required this.onMoveDown,
     required this.onCopyPrevious,
@@ -4048,7 +4026,6 @@ class _SlotCard extends StatelessWidget {
   final bool linkedToNext;
   final bool inSuperset; // part of a >=2 superset run → accent border
   final VoidCallback onRemove;
-  final VoidCallback onReplace;
   final VoidCallback onMoveUp;
   final VoidCallback onMoveDown;
 
@@ -4096,12 +4073,6 @@ class _SlotCard extends StatelessWidget {
     final controles = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-              IconButton(
-                tooltip: 'Cambiar ejercicio', // i18n
-                icon: Icon(TreinoIcon.edit, size: 15, color: palette.textMuted),
-                onPressed: onReplace,
-                visualDensity: VisualDensity.compact,
-              ),
               // Always rendered so the shortcut is discoverable; disabled on
               // the day's first exercise (no source to copy from).
               IconButton(
