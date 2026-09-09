@@ -9,6 +9,11 @@ import '../../../../workout/domain/routine.dart';
 import '../../../../workout/domain/routine_source.dart';
 import '../../../../workout/domain/routine_status.dart';
 import '../../../../workout/domain/routine_visibility.dart';
+import '../../../../../core/widgets/treino_icon.dart';
+import '../../../../workout/application/session_providers.dart'
+    show currentUidProvider;
+import '../../widgets/coach_hub_widgets.dart';
+import 'routine_actions_provider.dart';
 
 /// Grilla de las rutinas del PF, en cards.
 ///
@@ -89,18 +94,27 @@ class RoutineCard extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              routine.name,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontFamily: AppFonts.barlowCondensed,
-                fontWeight: AppFonts.w700,
-                fontSize: AppTextSize.bodyLarge,
-                // Una archivada se lee apagada: sigue siendo tuya y sigue
-                // estando, pero ya no es lo que estás usando.
-                color: archivada ? palette.textMuted : palette.textPrimary,
-              ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    routine.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontFamily: AppFonts.barlowCondensed,
+                      fontWeight: AppFonts.w700,
+                      fontSize: AppTextSize.bodyLarge,
+                      // Una archivada se lee apagada: sigue siendo tuya y
+                      // sigue estando, pero ya no es lo que estás usando.
+                      color:
+                          archivada ? palette.textMuted : palette.textPrimary,
+                    ),
+                  ),
+                ),
+                _MenuDeLaRutina(routine: routine),
+              ],
             ),
             const SizedBox(height: AppSpacing.s8),
             _Etiquetas(routine: routine),
@@ -232,3 +246,141 @@ class _Etiqueta extends StatelessWidget {
     );
   }
 }
+
+/// El ⋮ de una card: archivar y eliminar.
+///
+/// Las dos conviven a propósito. La app archiva por defecto —«el documento se
+/// conserva para mantener referencias históricas de sesiones», ADR-USR-04— y
+/// eso sigue siendo lo correcto para un plan que alguien entrenó. Eliminar es
+/// para lo otro: una plantilla que nunca se entrenó, o un plan cargado mal que
+/// no debería figurar en la biblioteca.
+class _MenuDeLaRutina extends ConsumerStatefulWidget {
+  const _MenuDeLaRutina({required this.routine});
+
+  final Routine routine;
+
+  @override
+  ConsumerState<_MenuDeLaRutina> createState() => _MenuDeLaRutinaState();
+}
+
+class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
+  bool _ocupado = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final r = widget.routine;
+    final archivada = r.status == RoutineStatus.archived;
+
+    if (_ocupado) {
+      return const SizedBox(
+        width: 32,
+        height: 32,
+        child: Center(
+          child: SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+
+    return TreinoPopupMenuButton<_AccionRutina>(
+      tooltip: 'Opciones de la rutina', // i18n
+      icon: Icon(TreinoIcon.dotsThree, size: 18, color: palette.textMuted),
+      // Misma caja que cualquier acción de fila del Hub: `PopupMenuButton` no
+      // reenvía `constraints` a su `IconButton`, sólo `style`.
+      iconSize: 18,
+      padding: EdgeInsets.zero,
+      style: IconButton.styleFrom(
+        padding: EdgeInsets.zero,
+        minimumSize: const Size(32, 32),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        visualDensity: VisualDensity.compact,
+      ),
+      onSelected: _ejecutar,
+      itemBuilder: (_) => [
+        if (!archivada)
+          const PopupMenuItem(
+            value: _AccionRutina.archivar,
+            child: Text('Archivar'), // i18n
+          ),
+        PopupMenuItem(
+          value: _AccionRutina.eliminar,
+          child: Text(
+            'Eliminar', // i18n
+            style: TextStyle(color: palette.danger),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _ejecutar(_AccionRutina accion) async {
+    final r = widget.routine;
+    final asignada = (r.assignedTo ?? '').isNotEmpty;
+
+    // El uid se resuelve DESPUÉS de confirmar. Chequearlo antes hacía que el
+    // tap no hiciera nada cuando el stream de auth todavía no emitió: un
+    // fallo silencioso, que es lo que hay que evitar. Si falta, la acción
+    // falla y lo dice por el mismo camino que cualquier otro error.
+    final confirmado = await showTreinoDialog<bool>(
+      context,
+      builder: (ctx) => TreinoDialog(
+        title: accion == _AccionRutina.archivar
+            ? '¿Archivar «${r.name}»?' // i18n
+            : '¿Eliminar «${r.name}»?', // i18n
+        body: Text(
+          accion == _AccionRutina.archivar
+              // i18n
+              ? 'Deja de estar activa. La podés recuperar desde el filtro '
+                  'Archivadas.'
+              : asignada
+                  // La advertencia CONCRETA, no un «esto no se puede
+                  // deshacer» genérico: un plan asignado pudo entrenarse, y
+                  // las sesiones de ese alumno apuntan a este documento.
+                  // Archivar existe justamente para no romper eso.
+                  // i18n
+                  ? 'Se borra para siempre. Los entrenamientos que el alumno '
+                      'ya hizo con esta rutina quedan sin referencia. Si sólo '
+                      'querés sacarla de circulación, archivala.'
+                  // i18n
+                  : 'Se borra para siempre. No se puede recuperar.',
+        ),
+        primaryLabel: accion == _AccionRutina.archivar
+            ? 'Archivar' // i18n
+            : 'Eliminar', // i18n
+        onPrimaryTap: () => Navigator.of(ctx).pop(true),
+        secondaryLabel: 'Cancelar', // i18n
+        onSecondaryTap: () => Navigator.of(ctx).pop(false),
+      ),
+    );
+    if (confirmado != true || !mounted) return;
+
+    setState(() => _ocupado = true);
+    final trainerId = ref.read(currentUidProvider) ?? '';
+    final acciones = ref.read(routineActionsProvider.notifier);
+    final ok = trainerId.isEmpty
+        ? false
+        : accion == _AccionRutina.archivar
+            ? await acciones.archive(
+                routineId: r.id,
+                trainerId: trainerId,
+                athleteId: r.assignedTo ?? '',
+              )
+            : await acciones.delete(routineId: r.id, trainerId: trainerId);
+
+    if (!mounted) return;
+    setState(() => _ocupado = false);
+    if (!ok) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(
+          content: Text('No se pudo. Probá de nuevo.'), // i18n
+        ));
+    }
+  }
+}
+
+enum _AccionRutina { archivar, eliminar }

@@ -156,6 +156,73 @@ void main() {
     });
   });
 
+  group('RoutineCard — el menú de la rutina', () {
+    testWidgets('ofrece archivar y eliminar', (tester) async {
+      await _pumpSoloGrilla(
+          tester, [_routine(id: 'r1', assignedTo: _athlete)], 'Sofía');
+
+      await tester.tap(find.byTooltip('Opciones de la rutina'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Archivar'), findsOneWidget);
+      expect(find.text('Eliminar'), findsOneWidget);
+    });
+
+    testWidgets('una YA archivada no ofrece archivar de nuevo',
+        (tester) async {
+      await _pumpSoloGrilla(
+        tester,
+        [_routine(id: 'r1', status: RoutineStatus.archived)],
+        null,
+      );
+
+      await tester.tap(find.byTooltip('Opciones de la rutina'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Archivar'), findsNothing);
+      expect(find.text('Eliminar'), findsOneWidget);
+    });
+
+    testWidgets('borrar un PLAN ASIGNADO avisa que rompe el historial',
+        (tester) async {
+      // Ésta es la advertencia que justifica que archivar siga existiendo. Un
+      // plan asignado pudo entrenarse, y las sesiones del alumno apuntan a
+      // ESTE documento: borrarlo las deja sin referencia, que es exactamente
+      // lo que ADR-USR-04 evita. Un «esto no se puede deshacer» genérico no
+      // dice eso.
+      await _pumpSoloGrilla(
+          tester, [_routine(id: 'r1', assignedTo: _athlete)], 'Sofía');
+
+      await tester.tap(find.byTooltip('Opciones de la rutina'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Eliminar'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('quedan sin referencia'), findsOneWidget);
+      expect(find.textContaining('archivala'), findsOneWidget);
+    });
+
+    testWidgets('borrar una PLANTILLA no inventa un historial que no existe',
+        (tester) async {
+      // Una plantilla nunca se entrenó: el alumno entrena una copia asignada.
+      // Advertirle sobre entrenamientos perdidos sería un susto falso, y una
+      // advertencia falsa es peor que ninguna (AGENTS.md §11.1).
+      await _pumpSoloGrilla(
+        tester,
+        [_routine(id: 'r1', source: RoutineSource.trainerTemplate)],
+        null,
+      );
+
+      await tester.tap(find.byTooltip('Opciones de la rutina'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Eliminar'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('quedan sin referencia'), findsNothing);
+      expect(find.textContaining('No se puede recuperar'), findsOneWidget);
+    });
+  });
+
   group('RoutineCardGrid — a dónde entra cada card', () {
     testWidgets('un PLAN va al editor de planes, con su alumno en la URL',
         (tester) async {

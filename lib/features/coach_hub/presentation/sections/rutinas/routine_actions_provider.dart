@@ -1,7 +1,8 @@
-// Mutación mínima de rutinas para el Coach Hub web (Fase 5, WU-04). Hoy
-// sólo soporta archivar — la ÚNICA mutación cableada desde esta pantalla
-// (`RoutineRepository.archive` ya existe; duplicar/asignar quedan fuera de
-// scope hasta que haya algo real a lo que cablearlas).
+// Mutaciones de rutinas para el Coach Hub web: archivar y ELIMINAR.
+//
+// Las dos invalidan `routinesAuthoredByProvider`, que es de donde lee la
+// pantalla de Rutinas desde que pasó a listar rutinas en vez de alumnos.
+// Duplicar/asignar siguen fuera de scope.
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -45,10 +46,44 @@ class RoutineActionsNotifier extends AsyncNotifier<void> {
       ref.invalidate(assignedRoutinesByTrainerProvider(
         (trainerId: trainerId, athleteId: athleteId),
       ));
+      // Y la grilla de la sección Rutinas, que lee de OTRO provider desde que
+      // el eje pasó a ser el autor. Sin esta línea la card archivada seguiría
+      // en pantalla hasta recargar — el mismo fallo silencioso que describe la
+      // advertencia de arriba, una mudanza de provider más tarde.
+      ref.invalidate(routinesAuthoredByProvider(trainerId));
       // El listado no alcanza: los lectores one-shot de la rutina archivada
       // (`routineByIdProvider` / `visibleRoutineByIdProvider`) siguen
       // devolviendo el doc con `status: active` hasta que se reinicie el
       // proceso. `ref.container` porque el notifier no es un widget.
+      invalidateRoutineById(ref.container, routineId);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// BORRA [routineId] de verdad. Irreversible.
+  ///
+  /// Convive con [archive] a propósito, no la reemplaza. La app archiva por
+  /// defecto —«el documento se conserva para mantener referencias históricas
+  /// de sesiones», ADR-USR-04— y eso sigue siendo lo correcto para un plan que
+  /// alguien entrenó: las sesiones apuntan al doc, y borrarlo las deja sin
+  /// referencia.
+  ///
+  /// Eliminar es para lo otro: una plantilla que nunca se entrenó, o un plan
+  /// que se cargó mal y no debería figurar en la biblioteca. Quién ofrece cuál
+  /// —y con qué advertencia— lo decide la UI, que es la que sabe si la rutina
+  /// tiene alumno.
+  ///
+  /// Las reglas de Firestore ya restringen el borrado al dueño
+  /// (`assignedBy == request.auth.uid`); esto no afloja nada.
+  Future<bool> delete({
+    required String routineId,
+    required String trainerId,
+  }) async {
+    try {
+      await ref.read(routineRepositoryProvider).deleteRoutine(routineId);
+      ref.invalidate(routinesAuthoredByProvider(trainerId));
       invalidateRoutineById(ref.container, routineId);
       return true;
     } catch (_) {
