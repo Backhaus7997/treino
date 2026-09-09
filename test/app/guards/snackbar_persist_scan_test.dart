@@ -42,7 +42,14 @@ void main() {
         }
         if (apertura < 0) continue;
 
-        final cuerpo = lineas.sublist(apertura, i).join('\n');
+        // Los COMENTARIOS no cuentan. La primera versión de este scan los
+        // miraba y se daba por satisfecha con la nota que explica el problema
+        // —que menciona `persist:` en prosa—, así que borrar el parámetro de
+        // verdad no rompía nada. Lo encontró el control negativo, no el test.
+        final cuerpo = lineas
+            .sublist(apertura, i)
+            .where((l) => !l.trimLeft().startsWith('//'))
+            .join('\n');
         if (!cuerpo.contains('persist:')) {
           ofensores.add('${entidad.path}:${i + 1}');
         }
