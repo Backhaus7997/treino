@@ -171,7 +171,14 @@ class _ChipItem extends StatelessWidget {
 
         return AnimatedContainer(
           key: Key('filter_chip_$label'),
-          duration: AppMotion.resolve(ctx, AppMotion.micro),
+          // EL HOVER NO ANIMA; el cambio de SELECCIÓN sí. Los seis chips están
+          // justo arriba de la tabla y el usuario los cruza cada vez que va del
+          // buscador a la lista: a 120 ms el barrido deja tres prendidos. Elegir
+          // uno, en cambio, pasa una vez y ahí el fundido dice que algo cambió.
+          // Mismo criterio que el item del sidebar en #1063.
+          duration: isSelected
+              ? AppMotion.resolve(ctx, AppMotion.micro)
+              : Duration.zero,
           curve: AppMotion.standard,
           decoration: BoxDecoration(
             color: bg,

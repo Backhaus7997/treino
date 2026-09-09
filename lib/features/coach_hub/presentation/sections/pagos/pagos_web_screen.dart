@@ -103,26 +103,26 @@ class _PagosScreenState extends ConsumerState<PagosScreen> {
             .toLowerCase();
 
     int cmp(Payment a, Payment b) => switch (key) {
-      'alumno' => nameOf(a).compareTo(nameOf(b)),
-      'monto' => a.amountArs.compareTo(b.amountArs),
-      'vencimiento' => (a.dueAt ?? a.createdAt).compareTo(
-        b.dueAt ?? b.createdAt,
-      ),
-      // Por el ESTADO QUE SE VE, no por `Payment.status`. El badge de la fila
-      // sale de `pagoEstadoOf`, que distingue vencido de por-vencer mirando
-      // `dueAt` contra la hora; `status` sólo sabe `pending` vs `paid` y
-      // dejaria a un vencido y a uno que vence en 20 dias en el mismo grupo.
-      // Ordenar por una cosa distinta de la que la columna muestra es la clase
-      // de detalle que se lee como un bug.
-      //
-      // El orden del enum ya es el util: vencido → porVencer → pagado, o sea
-      // lo urgente primero en ascendente.
-      'estado' => pagoEstadoOf(a, argentinaNow())
-          .estado
-          .index
-          .compareTo(pagoEstadoOf(b, argentinaNow()).estado.index),
-      _ => 0,
-    };
+          'alumno' => nameOf(a).compareTo(nameOf(b)),
+          'monto' => a.amountArs.compareTo(b.amountArs),
+          'vencimiento' => (a.dueAt ?? a.createdAt).compareTo(
+              b.dueAt ?? b.createdAt,
+            ),
+          // Por el ESTADO QUE SE VE, no por `Payment.status`. El badge de la fila
+          // sale de `pagoEstadoOf`, que distingue vencido de por-vencer mirando
+          // `dueAt` contra la hora; `status` sólo sabe `pending` vs `paid` y
+          // dejaria a un vencido y a uno que vence en 20 dias en el mismo grupo.
+          // Ordenar por una cosa distinta de la que la columna muestra es la clase
+          // de detalle que se lee como un bug.
+          //
+          // El orden del enum ya es el util: vencido → porVencer → pagado, o sea
+          // lo urgente primero en ascendente.
+          'estado' => pagoEstadoOf(a, argentinaNow())
+              .estado
+              .index
+              .compareTo(pagoEstadoOf(b, argentinaNow()).estado.index),
+          _ => 0,
+        };
 
     final sorted = List<Payment>.of(payments);
     sorted.sort(_sortAscending ? cmp : (a, b) => cmp(b, a));
@@ -262,32 +262,33 @@ class _PagosScreenState extends ConsumerState<PagosScreen> {
                 children: [
                   Expanded(
                     child: TreinoFilterChips(
-                options: _kFiltroLabels.values.toList(),
-                selected: {_kFiltroLabels[filtro]!},
-                badgeCounts: {
-                  _kFiltroLabels[PagosFiltro.vencidos]!: vencidosN,
-                  _kFiltroLabels[PagosFiltro.porVencer]!: porVencerN,
-                  _kFiltroLabels[PagosFiltro.pagados]!: pagadosN,
-                },
-                onChanged: (newSelected) {
-                  // Single-select: un tap que vacía la selección (chip activo
-                  // desmarcado) es un no-op — siempre necesitamos un filtro
-                  // activo (mismo patrón que solicitudTabProvider).
-                  if (newSelected.isEmpty) return;
-                  final label = newSelected.first;
-                  for (final entry in _kFiltroLabels.entries) {
-                    if (entry.value == label) {
-                      ref.read(pagosFiltroProvider.notifier).state = entry.key;
-                      // Cambiar de pestaña es cambiar de lista. Sin esto, el
-                      // PF sale de la página 3 de «Todos» y entra en la
-                      // página 3 de «Vencidos», que puede tener 2 filas: ve
-                      // una tabla vacía y nada que explique por qué.
-                      setState(() => _page = 0);
-                      break;
-                    }
-                  }
-                },
-                  ),
+                      options: _kFiltroLabels.values.toList(),
+                      selected: {_kFiltroLabels[filtro]!},
+                      badgeCounts: {
+                        _kFiltroLabels[PagosFiltro.vencidos]!: vencidosN,
+                        _kFiltroLabels[PagosFiltro.porVencer]!: porVencerN,
+                        _kFiltroLabels[PagosFiltro.pagados]!: pagadosN,
+                      },
+                      onChanged: (newSelected) {
+                        // Single-select: un tap que vacía la selección (chip activo
+                        // desmarcado) es un no-op — siempre necesitamos un filtro
+                        // activo (mismo patrón que solicitudTabProvider).
+                        if (newSelected.isEmpty) return;
+                        final label = newSelected.first;
+                        for (final entry in _kFiltroLabels.entries) {
+                          if (entry.value == label) {
+                            ref.read(pagosFiltroProvider.notifier).state =
+                                entry.key;
+                            // Cambiar de pestaña es cambiar de lista. Sin esto, el
+                            // PF sale de la página 3 de «Todos» y entra en la
+                            // página 3 de «Vencidos», que puede tener 2 filas: ve
+                            // una tabla vacía y nada que explique por qué.
+                            setState(() => _page = 0);
+                            break;
+                          }
+                        }
+                      },
+                    ),
                   ),
                   const SizedBox(width: AppSpacing.s12),
                   _PeriodoSelector(
@@ -399,27 +400,26 @@ class _PagosScreenState extends ConsumerState<PagosScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           PagosWebTable(
-        payments: pageOf(_sorted(payments, profiles), page: _page),
-        profiles: profiles,
-        emptyMessage: emptyMessage,
-        loading: bucketsAsync.isLoading,
-        errorMessage: bucketsAsync.hasError
-            ? 'Error al cargar pagos.'
-            : null, // i18n
-        onRetry: () => ref.invalidate(trainerPaymentsProvider),
-        sortColumnKey: _sortColumnKey,
-        sortAscending: _sortAscending,
-        onSort: (key, ascending) => setState(() {
-          _sortColumnKey = key;
-          _sortAscending = ascending;
-          // Reordenar cambia QUE filas caen en cada pagina. Quedarse en la 3
-          // deja al PF mirando un tramo del medio de una lista que acaba de
-          // cambiar de orden, sin nada que explique por que arranca ahi.
-          _page = 0;
-        }),
-        showActions: showActions,
-        onMarcarPagado: (p) => marcarPagadoDoc(context, ref, p),
-        onRecordar: (p) => recordar(context, ref, p, paymentAlias),
+            payments: pageOf(_sorted(payments, profiles), page: _page),
+            profiles: profiles,
+            emptyMessage: emptyMessage,
+            loading: bucketsAsync.isLoading,
+            errorMessage:
+                bucketsAsync.hasError ? 'Error al cargar pagos.' : null, // i18n
+            onRetry: () => ref.invalidate(trainerPaymentsProvider),
+            sortColumnKey: _sortColumnKey,
+            sortAscending: _sortAscending,
+            onSort: (key, ascending) => setState(() {
+              _sortColumnKey = key;
+              _sortAscending = ascending;
+              // Reordenar cambia QUE filas caen en cada pagina. Quedarse en la 3
+              // deja al PF mirando un tramo del medio de una lista que acaba de
+              // cambiar de orden, sin nada que explique por que arranca ahi.
+              _page = 0;
+            }),
+            showActions: showActions,
+            onMarcarPagado: (p) => marcarPagadoDoc(context, ref, p),
+            onRecordar: (p) => recordar(context, ref, p, paymentAlias),
           ),
           // El pie se dibuja solo si hay mas de una pagina — se esconde a si
           // mismo. Va con el TOTAL sin recortar, que es el `de 112`.
@@ -515,7 +515,11 @@ class _RegistrarPagoButton extends StatelessWidget {
 
         return AnimatedContainer(
           key: const Key('pagos_registrar_pago_cta'),
-          duration: AppMotion.resolve(ctx, AppMotion.micro),
+          // EL HOVER NO ANIMA. Un puntero es manipulación directa: el fondo tiene
+          // que estar donde está el cursor, no llegando. A 120/180 ms, barrer
+          // deja ESTELA — el anterior sigue apagándose cuando el siguiente ya se
+          // encendió. Mismo criterio de #1063, que no llegó hasta acá.
+          duration: Duration.zero,
           curve: AppMotion.standard,
           padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.s18,

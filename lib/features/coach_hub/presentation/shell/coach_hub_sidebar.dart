@@ -711,7 +711,11 @@ class _ProfileRow extends ConsumerWidget {
       key: Key(collapsed ? 'sidebar_profile_avatar' : 'sidebar_profile_row'),
       onTap: () => context.go('/ajustes'),
       builder: (ctx, states) => AnimatedContainer(
-        duration: AppMotionTokens.resolve(ctx, AppMotionTokens.cardStateChange),
+        // EL HOVER NO ANIMA. Un puntero es manipulación directa: el fondo tiene
+        // que estar donde está el cursor, no llegando. A 120/180 ms, barrer
+        // deja ESTELA — el anterior sigue apagándose cuando el siguiente ya se
+        // encendió. Mismo criterio de #1063, que no llegó hasta acá.
+        duration: Duration.zero,
         curve: AppMotionTokens.enter,
         padding: EdgeInsets.symmetric(
           // Colapsado el avatar va centrado en 72 px; el padding lo desalinearía.
