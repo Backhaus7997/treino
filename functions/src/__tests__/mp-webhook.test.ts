@@ -61,6 +61,7 @@ import { createHmac } from "node:crypto";
 
 import {
   DEDUPE_MS,
+  varianteDeFirma,
   WebhookRequestLike,
   firmaValida,
   idDelEvento,
@@ -521,6 +522,97 @@ describe("firmaValida — vectores dorados, calculados AFUERA de esta implementa
       xRequestId: ORO.requestId,
       dataIdDeLaUrl: ORO.idMinusculas,
     })).toBe(false);
+  });
+});
+
+describe("varianteDeFirma — de donde sale el id, que la doc no desambigua", () => {
+  // Todos usan los MISMOS hashes dorados de arriba: lo unico que cambia es por
+  // que campo entra el id. Si el manifest se armara distinto, ninguno pasaria.
+
+  it("dice `data.id-url` cuando MP manda `?data.id=`", () => {
+    expect(varianteDeFirma({
+      signingSecret: ORO.secret,
+      xSignature: conFirma(ORO_COMPLETO),
+      xRequestId: ORO.requestId,
+      dataIdDeLaUrl: ORO.idMinusculas,
+    })).toBe("data.id-url");
+  });
+
+  it("dice `id-url` cuando MP manda `?id=` — la lectura que nos faltaba", () => {
+    // Este es EL caso del 401 real: el simulador manda dos ids y elegimos el
+    // que no era.
+    expect(varianteDeFirma({
+      signingSecret: ORO.secret,
+      xSignature: conFirma(ORO_COMPLETO),
+      xRequestId: ORO.requestId,
+      dataIdDeLaUrl: undefined,
+      idDeLaUrl: ORO.idMinusculas,
+    })).toBe("id-url");
+  });
+
+  it("dice `data.id-body` si MP firmo con el del body", () => {
+    expect(varianteDeFirma({
+      signingSecret: ORO.secret,
+      xSignature: conFirma(ORO_COMPLETO),
+      xRequestId: ORO.requestId,
+      dataIdDeLaUrl: undefined,
+      dataIdDelBody: ORO.idMinusculas,
+    })).toBe("data.id-body");
+  });
+
+  it("dice `sin-id` cuando el manifest no lleva id", () => {
+    expect(varianteDeFirma({
+      signingSecret: ORO.secret,
+      xSignature: conFirma(ORO_SIN_DATA_ID),
+      xRequestId: ORO.requestId,
+      dataIdDeLaUrl: undefined,
+    })).toBe("sin-id");
+  });
+
+  it("con `data.id` y `id` a la vez, gana el de la doc y lo dice", () => {
+    expect(varianteDeFirma({
+      signingSecret: ORO.secret,
+      xSignature: conFirma(ORO_COMPLETO),
+      xRequestId: ORO.requestId,
+      dataIdDeLaUrl: ORO.idMinusculas,
+      idDeLaUrl: "123456",
+    })).toBe("data.id-url");
+  });
+
+  it("pero si MP firmo con el OTRO, tambien lo encuentra", () => {
+    // El escenario exacto del simulador: `data.id` es el recurso, `id` es el
+    // id de la notificacion, y no sabemos con cual firma.
+    expect(varianteDeFirma({
+      signingSecret: ORO.secret,
+      xSignature: conFirma(ORO_COMPLETO),
+      xRequestId: ORO.requestId,
+      dataIdDeLaUrl: "otro-id-distinto",
+      idDeLaUrl: ORO.idMinusculas,
+    })).toBe("id-url");
+  });
+
+  it("probar varias lecturas NO es aceptar cualquier firma", () => {
+    // La garantia que no se puede perder: ninguna combinacion de ids valida una
+    // firma que no salio de nuestro secreto.
+    expect(varianteDeFirma({
+      signingSecret: ORO.secret,
+      xSignature: `ts=${ORO.ts},v1=${"0".repeat(64)}`,
+      xRequestId: ORO.requestId,
+      dataIdDeLaUrl: ORO.idMinusculas,
+      idDeLaUrl: ORO.idMinusculas,
+      dataIdDelBody: ORO.idMinusculas,
+    })).toBeNull();
+  });
+
+  it("y con otro secreto tampoco valida ninguna variante", () => {
+    expect(varianteDeFirma({
+      signingSecret: "otro_secreto",
+      xSignature: conFirma(ORO_COMPLETO),
+      xRequestId: ORO.requestId,
+      dataIdDeLaUrl: ORO.idMinusculas,
+      idDeLaUrl: ORO.idMinusculas,
+      dataIdDelBody: ORO.idMinusculas,
+    })).toBeNull();
   });
 });
 

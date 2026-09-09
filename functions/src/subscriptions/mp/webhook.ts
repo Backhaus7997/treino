@@ -195,15 +195,44 @@ function ensureApp(): App {
  * Devuelve `true` cuando NO hay secreto: sin clave no hay nada que validar, y
  * la seguridad la sostiene el hecho de no confiar en el body. Ver el encabezado.
  */
-export function firmaValida(input: {
+export interface FirmaInput {
   signingSecret: string;
   xSignature: string | undefined;
   xRequestId: string | undefined;
-  /** El `data.id` de los QUERY PARAMS, no el del body. */
+  /** El `data.id` de los QUERY PARAMS — la lectura que manda la doc. */
   dataIdDeLaUrl: string | undefined;
-}): boolean {
-  if (!input.signingSecret) return true;
-  if (!input.xSignature) return false;
+  /** El `id` suelto de la query, cuando no viene como `data.id`. */
+  idDeLaUrl?: string | undefined;
+  /** El `data.id` del BODY. Ultimo recurso: la doc dice que no es este. */
+  dataIdDelBody?: string | undefined;
+}
+
+/**
+ * Cual de las lecturas del manifest reprodujo la firma, o `null` si ninguna.
+ *
+ * ── Por que hay VARIAS lecturas y no una ──
+ *
+ * El template de MP es textual —`id:[data.id_url];request-id:[x-request-id];ts:[ts];`—
+ * pero **de donde sale ese `data.id_url` es ambiguo en la practica**, y la
+ * ambiguedad costo caro: el simulador de MP manda DOS ids en el mismo evento,
+ * el del recurso (`data.id`) y el de la notificacion (`id`), y la doc no dice
+ * cual de los dos aparece en el query string ni con que nombre.
+ *
+ * Elegir una lectura y rezar es lo que hicimos primero, y dio 401 en el primer
+ * contacto real. Asi que se prueban TODAS las lecturas defendibles del spec y
+ * se devuelve cual matcheo. Eso hace dos cosas a la vez: deja de rechazar
+ * notificaciones legitimas, y —al logear la variante ganadora— nos dice cual es
+ * la de verdad, para poder ajustar esto a una sola cuando lo sepamos.
+ *
+ * No es laxitud. Todas las variantes se derivan de datos de LA MISMA request, y
+ * cualquiera de ellas exige igual acertar un HMAC-SHA256 con nuestro secreto.
+ * Pasar de una preimagen valida a siete no mueve esa aguja; lo que si evita es
+ * rechazar el 100% de las notificaciones por elegir mal entre lecturas que la
+ * doc no desambigua.
+ */
+export function varianteDeFirma(input: FirmaInput): string | null {
+  if (!input.signingSecret) return "sin-secreto";
+  if (!input.xSignature) return null;
 
   // `ts=...,v1=...`, en cualquier orden y con espacios posibles.
   let ts = "";
@@ -216,33 +245,8 @@ export function firmaValida(input: {
     if (clave === "ts") ts = valor;
     else if (clave === "v1") v1 = valor;
   }
-  if (!ts || !v1) return false;
+  if (!ts || !v1) return null;
 
-  // ── El template, y la unica ambiguedad que MP no resolvio ──
-  //
-  // Textual de la doc: `id:[data.id_url];request-id:[x-request-id];ts:[ts];`
-  // Los componentes ausentes se REMUEVEN, no se dejan vacios.
-  //
-  // Sobre el CASE del `data.id`, la doc y la implementacion de referencia de MP
-  // **se contradicen**:
-  //
-  //   - La doc dice: *«Si data.id se devuelve con caracteres alfanumericos en
-  //     mayusculas, conviertelo a minusculas antes de usarlo en el manifest»*.
-  //   - El SDK oficial de Node (`mercadopago/sdk-nodejs`,
-  //     `src/utils/webhook/index.ts`) NO lo baja a minusculas: usa el id tal
-  //     cual llega, y tiene un test que lo PINEA — *«case 2 — uppercase dataId
-  //     is preserved in HMAC»*.
-  //
-  // Las dos fuentes son de MP y dicen lo opuesto, asi que se aceptan LAS DOS
-  // derivaciones del mismo id recibido. No es laxitud: un atacante que quisiera
-  // aprovecharlo necesitaria acertar un HMAC-SHA256 igual, y pasar de una
-  // preimagen valida a dos no mueve esa aguja. Lo que si evita es el modo de
-  // falla caro — que MP firme con la variante que nosotros no elegimos y
-  // rechacemos el 100% de las notificaciones legitimas.
-  //
-  // Para TREINO es hoy un no-op: los ids de preapproval son hex en minusculas
-  // (`2c938084…`), asi que las dos variantes coinciden. Importa el dia que MP
-  // mande un id con mayusculas — los ULID de la Orders API son asi.
   const conId = (id: string | undefined): string => {
     const partes: string[] = [];
     if (id) partes.push(`id:${id};`);
@@ -251,28 +255,64 @@ export function firmaValida(input: {
     return partes.join("");
   };
 
-  const crudo = input.dataIdDeLaUrl;
-  const enMinusculas = crudo?.toLowerCase();
-  const candidatos = [conId(crudo)];
-  if (enMinusculas !== undefined && enMinusculas !== crudo) {
-    candidatos.push(conId(enMinusculas));
+  // Cada fuente de id, cruda y en minusculas. El lowercase esta porque la doc
+  // lo pide y el SDK oficial NO lo hace — ver el comentario de mas abajo.
+  const fuentes: [string, string | undefined][] = [
+    ["data.id-url", input.dataIdDeLaUrl],
+    ["id-url", input.idDeLaUrl],
+    ["data.id-body", input.dataIdDelBody],
+  ];
+
+  const candidatos: [string, string][] = [];
+  const vistos = new Set<string>();
+  const agregar = (nombre: string, id: string | undefined) => {
+    const manifest = conId(id);
+    if (vistos.has(manifest)) return;
+    vistos.add(manifest);
+    candidatos.push([nombre, manifest]);
+  };
+
+  for (const [nombre, id] of fuentes) {
+    // Una fuente ausente NO genera candidato con su nombre: produciria el
+    // manifest sin id y se lo atribuiria, que es una etiqueta que miente
+    // justo en el log del que estamos dependiendo para averiguar la verdad.
+    if (id === undefined) continue;
+    agregar(nombre, id);
+    const min = id.toLowerCase();
+    if (min !== id) agregar(`${nombre}-minusculas`, min);
   }
+  // El caso «componente ausente REMOVIDO» del manifest, explicito y ultimo.
+  agregar("sin-id", undefined);
 
-  return candidatos.some((manifest) => {
-    const esperado = createHmac("sha256", input.signingSecret)
-      .update(manifest)
-      .digest("hex");
-
+  const recibida = Buffer.from(v1, "utf8");
+  for (const [nombre, manifest] of candidatos) {
+    const esperado = Buffer.from(
+      createHmac("sha256", input.signingSecret).update(manifest).digest("hex"),
+      "utf8",
+    );
     // Comparacion de tiempo constante. Un `===` sobre un HMAC filtra, por el
     // tiempo de la comparacion, cuantos caracteres del prefijo acerto quien
     // prueba — que es como se falsifica una firma a fuerza de intentos.
-    const a = Buffer.from(esperado, "utf8");
-    const b = Buffer.from(v1, "utf8");
     // `timingSafeEqual` TIRA si los largos difieren, asi que el largo se
-    // compara antes. No filtra nada util: el largo de un SHA256 en hex es
-    // publico.
-    return a.length === b.length && timingSafeEqual(a, b);
-  });
+    // compara antes; no filtra nada util, el largo de un SHA256 hex es publico.
+    if (
+      esperado.length === recibida.length &&
+      timingSafeEqual(esperado, recibida)
+    ) {
+      return nombre;
+    }
+  }
+  return null;
+}
+
+/**
+ * Arma el manifest y compara el HMAC.
+ *
+ * Devuelve `true` cuando NO hay secreto: sin clave no hay nada que validar, y
+ * la seguridad la sostiene el hecho de no confiar en el body. Ver el encabezado.
+ */
+export function firmaValida(input: FirmaInput): boolean {
+  return varianteDeFirma(input) !== null;
 }
 
 /**
@@ -332,11 +372,15 @@ export async function runMpWebhook(
   deps: WebhookDeps,
 ): Promise<WebhookOutcome> {
   const query = (req.query ?? {}) as Record<string, unknown>;
-  const dataIdDeLaUrl = typeof query["data.id"] === "string"
-    ? (query["data.id"] as string)
-    : typeof query.id === "string"
-      ? (query.id as string)
-      : undefined;
+  const deLaQuery = (k: string): string | undefined =>
+    typeof query[k] === "string" ? (query[k] as string) : undefined;
+  const dataIdDeLaUrl = deLaQuery("data.id");
+  const idDeLaUrl = deLaQuery("id");
+  const dataIdDelBody = (() => {
+    const b = (req.body ?? {}) as { data?: { id?: unknown } };
+    const v = b.data?.id;
+    return typeof v === "string" ? v : undefined;
+  })();
 
   if (!deps.signingSecret) {
     // En CADA request, a proposito. Correr sin validar firma es un modo
@@ -347,29 +391,37 @@ export async function runMpWebhook(
     );
   }
 
-  if (
-    !firmaValida({
-      signingSecret: deps.signingSecret,
-      xSignature: req.header("x-signature"),
-      xRequestId: req.header("x-request-id"),
-      dataIdDeLaUrl,
-    })
-  ) {
+  const variante = varianteDeFirma({
+    signingSecret: deps.signingSecret,
+    xSignature: req.header("x-signature"),
+    xRequestId: req.header("x-request-id"),
+    dataIdDeLaUrl,
+    idDeLaUrl,
+    dataIdDelBody,
+  });
+
+  if (variante === null) {
     // Se logea QUE componentes habia, nunca sus VALORES: el body y los headers
     // los manda cualquiera de internet y no van a Cloud Logging.
     //
-    // Estos tres booleanos son lo unico que hace falta para diagnosticar el
-    // modo de falla mas probable del primer dia — que el manifest se arme con
-    // un componente de mas o de menos— sin exponer nada. Si TODOS vienen en
-    // true y aun asi rechaza, el problema es el secreto o el algoritmo; si
-    // alguno viene en false, es el manifest.
+    // `clavesDeLaQuery` son las CLAVES, no los valores: es lo que responde
+    // «¿MP manda `data.id` o `id` en la URL?», que la doc no dice y que fue
+    // justo lo que nos hizo elegir mal.
     logger.warn("mp/webhook: firma invalida — se descarta", {
       teniaSignature: req.header("x-signature") !== undefined,
       teniaRequestId: req.header("x-request-id") !== undefined,
       teniaDataIdEnLaUrl: dataIdDeLaUrl !== undefined,
+      teniaIdEnLaUrl: idDeLaUrl !== undefined,
+      teniaDataIdEnElBody: dataIdDelBody !== undefined,
+      clavesDeLaQuery: Object.keys(query).sort(),
     });
     return "firma-invalida";
   }
+
+  // Cual de las lecturas del manifest fue la buena. Se logea SIEMPRE, no solo
+  // al fallar: es el unico camino para averiguar cual usa MP de verdad y poder
+  // ajustar `varianteDeFirma` a una sola cuando lo sepamos. Ver su docstring.
+  logger.info("mp/webhook: firma validada", { variante });
 
   const topico = topicoDelEvento(req.body, req.query);
   if (topico !== TOPICO_SUSCRIPCION) {
