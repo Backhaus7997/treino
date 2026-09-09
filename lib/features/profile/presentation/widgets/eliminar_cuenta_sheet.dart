@@ -83,6 +83,11 @@ class EliminarCuentaSheet extends ConsumerWidget {
               SnackBar(
                 content: Text(message),
                 behavior: SnackBarBehavior.floating,
+                // `persist: false` A MANO. `SnackBar` hace
+                // `persist = persist ?? action != null`: con acción es eterno por
+                // default y el `duration` de acá abajo NO se mira. Sin esto el cartel
+                // se queda hasta recargar la página.
+                persist: false,
                 duration: const Duration(seconds: 6),
                 action: SnackBarAction(
                   label: l10n.eliminarCuentaSheetRetryLabel,
