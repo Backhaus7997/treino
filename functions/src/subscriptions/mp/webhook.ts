@@ -179,6 +179,23 @@ export interface WebhookDeps {
   nowMs: number;
   /** El secreto de firma, o `""` si MP no nos dio uno. */
   signingSecret: string;
+  /**
+   * Logea los VALORES crudos de la firma cuando no valida. APAGADO por default.
+   *
+   * Es una desviacion deliberada y TEMPORAL de la regla de este archivo —no
+   * escribir en Cloud Logging lo que manda cualquiera de internet— y por eso
+   * es un flag y no el comportamiento normal: la regla sigue vigente, y el
+   * test que la fija sigue verde con el flag apagado.
+   *
+   * Existe porque los booleanos agotaron lo que podian decir: con los cuatro
+   * componentes presentes, el algoritmo fijado contra el SDK oficial y tres
+   * versiones del secreto fallando, lo unico que queda es comparar VALORES.
+   * Ver `scripts/mp-firma-diagnostico.js`.
+   *
+   * Se prende con `MP_WEBHOOK_DEBUG=1` y **se apaga apenas sepamos la
+   * respuesta**.
+   */
+  diagnostico?: boolean;
 }
 
 function ensureApp(): App {
@@ -414,6 +431,26 @@ export async function runMpWebhook(
       teniaIdEnLaUrl: idDeLaUrl !== undefined,
       teniaDataIdEnElBody: dataIdDelBody !== undefined,
       clavesDeLaQuery: Object.keys(query).sort(),
+      // ── DIAGNOSTICO TEMPORAL, apagado por default ────────────────────
+      //
+      // Estos cinco campos NO revelan el secreto: `v1` es la SALIDA del HMAC
+      // (conocerla para un mensaje dado no permite firmar otro) y el resto es
+      // el mensaje. Lo que si son es datos que manda un tercero — por eso van
+      // detras de un flag y no en el camino normal.
+      //
+      // Con esto, `scripts/mp-firma-diagnostico.js` prueba las combinaciones
+      // localmente contra el secreto, que nunca sale de la maquina de quien lo
+      // corre.
+      ...(deps.diagnostico
+        ? {
+          diagnostico: {
+            firmaRecibida: req.header("x-signature"),
+            requestId: req.header("x-request-id"),
+            queryCruda: query,
+            dataIdDelBody,
+          },
+        }
+        : {}),
     });
     return "firma-invalida";
   }
@@ -534,6 +571,10 @@ export const mpWebhook = onRequest(
           mpClient: createMpClient(MP_ACCESS_TOKEN.value()),
           nowMs: Date.now(),
           signingSecret: MP_WEBHOOK_SECRET.value(),
+          // Ver `WebhookDeps.diagnostico`. Se prende con una variable de
+          // entorno y no con un cambio de codigo, para que apagarlo no
+          // requiera otro deploy de la logica.
+          diagnostico: process.env.MP_WEBHOOK_DEBUG === "1",
         },
       );
     } catch (err) {

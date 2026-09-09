@@ -740,6 +740,26 @@ describe("runMpWebhook — TRAMPA 3: el manifest usa el data.id de la QUERY", ()
     expect(mp.consultados).toHaveLength(0);
   });
 
+  it("con el flag de diagnostico PRENDIDO si logea los valores crudos", async () => {
+    // La contracara del test de abajo: la politica se puede levantar, pero
+    // SOLO a proposito y por un rato. Si esto queda prendido en produccion,
+    // Cloud Logging se llena de lo que mande cualquiera de internet.
+    const { app } = fakeApp(MUNDO());
+
+    await runMpWebhook(
+      app,
+      req({
+        query: { "data.id": SUB_ID },
+        headers: { "x-signature": "ts=1,v1=" + "0".repeat(64) },
+      }),
+      { ...deps(fakeMp(AUTORIZADA), { signingSecret: SECRETO }), diagnostico: true },
+    );
+
+    const logeado = JSON.stringify(warnSpy.mock.calls);
+    expect(logeado).toContain("firmaRecibida");
+    expect(logeado).toContain(SUB_ID);
+  });
+
   it("no se logea el body ni los headers de un evento rechazado", async () => {
     // Serian datos de cualquiera de internet escritos en Cloud Logging.
     const { app } = fakeApp(MUNDO());
