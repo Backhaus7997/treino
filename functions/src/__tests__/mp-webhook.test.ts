@@ -394,6 +394,136 @@ describe("el modo degradado GRITA", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// VECTORES DORADOS — lo unico de este archivo que NO es auto-consistente.
+//
+// El resto de los tests de firma calculan el HMAC esperado con el MISMO
+// algoritmo que el codigo bajo prueba (el helper `firmar` de mas abajo). Eso
+// verifica que TREINO esta de acuerdo con TREINO: si nuestro manifest usara
+// coma en vez de punto y coma, o le faltara el `;` final, o tuviera los
+// componentes en otro orden, TODOS esos tests seguirian en verde.
+//
+// Estas constantes cierran ese agujero. Son hashes LITERALES, escritos a mano,
+// derivados de los insumos que comparten los SDKs oficiales de Mercado Pago
+// (`secret`, `request-id` y `ts` de los fixtures de `mercadopago/sdk-nodejs`).
+// Si el template estuviera mal armado en CUALQUIER detalle —separador, cierre,
+// orden, remocion de ausentes, hex vs base64, o el clasico de invertir clave y
+// mensaje— ninguno de estos validaria.
+//
+// HONESTIDAD SOBRE QUE PRUEBAN: que TREINO calcula IDENTICO a la implementacion
+// canonica de MP. **NO** prueban que sea lo que el servidor de MP firma —
+// MP no publica ningun vector oficial. Eso solo lo confirma una notificacion
+// real.
+// ---------------------------------------------------------------------------
+
+const ORO = {
+  secret: "your_secret_key_here",
+  requestId: "2066ca19-c6f1-498a-be75-1923005edd06",
+  ts: "1742505638683",
+  idMinusculas: "ord01jq4s4ky8hwq6na5pxb65b3d3",
+  idMayusculas: "ORD01JQ4S4KY8HWQ6NA5PXB65B3D3",
+};
+
+/** `id:<min>;request-id:<rid>;ts:<ts>;` — el caso completo. */
+const ORO_COMPLETO =
+  "633f91233312dd391ec75fa0bea539cfc2d6c4918873305b84a96cc1c58db71c";
+/** El MISMO manifest pero con el id en MAYUSCULAS, sin normalizar. */
+const ORO_MAYUSCULAS =
+  "fb15ae6472eb449173c556793205d77787d58f384d183bb5bc3b724c27bd103c";
+/** `request-id:<rid>;ts:<ts>;` — sin data.id, componente removido. */
+const ORO_SIN_DATA_ID =
+  "8a7b0cc777a8217c3bab41a50c95dc92debbc6f8448f1c967dfe10ac1cb8b894";
+/** `id:<min>;ts:<ts>;` — sin request-id, componente removido. */
+const ORO_SIN_REQUEST_ID =
+  "a20c44820ab71562e89a7c9f64d5636efc8beba587b16c2f9bbbc3504892741a";
+
+const conFirma = (v1: string) => `ts=${ORO.ts},v1=${v1}`;
+
+describe("firmaValida — vectores dorados, calculados AFUERA de esta implementacion", () => {
+  it("el manifest completo valida contra el hash literal", () => {
+    expect(firmaValida({
+      signingSecret: ORO.secret,
+      xSignature: conFirma(ORO_COMPLETO),
+      xRequestId: ORO.requestId,
+      dataIdDeLaUrl: ORO.idMinusculas,
+    })).toBe(true);
+  });
+
+  it("sin data.id: el componente se REMUEVE, no queda vacio", () => {
+    expect(firmaValida({
+      signingSecret: ORO.secret,
+      xSignature: conFirma(ORO_SIN_DATA_ID),
+      xRequestId: ORO.requestId,
+      dataIdDeLaUrl: undefined,
+    })).toBe(true);
+  });
+
+  it("sin request-id: idem", () => {
+    expect(firmaValida({
+      signingSecret: ORO.secret,
+      xSignature: conFirma(ORO_SIN_REQUEST_ID),
+      xRequestId: undefined,
+      dataIdDeLaUrl: ORO.idMinusculas,
+    })).toBe(true);
+  });
+
+  // ── La divergencia doc-vs-SDK, fijada en los dos sentidos ──
+  //
+  // La doc de MP manda bajar el id a minusculas; el SDK oficial de Node NO lo
+  // hace y tiene un test que lo pinea. Como las dos fuentes son de MP y dicen
+  // lo opuesto, `firmaValida` acepta LAS DOS derivaciones. Estos dos tests son
+  // los que impiden que alguien "simplifique" eligiendo una: cada uno usa un
+  // hash literal distinto, y sacar cualquiera de las dos ramas tira uno.
+
+  it("un id en MAYUSCULAS firmado TAL CUAL valida — es lo que hace el SDK", () => {
+    expect(firmaValida({
+      signingSecret: ORO.secret,
+      xSignature: conFirma(ORO_MAYUSCULAS),
+      xRequestId: ORO.requestId,
+      dataIdDeLaUrl: ORO.idMayusculas,
+    })).toBe(true);
+  });
+
+  it("el MISMO id en mayusculas firmado en MINUSCULAS tambien — es lo que dice la doc", () => {
+    expect(firmaValida({
+      signingSecret: ORO.secret,
+      xSignature: conFirma(ORO_COMPLETO),
+      xRequestId: ORO.requestId,
+      dataIdDeLaUrl: ORO.idMayusculas,
+    })).toBe(true);
+  });
+
+  it("aceptar las dos NO es aceptar cualquiera: otro id sigue sin validar", () => {
+    expect(firmaValida({
+      signingSecret: ORO.secret,
+      xSignature: conFirma(ORO_COMPLETO),
+      xRequestId: ORO.requestId,
+      dataIdDeLaUrl: "otro-id-cualquiera",
+    })).toBe(false);
+  });
+
+  it("un ts distinto no valida — el ts entra al manifest tal cual", () => {
+    // La doc dice que el ts viene «en milisegundos» y su propio ejemplo son
+    // segundos; el SDK arreglo ese bug declarando que son SEGUNDOS. Para el
+    // HMAC da igual, porque entra como string literal — este test lo fija.
+    expect(firmaValida({
+      signingSecret: ORO.secret,
+      xSignature: `ts=1742505638,v1=${ORO_COMPLETO}`,
+      xRequestId: ORO.requestId,
+      dataIdDeLaUrl: ORO.idMinusculas,
+    })).toBe(false);
+  });
+
+  it("otro secreto no valida", () => {
+    expect(firmaValida({
+      signingSecret: "otro_secreto",
+      xSignature: conFirma(ORO_COMPLETO),
+      xRequestId: ORO.requestId,
+      dataIdDeLaUrl: ORO.idMinusculas,
+    })).toBe(false);
+  });
+});
+
 describe("firmaValida", () => {
   it("sin secreto configurado deja pasar: no hay nada que validar", () => {
     // MP puede no dar clave para aplicaciones de Suscripciones. Lo que sostiene
