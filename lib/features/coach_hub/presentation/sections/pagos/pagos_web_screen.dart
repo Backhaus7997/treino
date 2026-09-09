@@ -274,9 +274,6 @@ class _PagosScreenState extends ConsumerState<PagosScreen> {
                   PagosFiltro.todos => 'No hay pagos', // i18n
                 },
                 profiles: profiles,
-                // Tab Pagados no ofrece acciones — un pago ya cobrado no
-                // necesita recordatorio ni "marcar pagado" de nuevo.
-                showActions: filtro != PagosFiltro.pagados,
                 paymentAlias: paymentAlias,
               ),
             ),
@@ -294,12 +291,26 @@ class _PagosScreenState extends ConsumerState<PagosScreen> {
     required List<Payment> Function(PagosBuckets) getPayments,
     required String emptyMessage,
     required Map<String, UserPublicProfile> profiles,
-    required bool showActions,
     required String? paymentAlias,
   }) {
     final payments = bucketsAsync.valueOrNull != null
         ? getPayments(bucketsAsync.valueOrNull!)
         : const <Payment>[];
+
+    // La columna ACCIONES aparece si ALGUNA fila tiene algo para ofrecer, y
+    // eso lo dicen los datos — no la pestaña en la que estas parado.
+    //
+    // Antes era `filtro != PagosFiltro.pagados`. La regla de fondo era la
+    // correcta ("un pago cobrado no necesita recordatorio ni marcar pagado de
+    // nuevo") pero aplicada un nivel demasiado arriba: vale por FILA, y
+    // "Todos" mezcla filas de los dos tipos. Con los 12 pagos cobrados, la
+    // campanita aparecia sobre las 12 en "Todos" y sobre ninguna en "Pagados".
+    //
+    // Derivarlo asi conserva el efecto visible que ya estaba bien —en
+    // "Pagados" la columna sigue sin aparecer— pero como CONSECUENCIA de que
+    // ninguna fila tiene accion, no como una regla escrita aparte que se
+    // desincroniza de la de la fila.
+    final showActions = payments.any((p) => p.status == PaymentStatus.pending);
 
     // fbf4e6af: la vacuidad va DENTRO de la key. Sin esto, marcar pagado el
     // ultimo vencido reemplaza la tabla por el empty state bajo la misma key
