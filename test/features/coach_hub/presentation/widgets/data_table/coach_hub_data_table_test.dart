@@ -334,11 +334,23 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
+      // El `DecoratedBox` que el `AnimatedContainer` construye, NO la
+      // decoración que le pasamos al widget.
+      //
+      // La primera versión leía `AnimatedContainer.decoration`, que es el
+      // OBJETIVO: cambia al instante aunque la animación dure 180 ms. O sea
+      // que el test pasaba con la animación puesta y no probaba nada. Lo
+      // encontró el control negativo.
       Color? fondoDeLaFila() {
-        final c = tester.widget<AnimatedContainer>(
-          find.byKey(const Key('data_table_row_1')),
+        final d = tester.widget<DecoratedBox>(
+          find
+              .descendant(
+                of: find.byKey(const Key('data_table_row_1')),
+                matching: find.byType(DecoratedBox),
+              )
+              .first,
         );
-        return (c.decoration as BoxDecoration?)?.color;
+        return (d.decoration as BoxDecoration).color;
       }
 
       final enReposo = fondoDeLaFila();
