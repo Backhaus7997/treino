@@ -2,9 +2,22 @@
  * cleanupAssignedPlansOnUnlink — Cloud Function for TREINO.
  *
  * Fires on writes to `trainer_links/{linkId}`. When a link becomes
- * `terminated`, hard-deletes every plan the trainer had ASSIGNED to that
- * athlete, so the plans don't linger on the athlete after the relationship
- * ends.
+ * `terminated`, ARCHIVES every plan the trainer had ASSIGNED to that athlete,
+ * so the plans stop appearing for the athlete once the relationship ends.
+ *
+ * ARCHIVA, no borra. Hasta 2026-09-09 hacía `batch.delete()`, y eso contradecía
+ * la invariante que la propia app declara: `routine_status.dart` dice que una
+ * rutina se archiva en vez de borrarse "para mantener referencias históricas de
+ * sesiones" (ADR-USR-04). Las sesiones que el alumno ya entrenó apuntan a estos
+ * documentos: borrarlos las dejaba huérfanas, y si el vínculo se reactivaba el
+ * plan ya no existía.
+ *
+ * El PF lo describió como el comportamiento que esperaba —"las rutinas pasan a
+ * estar archivadas"— cuando el código hacía otra cosa.
+ *
+ * Archivar SOLO no alcanza para que el alumno deje de verlas: su query
+ * (`RoutineRepository.listAssignedTo`) también tiene que filtrar por estado, o
+ * el ex-alumno las sigue viendo, ahora marcadas. Las dos mitades van juntas.
  *
  * Why server-side: the Firestore client rule only lets the trainer
  * (`assignedBy`) delete `trainer-assigned` routines — the athlete cannot. Since
@@ -12,8 +25,8 @@
  * privileges so it works regardless of who cut it, without widening the client
  * rule.
  *
- * Scope — deletes ONLY `source == 'trainer-assigned'` docs for the exact
- * (trainer, athlete) pair:
+ * Scope — archiva SOLO los docs `source == 'trainer-assigned'` del par exacto
+ * (trainer, athlete):
  *   - Trainer TEMPLATES (`trainer-template`, `assignedTo: null`) are NEVER
  *     touched — they are separate, reusable documents. A template assigned to a
  *     single athlete still survives the unlink; only the athlete's assigned
@@ -46,13 +59,14 @@ function ensureApp(): App {
 type LinkData = Record<string, unknown>;
 
 /**
- * Hard-deletes every `trainer-assigned` routine for the (trainerId, athleteId)
- * pair. Pure + emulator-testable. Returns the count of deleted documents.
+ * Archives every `trainer-assigned` routine for the (trainerId, athleteId)
+ * pair — flips `status` to `archived`, keeping the document. Pure +
+ * emulator-testable. Returns the count of documents actually written.
  *
  * Three equality filters need no composite index (Firestore serves equality-only
  * queries from automatic single-field indexes).
  */
-export async function deleteAssignedPlansForPair(
+export async function archiveAssignedPlansForPair(
   app: App,
   trainerId: string,
   athleteId: string,
@@ -70,18 +84,28 @@ export async function deleteAssignedPlansForPair(
     return { count: 0 };
   }
 
-  let deleted = 0;
-  for (let i = 0; i < snapshot.docs.length; i += BATCH_SIZE) {
-    const chunk = snapshot.docs.slice(i, i + BATCH_SIZE);
-    const batch = db.batch();
-    for (const doc of chunk) {
-      batch.delete(doc.ref);
-    }
-    await batch.commit();
-    deleted += chunk.length;
+  // Las que ya están archivadas no se vuelven a escribir. Este trigger puede
+  // correr más de una vez sobre el mismo par —un reintento, o dos writes que
+  // dejan el link en `terminated`—, y reescribir el mismo valor cuesta una
+  // escritura por documento sin cambiar nada. El contador cuenta trabajo real,
+  // que es lo que el log dice.
+  const pending = snapshot.docs.filter((doc) => doc.get("status") !== "archived");
+  if (pending.length === 0) {
+    return { count: 0 };
   }
 
-  return { count: deleted };
+  let archived = 0;
+  for (let i = 0; i < pending.length; i += BATCH_SIZE) {
+    const chunk = pending.slice(i, i + BATCH_SIZE);
+    const batch = db.batch();
+    for (const doc of chunk) {
+      batch.update(doc.ref, { status: "archived" });
+    }
+    await batch.commit();
+    archived += chunk.length;
+  }
+
+  return { count: archived };
 }
 
 /**
@@ -132,8 +156,8 @@ export async function cleanupAssignedPlansOnUnlinkHandler(
     return { count: 0 };
   }
 
-  const result = await deleteAssignedPlansForPair(app, trainerId, athleteId);
-  logger.info("cleanupAssignedPlans: deleted assigned plans on unlink", {
+  const result = await archiveAssignedPlansForPair(app, trainerId, athleteId);
+  logger.info("cleanupAssignedPlans: archived assigned plans on unlink", {
     trainerId,
     athleteId,
     count: result.count,
