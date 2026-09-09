@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -190,6 +191,63 @@ void main() {
         ).future,
       );
       expect(result, isEmpty);
+    });
+  });
+
+  group('routinesAuthoredByProvider', () {
+    test('trae plantillas y planes del PF, más nuevas primero', () async {
+      final firestore = FakeFirebaseFirestore();
+      await firestore.collection('routines').doc('r-plan').set({
+        'id': 'r-plan',
+        'name': 'Plan asignado',
+        'split': 'PPL',
+        'level': 'beginner',
+        'days': <dynamic>[],
+        'source': 'trainer-assigned',
+        'assignedBy': 'trainer-1',
+        'assignedTo': 'athlete-a',
+        'visibility': 'private',
+        'createdAt': Timestamp.fromMillisecondsSinceEpoch(1000),
+      });
+      await firestore.collection('routines').doc('r-tpl').set({
+        'id': 'r-tpl',
+        'name': 'Plantilla',
+        'split': 'Full Body',
+        'level': 'beginner',
+        'days': <dynamic>[],
+        'source': 'trainer-template',
+        'assignedBy': 'trainer-1',
+        'assignedTo': null,
+        'visibility': 'public',
+        'createdAt': Timestamp.fromMillisecondsSinceEpoch(9000),
+      });
+
+      final container = makeContainer(RoutineRepository(firestore: firestore));
+      addTearDown(container.dispose);
+
+      final result =
+          await container.read(routinesAuthoredByProvider('trainer-1').future);
+
+      expect(result.map((r) => r.id), ['r-tpl', 'r-plan']);
+    });
+
+    test('trainerId vacío queda en LOADING, no en lista vacía', () async {
+      // Misma regresión que arriba, un provider más allá. «Todavía no sé quién
+      // es el PF» servido como `AsyncData([])` haría que la pantalla nueva le
+      // diga «no creaste ninguna rutina» a un PF que tiene veinte, durante los
+      // primeros frames de un hard reload.
+      final repo = RoutineRepository(firestore: FakeFirebaseFirestore());
+      final container = makeContainer(repo);
+      addTearDown(container.dispose);
+
+      final sub =
+          container.listen(routinesAuthoredByProvider(''), (_, __) {});
+      addTearDown(sub.close);
+
+      await Future<void>.delayed(Duration.zero);
+
+      expect(container.read(routinesAuthoredByProvider('')).isLoading, isTrue);
+      expect(container.read(routinesAuthoredByProvider('')).hasValue, isFalse);
     });
   });
 }

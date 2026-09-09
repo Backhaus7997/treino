@@ -56,3 +56,28 @@ final assignedRoutinesByTrainerProvider = FutureProvider.autoDispose.family<
         );
   },
 );
+
+/// TODAS las rutinas de las que un PF es autor: sus plantillas y los planes
+/// que asignó, más nuevas primero.
+///
+/// Es la contracara de [assignedRoutinesProvider]: aquél parte del ALUMNO y
+/// éste del AUTOR. La pantalla de Rutinas del Coach Hub listaba personas
+/// justamente porque esta mirada no existía.
+///
+/// ⚠️  Misma guarda que [assignedRoutinesByTrainerProvider], y por la misma
+/// razón: un `trainerId` VACÍO no significa «este PF no tiene rutinas», sino
+/// «todavía no sé quién es el PF». `currentUidProvider` sale de un stream, así
+/// que es null hasta que emite — en un hard reload del Hub, los primeros
+/// frames caen acá con la cadena vacía.
+///
+/// Devolver `const []` los resolvería como `AsyncData`, o sea como un HECHO, y
+/// la pantalla diría «todavía no creaste ninguna rutina» a un PF que tiene
+/// veinte. Un future que no completa deja el provider en `loading`, que es lo
+/// único cierto en ese instante (AGENTS.md §11.1).
+final routinesAuthoredByProvider =
+    FutureProvider.autoDispose.family<List<Routine>, String>(
+  (ref, trainerId) async {
+    if (trainerId.isEmpty) return Completer<List<Routine>>().future;
+    return ref.watch(routineRepositoryProvider).listAuthoredBy(trainerId);
+  },
+);

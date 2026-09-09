@@ -22,6 +22,7 @@ const _key = (trainerId: _trainerId, athleteId: _athleteId);
 void main() {
   late _MockRoutineRepository mockRepo;
   late int listCalls;
+  late int grillaCalls;
 
   ProviderContainer makeContainer() {
     return ProviderContainer(
@@ -31,6 +32,13 @@ void main() {
           listCalls++;
           return const <Routine>[];
         }),
+        // La grilla de la sección Rutinas lee de ACÁ desde que el eje pasó a
+        // ser el autor. Contar sus fetch es lo que prueba que la card
+        // desaparece sola en vez de quedarse hasta recargar.
+        routinesAuthoredByProvider(_trainerId).overrideWith((ref) async {
+          grillaCalls++;
+          return const <Routine>[];
+        }),
       ],
     );
   }
@@ -38,6 +46,7 @@ void main() {
   setUp(() {
     mockRepo = _MockRoutineRepository();
     listCalls = 0;
+    grillaCalls = 0;
   });
 
   group('RoutineActionsNotifier.archive', () {
@@ -120,6 +129,64 @@ void main() {
       expect(ok, isFalse);
     });
   });
+
+  group('RoutineActionsNotifier — la grilla de Rutinas se entera', () {
+    // CANDADO. Sacar cualquiera de estas dos invalidaciones COMPILA y no rompe
+    // nada visible: la rutina simplemente se queda en pantalla hasta recargar.
+    // Es el mismo fallo silencioso que el comentario de `archive` ya describía
+    // para la clave anterior — y volvió a pasar una mudanza de provider más
+    // tarde, cuando la pantalla dejó de leer de
+    // `assignedRoutinesByTrainerProvider`. Lo encontró un control negativo.
+
+    test('archive invalida routinesAuthoredByProvider', () async {
+      when(() => mockRepo.archive(any())).thenAnswer((_) async {});
+      final container = makeContainer();
+      addTearDown(container.dispose);
+
+      await container.read(routinesAuthoredByProvider(_trainerId).future);
+      expect(grillaCalls, 1);
+
+      final ok = await container.read(routineActionsProvider.notifier).archive(
+            routineId: 'r1',
+            trainerId: _trainerId,
+            athleteId: _athleteId,
+          );
+      expect(ok, isTrue);
+
+      await container.read(routinesAuthoredByProvider(_trainerId).future);
+      expect(grillaCalls, 2, reason: 'volvió a pedir: la card se va sola');
+    });
+
+    test('delete llama a repo.deleteRoutine e invalida la grilla', () async {
+      when(() => mockRepo.deleteRoutine(any())).thenAnswer((_) async {});
+      final container = makeContainer();
+      addTearDown(container.dispose);
+
+      await container.read(routinesAuthoredByProvider(_trainerId).future);
+      expect(grillaCalls, 1);
+
+      final ok = await container
+          .read(routineActionsProvider.notifier)
+          .delete(routineId: 'r1', trainerId: _trainerId);
+      expect(ok, isTrue);
+      verify(() => mockRepo.deleteRoutine('r1')).called(1);
+
+      await container.read(routinesAuthoredByProvider(_trainerId).future);
+      expect(grillaCalls, 2);
+    });
+
+    test('si el repo falla, delete devuelve false y no miente', () async {
+      when(() => mockRepo.deleteRoutine(any())).thenThrow(Exception('boom'));
+      final container = makeContainer();
+      addTearDown(container.dispose);
+
+      final ok = await container
+          .read(routineActionsProvider.notifier)
+          .delete(routineId: 'r1', trainerId: _trainerId);
+      expect(ok, isFalse);
+    });
+  });
+
 }
 
 Routine _makeRoutine(

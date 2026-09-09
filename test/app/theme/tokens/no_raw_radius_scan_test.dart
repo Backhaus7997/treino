@@ -118,7 +118,6 @@ void main() {
       'features/coach_hub/presentation/sections/facturacion_planes/pricing_screen.dart',
       'features/coach_hub/presentation/sections/pagos/widgets/registrar_pago_dialog.dart',
       'features/coach_hub/presentation/sections/routine_editor/routine_editor_web_screen.dart',
-      'features/coach_hub/presentation/sections/rutinas/rutinas_screen.dart',
       'features/coach_hub/presentation/widgets/create_custom_exercise_dialog.dart',
       'features/coach_hub/presentation/widgets/data_table/coach_hub_data_table.dart',
       'features/coach_hub/presentation/widgets/dialog/treino_dialog.dart',

@@ -182,7 +182,6 @@ void main() {
       'features/coach_hub/presentation/sections/planes/widgets/tarifa_card.dart',
       'features/coach_hub/presentation/sections/routine_editor/routine_editor_web_screen.dart',
       'features/coach_hub/presentation/sections/rutinas/athlete_routines_screen.dart',
-      'features/coach_hub/presentation/sections/rutinas/rutinas_screen.dart',
       'features/coach_hub/presentation/shell/coach_hub_sidebar.dart',
       'features/coach_hub/presentation/shell/coach_hub_top_bar.dart',
       'features/coach_hub/presentation/shell/mobile_banner.dart',
