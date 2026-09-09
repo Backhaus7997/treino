@@ -150,7 +150,16 @@ service cloud.firestore {
                     && request.resource.data.role == 'athlete'
                     && request.resource.data.get('blockedAthleteIds', null) == null
                     && request.resource.data.get('subscription', null) == null
-                    && request.resource.data.get('weightedLoad', null) == null;
+                    && request.resource.data.get('weightedLoad', null) == null
+                    // `athletePaywallEnforced` va por lo MISMO, y acá el
+                    // agujero sería peor que en los otros tres: este campo SÍ
+                    // lo lee una cláusula de autorización (`paywallEnforcedFor`,
+                    // en el match de `routines`). Como el pin de update lo
+                    // vuelve indeleble, quien se auto-creara el doc con `false`
+                    // quedaría exento para siempre y el paywall entero sería
+                    // decorativo para él. Es el mismo modo de falla que el
+                    // comentario de arriba documenta para `subscription`.
+                    && request.resource.data.get('athletePaywallEnforced', null) == null;
 
       // Update: only the owner can update, and the four immutable fields
       // MUST equal their previous values. Trainers via Admin SDK only;
@@ -197,6 +206,19 @@ service cloud.firestore {
                     // que ninguno: el que lee el comentario da por cerrado lo
                     // que quedó abierto.
                     && request.resource.data.get('blockedAthleteIds', null) == resource.data.get('blockedAthleteIds', null)
+                    // athletePaywallEnforced: CF-write-only. Es la conclusión
+                    // denormalizada de "¿a este alumno se le aplica el paywall?"
+                    // — la CF cruza su `athleteSubscription` con sus vínculos
+                    // activos, que es algo que la regla NO puede resolver sola
+                    // (los `trainer_links` tienen id autogenerado y las reglas
+                    // no hacen queries).
+                    //
+                    // A diferencia de `blockedAthleteIds`, este campo NO es
+                    // inerte: `paywallEnforcedFor` lo LEE para autorizar el
+                    // create y el update de rutinas propias. Sin este pin, el
+                    // bypass es una sola escritura — `{athletePaywallEnforced:
+                    // false}` y listo, quedás exento.
+                    && request.resource.data.get('athletePaywallEnforced', null) == resource.data.get('athletePaywallEnforced', null)
                     // Notification inbox read cursor: owner-writeable, timestamp-only.
                     && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['notificationsLastSeenAt'])
                         || request.resource.data.notificationsLastSeenAt is timestamp);
@@ -254,6 +276,67 @@ service cloud.firestore {
       // guarde una rutina `user-created`. Si agregás uno al modelo Routine, a
       // `createUserOwned` o a `updateUserOwned`, agregalo acá también —
       // si no, se rompen create Y update a la vez.
+      // ── Paywall del alumno suelto — topes de forma de rutina ─────────────
+      //
+      // `docs/paywall-alumno-suelto.md` §4 y §6.2. El cliente ya muestra estos
+      // mismos topes (`kFreeMaxRoutineDays` / `kFreeMaxRoutineWeeks`), pero eso
+      // es UX: un cliente parcheado los ignora. Acá está la ley.
+      //
+      // ⚠️  SI CAMBIÁS ESTOS NÚMEROS, cambialos también en
+      // `lib/features/paywall/domain/athlete_entitlement.dart`. Si discrepan,
+      // el alumno ve un tope y el servidor aplica otro — y el rebote llega sin
+      // que ninguna pantalla lo haya anticipado.
+      function freeMaxRoutineDays() { return 2; }
+      function freeMaxRoutineWeeks() { return 1; }
+
+      // ¿Al usuario que escribe se le APLICA el paywall?
+      //
+      // Lee UN campo denormalizado, `users/{uid}.athletePaywallEnforced`, que
+      // escribe una Cloud Function. NO se leen acá ni la suscripción ni los
+      // vínculos, y no es por comodidad:
+      //
+      //   • El vínculo con un PF EXIME al alumno (§2: el vinculado no paga
+      //     nunca, su PF ya paga por él). Pero `trainer_links` usa ids
+      //     autogenerados y las reglas NO PUEDEN hacer queries — sólo `get()`
+      //     a un path conocido. Desde acá es imposible saber si tiene vínculo.
+      //   • `session_shares/{athleteId}` sí es determinístico por atleta, pero
+      //     lo escribe el PROPIO alumno: usarlo para eximir sería dejar que
+      //     cada uno se auto-exima creando un doc.
+      //
+      // Así que la resolución (suscripción OR vínculo activo) vive en la CF, y
+      // acá se lee su conclusión.
+      //
+      // **AUSENTE ⇒ NO SE APLICA**, y ese default es deliberado: mientras el
+      // escritor no exista, esta regla es INERTE. Lo contrario —ausente ⇒ se
+      // aplica— le cortaría la rutina de 3 días a TODOS los atletas el día que
+      // se deploye, sin que ninguno tenga forma de pagar todavía. Las reglas no
+      // leen el flag del cliente: se aplican apenas se suben.
+      //
+      // Es el mismo criterio que `AthleteEntitlement.unknown` del lado Dart:
+      // ante la duda no se gatea. Fallar cerrado le bloquea la app a alguien
+      // que no hizo nada malo.
+      // El `u != null` NO es defensivo de más: `get()` devuelve null cuando el
+      // documento no existe, y tocarle `.data` a null no deniega — tira
+      // ERROR DE EVALUACIÓN, que rebota la escritura entera con un mensaje que
+      // no dice nada. Pasa de verdad: hay escrituras legítimas de usuarios sin
+      // doc de perfil todavía, y sin esta guarda rompían tests que no tienen
+      // nada que ver con el paywall.
+      //
+      // Sin doc ⇒ no se aplica, mismo default seguro que el campo ausente.
+      function paywallEnforcedFor(uid) {
+        let u = get(/databases/$(database)/documents/users/$(uid));
+        return u != null && u.data.get('athletePaywallEnforced', false) == true;
+      }
+
+      // La forma que la rutina tiene que cumplir cuando el paywall aplica.
+      // `days` es una lista del MISMO documento que se está escribiendo, así
+      // que `.size()` la mide sin agregación — que es exactamente lo que las
+      // reglas no tienen y por lo que contar RUTINAS es inviable (§6.1).
+      function withinFreeRoutineShape(data) {
+        return data.days.size() <= freeMaxRoutineDays()
+               && data.get('numWeeks', 1) <= freeMaxRoutineWeeks();
+      }
+
       function userCreatedRoutineFields() {
         return ['name', 'level', 'days',
                 'source', 'createdBy', 'visibility', 'createdAt', 'status',
@@ -412,7 +495,13 @@ service cloud.firestore {
                     // lo que se puede crear es exactamente lo que después se
                     // puede editar. Ver `userCreatedRoutineFields()`.
                     && request.resource.data.keys()
-                         .hasOnly(userCreatedRoutineFields());
+                         .hasOnly(userCreatedRoutineFields())
+                    // Paywall del alumno. El `get()` va ÚLTIMO a propósito: es
+                    // la única cláusula que cuesta una lectura facturada, y las
+                    // reglas cortan por izquierda — un payload que ya falla por
+                    // cualquiera de las guardas de arriba no la paga.
+                    && (withinFreeRoutineShape(request.resource.data)
+                        || !paywallEnforcedFor(request.auth.uid));
 
       // UPDATE path 1 (narrow): owner flips only `status` — archive / restore.
       // REQ-USR-013, SCENARIO-607, SCENARIO-608.
@@ -474,7 +563,22 @@ service cloud.firestore {
                     // The diff must touch ONLY content fields (name/level/days/
                     // numWeeks/visibility).
                     && request.resource.data.diff(resource.data).affectedKeys()
-                         .hasOnly(['name', 'level', 'days', 'numWeeks', 'visibility']);
+                         .hasOnly(['name', 'level', 'days', 'numWeeks', 'visibility'])
+                    // Paywall del alumno, EL MISMO tope que en el create — y
+                    // acá no es opcional: sin esta cláusula se crea con 2 días
+                    // y después se edita a 7, que es una puerta con la ventana
+                    // abierta al lado.
+                    //
+                    // Se mide sobre `request.resource`, o sea el documento
+                    // RESULTANTE. Una rutina de 5 días que quedó de antes se
+                    // puede seguir tocando mientras no crezca: bajarla a 3
+                    // sigue estando por encima del tope y también rebota, pero
+                    // eso es coherente con la spec §5 —al cancelar se CONGELA
+                    // la edición, no se borra ni se recorta nada— y con que el
+                    // atleta la pueda seguir ENTRENANDO entera, que no pasa
+                    // por acá.
+                    && (withinFreeRoutineShape(request.resource.data)
+                        || !paywallEnforcedFor(request.auth.uid));
 
       // UPDATE path 3: trainer edits content of a trainer-assigned plan.
       //
