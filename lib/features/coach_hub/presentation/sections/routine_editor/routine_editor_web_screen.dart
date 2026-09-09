@@ -247,6 +247,11 @@ class _EditorDay {
   bool colapsado = false;
 }
 
+/// Alto del pie fijo del editor (`EditorFooterBar`), para levantar los avisos
+/// por encima del boton de guardar. No sale de un token porque el pie lo
+/// compone el widget compartido con el editor mobile.
+const double _kAltoDelPieFijo = 88;
+
 const _kMaxDays = 7; // mirrors mobile's _kMaxDays
 const _kMaxWeeks = 16; // mirrors mobile's _kMaxWeeks
 
@@ -1258,8 +1263,57 @@ class _RoutineEditorWebScreenState
       return;
     }
 
+    final maskAnterior = Set<int>.from(slot.activeWeeks);
+    final semana = _selectedWeek;
     _markDirty();
     setState(() => slot.activeWeeks = newMask);
+
+    // EL AVISO NO ES DECORATIVO. «Solo esta semana» no borra la card: la
+    // atenúa, para poder volver a agregarla con los chips de «Semanas:». Desde
+    // el lado del PF eso se lee como «le di borrar y no se fue» —lo reportó
+    // con esas palabras— porque la única señal era un cambio de opacidad que
+    // hay que saber interpretar.
+    //
+    // El cartel dice QUÉ pasó y OFRECE LA VUELTA. Deshacer acá no es un lujo:
+    // el camino alternativo es abrir la card atenuada y encontrar los chips,
+    // que es exactamente el conocimiento que no se tenía al apretar borrar.
+    if (!mounted) return;
+    final nombre = slot.exercise?.name;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        // FLOTANTE Y LEVANTADO. El editor tiene un pie FIJO con «Guardar»
+        // abajo de todo, y un SnackBar normal se sienta justo encima: el PF
+        // acaba de sacar un ejercicio y el aviso le tapa el boton para
+        // guardarlo. Lo cazo un test que dejo de poder tocar submit despues
+        // de borrar.
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.fromLTRB(
+          AppSpacing.s20,
+          0,
+          AppSpacing.s20,
+          _kAltoDelPieFijo + AppSpacing.s12,
+        ),
+        content: Text(
+          nombre == null
+              ? 'Sacado de la Semana ${semana + 1}. Queda atenuado para '
+                  'volver a agregarlo.' // i18n
+              : '«$nombre» sale de la Semana ${semana + 1}. Queda atenuado '
+                  'para volver a agregarlo.', // i18n
+        ),
+        action: SnackBarAction(
+          label: 'Deshacer', // i18n
+          onPressed: () {
+            if (!mounted) return;
+            _markDirty();
+            // Se restaura la máscara ENTERA que había antes, no un `add` de la
+            // semana: la anterior podía estar vacía —que significa «en todas»—
+            // y agregarle una la convertiría en una máscara explícita de una
+            // sola semana, sacando el ejercicio de las otras.
+            setState(() => slot.activeWeeks = maskAnterior);
+          },
+        ),
+      ));
   }
 
   /// Swaps ONLY the exercise on a slot, keeping its sets, rest, notes,

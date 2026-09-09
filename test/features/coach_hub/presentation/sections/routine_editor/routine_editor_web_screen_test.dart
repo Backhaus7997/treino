@@ -2720,6 +2720,59 @@ void main() {
     });
   });
 
+  group('RoutineEditorWebScreen — «solo esta semana» dice que hizo', () {
+    // El PF: «si intentas borrar un ejercicio, este se opaca, pero no se va».
+    // Es cierto y es el diseño: «solo esta semana» atenua en vez de borrar,
+    // para poder volver a agregarlo con los chips. Lo que faltaba era DECIRLO
+    // — la unica senal era un cambio de opacidad que hay que saber
+    // interpretar.
+
+    /// Crea una rutina de 2 semanas con un ejercicio y lo saca de la semana
+    /// que se esta mirando — el camino exacto que reporto el PF.
+    Future<void> borrarSoloEstaSemana(WidgetTester tester) async {
+      await _pumpEditor(tester);
+      // El panel lateral esta siempre abierto en desktop (#860).
+      await tester.tap(find.text('Press de Banca'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Agregar (1)'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('+')); // 2 semanas
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Quitar ejercicio'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Solo esta semana'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('el cartel nombra el ejercicio y la semana', (tester) async {
+      await borrarSoloEstaSemana(tester);
+
+      expect(find.textContaining('sale de la Semana'), findsOneWidget);
+      expect(find.textContaining('Queda atenuado'), findsOneWidget);
+    });
+
+    testWidgets('«Deshacer» lo devuelve a la semana', (tester) async {
+      await borrarSoloEstaSemana(tester);
+
+      // El camino alternativo es abrir la card atenuada y encontrar los chips
+      // de «Semanas:» — que es exactamente el conocimiento que no se tenia al
+      // apretar borrar.
+      expect(find.text('Deshacer'), findsOneWidget);
+      await tester.tap(find.text('Deshacer'));
+      await tester.pumpAndSettle();
+
+      // Vuelve a estar presente: la card deja de estar atenuada.
+      expect(
+        find.ancestor(
+          of: find.byType(ExerciseCard),
+          matching: find.byType(Opacity),
+        ),
+        findsNothing,
+      );
+    });
+  });
+
   group('RoutineEditorWebScreen — el ejercicio ausente es INERTE', () {
     // El PF le da "eliminar" a un ejercicio de una rutina de varias semanas,
     // elige "solo esta semana", y lo ve atenuado en vez de desaparecer. Eso es

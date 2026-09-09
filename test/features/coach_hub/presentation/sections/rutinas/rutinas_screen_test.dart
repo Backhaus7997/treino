@@ -389,6 +389,12 @@ void main() {
 
       expect(find.text('Activo'), findsOneWidget);
       expect(find.text('Pausado'), findsOneWidget);
+      // El terminado no entra en «Todos» — su pildora se ve entrando por el
+      // chip «Inactivos», que es donde vive ahora.
+      expect(find.text('Inactivo'), findsNothing);
+
+      await tester.tap(find.textContaining('INACTIVOS'));
+      await tester.pumpAndSettle();
       expect(find.text('Inactivo'), findsOneWidget);
     });
 
@@ -514,15 +520,36 @@ void main() {
         routines: routines(),
       );
 
-      // Default filter is already "Todos" — tap it explicitly to also cover
-      // the chip's own label/count rendering.
-      await tester.tap(find.text('TODOS · 4'));
+      // «Todos» son TUS ALUMNOS, no el archivo historico: Dario tiene el
+      // vinculo TERMINADO y no entrena, asi que armarle una rutina no tiene
+      // sentido. Misma decision que el roster de Alumnos (#1042) y mismo
+      // reporte del PF («no se si mostraria la lista de los inactivos, me
+      // parecen datos de mas»).
+      await tester.tap(find.text('TODOS · 3'));
       await tester.pumpAndSettle();
 
       expect(find.text('Ana Sinrutina'), findsOneWidget);
       expect(find.text('Beto Conrutina'), findsOneWidget);
       expect(find.text('Caro Pausada'), findsOneWidget);
+      expect(find.text('Dario Terminado'), findsNothing);
+    });
+
+    testWidgets('el chip Inactivos sigue siendo la puerta a los terminados',
+        (tester) async {
+      // La salida esta a un click, y el chip los sigue CONTANDO aunque
+      // «Todos» ya no los liste: sin esto, sacarlos seria esconderlos.
+      await _pumpRutinas(
+        tester,
+        links: roster(),
+        names: names,
+        routines: routines(),
+      );
+
+      await tester.tap(find.text('INACTIVOS · 1'));
+      await tester.pumpAndSettle();
+
       expect(find.text('Dario Terminado'), findsOneWidget);
+      expect(find.text('Ana Sinrutina'), findsNothing);
     });
 
     testWidgets('chip counts reflect the whole roster', (tester) async {
@@ -533,7 +560,10 @@ void main() {
         routines: routines(),
       );
 
-      expect(find.text('TODOS · 4'), findsOneWidget);
+      // 3 y no 4: «Todos» deja afuera a los terminados. Los demas chips
+      // siguen contando sobre el roster COMPLETO — «Inactivos · 1» tiene que
+      // seguir diciendo cuantos hay, o sacarlos de «Todos» los esconderia.
+      expect(find.text('TODOS · 3'), findsOneWidget);
       expect(find.text('SIN RUTINA · 2'), findsOneWidget);
       expect(find.text('CON RUTINA · 2'), findsOneWidget);
       expect(find.text('ACTIVOS · 2'), findsOneWidget);

@@ -169,7 +169,15 @@ extension on RutinaFiltro {
 bool _matchesFiltro(
         _LinkEstado estado, int? activeRoutinesCount, RutinaFiltro f) =>
     switch (f) {
-      RutinaFiltro.todos => true,
+      // «Todos» son TUS ALUMNOS, no el archivo historico — misma decision
+      // que el roster de Alumnos (#1042). Un vinculo terminado no entrena, y
+      // armarle una rutina no tiene sentido: el PF lo reporto en las dos
+      // pantallas («no se si mostraria la lista de los inactivos, me parecen
+      // datos de mas»).
+      //
+      // El chip «Inactivos» los sigue mostrando y contando: la salida esta a
+      // un click.
+      RutinaFiltro.todos => estado != _LinkEstado.inactivo,
       RutinaFiltro.sinRutina =>
         activeRoutinesCount != null && activeRoutinesCount == 0,
       RutinaFiltro.conRutina =>
