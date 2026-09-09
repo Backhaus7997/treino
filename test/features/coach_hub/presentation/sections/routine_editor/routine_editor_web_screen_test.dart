@@ -2889,6 +2889,45 @@ void main() {
       expect(enElEditor(find.text('Press de Banca')), findsOneWidget);
     });
 
+    testWidgets('el picker no lo da por puesto en la semana que no lo tiene',
+        (tester) async {
+      // La otra mitad del camino de vuelta, y la que casi se me escapa: que
+      // `_agregarAlDia` sepa restaurar no alcanza si el picker ya lo cuenta
+      // como puesto. `alreadySelectedIds` arranca TILDANDO lo que recibe, así
+      // que mirando el día entero el ejercicio aparecía marcado en una semana
+      // que no lo tiene, y el botón decía «Agregar (1)» sin haber tocado nada.
+      //
+      // Va por el MODAL y no por el panel a propósito. El panel lee
+      // `alreadySelectedIds` UNA vez, en su `initState`: después de cambiar de
+      // semana sigue mostrando los tildes de la anterior, así que ahí la
+      // afirmación no se puede probar. El modal monta fresco en cada apertura.
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any()))
+          .thenAnswer((_) async => _presenceRoutine());
+      await _pumpEditor(tester, repo: repo, routineId: 'r7');
+      // `compact` (768–1279): sin panel lateral, el alta vuelve al modal.
+      tester.view.physicalSize = const Size(1100, 1100);
+      addTearDown(tester.view.reset);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('week_tab_1')));
+      await tester.pumpAndSettle();
+
+      final agregar = find.text('Agregar ejercicio');
+      await tester.ensureVisible(agregar.first);
+      await tester.pumpAndSettle();
+      await tester.tap(agregar.first);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(Dialog), findsOneWidget);
+      expect(
+        find.text('Agregar (1)'),
+        findsNothing,
+        reason: 'en esta semana el ejercicio NO está: nada pre-tildado',
+      );
+      expect(find.text('Agregar'), findsOneWidget);
+    });
+
     testWidgets('al volver es el MISMO slot, no uno nuevo en blanco',
         (tester) async {
       final repo = await abrirEnLaSemanaSinElEjercicio(tester);
