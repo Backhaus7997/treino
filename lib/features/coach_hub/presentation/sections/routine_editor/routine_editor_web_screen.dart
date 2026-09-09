@@ -495,8 +495,25 @@ class _RoutineEditorWebScreenState
     return editorSlot;
   }
 
+  /// El `ScaffoldMessenger` capturado, para poder limpiar en `dispose`.
+  ///
+  /// Se guarda acá y no se busca en `dispose` porque ahí el `context` ya está
+  /// desmontado y `ScaffoldMessenger.of` explota.
+  ScaffoldMessengerState? _messenger;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _messenger = ScaffoldMessenger.of(context);
+  }
+
   @override
   void dispose() {
+    // Los avisos de esta pantalla se van CON la pantalla. Un `SnackBar` vive
+    // en el `ScaffoldMessenger` de la app y no en la ruta, así que sin esto
+    // «sale de la Semana 3 · Deshacer» te seguía hasta Chat — y su Deshacer
+    // apuntaba a un editor que ya no existe.
+    _messenger?.clearSnackBars();
     _nameCtrl.dispose();
     _splitCtrl.dispose();
     _summaryCtrl.dispose();
@@ -1420,6 +1437,18 @@ class _RoutineEditorWebScreenState
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(
+        // NO PERSISTENTE, Y ESTO HAY QUE PONERLO A MANO. `SnackBar` hace
+        // `persist = persist ?? action != null`: cualquier cartel CON acción
+        // es eterno por default, y `ScaffoldMessenger` ni siquiera le agenda
+        // el timer de cierre. Como éste trae «Deshacer», se quedaba en
+        // pantalla hasta recargar la página — el PF lo reportó así, y se
+        // paseaba con él a otras secciones porque el `ScaffoldMessenger` vive
+        // en la app, no en la ruta.
+        //
+        // Seis segundos y no los cuatro de default: son los que hay para leer
+        // el nombre del ejercicio, entender qué pasó y decidir si deshacer.
+        persist: false,
+        duration: const Duration(seconds: 6),
         // FLOTANTE Y LEVANTADO. El editor tiene un pie FIJO con «Guardar»
         // abajo de todo, y un SnackBar normal se sienta justo encima: el PF
         // acaba de sacar un ejercicio y el aviso le tapa el boton para
