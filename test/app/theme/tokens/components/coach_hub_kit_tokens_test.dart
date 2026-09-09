@@ -163,7 +163,8 @@ void main() {
   // TreinoListRowTokens
   // ---------------------------------------------------------------------------
   group('TreinoListRowTokens — dark (mintMagenta)', () {
-    testWidgets('background == bg dark (0xFF0A0A0A)', (tester) async {
+    testWidgets('background == transparent (hereda el contenedor)',
+        (tester) async {
       late Color value;
       await tester.pumpWidget(_withTheme(
         palette: AppPalette.mintMagenta,
@@ -172,43 +173,52 @@ void main() {
           return const SizedBox.shrink();
         }),
       ));
-      // Valor pinado: ink950 = #0A0A0A (bg dark).
-      expect(value, const Color(0xFF0A0A0A));
+      // La fila NO decide el color del fondo sobre el que la ponen. Antes valía
+      // `bg` (ink950) y adentro de una card eso pintaba una banda que nadie
+      // pidió.
+      expect(value, Colors.transparent);
     });
 
-    testWidgets('hoverBackground dark == bgCard dark (0xFF0F1513)',
+    testWidgets('hoverBackground == el MISMO tinte que la tabla',
         (tester) async {
       late Color hover;
+      late Color tableHover;
       await tester.pumpWidget(_withTheme(
         palette: AppPalette.mintMagenta,
         child: Builder(builder: (ctx) {
           hover = TreinoListRowTokens.of(ctx).hoverBackground;
+          tableHover = TreinoTableTokens.of(ctx).rowHoverBackground;
           return const SizedBox.shrink();
         }),
       ));
-      // Valor pinado: ink900 = #0F1513 (bgCard dark).
-      expect(hover, const Color(0xFF0F1513));
+      // Un solo lenguaje de hover en todo el producto: si la tabla y la lista
+      // tintan distinto, el usuario aprende dos gramáticas para el mismo gesto.
+      expect(hover, tableHover);
     });
 
-    testWidgets('hoverBackground != background (estados distintos)',
+    testWidgets('skeletonBackground == surfaceSubtle, NO el hover',
         (tester) async {
+      late Color skeleton;
       late Color hover;
-      late Color bg;
       await tester.pumpWidget(_withTheme(
         palette: AppPalette.mintMagenta,
         child: Builder(builder: (ctx) {
           final t = TreinoListRowTokens.of(ctx);
+          skeleton = t.skeletonBackground;
           hover = t.hoverBackground;
-          bg = t.background;
           return const SizedBox.shrink();
         }),
       ));
-      expect(hover, isNot(equals(bg)));
+      // El skeleton se colgaba de `hoverBackground`. Con el hover tintado de
+      // acento, colgarse de él pintaría las barras de carga de color menta.
+      expect(skeleton, AppPalette.mintMagenta.surfaceSubtle);
+      expect(skeleton, isNot(equals(hover)));
     });
   });
 
   group('TreinoListRowTokens — light (mintMagentaLight)', () {
-    testWidgets('background light == bg light (0xFFFAFAFA)', (tester) async {
+    testWidgets('background == transparent (hereda el contenedor)',
+        (tester) async {
       late Color value;
       await tester.pumpWidget(_withTheme(
         palette: AppPalette.mintMagentaLight,
@@ -217,9 +227,68 @@ void main() {
           return const SizedBox.shrink();
         }),
       ));
-      // Valor pinado: paper50 = #FAFAFA (bg light).
-      expect(value, const Color(0xFFFAFAFA));
+      expect(value, Colors.transparent);
     });
+  });
+
+  // ---------------------------------------------------------------------------
+  // GUARD DE PERCEPTIBILIDAD — el hover de la fila tiene que VERSE
+  // ---------------------------------------------------------------------------
+  //
+  // El guard viejo decía `hoverBackground != background` y estaba EN VERDE
+  // mientras el bug existía: en tema claro la fila valía `#FAFAFA` y el hover
+  // `#FFFFFF`. Son distintos, sí — por 5 de 255. Invisible. El hover no
+  // destacaba la fila, la BORRABA contra la card que la contenía.
+  //
+  // «Distinto» no es la propiedad que nos importa. La que nos importa es «se
+  // nota». Este guard compone el hover (semitransparente) sobre los dos fondos
+  // reales donde puede caer una fila —la página (`bg`) y una card (`bgCard`)— y
+  // exige un delta mínimo por canal en AMBOS. Un token que se lea sobre uno
+  // solo de los dos vuelve a ser el bug de antes en la mitad de las pantallas.
+  group('TreinoListRow — el hover se distingue del fondo (ambos temas)', () {
+    // 8/255 por canal. El delta invisible que teníamos era 5; la tabla, que se
+    // ve, da ~13. El piso va en el medio y con margen sobre el caso roto.
+    const minDelta = 8;
+
+    int maxChannelDelta(Color a, Color b) {
+      int ch(double x) => (x * 255).round();
+      return [
+        (ch(a.r) - ch(b.r)).abs(),
+        (ch(a.g) - ch(b.g)).abs(),
+        (ch(a.b) - ch(b.b)).abs(),
+      ].reduce((x, y) => x > y ? x : y);
+    }
+
+    for (final (name, palette) in [
+      ('dark', AppPalette.mintMagenta),
+      ('light', AppPalette.mintMagentaLight),
+    ]) {
+      testWidgets('$name — hover sobre la página y sobre una card',
+          (tester) async {
+        late Color hover;
+        await tester.pumpWidget(_withTheme(
+          palette: palette,
+          child: Builder(builder: (ctx) {
+            hover = TreinoListRowTokens.of(ctx).hoverBackground;
+            return const SizedBox.shrink();
+          }),
+        ));
+
+        for (final (dondeCae, fondo) in [
+          ('la página (bg)', palette.bg),
+          ('una card (bgCard)', palette.bgCard),
+        ]) {
+          final compuesto = Color.alphaBlend(hover, fondo);
+          expect(
+            maxChannelDelta(compuesto, fondo),
+            greaterThanOrEqualTo(minDelta),
+            reason: '$name: el hover sobre $dondeCae no se distingue del fondo '
+                '(delta ${maxChannelDelta(compuesto, fondo)} < $minDelta). '
+                'Un hover que no se ve es peor que no tener hover.',
+          );
+        }
+      });
+    }
   });
 
   // ---------------------------------------------------------------------------
