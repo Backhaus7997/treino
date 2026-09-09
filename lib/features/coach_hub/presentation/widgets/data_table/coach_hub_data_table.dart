@@ -62,11 +62,16 @@ Widget coachHubDataTableCellWidgetsPreview() => CoachHubDataTable(
     );
 
 /// Modelo de columna para [CoachHubDataTable].
+/// Alineación de una columna de [CoachHubDataTable] — gobierna el header y
+/// las celdas al mismo tiempo.
+enum CoachHubColumnAlign { start, end }
+
 @immutable
 class CoachHubColumn {
   const CoachHubColumn({
     required this.key,
     required this.label,
+    this.align = CoachHubColumnAlign.start,
     this.sortable = false,
     this.flex = 1,
   });
@@ -82,6 +87,18 @@ class CoachHubColumn {
 
   /// Factor de flex para el ancho relativo de la columna.
   final int flex;
+
+  /// Hacia dónde se alinean el header Y las celdas de esta columna.
+  ///
+  /// Van juntos a propósito. Antes el header era siempre un `Row` que
+  /// arrancaba a la izquierda, y las celdas alineaban por su cuenta: la
+  /// columna ACCIONES terminaba con el rótulo pegado al borde izquierdo y los
+  /// íconos al derecho, a media tabla de distancia. El PF lo reportó como
+  /// «acomodar bien simétricas todas las columnas, fijate cómo está la de
+  /// acciones».
+  ///
+  /// Declararlo una sola vez es lo que impide que vuelvan a separarse.
+  final CoachHubColumnAlign align;
 }
 
 /// Modelo de fila para [CoachHubDataTable].
@@ -339,9 +356,18 @@ class _HeaderCell extends StatelessWidget {
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: column.align == CoachHubColumnAlign.end
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         children: [
           Text(
-            column.label,
+            // MAYÚSCULA acá y no en cada string. Los rótulos venían mezclados
+            // —«ALUMNO», «ESTADO» y «ÚLTIMO ENTRENO» salían de l10n en
+            // mayúscula, y «Rutina», «Plan» y «Vence» estaban escritos a mano
+            // capitalizados—, y la fila de headers se veía a dos alturas
+            // tipográficas distintas. Resolverlo en el componente es lo que
+            // impide que el próximo rótulo vuelva a desalinearse.
+            column.label.toUpperCase(),
             style: TextStyle(
               fontFamily: AppFonts.barlow,
               fontWeight: FontWeight.w600,
@@ -484,7 +510,14 @@ class _DataRow extends StatelessWidget {
               for (final col in columns)
                 Expanded(
                   flex: col.flex,
-                  child: Padding(
+                  child: Align(
+                    // La celda sigue la alineación DECLARADA en la columna, no
+                    // la que cada pantalla arme por dentro. Es la mitad que
+                    // hace que el header y el contenido no se separen.
+                    alignment: col.align == CoachHubColumnAlign.end
+                        ? Alignment.centerRight
+                        : Alignment.centerLeft,
+                    child: Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: TreinoTableTokens.cellPaddingH,
                       vertical: TreinoTableTokens.cellPaddingV,
@@ -500,6 +533,7 @@ class _DataRow extends StatelessWidget {
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
+                    ),
                   ),
                 ),
             ],
