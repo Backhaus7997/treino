@@ -264,6 +264,16 @@ class _MenuDeLaRutina extends ConsumerStatefulWidget {
 }
 
 class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
+  /// Lado de la caja del botón.
+  ///
+  /// Es la MISMA medida que el `minimumSize` de abajo, y el spinner que lo
+  /// reemplaza mientras la acción corre tiene que ocupar exactamente eso o la
+  /// card se mueve sola al tocar el menú. Va con nombre y no como `32` suelto
+  /// en los dos lados: duplicado se desincroniza, y además el scan de spacing
+  /// lee un literal dentro de un `SizedBox` como separación fuera de escala
+  /// —con razón— cuando acá es una dimensión de componente, no un espacio.
+  static const double _ladoDelBoton = 32;
+
   bool _ocupado = false;
 
   @override
@@ -274,8 +284,8 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
 
     if (_ocupado) {
       return const SizedBox(
-        width: 32,
-        height: 32,
+        width: _ladoDelBoton,
+        height: _ladoDelBoton,
         child: Center(
           child: SizedBox(
             width: 14,
@@ -295,7 +305,7 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
       padding: EdgeInsets.zero,
       style: IconButton.styleFrom(
         padding: EdgeInsets.zero,
-        minimumSize: const Size(32, 32),
+        minimumSize: const Size(_ladoDelBoton, _ladoDelBoton),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         visualDensity: VisualDensity.compact,
       ),
