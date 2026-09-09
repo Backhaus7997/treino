@@ -435,6 +435,76 @@ void main() {
   // `ClipRRect` de la tabla lo recorta en silencio. En producción, con 11 pagos
   // cargados, el PF veía 7 y los otros 4 no existían.
 
+  group('PagosScreen — orden por estado y ventana de tiempo', () {
+    testWidgets('la columna ESTADO es ordenable y agrupa por lo que se ve',
+        (tester) async {
+      tester.view.physicalSize = const Size(1440, 1400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        _wrap(const PagosScreen(), overrides: _mixedBucketsOverrides()),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Todos'));
+      await tester.pumpAndSettle();
+
+      // Antes ESTADO no era ordenable: era la unica de las cuatro columnas de
+      // datos sin flecha, y es justo la que agrupa «a quien le tengo que
+      // cobrar».
+      await tester.tap(find.text('ESTADO'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('sort_indicator_estado')), findsOneWidget);
+    });
+
+    testWidgets('el selector de periodo arranca en «todo el historial»',
+        (tester) async {
+      tester.view.physicalSize = const Size(1440, 1400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        _wrap(const PagosScreen(), overrides: _mixedBucketsOverrides()),
+      );
+      await tester.pumpAndSettle();
+
+      // Una ventana por default esconde pagos sin avisar, y el primero que se
+      // esconde es el mas viejo — que en una lista de deudas es el que mas
+      // importa.
+      expect(find.text('Todo el historial'), findsOneWidget);
+      expect(find.byKey(const Key('pagos_periodo_selector')), findsOneWidget);
+    });
+
+    testWidgets('elegir 30 dias saca los pagos viejos de la lista',
+        (tester) async {
+      tester.view.physicalSize = const Size(1440, 1400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        _wrap(const PagosScreen(), overrides: _treintaPagadosOverrides()),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Pagados'));
+      await tester.pumpAndSettle();
+      expect(find.text('1–25 de 30'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('pagos_periodo_selector')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('pagos_periodo_treintaDias')));
+      await tester.pumpAndSettle();
+
+      // Los 30 pagos son uno por dia hacia atras desde `_periodStart`, asi
+      // que con la ventana de 30 dias el paginado deja de hacer falta: la
+      // lista entra en una pagina y el pie se esconde solo.
+      expect(find.text('1–25 de 30'), findsNothing);
+    });
+  });
+
   group('PagosScreen — paginado de 25', () {
     testWidgets('con 30 pagos la tabla muestra 25 y aparece el pie',
         (tester) async {

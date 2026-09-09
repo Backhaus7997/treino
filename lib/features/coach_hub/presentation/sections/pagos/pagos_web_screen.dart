@@ -34,11 +34,16 @@ import '../../widgets/coach_hub_widgets.dart'
         CoachHubPager,
         CoachHubSectionHero,
         TreinoFilterChips,
+        TreinoPopupMenuButton,
         TreinoInteractiveState,
         pageOf;
 import 'widgets/registrar_pago_dialog.dart';
 import 'widgets/marcar_pagado_actions.dart';
+import 'package:treino/core/utils/argentina_time.dart';
+
 import 'widgets/pagos_buckets_provider.dart';
+import 'widgets/pagos_estado.dart';
+import 'widgets/pagos_periodo_provider.dart';
 import 'widgets/pagos_filtro_provider.dart';
 import 'widgets/pagos_kpi_row.dart';
 import 'widgets/pagos_web_table.dart';
@@ -103,6 +108,19 @@ class _PagosScreenState extends ConsumerState<PagosScreen> {
       'vencimiento' => (a.dueAt ?? a.createdAt).compareTo(
         b.dueAt ?? b.createdAt,
       ),
+      // Por el ESTADO QUE SE VE, no por `Payment.status`. El badge de la fila
+      // sale de `pagoEstadoOf`, que distingue vencido de por-vencer mirando
+      // `dueAt` contra la hora; `status` sólo sabe `pending` vs `paid` y
+      // dejaria a un vencido y a uno que vence en 20 dias en el mismo grupo.
+      // Ordenar por una cosa distinta de la que la columna muestra es la clase
+      // de detalle que se lee como un bug.
+      //
+      // El orden del enum ya es el util: vencido → porVencer → pagado, o sea
+      // lo urgente primero en ascendente.
+      'estado' => pagoEstadoOf(a, argentinaNow())
+          .estado
+          .index
+          .compareTo(pagoEstadoOf(b, argentinaNow()).estado.index),
       _ => 0,
     };
 
@@ -159,6 +177,7 @@ class _PagosScreenState extends ConsumerState<PagosScreen> {
   Widget build(BuildContext context) {
     final bucketsAsync = ref.watch(pagosBucketsProvider);
     final filtro = ref.watch(pagosFiltroProvider);
+    final periodo = ref.watch(pagosPeriodoProvider);
 
     // Alias de pago del trainer, para el mensaje de recordatorio (WU-07).
     final paymentAlias = ref.watch(
@@ -230,12 +249,19 @@ class _PagosScreenState extends ConsumerState<PagosScreen> {
             ),
           ),
 
-          // ── Filtro (chips) ──────────────────────────────────────────────────
+          // ── Filtro (chips) + ventana de tiempo ──────────────────────────────
+          //
+          // El selector de periodo va en la MISMA fila que los chips y no en
+          // una barra propia: son dos recortes de la misma lista —por estado y
+          // por fecha— y separarlos haria pensar que uno manda sobre el otro.
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
             child: TreinoFadeSlideIn(
               delay: AppMotion.stagger(2),
-              child: TreinoFilterChips(
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TreinoFilterChips(
                 options: _kFiltroLabels.values.toList(),
                 selected: {_kFiltroLabels[filtro]!},
                 badgeCounts: {
@@ -261,6 +287,20 @@ class _PagosScreenState extends ConsumerState<PagosScreen> {
                     }
                   }
                 },
+                  ),
+                  ),
+                  const SizedBox(width: AppSpacing.s12),
+                  _PeriodoSelector(
+                    periodo: periodo,
+                    onChanged: (p) {
+                      ref.read(pagosPeriodoProvider.notifier).state = p;
+                      // Igual que el cambio de pestaña: achicar la ventana
+                      // cambia la lista, y la pagina 3 de la anterior puede no
+                      // existir en la nueva.
+                      setState(() => _page = 0);
+                    },
+                  ),
+                ],
               ),
             ),
           ),
@@ -273,7 +313,11 @@ class _PagosScreenState extends ConsumerState<PagosScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(0, 20, 0, AppSpacing.s20),
             child: TreinoStateSwitcher(
-              childKey: ValueKey('pagos_filtro_${filtro.name}'),
+              // El periodo entra en la key: sin el, achicar la ventana
+              // reemplaza el contenido bajo la misma key y el switcher lo
+              // trata como el mismo widget — el cambio queda seco, sin el
+              // cross-fade que si tiene el cambio de pestaña.
+              childKey: ValueKey('pagos_${filtro.name}_${periodo.name}'),
               child: _tabBody(
                 bucketsAsync: bucketsAsync,
                 getPayments: switch (filtro) {
@@ -289,6 +333,7 @@ class _PagosScreenState extends ConsumerState<PagosScreen> {
                   PagosFiltro.todos => 'No hay pagos', // i18n
                 },
                 profiles: profiles,
+                periodo: periodo,
                 paymentAlias: paymentAlias,
               ),
             ),
@@ -306,11 +351,17 @@ class _PagosScreenState extends ConsumerState<PagosScreen> {
     required List<Payment> Function(PagosBuckets) getPayments,
     required String emptyMessage,
     required Map<String, UserPublicProfile> profiles,
+    required PagosPeriodo periodo,
     required String? paymentAlias,
   }) {
-    final payments = bucketsAsync.valueOrNull != null
+    final todos = bucketsAsync.valueOrNull != null
         ? getPayments(bucketsAsync.valueOrNull!)
         : const <Payment>[];
+
+    // La ventana recorta ANTES que todo lo demás: el conteo del pie, el «hay
+    // más de una página» y el `showActions` tienen que hablar de la lista que
+    // el PF está viendo, no de la que habría sin filtro.
+    final payments = filtrarPorPeriodo(todos, periodo);
 
     // La columna ACCIONES aparece si ALGUNA fila tiene algo para ofrecer, y
     // eso lo dicen los datos — no la pestaña en la que estas parado.
@@ -339,7 +390,9 @@ class _PagosScreenState extends ConsumerState<PagosScreen> {
         bucketsAsync.when(
           loading: () => 'loading',
           error: (_, __) => 'error',
-          data: (b) => getPayments(b).isEmpty ? 'empty' : 'data',
+          data: (b) => filtrarPorPeriodo(getPayments(b), periodo).isEmpty
+              ? 'empty'
+              : 'data',
         ),
       ),
       child: Column(
@@ -376,6 +429,63 @@ class _PagosScreenState extends ConsumerState<PagosScreen> {
             onPageChanged: (p) => setState(() => _page = p),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── _PeriodoSelector ────────────────────────────────────────────────────────
+
+/// Ventana de tiempo del listado. Un menú y no cuatro chips más: la fila ya
+/// tiene cuatro chips de estado, y sumarle cuatro de fecha convierte el filtro
+/// en la mitad de la pantalla.
+class _PeriodoSelector extends StatelessWidget {
+  const _PeriodoSelector({required this.periodo, required this.onChanged});
+
+  final PagosPeriodo periodo;
+  final ValueChanged<PagosPeriodo> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return TreinoPopupMenuButton<PagosPeriodo>(
+      key: const Key('pagos_periodo_selector'),
+      tooltip: 'Ventana de tiempo', // i18n
+      onSelected: onChanged,
+      itemBuilder: (_) => [
+        for (final p in PagosPeriodo.values)
+          PopupMenuItem(
+            key: Key('pagos_periodo_${p.name}'),
+            value: p,
+            child: Text(p.label),
+          ),
+      ],
+      icon: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.s12,
+          vertical: AppSpacing.s8,
+        ),
+        decoration: BoxDecoration(
+          border: Border.all(color: palette.border),
+          borderRadius: BorderRadius.circular(AppRadius.full),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(TreinoIcon.calendar, size: 14, color: palette.textMuted),
+            const SizedBox(width: AppSpacing.hairline),
+            Text(
+              periodo.label,
+              style: TextStyle(
+                fontFamily: AppFonts.barlow,
+                fontSize: AppTextSize.caption,
+                color: palette.textPrimary,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.hairline),
+            Icon(TreinoIcon.chevronDown, size: 12, color: palette.textMuted),
+          ],
+        ),
       ),
     );
   }

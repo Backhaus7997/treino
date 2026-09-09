@@ -153,7 +153,14 @@ class PagosWebTable extends StatelessWidget {
             label: 'VENCIMIENTO',
             sortable: true,
             flex: 2), // i18n
-        const CoachHubColumn(key: 'estado', label: 'ESTADO', flex: 2), // i18n
+        const CoachHubColumn(
+            key: 'estado',
+            label: 'ESTADO', // i18n
+            // Ordenable como las otras tres. Faltaba, y es la que agrupa: con
+            // los pendientes juntos arriba, «a quién le tengo que cobrar» se
+            // contesta de un vistazo en vez de saltando entre pestañas.
+            sortable: true,
+            flex: 2),
         if (showActions)
           const CoachHubColumn(
             key: 'acciones',
