@@ -83,7 +83,7 @@ class RoutineCard extends ConsumerWidget {
         decoration: BoxDecoration(
           color: palette.bgCard,
           border: Border.all(color: palette.border),
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
