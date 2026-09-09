@@ -28,7 +28,6 @@ import 'package:treino/features/coach/domain/athlete_note.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach_hub/presentation/sections/alumnos/alumno_detail_screen.dart';
-import 'package:treino/features/coach_hub/presentation/sections/chat/widgets/chat_detail_pane.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/payment_format.dart'
     show fmtDayMonth, nextDueDate;
 import 'package:treino/features/coach_hub/presentation/sections/alumnos/alumnos_screen.dart';
@@ -714,53 +713,6 @@ void main() {
       expect(anuncio('Privado, sin contenido'), findsOneWidget);
       expect(anuncio('Pagos, con cobro pendiente'), findsOneWidget);
       handle.dispose();
-    });
-
-    testWidgets(
-        'Chat: el header muestra el nombre real SIN depender de '
-        'chatsForCurrentUserProvider (root cause del flash original — ese '
-        'stream está cold acá y el fix nunca debería tocarlo)', (tester) async {
-      await _pump(
-        tester,
-        profile: _prof(name: 'Agustín'),
-        link: _link(TrainerLinkStatus.active),
-        extraOverrides: [
-          // Si `_Header` cayera al camino viejo (derivar otherUid escaneando
-          // chatsForCurrentUserProvider) esto explotaría o dejaría el nombre
-          // colgado en el placeholder — el fix pasa `peerUid` directo y
-          // nunca debería leer este provider en el contexto del Chat tab.
-          chatsForCurrentUserProvider.overrideWith(
-            (ref) => Stream<List<Chat>>.error(
-              StateError('chatsForCurrentUserProvider should not be read '
-                  'from the alumno-detail Chat tab'),
-            ),
-          ),
-        ],
-      );
-
-      // El chat dejó de ser pestaña: se abre desde la acción del header.
-      await tester.tap(find.byTooltip('Chat'));
-      await tester.pumpAndSettle();
-
-      // Scoped a ChatDetailPane: el header de arriba (misma pantalla)
-      // TAMBIÉN muestra "Agustín" — sería un false-positive si buscáramos
-      // el texto sin acotar. Lo que este test prueba es específicamente que
-      // el header DEL CHAT PANE (antes vacío/placeholder) ahora resuelve el
-      // nombre.
-      final chatPane = find.byType(ChatDetailPane);
-      expect(chatPane, findsOneWidget);
-      expect(
-        find.descendant(of: chatPane, matching: find.text('Agustín')),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(of: chatPane, matching: find.text('Usuario eliminado')),
-        findsNothing,
-      );
-      expect(
-        find.descendant(of: chatPane, matching: find.text('…')),
-        findsNothing,
-      );
     });
 
     testWidgets(
@@ -1677,7 +1629,16 @@ void main() {
           GoRoute(
             path: '/alumnos/:id',
             builder: (_, s) => Scaffold(
-                body: AlumnoDetailScreen(athleteId: s.pathParameters['id']!)),
+              body: AlumnoDetailScreen(
+                athleteId: s.pathParameters['id']!,
+                tabInicial: s.uri.queryParameters['tab'],
+              ),
+            ),
+          ),
+          // Doble del Chat global: alcanza con que diga que se llego.
+          GoRoute(
+            path: '/chat',
+            builder: (_, __) => const Scaffold(body: Text('CHAT GLOBAL')),
           ),
         ],
       );
@@ -1698,6 +1659,16 @@ void main() {
             measurementsForAthleteProvider
                 .overrideWith((ref, id) => Stream.value(const <Measurement>[])),
             gymsProvider.overrideWith((ref) => const <Gym>[]),
+            // El boton de Chat del header resuelve/crea el chat 1-1 antes de
+            // navegar; sin este stub pega contra Firestore real y la
+            // navegacion nunca llega.
+            chatForOtherUidProvider.overrideWith(
+              (ref, otherUid) async => Chat(
+                chatId: 'chat_$otherUid',
+                members: ['trainer-1', otherUid],
+                createdAt: DateTime.utc(2026, 1, 1),
+              ),
+            ),
             trainerLinkRepositoryProvider.overrideWithValue(repo),
             // El detalle abre en Resumen (W2 PR4), que lee estos providers.
             sessionsByUidProvider.overrideWith((ref, id) => const <Session>[]),
@@ -1730,6 +1701,53 @@ void main() {
       );
       await tester.pumpAndSettle();
     }
+
+    testWidgets('el boton de Chat del header NAVEGA al chat, no abre un modal',
+        (tester) async {
+      // Antes abria un `Dialog` con la conversacion adentro. El PF lo tocaba
+      // esperando ir al chat y se quedaba en un modal: «si toco el chat que me
+      // redirija al chat directamente».
+      //
+      // Es el mismo destino al que lleva el boton de chat del roster —misma
+      // funcion compartida—, asi que el mismo icono lleva al mismo lugar desde
+      // los dos lados.
+      await pumpRouter(tester, repo: _MockRepo());
+      await tester.tap(find.text('Sofía'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Chat'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('CHAT GLOBAL'), findsOneWidget);
+      // Y no quedo un modal encima: se NAVEGA, no se superpone.
+      expect(find.byType(Dialog), findsNothing);
+    });
+
+    testWidgets('entrar con ?tab=plan abre la ficha en Plan, no en Resumen',
+        (tester) async {
+      // Es el camino que usa Nutricion: «si entro a un alumno, que me mande
+      // directamente al apartado para cargarle plan nutricional, derecho».
+      await pumpRouter(tester, repo: _MockRepo());
+      final router = GoRouter.of(tester.element(find.text('Sofía')));
+      router.push('/alumnos/a1?tab=plan');
+      await tester.pumpAndSettle();
+
+      // El heatmap es marcador exclusivo del Resumen: si estuviera, la ficha
+      // habria abierto en la pestana de siempre.
+      expect(find.text('ADHERENCIA · 12 SEMANAS'), findsNothing);
+    });
+
+    testWidgets('una clave de tab inexistente abre en Resumen y no rompe',
+        (tester) async {
+      // La URL la puede escribir cualquiera, y un link viejo tiene que abrir
+      // la ficha, no romperla.
+      await pumpRouter(tester, repo: _MockRepo());
+      final router = GoRouter.of(tester.element(find.text('Sofía')));
+      router.push('/alumnos/a1?tab=noExiste');
+      await tester.pumpAndSettle();
+
+      expect(find.text('ADHERENCIA · 12 SEMANAS'), findsOneWidget);
+    });
 
     testWidgets('tap en la fila del roster navega al detalle', (tester) async {
       await pumpRouter(tester, repo: _MockRepo());

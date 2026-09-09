@@ -20,8 +20,19 @@ final List<RouteBase> alumnosRoutes = [
   ),
   GoRoute(
     path: '/alumnos/:id',
+    // `?tab=` elige la seccion de entrada. Sin esto, entrar a un alumno DESDE
+    // Nutricion caia en Resumen y habia que buscar la pestana a mano: el PF lo
+    // pidio como «si entro a un alumno, que me mande directamente al apartado
+    // para cargarle plan nutricional, derecho».
+    //
+    // Un query param y no un path nuevo: la ficha es la misma pantalla, y un
+    // `/alumnos/:id/plan` obligaria a mantener una ruta por pestana.
     pageBuilder: (_, state) => coachHubPageAnimated(
-        AlumnoDetailScreen(athleteId: state.pathParameters['id']!)),
+      AlumnoDetailScreen(
+        athleteId: state.pathParameters['id']!,
+        tabInicial: state.uri.queryParameters['tab'],
+      ),
+    ),
   ),
 ];
 

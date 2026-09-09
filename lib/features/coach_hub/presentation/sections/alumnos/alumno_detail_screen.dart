@@ -33,8 +33,8 @@ import 'package:treino/features/coach/domain/nutrition_plan.dart';
 import 'package:treino/features/coach/domain/nutrition_plan_presets.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
+import 'package:treino/features/coach_hub/presentation/sections/chat/abrir_chat_con_alumno.dart';
 import 'package:treino/features/coach_hub/presentation/sections/chat/widgets/avatar_color.dart';
-import 'package:treino/features/coach_hub/presentation/sections/chat/widgets/chat_detail_pane.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/gyms/application/gym_providers.dart';
 import 'package:treino/features/insights/domain/chart_period.dart';
@@ -230,9 +230,31 @@ final alumnoDetailIndicatorsProvider =
 /// contienen un segundo nivel segmentado. Renderiza DENTRO del shell, sin
 /// Scaffold (ADR-CHW-005).
 class AlumnoDetailScreen extends ConsumerWidget {
-  const AlumnoDetailScreen({super.key, required this.athleteId});
+  const AlumnoDetailScreen({
+    super.key,
+    required this.athleteId,
+    this.tabInicial,
+  });
 
   final String athleteId;
+
+  /// Seccion en la que abrir la ficha, por su clave (`plan`, `entrenamiento`,
+  /// `pagos`, …). `null` abre en Resumen, que es el comportamiento de siempre.
+  ///
+  /// Se compara contra [_clavesDeTab] y NO contra la etiqueta visible: las
+  /// etiquetas son copy —cambian en la pasada de i18n— y una URL no puede
+  /// depender de eso.
+  final String? tabInicial;
+
+  /// Clave estable de cada pestana, en el mismo orden que [_tabs].
+  static const _clavesDeTab = <String>[
+    'resumen',
+    'entrenamiento',
+    'progreso',
+    'plan',
+    'privado',
+    'pagos',
+  ];
 
   static const _tabs = <String>[
     'Resumen', // i18n: Fase W2
@@ -312,7 +334,13 @@ class AlumnoDetailScreen extends ConsumerWidget {
 
     return DefaultTabController(
       length: _tabs.length,
-      initialIndex: _resumenIndex,
+      initialIndex: () {
+        final i = _clavesDeTab.indexOf(tabInicial ?? '');
+        // Una clave que no existe cae en Resumen en vez de tirar: la URL la
+        // puede escribir cualquiera, y un link viejo tiene que abrir la ficha,
+        // no romperla.
+        return i < 0 ? _resumenIndex : i;
+      }(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -331,7 +359,14 @@ class AlumnoDetailScreen extends ConsumerWidget {
                   gymName: gymName,
                   billing: billing,
                   onPago: () => registrarPago(context, ref, athleteId),
-                  onChat: () => _abrirChat(context, athleteId),
+                  // Va al Chat, no a un modal. El PF tocaba este botón
+                  // esperando el chat y se quedaba adentro de un `Dialog`:
+                  // «si toco el chat que me redirija al chat directamente».
+                  //
+                  // Es EXACTAMENTE lo que hace el botón de chat del roster
+                  // —misma función compartida—, así que el mismo ícono lleva
+                  // al mismo lugar desde los dos lados.
+                  onChat: () => abrirChatConAlumno(context, ref, athleteId),
                   chatSinLeer:
                       indicators.chat == AlumnoGrupoEstado.requiereAtencion,
                   palette: palette,
@@ -761,23 +796,6 @@ class _SeccionesTabBar extends StatelessWidget {
 }
 
 /// Abre el chat con el alumno en un panel, sin salir de la ficha.
-Future<void> _abrirChat(BuildContext context, String athleteId) {
-  return showDialog<void>(
-    context: context,
-    builder: (ctx) {
-      final palette = AppPalette.of(ctx);
-      return Dialog(
-        backgroundColor: palette.bgCard,
-        insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 720, maxHeight: 640),
-          child: _ChatTab(athleteId: athleteId),
-        ),
-      );
-    },
-  );
-}
-
 /// Botón de chat del header, con punto cuando hay mensajes sin leer.
 class _ChatAction extends StatelessWidget {
   const _ChatAction({
@@ -882,46 +900,6 @@ class _Dot extends StatelessWidget {
         height: 8,
         decoration: BoxDecoration(color: color, shape: BoxShape.circle),
       );
-}
-
-class _ChatTab extends ConsumerWidget {
-  const _ChatTab({required this.athleteId});
-  final String athleteId;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final palette = AppPalette.of(context);
-    final chatAsync = ref.watch(chatForOtherUidProvider(athleteId));
-    // El nombre ya está cargado en el header de la ficha (mismo provider,
-    // warm) — se lo pasamos al pane para evitar el flash "Usuario eliminado"
-    // → "…" al abrir el chat.
-    final peerName = ref
-        .watch(userPublicProfileProvider(athleteId))
-        .valueOrNull
-        ?.displayName;
-    return TreinoStateSwitcher(
-      childKey: ValueKey(chatAsync.when(
-        loading: () => 'loading',
-        error: (_, __) => 'error',
-        data: (_) => 'data',
-      )),
-      child: chatAsync.when(
-        loading: () => const CoachHubSkeleton(filas: 3),
-        error: (_, __) => Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-          child: Text(
-            'No pudimos abrir el chat. Reintentá.', // i18n: Fase W2
-            style: TextStyle(color: palette.textMuted, fontSize: 15),
-          ),
-        ),
-        data: (chat) => ChatDetailPane(
-          chatId: chat.chatId,
-          peerUid: athleteId,
-          peerNameInitial: peerName,
-        ),
-      ),
-    );
-  }
 }
 
 class _PlanTab extends StatelessWidget {

@@ -95,7 +95,22 @@ class NutricionScreen extends ConsumerWidget {
                         ),
                         entry: entry,
                         onTap: () =>
-                            context.go('/alumnos/${entry.link.athleteId}'),
+                            // `push` y no `go`, y con `?tab=plan`.
+                            //
+                            // Con `go` la entrada de historial se REEMPLAZA:
+                            // para el router el PF estaba en Alumnos, asi que
+                            // la flecha atras lo devolvia ahi y no a
+                            // Nutricion. Y sin el `tab` caia en Resumen y
+                            // tenia que buscar la pestana a mano.
+                            //
+                            // Las dos mitades del mismo reporte: «si entro a
+                            // un alumno, que me mande directamente al
+                            // apartado para cargarle plan nutricional,
+                            // derecho, y si vuelvo atras me manda a la lista
+                            // de alumnos, no de nutricion».
+                            context.push(
+                              '/alumnos/${entry.link.athleteId}?tab=plan',
+                            ),
                       ),
                       if (entry != filtered.last)
                         const SizedBox(height: AppSpacing.s8),
