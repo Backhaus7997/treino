@@ -5581,6 +5581,12 @@ class _SetTableState extends State<_SetTable> {
 
     messenger.showSnackBar(
       SnackBar(
+        // `persist: false` A MANO. `SnackBar` hace
+        // `persist = persist ?? action != null`: con acción es eterno por
+        // default, así que este cartel se quedaba hasta recargar. Es el
+        // gemelo del que el PF reportó en el editor web.
+        persist: false,
+        duration: const Duration(seconds: 6),
         content: Text(l10n.routineEditorFillKgApplied),
         action: SnackBarAction(
           key: const Key('fill_kg_undo_action'),

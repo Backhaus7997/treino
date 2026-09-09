@@ -4,6 +4,7 @@
 
 import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseException;
 import 'package:flutter/material.dart';
+import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -2864,6 +2865,49 @@ void main() {
       // Y vuelve entero: Deshacer restaura la máscara ANTERIOR, no un `add`
       // de la semana — la anterior podía ser vacía («en todas»).
       expect(enElEditor(find.text('Press de Banca')), findsOneWidget);
+    });
+
+    testWidgets('el cartel se va SOLO, no se queda hasta recargar',
+        (tester) async {
+      // El PF: «llega esta notificación y no desaparece hasta que recargo la
+      // página». No era timing: `SnackBar` hace
+      // `persist = persist ?? action != null`, o sea que CUALQUIER cartel con
+      // acción es eterno por default y `ScaffoldMessenger` ni le agenda el
+      // timer. Éste trae «Deshacer», así que se quedaba para siempre.
+      await borrarSoloEstaSemana(tester);
+      expect(find.textContaining('sale de la Semana'), findsOneWidget);
+
+      // Sigue estando a los 5 s: la ventana para tocar Deshacer es real.
+      await tester.pump(const Duration(seconds: 5));
+      expect(find.textContaining('sale de la Semana'), findsOneWidget);
+
+      // Y se va solo a los 6.
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pump(const Duration(milliseconds: 500)); // animación de salida
+      expect(find.textContaining('sale de la Semana'), findsNothing);
+    });
+
+    testWidgets('el cartel NO sobrevive a irse de la pantalla', (tester) async {
+      // En la captura del PF el cartel del editor aparece sobre la sección de
+      // CHAT: se fue de la pantalla y el aviso lo siguió. Un `SnackBar` vive
+      // en el `ScaffoldMessenger` de la app, no en la ruta, así que sobrevive
+      // al pop — y su «Deshacer» apunta a un editor que ya no está.
+      await borrarSoloEstaSemana(tester);
+      expect(find.textContaining('sale de la Semana'), findsOneWidget);
+
+      // Se va del editor. Está sucio, así que el PopScope pregunta.
+      await tester.tap(find.byIcon(TreinoIcon.arrowLeft));
+      await tester.pumpAndSettle();
+      // El editor está sucio: el PopScope pregunta antes de dejar salir.
+      expect(find.text('¿Descartar los cambios?'), findsOneWidget);
+      await tester.tap(find.text('Descartar'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('sale de la Semana'),
+        findsNothing,
+        reason: 'el aviso es de ESTA pantalla: no puede seguirte a otra',
+      );
     });
 
     testWidgets('apagar el chip de la semana en curso avisa igual',
