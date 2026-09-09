@@ -15,8 +15,7 @@ import 'package:treino/features/coach/data/trainer_link_promotion_service.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_entitlement.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
-import 'package:treino/features/coach_hub/presentation/sections/chat/chat_section_screen.dart'
-    show selectedChatIdProvider;
+import 'package:treino/features/coach_hub/presentation/sections/chat/abrir_chat_con_alumno.dart';
 import 'package:treino/features/coach_hub/presentation/sections/nutricion/nutricion_providers.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/marcar_pagado_actions.dart'
     show registrarPago;
@@ -1107,17 +1106,8 @@ class _RowActionsState extends ConsumerState<_RowActions> {
   /// del Coach Hub dejando la conversación ya seleccionada
   /// (`selectedChatIdProvider`, mismo mecanismo que usa `ChatListPane` al
   /// tocar un ítem de la lista).
-  Future<void> _openChat(BuildContext context, WidgetRef ref) async {
-    // El router se captura ANTES del await: las filas del roster se
-    // rebuildean por sus streams y el context de la fila puede morir mientras
-    // getOrCreate resuelve — con `if (!context.mounted) return` la navegación
-    // se perdía silenciosamente (bug reportado en revisión en vivo).
-    final router = GoRouter.of(context);
-    final chat =
-        await ref.read(chatForOtherUidProvider(widget.link.athleteId).future);
-    ref.read(selectedChatIdProvider.notifier).state = chat.chatId;
-    router.go('/chat');
-  }
+  Future<void> _openChat(BuildContext context, WidgetRef ref) =>
+      abrirChatConAlumno(context, ref, widget.link.athleteId);
 
   @override
   Widget build(BuildContext context) {
