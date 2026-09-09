@@ -467,11 +467,11 @@
   "coachHubAlumnosLastWorkoutToday": "Hoy",
   "coachHubAlumnosStatusActive": "Activo",
   "coachHubAlumnosStatusDebt": "Con deuda",
-  "coachHubAlumnosStatusBlocked": "Bloqueado",
+  "coachHubAlumnosStatusBlocked": "Sin acceso",
   "@coachHubAlumnosStatusBlocked": {
     "description": "Coach Hub alumnos — status badge for a link blocked by the trainer plan limit (paywall Fase 7 downgrade). NOT the athlete fault: the trainer subscription lapsed."
   },
-  "coachHubAlumnosFilterBloqueados": "Bloqueados",
+  "coachHubAlumnosFilterBloqueados": "Sin acceso",
   "@coachHubAlumnosFilterBloqueados": {
     "description": "Coach Hub web alumnos section — filter chip for athletes blocked by the plan limit."
   },

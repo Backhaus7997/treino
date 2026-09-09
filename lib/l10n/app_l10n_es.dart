@@ -2607,10 +2607,10 @@ class AppL10nEs extends AppL10n {
   String get coachHubAlumnosStatusDebt => 'Con deuda';
 
   @override
-  String get coachHubAlumnosStatusBlocked => 'Bloqueado';
+  String get coachHubAlumnosStatusBlocked => 'Sin acceso';
 
   @override
-  String get coachHubAlumnosFilterBloqueados => 'Bloqueados';
+  String get coachHubAlumnosFilterBloqueados => 'Sin acceso';
 
   @override
   String get coachHubAlumnosBlockedHint =>
@@ -6994,10 +6994,10 @@ class AppL10nEsAr extends AppL10nEs {
   String get coachHubAlumnosStatusDebt => 'Con deuda';
 
   @override
-  String get coachHubAlumnosStatusBlocked => 'Bloqueado';
+  String get coachHubAlumnosStatusBlocked => 'Sin acceso';
 
   @override
-  String get coachHubAlumnosFilterBloqueados => 'Bloqueados';
+  String get coachHubAlumnosFilterBloqueados => 'Sin acceso';
 
   @override
   String get coachHubAlumnosBlockedHint =>
