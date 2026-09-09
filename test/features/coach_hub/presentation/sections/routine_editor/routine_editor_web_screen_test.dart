@@ -2652,6 +2652,74 @@ void main() {
     );
   });
 
+  group('RoutineEditorWebScreen — plegar el dia', () {
+    // El editor web dibuja TODOS los dias a la vez —a diferencia del mobile,
+    // que muestra uno por pestana—, asi que una rutina de 4 dias por 5
+    // ejercicios es una pagina que no termina mas. `_EditorSlot.expandido` ya
+    // resolvia esto para el EJERCICIO; faltaba la misma pieza para el DIA.
+
+    testWidgets('arranca abierto: cerrar por default esconderia trabajo',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any())).thenAnswer((_) async => _simpleRoutine());
+      await _pumpEditor(tester, repo: repo, routineId: 'r1');
+
+      expect(enElEditor(find.text('Press de Banca')), findsOneWidget);
+      expect(find.byKey(const Key('day_collapse_toggle_1')), findsOneWidget);
+    });
+
+    testWidgets('el chevron cierra el dia y deja el conteo en su lugar',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any())).thenAnswer((_) async => _simpleRoutine());
+      await _pumpEditor(tester, repo: repo, routineId: 'r1');
+
+      await tester.tap(find.byKey(const Key('day_collapse_toggle_1')));
+      await tester.pumpAndSettle();
+
+      // Los ejercicios se van del formulario. El `enElEditor` importa: el
+      // panel lateral lista el catalogo completo y matchearia igual.
+      expect(enElEditor(find.text('Press de Banca')), findsNothing);
+      // Sin el conteo, una card cerrada no se distingue de un dia vacio.
+      expect(find.text('1 ejercicio'), findsOneWidget);
+    });
+
+    testWidgets('vuelve a abrir con el mismo chevron', (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any())).thenAnswer((_) async => _simpleRoutine());
+      await _pumpEditor(tester, repo: repo, routineId: 'r1');
+
+      await tester.tap(find.byKey(const Key('day_collapse_toggle_1')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('day_collapse_toggle_1')));
+      await tester.pumpAndSettle();
+
+      expect(enElEditor(find.text('Press de Banca')), findsOneWidget);
+      expect(find.text('1 ejercicio'), findsNothing);
+    });
+
+    testWidgets('un dia con error MUESTRA su punto aunque este cerrado',
+        (tester) async {
+      // Un ejercicio recien agregado viene sin reps: el dia queda invalido y
+      // bloquea el guardado. Si al plegarlo se escondiera el aviso, el PF
+      // buscaria el problema en cualquier otro lado.
+      await _pumpEditor(tester);
+      // Se agrega desde el panel lateral, que en desktop esta siempre abierto
+      // (#860) y reemplaza al boton "Agregar ejercicio" del dia.
+      await tester.tap(find.text('Press de Banca'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Agregar (1)'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('day_error_dot_1')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('day_collapse_toggle_1')));
+      await tester.pumpAndSettle();
+
+      expect(enElEditor(find.text('Press de Banca')), findsNothing);
+      expect(find.byKey(const Key('day_error_dot_1')), findsOneWidget);
+    });
+  });
+
   group('RoutineEditorWebScreen — el ejercicio ausente es INERTE', () {
     // El PF le da "eliminar" a un ejercicio de una rutina de varias semanas,
     // elige "solo esta semana", y lo ve atenuado en vez de desaparecer. Eso es
