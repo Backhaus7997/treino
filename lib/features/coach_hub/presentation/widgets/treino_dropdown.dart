@@ -88,6 +88,8 @@ class TreinoPopupMenuButton<T> extends StatelessWidget {
     this.child,
     this.initialValue,
     this.padding = const EdgeInsets.all(AppSpacing.s8),
+    this.iconSize,
+    this.style,
   }) : assert(icon == null || child == null);
 
   final PopupMenuItemBuilder<T> itemBuilder;
@@ -97,6 +99,20 @@ class TreinoPopupMenuButton<T> extends StatelessWidget {
   final Widget? child;
   final T? initialValue;
   final EdgeInsetsGeometry padding;
+
+  /// Tamaño del ícono. En null usa el default de `PopupMenuButton`, que es
+  /// **24**: al lado de una fila de íconos de 18 el ⋮ mide de más.
+  final double? iconSize;
+
+  /// Estilo del `IconButton` interno.
+  ///
+  /// Es la ÚNICA forma de controlar su caja. `PopupMenuButton` le reenvía
+  /// `padding`, `iconSize` y `style`, pero **no `constraints`** — ese
+  /// parámetro suyo es para el MENÚ, no para el botón (ver `popup_menu.dart`,
+  /// donde arma el `IconButton`). Quien necesite que el ⋮ mida igual que sus
+  /// hermanos de un `Row` pasa un `IconButton.styleFrom(...)` con
+  /// `minimumSize`, `padding` y `tapTargetSize`.
+  final ButtonStyle? style;
 
   @override
   Widget build(BuildContext context) {
@@ -124,6 +140,8 @@ class TreinoPopupMenuButton<T> extends StatelessWidget {
         tooltip: tooltip,
         initialValue: initialValue,
         padding: padding,
+        iconSize: iconSize,
+        style: style,
         color: TreinoCardTokens.background(context),
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(

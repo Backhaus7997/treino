@@ -1101,6 +1101,46 @@ void main() {
       expect(tester.getCenter(find.byTooltip('Chat')).dx, xConMenu);
     });
 
+    testWidgets('los cuatro botones de acción miden IGUAL', (tester) async {
+      // El PF: «todos estos botoncitos están horribles». Lo objetivo debajo de
+      // eso: el ⋮ no es el mismo componente que sus tres hermanos.
+      // `PopupMenuButton` usa `iconSize` 24 por default y le suma 8 de
+      // padding, o sea 40x40 al lado de los 32x32 de `_IconAction`. Ocho
+      // píxeles de más, con la píldora de hover saliendo de otro tamaño y
+      // otro centro — que es lo que se ve en su captura.
+      await _pump(
+        tester,
+        links: [_link('a1', TrainerLinkStatus.active)],
+        profiles: [_prof('a1', 'Sofía')],
+      );
+
+      // El `IconButton` que envuelve al tooltip, no el tooltip: la caja que
+      // ocupa la fila es la del botón. Los dos componentes —`IconButton` y
+      // `PopupMenuButton`— terminan en uno.
+      Size cajaDe(String tooltip) => tester.getSize(
+            find
+                .ancestor(
+                  of: find.byTooltip(tooltip),
+                  matching: find.byType(IconButton),
+                )
+                .first,
+          );
+
+      final chat = cajaDe('Chat');
+      final rutinas = cajaDe('Rutinas');
+      final pago = cajaDe('Registrar pago');
+      final menu = cajaDe('Opciones del alumno');
+
+      expect(rutinas, chat, reason: 'los tres rápidos ya coincidían');
+      expect(pago, chat);
+      expect(
+        menu,
+        chat,
+        reason: 'el ⋮ es otro componente y hay que igualarlo A MANO: '
+            'sin `iconSize`/`constraints` propios mide 40x40 contra 32x32',
+      );
+    });
+
     testWidgets('tap en Chat resuelve/crea el chat y navega a /chat',
         (tester) async {
       await _pump(
