@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -111,6 +112,42 @@ bool _labelOculto(WidgetTester tester, String label) {
 }
 
 void main() {
+  testWidgets('CONTROL: sin hover no hay ningun Text vacio en el sidebar',
+      (tester) async {
+    await _pumpSidebar(tester);
+    expect(find.text('', findRichText: true), findsNothing);
+  });
+
+  testWidgets('expandido, el hover NO deja un tooltip vacío en pantalla',
+      (tester) async {
+    // El PF mandó una captura de un CUADRADO OSCURO flotando entre dos items
+    // del sidebar. Es un `Tooltip` con `message: ''`: se centra sobre su
+    // target y cae 24 px abajo, o sea justo en el hueco entre el item que se
+    // hoverea y el de abajo.
+    //
+    // El comentario de `coach_hub_sidebar.dart` afirmaba que «el Tooltip con
+    // mensaje vacío no se muestra». No es cierto: Flutter no chequea el
+    // mensaje, arma la burbuja igual y queda una caja sin texto.
+    await _pumpSidebar(tester); // expandido: los labels ya se leen
+
+    final item = find.text('Chat');
+    expect(item, findsOneWidget);
+
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    addTearDown(() => mouse.removePointer());
+    await mouse.addPointer(location: Offset.zero);
+    await mouse.moveTo(tester.getCenter(item));
+    await tester.pump();
+    // `waitDuration` del tooltip es 200 ms.
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(
+      find.text('', findRichText: true),
+      findsNothing,
+      reason: 'expandido el label ya está en pantalla: no va ninguna burbuja',
+    );
+  });
+
   testWidgets(
       'expandido → 240px, header con el wordmark, 2 headers (GESTIÓN, RECURSOS) y '
       'todos los labels del registry [SCENARIO-750]', (tester) async {
@@ -666,12 +703,32 @@ void main() {
     expect(_labelOculto(tester, 'Dashboard'), isTrue);
   });
 
-  testWidgets('expandido → sin tooltip: el label ya está en pantalla',
-      (tester) async {
+  testWidgets('expandido el Tooltip existe pero está APAGADO', (tester) async {
+    // Este test decía `find.byTooltip('Dashboard'), findsNothing` y pasaba —
+    // porque expandido el mensaje era `''`, así que no había ningún Tooltip
+    // con ESE mensaje. Y mientras tanto la burbuja vacía se dibujaba igual.
+    //
+    // O sea: el test verificaba el MECANISMO (qué string tenía el mensaje) en
+    // vez de la conducta (si aparece algo en pantalla), y por eso el cuadrado
+    // negro llegó a producción con la suite en verde. Ahora el mensaje es
+    // siempre el label —quien apaga es `TooltipVisibility`— y lo que se afirma
+    // es que no aparece NADA al hoverear, arriba en este mismo archivo.
     await _pumpSidebar(tester);
 
     expect(find.text('Dashboard'), findsOneWidget);
-    expect(find.byTooltip('Dashboard'), findsNothing);
+    // El widget está —tiene que estar, o cambiaría la forma del árbol y el
+    // label volvería a saltar al colapsar— y lleva su mensaje real.
+    expect(find.byTooltip('Dashboard'), findsOneWidget);
+
+    final visibility = tester.widget<TooltipVisibility>(
+      find
+          .ancestor(
+            of: find.byTooltip('Dashboard'),
+            matching: find.byType(TooltipVisibility),
+          )
+          .first,
+    );
+    expect(visibility.visible, isFalse, reason: 'expandido no se dispara');
   });
 }
 

@@ -305,6 +305,13 @@ Appointment _appointment({
 
 Future<void> _pump(
   WidgetTester tester, {
+  /// Tema del harness. Por defecto OSCURO, como el resto de la suite.
+  ///
+  /// Es un parámetro y no una constante porque en oscuro `accent` y
+  /// `accentText` son EL MISMO color: cualquier bug de contraste que dependa
+  /// de esa diferencia es invisible acá, y ya nos pasó. Los tests de color
+  /// pasan `AppTheme.light()`.
+  ThemeData? theme,
   UserPublicProfile? profile,
   TrainerLink? link,
   List<Measurement> measurements = const [],
@@ -424,7 +431,7 @@ Future<void> _pump(
         supportedLocales: AppL10n.supportedLocales,
         localeResolutionCallback: (l, s) =>
             resolveLocale(l ?? const Locale('es', 'AR'), s),
-        theme: AppTheme.dark(),
+        theme: theme ?? AppTheme.dark(),
         home: const Scaffold(body: AlumnoDetailScreen(athleteId: 'a1')),
       ),
     ),
@@ -497,6 +504,55 @@ void main() {
       );
 
       expect(find.text('\$9.000 · Semanal'), findsOneWidget);
+    });
+
+    testWidgets('header: «Pago» se LEE y hace juego con el botón de chat',
+        (tester) async {
+      // El PF: «esos dos botones en la ficha del alumno están feos». Dos cosas
+      // objetivas debajo de eso:
+      //
+      // 1. «Pago» pintaba con `palette.accent`, que es un color de FONDO. Como
+      //    texto sobre la card blanca mide 1,64:1 contra los 4,5 de WCAG AA:
+      //    se veía lavado. `accentText` es el acento legible como texto (en
+      //    oscuro son el mismo color, por eso el tema oscuro nunca lo mostró).
+      // 2. Los dos pills son hermanos y tenían padding horizontal distinto,
+      //    14 contra 12. Dos pills contiguas que difieren en 2 px se leen como
+      //    un error de alineación.
+      // EN CLARO a propósito: en oscuro `accent` y `accentText` son el mismo
+      // color y este test no distinguiría nada. La primera versión corría en
+      // el tema por defecto y pasaba con el bug puesto — lo cazó el control
+      // negativo, no el test.
+      await _pump(tester, theme: AppTheme.light());
+      await tester.pumpAndSettle();
+
+      final ctx = tester.element(find.widgetWithText(OutlinedButton, 'Pago'));
+      final palette = AppPalette.of(ctx);
+
+      final pago = tester.widget<OutlinedButton>(
+        find.widgetWithText(OutlinedButton, 'Pago'),
+      );
+      final fg = pago.style!.foregroundColor!.resolve(<WidgetState>{})!;
+      expect(fg, palette.accentText, reason: 'texto, no fondo');
+
+      final sobreLaCard = _contraste(fg, palette.bgCard);
+      expect(
+        sobreLaCard,
+        greaterThanOrEqualTo(4.5),
+        reason: '«Pago» mide ${sobreLaCard.toStringAsFixed(2)}:1 sobre la '
+            'card. Con `accent` daba 1,64:1.',
+      );
+
+      // Y el par: mismo padding que el botón de chat.
+      final chat = tester.widget<OutlinedButton>(
+        find.ancestor(
+          of: find.byIcon(TreinoIcon.chat),
+          matching: find.byType(OutlinedButton),
+        ),
+      );
+      expect(
+        pago.style!.padding!.resolve(<WidgetState>{}),
+        chat.style!.padding!.resolve(<WidgetState>{}),
+      );
     });
 
     testWidgets('header: botón Pago abre el diálogo de registrar pago (W2 PR7)',
@@ -2315,4 +2371,13 @@ void main() {
       expect(find.text('Recordar'), findsOneWidget);
     });
   });
+}
+
+/// Contraste WCAG entre dos colores ya opacos.
+double _contraste(Color a, Color b) {
+  final la = a.computeLuminance();
+  final lb = b.computeLuminance();
+  final hi = la > lb ? la : lb;
+  final lo = la > lb ? lb : la;
+  return (hi + 0.05) / (lo + 0.05);
 }

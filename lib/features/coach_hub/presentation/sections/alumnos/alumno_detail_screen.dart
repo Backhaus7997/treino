@@ -597,19 +597,28 @@ class _Header extends StatelessWidget {
                 palette: palette,
               ),
               const SizedBox(width: 8),
+              // Par con `_ChatAction`: MISMO padding y misma altura. Tenían
+              // 14 y 12 de horizontal sin ninguna razón, y dos pills contiguas
+              // que difieren en 2 px se leen como un error de alineación.
               OutlinedButton(
                 onPressed: onPago,
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: palette.accent,
+                  // `accentText` y NO `accent`: esto es TEXTO. El acento
+                  // (mint500) sobre la card blanca mide 1,64:1 contra los 4,5
+                  // que pide WCAG AA — «Pago» se leía lavado, que es como el
+                  // PF lo reportó. En oscuro los dos son el mismo color, y por
+                  // eso la suite —que corre en oscuro— nunca lo vio.
+                  foregroundColor: palette.accentText,
                   side: BorderSide(color: palette.border),
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
                 child: const Text('Pago', // i18n: Fase W2
-                    style:
-                        TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    style: TextStyle(
+                        fontSize: AppTextSize.bodyDense,
+                        fontWeight: FontWeight.w600)),
               ),
             ],
           ),
