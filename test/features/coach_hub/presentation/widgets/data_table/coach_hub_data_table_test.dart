@@ -314,6 +314,54 @@ void main() {
     });
 
     // -------------------------------------------------------------------------
+    // El hover pinta EN EL MISMO FRAME, sin estela
+    // -------------------------------------------------------------------------
+    testWidgets('el hover llega a su color en UN frame', (tester) async {
+      // El PF: «parpadeo al pasar el cursor sobre una lista». La fila fundía
+      // su fondo en 180 ms, así que al barrer quedaban tres o cuatro
+      // encendidas a la vez — la anterior todavía apagándose cuando la
+      // siguiente ya prendió.
+      //
+      // Un puntero es manipulación directa: el fondo tiene que ESTAR donde
+      // está el cursor, no llegando. El assert es «un frame», no «rápido»:
+      // cualquier duración mayor a cero vuelve a dejar estela.
+      await tester.pumpWidget(_wrap(
+        CoachHubDataTable(
+          columns: _columns,
+          rows: _rows,
+          onRowTap: (_) {},
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      Color? fondoDeLaFila() {
+        final c = tester.widget<AnimatedContainer>(
+          find.byKey(const Key('data_table_row_1')),
+        );
+        return (c.decoration as BoxDecoration?)?.color;
+      }
+
+      final enReposo = fondoDeLaFila();
+
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      addTearDown(() => mouse.removePointer());
+      await mouse.addPointer(location: Offset.zero);
+      await mouse.moveTo(
+        tester.getCenter(find.byKey(const Key('data_table_row_1'))),
+      );
+      // UN solo frame. Con una animación de por medio, acá habría un color
+      // intermedio y no el final.
+      await tester.pump();
+
+      final enHover = fondoDeLaFila();
+      expect(enHover, isNot(enReposo), reason: 'el hover pinta');
+
+      // Y no se mueve más: ya está en su valor final.
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(fondoDeLaFila(), enHover, reason: 'sin animación pendiente');
+    });
+
+    // -------------------------------------------------------------------------
     // Sin onRowTap: fila no focusable, sin Semantics(button)
     // -------------------------------------------------------------------------
     testWidgets(

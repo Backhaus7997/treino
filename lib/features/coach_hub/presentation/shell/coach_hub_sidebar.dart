@@ -298,19 +298,24 @@ class _SidebarItemRowState extends State<_SidebarItemRow> {
                 : Colors.transparent;
 
         return AnimatedContainer(
-          // `tapFeedback` (120ms) y no `cardStateChange` (180): esto es el
-          // hover de una LISTA que se barre con el mouse, no el cambio de
-          // estado de una card suelta.
+          // EL HOVER NO ANIMA; el cambio de SELECCIÓN sí.
           //
-          // A 180ms, al pasar de un item al siguiente el fondo del anterior
-          // todavía se está apagando cuando el nuevo ya se encendió, y durante
-          // ese solapamiento se ven DOS filas resaltadas. No es que el hover
-          // esté en dos lados: es que la salida dura más que el gesto.
+          // Este comentario ya explicaba, bien, por qué 180 ms dejaba dos
+          // filas prendidas al barrer — y la respuesta de entonces fue bajarlo
+          // a 120. Ciento veinte deja una estela más corta, no ninguna: el PF
+          // volvió a reportarlo. Un puntero es manipulación directa y el fondo
+          // tiene que estar donde está el cursor, no llegando.
+          //
+          // La píldora del item ACTIVO sigue animando: ése cambia al navegar,
+          // una vez, y ahí el fundido dice que algo pasó. Por eso la duración
+          // depende de `active` y no es cero a secas.
           //
           // Barrer una lista de 11 items es de las cosas que más veces por día
           // hace el PF, y a esa frecuencia lo que se quiere es respuesta, no
           // suavidad.
-          duration: AppMotionTokens.resolve(ctx, AppMotionTokens.tapFeedback),
+          duration: active
+              ? AppMotionTokens.resolve(ctx, AppMotionTokens.tapFeedback)
+              : Duration.zero,
           curve: AppMotionTokens.enter,
           height: CoachHubLayoutTokens.sidebarItemHeight,
           margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
