@@ -2555,10 +2555,10 @@ class AppL10nEn extends AppL10n {
   String get coachHubAlumnosStatusDebt => 'Overdue';
 
   @override
-  String get coachHubAlumnosStatusBlocked => 'Blocked';
+  String get coachHubAlumnosStatusBlocked => 'No access';
 
   @override
-  String get coachHubAlumnosFilterBloqueados => 'Blocked';
+  String get coachHubAlumnosFilterBloqueados => 'No access';
 
   @override
   String get coachHubAlumnosBlockedHint =>

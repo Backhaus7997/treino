@@ -463,10 +463,39 @@ void main() {
       expect(find.text('ALUMNOS'), findsOneWidget);
       expect(find.text('Sofía'), findsOneWidget);
       expect(find.text('Diego'), findsOneWidget);
-      expect(find.text('Aldo'), findsOneWidget);
       expect(find.text('Activo'), findsOneWidget);
       expect(find.text('Pausado'), findsOneWidget);
-      expect(find.text('Inactivo'), findsOneWidget);
+
+      // Aldo tiene el vinculo TERMINADO, y «Todos» son tus alumnos, no el
+      // archivo historico. Este test afirmaba lo contrario: con 12 vinculos
+      // de los cuales 10 estaban terminados, el roster abria en 12 filas donde
+      // 10 no tenian un solo dato util y cuatro de las siete columnas quedaban
+      // en blanco.
+      expect(find.text('Aldo'), findsNothing);
+      expect(find.text('Inactivo'), findsNothing);
+    });
+
+    testWidgets('el chip Inactivos sigue siendo la puerta a los terminados',
+        (tester) async {
+      // La salida esta a un click, y el chip los sigue CONTANDO aunque
+      // «Todos» ya no los liste: sin esto, sacarlos de «Todos» seria
+      // esconderlos.
+      await _pump(
+        tester,
+        links: [
+          _link('a1', TrainerLinkStatus.active),
+          _link('a3', TrainerLinkStatus.terminated),
+        ],
+        profiles: [_prof('a1', 'Sofía'), _prof('a3', 'Aldo')],
+      );
+
+      expect(find.text('Aldo'), findsNothing);
+
+      await tester.tap(find.text('Inactivos'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Aldo'), findsOneWidget);
+      expect(find.text('Sofía'), findsNothing);
     });
 
     testWidgets('filtro Pausados muestra solo pausados', (tester) async {
@@ -960,15 +989,57 @@ void main() {
         ],
       );
 
-      expect(find.byTooltip('Chat'), findsNWidgets(3));
-      expect(find.byTooltip('Rutinas'), findsNWidgets(3));
-      expect(find.byTooltip('Registrar pago'), findsNWidgets(3));
+      // Dos, no tres: el vinculo TERMINADO ya no entra en «Todos» (son tus
+      // alumnos, no el archivo). La afirmacion de fondo de este test —los 3
+      // botones salen sin importar el estado— se conserva entera unos
+      // renglones mas abajo, entrando por el chip «Inactivos».
+      expect(find.byTooltip('Chat'), findsNWidgets(2));
+      expect(find.byTooltip('Rutinas'), findsNWidgets(2));
+      expect(find.byTooltip('Registrar pago'), findsNWidgets(2));
       // #568: las acciones de vínculo ya no están sueltas en la fila — viven
       // en el menú ⋮, que aparece sólo cuando hay alguna disponible (activo o
       // pausado; el terminado no ofrece ninguna).
       expect(find.byTooltip('Pausar'), findsNothing);
       expect(find.byTooltip('Reanudar'), findsNothing);
       expect(find.byTooltip('Opciones del alumno'), findsNWidgets(2));
+
+      // El terminado, donde vive ahora: los 3 accesos rapidos siguen ahi.
+      await tester.tap(find.text('Inactivos'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ana'), findsOneWidget);
+      expect(find.byTooltip('Chat'), findsOneWidget);
+      expect(find.byTooltip('Rutinas'), findsOneWidget);
+      expect(find.byTooltip('Registrar pago'), findsOneWidget);
+      // Sin operaciones de vinculo NO hay ⋮ USABLE. `hitTestable` y no
+      // `findsNothing`: el widget sigue en el arbol como separador invisible
+      // —es la unica forma de que el hueco mida exactamente lo mismo que el
+      // boton— pero no recibe el mouse ni llega a la semantica.
+      expect(find.byTooltip('Opciones del alumno').hitTestable(), findsNothing);
+    });
+
+    testWidgets('la fila sin ⋮ reserva su hueco y no descuadra la grilla',
+        (tester) async {
+      // El PF lo reporto como «las acciones quedan feas»: la columna esta
+      // alineada a la derecha, asi que una fila sin operaciones de vinculo
+      // corria sus tres iconos hacia afuera y la grilla quedaba dentada.
+      await _pump(
+        tester,
+        links: [
+          _link('a1', TrainerLinkStatus.active),
+          _link('a3', TrainerLinkStatus.terminated),
+        ],
+        profiles: [_prof('a1', 'Sofía'), _prof('a3', 'Ana')],
+      );
+
+      final xConMenu = tester.getCenter(find.byTooltip('Chat')).dx;
+
+      await tester.tap(find.text('Inactivos'));
+      await tester.pumpAndSettle();
+
+      // Misma columna, mismo x: el hueco de 32px ocupa el lugar del ⋮ que no
+      // va. Sin el hueco, este icono se corre 32px a la derecha.
+      expect(tester.getCenter(find.byTooltip('Chat')).dx, xConMenu);
     });
 
     testWidgets('tap en Chat resuelve/crea el chat y navega a /chat',

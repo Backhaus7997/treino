@@ -95,7 +95,24 @@ AlumnoEstado estadoForLink(TrainerLink link, Set<String> conDeudaIds) {
 /// alumno con deuda cuenta solo bajo «Con deuda», igual que el mockup
 /// (view-general.png: Activos 14 · Con deuda 2 · … = total).
 bool _matchesFiltro(AlumnoEstado e, RosterFiltro f) => switch (f) {
-      RosterFiltro.todos => true,
+      // «Todos» son TUS ALUMNOS, no el archivo historico. Un vinculo
+      // `terminated` es un ex-alumno: no lo entrenas, no le cobras, y sus
+      // celdas de ultimo entreno / rutina / plan / vence estan todas vacias.
+      //
+      // Con 12 vinculos de los cuales 10 estaban terminados, el roster abria
+      // en 12 filas donde 10 no tenian un solo dato util y cuatro de las siete
+      // columnas quedaban en blanco. El PF lo reporto como «muchos datos de
+      // mas que no me sirven de nada» y como «todos los inactivos por que los
+      // querria ver».
+      //
+      // La salida sigue a un click: el chip «Inactivos» los muestra, y sigue
+      // contandolos aunque «Todos» ya no los liste.
+      //
+      // NO se toco el DEFAULT del filtro (sigue en `todos`) a proposito.
+      // Arrancar en «Activos» parece la solucion obvia y es peor: los chips
+      // son DISJUNTOS —un alumno con deuda cuenta solo bajo «Con deuda»—, asi
+      // que el roster abriria escondiendo justo a los que hay que mirar.
+      RosterFiltro.todos => e != AlumnoEstado.inactivo,
       RosterFiltro.activos => e == AlumnoEstado.activo,
       RosterFiltro.pausados => e == AlumnoEstado.pausado,
       RosterFiltro.bloqueados => e == AlumnoEstado.bloqueado,
@@ -1135,6 +1152,34 @@ class _RowActionsState extends ConsumerState<_RowActions> {
             size: 18, color: widget.palette.textMuted),
         onSelected: (action) => action(),
         itemBuilder: (_) => menuItems,
+      ));
+    } else {
+      // Hueco del ancho del ⋮ que no va. La columna esta alineada a la
+      // derecha, asi que sin esto las filas sin operaciones de vinculo
+      // —terminadas, sin acceso— corren sus tres iconos hacia afuera y la
+      // grilla queda dentada. El PF lo reporto como «las acciones quedan
+      // feas».
+      //
+      // Es el MISMO widget, invisible, y no un `SizedBox` con un numero: el
+      // ancho real del boton sale de su `padding` mas el tamano del icono, y
+      // un 32 escrito a mano ya salio 16px corto en el primer intento. Asi
+      // coincide por construccion y sigue coincidiendo si el kit cambia.
+      //
+      // `maintainInteractivity` queda en false (el default): ocupa lugar, no
+      // recibe el mouse ni aparece en el arbol de semantica. Un ⋮
+      // deshabilitado seria peor que la ausencia, porque promete algo.
+      buttons.add(Visibility(
+        visible: false,
+        maintainSize: true,
+        maintainAnimation: true,
+        maintainState: true,
+        child: TreinoPopupMenuButton<VoidCallback>(
+          tooltip: l10n.coachHubAlumnosRowActionsA11y,
+          icon: Icon(TreinoIcon.dotsThree,
+              size: 18, color: widget.palette.textMuted),
+          onSelected: (action) => action(),
+          itemBuilder: (_) => const [],
+        ),
       ));
     }
     return Row(
