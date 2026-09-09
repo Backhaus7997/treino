@@ -121,6 +121,21 @@ export { resumeTrainerLink } from "./subscriptions/resume-trainer-link";
 // el limite que cae solo por el paso del tiempo (cancelled + currentPeriodEnd
 // vencido no escribe un solo documento).
 export { syncEntitlementsOnSubscription, sweepEntitlements } from "./subscriptions/entitlement-triggers";
+// Paywall del ALUMNO: mantienen `users/{uid}.athletePaywallEnforced`, que es
+// el unico dato que firestore.rules NO puede calcular solo — el vinculo con el
+// PF vive en `trainer_links` con ids autogenerados, y las reglas no hacen
+// queries. Hacen falta LOS TRES: los dos triggers ven suscripcion y vinculo al
+// instante, y el barrido hace el backfill de los alumnos que ya existian (a
+// esos no los ve ningun trigger porque no escriben nada).
+//
+// Hoy escriben `false` en todos lados: el interruptor
+// ATHLETE_PAYWALL_ENFORCEMENT_ENABLED arranca apagado. Ver el encabezado del
+// modulo antes de prenderlo — falta el grandfathering.
+export {
+  syncAthletePaywallOnUser,
+  syncAthletePaywallOnTrainerLink,
+  sweepAthletePaywall,
+} from "./subscriptions/athlete-paywall-enforced";
 // SHELVED (gym-google-places, Plan B): resolveGymPlace cannot be deployed —
 // GCP project treino-dev sits under org code-assurance.com, whose
 // Domain-Restricted-Sharing policy blocks a publicly-invokable (allUsers)
