@@ -12,6 +12,7 @@
 ///
 /// Componentes exportados:
 /// - [TreinoAvatar] (`avatar/`)
+/// - [TreinoButton] / [TreinoIconButton] (`button/`)
 /// - [CoachHubDataTable] (`data_table/`)
 /// - [KpiCard] (`kpi_card/`)
 /// - [TreinoFilterChips] (`filter_chips/`)
@@ -24,6 +25,7 @@
 library;
 
 export 'avatar/treino_avatar.dart';
+export 'button/treino_button.dart';
 export 'data_table/coach_hub_data_table.dart';
 export 'dialog/treino_dialog.dart';
 export 'empty_state/empty_state.dart';
