@@ -445,7 +445,17 @@ export const mpWebhook = onRequest(
     // ser invocada por alguien sin cuenta. Sin tope, un POST en loop escala
     // Cloud Run y nos quema la cuota de la API de MP, que es la que necesita el
     // barrido nocturno para acreditarle el plan a todo el mundo.
-    maxInstances: 3,
+    //
+    // Empezo en 3 y se subio a 10 el 2026-09-09, porque 3 quedaba demasiado
+    // ajustado y eso NO es un problema simetrico al del abuso: cuando el tope
+    // se toca, Cloud Run contesta 429 ANTES de ejecutar nada, MP lo cuenta como
+    // entrega fallida y reintenta recien a los 15 minutos. O sea que un tope
+    // corto no ahorra plata, la RETRASA — le suma cuartos de hora a la
+    // acreditacion de alguien que ya pago.
+    //
+    // Diez sigue acotando el abuso (es el unico techo de todo el repo) y le da
+    // aire a una rafaga legitima de reintentos.
+    maxInstances: 10,
     // MP corta a los 22 segundos. Pasado eso da la notificacion por perdida y
     // reintenta, asi que seguir trabajando 60 segundos no sirve para nada.
     timeoutSeconds: 20,
