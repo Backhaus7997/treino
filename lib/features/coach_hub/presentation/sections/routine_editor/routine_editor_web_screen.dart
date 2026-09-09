@@ -234,6 +234,17 @@ class _EditorDay {
   int dayNumber;
   String name;
   List<_EditorSlot> slots = [];
+
+  /// Card cerrada. Sólo presentación: no viaja al dominio ni al guardado.
+  ///
+  /// El editor web dibuja TODOS los días a la vez —a diferencia del mobile,
+  /// que muestra uno por pestaña—, así que una rutina de 4 días por 5
+  /// ejercicios es una página que no termina más y no había forma de plegar
+  /// nada. `_EditorSlot.expandido` ya resolvía esto un nivel más abajo, para
+  /// el ejercicio; esto es la misma pieza para el día.
+  ///
+  /// Arranca abierto: cerrar por default escondería trabajo del PF.
+  bool colapsado = false;
 }
 
 const _kMaxDays = 7; // mirrors mobile's _kMaxDays
@@ -2777,6 +2788,11 @@ class _RoutineEditorWebScreenState
                                       slotHasError: _slotHasError,
                                       slotErrorText: _slotErrorText,
                                       canRemove: _days.length > 1,
+                                      colapsado: _days[i].colapsado,
+                                      onToggleColapsado: () => setState(
+                                        () => _days[i].colapsado =
+                                            !_days[i].colapsado,
+                                      ),
                                       onNameChanged: (v) =>
                                           _onDayNameChanged(i, v),
                                       onRemove: () => _removeDay(i),
@@ -3354,6 +3370,8 @@ class _DayCard extends StatelessWidget {
     required this.slotHasError,
     required this.slotErrorText,
     required this.canRemove,
+    required this.colapsado,
+    required this.onToggleColapsado,
     required this.onNameChanged,
     required this.onRemove,
     required this.onAddExercises,
@@ -3403,6 +3421,13 @@ class _DayCard extends StatelessWidget {
   final String? Function(_EditorSlot slot) slotErrorText;
   final bool canRemove;
   final ValueChanged<String> onNameChanged;
+  /// Card del día cerrada — se ve el nombre y el resumen, nada más.
+  final bool colapsado;
+
+  /// Abre o cierra la card. El estado vive en `_EditorDay.colapsado`, arriba,
+  /// para que sobreviva a los rebuilds del formulario.
+  final VoidCallback onToggleColapsado;
+
   final VoidCallback onRemove;
   final VoidCallback onAddExercises;
   final void Function(int slotIndex) onRemoveSlot;
@@ -3474,6 +3499,18 @@ class _DayCard extends StatelessWidget {
         children: [
           Row(
             children: [
+              IconButton(
+                key: Key('day_collapse_toggle_${day.dayNumber}'),
+                tooltip: colapsado
+                    ? 'Abrir el día' // i18n
+                    : 'Cerrar el día', // i18n
+                icon: Icon(
+                  colapsado ? TreinoIcon.chevronRight : TreinoIcon.chevronDown,
+                  size: 18,
+                  color: palette.textMuted,
+                ),
+                onPressed: onToggleColapsado,
+              ),
               Expanded(
                 child: TextFormField(
                   initialValue: day.name,
@@ -3489,8 +3526,28 @@ class _DayCard extends StatelessWidget {
                   ),
                 ),
               ),
+              // Cerrado, el conteo es lo único que queda del contenido:
+              // sin él la card no se distingue de un día vacío.
+              if (colapsado)
+                Padding(
+                  padding: const EdgeInsets.only(right: AppSpacing.s8),
+                  child: Text(
+                    day.slots.length == 1
+                        ? '1 ejercicio' // i18n
+                        : '${day.slots.length} ejercicios', // i18n
+                    style: GoogleFonts.barlow(
+                      color: palette.textMuted,
+                      fontSize: AppTextSize.caption,
+                    ),
+                  ),
+                ),
+              // El punto de error se dibuja TAMBIÉN cerrado, a propósito: un
+              // día plegado con series sin completar sigue bloqueando el
+              // guardado, y si la card no lo dijera el PF buscaría el problema
+              // en otro lado.
               if (hasError)
                 Container(
+                  key: Key('day_error_dot_${day.dayNumber}'),
                   width: 8,
                   height: 8,
                   margin: const EdgeInsets.only(right: 8),
@@ -3511,6 +3568,7 @@ class _DayCard extends StatelessWidget {
                 ),
             ],
           ),
+          if (!colapsado) ...[
           // RÁPIDO: escribir `press de banca 4x10 55` en vez de abrir el
           // modal, filtrar, elegir y completar cuatro campos. Es la pieza del
           // editor mobile que más gana acá, porque en la web hay teclado real.
@@ -3577,6 +3635,7 @@ class _DayCard extends StatelessWidget {
               supersetLabel: '+ Superserie', // i18n
               onAddSuperset: onAddSuperset,
             ),
+          ],
         ],
       ),
     );
