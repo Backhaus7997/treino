@@ -33,6 +33,11 @@ final _rows = [
   ),
 ];
 
+// Los rótulos de header se renderizan en MAYÚSCULA desde que la transformación
+// vive en `_HeaderCell` y no en cada string. Antes venían mezclados —«ALUMNO»
+// de l10n contra «Rutina» escrito a mano— y la fila se veía a dos alturas
+// tipográficas. Por eso los finders de acá buscan el rótulo transformado y no
+// el `label` que se declara en la columna.
 void main() {
   group('CoachHubDataTable —', () {
     // -------------------------------------------------------------------------
@@ -47,8 +52,8 @@ void main() {
         ),
       ));
       await tester.pump();
-      expect(find.text('Nombre'), findsOneWidget);
-      expect(find.text('Estado'), findsOneWidget);
+      expect(find.text('NOMBRE'), findsOneWidget);
+      expect(find.text('ESTADO'), findsOneWidget);
       expect(find.text('Ana García'), findsOneWidget);
       expect(find.text('Carlos López'), findsOneWidget);
     });
@@ -93,7 +98,7 @@ void main() {
         ),
       ));
       await tester.pump();
-      await tester.tap(find.text('Nombre'));
+      await tester.tap(find.text('NOMBRE'));
       await tester.pump();
       expect(sortedKey, 'name');
     });
@@ -113,7 +118,7 @@ void main() {
         ),
       ));
       await tester.pump();
-      await tester.tap(find.text('Estado'));
+      await tester.tap(find.text('ESTADO'));
       await tester.pump();
       expect(called, isFalse);
     });
@@ -432,7 +437,7 @@ void main() {
           theme: theme,
         ));
         await tester.pump();
-        expect(find.text('Nombre'), findsOneWidget);
+        expect(find.text('NOMBRE'), findsOneWidget);
         expect(find.text('Ana García'), findsOneWidget);
       }
     });

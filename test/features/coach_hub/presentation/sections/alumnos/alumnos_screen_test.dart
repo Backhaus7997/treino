@@ -1210,9 +1210,9 @@ void main() {
       expect(find.text('ESTADO'), findsOneWidget);
       expect(find.text('ACCIONES'), findsOneWidget);
       expect(find.text('ÚLTIMO ENTRENO'), findsNothing);
-      expect(find.text('Rutina'), findsNothing);
-      expect(find.text('Plan'), findsNothing);
-      expect(find.text('Vence'), findsNothing);
+      expect(find.text('RUTINA'), findsNothing);
+      expect(find.text('PLAN'), findsNothing);
+      expect(find.text('VENCE'), findsNothing);
       // Las celdas de las columnas colapsadas tampoco se renderizan.
       expect(find.text('Sin entrenos'), findsNothing);
       expect(find.text('Activa'), findsNothing);
@@ -1235,9 +1235,13 @@ void main() {
       expect(find.text('ALUMNO'), findsOneWidget);
       expect(find.text('ESTADO'), findsOneWidget);
       expect(find.text('ÚLTIMO ENTRENO'), findsOneWidget);
-      expect(find.text('Rutina'), findsOneWidget);
-      expect(find.text('Plan'), findsOneWidget);
-      expect(find.text('Vence'), findsOneWidget);
+      expect(find.text('RUTINA'), findsOneWidget);
+      // MAYÚSCULA como el resto: la transformación vive en `_HeaderCell`, no
+      // en cada string. Antes «Rutina», «Plan» y «Vence» estaban escritos a
+      // mano capitalizados contra «ALUMNO»/«ESTADO» de l10n, y la fila de
+      // headers se veía a dos alturas tipográficas distintas.
+      expect(find.text('PLAN'), findsOneWidget);
+      expect(find.text('VENCE'), findsOneWidget);
       expect(find.text('ACCIONES'), findsOneWidget);
     });
   });

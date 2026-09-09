@@ -608,6 +608,10 @@ class _RosterTable extends ConsumerWidget {
           key: 'acciones',
           label: l10n.coachHubAlumnosColumnActions,
           flex: 20,
+          // Los botones ya se dibujaban a la derecha; el rótulo se quedaba a
+          // la izquierda del slot, a media tabla de distancia. Declararlo acá
+          // los mueve a los dos.
+          align: CoachHubColumnAlign.end,
         ),
       ],
       rows: [

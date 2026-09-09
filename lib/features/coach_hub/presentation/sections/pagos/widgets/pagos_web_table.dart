@@ -28,7 +28,7 @@ import 'package:treino/features/payments/domain/payment.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 
 import '../../../widgets/coach_hub_widgets.dart'
-    show CoachHubColumn, CoachHubDataTable, CoachHubRow;
+    show CoachHubColumn, CoachHubColumnAlign, CoachHubDataTable, CoachHubRow;
 import 'pagos_estado.dart';
 import 'payment_format.dart';
 import 'package:treino/core/utils/argentina_time.dart';
@@ -156,7 +156,13 @@ class PagosWebTable extends StatelessWidget {
         const CoachHubColumn(key: 'estado', label: 'ESTADO', flex: 2), // i18n
         if (showActions)
           const CoachHubColumn(
-              key: 'acciones', label: 'ACCIONES', flex: 3), // i18n
+            key: 'acciones',
+            label: 'ACCIONES', // i18n
+            flex: 3,
+            // Los botones ya iban a la derecha; el rótulo no. Ahora los dos
+            // salen de la misma declaración.
+            align: CoachHubColumnAlign.end,
+          ),
       ],
       rows: [for (final p in payments) _rowFor(palette, p)],
       loading: loading,
