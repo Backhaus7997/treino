@@ -43,8 +43,12 @@ void main() {
     String source = 'trainer-assigned',
     String visibility = 'private',
     Timestamp? createdAt,
+    /// `null` = el documento NO trae el campo, que es la forma de los docs
+    /// anteriores a Fase 6 y el caso que este filtro no puede romper.
+    String? status,
   }) async {
     await firestore.collection('routines').doc(id).set({
+      if (status != null) 'status': status,
       'id': id,
       'name': 'Assigned Routine $id',
       'split': 'Full Body',
@@ -110,6 +114,50 @@ void main() {
       final result = await repo.listAssignedTo('unknown-athlete');
 
       expect(result, isEmpty);
+    });
+
+    test('una rutina ARCHIVADA no se le muestra al alumno', () async {
+      // Cuando el vínculo con el PF termina, `cleanupAssignedPlansOnUnlink`
+      // archiva sus planes. Antes los borraba en duro, y eso dejaba huérfanas
+      // las sesiones ya entrenadas (ADR-USR-04).
+      //
+      // Pero archivar SIN filtrar acá sería peor que borrar: el ex-alumno
+      // seguiría viendo el plan de un PF con el que ya no trabaja, ahora
+      // marcado. Las dos mitades del arreglo van juntas.
+      await seedAssignedRoutine(
+        id: 'r-viva',
+        assignedTo: 'athlete-1',
+        assignedBy: 'trainer-1',
+        status: 'active',
+      );
+      await seedAssignedRoutine(
+        id: 'r-archivada',
+        assignedTo: 'athlete-1',
+        assignedBy: 'trainer-ex',
+        status: 'archived',
+      );
+
+      final result = await repo.listAssignedTo('athlete-1');
+
+      expect(result.map((r) => r.id), ['r-viva']);
+    });
+
+    test('un doc SIN campo status sigue apareciendo (retro-compat)', () async {
+      // El candado del filtro. Los docs anteriores a Fase 6 no traen `status`,
+      // y el modelo los interpreta como `active`. Si el filtro se hiciera con
+      // un `where('status', isEqualTo: 'active')` en Firestore, esos docs
+      // quedarían EXCLUIDOS —una igualdad no matchea documentos sin el campo—
+      // y al alumno se le esconderían todos sus planes viejos.
+      await seedAssignedRoutine(
+        id: 'r-legacy',
+        assignedTo: 'athlete-1',
+        assignedBy: 'trainer-1',
+        // sin `status`, a propósito
+      );
+
+      final result = await repo.listAssignedTo('athlete-1');
+
+      expect(result.map((r) => r.id), ['r-legacy']);
     });
 
     test('excludes routines with source != trainer-assigned', () async {

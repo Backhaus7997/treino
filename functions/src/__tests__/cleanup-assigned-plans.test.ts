@@ -25,7 +25,7 @@ afterAll(async () => {
 });
 
 import {
-  deleteAssignedPlansForPair,
+  archiveAssignedPlansForPair,
   cleanupAssignedPlansOnUnlinkHandler,
 } from "../cleanup-assigned-plans";
 
@@ -91,38 +91,64 @@ async function exists(docId: string): Promise<boolean> {
   return snap.exists;
 }
 
+async function statusOf(docId: string): Promise<unknown> {
+  const snap = await db().collection("routines").doc(docId).get();
+  return snap.get("status");
+}
+
 function link(status: string, extra: Record<string, unknown> = {}) {
   return { trainerId: TRAINER, athleteId: ATHLETE, status, ...extra };
 }
 
-describe("deleteAssignedPlansForPair", () => {
+describe("archiveAssignedPlansForPair", () => {
   beforeEach(seedRoutines);
   afterEach(cleanupRoutines);
 
-  it("deletes the athlete's assigned plan from that trainer", async () => {
-    const { count } = await deleteAssignedPlansForPair(testApp, TRAINER, ATHLETE);
+  it("archives the athlete's assigned plan WITHOUT deleting it", async () => {
+    // Éste es el cambio de fondo. Antes hacía `batch.delete()`, y eso rompía
+    // la invariante que la app declara: una rutina se archiva para mantener
+    // las referencias históricas de sesiones (ADR-USR-04). Borrarla dejaba
+    // huérfanas las sesiones ya entrenadas, y si el vínculo se reactivaba el
+    // plan no existía más.
+    const { count } = await archiveAssignedPlansForPair(testApp, TRAINER, ATHLETE);
     expect(count).toBe(1);
-    expect(await exists(ASSIGNED_TA)).toBe(false);
+    expect(await exists(ASSIGNED_TA)).toBe(true);
+    expect(await statusOf(ASSIGNED_TA)).toBe("archived");
   });
 
-  it("does NOT delete the trainer's template (survives even if assigned)", async () => {
-    await deleteAssignedPlansForPair(testApp, TRAINER, ATHLETE);
+  it("does NOT touch the trainer's template (survives even if assigned)", async () => {
+    await archiveAssignedPlansForPair(testApp, TRAINER, ATHLETE);
     expect(await exists(TEMPLATE_T)).toBe(true);
+    expect(await statusOf(TEMPLATE_T)).toBeUndefined();
   });
 
-  it("does NOT delete plans assigned to a different athlete", async () => {
-    await deleteAssignedPlansForPair(testApp, TRAINER, ATHLETE);
+  it("does NOT touch plans assigned to a different athlete", async () => {
+    await archiveAssignedPlansForPair(testApp, TRAINER, ATHLETE);
     expect(await exists(ASSIGNED_TB)).toBe(true);
+    expect(await statusOf(ASSIGNED_TB)).toBeUndefined();
   });
 
-  it("does NOT delete the athlete's own user-created routines", async () => {
-    await deleteAssignedPlansForPair(testApp, TRAINER, ATHLETE);
+  it("does NOT touch the athlete's own user-created routines", async () => {
+    await archiveAssignedPlansForPair(testApp, TRAINER, ATHLETE);
     expect(await exists(USER_A)).toBe(true);
+    expect(await statusOf(USER_A)).toBeUndefined();
   });
 
   it("is a no-op when there are no assigned plans for the pair", async () => {
-    const { count } = await deleteAssignedPlansForPair(testApp, TRAINER, "ghost");
+    const { count } = await archiveAssignedPlansForPair(testApp, TRAINER, "ghost");
     expect(count).toBe(0);
+  });
+
+  it("correr dos veces no vuelve a escribir: la segunda cuenta 0", async () => {
+    // El trigger puede dispararse más de una vez sobre el mismo par (un
+    // reintento, dos writes que dejan el link en `terminated`). Re-escribir
+    // `archived` sobre `archived` cuesta una escritura y no cambia nada.
+    const primera = await archiveAssignedPlansForPair(testApp, TRAINER, ATHLETE);
+    expect(primera.count).toBe(1);
+
+    const segunda = await archiveAssignedPlansForPair(testApp, TRAINER, ATHLETE);
+    expect(segunda.count).toBe(0);
+    expect(await statusOf(ASSIGNED_TA)).toBe("archived");
   });
 });
 
@@ -130,14 +156,18 @@ describe("cleanupAssignedPlansOnUnlinkHandler guards", () => {
   beforeEach(seedRoutines);
   afterEach(cleanupRoutines);
 
-  it("deletes assigned plans when the link becomes terminated", async () => {
+  it("archives assigned plans when the link becomes terminated", async () => {
+    // El plan SOBREVIVE al corte del vínculo, archivado. Antes este test
+    // pedía `exists === false`: el trigger borraba en duro y se llevaba
+    // puestas las sesiones que el alumno ya había entrenado contra ese doc.
     const { count } = await cleanupAssignedPlansOnUnlinkHandler(
       testApp,
       link("active"),
       link("terminated"),
     );
     expect(count).toBe(1);
-    expect(await exists(ASSIGNED_TA)).toBe(false);
+    expect(await exists(ASSIGNED_TA)).toBe(true);
+    expect(await statusOf(ASSIGNED_TA)).toBe("archived");
   });
 
   it("skips when reason is account-deleted (cascade owns that flow)", async () => {

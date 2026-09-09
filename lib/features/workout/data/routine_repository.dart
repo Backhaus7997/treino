@@ -384,6 +384,19 @@ class RoutineRepository {
   /// Requires a composite index on `assignedTo + source + createdAt`
   /// (declared in `firestore.indexes.json`).
   ///
+  /// Las ARCHIVADAS no se devuelven. Cuando el vínculo con el PF termina, la
+  /// Cloud Function `cleanupAssignedPlansOnUnlink` archiva los planes que ese
+  /// PF le había asignado — antes los borraba en duro, y eso dejaba huérfanas
+  /// las sesiones ya entrenadas (ADR-USR-04). Archivar SIN filtrar acá sería
+  /// peor que borrar: el ex-alumno seguiría viendo el plan en su lista.
+  ///
+  /// El filtro va del lado del CLIENTE y no como `where('status', ...)` a
+  /// propósito. Los docs viejos no tienen el campo `status` —el modelo lo
+  /// interpreta como `active` por retro-compat—, y una igualdad en Firestore
+  /// **excluye los documentos que no tienen el campo**: filtrar en el servidor
+  /// le escondería al alumno todos sus planes anteriores a Fase 6. Además así
+  /// no hace falta índice nuevo.
+  ///
   /// REQ-COACH-PLANS-001, SCENARIO-432, SCENARIO-433.
   Future<List<Routine>> listAssignedTo(String athleteId) async {
     final snap = await _collection
@@ -392,7 +405,11 @@ class RoutineRepository {
         .orderBy('createdAt', descending: true)
         .limit(20)
         .get();
-    return snap.docs.map(_fromDoc).whereType<Routine>().toList();
+    return snap.docs
+        .map(_fromDoc)
+        .whereType<Routine>()
+        .where((r) => r.status != RoutineStatus.archived)
+        .toList();
   }
 
   /// Returns the plans [trainerId] assigned to [athleteId], newest first.
