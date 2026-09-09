@@ -331,6 +331,11 @@ class _RosterFrame extends ConsumerWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= 900;
+        // Segundo umbral. Los flex del roster estaban calibrados contra el
+        // PEOR caso (900 px, el propio breakpoint, donde el header «ÚLTIMO
+        // ENTRENO» desbordaba). Arriba de 1200 px esa calibración deja de
+        // tener sentido y empieza a hacer daño — ver `_RosterTable.columns`.
+        final roomy = constraints.maxWidth >= 1200;
         return SingleChildScrollView(
           padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.s20,
@@ -399,6 +404,7 @@ class _RosterFrame extends ConsumerWidget {
                         errorMessage: errorMessage,
                         onRetry: onRetry,
                         wide: wide,
+                        roomy: roomy,
                         emptyMessage: roster.isEmpty
                             ? l10n.coachHubAlumnosEmpty
                             : l10n.coachHubAlumnosEmptyFiltered,
@@ -542,6 +548,7 @@ class _RosterTable extends ConsumerWidget {
     required this.errorMessage,
     required this.emptyMessage,
     required this.wide,
+    required this.roomy,
     this.onRetry,
   });
 
@@ -562,6 +569,20 @@ class _RosterTable extends ConsumerWidget {
   /// `columns`, así que basta con no declarar la columna acá — no hace falta
   /// tocar el kit compartido (prohibido para esta pieza).
   final bool wide;
+
+  /// `true` con >=1200px de tabla — hay lugar para que ALUMNO respire.
+  ///
+  /// Los flex de abajo nacieron calibrados contra el peor caso (900px, con
+  /// las 7 columnas a la vez y «ÚLTIMO ENTRENO» desbordando por 43px). Esa
+  /// calibración, aplicada en desktop, le regala 275px a una celda que dice
+  /// «Hace 5 días» y le deja 142 a ALUMNO — de los cuales el avatar (36) y su
+  /// gap (12) se comen casi la mitad. El nombre se queda con ~66px y sale
+  /// «Mateo Pr...»: el dato más importante de la fila, truncado a la mitad,
+  /// mientras la columna de la fecha desperdicia 200px.
+  ///
+  /// Con lugar, la calibración es otra. No es un caso especial: es una tabla
+  /// responsive haciendo lo que tiene que hacer.
+  final bool roomy;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -591,17 +612,21 @@ class _RosterTable extends ConsumerWidget {
         // Flexible) — absorbe el recorte sin riesgo real de overflow (a
         // diferencia del resto, cuyo header es un `Text` sin ellipsis en el
         // kit compartido).
+        //
+        // Los flex viven en DOS calibraciones (ver `roomy`). Con lugar, el
+        // nombre —el dato que identifica la fila— se lleva lo que necesita;
+        // en angosto manda no desbordar el header más largo.
         CoachHubColumn(
           key: 'alumno',
           label: l10n.coachHubAlumnosColumnStudent,
-          flex: 14,
+          flex: roomy ? 26 : 14,
         ),
         // «ESTADO» (l10n, 6 mayúsculas) necesita más aire que un flex:1
         // sobre 11 columnas totales — mismo criterio que «Rutina».
         CoachHubColumn(
           key: 'estado',
           label: l10n.coachHubAlumnosColumnStatus,
-          flex: 14,
+          flex: roomy ? 12 : 14,
         ),
         // Responsive (breakpoint 900px): último entreno/rutina/nutrición/
         // vencimiento colapsan en angosto — alumno/estado/acciones quedan
@@ -613,13 +638,18 @@ class _RosterTable extends ConsumerWidget {
         if (wide) ...[
           // «ÚLTIMO ENTRENO» (l10n, 14 caracteres con espacio) es el header
           // más largo del roster — el que más flex necesita.
+          //
+          // Los 27 eran para que el header no desbordara a 900px. En desktop
+          // esos 27 son 275px para mostrar «Hace 5 días», mientras el nombre
+          // del alumno trunca a los 66. Con lugar bajan a 16 y el header
+          // sigue entrando entero.
           CoachHubColumn(
             key: 'ultimoEntreno',
             label: l10n.coachHubAlumnosColumnLastWorkout,
-            flex: 27,
+            flex: roomy ? 16 : 27,
           ),
-          const CoachHubColumn(
-              key: 'rutina', label: 'Rutina', flex: 14), // i18n
+          CoachHubColumn(
+              key: 'rutina', label: 'Rutina', flex: roomy ? 13 : 14), // i18n
           // Header corto ("Plan") en vez de "Nutrición": el ancho de columna
           // disponible (flex compartido con el resto de la fila, sin
           // ellipsis en `_HeaderCell` del kit) no entra con la palabra
@@ -629,7 +659,8 @@ class _RosterTable extends ConsumerWidget {
           const CoachHubColumn(
               key: 'nutricion', label: 'Plan', flex: 12), // i18n
           // Header corto ("Vence") por la misma razón que "Plan"/"Rutina".
-          const CoachHubColumn(key: 'vencimiento', label: 'Vence', flex: 13),
+          CoachHubColumn(
+              key: 'vencimiento', label: 'Vence', flex: roomy ? 12 : 13),
         ],
         // «ACCIONES» (l10n) + hasta 5 icon-buttons en la fila (pieza
         // «acciones» previa) — necesita el flex más alto después de
@@ -637,7 +668,9 @@ class _RosterTable extends ConsumerWidget {
         CoachHubColumn(
           key: 'acciones',
           label: l10n.coachHubAlumnosColumnActions,
-          flex: 20,
+          // Con `roomy` entran los 4 botones de 24px más sus 3 separaciones
+          // de 8 (120px) con margen, y sobra menos desperdicio que con 20.
+          flex: roomy ? 17 : 20,
           // Los botones ya se dibujaban a la derecha; el rótulo se quedaba a
           // la izquierda del slot, a media tabla de distancia. Declararlo acá
           // los mueve a los dos.
@@ -1206,28 +1239,7 @@ class _RowActionsState extends ConsumerState<_RowActions> {
       ));
     }
     if (menuItems.isNotEmpty) {
-      buttons.add(TreinoPopupMenuButton<VoidCallback>(
-        tooltip: l10n.coachHubAlumnosRowActionsA11y,
-        icon: Icon(TreinoIcon.dotsThree,
-            size: 18, color: widget.palette.textMuted),
-        // MISMA caja que `_IconAction`, y va por `style` porque es la única
-        // perilla que llega: `PopupMenuButton` le reenvía al `IconButton` su
-        // `padding`, `iconSize` y `style`, pero NO `constraints` — ese parámetro
-        // suyo es para el MENÚ. Sin esto el ⋮ mide 40x24 al lado de los 24x24 de
-        // sus tres hermanos, con la píldora de hover saliendo de otro tamaño y
-        // otro centro: el PF lo reportó como «todos estos botoncitos están
-        // horribles».
-        iconSize: 18,
-        padding: EdgeInsets.zero,
-        style: IconButton.styleFrom(
-          padding: EdgeInsets.zero,
-          minimumSize: const Size(32, 32),
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          visualDensity: VisualDensity.compact,
-        ),
-        onSelected: (action) => action(),
-        itemBuilder: (_) => menuItems,
-      ));
+      buttons.add(_menuButton(l10n, items: menuItems));
     } else {
       // Hueco del ancho del ⋮ que no va. La columna esta alineada a la
       // derecha, asi que sin esto las filas sin operaciones de vinculo
@@ -1248,36 +1260,69 @@ class _RowActionsState extends ConsumerState<_RowActions> {
         maintainSize: true,
         maintainAnimation: true,
         maintainState: true,
-        child: TreinoPopupMenuButton<VoidCallback>(
-          tooltip: l10n.coachHubAlumnosRowActionsA11y,
-          icon: Icon(TreinoIcon.dotsThree,
-              size: 18, color: widget.palette.textMuted),
-          // MISMA caja que `_IconAction`, y va por `style` porque es la única
-          // perilla que llega: `PopupMenuButton` le reenvía al `IconButton` su
-          // `padding`, `iconSize` y `style`, pero NO `constraints` — ese parámetro
-          // suyo es para el MENÚ. Sin esto el ⋮ mide 40x24 al lado de los 24x24 de
-          // sus tres hermanos, con la píldora de hover saliendo de otro tamaño y
-          // otro centro: el PF lo reportó como «todos estos botoncitos están
-          // horribles».
-          iconSize: 18,
-          padding: EdgeInsets.zero,
-          style: IconButton.styleFrom(
-            padding: EdgeInsets.zero,
-            minimumSize: const Size(32, 32),
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            visualDensity: VisualDensity.compact,
-          ),
-          onSelected: (action) => action(),
-          itemBuilder: (_) => const [],
-        ),
+        child: _menuButton(l10n, items: const []),
       ));
     }
+    // SEPARACIÓN entre blancos de click.
+    //
+    // El paso entre botones era exactamente su ancho, o sea CERO píxeles de
+    // aire: los targets se tocaban y un desvío de 1 px del cursor cambiaba de
+    // acción — con «Terminar vínculo» adentro de una de las cuatro. WCAG 2.2
+    // (2.5.8) pide 24x24 **o** separación suficiente; acá se cumplía el
+    // mínimo de tamaño justo y se incumplía la separación.
+    //
+    // Y miden 24, no 32: `visualDensity: compact` resta 2 unidades por eje y
+    // cada unidad son 4 px, así que el `minimumSize: Size(32, 32)` de #1062
+    // termina en 24x24 efectivos. Por eso no alcanza con agrandar la caja —
+    // el alto útil de la fila son 24 px (48 de `rowHeight` menos 12+12 de
+    // `cellPaddingV`) y no hay margen para crecer. Lo que sí hay es ancho:
+    // con 8 px entre botones la fila pasa de 96 a 120 px y la columna tiene
+    // 183.
     return Row(
       mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.end,
-      children: buttons,
+      children: [
+        for (var i = 0; i < buttons.length; i++) ...[
+          if (i > 0) const SizedBox(width: AppSpacing.s8),
+          buttons[i],
+        ],
+      ],
     );
   }
+
+  /// El ⋮ de la fila. Se usa DOS veces: visible cuando hay operaciones de
+  /// vínculo, e invisible —reservando su ancho— cuando no las hay.
+  ///
+  /// Estaba duplicado literal entre las dos ramas, con su comentario largo
+  /// repetido palabra por palabra. Treinta líneas iguales en dos lugares es
+  /// una invitación a cambiar la caja en una rama y no en la otra, que es
+  /// exactamente cómo la columna se desalineó en #1062.
+  Widget _menuButton(
+    AppL10n l10n, {
+    required List<PopupMenuEntry<VoidCallback>> items,
+  }) =>
+      TreinoPopupMenuButton<VoidCallback>(
+        tooltip: l10n.coachHubAlumnosRowActionsA11y,
+        icon: Icon(TreinoIcon.dotsThree,
+            size: 18, color: widget.palette.textMuted),
+        // MISMA caja que `_IconAction`, y va por `style` porque es la única
+        // perilla que llega: `PopupMenuButton` le reenvía al `IconButton` su
+        // `padding`, `iconSize` y `style`, pero NO `constraints` — ese parámetro
+        // suyo es para el MENÚ. Sin esto el ⋮ mide 40x24 al lado de los 24x24 de
+        // sus tres hermanos, con la píldora de hover saliendo de otro tamaño y
+        // otro centro: el PF lo reportó como «todos estos botoncitos están
+        // horribles».
+        iconSize: 18,
+        padding: EdgeInsets.zero,
+        style: IconButton.styleFrom(
+          padding: EdgeInsets.zero,
+          minimumSize: const Size(32, 32),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          visualDensity: VisualDensity.compact,
+        ),
+        onSelected: (action) => action(),
+        itemBuilder: (_) => items,
+      );
 }
 
 class _IconAction extends StatelessWidget {

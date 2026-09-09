@@ -15,6 +15,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/chat/domain/chat.dart';
@@ -1388,6 +1389,102 @@ void main() {
             .count,
         2,
       );
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Geometría del roster (hallazgos D y F del diagnóstico web del 2026-09-09)
+  // ---------------------------------------------------------------------------
+  group('AlumnosScreen — la fila respira', () {
+    // Medido en producción a 1440x900: la columna ALUMNO recibía 142 px de
+    // 1160, y de esos el avatar (36) y su gap (12) más el padding (28) se
+    // comían casi todo. Quedaban ~66 px para el nombre y en pantalla se leía
+    // «Mateo Pr...» — mientras ÚLTIMO ENTRENO se llevaba 275 px para mostrar
+    // «Hace 5 días».
+    //
+    // No se mide el ANCHO DEL TEXTO a propósito: en tests `GoogleFonts` no
+    // resuelve la familia del design system y mide con el fallback, así que
+    // cualquier assert sobre métricas tipográficas miente. Lo que sí es
+    // fiable es la POSICIÓN de las celdas, que sale del flex.
+    testWidgets(
+        'en desktop ALUMNO es más ancha que ÚLTIMO ENTRENO '
+        '[SCENARIO-CHW-ALU-32]', (tester) async {
+      await _pump(
+        tester,
+        width: 1400,
+        links: [_link('a1', TrainerLinkStatus.active)],
+        profiles: [_prof('a1', 'Mateo Presset')],
+      );
+
+      double anchoDeColumna(String desde, String hasta) =>
+          tester.getTopLeft(find.text(hasta)).dx -
+          tester.getTopLeft(find.text(desde)).dx;
+
+      final alumno = anchoDeColumna('ALUMNO', 'ESTADO');
+      final ultimoEntreno = anchoDeColumna('ÚLTIMO ENTRENO', 'RUTINA');
+
+      expect(
+        alumno,
+        greaterThan(ultimoEntreno),
+        reason: 'ALUMNO ($alumno px) es el dato que identifica la fila y '
+            'tenía menos lugar que ÚLTIMO ENTRENO ($ultimoEntreno px), que '
+            'muestra «Hace 5 días»',
+      );
+    });
+
+    // En angosto manda la otra restricción: «ÚLTIMO ENTRENO» es el header más
+    // largo del roster y a 900 px desbordaba por 43 px. Ahí la calibración
+    // vieja sigue siendo la correcta — por eso son dos y no una.
+    testWidgets(
+        'a 900px se conserva la calibración vieja '
+        '[SCENARIO-CHW-ALU-33]', (tester) async {
+      await _pump(
+        tester,
+        width: 1000,
+        links: [_link('a1', TrainerLinkStatus.active)],
+        profiles: [_prof('a1', 'Mateo Presset')],
+      );
+
+      final alumno = tester.getTopLeft(find.text('ESTADO')).dx -
+          tester.getTopLeft(find.text('ALUMNO')).dx;
+      final ultimoEntreno = tester.getTopLeft(find.text('RUTINA')).dx -
+          tester.getTopLeft(find.text('ÚLTIMO ENTRENO')).dx;
+
+      expect(
+        ultimoEntreno,
+        greaterThan(alumno),
+        reason: 'abajo de 1200 px el header largo sigue mandando',
+      );
+    });
+
+    // Los cuatro botones de acción tenían paso 24 px con ancho 24 px: los
+    // blancos de click SE TOCABAN. Un desvío de 1 px del cursor cambiaba de
+    // acción, y una de las cuatro abre el menú con «Terminar vínculo».
+    testWidgets(
+        'los íconos de acción no se tocan entre sí '
+        '[SCENARIO-CHW-ALU-34]', (tester) async {
+      await _pump(
+        tester,
+        width: 1400,
+        links: [_link('a1', TrainerLinkStatus.active)],
+        profiles: [_prof('a1', 'Mateo Presset')],
+      );
+
+      final chat = tester.getRect(find.byTooltip('Chat'));
+      final rutinas = tester.getRect(find.byTooltip('Rutinas'));
+      final pago = tester.getRect(find.byTooltip('Registrar pago'));
+
+      for (final (a, b, nombres) in [
+        (chat, rutinas, 'Chat → Rutinas'),
+        (rutinas, pago, 'Rutinas → Registrar pago'),
+      ]) {
+        expect(
+          b.left - a.right,
+          greaterThanOrEqualTo(AppSpacing.s8),
+          reason: '$nombres: los blancos de click quedan a '
+              '${b.left - a.right} px. Se tocaban a 0.',
+        );
+      }
     });
   });
 }

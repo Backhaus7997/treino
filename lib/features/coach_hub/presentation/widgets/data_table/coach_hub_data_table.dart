@@ -360,19 +360,32 @@ class _HeaderCell extends StatelessWidget {
             ? MainAxisAlignment.end
             : MainAxisAlignment.start,
         children: [
-          Text(
-            // MAYÚSCULA acá y no en cada string. Los rótulos venían mezclados
-            // —«ALUMNO», «ESTADO» y «ÚLTIMO ENTRENO» salían de l10n en
-            // mayúscula, y «Rutina», «Plan» y «Vence» estaban escritos a mano
-            // capitalizados—, y la fila de headers se veía a dos alturas
-            // tipográficas distintas. Resolverlo en el componente es lo que
-            // impide que el próximo rótulo vuelva a desalinearse.
-            column.label.toUpperCase(),
-            style: TextStyle(
-              fontFamily: AppFonts.barlow,
-              fontWeight: FontWeight.w600,
-              fontSize: AppTextSize.caption,
-              color: tokens.headerTextColor,
+          // `Flexible` + ellipsis: un rótulo más largo que su columna
+          // TRUNCABA LA APP, no el texto — franja amarilla y negra y una
+          // excepción de layout. La celda de datos (`_AlumnoCell`) ya se
+          // defendía así; el header no, y esa asimetría distorsionó los flex
+          // del roster: «ÚLTIMO ENTRENO» tenía flex 27 —275 px en desktop
+          // para mostrar «Hace 5 días»— porque era el número más chico con el
+          // que su header no reventaba a 900 px. El componente que no puede
+          // truncar termina cobrándole ancho a las columnas que sí importan.
+          Flexible(
+            child: Text(
+              // MAYÚSCULA acá y no en cada string. Los rótulos venían
+              // mezclados —«ALUMNO», «ESTADO» y «ÚLTIMO ENTRENO» salían de
+              // l10n en mayúscula, y «Rutina», «Plan» y «Vence» estaban
+              // escritos a mano capitalizados—, y la fila de headers se veía a
+              // dos alturas tipográficas distintas. Resolverlo en el
+              // componente es lo que impide que el próximo rótulo vuelva a
+              // desalinearse.
+              column.label.toUpperCase(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontFamily: AppFonts.barlow,
+                fontWeight: FontWeight.w600,
+                fontSize: AppTextSize.caption,
+                color: tokens.headerTextColor,
+              ),
             ),
           ),
           if (column.sortable && isSorted) ...[
@@ -529,21 +542,21 @@ class _DataRow extends StatelessWidget {
                         ? Alignment.centerRight
                         : Alignment.centerLeft,
                     child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: TreinoTableTokens.cellPaddingH,
-                      vertical: TreinoTableTokens.cellPaddingV,
-                    ),
-                    child: row.cellWidgets[col.key] ??
-                        Text(
-                          row.cells[col.key] ?? '',
-                          style: TextStyle(
-                            fontFamily: AppFonts.barlow,
-                            fontWeight: FontWeight.w400,
-                            fontSize: AppTextSize.body,
-                            color: AppPalette.of(ctx).textPrimary,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: TreinoTableTokens.cellPaddingH,
+                        vertical: TreinoTableTokens.cellPaddingV,
+                      ),
+                      child: row.cellWidgets[col.key] ??
+                          Text(
+                            row.cells[col.key] ?? '',
+                            style: TextStyle(
+                              fontFamily: AppFonts.barlow,
+                              fontWeight: FontWeight.w400,
+                              fontSize: AppTextSize.body,
+                              color: AppPalette.of(ctx).textPrimary,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
                     ),
                   ),
                 ),
