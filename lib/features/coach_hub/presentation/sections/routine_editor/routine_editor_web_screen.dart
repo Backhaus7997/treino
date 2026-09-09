@@ -946,7 +946,7 @@ class _RoutineEditorWebScreenState
           style: GoogleFonts.barlowCondensed(
             color: palette.textPrimary,
             fontWeight: FontWeight.w700,
-            fontSize: 18,
+            fontSize: AppTextSize.title,
           ),
         ),
         children: [
@@ -955,7 +955,10 @@ class _RoutineEditorWebScreenState
             child: Text(
               'Se reemplaza todo lo que tengas cargado en la Semana '
               '${targetWeek + 1}.', // i18n
-              style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 13),
+              style: GoogleFonts.barlow(
+                color: palette.textMuted,
+                fontSize: AppTextSize.bodyDense,
+              ),
             ),
           ),
           for (var w = 0; w < _numWeeks; w++)
