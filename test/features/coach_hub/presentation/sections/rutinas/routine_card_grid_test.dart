@@ -1,0 +1,215 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/features/coach_hub/presentation/sections/rutinas/routine_card_grid.dart';
+import 'package:treino/features/profile/application/user_public_profile_providers.dart';
+import 'package:treino/features/profile/domain/user_public_profile.dart';
+import 'package:treino/features/profile/domain/experience_level.dart';
+import 'package:treino/features/workout/domain/routine.dart';
+import 'package:treino/features/workout/domain/routine_source.dart';
+import 'package:treino/features/workout/domain/routine_status.dart';
+import 'package:treino/features/workout/domain/routine_visibility.dart';
+
+const _athlete = 'athlete-1';
+
+Routine _routine({
+  required String id,
+  String name = 'Fuerza 4x',
+  String? assignedTo,
+  RoutineSource source = RoutineSource.trainerAssigned,
+  RoutineVisibility visibility = RoutineVisibility.private,
+  RoutineStatus status = RoutineStatus.active,
+  int numWeeks = 1,
+}) =>
+    Routine(
+      id: id,
+      name: name,
+      split: 'PPL',
+      level: ExperienceLevel.beginner,
+      days: const [],
+      source: source,
+      assignedBy: 'trainer-1',
+      assignedTo: assignedTo,
+      visibility: visibility,
+      status: status,
+      numWeeks: numWeeks,
+    );
+
+/// Pumpea la grilla dentro de un router de verdad, para poder afirmar a dónde
+/// navega cada card — que es la mitad del contrato de esta pantalla.
+Future<String> _pumpYTocar(
+  WidgetTester tester,
+  List<Routine> routines, {
+  String tocar = 'r1',
+  String? displayName,
+}) async {
+  var destino = '/rutinas';
+  final router = GoRouter(
+    initialLocation: '/rutinas',
+    routes: [
+      GoRoute(
+        path: '/rutinas',
+        builder: (_, __) => Scaffold(
+          body: SingleChildScrollView(
+            child: RoutineCardGrid(routines: routines),
+          ),
+        ),
+      ),
+      GoRoute(
+        path: '/routine-editor/:athleteId/:routineId',
+        builder: (_, s) {
+          destino = s.uri.path;
+          return const Scaffold(body: Text('editor de plan'));
+        },
+      ),
+      GoRoute(
+        path: '/template-editor/:templateId',
+        builder: (_, s) {
+          destino = s.uri.path;
+          return const Scaffold(body: Text('editor de plantilla'));
+        },
+      ),
+    ],
+  );
+
+  await tester.pumpWidget(ProviderScope(
+    overrides: [
+      userPublicProfileProvider(_athlete).overrideWith(
+        (ref) => Stream<UserPublicProfile?>.value(
+          displayName == null
+              ? null
+              : UserPublicProfile(
+                  uid: _athlete,
+                  displayName: displayName,
+                  avatarUrl: null,
+                  gymId: null,
+                ),
+        ),
+      ),
+    ],
+    child: MaterialApp.router(
+      theme: AppTheme.dark(),
+      routerConfig: router,
+    ),
+  ));
+  await tester.pumpAndSettle();
+
+  await tester.tap(find.byKey(Key('routine_card_$tocar')));
+  await tester.pumpAndSettle();
+  return destino;
+}
+
+void main() {
+  group('RoutineCardGrid — etiquetas', () {
+    testWidgets('nombre resuelto → «Asignada a Sofía»', (tester) async {
+      await _pumpSoloGrilla(tester,
+          [_routine(id: 'r1', assignedTo: _athlete)], 'Sofía');
+      expect(find.text('Asignada a Sofía'), findsOneWidget);
+    });
+
+    testWidgets('nombre SIN resolver → «Asignada», nunca un nombre falso',
+        (tester) async {
+      // El perfil puede tardar o no existir (cuenta borrada). La card no
+      // puede inventar un nombre ni decir «Usuario eliminado»: dice lo único
+      // que sabe con certeza, que está asignada.
+      await _pumpSoloGrilla(
+          tester, [_routine(id: 'r1', assignedTo: _athlete)], null);
+      expect(find.text('Asignada'), findsOneWidget);
+      expect(find.textContaining('Asignada a'), findsNothing);
+    });
+
+    testWidgets('una plantilla dice «Plantilla» y no habla de alumnos',
+        (tester) async {
+      await _pumpSoloGrilla(
+        tester,
+        [_routine(id: 'r1', source: RoutineSource.trainerTemplate)],
+        null,
+      );
+      expect(find.text('Plantilla'), findsOneWidget);
+      expect(find.textContaining('Asignada'), findsNothing);
+    });
+
+    testWidgets('pública y archivada se acumulan', (tester) async {
+      await _pumpSoloGrilla(
+        tester,
+        [
+          _routine(
+            id: 'r1',
+            source: RoutineSource.trainerTemplate,
+            visibility: RoutineVisibility.public,
+            status: RoutineStatus.archived,
+          )
+        ],
+        null,
+      );
+      expect(find.text('Plantilla'), findsOneWidget);
+      expect(find.text('Pública'), findsOneWidget);
+      expect(find.text('Archivada'), findsOneWidget);
+    });
+
+    testWidgets('el resumen dice el split y las semanas', (tester) async {
+      await _pumpSoloGrilla(
+          tester, [_routine(id: 'r1', numWeeks: 4)], null);
+      expect(find.text('PPL · 4 semanas'), findsOneWidget);
+    });
+  });
+
+  group('RoutineCardGrid — a dónde entra cada card', () {
+    testWidgets('un PLAN va al editor de planes, con su alumno en la URL',
+        (tester) async {
+      final destino = await _pumpYTocar(
+        tester,
+        [_routine(id: 'r1', assignedTo: _athlete)],
+        displayName: 'Sofía',
+      );
+      expect(destino, '/routine-editor/$_athlete/r1');
+    });
+
+    testWidgets('una PLANTILLA va al editor de plantillas', (tester) async {
+      // No es un detalle de routing: un plan se guarda por `updateAssigned` y
+      // necesita el alumno; una plantilla va por `updateTemplate` y no tiene.
+      // Mandarla al editor de planes la haría pedir un `athleteId` que no
+      // existe.
+      final destino = await _pumpYTocar(
+        tester,
+        [_routine(id: 'r1', source: RoutineSource.trainerTemplate)],
+      );
+      expect(destino, '/template-editor/r1');
+    });
+  });
+}
+
+/// Igual que [_pumpYTocar] pero sin navegar — para afirmar sobre la card.
+Future<void> _pumpSoloGrilla(
+  WidgetTester tester,
+  List<Routine> routines,
+  String? displayName,
+) async {
+  await tester.pumpWidget(ProviderScope(
+    overrides: [
+      userPublicProfileProvider(_athlete).overrideWith(
+        (ref) => Stream<UserPublicProfile?>.value(
+          displayName == null
+              ? null
+              : UserPublicProfile(
+                  uid: _athlete,
+                  displayName: displayName,
+                  avatarUrl: null,
+                  gymId: null,
+                ),
+        ),
+      ),
+    ],
+    child: MaterialApp(
+      theme: AppTheme.dark(),
+      home: Scaffold(
+        body: SingleChildScrollView(
+          child: RoutineCardGrid(routines: routines),
+        ),
+      ),
+    ),
+  ));
+  await tester.pumpAndSettle();
+}
