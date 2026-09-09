@@ -1070,14 +1070,9 @@ class _RoutineEditorWebScreenState
       return;
     }
 
-    final day = _days[dayIndex];
-    final alreadyIds = day.slots
-        .where((s) => s.exercise != null)
-        .map((s) => s.exercise!.id)
-        .toSet();
     final picked = await showExercisePickerDialog(
       context,
-      alreadySelectedIds: alreadyIds,
+      alreadySelectedIds: _idsPresentesEnLaSemana(dayIndex),
     );
     if (picked == null || picked.isEmpty || !mounted) return;
     _agregarAlDia(dayIndex, picked);
@@ -1095,44 +1090,32 @@ class _RoutineEditorWebScreenState
   /// enlace del anterior, así que marcar el último también dejaría enganchado
   /// al ejercicio que venga después.
   Future<void> _addSupersetToDay(int dayIndex) async {
-    final day = _days[dayIndex];
-    final alreadyIds = day.slots
-        .where((s) => s.exercise != null)
-        .map((s) => s.exercise!.id)
-        .toSet();
+    final presentes = _idsPresentesEnLaSemana(dayIndex);
     final picked = await showExercisePickerDialog(
       context,
-      alreadySelectedIds: alreadyIds,
+      alreadySelectedIds: presentes,
     );
     if (picked == null || !mounted) return;
 
-    final nuevos =
-        picked.where((e) => !alreadyIds.contains(e.id)).toList();
+    final nuevos = picked.where((e) => !presentes.contains(e.id)).toList();
     // Una superserie de uno no es una superserie. Y decirlo, en vez de un
     // `return` mudo que deja el botón pareciendo roto.
     if (nuevos.length < 2) {
       if (!mounted) return;
       setState(() => _errorMessage = nuevos.isEmpty
-          ? 'Esos ejercicios ya están en el día.' // i18n
+          ? 'Esos ejercicios ya están en esta semana.' // i18n
           : 'Una superserie necesita al menos dos ejercicios.'); // i18n
       return;
     }
 
-    _markDirty();
-    setState(() {
-      _errorMessage = null;
-      final desde = day.slots.length;
-      for (final exercise in nuevos) {
-        day.slots.add(
-          _EditorSlot()
-            ..exercise = exercise
-            ..weeklySets = List.generate(_numWeeks, (_) => [_EditorSet()]),
-        );
-      }
-      for (var i = desde; i < day.slots.length - 1; i++) {
-        day.slots[i].linkedToNext = true;
-      }
-    });
+    setState(() => _errorMessage = null);
+    // Delega en el mismo camino que el panel lateral en vez de dar de alta acá.
+    // Antes esta rama tenía su propio `slots.add`, y era exactamente la
+    // divergencia contra la que advierte el doc de `_agregarSuperserieAlDia`:
+    // un ejercicio que el día YA tiene oculto en esta semana entraba de nuevo
+    // como slot duplicado, contra la invariante de un ejercicio por día
+    // (QA-WKT-004).
+    _agregarSuperserieAlDia(dayIndex, nuevos);
   }
 
   /// Agrega [elegidos] al día [dayIndex] YA ENLAZADOS como superserie.
@@ -1166,7 +1149,18 @@ class _RoutineEditorWebScreenState
     _markDirty();
     setState(() {
       for (final exercise in elegidos) {
-        if (day.slots.any((s) => s.exercise?.id == exercise.id)) continue;
+        final yaEstaEnElDia =
+            day.slots.indexWhere((s) => s.exercise?.id == exercise.id);
+        if (yaEstaEnElDia >= 0) {
+          // ESTE es el camino de vuelta. Un ejercicio por día es invariante
+          // del dominio (QA-WKT-004), así que re-agregar uno que el día ya
+          // tiene no puede dar de alta un slot nuevo: se le prende la semana
+          // en curso en la máscara. El slot vuelve con sus series, su
+          // descanso y sus notas — más de lo que consigue el teléfono, que
+          // ahí da de alta uno en blanco.
+          _prenderSemana(day.slots[yaEstaEnElDia], _selectedWeek);
+          continue;
+        }
         day.slots.add(
           _EditorSlot()
             ..exercise = exercise
@@ -1174,6 +1168,30 @@ class _RoutineEditorWebScreenState
         );
       }
     });
+  }
+
+  /// Ejercicios que el día [dayIndex] YA muestra en la semana en curso.
+  ///
+  /// Scopeado por presencia a propósito. Con la lista cruda, un slot sacado
+  /// «solo esta semana» seguía contando como "ya está": el picker lo
+  /// pre-marcaba y el alta lo descartaba por repetido, así que el ejercicio
+  /// quedaba INALCANZABLE desde la semana de la que lo habían sacado. Es el
+  /// mismo agujero que sigue teniendo el editor del teléfono.
+  Set<String> _idsPresentesEnLaSemana(int dayIndex) => _days[dayIndex]
+      .slots
+      .where((s) => s.exercise != null && s.isPresentInWeek(_selectedWeek))
+      .map((s) => s.exercise!.id)
+      .toSet();
+
+  /// Prende [week] en la máscara de [slot].
+  ///
+  /// Canonicaliza a máscara VACÍA cuando pasa a cubrir todas las semanas, por
+  /// la misma razón que `_toggleSlotWeekPresence`: `[0, 1]` en un plan de dos
+  /// semanas tiene que guardarse indistinguible de "sin máscara".
+  void _prenderSemana(_EditorSlot slot, int week) {
+    if (slot.isPresentInWeek(week)) return;
+    final mask = Set<int>.from(slot.activeWeeks)..add(week);
+    slot.activeWeeks = mask.length == _numWeeks ? <int>{} : mask;
   }
 
   void _removeSlot(int dayIndex, int slotIndex) {
@@ -1267,17 +1285,30 @@ class _RoutineEditorWebScreenState
     final semana = _selectedWeek;
     _markDirty();
     setState(() => slot.activeWeeks = newMask);
-
-    // EL AVISO NO ES DECORATIVO. «Solo esta semana» no borra la card: la
-    // atenúa, para poder volver a agregarla con los chips de «Semanas:». Desde
-    // el lado del PF eso se lee como «le di borrar y no se fue» —lo reportó
-    // con esas palabras— porque la única señal era un cambio de opacidad que
-    // hay que saber interpretar.
-    //
-    // El cartel dice QUÉ pasó y OFRECE LA VUELTA. Deshacer acá no es un lujo:
-    // el camino alternativo es abrir la card atenuada y encontrar los chips,
-    // que es exactamente el conocimiento que no se tenía al apretar borrar.
     if (!mounted) return;
+    _avisarSacadoDeLaSemana(slot, semana, maskAnterior);
+  }
+
+  /// Cartel de «lo saqué de esta semana», con la vuelta.
+  ///
+  /// La card DESAPARECE de la semana (`_filasDeSlots` filtra por presencia),
+  /// que es lo que el PF pedía: «si lo borro de una de las semanas, que se
+  /// borre de esa semana, no que quede ahí». Antes se atenuaba, y el cartel
+  /// decía «queda atenuado» — describía un estado que ya no existe.
+  ///
+  /// Por eso el aviso importa MÁS que antes, no menos: desaparecer sin decir
+  /// nada es indistinguible de haberlo borrado de todas. Dice de qué semana
+  /// salió y ofrece Deshacer, y el camino largo —«Agregar ejercicio», que
+  /// vuelve a ofrecerlo y le devuelve sus series— queda para después de que el
+  /// cartel se vaya.
+  ///
+  /// Lo comparten las DOS puertas que sacan un ejercicio de la semana en
+  /// curso: «Solo esta semana» y apagar el chip de la semana que se mira.
+  void _avisarSacadoDeLaSemana(
+    _EditorSlot slot,
+    int semana,
+    Set<int> maskAnterior,
+  ) {
     final nombre = slot.exercise?.name;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -1296,10 +1327,10 @@ class _RoutineEditorWebScreenState
         ),
         content: Text(
           nombre == null
-              ? 'Sacado de la Semana ${semana + 1}. Queda atenuado para '
-                  'volver a agregarlo.' // i18n
-              : '«$nombre» sale de la Semana ${semana + 1}. Queda atenuado '
-                  'para volver a agregarlo.', // i18n
+              ? 'Sacado de la Semana ${semana + 1}. Podés volver a agregarlo '
+                  'desde «Agregar ejercicio».' // i18n
+              : '«$nombre» sale de la Semana ${semana + 1}. Podés volver a '
+                  'agregarlo desde «Agregar ejercicio».', // i18n
         ),
         action: SnackBarAction(
           label: 'Deshacer', // i18n
@@ -1527,10 +1558,12 @@ class _RoutineEditorWebScreenState
   /// (`_firstValidationError`'s mask check is only a backstop for this).
   void _toggleSlotWeekPresence(int dayIndex, int slotIndex, int week) {
     final slot = _days[dayIndex].slots[slotIndex];
+    final maskAnterior = Set<int>.from(slot.activeWeeks);
     final mask = slot.activeWeeks.isEmpty
         ? {for (var w = 0; w < _numWeeks; w++) w}
         : Set<int>.from(slot.activeWeeks);
-    if (mask.contains(week)) {
+    final quita = mask.contains(week);
+    if (quita) {
       if (mask.length <= 1) return; // never let a removal empty the mask
       mask.remove(week);
     } else {
@@ -1542,6 +1575,14 @@ class _RoutineEditorWebScreenState
     }
     _markDirty();
     setState(() => slot.activeWeeks = mask);
+    // Apagar el chip de la semana que se está MIRANDO saca la card de la vista
+    // (`_filasDeSlots` filtra por presencia), igual que «Solo esta semana».
+    // Sin aviso la card se desvanecería bajo el cursor, sin decir qué pasó ni
+    // cómo volver — que es la queja original, servida por otra puerta.
+    // Apagar la semana de OTRA pestaña no mueve nada a la vista y no avisa.
+    if (quita && week == _selectedWeek) {
+      _avisarSacadoDeLaSemana(slot, week, maskAnterior);
+    }
   }
 
   void _onRestChanged(int dayIndex, int slotIndex, String value) {
@@ -3014,11 +3055,7 @@ class _RoutineEditorWebScreenState
           dias: [for (final d in _days) d.name],
           diaElegido: dia,
           onElegirDia: (i) => setState(() => _pickerDia = i),
-          alreadySelectedIds: _days[dia]
-              .slots
-              .where((s) => s.exercise != null)
-              .map((s) => s.exercise!.id)
-              .toSet(),
+          alreadySelectedIds: _idsPresentesEnLaSemana(dia),
           onAgregar: (elegidos) => _agregarAlDia(dia, elegidos),
           onAgregarEnSuperserie: (elegidos) =>
               _agregarSuperserieAlDia(dia, elegidos),
@@ -3716,29 +3753,59 @@ class _DayCard extends StatelessWidget {
       while (hasta < day.slots.length - 1 && day.slots[hasta].linkedToNext) {
         hasta++;
       }
-      final miembros = hasta - desde + 1;
+      // Presencia (REQ-WPRES render): un slot sacado "solo de esta semana"
+      // sigue en el modelo pero NO se dibuja, igual que el editor del teléfono
+      // (`_slotsVisibles`). La corrida de superserie se arma sobre la lista
+      // CRUDA —la define `linkedToNext` entre contiguos y eso no depende de la
+      // semana— y recién después se filtra por presencia.
+      //
+      // Los índices que viajan en los callbacks siguen siendo los ORIGINALES
+      // de `day.slots`: borrar y mover tienen que apuntar al slot real, no al
+      // lugar que ocupó entre los que quedaron a la vista.
+      final visibles = [
+        for (var k = desde; k <= hasta; k++)
+          if (day.slots[k].isPresentInWeek(selectedWeek)) k,
+      ];
+      i = hasta + 1;
+      // Bloque entero ausente de la semana: no ocupa lugar, ni el separador.
+      if (visibles.isEmpty) continue;
       filas.add(const SizedBox(height: 8));
-      if (miembros == 1) {
-        filas.add(_slotCard(desde, null));
+      // Una superserie a la que la semana le dejó UN miembro no es una
+      // superserie: va como card suelta, sin el envoltorio ni el badge A1.
+      if (visibles.length == 1) {
+        filas.add(_slotCard(visibles.first, null));
       } else {
         filas.add(SupersetBlock(
-          count: miembros,
+          count: visibles.length,
           children: [
-            for (var k = desde; k <= hasta; k++) ...[
-              _slotCard(k, k - desde),
-              if (k < hasta) const SizedBox(height: AppSpacing.s8),
+            for (var k = 0; k < visibles.length; k++) ...[
+              _slotCard(visibles[k], k),
+              if (k < visibles.length - 1)
+                const SizedBox(height: AppSpacing.s8),
             ],
           ],
         ));
       }
-      i = hasta + 1;
     }
     return filas;
   }
 
-  /// Una card de slot. [posEnGrupo] alimenta el badge A1/A2 y va en null
-  /// cuando el ejercicio es suelto.
+  /// Una card de slot. [posEnGrupo] alimenta el badge A1/A2 —cuenta sobre los
+  /// miembros VISIBLES, así un grupo al que la semana le ocultó el primero
+  /// numera A1/A2 y no A2/A3— y va en null cuando el ejercicio es suelto.
   Widget _slotCard(int i, int? posEnGrupo) {
+    // Mover y unir se deciden sobre lo que se VE en la semana, no sobre el
+    // índice crudo: con slots ocultos delante o detrás, la card ofrecía
+    // "Subir" y "Unir con el siguiente" para no hacer nada. Con todo visible
+    // esto da exactamente lo mismo que el `i > 0` de antes.
+    final hayVisibleAntes =
+        day.slots.take(i).any((s) => s.isPresentInWeek(selectedWeek));
+    final hayVisibleDespues =
+        day.slots.skip(i + 1).any((s) => s.isPresentInWeek(selectedWeek));
+    // Unir engancha con el CONTIGUO: si ese está oculto, la superserie que
+    // saldría tendría un miembro invisible.
+    final siguienteVisible = i < day.slots.length - 1 &&
+        day.slots[i + 1].isPresentInWeek(selectedWeek);
     return _SlotCard(
             onToggleExpanded: () => onToggleSlotExpanded(i),
             slot: day.slots[i],
@@ -3747,9 +3814,9 @@ class _DayCard extends StatelessWidget {
             numWeeks: numWeeks,
             hasError: slotHasError(day.slots[i]),
             errorText: slotErrorText(day.slots[i]),
-            canMoveUp: i > 0,
-            canMoveDown: i < day.slots.length - 1,
-            canLink: i < day.slots.length - 1,
+            canMoveUp: hayVisibleAntes,
+            canMoveDown: hayVisibleDespues,
+            canLink: siguienteVisible,
             linkedToNext: day.slots[i].linkedToNext,
             inSuperset:
                 (i < day.slots.length - 1 && day.slots[i].linkedToNext) ||
@@ -3873,12 +3940,12 @@ class _SlotCard extends StatelessWidget {
     // The sets for the currently-viewed week only — other weeks' rows aren't
     // rendered while a different tab is selected (Fase 4b).
     final weekSets = slot.weeklySets[selectedWeek];
-    // El ejercicio existe en la rutina pero NO en la semana que se está
-    // mirando. Gobierna las DOS mitades de la misma decisión: cuánto se ve
-    // (`Opacity`, al final del build) y qué responde al mouse (los dos
-    // `IgnorePointer` del cuerpo). Antes gobernaba sólo la primera.
-    final ausenteEnLaSemana =
-        numWeeks > 1 && !slot.isPresentInWeek(selectedWeek);
+    // Acá no hay caso "ausente de la semana": `_filasDeSlots` ya filtró por
+    // presencia, así que una card que llega hasta este build está SIEMPRE en
+    // la semana que se mira. Antes esta clase atenuaba (`Opacity`) y apagaba
+    // el mouse (dos `IgnorePointer`) para el slot ausente; eso existía porque
+    // la web no tenía forma de volver a agregarlo, y ahora la tiene desde
+    // «Agregar ejercicio».
     // La cáscara la dibuja `ExerciseCard`, el MISMO widget que el editor del
     // teléfono. Lo que eso trae acá y antes no había: la card se colapsa y,
     // cerrada, muestra el resumen de la prescripción; y el borde se pinta de
@@ -3972,10 +4039,7 @@ class _SlotCard extends StatelessWidget {
             ),
           ],
           // ── Bloque EDITABLE de arriba ───────────────────────────────────
-          // Inerte cuando el ejercicio no está en la semana que se mira.
-          IgnorePointer(
-            ignoring: ausenteEnLaSemana,
-            child: Column(
+          Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
               const SizedBox(height: 6),
@@ -4010,11 +4074,11 @@ class _SlotCard extends StatelessWidget {
               ),
               ],
             ),
-          ),
-          // ── Chips de semanas — SIEMPRE TOCABLES ─────────────────────────
-          // Quedan AFUERA de los dos `IgnorePointer` a propósito: son el único
-          // camino de vuelta. Si un ejercicio ausente fuera inerte de punta a
-          // punta, sacarlo de una semana sería irreversible desde la card.
+          // ── Chips de semanas ────────────────────────────────────────────
+          // Lo que la web puede y el teléfono no: prender o apagar CUALQUIER
+          // semana sin moverse de la que se está mirando. Apagar la semana en
+          // curso saca la card de la vista igual que «Solo esta semana», y
+          // avisa igual (mismo cartel, mismo Deshacer).
           const SizedBox(height: 6),
           // Presence mask (Fase 4c): which weeks this exercise is present in.
           // Only meaningful for multi-week plans.
@@ -4049,11 +4113,8 @@ class _SlotCard extends StatelessWidget {
             const SizedBox(height: 6),
           ],
           // ── Bloque EDITABLE de abajo ────────────────────────────────────
-          // Descanso, series, notas y el link de superserie. Todo esto era lo
-          // que seguía respondiendo al mouse sobre un ejercicio atenuado.
-          IgnorePointer(
-            ignoring: ausenteEnLaSemana,
-            child: Column(
+          // Descanso, series, notas y el link de superserie.
+          Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
               Row(
@@ -4180,17 +4241,9 @@ class _SlotCard extends StatelessWidget {
                 ),
               ],
             ),
-          ),
         ],
       ),
     );
-    // Dim (not hide) an exercise absent from the currently-viewed week so the
-    // trainer still sees it and can re-add it via the presence chips above
-    // (Fase 4c). Opacity alone doesn't block hit-testing, so the chips stay
-    // tappable while dimmed.
-    if (ausenteEnLaSemana) {
-      return Opacity(opacity: 0.45, child: card);
-    }
     return card;
   }
 }

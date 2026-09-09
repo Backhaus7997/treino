@@ -1328,7 +1328,15 @@ void main() {
         await tester.tap(find.text('Solo esta semana'));
         await tester.pumpAndSettle();
 
-        // Sigue estando (ahora solo en la semana 2).
+        // Se fue DE ESTA SEMANA. Antes se quedaba atenuado acá y el PF lo leía
+        // como «le di borrar y no se fue»; ahora desaparece de la semana de la
+        // que se lo sacó, que es lo que la palabra "borrar" promete.
+        expect(enElEditor(find.text('Press de Banca')), findsNothing);
+
+        // Pero sigue en la rutina: en la semana 2 está intacto. Esta mitad es
+        // la que separa "lo saqué de una semana" de "lo borré de todas".
+        await tester.tap(find.byKey(const Key('week_tab_1')));
+        await tester.pumpAndSettle();
         expect(enElEditor(find.text('Press de Banca')), findsOneWidget);
 
         await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
@@ -2721,11 +2729,13 @@ void main() {
   });
 
   group('RoutineEditorWebScreen — «solo esta semana» dice que hizo', () {
-    // El PF: «si intentas borrar un ejercicio, este se opaca, pero no se va».
-    // Es cierto y es el diseño: «solo esta semana» atenua en vez de borrar,
-    // para poder volver a agregarlo con los chips. Lo que faltaba era DECIRLO
-    // — la unica senal era un cambio de opacidad que hay que saber
-    // interpretar.
+    // El PF, dos veces: «si lo estoy borrando, para qué lo dejás ahí; quiero
+    // que si lo borro de una de las semanas se borre de esa semana». Ahora la
+    // card DESAPARECE de esa semana.
+    //
+    // Y por eso el cartel importa MÁS que antes, no menos: desaparecer sin
+    // decir nada es indistinguible de haberlo borrado de todas las semanas,
+    // que es la otra opción del mismo diálogo.
 
     /// Crea una rutina de 2 semanas con un ejercicio y lo saca de la semana
     /// que se esta mirando — el camino exacto que reporto el PF.
@@ -2749,38 +2759,84 @@ void main() {
       await borrarSoloEstaSemana(tester);
 
       expect(find.textContaining('sale de la Semana'), findsOneWidget);
-      expect(find.textContaining('Queda atenuado'), findsOneWidget);
+      // Y dice por dónde vuelve. El texto viejo prometía «Queda atenuado»,
+      // que describía un estado que ya no existe: no queda nada en pantalla.
+      expect(find.textContaining('Podés volver a agregarlo'), findsOneWidget);
+      expect(find.textContaining('Queda atenuado'), findsNothing);
     });
 
     testWidgets('«Deshacer» lo devuelve a la semana', (tester) async {
       await borrarSoloEstaSemana(tester);
 
-      // El camino alternativo es abrir la card atenuada y encontrar los chips
-      // de «Semanas:» — que es exactamente el conocimiento que no se tenia al
-      // apretar borrar.
+      // Se fue de la semana — eso es lo que se pidió.
+      expect(enElEditor(find.text('Press de Banca')), findsNothing);
+
       expect(find.text('Deshacer'), findsOneWidget);
       await tester.tap(find.text('Deshacer'));
       await tester.pumpAndSettle();
 
-      // Vuelve a estar presente: la card deja de estar atenuada.
-      expect(
-        find.ancestor(
-          of: find.byType(ExerciseCard),
-          matching: find.byType(Opacity),
-        ),
-        findsNothing,
-      );
+      // Y vuelve entero: Deshacer restaura la máscara ANTERIOR, no un `add`
+      // de la semana — la anterior podía ser vacía («en todas»).
+      expect(enElEditor(find.text('Press de Banca')), findsOneWidget);
+    });
+
+    testWidgets('apagar el chip de la semana en curso avisa igual',
+        (tester) async {
+      // La segunda puerta al mismo estado. Sin esto la card se desvanecía bajo
+      // el cursor sin decir qué pasó: la queja original, servida de nuevo.
+      await _pumpEditor(tester);
+      await tester.tap(find.text('Press de Banca'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Agregar (1)'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('+')); // 2 semanas
+      await tester.pumpAndSettle();
+      // Los chips viven DENTRO de la card, que nace colapsada.
+      await expandirEjercicios(tester);
+
+      // Apaga la semana 1 (índice 0), que es la que se está mirando.
+      await tester.ensureVisible(find.byKey(const Key('presence_chip_0')));
+      await tester.tap(find.byKey(const Key('presence_chip_0')));
+      await tester.pumpAndSettle();
+
+      expect(enElEditor(find.text('Press de Banca')), findsNothing);
+      expect(find.textContaining('sale de la Semana 1'), findsOneWidget);
+      expect(find.text('Deshacer'), findsOneWidget);
+    });
+
+    testWidgets('apagar el chip de OTRA semana no avisa: nada se movió',
+        (tester) async {
+      // Control del test de arriba. Si el cartel saliera también acá, estaría
+      // avisando de algo que el PF no ve pasar — ruido sobre una edición que
+      // no cambió la pantalla.
+      await _pumpEditor(tester);
+      await tester.tap(find.text('Press de Banca'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Agregar (1)'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('+')); // 2 semanas
+      await tester.pumpAndSettle();
+      await expandirEjercicios(tester);
+
+      // Mirando la semana 1, apaga la 2.
+      await tester.ensureVisible(find.byKey(const Key('presence_chip_1')));
+      await tester.tap(find.byKey(const Key('presence_chip_1')));
+      await tester.pumpAndSettle();
+
+      expect(enElEditor(find.text('Press de Banca')), findsOneWidget);
+      expect(find.textContaining('sale de la Semana'), findsNothing);
     });
   });
 
-  group('RoutineEditorWebScreen — el ejercicio ausente es INERTE', () {
-    // El PF le da "eliminar" a un ejercicio de una rutina de varias semanas,
-    // elige "solo esta semana", y lo ve atenuado en vez de desaparecer. Eso es
-    // el diseño (Fase 4c: se atenua para poder re-agregarlo). Lo que NO era
-    // diseno es que siguiera respondiendo al mouse: `Opacity` no bloquea el
-    // hit-testing, asi que kilos, reps, series, descanso, notas y el link de
-    // superserie quedaban editables sobre una semana de la que acababa de
-    // sacarlo.
+  group('RoutineEditorWebScreen — el ejercicio ausente NO ESTÁ', () {
+    // Antes esta pantalla ATENUABA la card ausente en vez de esconderla, y
+    // había una razón real: la web no tenía forma de volver a agregar el
+    // ejercicio, así que esconderlo lo habría dejado inalcanzable. Los chips
+    // de «Semanas:» eran ese único camino de vuelta, y por eso vivían afuera
+    // de los `IgnorePointer` que apagaban el resto de la card.
+    //
+    // Esconder recién se puede una vez que el picker lo vuelve a ofrecer. Ese
+    // es el test que sostiene todo este grupo, y va abajo.
     //
     // `_presenceRoutine` es `numWeeks: 2` con el slot presente SOLO en la
     // semana 0: pararse en la semana 2 es exactamente ese estado.
@@ -2794,56 +2850,119 @@ void main() {
       await _pumpEditor(tester, repo: repo, routineId: 'r7');
       await tester.tap(find.byKey(const Key('week_tab_1')));
       await tester.pumpAndSettle();
-      await expandirEjercicios(tester);
       return repo;
     }
 
-    testWidgets('sigue en pantalla, atenuado — no se oculta', (tester) async {
+    testWidgets('no se dibuja nada suyo en esa semana', (tester) async {
       await abrirEnLaSemanaSinElEjercicio(tester);
 
-      // La mitad que YA funcionaba: se ve, para poder volver a agregarlo.
+      expect(enElEditor(find.text('Press de Banca')), findsNothing);
+      // Y no queda un esqueleto: ni la prescripción ni los chips sobreviven.
+      // Con el atenuado, TODO esto seguía en el árbol.
+      expect(enElEditor(find.text('Descanso (seg)')), findsNothing);
+      expect(enElEditor(find.text('Semanas:')), findsNothing);
+    });
+
+    testWidgets('sigue intacto en la semana donde SÍ está', (tester) async {
+      await abrirEnLaSemanaSinElEjercicio(tester);
+      await tester.tap(find.byKey(const Key('week_tab_0')));
+      await tester.pumpAndSettle();
+
+      // Esconderlo de una semana no puede ser borrarlo de la rutina: son las
+      // dos ramas del mismo diálogo y tienen que seguir distinguiéndose.
       expect(enElEditor(find.text('Press de Banca')), findsOneWidget);
-      // `ancestor` y no `descendant`: el `Opacity` ENVUELVE la card.
-      expect(
-        find.ancestor(
-          of: find.byType(ExerciseCard),
-          matching: find.byType(Opacity),
-        ),
-        findsWidgets,
-      );
     });
 
-    testWidgets('lo editable esta en el arbol pero NO recibe el mouse',
+    testWidgets('el picker lo vuelve a OFRECER — el camino de vuelta',
         (tester) async {
+      // ESTE es el test que habilita esconder. Sin él, sacar un ejercicio de
+      // una semana lo volvía inalcanzable: filtrado de la lista Y descartado
+      // por el picker como «ya está en el día», porque `alreadySelectedIds`
+      // miraba el día entero en vez de la semana. Es el agujero que el editor
+      // del teléfono tenía y que este cambio cierra en los dos.
       await abrirEnLaSemanaSinElEjercicio(tester);
 
-      // `hitTestable()` es la afirmacion exacta: el widget existe y se ve, y
-      // aun asi no le llega el puntero. Con el `Opacity` solo, las dos
-      // busquedas devolvian lo mismo y el test no distinguia nada.
-      final descanso = enElEditor(find.text('Descanso (seg)'));
-      expect(descanso, findsOneWidget, reason: 'sigue renderizado');
+      await _elegirEnPanel(tester, 'Press de Banca');
+      await tester.tap(find.text('Agregar (1)'));
+      await tester.pumpAndSettle();
+
+      expect(enElEditor(find.text('Press de Banca')), findsOneWidget);
+    });
+
+    testWidgets('el picker no lo da por puesto en la semana que no lo tiene',
+        (tester) async {
+      // La otra mitad del camino de vuelta, y la que casi se me escapa: que
+      // `_agregarAlDia` sepa restaurar no alcanza si el picker ya lo cuenta
+      // como puesto. `alreadySelectedIds` arranca TILDANDO lo que recibe, así
+      // que mirando el día entero el ejercicio aparecía marcado en una semana
+      // que no lo tiene, y el botón decía «Agregar (1)» sin haber tocado nada.
+      //
+      // Va por el MODAL y no por el panel a propósito. El panel lee
+      // `alreadySelectedIds` UNA vez, en su `initState`: después de cambiar de
+      // semana sigue mostrando los tildes de la anterior, así que ahí la
+      // afirmación no se puede probar. El modal monta fresco en cada apertura.
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any()))
+          .thenAnswer((_) async => _presenceRoutine());
+      await _pumpEditor(tester, repo: repo, routineId: 'r7');
+      // `compact` (768–1279): sin panel lateral, el alta vuelve al modal.
+      tester.view.physicalSize = const Size(1100, 1100);
+      addTearDown(tester.view.reset);
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('week_tab_1')));
+      await tester.pumpAndSettle();
+
+      final agregar = find.text('Agregar ejercicio');
+      await tester.ensureVisible(agregar.first);
+      await tester.pumpAndSettle();
+      await tester.tap(agregar.first);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(Dialog), findsOneWidget);
       expect(
-        descanso.hitTestable(),
+        find.text('Agregar (1)'),
         findsNothing,
-        reason: 'pero inerte: no se edita una semana de la que se lo saco',
+        reason: 'en esta semana el ejercicio NO está: nada pre-tildado',
       );
-
-      final modo = enElEditor(find.text('Reps'));
-      expect(modo, findsOneWidget);
-      expect(modo.hitTestable(), findsNothing);
+      expect(find.text('Agregar'), findsOneWidget);
     });
 
-    testWidgets('los chips de semanas SIGUEN tocables — el camino de vuelta',
+    testWidgets('al volver es el MISMO slot, no uno nuevo en blanco',
         (tester) async {
-      await abrirEnLaSemanaSinElEjercicio(tester);
+      final repo = await abrirEnLaSemanaSinElEjercicio(tester);
+      when(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: any(named: 'draft'),
+        ),
+      ).thenAnswer((i) async => i.namedArguments[#draft] as Routine);
 
-      // Si el ejercicio ausente fuera inerte de punta a punta, sacarlo de una
-      // semana seria irreversible desde la card. Por eso los chips quedan
-      // AFUERA de los dos `IgnorePointer`, y por eso son dos y no uno: viven
-      // en el medio del cuerpo.
-      final etiqueta = enElEditor(find.text('Semanas:'));
-      expect(etiqueta, findsOneWidget);
-      expect(etiqueta.hitTestable(), findsOneWidget);
+      await _elegirEnPanel(tester, 'Press de Banca');
+      await tester.tap(find.text('Agregar (1)'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('routine_editor_submit_button')));
+      await tester.pumpAndSettle();
+
+      final draft = verify(
+        () => repo.updateAssigned(
+          uid: any(named: 'uid'),
+          draft: captureAny(named: 'draft'),
+        ),
+      ).captured.single as Routine;
+
+      final slots = draft.days.single.slots;
+      // UN slot, no dos. Un ejercicio por día es invariante del dominio
+      // (QA-WKT-004): dar de alta uno nuevo dejaría dos «Press de Banca» en el
+      // mismo día, que es lo que pasaría si el regreso fuera un alta común.
+      expect(slots, hasLength(1));
+      // Máscara vacía = presente en TODAS: volvió a la semana 2 sin perder la
+      // 1, y `[0, 1]` se canonicaliza a "sin máscara".
+      expect(slots.single.activeWeeks, isEmpty);
+      // Y con su prescripción: 8 reps a 60 kg, no un set en blanco.
+      expect(slots.single.weeklySets[1].single.reps, 8);
+      expect(slots.single.weeklySets[1].single.weightKg, 60);
     });
   });
 
@@ -3794,18 +3913,29 @@ void main() {
       );
     });
 
-    testWidgets(
-        'está deshabilitado sobre un ejercicio ausente de la semana vista',
+    testWidgets('ni siquiera existe sobre un ejercicio ausente de la semana',
         (tester) async {
-      // Web atenúa las tarjetas ausentes en vez de esconderlas como mobile,
-      // así que el botón es alcanzable sobre un ejercicio que esa semana no
-      // tiene prescripción visible que pisar.
+      // Antes la web atenuaba las cards ausentes en vez de esconderlas, así
+      // que el botón se dibujaba igual y había que deshabilitarlo a mano. Al
+      // ocultarlas (como mobile) la pregunta cambia de "¿está apagado?" a "¿no
+      // está?": no hay card, no hay botón, no hay prescripción que pisar.
+      //
+      // `Press Inclinado` es `activeWeeks: [1]`: falta en la semana 1 y está
+      // en la 2.
       await pump(tester, _copyPerWeekRoutine());
-      expect(copyButtonsOf(tester)[1].onPressed, isNull);
+      expect(find.text('Press Inclinado'), findsNothing);
+      expect(
+        copyButtonsOf(tester),
+        hasLength(1),
+        reason: 'un solo ejercicio a la vista → un solo botón de copiar',
+      );
 
       await tester.tap(find.byKey(const Key('week_tab_1')));
       await tester.pumpAndSettle();
-      expect(copyButtonsOf(tester)[1].onPressed, isNotNull);
+      expect(find.text('Press Inclinado'), findsOneWidget);
+      final botones = copyButtonsOf(tester);
+      expect(botones, hasLength(2));
+      expect(botones[1].onPressed, isNotNull);
     });
   });
 

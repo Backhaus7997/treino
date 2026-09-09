@@ -2048,18 +2048,19 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   /// Passes [alreadySelectedIds] so the picker pre-marks exercises already in
   /// the day — the user avoids accidental re-adds. (ADR-RER-01)
   Future<void> _pickExercisesForDay(BuildContext context, int dayIndex) async {
-    final existingIds = _days[dayIndex]
-        .slots
-        .where((s) => s.exercise != null)
-        .map((s) => s.exercise!.id)
-        .toSet();
     // Ver la nota de `_addSupersetForDay`: el picker pre-marca lo que el día
-    // ya tiene, así el usuario no elige un repetido sin darse cuenta.
+    // ya tiene, así el usuario no elige un repetido sin darse cuenta. Pero
+    // pre-marca lo que ya tiene EN ESTA SEMANA, no en el día entero, y esa
+    // diferencia es el bug que esto cierra: un slot sacado «solo de esta
+    // semana» seguía en `slots`, no se dibujaba (`_slotsVisibles` lo filtra) y
+    // encima el picker lo daba por puesto. El ejercicio quedaba INALCANZABLE
+    // desde la semana de la que lo habían sacado.
+    final presentes = _idsPresentesEnLaSemana(dayIndex);
     final picked = await showExercisePicker(context,
-        alreadySelectedIds: _resolublesPorElPicker(existingIds));
+        alreadySelectedIds: _resolublesPorElPicker(presentes));
     if (picked == null || picked.isEmpty || !mounted) return;
 
-    final nuevos = picked.where((e) => !existingIds.contains(e.id)).toList();
+    final nuevos = picked.where((e) => !presentes.contains(e.id)).toList();
     if (nuevos.isEmpty) {
       // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2069,15 +2070,40 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       return;
     }
 
+    // Lo elegido se parte en dos: lo que NACE acá y lo que VUELVE. Un
+    // ejercicio que el día ya tiene oculto en esta semana no puede dar de alta
+    // otro slot —un ejercicio por día es invariante del dominio
+    // (QA-WKT-004)—, así que se le prende la semana en la máscara. De paso
+    // vuelve con sus series, su descanso y sus notas.
+    final porId = {
+      for (final s in _days[dayIndex].slots)
+        if (s.exercise != null) s.exercise!.id: s,
+    };
+    final vuelven = [for (final e in nuevos) if (porId.containsKey(e.id)) e];
+    final aCrear = [for (final e in nuevos) if (!porId.containsKey(e.id)) e];
+
     // Determine presence scope for the new slots (ADR-WPRES-04).
     // Prompt only when multi-week AND viewing week ≥ 2 (index ≥ 1).
-    // ignore: use_build_context_synchronously
-    final scope = await _promptAddScope(context);
-    if (scope == null || !mounted) return;
+    //
+    // Sólo para los que NACEN: preguntarlo cuando todo lo elegido es un
+    // regreso sería ofrecer una decisión que después no se respeta. Un regreso
+    // devuelve el ejercicio a la semana que se está mirando y a ninguna otra
+    // —es lo único que se pidió al agregarlo acá— y nunca lo saca de las
+    // semanas donde ya estaba.
+    var scope = _AddScope.thisWeek;
+    if (aCrear.isNotEmpty) {
+      // ignore: use_build_context_synchronously
+      final elegido = await _promptAddScope(context);
+      if (elegido == null || !mounted) return;
+      scope = elegido;
+    }
 
     _markDirty();
     setState(() {
-      for (final ex in nuevos) {
+      for (final e in vuelven) {
+        _prenderSemana(porId[e.id]!, _selectedWeek);
+      }
+      for (final ex in aCrear) {
         final slot = _EditableSlot()
           ..expandido = false
           ..exercise = ex
@@ -2088,6 +2114,27 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         _days[dayIndex].slots = [..._days[dayIndex].slots, slot];
       }
     });
+  }
+
+  /// Ejercicios que el día [dayIndex] YA muestra en la semana en curso.
+  ///
+  /// Scopeado por presencia a propósito: es la contracara exacta de
+  /// `_slotsVisibles`. Lo que no se ve, se puede volver a agregar.
+  Set<String> _idsPresentesEnLaSemana(int dayIndex) => _days[dayIndex]
+      .slots
+      .where((s) => s.exercise != null && s.isPresentInWeek(_selectedWeek))
+      .map((s) => s.exercise!.id)
+      .toSet();
+
+  /// Prende [week] en la máscara de [slot].
+  ///
+  /// Canonicaliza a máscara VACÍA cuando pasa a cubrir todas las semanas:
+  /// `[0, 1]` en un plan de dos semanas tiene que guardarse indistinguible de
+  /// "sin máscara", que es la forma canónica de "en todas" ([isPresentInWeek]).
+  void _prenderSemana(_EditableSlot slot, int week) {
+    if (slot.isPresentInWeek(week)) return;
+    final mask = Set<int>.from(slot.activeWeeks)..add(week);
+    slot.activeWeeks = mask.length == _numWeeks ? <int>{} : mask;
   }
 
   /// El catálogo que el usuario puede ver: el del sistema más sus ejercicios
@@ -2123,14 +2170,14 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   /// están en el día — un ejercicio por día es invariante del dominio
   /// (QA-WKT-004), y ofrecerlo para que el tap no haga nada es peor que no
   /// ofrecerlo.
+  ///
+  /// "Ya están" es POR SEMANA, no por día: uno sacado «solo de esta semana»
+  /// tiene que volver a aparecer acá, o el atajo se convierte en la tercera
+  /// puerta cerrada —lista, picker y entrada rápida— sobre el mismo ejercicio.
   List<QuickEntryResult> _buscarParaEntradaRapida(String query, int dayIndex) {
     final texto = query.trim();
     if (texto.isEmpty) return const [];
-    final yaEstan = _days[dayIndex]
-        .slots
-        .where((s) => s.exercise != null)
-        .map((s) => s.exercise!.id)
-        .toSet();
+    final yaEstan = _idsPresentesEnLaSemana(dayIndex);
     // Catálogo del sistema MÁS los ejercicios propios. Buscar "sentadilla" y
     // no encontrar la variante que uno mismo cargó es peor que no tener el
     // atajo: el picker sí los muestra, y dos búsquedas que difieren en la
@@ -2190,11 +2237,42 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     final ex = catalogo.where((e) => e.id == exerciseId).firstOrNull;
     if (ex == null) return;
 
-    final scope = await _promptAddScope(context);
-    if (scope == null || !mounted) return;
+    // ¿Nace o vuelve? La búsqueda ofrece lo que no está PRESENTE en esta
+    // semana, así que lo elegido puede ser un slot que el día ya tiene y que
+    // está oculto acá.
+    final yaEnElDia =
+        _days[dayIndex].slots.indexWhere((s) => s.exercise?.id == ex.id);
+
+    // El scope sólo se pregunta para los que NACEN: un regreso vuelve a la
+    // semana que se está mirando y a ninguna otra, así que ofrecer «todas las
+    // semanas» sería ofrecer una decisión que después no se respeta.
+    var scope = _AddScope.thisWeek;
+    if (yaEnElDia < 0) {
+      final elegido = await _promptAddScope(context);
+      if (elegido == null || !mounted) return;
+      scope = elegido;
+    }
 
     _markDirty();
     setState(() {
+      if (yaEnElDia >= 0) {
+        // Vuelve prendiendo su máscara —un ejercicio por día es invariante
+        // (QA-WKT-004), no puede entrar un segundo slot— y la prescripción
+        // recién tipeada se aplica a ESTA semana: es lo que se pidió al
+        // escribirla, y las otras semanas quedan como estaban.
+        final existente = _days[dayIndex].slots[yaEnElDia];
+        _prenderSemana(existente, _selectedWeek);
+        existente.exerciseMode =
+            entry.esDuracion ? ExerciseMode.duration : ExerciseMode.reps;
+        existente.weeklySets[_selectedWeek] = List.generate(
+          entry.sets,
+          (i) => _EditableSet()
+            ..reps = entry.repsDeSet(i)
+            ..weightKg = entry.pesoDeSet(i)
+            ..durationSeconds = entry.duracionDeSet(i),
+        );
+        return;
+      }
       final slot = _EditableSlot()
         ..expandido = false
         ..exercise = ex
@@ -2238,6 +2316,12 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     // (ADR-RER-01). El parámetro existía y ninguna de las tres llamadas del
     // editor lo pasaba: el usuario elegía un ejercicio repetido sin saberlo,
     // el editor lo filtraba, y no pasaba nada.
+    //
+    // Acá `existingIds` va CRUDO —el día entero, no la semana— a diferencia de
+    // `_pickExercisesForDay`. No es un olvido: armar una superserie nueva con
+    // un slot que ya existe oculto exigiría MOVERLO para dejarlo contiguo al
+    // grupo, que es otra operación. El camino de vuelta de ese ejercicio es
+    // «Agregar ejercicio» suelto, que sí lo devuelve con todo lo suyo.
     final picked = await showExercisePicker(context,
         alreadySelectedIds: _resolublesPorElPicker(existingIds));
     if (picked == null || picked.isEmpty || !mounted) return;
@@ -2446,7 +2530,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         .where((s) => s.exercise != null)
         .map((s) => s.exercise!.id)
         .toSet();
-    // Ver la nota de `_addSupersetForDay`.
+    // Ver la nota de `_addSupersetForDay`, incluido por qué `existingIds` va
+    // crudo y no scopeado por semana.
     final l10n = AppL10n.of(context);
     final messenger = ScaffoldMessenger.of(context);
     final picked = await showExercisePicker(context,

@@ -1436,6 +1436,82 @@ void main() {
         reason: 'exercise must be added when no scope dialog blocks the flow');
   });
 
+  // ── El callejón sin salida ───────────────────────────────────────────────
+
+  group('un ejercicio sacado de una semana puede VOLVER a esa semana', () {
+    // El editor filtra por presencia (`_slotsVisibles`), así que un slot
+    // sacado «solo esta semana» desaparece de esa semana. Hasta ahí, bien.
+    //
+    // Pero los pickers calculaban «esto ya está en el día» sobre `slots`
+    // ENTERO, no sobre la semana: el ejercicio oculto seguía contando como
+    // puesto, quedaba pre-marcado y `nuevos` lo descartaba por repetido. Salía
+    // «no había nada nuevo» sobre un ejercicio que esa semana NO tenía.
+    //
+    // O sea: filtrado de la lista Y rechazado por el picker. No había NINGUNA
+    // forma de devolver ese ejercicio a esa semana. Estos dos tests son el
+    // candado de ese agujero.
+
+    testWidgets('el picker lo vuelve a ofrecer en vez de decir que ya está',
+        (tester) async {
+      await _pumpEditor(
+        tester,
+        mode: const SelfCreating(),
+        overrides: _overrides(),
+      );
+      await tester.enterText(
+          find.byKey(const Key('editor_name_field')), 'Mi Plan');
+      await tester.pumpAndSettle();
+
+      // Agregar semana AUTO-NAVEGA a la nueva (índice 1): hay que volver a la
+      // semana 1 para que el alta no dispare el diálogo de scope.
+      await _tapWeekKey(tester, 'add_week_button'); // 2 semanas
+      await _tapWeekKey(tester, 'week_tab_0');
+      await _addBenchPress(tester); // en la semana 1 → entra en todas
+
+      // Se lo saca de la semana 2.
+      await _tapWeekKey(tester, 'week_tab_1');
+      await _deleteSlotThisWeek(tester, 0);
+      expect(find.text('Press de Banca'), findsNothing,
+          reason: 'sacado de esta semana: no se dibuja');
+
+      // Y se lo vuelve a agregar DESDE la semana 2. Antes de este cambio, acá
+      // saltaba `routineEditorAddNothingNew` y el ejercicio no volvía nunca.
+      await _addBenchPress(tester);
+
+      expect(find.text('Press de Banca'), findsOneWidget,
+          reason: 'el camino de vuelta: el picker lo ofrece y el slot vuelve');
+    });
+
+    testWidgets('vuelve como el MISMO slot: no quedan dos en el día',
+        (tester) async {
+      // Un ejercicio por día es invariante del dominio (QA-WKT-004). Si el
+      // regreso diera de alta un slot nuevo en vez de prender la máscara del
+      // que ya está, la semana 1 —donde el viejo sigue presente— mostraría DOS
+      // «Press de Banca». La semana 2 sola no lo delata: ahí el viejo está
+      // oculto y se vería uno solo igual.
+      await _pumpEditor(
+        tester,
+        mode: const SelfCreating(),
+        overrides: _overrides(),
+      );
+      await tester.enterText(
+          find.byKey(const Key('editor_name_field')), 'Mi Plan');
+      await tester.pumpAndSettle();
+
+      await _tapWeekKey(tester, 'add_week_button'); // 2 semanas
+      await _tapWeekKey(tester, 'week_tab_0');
+      await _addBenchPress(tester);
+
+      await _tapWeekKey(tester, 'week_tab_1');
+      await _deleteSlotThisWeek(tester, 0);
+      await _addBenchPress(tester);
+
+      await _tapWeekKey(tester, 'week_tab_0');
+      expect(find.text('Press de Banca'), findsOneWidget,
+          reason: 'QA-WKT-004: un solo slot de ese ejercicio en el día');
+    });
+  });
+
   // ── Task 2.1 / 2.4 — duplicar-semana copies presence (SCENARIO-WPRES-020/021)
 
   group('SCENARIO-WPRES-020/021: duplicar-semana presence', () {
