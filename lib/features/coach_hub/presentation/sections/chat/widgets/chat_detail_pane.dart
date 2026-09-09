@@ -117,12 +117,32 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
     final uid = ref.read(currentUidProvider);
     if (uid == null) return;
     setState(() => _sending = true);
+    // El chat AL QUE SE MANDA, capturado antes del await.
+    //
+    // `ChatSectionScreen` reusa este State cuando el PF cambia de conversación
+    // —de eso se ocupa `didUpdateWidget`—, así que `widget.chatId` puede ser
+    // OTRO para cuando el envío responde. Leerlo después del await hace que el
+    // diagnóstico mienta con total seguridad: el log nombra el chat nuevo y el
+    // cartel dice "este chat" sobre uno donde nunca se intentó nada. Un
+    // mensaje de error que señala a la conversación equivocada es peor que no
+    // tenerlo, que es la razón entera de este PR.
+    final chatIdDelEnvio = widget.chatId;
     try {
       await ref.read(chatRepositoryProvider).sendMessage(
-            chatId: widget.chatId,
+            chatId: chatIdDelEnvio,
             senderId: uid,
             text: text,
           );
+      // SIN guarda de `chatId`, a propósito, aunque la simetría con el `catch`
+      // la pida. Una versión anterior limitaba el `clear()` a "si el PF sigue
+      // en el mismo chat", para no pisarle un borrador escrito en la
+      // conversación nueva. Ese borrador NO PUEDE EXISTIR: el composer va con
+      // `enabled: !sending`, así que mientras el envío está en vuelo no se
+      // puede tipear en ningún lado.
+      //
+      // Lo único que la guarda lograba era dejar el texto YA ENVIADO cargado
+      // en la otra conversación, a un Enter de mandárselo a la persona
+      // equivocada. El campo es uno solo y sobrevive al cambio de chat.
       _composerCtrl.clear();
     } catch (e, st) {
       // Antes acá había un `catch (_)`. El PF veía "Reintentá", reintentaba,
@@ -141,7 +161,7 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
           e,
           st,
           reason: 'ChatDetailPane._send: falló el envío en el chat '
-              '${widget.chatId}',
+              '$chatIdDelEnvio',
         ).catchError((_) {
           // Telemetría rota no es un chat roto.
         }),
@@ -155,9 +175,20 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
             // una sospecha: cuando este texto aparece, es porque las reglas
             // denegaron la escritura.
             content: Text(
-              isPermissionDenied(e)
-                  ? 'No tenés permiso para escribir en este chat.'
-                  : 'No pudimos enviar el mensaje. Reintentá.',
+              switch ((
+                isPermissionDenied(e),
+                widget.chatId == chatIdDelEnvio,
+              )) {
+                // El deíctico "este" sólo es cierto si el PF sigue parado en la
+                // conversación donde falló. Si ya se fue a otra, el cartel
+                // aparece sobre una conversación distinta y "este chat" señala
+                // a la equivocada.
+                (true, true) => 'No tenés permiso para escribir en este chat.',
+                (true, false) =>
+                  'No pudimos enviar el mensaje: no tenés permiso en '
+                      'esa conversación.',
+                (false, _) => 'No pudimos enviar el mensaje. Reintentá.',
+              },
             ), // i18n: Fase W2
           ),
         );
