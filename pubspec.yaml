@@ -34,6 +34,10 @@ dependencies:
   cloud_firestore: ^5.4.0
   cloud_functions: ^5.2.0
   file_picker: ^8.1.2
+  # Directo y no transitivo a proposito: `excel_parser.dart` abre el ZIP del
+  # .xlsx por su cuenta para normalizar los targets absolutos de las
+  # relaciones, que el paquete `excel` no soporta. Ver la nota ahi.
+  archive: ^3.6.1
   excel: ^4.0.6
   web: ^1.1.0
   google_sign_in: ^7.1.0
