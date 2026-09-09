@@ -239,7 +239,7 @@ class _GroupHeader extends StatelessWidget {
 /// [TreinoInteractiveState]): fondo `accent` al 8% de opacidad. El cambio de
 /// fondo anima con [AppMotionTokens.cardStateChange] (interrumpible,
 /// respeta reduce-motion vía `AppMotionTokens.resolve`).
-class _SidebarItemRow extends StatelessWidget {
+class _SidebarItemRow extends StatefulWidget {
   const _SidebarItemRow({
     super.key,
     required this.item,
@@ -256,10 +256,37 @@ class _SidebarItemRow extends StatelessWidget {
   final int? badgeCount;
 
   @override
+  State<_SidebarItemRow> createState() => _SidebarItemRowState();
+}
+
+class _SidebarItemRowState extends State<_SidebarItemRow> {
+  /// Identidad GLOBAL del label, para que su `State` sobreviva a que lo
+  /// re-parenteen.
+  ///
+  /// Hace falta por cómo funciona `Tooltip` adentro: sólo envuelve a su hijo
+  /// en `MouseRegion`+`GestureDetector` cuando el tooltip está HABILITADO, así
+  /// que al colapsar —que es justo cuando `TooltipVisibility` lo prende— la
+  /// forma del árbol cambia y todo lo de abajo se remonta. Un widget recién
+  /// montado no tiene de dónde interpolar: el `AnimatedPositioned` del label
+  /// nacía en su valor final y el label SALTABA, que es exactamente el bug que
+  /// los comentarios de este archivo vienen persiguiendo.
+  ///
+  /// Con `GlobalKey` Flutter MUEVE el elemento en vez de recrearlo, así que el
+  /// label conserva su animación aunque el `Tooltip` cambie de forma arriba.
+  /// Lo fija el test «el label se desliza afuera en vez de desaparecer».
+  final GlobalKey _labelKey = GlobalKey();
+
+  @override
   Widget build(BuildContext context) {
+    final item = widget.item;
+    final collapsed = widget.collapsed;
+    final active = widget.active;
+    final delay = widget.delay;
+    final badgeCount = widget.badgeCount;
+
     final tokens = CoachHubSidebarItemTokens.of(context);
     final fg = active ? tokens.activeForeground : tokens.inactiveForeground;
-    final hasBadge = badgeCount != null && badgeCount! > 0;
+    final hasBadge = badgeCount != null && badgeCount > 0;
 
     final row = TreinoInteractiveState(
       onTap: () => context.go(item.route),
@@ -331,6 +358,7 @@ class _SidebarItemRow extends StatelessWidget {
               // Va a `sidebarCollapsedWidth` y no a un valor menor porque ese
               // es el punto exacto donde el clip lo tapa entero.
               AnimatedPositioned(
+                key: _labelKey,
                 left: collapsed
                     ? CoachHubLayoutTokens.sidebarCollapsedWidth
                     : _kIconSize + 12,
@@ -371,7 +399,7 @@ class _SidebarItemRow extends StatelessWidget {
                         // otra. El badge sólo se ocupa de su propia forma.
                         if (hasBadge) ...[
                           const SizedBox(width: AppSpacing.s8),
-                          TreinoBadge(count: badgeCount!),
+                          TreinoBadge(count: badgeCount),
                         ],
                       ],
                     ),
@@ -424,25 +452,32 @@ class _SidebarItemRow extends StatelessWidget {
     // su elemento tiene que SOBREVIVIR al rebuild. Las dos condiciones son
     // necesarias; con una sola, el label sigue saltando.
     //
-    // Ahora los wrappers están siempre. El `Tooltip` con mensaje vacío no se
-    // muestra —expandido el label ya está en pantalla y un tooltip sería
-    // redundante— y el `Semantics` lleva el mismo label en los dos estados,
-    // que es correcto en ambos.
+    // Ahora los wrappers están siempre, y el `Semantics` lleva el mismo label
+    // en los dos estados, que es correcto en ambos.
+    //
+    // Quién apaga el tooltip expandido es `TooltipVisibility`, NO un mensaje
+    // vacío. Acá decía que «el Tooltip con mensaje vacío no se muestra» y era
+    // FALSO: Flutter no mira el mensaje, arma la burbuja igual, y quedaba un
+    // rectángulo oscuro sin texto flotando entre dos items —centrado sobre el
+    // item hovereado y 24 px abajo, que es el `verticalOffset` del tooltip—.
+    // El PF lo reportó como «ese cuadrado negro que aparece al pasar el
+    // cursor por el menú del costado». Lo fija el test del hover.
     final labelled = MergeSemantics(
       child: Semantics(
         label: hasBadge ? '${item.label}, $badgeCount' : item.label,
-        child: Tooltip(
-          message: collapsed
-              ? (hasBadge ? '${item.label} ($badgeCount)' : item.label)
-              : '',
-          // El sidebar colapsado tiene 23 íconos y el tooltip es la única
-          // forma de leerlos: 200 ms alcanzan para no dispararlo mientras
-          // el mouse cruza la columna, y se sienten instantáneos al frenar.
-          waitDuration: const Duration(milliseconds: 200),
-          // El label ya lo pone el `Semantics` de arriba; sin esto el
-          // lector lo diría dos veces.
-          excludeFromSemantics: true,
-          child: row,
+        child: TooltipVisibility(
+          visible: collapsed,
+          child: Tooltip(
+            message: hasBadge ? '${item.label} ($badgeCount)' : item.label,
+            // El sidebar colapsado tiene 23 íconos y el tooltip es la única
+            // forma de leerlos: 200 ms alcanzan para no dispararlo mientras
+            // el mouse cruza la columna, y se sienten instantáneos al frenar.
+            waitDuration: const Duration(milliseconds: 200),
+            // El label ya lo pone el `Semantics` de arriba; sin esto el
+            // lector lo diría dos veces.
+            excludeFromSemantics: true,
+            child: row,
+          ),
         ),
       ),
     );
