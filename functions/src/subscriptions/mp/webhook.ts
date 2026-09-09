@@ -218,30 +218,61 @@ export function firmaValida(input: {
   }
   if (!ts || !v1) return false;
 
-  // El template de MP, textual: `id:[data.id_url];request-id:[x-request-id];ts:[ts];`
+  // ── El template, y la unica ambiguedad que MP no resolvio ──
   //
-  // Los componentes ausentes se REMUEVEN —no se dejan vacios—, y los ids
-  // alfanumericos en mayusculas van en minusculas. Las dos reglas son de la
-  // doc, y las dos producen firmas que no matchean si se ignoran.
-  const partes: string[] = [];
-  if (input.dataIdDeLaUrl) {
-    partes.push(`id:${input.dataIdDeLaUrl.toLowerCase()};`);
+  // Textual de la doc: `id:[data.id_url];request-id:[x-request-id];ts:[ts];`
+  // Los componentes ausentes se REMUEVEN, no se dejan vacios.
+  //
+  // Sobre el CASE del `data.id`, la doc y la implementacion de referencia de MP
+  // **se contradicen**:
+  //
+  //   - La doc dice: *«Si data.id se devuelve con caracteres alfanumericos en
+  //     mayusculas, conviertelo a minusculas antes de usarlo en el manifest»*.
+  //   - El SDK oficial de Node (`mercadopago/sdk-nodejs`,
+  //     `src/utils/webhook/index.ts`) NO lo baja a minusculas: usa el id tal
+  //     cual llega, y tiene un test que lo PINEA — *«case 2 — uppercase dataId
+  //     is preserved in HMAC»*.
+  //
+  // Las dos fuentes son de MP y dicen lo opuesto, asi que se aceptan LAS DOS
+  // derivaciones del mismo id recibido. No es laxitud: un atacante que quisiera
+  // aprovecharlo necesitaria acertar un HMAC-SHA256 igual, y pasar de una
+  // preimagen valida a dos no mueve esa aguja. Lo que si evita es el modo de
+  // falla caro — que MP firme con la variante que nosotros no elegimos y
+  // rechacemos el 100% de las notificaciones legitimas.
+  //
+  // Para TREINO es hoy un no-op: los ids de preapproval son hex en minusculas
+  // (`2c938084…`), asi que las dos variantes coinciden. Importa el dia que MP
+  // mande un id con mayusculas — los ULID de la Orders API son asi.
+  const conId = (id: string | undefined): string => {
+    const partes: string[] = [];
+    if (id) partes.push(`id:${id};`);
+    if (input.xRequestId) partes.push(`request-id:${input.xRequestId};`);
+    partes.push(`ts:${ts};`);
+    return partes.join("");
+  };
+
+  const crudo = input.dataIdDeLaUrl;
+  const enMinusculas = crudo?.toLowerCase();
+  const candidatos = [conId(crudo)];
+  if (enMinusculas !== undefined && enMinusculas !== crudo) {
+    candidatos.push(conId(enMinusculas));
   }
-  if (input.xRequestId) partes.push(`request-id:${input.xRequestId};`);
-  partes.push(`ts:${ts};`);
 
-  const esperado = createHmac("sha256", input.signingSecret)
-    .update(partes.join(""))
-    .digest("hex");
+  return candidatos.some((manifest) => {
+    const esperado = createHmac("sha256", input.signingSecret)
+      .update(manifest)
+      .digest("hex");
 
-  // Comparacion de tiempo constante. Un `===` sobre un HMAC filtra, por el
-  // tiempo de la comparacion, cuantos caracteres del prefijo acerto quien
-  // prueba — que es como se falsifica una firma a fuerza de intentos.
-  const a = Buffer.from(esperado, "utf8");
-  const b = Buffer.from(v1, "utf8");
-  // `timingSafeEqual` TIRA si los largos difieren, asi que el largo se compara
-  // antes. No filtra nada util: el largo de un SHA256 en hex es publico.
-  return a.length === b.length && timingSafeEqual(a, b);
+    // Comparacion de tiempo constante. Un `===` sobre un HMAC filtra, por el
+    // tiempo de la comparacion, cuantos caracteres del prefijo acerto quien
+    // prueba — que es como se falsifica una firma a fuerza de intentos.
+    const a = Buffer.from(esperado, "utf8");
+    const b = Buffer.from(v1, "utf8");
+    // `timingSafeEqual` TIRA si los largos difieren, asi que el largo se
+    // compara antes. No filtra nada util: el largo de un SHA256 en hex es
+    // publico.
+    return a.length === b.length && timingSafeEqual(a, b);
+  });
 }
 
 /**
