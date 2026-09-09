@@ -231,7 +231,13 @@ export interface FirmaInput {
  * doc no desambigua.
  */
 export function varianteDeFirma(input: FirmaInput): string | null {
-  if (!input.signingSecret) return "sin-secreto";
+  // `.trim()` NO es cosmetico. El secreto se copia a mano del panel de MP y se
+  // pega en un prompt: un espacio o un salto de linea al final entra al HMAC
+  // como cualquier otro byte y hace que NINGUNA firma valide jamas, con un
+  // sintoma identico al de tener la clave equivocada. Es de los errores mas
+  // caros de diagnosticar y de los mas baratos de prevenir.
+  const secreto = input.signingSecret.trim();
+  if (!secreto) return "sin-secreto";
   if (!input.xSignature) return null;
 
   // `ts=...,v1=...`, en cualquier orden y con espacios posibles.
@@ -287,7 +293,7 @@ export function varianteDeFirma(input: FirmaInput): string | null {
   const recibida = Buffer.from(v1, "utf8");
   for (const [nombre, manifest] of candidatos) {
     const esperado = Buffer.from(
-      createHmac("sha256", input.signingSecret).update(manifest).digest("hex"),
+      createHmac("sha256", secreto).update(manifest).digest("hex"),
       "utf8",
     );
     // Comparacion de tiempo constante. Un `===` sobre un HMAC filtra, por el
