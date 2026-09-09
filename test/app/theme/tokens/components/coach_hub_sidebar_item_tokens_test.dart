@@ -14,7 +14,7 @@ Widget _withTheme({required AppPalette palette, required Widget child}) {
 
 void main() {
   group('CoachHubSidebarItemTokens — dark (mintMagenta)', () {
-    testWidgets('activeBackground == bgCard dark (0xFF0F1513)', (tester) async {
+    testWidgets('activeBackground == acento al 16%', (tester) async {
       late Color value;
       await tester.pumpWidget(_withTheme(
         palette: AppPalette.mintMagenta,
@@ -23,8 +23,10 @@ void main() {
           return const SizedBox.shrink();
         }),
       ));
-      // Valor pinado: ink900 = #0F1513 (bgCard dark).
-      expect(value, const Color(0xFF0F1513));
+      // El activo lleva el ACENTO. Antes era `bgCard`, que en claro es blanco
+      // sobre un sidebar casi blanco y no se veía; ver la nota del token.
+      expect(value, AppPalette.mintMagenta.accent.withValues(alpha: 0.16));
+      expect(value.a, closeTo(0.16, 0.01));
     });
 
     testWidgets('activeForeground == accent (0xFF2CE5A2)', (tester) async {
@@ -54,8 +56,7 @@ void main() {
       expect(value, const Color(0xFFFFFFFF));
     });
 
-    testWidgets('hoverBackground == accent con alpha 8% (hoverBackground)',
-        (tester) async {
+    testWidgets('hoverBackground == lavado NEUTRO, sin acento', (tester) async {
       late Color value;
       await tester.pumpWidget(_withTheme(
         palette: AppPalette.mintMagenta,
@@ -64,12 +65,12 @@ void main() {
           return const SizedBox.shrink();
         }),
       ));
-      // Valor esperado: mint500 con alpha=0.08 vía withValues (precisión float).
-      // Se verifica que los canales RGB son los del acento y el alpha ≈ 8%.
-      final expected = AppPalette.mintMagenta.accent.withValues(alpha: 0.08);
-      expect(value, expected);
-      // Alpha entre 7% y 9% (tolerancia por representaciones internas).
-      expect(value.a, closeTo(0.08, 0.01));
+      expect(value, AppPalette.mintMagenta.surfaceSubtle);
+      // Y es NEUTRO: mismos canales R, G y B. Éste es el candado de verdad —
+      // si alguien vuelve a darle el acento al hover, el hovereado se lee como
+      // seleccionado y volvemos al reporte del PF.
+      expect(value.r, closeTo(value.g, 0.001));
+      expect(value.g, closeTo(value.b, 0.001));
     });
 
     testWidgets('badgeBackground == highlight (0xFFC123E0)', (tester) async {
@@ -117,7 +118,7 @@ void main() {
   });
 
   group('CoachHubSidebarItemTokens — light (mintMagentaLight)', () {
-    testWidgets('activeBackground == bgCard light (0xFFFFFFFF)',
+    testWidgets('activeBackground == acento al 16% (light)',
         (tester) async {
       late Color value;
       await tester.pumpWidget(_withTheme(
@@ -127,8 +128,8 @@ void main() {
           return const SizedBox.shrink();
         }),
       ));
-      // Valor pinado: white = #FFFFFF (bgCard light).
-      expect(value, const Color(0xFFFFFFFF));
+      expect(value, AppPalette.mintMagentaLight.accent.withValues(alpha: 0.16));
+      expect(value.a, closeTo(0.16, 0.01));
     });
 
     testWidgets('inactiveForeground == textPrimary light (0xFF0F1513)',
@@ -160,4 +161,71 @@ void main() {
       expect(hover, isNot(equals(active)));
     });
   });
+
+  // ── El candado que faltaba ────────────────────────────────────────────────
+  //
+  // El guard viejo decía `hoverBackground != activeBackground`. Pasaba, y el
+  // bug existía igual: DISTINTOS no es «el activo se lee más fuerte». Con el
+  // activo en blanco sobre un sidebar casi blanco y el hover en verde, los dos
+  // eran distintos y el que mandaba era el equivocado.
+  group('CoachHubSidebarItemTokens — el activo se LEE', () {
+    for (final caso in <(String, AppPalette)>[
+      ('dark', AppPalette.mintMagenta),
+      ('light', AppPalette.mintMagentaLight),
+    ]) {
+      testWidgets('${caso.$1}: el label del item activo pasa WCAG AA',
+          (tester) async {
+        late CoachHubSidebarItemTokens t;
+        await tester.pumpWidget(_withTheme(
+          palette: caso.$2,
+          child: Builder(builder: (ctx) {
+            t = CoachHubSidebarItemTokens.of(ctx);
+            return const SizedBox.shrink();
+          }),
+        ));
+
+        // El fondo del item es TRANSLÚCIDO: se compone sobre el fondo del
+        // sidebar (`palette.bg`), y el contraste hay que medirlo contra el
+        // resultado, no contra el token suelto.
+        final fondo = Color.alphaBlend(t.activeBackground, caso.$2.bg);
+        final ratio = _ratio(t.activeForeground, fondo);
+
+        expect(
+          ratio,
+          greaterThanOrEqualTo(4.5),
+          reason: '${caso.$1}: el label activo mide '
+              '${ratio.toStringAsFixed(2)}:1 sobre su propia píldora. Con '
+              '`accent` en vez de `accentText` daba 1,64:1 en claro — el item '
+              'seleccionado era ilegible.',
+        );
+      });
+
+      testWidgets('${caso.$1}: hover y activo se distinguen por TONO',
+          (tester) async {
+        late CoachHubSidebarItemTokens t;
+        await tester.pumpWidget(_withTheme(
+          palette: caso.$2,
+          child: Builder(builder: (ctx) {
+            t = CoachHubSidebarItemTokens.of(ctx);
+            return const SizedBox.shrink();
+          }),
+        ));
+
+        // El hover NO tiene tono: R == G == B. El activo SÍ. Es lo que hace
+        // que no se confundan, porque en luminancia son casi iguales.
+        expect(t.hoverBackground.r, closeTo(t.hoverBackground.g, 0.001));
+        expect(t.hoverBackground.g, closeTo(t.hoverBackground.b, 0.001));
+        expect(t.activeBackground, isNot(equals(t.hoverBackground)));
+      });
+    }
+  });
+}
+
+/// Contraste WCAG entre dos colores YA OPACOS.
+double _ratio(Color a, Color b) {
+  final la = a.computeLuminance();
+  final lb = b.computeLuminance();
+  final hi = la > lb ? la : lb;
+  final lo = la > lb ? lb : la;
+  return (hi + 0.05) / (lo + 0.05);
 }
