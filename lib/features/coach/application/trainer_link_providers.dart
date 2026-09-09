@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../coach_hub/application/cf_providers.dart'
@@ -100,12 +102,38 @@ final currentAthleteLinkAnyStatusProvider =
   return links.first;
 });
 
+/// Ventana en la que el stream de vínculos SOBREVIVE a que lo suelten.
+///
+/// Es navegación, no caché de datos: moverse entre secciones del Coach Hub no
+/// puede costar una recarga.
+const _kVentanaDeGracia = Duration(minutes: 5);
+
 /// Stream real-time de los vínculos del PF actual. Lo consume el dashboard
-/// del PF (Etapa 3).
+/// del PF (Etapa 3) y el roster de Alumnos.
+///
+/// `autoDispose` CON ventana de gracia. Con `autoDispose` pelado, salir de
+/// Alumnos destruía el provider y volver arrancaba en `AsyncLoading` sin
+/// valor: la pantalla dibujaba el esqueleto, el `AnimatedSwitcher` de
+/// `TreinoStateSwitcher` hacía un cross-fade, Firestore resolvía DE CACHÉ en
+/// un frame, y venía el segundo cross-fade más los cuatro
+/// `TreinoFadeSlideIn` escalonados del contenido.
+///
+/// Eso es el parpadeo que reportó el PF, y pasaba en CADA entrada a la
+/// sección — no sólo en la primera. Con la ventana, volver encuentra el valor
+/// ya puesto y la pantalla entra derecho en `data`: una sola animación de
+/// entrada, la que el diseño quería.
+///
+/// El esqueleto sigue estando para la carga de verdad, que es cuando dice algo.
 final trainerLinksStreamProvider =
     StreamProvider.autoDispose<List<TrainerLink>>((ref) {
   final uid = ref.watch(currentUidProvider);
   if (uid == null) return const Stream.empty();
+  // El `keepAlive` se toma SIEMPRE y lo suelta el timer, no el último oyente:
+  // si lo soltara el oyente, volver a entrar antes de los 5 minutos seguiría
+  // encontrando el provider destruido y no habríamos arreglado nada.
+  final link = ref.keepAlive();
+  final timer = Timer(_kVentanaDeGracia, link.close);
+  ref.onDispose(timer.cancel);
   return ref.read(trainerLinkRepositoryProvider).watchForTrainer(uid);
 });
 
