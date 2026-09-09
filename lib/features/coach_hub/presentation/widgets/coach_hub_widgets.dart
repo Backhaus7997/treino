@@ -30,6 +30,7 @@ export 'empty_state/empty_state.dart';
 export 'filter_chips/filter_chips.dart';
 export 'kpi_card/kpi_card.dart';
 export 'list_row/list_row.dart';
+export 'pager/coach_hub_pager.dart';
 export 'section_header/section_header.dart';
 export 'section_hero/section_hero.dart';
 export 'treino_interactive_state.dart';

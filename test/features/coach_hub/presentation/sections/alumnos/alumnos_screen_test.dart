@@ -475,6 +475,65 @@ void main() {
       expect(find.text('Inactivo'), findsNothing);
     });
 
+    testWidgets('con 30 alumnos el roster muestra 25 y aparece el pie',
+        (tester) async {
+      await _pump(
+        tester,
+        links: [
+          for (var i = 0; i < 30; i++) _link('a$i', TrainerLinkStatus.active),
+        ],
+        profiles: [
+          // Nombre con padding: sin el cero a la izquierda, «Alumno 10» cae
+          // antes que «Alumno 2» en cualquier orden alfabetico y el test
+          // hablaria de la pagina equivocada.
+          for (var i = 0; i < 30; i++)
+            _prof('a$i', 'Alumno ${i.toString().padLeft(2, '0')}'),
+        ],
+      );
+
+      expect(find.text('Alumno 00'), findsOneWidget);
+      expect(find.text('1–25 de 30'), findsOneWidget);
+
+      // Con 25 filas el pie cae abajo del pliegue: sin `ensureVisible` el tap
+      // le pega al aire y el hit-test NO avisa.
+      await tester.ensureVisible(find.byKey(const Key('coach_hub_pager_next')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('coach_hub_pager_next')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('26–30 de 30'), findsOneWidget);
+      expect(find.text('Alumno 00'), findsNothing);
+    });
+
+    testWidgets('cambiar de chip vuelve a la pagina 1', (tester) async {
+      // Sin esto el PF sale de la pagina 2 y entra en la pagina 2 de otra
+      // lista, que puede no existir: ve una tabla vacia y nada que lo
+      // explique.
+      await _pump(
+        tester,
+        links: [
+          for (var i = 0; i < 30; i++) _link('a$i', TrainerLinkStatus.active),
+        ],
+        profiles: [
+          for (var i = 0; i < 30; i++)
+            _prof('a$i', 'Alumno ${i.toString().padLeft(2, '0')}'),
+        ],
+      );
+
+      await tester.ensureVisible(find.byKey(const Key('coach_hub_pager_next')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('coach_hub_pager_next')));
+      await tester.pumpAndSettle();
+      expect(find.text('26–30 de 30'), findsOneWidget);
+
+      await tester.ensureVisible(find.text('Activos'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Activos'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('1–25 de 30'), findsOneWidget);
+    });
+
     testWidgets('el chip Inactivos sigue siendo la puerta a los terminados',
         (tester) async {
       // La salida esta a un click, y el chip los sigue CONTANDO aunque

@@ -30,7 +30,12 @@ import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
 
 import '../../widgets/coach_hub_widgets.dart'
-    show CoachHubSectionHero, TreinoFilterChips, TreinoInteractiveState;
+    show
+        CoachHubPager,
+        CoachHubSectionHero,
+        TreinoFilterChips,
+        TreinoInteractiveState,
+        pageOf;
 import 'widgets/registrar_pago_dialog.dart';
 import 'widgets/marcar_pagado_actions.dart';
 import 'widgets/pagos_buckets_provider.dart';
@@ -71,6 +76,11 @@ class _PagosScreenState extends ConsumerState<PagosScreen> {
   // que ya se resuelve acá.
   String? _sortColumnKey;
   bool _sortAscending = true;
+
+  /// Pagina visible, 0-based. Vuelve a 0 cuando cambia el filtro o el orden:
+  /// quedarse en la pagina 3 despues de cambiar de pestaña muestra un tramo
+  /// del medio de otra lista, sin nada que explique por que arranca ahi.
+  int _page = 0;
 
   /// Ordena [payments] según [_sortColumnKey]/[_sortAscending]. Sin columna
   /// activa, devuelve la lista tal cual (orden del bucket, DESC createdAt).
@@ -242,6 +252,11 @@ class _PagosScreenState extends ConsumerState<PagosScreen> {
                   for (final entry in _kFiltroLabels.entries) {
                     if (entry.value == label) {
                       ref.read(pagosFiltroProvider.notifier).state = entry.key;
+                      // Cambiar de pestaña es cambiar de lista. Sin esto, el
+                      // PF sale de la página 3 de «Todos» y entra en la
+                      // página 3 de «Vencidos», que puede tener 2 filas: ve
+                      // una tabla vacía y nada que explique por qué.
+                      setState(() => _page = 0);
                       break;
                     }
                   }
@@ -327,8 +342,11 @@ class _PagosScreenState extends ConsumerState<PagosScreen> {
           data: (b) => getPayments(b).isEmpty ? 'empty' : 'data',
         ),
       ),
-      child: PagosWebTable(
-        payments: _sorted(payments, profiles),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          PagosWebTable(
+        payments: pageOf(_sorted(payments, profiles), page: _page),
         profiles: profiles,
         emptyMessage: emptyMessage,
         loading: bucketsAsync.isLoading,
@@ -341,10 +359,23 @@ class _PagosScreenState extends ConsumerState<PagosScreen> {
         onSort: (key, ascending) => setState(() {
           _sortColumnKey = key;
           _sortAscending = ascending;
+          // Reordenar cambia QUE filas caen en cada pagina. Quedarse en la 3
+          // deja al PF mirando un tramo del medio de una lista que acaba de
+          // cambiar de orden, sin nada que explique por que arranca ahi.
+          _page = 0;
         }),
         showActions: showActions,
         onMarcarPagado: (p) => marcarPagadoDoc(context, ref, p),
         onRecordar: (p) => recordar(context, ref, p, paymentAlias),
+          ),
+          // El pie se dibuja solo si hay mas de una pagina — se esconde a si
+          // mismo. Va con el TOTAL sin recortar, que es el `de 112`.
+          CoachHubPager(
+            total: payments.length,
+            page: _page,
+            onPageChanged: (p) => setState(() => _page = p),
+          ),
+        ],
       ),
     );
   }
