@@ -165,6 +165,11 @@ Future<void> _pump(
   // Ancho lógico de la ventana (px) — default 1200 (wide, breakpoint 900px).
   // Los tests de responsive lo bajan a <900 para forzar el layout angosto.
   double width = 1200,
+  // Retraso del batch de perfiles. Con `Duration.zero` (el default) el
+  // override resuelve SINCRÓNICAMENTE y el provider nunca pasa por `loading`,
+  // que es lo que asumen los ~40 tests de acá. Con un valor > 0 el ciclo
+  // `loading -> data` sí ocurre: es el que remontaba la pantalla entera.
+  Duration profilesDelay = Duration.zero,
 }) async {
   tester.view.physicalSize = Size(width, 900);
   tester.view.devicePixelRatio = 1.0;
@@ -208,9 +213,11 @@ Future<void> _pump(
         trainerLinksStreamProvider.overrideWith(
           (ref) => linksStream ?? Stream.value(links ?? const []),
         ),
-        userPublicProfilesBatchProvider.overrideWith(
-          (ref, key) => {for (final p in profiles) p.uid: p},
-        ),
+        userPublicProfilesBatchProvider.overrideWith((ref, key) {
+          final data = {for (final p in profiles) p.uid: p};
+          if (profilesDelay == Duration.zero) return data;
+          return Future.delayed(profilesDelay, () => data);
+        }),
         pagosPorCobrarProvider.overrideWith((ref) => AsyncData(cobros)),
         trainerPaymentsProvider.overrideWith((ref) => Stream.value(payments)),
         finishedInWindowByUidProvider.overrideWith(
@@ -1283,6 +1290,104 @@ void main() {
       expect(find.text('PLAN'), findsOneWidget);
       expect(find.text('VENCE'), findsOneWidget);
       expect(find.text('ACCIONES'), findsOneWidget);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Parpadeo al entrar (hallazgo A del diagnóstico web del 2026-09-09)
+  // ---------------------------------------------------------------------------
+  group('AlumnosScreen — un solo frame montado a la vez', () {
+    // Medido en producción con un contador de subárboles duplicados a 16 ms:
+    // entrando Dashboard -> Alumnos había DOS `_RosterFrame` completos
+    // pintados a la vez durante ~205 ms (3 corridas de 3, también con caché
+    // caliente). Dos hero «ALUMNOS», dos «Nuevo alumno», dos filas de chips,
+    // dos cabeceras de tabla, uno desvaneciéndose sobre el otro.
+    //
+    // La causa eran dos `TreinoStateSwitcher` anidados donde el de adentro
+    // envolvía la pantalla ENTERA: al cambiar la key de `loading` a `data`,
+    // Flutter desmontaba el frame viejo y montaba uno nuevo, y el nuevo
+    // volvía a correr su entrada escalonada porque `TreinoFadeSlideIn` es
+    // one-shot por State.
+    //
+    // El hero es la sonda: es único por definición. Si hay dos, hay dos
+    // copias del frame apiladas.
+    testWidgets(
+        'links loading -> data y perfiles loading -> data: nunca hay dos hero '
+        '[SCENARIO-CHW-ALU-30]', (tester) async {
+      final linksCtl = StreamController<List<TrainerLink>>();
+      addTearDown(linksCtl.close);
+
+      await _pump(
+        tester,
+        linksStream: linksCtl.stream,
+        profiles: [_prof('a1', 'Ana García')],
+        profilesDelay: const Duration(milliseconds: 120),
+        settle: false,
+      );
+
+      void unSoloFrame(String cuando) {
+        expect(
+          find.byType(CoachHubSectionHero),
+          findsOneWidget,
+          reason: 'en $cuando había más de un frame montado — eso es el '
+              'parpadeo que reportó el PF',
+        );
+      }
+
+      unSoloFrame('el arranque (links en loading)');
+
+      linksCtl.add([_link('a1', TrainerLinkStatus.active)]);
+
+      // Barrido frame a frame cubriendo el cross-fade completo
+      // (`AppMotion.base` = 240 ms) más el retraso de los perfiles.
+      for (var t = 16; t <= 480; t += 16) {
+        await tester.pump(const Duration(milliseconds: 16));
+        unSoloFrame('t=${t}ms');
+      }
+
+      // Y al final, la pantalla resolvió de verdad.
+      expect(find.text('Ana García'), findsOneWidget);
+    });
+
+    // El hero afirmaba «ALUMNOS 0» antes de decir «ALUMNOS 12», porque la
+    // rama `loading` le pasaba `roster: []` y el hero hacía `roster.length`.
+    // Un cero que dura medio segundo y es falso es peor que ningún número.
+    testWidgets(
+        'mientras los links cargan el hero NO afirma un total '
+        '[SCENARIO-CHW-ALU-31]', (tester) async {
+      final linksCtl = StreamController<List<TrainerLink>>();
+      addTearDown(linksCtl.close);
+
+      await _pump(
+        tester,
+        linksStream: linksCtl.stream,
+        profiles: [_prof('a1', 'Ana García'), _prof('a2', 'Beto Díaz')],
+        settle: false,
+      );
+      await tester.pump();
+
+      final hero = tester.widget<CoachHubSectionHero>(
+        find.byType(CoachHubSectionHero),
+      );
+      expect(
+        hero.count,
+        isNull,
+        reason: 'todavía no sabemos cuántos hay: `null`, no `0`',
+      );
+
+      linksCtl.add([
+        _link('a1', TrainerLinkStatus.active),
+        _link('a2', TrainerLinkStatus.active),
+      ]);
+      await tester.pump();
+      await tester.pump();
+
+      expect(
+        tester
+            .widget<CoachHubSectionHero>(find.byType(CoachHubSectionHero))
+            .count,
+        2,
+      );
     });
   });
 }
