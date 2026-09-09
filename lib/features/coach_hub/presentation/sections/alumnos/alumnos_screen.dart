@@ -809,7 +809,11 @@ class _RutinaCell extends ConsumerWidget {
     return _TappableDotLabel(
       color: activa ? palette.accent : palette.textMuted,
       label: activa ? 'Activa' : 'Sin rutina', // i18n
-      onTap: () => context.go('/rutinas/$athleteId'),
+      // `push` y no `go`: la pantalla de rutinas del alumno tiene flecha
+      // atras, y `go` REEMPLAZA la entrada de historial — llegando desde aca,
+      // esa flecha no tenia a donde volver y quedaba muerta. El PF: «el boton
+      // de ir para atras no funciona».
+      onTap: () => context.push('/rutinas/$athleteId'),
     );
   }
 }
@@ -1132,7 +1136,9 @@ class _RowActionsState extends ConsumerState<_RowActions> {
         icon: TreinoIcon.dumbbell,
         tooltip: 'Rutinas', // i18n
         color: widget.palette.textMuted,
-        onPressed: () => context.go('/rutinas/${widget.link.athleteId}'),
+        // `push` por el mismo motivo que el tap de la card: con `go` la
+        // flecha atras de la pantalla de rutinas queda sin destino.
+        onPressed: () => context.push('/rutinas/${widget.link.athleteId}'),
       ),
       _IconAction(
         icon: TreinoIcon.money,

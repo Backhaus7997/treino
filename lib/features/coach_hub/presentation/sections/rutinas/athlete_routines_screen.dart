@@ -78,7 +78,18 @@ class AthleteRoutinesScreen extends ConsumerWidget {
               children: [
                 IconButton(
                   icon: Icon(TreinoIcon.arrowLeft, color: palette.textMuted),
-                  onPressed: () => context.pop(),
+                  // `pop()` a secas asume que SIEMPRE se llego empujando.
+                  // No es cierto: a esta pantalla se entra desde Rutinas (con
+                  // `push`) y tambien desde Alumnos, y basta un link directo o
+                  // un refresh del navegador para que la pila este vacia. Ahi
+                  // la flecha no hacia nada — el PF: «el boton de ir para
+                  // atras no funciona».
+                  //
+                  // El fallback va a /rutinas, que es la lista de la que esta
+                  // pantalla es el detalle.
+                  onPressed: () => context.canPop()
+                      ? context.pop()
+                      : context.go('/rutinas'),
                 ),
                 const SizedBox(width: AppSpacing.hairline),
                 Expanded(
