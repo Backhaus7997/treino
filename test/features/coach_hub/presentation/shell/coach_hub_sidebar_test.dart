@@ -730,6 +730,43 @@ void main() {
     );
     expect(visibility.visible, isFalse, reason: 'expandido no se dispara');
   });
+
+  // ---------------------------------------------------------------------------
+  // Accesibilidad — el lector no dice el label dos veces (hallazgo H)
+  // ---------------------------------------------------------------------------
+  group('CoachHubSidebar — semántica del item', () {
+    // El árbol de semántica de producción devolvía «Dashboard Dashboard»,
+    // «Alumnos Alumnos», «Solicitudes Solicitudes» — cada item del menú leído
+    // dos veces por el lector de pantalla.
+    //
+    // El item ya se nombra a sí mismo con un `Semantics(label:)` afuera, en
+    // los DOS estados (el comentario del código lo dice así). Pero el `Text`
+    // visible de adentro estaba envuelto en `ExcludeSemantics(excluding:
+    // collapsed)`: sólo se callaba con el sidebar COLAPSADO. Expandido
+    // aportaba su propio label, y el `MergeSemantics` de arriba los pegaba.
+    testWidgets('expandido, el label se anuncia UNA sola vez', (tester) async {
+      final handle = tester.ensureSemantics();
+
+      await _pumpSidebar(tester);
+
+      final nodo = tester.getSemantics(
+        find
+            .ancestor(
+              of: find.text('Dashboard'),
+              matching: find.byType(MergeSemantics),
+            )
+            .last,
+      );
+
+      expect(
+        nodo.label,
+        'Dashboard',
+        reason: 'el lector lo decía dos veces: «${nodo.label}»',
+      );
+
+      handle.dispose();
+    });
+  });
 }
 
 /// Igual que [_pumpSidebar] pero con `itemsOverride`, para los casos que

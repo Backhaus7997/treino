@@ -382,7 +382,20 @@ class _SidebarItemRowState extends State<_SidebarItemRow> {
                   // el mouse. Colapsado, quien nombra al item es el Tooltip.
                   ignoring: collapsed,
                   child: ExcludeSemantics(
-                    excluding: collapsed,
+                    // SIEMPRE, no sólo colapsado.
+                    //
+                    // Quien nombra al item es el `Semantics(label:)` de más
+                    // afuera, y lo hace en los DOS estados. Este `Text` es la
+                    // presentación de ese mismo nombre; con `excluding:
+                    // collapsed` sólo se callaba colapsado, y expandido
+                    // aportaba su propio label que el `MergeSemantics` pegaba
+                    // al de arriba. El árbol de semántica de producción
+                    // devolvía «Dashboard Dashboard», «Alumnos Alumnos»: cada
+                    // item del menú leído dos veces por el lector de pantalla.
+                    //
+                    // Lo mismo vale para el badge que viaja en este `Row`: el
+                    // label de afuera ya dice «Pagos, 3».
+                    excluding: true,
                     child: Row(
                       children: [
                         Expanded(

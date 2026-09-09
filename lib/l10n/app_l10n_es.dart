@@ -2554,7 +2554,7 @@ class AppL10nEs extends AppL10n {
   String get coachHubAlumnosSearchHint => 'Buscar por nombre…';
 
   @override
-  String get coachHubAlumnosFilterAll => 'Todos';
+  String get coachHubAlumnosFilterAll => 'Vigentes';
 
   @override
   String get coachHubAlumnosFilterActivos => 'Activos';
@@ -6945,7 +6945,7 @@ class AppL10nEsAr extends AppL10nEs {
   String get coachHubAlumnosSearchHint => 'Buscar por nombre…';
 
   @override
-  String get coachHubAlumnosFilterAll => 'Todos';
+  String get coachHubAlumnosFilterAll => 'Vigentes';
 
   @override
   String get coachHubAlumnosFilterActivos => 'Activos';

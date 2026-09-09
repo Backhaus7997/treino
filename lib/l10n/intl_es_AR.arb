@@ -1883,9 +1883,9 @@
   "@coachHubAlumnosSearchHint": {
     "description": "Coach Hub web alumnos section — search field hint text."
   },
-  "coachHubAlumnosFilterAll": "Todos",
+  "coachHubAlumnosFilterAll": "Vigentes",
   "@coachHubAlumnosFilterAll": {
-    "description": "Coach Hub web alumnos section — 'All' filter chip label."
+    "description": "Coach Hub web alumnos section — filter chip for links that are NOT inactive. Deliberately not 'All': its count is lower than the hero total and than the Inactivos chip, and 'All' made that read as a counting bug."
   },
   "coachHubAlumnosFilterActivos": "Activos",
   "@coachHubAlumnosFilterActivos": {

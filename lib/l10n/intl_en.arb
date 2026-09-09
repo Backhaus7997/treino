@@ -1000,7 +1000,7 @@
   "coachHubAlumnosTitle": "ATHLETES",
   "coachHubAlumnosSummary": "{total} total · {active} active",
   "coachHubAlumnosSearchHint": "Search by name…",
-  "coachHubAlumnosFilterAll": "All",
+  "coachHubAlumnosFilterAll": "Current",
   "coachHubAlumnosFilterActivos": "Active",
   "coachHubAlumnosFilterConDeuda": "Overdue",
   "coachHubAlumnosFilterPausados": "Paused",

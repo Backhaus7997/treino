@@ -105,7 +105,16 @@ bool _matchesFiltro(AlumnoEstado e, RosterFiltro f) => switch (f) {
       // querria ver».
       //
       // La salida sigue a un click: el chip «Inactivos» los muestra, y sigue
-      // contandolos aunque «Todos» ya no los liste.
+      // contandolos aunque «Vigentes» ya no los liste.
+      //
+      // EL CHIP SE LLAMA «VIGENTES», NO «TODOS», y ese es el punto.
+      //
+      // La logica de aca abajo esta bien y este comentario la defiende bien.
+      // El problema era la PALABRA: un chip que dice literalmente «Todos» y
+      // muestra 2 al lado de «Inactivos 10», con un hero que arriba dice «12
+      // en total», se lee como un bug de conteo aunque no lo sea. El usuario
+      // no tiene forma de saber que «todos» excluye a los inactivos — la
+      // palabra le promete lo contrario.
       //
       // NO se toco el DEFAULT del filtro (sigue en `todos`) a proposito.
       // Arrancar en «Activos» parece la solucion obvia y es peor: los chips
