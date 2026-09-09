@@ -405,8 +405,7 @@ void main() {
         await _call(
           container,
           '/',
-          initialDestination:
-              const DeepLinkDestination(DeepLinkTo.solicitudes),
+          initialDestination: const DeepLinkDestination(DeepLinkTo.solicitudes),
         ),
         '/invitaciones',
       );
@@ -423,6 +422,37 @@ void main() {
         ),
         '/alumnos/uid-789',
       );
+    });
+
+    // EL CASO REAL, y el que estuvo roto desde siempre.
+    //
+    // Bajo hash routing —que es lo que usa el Coach Hub— una URL externa como
+    // `app.gettreino.com/?to=X` llega con el FRAGMENTO vacío, así que
+    // go_router no arranca en `/` sino en su `initialLocation`. Un PF CON
+    // SESIÓN aterriza ahí, no en `/` ni en `/login`, y el destino fino nunca
+    // se aplicaba: terminaba en el dashboard.
+    //
+    // Los tests de este grupo usaban todos `location: '/'`, que es la landing
+    // del que llega DESLOGUEADO. Por eso el bug pasó: se probaba el único
+    // camino donde no aparece.
+    test('to=facturacion en la LANDING real (/dashboard) → /facturacion/planes',
+        () async {
+      final container = await trainerContainer();
+      expect(
+        await _call(
+          container,
+          kCoachHubInitialLocation,
+          initialDestination: const DeepLinkDestination(DeepLinkTo.facturacion),
+        ),
+        '/facturacion/planes',
+      );
+    });
+
+    // El complemento: sin destino, la landing NO se auto-redirige a sí misma.
+    test('sin destino, en la landing → null, no un redirect a sí misma',
+        () async {
+      final container = await trainerContainer();
+      expect(await _call(container, kCoachHubInitialLocation), isNull);
     });
 
     // Mismo mecanismo que ya usa el gate de /login y /not-allowed: sirve
