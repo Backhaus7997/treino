@@ -133,6 +133,115 @@ void main() {
     });
   });
 
+  // ─── listAuthoredBy ───────────────────────────────────────────────────────
+
+  group('RoutineRepository.listAuthoredBy', () {
+    test('trae plantillas Y planes asignados del mismo PF', () async {
+      // `assignedBy` es lo único que une a las dos formas: una plantilla es
+      // `trainer-template` con `assignedTo: null`, un plan es
+      // `trainer-assigned` con el uid del alumno. Esta query es la contracara
+      // de `listAssignedTo`: aquélla parte del ALUMNO, ésta del AUTOR.
+      await seedAssignedRoutine(
+        id: 'r-plan',
+        assignedTo: 'athlete-1',
+        assignedBy: 'trainer-1',
+      );
+      await firestore.collection('routines').doc('r-plantilla').set({
+        'id': 'r-plantilla',
+        'name': 'Plantilla del PF',
+        'split': 'PPL',
+        'level': 'beginner',
+        'days': <dynamic>[],
+        'estimatedMinutesPerDay': null,
+        'imageUrl': null,
+        'source': 'trainer-template',
+        'assignedBy': 'trainer-1',
+        'assignedTo': null,
+        'visibility': 'private',
+        'createdAt': Timestamp.fromMillisecondsSinceEpoch(2000),
+      });
+
+      final result = await repo.listAuthoredBy('trainer-1');
+
+      expect(
+        result.map((r) => r.id).toSet(),
+        {'r-plan', 'r-plantilla'},
+        reason: 'las dos formas llevan `assignedBy`',
+      );
+    });
+
+    test('no trae lo de OTRO pf ni lo que creó el alumno', () async {
+      await seedAssignedRoutine(
+        id: 'r-mio',
+        assignedTo: 'athlete-1',
+        assignedBy: 'trainer-1',
+      );
+      await seedAssignedRoutine(
+        id: 'r-ajeno',
+        assignedTo: 'athlete-1',
+        assignedBy: 'trainer-2',
+      );
+      // Rutina propia del alumno: no tiene `assignedBy`.
+      await firestore.collection('routines').doc('r-del-alumno').set({
+        'id': 'r-del-alumno',
+        'name': 'Mi rutina',
+        'split': 'Full Body',
+        'level': 'beginner',
+        'days': <dynamic>[],
+        'source': 'user-created',
+        'createdBy': 'athlete-1',
+        'visibility': 'private',
+        'createdAt': Timestamp.fromMillisecondsSinceEpoch(1000),
+      });
+
+      final result = await repo.listAuthoredBy('trainer-1');
+
+      expect(result.map((r) => r.id), ['r-mio']);
+    });
+
+    test('más nuevas primero, y las que no tienen fecha al fondo', () async {
+      // Un `serverTimestamp` pendiente todavía no tiene valor: no se puede
+      // comparar con honestidad, así que queda último en vez de adivinarle
+      // una posición.
+      await seedAssignedRoutine(
+        id: 'r-vieja',
+        assignedTo: 'athlete-1',
+        assignedBy: 'trainer-1',
+        createdAt: Timestamp.fromMillisecondsSinceEpoch(1000),
+      );
+      await seedAssignedRoutine(
+        id: 'r-nueva',
+        assignedTo: 'athlete-1',
+        assignedBy: 'trainer-1',
+        createdAt: Timestamp.fromMillisecondsSinceEpoch(9000),
+      );
+      await firestore.collection('routines').doc('r-sin-fecha').set({
+        'id': 'r-sin-fecha',
+        'name': 'Sin fecha',
+        'split': 'PPL',
+        'level': 'beginner',
+        'days': <dynamic>[],
+        'source': 'trainer-assigned',
+        'assignedBy': 'trainer-1',
+        'assignedTo': 'athlete-1',
+        'visibility': 'private',
+      });
+
+      final result = await repo.listAuthoredBy('trainer-1');
+
+      expect(result.map((r) => r.id), ['r-nueva', 'r-vieja', 'r-sin-fecha']);
+    });
+
+    test('un uid vacío no consulta y devuelve vacío', () async {
+      await seedAssignedRoutine(
+        id: 'r1',
+        assignedTo: 'athlete-1',
+        assignedBy: 'trainer-1',
+      );
+      expect(await repo.listAuthoredBy(''), isEmpty);
+    });
+  });
+
   // ─── listAssignedToByTrainer ───────────────────────────────────────────────
 
   group('RoutineRepository.listAssignedToByTrainer', () {

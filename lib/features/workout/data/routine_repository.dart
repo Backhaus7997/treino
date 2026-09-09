@@ -443,6 +443,56 @@ class RoutineRepository {
     return docs.take(20).map(_fromDoc).whereType<Routine>().toList();
   }
 
+  /// TODAS las rutinas de las que [trainerId] es autor: sus plantillas y los
+  /// planes que le asignó a cualquier alumno, más nuevas primero.
+  ///
+  /// `assignedBy` es lo único que las une. Lo llevan las dos —una plantilla es
+  /// `trainer-template` con `assignedTo: null`, un plan es `trainer-assigned`
+  /// con el uid del alumno— y por eso alcanza una sola igualdad.
+  ///
+  /// Esta query es la contracara de [listAssignedTo]: aquélla parte del ALUMNO
+  /// y ésta parte del AUTOR. La pantalla de Rutinas del Coach Hub listaba
+  /// personas porque no existía esta segunda mirada.
+  ///
+  /// Equality-only, así que va sobre los índices automáticos de un solo campo:
+  /// **no necesita índice compuesto**. Agregarle `orderBy(createdAt)` sí lo
+  /// necesitaría, así que el orden se hace en Dart — mismo criterio que
+  /// [listAssignedToByTrainer], y por la misma razón: [Routine] no retiene
+  /// `createdAt`, así que se ordenan los snapshots crudos antes de mapear.
+  ///
+  /// Incluye las ARCHIVADAS. Para el PF son parte de su biblioteca —las suyas,
+  /// que se archivaron al terminar un vínculo— y esconderlas acá sería
+  /// perderlas; quien decide cómo mostrarlas es la pantalla.
+  Future<List<Routine>> listAuthoredBy(String trainerId) async {
+    if (trainerId.isEmpty) return const [];
+
+    final snap = await _collection
+        .where('assignedBy', isEqualTo: trainerId)
+        .get();
+
+    // `is Timestamp` y no un cast: un solo doc con `createdAt` de otra forma
+    // —un import viejo que lo dejó como String— tiraría `TypeError` y se
+    // llevaría puesta la lista entera, dejando la pantalla del PF en blanco.
+    // Degradarlo a "sin fecha" lo manda al fondo, que es discutible como orden
+    // pero nunca es una excepción.
+    Timestamp? createdAtOf(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+      final value = doc.data()['createdAt'];
+      return value is Timestamp ? value : null;
+    }
+
+    final docs = snap.docs.toList()
+      ..sort((a, b) {
+        final aAt = createdAtOf(a);
+        final bAt = createdAtOf(b);
+        // Un `serverTimestamp` pendiente no se puede comparar con honestidad:
+        // queda último hasta que Firestore lo resuelve.
+        if (aAt == null) return bAt == null ? 0 : 1;
+        if (bAt == null) return -1;
+        return bAt.compareTo(aAt);
+      });
+    return docs.map(_fromDoc).whereType<Routine>().toList();
+  }
+
   /// Persists a trainer-assigned plan.
   ///
   /// Validations (client-side):
