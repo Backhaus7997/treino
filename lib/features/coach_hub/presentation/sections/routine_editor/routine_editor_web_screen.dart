@@ -873,9 +873,14 @@ class _RoutineEditorWebScreenState
   }
 
   /// Replaces the selected week's prescription with a deep copy of the
-  /// PREVIOUS week's, slot by slot — mirrors mobile's `_duplicateWeek`
+  /// semana ORIGEN, slot por slot — sobre mobile's `_duplicateWeek`
   /// (REQ-PERIOD-014). `_EditorSet.copy()` keeps set types, so warm-ups and
   /// failure sets survive the duplication.
+  ///
+  /// La fuente ya no es «la anterior»: la elige el PF cuando el plan tiene más
+  /// de dos semanas. Desde que la semana nueva nace pelada, copiar dejó de ser
+  /// un rescate ocasional y pasó a ser LA forma de replicar un bloque, así que
+  /// tenía que poder ir de cualquier semana a cualquier otra.
   ///
   /// Presence travels with it (ADR-WPRES-06): a slot present in the source
   /// week becomes present in the target too, and one absent from the source
@@ -889,12 +894,23 @@ class _RoutineEditorWebScreenState
   /// source week doesn't have that exercise, after the copy NO week does, and
   /// a slot scheduled nowhere is a ghost — so it's dropped instead.
   Future<void> _duplicateWeek() async {
-    if (_selectedWeek == 0) return;
-    final sourceWeek = _selectedWeek - 1;
+    if (_numWeeks < 2) return;
     final targetWeek = _selectedWeek;
 
-    final confirmed = await _confirmDuplicateWeek(sourceWeek, targetWeek);
-    if (confirmed != true || !mounted) return;
+    final int sourceWeek;
+    if (_numWeeks == 2) {
+      // Una sola fuente posible: no hay nada que elegir, se confirma y listo.
+      sourceWeek = 1 - targetWeek;
+      final confirmed = await _confirmDuplicateWeek(sourceWeek, targetWeek);
+      if (confirmed != true || !mounted) return;
+    } else {
+      // Con tres o más, «la anterior» es una suposición que falla apenas
+      // querés replicar la Semana 1 en la 3. El selector ES la confirmación:
+      // nombra el destino y avisa que reemplaza, así no van dos modales.
+      final elegida = await _elegirSemanaOrigen(targetWeek);
+      if (elegida == null || !mounted) return;
+      sourceWeek = elegida;
+    }
 
     _markDirty();
     setState(() {
@@ -911,6 +927,53 @@ class _RoutineEditorWebScreenState
         }
       }
     });
+  }
+
+  /// Elige DE QUÉ semana copiar. Sólo con tres o más: con dos, la fuente es la
+  /// única otra y preguntarlo sería un modal para una respuesta forzada.
+  ///
+  /// Hace de confirmación al mismo tiempo — el título dice a dónde va y el
+  /// cuerpo avisa que reemplaza — así elegir origen no cuesta dos diálogos
+  /// encadenados.
+  Future<int?> _elegirSemanaOrigen(int targetWeek) {
+    final palette = AppPalette.of(context);
+    return showDialog<int>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        backgroundColor: palette.bgCard,
+        title: Text(
+          '¿Copiar a la Semana ${targetWeek + 1} desde cuál?', // i18n
+          style: GoogleFonts.barlowCondensed(
+            color: palette.textPrimary,
+            fontWeight: FontWeight.w700,
+            fontSize: 18,
+          ),
+        ),
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 10),
+            child: Text(
+              'Se reemplaza todo lo que tengas cargado en la Semana '
+              '${targetWeek + 1}.', // i18n
+              style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 13),
+            ),
+          ),
+          for (var w = 0; w < _numWeeks; w++)
+            if (w != targetWeek)
+              SimpleDialogOption(
+                key: Key('copy_source_week_$w'),
+                onPressed: () => Navigator.of(ctx).pop(w),
+                child: Text(
+                  'Semana ${w + 1}', // i18n
+                  style: GoogleFonts.barlow(
+                    color: palette.accent,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+        ],
+      ),
+    );
   }
 
   /// Confirms the overwrite. This replaces everything already loaded in the
@@ -1006,14 +1069,26 @@ class _RoutineEditorWebScreenState
     // `weeks_count: 4`. Bajar no se cuenta — el evento mide fricción hacia
     // arriba, que es donde un tope mordería.
     final grew = clamped > _numWeeks;
+    final anterior = _numWeeks;
     _markDirty();
     setState(() {
       _numWeeks = clamped;
       for (final day in _days) {
         for (final slot in day.slots) {
           _normalizeSlotWeeks(slot);
+          // LA SEMANA NUEVA NACE PELADA. Antes heredaba el plan entero: el PF
+          // sumaba una semana y se encontraba con los mismos ejercicios ya
+          // puestos, y peor, agregar uno en cualquier semana lo metía en todas
+          // —máscara vacía significa "en todas"—, así que las semanas no eran
+          // editables por separado. Se llenan a mano o con «Copiar semana».
+          if (grew) _dejarFueraDeLasSemanasNuevas(slot, anterior);
         }
       }
+      // Al SUMAR semanas se salta a la primera nueva, como el editor del
+      // teléfono. Desde que nace pelada esto dejó de ser una comodidad: parado
+      // en la semana vieja, «Copiar acá» apunta a la semana VACÍA como
+      // destino, o sea ofrece pisar el trabajo cargado con nada.
+      if (grew) _selectedWeek = anterior;
       if (_selectedWeek > _numWeeks - 1) _selectedWeek = _numWeeks - 1;
       if (_selectedWeek < 0) _selectedWeek = 0;
     });
@@ -1164,11 +1239,27 @@ class _RoutineEditorWebScreenState
         day.slots.add(
           _EditorSlot()
             ..exercise = exercise
-            ..weeklySets = List.generate(_numWeeks, (_) => [_EditorSet()]),
+            ..weeklySets = List.generate(_numWeeks, (_) => [_EditorSet()])
+            // NACE SÓLO EN LA SEMANA QUE SE ESTÁ MIRANDO. Antes nacía con
+            // máscara vacía, que en este modelo significa "en TODAS", y por eso
+            // agregar un ejercicio en una semana lo hacía aparecer en las
+            // otras. Para ponerlo en varias están los chips de «Semanas:» —por
+            // ejercicio— y «Copiar semana» —en bloque—; las dos son acciones
+            // que se ven, no un efecto lateral del alta.
+            ..activeWeeks = _soloLaSemanaEnCurso(),
         );
       }
     });
   }
+
+  /// Máscara con la que nace un slot: sólo la semana en curso.
+  ///
+  /// En un plan de una sola semana devuelve la máscara VACÍA, que es su forma
+  /// canónica de "en todas" — `{0}` y `{}` describen lo mismo ahí, y guardar
+  /// siempre la misma evita que un plan de una semana viaje con una máscara
+  /// explícita que después no significa nada.
+  Set<int> _soloLaSemanaEnCurso() =>
+      _numWeeks <= 1 ? <int>{} : {_selectedWeek};
 
   /// Ejercicios que el día [dayIndex] YA muestra en la semana en curso.
   ///
@@ -1192,6 +1283,19 @@ class _RoutineEditorWebScreenState
     if (slot.isPresentInWeek(week)) return;
     final mask = Set<int>.from(slot.activeWeeks)..add(week);
     slot.activeWeeks = mask.length == _numWeeks ? <int>{} : mask;
+  }
+
+  /// Saca a [slot] de todas las semanas de [desde] en adelante — las que
+  /// acaban de nacer.
+  ///
+  /// El trabajo real lo hace el primer caso: una máscara VACÍA significa "en
+  /// todas las semanas", así que un slot sin máscara aparecía solo en cada
+  /// semana nueva. Materializarla a las semanas que ya existían es lo que hace
+  /// que la nueva venga pelada.
+  void _dejarFueraDeLasSemanasNuevas(_EditorSlot slot, int desde) {
+    slot.activeWeeks = slot.activeWeeks.isEmpty
+        ? {for (var w = 0; w < desde; w++) w}
+        : (Set<int>.from(slot.activeWeeks)..removeWhere((w) => w >= desde));
   }
 
   void _removeSlot(int dayIndex, int slotIndex) {
@@ -1770,6 +1874,13 @@ class _RoutineEditorWebScreenState
     if (_splitCtrl.text.trim().isEmpty) {
       return 'Contanos el split (ej: Push/Pull/Legs).'; // i18n
     }
+    // Una semana entera sin ejercicios AVISA (dot en la pestaña, ver
+    // `_weekHasError`) pero NO bloquea el guardado, a diferencia de un día
+    // vacío. La razón es que ya existen planes así en producción: un plan de
+    // dos semanas cuyo único ejercicio está enmascarado a la semana 1 tiene la
+    // 2 vacía, y es exactamente la forma que dejaron las máscaras de presencia.
+    // Bloquear acá le sacaría el botón de guardar a un PF que abrió un plan
+    // viejo a cambiar otra cosa.
     for (final day in _days) {
       final hasExercise = day.slots.any((s) => s.exercise != null);
       if (!hasExercise) {
@@ -1883,9 +1994,24 @@ class _RoutineEditorWebScreenState
       !day.slots.any((s) => s.exercise != null) || day.slots.any(_slotHasError);
 
   /// Some scheduled exercise has an incomplete set in week [w] — drives the
-  /// warning dot on that week's tab.
+  /// warning dot on that week's tab. Una semana SIN ejercicios cuenta como
+  /// error: ver [_semanaVacia].
   bool _weekHasError(int w) =>
+      _semanaVacia(w) ||
       _days.any((day) => day.slots.any((s) => _slotHasErrorInWeek(s, w)));
+
+  /// La semana [w] no tiene NINGÚN ejercicio en ningún día.
+  ///
+  /// Antes no podía pasar: la semana nueva heredaba el plan entero. Desde que
+  /// nace pelada es el estado inicial de toda semana agregada, y sin esto se
+  /// guardaba en silencio un plan donde el alumno se queda una semana sin nada
+  /// que hacer. Un DÍA vacío ya bloqueaba el guardado desde siempre
+  /// ([_firstInvalidHint]); una semana vacía es lo mismo, una dimensión más
+  /// arriba.
+  bool _semanaVacia(int w) => !_days.any(
+        (day) => day.slots
+            .any((s) => s.exercise != null && s.isPresentInWeek(w)),
+      );
 
   Set<int> _weeksWithError() => {
         for (var w = 0; w < _numWeeks; w++)
@@ -2833,11 +2959,18 @@ class _RoutineEditorWebScreenState
                                                 () => _selectedWeek = w),
                                           ),
                                         ),
-                                        // Nothing to copy from on week 1.
-                                        if (_selectedWeek > 0) ...[
+                                        // Cualquier semana puede RECIBIR una
+                                        // copia, no sólo las que tienen una
+                                        // anterior: con la fuente elegible, la
+                                        // Semana 1 puede tomar de la 3.
+                                        ...[
                                           const SizedBox(width: 8),
                                           _DuplicateWeekButton(
-                                            sourceWeek: _selectedWeek - 1,
+                                            // Con dos semanas la fuente es la
+                                            // otra y el botón puede nombrarla.
+                                            sourceWeek: _numWeeks == 2
+                                                ? 1 - _selectedWeek
+                                                : null,
                                             palette: palette,
                                             onPressed: _duplicateWeek,
                                           ),
@@ -4529,19 +4662,24 @@ class _DuplicateWeekButton extends StatelessWidget {
     required this.onPressed,
   });
 
-  /// 0-based index of the week being copied FROM.
-  final int sourceWeek;
+  /// 0-based index of the week being copied FROM, cuando hay UNA sola posible
+  /// (plan de dos semanas). Con tres o más va en null: la fuente la elige el
+  /// PF en el selector, así que el botón no puede prometer cuál va a ser.
+  final int? sourceWeek;
   final AppPalette palette;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
+    final origen = sourceWeek;
     return TextButton.icon(
       key: const Key('duplicate_week_button'),
       onPressed: onPressed,
       icon: Icon(TreinoIcon.copy, size: 16, color: palette.textMuted),
       label: Text(
-        'Copiar Sem ${sourceWeek + 1} acá', // i18n
+        origen == null
+            ? 'Copiar otra semana acá' // i18n
+            : 'Copiar Sem ${origen + 1} acá', // i18n
         style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 13),
       ),
       style: TextButton.styleFrom(
