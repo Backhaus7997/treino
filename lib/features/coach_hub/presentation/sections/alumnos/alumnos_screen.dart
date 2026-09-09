@@ -124,6 +124,14 @@ final _filtroProvider =
     StateProvider.autoDispose<RosterFiltro>((_) => RosterFiltro.todos);
 final _queryProvider = StateProvider.autoDispose<String>((_) => '');
 
+/// Pagina visible del roster, 0-based.
+///
+/// Se resetea a 0 cuando cambia el filtro o la busqueda: quedarse en la
+/// pagina 3 despues de cambiar de chip deja al PF mirando un tramo del medio
+/// de una lista distinta —o una tabla vacia, si esa lista tiene 2 filas— sin
+/// nada que explique por que arranca ahi.
+final _pageProvider = StateProvider.autoDispose<int>((_) => 0);
+
 /// Modo de visualización del roster (toggle Tabla / Cards, mockup
 /// view-general.png vs view-general-cards.png). Viene de #347; la ronda de
 /// revisión enriqueció la TABLA con columnas nuevas, y el modo cards sigue
@@ -289,6 +297,12 @@ class _RosterFrame extends ConsumerWidget {
       return name.contains(query);
     }).toList();
 
+    // `visibles` es la lista COMPLETA que pasa el filtro y la busqueda —
+    // sigue siendo la que cuenta el pie y la que decide si hay mas de una
+    // pagina. `enPagina` es lo unico que se dibuja.
+    final page = ref.watch(_pageProvider);
+    final enPagina = pageOf(visibles, page: page);
+
     final activos = roster.where((e) => e.estado == AlumnoEstado.activo).length;
 
     // Breakpoint responsive (900px, mismo estándar que el resto del hub —
@@ -349,7 +363,7 @@ class _RosterFrame extends ConsumerWidget {
               // resumen, que es para lo que existe.
               if (ref.watch(_viewModeProvider) == AlumnosViewMode.tabla)
                 _RosterTable(
-                  visibles: visibles,
+                  visibles: enPagina,
                   profiles: profiles,
                   gymNameFor: gymNameFor,
                   loading: tableLoading,
@@ -362,18 +376,27 @@ class _RosterFrame extends ConsumerWidget {
                 )
               else
                 _RosterCardsGrid(
-                  links: [for (final e in visibles) e.link],
+                  links: [for (final e in enPagina) e.link],
                   profiles: profiles,
                   // La deuda ya viene resuelta en el estado compuesto del
                   // entry, así que no hace falta el mapa aparte que usaba la
                   // versión anterior de la grilla.
                   conDeudaIds: {
-                    for (final e in visibles)
+                    for (final e in enPagina)
                       if (e.estado == AlumnoEstado.conDeuda) e.link.athleteId,
                   },
                   deudaByAthlete: const {},
                   gymNameFor: gymNameFor,
                 ),
+              // Un solo pie para los dos modos: el paginado es de la LISTA,
+              // no de como se la esta dibujando. Se esconde solo con una
+              // pagina, asi que hoy —con 12 alumnos— no aparece.
+              CoachHubPager(
+                total: visibles.length,
+                page: page,
+                onPageChanged: (p) =>
+                    ref.read(_pageProvider.notifier).state = p,
+              ),
             ],
           ),
         );
@@ -417,7 +440,10 @@ class _FiltroChips extends ConsumerWidget {
         // así que un tap que vacía la selección es un no-op.
         if (newSelected.isEmpty) return;
         final f = filtroByLabel[newSelected.first];
-        if (f != null) ref.read(_filtroProvider.notifier).state = f;
+        if (f != null) {
+          ref.read(_filtroProvider.notifier).state = f;
+          ref.read(_pageProvider.notifier).state = 0;
+        }
       },
     );
   }
@@ -445,7 +471,10 @@ class _SearchFieldState extends ConsumerState<_SearchField> {
     final l10n = AppL10n.of(context);
     return TextField(
       controller: _controller,
-      onChanged: (v) => ref.read(_queryProvider.notifier).state = v,
+      onChanged: (v) {
+        ref.read(_queryProvider.notifier).state = v;
+        ref.read(_pageProvider.notifier).state = 0;
+      },
       style: TextStyle(color: palette.textPrimary, fontSize: 14),
       decoration: InputDecoration(
         hintText: l10n.coachHubAlumnosSearchHint,
