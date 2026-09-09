@@ -1179,6 +1179,21 @@ class _RowActionsState extends ConsumerState<_RowActions> {
         tooltip: l10n.coachHubAlumnosRowActionsA11y,
         icon: Icon(TreinoIcon.dotsThree,
             size: 18, color: widget.palette.textMuted),
+        // MISMA caja que `_IconAction`, y va por `style` porque es la única
+        // perilla que llega: `PopupMenuButton` le reenvía al `IconButton` su
+        // `padding`, `iconSize` y `style`, pero NO `constraints` — ese parámetro
+        // suyo es para el MENÚ. Sin esto el ⋮ mide 40x24 al lado de los 24x24 de
+        // sus tres hermanos, con la píldora de hover saliendo de otro tamaño y
+        // otro centro: el PF lo reportó como «todos estos botoncitos están
+        // horribles».
+        iconSize: 18,
+        padding: EdgeInsets.zero,
+        style: IconButton.styleFrom(
+          padding: EdgeInsets.zero,
+          minimumSize: const Size(32, 32),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          visualDensity: VisualDensity.compact,
+        ),
         onSelected: (action) => action(),
         itemBuilder: (_) => menuItems,
       ));
@@ -1206,6 +1221,21 @@ class _RowActionsState extends ConsumerState<_RowActions> {
           tooltip: l10n.coachHubAlumnosRowActionsA11y,
           icon: Icon(TreinoIcon.dotsThree,
               size: 18, color: widget.palette.textMuted),
+          // MISMA caja que `_IconAction`, y va por `style` porque es la única
+          // perilla que llega: `PopupMenuButton` le reenvía al `IconButton` su
+          // `padding`, `iconSize` y `style`, pero NO `constraints` — ese parámetro
+          // suyo es para el MENÚ. Sin esto el ⋮ mide 40x24 al lado de los 24x24 de
+          // sus tres hermanos, con la píldora de hover saliendo de otro tamaño y
+          // otro centro: el PF lo reportó como «todos estos botoncitos están
+          // horribles».
+          iconSize: 18,
+          padding: EdgeInsets.zero,
+          style: IconButton.styleFrom(
+            padding: EdgeInsets.zero,
+            minimumSize: const Size(32, 32),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            visualDensity: VisualDensity.compact,
+          ),
           onSelected: (action) => action(),
           itemBuilder: (_) => const [],
         ),
