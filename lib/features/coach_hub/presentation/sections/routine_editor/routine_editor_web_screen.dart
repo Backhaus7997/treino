@@ -3760,6 +3760,12 @@ class _SlotCard extends StatelessWidget {
     // The sets for the currently-viewed week only — other weeks' rows aren't
     // rendered while a different tab is selected (Fase 4b).
     final weekSets = slot.weeklySets[selectedWeek];
+    // El ejercicio existe en la rutina pero NO en la semana que se está
+    // mirando. Gobierna las DOS mitades de la misma decisión: cuánto se ve
+    // (`Opacity`, al final del build) y qué responde al mouse (los dos
+    // `IgnorePointer` del cuerpo). Antes gobernaba sólo la primera.
+    final ausenteEnLaSemana =
+        numWeeks > 1 && !slot.isPresentInWeek(selectedWeek);
     // La cáscara la dibuja `ExerciseCard`, el MISMO widget que el editor del
     // teléfono. Lo que eso trae acá y antes no había: la card se colapsa y,
     // cerrada, muestra el resumen de la prescripción; y el borde se pinta de
@@ -3852,36 +3858,50 @@ class _SlotCard extends StatelessWidget {
               style: GoogleFonts.barlow(color: palette.danger, fontSize: 12),
             ),
           ],
-          const SizedBox(height: 6),
-          // Modo del ejercicio: reps fijas / rango (mín–máx) / tiempo (paridad
-          // con mobile, Fases 1-2). exerciseMode + repMode combinados en 3 chips.
-          Row(
-            children: [
-              _ModeChip(
-                label: 'Reps', // i18n
-                selected: slot.exerciseMode == ExerciseMode.reps &&
-                    slot.repMode == RepMode.single,
-                palette: palette,
-                onTap: () => onModeChanged(ExerciseMode.reps, RepMode.single),
+          // ── Bloque EDITABLE de arriba ───────────────────────────────────
+          // Inerte cuando el ejercicio no está en la semana que se mira.
+          IgnorePointer(
+            ignoring: ausenteEnLaSemana,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+              const SizedBox(height: 6),
+              // Modo del ejercicio: reps fijas / rango (mín–máx) / tiempo (paridad
+              // con mobile, Fases 1-2). exerciseMode + repMode combinados en 3 chips.
+              Row(
+                children: [
+                  _ModeChip(
+                    label: 'Reps', // i18n
+                    selected: slot.exerciseMode == ExerciseMode.reps &&
+                        slot.repMode == RepMode.single,
+                    palette: palette,
+                    onTap: () => onModeChanged(ExerciseMode.reps, RepMode.single),
+                  ),
+                  const SizedBox(width: 6),
+                  _ModeChip(
+                    label: 'Rango', // i18n
+                    selected: slot.exerciseMode == ExerciseMode.reps &&
+                        slot.repMode == RepMode.range,
+                    palette: palette,
+                    onTap: () => onModeChanged(ExerciseMode.reps, RepMode.range),
+                  ),
+                  const SizedBox(width: 6),
+                  _ModeChip(
+                    label: 'Tiempo', // i18n
+                    selected: slot.exerciseMode == ExerciseMode.duration,
+                    palette: palette,
+                    onTap: () =>
+                        onModeChanged(ExerciseMode.duration, RepMode.single),
+                  ),
+                ],
               ),
-              const SizedBox(width: 6),
-              _ModeChip(
-                label: 'Rango', // i18n
-                selected: slot.exerciseMode == ExerciseMode.reps &&
-                    slot.repMode == RepMode.range,
-                palette: palette,
-                onTap: () => onModeChanged(ExerciseMode.reps, RepMode.range),
-              ),
-              const SizedBox(width: 6),
-              _ModeChip(
-                label: 'Tiempo', // i18n
-                selected: slot.exerciseMode == ExerciseMode.duration,
-                palette: palette,
-                onTap: () =>
-                    onModeChanged(ExerciseMode.duration, RepMode.single),
-              ),
-            ],
+              ],
+            ),
           ),
+          // ── Chips de semanas — SIEMPRE TOCABLES ─────────────────────────
+          // Quedan AFUERA de los dos `IgnorePointer` a propósito: son el único
+          // camino de vuelta. Si un ejercicio ausente fuera inerte de punta a
+          // punta, sacarlo de una semana sería irreversible desde la card.
           const SizedBox(height: 6),
           // Presence mask (Fase 4c): which weeks this exercise is present in.
           // Only meaningful for multi-week plans.
@@ -3915,128 +3935,139 @@ class _SlotCard extends StatelessWidget {
             ),
             const SizedBox(height: 6),
           ],
-          Row(
-            children: [
-              Text(
-                'Descanso (seg)', // i18n
-                style: GoogleFonts.barlow(
-                  color: palette.textMuted,
-                  fontSize: 12,
-                ),
-              ),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 60,
-                child: TextFormField(
-                  initialValue: slot.restSeconds.toString(),
-                  keyboardType: TextInputType.number,
-                  onChanged: onRestChanged,
-                  style: GoogleFonts.barlow(
-                    color: palette.textPrimary,
-                    fontSize: 13,
+          // ── Bloque EDITABLE de abajo ────────────────────────────────────
+          // Descanso, series, notas y el link de superserie. Todo esto era lo
+          // que seguía respondiendo al mouse sobre un ejercicio atenuado.
+          IgnorePointer(
+            ignoring: ausenteEnLaSemana,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+              Row(
+                children: [
+                  Text(
+                    'Descanso (seg)', // i18n
+                    style: GoogleFonts.barlow(
+                      color: palette.textMuted,
+                      fontSize: 12,
+                    ),
                   ),
-                  decoration: const InputDecoration(isDense: true),
-                ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 60,
+                    child: TextFormField(
+                      initialValue: slot.restSeconds.toString(),
+                      keyboardType: TextInputType.number,
+                      onChanged: onRestChanged,
+                      style: GoogleFonts.barlow(
+                        color: palette.textPrimary,
+                        fontSize: 13,
+                      ),
+                      decoration: const InputDecoration(isDense: true),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          for (var i = 0; i < weekSets.length; i++)
-            _SetRow(
-              // Key by SET IDENTITY, not by position (#655).
-              //
-              // [_SetRow] is stateless, but its number fields are
-              // `TextFormField(initialValue: …)` — uncontrolled: each one seeds
-              // its controller ONCE, when its element is created, and ignores
-              // later `initialValue` changes. So the only way to make a field
-              // show a new model value is to give its row a key the framework
-              // can't match, forcing a fresh element.
-              //
-              // Every mutation that REPLACES set instances — "copiar sets del
-              // anterior", "Copiar Sem N acá", switching weeks, removing a row
-              // — hands us new [_EditorSet] objects, so an [ObjectKey] flips
-              // exactly then and only then. A positional key (`w0s1`) survives
-              // all of those and leaves the old text on screen while the model
-              // underneath already changed: the copy would look like a no-op
-              // and only surface on save.
-              //
-              // Typing does NOT replace the instance (the mutators write the
-              // fields in place), so the key holds and the focused field keeps
-              // its text and cursor.
-              key: ObjectKey(weekSets[i]),
-              index: i,
-              set: weekSets[i],
-              palette: palette,
-              exerciseMode: slot.exerciseMode,
-              repMode: slot.repMode,
-              showErrors: hasError,
-              canRemove: weekSets.length > 1,
-              onRemove: () => onRemoveSet(i),
-              onRepsChanged: (v) => onSetRepsChanged(i, v),
-              onRepsMinChanged: (v) => onSetRepsMinChanged(i, v),
-              onRepsMaxChanged: (v) => onSetRepsMaxChanged(i, v),
-              onDurationChanged: (v) => onSetDurationChanged(i, v),
-              onWeightChanged: (v) => onSetWeightChanged(i, v),
-              chipLabel: _setChipLabel(weekSets, i),
-              onTypeChanged: (t) => onSetTypeChanged(i, t),
-            ),
-          // `AddSetButton`, el MISMO del teléfono, en vez de un `TextButton`
-          // de 12 px con un ícono de 14. Acá era un texto chico pegado a la
-          // izquierda: se leía como un link, no como el botón que se toca una
-          // vez por serie. El compartido ocupa el ancho, tiene alto de acción
-          // y contorno punteado — y trae el rol de botón para lectores de
-          // pantalla, que el `TextButton` daba y un `InkWell` pelado pierde.
-          const SizedBox(height: AppSpacing.hairline),
-          AddSetButton(
-            label: 'Agregar set', // i18n
-            onPressed: onAddSet,
-          ),
-          // El botón y el campo de notas se tocaban: dos bordes pegados se
-          // leen como UN control partido, no como dos cosas distintas.
-          const SizedBox(height: AppSpacing.s12),
-          // Coaching note for this exercise (optional). Located in tests via
-          // its hint, not a Key — a Key would collide across slots.
-          TextFormField(
-            initialValue: slot.notes,
-            onChanged: onNotesChanged,
-            maxLength: 200,
-            minLines: 1,
-            maxLines: 3,
-            style: GoogleFonts.barlow(color: palette.textPrimary, fontSize: 13),
-            decoration: InputDecoration(
-              isDense: true,
-              hintText: 'Notas para el alumno (opcional)', // i18n
-              hintStyle: GoogleFonts.barlow(
-                color: palette.textMuted,
-                fontSize: 12,
-              ),
-              counterText: '',
-            ),
-          ),
-          // Superset link — only offered when there IS a next exercise to link
-          // to. A run of linked exercises becomes one superset block on save.
-          if (canLink)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: onToggleLink,
-                icon: Icon(
-                  linkedToNext ? TreinoIcon.check : TreinoIcon.plus,
-                  size: 14,
-                  color: linkedToNext ? palette.accent : palette.textMuted,
+              const SizedBox(height: 4),
+              for (var i = 0; i < weekSets.length; i++)
+                _SetRow(
+                  // Key by SET IDENTITY, not by position (#655).
+                  //
+                  // [_SetRow] is stateless, but its number fields are
+                  // `TextFormField(initialValue: …)` — uncontrolled: each one seeds
+                  // its controller ONCE, when its element is created, and ignores
+                  // later `initialValue` changes. So the only way to make a field
+                  // show a new model value is to give its row a key the framework
+                  // can't match, forcing a fresh element.
+                  //
+                  // Every mutation that REPLACES set instances — "copiar sets del
+                  // anterior", "Copiar Sem N acá", switching weeks, removing a row
+                  // — hands us new [_EditorSet] objects, so an [ObjectKey] flips
+                  // exactly then and only then. A positional key (`w0s1`) survives
+                  // all of those and leaves the old text on screen while the model
+                  // underneath already changed: the copy would look like a no-op
+                  // and only surface on save.
+                  //
+                  // Typing does NOT replace the instance (the mutators write the
+                  // fields in place), so the key holds and the focused field keeps
+                  // its text and cursor.
+                  key: ObjectKey(weekSets[i]),
+                  index: i,
+                  set: weekSets[i],
+                  palette: palette,
+                  exerciseMode: slot.exerciseMode,
+                  repMode: slot.repMode,
+                  showErrors: hasError,
+                  canRemove: weekSets.length > 1,
+                  onRemove: () => onRemoveSet(i),
+                  onRepsChanged: (v) => onSetRepsChanged(i, v),
+                  onRepsMinChanged: (v) => onSetRepsMinChanged(i, v),
+                  onRepsMaxChanged: (v) => onSetRepsMaxChanged(i, v),
+                  onDurationChanged: (v) => onSetDurationChanged(i, v),
+                  onWeightChanged: (v) => onSetWeightChanged(i, v),
+                  chipLabel: _setChipLabel(weekSets, i),
+                  onTypeChanged: (t) => onSetTypeChanged(i, t),
                 ),
-                label: Text(
-                  linkedToNext
-                      ? 'En superserie con el siguiente' // i18n
-                      : 'Superserie con el siguiente', // i18n
-                  style: GoogleFonts.barlowCondensed(
-                    color: linkedToNext ? palette.accent : palette.textMuted,
-                    fontWeight: FontWeight.w700,
+              // `AddSetButton`, el MISMO del teléfono, en vez de un `TextButton`
+              // de 12 px con un ícono de 14. Acá era un texto chico pegado a la
+              // izquierda: se leía como un link, no como el botón que se toca una
+              // vez por serie. El compartido ocupa el ancho, tiene alto de acción
+              // y contorno punteado — y trae el rol de botón para lectores de
+              // pantalla, que el `TextButton` daba y un `InkWell` pelado pierde.
+              const SizedBox(height: AppSpacing.hairline),
+              AddSetButton(
+                label: 'Agregar set', // i18n
+                onPressed: onAddSet,
+              ),
+              // El botón y el campo de notas se tocaban: dos bordes pegados se
+              // leen como UN control partido, no como dos cosas distintas.
+              const SizedBox(height: AppSpacing.s12),
+              // Coaching note for this exercise (optional). Located in tests via
+              // its hint, not a Key — a Key would collide across slots.
+              TextFormField(
+                initialValue: slot.notes,
+                onChanged: onNotesChanged,
+                maxLength: 200,
+                minLines: 1,
+                maxLines: 3,
+                style: GoogleFonts.barlow(color: palette.textPrimary, fontSize: 13),
+                decoration: InputDecoration(
+                  isDense: true,
+                  hintText: 'Notas para el alumno (opcional)', // i18n
+                  hintStyle: GoogleFonts.barlow(
+                    color: palette.textMuted,
                     fontSize: 12,
                   ),
+                  counterText: '',
                 ),
               ),
+              // Superset link — only offered when there IS a next exercise to link
+              // to. A run of linked exercises becomes one superset block on save.
+              if (canLink)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: onToggleLink,
+                    icon: Icon(
+                      linkedToNext ? TreinoIcon.check : TreinoIcon.plus,
+                      size: 14,
+                      color: linkedToNext ? palette.accent : palette.textMuted,
+                    ),
+                    label: Text(
+                      linkedToNext
+                          ? 'En superserie con el siguiente' // i18n
+                          : 'Superserie con el siguiente', // i18n
+                      style: GoogleFonts.barlowCondensed(
+                        color: linkedToNext ? palette.accent : palette.textMuted,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
+          ),
         ],
       ),
     );
@@ -4044,7 +4075,7 @@ class _SlotCard extends StatelessWidget {
     // trainer still sees it and can re-add it via the presence chips above
     // (Fase 4c). Opacity alone doesn't block hit-testing, so the chips stay
     // tappable while dimmed.
-    if (numWeeks > 1 && !slot.isPresentInWeek(selectedWeek)) {
+    if (ausenteEnLaSemana) {
       return Opacity(opacity: 0.45, child: card);
     }
     return card;

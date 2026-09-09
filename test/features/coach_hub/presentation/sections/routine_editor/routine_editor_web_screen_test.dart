@@ -2652,6 +2652,80 @@ void main() {
     );
   });
 
+  group('RoutineEditorWebScreen — el ejercicio ausente es INERTE', () {
+    // El PF le da "eliminar" a un ejercicio de una rutina de varias semanas,
+    // elige "solo esta semana", y lo ve atenuado en vez de desaparecer. Eso es
+    // el diseño (Fase 4c: se atenua para poder re-agregarlo). Lo que NO era
+    // diseno es que siguiera respondiendo al mouse: `Opacity` no bloquea el
+    // hit-testing, asi que kilos, reps, series, descanso, notas y el link de
+    // superserie quedaban editables sobre una semana de la que acababa de
+    // sacarlo.
+    //
+    // `_presenceRoutine` es `numWeeks: 2` con el slot presente SOLO en la
+    // semana 0: pararse en la semana 2 es exactamente ese estado.
+    Future<_MockRoutineRepository> abrirEnLaSemanaSinElEjercicio(
+      WidgetTester tester,
+    ) async {
+      final repo = _MockRoutineRepository();
+      when(
+        () => repo.getById(any()),
+      ).thenAnswer((_) async => _presenceRoutine());
+      await _pumpEditor(tester, repo: repo, routineId: 'r7');
+      await tester.tap(find.byKey(const Key('week_tab_1')));
+      await tester.pumpAndSettle();
+      await expandirEjercicios(tester);
+      return repo;
+    }
+
+    testWidgets('sigue en pantalla, atenuado — no se oculta', (tester) async {
+      await abrirEnLaSemanaSinElEjercicio(tester);
+
+      // La mitad que YA funcionaba: se ve, para poder volver a agregarlo.
+      expect(enElEditor(find.text('Press de Banca')), findsOneWidget);
+      // `ancestor` y no `descendant`: el `Opacity` ENVUELVE la card.
+      expect(
+        find.ancestor(
+          of: find.byType(ExerciseCard),
+          matching: find.byType(Opacity),
+        ),
+        findsWidgets,
+      );
+    });
+
+    testWidgets('lo editable esta en el arbol pero NO recibe el mouse',
+        (tester) async {
+      await abrirEnLaSemanaSinElEjercicio(tester);
+
+      // `hitTestable()` es la afirmacion exacta: el widget existe y se ve, y
+      // aun asi no le llega el puntero. Con el `Opacity` solo, las dos
+      // busquedas devolvian lo mismo y el test no distinguia nada.
+      final descanso = enElEditor(find.text('Descanso (seg)'));
+      expect(descanso, findsOneWidget, reason: 'sigue renderizado');
+      expect(
+        descanso.hitTestable(),
+        findsNothing,
+        reason: 'pero inerte: no se edita una semana de la que se lo saco',
+      );
+
+      final modo = enElEditor(find.text('Reps'));
+      expect(modo, findsOneWidget);
+      expect(modo.hitTestable(), findsNothing);
+    });
+
+    testWidgets('los chips de semanas SIGUEN tocables — el camino de vuelta',
+        (tester) async {
+      await abrirEnLaSemanaSinElEjercicio(tester);
+
+      // Si el ejercicio ausente fuera inerte de punta a punta, sacarlo de una
+      // semana seria irreversible desde la card. Por eso los chips quedan
+      // AFUERA de los dos `IgnorePointer`, y por eso son dos y no uno: viven
+      // en el medio del cuerpo.
+      final etiqueta = enElEditor(find.text('Semanas:'));
+      expect(etiqueta, findsOneWidget);
+      expect(etiqueta.hitTestable(), findsOneWidget);
+    });
+  });
+
   group('RoutineEditorWebScreen — SetType round-trip', () {
     testWidgets('re-saving a mobile-authored routine preserves each set type', (
       tester,
