@@ -2149,6 +2149,20 @@ class _RoutineEditorWebScreenState
       });
       return;
     }
+
+    // La metáfora que pidió el PF, con las palabras que usó él: «o se te guarda
+    // con los cambios, o te crea una copia con los cambios manteniendo la
+    // original en la galería».
+    //
+    // Sólo al EDITAR algo que ya existe y sólo si hay cambios. Un cartel que
+    // sale siempre —incluido cuando no tocaste nada— enseña a apretar el
+    // primer botón sin leer, y ahí se pierde el peso de TODAS las
+    // confirmaciones de esta pantalla, incluida la de descartar.
+    final modo = (_isEditing && _isDirty)
+        ? await _preguntarComoGuardar()
+        : _ModoDeGuardado.pisar;
+    if (modo == null || !mounted) return;
+
     final trainerUid = ref.read(currentUidProvider);
     if (trainerUid == null) return;
 
@@ -2182,8 +2196,60 @@ class _RoutineEditorWebScreenState
     // the PF navigated away while the write was in flight.
     final analytics = ref.read(analyticsServiceProvider);
     final analyticsSource = _analyticsSource;
+    // Nombre de la copia recién creada, o null si esta pasada no creó ninguna.
+    // Se avisa al final, después de las invalidaciones — ver la rama de abajo.
+    String? copiaGuardada;
     try {
-      if (_isEditing) {
+      if (modo == _ModoDeGuardado.copia) {
+        // La copia nace como PLANTILLA, aunque se esté editando el plan de un
+        // alumno. Es el caso que el PF describió —«esto me quedó bueno, lo
+        // quiero para otros»— y el único que construye biblioteca: una copia
+        // asignada al mismo alumno le suma una tarjeta a esa persona y no le
+        // sirve para nadie más.
+        //
+        // Por eso NO lleva `assignedTo`: `createTemplate` fuerza
+        // source=trainer-template / assignedTo=null / visibility=private, que
+        // es lo único que las reglas aceptan en un `trainer-template`.
+        //
+        // Y por eso el documento original NO se toca: no hay `update` en esta
+        // rama. Ésa es toda la promesa de «mantener la original en la
+        // galería».
+        final copia = Routine(
+          id: '',
+          name: _nombreDeLaCopia(),
+          split: _splitCtrl.text.trim(),
+          level: _level,
+          days: days,
+          numWeeks: _numWeeks,
+          summary: _summaryOrNull,
+          goals: _goalsOrdered,
+          source: RoutineSource.trainerTemplate,
+          assignedBy: trainerUid,
+          visibility: RoutineVisibility.private,
+        );
+        await repo.createTemplate(copia);
+        analytics.logRoutineCreated(
+          // `trainerTemplate` fijo, y NO `analyticsSource`: ese getter sale de
+          // `widget.isTemplate`, que sigue en false cuando la copia se hizo
+          // desde el editor de un plan de alumno. El documento que se acaba de
+          // escribir es un `trainer-template`, así que reportarlo como
+          // `trainerAssigned` ensucia justo el corte que separa planes de
+          // plantillas reutilizables.
+          source: RoutineCreationSource.trainerTemplate,
+          daysCount: days.length,
+          weeksCount: _numWeeks,
+        );
+        // El aviso NO sale acá. Sale abajo, después de invalidar.
+        //
+        // `_avisarCopiaGuardada` toca `context`, y esto está después de un
+        // await: si el PF confirmó el descarte del navegador mientras el
+        // `createTemplate` estaba en vuelo, el State ya se dispuso y esa
+        // llamada TIRA. El catch la atrapa, ve `!mounted` y vuelve — con la
+        // copia YA escrita y la invalidación de la sección Rutinas sin correr.
+        // O sea: el aviso, que es cosmético, se llevaría puesto el refresco,
+        // que no lo es.
+        copiaGuardada = copia.name;
+      } else if (_isEditing) {
         // Preserve the loaded routine's identity (id, assignedBy/To, source,
         // createdAt, …). updateTemplate/updateAssigned each write only
         // name/split/level/days/numWeeks/summary — `days` is rebuilt from a
@@ -2258,19 +2324,44 @@ class _RoutineEditorWebScreenState
           weeksCount: _numWeeks,
         );
       }
+      // La grilla de la sección Rutinas. `routinesAuthoredByProvider` es un
+      // `FutureProvider.autoDispose` que esa pantalla WATCHEA, y el editor
+      // llega por `context.push`: la ruta de abajo sigue montada, así que el
+      // provider nunca se dispone y sirve la lista previa al guardado.
+      //
+      // Faltaba para TODOS los caminos de escritura de esta pantalla, no sólo
+      // para el de la copia: crear una plantilla, crear un plan o editar
+      // cualquiera de los dos dejaba la sección Rutinas mostrando lo de antes
+      // hasta recargar. No fallaba ruidosamente —es el fallo silencioso de
+      // AGENTS.md §11.1— y se explica por la fecha: la sección pasó a leer de
+      // este provider en #1065, después de que este editor se escribiera.
+      //
+      // `container` y no `ref`: es lo mismo que ya hace `invalidateRoutineById`
+      // acá arriba, y por el mismo motivo — la invalidación tiene que aterrizar
+      // aunque la pantalla se haya dispuesto durante el await.
+      container.invalidate(routinesAuthoredByProvider(trainerUid));
+
       // trainerTemplatesStreamProvider is a live stream — no invalidation
       // needed. The assigned list is a one-shot FutureProvider, so invalidate
       // it so the athlete detail's "Rutina activa" card refreshes on return.
-      if (!widget.isTemplate) {
+      //
+      // No en la rama de la copia: ahí no cambió nada del alumno. La copia es
+      // una plantilla nueva y el plan que estaba editando quedó igual.
+      if (!widget.isTemplate && modo != _ModoDeGuardado.copia) {
         ref.invalidate(assignedRoutinesByTrainerProvider(
           (trainerId: trainerUid, athleteId: widget.athleteId!),
         ));
+      }
+      // Recién ahora, con todo lo que NO es cosmético ya hecho. Y bajo
+      // `mounted`, que es la condición real para tocar `context`.
+      if (copiaGuardada != null && mounted) {
+        _avisarCopiaGuardada(copiaGuardada);
       }
       if (mounted) context.pop();
     } catch (error) {
       if (!mounted) return;
       if (isPermissionDenied(error)) {
-        _onWriteDenied(trainerUid: trainerUid);
+        _onWriteDenied(trainerUid: trainerUid, modo: modo);
         return;
       }
       setState(() {
@@ -2292,8 +2383,18 @@ class _RoutineEditorWebScreenState
   /// 2. **Copy.** El mensaje genérico («probá de nuevo») es ACTIVAMENTE falso
   ///    en este caso: le pide al PF repetir algo que va a fallar siempre. Y la
   ///    causa sólo se afirma cuando se puede probar — ver [_deniedMessage].
-  void _onWriteDenied({required String trainerUid}) {
-    final athleteId = widget.athleteId;
+  void _onWriteDenied({
+    required String trainerUid,
+    required _ModoDeGuardado modo,
+  }) {
+    // Guardar como COPIA escribe una plantilla, y una plantilla no es de
+    // nadie — aunque se haya llegado acá desde el plan de un alumno y
+    // `widget.athleteId` esté seteado. Tomarlo de la pantalla haría dos cosas
+    // falsas a la vez: mandar analytics con un `athleteId` que esta escritura
+    // no tocó, y ofrecerle al PF la salida a «mirá tu cupo con Juan» sobre una
+    // denegación que no tiene nada que ver con Juan. El paywall de rutinas por
+    // forma (días/semanas) no es por-alumno.
+    final athleteId = modo == _ModoDeGuardado.copia ? null : widget.athleteId;
     // Una plantilla no es de nadie: el paywall es por-alumno, así que el campo
     // no aplica en vez de valer «desconocido». Y no se lee el provider en ese
     // caso: en modo plantilla el build NO lo observa, así que un `read` suelto
@@ -2320,7 +2421,11 @@ class _RoutineEditorWebScreenState
             trainerId: trainerUid,
             athleteId: athleteId ?? 'none',
             collection: 'routines',
-            operation: _isEditing ? 'update' : 'create',
+            // Una copia es un CREATE aunque `_isEditing` sea true: se
+            // escribe un documento nuevo y el original ni se toca.
+            operation: (_isEditing && modo != _ModoDeGuardado.copia)
+                ? 'update'
+                : 'create',
             surface: 'routine_editor_web',
             athleteEntitlement: entitlement,
           ),
@@ -2328,7 +2433,10 @@ class _RoutineEditorWebScreenState
 
     setState(() {
       _submitting = false;
-      _errorMessage = _deniedMessage(entitlement == 'blocked');
+      _errorMessage = _deniedMessage(
+        entitlement == 'blocked',
+        sinAlumno: athleteId == null,
+      );
       // La salida a la pantalla de solo-lectura se ofrece también cuando la
       // causa NO está probada: ahí es justamente donde el PF necesita poder
       // MIRAR si su cupo lo explica o no.
@@ -2350,8 +2458,15 @@ class _RoutineEditorWebScreenState
   /// sobre él; el alumno conserva rutinas, historial y chat. Decirlo al revés
   /// («este alumno quedó sin acceso») sería falso y encima le cobraría al
   /// alumno una fricción que es del entrenador.
-  String _deniedMessage(bool athleteIsOutOfPlan) {
-    if (widget.isTemplate) {
+  /// [sinAlumno] es `athleteId == null` del llamador, y NO `widget.isTemplate`.
+  /// Los dos coinciden salvo en un caso: guardar como COPIA desde el editor de
+  /// un plan de alumno escribe una plantilla, y ahí `widget.isTemplate` sigue
+  /// en false. Ramificando por la pantalla en vez de por lo que se intentó
+  /// escribir, el cartel decía «no pudimos escribir sobre este alumno» y
+  /// mandaba a mirar su cupo, sobre una escritura que no era de ese alumno —
+  /// una advertencia falsa, que es lo que AGENTS.md §11.1 prohíbe.
+  String _deniedMessage(bool athleteIsOutOfPlan, {required bool sinAlumno}) {
+    if (sinAlumno) {
       // Sin alumno de por medio el cupo no puede ser la causa; nombrarlo sería
       // inventar.
       return 'No pudimos guardar la $_noun: tu cuenta no tiene permiso para '
@@ -2366,6 +2481,76 @@ class _RoutineEditorWebScreenState
     return 'No pudimos guardar la $_noun: tu cuenta no tiene permiso para '
         'escribir sobre este alumno. Reintentar no lo va a cambiar. '
         'Fijate si quedó fuera del cupo de tu plan.'; // i18n
+  }
+
+  // ── Guardar, o guardar una copia ─────────────────────────────────────────
+
+  /// Pregunta si los cambios pisan la rutina o nacen como copia.
+  ///
+  /// Devuelve `null` si se canceló — el diálogo es `barrierDismissible`, así
+  /// que tocar afuera o Escape también cancela. Cancelar NO guarda nada, que
+  /// es la única lectura segura de un diálogo del que te podés ir sin elegir.
+  Future<_ModoDeGuardado?> _preguntarComoGuardar() async {
+    final original = _loadedRoutine?.name.trim();
+    return showTreinoDialog<_ModoDeGuardado>(
+      context,
+      builder: (ctx) => TreinoDialog(
+        title: original == null || original.isEmpty
+            ? '¿Cómo guardás los cambios?' // i18n
+            : '¿Cómo guardás los cambios en «$original»?', // i18n
+        body: Text(
+          widget.isTemplate
+              // i18n
+              ? 'Guardar pisa esta plantilla con lo que acabás de armar. Una '
+                  'copia deja la original como estaba y suma una plantilla '
+                  'nueva a tu biblioteca.'
+              // Sobre un plan de alumno hay que decir las DOS mitades: qué le
+              // pasa al alumno y dónde queda la copia. La copia no es otro
+              // plan para él —es una plantilla tuya—, y si el cartel no lo
+              // dice el PF va a buscarla en el perfil del alumno.
+              // i18n
+              : 'Guardar actualiza el plan que está entrenando. Una copia lo '
+                  'deja como está y guarda lo que armaste como una plantilla '
+                  'nueva en tu biblioteca, sin alumno.',
+        ),
+        primaryLabel: 'Guardar', // i18n
+        onPrimaryTap: () => Navigator.of(ctx).pop(_ModoDeGuardado.pisar),
+        secondaryLabel: 'Guardar como copia', // i18n
+        onSecondaryTap: () => Navigator.of(ctx).pop(_ModoDeGuardado.copia),
+      ),
+    );
+  }
+
+  /// El nombre de la copia: el del formulario con «(copia)» al final.
+  ///
+  /// No se pide en el diálogo, y es una decisión. La metáfora que pidió el PF
+  /// —la de editar una foto— no tiene paso de nombre: el teléfono guarda la
+  /// copia y listo. Un segundo diálogo para nombrarla, o un campo en el
+  /// primero que el botón «Guardar» ignora, agregan fricción justo en el
+  /// momento en que el PF quiere terminar. Se renombra abriéndola, que es
+  /// donde ya sabe cómo hacerlo.
+  ///
+  /// Copiar dos veces da «X (copia) (copia)», y está bien: dice la verdad.
+  String _nombreDeLaCopia() {
+    final base = _nameCtrl.text.trim();
+    return base.isEmpty ? 'Copia' : '$base (copia)'; // i18n
+  }
+
+  /// Avisa dónde quedó la copia, antes de que el editor se cierre.
+  ///
+  /// El `ScaffoldMessenger` vive por encima de esta ruta, así que el snackbar
+  /// sobrevive al `pop` y se lee en la pantalla de atrás — que es justo donde
+  /// el PF va a buscar la copia.
+  void _avisarCopiaGuardada(String nombre) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(
+          // i18n
+          'Se guardó «$nombre» en tus plantillas. La original quedó como '
+          'estaba.',
+        ),
+      ));
   }
 
   // ── Discard guard ────────────────────────────────────────────────────────
@@ -4753,4 +4938,17 @@ class _PresenceChip extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Qué hace «guardar» sobre una rutina que ya existe.
+///
+/// Es la metáfora de editar una foto en el teléfono, que fue como el PF pidió
+/// la función: o se guarda con los cambios, o se crea una copia con los cambios
+/// y la original queda en la galería.
+enum _ModoDeGuardado {
+  /// Pisa el documento actual. `updateTemplate` / `updateAssigned`.
+  pisar,
+
+  /// Crea una PLANTILLA nueva con los cambios y no toca el documento actual.
+  copia,
 }
