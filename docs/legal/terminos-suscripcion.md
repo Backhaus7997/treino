@@ -110,8 +110,8 @@ cubre vivas donde vivas.
 
 ### Cómo ejercerlo
 
-Desde el **Botón de Arrepentimiento**, disponible en la página principal de
-gettreino.com. **No necesitás tener la sesión iniciada ni hacer ningún trámite
+Desde el **Botón de Arrepentimiento**, disponible en el pie de la página principal de
+gettreino.com — la dirección es **gettreino.com/es/arrepentimiento**. **No necesitás tener la sesión iniciada ni hacer ningún trámite
 previo.**
 
 Dentro de las **24 horas** te enviamos por el mismo medio un **código de
@@ -187,7 +187,7 @@ treino@gettreino.com
 | # | Qué | Dónde | Bloquea |
 |---|---|---|---|
 | 1 | **Botón de Arrepentimiento** en la home, sin login | `gettreino.com` | **Sí, si se cobra** |
-| 2 | Formulario de arrepentimiento | `gettreino.com/arrepentimiento` | **Sí** |
+| 2 | Formulario de arrepentimiento | ✅ publicado | **Sí** |
 | 3 | **Correo automático con código dentro de 24 h** | Backend | **Sí** |
 | 4 | Baja en línea | Coach Hub web | **Sí** |
 | 5 | Aviso previo a renovación y a cambio de precio | Backend | Sí |
@@ -234,9 +234,9 @@ tratamientos distintos.]]
 
 | # | Qué | Dónde |
 |---|---|---|
-| 1 | Botón de Arrepentimiento en la home, sin login | `gettreino.com` |
-| 2 | Formulario de arrepentimiento | `gettreino.com/arrepentimiento` |
-| 3 | Correo automático con código dentro de 24 h | Backend |
+| 1 | Botón de Arrepentimiento en la home, sin login | ✅ `gettreino.com/es/arrepentimiento` |
+| 2 | Formulario de arrepentimiento | ✅ publicado |
+| 3 | Correo automático con código dentro de 24 h | Backend — **falta probarlo de punta a punta** |
 | 4 | Baja en línea | Coach Hub web |
 
 **Para el alumno no hace falta nada de eso**: la tienda gestiona baja y

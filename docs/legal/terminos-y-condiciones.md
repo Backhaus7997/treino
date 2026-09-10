@@ -161,7 +161,7 @@ requieren una suscripción, y existe también una suscripción para atletas.
 - **Entrenadores**, en el Coach Hub web: el pago lo procesa Mercado Pago y
   liquida a la cuenta de BACKHAUSTIN S.A.S. **Tenés 14 días corridos para
   arrepentirte** y recuperar todo lo pagado, desde el Botón de Arrepentimiento
-  de la página principal, sin necesidad de iniciar sesión.
+  del pie de gettreino.com, sin necesidad de iniciar sesión.
 - **Atletas**, desde la aplicación móvil: el pago lo procesa App Store o Google
   Play. **La baja y el reembolso los gestiona la tienda**, desde los ajustes de
   suscripciones de tu dispositivo.

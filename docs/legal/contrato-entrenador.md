@@ -275,8 +275,8 @@ La suscripción **se renueva automáticamente** al final de cada período, con
 aviso previo, salvo que la des de baja antes.
 
 **Tenés 14 días corridos desde la contratación para arrepentirte y recuperar
-todo lo pagado.** Lo ejercés desde el Botón de Arrepentimiento de la página
-principal de gettreino.com, sin necesidad de iniciar sesión, y dentro de las 24
+todo lo pagado.** Lo ejercés desde el Botón de Arrepentimiento del pie de
+gettreino.com, sin necesidad de iniciar sesión, y dentro de las 24
 horas recibís un código de identificación de tu pedido.
 
 Pasado ese plazo podés dar de baja cuando quieras: conservás el acceso hasta el

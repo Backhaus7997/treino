@@ -29,36 +29,47 @@ Tres decisiones tomadas que condicionan todo lo de abajo:
 
 ---
 
-## 1. Estado actual — lo que hay y lo que falta
+## 1. Estado actual — verificado en producción el 2026-09-10
 
-```
-gettreino.com/legal/privacidad.html        404
-gettreino.com/eliminar-cuenta              404
-app.gettreino.com/legal/privacidad.html    200  OK
-```
+**El sitio está internacionalizado con prefijo de idioma.** Las rutas legales
+viven bajo `/es/`, no en la raíz. Cuatro ya están publicadas y funcionando:
 
-Las páginas legales **existen pero viven en el Coach Hub**
-(`app.gettreino.com`), no en el sitio público. Se generan desde el repo de la
-app con `dart run tool/build_legal_pages.dart` y viajan con `flutter build web`.
-
-> ⚠️ **Bug en producción.** Esas páginas enlazan a `equipo@treino.app`, una
-> casilla **que no existe**. Quien intente ejercer sus derechos o pedir el
-> borrado de su cuenta por esa vía recibe un rebote. La casilla real es
-> `treino@gettreino.com`. Hay que corregirlo en el repo de la app, no acá.
-
-### 1.1 Decisión previa: dónde viven las páginas legales
-
-Hay que elegir una y que sea consistente en las dos tiendas:
-
-| Opción | Implica |
+| Ruta | Estado |
 |---|---|
-| **A — Servirlas desde `gettreino.com`** | El sitio público las aloja. Es lo más claro para el usuario y para los revisores de tienda. Hay que sincronizarlas o proxyearlas desde el repo de la app |
-| **B — Dejarlas en `app.gettreino.com`** | Ya funciona. Pero el usuario que busca la política en el sitio público no la encuentra, y `/eliminar-cuenta` tiene que existir igual en la raíz |
+| `/es/arrepentimiento` | **200** — implementada |
+| `/es/eliminar-cuenta` | **200** — implementada |
+| `/es/privacidad` | **200** — implementada |
+| `/es/terminos` | **200** — implementada |
+| `/es/comunidad` | 404 |
+| `/es/descargo-medico` | 404 |
+| `/es/entrenadores` | 404 |
+| `/es/suscripcion` | 404 |
+| `/es/retencion` | 404 |
+| `/es/aviso-legal` | 404 |
+| `/es/cookies` | 404 |
 
-**Recomendación: A.** El sitio institucional es donde se las busca, y el botón
-de arrepentimiento tiene que estar sí o sí en la home de `gettreino.com`.
+### 1.1 El Botón de Arrepentimiento ya cumple
 
----
+Se verificó contra la Resolución 424/2020, punto por punto:
+
+| Requisito | Estado |
+|---|---|
+| Acceso desde la página de inicio | **Sí** — enlace en el pie, presente en la home |
+| Texto sin ambigüedad | **Sí** — dice literalmente «Botón de Arrepentimiento» |
+| Sin registración previa ni otro trámite | **Sí** — el formulario no pide iniciar sesión |
+| Lugar destacado | **Sí** — pie de página, que es la práctica de mercado |
+| Formulario con datos de la compra | **Sí** — nombre, correo, fecha, plan y notas |
+| Informa el plazo | **Sí** — 14 días |
+| Menciona el código de identificación | **Sí** |
+
+**Lo único que no se puede verificar desde afuera es si el correo automático con
+el código sale efectivamente dentro de las 24 horas.** Conviene probarlo de
+punta a punta: enviar el formulario y confirmar que llega.
+
+> ⚠️ **Bug pendiente, en el otro repositorio.** Las páginas legales que sirve el
+> Coach Hub (`app.gettreino.com/legal/*`) enlazan a `equipo@treino.app`, una
+> casilla **que no existe**. La real es `treino@gettreino.com`. Se corrige en el
+> repo de la app, no acá.
 
 ## 2. Footer legal — en todas las páginas
 
@@ -74,20 +85,26 @@ Obligatorio para comercio electrónico en Argentina. Texto sugerido:
 
 ### 2.2 Enlaces legales
 
-| Texto del enlace | Destino |
-|---|---|
-| Política de Privacidad | `/legal/privacidad` |
-| Términos y Condiciones | `/legal/terminos` |
-| Normas de Comunidad | `/legal/comunidad` |
-| Descargo Médico | `/legal/descargo-medico` |
-| Términos para Entrenadores | `/legal/entrenadores` |
-| Retención y eliminación de datos | `/legal/retencion` |
-| Aviso Legal | `/aviso-legal` |
-| **Eliminar mi cuenta** | `/eliminar-cuenta` |
-| **Botón de Arrepentimiento** | `/arrepentimiento` |
+| Texto del enlace | Destino | Estado |
+|---|---|---|
+| Política de Privacidad | `/es/privacidad` | Publicada |
+| Términos y Condiciones | `/es/terminos` | Publicada |
+| **Botón de Arrepentimiento** | `/es/arrepentimiento` | Publicada |
+| **Eliminar mi cuenta** | `/es/eliminar-cuenta` | Publicada |
+| Términos de Suscripción | `/es/suscripcion` | **Falta** |
+| Normas de Comunidad | `/es/comunidad` | **Falta** |
+| Descargo Médico | `/es/descargo-medico` | **Falta** |
+| Términos para Entrenadores | `/es/entrenadores` | **Falta** |
+| Retención y eliminación de datos | `/es/retencion` | **Falta** |
+| Aviso Legal | `/es/aviso-legal` | **Falta** |
 
-Las dos últimas van **destacadas**, no perdidas entre las demás. Ver por qué
-abajo.
+El arrepentimiento y la eliminación de cuenta van **destacados**, no perdidos
+entre los demás.
+
+> **Nota sobre el prefijo `/es/`.** Con alcance mundial el sitio va a servir más
+> idiomas. Las URLs que se carguen en App Store Connect y Play Console tienen que
+> ser las reales, con prefijo — y conviene que sean estables, porque cambiarlas
+> después obliga a actualizar las dos consolas.
 
 ---
 
@@ -205,35 +222,30 @@ legal; **consultarlo antes de sumar cualquier formulario que capture datos.**
 
 ## 8. Checklist
 
+Hecho:
+
+| | Qué |
+|---|---|
+| ✅ | `/es/arrepentimiento` enlazado desde el pie de la home, sin login |
+| ✅ | Formulario de arrepentimiento con datos de la compra |
+| ✅ | `/es/eliminar-cuenta` publicada |
+| ✅ | `/es/privacidad` y `/es/terminos` publicadas |
+
+Pendiente:
+
 | | Qué | Lo exige |
 |---|---|---|
-| ☐ | Footer con identificación del titular | Comercio electrónico AR |
-| ☐ | Footer con los 9 enlaces legales | — |
-| ☐ | Las páginas legales sirviéndose desde `gettreino.com` | Apple y Google |
-| ☐ | **`/arrepentimiento`** enlazado desde la home | **Res. 424/2020** |
-| ☐ | Formulario de arrepentimiento sin login | **Res. 424/2020** |
-| ☐ | Correo automático con código en 24 h | **Res. 424/2020** |
-| ☐ | **`/eliminar-cuenta`** en la raíz, sin login | **Google Play** |
-| ☐ | Banner de cookies con rechazo visible | RGPD |
+| ☐ | Probar de punta a punta que el correo con el código llega en 24 h | **Res. 424/2020** |
+| ☐ | Las seis páginas legales que faltan | Apple 1.2, consumidor |
+| ☐ | Footer con identificación del titular (razón social, CUIT, domicilio) | Comercio electrónico AR |
+| ☐ | Banner de cookies con rechazo tan visible como aceptar | RGPD |
 | ☐ | Inventario de terceros que carga el sitio | RGPD |
 | ☐ | Precio final y condiciones antes de pagar | Defensa del consumidor |
-| ☐ | Baja en línea | Res. 424/2020 |
-| ☐ | Corregir `equipo@treino.app` → `treino@gettreino.com` | *(en el repo de la app)* |
+| ☐ | Baja en línea del plan del entrenador | Res. 424/2020 |
+| ☐ | Cargar las URLs reales en App Store Connect y Play Console | Apple y Google |
 
----
-
-## 9. De dónde sale el texto
-
-Los textos legales **no se escriben acá**. Viven en `docs/legal/*.md` del repo
-de la app y se generan:
-
-```
-docs/legal/*.md  ->  legal_content.dart  ->  web/legal/*.html
-```
-
-Si el rediseño necesita el contenido, se toma de ahí. **No copiar y pegar
-manteniendo una segunda versión**: es exactamente el problema que esa cadena
-vino a resolver.
-
-Los documentos están en borrador y **no publicados**: esperan cuatro puntos de
-revisión legal. Coordinar la publicación antes de linkearlos.
+> **Ojo con el alumno.** Su suscripción se cobra por compra integrada, así que
+> la baja y el reembolso los gestionan Apple y Google. El sitio **no** tiene que
+> ofrecerle un flujo de baja: tiene que indicarle la ruta de los ajustes de su
+> dispositivo. El arrepentimiento del sitio es para el **entrenador**, que paga
+> por Mercado Pago.
