@@ -384,6 +384,47 @@ void _menuDeRutinasTests() {
       expect(find.text('Eliminar'), findsOneWidget);
     });
 
+    // §4.3: «esté asignada o no la rutina, poder publicarla». Sobre un plan no
+    // se publica el documento —las reglas lo deniegan— sino una plantilla
+    // nueva hecha a partir de él, y el ítem lo dice con otras palabras para
+    // que no se lea como si publicara la rutina del alumno.
+    testWidgets('un plan ASIGNADO ofrece publicar COMO PLANTILLA',
+        (tester) async {
+      await abrirMenu(tester, _routine(id: 'r1', assignedTo: _athlete));
+
+      expect(find.text('Publicar como plantilla'), findsOneWidget);
+      // Y no el otro, que flipearía `visibility` sobre el doc del alumno.
+      expect(find.text('Publicar en la comunidad'), findsNothing);
+    });
+
+    testWidgets('una PLANTILLA no ofrece «publicar como plantilla»',
+        (tester) async {
+      // Ya es una. Ofrecerlo duplicaría el ítem de arriba con otras palabras.
+      await abrirMenu(
+        tester,
+        _routine(id: 'r1', source: RoutineSource.trainerTemplate),
+      );
+
+      expect(find.text('Publicar como plantilla'), findsNothing);
+      expect(find.text('Publicar en la comunidad'), findsOneWidget);
+    });
+
+    testWidgets('un plan ARCHIVADO no lo ofrece', (tester) async {
+      // Archivada = fuera de circulación. Publicar una plantilla hecha a
+      // partir de ella la devolvería a circulación —y encima a la comunidad—
+      // por la puerta de atrás.
+      await abrirMenu(
+        tester,
+        _routine(
+          id: 'r1',
+          assignedTo: _athlete,
+          status: RoutineStatus.archived,
+        ),
+      );
+
+      expect(find.text('Publicar como plantilla'), findsNothing);
+    });
+
     // Recuperar un PLAN es visible para otra persona: vuelve al perfil del
     // alumno. Y el alumno lo lee aunque el vínculo haya terminado —la regla de
     // lectura mira `assignedTo`, no el link— así que el diálogo NOMBRA a quién
@@ -405,6 +446,145 @@ void _menuDeRutinasTests() {
       expect(find.text('¿Devolverle «Fuerza 4x» a Sofía?'), findsOneWidget);
       expect(find.textContaining('Vuelve a su perfil'), findsOneWidget);
       expect(find.text('Devolvérsela'), findsOneWidget);
+    });
+  });
+
+  group('RoutineCard — el diálogo de publicar como plantilla', () {
+    Future<void> abrirDialogo(
+      WidgetTester tester, {
+      required String nombreRutina,
+      String? displayName = 'Sofía',
+    }) async {
+      await _pumpSoloGrilla(
+        tester,
+        [_routine(id: 'r1', name: nombreRutina, assignedTo: _athlete)],
+        displayName,
+      );
+      await tester.tap(find.byTooltip('Opciones de la rutina'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Publicar como plantilla'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets(
+        'arranca con el nombre del plan y dice que el alumno no se toca',
+        (tester) async {
+      await abrirDialogo(tester, nombreRutina: 'Fuerza 4x');
+
+      final campo = tester
+          .widget<TextField>(find.byKey(const Key('publicar_nombre_field')));
+      expect(campo.controller!.text, 'Fuerza 4x');
+      expect(
+          find.textContaining('El plan de Sofía no se toca'), findsOneWidget);
+      expect(
+        find.textContaining('lo va a ver cualquiera que la encuentre'),
+        findsOneWidget,
+      );
+    });
+
+    // La advertencia CONCRETA, y sólo donde se puede probar. Es el mismo
+    // criterio que `_deniedMessage` del editor: nombrar la causa cuando está
+    // probada, describir el estado cuando no.
+    testWidgets('avisa si el nombre dice el nombre del alumno', (tester) async {
+      await abrirDialogo(tester, nombreRutina: 'Plan de Sofía');
+
+      expect(find.byKey(const Key('publicar_aviso_nombre_alumno')),
+          findsOneWidget);
+      expect(find.textContaining('dice «Sofía»'), findsOneWidget);
+    });
+
+    testWidgets('el aviso ignora acentos y mayúsculas', (tester) async {
+      // «plan de sofia» tiene que matchear «Sofía». Sin normalizar, el aviso
+      // se pierde justo en el caso más común: el PF escribiendo rápido.
+      await abrirDialogo(tester, nombreRutina: 'plan de sofia');
+
+      expect(find.byKey(const Key('publicar_aviso_nombre_alumno')),
+          findsOneWidget);
+    });
+
+    // El falso positivo que tenía la primera versión. Con `contains` de
+    // substring, un alumno llamado «Ana» hacía saltar el aviso sobre una
+    // rutina llamada «Semana de fuerza» — y el aviso DICE el nombre, así que
+    // era una advertencia concreta y falsa. Peor que ninguna (AGENTS.md
+    // §11.1), y encima en la función que existe para no filtrar un nombre.
+    testWidgets('un nombre corto NO matchea adentro de otra palabra',
+        (tester) async {
+      await abrirDialogo(
+        tester,
+        nombreRutina: 'Semana de fuerza',
+        displayName: 'Ana',
+      );
+
+      expect(find.byKey(const Key('publicar_aviso_nombre_alumno')),
+          findsNothing);
+      expect(find.text('Publicar'), findsOneWidget);
+    });
+
+    // El falso NEGATIVO de la misma versión: comparando contra el
+    // `displayName` entero, un perfil normal no matcheaba el caso que esto
+    // existe para agarrar.
+    testWidgets('un apellido de más no esconde el nombre', (tester) async {
+      await abrirDialogo(
+        tester,
+        nombreRutina: 'Plan de Sofía',
+        displayName: 'Sofía García',
+      );
+
+      expect(find.byKey(const Key('publicar_aviso_nombre_alumno')),
+          findsOneWidget);
+      // Y dice la palabra que EFECTIVAMENTE aparece, no el nombre completo:
+      // la rutina no dice «Sofía García».
+      expect(find.text('Ojo: dice «Sofía».'), findsOneWidget);
+    });
+
+    // No se bloquea la publicación —el PF puede tener permiso, o la palabra
+    // puede ser un falso positivo— pero se saca el camino por reflejo: con el
+    // botón diciendo otra cosa, no se publica sin haber leído.
+    testWidgets('el botón pasa a «Publicar igual» cuando nombra al alumno',
+        (tester) async {
+      await abrirDialogo(tester, nombreRutina: 'Plan de Sofía');
+      expect(find.text('Publicar igual'), findsOneWidget);
+      expect(find.text('Publicar'), findsNothing);
+
+      // Y vuelve a ser «Publicar» apenas se saca el nombre.
+      await tester.enterText(
+          find.byKey(const Key('publicar_nombre_field')), 'Fuerza base');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Publicar'), findsOneWidget);
+      expect(find.text('Publicar igual'), findsNothing);
+      expect(find.byKey(const Key('publicar_aviso_nombre_alumno')),
+          findsNothing);
+    });
+
+    testWidgets('sin nombre del alumno resuelto NO inventa una sospecha',
+        (tester) async {
+      // El perfil puede no haber cargado. «No sé» no es «está limpio», pero
+      // tampoco habilita a afirmar que dice un nombre que no conocemos.
+      await abrirDialogo(
+        tester,
+        nombreRutina: 'Plan de Sofía',
+        displayName: null,
+      );
+
+      expect(
+          find.byKey(const Key('publicar_aviso_nombre_alumno')), findsNothing);
+    });
+
+    testWidgets('un nombre en blanco no publica: lo dice', (tester) async {
+      // Cerrar el diálogo en silencio se leería como «cancelé», y publicar una
+      // plantilla sin nombre es peor todavía.
+      await abrirDialogo(tester, nombreRutina: 'Fuerza 4x');
+
+      await tester.enterText(
+          find.byKey(const Key('publicar_nombre_field')), '   ');
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Publicar'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Poné un nombre.'), findsOneWidget);
+      // El diálogo sigue abierto.
+      expect(find.byKey(const Key('publicar_nombre_field')), findsOneWidget);
     });
   });
 }

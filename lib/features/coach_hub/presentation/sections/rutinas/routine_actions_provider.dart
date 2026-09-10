@@ -1,13 +1,19 @@
-// Mutaciones de rutinas para el Coach Hub web: archivar, ELIMINAR, asignar y
-// publicar/despublicar.
+// Mutaciones de rutinas para el Coach Hub web: archivar, recuperar, ELIMINAR,
+// asignar, publicar/despublicar, y publicar como plantilla el plan de un
+// alumno.
 //
 // Todas invalidan `routinesAuthoredByProvider`, que es de donde lee la
 // pantalla de Rutinas desde que pasó a listar rutinas en vez de alumnos.
 library;
 
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:treino/core/analytics/analytics_service.dart';
 import 'package:treino/features/workout/data/routine_repository.dart';
 import 'package:treino/features/workout/domain/routine.dart';
+import 'package:treino/features/workout/domain/routine_source.dart';
+import 'package:treino/features/workout/domain/routine_visibility.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
 import 'package:treino/features/workout/application/routine_providers.dart'
     show invalidateRoutineById, routineRepositoryProvider;
@@ -168,6 +174,85 @@ class RoutineActionsNotifier extends AsyncNotifier<void> {
     }
   }
 
+  /// Publica el plan de un alumno COMO PLANTILLA: crea una plantilla nueva a
+  /// partir de él y publica ESA. El plan del alumno no se toca.
+  ///
+  /// La regla de Firestore restringe el flip de `visibility` a docs
+  /// `trainer-template` (UPDATE path 5), así que publicar la copia de un
+  /// alumno está denegado por contrato — y con razón: esa copia lleva su
+  /// nombre y su historial. Esto es la forma correcta de lo que el PF pidió
+  /// («esté asignada o no la rutina, poder publicarla»).
+  ///
+  /// [nombre] lo elige el PF en el diálogo y NO se deriva del plan. Publicar
+  /// expone el nombre al catálogo de la comunidad, y un plan asignado suele
+  /// llamarse por su dueño («Plan de Sofía»): heredarlo en silencio filtraría
+  /// el nombre de una clienta. Es la diferencia con «Guardar como copia» del
+  /// editor, donde la copia es privada y el nombre va automático.
+  ///
+  /// Devuelve un [ResultadoDePublicar] y no un `bool` porque son DOS
+  /// escrituras y el medio importa: si la plantilla se creó y el publish
+  /// falla, un `false` haría que el PF reintente y termine con dos
+  /// plantillas. La UI tiene que poder decir «se creó pero no se publicó».
+  Future<ResultadoDePublicar> publicarComoPlantilla({
+    required Routine plan,
+    required String nombre,
+    required String trainerId,
+  }) async {
+    final Routine creada;
+    try {
+      creada = await ref.read(routineRepositoryProvider).createTemplate(
+            plan.copyWith(
+              id: '',
+              name: nombre,
+              source: RoutineSource.trainerTemplate,
+              assignedBy: trainerId,
+              assignedTo: null,
+              visibility: RoutineVisibility.private,
+              // Los agregados de la comunidad son del documento publicado, no
+              // del plan del que se copió. Mismo criterio que
+              // `assignTemplateToAthlete`: `toJson()` ya los excluye del
+              // write, y limpiarlos acá mantiene fiel al objeto devuelto.
+              ratingAvg: null,
+              ratingsCount: null,
+            ),
+          );
+    } catch (_) {
+      return ResultadoDePublicar.falloAlCrear;
+    }
+
+    // El evento va acá y NO después del publish, por el mismo motivo que la
+    // invalidación: la rutina se creó. El dartdoc de `logRoutineCreated` es
+    // explícito en que las del PF se cuentan igual —«omitirlas dejaría el
+    // evento ciego a la mitad de las rutinas y sesgaría la comparación»—, así
+    // que una plantilla que existe pero no se llegó a publicar tiene que
+    // contarse lo mismo.
+    //
+    // `trainerTemplate` y no `trainerAssigned`: lo que se acaba de escribir es
+    // una plantilla, aunque se haya llegado acá desde el plan de un alumno. Es
+    // la misma trampa que #1097 corrigió en el editor — el evento describe la
+    // ESCRITURA, no la pantalla desde la que se disparó.
+    unawaited(ref.read(analyticsServiceProvider).logRoutineCreated(
+          source: RoutineCreationSource.trainerTemplate,
+          daysCount: creada.days.length,
+          weeksCount: creada.numWeeks,
+        ));
+
+    // La grilla ya tiene que enterarse de la plantilla nueva aunque el publish
+    // falle: existe igual, y si no aparece el PF no tiene cómo publicarla a
+    // mano ni cómo evitar crear otra.
+    ref.invalidate(routinesAuthoredByProvider(trainerId));
+
+    try {
+      await ref.read(routineRepositoryProvider).publishTemplate(creada.id);
+    } catch (_) {
+      return ResultadoDePublicar.creadaPeroSinPublicar;
+    }
+
+    ref.invalidate(routinesAuthoredByProvider(trainerId));
+    invalidateRoutineById(ref.container, creada.id);
+    return ResultadoDePublicar.ok;
+  }
+
   /// Pone [routineId] pública o privada.
   ///
   /// Sólo vale sobre PLANTILLAS: la regla de Firestore restringe el flip a
@@ -200,3 +285,20 @@ final routineActionsProvider =
     AsyncNotifierProvider<RoutineActionsNotifier, void>(
   RoutineActionsNotifier.new,
 );
+
+/// Cómo terminó [RoutineActionsNotifier.publicarComoPlantilla].
+///
+/// Tres estados y no dos, porque son dos escrituras: el del medio existe de
+/// verdad y esconderlo detrás de un `false` hace que el PF reintente sobre una
+/// plantilla que YA se creó.
+enum ResultadoDePublicar {
+  /// Se creó la plantilla y quedó pública.
+  ok,
+
+  /// No se pudo crear. No quedó nada.
+  falloAlCrear,
+
+  /// La plantilla se creó pero sigue privada. Está en la biblioteca del PF y
+  /// se publica desde su propio menú — reintentar acá crearía una segunda.
+  creadaPeroSinPublicar,
+}

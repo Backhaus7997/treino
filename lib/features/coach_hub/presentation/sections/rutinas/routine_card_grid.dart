@@ -349,6 +349,18 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
                   : 'Publicar en la comunidad', // i18n
             ),
           ),
+        // Publicar el plan de un alumno, que es lo que el PF pidió («esté
+        // asignada o no la rutina, poder publicarla»). NO es el mismo ítem que
+        // el de arriba: la regla restringe el flip de `visibility` a
+        // `trainer-template`, así que sobre un plan no se publica el documento
+        // —se crea una plantilla a partir de él y se publica ESA—. El plan del
+        // alumno no se toca, y el ítem lo dice con otras palabras para que no
+        // se lea como si publicara su rutina.
+        if (!esPlantilla && !archivada)
+          const PopupMenuItem(
+            value: _AccionRutina.publicarComoPlantilla,
+            child: Text('Publicar como plantilla'), // i18n
+          ),
         // Archivar, con el nombre que corresponde a lo que el PF está
         // haciendo. Sobre un plan asignado, «Archivar» es correcto y no se
         // entiende; «Sacársela a Juan» es la MISMA operación descrita desde el
@@ -397,6 +409,9 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
       return _publicar(r, publicada: accion == _AccionRutina.publicar);
     }
     if (accion == _AccionRutina.recuperar) return _recuperar(r);
+    if (accion == _AccionRutina.publicarComoPlantilla) {
+      return _publicarComoPlantilla(r);
+    }
 
     // El uid se resuelve DESPUÉS de confirmar. Chequearlo antes hacía que el
     // tap no hiciera nada cuando el stream de auth todavía no emitió: un
@@ -568,6 +583,56 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
         : '«${r.name}» vuelve a tu biblioteca.'); // i18n
   }
 
+  /// Publica el plan de un alumno COMO PLANTILLA.
+  ///
+  /// No publica el documento del alumno —las reglas lo deniegan, y con razón:
+  /// esa copia lleva su nombre y su historial—. Crea una plantilla nueva a
+  /// partir de él y publica ESA.
+  ///
+  /// Pide el nombre, y ése es el punto del diálogo. En «Guardar como copia»
+  /// del editor el nombre va automático porque la copia es PRIVADA; acá el
+  /// nombre entra al catálogo de la comunidad, y un plan asignado suele
+  /// llamarse por su dueño. Heredarlo en silencio filtraría el nombre de una
+  /// clienta a un catálogo público.
+  Future<void> _publicarComoPlantilla(Routine r) async {
+    final nombreAlumno = _nombreDelAlumno(ref, r);
+    final nombre = await showTreinoDialog<String>(
+      context,
+      builder: (ctx) => _DialogoDePublicar(
+        nombreInicial: r.name,
+        nombreAlumno: nombreAlumno,
+      ),
+    );
+    if (nombre == null || !mounted) return;
+
+    setState(() => _ocupado = true);
+    final trainerId = ref.read(currentUidProvider) ?? '';
+    final resultado = trainerId.isEmpty
+        ? ResultadoDePublicar.falloAlCrear
+        : await ref.read(routineActionsProvider.notifier).publicarComoPlantilla(
+              plan: r,
+              nombre: nombre,
+              trainerId: trainerId,
+            );
+
+    if (!mounted) return;
+    setState(() => _ocupado = false);
+    _avisar(switch (resultado) {
+      // i18n
+      ResultadoDePublicar.ok => '«$nombre» ya es pública. El plan de '
+          '${nombreAlumno ?? 'tu alumno'} quedó como estaba.',
+      // El caso del medio NO se cuenta como error: la plantilla existe. Decir
+      // «no se pudo» mandaría al PF a reintentar y a crear una segunda.
+      // i18n
+      ResultadoDePublicar.creadaPeroSinPublicar =>
+        '«$nombre» se creó en tus plantillas pero no se pudo publicar. '
+            'Publicala desde su propio menú — no repitas esto o vas a tener '
+            'dos.',
+      // i18n
+      ResultadoDePublicar.falloAlCrear => 'No se pudo. Probá de nuevo.',
+    });
+  }
+
   /// Asigna la plantilla a un alumno elegido en el momento.
   ///
   /// La plantilla NO se consume: `assignTemplateToAthlete` copia. Por eso el
@@ -631,10 +696,215 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
   }
 }
 
+/// Pide el nombre con el que la plantilla va a salir a la comunidad.
+///
+/// Arranca con el del plan y NO con uno en blanco: nueve de cada diez veces el
+/// nombre sirve tal cual, y una caja vacía obliga a reescribir algo que ya
+/// existe. Lo que cambia es que ahora se ve antes de publicar.
+class _DialogoDePublicar extends StatefulWidget {
+  const _DialogoDePublicar({
+    required this.nombreInicial,
+    required this.nombreAlumno,
+  });
+
+  final String nombreInicial;
+
+  /// El nombre del alumno, si su perfil resolvió. Sólo para la advertencia
+  /// PROBADA de abajo — `null` significa «no sé», y entonces no se afirma nada.
+  final String? nombreAlumno;
+
+  @override
+  State<_DialogoDePublicar> createState() => _DialogoDePublicarState();
+}
+
+class _DialogoDePublicarState extends State<_DialogoDePublicar> {
+  late final TextEditingController _ctrl;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: widget.nombreInicial);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  /// La parte del nombre del alumno que aparece en el nombre propuesto, o
+  /// `null` si no aparece ninguna.
+  ///
+  /// La advertencia se afirma sólo cuando se puede probar, que es el mismo
+  /// criterio que `_deniedMessage` del editor: si el perfil no resolvió, no se
+  /// dice nada en vez de inventar una sospecha.
+  ///
+  /// **Match por PALABRA COMPLETA, no por substring**, y contra cada palabra
+  /// del nombre del alumno por separado. Las dos cosas son necesarias y las dos
+  /// salieron de romperlo:
+  ///
+  /// - Con substring, un alumno llamado «Ana» hacía saltar la advertencia sobre
+  ///   una rutina llamada «Semana de fuerza» — y el cartel dice el nombre, así
+  ///   que era una advertencia CONCRETA y FALSA. Peor que ninguna
+  ///   (AGENTS.md §11.1), y en la función que existe para no filtrar un nombre.
+  /// - Comparando contra el `displayName` entero, un perfil normal como «Sofía
+  ///   García» NO matcheaba «Plan de Sofía», que es el caso que esto existe
+  ///   para agarrar.
+  ///
+  /// Se ignoran las palabras de menos de tres letras: son los conectores («de»,
+  /// «la») y no nombres. Perder a un alumno cuyo nombre entero mida dos letras
+  /// es un falso NEGATIVO —no se avisa— y eso falla del lado seguro: el PF
+  /// sigue viendo el nombre en el campo antes de publicar.
+  ///
+  /// Devuelve la palabra ORIGINAL, con sus acentos y mayúsculas, porque es la
+  /// que se muestra: sobre «Sofía García» el cartel tiene que decir «Sofía», no
+  /// el nombre completo —que no es lo que dice la rutina— ni «sofia».
+  String? get _palabraDelAlumnoEnElNombre {
+    final alumno = widget.nombreAlumno?.trim();
+    if (alumno == null || alumno.isEmpty) return null;
+
+    final enLaRutina = _palabras(_ctrl.text).toSet();
+    for (final palabra in alumno.split(RegExp(r'\s+'))) {
+      final plana = _plano(palabra);
+      if (plana.length < 3) continue;
+      if (enLaRutina.contains(plana)) return palabra;
+    }
+    return null;
+  }
+
+  /// Las palabras de [s], normalizadas: sin acentos, en minúscula y sin nada
+  /// que no sea letra o número (para que «Sofía,» y «(Sofía)» cuenten igual).
+  static Iterable<String> _palabras(String s) => _plano(s)
+      .split(RegExp(r'[^a-z0-9]+'))
+      .where((p) => p.isNotEmpty);
+
+  static String _plano(String s) {
+    const con = 'áàäâãéèëêíìïîóòöôõúùüûñ';
+    const sin = 'aaaaaeeeeiiiiooooouuuun';
+    var out = s.toLowerCase();
+    for (var i = 0; i < con.length; i++) {
+      out = out.replaceAll(con[i], sin[i]);
+    }
+    return out;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final alumno = widget.nombreAlumno;
+    final nombraAlAlumno = _palabraDelAlumnoEnElNombre;
+
+    return TreinoDialog(
+      title: 'Publicar como plantilla', // i18n
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            // Las dos mitades: qué se crea, y qué NO se toca. Sin la segunda,
+            // «publicar» sobre el plan de un alumno se lee como que se publica
+            // SU rutina — que es justo lo que no pasa.
+            // i18n
+            alumno == null
+                ? 'Se crea una plantilla nueva en tu biblioteca con este '
+                    'contenido y se publica. El plan de tu alumno no se toca.'
+                : 'Se crea una plantilla nueva en tu biblioteca con este '
+                    'contenido y se publica. El plan de $alumno no se toca.',
+            style: TextStyle(
+              fontFamily: AppFonts.barlow,
+              fontSize: AppTextSize.bodyDense,
+              color: palette.textMuted,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.s14),
+          TextField(
+            key: const Key('publicar_nombre_field'),
+            controller: _ctrl,
+            autofocus: true,
+            onChanged: (_) => setState(() => _error = null),
+            decoration: InputDecoration(
+              labelText: 'Nombre en la comunidad', // i18n
+              // `filled` + `fillColor` EXPLÍCITOS, y no por gusto: el tema
+              // fuerza `filled` en todo `InputDecoration`, así que un campo
+              // sin fondo declarado se pinta con el default y adentro de un
+              // diálogo eso sale como una banda oscura que se lee como una
+              // línea negra. Mismo criterio que `cuenta_tab.dart`: el campo va
+              // un tono MÁS OSCURO que la superficie que lo contiene, para que
+              // se lea como campo y no desaparezca en el fondo del diálogo.
+              filled: true,
+              fillColor: palette.bg,
+              isDense: true,
+            ),
+            style: TextStyle(
+              fontFamily: AppFonts.barlow,
+              fontSize: AppTextSize.body,
+              color: palette.textPrimary,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.s8),
+          Text(
+            'Este nombre lo va a ver cualquiera que la encuentre.', // i18n
+            style: TextStyle(
+              fontFamily: AppFonts.barlow,
+              fontSize: AppTextSize.caption,
+              color: palette.textMuted,
+            ),
+          ),
+          // La advertencia CONCRETA, y sólo cuando está probada.
+          if (nombraAlAlumno != null) ...[
+            const SizedBox(height: AppSpacing.s8),
+            Text(
+              'Ojo: dice «$nombraAlAlumno».', // i18n
+              key: const Key('publicar_aviso_nombre_alumno'),
+              style: TextStyle(
+                fontFamily: AppFonts.barlow,
+                fontWeight: AppFonts.w600,
+                fontSize: AppTextSize.caption,
+                color: palette.danger,
+              ),
+            ),
+          ],
+        ],
+      ),
+      errorMessage: _error,
+      // El botón cambia de nombre cuando el nombre todavía nombra al alumno.
+      //
+      // NO se bloquea la publicación, y es a propósito. El nombre de esa
+      // persona en un catálogo público es un problema real, pero la decisión
+      // sigue siendo del PF: puede tener el permiso de su alumna, o la palabra
+      // puede ser un falso positivo del match de arriba —«Ana», «Luz», «Sol»
+      // son nombres Y palabras—. Un guard que bloquea sobre una heurística
+      // deja al PF sin salida el día que la heurística se equivoca, y eso es
+      // peor que el problema que resuelve.
+      //
+      // Lo que sí se saca es el camino por reflejo: con el botón diciendo otra
+      // cosa, no se puede publicar sin haber leído que decía algo.
+      primaryLabel: nombraAlAlumno == null
+          ? 'Publicar' // i18n
+          : 'Publicar igual', // i18n
+      onPrimaryTap: () {
+        final nombre = _ctrl.text.trim();
+        // Vacío no pop-ea: cerrar el diálogo sin nombre publicaría una
+        // plantilla sin nombre, y devolver `null` en silencio se leería como
+        // «cancelé». Se dice qué falta.
+        if (nombre.isEmpty) {
+          setState(() => _error = 'Poné un nombre.'); // i18n
+          return;
+        }
+        Navigator.of(context).pop(nombre);
+      },
+      secondaryLabel: 'Cancelar', // i18n
+      onSecondaryTap: () => Navigator.of(context).pop(),
+    );
+  }
+}
+
 enum _AccionRutina {
   asignar,
   publicar,
   despublicar,
+  publicarComoPlantilla,
   archivar,
   recuperar,
   eliminar,
