@@ -18,6 +18,7 @@ import 'package:treino/features/workout/domain/custom_exercise.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 import '../../../../../fixtures/exercises.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 const _trainerId = 'trainer-1';
 const _athleteId = 'athlete-1';
@@ -270,7 +271,7 @@ void main() {
 
     // Publicar con cambios sin guardar mandaría la versión ANTERIOR a toda la
     // comunidad mientras la pantalla muestra la nueva.
-    final button = tester.widget<OutlinedButton>(toggle);
+    final button = tester.widget<TreinoButton>(toggle);
     expect(button.onPressed, isNull);
     expect(find.text('Guardá los cambios antes de publicar.'), findsOneWidget);
   });

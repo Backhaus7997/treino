@@ -21,6 +21,9 @@ import 'package:treino/features/workout/domain/routine.dart';
 import 'template_detail_dialog.dart';
 import 'template_grid_card.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
+import 'package:treino/app/theme/tokens/primitives.dart';
+import 'package:treino/app/theme/tokens/components/treino_button_tokens.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 /// Tab body for the "Templates Rutinas" tab of [BibliotecaWebScreen].
 ///
@@ -184,22 +187,19 @@ Future<void> _deleteTemplate(
         style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 13),
       ),
       actions: [
-        TextButton(
+        TreinoButton(
+          label: 'Cancelar', // i18n
+          variant: TreinoButtonVariant.ghost,
           onPressed: () => Navigator.of(ctx).pop(false),
-          child: Text(
-            'Cancelar', // i18n
-            style: GoogleFonts.barlow(color: palette.textMuted),
-          ),
         ),
-        TextButton(
+        const SizedBox(width: AppSpacing.s8),
+        // Borrar una plantilla es destructivo y ahora se ve así: antes era un
+        // `TextButton` con el texto en rojo, o sea la MISMA caja que el
+        // «Cancelar» de al lado.
+        TreinoButton(
+          label: 'Eliminar', // i18n
+          variant: TreinoButtonVariant.danger,
           onPressed: () => Navigator.of(ctx).pop(true),
-          child: Text(
-            'Eliminar', // i18n
-            style: GoogleFonts.barlow(
-              color: palette.danger,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
         ),
       ],
     ),
@@ -234,24 +234,13 @@ class _NuevaPlantillaButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TextButton.icon(
+    return TreinoButton(
       key: const Key('nueva_plantilla_button'),
+      label: 'Nueva plantilla', // i18n
+      icon: TreinoIcon.plus,
+      variant: TreinoButtonVariant.secondaryAccent,
+      size: TreinoButtonSize.sm,
       onPressed: () => context.push('/template-editor'),
-      icon: Icon(TreinoIcon.plus, size: 16, color: palette.accent),
-      label: Text(
-        'Nueva plantilla', // i18n
-        style: GoogleFonts.barlow(
-          color: palette.accent,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-      style: TextButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-          side: BorderSide(color: palette.accent.withValues(alpha: 0.5)),
-        ),
-      ),
     );
   }
 }

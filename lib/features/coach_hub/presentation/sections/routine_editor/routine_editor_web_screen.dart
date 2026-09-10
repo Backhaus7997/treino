@@ -725,8 +725,7 @@ class _RoutineEditorWebScreenState
     String exerciseId,
     QuickEntry entry,
   ) {
-    final ex =
-        _catalogoCompleto().where((e) => e.id == exerciseId).firstOrNull;
+    final ex = _catalogoCompleto().where((e) => e.id == exerciseId).firstOrNull;
     if (ex == null) return;
 
     _markDirty();
@@ -798,24 +797,15 @@ class _RoutineEditorWebScreenState
           ),
         ),
         actions: [
-          TextButton(
+          TreinoButton(
+            label: 'Cancelar', // i18n
+            variant: TreinoButtonVariant.ghost,
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text(
-              'Cancelar', // i18n
-              style: GoogleFonts.barlowCondensed(
-                color: AppPalette.of(dialogContext).textMuted,
-              ),
-            ),
           ),
-          TextButton(
+          const SizedBox(width: AppSpacing.s8),
+          TreinoButton(
+            label: isPublished ? 'Despublicar' : 'Publicar', // i18n
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: Text(
-              isPublished ? 'Despublicar' : 'Publicar', // i18n
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                color: AppPalette.of(dialogContext).accent,
-              ),
-            ),
           ),
         ],
       ),
@@ -825,9 +815,8 @@ class _RoutineEditorWebScreenState
     setState(() => _publishing = true);
     try {
       final repo = ref.read(routineRepositoryProvider);
-      final nextVisibility = isPublished
-          ? RoutineVisibility.private
-          : RoutineVisibility.public;
+      final nextVisibility =
+          isPublished ? RoutineVisibility.private : RoutineVisibility.public;
       if (isPublished) {
         await repo.unpublishTemplate(template.id);
       } else {
@@ -1018,25 +1007,18 @@ class _RoutineEditorWebScreenState
           style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
         ),
         actions: [
-          TextButton(
+          TreinoButton(
             // Keyed: the form footer has its own "Cancelar" too.
             key: const Key('duplicate_week_cancel_button'),
+            label: 'Cancelar', // i18n
+            variant: TreinoButtonVariant.ghost,
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(
-              'Cancelar', // i18n
-              style: GoogleFonts.barlow(color: palette.textMuted),
-            ),
           ),
-          TextButton(
+          const SizedBox(width: AppSpacing.s8),
+          TreinoButton(
             key: const Key('duplicate_week_confirm_button'),
+            label: 'Copiar', // i18n
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(
-              'Copiar', // i18n
-              style: GoogleFonts.barlow(
-                color: palette.accent,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
           ),
         ],
       ),
@@ -1160,7 +1142,7 @@ class _RoutineEditorWebScreenState
     // cómo quedó" no se rompe en cada iteración (#860). Abajo de 1280 sigue el
     // modal, que ahí es lo correcto.
     if (rsp.viewportFor(MediaQuery.sizeOf(context).width) ==
-            rsp.Viewport.desktop) {
+        rsp.Viewport.desktop) {
       setState(() => _pickerDia = dayIndex);
       return;
     }
@@ -1278,8 +1260,7 @@ class _RoutineEditorWebScreenState
   /// canónica de "en todas" — `{0}` y `{}` describen lo mismo ahí, y guardar
   /// siempre la misma evita que un plan de una semana viaje con una máscara
   /// explícita que después no significa nada.
-  Set<int> _soloLaSemanaEnCurso() =>
-      _numWeeks <= 1 ? <int>{} : {_selectedWeek};
+  Set<int> _soloLaSemanaEnCurso() => _numWeeks <= 1 ? <int>{} : {_selectedWeek};
 
   /// Ejercicios que el día [dayIndex] YA muestra en la semana en curso.
   ///
@@ -1561,25 +1542,18 @@ class _RoutineEditorWebScreenState
           style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
         ),
         actions: [
-          TextButton(
+          TreinoButton(
             // Keyed: the form footer has its own "Cancelar" too.
             key: const Key('copy_prescription_cancel_button'),
+            label: 'Cancelar', // i18n
+            variant: TreinoButtonVariant.ghost,
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(
-              'Cancelar', // i18n
-              style: GoogleFonts.barlow(color: palette.textMuted),
-            ),
           ),
-          TextButton(
+          const SizedBox(width: AppSpacing.s8),
+          TreinoButton(
             key: const Key('copy_prescription_confirm_button'),
+            label: 'Copiar', // i18n
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(
-              'Copiar', // i18n
-              style: GoogleFonts.barlow(
-                color: palette.accent,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
           ),
         ],
       ),
@@ -2025,8 +1999,8 @@ class _RoutineEditorWebScreenState
   /// ([_firstInvalidHint]); una semana vacía es lo mismo, una dimensión más
   /// arriba.
   bool _semanaVacia(int w) => !_days.any(
-        (day) => day.slots
-            .any((s) => s.exercise != null && s.isPresentInWeek(w)),
+        (day) =>
+            day.slots.any((s) => s.exercise != null && s.isPresentInWeek(w)),
       );
 
   Set<int> _weeksWithError() => {
@@ -2418,22 +2392,18 @@ class _RoutineEditorWebScreenState
           style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
         ),
         actions: [
-          TextButton(
+          TreinoButton(
+            label: 'Volver', // i18n
+            variant: TreinoButtonVariant.ghost,
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(
-              'Volver', // i18n
-              style: GoogleFonts.barlow(color: palette.textMuted),
-            ),
           ),
-          TextButton(
+          const SizedBox(width: AppSpacing.s8),
+          // Descartar los cambios destruye trabajo: va como destructivo y no
+          // como un `TextButton` rojo, que era la misma caja que «Volver».
+          TreinoButton(
+            label: 'Descartar', // i18n
+            variant: TreinoButtonVariant.danger,
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(
-              'Descartar', // i18n
-              style: GoogleFonts.barlow(
-                color: palette.danger,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
           ),
         ],
       ),
@@ -2480,8 +2450,10 @@ class _RoutineEditorWebScreenState
             padding: const EdgeInsets.fromLTRB(4, 4, 24, 12),
             child: Row(
               children: [
-                IconButton(
-                  icon: Icon(TreinoIcon.arrowLeft, color: palette.textMuted),
+                TreinoIconButton(
+                  icon: TreinoIcon.arrowLeft,
+                  tooltip: 'Volver', // i18n
+                  color: palette.textMuted,
                   onPressed: _onBackTap,
                 ),
                 const SizedBox(width: 4),
@@ -2766,8 +2738,8 @@ class _RoutineEditorWebScreenState
                                                     color: isPublished
                                                         ? palette.accent
                                                             .withValues(
-                                                              alpha: 0.14,
-                                                            )
+                                                            alpha: 0.14,
+                                                          )
                                                         : palette.bgElevated,
                                                     borderRadius:
                                                         BorderRadius.circular(
@@ -2793,8 +2765,8 @@ class _RoutineEditorWebScreenState
                                                             : palette.textMuted,
                                                       ),
                                                       const SizedBox(
-                                                        width: AppSpacing
-                                                            .hairline,
+                                                        width:
+                                                            AppSpacing.hairline,
                                                       ),
                                                       Text(
                                                         isPublished
@@ -2815,59 +2787,28 @@ class _RoutineEditorWebScreenState
                                                     ],
                                                   ),
                                                 ),
-                                                OutlinedButton.icon(
+                                                TreinoButton(
                                                   key: const Key(
                                                     'routine_editor_publish_toggle',
                                                   ),
+                                                  label: isPublished
+                                                      ? 'DESPUBLICAR' // i18n
+                                                      : 'PUBLICAR', // i18n
+                                                  icon: isPublished
+                                                      ? TreinoIcon.eyeOff
+                                                      : TreinoIcon.globe,
+                                                  variant: TreinoButtonVariant
+                                                      .secondaryAccent,
+                                                  // El flip es una escritura de
+                                                  // red: sin spinner el botón
+                                                  // sólo se apaga y no se
+                                                  // distingue de estar
+                                                  // deshabilitado por form
+                                                  // sucio.
+                                                  loading: _publishing,
                                                   onPressed: disabled
                                                       ? null
                                                       : _onTogglePublished,
-                                                  // El flip es una escritura
-                                                  // de red: sin spinner el
-                                                  // botón sólo se apaga y no
-                                                  // se distingue de estar
-                                                  // deshabilitado por form
-                                                  // sucio. El teléfono muestra
-                                                  // uno por el mismo motivo.
-                                                  icon: _publishing
-                                                      ? SizedBox(
-                                                          width: 18,
-                                                          height: 18,
-                                                          child:
-                                                              CircularProgressIndicator(
-                                                            strokeWidth: 2,
-                                                            color:
-                                                                palette.accent,
-                                                          ),
-                                                        )
-                                                      : Icon(
-                                                          isPublished
-                                                              ? TreinoIcon
-                                                                  .eyeOff
-                                                              : TreinoIcon
-                                                                  .globe,
-                                                          size: 18,
-                                                        ),
-                                                  label: Text(
-                                                    isPublished
-                                                        ? 'DESPUBLICAR' // i18n
-                                                        : 'PUBLICAR', // i18n
-                                                    style: GoogleFonts
-                                                        .barlowCondensed(
-                                                      fontWeight:
-                                                          FontWeight.w700,
-                                                    ),
-                                                  ),
-                                                  style:
-                                                      OutlinedButton.styleFrom(
-                                                    foregroundColor:
-                                                        palette.accent,
-                                                    side: BorderSide(
-                                                      color: disabled
-                                                          ? palette.border
-                                                          : palette.accent,
-                                                    ),
-                                                  ),
                                                 ),
                                               ],
                                             ),
@@ -3048,8 +2989,7 @@ class _RoutineEditorWebScreenState
                                             !_days[i].slots[s].expandido,
                                       ),
                                       quickEntryAbierto: _quickEntryDia == i,
-                                      onAddSuperset: () =>
-                                          _addSupersetToDay(i),
+                                      onAddSuperset: () => _addSupersetToDay(i),
                                       panelPresente: rsp.viewportFor(
                                             MediaQuery.sizeOf(context).width,
                                           ) ==
@@ -3101,28 +3041,15 @@ class _RoutineEditorWebScreenState
                                     const SizedBox(height: 12),
                                   ],
                                   if (_days.length < _kMaxDays)
-                                    OutlinedButton.icon(
+                                    TreinoButton(
                                       key: const Key(
                                           'routine_editor_add_day_button'),
+                                      label: 'Agregar día', // i18n
+                                      icon: TreinoIcon.plus,
+                                      variant:
+                                          TreinoButtonVariant.secondaryAccent,
+                                      expand: true,
                                       onPressed: _addDay,
-                                      icon: Icon(
-                                        TreinoIcon.plus,
-                                        size: 18,
-                                        color: palette.accent,
-                                      ),
-                                      label: Text(
-                                        'Agregar día', // i18n
-                                        style: GoogleFonts.barlowCondensed(
-                                          color: palette.accent,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                      style: OutlinedButton.styleFrom(
-                                        side: BorderSide(color: palette.accent),
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 14,
-                                        ),
-                                      ),
                                     ),
                                 ],
                               ),
@@ -3141,38 +3068,23 @@ class _RoutineEditorWebScreenState
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  TextButton(
+                  TreinoButton(
+                    label: 'Cancelar', // i18n
+                    variant: TreinoButtonVariant.ghost,
                     onPressed: _submitting ? null : _onBackTap,
-                    child: Text(
-                      'Cancelar', // i18n
-                      style: GoogleFonts.barlow(color: palette.textMuted),
-                    ),
                   ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
+                  const SizedBox(width: AppSpacing.s8),
+                  // El label ya decía «Guardando…» mientras guardaba, así que
+                  // acá el spinner sobra: `loading` lo pondría ENCIMA del
+                  // texto y taparía la única información que el botón tenía.
+                  TreinoButton(
                     key: const Key('routine_editor_submit_button'),
+                    label: _submitting
+                        ? 'Guardando…'
+                        : _isEditing
+                            ? 'Guardar cambios'
+                            : 'Asignar rutina', // i18n
                     onPressed: _submitting ? null : _submit,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: palette.accent,
-                      foregroundColor: TreinoButtonTokens.foreground(context),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.full),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 14,
-                      ),
-                    ),
-                    child: Text(
-                      _submitting
-                          ? 'Guardando…'
-                          : _isEditing
-                              ? 'Guardar cambios'
-                              : 'Asignar rutina', // i18n
-                      style: GoogleFonts.barlowCondensed(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
                   ),
                 ],
               ),
@@ -3428,22 +3340,10 @@ class _FatalMessage extends StatelessWidget {
               style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
             ),
             const SizedBox(height: 16),
-            OutlinedButton(
+            TreinoButton(
+              label: 'Volver', // i18n
+              variant: TreinoButtonVariant.secondary,
               onPressed: onBack,
-              style: OutlinedButton.styleFrom(
-                side: BorderSide(color: palette.border),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-              ),
-              child: Text(
-                'Volver', // i18n
-                style: GoogleFonts.barlowCondensed(
-                  color: palette.textPrimary,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
             ),
           ],
         ),
@@ -3658,6 +3558,7 @@ class _DayCard extends StatelessWidget {
   final String? Function(_EditorSlot slot) slotErrorText;
   final bool canRemove;
   final ValueChanged<String> onNameChanged;
+
   /// Card del día cerrada — se ve el nombre y el resumen, nada más.
   final bool colapsado;
 
@@ -3735,16 +3636,15 @@ class _DayCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              IconButton(
+              TreinoIconButton(
                 key: Key('day_collapse_toggle_${day.dayNumber}'),
+                icon: colapsado
+                    ? TreinoIcon.chevronRight
+                    : TreinoIcon.chevronDown,
                 tooltip: colapsado
                     ? 'Abrir el día' // i18n
                     : 'Cerrar el día', // i18n
-                icon: Icon(
-                  colapsado ? TreinoIcon.chevronRight : TreinoIcon.chevronDown,
-                  size: 18,
-                  color: palette.textMuted,
-                ),
+                color: palette.textMuted,
                 onPressed: onToggleColapsado,
               ),
               Expanded(
@@ -3793,84 +3693,76 @@ class _DayCard extends StatelessWidget {
                   ),
                 ),
               if (canRemove)
-                IconButton(
+                TreinoIconButton(
+                  icon: TreinoIcon.trash,
                   tooltip: 'Eliminar día', // i18n
-                  icon: Icon(
-                    TreinoIcon.trash,
-                    size: 18,
-                    color: palette.textMuted,
-                  ),
+                  color: palette.textMuted,
                   onPressed: onRemove,
                 ),
             ],
           ),
           if (!colapsado) ...[
-          // RÁPIDO: escribir `press de banca 4x10 55` en vez de abrir el
-          // modal, filtrar, elegir y completar cuatro campos. Es la pieza del
-          // editor mobile que más gana acá, porque en la web hay teclado real.
-          const SizedBox(height: AppSpacing.s8),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: onToggleQuickEntry,
-              icon: Icon(
-                TreinoIcon.specialty,
-                size: 15,
-                color: quickEntryAbierto ? palette.accent : palette.textMuted,
-              ),
-              label: Text(
-                'RÁPIDO', // i18n
-                style: GoogleFonts.barlowCondensed(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 12.5,
-                  letterSpacing: 1.1,
-                  color: quickEntryAbierto ? palette.accent : palette.textMuted,
-                ),
-              ),
-            ),
-          ),
-          if (quickEntryPanel != null) ...[
+            // RÁPIDO: escribir `press de banca 4x10 55` en vez de abrir el
+            // modal, filtrar, elegir y completar cuatro campos. Es la pieza del
+            // editor mobile que más gana acá, porque en la web hay teclado real.
             const SizedBox(height: AppSpacing.s8),
-            quickEntryPanel!,
-          ],
-          ..._filasDeSlots(),
-          // Un día sin ejercicios no dibujaba NADA entre el nombre y el botón:
-          // desde afuera no se distinguía de uno que no cargó todavía. El
-          // editor del teléfono ya tenía esta pieza.
-          if (day.slots.isEmpty) ...[
-            const SizedBox(height: AppSpacing.s12),
-            // Copy duplicado respecto de `routineEditorEmptyDayTitle/Body` a
-            // propósito: este archivo tiene PROHIBIDO llamar a `AppL10n`
-            // (constraint C-6, ver el header). Mismo criterio que `_goalLabel`
-            // más abajo — si cambia el copy, cambia en los DOS lados, hasta
-            // que el Coach Hub entre a la pasada de i18n.
-            const EmptyDayState(
-              title: 'DÍA VACÍO', // i18n
-              body: 'Agregá el primer ejercicio y ya queda listo para '
-                  'entrenar.', // i18n
+            Align(
+              alignment: Alignment.centerLeft,
+              // Abierto vs cerrado se dice con la VARIANTE. Antes eran dos
+              // `color:` calculados a mano en el ícono y en el label, que es
+              // exactamente el patrón que se puede desincronizar.
+              child: TreinoButton(
+                label: 'RÁPIDO', // i18n
+                icon: TreinoIcon.specialty,
+                variant: quickEntryAbierto
+                    ? TreinoButtonVariant.ghostAccent
+                    : TreinoButtonVariant.ghost,
+                size: TreinoButtonSize.sm,
+                onPressed: onToggleQuickEntry,
+              ),
             ),
-          ],
-          const SizedBox(height: 10),
-          // El botón compartido, el mismo del teléfono. `supersetLabel` va en
-          // null a propósito: en la web una superserie se arma con el toggle
-          // "unir con el siguiente" de cada ejercicio, no con un botón de alta,
-          // y `DayActionButtons` con un solo label ocupa la fila entera.
-          // Los botones del día SÓLO abajo de 1280.
-          //
-          // En desktop el panel lateral está siempre abierto y es la
-          // superficie para cargar ejercicios: dos entradas para lo mismo, una
-          // al lado de la otra, es ruido. Y la de superserie sobra del todo —
-          // ahí la decisión se toma en el panel, donde se hace la selección.
-          //
-          // Abajo de 1280 NO hay panel, así que acá siguen: sin ellos no
-          // habría forma de agregar nada.
-          if (!panelPresente)
-            DayActionButtons(
-              exerciseLabel: 'Agregar ejercicio', // i18n
-              onAddExercise: onAddExercises,
-              supersetLabel: '+ Superserie', // i18n
-              onAddSuperset: onAddSuperset,
-            ),
+            if (quickEntryPanel != null) ...[
+              const SizedBox(height: AppSpacing.s8),
+              quickEntryPanel!,
+            ],
+            ..._filasDeSlots(),
+            // Un día sin ejercicios no dibujaba NADA entre el nombre y el botón:
+            // desde afuera no se distinguía de uno que no cargó todavía. El
+            // editor del teléfono ya tenía esta pieza.
+            if (day.slots.isEmpty) ...[
+              const SizedBox(height: AppSpacing.s12),
+              // Copy duplicado respecto de `routineEditorEmptyDayTitle/Body` a
+              // propósito: este archivo tiene PROHIBIDO llamar a `AppL10n`
+              // (constraint C-6, ver el header). Mismo criterio que `_goalLabel`
+              // más abajo — si cambia el copy, cambia en los DOS lados, hasta
+              // que el Coach Hub entre a la pasada de i18n.
+              const EmptyDayState(
+                title: 'DÍA VACÍO', // i18n
+                body: 'Agregá el primer ejercicio y ya queda listo para '
+                    'entrenar.', // i18n
+              ),
+            ],
+            const SizedBox(height: 10),
+            // El botón compartido, el mismo del teléfono. `supersetLabel` va en
+            // null a propósito: en la web una superserie se arma con el toggle
+            // "unir con el siguiente" de cada ejercicio, no con un botón de alta,
+            // y `DayActionButtons` con un solo label ocupa la fila entera.
+            // Los botones del día SÓLO abajo de 1280.
+            //
+            // En desktop el panel lateral está siempre abierto y es la
+            // superficie para cargar ejercicios: dos entradas para lo mismo, una
+            // al lado de la otra, es ruido. Y la de superserie sobra del todo —
+            // ahí la decisión se toma en el panel, donde se hace la selección.
+            //
+            // Abajo de 1280 NO hay panel, así que acá siguen: sin ellos no
+            // habría forma de agregar nada.
+            if (!panelPresente)
+              DayActionButtons(
+                exerciseLabel: 'Agregar ejercicio', // i18n
+                onAddExercise: onAddExercises,
+                supersetLabel: '+ Superserie', // i18n
+                onAddSuperset: onAddSuperset,
+              ),
           ],
         ],
       ),
@@ -3952,41 +3844,39 @@ class _DayCard extends StatelessWidget {
     final siguienteVisible = i < day.slots.length - 1 &&
         day.slots[i + 1].isPresentInWeek(selectedWeek);
     return _SlotCard(
-            onToggleExpanded: () => onToggleSlotExpanded(i),
-            slot: day.slots[i],
-            palette: palette,
-            selectedWeek: selectedWeek,
-            numWeeks: numWeeks,
-            hasError: slotHasError(day.slots[i]),
-            errorText: slotErrorText(day.slots[i]),
-            canMoveUp: hayVisibleAntes,
-            canMoveDown: hayVisibleDespues,
-            canLink: siguienteVisible,
-            linkedToNext: day.slots[i].linkedToNext,
-            inSuperset:
-                (i < day.slots.length - 1 && day.slots[i].linkedToNext) ||
-                    (i > 0 && day.slots[i - 1].linkedToNext),
-            onRemove: () => onRemoveSlot(i),
-            onMoveUp: () => onMoveSlot(i, -1),
-            onMoveDown: () => onMoveSlot(i, 1),
-            onCopyPrevious: copyPreviousCallbackFor(i),
-            onRestChanged: (v) => onRestChanged(i, v),
-            onAddSet: () => onAddSet(i),
-            onRemoveSet: (set) => onRemoveSet(i, set),
-            onSetRepsChanged: (set, v) => onSetRepsChanged(i, set, v),
-            onSetRepsMinChanged: (set, v) => onSetRepsMinChanged(i, set, v),
-            onSetRepsMaxChanged: (set, v) => onSetRepsMaxChanged(i, set, v),
-            onSetDurationChanged: (set, v) => onSetDurationChanged(i, set, v),
-            onSetWeightChanged: (set, v) => onSetWeightChanged(i, set, v),
-            onSetTypeChanged: (set, t) => onSetTypeChanged(i, set, t),
-            onModeChanged: (em, rm) => onModeChanged(i, em, rm),
-            onNotesChanged: (v) => onNotesChanged(i, v),
-            onToggleLink: () => onToggleLink(i),
-            onTogglePresence: (w) => onTogglePresence(i, w),
-            supersetPosition: posEnGrupo,
-          );
+      onToggleExpanded: () => onToggleSlotExpanded(i),
+      slot: day.slots[i],
+      palette: palette,
+      selectedWeek: selectedWeek,
+      numWeeks: numWeeks,
+      hasError: slotHasError(day.slots[i]),
+      errorText: slotErrorText(day.slots[i]),
+      canMoveUp: hayVisibleAntes,
+      canMoveDown: hayVisibleDespues,
+      canLink: siguienteVisible,
+      linkedToNext: day.slots[i].linkedToNext,
+      inSuperset: (i < day.slots.length - 1 && day.slots[i].linkedToNext) ||
+          (i > 0 && day.slots[i - 1].linkedToNext),
+      onRemove: () => onRemoveSlot(i),
+      onMoveUp: () => onMoveSlot(i, -1),
+      onMoveDown: () => onMoveSlot(i, 1),
+      onCopyPrevious: copyPreviousCallbackFor(i),
+      onRestChanged: (v) => onRestChanged(i, v),
+      onAddSet: () => onAddSet(i),
+      onRemoveSet: (set) => onRemoveSet(i, set),
+      onSetRepsChanged: (set, v) => onSetRepsChanged(i, set, v),
+      onSetRepsMinChanged: (set, v) => onSetRepsMinChanged(i, set, v),
+      onSetRepsMaxChanged: (set, v) => onSetRepsMaxChanged(i, set, v),
+      onSetDurationChanged: (set, v) => onSetDurationChanged(i, set, v),
+      onSetWeightChanged: (set, v) => onSetWeightChanged(i, set, v),
+      onSetTypeChanged: (set, t) => onSetTypeChanged(i, set, t),
+      onModeChanged: (em, rm) => onModeChanged(i, em, rm),
+      onNotesChanged: (v) => onNotesChanged(i, v),
+      onToggleLink: () => onToggleLink(i),
+      onTogglePresence: (w) => onTogglePresence(i, w),
+      supersetPosition: posEnGrupo,
+    );
   }
-
 }
 
 // ── Exercise slot card ─────────────────────────────────────────────────────
@@ -4102,44 +3992,43 @@ class _SlotCard extends StatelessWidget {
     final controles = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-              // Always rendered so the shortcut is discoverable; disabled on
-              // the day's first exercise (no source to copy from).
-              IconButton(
-                tooltip: 'Copiar sets del anterior', // i18n
-                icon: Icon(TreinoIcon.copy, size: 15, color: palette.textMuted),
-                onPressed: onCopyPrevious,
-                visualDensity: VisualDensity.compact,
-              ),
-              IconButton(
-                tooltip: 'Subir', // i18n
-                icon: Icon(
-                  TreinoIcon.chevronUp,
-                  size: 16,
-                  color: palette.textMuted,
-                ),
-                onPressed: canMoveUp ? onMoveUp : null,
-                visualDensity: VisualDensity.compact,
-              ),
-              IconButton(
-                tooltip: 'Bajar', // i18n
-                icon: Icon(
-                  TreinoIcon.chevronDown,
-                  size: 16,
-                  color: palette.textMuted,
-                ),
-                onPressed: canMoveDown ? onMoveDown : null,
-                visualDensity: VisualDensity.compact,
-              ),
-              IconButton(
-                tooltip: 'Quitar ejercicio', // i18n
-                icon: Icon(
-                  TreinoIcon.trash,
-                  size: 16,
-                  color: palette.textMuted,
-                ),
-                onPressed: onRemove,
-                visualDensity: VisualDensity.compact,
-              ),
+        // Always rendered so the shortcut is discoverable; disabled on
+        // the day's first exercise (no source to copy from).
+        // Cuatro controles de la MISMA fila que venían en 15/16/16/16 px
+        // de ícono, con `visualDensity: compact` restando 8 px por eje a
+        // una caja que nadie había fijado. Ahora los cuatro son la misma
+        // caja de 24, con aire entre medio.
+        TreinoIconButton(
+          icon: TreinoIcon.copy,
+          tooltip: 'Copiar sets del anterior', // i18n
+          color: palette.textMuted,
+          size: TreinoButtonSize.xs,
+          onPressed: onCopyPrevious,
+        ),
+        const SizedBox(width: AppSpacing.hairline),
+        TreinoIconButton(
+          icon: TreinoIcon.chevronUp,
+          tooltip: 'Subir', // i18n
+          color: palette.textMuted,
+          size: TreinoButtonSize.xs,
+          onPressed: canMoveUp ? onMoveUp : null,
+        ),
+        const SizedBox(width: AppSpacing.hairline),
+        TreinoIconButton(
+          icon: TreinoIcon.chevronDown,
+          tooltip: 'Bajar', // i18n
+          color: palette.textMuted,
+          size: TreinoButtonSize.xs,
+          onPressed: canMoveDown ? onMoveDown : null,
+        ),
+        const SizedBox(width: AppSpacing.hairline),
+        TreinoIconButton(
+          icon: TreinoIcon.trash,
+          tooltip: 'Quitar ejercicio', // i18n
+          color: palette.textMuted,
+          size: TreinoButtonSize.xs,
+          onPressed: onRemove,
+        ),
       ],
     );
 
@@ -4176,8 +4065,8 @@ class _SlotCard extends StatelessWidget {
           ],
           // ── Bloque EDITABLE de arriba ───────────────────────────────────
           Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
               const SizedBox(height: 6),
               // Modo del ejercicio: reps fijas / rango (mín–máx) / tiempo (paridad
               // con mobile, Fases 1-2). exerciseMode + repMode combinados en 3 chips.
@@ -4188,7 +4077,8 @@ class _SlotCard extends StatelessWidget {
                     selected: slot.exerciseMode == ExerciseMode.reps &&
                         slot.repMode == RepMode.single,
                     palette: palette,
-                    onTap: () => onModeChanged(ExerciseMode.reps, RepMode.single),
+                    onTap: () =>
+                        onModeChanged(ExerciseMode.reps, RepMode.single),
                   ),
                   const SizedBox(width: 6),
                   _ModeChip(
@@ -4196,7 +4086,8 @@ class _SlotCard extends StatelessWidget {
                     selected: slot.exerciseMode == ExerciseMode.reps &&
                         slot.repMode == RepMode.range,
                     palette: palette,
-                    onTap: () => onModeChanged(ExerciseMode.reps, RepMode.range),
+                    onTap: () =>
+                        onModeChanged(ExerciseMode.reps, RepMode.range),
                   ),
                   const SizedBox(width: 6),
                   _ModeChip(
@@ -4208,8 +4099,8 @@ class _SlotCard extends StatelessWidget {
                   ),
                 ],
               ),
-              ],
-            ),
+            ],
+          ),
           // ── Chips de semanas ────────────────────────────────────────────
           // Lo que la web puede y el teléfono no: prender o apagar CUALQUIER
           // semana sin moverse de la que se está mirando. Apagar la semana en
@@ -4251,8 +4142,8 @@ class _SlotCard extends StatelessWidget {
           // ── Bloque EDITABLE de abajo ────────────────────────────────────
           // Descanso, series, notas y el link de superserie.
           Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
               Row(
                 children: [
                   Text(
@@ -4340,7 +4231,8 @@ class _SlotCard extends StatelessWidget {
                 maxLength: 200,
                 minLines: 1,
                 maxLines: 3,
-                style: GoogleFonts.barlow(color: palette.textPrimary, fontSize: 13),
+                style: GoogleFonts.barlow(
+                    color: palette.textPrimary, fontSize: 13),
                 decoration: InputDecoration(
                   isDense: true,
                   hintText: 'Notas para el alumno (opcional)', // i18n
@@ -4356,27 +4248,20 @@ class _SlotCard extends StatelessWidget {
               if (canLink)
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: TextButton.icon(
+                  child: TreinoButton(
+                    label: linkedToNext
+                        ? 'En superserie con el siguiente' // i18n
+                        : 'Superserie con el siguiente', // i18n
+                    icon: linkedToNext ? TreinoIcon.check : TreinoIcon.plus,
+                    variant: linkedToNext
+                        ? TreinoButtonVariant.ghostAccent
+                        : TreinoButtonVariant.ghost,
+                    size: TreinoButtonSize.sm,
                     onPressed: onToggleLink,
-                    icon: Icon(
-                      linkedToNext ? TreinoIcon.check : TreinoIcon.plus,
-                      size: 14,
-                      color: linkedToNext ? palette.accent : palette.textMuted,
-                    ),
-                    label: Text(
-                      linkedToNext
-                          ? 'En superserie con el siguiente' // i18n
-                          : 'Superserie con el siguiente', // i18n
-                      style: GoogleFonts.barlowCondensed(
-                        color: linkedToNext ? palette.accent : palette.textMuted,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 12,
-                      ),
-                    ),
                   ),
                 ),
-              ],
-            ),
+            ],
+          ),
         ],
       ),
     );
@@ -4568,11 +4453,12 @@ class _SetRow extends StatelessWidget {
               ),
             ),
           ],
-          IconButton(
+          TreinoIconButton(
+            icon: TreinoIcon.close,
             tooltip: 'Quitar set', // i18n
-            icon: Icon(TreinoIcon.close, size: 14, color: palette.textMuted),
+            color: palette.textMuted,
+            size: TreinoButtonSize.xs,
             onPressed: canRemove ? onRemove : null,
-            visualDensity: VisualDensity.compact,
           ),
         ],
       ),
@@ -4675,23 +4561,15 @@ class _DuplicateWeekButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final origen = sourceWeek;
-    return TextButton.icon(
+    return TreinoButton(
       key: const Key('duplicate_week_button'),
+      label: origen == null
+          ? 'Copiar otra semana acá' // i18n
+          : 'Copiar Sem ${origen + 1} acá', // i18n
+      icon: TreinoIcon.copy,
+      variant: TreinoButtonVariant.secondary,
+      size: TreinoButtonSize.sm,
       onPressed: onPressed,
-      icon: Icon(TreinoIcon.copy, size: 16, color: palette.textMuted),
-      label: Text(
-        origen == null
-            ? 'Copiar otra semana acá' // i18n
-            : 'Copiar Sem ${origen + 1} acá', // i18n
-        style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 13),
-      ),
-      style: TextButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-          side: BorderSide(color: palette.border),
-        ),
-      ),
     );
   }
 }

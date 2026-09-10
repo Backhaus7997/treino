@@ -65,7 +65,7 @@ void main() {
     /// Techo de archivos permitidos. Congelado en el estado de `main` al abrir
     /// la issue #665. NUNCA subir este número: cada fase que migra un archivo
     /// lo baja.
-    const allowlistCeiling = 83;
+    const allowlistCeiling = 82;
 
     /// Techo de ocurrencias totales de radio crudo en `lib/`. Mismo contrato
     /// que [allowlistCeiling]: sólo baja.
@@ -110,7 +110,6 @@ void main() {
       'features/coach_hub/presentation/sections/alumnos/alumno_detail_screen.dart',
       'features/coach_hub/presentation/sections/alumnos/alumnos_screen.dart',
       'features/coach_hub/presentation/sections/biblioteca/widgets/template_detail_dialog.dart',
-      'features/coach_hub/presentation/sections/biblioteca/widgets/templates_tab.dart',
       'features/coach_hub/presentation/sections/chat/widgets/chat_list_pane.dart',
       'features/coach_hub/presentation/sections/chat/widgets/chat_message_bubble.dart',
       'features/coach_hub/presentation/sections/facturacion_planes/paywall_preview_screen.dart',

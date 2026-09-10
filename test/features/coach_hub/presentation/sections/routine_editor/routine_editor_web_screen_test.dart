@@ -41,6 +41,7 @@ import 'package:treino/features/workout/domain/set_spec.dart';
 import '../../../../../fixtures/routine_editor_ui.dart';
 import '../../../../../fixtures/exercises.dart';
 import '../../../../../helpers/fake_analytics_service.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -1028,8 +1029,8 @@ Future<void> _fillMinimalValidForm(WidgetTester tester) async {
   await tester.pumpAndSettle();
   await tester.tap(find.text('Agregar (1)'));
   await tester.pumpAndSettle();
-      // El panel NO se cierra: es el punto del #860 y ya no tiene con qué.
-      // Lo que sigue mira el EDITOR, así que scopea con [enElEditor].
+  // El panel NO se cierra: es el punto del #860 y ya no tiene con qué.
+  // Lo que sigue mira el EDITOR, así que scopea con [enElEditor].
   // La card nace PLEGADA desde que la web usa `ExerciseCard`: los campos
   // de sets no están en el árbol hasta abrirla.
   await expandirEjercicios(tester);
@@ -2883,7 +2884,8 @@ void main() {
 
       // Y se va solo a los 6.
       await tester.pump(const Duration(seconds: 2));
-      await tester.pump(const Duration(milliseconds: 500)); // animación de salida
+      await tester
+          .pump(const Duration(milliseconds: 500)); // animación de salida
       expect(find.textContaining('sale de la Semana'), findsNothing);
     });
 
@@ -3872,11 +3874,11 @@ void main() {
     const copyTooltip = 'Copiar sets del anterior';
 
     Finder copyButtons() => find.byWidgetPredicate(
-          (w) => w is IconButton && w.tooltip == copyTooltip,
+          (w) => w is TreinoIconButton && w.tooltip == copyTooltip,
         );
 
-    List<IconButton> copyButtonsOf(WidgetTester tester) =>
-        tester.widgetList<IconButton>(copyButtons()).toList();
+    List<TreinoIconButton> copyButtonsOf(WidgetTester tester) =>
+        tester.widgetList<TreinoIconButton>(copyButtons()).toList();
 
     /// Text the trainer actually SEES in the n-th field carrying [hint] —
     /// read off the controller of the [TextField] that [TextFormField] builds,
@@ -4126,8 +4128,7 @@ void main() {
           .single as Routine;
       final slot = draft.days.single.slots.single;
       expect(slot.exerciseName, 'Press de Banca');
-      expect(slot.sets, hasLength(4),
-          reason: '4x10 son CUATRO series, no una');
+      expect(slot.sets, hasLength(4), reason: '4x10 son CUATRO series, no una');
       expect(slot.sets.every((s) => s.reps == 10), isTrue);
       expect(slot.sets.every((s) => s.weightKg == 55), isTrue);
     });
@@ -4190,12 +4191,14 @@ void main() {
       await _pumpEditor(tester);
 
       final panel = find.byType(ExercisePickerPanel);
-      final fila = find.descendant(of: panel, matching: find.text('Press de Banca'));
+      final fila =
+          find.descendant(of: panel, matching: find.text('Press de Banca'));
       await tester.ensureVisible(fila);
       await tester.pumpAndSettle();
       await tester.tap(fila);
       await tester.pumpAndSettle();
-      await tester.tap(find.descendant(of: panel, matching: find.text('Agregar (1)')));
+      await tester
+          .tap(find.descendant(of: panel, matching: find.text('Agregar (1)')));
       await tester.pumpAndSettle();
 
       // El corazón del #860: el loop "miro qué puse → elijo el que sigue →
@@ -4209,7 +4212,8 @@ void main() {
       );
     });
 
-    testWidgets('abajo de 1280 no hay panel: el día conserva sus botones y el modal',
+    testWidgets(
+        'abajo de 1280 no hay panel: el día conserva sus botones y el modal',
         (tester) async {
       await _pumpEditor(tester);
       // `compact`: 768-1279. Ahí el sidebar ya está forzado a colapsar
@@ -4222,7 +4226,8 @@ void main() {
       // Y por eso mismo los botones del día NO se pueden sacar acá: sin panel
       // y sin ellos no habría forma de cargar un ejercicio.
       final agregar = find.text('Agregar ejercicio');
-      expect(agregar, findsWidgets, reason: 'única entrada que queda abajo de 1280');
+      expect(agregar, findsWidgets,
+          reason: 'única entrada que queda abajo de 1280');
 
       await tester.ensureVisible(agregar.first);
       await tester.pumpAndSettle();
@@ -4248,7 +4253,8 @@ void main() {
 
       await tester.tap(boton);
       await tester.pumpAndSettle();
-      expect(panel, findsOneWidget, reason: 'sigue abierto, como cualquier alta');
+      expect(panel, findsOneWidget,
+          reason: 'sigue abierto, como cualquier alta');
     });
 
     testWidgets('"En superserie" los agrega YA enlazados', (tester) async {
@@ -4303,7 +4309,8 @@ void main() {
       expect(slots[1].supersetGroup, slots[0].supersetGroup);
     });
 
-    testWidgets('en desktop el día NO repite los botones de alta', (tester) async {
+    testWidgets('en desktop el día NO repite los botones de alta',
+        (tester) async {
       await _pumpEditor(tester);
 
       // Dos entradas para lo mismo, una al lado de la otra, es ruido: el panel
@@ -4359,7 +4366,8 @@ void main() {
   });
 
   group('RoutineEditorWebScreen — entrada rápida: elegir una variante', () {
-    testWidgets('elegir un ejercicio de nombre MÁS LARGO que lo tipeado queda '
+    testWidgets(
+        'elegir un ejercicio de nombre MÁS LARGO que lo tipeado queda '
         'seleccionado', (tester) async {
       final repo = _MockRoutineRepository();
       when(() => repo.getById(any())).thenAnswer((_) async => null);
