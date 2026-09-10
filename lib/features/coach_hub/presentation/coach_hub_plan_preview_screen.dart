@@ -31,6 +31,7 @@ import '../../workout/domain/routine_visibility.dart';
 import '../application/cf_providers.dart';
 import '../application/plan_import_providers.dart';
 import '../domain/parsed_plan.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 /// Preview del plan importado. Muestra:
 /// - Nombre / días / semanas / nivel
@@ -77,15 +78,16 @@ class _CoachHubPlanPreviewScreenState
             style: TextStyle(color: palette.textMuted, fontSize: 14),
           ),
           actions: [
-            TextButton(
+            TreinoButton(
+              label: l10n.commonCancel,
+              variant: TreinoButtonVariant.ghost,
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text(l10n.commonCancel,
-                  style: TextStyle(color: palette.textMuted)),
             ),
-            TextButton(
+            const SizedBox(width: AppSpacing.s8),
+            TreinoButton(
+              label: l10n.coachHubPreviewDiscardConfirm,
+              variant: TreinoButtonVariant.danger,
               onPressed: () => Navigator.of(ctx).pop(true),
-              child: Text(l10n.coachHubPreviewDiscardConfirm,
-                  style: TextStyle(color: palette.danger)),
             ),
           ],
         );
@@ -416,36 +418,13 @@ class _CoachHubPlanPreviewScreenState
                       ),
                     ],
                     const SizedBox(height: 18),
-                    ElevatedButton(
-                      onPressed:
-                          _saving ? null : () => _assign(plan, profile.uid),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: palette.accent,
-                        foregroundColor: TreinoButtonTokens.foreground(context),
-                        minimumSize: const Size.fromHeight(48),
-                        shape: const StadiumBorder(),
-                        disabledBackgroundColor:
-                            palette.accent.withValues(alpha: 0.3),
-                      ),
-                      child: _saving
-                          ? SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: TreinoButtonTokens.foreground(context),
-                              ),
-                            )
-                          : Text(
-                              _selectedAthleteIds.length > 1
-                                  ? 'ASIGNAR PLAN A ${_selectedAthleteIds.length} ATLETAS'
-                                  : 'ASIGNAR PLAN',
-                              style: GoogleFonts.barlowCondensed(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 14,
-                                letterSpacing: 1.4,
-                              ),
-                            ),
+                    TreinoButton(
+                      label: _selectedAthleteIds.length > 1
+                          ? 'ASIGNAR PLAN A ${_selectedAthleteIds.length} ATLETAS'
+                          : 'ASIGNAR PLAN',
+                      expand: true,
+                      loading: _saving,
+                      onPressed: () => _assign(plan, profile.uid),
                     ),
                   ],
                 ),
@@ -472,10 +451,11 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        IconButton(
-          onPressed: onBack,
-          icon: Icon(TreinoIcon.arrowLeft, color: palette.textPrimary),
+        TreinoIconButton(
+          icon: TreinoIcon.arrowLeft,
           tooltip: 'Volver',
+          color: palette.textPrimary,
+          onPressed: onBack,
         ),
         const SizedBox(width: 8),
         Expanded(
@@ -716,25 +696,12 @@ class _DayCard extends StatelessWidget {
                         ),
                         if (i.exerciseId == null) ...[
                           const SizedBox(height: 6),
-                          TextButton.icon(
+                          TreinoButton(
+                            label: 'Asignar manualmente',
+                            icon: TreinoIcon.search,
+                            variant: TreinoButtonVariant.ghostAccent,
+                            size: TreinoButtonSize.sm,
                             onPressed: () => onPickManual(index, i),
-                            icon: Icon(
-                              TreinoIcon.search,
-                              size: 16,
-                              color: palette.accent,
-                            ),
-                            label: Text(
-                              'Asignar manualmente',
-                              style: TextStyle(
-                                color: palette.accent,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 4),
-                              minimumSize: const Size(0, 44),
-                            ),
                           ),
                         ],
                       ],

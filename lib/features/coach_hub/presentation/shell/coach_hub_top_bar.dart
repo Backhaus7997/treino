@@ -5,6 +5,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 
 import 'sidebar_registry.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 /// Top bar del Coach Hub web (REQ-SH-007). 64 px de alto.
 ///
@@ -54,9 +55,10 @@ class CoachHubTopBar extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppSpacing.s20),
-          IconButton(
+          TreinoIconButton(
+            icon: TreinoIcon.bell,
             tooltip: 'Notificaciones', // i18n: Fase W1
-            icon: Icon(TreinoIcon.bell, color: palette.textMuted),
+            color: palette.textMuted,
             onPressed: () {}, // ODQ-4: visible pero inerte en W1
           ),
         ],

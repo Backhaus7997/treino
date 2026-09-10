@@ -156,7 +156,8 @@ void main() {
       // repetir algo que va a fallar las próximas cien veces igual.
       expect(find.text('No tenés permiso para escribir en este chat.'),
           findsOneWidget);
-      expect(find.text('No pudimos enviar el mensaje. Reintentá.'), findsNothing);
+      expect(
+          find.text('No pudimos enviar el mensaje. Reintentá.'), findsNothing);
     });
 
     testWidgets('cualquier otro código sí invita a reintentar', (tester) async {
@@ -166,8 +167,8 @@ void main() {
       );
 
       // `unavailable` es la caída de red de verdad: acá reintentar sirve.
-      expect(
-          find.text('No pudimos enviar el mensaje. Reintentá.'), findsOneWidget);
+      expect(find.text('No pudimos enviar el mensaje. Reintentá.'),
+          findsOneWidget);
       expect(find.text('No tenés permiso para escribir en este chat.'),
           findsNothing);
     });
@@ -178,8 +179,8 @@ void main() {
       // texto del error, por ejemplo— pasaría los dos tests de arriba.
       await _intentarEnviar(tester, StateError('cualquier otra cosa'));
 
-      expect(
-          find.text('No pudimos enviar el mensaje. Reintentá.'), findsOneWidget);
+      expect(find.text('No pudimos enviar el mensaje. Reintentá.'),
+          findsOneWidget);
     });
 
     testWidgets('el composer no se limpia cuando el envío falla',

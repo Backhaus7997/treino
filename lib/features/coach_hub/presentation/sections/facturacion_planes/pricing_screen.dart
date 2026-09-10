@@ -10,6 +10,7 @@ import '../../../../profile/application/user_providers.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 import 'acreditacion_al_volver.dart';
 import 'plan_checkout.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 /// Umbral entre el layout ancho (Coach Hub web) y el apilado del teléfono.
 ///
@@ -102,14 +103,19 @@ class PricingRouteScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
+        leading: TreinoIconButton(
+          // Keyed para que el guard de superficie de la pricing page pueda
+          // EXCLUIRLA de su barrido: volver es un tap legítimo, y desde que
+          // este botón es del kit entra en `find.byType(TreinoTappable)`.
+          key: const Key('pricing_back_button'),
+          icon: TreinoIcon.back,
+          tooltip: 'Volver', // i18n: Fase W3
+          color: palette.textPrimary,
           // Al paywall se llega con `push` desde "VER PLANES", así que casi
           // siempre hay a dónde volver. El fallback cubre el deep-link directo
           // a la URL, donde `pop` no tiene destino y dejaría al PF encerrado.
           onPressed: () =>
               context.canPop() ? context.pop() : context.go('/coach'),
-          icon: Icon(TreinoIcon.back, color: palette.textPrimary),
-          tooltip: 'Volver', // i18n: Fase W3
         ),
       ),
       body: const SafeArea(top: false, child: PricingScreen()),

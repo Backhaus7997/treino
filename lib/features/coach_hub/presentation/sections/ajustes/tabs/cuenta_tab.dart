@@ -236,25 +236,10 @@ class _CuentaFormState extends ConsumerState<_CuentaForm> {
       children: [
         Align(
           alignment: Alignment.centerRight,
-          child: ElevatedButton(
-            onPressed: (_canSave && !_saving) ? _save : null,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: palette.accent,
-              foregroundColor: TreinoButtonTokens.foreground(context),
-              disabledBackgroundColor: palette.bgCard,
-              disabledForegroundColor: palette.textMuted,
-              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
-            ),
-            child: _saving
-                ? SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: TreinoButtonTokens.foreground(context),
-                    ),
-                  )
-                : const Text('GUARDAR CAMBIOS'), // i18n: Fase W3
+          child: TreinoButton(
+            label: 'GUARDAR CAMBIOS', // i18n: Fase W3
+            loading: _saving,
+            onPressed: _canSave ? _save : null,
           ),
         ),
         const SizedBox(height: 16),
@@ -531,23 +516,17 @@ class _FotoEditorState extends ConsumerState<_FotoEditor> {
                 runSpacing: 8,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  OutlinedButton(
-                    onPressed: _busy ? null : _changePhoto,
-                    child: _busy
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('CAMBIAR FOTO'), // i18n: Fase W3
+                  TreinoButton(
+                    label: 'CAMBIAR FOTO', // i18n: Fase W3
+                    variant: TreinoButtonVariant.secondary,
+                    loading: _busy,
+                    onPressed: _changePhoto,
                   ),
                   if (hasAvatar)
-                    TextButton(
+                    TreinoButton(
+                      label: 'QUITAR', // i18n: Fase W3
+                      variant: TreinoButtonVariant.danger,
                       onPressed: _busy ? null : _removePhoto,
-                      style: TextButton.styleFrom(
-                        foregroundColor: palette.danger,
-                      ),
-                      child: const Text('QUITAR'), // i18n: Fase W3
                     ),
                 ],
               ),
@@ -604,21 +583,20 @@ class _DangerZone extends ConsumerWidget {
             spacing: 12,
             runSpacing: 12,
             children: [
-              OutlinedButton(
+              // Pausar NO es destructivo —se revierte— así que se queda en
+              // secundario. Eliminar la cuenta sí, y ahora se ve distinto.
+              // Antes eran dos pills iguales salvo por el color del borde:
+              // `warning` y `danger` uno al lado del otro, que a ojo son «dos
+              // botones de peligro» y no una escalación.
+              TreinoButton(
+                label: 'PAUSAR CUENTA', // i18n: Fase W3
+                variant: TreinoButtonVariant.secondary,
                 onPressed: () => _confirmPausarCuenta(context),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: palette.warning,
-                  side: BorderSide(color: palette.warning),
-                ),
-                child: const Text('PAUSAR CUENTA'), // i18n: Fase W3
               ),
-              OutlinedButton(
+              TreinoButton(
+                label: 'ELIMINAR CUENTA', // i18n: Fase W3
+                variant: TreinoButtonVariant.danger,
                 onPressed: () => _confirmEliminarCuenta(context),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: palette.danger,
-                  side: BorderSide(color: palette.danger),
-                ),
-                child: const Text('ELIMINAR CUENTA'), // i18n: Fase W3
               ),
             ],
           ),

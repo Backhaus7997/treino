@@ -25,7 +25,8 @@ void main() {
     ('oscuro', AppTheme.dark()),
     ('claro', AppTheme.light()),
   ]) {
-    testWidgets('TreinoDropdown usa tokens en tema ${entry.$1}', (tester) async {
+    testWidgets('TreinoDropdown usa tokens en tema ${entry.$1}',
+        (tester) async {
       await tester.pumpWidget(
         _harness(
           theme: entry.$2,

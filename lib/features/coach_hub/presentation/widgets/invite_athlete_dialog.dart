@@ -20,6 +20,7 @@ import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/domain/trainer_invite_link.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 /// Abre el diálogo de invitación. Devuelve cuando el PF lo cierra.
 Future<void> showInviteAthleteDialog(BuildContext context) => showDialog<void>(
@@ -127,18 +128,11 @@ class _InviteAthleteDialogState extends ConsumerState<InviteAthleteDialog> {
                       ),
                     ),
                     const SizedBox(width: AppSpacing.s12),
-                    TextButton(
+                    TreinoButton(
                       key: const Key('invite_dialog_close'),
+                      label: 'Listo', // i18n
+                      variant: TreinoButtonVariant.ghost,
                       onPressed: () => Navigator.of(context).pop(),
-                      child: Text(
-                        'Listo', // i18n
-                        style: GoogleFonts.barlowCondensed(
-                          fontSize: AppTextSize.body,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.8,
-                          color: palette.textPrimary,
-                        ),
-                      ),
                     ),
                   ],
                 ),
@@ -146,18 +140,12 @@ class _InviteAthleteDialogState extends ConsumerState<InviteAthleteDialog> {
                 const SizedBox(height: AppSpacing.s18),
                 Align(
                   alignment: Alignment.centerRight,
-                  child: TextButton(
+                  child: TreinoButton(
                     key: const Key('invite_dialog_close'),
+                    label: 'Cerrar', // i18n
+                    variant: TreinoButtonVariant.ghost,
+                    expand: true,
                     onPressed: () => Navigator.of(context).pop(),
-                    child: Text(
-                      'Cerrar', // i18n
-                      style: GoogleFonts.barlowCondensed(
-                        fontSize: AppTextSize.body,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8,
-                        color: palette.textPrimary,
-                      ),
-                    ),
                   ),
                 ),
               ],
@@ -226,30 +214,15 @@ class _BotonCopiar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FilledButton.icon(
+    // El ícono ya NO hace cross-fade al copiar: el `AnimatedSwitcher` cambiaba
+    // sólo el ícono mientras el label saltaba de golpe, o sea dos velocidades
+    // para un mismo evento. Ahora los dos cambian juntos.
+    return TreinoButton(
       key: const Key('invite_dialog_copy'),
+      label: copiado ? '¡Copiado!' : 'Copiar link', // i18n
+      icon: copiado ? TreinoIcon.check : TreinoIcon.copy,
+      expand: true,
       onPressed: onTap,
-      style: FilledButton.styleFrom(
-        backgroundColor: palette.accent,
-        foregroundColor: TreinoButtonTokens.foreground(context),
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.s14),
-      ),
-      icon: AnimatedSwitcher(
-        duration: AppMotion.resolve(context, AppMotion.micro),
-        child: Icon(
-          copiado ? TreinoIcon.check : TreinoIcon.copy,
-          key: ValueKey(copiado),
-          size: 15,
-        ),
-      ),
-      label: Text(
-        copiado ? '¡Copiado!' : 'Copiar link', // i18n
-        style: GoogleFonts.barlowCondensed(
-          fontSize: AppTextSize.body,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.8,
-        ),
-      ),
     );
   }
 }

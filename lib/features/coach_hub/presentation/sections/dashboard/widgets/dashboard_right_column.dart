@@ -42,6 +42,7 @@ import 'package:treino/features/profile/application/user_public_profile_provider
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
 import 'package:treino/l10n/app_l10n.dart';
+import 'package:treino/app/theme/tokens/components/treino_button_tokens.dart';
 
 /// Columna derecha: Próximas sesiones + Vencimientos 7 días + Alumnos
 /// inactivos. REQ-HOY-07, REQ-HOY-08, REQ-HOY-09.
@@ -140,10 +141,10 @@ class _SectionError extends StatelessWidget {
           ),
           if (onRetry != null) ...[
             const SizedBox(height: AppSpacing.s8),
-            TextButton(
+            TreinoButton(
+              label: l10n.coachRetryLabel,
+              variant: TreinoButtonVariant.ghostAccent,
               onPressed: onRetry,
-              style: TextButton.styleFrom(foregroundColor: palette.accent),
-              child: Text(l10n.coachRetryLabel),
             ),
           ],
         ],

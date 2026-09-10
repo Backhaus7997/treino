@@ -12,6 +12,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/features/payments/domain/payment.dart';
 
 import 'payment_format.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 /// Historial de pagos de un alumno en formato tabla compacta.
 ///
@@ -109,23 +110,11 @@ class PagosTable extends StatelessWidget {
                       child: Align(
                         alignment: Alignment.centerRight,
                         child: p.status == PaymentStatus.pending
-                            ? TextButton(
-                                style: TextButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 4),
-                                  tapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
-                                  minimumSize: Size.zero,
-                                ),
+                            ? TreinoButton(
+                                label: 'Recordar', // i18n
+                                variant: TreinoButtonVariant.ghostAccent,
+                                size: TreinoButtonSize.xs,
                                 onPressed: () => onRecordar!(p),
-                                child: Text(
-                                  'Recordar', // i18n
-                                  style: TextStyle(
-                                    color: palette.accent,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
                               )
                             : const SizedBox.shrink(),
                       ),

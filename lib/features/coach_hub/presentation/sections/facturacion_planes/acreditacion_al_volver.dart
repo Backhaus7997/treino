@@ -6,6 +6,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach_hub/application/cf_providers.dart';
+import 'package:treino/app/theme/tokens/primitives.dart';
 
 /// Lo que sabemos del pago del PF cuando aterriza en la pantalla de planes.
 ///

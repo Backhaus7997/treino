@@ -37,7 +37,8 @@ void main() {
       expect(title.style?.fontFamily, AppFonts.barlowCondensed);
     });
 
-    testWidgets('el count se resalta en accent, como el nombre de la '
+    testWidgets(
+        'el count se resalta en accent, como el nombre de la '
         'welcome card', (tester) async {
       await tester.pumpWidget(wrap(
         const CoachHubSectionHero(title: 'Alumnos', count: 24),
@@ -104,8 +105,7 @@ void main() {
       );
       final decoration = pill.decoration! as BoxDecoration;
       expect(decoration.color, palette.accent);
-      expect(decoration.borderRadius,
-          BorderRadius.circular(AppRadius.full));
+      expect(decoration.borderRadius, BorderRadius.circular(AppRadius.full));
 
       await tester.tap(find.text('Nuevo alumno'));
       expect(taps, 1);
@@ -127,8 +127,8 @@ void main() {
         ),
       ));
 
-      expect(find.byType(OutlinedButton), findsOneWidget);
-      await tester.tap(find.byType(OutlinedButton));
+      expect(find.byType(TreinoButton), findsOneWidget);
+      await tester.tap(find.byType(TreinoButton));
       expect(taps, 1);
     });
 
@@ -152,7 +152,8 @@ void main() {
       expect(find.text('registrar'), findsOneWidget);
     });
 
-    testWidgets('sigue exponiendo un TreinoSectionHeader — el kit no se '
+    testWidgets(
+        'sigue exponiendo un TreinoSectionHeader — el kit no se '
         'duplica', (tester) async {
       await tester.pumpWidget(wrap(
         const CoachHubSectionHero(title: 'Nutrición'),

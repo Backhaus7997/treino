@@ -10,6 +10,7 @@ import '../../../../../app/theme/tokens/primitives.dart';
 import '../../../../../core/widgets/treino_icon.dart';
 import '../preview_wrapper.dart';
 import '../treino_interactive_state.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 /// Previews del kit — Finding W3.
 @Preview(name: 'Dialog — normal', wrapper: coachHubPreviewWrapper)
@@ -241,11 +242,12 @@ class _Header extends StatelessWidget {
             ),
           ),
         ),
-        IconButton(
+        TreinoIconButton(
           key: const Key('dialog_close_button'),
+          icon: TreinoIcon.close,
+          tooltip: 'Cerrar', // i18n
+          color: tokens.contentColor,
           onPressed: () => Navigator.of(context).maybePop(),
-          icon: Icon(TreinoIcon.close, color: tokens.contentColor, size: 18),
-          splashRadius: 18,
         ),
       ],
     );

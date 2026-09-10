@@ -75,7 +75,8 @@ void main() {
     expect(
       productoresDir.existsSync(),
       isTrue,
-      reason: 'No se encontró ${productoresDir.path} — ¿cambió el cwd del test?',
+      reason:
+          'No se encontró ${productoresDir.path} — ¿cambió el cwd del test?',
     );
 
     final encontrados = <String>{};

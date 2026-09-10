@@ -222,15 +222,16 @@ class _RegistrarPagoDialogState extends ConsumerState<RegistrarPagoDialog> {
         ),
       ),
       actions: [
-        TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text('Cancelar', // i18n
-                style: TextStyle(color: palette.textMuted))),
-        TextButton(
-            onPressed: _submit,
-            child: Text('Registrar', // i18n
-                style: TextStyle(
-                    color: palette.accent, fontWeight: FontWeight.w700))),
+        TreinoButton(
+          label: 'Cancelar', // i18n
+          variant: TreinoButtonVariant.ghost,
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        const SizedBox(width: AppSpacing.s8),
+        TreinoButton(
+          label: 'Registrar', // i18n
+          onPressed: _submit,
+        ),
       ],
     );
   }

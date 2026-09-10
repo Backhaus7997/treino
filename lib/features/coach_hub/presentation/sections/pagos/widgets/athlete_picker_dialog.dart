@@ -30,6 +30,8 @@ import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart'
     show userPublicProfilesBatchProvider;
+import 'package:treino/app/theme/tokens/components/treino_button_tokens.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 /// Abre el diálogo de selección de alumno; devuelve el `athleteId` elegido,
 /// o `null` si el trainer cancela / no hay alumnos vinculados.
@@ -73,12 +75,10 @@ class _AthletePickerDialog extends ConsumerWidget {
         ),
       ),
       actions: [
-        TextButton(
+        TreinoButton(
+          label: 'Cancelar', // i18n
+          variant: TreinoButtonVariant.ghost,
           onPressed: () => Navigator.of(context).pop(),
-          child: Text(
-            'Cancelar', // i18n
-            style: TextStyle(color: palette.textMuted),
-          ),
         ),
       ],
     );

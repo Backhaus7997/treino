@@ -623,12 +623,11 @@ class _ToggleButton extends StatelessWidget {
 
     return Tooltip(
       message: tooltip,
-      child: IconButton(
+      child: TreinoIconButton(
         key: const Key('sidebar_toggle_button'),
-        icon: Icon(TreinoIcon.menu, size: 20, color: palette.textMuted),
-        padding: EdgeInsets.zero,
-        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-        visualDensity: VisualDensity.compact,
+        icon: TreinoIcon.menu,
+        tooltip: 'Menú', // i18n
+        color: palette.textMuted,
         onPressed: canToggle ? onToggle : null,
       ),
     );

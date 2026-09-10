@@ -12,6 +12,8 @@ import '../empty_state/empty_state.dart';
 import '../preview_wrapper.dart';
 import '../treino_interactive_state.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
+import 'package:treino/app/theme/tokens/components/treino_button_tokens.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 /// Previews del kit — Finding W3.
 @Preview(name: 'DataTable — normal', wrapper: coachHubPreviewWrapper)
@@ -655,13 +657,11 @@ class _ErrorState extends StatelessWidget {
           ),
           if (onRetry != null) ...[
             const SizedBox(height: AppSpacing.s12),
-            TextButton(
+            TreinoButton(
               key: const Key('data_table_retry'),
+              label: 'Reintentar',
+              variant: TreinoButtonVariant.ghostAccent,
               onPressed: onRetry,
-              child: Text(
-                'Reintentar',
-                style: TextStyle(color: palette.accent),
-              ),
             ),
           ],
         ],

@@ -14,6 +14,7 @@ import 'package:treino/features/coach_hub/presentation/sections/perfil_publico/p
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 UserProfile _trainerProfile({
   String? displayName = 'Joaquín Nadal',
@@ -162,7 +163,7 @@ void main() {
         findsOneWidget,
       );
 
-      final retryButton = find.widgetWithText(TextButton, 'Reintentar');
+      final retryButton = find.widgetWithText(TreinoButton, 'Reintentar');
       expect(retryButton, findsOneWidget);
 
       await tester.tap(retryButton);

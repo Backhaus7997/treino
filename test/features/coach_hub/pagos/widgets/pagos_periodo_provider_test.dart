@@ -58,7 +58,9 @@ void main() {
       // esa fecha, ninguno entraría en 30 días y el test de arriba habría
       // pasado devolviendo vacío… si no fuera porque afirma los ids.
       // Este lo dice explícito.
-      final soloCreated = [_pago('sinVenc', diasAtras: 5, conVencimiento: false)];
+      final soloCreated = [
+        _pago('sinVenc', diasAtras: 5, conVencimiento: false)
+      ];
       expect(
         filtrarPorPeriodo(soloCreated, PagosPeriodo.treintaDias, now: _ahora)
             .length,
@@ -94,7 +96,8 @@ void main() {
 
     test('sólo «todo» no tiene días', () {
       expect(PagosPeriodo.todo.dias, isNull);
-      for (final p in PagosPeriodo.values.where((p) => p != PagosPeriodo.todo)) {
+      for (final p
+          in PagosPeriodo.values.where((p) => p != PagosPeriodo.todo)) {
         expect(p.dias, isNotNull);
         expect(p.dias, greaterThan(0));
       }

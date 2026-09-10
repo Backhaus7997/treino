@@ -113,7 +113,8 @@ List<Override> _baseOverrides({required List<Session> sessions}) => [
       gymsProvider.overrideWith((ref) => const <Gym>[]),
       athleteBillingProvider.overrideWith((ref, id) => Stream.value(null)),
       sessionsByUidProvider.overrideWith((ref, id) => sessions),
-      assignedRoutinesByTrainerProvider.overrideWith((ref, key) => const <Routine>[]),
+      assignedRoutinesByTrainerProvider
+          .overrideWith((ref, key) => const <Routine>[]),
       athleteLast7DaysInsightsProvider
           .overrideWith((ref, uid) async => const <DayInsights>[]),
       athleteDayInsightsProvider.overrideWith(

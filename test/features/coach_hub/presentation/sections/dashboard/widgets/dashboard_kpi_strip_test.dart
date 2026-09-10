@@ -162,7 +162,8 @@ void main() {
       await pumpEnAncho(tester, 1200);
 
       final anchos = [
-        for (var i = 0; i < 4; i++) tester.getRect(find.byType(KpiCard).at(i)).width,
+        for (var i = 0; i < 4; i++)
+          tester.getRect(find.byType(KpiCard).at(i)).width,
       ];
       for (final w in anchos) {
         expect(w, moreOrLessEquals(anchos.first, epsilon: 0.5),
@@ -175,7 +176,8 @@ void main() {
           reason: 'la separación es fija, no proporcional');
     });
 
-    testWidgets('en un ancho que no da, sigue habiendo scroll en vez de '
+    testWidgets(
+        'en un ancho que no da, sigue habiendo scroll en vez de '
         'cards ilegibles', (tester) async {
       await pumpEnAncho(tester, 420);
       expect(find.byType(SingleChildScrollView), findsOneWidget);
