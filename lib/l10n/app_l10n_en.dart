@@ -2503,7 +2503,7 @@ class AppL10nEn extends AppL10n {
   String get coachHubAlumnosSearchHint => 'Search by name…';
 
   @override
-  String get coachHubAlumnosFilterAll => 'All';
+  String get coachHubAlumnosFilterAll => 'Current';
 
   @override
   String get coachHubAlumnosFilterActivos => 'Active';

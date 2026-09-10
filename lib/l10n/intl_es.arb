@@ -450,7 +450,7 @@
   "coachHubAlumnosTitle": "ALUMNOS",
   "coachHubAlumnosSummary": "{total} en total · {active} activos",
   "coachHubAlumnosSearchHint": "Buscar por nombre…",
-  "coachHubAlumnosFilterAll": "Todos",
+  "coachHubAlumnosFilterAll": "Vigentes",
   "coachHubAlumnosFilterActivos": "Activos",
   "coachHubAlumnosFilterConDeuda": "Con deuda",
   "coachHubAlumnosFilterPausados": "Pausados",
