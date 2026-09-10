@@ -409,31 +409,37 @@ def build_story():
 
     for block in resolved(
         4, "Cómo se cobran las suscripciones",
-        "<b>Pasarela de pago externa</b>, que captura el medio de pago y liquida "
-        "los fondos a la cuenta bancaria de BACKHAUSTIN S.A.S.",
-        [["Quién procesa", "Un proveedor de servicios de pago externo"],
-         ["Quién recibe", "BACKHAUSTIN S.A.S., en su cuenta bancaria"],
-         ["Qué guarda TREINO",
-          "Nada del medio de pago: queda en poder del procesador"],
-         ["Alcance", "Suscripción del entrenador, y a futuro la del alumno"],
+        "<b>Modelo mixto, ya implementado.</b> El entrenador contrata en el "
+        "Coach Hub web y paga por Mercado Pago; el atleta contrata en la "
+        "aplicación y paga por la tienda.",
+        [["Entrenador", "Coach Hub web · Mercado Pago · liquida a la cuenta "
+          "de BACKHAUSTIN S.A.S."],
+         ["Atleta", "Aplicación móvil · App Store y Google Play · comisión "
+          "del 15%"],
+         ["Encuadre del PF", "<b>Guideline 3.1.3(f)</b> — la app es companion "
+          "gratuita de una herramienta web paga, y el Coach Hub es esa "
+          "herramienta"],
+         ["Encuadre del atleta", "<b>Guideline 3.1.1</b> — sin superficie web "
+          "no hay exención que invocar"],
          ["Sin cambios", "TREINO sigue sin intermediar la plata alumno-PF (D5)"]],
-        [["Frente", "Qué falta"],
-         ["<b>Regla 3.1.1 de Apple y facturación de Google</b>",
-          "Los bienes digitales consumidos dentro de la app deben pasar por el "
-          "sistema de pago de la tienda. Cobrar por pasarela externa una "
-          "suscripción de consumidor usada dentro de la app es exactamente el "
-          "supuesto que esas reglas alcanzan. <b>Resolver antes de construir la "
-          "integración</b>, no después"],
-         ["<b>Decisión D6</b>",
-          "Sigue pendiente: arrepentimiento, reembolsos, renovación automática "
-          "y baja. Sin eso no se pueden escribir los términos de suscripción "
-          "ni el botón de arrepentimiento"],
-         ["<b>Alcance mundial</b>",
-          "Derecho de desistimiento por jurisdicción y tratamiento fiscal de "
-          "servicios digitales en cada mercado"]],
-        "Con alcance mundial y una suscripción de alumno prevista, el punto de "
-        "Apple deja de ser discutible por analogía y conviene llevarlo al "
-        "abogado como pregunta concreta, con el modelo de cobro ya definido."):
+        [["Frente", "Qué implica"],
+         ["<b>La colisión 3.1.1 quedó resuelta</b>",
+          "Era la pregunta más urgente de la revisión legal y se resolvió en "
+          "código. Ya no define si se construye la integración: está "
+          "construida y cobrando"],
+         ["<b>La baja del atleta no es nuestra</b>",
+          "La gestionan Apple y Google con sus políticas. No se puede procesar "
+          "ni negar. Lo único a construir es la pantalla que indica la ruta"],
+         ["<b>El arrepentimiento sí es nuestro, para el PF</b>",
+          "Su cobro es propio, así que el Botón de Arrepentimiento y el código "
+          "en 24 horas siguen siendo obligación nuestra. Ver D6"],
+         ["<b>Dos tratamientos fiscales</b>",
+          "Dos vías de cobro conviviendo significa dos regímenes impositivos "
+          "en cada mercado. Va a la revisión legal"]],
+        "El encuadre está bien argumentado y documentado en el propio código "
+        "(`athlete_checkout.dart`). Lo que se le pide al abogado ya no es "
+        "definirlo sino <b>validarlo</b>, y sobre todo dictaminar el "
+        "tratamiento fiscal de las dos vías."):
         A(block)
 
     A(PageBreak())

@@ -47,15 +47,38 @@ en la sección 8.2 de los Términos para Entrenadores.
 
 ## 3. Cómo se cobra
 
-Los pagos se procesan a través de un **proveedor de servicios de pago externo**,
-que captura el medio de pago y liquida los fondos a la cuenta bancaria de
+**El cobro depende de quién contrata**, y las condiciones de baja y reembolso
+cambian con él. Conviene tenerlo claro desde el principio.
+
+| | Entrenador | Atleta |
+|---|---|---|
+| Dónde contrata | El **Coach Hub web** | La **aplicación móvil** |
+| Quién procesa | Mercado Pago | **App Store / Google Play** |
+| Quién gestiona la baja | TREINO | **La tienda** |
+| Quién gestiona el reembolso | TREINO | **La tienda** |
+
+### 3.1 Si sos entrenador
+
+Contratás desde el Coach Hub web. El pago lo procesa **Mercado Pago**, que
+captura el medio de pago y liquida los fondos a la cuenta bancaria de
 BACKHAUSTIN S.A.S.
 
-**TREINO no almacena los datos completos de tu tarjeta ni de tu medio de pago.**
-Quedan en poder de ese procesador, que es responsable de su propio tratamiento.
+**TREINO no almacena los datos completos de tu tarjeta.** Quedan en poder del
+procesador, que es responsable de su propio tratamiento.
 
-Antes de confirmar cualquier contratación vas a ver el **precio final**, la
-moneda, qué incluye el plan, cada cuánto se renueva y cómo darlo de baja.
+Las secciones 6 y 7 —arrepentimiento y baja— **te aplican directamente**.
+
+### 3.2 Si sos atleta
+
+Contratás desde la aplicación móvil, y el pago lo procesa **App Store o Google
+Play** según tu dispositivo. TREINO no interviene en el cobro ni accede a tu
+medio de pago en ningún momento.
+
+Eso significa que **la baja y el reembolso los gestiona la tienda**, con sus
+propias políticas y plazos. Ver la sección 8.
+
+En los dos casos, antes de confirmar vas a ver el **precio final**, la moneda,
+qué incluye el plan, cada cuánto se renueva y cómo darlo de baja.
 
 ## 4. Período de prueba
 
@@ -77,8 +100,9 @@ vigencia.
 
 ## 6. Tu derecho a arrepentirte
 
-**Tenés 14 días corridos desde la contratación para arrepentirte y recuperar
-todo lo pagado, sin dar explicaciones y sin costo alguno.**
+**Si contrataste en el Coach Hub web** —es decir, si sos entrenador— tenés **14
+días corridos desde la contratación para arrepentirte y recuperar todo lo
+pagado**, sin dar explicaciones y sin costo alguno.
 
 Adoptamos 14 días **para todo el mundo**. Es más de lo que exige la ley
 argentina —que son 10— y equivale al plazo europeo, así que la misma regla te
@@ -97,6 +121,12 @@ mismo medio de pago.
 Este derecho es **irrenunciable**: nada de lo que digan estos términos puede
 quitártelo.
 
+### Si contrataste desde la aplicación
+
+Si sos atleta y contrataste por App Store o Google Play, **el reembolso lo
+gestiona la tienda** y no podemos procesarlo nosotros. Ver la sección 8. Eso no
+afecta los derechos que la normativa de tu país te reconozca.
+
 ## 7. Baja fuera del plazo de arrepentimiento
 
 Pasados los 14 días **podés dar de baja cuando quieras**, en línea, sin llamar
@@ -108,14 +138,23 @@ Al hacerlo:
 - **No se reembolsa el período en curso.**
 - No se te vuelve a cobrar.
 
-## 8. Si contrataste desde la aplicación
+## 8. Suscripciones contratadas por App Store o Google Play
 
-Si tu suscripción se contrató a través de App Store o Google Play, **la baja y
-el reembolso los gestiona la tienda** conforme a sus propias políticas, y no
-podemos procesarlos nosotros.
+Si tu suscripción se contrató desde la aplicación móvil, **la baja y el
+reembolso los gestiona la tienda** conforme a sus propias políticas, y no
+podemos procesarlos nosotros ni negarnos a ellos.
 
-En ese caso tenés que gestionarlo desde los ajustes de suscripciones de tu
-dispositivo. Te indicamos dónde en el momento de la baja.
+**Para darte de baja** entrá a los ajustes de suscripciones de tu dispositivo:
+
+- **iPhone o iPad:** Ajustes → tu nombre → Suscripciones
+- **Android:** Google Play → Pagos y suscripciones → Suscripciones
+
+**Para pedir un reembolso**, se solicita a la tienda. Cada una tiene su propio
+plazo y su propio criterio.
+
+Te indicamos esta ruta desde la aplicación en el momento de la baja. Si tenés un
+problema que la tienda no resuelve, escribinos igual a treino@gettreino.com y
+vemos qué podemos hacer.
 
 ## 9. Si no pagás
 
@@ -161,18 +200,47 @@ proceso, no un sistema automatizado, y con el volumen esperado alcanza.
 
 ## B. Lo que todavía no está resuelto
 
-[[PENDIENTE — REVISIÓN LEGAL. Tres puntos: (a) si los bienes digitales
-consumidos dentro de la app obligan a usar el sistema de pago de la tienda
-—regla 3.1.1 de Apple y política de facturación de Google—, lo que cambiaría
-quién gestiona bajas y reembolsos y hay que resolver ANTES de construir la
-integración; (b) si algún supuesto del art. 1116 del Código Civil y Comercial
-excluye a un servicio por suscripción del derecho de revocación, y si es
-oponible una renuncia expresa a cambio de ejecución inmediata como admite el
-régimen europeo; (c) tratamiento fiscal de servicios digitales en cada mercado
-donde se cobre.]]
+**La regla 3.1.1 ya está resuelta**, y en código. El encuadre es:
+
+| | Entrenador | Alumno |
+|---|---|---|
+| Cobra en | Coach Hub web (Mercado Pago) | App móvil (IAP) |
+| Comisión | ~4-6% de la pasarela | 15% de la tienda |
+| La regla | **3.1.3(f) lo exime** | **3.1.1 lo obliga** |
+
+El razonamiento vive en `lib/features/paywall/application/athlete_checkout.dart`
+y es sólido: la Guideline 3.1.3(f) exime del in-app purchase a una *«free app
+acting as a stand-alone companion to a paid web based tool»*, y el Coach Hub
+**es** esa herramienta web paga. Para el alumno no existe superficie web, así que
+no hay exención que invocar.
+
+[[PENDIENTE — REVISIÓN LEGAL. Quedan dos: (a) si algún supuesto del art. 1116
+del Código Civil y Comercial excluye a un servicio por suscripción del derecho
+de revocación, y si es oponible una renuncia expresa a cambio de ejecución
+inmediata como admite el régimen europeo; (b) tratamiento fiscal de servicios
+digitales en cada mercado donde se cobre — con dos vías de cobro, hay dos
+tratamientos distintos.]]
 
 ## C. Estado del código
 
-El paywall existe (`functions/src/subscriptions/`), con tabla de precios y
-límites por plan. **No hay procesador de pagos integrado**, y el enforcement del
-lado del entrenador está pendiente. Nada de lo de arriba está construido.
+**Implementado y en main:**
+
+- Cobro del alumno por IAP: `purchases_flutter` con RevenueCat, más el webhook
+  que acredita la suscripción (`feat(iap)` #1068, #1080).
+- Cobro del entrenador por Mercado Pago desde el Coach Hub web.
+- Los límites por plan y el paywall (`functions/src/subscriptions/`).
+
+**Falta, y es lo que bloquea publicar el cobro del entrenador:**
+
+| # | Qué | Dónde |
+|---|---|---|
+| 1 | Botón de Arrepentimiento en la home, sin login | `gettreino.com` |
+| 2 | Formulario de arrepentimiento | `gettreino.com/arrepentimiento` |
+| 3 | Correo automático con código dentro de 24 h | Backend |
+| 4 | Baja en línea | Coach Hub web |
+
+**Para el alumno no hace falta nada de eso**: la tienda gestiona baja y
+reembolso. Lo único que hay que construir es la pantalla que le indica la ruta
+—Ajustes → Suscripciones— en el momento de la baja.
+
+Especificación del sitio en [`spec-web-legal.md`](./spec-web-legal.md).

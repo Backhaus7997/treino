@@ -37,8 +37,8 @@ tres partes:
 - El vínculo alumno-entrenador habilita **mensajería privada**.
 - El entrenador puede llevar **notas y archivos privados sobre el alumno** que el
   alumno no ve en su aplicación.
-- La suscripción del entrenador ya tiene precios definidos. Está prevista una
-  **suscripción de alumno** a futuro.
+- **Las dos suscripciones ya están implementadas y cobrando**: la del entrenador
+  por Mercado Pago en la web, la del atleta por compra integrada.
 
 ---
 
@@ -95,11 +95,17 @@ pagos (respaldo contable), la puntuación de las reseñas (promedio del
 entrenador) y el hilo de chat (le pertenece también al otro participante). Los
 tres sin nombre, sólo con identificador. ¿Es sostenible?
 
-**6. Cobro fuera de las tiendas.** El paywall vive en la web, pero amplía
-límites que se usan dentro de la aplicación iOS. La regla 3.1.1 de Apple exige
-compra integrada para bienes digitales consumidos en la app. ¿Se puede sostener
-el cobro por pasarela propia? **Esto define si se construye la integración o
-no**, así que es la más urgente.
+**6. Encuadre del cobro — validar, no definir.** Se resolvió por dos vías:
+
+| | Entrenador | Atleta |
+|---|---|---|
+| Contrata en | Coach Hub **web** | Aplicación **móvil** |
+| Procesa | Mercado Pago | App Store / Google Play |
+| Encuadre invocado | **Guideline 3.1.3(f)** — la app es *companion* gratuita de una herramienta web paga | **Guideline 3.1.1** — sin superficie web no hay exención |
+
+Pedimos validar que el encuadre se sostiene, y en particular **el tratamiento
+fiscal de cada vía**: son dos regímenes distintos conviviendo en el mismo
+producto, en todos los mercados donde se cobre.
 
 ---
 

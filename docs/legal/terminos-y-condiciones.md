@@ -153,21 +153,24 @@ económico en sí no lo resolvemos nosotros.
 
 ## 8. Suscripciones y pagos a TREINO
 
-Usar TREINO como atleta es gratuito. Los entrenadores requieren una suscripción,
-y está prevista una para atletas a futuro.
+Usar TREINO como atleta es gratuito en su versión básica. Los entrenadores
+requieren una suscripción, y existe también una suscripción para atletas.
 
-Los pagos se procesan por un **proveedor de servicios de pago externo**, que
-liquida los fondos a la cuenta bancaria de BACKHAUSTIN S.A.S. **No almacenamos
-los datos completos de tu medio de pago.**
+**Cómo se cobra depende de dónde contrates:**
 
-**Tenés 14 días corridos desde la contratación para arrepentirte y recuperar
-todo lo pagado**, sin dar explicaciones. Podés ejercerlo desde el Botón de
-Arrepentimiento de la página principal, sin necesidad de iniciar sesión.
-Pasado ese plazo podés dar de baja cuando quieras, conservando el acceso hasta
-el final del período pagado, pero sin reembolso de ese período.
+- **Entrenadores**, en el Coach Hub web: el pago lo procesa Mercado Pago y
+  liquida a la cuenta de BACKHAUSTIN S.A.S. **Tenés 14 días corridos para
+  arrepentirte** y recuperar todo lo pagado, desde el Botón de Arrepentimiento
+  de la página principal, sin necesidad de iniciar sesión.
+- **Atletas**, desde la aplicación móvil: el pago lo procesa App Store o Google
+  Play. **La baja y el reembolso los gestiona la tienda**, desde los ajustes de
+  suscripciones de tu dispositivo.
 
-Las condiciones completas —planes, precios, renovación, prueba gratuita y
-baja— están en los [Términos de Suscripción](./terminos-suscripcion.md).
+En los dos casos, pasado el plazo de arrepentimiento podés dar de baja cuando
+quieras conservando el acceso hasta el final del período pagado.
+
+Las condiciones completas están en los [Términos de
+Suscripción](./terminos-suscripcion.md).
 
 Esto es **distinto** de los pagos entre vos y tu entrenador, que no pasan por
 TREINO. Ver la sección 7.
