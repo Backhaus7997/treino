@@ -56,6 +56,21 @@ abstract final class TreinoButtonTokens {
           borderColor: p.border,
           hoverBorderColor: p.borderHover,
         ),
+      // Secundaria DESTACADA: misma caja que la secundaria, texto en acento.
+      //
+      // Va `accentText` y NO `accent`, y el motivo está medido: el acento
+      // (mint500) sobre una card blanca da 1,64:1 contra los 4,5 que pide WCAG
+      // AA. El botón «Pago» del detalle se leía lavado y el PF lo reportó
+      // así. En oscuro los dos tokens son el MISMO color, y por eso la suite
+      // —que corre en oscuro— nunca lo vio. Que la decisión viva acá y no en
+      // cada llamador es lo que impide que vuelva a pasar.
+      TreinoButtonVariant.secondaryAccent => TreinoButtonVisual._(
+          background: AppColorPrimitives.transparent,
+          hoverBackground: p.surfaceSubtle,
+          foreground: p.accentText,
+          borderColor: p.border,
+          hoverBorderColor: p.borderHover,
+        ),
       // La terciaria: sin caja hasta que la tocás. Para acciones que no
       // compiten (cancelar, «ver más»).
       TreinoButtonVariant.ghost => TreinoButtonVisual._(
@@ -69,9 +84,14 @@ abstract final class TreinoButtonTokens {
   }
 }
 
-/// Las tres jerarquías de acción. Más variantes que estas tres es pedirle al
-/// usuario que aprenda un vocabulario que no le sirve.
-enum TreinoButtonVariant { primary, secondary, ghost }
+/// Las jerarquías de acción del producto. Cuatro, y no una más: cada variante
+/// nueva es vocabulario que el usuario tiene que aprender para operar.
+///
+/// [secondaryAccent] no es decoración: es la secundaria que el diseño quiere
+/// que se note (el «Pago» del detalle del alumno, al lado del «Chat» neutro).
+/// Existe como variante y no como color suelto porque ahí vive el arreglo de
+/// contraste de #1056.
+enum TreinoButtonVariant { primary, secondary, secondaryAccent, ghost }
 
 /// Dos tamaños. `sm` para densidad de tabla y de fila; `md` para diálogos y
 /// para el CTA de una sección.
@@ -81,6 +101,21 @@ enum TreinoButtonVariant { primary, secondary, ghost }
 /// tamaños de ícono en un solo archivo, y de 59 botones sólo 6 acotaban su tap
 /// target.
 enum TreinoButtonSize {
+  /// Densidad de TABLA. No es «sm más chico»: es el tamaño que impone la fila.
+  ///
+  /// `TreinoTableTokens.rowHeight` son 48 px y `cellPaddingV` 12 arriba y 12
+  /// abajo, así que el alto útil de una celda son 24 y no hay negociación. Un
+  /// botón de 32 ahí adentro desborda. Los cuatro íconos de acción del roster
+  /// medían exactamente esto —24x24— por accidente, vía `visualDensity`; acá
+  /// lo miden a propósito, y con 4 px de aire alrededor del ícono en vez de 3.
+  ///
+  /// 24x24 es el piso de WCAG 2.2 (2.5.8) y sólo alcanza CON separación entre
+  /// botones. Quien los agrupe tiene que ponerla.
+  xs(
+      height: 24,
+      paddingH: AppSpacing.hairline,
+      fontSize: AppTextSize.caption,
+      iconSize: 16),
   sm(
       height: 32,
       paddingH: AppSpacing.s12,

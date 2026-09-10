@@ -94,16 +94,24 @@ void _noop() {}
 class TreinoButton extends StatelessWidget {
   const TreinoButton({
     super.key,
-    required this.label,
     required this.onPressed,
+    this.label,
     this.variant = TreinoButtonVariant.primary,
     this.size = TreinoButtonSize.md,
     this.icon,
     this.expand = false,
+    this.trailing,
     this.semanticsLabel,
-  });
+  })  : assert(label != null || icon != null,
+            'un botón sin label y sin ícono no comunica nada'),
+        assert(label != null || semanticsLabel != null,
+            'un botón sin label visible necesita nombrarse para el lector');
 
-  final String label;
+  /// `null` para un botón de sólo ícono que igual respeta el padding y el alto
+  /// de su [size] — que es lo que hace falta cuando comparte fila con botones
+  /// con texto. Los dos del header del detalle medían 16 y 19 px de alto
+  /// justamente por resolver esto cada uno por su cuenta.
+  final String? label;
 
   /// `null` deshabilita el botón — misma convención que
   /// [TreinoInteractiveState], que resuelve `disabled` mirando si hay `onTap`.
@@ -118,6 +126,9 @@ class TreinoButton extends StatelessWidget {
 
   /// `true` para que ocupe el ancho disponible (diálogos, formularios).
   final bool expand;
+
+  /// Slot al final del contenido — un punto de «sin leer», un contador.
+  final Widget? trailing;
 
   /// Label para el lector de pantalla cuando el visible no alcanza.
   ///
@@ -179,19 +190,24 @@ class TreinoButton extends StatelessWidget {
                   // `Flexible` + ellipsis: un label más largo que su caja
                   // trunca el TEXTO, no la app. El header de la tabla ya se
                   // comió esa lección.
-                  Flexible(
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontFamily: AppFonts.barlow,
-                        fontWeight: AppFonts.w600,
-                        fontSize: size.fontSize,
-                        color: visual.foreground,
+                  if (label != null)
+                    Flexible(
+                      child: Text(
+                        label!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontFamily: AppFonts.barlow,
+                          fontWeight: AppFonts.w600,
+                          fontSize: size.fontSize,
+                          color: visual.foreground,
+                        ),
                       ),
                     ),
-                  ),
+                  if (trailing != null) ...[
+                    const SizedBox(width: AppSpacing.hairline),
+                    trailing!,
+                  ],
                 ],
               ),
             ),

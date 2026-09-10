@@ -597,28 +597,19 @@ class _Header extends StatelessWidget {
                 palette: palette,
               ),
               const SizedBox(width: 8),
-              // Par con `_ChatAction`: MISMO padding y misma altura. Tenían
-              // 14 y 12 de horizontal sin ninguna razón, y dos pills contiguas
-              // que difieren en 2 px se leen como un error de alineación.
-              OutlinedButton(
+              // Par con `_ChatAction`: MISMO padding y misma altura, y ahora
+              // por construcción y no por acuerdo. Tenían 14 y 12 de
+              // horizontal sin ninguna razón, y aun después de igualar el
+              // padding declarado seguían reportando cajas de 16 y 19 px de
+              // alto. Con `TreinoButtonSize.sm` los dos miden 32.
+              //
+              // La variante lleva el `accentText` adentro: ese arreglo de
+              // contraste (#1056) ahora vive en el token, no en este callsite.
+              TreinoButton(
+                label: 'Pago', // i18n: Fase W2
+                variant: TreinoButtonVariant.secondaryAccent,
+                size: TreinoButtonSize.sm,
                 onPressed: onPago,
-                style: OutlinedButton.styleFrom(
-                  // `accentText` y NO `accent`: esto es TEXTO. El acento
-                  // (mint500) sobre la card blanca mide 1,64:1 contra los 4,5
-                  // que pide WCAG AA — «Pago» se leía lavado, que es como el
-                  // PF lo reportó. En oscuro los dos son el mismo color, y por
-                  // eso la suite —que corre en oscuro— nunca lo vio.
-                  foregroundColor: palette.accentText,
-                  side: BorderSide(color: palette.border),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: const Text('Pago', // i18n: Fase W2
-                    style: TextStyle(
-                        fontSize: AppTextSize.bodyDense,
-                        fontWeight: FontWeight.w600)),
               ),
             ],
           ),
@@ -819,41 +810,32 @@ class _ChatAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      label: sinLeer
-          ? 'Chat, con mensajes sin leer' // i18n: Fase W2
-          : 'Chat', // i18n: Fase W2
-      button: true,
-      excludeSemantics: true,
-      child: Tooltip(
-        message: 'Chat', // i18n: Fase W2
-        child: OutlinedButton(
-          onPressed: onTap,
-          style: OutlinedButton.styleFrom(
-            foregroundColor: palette.textPrimary,
-            side: BorderSide(color: palette.border),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            minimumSize: Size.zero,
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(TreinoIcon.chat, size: 16, color: palette.textPrimary),
-              if (sinLeer) ...[
-                const SizedBox(width: AppSpacing.hairline),
-                Container(
-                  width: TreinoNavMarkTokens.size,
-                  height: TreinoNavMarkTokens.size,
-                  decoration: BoxDecoration(
-                    color: TreinoNavMarkTokens.of(context).attention,
-                    shape: BoxShape.circle,
-                  ),
+    return Tooltip(
+      message: 'Chat', // i18n: Fase W2
+      // El nombre accesible lo pone `semanticsLabel`; sin esto el lector lo
+      // diría dos veces.
+      excludeFromSemantics: true,
+      child: TreinoButton(
+        // Sin label visible: es un botón de ícono que igual tiene que medir lo
+        // mismo que el «Pago» de al lado. Ése es todo el punto del tamaño del
+        // kit.
+        icon: TreinoIcon.chat,
+        semanticsLabel: sinLeer
+            ? 'Chat, con mensajes sin leer' // i18n: Fase W2
+            : 'Chat', // i18n: Fase W2
+        variant: TreinoButtonVariant.secondary,
+        size: TreinoButtonSize.sm,
+        onPressed: onTap,
+        trailing: sinLeer
+            ? Container(
+                width: TreinoNavMarkTokens.size,
+                height: TreinoNavMarkTokens.size,
+                decoration: BoxDecoration(
+                  color: TreinoNavMarkTokens.of(context).attention,
+                  shape: BoxShape.circle,
                 ),
-              ],
-            ],
-          ),
-        ),
+              )
+            : null,
       ),
     );
   }

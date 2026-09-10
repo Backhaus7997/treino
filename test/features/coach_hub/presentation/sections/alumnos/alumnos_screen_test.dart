@@ -1122,17 +1122,15 @@ void main() {
         profiles: [_prof('a1', 'Sofía')],
       );
 
-      // El `IconButton` que envuelve al tooltip, no el tooltip: la caja que
-      // ocupa la fila es la del botón. Los dos componentes —`IconButton` y
-      // `PopupMenuButton`— terminan en uno.
-      Size cajaDe(String tooltip) => tester.getSize(
-            find
-                .ancestor(
-                  of: find.byTooltip(tooltip),
-                  matching: find.byType(IconButton),
-                )
-                .first,
-          );
+      // Se mide la caja RENDERIZADA por el tooltip, no un tipo de widget.
+      //
+      // Antes esto buscaba el `IconButton` que envolvía al tooltip, y eso ató
+      // el test a la implementación: al migrar los tres rápidos a
+      // `TreinoIconButton` —que no tiene `IconButton` adentro— el finder se
+      // quedó sin candidatos y el test reventó sin que nada se hubiera roto
+      // en pantalla. Lo que el usuario ve es el tamaño de la caja; eso es lo
+      // que hay que afirmar.
+      Size cajaDe(String tooltip) => tester.getSize(find.byTooltip(tooltip));
 
       final chat = cajaDe('Chat');
       final rutinas = cajaDe('Rutinas');
