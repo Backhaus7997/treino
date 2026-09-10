@@ -157,8 +157,6 @@ void main() {
       'features/coach_hub/presentation/sections/alumnos/alumno_detail_screen.dart',
       'features/coach_hub/presentation/sections/alumnos/alumnos_screen.dart',
       'features/coach_hub/presentation/sections/biblioteca/widgets/ejercicios_tab.dart',
-      'features/coach_hub/presentation/sections/biblioteca/widgets/template_detail_dialog.dart',
-      'features/coach_hub/presentation/sections/biblioteca/widgets/templates_tab.dart',
       'features/coach_hub/presentation/sections/chat/widgets/chat_detail_pane.dart',
       'features/coach_hub/presentation/sections/chat/widgets/chat_list_pane.dart',
       'features/coach_hub/presentation/sections/chat/widgets/chat_message_bubble.dart',

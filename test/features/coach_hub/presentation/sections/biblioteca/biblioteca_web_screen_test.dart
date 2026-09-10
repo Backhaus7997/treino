@@ -153,22 +153,32 @@ void main() {
   });
 
   group('BibliotecaWebScreen — contract', () {
-    testWidgets('mounts successfully and has 2 tabs — SCENARIO-BIBW-02a',
+    testWidgets('monta sin TabBar: la sección es sólo Ejercicios',
         (tester) async {
+      // Tenía dos tabs. «Templates Rutinas» se retiró porque las plantillas
+      // del PF se listaban acá Y en la sección Rutinas, con capacidades
+      // distintas — acá eran inertes. Con una sola tab, la TabBar sobra: es
+      // un encabezado que promete una elección que no existe.
       tester.view.physicalSize = const Size(1280, 900);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
-      await tester.pumpWidget(_wrap());
-      await tester.pump(); // single frame
+      // `_wrapWithData` y `pumpAndSettle`, no un frame suelto: el hero está
+      // adentro de un `TreinoFadeSlideIn` con stagger, que no construye a su
+      // hijo hasta que corre el delay. La versión anterior de este test se
+      // apoyaba en las etiquetas de la TabBar, que sí estaban en el primer
+      // frame por estar FUERA de la animación — al sacar la tab, no queda
+      // nada que assertear en frame 1.
+      await tester.pumpWidget(_wrapWithData());
+      await tester.pumpAndSettle();
 
-      // TabBar with 2 tabs must exist
-      expect(find.byType(TabBar), findsOneWidget);
-
-      // Both tab labels visible (labels include counts: "Ejercicios · N")
-      expect(find.textContaining('Ejercicios'), findsWidgets);
-      expect(find.textContaining('Templates Rutinas'), findsOneWidget);
+      expect(find.byType(TabBar), findsNothing);
+      expect(find.byType(Tab), findsNothing);
+      expect(find.textContaining('Templates Rutinas'), findsNothing);
+      // La sección se sigue anunciando. `TreinoSectionHeader` uppercasea el
+      // título (design system). El subtítulo lo cubre el test de abajo.
+      expect(find.text('BIBLIOTECA'), findsOneWidget);
     });
 
     testWidgets('does not render a Scaffold inside itself — SCENARIO-BIBW-02a',
@@ -243,7 +253,7 @@ void main() {
       expect(fadeSlideInAncestor.delay, AppMotion.stagger(0));
     });
 
-    testWidgets('shows honest subtitle with real exercise + template counts',
+    testWidgets('el subtítulo cuenta ejercicios, y ya no habla de templates',
         (tester) async {
       tester.view.physicalSize = const Size(1280, 900);
       tester.view.devicePixelRatio = 1.0;
@@ -253,13 +263,17 @@ void main() {
       await tester.pumpWidget(_wrapWithData());
       await tester.pumpAndSettle();
 
-      // 2 catalog + 1 custom = 3 ejercicios · 2 templates.
+      // 2 de catálogo + 1 propio = 3 ejercicios.
       expect(find.textContaining('3 ejercicios'), findsOneWidget);
-      expect(find.textContaining('2 templates'), findsOneWidget);
+      // El contador de templates se fue con la tab. Un subtítulo que sigue
+      // prometiendo plantillas en una sección que ya no las tiene es
+      // exactamente la clase de cartel que AGENTS.md §11.1 prohíbe.
+      expect(find.textContaining('templates'), findsNothing);
     });
 
-    testWidgets('still has exactly 2 tabs with no own Scaffold/SafeArea',
-        (tester) async {
+    // Lo que importa de este test sobrevive a la tab: el contrato de sección
+    // de ADR-CHW-005. El chrome lo pone el shell, no la pantalla.
+    testWidgets('sigue sin Scaffold ni SafeArea propios', (tester) async {
       tester.view.physicalSize = const Size(1280, 900);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -268,7 +282,6 @@ void main() {
       await tester.pumpWidget(_wrap());
       await tester.pump();
 
-      expect(find.byType(Tab), findsNWidgets(2));
       expect(find.byType(Scaffold), findsOneWidget);
       expect(find.byType(SafeArea), findsNothing);
     });
