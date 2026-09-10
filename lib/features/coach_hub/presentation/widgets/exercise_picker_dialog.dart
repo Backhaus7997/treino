@@ -968,16 +968,17 @@ CustomExercise? _customWithId(List<CustomExercise> items, String id) {
 /// Ver `picker_panel_width_provider.dart` para el rango y por qué.
 const double kAnchoPanelPicker = kAnchoPanelPickerDefault;
 
-/// Ancho del asa de arrastre: `AppSpacing.s8`.
+/// Ancho del asa de arrastre: `AppSpacing.s12`.
 ///
 /// Es el primer separador arrastrable del hub, así que no hay precedente que
 /// copiar — el número sale de la escala de spacing, que es lo que el guard
 /// `no_off_scale_spacing_scan` permite.
 ///
-/// Ocho y no uno: un asa del ancho del borde que dibuja es imposible de
-/// agarrar sin apuntar. El borde sigue midiendo 1 px; lo que mide 8 es el
-/// blanco de agarre, que es invisible salvo por el cursor.
-const double kAnchoAsaPanel = AppSpacing.s8;
+/// Doce y no uno: un asa del ancho del borde que dibuja es imposible de
+/// agarrar sin apuntar. El borde sigue midiendo 1 px; lo que mide 12 es el
+/// blanco de agarre, invisible salvo por el cursor. Empezó en 8 y lo subió el
+/// PF después de probarlo en la pantalla real, que es donde se decide esto.
+const double kAnchoAsaPanel = AppSpacing.s12;
 
 /// El picker como PANEL LATERAL persistente (#860).
 ///
