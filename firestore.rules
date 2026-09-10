@@ -106,6 +106,54 @@ service cloud.firestore {
           && get(/databases/$(database)/documents/follows/$(id)).data.status == 'accepted';
     }
 
+    // ── Paywall del alumno suelto — el predicado de "¿a éste se le aplica?" ──
+    //
+    // Vive en el scope RAÍZ, no adentro de un match, porque lo consumen dos
+    // ramas del árbol que son hermanas y no se ven entre sí:
+    //   • `match /routines/{routineId}` — los topes de forma de la rutina
+    //     propia (días y semanas).
+    //   • `match /users/{uid}/sessions/{sessionId}` — que un free no ENTRENE
+    //     una plantilla paga del catálogo.
+    // Mismo criterio que los guards genéricos de más arriba: sin conocimiento
+    // de colección propia y con más de un consumidor ⇒ arriba, una sola vez.
+    // Duplicarla sería tener dos definiciones de un predicado de AUTORIZACIÓN,
+    // que es la peor clase de duplicado: divergen en silencio y la mitad que
+    // se olvida queda abierta.
+    //
+    // Lee UN campo denormalizado, `users/{uid}.athletePaywallEnforced`, que
+    // escribe una Cloud Function. NO se leen acá ni la suscripción ni los
+    // vínculos, y no es por comodidad:
+    //
+    //   • El vínculo con un PF EXIME al alumno (spec §2: el vinculado no paga
+    //     nunca, su PF ya paga por él). Pero `trainer_links` usa ids
+    //     autogenerados y las reglas NO PUEDEN hacer queries — sólo `get()` a
+    //     un path conocido. Desde acá es imposible saber si tiene vínculo.
+    //   • `session_shares/{athleteId}` sí es determinístico por atleta, pero
+    //     lo escribe el PROPIO alumno: usarlo para eximir sería dejar que
+    //     cada uno se auto-exima creando un doc.
+    //
+    // Así que la resolución (suscripción OR vínculo activo) vive en la CF, y
+    // acá se lee su conclusión.
+    //
+    // **AUSENTE ⇒ NO SE APLICA**, y ese default es deliberado: mientras el
+    // escritor no exista, toda regla que dependa de esto es INERTE. Lo
+    // contrario —ausente ⇒ se aplica— le cortaría la app a TODOS los atletas
+    // el día que se deploye, sin que ninguno tenga forma de pagar todavía.
+    // Las reglas no leen el flag del cliente: se aplican apenas se suben.
+    //
+    // El `u != null` NO es defensivo de más: `get()` devuelve null cuando el
+    // documento no existe, y tocarle `.data` a null no deniega — tira ERROR DE
+    // EVALUACIÓN, que rebota la escritura entera con un mensaje que no dice
+    // nada. Pasa de verdad: hay escrituras legítimas de usuarios sin doc de
+    // perfil todavía, y sin esta guarda rompían tests que no tienen nada que
+    // ver con el paywall.
+    //
+    // Sin doc ⇒ no se aplica, mismo default seguro que el campo ausente.
+    function paywallEnforcedFor(uid) {
+      let u = get(/databases/$(database)/documents/users/$(uid));
+      return u != null && u.data.get('athletePaywallEnforced', false) == true;
+    }
+
     match /users/{uid} {
       // Owner-only read.
       allow read: if request.auth != null
@@ -340,18 +388,12 @@ service cloud.firestore {
       // Es el mismo criterio que `AthleteEntitlement.unknown` del lado Dart:
       // ante la duda no se gatea. Fallar cerrado le bloquea la app a alguien
       // que no hizo nada malo.
-      // El `u != null` NO es defensivo de más: `get()` devuelve null cuando el
-      // documento no existe, y tocarle `.data` a null no deniega — tira
-      // ERROR DE EVALUACIÓN, que rebota la escritura entera con un mensaje que
-      // no dice nada. Pasa de verdad: hay escrituras legítimas de usuarios sin
-      // doc de perfil todavía, y sin esta guarda rompían tests que no tienen
-      // nada que ver con el paywall.
       //
-      // Sin doc ⇒ no se aplica, mismo default seguro que el campo ausente.
-      function paywallEnforcedFor(uid) {
-        let u = get(/databases/$(database)/documents/users/$(uid));
-        return u != null && u.data.get('athletePaywallEnforced', false) == true;
-      }
+      // ⚠️  `paywallEnforcedFor()` YA NO VIVE ACÁ. Subió al scope raíz porque
+      // `match /users/{uid}/sessions/{sessionId}` es un match HERMANO de éste
+      // y no veía la función. Duplicarla habría dado dos definiciones del
+      // mismo predicado de autorización, que es exactamente el modo de falla
+      // que documenta el bloque de guards genéricos de arriba.
 
       // La forma que la rutina tiene que cumplir cuando el paywall aplica.
       // `days` es una lista del MISMO documento que se está escribiendo, así
@@ -2212,7 +2254,63 @@ service cloud.firestore {
                   && (request.auth.uid == uid
                       || (exists(/databases/$(database)/documents/session_shares/$(uid))
                           && get(/databases/$(database)/documents/session_shares/$(uid)).data.trainerId == request.auth.uid));
-      allow write: if request.auth != null && request.auth.uid == uid;
+      // ── Paywall del alumno — que un free no ENTRENE una plantilla paga ─────
+      //
+      // El eje del catálogo (spec §4.1.1: principiante gratis, intermedio y
+      // avanzado pagos) tenía su enforcement SÓLO en la UI del teléfono
+      // (#1066: la grilla, "Seguir" y EMPEZAR). Los dos relojes escriben acá
+      // DIRECTO —el Wear con el SDK de Dart, el watchOS por REST con su propia
+      // credencial— y ninguno de los dos pasa por esas pantallas. Un cliente
+      // parcheado tampoco. Acá está la ley.
+      //
+      // **Sólo el CREATE**, y es la decisión más importante de este bloque.
+      // Un `update` es `finish()`: cerrar un entreno que YA existe. Si la
+      // sesión se creó cuando el alumno tenía derecho —y después se le venció
+      // la suscripción, o se terminó el vínculo con su PF— rebotarle el cierre
+      // le borraría un entrenamiento que de verdad hizo. Eso es exactamente el
+      // daño que este bloque existe para evitar, así que el tope frena ANTES
+      // de empezar y nunca en el medio. Mismo criterio que la spec §5 aplica a
+      // las rutinas: al cancelar se congela lo nuevo, no se destruye lo hecho.
+      //
+      // El orden de los disyuntos es el orden del costo: los dos `get()` son
+      // lecturas facturadas, y `||` corta por izquierda. Un alumno sin paywall
+      // aplicado paga UNA lectura y nunca la de la rutina.
+      //
+      // `routineId` es `required` en el modelo (`session.dart:16`) y el
+      // watchOS lo exige para siquiera armar la sesión
+      // (`HistorySync.swift:142`), así que en el camino gateado su ausencia no
+      // es un cliente viejo: es un payload que la app no produce. Se deniega.
+      allow create: if request.auth != null
+                    && request.auth.uid == uid
+                    && (!paywallEnforcedFor(uid)
+                        || sesionSobreRutinaLibre(request.resource.data));
+
+      // Update y delete NO llevan el gate, por lo dicho arriba: cerrar o
+      // corregir un entreno empezado no puede depender de un derecho que se
+      // pudo vencer en el medio.
+      allow update, delete: if request.auth != null && request.auth.uid == uid;
+
+      // `true` si la rutina que la sesión apunta NO es del catálogo pago.
+      //
+      // Falla ABIERTO en los dos bordes, igual que `paywallEnforcedFor`:
+      //   • rutina inexistente (`r == null`) ⇒ libre. `get()` de un doc que no
+      //     está devuelve null, y desreferenciarlo tira ERROR DE EVALUACIÓN
+      //     —que rebota la escritura con un mensaje que no dice nada—, no un
+      //     deny limpio. Y una sesión sobre una rutina borrada es un problema
+      //     de datos, no de cobro.
+      //   • `isPremium` ausente ⇒ libre. Es el mismo default que el modelo
+      //     Dart (`routine.dart`: `@Default(false)`), y hace que un error de
+      //     siembra abra en vez de cobrar.
+      function sesionSobreRutinaLibre(d) {
+        return d.get('routineId', null) is string
+            && d.routineId.size() > 0
+            && !rutinaEsPaga(d.routineId);
+      }
+
+      function rutinaEsPaga(routineId) {
+        let r = get(/databases/$(database)/documents/routines/$(routineId));
+        return r != null && r.data.get('isPremium', false) == true;
+      }
 
       // setLogs sub-collection (REQ-SETLOGS-001..004, trainer-athlete-set-logs).
       // Read mirrors parent session-share predicate: owner OR linked trainer.
