@@ -48,8 +48,7 @@ class AparienciaTab extends ConsumerWidget {
           decoration: BoxDecoration(
             color: TreinoCardTokens.background(context),
             border: Border.all(color: TreinoCardTokens.border(context)),
-            borderRadius:
-                BorderRadius.circular(TreinoCardTokens.borderRadius),
+            borderRadius: BorderRadius.circular(TreinoCardTokens.borderRadius),
             boxShadow: TreinoCardTokens.boxShadow,
           ),
           child: Column(
@@ -105,7 +104,9 @@ class _ThemeOption extends StatelessWidget {
       onTap: onTap,
       builder: (ctx, states) => AnimatedContainer(
         key: Key('appearance_${label.toLowerCase()}'),
-        duration: AppMotion.resolve(ctx, AppMotion.fast),
+        // EL HOVER NO ANIMA; el cambio de SELECCIÓN sí — #1063.
+        duration:
+            selected ? AppMotion.resolve(ctx, AppMotion.fast) : Duration.zero,
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.s14,
           vertical: AppSpacing.s12,

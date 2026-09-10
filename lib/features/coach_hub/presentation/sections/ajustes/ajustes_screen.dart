@@ -125,7 +125,11 @@ class _SubNav extends StatelessWidget {
             onTap: () => FirebaseAuth.instance.signOut(),
             builder: (ctx, states) => AnimatedContainer(
               key: const Key('ajustes_sign_out'),
-              duration: AppMotion.resolve(ctx, AppMotion.fast),
+              // EL HOVER NO ANIMA. Un puntero es manipulación directa: el fondo tiene
+              // que estar donde está el cursor, no llegando. A 120/180 ms, barrer
+              // deja ESTELA — el anterior sigue apagándose cuando el siguiente ya se
+              // encendió. Mismo criterio de #1063, que no llegó hasta acá.
+              duration: Duration.zero,
               padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.s14,
                 vertical: AppSpacing.s12,
@@ -209,7 +213,10 @@ class _SubNavItem extends StatelessWidget {
 
             return AnimatedContainer(
               key: Key('ajustes_subnav_${tab.name}'),
-              duration: AppMotion.resolve(ctx, AppMotion.fast),
+              // EL HOVER NO ANIMA; el cambio de SELECCIÓN sí — #1063.
+              duration: selected
+                  ? AppMotion.resolve(ctx, AppMotion.fast)
+                  : Duration.zero,
               curve: AppMotion.standard,
               margin: const EdgeInsets.only(bottom: AppSpacing.hairline),
               padding: const EdgeInsets.symmetric(

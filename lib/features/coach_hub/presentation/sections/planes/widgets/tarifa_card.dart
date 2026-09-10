@@ -87,7 +87,11 @@ class TarifaCard extends StatelessWidget {
               '${masUsada ? ', más usada' : ''}', // i18n
           child: AnimatedContainer(
             key: const Key('tarifa_card_root'),
-            duration: AppMotion.resolve(ctx, AppMotion.fast),
+            // EL HOVER NO ANIMA. Un puntero es manipulación directa: el fondo tiene
+            // que estar donde está el cursor, no llegando. A 120/180 ms, barrer
+            // deja ESTELA — el anterior sigue apagándose cuando el siguiente ya se
+            // encendió. Mismo criterio de #1063, que no llegó hasta acá.
+            duration: Duration.zero,
             curve: AppMotion.standard,
             padding: const EdgeInsets.all(AppSpacing.s18),
             decoration: BoxDecoration(
