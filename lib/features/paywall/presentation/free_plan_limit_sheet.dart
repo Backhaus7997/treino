@@ -5,6 +5,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
+import '../domain/athlete_entitlement.dart';
 
 /// Qué eje del plan free se tocó. Cambia sólo el cuerpo del mensaje: el título
 /// y la acción son los mismos.
@@ -41,6 +42,31 @@ enum FreePlanLimit {
   /// no restringe lo que el alumno PUEDE HACER, sino hasta dónde puede MIRAR
   /// lo que ya hizo.
   chartHistory,
+
+  /// La rutina propia que está editando YA tiene más días que el tope, y por
+  /// eso el guardado entero rebota.
+  ///
+  /// **Es un límite de naturaleza distinta a [days], y por eso no lo reusa.**
+  /// [days] frena un "+" que todavía no ocurrió: nada se perdió, el tope se
+  /// explica en futuro. Éste habla de un documento que YA existe con esa
+  /// forma — típicamente uno que el alumno armó antes de que el paywall se
+  /// encendiera, o mientras estaba vinculado a un PF que después dejó de
+  /// pagar por él. Decirle "armás rutinas de hasta N días" a alguien que está
+  /// mirando la suya de N+1 no explica nada: la pregunta que tiene es qué
+  /// hace AHORA con ésta.
+  ///
+  /// Y tiene respuesta, que es lo que hace que valga la pena el valor
+  /// separado: `firestore.rules` mide el documento RESULTANTE, así que
+  /// recortarla al tope guarda bien. El cuerpo de este caso es el único de la
+  /// hoja que pide una acción concreta en vez de nombrar un límite.
+  shapeDays,
+
+  /// El hermano de [shapeDays] para el eje SEMANAS.
+  ///
+  /// Existe porque `withinFreeRoutineShape` mide las DOS dimensiones en la
+  /// misma cláusula: cubrir sólo los días dejaría la rutina periodizada
+  /// cayendo en el `permission-denied` crudo que este caso vino a sacar.
+  shapeWeeks,
 }
 
 /// Hoja que explica por qué no se pudo agregar un día (o una semana) más.
@@ -54,11 +80,28 @@ enum FreePlanLimit {
 /// (`docs/paywall-alumno-suelto.md` §7.1), y un CTA que no lleva a ningún lado
 /// es peor que no tenerlo: promete una salida que no está. Cuando el checkout
 /// exista, [onUpgrade] deja de ser `null` y la hoja dibuja el botón sola.
+///
+/// [actual] es cuántos días (o semanas) tiene HOY la rutina, y sólo lo usan
+/// [FreePlanLimit.shapeDays] y [FreePlanLimit.shapeWeeks] — los dos casos que
+/// hablan de un documento que ya existe fuera de forma. El tope contra el que
+/// se compara NO se pasa: la hoja lo lee de [kFreeMaxRoutineDays] /
+/// [kFreeMaxRoutineWeeks]. Es deliberado. El número ya vivía escrito a mano
+/// dentro de las cadenas del `.arb` y quedó mintiendo el día que el tope
+/// cambió; que la única fuente sea la constante es lo que hace que no pueda
+/// volver a pasar.
 Future<void> showFreePlanLimitSheet(
   BuildContext context, {
   required FreePlanLimit limit,
+  int? actual,
   VoidCallback? onUpgrade,
 }) {
+  assert(
+    (limit != FreePlanLimit.shapeDays && limit != FreePlanLimit.shapeWeeks) ||
+        actual != null,
+    'shapeDays/shapeWeeks describen una rutina concreta: sin `actual` el '
+    'cuerpo no puede decir cuántos días tiene ni cuántos sobran, que es todo '
+    'lo que los distingue de days/weeks.',
+  );
   final palette = AppPalette.of(context);
   return showModalBottomSheet<void>(
     context: context,
@@ -66,14 +109,23 @@ Future<void> showFreePlanLimitSheet(
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
     ),
-    builder: (ctx) => _FreePlanLimitBody(limit: limit, onUpgrade: onUpgrade),
+    builder: (ctx) => _FreePlanLimitBody(
+      limit: limit,
+      actual: actual,
+      onUpgrade: onUpgrade,
+    ),
   );
 }
 
 class _FreePlanLimitBody extends StatelessWidget {
-  const _FreePlanLimitBody({required this.limit, this.onUpgrade});
+  const _FreePlanLimitBody({
+    required this.limit,
+    this.actual,
+    this.onUpgrade,
+  });
 
   final FreePlanLimit limit;
+  final int? actual;
   final VoidCallback? onUpgrade;
 
   @override
@@ -125,16 +177,34 @@ class _FreePlanLimitBody extends StatelessWidget {
             const SizedBox(height: AppSpacing.s12),
             Text(
               switch (limit) {
-                FreePlanLimit.days => l10n.paywallFreePlanLimitDaysBody,
+                FreePlanLimit.days =>
+                  l10n.paywallFreePlanLimitDaysBody(kFreeMaxRoutineDays),
                 FreePlanLimit.weeks => l10n.paywallFreePlanLimitWeeksBody,
                 FreePlanLimit.premiumTemplate =>
                   l10n.paywallFreePlanLimitTemplateBody,
                 FreePlanLimit.customizeTemplate =>
-                  l10n.paywallFreePlanLimitCustomizeTemplateBody,
+                  l10n.paywallFreePlanLimitCustomizeTemplateBody(
+                    kFreeMaxRoutineDays,
+                  ),
                 FreePlanLimit.routineCount =>
                   l10n.paywallFreePlanLimitRoutineCountBody,
                 FreePlanLimit.chartHistory =>
                   l10n.paywallFreePlanLimitChartHistoryBody,
+                // El `?? 0` no se alcanza: el assert de
+                // `showFreePlanLimitSheet` exige `actual` para estos dos. Está
+                // para que la falta en release degrade a un cuerpo raro y no a
+                // un crash sobre una pantalla que el alumno abrió para
+                // entender por qué no puede guardar.
+                FreePlanLimit.shapeDays =>
+                  l10n.paywallFreePlanLimitShapeDaysBody(
+                    actual ?? 0,
+                    kFreeMaxRoutineDays,
+                  ),
+                FreePlanLimit.shapeWeeks =>
+                  l10n.paywallFreePlanLimitShapeWeeksBody(
+                    actual ?? 0,
+                    kFreeMaxRoutineWeeks,
+                  ),
               },
               style: GoogleFonts.inter(
                 fontSize: 14,

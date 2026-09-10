@@ -4341,12 +4341,23 @@ class AppL10nEs extends AppL10n {
   String get paywallFreePlanLimitTitle => 'Esto es parte del plan pago';
 
   @override
-  String get paywallFreePlanLimitDaysBody =>
-      'Con el plan gratis armás rutinas de hasta 2 días. Las plantillas de principiante del catálogo las seguís completas, sin tope.';
+  String paywallFreePlanLimitDaysBody(int max) {
+    return 'Con el plan gratis armás rutinas de hasta $max días. Las plantillas de principiante del catálogo las seguís completas, sin tope.';
+  }
 
   @override
   String get paywallFreePlanLimitWeeksBody =>
       'Periodizar en varias semanas es parte del plan pago. Con el gratis tu rutina propia va de a una semana.';
+
+  @override
+  String paywallFreePlanLimitShapeDaysBody(int actual, int max) {
+    return 'Esta rutina tiene $actual días y con el plan gratis guardás hasta $max. Sacá los que sobren y vas a poder guardar los cambios. Entrenarla completa no tiene tope.';
+  }
+
+  @override
+  String paywallFreePlanLimitShapeWeeksBody(int actual, int max) {
+    return 'Esta rutina está periodizada en $actual semanas y con el plan gratis guardás hasta $max. Podés dejarla en $max para guardar los cambios, o pasarte al plan pago. Entrenarla completa no tiene tope.';
+  }
 
   @override
   String get paywallFreePlanLimitUpgrade => 'Ver el plan pago';
@@ -4359,8 +4370,9 @@ class AppL10nEs extends AppL10n {
       'Esta plantilla es parte del plan pago. Las de nivel principiante las podés usar completas con el plan gratis.';
 
   @override
-  String get paywallFreePlanLimitCustomizeTemplateBody =>
-      'Personalizar una plantilla del catálogo es parte del plan pago. Con el gratis la seguís tal cual, sin tope de días, o armás tu propia rutina de hasta 2 días.';
+  String paywallFreePlanLimitCustomizeTemplateBody(int max) {
+    return 'Personalizar una plantilla del catálogo es parte del plan pago. Con el gratis la seguís tal cual, sin tope de días, o armás tu propia rutina de hasta $max días.';
+  }
 
   @override
   String get workoutPlantillasPremiumChip => 'PLAN PAGO';
@@ -8728,12 +8740,23 @@ class AppL10nEsAr extends AppL10nEs {
   String get paywallFreePlanLimitTitle => 'Esto es parte del plan pago';
 
   @override
-  String get paywallFreePlanLimitDaysBody =>
-      'Con el plan gratis armás rutinas de hasta 2 días. Las plantillas de principiante del catálogo las seguís completas, sin tope.';
+  String paywallFreePlanLimitDaysBody(int max) {
+    return 'Con el plan gratis armás rutinas de hasta $max días. Las plantillas de principiante del catálogo las seguís completas, sin tope.';
+  }
 
   @override
   String get paywallFreePlanLimitWeeksBody =>
       'Periodizar en varias semanas es parte del plan pago. Con el gratis tu rutina propia va de a una semana.';
+
+  @override
+  String paywallFreePlanLimitShapeDaysBody(int actual, int max) {
+    return 'Esta rutina tiene $actual días y con el plan gratis guardás hasta $max. Sacá los que sobren y vas a poder guardar los cambios. Entrenarla completa no tiene tope.';
+  }
+
+  @override
+  String paywallFreePlanLimitShapeWeeksBody(int actual, int max) {
+    return 'Esta rutina está periodizada en $actual semanas y con el plan gratis guardás hasta $max. Podés dejarla en $max para guardar los cambios, o pasarte al plan pago. Entrenarla completa no tiene tope.';
+  }
 
   @override
   String get paywallFreePlanLimitUpgrade => 'Ver el plan pago';
@@ -8746,8 +8769,9 @@ class AppL10nEsAr extends AppL10nEs {
       'Esta plantilla es parte del plan pago. Las de nivel principiante las podés usar completas con el plan gratis.';
 
   @override
-  String get paywallFreePlanLimitCustomizeTemplateBody =>
-      'Personalizar una plantilla del catálogo es parte del plan pago. Con el gratis la seguís tal cual, sin tope de días, o armás tu propia rutina de hasta 2 días.';
+  String paywallFreePlanLimitCustomizeTemplateBody(int max) {
+    return 'Personalizar una plantilla del catálogo es parte del plan pago. Con el gratis la seguís tal cual, sin tope de días, o armás tu propia rutina de hasta $max días.';
+  }
 
   @override
   String get workoutPlantillasPremiumChip => 'PLAN PAGO';

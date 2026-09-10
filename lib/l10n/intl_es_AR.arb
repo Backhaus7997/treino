@@ -3738,13 +3738,42 @@
   "@paywallFreePlanLimitTitle": {
     "description": "Titulo de la hoja que se abre cuando un alumno en plan free toca el + que cruzaria el tope de dias o semanas de su propia rutina."
   },
-  "paywallFreePlanLimitDaysBody": "Con el plan gratis armás rutinas de hasta 2 días. Las plantillas de principiante del catálogo las seguís completas, sin tope.",
+  "paywallFreePlanLimitDaysBody": "Con el plan gratis armás rutinas de hasta {max} días. Las plantillas de principiante del catálogo las seguís completas, sin tope.",
   "@paywallFreePlanLimitDaysBody": {
-    "description": "Cuerpo para el tope de DIAS. Aclara que el catalogo de principiante sigue libre, para que el limite no se lea como que no puede entrenar."
+    "description": "Cuerpo para el tope de DIAS, al tocar el + que lo cruzaria. El numero va por placeholder y no escrito a mano: vivia como un 2 literal en esta cadena y quedo mintiendo el dia que kFreeMaxRoutineDays paso a 3. Aclara que el catalogo de principiante sigue libre, para que el limite no se lea como que no puede entrenar.",
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
   },
   "paywallFreePlanLimitWeeksBody": "Periodizar en varias semanas es parte del plan pago. Con el gratis tu rutina propia va de a una semana.",
   "@paywallFreePlanLimitWeeksBody": {
     "description": "Cuerpo para el tope de SEMANAS."
+  },
+  "paywallFreePlanLimitShapeDaysBody": "Esta rutina tiene {actual} días y con el plan gratis guardás hasta {max}. Sacá los que sobren y vas a poder guardar los cambios. Entrenarla completa no tiene tope.",
+  "@paywallFreePlanLimitShapeDaysBody": {
+    "description": "Cuerpo de la hoja cuando el alumno free intenta GUARDAR una rutina propia que YA tiene mas dias que el tope — tipicamente una que armo antes de que el paywall se encendiera, o mientras estaba vinculado a un PF. Distinto de paywallFreePlanLimitDaysBody: aquel frena un + que todavia no paso, este explica un documento que ya existe. Tiene que ser ACCIONABLE porque hay salida real: firestore.rules mide el documento RESULTANTE, asi que recortar a {max} dias guarda bien. La ultima frase no es relleno: entrenar escribe en sessions y no pasa por la regla de forma, y sin decirlo el alumno cree que perdio la rutina.",
+    "placeholders": {
+      "actual": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "paywallFreePlanLimitShapeWeeksBody": "Esta rutina está periodizada en {actual} semanas y con el plan gratis guardás hasta {max}. Podés dejarla en {max} para guardar los cambios, o pasarte al plan pago. Entrenarla completa no tiene tope.",
+  "@paywallFreePlanLimitShapeWeeksBody": {
+    "description": "El hermano de paywallFreePlanLimitShapeDaysBody para el eje SEMANAS. Existe porque firestore.rules mide las dos dimensiones en la misma clausula (withinFreeRoutineShape): cubrir solo los dias dejaria la rutina periodizada cayendo en el permission-denied crudo que este trabajo vino a sacar.",
+    "placeholders": {
+      "actual": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
   },
   "paywallFreePlanLimitUpgrade": "Ver el plan pago",
   "@paywallFreePlanLimitUpgrade": {
@@ -3756,9 +3785,14 @@
   "@paywallFreePlanLimitTemplateBody": {
     "description": "Cuerpo de la hoja cuando el alumno toca una plantilla del catalogo marcada isPremium. Nombra la salida gratis (las de principiante) para que el limite no se lea como que el catalogo entero esta cerrado."
   },
-  "paywallFreePlanLimitCustomizeTemplateBody": "Personalizar una plantilla del catálogo es parte del plan pago. Con el gratis la seguís tal cual, sin tope de días, o armás tu propia rutina de hasta 2 días.",
+  "paywallFreePlanLimitCustomizeTemplateBody": "Personalizar una plantilla del catálogo es parte del plan pago. Con el gratis la seguís tal cual, sin tope de días, o armás tu propia rutina de hasta {max} días.",
   "@paywallFreePlanLimitCustomizeTemplateBody": {
-    "description": "Cuerpo de la hoja cuando el alumno free toca 'Usar como base' sobre una plantilla del catalogo. Distinto del caso isPremium: aca la plantilla puede ser gratis y lo pago es COPIARLA. Nombra las DOS salidas gratis (seguirla tal cual, o armar una propia) para que no se lea como que el catalogo se cerro."
+    "description": "Cuerpo de la hoja cuando el alumno free toca 'Usar como base' sobre una plantilla del catalogo. Distinto del caso isPremium: aca la plantilla puede ser gratis y lo pago es COPIARLA. Nombra las DOS salidas gratis (seguirla tal cual, o armar una propia) para que no se lea como que el catalogo se cerro. El numero va por placeholder por el mismo motivo que en DaysBody.",
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
   },
   "workoutPlantillasPremiumChip": "PLAN PAGO",
   "@workoutPlantillasPremiumChip": {

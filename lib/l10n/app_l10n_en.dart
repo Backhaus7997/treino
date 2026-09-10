@@ -4263,10 +4263,22 @@ class AppL10nEn extends AppL10n {
   String get paywallFreePlanLimitTitle => '';
 
   @override
-  String get paywallFreePlanLimitDaysBody => '';
+  String paywallFreePlanLimitDaysBody(int max) {
+    return '';
+  }
 
   @override
   String get paywallFreePlanLimitWeeksBody => '';
+
+  @override
+  String paywallFreePlanLimitShapeDaysBody(int actual, int max) {
+    return '';
+  }
+
+  @override
+  String paywallFreePlanLimitShapeWeeksBody(int actual, int max) {
+    return '';
+  }
 
   @override
   String get paywallFreePlanLimitUpgrade => '';
@@ -4278,7 +4290,9 @@ class AppL10nEn extends AppL10n {
   String get paywallFreePlanLimitTemplateBody => '';
 
   @override
-  String get paywallFreePlanLimitCustomizeTemplateBody => '';
+  String paywallFreePlanLimitCustomizeTemplateBody(int max) {
+    return '';
+  }
 
   @override
   String get workoutPlantillasPremiumChip => '';

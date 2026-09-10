@@ -29,6 +29,8 @@ import 'package:treino/features/workout/application/user_routines_providers.dart
 import 'package:treino/features/workout/data/routine_repository.dart';
 import 'package:treino/features/workout/domain/custom_exercise.dart';
 import 'package:treino/features/workout/domain/routine.dart';
+import 'package:treino/features/workout/domain/routine_day.dart';
+import 'package:treino/features/workout/domain/routine_slot.dart';
 import 'package:treino/features/workout/domain/routine_source.dart';
 import 'package:treino/features/workout/domain/routine_visibility.dart';
 import 'package:treino/features/workout/presentation/routine_editor_mode.dart';
@@ -185,7 +187,7 @@ void main() {
   });
 
   group('flag apagado — el estado en que esto shipea', () {
-    testWidgets('el alumno free llega al tercer día sin ver ninguna hoja',
+    testWidgets('el alumno free llega al cuarto día sin ver ninguna hoja',
         (tester) async {
       // ESTE es el test que protege a los 8 testers de hoy: nadie puede pagar
       // todavía, así que todos son `free`. Si el gate estuviera activo, este
@@ -200,16 +202,17 @@ void main() {
       );
 
       await _tapAgregarDia(tester);
-      await _tapAgregarDia(tester); // el que cruzaría el tope de 2
+      await _tapAgregarDia(tester);
+      await _tapAgregarDia(tester); // el que cruzaría el tope de 3
 
       expect(_sheet, findsNothing);
-      expect(find.byKey(const Key('day_tab_2')), findsOneWidget,
-          reason: 'con el flag apagado el tercer día se agrega igual');
+      expect(find.byKey(const Key('day_tab_3')), findsOneWidget,
+          reason: 'con el flag apagado el cuarto día se agrega igual');
     });
   });
 
   group('flag encendido', () {
-    testWidgets('alumno free: el "+" del tercer día abre la hoja y NO agrega',
+    testWidgets('alumno free: el "+" del cuarto día abre la hoja y NO agrega',
         (tester) async {
       await _pumpEditor(
         tester,
@@ -221,12 +224,16 @@ void main() {
       );
 
       await _tapAgregarDia(tester); // 1 → 2, dentro del tope
-      expect(_sheet, findsNothing, reason: 'el segundo día es gratis');
+      await _tapAgregarDia(tester); // 2 → 3, es el tope y entra
+      expect(_sheet, findsNothing,
+          reason: 'el tercer día es el tope, y el tope entra: es la forma de '
+              'las tres plantillas de principiante que el free sigue gratis');
+      expect(find.byKey(const Key('day_tab_2')), findsOneWidget);
 
-      await _tapAgregarDia(tester); // 2 → 3, cruza
+      await _tapAgregarDia(tester); // 3 → 4, cruza
 
       expect(_sheet, findsOneWidget);
-      expect(find.byKey(const Key('day_tab_2')), findsNothing,
+      expect(find.byKey(const Key('day_tab_3')), findsNothing,
           reason: 'el día no se agregó');
     });
 
@@ -244,6 +251,7 @@ void main() {
       );
       await _tapAgregarDia(tester);
       await _tapAgregarDia(tester);
+      await _tapAgregarDia(tester); // el que cruza el tope de 3
 
       expect(_sheet, findsOneWidget);
       expect(find.byKey(const Key('free_plan_limit_upgrade')), findsNothing);
@@ -262,9 +270,10 @@ void main() {
 
       await _tapAgregarDia(tester);
       await _tapAgregarDia(tester);
+      await _tapAgregarDia(tester); // el que gatearía a un free
 
       expect(_sheet, findsNothing);
-      expect(find.byKey(const Key('day_tab_2')), findsOneWidget);
+      expect(find.byKey(const Key('day_tab_3')), findsOneWidget);
     });
 
     testWidgets('entitlement unknown: falla ABIERTO, deja pasar',
@@ -282,9 +291,10 @@ void main() {
 
       await _tapAgregarDia(tester);
       await _tapAgregarDia(tester);
+      await _tapAgregarDia(tester); // el que gatearía a un free confirmado
 
       expect(_sheet, findsNothing);
-      expect(find.byKey(const Key('day_tab_2')), findsOneWidget);
+      expect(find.byKey(const Key('day_tab_3')), findsOneWidget);
     });
 
     testWidgets('el PF nunca ve el gate, aunque figure como free',
@@ -303,9 +313,10 @@ void main() {
 
       await _tapAgregarDia(tester);
       await _tapAgregarDia(tester);
+      await _tapAgregarDia(tester); // el que gatearía a un alumno
 
       expect(_sheet, findsNothing);
-      expect(find.byKey(const Key('day_tab_2')), findsOneWidget);
+      expect(find.byKey(const Key('day_tab_3')), findsOneWidget);
     });
 
     testWidgets('alumno free: "+ Semana" abre la hoja y no suma la semana',
@@ -411,6 +422,208 @@ void main() {
       expect(_sheet, findsNothing);
       expect(find.text('Llegaste al máximo de 10 rutinas activas.'),
           findsOneWidget);
+    });
+  });
+
+  // ── La rutina PROPIA que ya está fuera de la forma free ──────────────────
+  //
+  // El agujero que quedaba después de cerrar las tres puertas del catálogo.
+  // El gate del destino exige `source == RoutineSource.system`, así que una
+  // rutina `user-created` no lo cruza nunca: hidrataba el editor entero, el
+  // alumno editaba, guardaba, y `firestore.rules` la rebotaba con "No tenés
+  // permisos. Recargá la app.".
+  //
+  // No es un caso de borde. Hoy el flag está apagado y la CF escribe
+  // `athletePaywallEnforced: false`, o sea que TODAS las rutinas que existan
+  // el día del encendido se armaron sin tope. A eso se suman las dos formas de
+  // perder el derecho con la rutina ya guardada: que se termine el vínculo con
+  // el PF que pagaba por vos, y que se venza tu suscripción.
+  group('rutina propia fuera de tope', () {
+    /// Un slot completo. Los días TIENEN que traer ejercicios: `_submit`
+    /// valida la rutina antes de mirar el paywall —un plan incompleto tiene un
+    /// problema más urgente y un mensaje más específico— así que una rutina
+    /// con días vacíos nunca llegaría al chequeo de forma.
+    const slot = RoutineSlot(
+      exerciseId: 'bench-press',
+      exerciseName: 'Press de Banca',
+      muscleGroup: 'chest',
+      targetSets: 3,
+      targetRepsMin: 8,
+      targetRepsMax: 12,
+      restSeconds: 90,
+      targetReps: [10],
+    );
+
+    /// Una rutina propia con [dias] días, como la que quedó de antes.
+    Routine mia({int dias = 4, int numWeeks = 1}) => Routine(
+          id: 'mia-1',
+          name: 'Mi full body',
+          split: null,
+          level: ExperienceLevel.beginner,
+          days: [
+            for (var i = 1; i <= dias; i++)
+              RoutineDay(dayNumber: i, name: 'Día $i', slots: const [slot]),
+          ],
+          source: RoutineSource.userCreated,
+          visibility: RoutineVisibility.private,
+          createdBy: 'athlete-1',
+          numWeeks: numWeeks,
+        );
+
+    _MockRoutineRepository repoCon(Routine fuente) {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any())).thenAnswer((_) async => fuente);
+      when(() => repo.updateUserOwned(
+                uid: any(named: 'uid'),
+                draft: any(named: 'draft'),
+              ))
+          .thenAnswer((inv) async =>
+              inv.namedArguments[const Symbol('draft')] as Routine);
+      return repo;
+    }
+
+    testWidgets('alumno free: la hoja aparece al ENTRAR, no al guardar',
+        (tester) async {
+      // El punto entero del cambio. Enterarse al abrir es lo que le ahorra
+      // reacomodar ejercicios media hora para después perder el trabajo.
+      final repo = repoCon(mia(dias: 4));
+      await _pumpEditor(
+        tester,
+        mode: const SelfCreating(existingRoutineId: 'mia-1'),
+        overrides: _overrides(
+          paywallEnabled: true,
+          entitlement: AthleteEntitlement.free,
+          repo: repo,
+        ),
+      );
+
+      expect(_sheet, findsOneWidget);
+    });
+
+    testWidgets('el aviso NO bloquea: el editor queda usable para recortar',
+        (tester) async {
+      // La asimetría deliberada con el gate del catálogo. Allá no hay nada que
+      // el alumno pueda hacer, así que se le corta la entrada. Acá la salida
+      // está adentro —sacar los días que sobran— y bloquear el editor sería
+      // dejarlo con una rutina que no puede ni tocar ni arreglar.
+      final repo = repoCon(mia(dias: 4));
+      await _pumpEditor(
+        tester,
+        mode: const SelfCreating(existingRoutineId: 'mia-1'),
+        overrides: _overrides(
+          paywallEnabled: true,
+          entitlement: AthleteEntitlement.free,
+          repo: repo,
+        ),
+      );
+      await tester.tap(find.byKey(const Key('free_plan_limit_dismiss')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('editor_name_field')), findsOneWidget,
+          reason: 'sin editor el alumno no tiene con qué recortar');
+      expect(find.byKey(const Key('day_tab_3')), findsOneWidget,
+          reason: 'los 4 días se hidrataron: se pueden sacar');
+    });
+
+    testWidgets('guardar sin recortar no escribe, y explica por qué',
+        (tester) async {
+      // El reemplazo del `permission-denied` crudo: la escritura ni sale.
+      final repo = repoCon(mia(dias: 4));
+      await _pumpEditor(
+        tester,
+        mode: const SelfCreating(existingRoutineId: 'mia-1'),
+        overrides: _overrides(
+          paywallEnabled: true,
+          entitlement: AthleteEntitlement.free,
+          repo: repo,
+        ),
+      );
+      await tester.tap(find.byKey(const Key('free_plan_limit_dismiss')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.widgetWithText(ElevatedButton, 'GUARDAR CAMBIOS'));
+      await tester.pumpAndSettle();
+
+      expect(_sheet, findsOneWidget);
+      expect(
+        find.text('No tenés permisos para hacer esto. Recargá la app.'),
+        findsNothing,
+        reason: 'ese mensaje es el que este trabajo vino a sacar: manda a '
+            'recargar, que no arregla nada',
+      );
+      verifyNever(() => repo.updateUserOwned(
+            uid: any(named: 'uid'),
+            draft: any(named: 'draft'),
+          ));
+    });
+
+    testWidgets('una rutina propia DENTRO del tope no ve nada', (tester) async {
+      // El control negativo. Con 3 días —la forma de las plantillas gratis—
+      // el alumno free edita y guarda sin ver una sola hoja.
+      final repo = repoCon(mia(dias: kFreeMaxRoutineDays));
+      await _pumpEditor(
+        tester,
+        mode: const SelfCreating(existingRoutineId: 'mia-1'),
+        overrides: _overrides(
+          paywallEnabled: true,
+          entitlement: AthleteEntitlement.free,
+          repo: repo,
+        ),
+      );
+
+      expect(_sheet, findsNothing);
+      expect(find.byKey(const Key('editor_name_field')), findsOneWidget);
+    });
+
+    testWidgets('alumno con derecho: su rutina de 4 días no le dice nada',
+        (tester) async {
+      final repo = repoCon(mia(dias: 4));
+      await _pumpEditor(
+        tester,
+        mode: const SelfCreating(existingRoutineId: 'mia-1'),
+        overrides: _overrides(
+          paywallEnabled: true,
+          entitlement: AthleteEntitlement.entitled,
+          repo: repo,
+        ),
+      );
+
+      expect(_sheet, findsNothing);
+    });
+
+    testWidgets('paywall apagado: nadie ve nada, que es como esto shipea',
+        (tester) async {
+      final repo = repoCon(mia(dias: 5));
+      await _pumpEditor(
+        tester,
+        mode: const SelfCreating(existingRoutineId: 'mia-1'),
+        overrides: _overrides(
+          paywallEnabled: false,
+          entitlement: AthleteEntitlement.free,
+          repo: repo,
+        ),
+      );
+
+      expect(_sheet, findsNothing);
+      expect(find.byKey(const Key('editor_name_field')), findsOneWidget);
+    });
+
+    testWidgets('el eje SEMANAS también se anticipa', (tester) async {
+      // `withinFreeRoutineShape` mide las dos dimensiones en la misma
+      // cláusula. Cubrir sólo los días dejaría la rutina periodizada cayendo
+      // en el mismo permission-denied crudo.
+      final repo = repoCon(mia(dias: 2, numWeeks: 4));
+      await _pumpEditor(
+        tester,
+        mode: const SelfCreating(existingRoutineId: 'mia-1'),
+        overrides: _overrides(
+          paywallEnabled: true,
+          entitlement: AthleteEntitlement.free,
+          repo: repo,
+        ),
+      );
+
+      expect(_sheet, findsOneWidget);
     });
   });
 
