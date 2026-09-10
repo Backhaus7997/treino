@@ -193,7 +193,11 @@ class _SkeletonRow extends StatelessWidget {
               width: 140,
               height: 14,
               decoration: BoxDecoration(
-                color: tokens.hoverBackground,
+                // Relleno NEUTRO, no el color de hover. El skeleton se colgaba
+                // de `hoverBackground` cuando ese token era `bgCard`; ahora que
+                // el hover es acento al 6 %, colgarse de él pintaría las barras
+                // de carga de color menta.
+                color: tokens.skeletonBackground,
                 borderRadius:
                     BorderRadius.circular(TreinoListRowTokens.borderRadius / 4),
               ),
