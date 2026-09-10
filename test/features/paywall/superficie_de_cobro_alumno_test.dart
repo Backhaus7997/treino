@@ -1,36 +1,56 @@
 // Guard de superficie de cobro — el lado del ALUMNO.
 //
-// ─── Qué regla protege ──────────────────────────────────────────────────────
+// ─── LEER ESTO PRIMERO: LA REGLA QUE PROTEGE CAMBIO ─────────────────────────
 //
-// `docs/paywall-alumno-suelto.md` §7 elige la Guideline **3.1.3(f)** de Apple
-// (*Free Stand-alone App*): la app móvil no vende nada **ni linkea al
-// checkout**; el alumno paga en la web y el entitlement llega por Firestore.
+// Este archivo nacio defendiendo la Guideline **3.1.3(f)** (*Free Stand-alone
+// App*): la app movil no vende nada ni linkea al checkout, el alumno paga en la
+// web y el entitlement llega por Firestore.
 //
-// La segunda mitad de esa frase es la que se rompe sola. Que la app no cobre
-// lo sostiene un tipo sellado (`PlanCheckoutOnWebOnly`) y lo fija el group
-// «guard de superficie» de `pricing_screen_test.dart`. Pero **abrir el
-// navegador hacia la pasarela no toca ese tipo**: es un `launchUrl` de una
-// línea, en cualquier archivo, y compila.
+// **Esa decision se revirtio.** El alumno paga por IAP (App Store + Google
+// Play) via RevenueCat. El motivo esta en `docs/paywall-alumno-suelto.md`: la
+// exencion 3.1.3(f) exige que la app sea companion de una *"paid web based
+// tool"*, y para el ALUMNO no existe ninguna superficie web — solo el PF tiene
+// Coach Hub. Sin web no habia exencion que invocar.
 //
-// ─── Por qué este archivo existe, si ya hay un guard ────────────────────────
+// El PF sigue cobrando por Mercado Pago desde la web, y eso NO cambia: ahi
+// 3.1.3(f) aplica de verdad.
 //
-// El de `pricing_screen_test.dart` es estructural sobre UNA carpeta:
-// `coach_hub/presentation/sections/facturacion_planes`. Es el paywall del
-// ENTRENADOR.
+// ─── POR QUE ESTE ARCHIVO SE REESCRIBIO EN VEZ DE BORRARSE ──────────────────
 //
-// El del ALUMNO vive en `lib/features/paywall/` y no estaba cubierto por
-// ninguno — y es justo donde va el trabajo nuevo: `free_plan_limit_sheet.dart`
-// tiene un `onUpgrade` hoy `null`, con un dartdoc que dice textual "cuando el
-// checkout exista, [onUpgrade] deja de ser null y la hoja dibuja el botón
-// sola". Ese es el día en que alguien tiene que decidir qué hace el botón, y
-// la respuesta correcta —no abrir nada— no la garantiza ningún tipo.
+// Porque cuando la decision se dio vuelta, **los guards no se pusieron rojos**.
+// Verificado por mutacion, no razonado: se cableo `Purchases.purchasePackage`
+// adentro de `lib/features/paywall/` y los cuatro tests siguieron verdes.
+//
+// La razon es que todos los guards de este archivo miraban APERTURA DE URL
+// (`launchUrl`, `url_launcher`, `WebViewController`). RevenueCat no usa ninguna:
+// habla por platform channel contra StoreKit y Play Billing. O sea que la
+// arquitectura que el repo blindo a mano se podia revertir en silencio.
+//
+// Un guard que no se pone rojo cuando la decision que defiende se revierte no
+// es un guard: es un archivo que miente. Por eso ahora hay un tercer eje —
+// **quien puede COMPRAR**— que es el que faltaba.
+//
+// ─── LOS TRES EJES QUE ESTE ARCHIVO FIJA ────────────────────────────────────
+//
+//   1. El paywall del alumno no abre nada afuera de la app.
+//      Sigue valiendo, y ahora por un motivo MAS fuerte: con IAP adentro, el
+//      intro de 3.1.3 prohibe *"encourage users to use a purchasing method
+//      other than in-app purchase"*, y la excepcion es solo para la storefront
+//      de EEUU. Argentina no lo es.
+//
+//   2. El repo entero declara quien abre una URL. (allowlist)
+//
+//   3. **NUEVO**: el repo entero declara quien COMPRA. (allowlist)
+//      Comprar adentro de la app es ahora lo correcto para el alumno, pero
+//      tiene que pasar por los archivos declarados y por ningun otro. Sin esto,
+//      cualquier pantalla puede disparar una compra y nadie se entera al
+//      revisar el PR.
 //
 // ─── El costo de equivocarse ────────────────────────────────────────────────
 //
-// No es un warning: es rechazo de review, o la comisión de la tienda sobre
-// cada suscripción. Y Argentina no está en el External Purchase Link
-// Entitlement, así que la salida "linkeamos con permiso" tampoco existe
-// (`docs/paywall-alumno-suelto.md` §7).
+// Del lado del PF, cobrar por afuera desde el binario movil es 3.1.3(c) y hoy
+// no hay exencion que lo cubra. Del lado del alumno, una compra disparada desde
+// un lugar no declarado es una que nadie reviso.
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -43,6 +63,19 @@ const _aperturasExternas = <String>[
   'WebViewController',
   'WebViewWidget',
   'InAppBrowser',
+];
+
+/// APIs que disparan una compra dentro de la app.
+///
+/// El import solo ya alcanza —no se puede usar el SDK sin importarlo— pero los
+/// metodos van igual: si algun dia el import se esconde detras de un barrel
+/// propio, la llamada sigue siendo visible.
+const _apisDeCompra = <String>[
+  'package:purchases_flutter',
+  'Purchases.purchasePackage',
+  'Purchases.purchaseProduct',
+  'Purchases.purchaseStoreProduct',
+  'package:in_app_purchase',
 ];
 
 /// El código de [f] sin comentarios.
@@ -170,8 +203,7 @@ void main() {
               'comentario de arriba y el encabezado de plan_checkout.dart',
     };
 
-    test('la lista de archivos que abren URLs es exactamente la declarada',
-        () {
+    test('la lista de archivos que abren URLs es exactamente la declarada', () {
       final encontrados = <String>{};
       for (final f in _dartsDe('lib')) {
         final codigo = _sinComentarios(f);
@@ -203,6 +235,54 @@ void main() {
         desaparecidos,
         isEmpty,
         reason: 'estos ya no abren nada: sacalos de `permitidos` para que la '
+            'lista siga diciendo la verdad\n${desaparecidos.join("\n")}',
+      );
+    });
+  });
+
+  group('quién puede COMPRAR en toda la app', () {
+    // El eje que faltaba, y el que dejo que la decision se revirtiera en
+    // silencio. Mismo patron que la allowlist de URLs de arriba: en vez de
+    // "esta carpeta no compra", **el repo entero declara quien compra**.
+    //
+    // Hoy la lista esta VACIA a proposito. No es un olvido: todavia no hay
+    // ningun cableado de compra en `lib/`. El primero que lo agregue va a poner
+    // rojo este test y va a tener que escribir aca por que ese archivo es un
+    // punto de compra legitimo. Ese medio minuto es todo el punto.
+    //
+    // Cuando llegue el cableado, la lista deberia quedar corta: el bootstrap
+    // que hace `Purchases.configure`, y el repositorio que dispara la compra.
+    // Una pantalla NO deberia estar aca — deberia llamar al repositorio.
+    const permitidos = <String, String>{};
+
+    test('la lista de archivos que compran es exactamente la declarada', () {
+      final encontrados = <String>{};
+      for (final f in _dartsDe('lib')) {
+        final codigo = _sinComentarios(f);
+        if (_apisDeCompra.any(codigo.contains)) {
+          encontrados.add(f.path.replaceAll(r'', '/'));
+        }
+      }
+
+      final nuevos = encontrados.difference(permitidos.keys.toSet());
+      expect(
+        nuevos,
+        isEmpty,
+        reason: 'archivos nuevos disparando una compra:\n'
+            '${nuevos.join("\n")}\n\n'
+            'Comprar adentro de la app es lo correcto para el ALUMNO, pero '
+            'tiene que pasar por un lugar declarado. Sumalo a `permitidos` con '
+            'su razón.\n\n'
+            'Y si esto aparecio en una pantalla del PF: pará. El profe NO '
+            'compra por IAP — paga por Mercado Pago desde la web, y meter su '
+            'cobro adentro de la app le cambia la comision del 0% al 15%.',
+      );
+
+      final desaparecidos = permitidos.keys.toSet().difference(encontrados);
+      expect(
+        desaparecidos,
+        isEmpty,
+        reason: 'estos ya no compran: sacalos de `permitidos` para que la '
             'lista siga diciendo la verdad\n${desaparecidos.join("\n")}',
       );
     });
