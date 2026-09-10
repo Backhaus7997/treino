@@ -15,6 +15,7 @@ import 'package:treino/features/coach_hub/presentation/shell/coach_hub_top_bar.d
 import 'package:treino/features/coach_hub/presentation/shell/mobile_banner.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 /// Monta el `CoachHubScaffold` dentro de un `ShellRoute`, con el `child`
 /// provisto por la ruta activa (como en producción, ADR-CHW-008). `prefs`
@@ -138,7 +139,7 @@ void main() {
 
       expect(find.byType(CoachHubSidebar), findsOneWidget);
       expect(_sidebarWidth(tester), 72); // forzado pese a provider=false
-      final toggle = tester.widget<IconButton>(
+      final toggle = tester.widget<TreinoIconButton>(
         find.byKey(const Key('sidebar_toggle_button')),
       );
       expect(toggle.onPressed, isNull);

@@ -76,8 +76,10 @@ class AthleteRoutinesScreen extends ConsumerWidget {
             delay: AppMotion.stagger(0),
             child: Row(
               children: [
-                IconButton(
-                  icon: Icon(TreinoIcon.arrowLeft, color: palette.textMuted),
+                TreinoIconButton(
+                  icon: TreinoIcon.arrowLeft,
+                  tooltip: 'Volver', // i18n
+                  color: palette.textMuted,
                   // `pop()` a secas asume que SIEMPRE se llego empujando.
                   // No es cierto: a esta pantalla se entra desde Rutinas (con
                   // `push`) y tambien desde Alumnos, y basta un link directo o
@@ -87,9 +89,8 @@ class AthleteRoutinesScreen extends ConsumerWidget {
                   //
                   // El fallback va a /rutinas, que es la lista de la que esta
                   // pantalla es el detalle.
-                  onPressed: () => context.canPop()
-                      ? context.pop()
-                      : context.go('/rutinas'),
+                  onPressed: () =>
+                      context.canPop() ? context.pop() : context.go('/rutinas'),
                 ),
                 const SizedBox(width: AppSpacing.hairline),
                 Expanded(
@@ -366,13 +367,12 @@ class _RoutineRowState extends ConsumerState<_RoutineRow> {
         children: [
           Icon(TreinoIcon.edit, size: 18, color: palette.textMuted),
           const SizedBox(width: AppSpacing.s8),
-          IconButton(
+          TreinoIconButton(
             key: ValueKey('routine_row_archive_button_${routine.id}'),
+            icon: TreinoIcon.archive,
             tooltip: 'Archivar', // i18n
-            icon: Icon(TreinoIcon.archive, size: 18, color: palette.textMuted),
+            color: palette.textMuted,
             onPressed: _handleArchiveTap,
-            visualDensity: VisualDensity.compact,
-            splashRadius: 16,
           ),
         ],
       );

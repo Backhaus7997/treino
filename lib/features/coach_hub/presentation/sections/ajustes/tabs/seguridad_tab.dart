@@ -4,6 +4,7 @@ import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 /// Acciones de seguridad que ya existen en Auth, sin crear un segundo flujo.
 class SeguridadTab extends ConsumerStatefulWidget {
@@ -69,8 +70,7 @@ class _SeguridadTabState extends ConsumerState<SeguridadTab> {
           decoration: BoxDecoration(
             color: TreinoCardTokens.background(context),
             border: Border.all(color: TreinoCardTokens.border(context)),
-            borderRadius:
-                BorderRadius.circular(TreinoCardTokens.borderRadius),
+            borderRadius: BorderRadius.circular(TreinoCardTokens.borderRadius),
             boxShadow: TreinoCardTokens.boxShadow,
           ),
           child: Row(
@@ -101,17 +101,13 @@ class _SeguridadTabState extends ConsumerState<SeguridadTab> {
                 ),
               ),
               const SizedBox(width: AppSpacing.s14),
-              OutlinedButton(
-                onPressed: email?.isNotEmpty == true && !_sending
-                    ? _sendReset
-                    : null,
-                child: Text(
-                  _sending ? 'ENVIANDO…' : 'ENVIAR ENLACE',
-                  style: const TextStyle(
-                    fontFamily: AppFonts.barlowCondensed,
-                    fontWeight: AppFonts.w700,
-                  ),
-                ),
+              // El label ya dice «ENVIANDO…», así que `loading` taparía la
+              // única información que el botón tiene mientras espera.
+              TreinoButton(
+                label: _sending ? 'ENVIANDO…' : 'ENVIAR ENLACE',
+                variant: TreinoButtonVariant.secondary,
+                onPressed:
+                    email?.isNotEmpty == true && !_sending ? _sendReset : null,
               ),
             ],
           ),

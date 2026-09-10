@@ -32,6 +32,8 @@ import '../../../widgets/coach_hub_widgets.dart'
 import 'pagos_estado.dart';
 import 'payment_format.dart';
 import 'package:treino/core/utils/argentina_time.dart';
+import 'package:treino/app/theme/tokens/components/treino_button_tokens.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 // ── PagosWebTable ─────────────────────────────────────────────────────────────
 
@@ -410,29 +412,14 @@ class _AccionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TextButton(
+    // Densidad de tabla (`xs`): esta acción vive dentro de una fila de
+    // `CoachHubDataTable`, donde el alto útil son 24 px.
+    return TreinoButton(
+      label: label,
+      icon: icon,
+      variant: TreinoButtonVariant.ghostAccent,
+      size: TreinoButtonSize.xs,
       onPressed: onTap,
-      style: TextButton.styleFrom(
-        foregroundColor: color,
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.hairline),
-        minimumSize: Size.zero,
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        visualDensity: VisualDensity.compact,
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12),
-          const SizedBox(width: AppSpacing.hairline),
-          Flexible(
-            child: Text(
-              label,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

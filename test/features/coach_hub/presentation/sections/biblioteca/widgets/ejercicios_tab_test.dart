@@ -267,8 +267,7 @@ void main() {
       expect(find.byType(TreinoDialog), findsNothing);
     });
 
-    testWidgets(
-        'compact (1100): abre TreinoDialog — SCENARIO-BIBW-07a',
+    testWidgets('compact (1100): abre TreinoDialog — SCENARIO-BIBW-07a',
         (tester) async {
       tester.view.physicalSize = const Size(1100, 900);
       tester.view.devicePixelRatio = 1.0;

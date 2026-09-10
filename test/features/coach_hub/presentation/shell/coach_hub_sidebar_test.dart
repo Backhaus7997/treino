@@ -17,6 +17,7 @@ import 'package:treino/features/coach_hub/presentation/shell/navigator_semantics
 import 'package:treino/features/coach_hub/presentation/shell/sidebar_item.dart';
 import 'package:treino/features/coach_hub/presentation/shell/sidebar_registry.dart';
 import 'package:treino/core/widgets/treino_logo.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 /// Monta el sidebar dentro de un `ShellRoute` real (necesita `GoRouterState`).
 /// Resuelve las prefs en el cuerpo del test y overridea
@@ -305,11 +306,13 @@ void main() {
       'fusionado con el header de grupo (REQ-SH-004/006)', (tester) async {
     await _pumpSidebar(tester, prefs: {'coach_hub.sidebar.collapsed': true});
 
-    final toggle = tester.widget<IconButton>(
+    final toggle = tester.widget<TreinoIconButton>(
       find.byKey(const Key('sidebar_toggle_button')),
     );
     expect(toggle.onPressed, isNotNull); // se puede re-expandir
-    expect((toggle.icon as Icon).icon, TreinoIcon.menu);
+    // Sin cast: `TreinoIconButton` toma un `IconData` directo, no un widget
+    // `Icon`. El `as Icon` del kit de Material era una capa de más.
+    expect(toggle.icon, TreinoIcon.menu);
     // El header GESTIÓN ya no aparece en absoluto colapsado (no hay toggle
     // fusionado que lo mantenga visible).
     expect(find.text('GESTIÓN'), findsNothing);

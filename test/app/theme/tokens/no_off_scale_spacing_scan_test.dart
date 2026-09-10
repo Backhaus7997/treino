@@ -83,7 +83,7 @@ void main() {
 
     /// Techo de archivos permitidos, congelado con el PR que trae el guard.
     /// NUNCA subirlo.
-    const allowlistCeiling = 166;
+    const allowlistCeiling = 164;
 
     /// Techo de ocurrencias totales en `lib/`. Mismo contrato: sólo baja.
     const offScaleDebtCeiling = 982;
@@ -171,8 +171,6 @@ void main() {
       'features/coach_hub/presentation/sections/pagos/pagos_web_screen.dart',
       'features/coach_hub/presentation/sections/pagos/widgets/estado_cuenta_card.dart',
       'features/coach_hub/presentation/sections/pagos/widgets/registrar_pago_dialog.dart',
-      'features/coach_hub/presentation/sections/perfil_publico/widgets/especialidad_precio_card.dart',
-      'features/coach_hub/presentation/sections/perfil_publico/widgets/identidad_card.dart',
       'features/coach_hub/presentation/sections/planes/planes_screen.dart',
       'features/coach_hub/presentation/sections/routine_editor/routine_editor_web_screen.dart',
       'features/coach_hub/presentation/sections/rutinas/athlete_routines_screen.dart',

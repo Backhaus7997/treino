@@ -6,6 +6,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
+import 'package:treino/app/theme/tokens/components/treino_button_tokens.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 /// Screen que se muestra cuando un athlete (o user sin role=trainer)
 /// entra al Coach Hub web.
@@ -94,31 +96,13 @@ class _CoachHubNotAllowedScreenState
                   ),
                 ),
                 const SizedBox(height: 24),
-                OutlinedButton.icon(
-                  onPressed: _signingOut ? null : _signOut,
-                  icon: _signingOut
-                      ? SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: palette.textPrimary,
-                          ),
-                        )
-                      : Icon(
-                          TreinoIcon.signOut,
-                          color: palette.textPrimary,
-                          size: 18,
-                        ),
-                  label: Text(
-                    AppL10n.of(context).authProfileSignOut,
-                    style: TextStyle(color: palette.textPrimary),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: palette.border),
-                    minimumSize: const Size.fromHeight(44),
-                    shape: const StadiumBorder(),
-                  ),
+                TreinoButton(
+                  label: AppL10n.of(context).authProfileSignOut,
+                  icon: TreinoIcon.signOut,
+                  variant: TreinoButtonVariant.secondary,
+                  expand: true,
+                  loading: _signingOut,
+                  onPressed: _signOut,
                 ),
                 if (_error != null) ...[
                   const SizedBox(height: 14),

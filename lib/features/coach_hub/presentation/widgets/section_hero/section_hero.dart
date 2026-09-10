@@ -16,6 +16,7 @@ import '../../../../../core/widgets/treino_icon.dart';
 import '../preview_wrapper.dart';
 import '../section_header/section_header.dart';
 import '../treino_interactive_state.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 /// Previews del kit.
 @Preview(
@@ -199,20 +200,13 @@ class _HeroActionPill extends StatelessWidget {
     );
 
     if (!action.primary) {
-      return OutlinedButton.icon(
+      return TreinoButton(
         key: Key('hero_action_$index'),
+        label: action.label,
+        icon: action.icon,
+        variant: TreinoButtonVariant.secondary,
+        size: TreinoButtonSize.sm,
         onPressed: action.onTap,
-        icon: Icon(action.icon, size: 15, color: palette.textPrimary),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: palette.textPrimary,
-          side: BorderSide(color: palette.border),
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.s12,
-            vertical: AppSpacing.s8,
-          ),
-          shape: const StadiumBorder(),
-        ),
-        label: Text(action.label, style: labelStyle),
       );
     }
 

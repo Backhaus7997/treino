@@ -39,6 +39,8 @@ import 'planes_filtro_provider.dart';
 import 'tarifas_model.dart';
 import 'tarifas_provider.dart';
 import 'widgets/tarifa_card.dart';
+import 'package:treino/app/theme/tokens/components/treino_button_tokens.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 /// Etiquetas (es-AR) de cada [PlanesFiltroCadencia], en el orden en que se
 /// muestran los chips.
@@ -437,12 +439,10 @@ class _TarifasGridError extends StatelessWidget {
               style: TextStyle(color: palette.textMuted, fontSize: 14),
             ),
             const SizedBox(height: AppSpacing.s12),
-            TextButton(
+            TreinoButton(
+              label: 'Reintentar', // i18n
+              variant: TreinoButtonVariant.ghostAccent,
               onPressed: onRetry,
-              child: Text(
-                'Reintentar', // i18n
-                style: TextStyle(color: palette.accent, fontSize: 14),
-              ),
             ),
           ],
         ),

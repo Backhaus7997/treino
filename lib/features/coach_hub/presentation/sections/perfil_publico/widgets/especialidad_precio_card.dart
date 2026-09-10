@@ -31,6 +31,7 @@ import 'package:treino/features/coach/presentation/widgets/trainer_specialty_chi
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
+import 'package:treino/app/theme/tokens/primitives.dart';
 
 /// Card «ESPECIALIDAD» + «PRECIO MENSUAL» — columna izquierda de
 /// `PerfilPublicoScreen` (WU-04).
@@ -222,29 +223,11 @@ class _EspecialidadPrecioCardState
             const SizedBox(height: AppSpacing.s12),
             Align(
               alignment: Alignment.centerRight,
-              child: ElevatedButton(
+              child: TreinoButton(
                 key: const Key('especialidad_precio_card_save_button'),
+                label: 'GUARDAR', // i18n: Fase 11
+                loading: _saving,
                 onPressed: _canSave ? _save : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: palette.accent,
-                  foregroundColor: TreinoButtonTokens.foreground(context),
-                  disabledBackgroundColor: palette.bgCard,
-                  disabledForegroundColor: palette.textMuted,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.s18,
-                    vertical: AppSpacing.s12,
-                  ),
-                ),
-                child: _saving
-                    ? SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: TreinoButtonTokens.foreground(context),
-                        ),
-                      )
-                    : const Text('GUARDAR'), // i18n: Fase 11
               ),
             ),
             const SizedBox(height: AppSpacing.s18),

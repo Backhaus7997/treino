@@ -728,10 +728,24 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      // La flecha de VOLVER queda AFUERA del barrido. No es una venta —lleva
+      // a `/coach`, de donde vino el PF— y entró acá recién cuando pasó a ser
+      // un `TreinoIconButton` del kit: como `IconButton` de Material no era
+      // `TreinoTappable` y el barrido no la veía. Dispararla desmonta la
+      // página y el resto del guard se queda sin nada que mirar.
+      final volver = tester
+          .widgetList<TreinoTappable>(find.descendant(
+            of: find.byKey(const Key('pricing_back_button')),
+            matching: find.byType(TreinoTappable),
+          ))
+          .map((w) => w.onTap)
+          .toSet();
+
       final taps = tester
           .widgetList<TreinoTappable>(find.byType(TreinoTappable))
           .map((w) => w.onTap)
           .whereType<VoidCallback>()
+          .where((t) => !volver.contains(t))
           .toList();
 
       // Línea de base ANTES de tocar nada: el router ya puede tener barreras
@@ -812,7 +826,8 @@ void main() {
       await pump(tester, _kMobileSize);
 
       var navego = false;
-      debugPlanCheckoutCreator = ({required tier, required annual}) async => null;
+      debugPlanCheckoutCreator =
+          ({required tier, required annual}) async => null;
       debugPlanCheckoutLauncher = (u) async {
         navego = true;
         return true;

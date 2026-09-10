@@ -362,7 +362,8 @@ void main() {
       expect(find.byKey(filtersKey), findsNothing);
 
       final grid = tester.widget<GridView>(find.byKey(gridKey));
-      expect(grid.gridDelegate, isA<SliverGridDelegateWithMaxCrossAxisExtent>());
+      expect(
+          grid.gridDelegate, isA<SliverGridDelegateWithMaxCrossAxisExtent>());
 
       await tester.tap(_inside(gridKey, find.text('Press de Banca')));
       await tester.pumpAndSettle();
@@ -431,7 +432,8 @@ void main() {
 
       final contenedor = tester.widget<Container>(
         find
-            .descendant(of: find.byKey(panelKey), matching: find.byType(Container))
+            .descendant(
+                of: find.byKey(panelKey), matching: find.byType(Container))
             .first,
       );
       final decoracion = contenedor.decoration! as BoxDecoration;

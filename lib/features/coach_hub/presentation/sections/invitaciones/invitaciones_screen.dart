@@ -35,6 +35,7 @@ import '../facturacion_planes/plan_limit_paywall.dart';
 import '../../widgets/coach_hub_widgets.dart';
 import 'solicitudes_providers.dart';
 import 'widgets/solicitud_card.dart';
+import 'package:treino/app/theme/tokens/components/treino_button_tokens.dart';
 
 /// Bandeja de Solicitudes (`/invitaciones`) — WU-04.
 class InvitacionesScreen extends ConsumerWidget {
@@ -59,7 +60,8 @@ class InvitacionesScreen extends ConsumerWidget {
             child: CoachHubSectionHero(
               title: 'Solicitudes', // i18n: Fase W1
               count: pendingCount,
-              subtitle: 'Alumnos que pidieron entrenar con vos.', // i18n: Fase W1
+              subtitle:
+                  'Alumnos que pidieron entrenar con vos.', // i18n: Fase W1
             ),
           ),
           const SizedBox(height: AppSpacing.s18),
@@ -200,11 +202,11 @@ class _ErrorSection extends StatelessWidget {
           ),
           if (onRetry != null) ...[
             const SizedBox(height: AppSpacing.s8),
-            TextButton(
+            TreinoButton(
               key: const Key('invitaciones_retry'),
+              label: l10n.coachRetryLabel,
+              variant: TreinoButtonVariant.ghostAccent,
               onPressed: onRetry,
-              style: TextButton.styleFrom(foregroundColor: palette.accent),
-              child: Text(l10n.coachRetryLabel),
             ),
           ],
         ],

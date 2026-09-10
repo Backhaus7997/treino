@@ -182,10 +182,10 @@ class _SectionError extends StatelessWidget {
           ),
           if (onRetry != null) ...[
             const SizedBox(height: AppSpacing.s8),
-            TextButton(
+            TreinoButton(
+              label: l10n.coachRetryLabel,
+              variant: TreinoButtonVariant.ghostAccent,
               onPressed: onRetry,
-              style: TextButton.styleFrom(foregroundColor: palette.accent),
-              child: Text(l10n.coachRetryLabel),
             ),
           ],
         ],
@@ -355,26 +355,19 @@ class _PendingRequestTileState extends ConsumerState<_PendingRequestTile> {
               ),
             )
           else ...[
-            TextButton(
+            TreinoButton(
               key: Key('decline_${widget.link.id}'),
+              label: l10n.coachHubActionReject,
+              variant: TreinoButtonVariant.ghost,
+              size: TreinoButtonSize.sm,
               onPressed: _decline,
-              style: TextButton.styleFrom(
-                foregroundColor: palette.textMuted,
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s12),
-              ),
-              child: Text(l10n.coachHubActionReject),
             ),
             const SizedBox(width: AppSpacing.hairline),
-            ElevatedButton(
+            TreinoButton(
               key: Key('accept_${widget.link.id}'),
+              label: l10n.coachHubActionAccept,
+              size: TreinoButtonSize.sm,
               onPressed: _accept,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: palette.accent,
-                foregroundColor: TreinoButtonTokens.foreground(context),
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s14),
-                shape: const StadiumBorder(),
-              ),
-              child: Text(l10n.coachHubActionAccept),
             ),
           ],
         ],

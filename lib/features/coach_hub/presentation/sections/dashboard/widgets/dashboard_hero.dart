@@ -26,6 +26,7 @@ import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
 import 'package:treino/l10n/app_l10n.dart';
 import '../../../widgets/invite_athlete_dialog.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 // ── Alert banner (REAL — composes vencidos + solicitudes + inactivos) ────────
 
@@ -431,28 +432,12 @@ class _QuickAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    return OutlinedButton.icon(
+    return TreinoButton(
+      label: label,
+      icon: icon,
+      variant: TreinoButtonVariant.secondary,
+      size: TreinoButtonSize.sm,
       onPressed: onTap,
-      icon: Icon(icon, size: 15, color: palette.textPrimary),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: palette.textPrimary,
-        side: BorderSide(color: palette.border),
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.s12,
-          vertical: AppSpacing.s8,
-        ),
-        shape: const StadiumBorder(),
-      ),
-      label: Text(
-        label,
-        style: const TextStyle(
-          fontFamily: AppFonts.barlowCondensed,
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 1.1,
-        ),
-      ),
     );
   }
 }

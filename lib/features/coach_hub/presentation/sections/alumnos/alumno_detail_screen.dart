@@ -1280,16 +1280,10 @@ class _ProgressHeader extends StatelessWidget {
             ],
           ),
         ),
-        ElevatedButton.icon(
+        TreinoButton(
+          label: actionLabel,
+          icon: TreinoIcon.plus,
           onPressed: onPressed,
-          icon: const Icon(TreinoIcon.plus, size: 16),
-          label: Text(actionLabel),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: palette.accent,
-            foregroundColor: TreinoButtonTokens.foreground(context),
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-            shape: const StadiumBorder(),
-          ),
         ),
       ],
     );
@@ -3808,28 +3802,11 @@ class _ArchivosTabState extends ConsumerState<_ArchivosTab> {
                   ],
                 ),
               ),
-              ElevatedButton.icon(
-                onPressed: _uploading ? null : () => _pickAndUpload(trainerUid),
-                icon: _uploading
-                    ? SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: palette.bg,
-                        ),
-                      )
-                    : Icon(TreinoIcon.upload, size: 16, color: palette.bg),
-                label: Text(l10n.coachHubAlumnoDetailArchivosUploadButton),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: palette.accent,
-                  foregroundColor: TreinoButtonTokens.foreground(context),
-                  disabledBackgroundColor:
-                      palette.accent.withValues(alpha: 0.3),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                  shape: const StadiumBorder(),
-                ),
+              TreinoButton(
+                label: l10n.coachHubAlumnoDetailArchivosUploadButton,
+                icon: TreinoIcon.upload,
+                loading: _uploading,
+                onPressed: () => _pickAndUpload(trainerUid),
               ),
             ],
           ),
@@ -5773,17 +5750,10 @@ class _SeguimientoTabState extends ConsumerState<_SeguimientoTab> {
                   ],
                 ),
               ),
-              ElevatedButton.icon(
-                onPressed: () => _openDialog(),
-                icon: const Icon(TreinoIcon.plus, size: 16),
-                label: const Text('NUEVA ENTRADA'), // i18n: Fase W2
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: palette.accent,
-                  foregroundColor: TreinoButtonTokens.foreground(context),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                  shape: const StadiumBorder(),
-                ),
+              TreinoButton(
+                label: 'NUEVA ENTRADA', // i18n: Fase W2
+                icon: TreinoIcon.plus,
+                onPressed: _openDialog,
               ),
             ],
           ),

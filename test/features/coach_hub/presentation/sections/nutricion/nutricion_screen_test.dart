@@ -26,6 +26,7 @@ import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
 import 'package:treino/l10n/app_l10n.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 const _trainerId = 'trainer-1';
 
@@ -233,7 +234,7 @@ void main() {
       expect(find.byKey(const Key('nutricion_error')), findsOneWidget);
       expect(find.text('No pudimos cargar tus alumnos.'), findsOneWidget);
 
-      final retryButton = find.widgetWithText(TextButton, 'Reintentar');
+      final retryButton = find.widgetWithText(TreinoButton, 'Reintentar');
       expect(retryButton, findsOneWidget);
 
       // Retry invalida el provider y re-suscribe al mismo stream fallido —
@@ -257,7 +258,7 @@ void main() {
       );
       expect(find.text('Todavía no tenés alumnos.'), findsOneWidget);
 
-      await tester.tap(find.widgetWithText(TextButton, 'Ir a Alumnos'));
+      await tester.tap(find.widgetWithText(TreinoButton, 'Ir a Alumnos'));
       await tester.pumpAndSettle();
 
       expect(find.text('ALUMNOS'), findsOneWidget);
