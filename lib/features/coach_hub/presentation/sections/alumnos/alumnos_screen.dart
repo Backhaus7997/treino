@@ -157,47 +157,42 @@ class AlumnosScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final l10n = AppL10n.of(context);
-    final linksAsync = ref.watch(trainerLinksStreamProvider);
-
-    return TreinoStateSwitcher(
-      childKey: ValueKey('alumnos_links_${_stateKeyOf(linksAsync)}'),
-      child: linksAsync.when(
-        loading: () => const _RosterFrame(
-          roster: [],
-          profiles: {},
-          gymNameById: {},
-          tableLoading: true,
-        ),
-        error: (e, _) => _RosterFrame(
-          roster: const [],
-          profiles: const {},
-          gymNameById: const {},
-          errorMessage: l10n.coachHubAlumnosLoadError,
-          onRetry: () => ref.invalidate(trainerLinksStreamProvider),
-        ),
-        data: (links) => _LinksLoaded(links: links),
-      ),
-    );
+    // NO hay `TreinoStateSwitcher` acá, y es a propósito.
+    //
+    // Había dos anidados —uno por los links, otro por los perfiles— y el de
+    // adentro envolvía la PANTALLA ENTERA, no la tabla. Cuando la key pasaba
+    // de `loading` a `data`, Flutter desmontaba el `_RosterFrame` viejo y
+    // montaba uno nuevo, y durante los 240 ms de `AppMotion.base` los dos
+    // quedaban pintados encima: dos hero «ALUMNOS», dos botones «Nuevo
+    // alumno», dos filas de chips, dos cabeceras de tabla. Medido en
+    // producción: ~205 ms con el frame duplicado, 3 corridas de 3.
+    //
+    // El agravante era que el frame nuevo volvía a correr su entrada
+    // escalonada: `TreinoFadeSlideIn` es one-shot POR STATE, y el State se iba
+    // con el desmonte. Hero, chips y buscador hacían fade + slide de 12 px
+    // otra vez, encima de la copia vieja apagándose. Eso es el parpadeo.
+    //
+    // El chrome no depende del estado de carga: no tiene por qué desmontarse.
+    // Sólo la TABLA cross-fadea, y lo hace adentro de `_RosterFrame`.
+    return _LinksLoaded(linksAsync: ref.watch(trainerLinksStreamProvider));
   }
 }
 
-String _stateKeyOf(AsyncValue<Object?> value) {
-  if (value.hasError) return 'error';
-  if (value.isLoading && !value.hasValue) return 'loading';
-  return 'data';
-}
-
-/// Resuelve perfiles + gyms + deuda una vez que el stream de links ya emitió,
-/// y cross-fadea la tabla entre loading/error/data de los perfiles.
+/// Resuelve perfiles + gyms + deuda y colapsa los DOS `AsyncValue` (links y
+/// perfiles) en un único estado de tabla.
+///
+/// Se construye siempre, en los tres estados — por eso recibe el `AsyncValue`
+/// y no la lista ya resuelta. Mientras los links no llegaron trabaja con una
+/// lista vacía y le avisa al hero que todavía no sabe cuántos hay.
 class _LinksLoaded extends ConsumerWidget {
-  const _LinksLoaded({required this.links});
+  const _LinksLoaded({required this.linksAsync});
 
-  final List<TrainerLink> links;
+  final AsyncValue<List<TrainerLink>> linksAsync;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppL10n.of(context);
+    final links = linksAsync.valueOrNull ?? const <TrainerLink>[];
 
     // Un alumno = una fila: colapsamos a su link más reciente (el stream
     // viene requestedAt DESC) y excluimos `pending` (esos son solicitudes,
@@ -225,29 +220,40 @@ class _LinksLoaded extends ConsumerWidget {
       for (final l in roster) (link: l, estado: estadoForLink(l, conDeudaIds)),
     ];
 
-    return TreinoStateSwitcher(
-      childKey: ValueKey('alumnos_profiles_${_stateKeyOf(profilesAsync)}'),
-      child: profilesAsync.when(
-        loading: () => _RosterFrame(
-          roster: rosterWithEstado,
-          profiles: const {},
-          gymNameById: gymNameById,
-          tableLoading: true,
+    // Los dos asyncs, colapsados en UN estado de tabla. El de links manda:
+    // si falló, el mensaje de perfiles sobra.
+    final (String tableState, String? errorMessage, VoidCallback? onRetry) =
+        switch ((linksAsync, profilesAsync)) {
+      (final l, _) when l.hasError => (
+          'error',
+          l10n.coachHubAlumnosLoadError,
+          () => ref.invalidate(trainerLinksStreamProvider),
         ),
-        error: (e, _) => _RosterFrame(
-          roster: rosterWithEstado,
-          profiles: const {},
-          gymNameById: gymNameById,
-          errorMessage: l10n.coachHubAlumnosProfilesLoadError,
-          onRetry: () =>
-              ref.invalidate(userPublicProfilesBatchProvider(ids.join(','))),
+      (_, final p) when p.hasError => (
+          'error',
+          l10n.coachHubAlumnosProfilesLoadError,
+          () => ref.invalidate(userPublicProfilesBatchProvider(ids.join(','))),
         ),
-        data: (profiles) => _RosterFrame(
-          roster: rosterWithEstado,
-          profiles: profiles,
-          gymNameById: gymNameById,
+      (final l, final p) when !l.hasValue || !p.hasValue => (
+          'loading',
+          null,
+          null,
         ),
-      ),
+      _ => ('data', null, null),
+    };
+
+    return _RosterFrame(
+      roster: rosterWithEstado,
+      profiles: profilesAsync.valueOrNull ?? const {},
+      gymNameById: gymNameById,
+      // `null`, no `0`. En la entrada fría el hero afirmaba «ALUMNOS 0» antes
+      // de decir «ALUMNOS 12»: un dato falso durante medio segundo es peor que
+      // ningún dato.
+      rosterCount: linksAsync.hasValue ? rosterWithEstado.length : null,
+      tableState: tableState,
+      tableLoading: tableState == 'loading',
+      errorMessage: errorMessage,
+      onRetry: onRetry,
     );
   }
 }
@@ -255,13 +261,16 @@ class _LinksLoaded extends ConsumerWidget {
 /// Header (título CAPS + subtítulo) + filtros + búsqueda + tabla.
 ///
 /// El bloque header/filtros/búsqueda entra con `TreinoFadeSlideIn` staggered
-/// (índices 0/1/2); la tabla queda fuera de ese stagger — su propio
-/// cross-fade lo resuelve el `TreinoStateSwitcher` del caller.
+/// (índices 0/1/2) UNA sola vez: este frame se monta una vez por visita y ya
+/// no lo desmonta ningún switcher de arriba. El cross-fade de estados vive
+/// adentro y envuelve **sólo la tabla**.
 class _RosterFrame extends ConsumerWidget {
   const _RosterFrame({
     required this.roster,
     required this.profiles,
     required this.gymNameById,
+    this.rosterCount,
+    this.tableState = 'data',
     this.tableLoading = false,
     this.errorMessage,
     this.onRetry,
@@ -270,6 +279,16 @@ class _RosterFrame extends ConsumerWidget {
   final List<_RosterEntry> roster;
   final Map<String, UserPublicProfile> profiles;
   final Map<String, String> gymNameById;
+
+  /// Cuántos alumnos hay — `null` mientras todavía no se sabe.
+  ///
+  /// No es `roster.length`: durante la carga `roster` está vacío y eso NO
+  /// significa «tenés 0 alumnos», significa «todavía no sé». El hero omite el
+  /// número en vez de afirmar un cero que dura medio segundo y es mentira.
+  final int? rosterCount;
+
+  /// Estado del cross-fade de la tabla (`loading` / `error` / `data`).
+  final String tableState;
   final bool tableLoading;
   final String? errorMessage;
   final VoidCallback? onRetry;
@@ -324,8 +343,10 @@ class _RosterFrame extends ConsumerWidget {
                 delay: AppMotion.stagger(0),
                 child: CoachHubSectionHero(
                   title: l10n.coachHubAlumnosTitle,
-                  count: roster.length,
-                  subtitle: l10n.coachHubAlumnosSummary(roster.length, activos),
+                  count: rosterCount,
+                  subtitle: rosterCount == null
+                      ? null
+                      : l10n.coachHubAlumnosSummary(rosterCount!, activos),
                   actions: [
                     CoachHubHeroAction(
                       label: l10n.dashboardQuickActionNuevoAlumno,
@@ -356,37 +377,47 @@ class _RosterFrame extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: AppSpacing.s14),
-              // #347: el toggle Tabla/Cards. La tabla es la enriquecida por la
-              // ronda de revisión (último entreno, rutina, nutrición,
-              // vencimiento, acciones rápidas); el modo cards muestra el
-              // resumen, que es para lo que existe.
-              if (ref.watch(_viewModeProvider) == AlumnosViewMode.tabla)
-                _RosterTable(
-                  visibles: enPagina,
-                  profiles: profiles,
-                  gymNameFor: gymNameFor,
-                  loading: tableLoading,
-                  errorMessage: errorMessage,
-                  onRetry: onRetry,
-                  wide: wide,
-                  emptyMessage: roster.isEmpty
-                      ? l10n.coachHubAlumnosEmpty
-                      : l10n.coachHubAlumnosEmptyFiltered,
-                )
-              else
-                _RosterCardsGrid(
-                  links: [for (final e in enPagina) e.link],
-                  profiles: profiles,
-                  // La deuda ya viene resuelta en el estado compuesto del
-                  // entry, así que no hace falta el mapa aparte que usaba la
-                  // versión anterior de la grilla.
-                  conDeudaIds: {
-                    for (final e in enPagina)
-                      if (e.estado == AlumnoEstado.conDeuda) e.link.athleteId,
-                  },
-                  deudaByAthlete: const {},
-                  gymNameFor: gymNameFor,
-                ),
+              // ÚNICO cross-fade de la pantalla, y envuelve SÓLO esto.
+              //
+              // Antes el switcher estaba arriba de todo y remontaba el frame
+              // entero; el header, los chips y el buscador se desmontaban con
+              // él aunque no dependan del estado de carga. Acá adentro, lo
+              // único que cambia entre loading/error/data es la tabla, que es
+              // exactamente lo que tiene que cambiar.
+              TreinoStateSwitcher(
+                childKey: ValueKey('alumnos_tabla_$tableState'),
+                // #347: el toggle Tabla/Cards. La tabla es la enriquecida por
+                // la ronda de revisión (último entreno, rutina, nutrición,
+                // vencimiento, acciones rápidas); el modo cards muestra el
+                // resumen, que es para lo que existe.
+                child: ref.watch(_viewModeProvider) == AlumnosViewMode.tabla
+                    ? _RosterTable(
+                        visibles: enPagina,
+                        profiles: profiles,
+                        gymNameFor: gymNameFor,
+                        loading: tableLoading,
+                        errorMessage: errorMessage,
+                        onRetry: onRetry,
+                        wide: wide,
+                        emptyMessage: roster.isEmpty
+                            ? l10n.coachHubAlumnosEmpty
+                            : l10n.coachHubAlumnosEmptyFiltered,
+                      )
+                    : _RosterCardsGrid(
+                        links: [for (final e in enPagina) e.link],
+                        profiles: profiles,
+                        // La deuda ya viene resuelta en el estado compuesto del
+                        // entry, así que no hace falta el mapa aparte que usaba la
+                        // versión anterior de la grilla.
+                        conDeudaIds: {
+                          for (final e in enPagina)
+                            if (e.estado == AlumnoEstado.conDeuda)
+                              e.link.athleteId,
+                        },
+                        deudaByAthlete: const {},
+                        gymNameFor: gymNameFor,
+                      ),
+              ),
               // Un solo pie para los dos modos: el paginado es de la LISTA,
               // no de como se la esta dibujando. Se esconde solo con una
               // pagina, asi que hoy —con 12 alumnos— no aparece.
