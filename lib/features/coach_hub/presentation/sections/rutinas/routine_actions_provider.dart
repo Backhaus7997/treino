@@ -6,6 +6,7 @@
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:treino/features/workout/data/routine_repository.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
 import 'package:treino/features/workout/application/routine_providers.dart'
@@ -41,9 +42,51 @@ class RoutineActionsNotifier extends AsyncNotifier<void> {
     required String routineId,
     required String trainerId,
     required String athleteId,
+  }) async =>
+      _flipStatus(
+        routineId: routineId,
+        trainerId: trainerId,
+        athleteId: athleteId,
+        escribir: (repo) => repo.archive(routineId),
+      );
+
+  /// El camino de vuelta: devuelve la rutina archivada a `active`.
+  ///
+  /// Va junto a [archive] y con las MISMAS invalidaciones, no porque sea
+  /// simétrico en la UI —la card aparece en un filtro y desaparece del otro—
+  /// sino porque el fallo es simétrico: si sólo se invalidara la grilla, la
+  /// rutina recuperada no volvería a la ficha del alumno hasta recargar.
+  ///
+  /// Sin esto, el diálogo de archivar prometía algo que el producto no podía
+  /// cumplir. El filtro «Archivadas» la muestra; recuperarla no existía.
+  Future<bool> unarchive({
+    required String routineId,
+    required String trainerId,
+    required String athleteId,
+  }) async =>
+      _flipStatus(
+        routineId: routineId,
+        trainerId: trainerId,
+        athleteId: athleteId,
+        escribir: (repo) => repo.unarchive(routineId),
+      );
+
+  /// Lo común de [archive] y [unarchive]: escribir y después invalidar TODO lo
+  /// que mira ese documento.
+  ///
+  /// Está factorizado a propósito y no duplicado. Las tres invalidaciones son
+  /// la parte fácil de olvidar y la que no falla ruidosamente: olvidar una no
+  /// rompe la compilación ni tira excepción, sólo deja una card vieja en
+  /// pantalla hasta recargar. Con dos copias, el próximo que agregue un cuarto
+  /// lector actualiza una y no la otra.
+  Future<bool> _flipStatus({
+    required String routineId,
+    required String trainerId,
+    required String athleteId,
+    required Future<void> Function(RoutineRepository repo) escribir,
   }) async {
     try {
-      await ref.read(routineRepositoryProvider).archive(routineId);
+      await escribir(ref.read(routineRepositoryProvider));
       ref.invalidate(assignedRoutinesByTrainerProvider(
         (trainerId: trainerId, athleteId: athleteId),
       ));

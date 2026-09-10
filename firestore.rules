@@ -817,6 +817,42 @@ service cloud.firestore {
                          == ['visibility'].toSet()
                     && request.resource.data.visibility in ['private', 'public'];
 
+      // UPDATE path 6 (narrow): el PF dueño archiva o recupera una rutina
+      // suya — flipea SÓLO `status` entre 'active' y 'archived'. Mismo idioma
+      // que el path 1 (el atleta con las suyas) y que el path 5.
+      //
+      // Existía el cliente y no existía la regla. `RoutineRepository.archive`
+      // es de 2026-07-17 y el menú ⋮ ofrece «Archivar» desde entonces en las
+      // dos pantallas de rutinas del Hub, pero ninguno de los paths 3 y 4
+      // lista `status` en su `affectedKeys().hasOnly([...])`: son paths de
+      // CONTENIDO ('name', 'split', 'level', 'days', 'numWeeks', 'summary',
+      // + 'goals' en plantilla). Los cinco paths denegaban, `archive()`
+      // atrapaba el `permission-denied` y devolvía `false`, y el PF veía «No
+      // se pudo. Probá de nuevo.» cada vez. Dos meses de un botón que nunca
+      // hizo nada — el fallo silencioso de AGENTS.md §11.1. Lo fija
+      // `scripts/rules_test/trainer-routine-status.test.js`.
+      //
+      // Por qué NO afloja nada, aunque toque una rutina que un alumno entrena:
+      // el documento se queda donde está. Archivar es soft-delete justamente
+      // para que las `Session.routineId` del alumno no queden colgando
+      // (ADR-USR-04), y es la operación que el #1064 eligió sobre borrar al
+      // terminar un vínculo. Lo que el PF NO puede seguir haciendo por acá es
+      // mover la rutina de dueño: `assignedTo` y `source` no entran en el
+      // diff, así que convertir un plan asignado en plantilla sigue denegado.
+      //
+      // Sin gate de rol, a diferencia del path 5. Ahí hace falta porque
+      // publicar mete el doc en el catálogo público y un atleta puede tener
+      // un `trainer-template` forjado (CREATE branch 1 es anterior a los
+      // chequeos de rol). Archivar no expone nada: es estrictamente más débil
+      // que el DELETE de abajo, que ya se permite sin gate de rol. Un `get()`
+      // acá costaría una lectura facturada por archivada, a cambio de nada.
+      allow update: if request.auth != null
+                    && request.auth.uid == resource.data.assignedBy
+                    && resource.data.source in ['trainer-template', 'trainer-assigned']
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                         == ['status'].toSet()
+                    && request.resource.data.status in ['active', 'archived'];
+
       // DELETE (narrow): the owning trainer may delete their OWN
       // `trainer-template` docs (library cleanup) and `trainer-assigned`
       // plans (manually remove a plan from an athlete). User/system routines
