@@ -1349,25 +1349,22 @@ class _IconAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Hasta 5 botones conviven en la columna «Acciones» (3 acciones rápidas
-    // siempre visibles + hasta 2 de vínculo pausar/reanudar + terminar). Con
-    // Material 3 (ADR de tema, `useMaterial3: true`), `constraints`/`padding`
-    // por sí solos NO alcanzan: `MaterialTapTargetSize.padded` (default del
-    // tema) fuerza un tap target mínimo de 48x48 vía `_InputPadding` —
-    // invisible pero SÍ cuenta para el layout del `Row` padre, y overflowea
-    // igual aunque el `IconButton` se vea de 32x32. `tapTargetSize:
-    // shrinkWrap` en el `style` es lo que realmente reduce el tamaño de caja
-    // que el botón reporta al `Row`.
-    return IconButton(
+    // Antes esto era un `IconButton` con `padding`, `constraints`,
+    // `visualDensity` y `tapTargetSize` combinados a mano, y el comentario que
+    // vivía acá explicaba —bien— que sin `shrinkWrap` el `_InputPadding` de
+    // Material 3 mete 48x48 invisibles que igual cuentan para el layout.
+    //
+    // Todo eso era conocimiento necesario para escribir UN botón, y lo pagaba
+    // cada callsite: en `coach_hub` había 156 botones Material crudos y en el
+    // detalle del alumno conviven siete paddings distintos. Ahora lo sabe el
+    // kit. Acá sólo queda el tamaño, y `xs` es el que impone la fila: 48 px de
+    // `rowHeight` menos 12+12 de `cellPaddingV` son 24 de alto útil.
+    return TreinoIconButton(
+      icon: icon,
       tooltip: tooltip,
-      icon: Icon(icon, size: 18, color: color),
+      color: color,
+      size: TreinoButtonSize.xs,
       onPressed: onPressed,
-      padding: EdgeInsets.zero,
-      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-      visualDensity: VisualDensity.compact,
-      style: IconButton.styleFrom(
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      ),
     );
   }
 }

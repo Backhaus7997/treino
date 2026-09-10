@@ -50,6 +50,7 @@ import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 import 'alumno_detail_test_navigation.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 const _trainerUid = 't1';
 const _athleteUid = 'a1';
@@ -181,7 +182,8 @@ List<Override> _baseOverrides({
       gymsProvider.overrideWith((ref) => const <Gym>[]),
       athleteBillingProvider.overrideWith((ref, id) => Stream.value(null)),
       sessionsByUidProvider.overrideWith((ref, id) => const <Session>[]),
-      assignedRoutinesByTrainerProvider.overrideWith((ref, key) => const <Routine>[]),
+      assignedRoutinesByTrainerProvider
+          .overrideWith((ref, key) => const <Routine>[]),
       athleteNoteProvider(
         (trainerId: _trainerUid, athleteId: _athleteUid),
       ).overrideWith((ref) => const Stream.empty()),
@@ -308,7 +310,7 @@ void main() {
 
     expect(find.byType(MeasurementProgressChart), findsOneWidget);
     expect(find.text('70 kg'), findsWidgets);
-    // Icons.edit, no TreinoIcon.edit: es el que el row usa de verdad.
+    // TreinoIcon.edit, no TreinoIcon.edit: es el que el row usa de verdad.
     //
     // Se scrollea al final porque la lista es perezosa: con el chart arriba, la
     // segunda fila no está en el árbol hasta llegar. Que haya que scrollear ES
@@ -317,7 +319,7 @@ void main() {
     // double crudo — '72.0 kg' — a diferencia de la card de lectura, que lo
     // recorta a '72 kg'.
     await _scrollHasta(tester, find.textContaining('72.0 kg'));
-    expect(find.byIcon(Icons.edit), findsNWidgets(2));
+    expect(find.byIcon(TreinoIcon.edit), findsNWidgets(2));
   });
 
   testWidgets(
@@ -346,9 +348,9 @@ void main() {
     await tester.pumpWidget(_wrap(_baseOverrides(measurements: muchas)));
     await _selectMedicionesTab(tester);
 
-    // El lápiz de editar es uno por fila, y es público (Icons.edit) a
+    // El lápiz de editar es uno por fila, y es público (TreinoIcon.edit) a
     // diferencia de la clase privada de la row.
-    final filasConstruidas = find.byIcon(Icons.edit).evaluate().length;
+    final filasConstruidas = find.byIcon(TreinoIcon.edit).evaluate().length;
 
     expect(
       filasConstruidas,
@@ -378,7 +380,7 @@ void main() {
     expect(find.textContaining('78.0 kg'), findsOneWidget);
 
     // Tap en la row (usa el chevron).
-    await tester.tap(find.byIcon(Icons.keyboard_arrow_right));
+    await tester.tap(find.byIcon(TreinoIcon.chevronRight));
     await tester.pumpAndSettle();
 
     // Post-expansión: aparecen labels y valores que SÓLO renderiza el detalle.
@@ -491,8 +493,8 @@ void main() {
     await tester.pumpWidget(_wrap(_baseOverrides(measurements: [m])));
     await _selectMedicionesTab(tester);
 
-    // Botón editar (Icons.edit) en la row.
-    final editBtn = find.byIcon(Icons.edit);
+    // Botón editar (TreinoIcon.edit) en la row.
+    final editBtn = find.byIcon(TreinoIcon.edit);
     expect(editBtn, findsOneWidget);
     await tester.tap(editBtn);
     await tester.pumpAndSettle();
@@ -518,11 +520,11 @@ void main() {
       _baseOverrides(measurements: [m], repo: repo),
     ));
     await _selectMedicionesTab(tester);
-    await tester.tap(find.byIcon(Icons.edit));
+    await tester.tap(find.byIcon(TreinoIcon.edit));
     await tester.pumpAndSettle();
 
     // Tap en el botón GUARDAR del dialog.
-    await tester.tap(find.widgetWithText(ElevatedButton, 'GUARDAR'));
+    await tester.tap(find.widgetWithText(TreinoButton, 'GUARDAR'));
     await tester.pumpAndSettle();
 
     // Debería haber llamado update, NO add.

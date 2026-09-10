@@ -47,6 +47,7 @@ import 'package:treino/l10n/app_l10n.dart';
 
 import 'alumno_detail_test_navigation.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 const _trainerUid = 't1';
 const _athleteUid = 'a1';
@@ -105,7 +106,8 @@ List<Override> _baseOverrides({
       gymsProvider.overrideWith((ref) => const <Gym>[]),
       athleteBillingProvider.overrideWith((ref, id) => Stream.value(null)),
       sessionsByUidProvider.overrideWith((ref, id) => const <Session>[]),
-      assignedRoutinesByTrainerProvider.overrideWith((ref, key) => const <Routine>[]),
+      assignedRoutinesByTrainerProvider
+          .overrideWith((ref, key) => const <Routine>[]),
       athleteNoteProvider(
         (trainerId: _trainerUid, athleteId: _athleteUid),
       ).overrideWith((ref) => noteStream),
@@ -180,9 +182,9 @@ void main() {
     )));
     await _selectNotasTab(tester);
 
-    final saveBtn = find.widgetWithText(ElevatedButton, 'GUARDAR');
+    final saveBtn = find.widgetWithText(TreinoButton, 'GUARDAR');
     expect(saveBtn, findsOneWidget);
-    final button = tester.widget<ElevatedButton>(saveBtn);
+    final button = tester.widget<TreinoButton>(saveBtn);
     expect(button.onPressed, isNull,
         reason: 'empty tab + empty buffer → nothing to save');
   });
@@ -207,8 +209,8 @@ void main() {
     await tester.enterText(tf, 'Lesión de rodilla, evitar sentadilla profunda');
     await tester.pump();
 
-    final saveBtn = find.widgetWithText(ElevatedButton, 'GUARDAR');
-    final button = tester.widget<ElevatedButton>(saveBtn);
+    final saveBtn = find.widgetWithText(TreinoButton, 'GUARDAR');
+    final button = tester.widget<TreinoButton>(saveBtn);
     expect(button.onPressed, isNotNull,
         reason: 'buffer diverges from saved → save must enable');
 
@@ -289,7 +291,8 @@ void main() {
       gymsProvider.overrideWith((ref) => const <Gym>[]),
       athleteBillingProvider.overrideWith((ref, id) => Stream.value(null)),
       sessionsByUidProvider.overrideWith((ref, id) => const <Session>[]),
-      assignedRoutinesByTrainerProvider.overrideWith((ref, key) => const <Routine>[]),
+      assignedRoutinesByTrainerProvider
+          .overrideWith((ref, key) => const <Routine>[]),
       athleteNoteProvider(
         (trainerId: _trainerUid, athleteId: _athleteUid),
       ).overrideWith((ref) => Stream.value(AthleteNote(

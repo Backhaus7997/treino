@@ -13,6 +13,8 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/locale_resolver.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/app/theme/tokens/components/treino_button_tokens.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 import 'package:treino/core/widgets/treino_segmented_pill.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
@@ -491,7 +493,7 @@ void main() {
 
       expect(find.text('\$24.000 · Mensual'), findsOneWidget);
       expect(find.textContaining('Próx. cobro:'), findsOneWidget);
-      expect(find.widgetWithText(OutlinedButton, 'Pago'), findsOneWidget);
+      expect(find.widgetWithText(TreinoButton, 'Pago'), findsOneWidget);
     });
 
     testWidgets('header: cadencia semanal se etiqueta "Semanal" (W2 PR7)',
@@ -525,13 +527,14 @@ void main() {
       await _pump(tester, theme: AppTheme.light());
       await tester.pumpAndSettle();
 
-      final ctx = tester.element(find.widgetWithText(OutlinedButton, 'Pago'));
+      final ctx = tester.element(find.widgetWithText(TreinoButton, 'Pago'));
       final palette = AppPalette.of(ctx);
 
-      final pago = tester.widget<OutlinedButton>(
-        find.widgetWithText(OutlinedButton, 'Pago'),
-      );
-      final fg = pago.style!.foregroundColor!.resolve(<WidgetState>{})!;
+      // El color ya no sale de este callsite: sale de la variante. Que el
+      // arreglo de contraste viva en el token es lo que impide que el próximo
+      // botón lo vuelva a resolver por su cuenta.
+      final fg = TreinoButtonTokens.of(ctx, TreinoButtonVariant.secondaryAccent)
+          .foreground;
       expect(fg, palette.accentText, reason: 'texto, no fondo');
 
       final sobreLaCard = _contraste(fg, palette.bgCard);
@@ -542,17 +545,22 @@ void main() {
             'card. Con `accent` daba 1,64:1.',
       );
 
-      // Y el par: mismo padding que el botón de chat.
-      final chat = tester.widget<OutlinedButton>(
-        find.ancestor(
-          of: find.byIcon(TreinoIcon.chat),
-          matching: find.byType(OutlinedButton),
-        ),
-      );
-      expect(
-        pago.style!.padding!.resolve(<WidgetState>{}),
-        chat.style!.padding!.resolve(<WidgetState>{}),
-      );
+      // Y el par. Ya no se compara el padding DECLARADO —que ya era igual—
+      // sino el alto RENDERIZADO, que es lo que el usuario ve y lo que estaba
+      // mal: el árbol de semántica de producción reportaba 16 px para «Chat»
+      // y 19 para «Pago», con el mismo padding declarado en los dos.
+      final altoPago =
+          tester.getSize(find.widgetWithText(TreinoButton, 'Pago')).height;
+      final altoChat = tester
+          .getSize(find.ancestor(
+            of: find.byIcon(TreinoIcon.chat),
+            matching: find.byType(TreinoButton),
+          ))
+          .height;
+      expect(altoPago, altoChat,
+          reason: 'dos pills hermanas que miden distinto se leen como un '
+              'error de alineación');
+      expect(altoPago, TreinoButtonSize.sm.height);
     });
 
     testWidgets('header: botón Pago abre el diálogo de registrar pago (W2 PR7)',
@@ -562,7 +570,7 @@ void main() {
           link: _link(TrainerLinkStatus.active),
           paymentRepo: _MockPaymentRepo());
 
-      await tester.tap(find.widgetWithText(OutlinedButton, 'Pago'));
+      await tester.tap(find.widgetWithText(TreinoButton, 'Pago'));
       await tester.pumpAndSettle();
 
       expect(find.text('Registrar pago'), findsOneWidget); // título del diálogo
@@ -577,7 +585,7 @@ void main() {
       expect(find.textContaining('Próx. cobro:'), findsNothing);
       expect(find.text('· Mensual'), findsNothing);
       // El botón Pago está siempre (no depende de billing).
-      expect(find.widgetWithText(OutlinedButton, 'Pago'), findsOneWidget);
+      expect(find.widgetWithText(TreinoButton, 'Pago'), findsOneWidget);
     });
 
     testWidgets(
@@ -1246,7 +1254,10 @@ void main() {
           paymentRepo: repo);
 
       await navigateAlumnoDetail(tester, group: 'Pagos');
-      await tester.tap(find.text('+ Registrar pago'));
+      // El «+» dejó de ser parte del string y pasó a ser el ícono del botón,
+      // así que ahora el botón y el TÍTULO del diálogo dicen lo mismo: hay que
+      // desambiguar por widget.
+      await tester.tap(find.widgetWithText(TreinoButton, 'Registrar pago'));
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextField).at(0), '5000');
@@ -1272,7 +1283,10 @@ void main() {
           paymentRepo: repo);
 
       await navigateAlumnoDetail(tester, group: 'Pagos');
-      await tester.tap(find.text('+ Registrar pago'));
+      // El «+» dejó de ser parte del string y pasó a ser el ícono del botón,
+      // así que ahora el botón y el TÍTULO del diálogo dicen lo mismo: hay que
+      // desambiguar por widget.
+      await tester.tap(find.widgetWithText(TreinoButton, 'Registrar pago'));
       await tester.pumpAndSettle();
 
       // Concepto sin monto → validación, sin escritura.
@@ -1294,7 +1308,10 @@ void main() {
           paymentRepo: repo);
 
       await navigateAlumnoDetail(tester, group: 'Pagos');
-      await tester.tap(find.text('+ Registrar pago'));
+      // El «+» dejó de ser parte del string y pasó a ser el ícono del botón,
+      // así que ahora el botón y el TÍTULO del diálogo dicen lo mismo: hay que
+      // desambiguar por widget.
+      await tester.tap(find.widgetWithText(TreinoButton, 'Registrar pago'));
       await tester.pumpAndSettle();
 
       // Monto válido pero concepto vacío → validación, sin escritura.
