@@ -135,6 +135,122 @@ void main() {
     });
   });
 
+  group('RoutineActionsNotifier.unarchive', () {
+    // EL test de este grupo. `archive` y `unarchive` comparten `_flipStatus`,
+    // que recibe QUÉ escribir como callback: es una función de un renglón de
+    // distancia entre «recuperar» y «archivar de nuevo». Mismo modo de falla
+    // que el de publicar/despublicar, y por eso mismo el control es el mismo.
+    //
+    // Si «Recuperar» archivara, el PF no vería NADA raro: la rutina ya estaba
+    // archivada y sigue archivada. El botón sería un no-op perfecto.
+    test('llama a repo.unarchive, NO a repo.archive', () async {
+      when(() => mockRepo.unarchive(any())).thenAnswer((_) async {});
+
+      final container = makeContainer();
+      addTearDown(container.dispose);
+
+      final ok =
+          await container.read(routineActionsProvider.notifier).unarchive(
+                routineId: 'r1',
+                trainerId: _trainerId,
+                athleteId: _athleteId,
+              );
+      expect(ok, isTrue);
+      verify(() => mockRepo.unarchive('r1')).called(1);
+      verifyNever(() => mockRepo.archive(any()));
+    });
+
+    // El espejo del de arriba: el mismo callback mal cableado en la otra
+    // dirección dejaría «Sacársela a X» devolviéndole la rutina al alumno.
+    test('control: archive sigue llamando a repo.archive, NO a unarchive',
+        () async {
+      when(() => mockRepo.archive(any())).thenAnswer((_) async {});
+
+      final container = makeContainer();
+      addTearDown(container.dispose);
+
+      await container.read(routineActionsProvider.notifier).archive(
+            routineId: 'r1',
+            trainerId: _trainerId,
+            athleteId: _athleteId,
+          );
+      verify(() => mockRepo.archive('r1')).called(1);
+      verifyNever(() => mockRepo.unarchive(any()));
+    });
+
+    test('invalida los DOS listados', () async {
+      when(() => mockRepo.unarchive(any())).thenAnswer((_) async {});
+
+      final container = makeContainer();
+      addTearDown(container.dispose);
+      await container.read(assignedRoutinesByTrainerProvider(_key).future);
+      await container.read(routinesAuthoredByProvider(_trainerId).future);
+      listCalls = 0;
+      grillaCalls = 0;
+
+      await container.read(routineActionsProvider.notifier).unarchive(
+            routineId: 'r1',
+            trainerId: _trainerId,
+            athleteId: _athleteId,
+          );
+
+      await container.read(assignedRoutinesByTrainerProvider(_key).future);
+      await container.read(routinesAuthoredByProvider(_trainerId).future);
+
+      // La grilla, para que la card deje de decir «Archivada». Y el par
+      // trainer/alumno, que es de donde lee la ficha: sin eso la rutina
+      // recuperada no vuelve a aparecerle al alumno hasta recargar.
+      expect(grillaCalls, 1);
+      expect(listCalls, 1);
+    });
+
+    test('invalida también la caché single-doc', () async {
+      when(() => mockRepo.unarchive(any())).thenAnswer((_) async {});
+
+      var activa = false;
+      var getByIdCalls = 0;
+      when(() => mockRepo.getById('r1')).thenAnswer((_) async {
+        getByIdCalls++;
+        return _makeRoutine(
+          'r1',
+          status: activa ? RoutineStatus.active : RoutineStatus.archived,
+        );
+      });
+
+      final container = makeContainer();
+      addTearDown(container.dispose);
+
+      final antes = await container.read(routineByIdProvider('r1').future);
+      expect(antes!.status, RoutineStatus.archived);
+
+      activa = true;
+      await container.read(routineActionsProvider.notifier).unarchive(
+            routineId: 'r1',
+            trainerId: _trainerId,
+            athleteId: _athleteId,
+          );
+
+      final despues = await container.read(routineByIdProvider('r1').future);
+      expect(despues!.status, RoutineStatus.active);
+      expect(getByIdCalls, 2);
+    });
+
+    test('si el repo falla devuelve false y no propaga', () async {
+      when(() => mockRepo.unarchive(any())).thenThrow(Exception('boom'));
+
+      final container = makeContainer();
+      addTearDown(container.dispose);
+
+      final ok =
+          await container.read(routineActionsProvider.notifier).unarchive(
+                routineId: 'r1',
+                trainerId: _trainerId,
+                athleteId: _athleteId,
+              );
+      expect(ok, isFalse);
+    });
+  });
+
   group('RoutineActionsNotifier — la grilla de Rutinas se entera', () {
     // CANDADO. Sacar cualquiera de estas dos invalidaciones COMPILA y no rompe
     // nada visible: la rutina simplemente se queda en pantalla hasta recargar.

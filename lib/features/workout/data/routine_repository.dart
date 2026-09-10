@@ -331,9 +331,29 @@ class RoutineRepository {
   /// remain intact (ADR-USR-04). Only the `status` field is mutated,
   /// matching the narrow Firestore update rule (REQ-USR-013).
   ///
+  /// Sirve a los DOS dueños posibles: el atleta con sus `user-created`
+  /// (UPDATE path 1) y el PF con sus `trainer-*` (UPDATE path 6). El segundo
+  /// caso NO estuvo cubierto por las reglas entre 2026-07-17 y hoy: el método
+  /// existía, el menú lo ofrecía, y los cinco paths denegaban. Ver el
+  /// comentario del path 6 en `firestore.rules`.
+  ///
   /// REQ-USR-006, SCENARIO-USR-010..011.
   Future<void> archive(String routineId) async {
     await _collection.doc(routineId).update({'status': 'archived'});
+  }
+
+  /// El camino de vuelta de [archive]: devuelve la rutina a `active`.
+  ///
+  /// No es una comodidad. Sin esto, archivar es un borrado con otro nombre y
+  /// todo diálogo que diga «la podés recuperar» miente — que es exactamente
+  /// lo que decía el de `routine_card_grid.dart` mientras esto no existía. El
+  /// filtro «Archivadas» te la MUESTRA; para volver a usarla hacía falta este
+  /// método y no estaba.
+  ///
+  /// Mismo diff angosto que [archive], misma regla (UPDATE path 1 para el
+  /// atleta, path 6 para el PF): sólo `status`, y sólo hacia 'active'.
+  Future<void> unarchive(String routineId) async {
+    await _collection.doc(routineId).update({'status': 'active'});
   }
 
   Future<Routine?> getById(String id) async {
