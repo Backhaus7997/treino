@@ -81,11 +81,28 @@ void main() {
       expect(find.byType(PopupMenuButton<String>), findsNothing);
     });
 
-    testWidgets('campo de búsqueda decorativo presente', (tester) async {
+    // Este test pedía lo CONTRARIO: que el campo estuviera presente. Fijaba un
+    // control `enabled: false` que se veía operable y no hacía nada — el PF lo
+    // tipeaba y no pasaba nada. Ahora es el candado: la barra no vuelve a
+    // ofrecer una búsqueda que no busca.
+    testWidgets('la barra NO ofrece un buscador muerto', (tester) async {
       await _pumpTopBar(tester);
-      expect(find.text('Buscar alumnos, rutinas, plan...'), findsOneWidget);
-      expect(find.byIcon(TreinoIcon.search), findsOneWidget);
-      expect(tester.widget<TextField>(find.byType(TextField)).enabled, isFalse);
+      expect(find.byType(TextField), findsNothing);
+      expect(find.byIcon(TreinoIcon.search), findsNothing);
+      expect(find.text('Buscar alumnos, rutinas, plan...'), findsNothing);
+    });
+
+    testWidgets('y la campana sigue pegada a la derecha', (tester) async {
+      await _pumpTopBar(tester);
+      final barra = tester.getRect(find.byType(CoachHubTopBar));
+      final campana = tester.getRect(find.byIcon(TreinoIcon.bell));
+      expect(
+        barra.right - campana.right,
+        lessThan(48),
+        reason: 'sin el buscador en el centro, el `Expanded` del título es lo '
+            'único que empuja la campana al borde. Con `Flexible` + `Spacer` '
+            'se reparten el sobrante y queda a media barra (461 px medidos)',
+      );
     });
 
     testWidgets('smoke visual en tema claro (mintMagentaLight)',
