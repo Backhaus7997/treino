@@ -81,6 +81,9 @@ interface UserFixture {
   createdAt: number;
   displayName?: string | null;
   subscription?: Record<string, unknown> | null;
+  // La suscripcion del ALUMNO — otro campo, otro paywall, mismo motivo para
+  // estar pinneado: lo escribe la CF, nunca el dueno del documento.
+  athleteSubscription?: Record<string, unknown> | null;
   weightedLoad?: number | null;
   blockedAthleteIds?: string[];
 }
@@ -385,6 +388,113 @@ describe("users rules — blockedAthleteIds CF-write-only (slice 5)", () => {
 //     FCM repository writes `set({fcmTokens: arrayUnion(...)}, merge: true)`.
 //     A regression test that proves "ordinary profile edits still pass" using
 //     a shape the app does not send proves less than it looks.
+describe("users rules — athleteSubscription: la ENTRADA del paywall del alumno", () => {
+  // Este campo estaba SIN pin mientras su conclusión denormalizada
+  // (`athletePaywallEnforced`) sí lo tenía. Cerrar la salida y dejar abierta la
+  // entrada no cierra nada: el alumno se escribe la suscripción, la CF la cree,
+  // escribe `enforced: false` con el Admin SDK, y las cláusulas de rutina lo
+  // dejan pasar. El bypass da una vuelta más, y llega al mismo lugar.
+  const uid = "athlete-forge-subscription";
+
+  it("deniega al dueño escribirse una suscripción de la nada", async () => {
+    await seedUser({
+      uid,
+      role: "athlete",
+      email: `${uid}@example.test`,
+      createdAt: 0,
+    });
+
+    const client = testEnv.authenticatedContext(uid);
+    const ref = client.firestore().collection(COL_USERS).doc(uid);
+
+    await assertFails(ref.update({ athleteSubscription: { status: "active" } }));
+  });
+
+  it("deniega REVIVIR una suscripción vencida", async () => {
+    await seedUser({
+      uid: `${uid}-expired`,
+      role: "athlete",
+      email: `${uid}-expired@example.test`,
+      createdAt: 0,
+      athleteSubscription: { status: "expired" },
+    });
+
+    const client = testEnv.authenticatedContext(`${uid}-expired`);
+    const ref = client.firestore().collection(COL_USERS).doc(`${uid}-expired`);
+
+    await assertFails(ref.update({ athleteSubscription: { status: "active" } }));
+  });
+
+  it("deniega BORRARLA — el pin es en los dos sentidos", async () => {
+    await seedUser({
+      uid: `${uid}-delete`,
+      role: "athlete",
+      email: `${uid}-delete@example.test`,
+      createdAt: 0,
+      athleteSubscription: { status: "active" },
+    });
+
+    const client = testEnv.authenticatedContext(`${uid}-delete`);
+    const ref = client.firestore().collection(COL_USERS).doc(`${uid}-delete`);
+
+    await assertFails(
+      ref.update({ athleteSubscription: firebase.firestore.FieldValue.delete() }),
+    );
+  });
+
+  it("deniega SEMBRARLA en el create — la mitad de los verbos es peor que ninguno", async () => {
+    // Sin este caso, el pin del update la volvería INDELEBLE: quien se
+    // auto-creara el doc con `active` quedaría exento para siempre. Es la
+    // lección textual del agujero de `subscription`, verificado contra el
+    // emulador en su momento.
+    const freshUid = "athlete-plants-subscription-on-create";
+    const client = testEnv.authenticatedContext(freshUid);
+    const ref = client.firestore().collection(COL_USERS).doc(freshUid);
+
+    await assertFails(
+      ref.set({
+        uid: freshUid,
+        role: "athlete",
+        email: `${freshUid}@example.test`,
+        createdAt: 0,
+        athleteSubscription: { status: "active" },
+      }),
+    );
+  });
+
+  it("el signup normal sigue pasando — el pin rechaza el CAMPO, no el alta", async () => {
+    const freshUid = "athlete-signup-sin-subscription";
+    const client = testEnv.authenticatedContext(freshUid);
+    const ref = client.firestore().collection(COL_USERS).doc(freshUid);
+
+    await assertSucceeds(
+      ref.set({
+        uid: freshUid,
+        role: "athlete",
+        email: `${freshUid}@example.test`,
+        createdAt: 0,
+      }),
+    );
+  });
+
+  it("y el dueño sigue pudiendo escribir sus campos normales", async () => {
+    await seedUser({
+      uid: `${uid}-normal`,
+      role: "athlete",
+      email: `${uid}-normal@example.test`,
+      createdAt: 0,
+      athleteSubscription: { status: "active" },
+    });
+
+    const client = testEnv.authenticatedContext(`${uid}-normal`);
+    const ref = client.firestore().collection(COL_USERS).doc(`${uid}-normal`);
+
+    // El pin compara contra el valor existente, así que un update que NO toca
+    // el campo pasa aunque el campo esté presente en el documento.
+    await assertSucceeds(ref.update({ displayName: "Martín" }));
+  });
+});
+
 describe("users rules — blockedAthleteIds: create verb + real write shapes", () => {
   const uid = "athlete-plants-blocked-ids";
 
