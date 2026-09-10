@@ -42,6 +42,7 @@ import '../../../../../fixtures/routine_editor_ui.dart';
 import '../../../../../fixtures/exercises.dart';
 import '../../../../../helpers/fake_analytics_service.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
+import 'package:treino/features/coach_hub/application/picker_panel_width_provider.dart';
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -4234,6 +4235,53 @@ void main() {
       await tester.tap(agregar.first);
       await tester.pumpAndSettle();
       expect(find.byType(Dialog), findsOneWidget);
+    });
+
+    // ── El panel se puede ensanchar ───────────────────────────────────────
+    //
+    // El PF: «no se adapta bien la lista de ejercicios a la pantalla y sus
+    // diferentes tamaños». El panel estaba clavado en 400 px, así que un
+    // monitor más grande no le sumaba nada — ni al panel ni a la rutina.
+    Finder asaDelPanel() => find.descendant(
+          of: find.byType(ExercisePickerPanel),
+          matching: find.byWidgetPredicate(
+            (w) =>
+                w is MouseRegion &&
+                w.cursor == SystemMouseCursors.resizeLeftRight,
+          ),
+        );
+
+    double anchoPanel(WidgetTester tester) =>
+        tester.getSize(find.byType(ExercisePickerPanel)).width;
+
+    testWidgets('arrastrar el asa ensancha el panel', (tester) async {
+      await _pumpEditor(tester);
+      final antes = anchoPanel(tester);
+
+      // El asa vive en el borde IZQUIERDO, el que da contra la rutina, así que
+      // tirar hacia la izquierda agranda.
+      await tester.drag(asaDelPanel(), const Offset(-80, 0));
+      await tester.pumpAndSettle();
+
+      expect(anchoPanel(tester), antes + 80);
+    });
+
+    testWidgets('y se frena donde la rutina dejaría de entrar', (tester) async {
+      await _pumpEditor(tester);
+
+      // Un tirón imposible: sin tope el panel se comería la pantalla y la
+      // rutina quedaría en cero.
+      await tester.drag(asaDelPanel(), const Offset(-5000, 0));
+      await tester.pumpAndSettle();
+
+      final panel = anchoPanel(tester);
+      final total = tester.getSize(find.byType(RoutineEditorWebScreen)).width;
+      expect(
+        total - panel,
+        greaterThanOrEqualTo(kAnchoMinimoRutina),
+        reason: 'la rutina no cede nunca sus $kAnchoMinimoRutina px: el panel '
+            'quedó en $panel sobre $total',
+      );
     });
 
     testWidgets('"En superserie" sólo aparece con 2 o más elegidos',

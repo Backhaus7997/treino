@@ -56,6 +56,7 @@ import '../../shell/responsive.dart' as rsp;
 import '../../widgets/create_custom_exercise_dialog.dart';
 import '../../widgets/coach_hub_widgets.dart';
 import '../../widgets/exercise_picker_dialog.dart';
+import 'package:treino/features/coach_hub/application/picker_panel_width_provider.dart';
 
 /// Editor de rutinas web — crea o edita la rutina de UN alumno (mirrors
 /// mobile's `RoutineEditorScreen(TrainerAssigning)`). Soporta, por ejercicio:
@@ -3106,20 +3107,42 @@ class _RoutineEditorWebScreenState
     // él): sin este clamp el panel leería un índice fuera de rango.
     final dia = _pickerDia.clamp(0, _days.length - 1);
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(child: arbol),
-        ExercisePickerPanel(
-          dias: [for (final d in _days) d.name],
-          diaElegido: dia,
-          onElegirDia: (i) => setState(() => _pickerDia = i),
-          alreadySelectedIds: _idsPresentesEnLaSemana(dia),
-          onAgregar: (elegidos) => _agregarAlDia(dia, elegidos),
-          onAgregarEnSuperserie: (elegidos) =>
-              _agregarSuperserieAlDia(dia, elegidos),
-        ),
-      ],
+    // `LayoutBuilder` y NO `MediaQuery`: acá adentro el viewport miente. El
+    // sidebar ya está descontado, y encima colapsa de 240 a 72 sin que el
+    // viewport cambie un píxel. El gate binario de «esto es desktop» de arriba
+    // sí sale de `MediaQuery` — ése es el número del ADR-CHW-004.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxAncho = maxAnchoPanelPicker(constraints.maxWidth);
+        // Se acota TAMBIÉN al dibujar: el ancho guardado puede venir de un
+        // monitor más grande, y ahí no entra. `ajustar` lo corrige en prefs la
+        // primera vez que se arrastra; esto lo hace ver bien mientras tanto.
+        final ancho = ref
+            .watch(pickerPanelWidthProvider)
+            .clamp(kAnchoPanelPickerMin, maxAncho);
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(child: arbol),
+            ExercisePickerPanel(
+              width: ancho,
+              // El asa vive en el borde IZQUIERDO del panel, así que arrastrar
+              // hacia la izquierda —dx negativo— lo ensancha.
+              onResize: (dx) => ref
+                  .read(pickerPanelWidthProvider.notifier)
+                  .ajustar(-dx, maxAncho: maxAncho),
+              dias: [for (final d in _days) d.name],
+              diaElegido: dia,
+              onElegirDia: (i) => setState(() => _pickerDia = i),
+              alreadySelectedIds: _idsPresentesEnLaSemana(dia),
+              onAgregar: (elegidos) => _agregarAlDia(dia, elegidos),
+              onAgregarEnSuperserie: (elegidos) =>
+                  _agregarSuperserieAlDia(dia, elegidos),
+            ),
+          ],
+        );
+      },
     );
   }
 }

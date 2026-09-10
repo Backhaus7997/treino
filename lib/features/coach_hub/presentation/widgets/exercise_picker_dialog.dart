@@ -25,6 +25,7 @@ import '../sections/biblioteca/widgets/exercise_detail_dialog.dart'
 import 'create_custom_exercise_dialog.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
+import 'package:treino/features/coach_hub/application/picker_panel_width_provider.dart';
 
 /// Web equivalent of [showExercisePicker] (mobile's `exercise_picker_sheet.dart`
 /// bottom sheet) — a multi-select exercise picker for the Coach Hub routine
@@ -956,13 +957,27 @@ CustomExercise? _customWithId(List<CustomExercise> items, String id) {
   return null;
 }
 
-/// Ancho del panel lateral, en px lógicos.
+/// Ancho POR DEFECTO del panel lateral, en px lógicos.
 ///
-/// 400 y no más: el editor de la izquierda tiene que seguir siendo LEGIBLE
-/// mientras se elige, que es el punto del #860. A 1280 —el piso donde el panel
-/// aparece— esto le deja 880 al editor, más que los 560 que ocupaba el modal
-/// tapándolo todo.
-const double kAnchoPanelPicker = 400;
+/// Era fijo, y ahí estaba el problema: el editor de la izquierda tiene que
+/// seguir siendo legible mientras se elige (el punto del #860), pero clavar el
+/// panel en 400 significaba que un monitor de 1920 no le sumaba un píxel a
+/// NADIE — ni al panel ni a la rutina. Ahora es el punto de partida y lo mueve
+/// quien quiera, entre `kAnchoPanelPickerMin` y lo que deje la rutina.
+///
+/// Ver `picker_panel_width_provider.dart` para el rango y por qué.
+const double kAnchoPanelPicker = kAnchoPanelPickerDefault;
+
+/// Ancho del asa de arrastre: `AppSpacing.s8`.
+///
+/// Es el primer separador arrastrable del hub, así que no hay precedente que
+/// copiar — el número sale de la escala de spacing, que es lo que el guard
+/// `no_off_scale_spacing_scan` permite.
+///
+/// Ocho y no uno: un asa del ancho del borde que dibuja es imposible de
+/// agarrar sin apuntar. El borde sigue midiendo 1 px; lo que mide 8 es el
+/// blanco de agarre, que es invisible salvo por el cursor.
+const double kAnchoAsaPanel = AppSpacing.s8;
 
 /// El picker como PANEL LATERAL persistente (#860).
 ///
@@ -985,8 +1000,19 @@ class ExercisePickerPanel extends StatelessWidget {
     required this.onAgregar,
     required this.onAgregarEnSuperserie,
     this.alreadySelectedIds = const {},
+    this.width = kAnchoPanelPicker,
+    this.onResize,
     super.key,
   });
+
+  /// Ancho actual del panel. Lo decide el llamador, que es el único que sabe
+  /// cuánto lugar hay — ver `maxAnchoPanelPicker`.
+  final double width;
+
+  /// Arrastre del asa, en px. Positivo = el panel se ENSANCHA.
+  ///
+  /// `null` apaga el asa: en el modal no hay nada que redimensionar.
+  final ValueChanged<double>? onResize;
 
   /// Los nombres de los días del plan, en orden.
   final List<String> dias;
@@ -1011,11 +1037,13 @@ class ExercisePickerPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    return Container(
-      width: kAnchoPanelPicker,
+    final panel = Container(
+      width: width,
       decoration: BoxDecoration(
         color: palette.bgCard,
-        border: Border(left: BorderSide(color: palette.border)),
+        border: onResize == null
+            ? Border(left: BorderSide(color: palette.border))
+            : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1068,6 +1096,50 @@ class ExercisePickerPanel extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+
+    if (onResize == null) return panel;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [_AsaDeArrastre(onResize: onResize!), panel],
+    );
+  }
+}
+
+/// El asa que ensancha y angosta el panel.
+///
+/// Va en su BORDE IZQUIERDO, que es el que da contra la rutina: arrastrar
+/// hacia la izquierda agranda el panel, y es el mismo gesto que en cualquier
+/// otro panel redimensionable. El delta llega en px de pantalla, así que
+/// ensanchar es `-delta`; esa inversión la hace el llamador, que es el que
+/// sabe de qué lado está.
+///
+/// El asa mide 8 px de ancho pero sólo DIBUJA el borde de 1 que ya estaba. Los
+/// otros 7 son blanco de agarre: invisibles salvo por el cursor, que cambia a
+/// `resizeLeftRight` al pasar por encima. Sin eso el asa sería del ancho del
+/// borde y habría que apuntarle.
+class _AsaDeArrastre extends StatelessWidget {
+  const _AsaDeArrastre({required this.onResize});
+
+  final ValueChanged<double> onResize;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return MouseRegion(
+      cursor: SystemMouseCursors.resizeLeftRight,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onHorizontalDragUpdate: (d) => onResize(d.delta.dx),
+        child: SizedBox(
+          width: kAnchoAsaPanel,
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: Container(width: 1, color: palette.border),
+          ),
+        ),
       ),
     );
   }
