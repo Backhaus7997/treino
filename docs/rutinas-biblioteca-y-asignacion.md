@@ -1,8 +1,9 @@
 # Rutinas: biblioteca del PF y asignación a alumnos
 
-**Estado:** §4.1, §4.2 y §4.4 implementados y mergeados. Falta **§4.3**.
-**Fecha:** 2026-09-10 (reescrito; la versión anterior tenía dos premisas falsas).
-**Para:** la sesión que tome §4.3, o cualquiera que toque rutinas del PF.
+**Estado:** §4 completo — 4.1, 4.2, 4.3 y 4.4 implementados y mergeados.
+**Fecha:** 2026-09-10.
+**Para:** cualquiera que toque rutinas del PF. La §6 de trampas es lo que más
+sirve si venís a hacer otra cosa sobre estos archivos.
 
 > **Los números de línea de este doc se desactualizan.** Los de la versión
 > anterior estaban corridos ~40 líneas y hacían desconfiar del doc entero.
@@ -158,33 +159,50 @@ Las cuatro decisiones que este doc dejaba abiertas, resueltas:
 La rama de la copia **no llama a ningún `update`**. Ésa es toda la promesa de
 «mantener la original en la galería», y hay test con `verifyNever` que la fija.
 
-### 4.3 Publicar esté asignada o no — **PENDIENTE, lo único que queda**
+### 4.3 Publicar esté asignada o no — HECHO (#1099)
 
 `firestore.rules` restringe el flip de `visibility` a `trainer-template` del
 dueño (path 5). Publicar la copia de un alumno lo rechaza el servidor — y con
 razón, esa copia lleva su nombre y su historial.
 
-La forma correcta:
+Lo entregado:
 
-- `trainer-template` → flip directo (**ya implementado**, #1091).
-- `trainer-assigned` → ofrecer **«Publicar como plantilla»**: `createTemplate` a
-  partir de esa copia y publicar ESE. La rutina del alumno no se toca.
+- `trainer-template` → flip directo (#1091).
+- `trainer-assigned` → el ⋮ ofrece **«Publicar como plantilla»**: crea una
+  plantilla NUEVA a partir del plan y publica ESA. El plan del alumno no se
+  toca. Se llama así y no «Publicar» justamente para que no se lea como si
+  publicara la rutina de esa persona.
 
-Con §4.2 puesto, la mitad de esto ya existe: «Guardar como copia» desde el
-editor de un plan crea exactamente esa plantilla. Falta el atajo desde el ⋮ y el
-publicar.
+**El nombre se pide, y ésa es la diferencia con §4.2.** Ahí el nombre va
+automático porque la copia es privada; acá entra al catálogo de la comunidad, y
+un plan asignado suele llamarse por su dueño. El diálogo arranca con el nombre
+del plan, dice que lo va a ver cualquiera, y si el nombre nombra al alumno lo
+avisa con la palabra que aparece.
 
-**Decisión sin tomar, y no es menor: publicar expone el NOMBRE al catálogo
-público.** Un plan asignado suele llamarse «Plan de Sofía». Publicarlo tal cual
-filtra el nombre de una clienta a la comunidad. Acá **sí** hace falta que el PF
-lo renombre antes de publicar — al revés que en §4.2, donde la copia es privada
-y el nombre va automático. La diferencia no es de gusto: una es privada y la
-otra es pública e irreversible en la práctica (junta valoraciones).
+**El match es por PALABRA COMPLETA**, y las dos direcciones salieron de
+romperlo (las encontró Codex en la review):
 
-⚠️ **§4.3 toca `routine_card_grid.dart` y `routine_actions_provider.dart`**, los
-mismos métodos que #1092. Si hay otro PR abierto sobre esos archivos, esperalo:
-apilar es una trampa acá (el squash del padre cierra al hijo y no se puede
-reabrir).
+- Con `contains` de substring, un alumno «Ana» hacía saltar el aviso sobre
+  «Semana de fuerza». El aviso DICE el nombre, así que era una advertencia
+  concreta y FALSA — peor que ninguna, y en la función que existe para no
+  filtrar un nombre.
+- Comparando contra el `displayName` entero, «Sofía García» NO matcheaba «Plan
+  de Sofía», que es el caso que esto existe para agarrar.
+
+Se tokenizan los dos lados, se ignoran las palabras de menos de tres letras
+(conectores) y se devuelve la palabra ORIGINAL, que es la que se muestra.
+
+**No se bloquea la publicación.** La review pedía que el diálogo no cierre
+mientras el nombre nombre al alumno. No se hizo: la decisión sigue siendo del PF
+—puede tener permiso de su alumna, y «Ana», «Luz» o «Sol» son nombres Y
+palabras— y un guard que bloquea sobre una heurística deja al PF sin salida el
+día que la heurística se equivoca. Lo que sí cambia es el botón: pasa a decir
+**«Publicar igual»**. No se puede publicar sin haber leído que decía algo.
+
+**`publicarComoPlantilla` devuelve tres estados, no un `bool`.** Son DOS
+escrituras y el del medio existe: si la plantilla se crea y el publish falla, un
+`false` haría que el PF reintente y termine con DOS. La grilla se invalida y el
+`routine_created` se emite ANTES del publish, por lo mismo.
 
 ### 4.4 Ordenar la biblioteca — HECHO (#1093 + #1096)
 
@@ -223,9 +241,9 @@ secciones del Hub **web**.
 
 ## 5. Lo que queda
 
-Sólo **§4.3**. Con su decisión de nombre sin tomar.
+**Nada de §4.** Los cuatro puntos están implementados y mergeados.
 
-Aparte, dos cosas que quedaron señaladas y no hechas:
+Dos cosas quedaron señaladas y no hechas, ninguna bloqueante:
 
 - `athlete_routines_screen.dart` no ofrece «Recuperar». Su copy es honesto —
   promete VER la rutina en Archivadas, no recuperarla— así que no miente, pero
@@ -233,8 +251,6 @@ Aparte, dos cosas que quedaron señaladas y no hechas:
 - La sección `Biblioteca` ahora es sólo ejercicios y sigue llamándose
   «Biblioteca». Si «Ejercicios» describe mejor lo que quedó, es un PR de naming
   aparte (AGENTS.md §1 es estricto con eso).
-
----
 
 ## 6. Trampas del repo que aplican a este tema
 
@@ -292,3 +308,22 @@ Ordenadas por cuánto tiempo hacen perder.
 
 10. **`TreinoSectionHeader` uppercasea el título.** `find.text('Biblioteca')`
     falla; es `'BIBLIOTECA'`.
+
+11. **Una advertencia que NOMBRA algo tiene que probar que ese algo está.** El
+    aviso de «este nombre dice el de tu alumno» arrancó comparando con
+    `contains` de substring: un alumno «Ana» lo hacía saltar sobre «Semana de
+    fuerza», con el cartel diciendo «dice "Ana"». Concreta y falsa. Si vas a
+    poner el dato adentro del mensaje, el match tiene que ser por palabra
+    completa — y con los acentos normalizados en los dos lados.
+
+12. **Un guard que bloquea sobre una heurística necesita salida.** La review
+    pedía impedir la publicación mientras el nombre nombrara al alumno. Con un
+    match imperfecto, eso deja al PF trabado sin forma de salir el día que la
+    heurística se equivoca. Cambiar el LABEL del botón a «Publicar igual» saca
+    el camino por reflejo sin trabar a nadie.
+
+13. **Si tu rama crea un documento, fijate qué evento emiten las otras.**
+    `logRoutineCreated` es el evento de TODA rutina nueva —su dartdoc dice que
+    las del PF se cuentan igual, «omitirlas dejaría el evento ciego a la mitad
+    de las rutinas»— y el camino nuevo no lo emitía. Va con el `source` de lo
+    que se ESCRIBIÓ, no de la pantalla.
