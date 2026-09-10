@@ -12,6 +12,8 @@ import '../../../core/analytics/analytics_service.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../paywall/application/athlete_entitlement_provider.dart';
+import '../../paywall/domain/athlete_entitlement.dart'
+    show kFreeMaxRoutineDays, kFreeMaxRoutineWeeks;
 import '../../paywall/presentation/free_plan_limit_sheet.dart';
 import '../../profile/application/user_providers.dart'
     show userProfileProvider, userRepositoryProvider;
@@ -388,6 +390,26 @@ class _FollowTemplateBar extends ConsumerWidget {
     );
     final yaLaSigue = activeId == routine.id;
 
+    // Plantilla de nivel intermedio/avanzado y alumno sin derecho. Mismo
+    // criterio que `_UseAsBaseBar`: el botón SIGUE visible y abre la hoja en
+    // vez de desaparecer, porque esconderlo dejaría al alumno sin saber que la
+    // función existe y el candado de la grilla ya se lo anticipó.
+    //
+    // Este era el agujero grande del eje: `_follow` escribía
+    // `users/{uid}.activeRoutineId` sin consultar entitlement, así que el
+    // candado de la grilla y el de "Usar como base" tapaban dos de las TRES
+    // puertas del catálogo. La spec parte el catálogo por nivel
+    // (`docs/paywall-alumno-suelto.md` §4): seguir una de principiante es
+    // gratis y sin tope de días, seguir una intermedia/avanzada es del pago.
+    //
+    // `locked` le gana a `yaLaSigue` a propósito. Un alumno que ya venía
+    // siguiendo una premium de antes del gate ve el candado acá Y en la acción
+    // de EMPEZAR — las dos superficies dicen lo mismo. Que ese alumno quede sin
+    // poder entrenar lo que ya tenía activo es el problema de grandfathering
+    // que sigue abierto, y se resuelve antes de prender el interruptor, no
+    // dejando que una pantalla prometa lo que la otra rebota.
+    final locked = routine.isPremium && ref.watch(catalogLockActiveProvider);
+
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     final label =
@@ -406,15 +428,23 @@ class _FollowTemplateBar extends ConsumerWidget {
             key: const Key('routine_follow_template'),
             tooltip: label,
             icon: Icon(
-              yaLaSigue ? TreinoIcon.check : TreinoIcon.play,
-              color: yaLaSigue ? palette.accent : palette.textPrimary,
+              locked
+                  ? TreinoIcon.lock
+                  : (yaLaSigue ? TreinoIcon.check : TreinoIcon.play),
+              color: locked
+                  ? palette.textMuted
+                  : (yaLaSigue ? palette.accent : palette.textPrimary),
             ),
             // Ya seguirla no es un estado que haya que "deshacer" desde acá:
             // para cambiar de rutina activa se elige OTRA. Un botón que la
             // desactiva dejaría al atleta sin ninguna, que no es algo que
             // haya pedido.
-            onPressed:
-                yaLaSigue ? null : () => _follow(context, ref, routine),
+            onPressed: locked
+                ? () => showFreePlanLimitSheet(
+                      context,
+                      limit: FreePlanLimit.premiumTemplate,
+                    )
+                : (yaLaSigue ? null : () => _follow(context, ref, routine)),
           ),
         ),
       ),
@@ -455,7 +485,43 @@ class _UseAsBaseBar extends ConsumerWidget {
     // sin saber que la función existe, y el candado de la grilla ya le anticipó
     // que esta plantilla es del plan pago — que el detalle no diga nada sería
     // la app cambiando de idea entre dos pantallas.
-    final locked = routine.isPremium && ref.watch(catalogLockActiveProvider);
+    //
+    // El gate mide DOS ejes distintos, y antes medía solo medio del primero.
+    //
+    // Eje 1 — el catálogo. `docs/paywall-alumno-suelto.md` §4 le da fila propia
+    // a "Editar / personalizar una plantilla del catálogo": free NO. O sea que
+    // no alcanza con `isPremium` — personalizar una de PRINCIPIANTE también es
+    // del plan pago, aunque seguirla tal cual sea gratis. Y no es un detalle
+    // de política: las tres plantillas gratis tienen 3 días contra un tope free
+    // de 2, así que con el gate viejo el alumno entraba al editor, cargaba todo,
+    // tocaba Guardar, y `firestore.rules` lo rebotaba con "No tenés permisos.
+    // Recargá la app." Perdía el trabajo y encima el mensaje le pedía algo que
+    // no arreglaba nada. Frenarlo en la ENTRADA es lo que hace honesta a la
+    // pantalla.
+    //
+    // Eje 2 — la forma, para las plantillas de PF públicas, que la spec no
+    // cubre. Ahí el límite no es el catálogo sino el tope de la rutina propia:
+    // si la plantilla excede la forma free, la copia se rebota al guardar por
+    // el mismo camino. Se frena antes, con el motivo REAL (días o semanas), no
+    // con el del catálogo.
+    // `customizeLockActiveProvider` y NO `catalogLockActiveProvider`: son dos
+    // ejes distintos y el segundo se cruza con `isPremium` por contrato. Ver el
+    // dartdoc de los dos, que explica por qué el catálogo necesita dos.
+    final customizeLocked = ref.watch(customizeLockActiveProvider);
+    final esDelCatalogo = routine.source == RoutineSource.system;
+    final excedeDias = routine.days.length > kFreeMaxRoutineDays;
+    final excedeSemanas = routine.numWeeks > kFreeMaxRoutineWeeks;
+
+    final FreePlanLimit? lockedReason = !customizeLocked
+        ? null
+        : esDelCatalogo
+            ? FreePlanLimit.customizeTemplate
+            : excedeDias
+                ? FreePlanLimit.days
+                : excedeSemanas
+                    ? FreePlanLimit.weeks
+                    : null;
+    final locked = lockedReason != null;
 
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
@@ -475,11 +541,8 @@ class _UseAsBaseBar extends ConsumerWidget {
               locked ? TreinoIcon.lock : TreinoIcon.copy,
               color: locked ? palette.textMuted : palette.textPrimary,
             ),
-            onPressed: () => locked
-                ? showFreePlanLimitSheet(
-                    context,
-                    limit: FreePlanLimit.premiumTemplate,
-                  )
+            onPressed: () => lockedReason != null
+                ? showFreePlanLimitSheet(context, limit: lockedReason)
                 : context.push('/workout/customize-routine/${routine.id}'),
           ),
         ),
@@ -668,6 +731,27 @@ class _RoutineDetailContent extends ConsumerWidget {
 
     final showStartAction = _startActionVisible(ref);
 
+    // El paywall gatea la ACCIÓN, nunca la VISIBILIDAD, y eso es deliberado por
+    // dos motivos que apuntan al mismo lado.
+    //
+    // Uno es de layout y ya se pagó una vez: los encabezados de
+    // `_StartSessionAction` y `_PeriodizedStartAction` explican que un guard
+    // que viva DENTRO del widget encoge el botón a nada mientras el padre
+    // sigue reservando la altura de la barra (#641). Por eso se decide acá y
+    // se baja como parámetro: el slot fijado y su ocupante no pueden discrepar.
+    //
+    // El otro es de producto, el mismo de `_UseAsBaseBar`: un botón que
+    // desaparece no le enseña a nadie que la función existe. Que quede visible
+    // y explique es lo que convierte un límite en una oferta.
+    //
+    // Y va sobre EMPEZAR además de sobre "Seguir", porque seguir no es
+    // requisito para entrenar: `_startActionVisible` devolvía `true`
+    // incondicional sobre una plantilla del sistema, así que el candado de
+    // "Seguir" solo tapaba el camino largo.
+    final startLocked = routine.source == RoutineSource.system &&
+        routine.isPremium &&
+        ref.watch(catalogLockActiveProvider);
+
     return Column(
       children: [
         Expanded(
@@ -824,8 +908,13 @@ class _RoutineDetailContent extends ConsumerWidget {
                     routine: routine,
                     day: day,
                     viewedWeek: viewedWeek,
+                    paywallLocked: startLocked,
                   )
-                : _StartSessionAction(routine: routine, day: day),
+                : _StartSessionAction(
+                    routine: routine,
+                    day: day,
+                    paywallLocked: startLocked,
+                  ),
           ),
       ],
     );
@@ -1340,6 +1429,7 @@ class _PeriodizedStartAction extends ConsumerWidget {
     required this.routine,
     required this.day,
     required this.viewedWeek,
+    required this.paywallLocked,
   });
 
   final Routine routine;
@@ -1347,6 +1437,14 @@ class _PeriodizedStartAction extends ConsumerWidget {
 
   /// 0-based week currently displayed by the parent screen.
   final int viewedWeek;
+
+  /// Plantilla del catálogo del plan pago y alumno sin derecho.
+  ///
+  /// Lo decide el padre por el mismo motivo que la visibilidad — ver el
+  /// encabezado de la clase y `_RoutineDetailContent.startLocked`. Acá NO se
+  /// recalcula: dos lecturas del mismo entitlement en dos widgets es
+  /// exactamente cómo se llega a que el slot y su ocupante discrepen.
+  final bool paywallLocked;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1366,6 +1464,17 @@ class _PeriodizedStartAction extends ConsumerWidget {
           ? AppL10n.of(context).routineDetailRepeat
           : AppL10n.of(context).routineDetailStart,
       onPressed: () {
+        // La hoja va ANTES del log: `logRoutineStarted` significa "empezó a
+        // entrenar", y una sesión que el paywall no dejó empezar no lo es.
+        // Loguearla igual metería ruido en la única métrica que dice si la
+        // gente entrena.
+        if (paywallLocked) {
+          showFreePlanLimitSheet(
+            context,
+            limit: FreePlanLimit.premiumTemplate,
+          );
+          return;
+        }
         ref.read(analyticsServiceProvider).logRoutineStarted(
               routineId: routine.id,
               routineName: routine.name,
@@ -1562,16 +1671,32 @@ class _EmptyState extends StatelessWidget {
 /// lived in this widget would shrink the button to nothing while the parent
 /// still reserved the bar's height (#641).
 class _StartSessionAction extends ConsumerWidget {
-  const _StartSessionAction({required this.routine, required this.day});
+  const _StartSessionAction({
+    required this.routine,
+    required this.day,
+    required this.paywallLocked,
+  });
 
   final Routine routine;
   final RoutineDay day;
+
+  /// Plantilla del catálogo del plan pago y alumno sin derecho. Lo decide el
+  /// padre — ver el encabezado de la clase y `_PeriodizedStartAction`.
+  final bool paywallLocked;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return _StartActionButton(
       label: AppL10n.of(context).routineDetailStart,
       onPressed: () {
+        // Antes del log, por el mismo motivo que en `_PeriodizedStartAction`.
+        if (paywallLocked) {
+          showFreePlanLimitSheet(
+            context,
+            limit: FreePlanLimit.premiumTemplate,
+          );
+          return;
+        }
         ref.read(analyticsServiceProvider).logRoutineStarted(
               routineId: routine.id,
               routineName: routine.name,

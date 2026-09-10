@@ -16,6 +16,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
@@ -37,6 +38,10 @@ import 'package:treino/l10n/app_l10n.dart';
 
 const _athlete = 'athlete-1';
 const _chip = Key('routine_use_as_base');
+
+/// La hoja de límite del plan free. Se identifica por el grabber porque es la
+/// única parte de la hoja que no depende del motivo que la abrió.
+const sheet = Key('free_plan_limit_grabber');
 
 const _day = RoutineDay(
   dayNumber: 1,
@@ -119,6 +124,64 @@ Future<void> _pump(
     ),
   );
   await tester.pumpAndSettle();
+}
+
+/// Igual que [_pump] pero con un router de verdad, y devuelve a dónde se
+/// navegó (o `null` si no se navegó).
+///
+/// Hace falta para el gate de EMPEZAR y sólo ahí: los demás tests miran íconos
+/// y hojas, que no necesitan rutas. Acá la aserción ES la navegación — que un
+/// alumno free NO llegue a `/workout/session/...` sobre una plantilla paga, y
+/// que sí llegue sobre una de principiante. Sin router, el caso negativo no se
+/// puede distinguir de "el botón no hizo nada".
+Future<String? Function()> _pumpConRouter(
+  WidgetTester tester,
+  Routine routine, {
+  bool? paywallEnabled,
+  AthleteEntitlement? entitlement,
+}) async {
+  String? pushed;
+  final router = GoRouter(
+    routes: [
+      GoRoute(
+        path: '/',
+        builder: (_, __) => const RoutineDetailScreen(routineId: 'r-1'),
+      ),
+      GoRoute(
+        path: '/workout/session/:routineId/:dayNumber',
+        builder: (_, state) {
+          pushed = state.matchedLocation;
+          return const Scaffold(body: Center(child: Text('session-stub')));
+        },
+      ),
+    ],
+  );
+
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        routineByIdStreamProvider('r-1')
+            .overrideWith((ref) => Stream.value(routine)),
+        currentUidProvider.overrideWithValue(_athlete),
+        userProfileProvider.overrideWith(
+          (ref) => Stream.value(_profile(UserRole.athlete)),
+        ),
+        if (paywallEnabled != null)
+          athletePaywallEnabledProvider.overrideWithValue(paywallEnabled),
+        if (entitlement != null)
+          athleteEntitlementProvider.overrideWithValue(entitlement),
+      ],
+      child: MaterialApp.router(
+        theme: AppTheme.dark(),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
+        routerConfig: router,
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+  return () => pushed;
 }
 
 void main() {
@@ -209,7 +272,6 @@ void main() {
   // plan pago, y que el detalle no dijera nada sería la app cambiando de idea
   // entre dos pantallas— pero abre la hoja en vez de llevar al editor.
   group('plantilla paga del catálogo', () {
-    const sheet = Key('free_plan_limit_grabber');
 
     /// El ícono del chip dice el estado sin necesidad de tocarlo: candado
     /// cuando está bloqueado, copiar cuando no.
@@ -253,8 +315,26 @@ void main() {
               'con derecho, la plantilla paga se copia como cualquier otra');
     });
 
-    testWidgets('plantilla gratis: nada cambia aunque el paywall esté activo',
+    testWidgets('plantilla GRATIS: copiarla también es del plan pago',
         (tester) async {
+      // Este test afirmaba lo contrario —"las 3 de principiante quedan libres,
+      // con o sin paywall"— y esa expectativa estaba mal por dos motivos
+      // independientes. Se deja escrito porque el error es fácil de repetir.
+      //
+      // 1. La spec le da fila PROPIA y sin calificar por nivel:
+      //    `docs/paywall-alumno-suelto.md` §4, "Editar / personalizar una
+      //    plantilla del catálogo | free: no | pago: sí". Seguir una de
+      //    principiante es gratis; COPIARLA no. Son dos filas distintas de la
+      //    misma tabla, y el gate viejo leía una sola.
+      //
+      // 2. Aunque la política dijera lo contrario, era imposible de cumplir:
+      //    las tres plantillas de principiante tienen 3 días
+      //    (`docs/video-catalog-audit/improved-templates.json`) contra
+      //    `kFreeMaxRoutineDays = 2`. O sea que "copiar gratis" terminaba
+      //    siempre igual: el alumno cargaba todo el editor, tocaba Guardar, y
+      //    `firestore.rules` lo rebotaba con "No tenés permisos. Recargá la
+      //    app.". Perdía el trabajo y el mensaje le pedía algo que no
+      //    arreglaba nada.
       await _pump(
         tester,
         _routine(source: RoutineSource.system),
@@ -262,8 +342,14 @@ void main() {
         entitlement: AthleteEntitlement.free,
       );
 
-      expect(iconoDelChip(tester), TreinoIcon.copy,
-          reason: 'las 3 de principiante quedan libres, con o sin paywall');
+      expect(iconoDelChip(tester), TreinoIcon.lock,
+          reason: 'personalizar CUALQUIER plantilla del catálogo es plan pago');
+
+      await tester.tap(find.byKey(_chip));
+      await tester.pumpAndSettle();
+      expect(find.byKey(sheet), findsOneWidget,
+          reason: 'se frena en la ENTRADA, no al guardar: si no, pierde todo '
+              'el trabajo contra un mensaje que no explica nada');
     });
 
     testWidgets('paywall apagado: ni la plantilla paga se gatea',
@@ -362,6 +448,141 @@ void main() {
       final boton = tester.widget<IconButton>(find.byKey(seguir));
       expect(boton.onPressed, isNotNull);
       expect((boton.icon as Icon).icon, TreinoIcon.play);
+    });
+
+    // ── El gate del catálogo pago sobre SEGUIR ───────────────────────────
+    //
+    // Este era el agujero: `_follow` escribía `activeRoutineId` sin consultar
+    // entitlement, así que el candado tapaba la grilla y "Usar como base" y
+    // dejaba abierta la puerta del medio.
+
+    testWidgets('plantilla PAGA + alumno free: candado y hoja, no la sigue',
+        (tester) async {
+      await _pump(
+        tester,
+        _routine(source: RoutineSource.system, isPremium: true),
+        paywallEnabled: true,
+        entitlement: AthleteEntitlement.free,
+      );
+
+      final boton = tester.widget<IconButton>(find.byKey(seguir));
+      expect((boton.icon as Icon).icon, TreinoIcon.lock);
+
+      await tester.tap(find.byKey(seguir));
+      await tester.pumpAndSettle();
+      expect(find.byKey(sheet), findsOneWidget);
+    });
+
+    testWidgets('plantilla de PRINCIPIANTE: seguirla sigue siendo gratis',
+        (tester) async {
+      // La contracara de "copiarla es pago". Si este test se pusiera rojo
+      // junto con el de copiar, el catálogo quedaría cerrado entero para el
+      // free — que es exactamente lo que la spec NO quiere (§3.3).
+      await _pump(
+        tester,
+        _routine(source: RoutineSource.system),
+        paywallEnabled: true,
+        entitlement: AthleteEntitlement.free,
+      );
+
+      final boton = tester.widget<IconButton>(find.byKey(seguir));
+      expect((boton.icon as Icon).icon, TreinoIcon.play);
+      expect(boton.onPressed, isNotNull);
+    });
+
+    testWidgets('con derecho, la plantilla paga se sigue normal',
+        (tester) async {
+      await _pump(
+        tester,
+        _routine(source: RoutineSource.system, isPremium: true),
+        paywallEnabled: true,
+        entitlement: AthleteEntitlement.entitled,
+      );
+
+      final boton = tester.widget<IconButton>(find.byKey(seguir));
+      expect((boton.icon as Icon).icon, TreinoIcon.play);
+      expect(boton.onPressed, isNotNull);
+    });
+  });
+
+  // ── EMPEZAR (§4.1.1: el camino corto) ─────────────────────────────────────
+  //
+  // Seguir NO es requisito para entrenar: `_startActionVisible` devolvía `true`
+  // incondicional sobre una plantilla del sistema, así que gatear sólo "Seguir"
+  // dejaba el camino corto abierto — se entra al detalle y se toca EMPEZAR.
+  //
+  // El gate va sobre la ACCIÓN y nunca sobre la VISIBILIDAD, por #641: un guard
+  // que esconda el botón encoge el ocupante mientras el padre sigue reservando
+  // la altura de la barra fijada.
+  group('EMPEZAR sobre una plantilla del catálogo', () {
+    testWidgets('plantilla PAGA + alumno free: hoja, y NO entra a la sesión',
+        (tester) async {
+      final pushed = await _pumpConRouter(
+        tester,
+        _routine(source: RoutineSource.system, isPremium: true),
+        paywallEnabled: true,
+        entitlement: AthleteEntitlement.free,
+      );
+
+      expect(find.text('EMPEZAR'), findsOneWidget,
+          reason: 'esconderlo rompería el slot fijado (#641) y además no le '
+              'enseñaría a nadie que la función existe');
+
+      await tester.tap(find.text('EMPEZAR'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(sheet), findsOneWidget);
+      expect(pushed(), isNull,
+          reason: 'este era el camino corto: sin gatear acá, alcanzaba con '
+              'entrar al detalle y tocar EMPEZAR');
+    });
+
+    testWidgets('plantilla de PRINCIPIANTE: entrenarla es gratis',
+        (tester) async {
+      final pushed = await _pumpConRouter(
+        tester,
+        _routine(source: RoutineSource.system),
+        paywallEnabled: true,
+        entitlement: AthleteEntitlement.free,
+      );
+
+      await tester.tap(find.text('EMPEZAR'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(sheet), findsNothing,
+          reason: 'entrenar el catálogo de principiante es gratis (§3.3)');
+      expect(pushed(), '/workout/session/r-1/1');
+    });
+
+    testWidgets('paywall apagado: ni la plantilla paga se gatea',
+        (tester) async {
+      final pushed = await _pumpConRouter(
+        tester,
+        _routine(source: RoutineSource.system, isPremium: true),
+        paywallEnabled: false,
+        entitlement: AthleteEntitlement.free,
+      );
+
+      await tester.tap(find.text('EMPEZAR'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(sheet), findsNothing);
+      expect(pushed(), '/workout/session/r-1/1');
+    });
+
+    testWidgets('con derecho, la plantilla paga se entrena normal',
+        (tester) async {
+      final pushed = await _pumpConRouter(
+        tester,
+        _routine(source: RoutineSource.system, isPremium: true),
+        paywallEnabled: true,
+        entitlement: AthleteEntitlement.entitled,
+      );
+
+      await tester.tap(find.text('EMPEZAR'));
+      await tester.pumpAndSettle();
+
+      expect(pushed(), '/workout/session/r-1/1');
     });
   });
 }

@@ -980,6 +980,15 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   /// Shown when the routine to edit no longer exists in Firestore.
   bool _loadNotFound = false;
 
+  /// El alumno free entró a copiar una plantilla del catálogo, que es del plan
+  /// pago (`docs/paywall-alumno-suelto.md` §4).
+  ///
+  /// Vive acá y no en el widget que empuja la ruta porque el chip "Usar como
+  /// base" es UN call site y la ruta tiene más puertas — `treino://` no declara
+  /// `pathPrefix`, así que un deep link entra derecho. El gate va en el
+  /// destino.
+  bool _paywallBlocked = false;
+
   /// True once the user has touched anything (name/split text, level, or any
   /// day/slot/set mutation). Drives the unsaved-changes guard (PopScope +
   /// "¿Descartar cambios?" dialog) on both the AppBar back button and the
@@ -1128,6 +1137,49 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         });
         return;
       }
+      // ── El gate del catálogo, en el DESTINO y no en el botón ─────────────
+      //
+      // El chip "Usar como base" del detalle ya lo frena, pero ese es UN call
+      // site y la ruta tiene más de una puerta: `treino://` está declarado sin
+      // `pathPrefix` (`AndroidManifest.xml`), así que
+      // `treino:///workout/customize-routine/<id>` entra derecho acá, y el
+      // `redirect` global del router sólo resuelve sesión y rol — de
+      // entitlements no sabe nada.
+      //
+      // Gatear en el destino cubre esa puerta y todas las que vengan después.
+      // Es el mismo principio que hace que el servidor sea la ley y el cliente
+      // la UX: el chequeo vive donde ocurre la cosa, no donde se la pide.
+      //
+      // Va acá, apenas resuelve la rutina fuente y ANTES de hidratar, para que
+      // el alumno no llegue a ver un editor cargado que después no puede
+      // guardar.
+      if (_isCustomizing &&
+          routine.source == RoutineSource.system &&
+          ref.read(customizeLockActiveProvider)) {
+        // El estado terminal PRIMERO, la hoja después. Así el formulario no se
+        // dibuja nunca —ni por un frame— detrás del modal, y si el alumno lo
+        // descarta queda en una pantalla que le explica por qué, con su botón
+        // de volver, en vez de en un editor vacío que no va a poder guardar.
+        setState(() {
+          _loading = false;
+          _paywallBlocked = true;
+        });
+        // La hoja NO se awaitea para después hacer `pop()`, y la primera
+        // versión de esto sí lo hacía al revés: llamaba a
+        // `showFreePlanLimitSheet(...)` y le pegaba un `context.pop()` en la
+        // línea siguiente. Ese pop se comía la hoja —`showModalBottomSheet`
+        // empuja una ruta, así que el pop cerraba el modal en el mismo frame en
+        // que se abría— y el alumno veía un parpadeo y nada más. Lo agarró el
+        // test de este gate.
+        unawaited(
+          showFreePlanLimitSheet(
+            context,
+            limit: FreePlanLimit.customizeTemplate,
+          ),
+        );
+        return;
+      }
+
       // Map Routine → editor state — inverse of the create path in _submit().
       // Applies equally to SelfCreating / TrainerAssigning / TrainerTemplating.
       // Guard against the controller listeners marking a freshly-loaded
@@ -1532,10 +1584,12 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     final max = switch (limit) {
       FreePlanLimit.days => kFreeMaxRoutineDays,
       FreePlanLimit.weeks => kFreeMaxRoutineWeeks,
-      // El editor no gatea por plantilla paga: ese eje se decide ANTES, en el
-      // detalle de la plantilla — si el alumno llegó hasta acá con una copia,
-      // es porque tenía derecho a copiarla. `null` = este límite no aplica.
+      // El editor no gatea por catálogo: los DOS ejes de ese límite —seguir una
+      // plantilla paga, y personalizar cualquiera— se deciden ANTES, en el
+      // detalle de la plantilla. Si el alumno llegó hasta acá con una copia, es
+      // porque tenía derecho a copiarla. `null` = este límite no aplica.
       FreePlanLimit.premiumTemplate => null,
+      FreePlanLimit.customizeTemplate => null,
       // El tope de rutinas no es un contador de la pantalla: se mide contra la
       // lista guardada, así que lo resuelve `_freePlanBlocksNewRoutine` al
       // guardar. Acá no aplica.
@@ -3123,9 +3177,20 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     }
 
     // Not-found state: routine was deleted before the user opened it.
-    if (_loadNotFound) {
+    // Estado terminal: la rutina no está, o el plan free no deja copiarla.
+    //
+    // Los dos comparten el shell porque comparten la propiedad que importa: el
+    // formulario NO se dibuja. Un editor vacío detrás de una hoja —con nombre,
+    // días y botón de guardar— es peor que no dejar entrar, porque invita a
+    // trabajar sobre algo que no se va a poder guardar.
+    //
+    // Y es un estado ESTÁTICO, no el shell de carga. Dejar `_loading` en alto
+    // parecía más simple, pero el esqueleto tiene shimmer: la pantalla se queda
+    // animando para siempre y `pumpAndSettle` de los tests no asienta nunca. Un
+    // cuelgue en un test suele ser un cuelgue en la UI.
+    if (_loadNotFound || _paywallBlocked) {
       return _shell(
-        bodyKey: const ValueKey('notfound'),
+        bodyKey: ValueKey(_paywallBlocked ? 'paywall-blocked' : 'notfound'),
         body: SafeArea(
           child: Column(
             children: [
@@ -3146,7 +3211,10 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
               Expanded(
                 child: Center(
                   child: Text(
-                    l10n.workoutSelfEditorNotFound,
+                    _paywallBlocked
+                        ? l10n.paywallFreePlanLimitCustomizeTemplateBody
+                        : l10n.workoutSelfEditorNotFound,
+                    textAlign: TextAlign.center,
                     style: TextStyle(color: palette.textMuted),
                   ),
                 ),

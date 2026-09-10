@@ -7524,7 +7524,7 @@ abstract class AppL10n {
   /// Cuerpo para el tope de DIAS. Aclara que el catalogo de principiante sigue libre, para que el limite no se lea como que no puede entrenar.
   ///
   /// In es_AR, this message translates to:
-  /// **'Con el plan gratis armas rutinas de hasta 2 dias. Las plantillas de principiante del catalogo las seguis completas, sin tope.'**
+  /// **'Con el plan gratis armás rutinas de hasta 2 días. Las plantillas de principiante del catálogo las seguís completas, sin tope.'**
   String get paywallFreePlanLimitDaysBody;
 
   /// Cuerpo para el tope de SEMANAS.
@@ -7548,8 +7548,14 @@ abstract class AppL10n {
   /// Cuerpo de la hoja cuando el alumno toca una plantilla del catalogo marcada isPremium. Nombra la salida gratis (las de principiante) para que el limite no se lea como que el catalogo entero esta cerrado.
   ///
   /// In es_AR, this message translates to:
-  /// **'Esta plantilla es parte del plan pago. Las de nivel principiante las podes usar completas con el plan gratis.'**
+  /// **'Esta plantilla es parte del plan pago. Las de nivel principiante las podés usar completas con el plan gratis.'**
   String get paywallFreePlanLimitTemplateBody;
+
+  /// Cuerpo de la hoja cuando el alumno free toca 'Usar como base' sobre una plantilla del catalogo. Distinto del caso isPremium: aca la plantilla puede ser gratis y lo pago es COPIARLA. Nombra las DOS salidas gratis (seguirla tal cual, o armar una propia) para que no se lea como que el catalogo se cerro.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Personalizar una plantilla del catálogo es parte del plan pago. Con el gratis la seguís tal cual, sin tope de días, o armás tu propia rutina de hasta 2 días.'**
+  String get paywallFreePlanLimitCustomizeTemplateBody;
 
   /// Pildora con candado sobre las cards del catalogo que el alumno no puede usar con su plan actual. Solo se dibuja cuando la plantilla esta realmente bloqueada para quien mira.
   ///

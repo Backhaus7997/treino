@@ -19,6 +19,19 @@ enum FreePlanLimit {
   /// no es la forma de lo que armó, es el contenido curado al que accede.
   premiumTemplate,
 
+  /// Quiso COPIAR una plantilla del catálogo para editarla.
+  ///
+  /// Distinto de [premiumTemplate], y la diferencia importa: acá la plantilla
+  /// puede ser una de las gratis. Lo que es del plan pago es *personalizarla*
+  /// —la spec le da fila propia (`docs/paywall-alumno-suelto.md` §4, "Editar /
+  /// personalizar una plantilla del catálogo")—, mientras seguirla tal cual
+  /// sigue siendo gratis y sin tope de días.
+  ///
+  /// Si se reusara [premiumTemplate] acá, el alumno leería "esta plantilla es
+  /// del plan pago" sobre una plantilla que la pantalla anterior le mostró SIN
+  /// candado. Dos mensajes contradictorios sobre el mismo objeto.
+  customizeTemplate,
+
   /// Llegó al tope de rutinas propias del plan free. A diferencia de los otros
   /// tres, este límite se toca al GUARDAR: la cuenta sólo se conoce contra la
   /// lista existente.
@@ -116,6 +129,8 @@ class _FreePlanLimitBody extends StatelessWidget {
                 FreePlanLimit.weeks => l10n.paywallFreePlanLimitWeeksBody,
                 FreePlanLimit.premiumTemplate =>
                   l10n.paywallFreePlanLimitTemplateBody,
+                FreePlanLimit.customizeTemplate =>
+                  l10n.paywallFreePlanLimitCustomizeTemplateBody,
                 FreePlanLimit.routineCount =>
                   l10n.paywallFreePlanLimitRoutineCountBody,
                 FreePlanLimit.chartHistory =>

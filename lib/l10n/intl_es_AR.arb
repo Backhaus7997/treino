@@ -3738,7 +3738,7 @@
   "@paywallFreePlanLimitTitle": {
     "description": "Titulo de la hoja que se abre cuando un alumno en plan free toca el + que cruzaria el tope de dias o semanas de su propia rutina."
   },
-  "paywallFreePlanLimitDaysBody": "Con el plan gratis armas rutinas de hasta 2 dias. Las plantillas de principiante del catalogo las seguis completas, sin tope.",
+  "paywallFreePlanLimitDaysBody": "Con el plan gratis armás rutinas de hasta 2 días. Las plantillas de principiante del catálogo las seguís completas, sin tope.",
   "@paywallFreePlanLimitDaysBody": {
     "description": "Cuerpo para el tope de DIAS. Aclara que el catalogo de principiante sigue libre, para que el limite no se lea como que no puede entrenar."
   },
@@ -3752,9 +3752,13 @@
   },
   "paywallFreePlanLimitDismiss": "Entendido",
   "@paywallFreePlanLimitDismiss": {},
-  "paywallFreePlanLimitTemplateBody": "Esta plantilla es parte del plan pago. Las de nivel principiante las podes usar completas con el plan gratis.",
+  "paywallFreePlanLimitTemplateBody": "Esta plantilla es parte del plan pago. Las de nivel principiante las podés usar completas con el plan gratis.",
   "@paywallFreePlanLimitTemplateBody": {
     "description": "Cuerpo de la hoja cuando el alumno toca una plantilla del catalogo marcada isPremium. Nombra la salida gratis (las de principiante) para que el limite no se lea como que el catalogo entero esta cerrado."
+  },
+  "paywallFreePlanLimitCustomizeTemplateBody": "Personalizar una plantilla del catálogo es parte del plan pago. Con el gratis la seguís tal cual, sin tope de días, o armás tu propia rutina de hasta 2 días.",
+  "@paywallFreePlanLimitCustomizeTemplateBody": {
+    "description": "Cuerpo de la hoja cuando el alumno free toca 'Usar como base' sobre una plantilla del catalogo. Distinto del caso isPremium: aca la plantilla puede ser gratis y lo pago es COPIARLA. Nombra las DOS salidas gratis (seguirla tal cual, o armar una propia) para que no se lea como que el catalogo se cerro."
   },
   "workoutPlantillasPremiumChip": "PLAN PAGO",
   "@workoutPlantillasPremiumChip": {
