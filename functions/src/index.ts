@@ -192,3 +192,17 @@ export { reconcileMyCheckout } from "./subscriptions/mp/reconcile-my-checkout";
 // aplicaciones de Suscripciones, pero tiene que EXISTIR o el deploy falla:
 //   firebase functions:secrets:set MP_WEBHOOK_SECRET --project prod
 export { mpWebhook } from "./subscriptions/mp/webhook";
+
+// El webhook de RevenueCat: el que le acredita la suscripcion al ALUMNO.
+//
+// Mismo principio que el de MP —del evento se usa el `app_user_id` y la verdad
+// se le pregunta a RevenueCat con nuestra key— pero la POLITICA DE CODIGOS es
+// la inversa, y esa es la parte que no se puede copiar: MP reintenta cada 15
+// minutos para siempre, RevenueCat reintenta 5 veces y abandona. Aca un fallo
+// transitorio SI tiene que contestar 5xx. Ver el encabezado del archivo.
+//
+// Requiere DOS secretos y una variable de entorno:
+//   firebase functions:secrets:set RC_API_KEY         --project prod
+//   firebase functions:secrets:set RC_WEBHOOK_SECRET  --project prod
+//   RC_PROJECT_ID=proj...  (no es secreto)
+export { rcWebhook } from "./subscriptions/rc/webhook";
