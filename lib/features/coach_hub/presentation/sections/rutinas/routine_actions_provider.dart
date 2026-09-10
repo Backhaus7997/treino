@@ -1,11 +1,12 @@
-// Mutaciones de rutinas para el Coach Hub web: archivar y ELIMINAR.
+// Mutaciones de rutinas para el Coach Hub web: archivar, ELIMINAR, asignar y
+// publicar/despublicar.
 //
-// Las dos invalidan `routinesAuthoredByProvider`, que es de donde lee la
+// Todas invalidan `routinesAuthoredByProvider`, que es de donde lee la
 // pantalla de Rutinas desde que pasó a listar rutinas en vez de alumnos.
-// Duplicar/asignar siguen fuera de scope.
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
 import 'package:treino/features/workout/application/routine_providers.dart'
     show invalidateRoutineById, routineRepositoryProvider;
@@ -83,6 +84,66 @@ class RoutineActionsNotifier extends AsyncNotifier<void> {
   }) async {
     try {
       await ref.read(routineRepositoryProvider).deleteRoutine(routineId);
+      ref.invalidate(routinesAuthoredByProvider(trainerId));
+      invalidateRoutineById(ref.container, routineId);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Asigna [template] a [athleteId]. Devuelve `true` en éxito.
+  ///
+  /// **COPIA, no mueve.** `assignTemplateToAthlete` crea un documento NUEVO
+  /// —`source: trainer-assigned`, `visibility: private`— y la plantilla queda
+  /// donde estaba. Es a propósito: la plantilla es reutilizable, y si asignarla
+  /// la consumiera no se podría dar la misma rutina a dos alumnos.
+  ///
+  /// Por eso la card de la plantilla NO cambia de estado al asignar, y la UI
+  /// tiene que decirlo — si no, el PF asigna, no ve nada distinto y vuelve a
+  /// apretar.
+  ///
+  /// Se invalidan los DOS listados: el de la sección (por el doc nuevo) y el
+  /// del par trainer/alumno, que es de donde lee la ficha del alumno.
+  Future<bool> assignTemplate({
+    required Routine template,
+    required String athleteId,
+    required String trainerId,
+  }) async {
+    try {
+      await ref.read(routineRepositoryProvider).assignTemplateToAthlete(
+            template: template,
+            athleteId: athleteId,
+          );
+      ref.invalidate(routinesAuthoredByProvider(trainerId));
+      ref.invalidate(assignedRoutinesByTrainerProvider(
+        (trainerId: trainerId, athleteId: athleteId),
+      ));
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Pone [routineId] pública o privada.
+  ///
+  /// Sólo vale sobre PLANTILLAS: la regla de Firestore restringe el flip a
+  /// docs `trainer-template` del dueño. Ofrecerlo sobre una rutina asignada
+  /// sería un botón que falla siempre, así que quien arma el menú tiene que
+  /// gatearlo — acá se asume ya gateado.
+  ///
+  /// Despublicar NO borra las valoraciones de la comunidad: quedan en la
+  /// subcolección y vuelven intactas si se republica.
+  Future<bool> setPublicada({
+    required String routineId,
+    required bool publicada,
+    required String trainerId,
+  }) async {
+    try {
+      final repo = ref.read(routineRepositoryProvider);
+      await (publicada
+          ? repo.publishTemplate(routineId)
+          : repo.unpublishTemplate(routineId));
       ref.invalidate(routinesAuthoredByProvider(trainerId));
       invalidateRoutineById(ref.container, routineId);
       return true;

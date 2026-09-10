@@ -14,6 +14,7 @@ import '../../../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../../widgets/coach_hub_widgets.dart';
 import 'routine_actions_provider.dart';
+import '../../widgets/athlete_picker_dialog.dart';
 
 /// Grilla de las rutinas del PF, en cards.
 ///
@@ -41,8 +42,7 @@ class RoutineCardGrid extends StatelessWidget {
             ((available + _runSpacing) / (_targetCardWidth + _runSpacing))
                 .floor();
         final columns = raw < 1 ? 1 : raw;
-        final cardWidth =
-            (available - _runSpacing * (columns - 1)) / columns;
+        final cardWidth = (available - _runSpacing * (columns - 1)) / columns;
         return Wrap(
           spacing: _runSpacing,
           runSpacing: _runSpacing,
@@ -281,6 +281,8 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
     final palette = AppPalette.of(context);
     final r = widget.routine;
     final archivada = r.status == RoutineStatus.archived;
+    final esPlantilla = r.source == RoutineSource.trainerTemplate;
+    final publica = r.visibility == RoutineVisibility.public;
 
     if (_ocupado) {
       return const SizedBox(
@@ -310,7 +312,28 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
         visualDensity: VisualDensity.compact,
       ),
       onSelected: _ejecutar,
+      // Cada acción se ofrece SÓLO donde es válida. Un ítem de menú que falla
+      // siempre es peor que no tenerlo: el PF lo aprieta, ve un error y no
+      // aprende por qué.
+      //
+      // `publicar` es el caso claro: la regla de Firestore restringe el flip
+      // de `visibility` a docs `trainer-template` del dueño, así que sobre una
+      // rutina asignada sería un botón roto por contrato.
       itemBuilder: (_) => [
+        if (esPlantilla && !archivada)
+          const PopupMenuItem(
+            value: _AccionRutina.asignar,
+            child: Text('Asignar a un alumno'), // i18n
+          ),
+        if (esPlantilla && !archivada)
+          PopupMenuItem(
+            value: publica ? _AccionRutina.despublicar : _AccionRutina.publicar,
+            child: Text(
+              publica
+                  ? 'Despublicar' // i18n
+                  : 'Publicar en la comunidad', // i18n
+            ),
+          ),
         if (!archivada)
           const PopupMenuItem(
             value: _AccionRutina.archivar,
@@ -330,6 +353,16 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
   Future<void> _ejecutar(_AccionRutina accion) async {
     final r = widget.routine;
     final asignada = (r.assignedTo ?? '').isNotEmpty;
+
+    // Asignar y publicar NO piden confirmación: no destruyen nada y las dos se
+    // deshacen desde este mismo menú. Meterlas en el diálogo de «¿estás
+    // seguro?» que existe para borrar le enseñaría al PF a apretar «sí» sin
+    // leer, que es cómo se pierde el peso de la advertencia de eliminar.
+    if (accion == _AccionRutina.asignar) return _asignar(r);
+    if (accion == _AccionRutina.publicar ||
+        accion == _AccionRutina.despublicar) {
+      return _publicar(r, publicada: accion == _AccionRutina.publicar);
+    }
 
     // El uid se resuelve DESPUÉS de confirmar. Chequearlo antes hacía que el
     // tap no hiciera nada cuando el stream de auth todavía no emitió: un
@@ -383,14 +416,70 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
 
     if (!mounted) return;
     setState(() => _ocupado = false);
+    if (!ok) _avisar('No se pudo. Probá de nuevo.'); // i18n
+  }
+
+  /// Asigna la plantilla a un alumno elegido en el momento.
+  ///
+  /// La plantilla NO se consume: `assignTemplateToAthlete` copia. Por eso el
+  /// aviso dice «se copió» y no «se movió» — la card sigue en pantalla igual
+  /// que antes, y sin decirlo el PF creería que no pasó nada y volvería a
+  /// apretar.
+  Future<void> _asignar(Routine r) async {
+    final athleteId = await pickAthlete(context, ref);
+    if (athleteId == null || !mounted) return;
+
+    setState(() => _ocupado = true);
+    final trainerId = ref.read(currentUidProvider) ?? '';
+    final ok = trainerId.isEmpty
+        ? false
+        : await ref.read(routineActionsProvider.notifier).assignTemplate(
+              template: r,
+              athleteId: athleteId,
+              trainerId: trainerId,
+            );
+
+    if (!mounted) return;
+    setState(() => _ocupado = false);
+    _avisar(ok
+        // i18n
+        ? 'Se le asignó una copia de «${r.name}». La plantilla queda acá para '
+            'volver a usarla.'
+        : 'No se pudo asignar. Probá de nuevo.'); // i18n
+  }
+
+  /// Publica o despublica la plantilla en la comunidad.
+  Future<void> _publicar(Routine r, {required bool publicada}) async {
+    setState(() => _ocupado = true);
+    final trainerId = ref.read(currentUidProvider) ?? '';
+    final ok = trainerId.isEmpty
+        ? false
+        : await ref.read(routineActionsProvider.notifier).setPublicada(
+              routineId: r.id,
+              publicada: publicada,
+              trainerId: trainerId,
+            );
+
+    if (!mounted) return;
+    setState(() => _ocupado = false);
     if (!ok) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(
-          content: Text('No se pudo. Probá de nuevo.'), // i18n
-        ));
+      _avisar('No se pudo. Probá de nuevo.'); // i18n
+      return;
     }
+    _avisar(publicada
+        // i18n
+        ? '«${r.name}» ya es pública: cualquiera puede encontrarla y usarla.'
+        // Lo de las valoraciones no es un detalle: es la duda que frena a
+        // despublicar. Se conservan y vuelven si se republica.
+        // i18n
+        : '«${r.name}» vuelve a ser privada. Las valoraciones se guardan.');
+  }
+
+  void _avisar(String mensaje) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(mensaje)));
   }
 }
 
-enum _AccionRutina { archivar, eliminar }
+enum _AccionRutina { asignar, publicar, despublicar, archivar, eliminar }

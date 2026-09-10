@@ -132,7 +132,7 @@ class _PagosScreenState extends ConsumerState<PagosScreen> {
   /// CTA "+ Registrar pago" (trainer-wide, sin alumno de contexto).
   ///
   /// ADR-F9-06 (remediación CRITICAL-1, verify ronda 1): primero elige el
-  /// alumno vía [pickAthleteForPago] (roster real del trainer) y recién
+  /// alumno vía [pickAthlete] (roster real del trainer) y recién
   /// entonces delega en `registrarPago`, que abre `RegistrarPagoDialog` y
   /// persiste el resultado con `paymentRepositoryProvider.add` — el mismo
   /// helper que ya usa `alumno_detail_screen.dart`. Antes de esta pieza el
