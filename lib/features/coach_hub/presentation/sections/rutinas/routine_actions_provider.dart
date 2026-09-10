@@ -164,6 +164,22 @@ class RoutineActionsNotifier extends AsyncNotifier<void> {
             template: template,
             athleteId: athleteId,
           );
+      // `routine_created` va acá igual que en el gemelo de mobile
+      // (`trainer_workout_view.dart`, que ya lo emitía con el mismo `source`):
+      // `assignTemplateToAthlete` CREA un documento, y el dartdoc del evento
+      // dice que las del PF se cuentan igual porque «omitirlas dejaría el
+      // evento ciego a la mitad de las rutinas». Faltaba sólo del lado web, así
+      // que las asignaciones hechas desde el Coach Hub desaparecían de la
+      // medición mientras las del teléfono se contaban — el peor caso para un
+      // número que se compara entre superficies.
+      //
+      // `trainerAssigned` y no `trainerTemplate`: lo que se escribió es la
+      // copia del alumno. La plantilla no se toca.
+      unawaited(ref.read(analyticsServiceProvider).logRoutineCreated(
+            source: RoutineCreationSource.trainerAssigned,
+            daysCount: template.days.length,
+            weeksCount: template.numWeeks,
+          ));
       ref.invalidate(routinesAuthoredByProvider(trainerId));
       ref.invalidate(assignedRoutinesByTrainerProvider(
         (trainerId: trainerId, athleteId: athleteId),
