@@ -5,6 +5,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:treino/core/analytics/analytics_service.dart';
+
+import '../../../../../helpers/fake_analytics_service.dart';
 import 'package:treino/features/coach_hub/presentation/sections/rutinas/routine_actions_provider.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
@@ -28,6 +31,7 @@ void main() {
   setUpAll(() => registerFallbackValue(_makeRoutine('fallback')));
 
   late _MockRoutineRepository mockRepo;
+  late FakeAnalyticsService analytics;
   late int listCalls;
   late int grillaCalls;
 
@@ -35,6 +39,7 @@ void main() {
     return ProviderContainer(
       overrides: [
         routineRepositoryProvider.overrideWithValue(mockRepo),
+        analyticsServiceProvider.overrideWithValue(analytics),
         assignedRoutinesByTrainerProvider(_key).overrideWith((ref) async {
           listCalls++;
           return const <Routine>[];
@@ -52,6 +57,7 @@ void main() {
 
   setUp(() {
     mockRepo = _MockRoutineRepository();
+    analytics = FakeAnalyticsService();
     listCalls = 0;
     grillaCalls = 0;
   });
@@ -370,6 +376,190 @@ void main() {
                 trainerId: _trainerId,
               );
       expect(ok, isFalse);
+    });
+  });
+
+  group('RoutineActionsNotifier.publicarComoPlantilla', () {
+    const plan = Routine(
+      id: 'plan-1',
+      name: 'Plan de Sofía',
+      level: ExperienceLevel.beginner,
+      days: [],
+      source: RoutineSource.trainerAssigned,
+      assignedBy: _trainerId,
+      assignedTo: _athleteId,
+      visibility: RoutineVisibility.private,
+      status: RoutineStatus.active,
+    );
+
+    void stubCreate() {
+      when(() => mockRepo.createTemplate(any())).thenAnswer((i) async {
+        final r = i.positionalArguments.first as Routine;
+        return r.copyWith(id: 'tpl-nueva');
+      });
+    }
+
+    // EL test. Las reglas denegarían publicar el documento del alumno (path 5
+    // exige `trainer-template`), y aunque lo permitieran no habría que
+    // hacerlo: esa copia lleva su nombre y su historial. Se publica una
+    // plantilla NUEVA.
+    test('crea una plantilla y publica ESA, sin tocar el plan del alumno',
+        () async {
+      stubCreate();
+      when(() => mockRepo.publishTemplate(any())).thenAnswer((_) async {});
+
+      final container = makeContainer();
+      addTearDown(container.dispose);
+
+      final res = await container
+          .read(routineActionsProvider.notifier)
+          .publicarComoPlantilla(
+            plan: plan,
+            nombre: 'Fuerza para principiantes',
+            trainerId: _trainerId,
+          );
+
+      expect(res, ResultadoDePublicar.ok);
+      verify(() => mockRepo.publishTemplate('tpl-nueva')).called(1);
+      // Ni un update ni un publish sobre el documento del alumno.
+      verifyNever(() => mockRepo.publishTemplate('plan-1'));
+      verifyNever(() => mockRepo.updateAssigned(
+            uid: any(named: 'uid'),
+            draft: any(named: 'draft'),
+          ));
+    });
+
+    // El nombre es el que el PF eligió, NO el del plan. Publicar expone el
+    // nombre al catálogo público y un plan asignado suele llamarse por su
+    // dueño: heredarlo en silencio filtraría el nombre de una clienta.
+    test('la plantilla lleva el nombre elegido y nace sin alumno', () async {
+      stubCreate();
+      when(() => mockRepo.publishTemplate(any())).thenAnswer((_) async {});
+
+      final container = makeContainer();
+      addTearDown(container.dispose);
+
+      await container
+          .read(routineActionsProvider.notifier)
+          .publicarComoPlantilla(
+            plan: plan,
+            nombre: 'Fuerza para principiantes',
+            trainerId: _trainerId,
+          );
+
+      final creada = verify(() => mockRepo.createTemplate(captureAny()))
+          .captured
+          .single as Routine;
+      expect(creada.name, 'Fuerza para principiantes');
+      expect(creada.name, isNot(contains('Sofía')));
+      expect(creada.id, isEmpty); // documento NUEVO
+      expect(creada.source, RoutineSource.trainerTemplate);
+      expect(creada.assignedTo, isNull);
+      expect(creada.visibility, RoutineVisibility.private);
+    });
+
+    // El estado del medio, que es el que justifica que esto no devuelva bool:
+    // la plantilla EXISTE. Un `false` haría que el PF reintente y termine con
+    // dos.
+    test('si el publish falla, dice que la plantilla igual se creó', () async {
+      stubCreate();
+      when(() => mockRepo.publishTemplate(any())).thenThrow(Exception('nope'));
+
+      final container = makeContainer();
+      addTearDown(container.dispose);
+      await container.read(routinesAuthoredByProvider(_trainerId).future);
+      grillaCalls = 0;
+
+      final res = await container
+          .read(routineActionsProvider.notifier)
+          .publicarComoPlantilla(
+            plan: plan,
+            nombre: 'Fuerza',
+            trainerId: _trainerId,
+          );
+
+      expect(res, ResultadoDePublicar.creadaPeroSinPublicar);
+      verify(() => mockRepo.createTemplate(any())).called(1);
+
+      // Y la grilla YA se enteró: la plantilla existe aunque no esté pública,
+      // y si no apareciera el PF no tendría cómo publicarla a mano ni cómo
+      // darse cuenta de que no hace falta repetir.
+      await container.read(routinesAuthoredByProvider(_trainerId).future);
+      expect(grillaCalls, 1);
+    });
+
+    // `routine_created` es el evento de TODA rutina nueva: su dartdoc dice que
+    // las del PF se cuentan igual porque «omitirlas dejaría el evento ciego a
+    // la mitad de las rutinas». Sin esto, las plantillas nacidas por acá
+    // desaparecen de la medición de forma (días y semanas).
+    test('cuenta la plantilla nueva como routine_created', () async {
+      stubCreate();
+      when(() => mockRepo.publishTemplate(any())).thenAnswer((_) async {});
+
+      final container = makeContainer();
+      addTearDown(container.dispose);
+
+      await container.read(routineActionsProvider.notifier).publicarComoPlantilla(
+            plan: plan,
+            nombre: 'Fuerza',
+            trainerId: _trainerId,
+          );
+
+      final params = analytics.paramsOf('routine_created').single;
+      // `trainer_template` y no `trainer_assigned`: el evento describe lo que
+      // se escribió, no la pantalla desde la que se disparó. Misma trampa que
+      // corrigió #1097 en el editor.
+      expect(params['source'], 'trainer_template');
+    });
+
+    test('lo cuenta también si el publish falla: la plantilla existe',
+        () async {
+      stubCreate();
+      when(() => mockRepo.publishTemplate(any())).thenThrow(Exception('nope'));
+
+      final container = makeContainer();
+      addTearDown(container.dispose);
+
+      await container.read(routineActionsProvider.notifier).publicarComoPlantilla(
+            plan: plan,
+            nombre: 'Fuerza',
+            trainerId: _trainerId,
+          );
+
+      expect(analytics.paramsOf('routine_created'), hasLength(1));
+    });
+
+    test('si no se pudo crear, NO cuenta nada', () async {
+      when(() => mockRepo.createTemplate(any())).thenThrow(Exception('boom'));
+
+      final container = makeContainer();
+      addTearDown(container.dispose);
+
+      await container.read(routineActionsProvider.notifier).publicarComoPlantilla(
+            plan: plan,
+            nombre: 'Fuerza',
+            trainerId: _trainerId,
+          );
+
+      expect(analytics.paramsOf('routine_created'), isEmpty);
+    });
+
+    test('si no se pudo crear, no publica nada', () async {
+      when(() => mockRepo.createTemplate(any())).thenThrow(Exception('boom'));
+
+      final container = makeContainer();
+      addTearDown(container.dispose);
+
+      final res = await container
+          .read(routineActionsProvider.notifier)
+          .publicarComoPlantilla(
+            plan: plan,
+            nombre: 'Fuerza',
+            trainerId: _trainerId,
+          );
+
+      expect(res, ResultadoDePublicar.falloAlCrear);
+      verifyNever(() => mockRepo.publishTemplate(any()));
     });
   });
 
