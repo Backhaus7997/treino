@@ -4592,10 +4592,10 @@ abstract class AppL10n {
   /// **'Buscar por nombre…'**
   String get coachHubAlumnosSearchHint;
 
-  /// Coach Hub web alumnos section — 'All' filter chip label.
+  /// Coach Hub web alumnos section — filter chip for links that are NOT inactive. Deliberately not 'All': its count is lower than the hero total and than the Inactivos chip, and 'All' made that read as a counting bug.
   ///
   /// In es_AR, this message translates to:
-  /// **'Todos'**
+  /// **'Vigentes'**
   String get coachHubAlumnosFilterAll;
 
   /// Coach Hub web alumnos section — 'Active' filter chip label. Lowercase spelling to match filter chip vs the dashboard's uppercase filter.
