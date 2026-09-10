@@ -24,6 +24,7 @@ import '../sections/biblioteca/widgets/exercise_detail_dialog.dart'
     show showExerciseDetailDialog;
 import 'create_custom_exercise_dialog.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 /// Web equivalent of [showExercisePicker] (mobile's `exercise_picker_sheet.dart`
 /// bottom sheet) — a multi-select exercise picker for the Coach Hub routine
@@ -199,22 +200,16 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
               color: palette.textMuted, fontSize: AppTextSize.bodyDense),
         ),
         actions: [
-          TextButton(
+          TreinoButton(
+            label: 'Cancelar', // i18n
+            variant: TreinoButtonVariant.ghost,
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(
-              'Cancelar', // i18n
-              style: GoogleFonts.barlow(color: palette.textMuted),
-            ),
           ),
-          TextButton(
+          const SizedBox(width: AppSpacing.s8),
+          TreinoButton(
+            label: 'Eliminar', // i18n
+            variant: TreinoButtonVariant.danger,
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(
-              'Eliminar', // i18n
-              style: GoogleFonts.barlow(
-                color: palette.danger,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
           ),
         ],
       ),
@@ -273,9 +268,10 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
                   ),
                 ),
               ),
-              IconButton(
+              TreinoIconButton(
+                icon: TreinoIcon.close,
                 tooltip: 'Cerrar', // i18n
-                icon: Icon(TreinoIcon.close, color: palette.textMuted),
+                color: palette.textMuted,
                 onPressed: () => Navigator.of(context).pop(),
               ),
             ],
@@ -294,13 +290,11 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
               prefixIcon: Icon(TreinoIcon.search, color: palette.textMuted),
               suffixIcon: _query.isEmpty
                   ? null
-                  : IconButton(
-                      icon: Icon(
-                        TreinoIcon.close,
-                        color: palette.textMuted,
-                        size: 18,
-                      ),
+                  : TreinoIconButton(
+                      icon: TreinoIcon.close,
                       tooltip: 'Borrar', // i18n
+                      color: palette.textMuted,
+                      size: TreinoButtonSize.xs,
                       onPressed: () {
                         _searchController.clear();
                         setState(() => _query = '');
@@ -342,29 +336,22 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
           alignment: Alignment.centerLeft,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 0, 20, 0),
-            child: TextButton.icon(
+            // Con filtros puestos el botón pasa a acento: la variante DICE si
+            // hay filtros activos, en vez de un `color:` calculado a mano.
+            child: TreinoButton(
               key: const Key('picker_filtros_toggle'),
+              label: _cantidadDeFiltros == 0
+                  ? 'Filtros' // i18n
+                  : 'Filtros ($_cantidadDeFiltros)', // i18n
+              icon: _filtrosAbiertos
+                  ? TreinoIcon.chevronUp
+                  : TreinoIcon.chevronDown,
+              variant: _cantidadDeFiltros == 0
+                  ? TreinoButtonVariant.ghost
+                  : TreinoButtonVariant.ghostAccent,
+              size: TreinoButtonSize.sm,
               onPressed: () =>
                   setState(() => _filtrosAbiertos = !_filtrosAbiertos),
-              icon: Icon(
-                _filtrosAbiertos
-                    ? TreinoIcon.chevronUp
-                    : TreinoIcon.chevronDown,
-                size: 16,
-                color: palette.textMuted,
-              ),
-              label: Text(
-                _cantidadDeFiltros == 0
-                    ? 'Filtros' // i18n
-                    : 'Filtros ($_cantidadDeFiltros)', // i18n
-                style: GoogleFonts.barlowCondensed(
-                  color: _cantidadDeFiltros == 0
-                      ? palette.textMuted
-                      : palette.accentText,
-                  fontWeight: FontWeight.w700,
-                  fontSize: AppTextSize.bodyDense,
-                ),
-              ),
             ),
           ),
         ),
@@ -401,22 +388,29 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
           decoration: BoxDecoration(
             border: Border(top: BorderSide(color: palette.border)),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+          // `Wrap` y no `Row`: acá conviven hasta TRES botones —Cancelar, En
+          // superserie, Agregar (N)— y este pie vive tanto en un diálogo como
+          // en un panel lateral de 400 px. Con `Row` la tercera opción hacía
+          // desbordar la fila; envueltos, bajan a una segunda línea. Los
+          // labels además se traducen, así que el ancho no es un número que
+          // podamos fijar de antemano.
+          child: Wrap(
+            alignment: WrapAlignment.end,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 0,
+            runSpacing: AppSpacing.s8,
             children: [
               // "Cancelar" SÓLO en modo diálogo. En el panel no hay ruta que
               // cerrar: `Navigator.pop()` saldría del editor entero, que es
               // exactamente lo contrario de lo que el botón promete. El panel
               // se cierra con su propia X.
               if (widget.onAgregar == null) ...[
-                TextButton(
+                TreinoButton(
+                  label: 'Cancelar', // i18n
+                  variant: TreinoButtonVariant.ghost,
                   onPressed: () => Navigator.of(context).pop(),
-                  child: Text(
-                    'Cancelar', // i18n
-                    style: GoogleFonts.barlow(color: palette.textMuted),
-                  ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSpacing.s8),
               ],
               // "Agregar en superserie" SÓLO con 2 o más elegidos: una
               // superserie de uno no existe, y un botón deshabilitado que
@@ -429,55 +423,28 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
               if (widget.onAgregarEnSuperserie != null && _selected.length >= 2)
                 Padding(
                   padding: const EdgeInsets.only(right: AppSpacing.s8),
-                  child: TextButton.icon(
+                  child: TreinoButton(
                     key: const Key('picker_agregar_superserie'),
+                    label: 'En superserie', // i18n
+                    icon: TreinoIcon.streak,
+                    variant: TreinoButtonVariant.secondary,
                     onPressed: () => _confirm(
                       defaultsAsync.valueOrNull ?? const [],
                       customsAsync.valueOrNull ?? const [],
                       enSuperserie: true,
                     ),
-                    icon: Icon(
-                      TreinoIcon.streak,
-                      size: 15,
-                      color: palette.highlight,
-                    ),
-                    label: Text(
-                      'En superserie', // i18n
-                      style: GoogleFonts.barlowCondensed(
-                        color: palette.textPrimary,
-                        fontWeight: FontWeight.w700,
-                        fontSize: AppTextSize.bodyDense,
-                      ),
-                    ),
                   ),
                 ),
-              ElevatedButton(
+              TreinoButton(
+                label: _selected.isEmpty
+                    ? 'Agregar' // i18n
+                    : 'Agregar (${_selected.length})', // i18n
                 onPressed: _selected.isEmpty
                     ? null
                     : () => _confirm(
                           defaultsAsync.valueOrNull ?? const [],
                           customsAsync.valueOrNull ?? const [],
                         ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: palette.accent,
-                  foregroundColor: TreinoButtonTokens.foreground(context),
-                  disabledBackgroundColor: palette.accent.withValues(
-                    alpha: 0.3,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppRadius.full),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                ),
-                child: Text(
-                  _selected.isEmpty
-                      ? 'Agregar' // i18n
-                      : 'Agregar (${_selected.length})', // i18n
-                  style: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: AppTextSize.body,
-                  ),
-                ),
               ),
             ],
           ),
@@ -881,35 +848,26 @@ class _ExerciseRow extends StatelessWidget {
                 const SizedBox(width: 8),
               ],
               if (onEdit != null)
-                IconButton(
+                TreinoIconButton(
+                  icon: TreinoIcon.edit,
                   tooltip: 'Editar', // i18n
-                  icon: Icon(
-                    TreinoIcon.edit,
-                    size: 15,
-                    color: palette.textMuted,
-                  ),
-                  visualDensity: VisualDensity.compact,
+                  color: palette.textMuted,
+                  size: TreinoButtonSize.xs,
                   onPressed: onEdit,
                 ),
               if (onDelete != null)
-                IconButton(
+                TreinoIconButton(
+                  icon: TreinoIcon.trash,
                   tooltip: 'Eliminar', // i18n
-                  icon: Icon(
-                    TreinoIcon.trash,
-                    size: 15,
-                    color: palette.textMuted,
-                  ),
-                  visualDensity: VisualDensity.compact,
+                  color: palette.textMuted,
+                  size: TreinoButtonSize.xs,
                   onPressed: onDelete,
                 ),
-              IconButton(
+              TreinoIconButton(
+                icon: TreinoIcon.chartBar,
                 tooltip: 'Ver detalle', // i18n
-                icon: Icon(
-                  TreinoIcon.chartBar,
-                  size: 16,
-                  color: palette.textMuted,
-                ),
-                visualDensity: VisualDensity.compact,
+                color: palette.textMuted,
+                size: TreinoButtonSize.xs,
                 onPressed: () => showExerciseDetailDialog(
                   context,
                   exerciseId: id,

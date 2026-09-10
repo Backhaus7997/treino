@@ -11,6 +11,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/features/coach_hub/presentation/sections/biblioteca/widgets/template_format.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/workout/domain/routine.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 /// Opens an [AlertDialog] with the details of a trainer template.
 ///
@@ -162,64 +163,45 @@ class _TemplateDetailDialog extends StatelessWidget {
         ),
       ),
       actions: [
-        TextButton(
+        TreinoButton(
+          label: 'Cerrar', // i18n
+          variant: TreinoButtonVariant.ghost,
           onPressed: () => Navigator.of(context).pop(),
-          child: Text(
-            'Cerrar', // i18n
-            style: GoogleFonts.barlow(
-              fontWeight: FontWeight.w600,
-              color: palette.textMuted,
-            ),
-          ),
         ),
         if (onDelete != null)
-          TextButton(
+          TreinoButton(
             key: const Key('template_detail_delete_button'),
+            label: 'Eliminar', // i18n
+            variant: TreinoButtonVariant.danger,
             onPressed: () {
               Navigator.of(context).pop();
               onDelete!();
             },
-            child: Text(
-              'Eliminar', // i18n
-              style: GoogleFonts.barlow(
-                fontWeight: FontWeight.w600,
-                color: palette.danger,
-              ),
-            ),
           ),
         if (onEdit != null)
-          TextButton(
+          TreinoButton(
             key: const Key('template_detail_edit_button'),
+            label: 'Editar', // i18n
+            variant: TreinoButtonVariant.ghostAccent,
             // Pop first, then hand off — the caller's context does the
             // navigation, so nothing runs on this dialog's dead context.
             onPressed: () {
               Navigator.of(context).pop();
               onEdit!();
             },
-            child: Text(
-              'Editar', // i18n
-              style: GoogleFonts.barlow(
-                fontWeight: FontWeight.w600,
-                color: palette.accent,
-              ),
-            ),
           ),
         if (onUse != null)
-          TextButton(
+          // La acción que el diálogo QUIERE que elijas. Era un `TextButton`
+          // más, indistinguible de «Cerrar» salvo por el color.
+          TreinoButton(
             key: const Key('template_detail_use_button'),
+            label: 'Usar en un alumno', // i18n
             // Same pop-then-hand-off contract as Editar: the caller owns the
             // athlete picker + assign, so nothing runs on this dead context.
             onPressed: () {
               Navigator.of(context).pop();
               onUse!();
             },
-            child: Text(
-              'Usar en un alumno', // i18n
-              style: GoogleFonts.barlow(
-                fontWeight: FontWeight.w700,
-                color: palette.accent,
-              ),
-            ),
           ),
       ],
     );

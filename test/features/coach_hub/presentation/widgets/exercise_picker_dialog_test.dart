@@ -21,6 +21,7 @@ import 'package:treino/features/workout/domain/equipment_type.dart';
 import 'package:treino/features/workout/domain/exercise.dart';
 
 import '../../../../fixtures/exercises.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -189,8 +190,11 @@ void main() {
     ) async {
       await _openPicker(tester);
 
-      final button = tester.widget<ElevatedButton>(
-        find.widgetWithText(ElevatedButton, 'Agregar'),
+      // Por su LABEL, no por el tipo del widget: atarlo al tipo es lo que
+      // hizo que este test reventara al migrar al kit sin que nada se rompiera
+      // en pantalla.
+      final button = tester.widget<TreinoButton>(
+        find.widgetWithText(TreinoButton, 'Agregar'),
       );
       expect(button.onPressed, isNull);
     });

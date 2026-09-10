@@ -175,37 +175,37 @@ class _BibliotecaWebScreenState extends ConsumerState<BibliotecaWebScreen>
             Positioned.fill(child: columna),
             if (mostrarDrawer)
               Positioned(
-              top: 0,
-              bottom: 0,
-              right: 0,
-              width: anchoDrawer,
-              // Entra deslizando desde el borde derecho. La key es constante a
-              // proposito: asi anima al abrir, y al pasar de un ejercicio a
-              // otro el contenido se reemplaza en el lugar en vez de salir y
-              // volver a entrar.
-              child: TweenAnimationBuilder<double>(
-                key: const ValueKey('biblioteca_drawer_slide'),
-                tween: Tween<double>(begin: 1, end: 0),
-                duration: AppMotion.resolve(context, AppMotion.base),
-                curve: AppMotion.standard,
-                builder: (context, t, child) => FractionalTranslation(
-                  translation: Offset(t, 0),
-                  child: child,
-                ),
-                child: ExerciseDetailPanel(
-                  key: const Key('biblioteca_detail_panel'),
-                  width: anchoDrawer,
-                  exerciseId: seleccion.exerciseId,
-                  ownerId: seleccion.ownerId,
-                  exerciseName: seleccion.exerciseName,
-                  onClose: () {
-                    ref
-                        .read(bibliotecaSelectedExerciseProvider.notifier)
-                        .state = null;
-                  },
+                top: 0,
+                bottom: 0,
+                right: 0,
+                width: anchoDrawer,
+                // Entra deslizando desde el borde derecho. La key es constante a
+                // proposito: asi anima al abrir, y al pasar de un ejercicio a
+                // otro el contenido se reemplaza en el lugar en vez de salir y
+                // volver a entrar.
+                child: TweenAnimationBuilder<double>(
+                  key: const ValueKey('biblioteca_drawer_slide'),
+                  tween: Tween<double>(begin: 1, end: 0),
+                  duration: AppMotion.resolve(context, AppMotion.base),
+                  curve: AppMotion.standard,
+                  builder: (context, t, child) => FractionalTranslation(
+                    translation: Offset(t, 0),
+                    child: child,
+                  ),
+                  child: ExerciseDetailPanel(
+                    key: const Key('biblioteca_detail_panel'),
+                    width: anchoDrawer,
+                    exerciseId: seleccion.exerciseId,
+                    ownerId: seleccion.ownerId,
+                    exerciseName: seleccion.exerciseName,
+                    onClose: () {
+                      ref
+                          .read(bibliotecaSelectedExerciseProvider.notifier)
+                          .state = null;
+                    },
+                  ),
                 ),
               ),
-            ),
           ],
         );
       },

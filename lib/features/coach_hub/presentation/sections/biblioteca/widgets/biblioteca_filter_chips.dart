@@ -61,43 +61,43 @@ class BibliotecaFilterChips extends ConsumerWidget {
         : selectedEquipment.map((e) => e.label.toUpperCase()).toSet();
 
     final content = Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: vertical ? MainAxisSize.min : MainAxisSize.max,
-        children: [
-          // ── Muscle row ────────────────────────────────────────────────────
-          _SectionLabel(label: 'MÚSCULO', palette: palette), // i18n
-          const SizedBox(height: AppSpacing.hairline),
-          TreinoFilterChips(
-            options: muscleOptions,
-            selected: selectedMuscleLabels,
-            multiSelect: true,
-            onChanged: (newSelected) {
-              ref.read(bibliotecaMuscleFilterProvider.notifier).state =
-                  _resolveMuscleSelection(
-                previousSelected: selectedMuscleLabels,
-                newSelected: newSelected,
-              );
-            },
-          ),
-          const SizedBox(height: AppSpacing.s12),
-          // ── Equipment row ─────────────────────────────────────────────────
-          _SectionLabel(label: 'EQUIPAMIENTO', palette: palette), // i18n
-          const SizedBox(height: AppSpacing.hairline),
-          TreinoFilterChips(
-            options: equipmentOptions,
-            selected: selectedEquipmentLabels,
-            multiSelect: true,
-            onChanged: (newSelected) {
-              ref.read(bibliotecaEquipmentFilterProvider.notifier).state =
-                  _resolveEquipmentSelection(
-                previousSelected: selectedEquipmentLabels,
-                newSelected: newSelected,
-              );
-            },
-          ),
-          const SizedBox(height: AppSpacing.s12),
-        ],
-      );
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: vertical ? MainAxisSize.min : MainAxisSize.max,
+      children: [
+        // ── Muscle row ────────────────────────────────────────────────────
+        _SectionLabel(label: 'MÚSCULO', palette: palette), // i18n
+        const SizedBox(height: AppSpacing.hairline),
+        TreinoFilterChips(
+          options: muscleOptions,
+          selected: selectedMuscleLabels,
+          multiSelect: true,
+          onChanged: (newSelected) {
+            ref.read(bibliotecaMuscleFilterProvider.notifier).state =
+                _resolveMuscleSelection(
+              previousSelected: selectedMuscleLabels,
+              newSelected: newSelected,
+            );
+          },
+        ),
+        const SizedBox(height: AppSpacing.s12),
+        // ── Equipment row ─────────────────────────────────────────────────
+        _SectionLabel(label: 'EQUIPAMIENTO', palette: palette), // i18n
+        const SizedBox(height: AppSpacing.hairline),
+        TreinoFilterChips(
+          options: equipmentOptions,
+          selected: selectedEquipmentLabels,
+          multiSelect: true,
+          onChanged: (newSelected) {
+            ref.read(bibliotecaEquipmentFilterProvider.notifier).state =
+                _resolveEquipmentSelection(
+              previousSelected: selectedEquipmentLabels,
+              newSelected: newSelected,
+            );
+          },
+        ),
+        const SizedBox(height: AppSpacing.s12),
+      ],
+    );
 
     if (vertical) {
       return SingleChildScrollView(child: content);

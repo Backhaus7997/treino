@@ -9,6 +9,7 @@ import '../../../../../../app/theme/app_palette.dart';
 import '../../../../../../app/theme/tokens/primitives.dart';
 import '../../../../../../core/widgets/treino_icon.dart';
 import 'exercise_detail_dialog.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 /// Ancho mínimo del drawer, en px lógicos.
 ///
@@ -92,14 +93,11 @@ class ExerciseDetailPanel extends StatelessWidget {
                     ),
                   ),
                 ),
-                IconButton(
+                TreinoIconButton(
+                  icon: TreinoIcon.close,
                   tooltip: 'Cerrar detalle', // i18n
+                  color: palette.textMuted,
                   onPressed: onClose,
-                  icon: Icon(
-                    TreinoIcon.close,
-                    color: palette.textMuted,
-                    size: 20,
-                  ),
                 ),
               ],
             ),
