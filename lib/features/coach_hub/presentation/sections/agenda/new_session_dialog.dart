@@ -202,14 +202,15 @@ class _NewSessionDialogState extends ConsumerState<NewSessionDialog> {
       // await porque después el `ref` puede estar disposeado.
       final analytics = ref.read(analyticsServiceProvider);
 
-      final appt = await ref.read(appointmentRepositoryProvider).createByTrainer(
-            trainerId: trainerId,
-            athleteId: athleteId,
-            athleteDisplayName: athleteDisplayName,
-            startsAt: startsAt,
-            durationMin: dur,
-            noteBefore: note.isEmpty ? null : note,
-          );
+      final appt =
+          await ref.read(appointmentRepositoryProvider).createByTrainer(
+                trainerId: trainerId,
+                athleteId: athleteId,
+                athleteDisplayName: athleteDisplayName,
+                startsAt: startsAt,
+                durationMin: dur,
+                noteBefore: note.isEmpty ? null : note,
+              );
 
       // Ver la nota del mismo evento en `new_session_sheet.dart`: va antes del
       // guard de `mounted` porque la cita ya está escrita.
@@ -298,30 +299,15 @@ class _NewSessionDialogState extends ConsumerState<NewSessionDialog> {
           style: GoogleFonts.barlow(fontSize: 14, color: palette.textPrimary),
         ),
         actions: [
-          OutlinedButton(
+          TreinoButton(
+            label: 'Cancelar', // i18n
+            variant: TreinoButtonVariant.ghost,
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(
-              'Cancelar', // i18n
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-                color: palette.textPrimary,
-              ),
-            ),
           ),
-          ElevatedButton(
+          const SizedBox(width: AppSpacing.s8),
+          TreinoButton(
+            label: 'Cargar igual', // i18n
             onPressed: () => Navigator.of(ctx).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: palette.accent,
-              foregroundColor: TreinoButtonTokens.foreground(context),
-            ),
-            child: Text(
-              'Cargar igual', // i18n
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-              ),
-            ),
           ),
         ],
       ),
@@ -474,42 +460,16 @@ class _NewSessionDialogState extends ConsumerState<NewSessionDialog> {
         ),
       ),
       actions: [
-        TextButton(
+        TreinoButton(
+          label: 'Cancelar', // i18n
+          variant: TreinoButtonVariant.ghost,
           onPressed: _saving ? null : () => Navigator.of(context).pop(false),
-          style: TextButton.styleFrom(foregroundColor: palette.textMuted),
-          child: Text(
-            'Cancelar', // i18n
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-            ),
-          ),
         ),
-        ElevatedButton(
-          onPressed: (_saving || !hasActiveLinks) ? null : _submit,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: palette.accent,
-            foregroundColor: TreinoButtonTokens.foreground(context),
-            shape: const StadiumBorder(),
-            disabledBackgroundColor: palette.accent.withValues(alpha: 0.3),
-          ),
-          child: _saving
-              ? SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: TreinoButtonTokens.foreground(context),
-                  ),
-                )
-              : Text(
-                  'REGISTRAR SESIÓN', // i18n
-                  style: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                    letterSpacing: 0.8,
-                  ),
-                ),
+        const SizedBox(width: AppSpacing.s8),
+        TreinoButton(
+          label: 'REGISTRAR SESIÓN', // i18n
+          loading: _saving,
+          onPressed: hasActiveLinks ? _submit : null,
         ),
       ],
     );

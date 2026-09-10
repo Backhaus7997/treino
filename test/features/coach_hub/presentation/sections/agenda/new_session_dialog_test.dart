@@ -27,6 +27,7 @@ import 'package:treino/features/workout/application/session_providers.dart'
 import 'package:treino/l10n/app_l10n.dart';
 
 import '../../../../../helpers/fake_analytics_service.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -148,7 +149,8 @@ List<Override> _overrides({
   final stub = repo ?? _StubAppointmentRepository();
   return [
     currentUidProvider.overrideWithValue(_kTrainerId),
-    if (analytics != null) analyticsServiceProvider.overrideWithValue(analytics),
+    if (analytics != null)
+      analyticsServiceProvider.overrideWithValue(analytics),
     trainerLinksStreamProvider.overrideWith(
       (ref) => Stream.value(links),
     ),
@@ -233,17 +235,15 @@ void main() {
         findsOneWidget,
       );
 
-      // El botón REGISTRAR debe estar deshabilitado (null onPressed)
-      final elevatedButtons = find.byType(ElevatedButton);
-      bool foundDisabled = false;
-      for (final btn in tester.widgetList<ElevatedButton>(elevatedButtons)) {
-        if (btn.onPressed == null) {
-          foundDisabled = true;
-          break;
-        }
-      }
-      expect(foundDisabled, isTrue,
-          reason: 'ElevatedButton de submit debe estar deshabilitado');
+      // El botón REGISTRAR debe estar deshabilitado (null onPressed).
+      // Se lo busca por su LABEL y no por el tipo del widget: atarlo al tipo
+      // es lo que hizo que este test reventara al migrar al kit, sin que nada
+      // se hubiera roto en pantalla.
+      final submit = tester.widget<TreinoButton>(
+        find.widgetWithText(TreinoButton, 'REGISTRAR SESIÓN'),
+      );
+      expect(submit.onPressed, isNull,
+          reason: 'sin alumnos activos no hay nada que registrar');
     });
 
     testWidgets('sin ningún vínculo → mensaje + submit deshabilitado',

@@ -254,7 +254,8 @@ class _AgendaTimeGridState extends State<AgendaTimeGrid> {
         fusionadas[fusionadas.length - 1] = AgendaAvailabilityBand(
           weekday: weekday,
           startMinute: ultima.startMinute,
-          endMinute: b.endMinute > ultima.endMinute ? b.endMinute : ultima.endMinute,
+          endMinute:
+              b.endMinute > ultima.endMinute ? b.endMinute : ultima.endMinute,
         );
       } else {
         fusionadas.add(b);

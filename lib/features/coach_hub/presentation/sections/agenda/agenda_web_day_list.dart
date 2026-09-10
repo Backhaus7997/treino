@@ -27,6 +27,8 @@ import 'agenda_web_helpers.dart';
 import 'appointment_detail_dialog.dart';
 import 'batch_cobrar_dialog.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
+import 'package:treino/app/theme/tokens/components/treino_button_tokens.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 // ─── AgendaWebDayList ─────────────────────────────────────────────────────────
 
@@ -322,23 +324,11 @@ class _SelectionHeaderRow extends StatelessWidget {
     if (!selectionMode) {
       return Align(
         alignment: Alignment.centerRight,
-        child: TextButton(
+        child: TreinoButton(
+          label: 'Seleccionar', // i18n
+          variant: TreinoButtonVariant.ghost,
+          size: TreinoButtonSize.sm,
           onPressed: onEnterSelection,
-          style: TextButton.styleFrom(
-            foregroundColor: palette.textMuted,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-            minimumSize: const Size(0, 32),
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-          child: Text(
-            'Seleccionar', // i18n
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 12,
-              letterSpacing: 0.6,
-              color: palette.textMuted,
-            ),
-          ),
         ),
       );
     }
@@ -358,22 +348,11 @@ class _SelectionHeaderRow extends StatelessWidget {
             ),
           ),
         ),
-        TextButton(
+        TreinoButton(
+          label: 'Cancelar', // i18n
+          variant: TreinoButtonVariant.ghost,
+          size: TreinoButtonSize.sm,
           onPressed: onCancelSelection,
-          style: TextButton.styleFrom(
-            foregroundColor: palette.textMuted,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-            minimumSize: const Size(0, 32),
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-          child: Text(
-            'Cancelar', // i18n
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 12,
-              letterSpacing: 0.6,
-            ),
-          ),
         ),
       ],
     );
@@ -390,25 +369,12 @@ class _CobrarLoteBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
     return Padding(
       padding: const EdgeInsets.only(top: 8),
-      child: ElevatedButton(
+      child: TreinoButton(
+        label: 'COBRAR ($count)', // i18n
+        expand: true,
         onPressed: onTap,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: palette.accent,
-          foregroundColor: TreinoButtonTokens.foreground(context),
-          minimumSize: const Size.fromHeight(48),
-          shape: const StadiumBorder(),
-        ),
-        child: Text(
-          'COBRAR ($count)', // i18n
-          style: GoogleFonts.barlowCondensed(
-            fontWeight: FontWeight.w700,
-            fontSize: 14,
-            letterSpacing: 1.2,
-          ),
-        ),
       ),
     );
   }

@@ -16,6 +16,7 @@ import '../../../../coach/application/agenda_providers.dart';
 import '../../../../coach/domain/availability_override.dart';
 import '../../../../coach/presentation/agenda_formatters.dart';
 import 'package:treino/core/utils/argentina_time.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 // ─── BlockOverrideFormDialog ──────────────────────────────────────────────────
 
@@ -78,30 +79,16 @@ class _BlockOverrideFormDialogState
         ),
       ),
       actions: [
-        OutlinedButton(
+        TreinoButton(
+          label: 'CANCELAR', // i18n
+          variant: TreinoButtonVariant.ghost,
           onPressed: () => Navigator.of(context).pop(),
-          child: Text(
-            'CANCELAR', // i18n
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-              color: palette.textPrimary,
-            ),
-          ),
         ),
-        ElevatedButton(
-          onPressed: _saving ? null : () => _save(context),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: palette.accent,
-            foregroundColor: TreinoButtonTokens.foreground(context),
-          ),
-          child: Text(
-            'CONFIRMAR', // i18n
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-            ),
-          ),
+        const SizedBox(width: AppSpacing.s8),
+        TreinoButton(
+          label: 'CONFIRMAR', // i18n
+          loading: _saving,
+          onPressed: () => _save(context),
         ),
       ],
     );
@@ -263,30 +250,16 @@ class _ExtraOverrideFormDialogState
         ),
       ),
       actions: [
-        OutlinedButton(
+        TreinoButton(
+          label: 'CANCELAR', // i18n
+          variant: TreinoButtonVariant.ghost,
           onPressed: () => Navigator.of(context).pop(),
-          child: Text(
-            'CANCELAR', // i18n
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-              color: palette.textPrimary,
-            ),
-          ),
         ),
-        ElevatedButton(
-          onPressed: _saving ? null : () => _save(context),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: palette.accent,
-            foregroundColor: TreinoButtonTokens.foreground(context),
-          ),
-          child: Text(
-            'CONFIRMAR', // i18n
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-            ),
-          ),
+        const SizedBox(width: AppSpacing.s8),
+        TreinoButton(
+          label: 'CONFIRMAR', // i18n
+          loading: _saving,
+          onPressed: () => _save(context),
         ),
       ],
     );

@@ -14,6 +14,8 @@ import '../../../../coach/presentation/agenda_formatters.dart';
 import 'override_form_dialog.dart';
 import 'rule_form_dialog.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
+import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 // ─── AvailabilityEditorPanel ──────────────────────────────────────────────────
 
@@ -71,10 +73,11 @@ class AvailabilityEditorPanel extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  IconButton(
-                    icon: Icon(Icons.close, color: palette.textMuted, size: 20),
-                    onPressed: () => Navigator.of(context).pop(),
+                  TreinoIconButton(
+                    icon: TreinoIcon.close,
                     tooltip: 'Cerrar', // i18n
+                    color: palette.textMuted,
+                    onPressed: () => Navigator.of(context).pop(),
                   ),
                 ],
               ),
@@ -111,25 +114,12 @@ class AvailabilityEditorPanel extends ConsumerWidget {
                     // ── Agregar horario ────────────────────────────────────────
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                      child: OutlinedButton.icon(
+                      child: TreinoButton(
+                        label: 'AGREGAR HORARIO', // i18n
+                        icon: TreinoIcon.plus,
+                        variant: TreinoButtonVariant.secondaryAccent,
+                        expand: true,
                         onPressed: () => _openAddRuleForm(context, trainerId),
-                        icon: Icon(Icons.add, size: 18, color: palette.accent),
-                        label: Text(
-                          'AGREGAR HORARIO', // i18n
-                          style: GoogleFonts.barlowCondensed(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13,
-                            letterSpacing: 0.8,
-                            color: palette.accent,
-                          ),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: palette.accent),
-                          minimumSize: const Size.fromHeight(44),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppRadius.full),
-                          ),
-                        ),
                       ),
                     ),
 
@@ -175,54 +165,26 @@ class AvailabilityEditorPanel extends ConsumerWidget {
                       child: Row(
                         children: [
                           Expanded(
-                            child: OutlinedButton.icon(
+                            child: TreinoButton(
+                              label: 'BLOQUEAR DÍA', // i18n
+                              icon: TreinoIcon.close,
+                              variant: TreinoButtonVariant.secondary,
+                              size: TreinoButtonSize.sm,
+                              expand: true,
                               onPressed: () =>
                                   _openBlockForm(context, trainerId),
-                              icon: Icon(Icons.block_outlined,
-                                  size: 16, color: palette.textMuted),
-                              label: Text(
-                                'BLOQUEAR DÍA', // i18n
-                                style: GoogleFonts.barlowCondensed(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 12,
-                                  letterSpacing: 0.6,
-                                  color: palette.textMuted,
-                                ),
-                              ),
-                              style: OutlinedButton.styleFrom(
-                                side: BorderSide(color: palette.border),
-                                minimumSize: const Size.fromHeight(40),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(AppRadius.full),
-                                ),
-                              ),
                             ),
                           ),
                           const SizedBox(width: 8),
                           Expanded(
-                            child: OutlinedButton.icon(
+                            child: TreinoButton(
+                              label: 'VENTANA EXTRA', // i18n
+                              icon: TreinoIcon.plus,
+                              variant: TreinoButtonVariant.secondaryAccent,
+                              size: TreinoButtonSize.sm,
+                              expand: true,
                               onPressed: () =>
                                   _openExtraForm(context, trainerId),
-                              icon: Icon(Icons.add_circle_outline,
-                                  size: 16, color: palette.accent),
-                              label: Text(
-                                'VENTANA EXTRA', // i18n
-                                style: GoogleFonts.barlowCondensed(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 12,
-                                  letterSpacing: 0.6,
-                                  color: palette.accent,
-                                ),
-                              ),
-                              style: OutlinedButton.styleFrom(
-                                side: BorderSide(color: palette.accent),
-                                minimumSize: const Size.fromHeight(40),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(AppRadius.full),
-                                ),
-                              ),
                             ),
                           ),
                         ],
@@ -328,30 +290,15 @@ class _RulesList extends ConsumerWidget {
           style: GoogleFonts.barlow(fontSize: 14, color: palette.textPrimary),
         ),
         actions: [
-          OutlinedButton(
+          TreinoButton(
+            label: 'CANCELAR', // i18n
+            variant: TreinoButtonVariant.ghost,
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(
-              'CANCELAR', // i18n
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-                color: palette.textPrimary,
-              ),
-            ),
           ),
-          ElevatedButton(
+          const SizedBox(width: AppSpacing.s8),
+          TreinoButton(
+            label: 'CONFIRMAR', // i18n
             onPressed: () => Navigator.of(ctx).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: palette.accent,
-              foregroundColor: TreinoButtonTokens.foreground(context),
-            ),
-            child: Text(
-              'CONFIRMAR', // i18n
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-              ),
-            ),
           ),
         ],
       ),
@@ -422,16 +369,18 @@ class _RuleTile extends StatelessWidget {
               ],
             ),
           ),
-          IconButton(
-            icon: Icon(Icons.edit_outlined, size: 20, color: palette.textMuted),
-            onPressed: onEdit,
+          TreinoIconButton(
+            icon: TreinoIcon.edit,
             tooltip: 'Editar', // i18n
+            color: palette.textMuted,
+            onPressed: onEdit,
           ),
-          IconButton(
-            icon:
-                Icon(Icons.delete_outline, size: 20, color: palette.highlight),
-            onPressed: onDelete,
+          const SizedBox(width: AppSpacing.hairline),
+          TreinoIconButton(
+            icon: TreinoIcon.trash,
             tooltip: 'Eliminar', // i18n
+            color: palette.highlight,
+            onPressed: onDelete,
           ),
         ],
       ),
@@ -493,30 +442,15 @@ class _OverridesList extends ConsumerWidget {
           style: GoogleFonts.barlow(fontSize: 14, color: palette.textPrimary),
         ),
         actions: [
-          OutlinedButton(
+          TreinoButton(
+            label: 'CANCELAR', // i18n
+            variant: TreinoButtonVariant.ghost,
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(
-              'CANCELAR', // i18n
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-                color: palette.textPrimary,
-              ),
-            ),
           ),
-          ElevatedButton(
+          const SizedBox(width: AppSpacing.s8),
+          TreinoButton(
+            label: 'CONFIRMAR', // i18n
             onPressed: () => Navigator.of(ctx).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: palette.accent,
-              foregroundColor: TreinoButtonTokens.foreground(context),
-            ),
-            child: Text(
-              'CONFIRMAR', // i18n
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-              ),
-            ),
           ),
         ],
       ),
@@ -588,11 +522,11 @@ class _OverrideTile extends StatelessWidget {
               ],
             ),
           ),
-          IconButton(
-            icon:
-                Icon(Icons.delete_outline, size: 20, color: palette.highlight),
-            onPressed: onDelete,
+          TreinoIconButton(
+            icon: TreinoIcon.trash,
             tooltip: 'Eliminar', // i18n
+            color: palette.highlight,
+            onPressed: onDelete,
           ),
         ],
       ),
@@ -653,23 +587,10 @@ class _ErrorState extends StatelessWidget {
             style: GoogleFonts.barlow(fontSize: 14, color: palette.textMuted),
           ),
           const SizedBox(height: 16),
-          OutlinedButton(
+          TreinoButton(
+            label: 'REINTENTAR', // i18n
+            variant: TreinoButtonVariant.secondaryAccent,
             onPressed: onRetry,
-            style: OutlinedButton.styleFrom(
-              side: BorderSide(color: palette.accent),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppRadius.full),
-              ),
-            ),
-            child: Text(
-              'REINTENTAR', // i18n
-              style: GoogleFonts.barlowCondensed(
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-                letterSpacing: 0.8,
-                color: palette.accent,
-              ),
-            ),
           ),
         ],
       ),

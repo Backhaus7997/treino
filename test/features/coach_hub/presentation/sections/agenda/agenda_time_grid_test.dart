@@ -79,15 +79,18 @@ void main() {
         evento('tarde', DateTime(2026, 9, 7, 17), 60),
       ]);
 
-      final y1 = tester.getTopLeft(find.byKey(const Key('agenda_event_temprano'))).dy;
-      final y2 = tester.getTopLeft(find.byKey(const Key('agenda_event_tarde'))).dy;
+      final y1 =
+          tester.getTopLeft(find.byKey(const Key('agenda_event_temprano'))).dy;
+      final y2 =
+          tester.getTopLeft(find.byKey(const Key('agenda_event_tarde'))).dy;
 
       expect(y2, greaterThan(y1));
     });
   });
 
   group('Solapamiento —', () {
-    testWidgets('dos sesiones a la misma hora se reparten el ancho, no se '
+    testWidgets(
+        'dos sesiones a la misma hora se reparten el ancho, no se '
         'tapan', (tester) async {
       await pump(tester, eventos: [
         evento('x', DateTime(2026, 9, 7, 10), 60),
@@ -363,9 +366,11 @@ void main() {
       expect(find.byKey(const Key('agenda_band_1_600')), findsNothing);
 
       final banda = tester.getSize(find.byKey(const Key('agenda_band_1_540')));
-      final unaHora = tester.getSize(
-            find.byKey(const Key('agenda_day_column_0')),
-          ).height /
+      final unaHora = tester
+              .getSize(
+                find.byKey(const Key('agenda_day_column_0')),
+              )
+              .height /
           24;
       expect(banda.height, moreOrLessEquals(unaHora * 2, epsilon: 2),
           reason: 'la banda fusionada tiene que medir las dos horas');
