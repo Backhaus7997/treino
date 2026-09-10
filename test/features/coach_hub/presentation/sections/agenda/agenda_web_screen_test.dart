@@ -101,7 +101,8 @@ void main() {
     // rama angosta: ahí sigue viviendo el selector de fechas + lista del día,
     // y por eso no cambiaron. Arriba de 900 px la pantalla pasa a la grilla,
     // y esa rama no la cubría nadie.
-    testWidgets('a partir de 900 px se muestra la grilla de tiempo, no el '
+    testWidgets(
+        'a partir de 900 px se muestra la grilla de tiempo, no el '
         'selector de fechas', (tester) async {
       tester.view.physicalSize = const Size(1400, 900);
       tester.view.devicePixelRatio = 1.0;
@@ -148,16 +149,14 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final antes = tester
-          .widget<AgendaWeekView>(find.byType(AgendaWeekView))
-          .firstDay;
+      final antes =
+          tester.widget<AgendaWeekView>(find.byType(AgendaWeekView)).firstDay;
 
       await tester.tap(find.byKey(const Key('agenda_next')));
       await tester.pumpAndSettle();
 
-      final despues = tester
-          .widget<AgendaWeekView>(find.byType(AgendaWeekView))
-          .firstDay;
+      final despues =
+          tester.widget<AgendaWeekView>(find.byType(AgendaWeekView)).firstDay;
 
       expect(despues.difference(antes).inDays, 7);
     });

@@ -15,6 +15,7 @@ import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
 import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
+import 'package:treino/core/widgets/treino_icon.dart';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -275,7 +276,7 @@ void main() {
       await _openPanel(tester, rules: [existing], repo: stub);
 
       // Find and tap the edit icon button
-      final editIcons = find.byIcon(Icons.edit_outlined);
+      final editIcons = find.byIcon(TreinoIcon.edit);
       expect(editIcons, findsOneWidget);
       await tester.tap(editIcons);
       await tester.pumpAndSettle();
@@ -304,7 +305,7 @@ void main() {
       await _openPanel(tester, rules: [existing], repo: stub);
 
       // Find and tap the delete icon button
-      final deleteIcons = find.byIcon(Icons.delete_outline);
+      final deleteIcons = find.byIcon(TreinoIcon.trash);
       expect(deleteIcons, findsOneWidget);
       await tester.tap(deleteIcons);
       await tester.pumpAndSettle();

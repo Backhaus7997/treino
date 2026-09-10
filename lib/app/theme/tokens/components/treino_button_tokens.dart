@@ -71,6 +71,15 @@ abstract final class TreinoButtonTokens {
           borderColor: p.border,
           hoverBorderColor: p.borderHover,
         ),
+      // DESTRUCTIVA. Borde y texto en `danger`, sin relleno: la acción que
+      // borra no se ofrece como un CTA lleno, pero tampoco se disimula.
+      TreinoButtonVariant.danger => TreinoButtonVisual._(
+          background: AppColorPrimitives.transparent,
+          hoverBackground: p.danger.withValues(alpha: 0.08),
+          foreground: p.danger,
+          borderColor: p.danger,
+          hoverBorderColor: p.danger,
+        ),
       // La terciaria en acento: sin caja, texto que invita. Es el «+ Asignar
       // rutina» / «+ Registrar pago» que estaba escrito como `TextButton` con
       // el color a mano en cada callsite.
@@ -119,6 +128,10 @@ enum TreinoButtonVariant {
   secondaryAccent,
   ghost,
   ghostAccent,
+
+  /// Fuera de la grilla a propósito: [danger] no es un nivel de énfasis, es
+  /// una advertencia. Va sólo donde la acción destruye algo.
+  danger,
 }
 
 /// Dos tamaños. `sm` para densidad de tabla y de fila; `md` para diálogos y

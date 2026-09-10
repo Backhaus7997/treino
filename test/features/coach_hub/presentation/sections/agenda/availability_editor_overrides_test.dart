@@ -16,6 +16,7 @@ import 'package:treino/features/coach_hub/presentation/sections/agenda/agenda_we
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
 import 'package:treino/l10n/app_l10n.dart';
+import 'package:treino/core/widgets/treino_icon.dart';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -304,7 +305,7 @@ void main() {
       await _openPanel(tester, overrides: [_blockOverride()], repo: stub);
 
       // Find delete icon button in overrides section
-      final deleteIcons = find.byIcon(Icons.delete_outline);
+      final deleteIcons = find.byIcon(TreinoIcon.trash);
       expect(deleteIcons, findsWidgets);
       await tester.tap(deleteIcons.last);
       await tester.pumpAndSettle();

@@ -27,6 +27,7 @@ import 'agenda_week_view.dart';
 import 'appointment_detail_dialog.dart';
 import 'availability_editor_panel.dart';
 import 'new_session_dialog.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 // ─── AgendaWebScreen ──────────────────────────────────────────────────────────
 
@@ -145,8 +146,8 @@ class _AgendaWebScreenState extends ConsumerState<AgendaWebScreen> {
                 _GridHeader(
                   weekStart: _weekStart,
                   dayCount: _gridDays,
-                  onPrev: () => setState(() => _weekStart = _weekStart
-                      .subtract(Duration(days: _gridDays))),
+                  onPrev: () => setState(() => _weekStart =
+                      _weekStart.subtract(Duration(days: _gridDays))),
                   onNext: () => setState(() =>
                       _weekStart = _weekStart.add(Duration(days: _gridDays))),
                   onToday: () => setState(() => _weekStart = _gridDays == 7
@@ -154,8 +155,7 @@ class _AgendaWebScreenState extends ConsumerState<AgendaWebScreen> {
                       : argentinaNow()),
                   onDayCount: (n) => setState(() {
                     _gridDays = n;
-                    _weekStart =
-                        n == 7 ? _lunesDe(_weekStart) : _weekStart;
+                    _weekStart = n == 7 ? _lunesDe(_weekStart) : _weekStart;
                   }),
                   onNewSession: () => _openNewSessionDialog(context),
                   onMisHorarios: () =>
@@ -293,45 +293,18 @@ class _DayPanelHeader extends StatelessWidget {
             ),
           ),
         ),
-        OutlinedButton(
+        TreinoButton(
+          label: 'MIS HORARIOS', // i18n
+          variant: TreinoButtonVariant.secondaryAccent,
+          size: TreinoButtonSize.sm,
           onPressed: onMisHorarios,
-          style: OutlinedButton.styleFrom(
-            side: BorderSide(color: palette.accent),
-            minimumSize: const Size(0, 36),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-            shape: const StadiumBorder(),
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-          child: Text(
-            'MIS HORARIOS', // i18n
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-              letterSpacing: 0.8,
-              color: palette.accent,
-            ),
-          ),
         ),
         const SizedBox(width: 8),
-        ElevatedButton.icon(
+        TreinoButton(
+          label: 'NUEVA SESIÓN', // i18n
+          icon: TreinoIcon.plus,
+          size: TreinoButtonSize.sm,
           onPressed: onNewSession,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: palette.accent,
-            foregroundColor: TreinoButtonTokens.foreground(context),
-            minimumSize: const Size(0, 36),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
-            shape: const StadiumBorder(),
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          ),
-          icon: const Icon(Icons.add, size: 16),
-          label: Text(
-            'NUEVA SESIÓN', // i18n
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-              letterSpacing: 0.8,
-            ),
-          ),
         ),
       ],
     );
@@ -365,8 +338,18 @@ class _GridHeader extends StatelessWidget {
   final VoidCallback onMisHorarios;
 
   static const _meses = [
-    'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
-    'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
+    'enero',
+    'febrero',
+    'marzo',
+    'abril',
+    'mayo',
+    'junio',
+    'julio',
+    'agosto',
+    'septiembre',
+    'octubre',
+    'noviembre',
+    'diciembre',
   ];
 
   /// "7 – 13 de septiembre" o "29 de septiembre – 5 de octubre".
@@ -391,38 +374,47 @@ class _GridHeader extends StatelessWidget {
 
     return Row(
       children: [
-        IconButton(
+        TreinoIconButton(
           key: const Key('agenda_prev'),
-          onPressed: onPrev,
-          icon: Icon(TreinoIcon.arrowLeft, color: palette.textPrimary),
+          icon: TreinoIcon.arrowLeft,
           tooltip: 'Anterior', // i18n
+          color: palette.textPrimary,
+          onPressed: onPrev,
         ),
-        IconButton(
+        const SizedBox(width: AppSpacing.hairline),
+        TreinoIconButton(
           key: const Key('agenda_next'),
-          onPressed: onNext,
-          icon: Icon(TreinoIcon.arrowRight, color: palette.textPrimary),
+          icon: TreinoIcon.arrowRight,
           tooltip: 'Siguiente', // i18n
+          color: palette.textPrimary,
+          onPressed: onNext,
         ),
         const SizedBox(width: AppSpacing.s8),
-        OutlinedButton(
+        TreinoButton(
           key: const Key('agenda_today'),
+          label: 'Hoy', // i18n
+          variant: TreinoButtonVariant.secondary,
+          size: TreinoButtonSize.sm,
           onPressed: onToday,
-          style: OutlinedButton.styleFrom(
-            foregroundColor: palette.textPrimary,
-            side: BorderSide(color: palette.border),
-            shape: const StadiumBorder(),
-          ),
-          child: const Text('Hoy'), // i18n
         ),
         const SizedBox(width: AppSpacing.s14),
-        Text(
-          _titulo,
-          style: TextStyle(
-            fontFamily: AppFonts.barlowCondensed,
-            fontWeight: FontWeight.w700,
-            fontSize: 20,
-            letterSpacing: 0.5,
-            color: palette.textPrimary,
+        // `Flexible` + ellipsis: el título es la única pieza de ancho libre de
+        // esta barra, y sin acotar hacía DESBORDAR el `Row` entero —franja
+        // amarilla y negra— apenas los controles de al lado crecían un poco.
+        // El `Spacer` de abajo cede primero; recién después trunca el título.
+        Flexible(
+          child: Text(
+            _titulo,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            softWrap: false,
+            style: TextStyle(
+              fontFamily: AppFonts.barlowCondensed,
+              fontWeight: FontWeight.w700,
+              fontSize: 20,
+              letterSpacing: 0.5,
+              color: palette.textPrimary,
+            ),
           ),
         ),
         const Spacer(),
@@ -431,29 +423,21 @@ class _GridHeader extends StatelessWidget {
           // Single-select: el kit toma un Set porque también sirve de
           // multi-select, pero acá los dos rangos se excluyen.
           selected: {dayCount == 1 ? 'Día' : 'Semana'}, // i18n
-          onChanged: (sel) =>
-              onDayCount(sel.contains('Día') ? 1 : 7), // i18n
+          onChanged: (sel) => onDayCount(sel.contains('Día') ? 1 : 7), // i18n
         ),
         const SizedBox(width: AppSpacing.s14),
-        OutlinedButton(
+        TreinoButton(
+          label: 'Mis horarios', // i18n
+          variant: TreinoButtonVariant.secondary,
+          size: TreinoButtonSize.sm,
           onPressed: onMisHorarios,
-          style: OutlinedButton.styleFrom(
-            foregroundColor: palette.textPrimary,
-            side: BorderSide(color: palette.border),
-            shape: const StadiumBorder(),
-          ),
-          child: const Text('Mis horarios'), // i18n
         ),
         const SizedBox(width: AppSpacing.s8),
-        ElevatedButton.icon(
+        TreinoButton(
+          label: 'Nueva sesión', // i18n
+          icon: TreinoIcon.plus,
+          size: TreinoButtonSize.sm,
           onPressed: onNewSession,
-          icon: const Icon(TreinoIcon.plus, size: 16),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: palette.accent,
-            foregroundColor: TreinoButtonTokens.foreground(context),
-            shape: const StadiumBorder(),
-          ),
-          label: const Text('Nueva sesión'), // i18n
         ),
       ],
     );
