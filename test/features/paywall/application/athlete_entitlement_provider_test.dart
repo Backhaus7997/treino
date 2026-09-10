@@ -155,11 +155,19 @@ void main() {
   });
 
   group('topes del plan free', () {
-    test('2 días y 1 semana', () {
+    test('3 días y 1 semana', () {
       // Pineados: son el contrato con `docs/paywall-alumno-suelto.md` §4 y con
-      // la regla de firestore que los va a replicar. Si cambian acá sin
-      // cambiar allá, el cliente y el servidor discrepan.
-      expect(kFreeMaxRoutineDays, 2);
+      // `firestore.rules` (`freeMaxRoutineDays()` / `freeMaxRoutineWeeks()`),
+      // que los replica a mano. Si cambian acá sin cambiar allá, el cliente
+      // muestra un tope y el servidor aplica otro, y el alumno se come un
+      // rebote que ninguna pantalla anticipó.
+      //
+      // El 3 no es arbitrario y por eso este pin importa: es la forma de las
+      // TRES plantillas que el free sigue gratis (`ppl-beginner`,
+      // `full-body-3day`, `calistenia-beginner`). Bajarlo devuelve la
+      // incoherencia de recomendarle al alumno un programa que después no lo
+      // deja armarse — que era la fuente del `permission-denied` al guardar.
+      expect(kFreeMaxRoutineDays, 3);
       expect(kFreeMaxRoutineWeeks, 1);
     });
 

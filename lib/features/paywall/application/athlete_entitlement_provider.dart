@@ -142,13 +142,18 @@ final catalogLockActiveProvider = Provider.autoDispose<bool>((ref) {
 /// plantilla del catálogo es del plan pago, incluidas las tres de principiante
 /// que seguir sí es gratis.
 ///
-/// Y no es sólo política: las tres gratis tienen 3 días
-/// (`docs/video-catalog-audit/improved-templates.json`) contra
-/// [kFreeMaxRoutineDays] = 2. Con el gate cruzado por `isPremium`, el alumno
-/// free entraba al editor, cargaba todo, tocaba Guardar y `firestore.rules` lo
-/// rebotaba con "No tenés permisos. Recargá la app.". Perdía el trabajo contra
-/// un mensaje que no explicaba nada. Este provider es lo que mueve ese freno a
-/// la ENTRADA, donde todavía no invirtió nada.
+/// **Es política pura, y desde que [kFreeMaxRoutineDays] pasó a 3 eso es lo
+/// único que la sostiene.** Antes había además un motivo de forma: las tres
+/// plantillas gratis tienen 3 días y el tope era 2, así que copiar cualquiera
+/// terminaba sí o sí en un `permission-denied` al guardar. Ese motivo ya no
+/// existe — una copia de 3 días hoy entra en la forma free.
+///
+/// El gate SIGUE, porque la spec le da fila propia a "Editar / personalizar
+/// una plantilla del catálogo" (`docs/paywall-alumno-suelto.md` §4) con
+/// independencia de cuántos días tenga. Pero ahora frena por lo que el
+/// producto decidió cobrar, no por una aritmética que se rompía sola. Si
+/// mañana el producto abre personalizar, este provider se apaga y no queda
+/// ninguna deuda de forma escondida atrás.
 final customizeLockActiveProvider = Provider.autoDispose<bool>((ref) {
   if (!ref.watch(athletePaywallEnabledProvider)) return false;
   return ref.watch(athleteEntitlementProvider).gatesFreeLimits;

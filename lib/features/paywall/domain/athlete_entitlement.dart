@@ -56,23 +56,51 @@ const bool kAthletePaywallEnabled = false;
 
 /// Días máximos de una rutina PROPIA en el plan free.
 ///
-/// Dos, no uno: dos días es el mínimo que expresa un programa de principiante
-/// real (un A/B). Con uno, `nextPlanPosition` además rompe — `rolledOver` es
-/// `lastFinished.dayNumber >= numDays`, que con `numDays == 1` da siempre
-/// `true` y quema una semana por sesión terminada
-/// (`plan_advance.dart`, y `docs/paywall-alumno-suelto.md` §3.2).
+/// **Tres, y el número lo fija el propio catálogo.** Las tres plantillas que
+/// el alumno free puede seguir gratis —`ppl-beginner`, `full-body-3day`,
+/// `calistenia-beginner` (`docs/video-catalog-audit/improved-templates.json`)—
+/// tienen 3 días. Con el tope en 2, la app le mostraba esas tres como el
+/// programa que debería hacer y después no lo dejaba armarse una igual. Esa
+/// incoherencia no era cosmética: era la fuente del `permission-denied` al
+/// guardar, porque `firestore.rules` mide la forma del documento RESULTANTE.
+///
+/// Un full body 3x/semana es el programa de principiante estándar. Dejarlo
+/// afuera del free no vendía periodización: vendía frustración.
+///
+/// **La palanca de conversión son las SEMANAS, no los días.**
+/// [kFreeMaxRoutineWeeks] es lo que separa un programa de principiante de uno
+/// periodizado, y ese es el corte que el producto cobra.
+///
+/// Efecto secundario deliberado y valioso: con el tope en 3, una rutina de 4
+/// días que quedó de antes **tiene salida** — sacarle un día deja el
+/// resultante en 3 y la regla lo acepta. Con el tope en 2 no había ninguna, y
+/// por eso el mensaje de límite podía ofrecer un camino en vez de sólo una
+/// negativa. Ver `RoutineEditorScreen._freePlanBlocksShape`.
+///
+/// El piso sigue siendo 2 y no 1 por un motivo que no cambió: con
+/// `numDays == 1`, `nextPlanPosition` rompe — `rolledOver` es
+/// `lastFinished.dayNumber >= numDays`, que da siempre `true` y quema una
+/// semana por sesión terminada (`plan_advance.dart`, y
+/// `docs/paywall-alumno-suelto.md` §3.2).
+///
+/// ⚠️  Este número vive DUPLICADO en `firestore.rules` (`freeMaxRoutineDays()`).
+/// Si cambiás uno, cambiá el otro: el cliente muestra un tope y el servidor
+/// aplica otro, y el rebote llega sin que ninguna pantalla lo anticipe.
 ///
 /// NO aplica al catálogo del sistema: seguir una plantilla precargada se gatea
 /// por nivel, no por días (§4.1.1 de la spec).
-const int kFreeMaxRoutineDays = 2;
+const int kFreeMaxRoutineDays = 3;
 
 /// Rutinas PROPIAS que puede tener guardadas un alumno del plan free.
 ///
-/// Tres y no dos: con el tope de [kFreeMaxRoutineDays] días, la diferencia
-/// entre dos y tres es casi nula en la práctica —nadie arma tres rutinas
-/// distintas de dos días— pero tres da la sensación de que hay lugar para
-/// probar. Como palanca de conversión rinden lo mismo, y la de tres no se
-/// siente mezquina.
+/// Tres y no dos: como palanca de conversión rinden lo mismo —el límite que
+/// de verdad muerde es el de SEMANAS— y la de tres no se siente mezquina.
+///
+/// (La justificación original decía "nadie arma tres rutinas distintas de dos
+/// días". Ese argumento se apoyaba en [kFreeMaxRoutineDays] valiendo 2 y dejó
+/// de ser cierto cuando pasó a 3: con 3 días sí se arman rutinas propias
+/// distintas. La conclusión no cambia, pero el motivo sí, y dejar el viejo
+/// escrito haría que el próximo que lo lea razone sobre una premisa muerta.)
 ///
 /// **No cuenta las plantillas del catálogo que el alumno sigue**: seguir no
 /// copia (#963), así que no crea un doc `user-created` y no ocupa cupo. Un

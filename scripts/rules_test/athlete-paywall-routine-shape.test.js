@@ -8,7 +8,14 @@
  * Los dos ejes que cubre este archivo:
  *
  *   1. Que el tope MUERDA en create Y en update. Sólo en create sería una
- *      puerta con la ventana abierta al lado: creás con 2 días y editás a 7.
+ *      puerta con la ventana abierta al lado: creás con 3 días y editás a 7.
+ *
+ *      Y en update se mide el documento RESULTANTE, no el delta. De ahí sale
+ *      lo que puede hacer el dueño de una rutina que quedó de antes por
+ *      encima del tope: renombrarla REBOTA (el resultante sigue afuera),
+ *      recortarla al tope PASA, archivarla PASA (es UPDATE path 1). Los tres
+ *      están cubiertos abajo, porque los tres son el camino real de la
+ *      población que ya tiene rutinas armadas el día que esto se encienda.
  *
  *   2. Que el default sea INERTE. `athletePaywallEnforced` lo escribe una CF
  *      que TODAVÍA NO EXISTE, así que hoy el campo está ausente en todos los
@@ -113,10 +120,21 @@ describe('paywall del alumno — CREATE de rutina propia', () => {
     );
   });
 
-  it('con enforced=true: 3 días REBOTA', async () => {
+  it('con enforced=true: 3 días pasa — es el tope, y el tope entra', async () => {
+    // El caso que fija el número contra el CATÁLOGO. Las tres plantillas que
+    // el free puede seguir gratis (`ppl-beginner`, `full-body-3day`,
+    // `calistenia-beginner`) tienen 3 días. Si este test se pone rojo, la app
+    // volvió a recomendarle al alumno un programa que no lo deja armarse.
+    await seedUser(ATHLETE, { athletePaywallEnforced: true });
+    await assertSucceeds(
+      as(ATHLETE).collection('routines').add(rutina(ATHLETE, { days: 3 })),
+    );
+  });
+
+  it('con enforced=true: 4 días REBOTA', async () => {
     await seedUser(ATHLETE, { athletePaywallEnforced: true });
     await assertFails(
-      as(ATHLETE).collection('routines').add(rutina(ATHLETE, { days: 3 })),
+      as(ATHLETE).collection('routines').add(rutina(ATHLETE, { days: 4 })),
     );
   });
 
@@ -146,12 +164,23 @@ describe('paywall del alumno — CREATE de rutina propia', () => {
 describe('paywall del alumno — UPDATE de rutina propia', () => {
   const ID = 'r-1';
 
-  it('con enforced=true: crecer a 3 días REBOTA', async () => {
+  it('con enforced=true: crecer a 4 días REBOTA', async () => {
     // SIN esta cláusula el tope del create sería una puerta con la ventana
-    // abierta al lado: creo con 2 y edito a 7.
+    // abierta al lado: creo con 3 y edito a 7.
+    await seedUser(ATHLETE, { athletePaywallEnforced: true });
+    await seedRoutine(ID, rutina(ATHLETE, { days: 3 }));
+    await assertFails(
+      as(ATHLETE)
+        .collection('routines')
+        .doc(ID)
+        .update({ days: [day(1), day(2), day(3), day(4)] }),
+    );
+  });
+
+  it('con enforced=true: crecer HASTA el tope (2 → 3) pasa', async () => {
     await seedUser(ATHLETE, { athletePaywallEnforced: true });
     await seedRoutine(ID, rutina(ATHLETE, { days: 2 }));
-    await assertFails(
+    await assertSucceeds(
       as(ATHLETE)
         .collection('routines')
         .doc(ID)
@@ -180,6 +209,45 @@ describe('paywall del alumno — UPDATE de rutina propia', () => {
     await seedRoutine(ID, rutina(ATHLETE, { days: 5 }));
     await assertSucceeds(
       as(ATHLETE).collection('routines').doc(ID).update({ name: 'Renombrada' }),
+    );
+  });
+
+  // ── La rutina que quedó de antes por encima del tope ──────────────────────
+  //
+  // Es la población más grande del día del encendido, no un caso de borde: hoy
+  // `kAthletePaywallEnabled` está en `false` y la CF escribe
+  // `athletePaywallEnforced: false`, así que TODAS las rutinas que existan
+  // están armadas sin tope. A eso se suman los que pierden el derecho con la
+  // rutina ya guardada (se termina el vínculo con el PF, o se vence el pago).
+  //
+  // Estos tres tests existen porque el comentario de la regla describía este
+  // caso MAL: decía "se puede seguir tocando mientras no crezca", que es falso
+  // —la cláusula mide el RESULTANTE— y se contradecía con su propia frase
+  // siguiente. Quien lo leyera daba por cubierto un camino que rebotaba.
+  // AGENTS.md §11.1. Ahora el comportamiento lo fija el emulador y no la prosa.
+
+  it('con enforced=true: RENOMBRAR una de 4 días REBOTA', async () => {
+    // El caso que el comentario viejo daba por permitido. No se tocaron los
+    // días y rebota igual, porque el documento resultante sigue teniendo 4.
+    await seedUser(ATHLETE, { athletePaywallEnforced: true });
+    await seedRoutine(ID, rutina(ATHLETE, { days: 4 }));
+    await assertFails(
+      as(ATHLETE).collection('routines').doc(ID).update({ name: 'Renombrada' }),
+    );
+  });
+
+  it('con enforced=true: RECORTAR una de 4 días al tope PASA', async () => {
+    // La salida real, y la razón por la que el cliente puede ofrecer una
+    // acción concreta ("sacá los días que sobran") en vez de sólo una
+    // negativa. Con el tope en 2 esto no existía: bajar de 4 a 3 seguía
+    // rebotando y el alumno no tenía nada que hacer más que archivarla.
+    await seedUser(ATHLETE, { athletePaywallEnforced: true });
+    await seedRoutine(ID, rutina(ATHLETE, { days: 4 }));
+    await assertSucceeds(
+      as(ATHLETE)
+        .collection('routines')
+        .doc(ID)
+        .update({ days: [day(1), day(2), day(3)] }),
     );
   });
 

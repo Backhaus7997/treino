@@ -80,7 +80,7 @@ terminada. Un plan de 8 semanas se quema en 8 sesiones y el módulo vuelve a 0,
 en silencio.
 
 Consecuencia: si el free fuera de 1 día, tendría que ser también de 1 semana. Con
-el free de 2 días (sección 4) el problema no aparece, pero la restricción queda
+el free de 3 días (sección 4) el problema no aparece, pero la restricción queda
 documentada por si alguien vuelve a proponer 1 día.
 
 ### 3.3 Un tope bajo de días apaga el catálogo — y esto pega también con 2
@@ -101,7 +101,7 @@ Las 7 plantillas del sistema tienen **3, 3, 4, 5, 4, 3 y 3 días**
 
 Ninguna tiene 1 ni 2 días. StrongLifts 5×5 y Starting Strength (programas A/B de
 2 días) **no están en el catálogo**; si se agregaran, serían las únicas que
-entran en un free de 2 días.
+entraban en el free de 2 días que esta sección analizaba.
 
 Y para seguir una plantilla hay que copiarla: `todaysRoutineProvider` resuelve
 la rutina activa **solo** contra `assignedRoutinesProvider` y
@@ -119,7 +119,47 @@ enforcement de la sección 6 (`days.size() <= 2` en el create de `user-created`)
 copiar **cualquier** plantilla del catálogo (mínimo 3 días) rebota contra el
 paywall. El catálogo entero queda detrás del pago para el alumno suelto. Firestore
 no puede distinguir "copia de plantilla" de "armada a mano": el documento es
-idéntico. La sección 4.1 resuelve esto.
+idéntico. La sección 4.1 resuelve el eje de SEGUIR; la 3.4, el de la forma.
+
+### 3.4 El tope pasó de 2 a 3 días, y el número lo fija la tabla de arriba
+
+**Decisión de producto tomada después de escribir 3.3, y sobre su propia
+evidencia.** El análisis de arriba trata el choque catálogo-vs-tope como algo a
+esquivar (dejar seguir sin copiar). Pero mirando la tabla de días una vez más:
+`3, 3, 4, 5, 4, 3, 3`. **Las tres plantillas que el free puede seguir gratis
+tienen 3 días.** O sea que la app le mostraba al alumno free tres programas
+como "esto es lo que deberías hacer" y después no lo dejaba armarse uno igual.
+
+Eso no era un tope: era una incoherencia, y era la fuente del
+`permission-denied` al guardar. Un full body 3x/semana es EL programa de
+principiante estándar; dejarlo afuera del free no vendía periodización, vendía
+frustración.
+
+**Qué cambia y qué no:**
+
+- El tope de días pasa a **3** (`kFreeMaxRoutineDays`, y `freeMaxRoutineDays()`
+  en `firestore.rules` — el número vive duplicado y los dos van juntos).
+- El tope de **semanas NO cambia**. Sigue en 1, y pasa a ser la palanca de
+  conversión principal de la rutina propia.
+- El gate de **personalizar** una plantilla del catálogo **sigue**. Es la fila
+  propia de la tabla de §4 y es política, no forma: antes el gate tenía además
+  una razón aritmética (copiar una de 3 días rebotaba sí o sí contra el tope de
+  2), y esa razón desapareció. Que quede escrito, porque el día que el producto
+  quiera abrir personalizar no hay ninguna deuda de forma escondida atrás.
+
+**Efecto secundario buscado, sobre la población que ya tiene rutinas armadas.**
+`firestore.rules` mide el documento RESULTANTE, así que con el tope en 3 una
+rutina de 4 días que quedó de antes **tiene salida**: sacarle un día la deja en
+3 y guarda bien. Con el tope en 2 no había ninguna —bajar de 4 a 3 seguía
+rebotando— y lo único que le quedaba al alumno era archivarla. Por eso el
+mensaje de límite de ese caso puede pedir una acción concreta en vez de sólo
+nombrar una restricción.
+
+No es una población chica: hoy `kAthletePaywallEnabled` está en `false` y la CF
+escribe `athletePaywallEnforced: false`, así que **todas** las rutinas que
+existan el día del encendido se armaron sin tope. A eso se suman los dos modos
+de perder el derecho con la rutina ya guardada (se termina el vínculo con el PF,
+se vence la suscripción).
 
 ---
 
@@ -127,15 +167,20 @@ idéntico. La sección 4.1 resuelve esto.
 
 |  | Free | Pago |
 |---|---|---|
-| Días por rutina propia | **2** | hasta 7 (`_kMaxDays`) |
+| Días por rutina propia | **3** | hasta 7 (`_kMaxDays`) |
 | Semanas por rutina propia | **1** | hasta 16 (`_kMaxWeeks`) + periodización (`weeklySets`, `activeWeeks`) |
 | Seguir el catálogo — nivel principiante (3 plantillas) | **sí** | sí |
 | Seguir el catálogo — nivel intermedio/avanzado (4 plantillas) | no — ver 4.1.1 | sí |
 | Editar / personalizar una plantilla del catálogo | no | sí |
 | Gráficos históricos | 3 meses | all-time |
 
-Dos días es el mínimo que expresa un programa de principiante real (A/B). Queda
-debajo de Hevy (4 rutinas gratis) y Strong (3), pero es defendible; uno no lo es.
+**Tres días, y lo fija el propio catálogo** (ver 3.4). Un full body 3x/semana es
+el programa de principiante estándar y es la forma de las tres plantillas que el
+free sigue gratis. Queda debajo de Hevy (4 rutinas gratis) y Strong (3), pero es
+defendible; uno no lo es (3.2).
+
+La palanca de conversión de esta tabla es la fila de SEMANAS, no la de días:
+periodizar es lo que separa un programa de principiante de uno intermedio.
 
 ### 4.1 El catálogo tiene que poder correrse sin copiar
 
@@ -293,7 +338,7 @@ y `.size()` sobre listas ya se usa en estas reglas
   `request.resource.data.days.size() <= N && request.resource.data.numWeeks <= M`
   cuando el usuario no está entitled.
 - **UPDATE path 2** (contenido, [firestore.rules:452-477](../firestore.rules)):
-  la misma condición. Sin esto, se crea con 2 días y se edita a 7. El `hasOnly`
+  la misma condición. Sin esto, se crea con 3 días y se edita a 7. El `hasOnly`
   de `affectedKeys` ya incluye `days` y `numWeeks`, así que la condición se
   suma sin romper edits parciales.
 - **Nunca** en `allow read`.
@@ -454,10 +499,15 @@ Dos límites de lectura que hay que tener presentes:
 Construir el paywall si, sobre `source IN (self, self_from_template)` y con al
 menos **200 instalaciones distintas** que hayan emitido `routine_created`:
 
-1. **≥ 25%** de las `routine_created` tienen `days_count >= 3`. Debajo de eso,
-   el límite de 2 días no lo toca casi nadie y el paywall no cobra.
+1. **≥ 25%** de las `routine_created` tienen `days_count >= 4`. Debajo de eso,
+   el límite de 3 días no lo toca casi nadie y el paywall no cobra.
 2. **≥ 40%** de las instalaciones con `routine_day_added` llegan a
-   `days_count == 3`. Es la tasa de "choque" contra el tope.
+   `days_count == 4`. Es la tasa de "choque" contra el tope.
+
+   (Los dos umbrales decían 3 cuando el tope era 2. Al subirlo, el corte que
+   mide "choca contra el paywall" se corre con él — si no, la telemetría
+   contaría como choque a todo el que arma un full body, que ahora es gratis, y
+   el criterio diría que construir el paywall se justifica cuando no.)
 3. `self_from_template` es **≥ 30%** de las `routine_created`. Si es más, el
    catálogo es el producto y la sección 4.1 pasa de "necesaria" a "urgente".
 
