@@ -71,6 +71,16 @@ abstract final class TreinoButtonTokens {
           borderColor: p.border,
           hoverBorderColor: p.borderHover,
         ),
+      // La terciaria en acento: sin caja, texto que invita. Es el «+ Asignar
+      // rutina» / «+ Registrar pago» que estaba escrito como `TextButton` con
+      // el color a mano en cada callsite.
+      TreinoButtonVariant.ghostAccent => TreinoButtonVisual._(
+          background: AppColorPrimitives.transparent,
+          hoverBackground: p.surfaceSubtle,
+          foreground: p.accentText,
+          borderColor: AppColorPrimitives.transparent,
+          hoverBorderColor: AppColorPrimitives.transparent,
+        ),
       // La terciaria: sin caja hasta que la tocás. Para acciones que no
       // compiten (cancelar, «ver más»).
       TreinoButtonVariant.ghost => TreinoButtonVisual._(
@@ -84,14 +94,32 @@ abstract final class TreinoButtonTokens {
   }
 }
 
-/// Las jerarquías de acción del producto. Cuatro, y no una más: cada variante
-/// nueva es vocabulario que el usuario tiene que aprender para operar.
+/// Las jerarquías de acción del producto. No es una lista suelta: es una
+/// grilla de dos ejes más el CTA.
 ///
-/// [secondaryAccent] no es decoración: es la secundaria que el diseño quiere
-/// que se note (el «Pago» del detalle del alumno, al lado del «Chat» neutro).
-/// Existe como variante y no como color suelto porque ahí vive el arreglo de
-/// contraste de #1056.
-enum TreinoButtonVariant { primary, secondary, secondaryAccent, ghost }
+/// |            | neutro           | acento                 |
+/// |------------|------------------|------------------------|
+/// | con borde  | [secondary]      | [secondaryAccent]      |
+/// | sin borde  | [ghost]          | [ghostAccent]          |
+///
+/// Y arriba de todo [primary], el CTA relleno — uno por pantalla.
+///
+/// Las cinco ya existían en el producto; lo que no existía era el nombre, así
+/// que cada pantalla las volvía a inventar con colores y paddings propios. Una
+/// variante NUEVA, en cambio, es vocabulario que el usuario tiene que
+/// aprender: antes de agregar la sexta, mirar si alguna de estas cinco dice lo
+/// mismo.
+///
+/// Las dos de acento llevan `accentText` y no `accent`, y eso NO es un detalle
+/// de implementación: es el arreglo de contraste de #1056, blindado adentro
+/// del token para que ningún callsite lo vuelva a resolver mal.
+enum TreinoButtonVariant {
+  primary,
+  secondary,
+  secondaryAccent,
+  ghost,
+  ghostAccent,
+}
 
 /// Dos tamaños. `sm` para densidad de tabla y de fila; `md` para diálogos y
 /// para el CTA de una sección.

@@ -1254,7 +1254,10 @@ void main() {
           paymentRepo: repo);
 
       await navigateAlumnoDetail(tester, group: 'Pagos');
-      await tester.tap(find.text('+ Registrar pago'));
+      // El «+» dejó de ser parte del string y pasó a ser el ícono del botón,
+      // así que ahora el botón y el TÍTULO del diálogo dicen lo mismo: hay que
+      // desambiguar por widget.
+      await tester.tap(find.widgetWithText(TreinoButton, 'Registrar pago'));
       await tester.pumpAndSettle();
 
       await tester.enterText(find.byType(TextField).at(0), '5000');
@@ -1280,7 +1283,10 @@ void main() {
           paymentRepo: repo);
 
       await navigateAlumnoDetail(tester, group: 'Pagos');
-      await tester.tap(find.text('+ Registrar pago'));
+      // El «+» dejó de ser parte del string y pasó a ser el ícono del botón,
+      // así que ahora el botón y el TÍTULO del diálogo dicen lo mismo: hay que
+      // desambiguar por widget.
+      await tester.tap(find.widgetWithText(TreinoButton, 'Registrar pago'));
       await tester.pumpAndSettle();
 
       // Concepto sin monto → validación, sin escritura.
@@ -1302,7 +1308,10 @@ void main() {
           paymentRepo: repo);
 
       await navigateAlumnoDetail(tester, group: 'Pagos');
-      await tester.tap(find.text('+ Registrar pago'));
+      // El «+» dejó de ser parte del string y pasó a ser el ícono del botón,
+      // así que ahora el botón y el TÍTULO del diálogo dicen lo mismo: hay que
+      // desambiguar por widget.
+      await tester.tap(find.widgetWithText(TreinoButton, 'Registrar pago'));
       await tester.pumpAndSettle();
 
       // Monto válido pero concepto vacío → validación, sin escritura.

@@ -100,6 +100,7 @@ class TreinoButton extends StatelessWidget {
     this.size = TreinoButtonSize.md,
     this.icon,
     this.expand = false,
+    this.loading = false,
     this.trailing,
     this.semanticsLabel,
   })  : assert(label != null || icon != null,
@@ -130,6 +131,15 @@ class TreinoButton extends StatelessWidget {
   /// Slot al final del contenido — un punto de «sin leer», un contador.
   final Widget? trailing;
 
+  /// Operación en curso: el botón no responde y muestra un spinner EN EL LUGAR
+  /// del label, sin cambiar de tamaño.
+  ///
+  /// El ancho se conserva porque el label sigue montado a opacidad cero abajo
+  /// del spinner. Reemplazarlo de verdad achica el botón y mueve todo lo que
+  /// tiene al lado justo cuando el usuario acaba de apretarlo — que es el
+  /// momento en que menos quiere que la pantalla se le mueva.
+  final bool loading;
+
   /// Label para el lector de pantalla cuando el visible no alcanza.
   ///
   /// Se aplica con `excludeSemantics`, así que reemplaza al texto en vez de
@@ -147,7 +157,7 @@ class TreinoButton extends StatelessWidget {
       label: semanticsLabel,
       excludeSemantics: semanticsLabel != null,
       child: TreinoInteractiveState(
-        onTap: onPressed,
+        onTap: loading ? null : onPressed,
         builder: (ctx, states) {
           final on = states.hovered || states.pressed;
           // Deshabilitado: mismo layout, medio tono. No se esconde ni se
@@ -179,41 +189,64 @@ class TreinoButton extends StatelessWidget {
                       ]
                     : null,
               ),
-              child: Row(
-                mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (icon != null) ...[
-                    Icon(icon, size: size.iconSize, color: visual.foreground),
-                    const SizedBox(width: TreinoButtonSize.gap),
-                  ],
-                  // `Flexible` + ellipsis: un label más largo que su caja
-                  // trunca el TEXTO, no la app. El header de la tabla ya se
-                  // comió esa lección.
-                  if (label != null)
-                    Flexible(
-                      child: Text(
-                        label!,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontFamily: AppFonts.barlow,
-                          fontWeight: AppFonts.w600,
-                          fontSize: size.fontSize,
-                          color: visual.foreground,
+              child: _maybeLoading(
+                visual,
+                Row(
+                  mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (icon != null) ...[
+                      Icon(icon, size: size.iconSize, color: visual.foreground),
+                      const SizedBox(width: TreinoButtonSize.gap),
+                    ],
+                    // `Flexible` + ellipsis: un label más largo que su caja
+                    // trunca el TEXTO, no la app. El header de la tabla ya se
+                    // comió esa lección.
+                    if (label != null)
+                      Flexible(
+                        child: Text(
+                          label!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontFamily: AppFonts.barlow,
+                            fontWeight: AppFonts.w600,
+                            fontSize: size.fontSize,
+                            color: visual.foreground,
+                          ),
                         ),
                       ),
-                    ),
-                  if (trailing != null) ...[
-                    const SizedBox(width: AppSpacing.hairline),
-                    trailing!,
+                    if (trailing != null) ...[
+                      const SizedBox(width: AppSpacing.hairline),
+                      trailing!,
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
           );
         },
       ),
+    );
+  }
+
+  /// El contenido tal cual, o con el spinner encima y el contenido invisible.
+  Widget _maybeLoading(TreinoButtonVisual visual, Widget content) {
+    if (!loading) return content;
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        // Sigue MONTADO y midiendo: es lo que impide que el botón se achique.
+        Opacity(opacity: 0, child: content),
+        SizedBox(
+          width: size.iconSize,
+          height: size.iconSize,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation(visual.foreground),
+          ),
+        ),
+      ],
     );
   }
 }

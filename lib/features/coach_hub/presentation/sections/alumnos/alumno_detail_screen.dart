@@ -1030,13 +1030,15 @@ class _ProgresoTabState extends ConsumerState<_ProgresoTab> {
           'No se puede deshacer.', // i18n: Fase W2
         ),
         actions: [
-          TextButton(
+          TreinoButton(
+            label: 'Cancelar', // i18n: Fase W2
+            variant: TreinoButtonVariant.ghost,
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'), // i18n: Fase W2
           ),
-          FilledButton(
+          const SizedBox(width: AppSpacing.s8),
+          TreinoButton(
+            label: 'Confirmar', // i18n: Fase W2
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Confirmar'), // i18n: Fase W2
           ),
         ],
       ),
@@ -1064,13 +1066,15 @@ class _ProgresoTabState extends ConsumerState<_ProgresoTab> {
           'No se puede deshacer.', // i18n: Fase W2
         ),
         actions: [
-          TextButton(
+          TreinoButton(
+            label: 'Cancelar', // i18n: Fase W2
+            variant: TreinoButtonVariant.ghost,
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'), // i18n: Fase W2
           ),
-          FilledButton(
+          const SizedBox(width: AppSpacing.s8),
+          TreinoButton(
+            label: 'Confirmar', // i18n: Fase W2
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Confirmar'), // i18n: Fase W2
           ),
         ],
       ),
@@ -1724,18 +1728,12 @@ class _SinRutinaNotice extends StatelessWidget {
               ),
             ),
             const SizedBox(width: AppSpacing.s12),
-            TextButton.icon(
+            TreinoButton(
+              label: 'Asignar rutina', // i18n
+              icon: TreinoIcon.plus,
+              variant: TreinoButtonVariant.ghostAccent,
+              size: TreinoButtonSize.sm,
               onPressed: onAsignar,
-              icon: Icon(TreinoIcon.plus, size: 16, color: palette.accent),
-              label: Text(
-                'Asignar rutina', // i18n
-                style: TextStyle(
-                  fontFamily: AppFonts.barlow,
-                  color: palette.accent,
-                  fontWeight: AppFonts.w700,
-                  fontSize: AppTextSize.bodyDense,
-                ),
-              ),
             ),
           ],
         ),
@@ -2561,16 +2559,14 @@ class _PagosTab extends ConsumerWidget {
                 child:
                     _sectionLabel(palette, 'ESTADO DE CUENTA'), // i18n: Fase W2
               ),
-              TextButton(
+              // El «+» era parte del STRING. Ahora es el ícono, que es lo que
+              // permite que lo traduzcan sin arrastrarlo.
+              TreinoButton(
+                label: 'Registrar pago', // i18n: Fase W2
+                icon: TreinoIcon.plus,
+                variant: TreinoButtonVariant.ghostAccent,
+                size: TreinoButtonSize.sm,
                 onPressed: () => registrarPago(context, ref, athleteId),
-                child: Text(
-                  '+ Registrar pago', // i18n: Fase W2
-                  style: TextStyle(
-                    color: palette.accent,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                  ),
-                ),
               ),
             ],
           ),
@@ -2599,7 +2595,10 @@ class _PagosTab extends ConsumerWidget {
           const SizedBox(height: 14),
           Align(
             alignment: Alignment.centerLeft,
-            child: TextButton(
+            child: TreinoButton(
+              label: 'Exportar CSV', // i18n: Fase W2
+              variant: TreinoButtonVariant.ghostAccent,
+              size: TreinoButtonSize.sm,
               onPressed: () {
                 final name = ref
                         .read(userPublicProfileProvider(athleteId))
@@ -2613,14 +2612,6 @@ class _PagosTab extends ConsumerWidget {
                   mimeType: 'text/csv',
                 );
               },
-              child: Text(
-                'Exportar CSV', // i18n: Fase W2
-                style: TextStyle(
-                  color: palette.accent,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                ),
-              ),
             ),
           ),
         ],
@@ -2682,18 +2673,13 @@ class _RutinaTab extends ConsumerWidget {
           Row(
             children: [
               Expanded(child: _sectionLabel(palette, 'RUTINA ACTIVA')), // i18n
-              TextButton.icon(
+              TreinoButton(
+                label: 'Asignar rutina', // i18n: Fase W2
+                icon: TreinoIcon.plus,
+                variant: TreinoButtonVariant.ghostAccent,
+                size: TreinoButtonSize.sm,
                 onPressed: () =>
                     context.push('/routine-editor/$athleteId'), // i18n
-                icon: Icon(TreinoIcon.plus, size: 16, color: palette.accent),
-                label: Text(
-                  'Asignar rutina', // i18n: Fase W2
-                  style: TextStyle(
-                    color: palette.accent,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                  ),
-                ),
               ),
             ],
           ),
@@ -2960,21 +2946,13 @@ class _RutinaCard extends StatelessWidget {
                   ),
                 ),
               ),
-              TextButton.icon(
+              TreinoButton(
+                label: 'Editar', // i18n: Fase W2
+                icon: TreinoIcon.edit,
+                variant: TreinoButtonVariant.ghostAccent,
+                size: TreinoButtonSize.sm,
                 onPressed: () =>
                     context.push('/routine-editor/$athleteId/${routine.id}'),
-                icon: Icon(TreinoIcon.edit, size: 15, color: palette.accent),
-                label: Text('Editar', // i18n: Fase W2
-                    style: TextStyle(
-                        color: palette.accent,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13)),
-                style: TextButton.styleFrom(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
               ),
             ],
           ),
@@ -3524,36 +3502,10 @@ class _NotasPrivadasTabState extends ConsumerState<_NotasPrivadasTab> {
                 // ── Save button ─────────────────────────────────────────────
                 Align(
                   alignment: Alignment.centerRight,
-                  child: ElevatedButton(
-                    onPressed: (_saving || !_hasChanges)
-                        ? null
-                        : () => _save(trainerUid),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: palette.accent,
-                      foregroundColor: TreinoButtonTokens.foreground(context),
-                      disabledBackgroundColor:
-                          palette.accent.withValues(alpha: 0.3),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 24, vertical: 12),
-                      shape: const StadiumBorder(),
-                    ),
-                    child: _saving
-                        ? SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: TreinoButtonTokens.foreground(context),
-                            ),
-                          )
-                        : Text(
-                            l10n.coachHubAlumnoDetailNotasSaveButton,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.8,
-                            ),
-                          ),
+                  child: TreinoButton(
+                    label: l10n.coachHubAlumnoDetailNotasSaveButton,
+                    loading: _saving,
+                    onPressed: _hasChanges ? () => _save(trainerUid) : null,
                   ),
                 ),
               ],
@@ -3790,13 +3742,15 @@ class _ArchivosTabState extends ConsumerState<_ArchivosTab> {
           l10n.coachHubAlumnoDetailArchivosDeleteBody(file.fileName),
         ),
         actions: [
-          TextButton(
+          TreinoButton(
+            label: l10n.coachHubActionCancel,
+            variant: TreinoButtonVariant.ghost,
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(l10n.coachHubActionCancel),
           ),
-          FilledButton(
+          const SizedBox(width: AppSpacing.s8),
+          TreinoButton(
+            label: l10n.coachHubActionConfirm,
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(l10n.coachHubActionConfirm),
           ),
         ],
       ),
@@ -4060,39 +4014,34 @@ class _ArchivoRow extends ConsumerWidget {
               message: file.sharedWithAthlete
                   ? l10n.coachHubAlumnoDetailArchivosUnshareTooltip
                   : l10n.coachHubAlumnoDetailArchivosShareTooltip,
-              child: TextButton.icon(
+              // Compartido vs privado se dice con la VARIANTE, no con un
+              // `foregroundColor` calculado en el callsite: acento cuando el
+              // alumno lo ve, neutro cuando no.
+              child: TreinoButton(
+                label: file.sharedWithAthlete
+                    ? l10n.coachHubAlumnoDetailArchivosSharedLabel
+                    : l10n.coachHubAlumnoDetailArchivosPrivateLabel,
+                icon:
+                    file.sharedWithAthlete ? TreinoIcon.eye : TreinoIcon.eyeOff,
+                variant: file.sharedWithAthlete
+                    ? TreinoButtonVariant.ghostAccent
+                    : TreinoButtonVariant.ghost,
+                size: TreinoButtonSize.sm,
                 onPressed: () => _toggleShared(context, ref),
-                icon: Icon(
-                  file.sharedWithAthlete ? TreinoIcon.eye : TreinoIcon.eyeOff,
-                  size: 18,
-                ),
-                label: Text(
-                  file.sharedWithAthlete
-                      ? l10n.coachHubAlumnoDetailArchivosSharedLabel
-                      : l10n.coachHubAlumnoDetailArchivosPrivateLabel,
-                ),
-                style: TextButton.styleFrom(
-                  foregroundColor: file.sharedWithAthlete
-                      ? palette.accentText
-                      : palette.textMuted,
-                  textStyle: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: AppTextSize.caption,
-                    letterSpacing: 0.8,
-                  ),
-                ),
               ),
             ),
-            IconButton(
+            TreinoIconButton(
+              icon: TreinoIcon.download,
               tooltip: l10n.coachHubAlumnoDetailArchivosOpenTooltip,
+              color: palette.textMuted,
               onPressed: _open,
-              icon:
-                  Icon(TreinoIcon.download, size: 18, color: palette.textMuted),
             ),
-            IconButton(
+            const SizedBox(width: AppSpacing.hairline),
+            TreinoIconButton(
+              icon: TreinoIcon.trash,
               tooltip: l10n.coachHubAlumnoDetailArchivosDeleteTooltip,
+              color: palette.danger,
               onPressed: onDelete,
-              icon: Icon(TreinoIcon.trash, size: 18, color: palette.danger),
             ),
           ],
         ),
@@ -4315,8 +4264,8 @@ class _MedicionRowState extends State<_MedicionRow> {
                       children: [
                         Icon(
                           _expanded
-                              ? Icons.keyboard_arrow_down
-                              : Icons.keyboard_arrow_right,
+                              ? TreinoIcon.chevronDown
+                              : TreinoIcon.chevronRight,
                           size: 22,
                           color: palette.textMuted,
                         ),
@@ -4348,15 +4297,18 @@ class _MedicionRowState extends State<_MedicionRow> {
                     ),
                   ),
                 ),
-                IconButton(
+                TreinoIconButton(
+                  icon: TreinoIcon.edit,
                   tooltip: 'Editar', // i18n: Fase W2
+                  color: palette.textMuted,
                   onPressed: widget.onEdit,
-                  icon: Icon(Icons.edit, size: 18, color: palette.textMuted),
                 ),
-                IconButton(
+                const SizedBox(width: AppSpacing.hairline),
+                TreinoIconButton(
+                  icon: TreinoIcon.trash,
                   tooltip: 'Eliminar', // i18n: Fase W2
+                  color: palette.danger,
                   onPressed: widget.onDelete,
-                  icon: Icon(TreinoIcon.trash, size: 18, color: palette.danger),
                 ),
               ],
             ),
@@ -4903,31 +4855,23 @@ class _NuevaMedicionDialogState extends ConsumerState<_NuevaMedicionDialog> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  TextButton(
+                  TreinoButton(
+                    label: 'Cancelar', // i18n: Fase W2
+                    variant: TreinoButtonVariant.ghost,
                     onPressed:
                         _saving ? null : () => Navigator.of(context).pop(),
-                    child: const Text('Cancelar'), // i18n: Fase W2
                   ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: _saving ? null : _save,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: palette.accent,
-                      foregroundColor: TreinoButtonTokens.foreground(context),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 12),
-                      shape: const StadiumBorder(),
-                    ),
-                    child: _saving
-                        ? SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: TreinoButtonTokens.foreground(context),
-                            ),
-                          )
-                        : const Text('GUARDAR'), // i18n: Fase W2
+                  const SizedBox(width: AppSpacing.s8),
+                  // `loading` ya lo deshabilita, y el spinner NO achica el botón: el
+                  // label sigue montado abajo, invisible. Antes se reemplazaba de
+                  // verdad y la fila se movía justo cuando el usuario acababa de
+                  // apretar. Aparte, era píldora (`StadiumBorder`) mientras otros
+                  // diálogos del mismo archivo usaban rectángulo — el radio ahora lo
+                  // decide el token, no el callsite.
+                  TreinoButton(
+                    label: 'GUARDAR', // i18n: Fase W2
+                    loading: _saving,
+                    onPressed: _save,
                   ),
                 ],
               ),
@@ -4965,7 +4909,7 @@ class _NuevaMedicionSection extends StatelessWidget {
         children: [
           if (onToggle != null)
             Icon(
-              expanded ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_right,
+              expanded ? TreinoIcon.chevronDown : TreinoIcon.chevronRight,
               size: 18,
               color: palette.textMuted,
             ),
@@ -5138,8 +5082,8 @@ class _RendimientoRowState extends State<_RendimientoRow> {
                       children: [
                         Icon(
                           _expanded
-                              ? Icons.keyboard_arrow_down
-                              : Icons.keyboard_arrow_right,
+                              ? TreinoIcon.chevronDown
+                              : TreinoIcon.chevronRight,
                           size: 22,
                           color: palette.textMuted,
                         ),
@@ -5171,15 +5115,18 @@ class _RendimientoRowState extends State<_RendimientoRow> {
                     ),
                   ),
                 ),
-                IconButton(
+                TreinoIconButton(
+                  icon: TreinoIcon.edit,
                   tooltip: 'Editar', // i18n: Fase W2
+                  color: palette.textMuted,
                   onPressed: widget.onEdit,
-                  icon: Icon(Icons.edit, size: 18, color: palette.textMuted),
                 ),
-                IconButton(
+                const SizedBox(width: AppSpacing.hairline),
+                TreinoIconButton(
+                  icon: TreinoIcon.trash,
                   tooltip: 'Eliminar', // i18n: Fase W2
+                  color: palette.danger,
                   onPressed: widget.onDelete,
-                  icon: Icon(TreinoIcon.trash, size: 18, color: palette.danger),
                 ),
               ],
             ),
@@ -5689,31 +5636,23 @@ class _NuevoRendimientoDialogState
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  TextButton(
+                  TreinoButton(
+                    label: 'Cancelar', // i18n: Fase W2
+                    variant: TreinoButtonVariant.ghost,
                     onPressed:
                         _saving ? null : () => Navigator.of(context).pop(),
-                    child: const Text('Cancelar'), // i18n: Fase W2
                   ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: _saving ? null : _save,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: palette.accent,
-                      foregroundColor: TreinoButtonTokens.foreground(context),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 12),
-                      shape: const StadiumBorder(),
-                    ),
-                    child: _saving
-                        ? SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: TreinoButtonTokens.foreground(context),
-                            ),
-                          )
-                        : const Text('GUARDAR'), // i18n: Fase W2
+                  const SizedBox(width: AppSpacing.s8),
+                  // `loading` ya lo deshabilita, y el spinner NO achica el botón: el
+                  // label sigue montado abajo, invisible. Antes se reemplazaba de
+                  // verdad y la fila se movía justo cuando el usuario acababa de
+                  // apretar. Aparte, era píldora (`StadiumBorder`) mientras otros
+                  // diálogos del mismo archivo usaban rectángulo — el radio ahora lo
+                  // decide el token, no el callsite.
+                  TreinoButton(
+                    label: 'GUARDAR', // i18n: Fase W2
+                    loading: _saving,
+                    onPressed: _save,
                   ),
                 ],
               ),
@@ -5771,13 +5710,15 @@ class _SeguimientoTabState extends ConsumerState<_SeguimientoTab> {
           'No se puede deshacer.', // i18n: Fase W2
         ),
         actions: [
-          TextButton(
+          TreinoButton(
+            label: 'Cancelar', // i18n: Fase W2
+            variant: TreinoButtonVariant.ghost,
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'), // i18n: Fase W2
           ),
-          FilledButton(
+          const SizedBox(width: AppSpacing.s8),
+          TreinoButton(
+            label: 'Confirmar', // i18n: Fase W2
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Confirmar'), // i18n: Fase W2
           ),
         ],
       ),
@@ -5834,7 +5775,7 @@ class _SeguimientoTabState extends ConsumerState<_SeguimientoTab> {
               ),
               ElevatedButton.icon(
                 onPressed: () => _openDialog(),
-                icon: const Icon(Icons.add, size: 16),
+                icon: const Icon(TreinoIcon.plus, size: 16),
                 label: const Text('NUEVA ENTRADA'), // i18n: Fase W2
                 style: ElevatedButton.styleFrom(
                   backgroundColor: palette.accent,
@@ -5938,19 +5879,18 @@ class _SeguimientoEntryCard extends StatelessWidget {
               const SizedBox(width: 10),
               _TagChip(tag: entry.tag, palette: palette),
               const Spacer(),
-              IconButton(
+              TreinoIconButton(
+                icon: TreinoIcon.edit,
                 tooltip: 'Editar', // i18n: Fase W2
+                color: palette.textMuted,
                 onPressed: onEdit,
-                icon: Icon(Icons.edit, size: 18, color: palette.textMuted),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               ),
-              IconButton(
+              const SizedBox(width: AppSpacing.hairline),
+              TreinoIconButton(
+                icon: TreinoIcon.trash,
                 tooltip: 'Eliminar', // i18n: Fase W2
+                color: palette.danger,
                 onPressed: onDelete,
-                icon: Icon(TreinoIcon.trash, size: 18, color: palette.danger),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               ),
             ],
           ),
@@ -6178,31 +6118,23 @@ class _NuevaEntradaSeguimientoDialogState
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    TextButton(
+                    TreinoButton(
+                      label: 'Cancelar', // i18n: Fase W2
+                      variant: TreinoButtonVariant.ghost,
                       onPressed:
                           _saving ? null : () => Navigator.of(context).pop(),
-                      child: const Text('Cancelar'), // i18n: Fase W2
                     ),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
-                      onPressed: _saving ? null : _save,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: palette.accent,
-                        foregroundColor: TreinoButtonTokens.foreground(context),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 12),
-                        shape: const StadiumBorder(),
-                      ),
-                      child: _saving
-                          ? SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: TreinoButtonTokens.foreground(context),
-                              ),
-                            )
-                          : const Text('GUARDAR'), // i18n: Fase W2
+                    const SizedBox(width: AppSpacing.s8),
+                    // `loading` ya lo deshabilita, y el spinner NO achica el botón: el
+                    // label sigue montado abajo, invisible. Antes se reemplazaba de
+                    // verdad y la fila se movía justo cuando el usuario acababa de
+                    // apretar. Aparte, era píldora (`StadiumBorder`) mientras otros
+                    // diálogos del mismo archivo usaban rectángulo — el radio ahora lo
+                    // decide el token, no el callsite.
+                    TreinoButton(
+                      label: 'GUARDAR', // i18n: Fase W2
+                      loading: _saving,
+                      onPressed: _save,
                     ),
                   ],
                 ),
@@ -6419,25 +6351,10 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
                     ],
                   ),
                 ),
-                ElevatedButton(
-                  onPressed: _saving ? null : _save,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: palette.accent,
-                    foregroundColor: TreinoButtonTokens.foreground(context),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 12),
-                    shape: const StadiumBorder(),
-                  ),
-                  child: _saving
-                      ? SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: TreinoButtonTokens.foreground(context),
-                          ),
-                        )
-                      : const Text('GUARDAR PLAN'), // i18n: Fase W2
+                TreinoButton(
+                  label: 'GUARDAR PLAN', // i18n: Fase W2
+                  loading: _saving,
+                  onPressed: _save,
                 ),
               ],
             ),
@@ -6487,17 +6404,11 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
                         ),
                       ),
                     const SizedBox(height: 4),
-                    OutlinedButton.icon(
+                    TreinoButton(
+                      label: 'AGREGAR COMIDA', // i18n: Fase W2
+                      icon: TreinoIcon.plus,
+                      variant: TreinoButtonVariant.secondaryAccent,
                       onPressed: _addMeal,
-                      icon: const Icon(Icons.add, size: 16),
-                      label: const Text('AGREGAR COMIDA'), // i18n: Fase W2
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: palette.accent,
-                        side: BorderSide(color: palette.accent),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 18, vertical: 12),
-                        shape: const StadiumBorder(),
-                      ),
                     ),
                     const SizedBox(height: 24),
                   ],
@@ -6611,7 +6522,7 @@ class _MealEditor extends StatelessWidget {
                       color: palette.textMuted.withValues(alpha: 0.6),
                       fontSize: 12,
                     ),
-                    prefixIcon: Icon(Icons.schedule,
+                    prefixIcon: Icon(TreinoIcon.clock,
                         size: 14, color: palette.textMuted),
                     prefixIconConstraints:
                         const BoxConstraints(minWidth: 22, minHeight: 22),
@@ -6623,12 +6534,16 @@ class _MealEditor extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 4),
-              IconButton(
+              // Los tres «Eliminar» anidados del editor de nutrición —comida,
+              // grupo, opción— venían en 16/14/12 px de ícono y cajas de
+              // 28/26/24. La jerarquía por tamaño de ícono no se lee: se lee
+              // por sangría, que ya está. Los tres van a `xs`.
+              TreinoIconButton(
+                icon: TreinoIcon.trash,
                 tooltip: 'Eliminar comida', // i18n: Fase W2
+                color: palette.danger,
+                size: TreinoButtonSize.xs,
                 onPressed: onDelete,
-                icon: Icon(TreinoIcon.trash, size: 16, color: palette.danger),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
               ),
             ],
           ),
@@ -6646,15 +6561,12 @@ class _MealEditor extends StatelessWidget {
               ),
             Align(
               alignment: Alignment.centerLeft,
-              child: TextButton.icon(
+              child: TreinoButton(
+                label: 'AGREGAR GRUPO', // i18n: Fase W2
+                icon: TreinoIcon.plus,
+                variant: TreinoButtonVariant.ghostAccent,
+                size: TreinoButtonSize.sm,
                 onPressed: _addGroup,
-                icon: const Icon(Icons.add, size: 14),
-                label: const Text('AGREGAR GRUPO'), // i18n: Fase W2
-                style: TextButton.styleFrom(
-                  foregroundColor: palette.accent,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                ),
               ),
             ),
           ],
@@ -6742,12 +6654,12 @@ class _GroupEditor extends StatelessWidget {
                 palette: palette,
                 onChanged: (m) => onChanged(group.copyWith(selectionMode: m)),
               ),
-              IconButton(
+              TreinoIconButton(
+                icon: TreinoIcon.trash,
                 tooltip: 'Eliminar grupo', // i18n: Fase W2
+                color: palette.danger,
+                size: TreinoButtonSize.xs,
                 onPressed: onDelete,
-                icon: Icon(TreinoIcon.trash, size: 14, color: palette.danger),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
               ),
             ],
           ),
@@ -6764,15 +6676,12 @@ class _GroupEditor extends StatelessWidget {
             ),
           Align(
             alignment: Alignment.centerLeft,
-            child: TextButton.icon(
+            child: TreinoButton(
+              label: 'AGREGAR OPCIÓN', // i18n: Fase W2
+              icon: TreinoIcon.plus,
+              variant: TreinoButtonVariant.ghostAccent,
+              size: TreinoButtonSize.xs,
               onPressed: _addOption,
-              icon: const Icon(Icons.add, size: 12),
-              label: const Text('AGREGAR OPCIÓN'), // i18n: Fase W2
-              style: TextButton.styleFrom(
-                foregroundColor: palette.accent,
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                textStyle: const TextStyle(fontSize: 11),
-              ),
             ),
           ),
         ],
@@ -6925,12 +6834,12 @@ class _OptionRow extends StatelessWidget {
                 onChanged(option.copyWith(notes: v.isEmpty ? null : v)),
           ),
         ),
-        IconButton(
+        TreinoIconButton(
+          icon: TreinoIcon.trash,
           tooltip: 'Eliminar opción', // i18n: Fase W2
+          color: palette.danger,
+          size: TreinoButtonSize.xs,
           onPressed: onDelete,
-          icon: Icon(TreinoIcon.trash, size: 12, color: palette.danger),
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
         ),
       ],
     );
