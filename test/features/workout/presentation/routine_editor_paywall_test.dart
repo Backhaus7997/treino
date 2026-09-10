@@ -36,6 +36,8 @@ import 'package:treino/features/workout/domain/routine_visibility.dart';
 import 'package:treino/features/workout/presentation/routine_editor_mode.dart';
 import 'package:treino/features/workout/presentation/routine_editor_screen.dart';
 import 'package:treino/l10n/app_l10n.dart';
+import 'package:purchases_flutter/purchases_flutter.dart';
+import 'package:treino/features/paywall/application/athlete_checkout.dart';
 
 import '../../../fixtures/exercises.dart';
 import '../../../fixtures/routine_editor_ui.dart';
@@ -239,8 +241,14 @@ void main() {
 
     testWidgets('la hoja no ofrece un botón de pago que no lleva a ningún lado',
         (tester) async {
-      // Mientras no exista checkout, `onUpgrade` es null y el CTA no se dibuja.
-      // Un botón que promete una salida inexistente es peor que no tenerlo.
+      // El motivo cambió y conviene decirlo: antes el CTA no se dibujaba
+      // porque `onUpgrade` era null. Ese parámetro ya no existe — la hoja mira
+      // `athleteCheckoutProvider` y decide sola.
+      //
+      // Acá sigue sin dibujarse por la razón CORRECTA: en un test no hay clave
+      // del SDK, así que `resolveAthleteCheckout()` devuelve
+      // `AthleteCheckoutUnavailable`. Un botón que promete una salida
+      // inexistente es peor que no tenerlo, y eso no cambió.
       await _pumpEditor(
         tester,
         mode: const SelfCreating(),
@@ -256,6 +264,31 @@ void main() {
       expect(_sheet, findsOneWidget);
       expect(find.byKey(const Key('free_plan_limit_upgrade')), findsNothing);
       expect(find.byKey(const Key('free_plan_limit_dismiss')), findsOneWidget);
+    });
+
+    testWidgets('con una superficie que SÍ puede cobrar, el CTA aparece',
+        (tester) async {
+      // La contraparte del test de arriba. Sin este, «no se dibuja el botón»
+      // pasaría también si alguien borrara el botón entero.
+      await _pumpEditor(
+        tester,
+        mode: const SelfCreating(),
+        overrides: [
+          ..._overrides(
+            paywallEnabled: true,
+            entitlement: AthleteEntitlement.free,
+          ),
+          athleteCheckoutProvider.overrideWithValue(
+            resolveAthleteCheckout(store: _StoreDeMentira()),
+          ),
+        ],
+      );
+      await _tapAgregarDia(tester);
+      await _tapAgregarDia(tester);
+      await _tapAgregarDia(tester);
+
+      expect(_sheet, findsOneWidget);
+      expect(find.byKey(const Key('free_plan_limit_upgrade')), findsOneWidget);
     });
 
     testWidgets('alumno con derecho: no se le gatea nada', (tester) async {
@@ -724,4 +757,23 @@ void main() {
       expect(find.byKey(const Key('editor_name_field')), findsOneWidget);
     });
   });
+}
+
+/// Lo mínimo para que `resolveAthleteCheckout` devuelva la variante que cobra.
+///
+/// La hoja de límite sólo mira el TIPO —¿es `AthleteCheckoutOnStore`?— y nunca
+/// le pregunta nada a la tienda, así que ningún método de acá se llama.
+final class _StoreDeMentira implements AthleteStore {
+  @override
+  Future<void> logIn(String uid) async => throw UnimplementedError();
+
+  @override
+  Future<Offering?> currentOffering() async => throw UnimplementedError();
+
+  @override
+  Future<CustomerInfo> purchase(Package package) async =>
+      throw UnimplementedError();
+
+  @override
+  Future<CustomerInfo> restore() async => throw UnimplementedError();
 }

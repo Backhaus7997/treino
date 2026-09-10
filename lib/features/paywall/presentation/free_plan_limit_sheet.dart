@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
+import '../application/athlete_checkout.dart';
 import '../domain/athlete_entitlement.dart';
+import 'athlete_paywall_screen.dart';
 
 /// Qué eje del plan free se tocó. Cambia sólo el cuerpo del mensaje: el título
 /// y la acción son los mismos.
@@ -76,10 +79,18 @@ enum FreePlanLimit {
 /// es el instante exacto en que el tope muerde, y frenar recién al guardar
 /// —después de que cargó ejercicios y series— haría que pierda el trabajo.
 ///
-/// **No tiene botón de pago todavía.** El checkout web del alumno no existe
-/// (`docs/paywall-alumno-suelto.md` §7.1), y un CTA que no lleva a ningún lado
-/// es peor que no tenerlo: promete una salida que no está. Cuando el checkout
-/// exista, [onUpgrade] deja de ser `null` y la hoja dibuja el botón sola.
+/// **El botón de pago lo decide la hoja, no el que la abre.**
+///
+/// Antes habia un parametro `onUpgrade` que cada call site tenia que pasar.
+/// Se saco a proposito: son 8 call sites, y 8 lugares donde alguien podia
+/// pasar una closure DISTINTA —una que abriera la web, por ejemplo— sin que
+/// el tipo sellado se enterara. Una sola decision, en un solo lugar, es la
+/// version segura.
+///
+/// La hoja mira [athleteCheckoutProvider]: dibuja el boton solo cuando hay una
+/// superficie que de verdad puede cobrar. Si no la hay —web, o un binario sin
+/// la clave del SDK— no lo dibuja, porque un CTA que no lleva a ningun lado es
+/// peor que no tenerlo: promete una salida que no esta.
 ///
 /// [actual] es cuántos días (o semanas) tiene HOY la rutina, y sólo lo usan
 /// [FreePlanLimit.shapeDays] y [FreePlanLimit.shapeWeeks] — los dos casos que
@@ -93,7 +104,6 @@ Future<void> showFreePlanLimitSheet(
   BuildContext context, {
   required FreePlanLimit limit,
   int? actual,
-  VoidCallback? onUpgrade,
 }) {
   assert(
     (limit != FreePlanLimit.shapeDays && limit != FreePlanLimit.shapeWeeks) ||
@@ -109,27 +119,21 @@ Future<void> showFreePlanLimitSheet(
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
     ),
-    builder: (ctx) => _FreePlanLimitBody(
-      limit: limit,
-      actual: actual,
-      onUpgrade: onUpgrade,
-    ),
+    builder: (ctx) => _FreePlanLimitBody(limit: limit, actual: actual),
   );
 }
 
-class _FreePlanLimitBody extends StatelessWidget {
-  const _FreePlanLimitBody({
-    required this.limit,
-    this.actual,
-    this.onUpgrade,
-  });
+class _FreePlanLimitBody extends ConsumerWidget {
+  const _FreePlanLimitBody({required this.limit, this.actual});
 
   final FreePlanLimit limit;
   final int? actual;
-  final VoidCallback? onUpgrade;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // La UNICA decision sobre si se puede comprar. No la toma el call site.
+    final puedeComprar =
+        ref.watch(athleteCheckoutProvider) is AthleteCheckoutOnStore;
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
 
@@ -213,12 +217,12 @@ class _FreePlanLimitBody extends StatelessWidget {
               ),
             ),
             const SizedBox(height: AppSpacing.s18),
-            if (onUpgrade != null) ...[
+            if (puedeComprar) ...[
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   key: const Key('free_plan_limit_upgrade'),
-                  onPressed: onUpgrade,
+                  onPressed: () => _abrirPaywall(context),
                   child: Text(l10n.paywallFreePlanLimitUpgrade),
                 ),
               ),
@@ -236,5 +240,21 @@ class _FreePlanLimitBody extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// Abre el paywall y, si el alumno compro, cierra tambien esta hoja.
+  ///
+  /// Se navega en vez de mostrar la compra adentro de la hoja porque la
+  /// guideline 3.1.2 pide describir claramente que se lleva por ese precio, y
+  /// eso no entra en un bottom sheet arriba del cuerpo del limite.
+  Future<void> _abrirPaywall(BuildContext context) async {
+    final compro = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => const AthletePaywallScreen(),
+      ),
+    );
+    if (compro == true && context.mounted && Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
   }
 }
