@@ -256,6 +256,14 @@ class _TemplatesGrid extends ConsumerWidget {
             // QUIEN MIRA: `isPremium` sola no alcanza. Un alumno con derecho
             // ve el catálogo entero sin candados, y con el paywall apagado
             // no lo ve nadie.
+            //
+            // La grilla habla del eje SEGUIR y de ninguno más — de ahí el
+            // cruce con `isPremium` y el uso de `catalogLockActiveProvider`.
+            // Que una de principiante aparezca SIN candado acá y con el botón
+            // de "Usar como base" bloqueado en el detalle NO es una
+            // discrepancia: seguirla es gratis y copiarla no. El detalle usa
+            // `customizeLockActiveProvider`, que es el otro eje. Antes de
+            // "arreglar" esta asimetría, leer el dartdoc de los dos providers.
             TemplateOrigin.system =>
               catalogLocked && entry.routine.isPremium
                   ? PremiumChip(routineId: entry.routine.id)

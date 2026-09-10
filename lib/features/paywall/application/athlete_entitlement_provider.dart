@@ -99,16 +99,57 @@ final athleteEntitlementProvider = Provider.autoDispose<AthleteEntitlement>(
   },
 );
 
-/// `true` cuando el candado del catálogo pago está ACTIVO para el alumno
-/// actual — o sea, cuando una plantilla con `isPremium` le queda bloqueada.
+/// El catálogo tiene DOS ejes de cobro, no uno, y confundirlos rompe promesas.
 ///
-/// Se combina con el campo de la plantilla, no lo reemplaza:
+/// La spec les da filas separadas (`docs/paywall-alumno-suelto.md` §4):
+///
+/// | Seguir el catálogo — principiante (3)        | free: **sí** |
+/// | Seguir el catálogo — intermedio/avanzado (4) | free: no     |
+/// | Editar / personalizar una plantilla          | free: no     |
+///
+/// O sea que sobre la MISMA plantilla de principiante el alumno free puede
+/// entrenarla tal cual y no puede copiarla. Un solo booleano no expresa eso, y
+/// el intento de forzarlo produce exactamente la falla que estos providers
+/// existen para evitar: la grilla no pinta candado sobre `ppl-beginner` (bien:
+/// seguirla es gratis) mientras el detalle bloquea el botón de copiar (bien
+/// también) — pero si los dos leyeran el MISMO provider, uno de los dos estaría
+/// mintiendo.
+///
+/// Por eso son dos, con el mismo cuerpo y contratos distintos. Lo que se
+/// mantiene de la versión anterior es la razón de ser: cada eje tiene UNA
+/// fuente, para que dos pantallas del mismo eje no puedan discrepar.
+///
+/// ---
+///
+/// Eje 1 — SEGUIR. `true` cuando una plantilla con `isPremium` le queda
+/// bloqueada al alumno actual.
+///
+/// **Se combina con el campo de la plantilla, no lo reemplaza:**
 /// `routine.isPremium && ref.watch(catalogLockActiveProvider)`.
 ///
-/// Existe como provider propio para que la grilla y el detalle no puedan
-/// discrepar: si una pinta el candado y la otra deja pasar, el alumno ve una
-/// promesa rota. Una sola fuente, dos consumidores.
+/// Consumidores: el chip de la grilla (`plantillas_tab.dart`), el botón de
+/// seguir y la acción de EMPEZAR (`routine_detail_screen.dart`). Los tres
+/// cruzan `isPremium` porque los tres hablan de "entrenar ESTA plantilla".
 final catalogLockActiveProvider = Provider.autoDispose<bool>((ref) {
+  if (!ref.watch(athletePaywallEnabledProvider)) return false;
+  return ref.watch(athleteEntitlementProvider).gatesFreeLimits;
+});
+
+/// Eje 2 — PERSONALIZAR. `true` cuando copiar una plantilla del catálogo para
+/// editarla le queda bloqueado al alumno actual.
+///
+/// **NO se cruza con `isPremium`, y eso es el punto.** Personalizar cualquier
+/// plantilla del catálogo es del plan pago, incluidas las tres de principiante
+/// que seguir sí es gratis.
+///
+/// Y no es sólo política: las tres gratis tienen 3 días
+/// (`docs/video-catalog-audit/improved-templates.json`) contra
+/// [kFreeMaxRoutineDays] = 2. Con el gate cruzado por `isPremium`, el alumno
+/// free entraba al editor, cargaba todo, tocaba Guardar y `firestore.rules` lo
+/// rebotaba con "No tenés permisos. Recargá la app.". Perdía el trabajo contra
+/// un mensaje que no explicaba nada. Este provider es lo que mueve ese freno a
+/// la ENTRADA, donde todavía no invirtió nada.
+final customizeLockActiveProvider = Provider.autoDispose<bool>((ref) {
   if (!ref.watch(athletePaywallEnabledProvider)) return false;
   return ref.watch(athleteEntitlementProvider).gatesFreeLimits;
 });

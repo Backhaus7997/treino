@@ -4342,7 +4342,7 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get paywallFreePlanLimitDaysBody =>
-      'Con el plan gratis armas rutinas de hasta 2 dias. Las plantillas de principiante del catalogo las seguis completas, sin tope.';
+      'Con el plan gratis armás rutinas de hasta 2 días. Las plantillas de principiante del catálogo las seguís completas, sin tope.';
 
   @override
   String get paywallFreePlanLimitWeeksBody =>
@@ -4356,7 +4356,11 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get paywallFreePlanLimitTemplateBody =>
-      'Esta plantilla es parte del plan pago. Las de nivel principiante las podes usar completas con el plan gratis.';
+      'Esta plantilla es parte del plan pago. Las de nivel principiante las podés usar completas con el plan gratis.';
+
+  @override
+  String get paywallFreePlanLimitCustomizeTemplateBody =>
+      'Personalizar una plantilla del catálogo es parte del plan pago. Con el gratis la seguís tal cual, sin tope de días, o armás tu propia rutina de hasta 2 días.';
 
   @override
   String get workoutPlantillasPremiumChip => 'PLAN PAGO';
@@ -8725,7 +8729,7 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get paywallFreePlanLimitDaysBody =>
-      'Con el plan gratis armas rutinas de hasta 2 dias. Las plantillas de principiante del catalogo las seguis completas, sin tope.';
+      'Con el plan gratis armás rutinas de hasta 2 días. Las plantillas de principiante del catálogo las seguís completas, sin tope.';
 
   @override
   String get paywallFreePlanLimitWeeksBody =>
@@ -8739,7 +8743,11 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get paywallFreePlanLimitTemplateBody =>
-      'Esta plantilla es parte del plan pago. Las de nivel principiante las podes usar completas con el plan gratis.';
+      'Esta plantilla es parte del plan pago. Las de nivel principiante las podés usar completas con el plan gratis.';
+
+  @override
+  String get paywallFreePlanLimitCustomizeTemplateBody =>
+      'Personalizar una plantilla del catálogo es parte del plan pago. Con el gratis la seguís tal cual, sin tope de días, o armás tu propia rutina de hasta 2 días.';
 
   @override
   String get workoutPlantillasPremiumChip => 'PLAN PAGO';

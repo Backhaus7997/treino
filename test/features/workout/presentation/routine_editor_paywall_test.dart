@@ -413,4 +413,102 @@ void main() {
           findsOneWidget);
     });
   });
+
+  // ── El gate en el DESTINO (no en el botón que lleva acá) ─────────────────
+  //
+  // El chip "Usar como base" del detalle ya frena, pero es UN call site y la
+  // ruta tiene más de una puerta: `treino://` está declarado sin `pathPrefix`,
+  // así que `treino:///workout/customize-routine/<id>` entra derecho al editor,
+  // y el `redirect` global del router sólo resuelve sesión y rol.
+  //
+  // Estos tests entran por la ruta, sin pasar por ningún botón — que es
+  // exactamente lo que hace el deep link.
+  group('personalizar una plantilla del catálogo', () {
+    /// La rutina fuente que devuelve el repo cuando el editor la pide.
+    Routine plantilla({RoutineSource source = RoutineSource.system}) => Routine(
+          id: 'sys-1',
+          name: 'Full Body 3 días',
+          split: 'FULL BODY',
+          level: ExperienceLevel.beginner,
+          days: const [],
+          source: source,
+          visibility: RoutineVisibility.public,
+        );
+
+    _MockRoutineRepository repoCon(Routine fuente) {
+      final repo = _MockRoutineRepository();
+      when(() => repo.getById(any())).thenAnswer((_) async => fuente);
+      return repo;
+    }
+
+    testWidgets('alumno free: no entra al editor, ve la hoja', (tester) async {
+      final repo = repoCon(plantilla());
+      await _pumpEditor(
+        tester,
+        mode: const SelfCustomizing(sourceRoutineId: 'sys-1'),
+        overrides: _overrides(
+          paywallEnabled: true,
+          entitlement: AthleteEntitlement.free,
+          repo: repo,
+        ),
+      );
+
+      expect(_sheet, findsOneWidget);
+      expect(find.byKey(const Key('editor_name_field')), findsNothing,
+          reason: 'si el editor se hidrata, el alumno carga todo y recién al '
+              'guardar se entera — perdiendo el trabajo');
+    });
+
+    testWidgets('alumno con derecho: entra normal', (tester) async {
+      final repo = repoCon(plantilla());
+      await _pumpEditor(
+        tester,
+        mode: const SelfCustomizing(sourceRoutineId: 'sys-1'),
+        overrides: _overrides(
+          paywallEnabled: true,
+          entitlement: AthleteEntitlement.entitled,
+          repo: repo,
+        ),
+      );
+
+      expect(_sheet, findsNothing);
+      expect(find.byKey(const Key('editor_name_field')), findsOneWidget);
+    });
+
+    testWidgets('paywall apagado: entra normal', (tester) async {
+      final repo = repoCon(plantilla());
+      await _pumpEditor(
+        tester,
+        mode: const SelfCustomizing(sourceRoutineId: 'sys-1'),
+        overrides: _overrides(
+          paywallEnabled: false,
+          entitlement: AthleteEntitlement.free,
+          repo: repo,
+        ),
+      );
+
+      expect(_sheet, findsNothing);
+      expect(find.byKey(const Key('editor_name_field')), findsOneWidget);
+    });
+
+    testWidgets('plantilla de un PF: el gate del catálogo NO aplica',
+        (tester) async {
+      // El gate es del CATÁLOGO (`source == system`). Una plantilla publicada
+      // por un PF es contenido de la comunidad y la spec no la cobra — el
+      // límite que le corresponde es el de FORMA, y ese lo aplica el detalle.
+      final repo = repoCon(plantilla(source: RoutineSource.trainerTemplate));
+      await _pumpEditor(
+        tester,
+        mode: const SelfCustomizing(sourceRoutineId: 'sys-1'),
+        overrides: _overrides(
+          paywallEnabled: true,
+          entitlement: AthleteEntitlement.free,
+          repo: repo,
+        ),
+      );
+
+      expect(_sheet, findsNothing);
+      expect(find.byKey(const Key('editor_name_field')), findsOneWidget);
+    });
+  });
 }

@@ -1816,5 +1816,7 @@
   "paywallFreePlanLimitRoutineCountBody": "",
   "@paywallFreePlanLimitRoutineCountBody": {},
   "paywallFreePlanLimitChartHistoryBody": "",
-  "@paywallFreePlanLimitChartHistoryBody": {}
+  "@paywallFreePlanLimitChartHistoryBody": {},
+  "paywallFreePlanLimitCustomizeTemplateBody": "",
+  "@paywallFreePlanLimitCustomizeTemplateBody": {}
 }
