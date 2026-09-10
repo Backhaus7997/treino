@@ -93,6 +93,29 @@ class SessionRepository {
   ///
   /// El teléfono sigue esperando por defecto: ahí un fallo de escritura tiene
   /// que poder propagarse, y la pantalla puede mostrarlo.
+  ///
+  /// ## [onServerRejected] — el rechazo que antes moría en un log
+  ///
+  /// Con [waitForServer] en `false` este método no puede propagar un fallo por
+  /// el `Future` que devuelve: para cuando el servidor contesta, el llamador ya
+  /// siguió de largo y el reloj ya abrió la pantalla de entreno. Antes eso se
+  /// resolvía mandando el error a `developer.log` y nada más, y ahí se
+  /// escondía una diferencia que importa muchísimo:
+  ///
+  ///   • **Sin red**, el `Future` de `set()` no falla — queda PENDIENTE, y
+  ///     Firestore reintenta solo cuando vuelve la conexión. Ese caso no tiene
+  ///     que molestar a nadie: es el modo normal de un reloj.
+  ///   • **Rechazado por reglas**, el `Future` SÍ falla, y falla para siempre.
+  ///     Reintentar no lo va a arreglar. El atleta está entrenando contra una
+  ///     sesión que no existe en el servidor y que no va a existir nunca.
+  ///
+  /// El log trataba los dos igual. [onServerRejected] es el canal para el
+  /// segundo: se invoca sólo cuando el servidor RECHAZA, para que la pantalla
+  /// pueda decirlo mientras el entreno todavía no arrancó de verdad. Si se
+  /// omite, el comportamiento es el de antes.
+  ///
+  /// No se invoca en el camino con [waitForServer] en `true`: ahí el error
+  /// viaja por el `Future` y el llamador ya lo tiene.
   Future<Session> create({
     required String uid,
     required String routineId,
@@ -101,6 +124,7 @@ class SessionRepository {
     int dayNumber = 1,
     int weekNumber = 0,
     bool waitForServer = true,
+    void Function(Object error)? onServerRejected,
   }) async {
     final ref = _sessions(uid).doc();
     final session = Session(
@@ -122,13 +146,19 @@ class SessionRepository {
     } else {
       // La escritura ya se aplicó al caché al llamar a `set`. Lo que se saltea
       // es la confirmación del servidor, que Firestore reintenta solo.
+      //
+      // El `catchError` NO se dispara por falta de red: sin conexión el
+      // `Future` queda pendiente y Firestore reintenta cuando vuelve. Lo que
+      // llega acá es un rechazo REAL del servidor —típicamente `permission-
+      // denied`— y ése no se arregla reintentando nunca.
       unawaited(
-        escritura.catchError(
-          (Object e) => developer.log(
-            'create: la sesión no llegó al servidor todavía — $e',
+        escritura.catchError((Object e) {
+          developer.log(
+            'create: el servidor rechazó la sesión — $e',
             name: 'SessionRepository',
-          ),
-        ),
+          );
+          onServerRejected?.call(e);
+        }),
       );
     }
     return session;

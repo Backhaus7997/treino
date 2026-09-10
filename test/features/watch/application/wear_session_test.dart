@@ -79,6 +79,14 @@ dynamic reflectDelegate(SessionRepository real, Invocation i) {
       startedAt: i.namedArguments[#startedAt] as DateTime,
       dayNumber: i.namedArguments[#dayNumber] as int? ?? 1,
       weekNumber: i.namedArguments[#weekNumber] as int? ?? 0,
+      // Estos dos NO estaban reenviados, y su ausencia era un verde falso
+      // esperando: el delegate forzaba `waitForServer: true` aunque el
+      // notifier pidiera `false`, así que la rama asíncrona del reloj —la
+      // única donde vive `onServerRejected`— no se ejercitaba nunca. Un
+      // delegate que se come argumentos prueba un método que no existe.
+      waitForServer: i.namedArguments[#waitForServer] as bool? ?? true,
+      onServerRejected:
+          i.namedArguments[#onServerRejected] as void Function(Object)?,
     );
   }
   if (n.contains('watchRevision')) {
