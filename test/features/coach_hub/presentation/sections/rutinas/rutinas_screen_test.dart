@@ -173,9 +173,85 @@ void main() {
     });
   });
 
+  group('RutinasScreen — los dos bloques', () {
+    // El corte de §4.4: una plantilla se reutiliza, la copia de un alumno tiene
+    // dueño. Con 20 alumnos y 5 rutinas cada uno, mezcladas, las plantillas del
+    // PF son el 5% de una grilla de 100 tarjetas.
+    testWidgets('separa «Mis plantillas» de lo que entrena cada alumno',
+        (tester) async {
+      await _pump(tester, rutinas: _mezcla());
+
+      expect(find.text('MIS PLANTILLAS'), findsOneWidget);
+      expect(find.text('LO QUE ENTRENA CADA ALUMNO'), findsOneWidget);
+    });
+
+    testWidgets('las asignadas van bajo el nombre de su alumno',
+        (tester) async {
+      await _pump(tester, rutinas: _mezcla());
+
+      // El nombre aparece DOS veces y las dos son correctas: como encabezado
+      // del grupo, y dentro de la card como etiqueta «Asignada a Sofía».
+      expect(find.text('Sofía'), findsOneWidget);
+      expect(find.text('Asignada a Sofía'), findsOneWidget);
+    });
+
+    testWidgets('sin perfil resuelto el grupo dice «Alumno», nunca el uid',
+        (tester) async {
+      // Mismo criterio que las etiquetas de la card. El perfil puede tardar o
+      // no existir (cuenta borrada); el encabezado no puede inventar un nombre
+      // ni filtrar el uid a la pantalla.
+      await _pump(tester, rutinas: [
+        _rutina(
+          id: 'r-x',
+          name: 'Plan de alguien',
+          assignedTo: 'athlete-sin-perfil',
+        ),
+      ]);
+
+      expect(find.text('Alumno'), findsOneWidget);
+      expect(find.textContaining('athlete-sin-perfil'), findsNothing);
+    });
+
+    testWidgets('un bloque sin contenido no dibuja su encabezado',
+        (tester) async {
+      // Un PF que todavía no armó ninguna plantilla no tiene por qué ver un
+      // título «MIS PLANTILLAS» sobre el vacío.
+      await _pump(tester, rutinas: [
+        _rutina(id: 'r-plan', name: 'Plan de Sofía', assignedTo: _athlete),
+      ]);
+
+      expect(find.text('MIS PLANTILLAS'), findsNothing);
+      expect(find.text('LO QUE ENTRENA CADA ALUMNO'), findsOneWidget);
+    });
+
+    // CANDADO del predicado único. Los chips que estos bloques reemplazan
+    // usaban DOS predicados —«Plantillas» miraba `source`, «Asignadas» miraba
+    // `assignedTo`— y una rutina donde discreparan caía en los dos o, peor, en
+    // ninguno: desaparecía de la pantalla sin que nada fallara.
+    //
+    // Este fixture es justamente esa rutina incoherente (un `trainer-template`
+    // CON alumno, que las reglas no permiten crear pero que un doc viejo o un
+    // import podría tener). Tiene que aparecer exactamente una vez.
+    testWidgets('una rutina incoherente igual cae en un bloque, y en uno solo',
+        (tester) async {
+      await _pump(tester, rutinas: [
+        _rutina(
+          id: 'r-raro',
+          name: 'Rutina incoherente',
+          source: RoutineSource.trainerTemplate,
+          assignedTo: _athlete,
+        ),
+      ]);
+
+      expect(find.text('Rutina incoherente'), findsOneWidget);
+      expect(find.text('MIS PLANTILLAS'), findsNothing);
+      expect(find.text('LO QUE ENTRENA CADA ALUMNO'), findsOneWidget);
+    });
+  });
+
   group('RutinasScreen — filtros', () {
-    testWidgets('«Todas» esconde las archivadas', (tester) async {
-      // Mismo criterio que el chip «Todos» del roster de Alumnos con los
+    testWidgets('«Vigentes» esconde las archivadas', (tester) async {
+      // Mismo criterio que el chip equivalente del roster de Alumnos con los
       // inactivos: lo archivado tiene su propio chip y no compite por la
       // atención con lo que está en uso.
       await _pump(tester, rutinas: _mezcla());
@@ -183,23 +259,15 @@ void main() {
       expect(find.text('Plan de Sofía'), findsOneWidget);
     });
 
-    testWidgets('«Plantillas» deja sólo las plantillas', (tester) async {
+    // «Plantillas» y «Asignadas» ya no son chips: son los dos bloques. Un chip
+    // que muestra exactamente el contenido de un bloque que ya está en pantalla
+    // no filtra nada, sólo esconde el otro.
+    testWidgets('ya no hay chips de Plantillas ni de Asignadas',
+        (tester) async {
       await _pump(tester, rutinas: _mezcla());
-      await tester.tap(find.text('Plantillas'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Hipertrofia base'), findsOneWidget);
-      expect(find.text('Fuerza para principiantes'), findsOneWidget);
-      expect(find.text('Plan de Sofía'), findsNothing);
-    });
-
-    testWidgets('«Asignadas» deja sólo las que tienen alumno', (tester) async {
-      await _pump(tester, rutinas: _mezcla());
-      await tester.tap(find.text('Asignadas'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Plan de Sofía'), findsOneWidget);
-      expect(find.text('Hipertrofia base'), findsNothing);
+      expect(find.text('Plantillas'), findsNothing);
+      expect(find.text('Asignadas'), findsNothing);
+      expect(find.text('Todas'), findsNothing);
     });
 
     testWidgets('«Públicas» deja sólo la publicada', (tester) async {
