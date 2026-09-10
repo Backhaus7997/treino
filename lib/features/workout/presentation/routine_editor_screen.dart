@@ -1301,6 +1301,29 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       }
       _hydrating = false;
       setState(() => _loading = false);
+      // Avisar apenas se ve la rutina, no recién al guardar.
+      //
+      // Éste es el "antes de invertir trabajo" del gate: si la rutina que
+      // acaba de abrir ya está fuera de la forma free, el alumno tiene que
+      // saberlo AHORA, no después de reacomodar ejercicios media hora. El
+      // chequeo de `_submit` es la red; esto es lo que hace que casi nunca
+      // haga falta.
+      //
+      // NO bloquea, a diferencia del gate del catálogo de más arriba, y la
+      // asimetría es el punto: acá el alumno SÍ puede resolverlo —recortando
+      // los días que sobran— y la herramienta para hacerlo es justamente el
+      // editor que se le está abriendo. Un estado terminal lo dejaría con una
+      // rutina que no puede ni tocar ni arreglar.
+      //
+      // Se llama al MISMO predicado que usa `_submit`, y no a una copia del
+      // umbral, para que el aviso de entrada y el freno de guardado no puedan
+      // discrepar. Si divergieran, el alumno vería la hoja al entrar y
+      // guardaría igual — o peor, no la vería y rebotaría al guardar, que es
+      // el agujero que esto cierra.
+      //
+      // El valor de retorno se descarta a propósito: acá no se decide nada,
+      // sólo se avisa.
+      _freePlanBlocksShape();
     } catch (_) {
       if (!mounted) return;
       _hydrating = false;
@@ -1597,6 +1620,13 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       // El historial de gráficos no se toca desde el editor: vive en las
       // pantallas de Insights.
       FreePlanLimit.chartHistory => null,
+      // Los dos de FORMA no entran acá y no es una omisión: este método mide
+      // una operación que el alumno ACABA de pedir (`next` = el total que
+      // quedaría), mientras que shapeDays/shapeWeeks describen el documento
+      // que YA está cargado. Los resuelve `_freePlanBlocksShape` contra el
+      // estado actual, no contra un delta.
+      FreePlanLimit.shapeDays => null,
+      FreePlanLimit.shapeWeeks => null,
     };
     if (max == null || next <= max) return false;
     if (!ref.read(athleteEntitlementProvider).gatesFreeLimits) return false;
@@ -1618,6 +1648,62 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     if (actuales < kFreeMaxOwnRoutines) return false;
     if (!ref.read(athleteEntitlementProvider).gatesFreeLimits) return false;
     showFreePlanLimitSheet(context, limit: FreePlanLimit.routineCount);
+    return true;
+  }
+
+  /// `true` si el plan free frena el GUARDADO porque la rutina que está en
+  /// pantalla YA excede la forma free — y en ese caso ya abrió la hoja que lo
+  /// explica y ofrece la salida.
+  ///
+  /// ## Por qué `_freePlanBlocks` no alcanzaba
+  ///
+  /// Aquél gatea DELTAS: se lo llama desde `_addDay` y `_addWeek` con el total
+  /// que quedaría, así que sólo ve rutinas que cruzan el tope mientras el
+  /// alumno mira. Una rutina que ya nació del otro lado del tope no pasa por
+  /// ningún "+", y por eso se colaba entera hasta `updateUserOwned`.
+  ///
+  /// Y no es un caso de borde: hoy `kAthletePaywallEnabled` está en `false` y
+  /// la CF escribe `athletePaywallEnforced: false` en todos lados, o sea que
+  /// **todas** las rutinas que existan el día del encendido se armaron sin
+  /// tope. A eso se suman las dos formas de perder el derecho con la rutina ya
+  /// guardada: que se termine el vínculo con el PF que pagaba por vos, y que
+  /// se te venza la suscripción. Las tres poblaciones caían en el mismo lugar
+  /// —el `catch` de `_submit`— y leían "No tenés permisos. Recargá la app.",
+  /// que además de no explicar nada manda a hacer algo que no arregla nada.
+  ///
+  /// ## Por qué frena acá y no en la entrada del editor
+  ///
+  /// Deliberado, y es la diferencia con el gate del catálogo de
+  /// `_loadExistingRoutine`. Allá el alumno no puede hacer NADA para destrabar
+  /// la plantilla del sistema, así que entrar sólo le hace perder tiempo. Acá
+  /// la salida está adentro: `firestore.rules` mide el documento RESULTANTE
+  /// (`withinFreeRoutineShape`), así que sacar los días que sobran guarda
+  /// bien. Bloquear la entrada le sacaría la única herramienta que tiene para
+  /// arreglarlo, y lo dejaría con una rutina que no puede ni tocar.
+  ///
+  /// Lo que sí se le debe es avisarle ANTES de invertir trabajo, y por eso
+  /// `_loadExistingRoutine` llama a este mismo método apenas termina de
+  /// hidratar: ahí el retorno se descarta —no frena nada— y sólo queda la
+  /// hoja abierta sobre un editor que el alumno ya puede usar para recortar.
+  ///
+  /// El orden de las guardas replica el de `_freePlanBlocks`: el entitlement
+  /// —lo único que toca Firestore— se lee último.
+  bool _freePlanBlocksShape() {
+    if (!ref.read(athletePaywallEnabledProvider)) return false;
+    if (!_isAthleteOwnedMode) return false;
+    final excedeDias = _days.length > kFreeMaxRoutineDays;
+    final excedeSemanas = _numWeeks > kFreeMaxRoutineWeeks;
+    if (!excedeDias && !excedeSemanas) return false;
+    if (!ref.read(athleteEntitlementProvider).gatesFreeLimits) return false;
+    // Los días primero cuando fallan los dos: es el eje que el alumno puede
+    // arreglar sin resignar nada del programa, y el cuerpo de esa hoja es el
+    // único que le pide una acción concreta. Si además le sobran semanas, el
+    // segundo intento de guardar se lo dice.
+    showFreePlanLimitSheet(
+      context,
+      limit: excedeDias ? FreePlanLimit.shapeDays : FreePlanLimit.shapeWeeks,
+      actual: excedeDias ? _days.length : _numWeeks,
+    );
     return true;
   }
 
@@ -2699,6 +2785,22 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       return;
     }
 
+    // El tope de FORMA del plan free, antes de tocar la red.
+    //
+    // Va después de la validación y antes de cualquier escritura, y las dos
+    // cosas importan. Después, porque una rutina inválida tiene un problema
+    // más urgente que el paywall y su mensaje es más específico. Antes,
+    // porque `firestore.rules` va a rebotar esta escritura igual: anticiparla
+    // le ahorra al alumno el round-trip y —lo que de verdad importa— cambia
+    // "No tenés permisos. Recargá la app." por una hoja que le dice cuántos
+    // días le sobran y que entrenarla completa no tiene tope.
+    //
+    // El `catch` de abajo SIGUE traduciendo `permission-denied`, y tiene que
+    // seguir: este chequeo es UX y puede quedar corto (un doc con una forma
+    // que el editor no modela, un tope que cambió en el servidor y todavía no
+    // en el cliente). La ley es la regla; esto es la cortesía de avisar antes.
+    if (_freePlanBlocksShape()) return;
+
     // A successful save persists the work, so the editor is no longer "dirty":
     // clear the flag up front so the post-save context.pop()/context.go() in the
     // branches below is NOT intercepted by the unsaved-changes PopScope guard
@@ -3212,7 +3314,9 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                 child: Center(
                   child: Text(
                     _paywallBlocked
-                        ? l10n.paywallFreePlanLimitCustomizeTemplateBody
+                        ? l10n.paywallFreePlanLimitCustomizeTemplateBody(
+                            kFreeMaxRoutineDays,
+                          )
                         : l10n.workoutSelfEditorNotFound,
                     textAlign: TextAlign.center,
                     style: TextStyle(color: palette.textMuted),

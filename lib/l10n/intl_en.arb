@@ -1818,5 +1818,9 @@
   "paywallFreePlanLimitChartHistoryBody": "",
   "@paywallFreePlanLimitChartHistoryBody": {},
   "paywallFreePlanLimitCustomizeTemplateBody": "",
-  "@paywallFreePlanLimitCustomizeTemplateBody": {}
+  "@paywallFreePlanLimitCustomizeTemplateBody": {},
+  "paywallFreePlanLimitShapeDaysBody": "",
+  "@paywallFreePlanLimitShapeDaysBody": {},
+  "paywallFreePlanLimitShapeWeeksBody": "",
+  "@paywallFreePlanLimitShapeWeeksBody": {}
 }

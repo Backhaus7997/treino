@@ -311,7 +311,7 @@ service cloud.firestore {
       // `lib/features/paywall/domain/athlete_entitlement.dart`. Si discrepan,
       // el alumno ve un tope y el servidor aplica otro — y el rebote llega sin
       // que ninguna pantalla lo haya anticipado.
-      function freeMaxRoutineDays() { return 2; }
+      function freeMaxRoutineDays() { return 3; }
       function freeMaxRoutineWeeks() { return 1; }
 
       // ¿Al usuario que escribe se le APLICA el paywall?
@@ -595,13 +595,33 @@ service cloud.firestore {
                     // abierta al lado.
                     //
                     // Se mide sobre `request.resource`, o sea el documento
-                    // RESULTANTE. Una rutina de 5 días que quedó de antes se
-                    // puede seguir tocando mientras no crezca: bajarla a 3
-                    // sigue estando por encima del tope y también rebota, pero
-                    // eso es coherente con la spec §5 —al cancelar se CONGELA
-                    // la edición, no se borra ni se recorta nada— y con que el
-                    // atleta la pueda seguir ENTRENANDO entera, que no pasa
-                    // por acá.
+                    // RESULTANTE — y de ahí sale la única lectura correcta de
+                    // qué puede hacer el dueño de una rutina que quedó de
+                    // antes por encima del tope:
+                    //
+                    //   • Renombrarla SIN tocar los días: **rebota**. El
+                    //     resultante sigue teniendo 4 días y 4 > 3. No hay
+                    //     excepción por "no la agrandé".
+                    //   • Recortarla a 3 días o menos: **pasa**. El resultante
+                    //     entra en la forma free.
+                    //   • Archivarla: **pasa**, por UPDATE path 1
+                    //     (`affectedKeys == ['status']`), que no lleva esta
+                    //     cláusula. Es la salida de emergencia y tiene que
+                    //     seguir así (spec §5: al cancelar se congela la
+                    //     edición, no se borra nada).
+                    //   • ENTRENARLA entera: **pasa**, no toca esta regla.
+                    //
+                    // ⚠️  Una versión anterior de este comentario decía "se
+                    // puede seguir tocando mientras no crezca". Era FALSO y se
+                    // contradecía con su propia frase siguiente. Quien lo
+                    // leyera concluía que renombrar estaba cubierto, y el
+                    // alumno se comía un permission-denied que el comentario
+                    // acababa de descartar. AGENTS.md §11.1: una advertencia
+                    // falsa es peor que ninguna.
+                    //
+                    // El cliente ANTICIPA estos tres casos antes de escribir
+                    // (`RoutineEditorScreen._freePlanBlocksShape`) para que el
+                    // rebote no llegue nunca como "no tenés permisos".
                     && (withinFreeRoutineShape(request.resource.data)
                         || !paywallEnforcedFor(request.auth.uid));
 

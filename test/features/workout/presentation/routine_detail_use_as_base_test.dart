@@ -272,7 +272,6 @@ void main() {
   // plan pago, y que el detalle no dijera nada sería la app cambiando de idea
   // entre dos pantallas— pero abre la hoja en vez de llevar al editor.
   group('plantilla paga del catálogo', () {
-
     /// El ícono del chip dice el estado sin necesidad de tocarlo: candado
     /// cuando está bloqueado, copiar cuando no.
     ///
@@ -327,14 +326,20 @@ void main() {
       //    principiante es gratis; COPIARLA no. Son dos filas distintas de la
       //    misma tabla, y el gate viejo leía una sola.
       //
-      // 2. Aunque la política dijera lo contrario, era imposible de cumplir:
-      //    las tres plantillas de principiante tienen 3 días
-      //    (`docs/video-catalog-audit/improved-templates.json`) contra
-      //    `kFreeMaxRoutineDays = 2`. O sea que "copiar gratis" terminaba
-      //    siempre igual: el alumno cargaba todo el editor, tocaba Guardar, y
-      //    `firestore.rules` lo rebotaba con "No tenés permisos. Recargá la
-      //    app.". Perdía el trabajo y el mensaje le pedía algo que no
-      //    arreglaba nada.
+      // 2. Cuando esto se escribió había ADEMÁS un motivo de forma: las tres
+      //    plantillas de principiante tienen 3 días
+      //    (`docs/video-catalog-audit/improved-templates.json`) contra un
+      //    `kFreeMaxRoutineDays` que entonces valía 2, así que "copiar gratis"
+      //    terminaba siempre igual — el alumno cargaba todo el editor, tocaba
+      //    Guardar, y `firestore.rules` lo rebotaba con "No tenés permisos.
+      //    Recargá la app.".
+      //
+      //    **Ese segundo motivo YA NO EXISTE**: el tope pasó a 3 justamente
+      //    para disolver esa incoherencia, y hoy una copia de 3 días entra en
+      //    la forma free. Se deja escrito porque explica de dónde salió el
+      //    gate, pero quien lea esto tiene que saber que lo único que lo
+      //    sostiene ahora es el punto 1 — la política. Si mañana el producto
+      //    abre personalizar, no queda ninguna deuda de forma atrás.
       await _pump(
         tester,
         _routine(source: RoutineSource.system),

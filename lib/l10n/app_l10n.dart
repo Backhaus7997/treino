@@ -7521,17 +7521,29 @@ abstract class AppL10n {
   /// **'Esto es parte del plan pago'**
   String get paywallFreePlanLimitTitle;
 
-  /// Cuerpo para el tope de DIAS. Aclara que el catalogo de principiante sigue libre, para que el limite no se lea como que no puede entrenar.
+  /// Cuerpo para el tope de DIAS, al tocar el + que lo cruzaria. El numero va por placeholder y no escrito a mano: vivia como un 2 literal en esta cadena y quedo mintiendo el dia que kFreeMaxRoutineDays paso a 3. Aclara que el catalogo de principiante sigue libre, para que el limite no se lea como que no puede entrenar.
   ///
   /// In es_AR, this message translates to:
-  /// **'Con el plan gratis armás rutinas de hasta 2 días. Las plantillas de principiante del catálogo las seguís completas, sin tope.'**
-  String get paywallFreePlanLimitDaysBody;
+  /// **'Con el plan gratis armás rutinas de hasta {max} días. Las plantillas de principiante del catálogo las seguís completas, sin tope.'**
+  String paywallFreePlanLimitDaysBody(int max);
 
   /// Cuerpo para el tope de SEMANAS.
   ///
   /// In es_AR, this message translates to:
   /// **'Periodizar en varias semanas es parte del plan pago. Con el gratis tu rutina propia va de a una semana.'**
   String get paywallFreePlanLimitWeeksBody;
+
+  /// Cuerpo de la hoja cuando el alumno free intenta GUARDAR una rutina propia que YA tiene mas dias que el tope — tipicamente una que armo antes de que el paywall se encendiera, o mientras estaba vinculado a un PF. Distinto de paywallFreePlanLimitDaysBody: aquel frena un + que todavia no paso, este explica un documento que ya existe. Tiene que ser ACCIONABLE porque hay salida real: firestore.rules mide el documento RESULTANTE, asi que recortar a {max} dias guarda bien. La ultima frase no es relleno: entrenar escribe en sessions y no pasa por la regla de forma, y sin decirlo el alumno cree que perdio la rutina.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esta rutina tiene {actual} días y con el plan gratis guardás hasta {max}. Sacá los que sobren y vas a poder guardar los cambios. Entrenarla completa no tiene tope.'**
+  String paywallFreePlanLimitShapeDaysBody(int actual, int max);
+
+  /// El hermano de paywallFreePlanLimitShapeDaysBody para el eje SEMANAS. Existe porque firestore.rules mide las dos dimensiones en la misma clausula (withinFreeRoutineShape): cubrir solo los dias dejaria la rutina periodizada cayendo en el permission-denied crudo que este trabajo vino a sacar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esta rutina está periodizada en {actual} semanas y con el plan gratis guardás hasta {max}. Podés dejarla en {max} para guardar los cambios, o pasarte al plan pago. Entrenarla completa no tiene tope.'**
+  String paywallFreePlanLimitShapeWeeksBody(int actual, int max);
 
   /// CTA de la hoja de limite. Solo se dibuja cuando existe checkout: hoy la hoja se muestra sin este boton.
   ///
@@ -7551,11 +7563,11 @@ abstract class AppL10n {
   /// **'Esta plantilla es parte del plan pago. Las de nivel principiante las podés usar completas con el plan gratis.'**
   String get paywallFreePlanLimitTemplateBody;
 
-  /// Cuerpo de la hoja cuando el alumno free toca 'Usar como base' sobre una plantilla del catalogo. Distinto del caso isPremium: aca la plantilla puede ser gratis y lo pago es COPIARLA. Nombra las DOS salidas gratis (seguirla tal cual, o armar una propia) para que no se lea como que el catalogo se cerro.
+  /// Cuerpo de la hoja cuando el alumno free toca 'Usar como base' sobre una plantilla del catalogo. Distinto del caso isPremium: aca la plantilla puede ser gratis y lo pago es COPIARLA. Nombra las DOS salidas gratis (seguirla tal cual, o armar una propia) para que no se lea como que el catalogo se cerro. El numero va por placeholder por el mismo motivo que en DaysBody.
   ///
   /// In es_AR, this message translates to:
-  /// **'Personalizar una plantilla del catálogo es parte del plan pago. Con el gratis la seguís tal cual, sin tope de días, o armás tu propia rutina de hasta 2 días.'**
-  String get paywallFreePlanLimitCustomizeTemplateBody;
+  /// **'Personalizar una plantilla del catálogo es parte del plan pago. Con el gratis la seguís tal cual, sin tope de días, o armás tu propia rutina de hasta {max} días.'**
+  String paywallFreePlanLimitCustomizeTemplateBody(int max);
 
   /// Pildora con candado sobre las cards del catalogo que el alumno no puede usar con su plan actual. Solo se dibuja cuando la plantilla esta realmente bloqueada para quien mira.
   ///
