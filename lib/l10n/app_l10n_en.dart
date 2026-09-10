@@ -4320,4 +4320,58 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get paywallFreePlanLimitChartHistoryBody => '';
+
+  @override
+  String get paywallAlumnoTitulo => '';
+
+  @override
+  String get paywallAlumnoBajada => '';
+
+  @override
+  String get paywallAlumnoPlanMensual => '';
+
+  @override
+  String get paywallAlumnoPlanAnual => '';
+
+  @override
+  String get paywallAlumnoAhorro => '';
+
+  @override
+  String get paywallAlumnoBeneficio1 => '';
+
+  @override
+  String get paywallAlumnoBeneficio2 => '';
+
+  @override
+  String get paywallAlumnoBeneficio3 => '';
+
+  @override
+  String get paywallAlumnoBeneficio4 => '';
+
+  @override
+  String get paywallAlumnoImpuestos => '';
+
+  @override
+  String get paywallAlumnoCta => '';
+
+  @override
+  String get paywallAlumnoRestaurar => '';
+
+  @override
+  String get paywallAlumnoSinPlanes => '';
+
+  @override
+  String get paywallAlumnoReintentar => '';
+
+  @override
+  String get paywallAlumnoListo => '';
+
+  @override
+  String get paywallAlumnoPendiente => '';
+
+  @override
+  String get paywallAlumnoErrorCompra => '';
+
+  @override
+  String get paywallAlumnoSinRestaurar => '';
 }
