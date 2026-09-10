@@ -3941,5 +3941,13 @@ service cloud.firestore {
     match /mp_webhook_events/{eventId} {
       allow read, write: if false;
     }
+    // El dedupe del webhook de RevenueCat, por el MISMO motivo y con un peso
+    // mayor: aca la marca no caduca. En el de MP es una ventana de 10 minutos,
+    // asi que un doc plantado se vence solo; aca es permanente, o sea que
+    // escribir un `event.id` a mano deja ese evento descartado PARA SIEMPRE y
+    // el alumno que pago no cobra nunca su acreditacion.
+    match /rc_webhook_events/{eventId} {
+      allow read, write: if false;
+    }
   }
 }
