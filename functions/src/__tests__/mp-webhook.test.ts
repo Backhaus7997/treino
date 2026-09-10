@@ -515,6 +515,38 @@ describe("firmaValida — vectores dorados, calculados AFUERA de esta implementa
     })).toBe(false);
   });
 
+  it("un secreto con espacios o salto de linea al final valida igual", () => {
+    // El secreto se copia a mano del panel de MP y se pega en un prompt. Un
+    // byte invisible al final entra al HMAC como cualquier otro y hace que
+    // NINGUNA firma valide nunca, con un sintoma identico al de tener la clave
+    // equivocada — o sea, el error mas caro de diagnosticar del archivo.
+    for (const sucio of [
+      `${ORO.secret} `,
+      `${ORO.secret}
+`,
+      `  ${ORO.secret}
+`,
+      `	${ORO.secret}`,
+    ]) {
+      expect(firmaValida({
+        signingSecret: sucio,
+        xSignature: conFirma(ORO_COMPLETO),
+        xRequestId: ORO.requestId,
+        dataIdDeLaUrl: ORO.idMinusculas,
+      })).toBe(true);
+    }
+  });
+
+  it("un secreto que es SOLO espacios cuenta como ausente", () => {
+    // Y ausente significa «no hay nada que validar», no «validar contra vacio».
+    expect(varianteDeFirma({
+      signingSecret: "   \n\t ",
+      xSignature: undefined,
+      xRequestId: undefined,
+      dataIdDeLaUrl: undefined,
+    })).toBe("sin-secreto");
+  });
+
   it("otro secreto no valida", () => {
     expect(firmaValida({
       signingSecret: "otro_secreto",
