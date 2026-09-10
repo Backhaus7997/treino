@@ -17,6 +17,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'app/app.dart';
 import 'core/persistence/shared_prefs_provider.dart';
 import 'firebase_options.dart';
+import 'features/paywall/application/athlete_checkout.dart';
 
 Future<void> main() async {
   // runZonedGuarded captura excepciones async no atrapadas (futures sin await,
@@ -175,6 +176,18 @@ Future<void> main() async {
     // native bundles (Info.plist URL scheme on iOS, google-services.json on
     // Android), so no explicit args are needed here.
     await GoogleSignIn.instance.initialize();
+
+    // RevenueCat: el SDK con el que el ALUMNO compra su suscripcion por IAP.
+    // Va DESPUES de Firebase porque la compra se identifica con el uid de
+    // Firebase Auth (ver el encabezado de athlete_checkout.dart).
+    //
+    // Movil-only, como App Check y Crashlytics arriba: `main_coach_hub.dart`
+    // NO llama a esto, por el mismo motivo por el que no inicializa
+    // GoogleSignIn. El guard `kIsWeb` vive adentro de la funcion.
+    //
+    // Devuelve false si todavia no hay clave configurada. No tira: un binario
+    // sin clave tiene que arrancar igual y simplemente no ofrecer comprar.
+    await configurarRevenueCat();
 
     const useEmulator = bool.fromEnvironment(
       'USE_EMULATOR',

@@ -73,6 +73,7 @@ const _aperturasExternas = <String>[
 const _apisDeCompra = <String>[
   'package:purchases_flutter',
   'Purchases.purchasePackage',
+  'Purchases.purchase(',
   'Purchases.purchaseProduct',
   'Purchases.purchaseStoreProduct',
   'package:in_app_purchase',
@@ -253,14 +254,27 @@ void main() {
     // Cuando llegue el cableado, la lista deberia quedar corta: el bootstrap
     // que hace `Purchases.configure`, y el repositorio que dispara la compra.
     // Una pantalla NO deberia estar aca — deberia llamar al repositorio.
-    const permitidos = <String, String>{};
+    const permitidos = <String, String>{
+      // El PRIMER y por ahora UNICO punto de compra del alumno. Es un tipo
+      // sellado: `AthleteCheckoutOnStore` tiene `start`, `AthleteCheckoutUnavailable`
+      // no lo tiene, y los constructores son privados a la libreria — asi que
+      // desde `lib/` la unica forma de conseguir la variante que cobra es
+      // `resolveAthleteCheckout()`.
+      //
+      // Una PANTALLA no deberia entrar nunca a esta lista: tiene que llamar a
+      // este archivo, no hablarle al SDK por su cuenta. Si estas por agregar
+      // una, ese es el olor.
+      'lib/features/paywall/application/athlete_checkout.dart':
+          'la capacidad de comprar del alumno: `start` es el unico camino a un '
+              'cobro del alumno en toda la app, y el uid entra por su firma',
+    };
 
     test('la lista de archivos que compran es exactamente la declarada', () {
       final encontrados = <String>{};
       for (final f in _dartsDe('lib')) {
         final codigo = _sinComentarios(f);
         if (_apisDeCompra.any(codigo.contains)) {
-          encontrados.add(f.path.replaceAll(r'', '/'));
+          encontrados.add(f.path.replaceAll(r'\', '/'));
         }
       }
 
