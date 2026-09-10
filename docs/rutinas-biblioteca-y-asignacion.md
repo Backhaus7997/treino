@@ -1,9 +1,13 @@
 # Rutinas: biblioteca del PF y asignación a alumnos
 
-**Estado:** diseño acordado, sin implementar (salvo lo que dice §6).
-**Fecha:** 2026-09-10.
-**Para:** la sesión que tome este tema. Leé §2 antes que nada — hay una premisa
-falsa que hace perder tiempo.
+**Estado:** §4.1, §4.2 y §4.4 implementados y mergeados. Falta **§4.3**.
+**Fecha:** 2026-09-10 (reescrito; la versión anterior tenía dos premisas falsas).
+**Para:** la sesión que tome §4.3, o cualquiera que toque rutinas del PF.
+
+> **Los números de línea de este doc se desactualizan.** Los de la versión
+> anterior estaban corridos ~40 líneas y hacían desconfiar del doc entero.
+> Tratalos como una pista, no como una dirección: verificá con `rg` antes de
+> creerles.
 
 ---
 
@@ -29,218 +33,262 @@ falsa que hace perder tiempo.
 
 ---
 
-## 2. La premisa falsa: **asignar YA copia**
+## 2. La premisa falsa del PF: **asignar YA copia**
 
-El PF cree que asignar una rutina se la saca de su biblioteca. **No es así**, y
-esto hay que verificarlo antes de diseñar nada:
+El PF creía que asignar una rutina se la sacaba de su biblioteca. No es así:
+`assignTemplateToAthlete` (`routine_repository.dart:656`) hace `copyWith(id: '')`
+y crea un documento NUEVO. La plantilla no se toca. Se puede asignar la misma
+plantilla a veinte alumnos y sigue estando.
 
-`lib/features/workout/data/routine_repository.dart:636` —
-`assignTemplateToAthlete` hace:
+Su dartdoc lo dice explícito: *«The template itself is left untouched so it can
+be reused for other athletes»*.
 
-```dart
-final assigned = template.copyWith(
-  id: '',                                   // documento NUEVO
-  source: RoutineSource.trainerAssigned,
-  assignedTo: athleteId,
-  visibility: RoutineVisibility.private,
-);
-return createAssigned(assigned);
-```
-
-La plantilla original **no se toca**. Se puede asignar la misma plantilla a
-veinte alumnos y sigue estando. O sea: *«que siempre le queden al PF» ya
-funciona*. Lo que falta es que la pantalla lo diga — hoy nada en la UI lo
-comunica, y por eso el PF asume lo contrario.
-
-**Consecuencia para el diseño:** no hay que construir un modelo de biblioteca.
-Ya existe. Lo que hay que construir es lo de §4.
+**Esto sigue siendo cierto y ahora la UI lo dice**: el aviso de asignar
+(#1091) declara que se asignó una COPIA y que la plantilla queda.
 
 ---
 
-## 3. El modelo de datos, y por qué NO se puede «desasignar» mutando
+## 3. El modelo de datos
 
 ### 3.1 Los tres tipos de rutina
 
 `lib/features/workout/domain/routine_source.dart`
 
-| `source` | `assignedTo` | quién es el dueño | qué es |
+| `source` | `assignedTo` | dueño | qué es |
 |---|---|---|---|
 | `system` | — | la app | catálogo del sistema |
-| `trainer-template` | **`null`** | el PF (`assignedBy`) | plantilla reutilizable de la biblioteca |
+| `trainer-template` | **`null`** | el PF (`assignedBy`) | plantilla reutilizable |
 | `trainer-assigned` | uid del alumno | el PF (`assignedBy`) | la copia que ese alumno entrena |
 
 ### 3.2 `assignedTo` y `source` son INMUTABLES, por regla de servidor
 
-`firestore.rules`, verificado:
-
-```
-# línea 653-654 — UPDATE path 3: el PF edita un plan asignado
-&& request.resource.data.assignedTo == resource.data.assignedTo
-&& request.resource.data.source     == resource.data.source
-
-# línea 718-719 — UPDATE path 4: el PF edita una plantilla
-&& request.resource.data.assignedTo == null
-&& request.resource.data.source     == resource.data.source
-```
-
-No hay ningún `allow update` que permita cambiar `assignedTo` ni `source`
-después del create. Los cinco paths están en las líneas 531, 540, 628, 693 y
-757 de `firestore.rules`.
-
-**Por lo tanto: convertir una rutina asignada de vuelta en plantilla es
-rechazado por el servidor.** No es una limitación del cliente ni algo que se
-arregle con un método nuevo en el repo. Si alguien lo intenta, el write falla y
-el PF ve un error que no puede resolver.
+Ningún `allow update` de `/routines` los deja cambiar después del create.
+**Convertir una rutina asignada de vuelta en plantilla lo rechaza el servidor.**
+No es una limitación del cliente ni algo que se arregle con un método nuevo.
 
 ### 3.3 Por qué la regla está bien y NO hay que aflojarla
 
-`lib/features/workout/domain/session.dart:16` — `Session` lleva
-`required String routineId`. Las sesiones que el alumno ya entrenó apuntan a
-ESE documento.
-
-Es el mismo motivo por el que el PR #1064 hizo que terminar un vínculo
-**archive** las rutinas del alumno en vez de borrarlas (ADR-USR-04: «el
-documento se conserva para mantener referencias históricas de sesiones»).
+`Session` lleva `required String routineId`. Las sesiones que el alumno ya
+entrenó apuntan a ESE documento. Es el mismo motivo por el que el PR #1064 hizo
+que terminar un vínculo **archive** las rutinas en vez de borrarlas (ADR-USR-04).
 Mutar `assignedTo` a `null` dejaría las sesiones del alumno colgando de un
 documento que pasó a ser una plantilla del PF.
 
-> ⚠️ **Si la próxima sesión piensa en tocar `firestore.rules` para permitir
-> esto: no.** La regla protege datos del alumno. El resultado que el PF quiere
-> se consigue sin tocarla — ver §4.1.
+> ⚠️ **Si pensás en tocar `firestore.rules` para permitir eso: no.** El
+> resultado que el PF quiere se consigue archivando la copia — ver §4.1.
+
+### 3.4 Los seis paths de UPDATE
+
+Están en el bloque `match /routines/{routineId}` (`firestore.rules:324`):
+
+| path | quién | qué puede cambiar |
+|---|---|---|
+| 1 | el atleta dueño (`user-created`) | sólo `status` (archivar / restaurar) |
+| 2 | el atleta dueño | contenido |
+| 3 | el PF (`trainer-assigned`) | contenido: `name split level days numWeeks summary` |
+| 4 | el PF (`trainer-template`) | idem + `goals` |
+| 5 | el PF (`trainer-template`) | sólo `visibility` (publicar / despublicar) |
+| **6** | **el PF (`trainer-*`)** | **sólo `status` (archivar / recuperar)** |
+
+El path 6 es de #1092 y se agregó porque **faltaba** — ver §4.1.
 
 ---
 
-## 4. Qué hay que hacer, en orden
+## 4. El plan
 
-### 4.1 Desasignar (lo que el PF llama así) — **cambio de UI, no de modelo**
+### 4.1 «Desasignar» — HECHO (#1092)
 
-**El resultado que el PF quiere ya se puede:** archivar la copia del alumno. La
-copia sale de la lista del alumno y la plantilla del PF queda intacta. Ya está
-implementado (`RoutineActionsNotifier.archive`).
+**La versión anterior de este doc decía que esto era «copy + gateo, cero
+cambios de reglas» porque `RoutineActionsNotifier.archive` ya existía. Era
+falso: el método existía y el servidor lo denegaba.**
 
-Lo que falta es **cómo se lee**:
+`status` no estaba en el `affectedKeys().hasOnly([...])` de ningún path del PF
+—los 3 y 4 son de CONTENIDO— y el único que sí flipea `status` (path 1) exige
+`source == 'user-created'`. Los cinco paths denegaban. Desde `fdce15c7`
+(2026-07-17), en las dos pantallas de rutinas del Hub.
 
-- Hoy el menú ⋮ de una rutina asignada dice «Archivar». Desde la sección
-  Rutinas eso no se lee como «sacársela a este alumno».
-- Sobre una rutina `trainer-assigned`, el ítem debería decir algo como
-  **«Sacársela a {nombre}»**, y el diálogo aclarar que la plantilla del PF no
-  se toca y que los entrenamientos que el alumno ya hizo se conservan.
-- Sobre una `trainer-template`, «Archivar» sigue siendo la palabra correcta.
+No fallaba ruidosamente: `archive()` atrapa el `permission-denied` y devuelve
+`false`, así que el PF veía **«No se pudo. Probá de nuevo.»** cada vez. Dos
+meses.
 
-**Es copy + gateo. Cero cambios de esquema, cero de reglas.**
+Nada en Dart lo veía. El repo compila igual, y los seis widget tests de
+archivar de `athlete_routines_screen_test.dart` pasaban en verde: mockean el
+repositorio, así que prueban que el cliente LLAMA, nunca que el servidor acepte.
 
-### 4.2 «Guardar» vs «Guardar como copia» al editar — **lo más valioso, y no existe**
+Lo entregado:
 
-La metáfora de la foto. Al guardar cambios en el editor
-(`routine_editor_web_screen.dart`), ofrecer:
+- **UPDATE path 6** (`firestore.rules:820`), angosto: el dueño flipea SÓLO
+  `status` entre `active` y `archived` sobre sus `trainer-*`.
+- `RoutineRepository.unarchive` (`routine_repository.dart:355`). Sin el camino
+  de vuelta, archivar es un borrado con otro nombre y todo diálogo que prometa
+  recuperar miente — que es lo que decía el de la card mientras no existía.
+- El ⋮ sobre un plan asignado dice **«Sacársela a {nombre}»**
+  (`routine_card_grid.dart:364`); sobre una plantilla sigue diciendo
+  «Archivar». Sobre una archivada aparece **«Recuperar»**.
+- 12 tests de reglas (`scripts/rules_test/trainer-routine-status.test.js`).
 
-- **Guardar** → pisa el documento actual (`updateTemplate` / `updateAssigned`,
-  ya existen: repo líneas 285 y 232).
-- **Guardar como copia** → crea un documento nuevo con los cambios y deja el
-  original como estaba (`createTemplate`, repo línea 553).
+**El diálogo NO promete que la plantilla del PF queda intacta**, que era lo que
+pedía el diseño original. Sería verdad sólo si ese plan hubiera salido de una
+plantilla, y no hay forma de saberlo: `createAssigned` se llama desde tres
+pantallas que arman el plan a mano y la rutina no guarda de qué documento se
+copió. Dice las tres cosas que sí son ciertas siempre: el alumno deja de verla,
+sus entrenamientos se conservan, y queda en Archivadas.
 
-Encaja con el modelo actual sin tocar reglas ni esquema.
+### 4.2 Guardar / guardar como copia — HECHO (#1097)
 
-**Decisiones que hay que tomar antes de codear:**
+El cartel sale al guardar una rutina que **ya existe** y **tiene cambios**
+(`_preguntarComoGuardar`, `routine_editor_web_screen.dart:2493`). Las dos
+condiciones importan: uno que sale siempre enseña a apretar el primer botón sin
+leer, y ahí se pierde el peso de todas las confirmaciones de la pantalla.
 
-1. ¿El cartel sale **siempre** o sólo si hubo cambios? (Si sale siempre,
-   molesta; el editor ya tiene `_isDirty`.)
-2. Editando una rutina **asignada**, ¿la copia nace como plantilla
-   (`trainer-template`, `assignedTo: null`) o como otra asignada al mismo
-   alumno? La primera es la que sirve al caso «esto me quedó bueno, lo quiero
-   para reusar».
-3. ¿Qué nombre lleva la copia? («Fuerza 4x (copia)» es lo obvio; conviene que
-   el diálogo lo deje editar.)
-4. El límite del plan free existe y hay que respetarlo: ver
-   `freeMaxRoutineDays()` / `freeMaxRoutineWeeks()` en `firestore.rules` y el
-   paywall de #1082. Una copia es una rutina nueva y cuenta.
+Las cuatro decisiones que este doc dejaba abiertas, resueltas:
 
-### 4.3 Publicar esté asignada o no
+1. **¿Siempre?** No: sólo editando y sólo con `_isDirty`.
+2. **¿La copia de un plan asignado es plantilla o plan?** **Plantilla.** Es el
+   caso que el PF describió y el único que construye biblioteca; una copia
+   asignada al mismo alumno le suma una tarjeta a esa persona y no le sirve a
+   nadie más.
+3. **¿Qué nombre?** «X (copia)», automático. La metáfora de editar una foto no
+   tiene paso de nombre. Un campo en el diálogo queda ignorado por el botón
+   «Guardar», y un segundo diálogo agrega fricción justo cuando el PF quiere
+   terminar.
+4. **El tope del plan free** no era una decisión sino una restricción: la copia
+   pasa por el mismo `try/catch` y el mismo `_onWriteDenied`.
 
-`firestore.rules:757` — UPDATE path 5 restringe el flip de `visibility` a:
+La rama de la copia **no llama a ningún `update`**. Ésa es toda la promesa de
+«mantener la original en la galería», y hay test con `verifyNever` que la fija.
 
-```
-&& request.auth.uid == resource.data.assignedBy
-&& resource.data.source == 'trainer-template'
-&& affectedKeys() == ['visibility'].toSet()
-```
+### 4.3 Publicar esté asignada o no — **PENDIENTE, lo único que queda**
 
-O sea: **sólo plantillas**. Publicar la copia de un alumno lo rechaza el
-servidor — y con razón, esa copia lleva su nombre y su historial.
+`firestore.rules` restringe el flip de `visibility` a `trainer-template` del
+dueño (path 5). Publicar la copia de un alumno lo rechaza el servidor — y con
+razón, esa copia lleva su nombre y su historial.
 
-El PF igual quiere el ítem disponible en cualquier rutina. La forma correcta:
+La forma correcta:
 
-- Si es `trainer-template` → flip directo (**ya implementado**, ver §6).
-- Si es `trainer-assigned` → ofrecer **«Publicar como plantilla»**: crear un
-  `trainer-template` a partir de esa copia (`createTemplate`) y publicar ESE.
-  La rutina del alumno no se toca.
+- `trainer-template` → flip directo (**ya implementado**, #1091).
+- `trainer-assigned` → ofrecer **«Publicar como plantilla»**: `createTemplate` a
+  partir de esa copia y publicar ESE. La rutina del alumno no se toca.
 
-**Decisión a tomar:** eso genera un documento por publicación. Hay que decidir
-si el PF lo ve como una plantilla más en su biblioteca (probablemente sí, y
-está bien) y qué nombre lleva.
+Con §4.2 puesto, la mitad de esto ya existe: «Guardar como copia» desde el
+editor de un plan crea exactamente esa plantilla. Falta el atajo desde el ⋮ y el
+publicar.
 
-### 4.4 Ordenar la biblioteca — **prerequisito de 4.2**
+**Decisión sin tomar, y no es menor: publicar expone el NOMBRE al catálogo
+público.** Un plan asignado suele llamarse «Plan de Sofía». Publicarlo tal cual
+filtra el nombre de una clienta a la comunidad. Acá **sí** hace falta que el PF
+lo renombre antes de publicar — al revés que en §4.2, donde la copia es privada
+y el nombre va automático. La diferencia no es de gusto: una es privada y la
+otra es pública e irreversible en la práctica (junta valoraciones).
 
-`routine_repository.dart:483` — `listAuthoredBy` hace un solo
-`where('assignedBy', isEqualTo: trainerId)`. Devuelve **plantillas Y todas las
-copias asignadas**, mezcladas.
+⚠️ **§4.3 toca `routine_card_grid.dart` y `routine_actions_provider.dart`**, los
+mismos métodos que #1092. Si hay otro PR abierto sobre esos archivos, esperalo:
+apilar es una trampa acá (el squash del padre cierra al hijo y no se puede
+reabrir).
 
-La sección Rutinas las muestra juntas, con filtros
-(`rutinas_screen.dart:100`: `todas / asignadas / plantillas / publicas /
-archivadas`). Con 20 alumnos y 5 rutinas cada uno, la lista tiene 100 tarjetas
-de las cuales 5 son «las tuyas».
+### 4.4 Ordenar la biblioteca — HECHO (#1093 + #1096)
 
-**Si se implementa 4.2 antes que esto, cada copia guardada empeora el
-desorden.** Conviene separar «Mis rutinas» (plantillas) de «Lo que está
-entrenando cada alumno» (asignadas) antes de facilitar la creación de copias.
+**La versión anterior de este doc decía que había que separar «Mis rutinas» de
+«Lo que entrena cada alumno» dentro de la sección Rutinas. Le faltaba el dato
+que cambiaba el problema: esa separación YA EXISTÍA como sección, y el problema
+real era la duplicación.**
+
+Las plantillas del PF se listaban en DOS lugares del Hub, y no eran
+equivalentes:
+
+| | `Biblioteca › Plantillas` | `Rutinas` |
+|---|---|---|
+| qué mostraba | sólo plantillas | plantillas **+** planes asignados |
+| acciones | tap → diálogo de detalle | ⋮ completo |
+| publicar | «se hace desde el editor» | desde el menú |
+
+O sea: el lado bonito era el inerte. Duplicar una lista es tolerable;
+duplicarla con capacidades distintas es cómo se desincronizan las cosas.
+
+Lo entregado:
+
+- **#1093**: Rutinas se parte en «MIS PLANTILLAS» y «LO QUE ENTRENA CADA
+  ALUMNO», las asignadas agrupadas bajo el nombre de su alumno. Los chips pasan
+  de cinco a tres (`Vigentes · Públicas · Archivadas`): «Plantillas» y
+  «Asignadas» dejaron de ser filtros para ser los bloques.
+- **#1096**: se retira la sub-tab Plantillas de Biblioteca, que queda sólo para
+  Ejercicios, y se borra el cluster huérfano (`templates_tab`,
+  `template_grid_card`, `template_detail_dialog`, `template_format` + 2 tests).
+
+`trainerTemplatesStreamProvider` sigue vivo: lo usa la pestaña Plantillas del PF
+en **mobile** (`trainer_workout_view.dart`). Fue una decisión sobre las
+secciones del Hub **web**.
 
 ---
 
-## 5. Orden recomendado
+## 5. Lo que queda
 
-1. **4.1** — copy + gateo. Chico, y desactiva el miedo del PF de una.
-2. **4.4** — ordenar la biblioteca. Sin esto, lo que sigue ensucia.
-3. **4.2** — guardar / guardar copia. Lo que más suma.
-4. **4.3** — publicar desde una asignada.
+Sólo **§4.3**. Con su decisión de nombre sin tomar.
 
----
+Aparte, dos cosas que quedaron señaladas y no hechas:
 
-## 6. Lo que YA está hecho (no rehacer)
-
-Rama `feat/coach-hub-rutinas-asignar-publicar`, sobre `main`:
-
-- `RoutineActionsNotifier.assignTemplate(...)` — asigna una plantilla a un
-  alumno e invalida los dos listados (la grilla de la sección y el par
-  trainer/alumno de la ficha).
-- `RoutineActionsNotifier.setPublicada(...)` — publica/despublica una
-  plantilla.
-- El menú ⋮ de `routine_card_grid.dart` ofrece **«Asignar a un alumno»** y
-  **«Publicar en la comunidad» / «Despublicar»**, gateados: sólo sobre
-  `trainer-template` no archivadas.
-- El aviso de asignar dice explícitamente que **se asignó una copia y la
-  plantilla queda**. Esa frase es la que ataca la premisa falsa de §2.
-- El selector de alumno se mudó de `sections/pagos/widgets/` al kit como
-  `pickAthlete` (dos secciones importándose entre sí es peor que compartirlo).
-- Tests: 4 de gateo del menú + 5 del provider, incluido que despublicar llame a
-  `unpublishTemplate` y **no** a `publishTemplate` — el peor fallo posible acá
-  es que «Despublicar» publique.
+- `athlete_routines_screen.dart` no ofrece «Recuperar». Su copy es honesto —
+  promete VER la rutina en Archivadas, no recuperarla— así que no miente, pero
+  la acción existe y esa pantalla no la expone.
+- La sección `Biblioteca` ahora es sólo ejercicios y sigue llamándose
+  «Biblioteca». Si «Ejercicios» describe mejor lo que quedó, es un PR de naming
+  aparte (AGENTS.md §1 es estricto con eso).
 
 ---
 
-## 7. Trampas del repo que aplican a este tema
+## 6. Trampas del repo que aplican a este tema
 
-- **`assignedTo` y `source` son inmutables.** Ya dicho, pero es la que más
-  tiempo hace perder. Ver §3.2.
-- **Un ítem de menú que las reglas van a rechazar es peor que no tenerlo.** El
-  PF lo aprieta, ve un error y no aprende por qué. Gatear siempre.
-- **Invalidar los DOS listados** después de cualquier mutación:
-  `routinesAuthoredByProvider(trainerId)` (la sección) y
-  `assignedRoutinesByTrainerProvider((trainerId, athleteId))` (la ficha del
-  alumno). Olvidar uno no falla ni compila mal: la card se queda en pantalla
-  hasta recargar. Es el fallo silencioso que AGENTS.md §11.1 prohíbe. El
-  dartdoc de `archive` en `routine_actions_provider.dart` lo explica largo.
-- **El plan free tiene tope de días y semanas por rutina.** Cualquier flujo que
-  cree rutinas nuevas (una copia lo es) tiene que contemplarlo.
-- **El gate visual corre sólo en Linux CI.** Si la UI cambia, los goldens se
-  regeneran con un commit vacío `[regen-goldens]` y hay que aprobar los runs
-  que quedan en `action_required`. Ver `docs/visual-gate.md`.
+Ordenadas por cuánto tiempo hacen perder.
+
+1. **Un repo mockeado tapa un `permission-denied`.** Los widget tests
+   verifican que el cliente LLAMA al método, nunca que el servidor lo acepte.
+   Un botón puede estar roto dos meses con la suite en verde y `dart analyze`
+   limpio. **Toda escritura nueva a Firestore necesita un test en
+   `scripts/rules_test/`.**
+
+2. **La suite de reglas con `firebase-tools@13` da 4 rojos falsos.** Java 17 no
+   le alcanza a la 15, así que la salida obvia es `npx -y firebase-tools@13` — y
+   con esa CLI fallan siempre `SCENARIO-PERIOD-050`, `-054`,
+   `WPRES-RULES-01` y el de paywall/rutina inexistente. En CI (que usa la 15)
+   pasan. El JDK 21 ya está instalado en esta máquina; el comando correcto y el
+   control negativo que aísla el efecto están en la cabecera de
+   `scripts/test_rules.sh` (#1095), no en `docs/`.
+
+3. **`assignedTo` y `source` son inmutables.** §3.2. La que más tiempo hace
+   perder si no se lee.
+
+4. **Un ítem de menú que las reglas van a rechazar es peor que no tenerlo.** El
+   PF lo aprieta, ve un error y no aprende por qué. Gatear siempre — y probar
+   el gateo contra el emulador, no contra un mock.
+
+5. **Invalidar TODOS los listados después de cualquier mutación.** Son tres
+   lectores: `routinesAuthoredByProvider(trainerId)` (la sección),
+   `assignedRoutinesByTrainerProvider((trainerId, athleteId))` (la ficha del
+   alumno) y las cachés single-doc vía `invalidateRoutineById`. Olvidar uno no
+   falla ni compila mal: la card se queda en pantalla hasta recargar.
+   **El editor web se olvidaba del primero para TODOS sus caminos de
+   escritura** — arreglado en #1097. Es `autoDispose` y al editor se llega por
+   `context.push`, así que la ruta de abajo sigue montada y el provider nunca se
+   dispone.
+
+6. **Que la escritura se describa a sí misma, no a la pantalla.** Guardar como
+   copia desde el editor de un plan escribe una PLANTILLA, pero
+   `widget.isTemplate` sigue en `false` y `widget.athleteId` no es `null`.
+   Cuatro lugares miraban la pantalla y mentían: el `athleteId` y el `source` de
+   analytics, la `operation`, y el copy de la denegación. Si agregás una rama de
+   escritura, revisá qué más deriva del modo de la pantalla.
+
+7. **El plan free tiene tope de días y semanas por rutina.** Cualquier flujo
+   que cree rutinas nuevas (una copia lo es) tiene que contemplarlo.
+
+8. **El gate visual corre sólo en Linux CI.** Si la UI cambia, los goldens se
+   regeneran con un commit vacío `[regen-goldens]` y hay que aprobar los runs
+   que quedan en `action_required`. Ver `docs/visual-gate.md`.
+
+9. **Un `SnackBar` sin drenar rompe el test SIGUIENTE.** Deja un `Timer` vivo.
+   El síntoma es un test que falla en suite y pasa en aislamiento: se arregla
+   con `await tester.pump(const Duration(seconds: 6))` al final del que lo
+   muestra.
+
+10. **`TreinoSectionHeader` uppercasea el título.** `find.text('Biblioteca')`
+    falla; es `'BIBLIOTECA'`.
