@@ -12,6 +12,8 @@ import 'package:treino/features/workout/data/routine_repository.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_status.dart';
+import 'package:treino/features/workout/domain/routine_visibility.dart';
+import 'package:treino/features/workout/domain/routine_source.dart';
 
 class _MockRoutineRepository extends Mock implements RoutineRepository {}
 
@@ -20,6 +22,11 @@ const _trainerId = 'trainer-1';
 const _key = (trainerId: _trainerId, athleteId: _athleteId);
 
 void main() {
+  // `any(named: 'template')` sobre un parámetro tipado necesita un fallback
+  // registrado: mocktail lo pasa de mano en mano sin tocarlo, pero necesita
+  // ALGO del tipo correcto para armar el matcher.
+  setUpAll(() => registerFallbackValue(_makeRoutine('fallback')));
+
   late _MockRoutineRepository mockRepo;
   late int listCalls;
   late int grillaCalls;
@@ -50,7 +57,8 @@ void main() {
   });
 
   group('RoutineActionsNotifier.archive', () {
-    test('llama a repo.archive(routineId) e invalida assignedRoutinesByTrainerProvider',
+    test(
+        'llama a repo.archive(routineId) e invalida assignedRoutinesByTrainerProvider',
         () async {
       when(() => mockRepo.archive(any())).thenAnswer((_) async {});
       final container = makeContainer();
@@ -64,9 +72,8 @@ void main() {
       await container.read(assignedRoutinesByTrainerProvider(_key).future);
       expect(listCalls, 1);
 
-      final ok = await container
-          .read(routineActionsProvider.notifier)
-          .archive(routineId: 'r1', trainerId: _trainerId, athleteId: _athleteId);
+      final ok = await container.read(routineActionsProvider.notifier).archive(
+          routineId: 'r1', trainerId: _trainerId, athleteId: _athleteId);
 
       expect(ok, isTrue);
       verify(() => mockRepo.archive('r1')).called(1);
@@ -103,9 +110,8 @@ void main() {
       expect(getByIdCalls, 1);
 
       archived = true;
-      await container
-          .read(routineActionsProvider.notifier)
-          .archive(routineId: 'r1', trainerId: _trainerId, athleteId: _athleteId);
+      await container.read(routineActionsProvider.notifier).archive(
+          routineId: 'r1', trainerId: _trainerId, athleteId: _athleteId);
 
       // Sin la invalidación esto seguiría dando `active`: el keepAlive de
       // `_cacheOnlyOnSuccess` sólo se suelta si el fetch TIRA, así que el doc
@@ -122,9 +128,8 @@ void main() {
       final container = makeContainer();
       addTearDown(container.dispose);
 
-      final ok = await container
-          .read(routineActionsProvider.notifier)
-          .archive(routineId: 'r1', trainerId: _trainerId, athleteId: _athleteId);
+      final ok = await container.read(routineActionsProvider.notifier).archive(
+          routineId: 'r1', trainerId: _trainerId, athleteId: _athleteId);
 
       expect(ok, isFalse);
     });
@@ -187,6 +192,131 @@ void main() {
     });
   });
 
+  group('RoutineActionsNotifier.assignTemplate', () {
+    final plantilla = Routine(
+      id: 'tpl-1',
+      name: 'Fuerza 4x',
+      level: ExperienceLevel.beginner,
+      days: const [],
+      source: RoutineSource.trainerTemplate,
+      assignedBy: _trainerId,
+      visibility: RoutineVisibility.private,
+      status: RoutineStatus.active,
+    );
+
+    // COPIA, no mueve: `assignTemplateToAthlete` crea un doc nuevo y la
+    // plantilla queda donde estaba. Si la consumiera, no se podría dar la
+    // misma rutina a dos alumnos.
+    test('copia la plantilla al alumno e invalida los DOS listados', () async {
+      when(() => mockRepo.assignTemplateToAthlete(
+            template: any(named: 'template'),
+            athleteId: any(named: 'athleteId'),
+          )).thenAnswer((_) async => plantilla);
+
+      final container = makeContainer();
+      addTearDown(container.dispose);
+      await container.read(assignedRoutinesByTrainerProvider(_key).future);
+      await container.read(routinesAuthoredByProvider(_trainerId).future);
+      listCalls = 0;
+      grillaCalls = 0;
+
+      final ok =
+          await container.read(routineActionsProvider.notifier).assignTemplate(
+                template: plantilla,
+                athleteId: _athleteId,
+                trainerId: _trainerId,
+              );
+      expect(ok, isTrue);
+
+      await container.read(assignedRoutinesByTrainerProvider(_key).future);
+      await container.read(routinesAuthoredByProvider(_trainerId).future);
+
+      // La grilla de la sección, por el doc nuevo. Y el par trainer/alumno,
+      // que es de donde lee la ficha del alumno: sin eso la rutina recién
+      // asignada no aparece ahí hasta recargar.
+      expect(grillaCalls, 1);
+      expect(listCalls, 1);
+    });
+
+    test('si el repo falla devuelve false y no rompe', () async {
+      when(() => mockRepo.assignTemplateToAthlete(
+            template: any(named: 'template'),
+            athleteId: any(named: 'athleteId'),
+          )).thenThrow(Exception('sin red'));
+
+      final container = makeContainer();
+      addTearDown(container.dispose);
+
+      final ok =
+          await container.read(routineActionsProvider.notifier).assignTemplate(
+                template: plantilla,
+                athleteId: _athleteId,
+                trainerId: _trainerId,
+              );
+      expect(ok, isFalse);
+    });
+  });
+
+  group('RoutineActionsNotifier.setPublicada', () {
+    test('publicar llama a publishTemplate e invalida la grilla', () async {
+      when(() => mockRepo.publishTemplate(any())).thenAnswer((_) async {});
+
+      final container = makeContainer();
+      addTearDown(container.dispose);
+      await container.read(routinesAuthoredByProvider(_trainerId).future);
+      grillaCalls = 0;
+
+      final ok =
+          await container.read(routineActionsProvider.notifier).setPublicada(
+                routineId: 'tpl-1',
+                publicada: true,
+                trainerId: _trainerId,
+              );
+      expect(ok, isTrue);
+      verify(() => mockRepo.publishTemplate('tpl-1')).called(1);
+      verifyNever(() => mockRepo.unpublishTemplate(any()));
+
+      await container.read(routinesAuthoredByProvider(_trainerId).future);
+      expect(grillaCalls, 1);
+    });
+
+    // El flip es de UN campo en cada dirección. Si `publicada: false` llamara
+    // igual a `publishTemplate`, el menú diría «Despublicar» y PUBLICARÍA —
+    // el peor fallo posible acá, porque expone a la comunidad justo lo que el
+    // PF quiso sacar.
+    test('despublicar llama a unpublishTemplate, NO a publishTemplate',
+        () async {
+      when(() => mockRepo.unpublishTemplate(any())).thenAnswer((_) async {});
+
+      final container = makeContainer();
+      addTearDown(container.dispose);
+
+      final ok =
+          await container.read(routineActionsProvider.notifier).setPublicada(
+                routineId: 'tpl-1',
+                publicada: false,
+                trainerId: _trainerId,
+              );
+      expect(ok, isTrue);
+      verify(() => mockRepo.unpublishTemplate('tpl-1')).called(1);
+      verifyNever(() => mockRepo.publishTemplate(any()));
+    });
+
+    test('si el repo falla devuelve false', () async {
+      when(() => mockRepo.publishTemplate(any())).thenThrow(Exception('nope'));
+
+      final container = makeContainer();
+      addTearDown(container.dispose);
+
+      final ok =
+          await container.read(routineActionsProvider.notifier).setPublicada(
+                routineId: 'tpl-1',
+                publicada: true,
+                trainerId: _trainerId,
+              );
+      expect(ok, isFalse);
+    });
+  });
 }
 
 Routine _makeRoutine(

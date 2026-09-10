@@ -168,7 +168,7 @@ void main() {
       'features/coach_hub/presentation/sections/facturacion_planes/pricing_screen.dart',
       'features/coach_hub/presentation/sections/invitaciones/widgets/solicitud_card.dart',
       'features/coach_hub/presentation/sections/pagos/pagos_web_screen.dart',
-      'features/coach_hub/presentation/sections/pagos/widgets/athlete_picker_dialog.dart',
+      'features/coach_hub/presentation/widgets/athlete_picker_dialog.dart',
       'features/coach_hub/presentation/sections/pagos/widgets/estado_cuenta_card.dart',
       'features/coach_hub/presentation/sections/pagos/widgets/marcar_pagado_actions.dart',
       'features/coach_hub/presentation/sections/pagos/widgets/pagos_table.dart',

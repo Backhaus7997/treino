@@ -102,10 +102,11 @@ Future<String> _pumpYTocar(
 }
 
 void main() {
+  _menuDeRutinasTests();
   group('RoutineCardGrid — etiquetas', () {
     testWidgets('nombre resuelto → «Asignada a Sofía»', (tester) async {
-      await _pumpSoloGrilla(tester,
-          [_routine(id: 'r1', assignedTo: _athlete)], 'Sofía');
+      await _pumpSoloGrilla(
+          tester, [_routine(id: 'r1', assignedTo: _athlete)], 'Sofía');
       expect(find.text('Asignada a Sofía'), findsOneWidget);
     });
 
@@ -150,8 +151,7 @@ void main() {
     });
 
     testWidgets('el resumen dice el split y las semanas', (tester) async {
-      await _pumpSoloGrilla(
-          tester, [_routine(id: 'r1', numWeeks: 4)], null);
+      await _pumpSoloGrilla(tester, [_routine(id: 'r1', numWeeks: 4)], null);
       expect(find.text('PPL · 4 semanas'), findsOneWidget);
     });
   });
@@ -168,8 +168,7 @@ void main() {
       expect(find.text('Eliminar'), findsOneWidget);
     });
 
-    testWidgets('una YA archivada no ofrece archivar de nuevo',
-        (tester) async {
+    testWidgets('una YA archivada no ofrece archivar de nuevo', (tester) async {
       await _pumpSoloGrilla(
         tester,
         [_routine(id: 'r1', status: RoutineStatus.archived)],
@@ -249,6 +248,82 @@ void main() {
 }
 
 /// Igual que [_pumpYTocar] pero sin navegar — para afirmar sobre la card.
+void _menuDeRutinasTests() {
+  group('RoutineCardGrid — el menú ofrece SÓLO lo que es válido', () {
+    Future<void> abrirMenu(WidgetTester tester, Routine r) async {
+      await _pumpSoloGrilla(tester, [r], 'Sofía');
+      await tester.tap(find.byTooltip('Opciones de la rutina'));
+      await tester.pumpAndSettle();
+    }
+
+    // Publicar hace un flip de `visibility`, y la regla de Firestore lo
+    // restringe a docs `trainer-template` del dueño. Sobre una rutina asignada
+    // el ítem sería un botón roto POR CONTRATO: el PF lo aprieta, ve un error
+    // y no aprende por qué.
+    testWidgets('una rutina ASIGNADA no ofrece publicar ni asignar',
+        (tester) async {
+      await abrirMenu(
+        tester,
+        _routine(id: 'r1', assignedTo: _athlete),
+      );
+
+      expect(find.text('Publicar en la comunidad'), findsNothing);
+      expect(find.text('Despublicar'), findsNothing);
+      expect(find.text('Asignar a un alumno'), findsNothing);
+      expect(find.text('Archivar'), findsOneWidget);
+      expect(find.text('Eliminar'), findsOneWidget);
+    });
+
+    testWidgets('una PLANTILLA privada ofrece asignar y publicar',
+        (tester) async {
+      await abrirMenu(
+        tester,
+        _routine(id: 'r1', source: RoutineSource.trainerTemplate),
+      );
+
+      expect(find.text('Asignar a un alumno'), findsOneWidget);
+      expect(find.text('Publicar en la comunidad'), findsOneWidget);
+      expect(find.text('Despublicar'), findsNothing);
+    });
+
+    // El ítem dice lo CONTRARIO del estado actual: es la acción, no la
+    // etiqueta del estado. Con la plantilla ya pública, ofrecer «Publicar»
+    // sería prometer algo que ya pasó.
+    testWidgets('una PLANTILLA pública ofrece despublicar', (tester) async {
+      await abrirMenu(
+        tester,
+        _routine(
+          id: 'r1',
+          source: RoutineSource.trainerTemplate,
+          visibility: RoutineVisibility.public,
+        ),
+      );
+
+      expect(find.text('Despublicar'), findsOneWidget);
+      expect(find.text('Publicar en la comunidad'), findsNothing);
+    });
+
+    // Archivada = fuera de circulación. Asignarla o publicarla la devolvería a
+    // circulación por la puerta de atrás, sin desarchivarla.
+    testWidgets('una plantilla ARCHIVADA sólo se puede eliminar',
+        (tester) async {
+      await abrirMenu(
+        tester,
+        _routine(
+          id: 'r1',
+          source: RoutineSource.trainerTemplate,
+          status: RoutineStatus.archived,
+        ),
+      );
+
+      expect(find.text('Asignar a un alumno'), findsNothing);
+      expect(find.text('Publicar en la comunidad'), findsNothing);
+      expect(find.text('Archivar'), findsNothing);
+      expect(find.text('Eliminar'), findsOneWidget);
+    });
+  });
+}
+
 Future<void> _pumpSoloGrilla(
   WidgetTester tester,
   List<Routine> routines,

@@ -1,5 +1,9 @@
-/// Selector de alumno para el CTA "+ Registrar pago" trainer-wide de la
-/// sección Pagos (`pagos_web_screen.dart`).
+/// Selector de alumno del Coach Hub — cualquier acción que necesite elegir a
+/// quién, sin un alumno de contexto en la ruta.
+///
+/// Vivía en `sections/pagos/widgets/` porque nació ahí. Se mudó al kit cuando
+/// Rutinas necesitó lo mismo para asignar una plantilla: dos secciones
+/// importándose entre sí es peor que un widget compartido.
 ///
 /// ADR-F9-06 (remediación CRITICAL-1, verify ronda 1): a diferencia de
 /// `alumno_detail_screen.dart` — donde el `athleteId` ya viene de la ruta —
@@ -35,7 +39,7 @@ import 'package:treino/features/coach_hub/presentation/widgets/button/treino_but
 
 /// Abre el diálogo de selección de alumno; devuelve el `athleteId` elegido,
 /// o `null` si el trainer cancela / no hay alumnos vinculados.
-Future<String?> pickAthleteForPago(BuildContext context, WidgetRef ref) {
+Future<String?> pickAthlete(BuildContext context, WidgetRef ref) {
   return showDialog<String>(
     context: context,
     builder: (_) => const _AthletePickerDialog(),
