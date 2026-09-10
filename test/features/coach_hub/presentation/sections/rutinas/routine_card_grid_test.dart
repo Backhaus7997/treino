@@ -157,15 +157,74 @@ void main() {
   });
 
   group('RoutineCard — el menú de la rutina', () {
-    testWidgets('ofrece archivar y eliminar', (tester) async {
+    testWidgets('sobre un PLAN, archivar se llama «Sacársela a {nombre}»',
+        (tester) async {
+      // Es la MISMA operación —archivar la copia del alumno— con el nombre de
+      // lo que el PF vino a hacer. Con la palabra «Archivar» no la encontraba:
+      // llegó a pedir «desasignar» como función nueva, que las reglas no
+      // permiten (`assignedTo` es inmutable) y que no hace falta.
       await _pumpSoloGrilla(
           tester, [_routine(id: 'r1', assignedTo: _athlete)], 'Sofía');
 
       await tester.tap(find.byTooltip('Opciones de la rutina'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Archivar'), findsOneWidget);
+      expect(find.text('Sacársela a Sofía'), findsOneWidget);
+      expect(find.text('Archivar'), findsNothing);
       expect(find.text('Eliminar'), findsOneWidget);
+    });
+
+    testWidgets('sobre una PLANTILLA sigue diciendo «Archivar»',
+        (tester) async {
+      // Una plantilla no tiene a quién sacársela. «Archivar» describe bien lo
+      // que pasa: sale de tu biblioteca.
+      await _pumpSoloGrilla(
+        tester,
+        [_routine(id: 'r1', source: RoutineSource.trainerTemplate)],
+        null,
+      );
+
+      await tester.tap(find.byTooltip('Opciones de la rutina'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Archivar'), findsOneWidget);
+      expect(find.textContaining('Sacársela'), findsNothing);
+    });
+
+    testWidgets('sin nombre resuelto dice «al alumno», nunca un uid',
+        (tester) async {
+      // Mismo criterio que las etiquetas: mientras el perfil carga —o si la
+      // cuenta se borró— no se inventa un nombre ni se filtra el uid a la UI.
+      await _pumpSoloGrilla(
+          tester, [_routine(id: 'r1', assignedTo: _athlete)], null);
+
+      await tester.tap(find.byTooltip('Opciones de la rutina'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sacársela al alumno'), findsOneWidget);
+      expect(find.textContaining(_athlete), findsNothing);
+    });
+
+    testWidgets('el diálogo de sacársela NO promete que la plantilla queda',
+        (tester) async {
+      // La tentación del diseño original era tranquilizar con «tu plantilla no
+      // se toca». Sería verdad SÓLO si el plan hubiera salido de una
+      // plantilla, y la rutina no guarda de qué doc se copió:
+      // `createAssigned` se llama desde tres pantallas que arman el plan a
+      // mano. Un cartel que tranquiliza con algo que puede ser falso es peor
+      // que no tenerlo (AGENTS.md §11.1).
+      await _pumpSoloGrilla(
+          tester, [_routine(id: 'r1', assignedTo: _athlete)], 'Sofía');
+
+      await tester.tap(find.byTooltip('Opciones de la rutina'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sacársela a Sofía'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('plantilla'), findsNothing);
+      // Lo que sí es cierto siempre, y es lo que frena el miedo real.
+      expect(find.textContaining('ya hizo se conservan'), findsOneWidget);
+      expect(find.textContaining('Archivadas'), findsOneWidget);
     });
 
     testWidgets('una YA archivada no ofrece archivar de nuevo', (tester) async {
@@ -179,6 +238,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Archivar'), findsNothing);
+      expect(find.text('Recuperar'), findsOneWidget);
       expect(find.text('Eliminar'), findsOneWidget);
     });
 
@@ -270,7 +330,7 @@ void _menuDeRutinasTests() {
       expect(find.text('Publicar en la comunidad'), findsNothing);
       expect(find.text('Despublicar'), findsNothing);
       expect(find.text('Asignar a un alumno'), findsNothing);
-      expect(find.text('Archivar'), findsOneWidget);
+      expect(find.text('Sacársela a Sofía'), findsOneWidget);
       expect(find.text('Eliminar'), findsOneWidget);
     });
 
@@ -304,8 +364,9 @@ void _menuDeRutinasTests() {
     });
 
     // Archivada = fuera de circulación. Asignarla o publicarla la devolvería a
-    // circulación por la puerta de atrás, sin desarchivarla.
-    testWidgets('una plantilla ARCHIVADA sólo se puede eliminar',
+    // circulación por la puerta de atrás, sin desarchivarla. Lo que SÍ ofrece
+    // es desarchivarla por la puerta de adelante.
+    testWidgets('una plantilla ARCHIVADA ofrece recuperar y eliminar',
         (tester) async {
       await abrirMenu(
         tester,
@@ -319,7 +380,31 @@ void _menuDeRutinasTests() {
       expect(find.text('Asignar a un alumno'), findsNothing);
       expect(find.text('Publicar en la comunidad'), findsNothing);
       expect(find.text('Archivar'), findsNothing);
+      expect(find.text('Recuperar'), findsOneWidget);
       expect(find.text('Eliminar'), findsOneWidget);
+    });
+
+    // Recuperar un PLAN es visible para otra persona: vuelve al perfil del
+    // alumno. Y el alumno lo lee aunque el vínculo haya terminado —la regla de
+    // lectura mira `assignedTo`, no el link— así que el diálogo NOMBRA a quién
+    // se lo está devolviendo. Ese nombre es el guard.
+    testWidgets('recuperar un PLAN confirma nombrando al alumno',
+        (tester) async {
+      await abrirMenu(
+        tester,
+        _routine(
+          id: 'r1',
+          assignedTo: _athlete,
+          status: RoutineStatus.archived,
+        ),
+      );
+
+      await tester.tap(find.text('Recuperar'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('¿Devolverle «Fuerza 4x» a Sofía?'), findsOneWidget);
+      expect(find.textContaining('Vuelve a su perfil'), findsOneWidget);
+      expect(find.text('Devolvérsela'), findsOneWidget);
     });
   });
 }

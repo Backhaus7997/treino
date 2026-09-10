@@ -247,13 +247,27 @@ class _Etiqueta extends StatelessWidget {
   }
 }
 
-/// El ⋮ de una card: archivar y eliminar.
+/// El ⋮ de una card: asignar, publicar, archivar, recuperar y eliminar.
 ///
-/// Las dos conviven a propósito. La app archiva por defecto —«el documento se
-/// conserva para mantener referencias históricas de sesiones», ADR-USR-04— y
-/// eso sigue siendo lo correcto para un plan que alguien entrenó. Eliminar es
-/// para lo otro: una plantilla que nunca se entrenó, o un plan cargado mal que
-/// no debería figurar en la biblioteca.
+/// Archivar y eliminar conviven a propósito. La app archiva por defecto —«el
+/// documento se conserva para mantener referencias históricas de sesiones»,
+/// ADR-USR-04— y eso sigue siendo lo correcto para un plan que alguien
+/// entrenó. Eliminar es para lo otro: una plantilla que nunca se entrenó, o un
+/// plan cargado mal que no debería figurar en la biblioteca.
+///
+/// **Archivar se llama distinto según qué sea la rutina, y no es cosmética.**
+/// Sobre una PLANTILLA, «Archivar» describe bien lo que pasa: sale de tu
+/// biblioteca. Sobre un PLAN ASIGNADO, la misma palabra no dice lo que el PF
+/// está buscando cuando entra acá —sacarle la rutina a un alumno para darle
+/// otra—, y por no encontrar esa acción llegó a pedirla como una función nueva
+/// («desasignar»). No hacía falta ninguna: archivar la copia del alumno ES
+/// eso. Faltaba que el menú lo dijera con las palabras del PF.
+///
+/// **No se puede desasignar de verdad, y está bien.** `assignedTo` y `source`
+/// son inmutables por regla de servidor (`firestore.rules`, paths 3 y 4).
+/// Convertir la copia del alumno de vuelta en plantilla dejaría sus
+/// `Session.routineId` colgando de un documento que pasó a ser del PF. Por eso
+/// «Sacársela a X» archiva, y el diálogo no promete lo que no hace.
 class _MenuDeLaRutina extends ConsumerStatefulWidget {
   const _MenuDeLaRutina({required this.routine});
 
@@ -283,6 +297,7 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
     final archivada = r.status == RoutineStatus.archived;
     final esPlantilla = r.source == RoutineSource.trainerTemplate;
     final publica = r.visibility == RoutineVisibility.public;
+    final nombreAlumno = _nombreDelAlumno(ref, r);
 
     if (_ocupado) {
       return const SizedBox(
@@ -334,10 +349,28 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
                   : 'Publicar en la comunidad', // i18n
             ),
           ),
+        // Archivar, con el nombre que corresponde a lo que el PF está
+        // haciendo. Sobre un plan asignado, «Archivar» es correcto y no se
+        // entiende; «Sacársela a Juan» es la MISMA operación descrita desde el
+        // problema del PF. Ver el dartdoc de la clase.
         if (!archivada)
-          const PopupMenuItem(
+          PopupMenuItem(
             value: _AccionRutina.archivar,
-            child: Text('Archivar'), // i18n
+            child: Text(
+              esPlantilla
+                  ? 'Archivar' // i18n
+                  : nombreAlumno == null
+                      ? 'Sacársela al alumno' // i18n
+                      : 'Sacársela a $nombreAlumno', // i18n
+            ),
+          ),
+        // El camino de vuelta. Existe desde este cambio: hasta ahora el filtro
+        // «Archivadas» te la MOSTRABA y no había forma de volver a usarla,
+        // mientras el diálogo prometía que se podía recuperar.
+        if (archivada)
+          const PopupMenuItem(
+            value: _AccionRutina.recuperar,
+            child: Text('Recuperar'), // i18n
           ),
         PopupMenuItem(
           value: _AccionRutina.eliminar,
@@ -363,23 +396,28 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
         accion == _AccionRutina.despublicar) {
       return _publicar(r, publicada: accion == _AccionRutina.publicar);
     }
+    if (accion == _AccionRutina.recuperar) return _recuperar(r);
 
     // El uid se resuelve DESPUÉS de confirmar. Chequearlo antes hacía que el
     // tap no hiciera nada cuando el stream de auth todavía no emitió: un
     // fallo silencioso, que es lo que hay que evitar. Si falta, la acción
     // falla y lo dice por el mismo camino que cualquier otro error.
+    final archivar = accion == _AccionRutina.archivar;
+    final nombre = _nombreDelAlumno(ref, r);
+
     final confirmado = await showTreinoDialog<bool>(
       context,
       builder: (ctx) => TreinoDialog(
-        title: accion == _AccionRutina.archivar
-            ? '¿Archivar «${r.name}»?' // i18n
-            : '¿Eliminar «${r.name}»?', // i18n
+        title: !archivar
+            ? '¿Eliminar «${r.name}»?' // i18n
+            : !asignada
+                ? '¿Archivar «${r.name}»?' // i18n
+                : nombre == null
+                    ? '¿Sacarle «${r.name}» al alumno?' // i18n
+                    : '¿Sacarle «${r.name}» a $nombre?', // i18n
         body: Text(
-          accion == _AccionRutina.archivar
-              // i18n
-              ? 'Deja de estar activa. La podés recuperar desde el filtro '
-                  'Archivadas.'
-              : asignada
+          !archivar
+              ? asignada
                   // La advertencia CONCRETA, no un «esto no se puede
                   // deshacer» genérico: un plan asignado pudo entrenarse, y
                   // las sesiones de ese alumno apuntan a este documento.
@@ -389,11 +427,33 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
                       'ya hizo con esta rutina quedan sin referencia. Si sólo '
                       'querés sacarla de circulación, archivala.'
                   // i18n
-                  : 'Se borra para siempre. No se puede recuperar.',
+                  : 'Se borra para siempre. No se puede recuperar.'
+              : asignada
+                  // Las TRES cosas que el PF necesita saber para no tenerle
+                  // miedo, y ninguna de más.
+                  //
+                  // Lo que NO dice, a propósito: que «tu plantilla queda
+                  // intacta». Sería verdad sólo si este plan hubiera salido de
+                  // una plantilla, y no hay forma de saberlo — `createAssigned`
+                  // se llama desde tres pantallas que arman el plan a mano, y
+                  // la rutina no guarda de qué documento se copió. Un cartel
+                  // que tranquiliza con algo que puede ser falso es peor que
+                  // no tenerlo (AGENTS.md §11.1); el lugar donde esa frase SÍ
+                  // es cierta es el aviso de asignar, y ahí está.
+                  // i18n
+                  ? 'Deja de verla en su perfil y no va a poder seguir '
+                      'entrenándola. Los entrenamientos que ya hizo se '
+                      'conservan, y la rutina te queda en el filtro '
+                      'Archivadas por si se la querés devolver.'
+                  // i18n
+                  : 'Sale de tu biblioteca y deja de estar activa. Te queda '
+                      'en el filtro Archivadas, y desde ahí la recuperás.',
         ),
-        primaryLabel: accion == _AccionRutina.archivar
-            ? 'Archivar' // i18n
-            : 'Eliminar', // i18n
+        primaryLabel: !archivar
+            ? 'Eliminar' // i18n
+            : !asignada
+                ? 'Archivar' // i18n
+                : 'Sacársela', // i18n
         onPrimaryTap: () => Navigator.of(ctx).pop(true),
         secondaryLabel: 'Cancelar', // i18n
         onSecondaryTap: () => Navigator.of(ctx).pop(false),
@@ -416,7 +476,96 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
 
     if (!mounted) return;
     setState(() => _ocupado = false);
-    if (!ok) _avisar('No se pudo. Probá de nuevo.'); // i18n
+    if (!ok) {
+      _avisar('No se pudo. Probá de nuevo.'); // i18n
+      return;
+    }
+    // El éxito se avisa sólo al sacarle una rutina a un alumno, y por una
+    // razón: con el filtro «Todas» —el default— la card NO desaparece, sólo
+    // se le suma la etiqueta «Archivada». Sin una línea que lo diga, el PF
+    // hace la acción más delicada del menú y la pantalla se ve casi igual.
+    // Eliminar y archivar una plantilla sí se ven: la card se va o se apaga.
+    if (archivar && asignada) {
+      _avisar(nombre == null
+          // i18n
+          ? 'Listo. Ya no la ve en su perfil, y te queda en Archivadas.'
+          // i18n
+          : 'Listo, $nombre ya no la ve. Te queda en Archivadas por si se la '
+              'querés devolver.');
+    }
+  }
+
+  /// El nombre del alumno de una rutina asignada, o `null`.
+  ///
+  /// `null` cubre DOS casos distintos que el llamador trata igual: que la
+  /// rutina no tenga alumno (es plantilla) y que el perfil todavía no haya
+  /// resuelto. El segundo importa: mientras carga hay que decir «al alumno», no
+  /// un nombre inventado ni un id crudo. Mismo criterio que `_Etiquetas`, que
+  /// muestra «Asignada» hasta que el nombre llega.
+  static String? _nombreDelAlumno(WidgetRef ref, Routine r) {
+    final uid = r.assignedTo;
+    if (uid == null || uid.isEmpty) return null;
+    final nombre =
+        ref.watch(userPublicProfileProvider(uid)).valueOrNull?.displayName;
+    final limpio = nombre?.trim();
+    return (limpio == null || limpio.isEmpty) ? null : limpio;
+  }
+
+  /// Devuelve una rutina archivada a `active`.
+  ///
+  /// Pide confirmación SÓLO si tiene alumno, y no por ser destructiva —no lo
+  /// es— sino porque es visible para otra persona: el plan vuelve al perfil del
+  /// alumno y lo puede entrenar de nuevo. Y el alumno lo lee aunque el vínculo
+  /// haya terminado (la regla de lectura mira `assignedTo`, no el link), así
+  /// que un PF recuperando planes viejos en fila podría devolverle una rutina a
+  /// alguien que ya no es su alumno sin darse cuenta. Nombrar a la persona en
+  /// el diálogo es lo que lo frena.
+  ///
+  /// Recuperar una PLANTILLA no le llega a nadie, así que va directo.
+  Future<void> _recuperar(Routine r) async {
+    final nombre = _nombreDelAlumno(ref, r);
+    final asignada = (r.assignedTo ?? '').isNotEmpty;
+
+    if (asignada) {
+      final confirmado = await showTreinoDialog<bool>(
+        context,
+        builder: (ctx) => TreinoDialog(
+          title: nombre == null
+              ? '¿Devolverle «${r.name}» al alumno?' // i18n
+              : '¿Devolverle «${r.name}» a $nombre?', // i18n
+          body: const Text(
+            // i18n
+            'Vuelve a su perfil y la va a poder entrenar de nuevo.',
+          ),
+          primaryLabel: 'Devolvérsela', // i18n
+          onPrimaryTap: () => Navigator.of(ctx).pop(true),
+          secondaryLabel: 'Cancelar', // i18n
+          onSecondaryTap: () => Navigator.of(ctx).pop(false),
+        ),
+      );
+      if (confirmado != true || !mounted) return;
+    }
+
+    setState(() => _ocupado = true);
+    final trainerId = ref.read(currentUidProvider) ?? '';
+    final ok = trainerId.isEmpty
+        ? false
+        : await ref.read(routineActionsProvider.notifier).unarchive(
+              routineId: r.id,
+              trainerId: trainerId,
+              athleteId: r.assignedTo ?? '',
+            );
+
+    if (!mounted) return;
+    setState(() => _ocupado = false);
+    if (!ok) {
+      _avisar('No se pudo. Probá de nuevo.'); // i18n
+      return;
+    }
+    _avisar(asignada
+        // i18n
+        ? '«${r.name}» vuelve a estar activa${nombre == null ? '' : ' para $nombre'}.'
+        : '«${r.name}» vuelve a tu biblioteca.'); // i18n
   }
 
   /// Asigna la plantilla a un alumno elegido en el momento.
@@ -482,4 +631,11 @@ class _MenuDeLaRutinaState extends ConsumerState<_MenuDeLaRutina> {
   }
 }
 
-enum _AccionRutina { asignar, publicar, despublicar, archivar, eliminar }
+enum _AccionRutina {
+  asignar,
+  publicar,
+  despublicar,
+  archivar,
+  recuperar,
+  eliminar,
+}
