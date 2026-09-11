@@ -221,7 +221,20 @@ service cloud.firestore {
                     // Cerrar la salida y dejar abierta la entrada no cierra
                     // nada. Lo escribe el webhook de la tienda, nunca el
                     // cliente.
-                    && request.resource.data.get('athleteSubscription', null) == null;
+                    && request.resource.data.get('athleteSubscription', null) == null
+                    // storeAccountToken: el UUID con el que una tienda
+                    // identifica la cuenta del comprador. Lo emite
+                    // `ensureStoreAccountToken` y NUNCA el cliente.
+                    //
+                    // Es un ANCLA DE IDENTIDAD DE PAGOS: quien pudiera
+                    // escribirlo podria ponerse el token de otro y reclamar
+                    // sus compras — el webhook recibe el token, busca a quien
+                    // pertenece, y encuentra al atacante.
+                    //
+                    // Hoy no se usa para nada. Se pinea igual, porque el dia
+                    // que se use va a estar lleno de tokens viejos que nadie
+                    // sabe quien escribio.
+                    && request.resource.data.get('storeAccountToken', null) == null;
 
       // Update: only the owner can update, and the four immutable fields
       // MUST equal their previous values. Trainers via Admin SDK only;
@@ -292,6 +305,11 @@ service cloud.firestore {
                     // indeleble lo que se sembró al crear, y el que lee el
                     // comentario da por cerrado lo que quedó abierto.
                     && request.resource.data.get('athleteSubscription', null) == resource.data.get('athleteSubscription', null)
+                    // storeAccountToken: CF-write-only, en los DOS verbos por
+                    // la misma razon de siempre — medio pin es peor que
+                    // ninguno, porque vuelve INDELEBLE lo que se sembro al
+                    // crear.
+                    && request.resource.data.get('storeAccountToken', null) == resource.data.get('storeAccountToken', null)
                     // Notification inbox read cursor: owner-writeable, timestamp-only.
                     && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['notificationsLastSeenAt'])
                         || request.resource.data.notificationsLastSeenAt is timestamp);

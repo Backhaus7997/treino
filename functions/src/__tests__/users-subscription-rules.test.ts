@@ -31,6 +31,7 @@
  *     "npm --prefix functions test -- --runInBand users-subscription-rules"
  */
 
+import { randomUUID } from "node:crypto";
 import * as fs from "fs";
 import * as path from "path";
 import {
@@ -84,6 +85,8 @@ interface UserFixture {
   // La suscripcion del ALUMNO — otro campo, otro paywall, mismo motivo para
   // estar pinneado: lo escribe la CF, nunca el dueno del documento.
   athleteSubscription?: Record<string, unknown> | null;
+  /// El UUID con el que una tienda identifica la cuenta. CF-write-only.
+  storeAccountToken?: string | null;
   weightedLoad?: number | null;
   blockedAthleteIds?: string[];
 }
@@ -388,6 +391,120 @@ describe("users rules — blockedAthleteIds CF-write-only (slice 5)", () => {
 //     FCM repository writes `set({fcmTokens: arrayUnion(...)}, merge: true)`.
 //     A regression test that proves "ordinary profile edits still pass" using
 //     a shape the app does not send proves less than it looks.
+describe("users rules — storeAccountToken: el ancla de identidad de pagos", () => {
+  // Hoy este campo NO SE USA PARA NADA. Se pinea igual, y el motivo es el que
+  // hace que valga la pena testearlo: el dia que se use, la base va a estar
+  // llena de tokens viejos que nadie sabe quien escribio.
+  //
+  // Es un ANCLA DE IDENTIDAD: quien pudiera escribirlo podria ponerse el token
+  // de otro y reclamar sus compras — el webhook recibe el token, busca a quien
+  // pertenece, y encuentra al atacante.
+  const uid = "athlete-forge-token";
+  // Generados, no literales: un UUID escrito a mano al lado de una variable
+  // llamada `TOKEN` dispara la regla `generic-api-key` de gitleaks, y ese gate
+  // es BLOQUEANTE. Ampliarle la allowlist para que entre un test es cómo un
+  // gate de seguridad termina apagado.
+  const TOKEN = randomUUID();
+  const OTRO = randomUUID();
+
+  it("deniega al dueño escribirse un token", async () => {
+    await seedUser({
+      uid,
+      role: "athlete",
+      email: `${uid}@example.test`,
+      createdAt: 0,
+    });
+
+    const client = testEnv.authenticatedContext(uid);
+    const ref = client.firestore().collection(COL_USERS).doc(uid);
+
+    await assertFails(ref.update({ storeAccountToken: TOKEN }));
+  });
+
+  it("EL QUE IMPORTA: deniega ROBARSE el token de otro", async () => {
+    // El ataque concreto: si esto pasara, el atacante podria comprar y que la
+    // acreditacion cayera sobre la cuenta de la victima — o al reves, hacer
+    // que la compra de la victima lo acredite a el.
+    await seedUser({
+      uid: `${uid}-robo`,
+      role: "athlete",
+      email: `${uid}-robo@example.test`,
+      createdAt: 0,
+      storeAccountToken: TOKEN,
+    });
+
+    const client = testEnv.authenticatedContext(`${uid}-robo`);
+    const ref = client.firestore().collection(COL_USERS).doc(`${uid}-robo`);
+
+    await assertFails(ref.update({ storeAccountToken: OTRO }));
+  });
+
+  it("deniega BORRARLO — el pin es en los dos sentidos", async () => {
+    await seedUser({
+      uid: `${uid}-delete`,
+      role: "athlete",
+      email: `${uid}-delete@example.test`,
+      createdAt: 0,
+      storeAccountToken: TOKEN,
+    });
+
+    const client = testEnv.authenticatedContext(`${uid}-delete`);
+    const ref = client.firestore().collection(COL_USERS).doc(`${uid}-delete`);
+
+    await assertFails(
+      ref.update({ storeAccountToken: firebase.firestore.FieldValue.delete() }),
+    );
+  });
+
+  it("deniega SEMBRARLO en el create — media proteccion es peor que ninguna", async () => {
+    // Sin este caso, el pin del update lo volveria INDELEBLE: quien se
+    // auto-creara el doc con un token elegido quedaria con el para siempre.
+    const freshUid = "athlete-plants-token-on-create";
+    const client = testEnv.authenticatedContext(freshUid);
+    const ref = client.firestore().collection(COL_USERS).doc(freshUid);
+
+    await assertFails(
+      ref.set({
+        uid: freshUid,
+        role: "athlete",
+        email: `${freshUid}@example.test`,
+        createdAt: 0,
+        storeAccountToken: TOKEN,
+      }),
+    );
+  });
+
+  it("el signup normal sigue pasando — el pin rechaza el CAMPO, no el alta", async () => {
+    const freshUid = "athlete-signup-sin-token";
+    const client = testEnv.authenticatedContext(freshUid);
+    const ref = client.firestore().collection(COL_USERS).doc(freshUid);
+
+    await assertSucceeds(
+      ref.set({
+        uid: freshUid,
+        role: "athlete",
+        email: `${freshUid}@example.test`,
+        createdAt: 0,
+      }),
+    );
+  });
+
+  it("y el dueño sigue pudiendo escribir sus campos normales", async () => {
+    await seedUser({
+      uid: `${uid}-normal`,
+      role: "athlete",
+      email: `${uid}-normal@example.test`,
+      createdAt: 0,
+      storeAccountToken: TOKEN,
+    });
+
+    const client = testEnv.authenticatedContext(`${uid}-normal`);
+    const ref = client.firestore().collection(COL_USERS).doc(`${uid}-normal`);
+
+    await assertSucceeds(ref.update({ displayName: "Martín" }));
+  });
+});
+
 describe("users rules — athleteSubscription: la ENTRADA del paywall del alumno", () => {
   // Este campo estaba SIN pin mientras su conclusión denormalizada
   // (`athletePaywallEnforced`) sí lo tenía. Cerrar la salida y dejar abierta la
