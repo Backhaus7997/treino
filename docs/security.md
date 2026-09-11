@@ -243,8 +243,8 @@ ejercitan las mismas reglas por HTTP crudo en vez de por SDK.
 
 Se dejan porque **siguen siendo reproducibles**, que es todo el valor de una
 foto: el mismo comando contra `git show 7b3d27dc:<archivo>` devuelve 296 y 202
-clavados. Lo que no son es el presente — hoy dan **765 y 441**, dos veces y
-media, sobre 56 archivos en vez de 28.
+clavados. Lo que no son es el presente — hoy dan **736 y 429**, dos veces y
+media, sobre 54 archivos en vez de 28.
 
 ⚠️ Y ojo con ese **`8 en scripts/rules_test/`**: es exactamente de donde §1.4
 copió el 8 que quedó podrido hasta que alguien recontó y encontró 14. Si venís a
@@ -479,21 +479,50 @@ sección en el mismo PR.** Concretamente:
 4. **Reconciliá el universo, no sólo los totales.** Un total puede cuadrar
    perfecto con una fila que nunca se escribió: `exerciseFeedback` y
    `wellbeingCheckIns` vivieron así, con tests y sin fila. Lo único que lo
-   detecta es contar los dos lados y restar:
+   detecta es comparar los dos lados. **Comparar los CONJUNTOS, no los
+   tamaños**: un renombre saca un `match` y mete otro, la cardinalidad no se
+   mueve y el chequeo pasa en verde con una fila rancia *y* un path sin fila.
+   Medido: renombrar `follows` → `followEdges` deja 42 `match`, 36 filas y la
+   resta sigue dando 5.
 
    ```bash
-   rg -c '^\s*match /' firestore.rules   # menos 1, el wrapper databases/documents
+   python3 - <<'PY'
+   import re
+   EXCL = {"mp_checkouts","mp_plans","mp_preapprovals",
+           "mp_webhook_events","rc_webhook_events"}   # §2.0 punto 1
+   rules = open("firestore.rules").read(); doc = open("docs/security.md").read()
+   paths, pila, d = [], [], 0
+   for raw in rules.splitlines():
+       s = re.sub(r"//.*$", "", raw).strip()
+       m = re.match(r"match\s+(\S+)\s*\{", s)
+       if m:
+           seg = m.group(1).strip("/")
+           paths.append("/".join([p for p, _ in pila] + [seg])); pila.append((seg, d))
+       d += s.count("{") - s.count("}")
+       while pila and d <= pila[-1][1]: pila.pop()
+   W = "databases/{database}/documents"
+   norm = lambda p: re.sub(r"\{[^}]+\}", "{}", p.strip("/"))
+   reglas = {norm(p[len(W) + 1:]) for p in paths if p != W}
+   b = doc[doc.index("### 1.1 "):doc.index("### 1.2 ")]
+   filas = {norm(l.strip().strip("|").split("|")[0].strip().strip("`"))
+            for l in b[:b.index("**")].splitlines() if l.startswith("| `")}
+   cubre = lambda p: p in filas or "/".join(p.split("/")[:-1]) in filas
+   sin_fila = {p.split("/")[0] for p in reglas if not cubre(p)} - EXCL
+   huerfanas = {f for f in filas
+                if not any(f == p or f == "/".join(p.split("/")[:-1]) for p in reglas)}
+   print("match sin fila :", sorted(sin_fila) or "ninguno")
+   print("filas huérfanas:", sorted(huerfanas) or "ninguna")
+   PY
    ```
 
-   Esa cuenta menos las filas de §1.1 tiene que dar **exactamente 5**, y esos 5
-   tienen que ser `mp_checkouts`, `mp_plans`, `mp_preapprovals`,
-   `mp_webhook_events` y `rc_webhook_events` — los únicos que la matriz excluye
-   a propósito (§2.0, punto 1). Si da otra cosa, hay un `match` sin fila.
+   Las dos listas tienen que salir vacías. La primera caza un `match` que nunca
+   entró a la matriz; la segunda, una fila que quedó nombrando un path que ya no
+   existe. Un conteo no distingue ninguna de las dos.
 
-   Nombralos, no los deduzcas por ser `if false`: **`mail_queue` también es
-   `if false` y sí tiene fila**, con las cinco celdas en `—`. "Cerrado a todo
-   cliente" no es el criterio que separa las dos listas, así que un chequeo
-   escrito así pasa en verde con una fila de menos.
+   Y las cinco exclusiones van **nombradas** en `EXCL`, no deducidas por ser
+   `if false`: **`mail_queue` también es `if false` y sí tiene fila**, con las
+   cinco celdas en `—`. "Cerrado a todo cliente" no es el criterio que separa
+   las dos listas, así que deducirlas deja pasar una fila de menos.
 5. Los tests de reglas se corren con:
 
    ```bash
