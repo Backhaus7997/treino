@@ -60,7 +60,7 @@ porque son permisos distintos: `get` protege un documento, `list` protege la
 enumeración, y una regla puede tapar uno y dejar el otro abierto). En Storage
 son `get` / `list` / `write` / `delete`.
 
-### 1.1 Firestore — 34 paths declarados en `firestore.rules`
+### 1.1 Firestore — 36 paths declarados en `firestore.rules`
 
 | Colección | get | list | create | update | delete |
 |---|---|---|---|---|---|
@@ -68,7 +68,9 @@ son `get` / `list` / `write` / `delete`.
 | `users/{uid}/notifications` | ✅ | — | ✅ | ✅ | ✅ |
 | `users/{uid}/sessions` | ✅ | ✅ | ✅ | — | — |
 | `users/{uid}/sessions/{sid}/setLogs` | ✅ | ✅ | ✅ | — | — |
+| `users/{uid}/sessions/{sid}/exerciseFeedback` | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `users/{uid}/checkIns` | 🟡 | — | 🟡 | — | — |
+| `users/{uid}/wellbeingCheckIns` | ✅ | ✅ | ✅ | — | ✅ |
 | `users/{uid}/customExercises` | — | — | — | — | — |
 | `exercises` | — | — | — | — | — |
 | `routines` | ✅ | ✅ | ✅ | ✅ | — |
@@ -99,19 +101,39 @@ son `get` / `list` / `write` / `delete`.
 | `reviews` | — | — | ✅ | — | — |
 | `mail_queue` | — | — | — | — | — |
 
-**103 de 170 celdas** tienen test negativo (61%). Por operación:
+**112 de 180 celdas** tienen test negativo (62%). Por operación:
 
 | Operación | Paths con test negativo |
 |---|---|
-| `get` | 21 / 34 |
-| `list` | 15 / 34 |
-| `create` | 28 / 34 |
-| `update` | 22 / 34 |
-| `delete` | 12 / 34 |
+| `get` | 23 / 36 |
+| `list` | 17 / 36 |
+| `create` | 32 / 36 |
+| `update` | 26 / 36 |
+| `delete` | 14 / 36 |
 
-Cinco paths siguen **sin una sola aserción negativa**:
-`users/{uid}/customExercises`, `exercises`, `coach_availability_rules`,
-`coach_availability_overrides`, `mail_queue`.
+Tres paths siguen **sin una sola aserción negativa**:
+`users/{uid}/customExercises`, `exercises`, `mail_queue`.
+
+> **`exerciseFeedback` y `wellbeingCheckIns` entran acá recién ahora, y las dos
+> ya tenían suite propia.** No son `match` nuevos: estaban en `firestore.rules`
+> con sus tests (`exercise-feedback-rules.test.ts`, 30 negativas;
+> `wellbeing-checkins-rules.test.ts`, 8) y nunca les tocó fila. El §1.8 punto 1
+> ya pedía la fila; lo que faltaba era algo que **avisara** cuando no se hacía,
+> porque una fila ausente no se ve — a diferencia de una celda en `—`, que grita
+> desde la tabla.
+>
+> Lo que costó: `users/{uid}/wellbeingCheckIns` es, según el comentario de su
+> propia regla, *el dato más sensible que guarda la app* —salud autorreportada,
+> dolor y zona— y estuvo fuera de la matriz de cobertura desde que existe. Bien
+> cubierto en los tests, invisible en el inventario. Un hueco de cobertura ahí
+> no lo habría detectado nadie leyendo esta sección, que es exactamente para lo
+> que existe.
+>
+> `wellbeingCheckIns` queda con `update` en `—` a propósito: su regla es un
+> `allow read, write` único, y los dos negativos de escritura corren sobre un
+> documento que **no existe**, o sea que ejercitan `create`. El único `set`
+> sobre un doc ya guardado es un positivo (el dueño editando lo suyo). La celda
+> está vacía porque está vacía, no por omisión al transcribir.
 
 > **QA-SEC-010 (oráculo de existencia) no mueve los totales, y conviene que se
 > entienda por qué.** `existence-oracle-rules.test.ts` agregó 8 negativos
@@ -236,9 +258,22 @@ números de arriba son call sites reales, no líneas.
 Esto es lo primero que hay que saber antes de tocar una regla:
 
 | Suite | Archivos | Job de CI | Cómo se corre a mano |
-|---|---|---|---|---|
-| `functions/src/__tests__/*-rules.test.ts` | 34 | *Functions Test* | `npm --prefix functions run test:rules:emulator` |
-| `scripts/rules_test/*.test.js` | 8 | *Rules Test* | `bash scripts/test_rules.sh` |
+|---|---|---|---|
+| `functions/src/__tests__/*-rules.test.ts` | 39 | *Functions Test* | `npm --prefix functions run test:rules:emulator` |
+| `scripts/rules_test/*.test.js` | 14 | *Rules Test* | `bash scripts/test_rules.sh` |
+
+La columna **Archivos** es un conteo, no una impresión, y crece sola. Recontala
+en vez de confiar en el número escrito — las dos cifras llegaron a estar en 34 y
+8 cuando ya eran 39 y 14:
+
+```bash
+fd -e ts -- '-rules\.test\.ts$' functions/src/__tests__ | wc -l
+fd -e js '\.test\.js$' scripts/rules_test | wc -l
+```
+
+Ninguna de las dos suites tiene lista que mantener: jest globea el directorio
+(`scripts/test_rules.sh` lo dice en su header), así que un archivo nuevo entra
+a CI solo — y este número se queda atrás solo.
 
 La segunda entró en CI con **#680 Slice B**. Hasta ahí era un ítem de checklist
 de PR — `scripts/test_rules.sh` lo decía en su propio header — y ocho
@@ -425,8 +460,31 @@ sección en el mismo PR.** Concretamente:
    no porque el otro job valga menos (los dos corren igual en cada PR), sino
    porque ahí está TypeScript y es donde las dos suites van a converger algún
    día (§1.6, punto 7).
-3. Recalculá los totales de §1.1 y §1.2. Son conteos, no impresiones.
-4. Los tests de reglas se corren con:
+3. Recalculá los totales de §1.1 y §1.2. Son conteos, no impresiones. Y
+   recalculalos **desde la tabla**, no a mano sobre tu diff: el total, el
+   desglose por operación y el párrafo de "paths sin una sola aserción
+   negativa" tienen que salir del mismo parseo, o se separan. Los tres se
+   habían separado a la vez — el párrafo nombraba cinco paths cuando eran tres,
+   y dos de los que nombraba ya tenían `create` y `update` en ✅.
+4. **Reconciliá el universo, no sólo los totales.** Un total puede cuadrar
+   perfecto con una fila que nunca se escribió: `exerciseFeedback` y
+   `wellbeingCheckIns` vivieron así, con tests y sin fila. Lo único que lo
+   detecta es contar los dos lados y restar:
+
+   ```bash
+   rg -c '^\s*match /' firestore.rules   # menos 1, el wrapper databases/documents
+   ```
+
+   Esa cuenta menos las filas de §1.1 tiene que dar **exactamente 5**, y esos 5
+   tienen que ser `mp_checkouts`, `mp_plans`, `mp_preapprovals`,
+   `mp_webhook_events` y `rc_webhook_events` — los únicos que la matriz excluye
+   a propósito (§2.0, punto 1). Si da otra cosa, hay un `match` sin fila.
+
+   Nombralos, no los deduzcas por ser `if false`: **`mail_queue` también es
+   `if false` y sí tiene fila**, con las cinco celdas en `—`. "Cerrado a todo
+   cliente" no es el criterio que separa las dos listas, así que un chequeo
+   escrito así pasa en verde con una fila de menos.
+5. Los tests de reglas se corren con:
 
    ```bash
    npm --prefix functions run test:rules:emulator   # requiere Java 21+
@@ -527,11 +585,32 @@ que el borrado de cuenta se lleva todo eso, y que la política dice la verdad.
 **Método.** Nada acá sale de memoria ni de suposición:
 
 1. El universo de stores se enumeró con `rg '^\s*match /' firestore.rules` →
-   **34 paths** (el mismo número que reporta §1.1),
-   más `audit_log/{uid}`, que **no tiene bloque `match`** —lo escribe sólo el
+   **42 líneas**, que son **41 colecciones** una vez descontado el wrapper
+   `match /databases/{database}/documents`.
+
+   Ese 41 **no es** el número de §1.1, y conviene dejar escrito por qué, porque
+   la cifra ya derivó una vez por no estarlo: §1.1 declara **36 paths** y las
+   **5** que faltan son `mp_checkouts`, `mp_plans`, `mp_preapprovals`,
+   `mp_webhook_events` y `rc_webhook_events`. Las cinco son `allow read, write:
+   if false` — bloques **documentales**, escritos sólo por el Admin SDK, que
+   existen para que el default-deny quede explícito en el archivo. No ejercitan
+   ningún permiso de cliente y por eso no aportan celdas a aquella matriz
+   (`mp-collections-rules.test.ts` sí las testea: verifica justamente que estén
+   cerradas). **41 = 36 + 5.**
+
+   ⚠️ `if false` **no** es el criterio, aunque lo parezca: `mail_queue` es
+   igual de CF-only, igual de `if false`, y **sí** ocupa fila en §1.1 con las
+   cinco celdas en `—`. Las dos formas de tratar un bloque cerrado conviven acá
+   y ninguna está escrita como decisión. Si alguna vez se unifica, mueve el
+   total de §1.1 —una fila de menos, o cinco de más— y no es cosmético.
+
+   Más `audit_log/{uid}`, que **no tiene bloque `match`** —lo escribe sólo el
    Admin SDK y por default-deny ningún cliente lo alcanza— y por eso no aparece
    en aquella matriz pero sí guarda un dato personal.
-2. Storage: `storage.rules` declara **6 paths** + el catch-all `deny`.
+2. Storage: `storage.rules` declara **7 paths** + el wrapper
+   `match /b/{bucket}/o` y el catch-all `deny` — el mismo número que la tabla
+   de §1.2. Decía 6: `sessionFeedback/{uid}/{sid}/{file}` entró a las reglas y
+   a §1.2, y este punto se quedó atrás. Mismo modo de falla que el punto 1.
 3. Los campos salen de las `keys().hasOnly([...])` de `firestore.rules` y, donde
    la regla no tiene allowlist, de los modelos `freezed` en `lib/**/domain/`.
 4. La cobertura de borrado sale de leer `functions/src/delete-account.ts` y los
