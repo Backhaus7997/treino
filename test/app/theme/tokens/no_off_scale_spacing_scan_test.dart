@@ -83,7 +83,7 @@ void main() {
 
     /// Techo de archivos permitidos, congelado con el PR que trae el guard.
     /// NUNCA subirlo.
-    const allowlistCeiling = 164;
+    const allowlistCeiling = 163;
 
     /// Techo de ocurrencias totales en `lib/`. Mismo contrato: sólo baja.
     const offScaleDebtCeiling = 982;
@@ -92,7 +92,6 @@ void main() {
     /// un REGISTRO DE DEUDA, no una licencia.
     const allowlist = {
       'app/not_found_screen.dart',
-      'app/router.dart',
       'core/widgets/firebase_storage_video_player.dart',
       'core/widgets/treino_bottom_bar.dart',
       'features/auth/presentation/forgot_password_screen.dart',

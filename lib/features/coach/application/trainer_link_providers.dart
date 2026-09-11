@@ -55,15 +55,6 @@ final linksForAthleteProvider =
   },
 );
 
-/// Ventana en la que los streams de vínculos SOBREVIVEN a que los suelten.
-///
-/// Es navegación, no caché de datos: moverse entre secciones no puede costar
-/// una recarga. Nació para el Coach Hub (el parpadeo del roster de Alumnos) y
-/// hoy la usan también los dos providers del lado del atleta, por el mismo
-/// motivo: navegar de "Mi PF" a `/coach/agenda` no puede volver a pagar el
-/// round-trip.
-const _kVentanaDeGracia = Duration(minutes: 5);
-
 /// Cuánto esperamos a que conteste el servidor antes de contestar nosotros.
 ///
 /// [TrainerLinkRepository.watchForAthlete] descarta la snapshot VACÍA que sirve
@@ -113,11 +104,19 @@ final currentAthleteLinkProvider =
     StreamProvider.autoDispose<TrainerLink?>((ref) {
   final uid = ref.watch(currentUidProvider);
   if (uid == null) return Stream<TrainerLink?>.value(null);
-  // Ver `trainerLinksStreamProvider`: el keepAlive se toma SIEMPRE y lo suelta
-  // el timer, no el último oyente.
-  final link = ref.keepAlive();
-  final timer = Timer(_kVentanaDeGracia, link.close);
-  ref.onDispose(timer.cancel);
+  // SIN la ventana de gracia que sí tiene el lado del PF, y a propósito.
+  //
+  // Allá arregla un parpadeo real: el roster de Alumnos se soltaba al salir de
+  // la sección y volver arrancaba en `AsyncLoading`. Acá no hace falta, porque
+  // `watchForAthlete` sólo descarta las snapshots vacías: apenas el vínculo
+  // está en la caché local, una suscripción nueva llega CON documentos, pasa
+  // la guarda y resuelve en un frame. La caché ya da la continuidad.
+  //
+  // Y el `keepAlive` no es gratis: impide el dispose, así que el `Timer` le
+  // sobrevive al widget. Cualquier test que monte un árbol que toque este
+  // provider —el shell entero, sin ir más lejos— muere con `!timersPending`
+  // sin tener nada que ver con vínculos. Medido:
+  // `router_post_login_bottom_bar_test.dart` se cayó por esto.
   return _conEsperaAcotada(
     ref
         .read(trainerLinkRepositoryProvider)
@@ -154,9 +153,7 @@ final currentAthleteLinkAnyStatusProvider =
     StreamProvider.autoDispose<TrainerLink?>((ref) {
   final uid = ref.watch(currentUidProvider);
   if (uid == null) return Stream<TrainerLink?>.value(null);
-  final link = ref.keepAlive();
-  final timer = Timer(_kVentanaDeGracia, link.close);
-  ref.onDispose(timer.cancel);
+  // Ver [currentAthleteLinkProvider]: tampoco lleva ventana de gracia.
   return _conEsperaAcotada(
     ref.read(trainerLinkRepositoryProvider).watchForAthlete(
       uid,
@@ -168,6 +165,12 @@ final currentAthleteLinkAnyStatusProvider =
     ),
   ).map((links) => links.isEmpty ? null : links.first);
 });
+
+/// Ventana en la que el stream de vínculos SOBREVIVE a que lo suelten.
+///
+/// Es navegación, no caché de datos: moverse entre secciones del Coach Hub no
+/// puede costar una recarga.
+const _kVentanaDeGracia = Duration(minutes: 5);
 
 /// Stream real-time de los vínculos del PF actual. Lo consume el dashboard
 /// del PF (Etapa 3) y el roster de Alumnos.
