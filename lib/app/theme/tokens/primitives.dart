@@ -433,8 +433,11 @@ abstract final class AppRadius {
 abstract final class AppDecorativeRadii {
   /// `41.0` — Pill de la nav bar replicada en el deck (`OnboardingNavBar`).
   ///
-  /// Deliberadamente distinto del `36` de `TreinoBottomBar`: la réplica se
+  /// Deliberadamente distinto del `26` de `TreinoBottomBar`: la réplica se
   /// dibuja más chata que la barra real para que entre en el device preview.
+  /// (Decía `36`, que fue el valor de la barra real hasta que se la hizo
+  /// concéntrica con su pill. El dibujo no se tocó: nunca dependió de ese
+  /// número, sólo lo citaba para explicar por qué no coincide.)
   static const double navBarPill = 41.0;
 
   /// `34.0` — Esquina exterior del chasis blanco (`OnboardingDevicePreview`).
