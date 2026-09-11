@@ -7,7 +7,7 @@ import '../../../../app/theme/app_palette.dart';
 import '../../../../app/theme/tokens/tokens.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../../chat/application/chat_providers.dart'
-    show chatRepositoryProvider;
+    show chatInquiryPromotionServiceProvider, chatRepositoryProvider;
 import '../../../workout/application/session_providers.dart'
     show currentUidProvider;
 
@@ -62,6 +62,27 @@ class _TrainerInquiryCtaState extends ConsumerState<TrainerInquiryCta> {
             otherId: widget.trainerId,
             asInquiry: true,
           );
+      // `getOrCreate` sale temprano si el doc ya existía, y la marca sólo se
+      // estampa al CREAR. Un chat social preexistente —creado cuando el PF
+      // seguía al alumno, y después dejó de seguirlo— llega hasta acá sin
+      // `kind`, y desde el cliente no se puede agregar: está pineado inmutable
+      // en las rules. Sin esto, el alumno no le puede escribir NUNCA MÁS a ese
+      // PF, con un cartel que le echa la culpa al follow.
+      //
+      // Chat de Coach (`linkId != null`) no lleva marca: ya escapa por su
+      // propia rama, y marcarlo dejaría un campo mentiroso.
+      if (chat.linkId == null && !chat.isInquiry) {
+        try {
+          await ref
+              .read(chatInquiryPromotionServiceProvider)
+              .promote(widget.trainerId);
+        } catch (_) {
+          // A propósito NO corta la navegación. El chat existe y su historial
+          // es legible; que falle la marca no puede costarle al usuario el
+          // acceso a la conversación. Lo que pierde es el composer, que es
+          // exactamente el estado en el que ya estaba.
+        }
+      }
       router.push('/coach/chat/${chat.chatId}?other=${widget.trainerId}');
     } catch (_) {
       messenger

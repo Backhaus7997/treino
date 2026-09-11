@@ -211,6 +211,7 @@ const EXPECTED_DEPLOYED = [
   "createPreapproval",
   "deleteAccount",
   "mintWatchCredential",
+  "promoteChatToInquiry",
   "reconcileMyCheckout",
   "requestEmailVerification",
   "requestPasswordReset",
@@ -310,6 +311,12 @@ describe("QA-SEC-016: el guard falla cuando tiene que fallar", () => {
       attested: false,
     },
     { module: "add-alias", symbol: "addAlias", as: "addAlias", attested: true },
+    {
+      module: "chat/promote-chat-to-inquiry",
+      symbol: "promoteChatToInquiry",
+      as: "promoteChatToInquiry",
+      attested: true,
+    },
     {
       module: "subscriptions/accept-trainer-link",
       symbol: "acceptTrainerLink",
