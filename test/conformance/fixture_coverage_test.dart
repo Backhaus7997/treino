@@ -45,7 +45,6 @@ const Map<String, String> _pendientesDeSwift = {
   // apenas se pueda.
 };
 
-
 void main() {
   group('cobertura de fixtures de conformidad', () {
     late List<String> fixtures;
