@@ -90,7 +90,8 @@ Widget _wrap({
       // Own profile (tile reads uid + profile fields from here)
       userProfileProvider.overrideWith((ref) => Stream.value(_profile())),
       // Active trainer link (null = no link)
-      currentAthleteLinkProvider.overrideWith((ref) => Stream.value(activeLink)),
+      currentAthleteLinkProvider
+          .overrideWith((ref) => Stream.value(activeLink)),
       // Current share state
       profileShareProvider.overrideWith(
         (ref, athleteId) => Stream.value(existingShare),

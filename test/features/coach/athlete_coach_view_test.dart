@@ -89,7 +89,8 @@ void main() {
       await tester.pumpWidget(_wrap(
         const AthleteCoachView(),
         overrides: [
-          currentAthleteLinkProvider.overrideWith((ref) => Stream.value(_makeLink())),
+          currentAthleteLinkProvider
+              .overrideWith((ref) => Stream.value(_makeLink())),
           userPublicProfileProvider('trainer-1')
               .overrideWith((ref) => Stream.value(_makePub())),
         ],
@@ -106,7 +107,8 @@ void main() {
       await tester.pumpWidget(_wrap(
         const AthleteCoachView(),
         overrides: [
-          currentAthleteLinkProvider.overrideWith((ref) => Stream.value(_makeLink())),
+          currentAthleteLinkProvider
+              .overrideWith((ref) => Stream.value(_makeLink())),
           userPublicProfileProvider('trainer-1')
               .overrideWith((ref) => Stream.value(_makePub())),
         ],
@@ -121,8 +123,8 @@ void main() {
       await tester.pumpWidget(_wrap(
         const AthleteCoachView(),
         overrides: [
-          currentAthleteLinkProvider.overrideWith(
-              (ref) => Stream.value(_makeLink(status: TrainerLinkStatus.pending))),
+          currentAthleteLinkProvider.overrideWith((ref) =>
+              Stream.value(_makeLink(status: TrainerLinkStatus.pending))),
           userPublicProfileProvider('trainer-1')
               .overrideWith((ref) => Stream.value(_makePub())),
         ],
@@ -145,8 +147,8 @@ void main() {
       await tester.pumpWidget(_wrap(
         const AthleteCoachView(),
         overrides: [
-          currentAthleteLinkProvider.overrideWith(
-              (ref) => Stream.value(_makeLink(status: TrainerLinkStatus.paused))),
+          currentAthleteLinkProvider.overrideWith((ref) =>
+              Stream.value(_makeLink(status: TrainerLinkStatus.paused))),
           userPublicProfileProvider('trainer-1')
               .overrideWith((ref) => Stream.value(_makePub())),
         ],
@@ -166,8 +168,8 @@ void main() {
       await tester.pumpWidget(_wrap(
         const AthleteCoachView(),
         overrides: [
-          currentAthleteLinkProvider.overrideWith(
-              (ref) => Stream.value(_makeLink(status: TrainerLinkStatus.pending))),
+          currentAthleteLinkProvider.overrideWith((ref) =>
+              Stream.value(_makeLink(status: TrainerLinkStatus.pending))),
           userPublicProfileProvider('trainer-1')
               .overrideWith((ref) => Stream.value(_makePub())),
         ],
@@ -212,7 +214,8 @@ void main() {
         await tester.pumpWidget(_wrap(
           const AthleteCoachView(),
           overrides: [
-            currentAthleteLinkProvider.overrideWith((ref) => Stream.value(_makeLink())),
+            currentAthleteLinkProvider
+                .overrideWith((ref) => Stream.value(_makeLink())),
             userPublicProfileProvider('trainer-1')
                 .overrideWith((ref) => Stream.value(_makePub())),
           ],
@@ -235,8 +238,8 @@ void main() {
         await tester.pumpWidget(_wrap(
           const AthleteCoachView(),
           overrides: [
-            currentAthleteLinkProvider.overrideWith(
-                (ref) => Stream.value(_makeLink(status: TrainerLinkStatus.pending))),
+            currentAthleteLinkProvider.overrideWith((ref) =>
+                Stream.value(_makeLink(status: TrainerLinkStatus.pending))),
             userPublicProfileProvider('trainer-1')
                 .overrideWith((ref) => Stream.value(_makePub())),
           ],
@@ -261,8 +264,8 @@ void main() {
       await tester.pumpWidget(_wrap(
         const AthleteCoachViewTestHarness(),
         overrides: [
-          currentAthleteLinkProvider
-              .overrideWith((ref) => Stream.value(_makeLink(trainerId: trainerId))),
+          currentAthleteLinkProvider.overrideWith(
+              (ref) => Stream.value(_makeLink(trainerId: trainerId))),
           userPublicProfileProvider(trainerId)
               .overrideWith((ref) => Stream.value(_makePub())),
           hasUnreadFromProvider(trainerId).overrideWith((ref) => true),
@@ -280,8 +283,8 @@ void main() {
       await tester.pumpWidget(_wrap(
         const AthleteCoachViewTestHarness(),
         overrides: [
-          currentAthleteLinkProvider
-              .overrideWith((ref) => Stream.value(_makeLink(trainerId: trainerId))),
+          currentAthleteLinkProvider.overrideWith(
+              (ref) => Stream.value(_makeLink(trainerId: trainerId))),
           userPublicProfileProvider(trainerId)
               .overrideWith((ref) => Stream.value(_makePub())),
           hasUnreadFromProvider(trainerId).overrideWith((ref) => false),

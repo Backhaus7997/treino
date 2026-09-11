@@ -108,8 +108,8 @@ void main() {
         overrides: [
           sessionNotifierProvider.overrideWith(() => _StubNotifier(state)),
           currentUidProvider.overrideWithValue('u1'),
-          currentAthleteLinkProvider
-              .overrideWith((ref) => Stream.value(linked ? _activeLink() : null)),
+          currentAthleteLinkProvider.overrideWith(
+              (ref) => Stream.value(linked ? _activeLink() : null)),
           exerciseFeedbackSubmitterProvider.overrideWithValue(submitter),
         ],
         child: MaterialApp(

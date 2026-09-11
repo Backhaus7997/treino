@@ -424,7 +424,8 @@ void main() {
           currentUidProvider.overrideWithValue('test-uid'),
           sessionsByUidProvider.overrideWith((ref, uid) async => []),
           authStateChangesProvider.overrideWith((ref) => const Stream.empty()),
-          currentAthleteLinkProvider.overrideWith((ref) => Stream.value(makeLink())),
+          currentAthleteLinkProvider
+              .overrideWith((ref) => Stream.value(makeLink())),
           assignedRoutinesProvider('test-uid').overrideWith((ref) async => []),
           userCreatedRoutinesProvider('test-uid')
               .overrideWith((ref) => Stream.value(const <Routine>[])),

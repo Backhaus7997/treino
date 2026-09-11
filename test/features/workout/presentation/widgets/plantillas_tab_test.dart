@@ -462,7 +462,8 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            currentAthleteLinkProvider.overrideWith((ref) => Stream.value(makeLink())),
+            currentAthleteLinkProvider
+                .overrideWith((ref) => Stream.value(makeLink())),
             routinesProvider.overrideWith((ref) async => catalog),
             ...coachOverrides(coach),
           ],

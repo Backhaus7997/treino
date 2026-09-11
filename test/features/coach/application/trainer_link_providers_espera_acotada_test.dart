@@ -29,7 +29,8 @@ import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 
-class _MockTrainerLinkRepository extends Mock implements TrainerLinkRepository {}
+class _MockTrainerLinkRepository extends Mock
+    implements TrainerLinkRepository {}
 
 void main() {
   const athleteId = 'athlete-1';

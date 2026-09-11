@@ -211,9 +211,8 @@ void main() {
     final realDocs = await realDocsFor([active, pending, terminated]);
 
     final emissions = <List<TrainerLink>>[];
-    final sub = repo
-        .watchForAthlete(athleteId, statuses: {TrainerLinkStatus.active})
-        .listen(emissions.add);
+    final sub = repo.watchForAthlete(athleteId,
+        statuses: {TrainerLinkStatus.active}).listen(emissions.add);
 
     snapshots.add(fakeSnapshot(docs: realDocs, isFromCache: false));
     await Future<void>.delayed(Duration.zero);

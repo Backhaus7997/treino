@@ -322,7 +322,8 @@ List<Override> onboardingSampleOverrides() => [
         ],
       ),
       sessionsByUidProvider.overrideWith((ref, uid) async => _sampleSessions),
-      currentAthleteLinkProvider.overrideWith((ref) => Stream.value(_sampleLink)),
+      currentAthleteLinkProvider
+          .overrideWith((ref) => Stream.value(_sampleLink)),
 
       // Slide 3 — Feed.
       feedSegmentProvider.overrideWith((ref) => FeedSegment.amigos),

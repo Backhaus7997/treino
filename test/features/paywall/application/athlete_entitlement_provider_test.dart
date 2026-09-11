@@ -110,8 +110,8 @@ void main() {
           firestoreProvider.overrideWithValue(firestore),
           currentUidProvider.overrideWithValue(_uid),
           // Nunca completa: modela el read en vuelo.
-          currentAthleteLinkProvider
-              .overrideWith((ref) => Completer<TrainerLink?>().future.asStream()),
+          currentAthleteLinkProvider.overrideWith(
+              (ref) => Completer<TrainerLink?>().future.asStream()),
         ],
       );
       addTearDown(container.dispose);

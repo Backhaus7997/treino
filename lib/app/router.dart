@@ -1294,8 +1294,7 @@ class _GateDeVinculo extends ConsumerWidget {
               if (!faltaLaSesion) ...[
                 const SizedBox(height: 18),
                 TextButton(
-                  onPressed: () =>
-                      ref.invalidate(currentAthleteLinkProvider),
+                  onPressed: () => ref.invalidate(currentAthleteLinkProvider),
                   child: Text(l10n.athleteLinkRequiredRetry),
                 ),
               ],
