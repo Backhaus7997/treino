@@ -463,6 +463,13 @@ class AppL10nEs extends AppL10n {
       'No encontramos un vínculo activo con un PF.';
 
   @override
+  String get trainerAcceptsInquiriesTitle => 'Acepto consultas';
+
+  @override
+  String get trainerAcceptsInquiriesSubtitle =>
+      'Un alumno puede escribirte antes de pedirte el vínculo. Si lo apagás, sólo te escriben tus alumnos.';
+
+  @override
   String get athleteLinkUnconfirmed =>
       'No pudimos confirmar tu vínculo con tu PF.';
 
@@ -4937,6 +4944,13 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get athleteLinkRequired =>
       'No encontramos un vínculo activo con un PF.';
+
+  @override
+  String get trainerAcceptsInquiriesTitle => 'Acepto consultas';
+
+  @override
+  String get trainerAcceptsInquiriesSubtitle =>
+      'Un alumno puede escribirte antes de pedirte el vínculo. Si lo apagás, sólo te escriben tus alumnos.';
 
   @override
   String get athleteLinkUnconfirmed =>

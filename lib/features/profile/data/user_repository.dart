@@ -61,6 +61,10 @@ class UserRepository {
     'trainerLocations',
     'trainerGeohashes',
     'trainerOffersOnline',
+    // #637 — kill switch de consultas previas. Sin esta entrada el toggle
+    // escribe en `users/{uid}` y NUNCA llega a `trainerPublicProfiles`, que es
+    // el único doc que mira la rule. El interruptor quedaría mudo.
+    'acceptsInquiries',
     // ADR-RV-005: CF-write-only — do not add averageRating or reviewCount here.
     // Those fields are written exclusively by the reviewAggregate Cloud Function
     // and must never be propagated by client dual-write.
@@ -224,6 +228,9 @@ class UserRepository {
     }
     if (partial.containsKey('trainerOffersOnline')) {
       result['trainerOffersOnline'] = partial['trainerOffersOnline'];
+    }
+    if (partial.containsKey('acceptsInquiries')) {
+      result['acceptsInquiries'] = partial['acceptsInquiries'];
     }
     // ADR-TPO-001: include uid so the Firestore create rule passes on
     // the first-ever write. SetOptions(merge:true) makes this idempotent.

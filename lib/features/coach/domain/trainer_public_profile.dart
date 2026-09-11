@@ -39,6 +39,10 @@ class TrainerPublicProfile with _$TrainerPublicProfile {
     @Default(<TrainerLocation>[]) List<TrainerLocation> trainerLocations,
     @Default(<String>[]) List<String> trainerGeohashes,
     @Default(false) bool trainerOffersOnline,
+    /// Ver [UserProfile.acceptsInquiries]. Default `true` a propósito: espeja
+    /// el `.get('acceptsInquiries', true)` de `firestore.rules`, así que un
+    /// perfil legacy sin el campo sigue siendo consultable.
+    @Default(true) bool acceptsInquiries,
     // ── Review aggregate (Fase 6 Etapa 7) ──────────────────────────────────
     // Written exclusively by the reviewAggregate Cloud Function.
     // ADR-RV-004: lives on TrainerPublicProfile for O(1) discovery reads.

@@ -37,6 +37,7 @@ mixin _$ExerciseFeedback {
   /// Si algún día el enum crece, un cliente viejo muestra el reporte con la
   /// marca de `comment` en vez de esconderlo. Es la dirección de falla
   /// menos mala: perder el badge es recuperable, perder el reporte no.
+// ignore: invalid_annotation_target
   @JsonKey(unknownEnumValue: ExerciseFeedbackKind.comment)
   ExerciseFeedbackKind get kind => throw _privateConstructorUsedError;
   String? get text => throw _privateConstructorUsedError;
@@ -271,6 +272,7 @@ class _$ExerciseFeedbackImpl extends _ExerciseFeedback {
   /// Si algún día el enum crece, un cliente viejo muestra el reporte con la
   /// marca de `comment` en vez de esconderlo. Es la dirección de falla
   /// menos mala: perder el badge es recuperable, perder el reporte no.
+// ignore: invalid_annotation_target
   @override
   @JsonKey(unknownEnumValue: ExerciseFeedbackKind.comment)
   final ExerciseFeedbackKind kind;
@@ -378,6 +380,7 @@ abstract class _ExerciseFeedback extends ExerciseFeedback {
   /// Si algún día el enum crece, un cliente viejo muestra el reporte con la
   /// marca de `comment` en vez de esconderlo. Es la dirección de falla
   /// menos mala: perder el badge es recuperable, perder el reporte no.
+// ignore: invalid_annotation_target
   @override
   @JsonKey(unknownEnumValue: ExerciseFeedbackKind.comment)
   ExerciseFeedbackKind get kind;

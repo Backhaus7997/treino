@@ -65,6 +65,9 @@ class _ProfileEditTrainerScreenState
   TrainerSpecialty? _specialty;
   final List<TrainerLocation> _locations = [];
   bool _offersOnline = false;
+  // Arranca en true: es el default de la rule, y un PF que nunca tocó el
+  // toggle SÍ acepta consultas.
+  bool _acceptsInquiries = true;
   bool _initialized = false;
   bool _saving = false;
   String? _error;
@@ -90,6 +93,7 @@ class _ProfileEditTrainerScreenState
       ..clear()
       ..addAll(profile.trainerLocations);
     _offersOnline = profile.trainerOffersOnline;
+    _acceptsInquiries = profile.acceptsInquiries;
     _initialized = true;
   }
 
@@ -197,6 +201,7 @@ class _ProfileEditTrainerScreenState
       'trainerLocations': _locations.map((l) => l.toJson()).toList(),
       'trainerGeohashes': _locations.map((l) => l.geohash).toSet().toList(),
       'trainerOffersOnline': _offersOnline,
+      'acceptsInquiries': _acceptsInquiries,
       // Limpiar legacy singular — este form trabaja con el modelo array-based.
       // Si no los nulleamos, quedan zombi en Firestore (de la migration original)
       // y el mapa los renderea como pin físico aunque el PF haya borrado
@@ -355,13 +360,27 @@ class _ProfileEditTrainerScreenState
               onRemove: _removeLocation,
             ),
             const SizedBox(height: 18),
-            _OnlineToggle(
+            _ToggleCard(
               palette: palette,
+              title: 'Doy clases virtuales',
+              subtitle: 'Atletas de cualquier zona pueden contactarte.',
               value: _offersOnline,
               onChanged: (v) => setState(() {
                 _offersOnline = v;
                 _error = null;
               }),
+            ),
+            const SizedBox(height: 12),
+            // #637 — el kill switch de las consultas previas. Vive acá, al lado
+            // de "doy clases virtuales", porque las dos responden la misma
+            // pregunta: por dónde te puede alcanzar un alumno que todavía no
+            // es tuyo.
+            _ToggleCard(
+              palette: palette,
+              title: l10n.trainerAcceptsInquiriesTitle,
+              subtitle: l10n.trainerAcceptsInquiriesSubtitle,
+              value: _acceptsInquiries,
+              onChanged: (v) => setState(() => _acceptsInquiries = v),
             ),
             if (_error != null) ...[
               const SizedBox(height: 14),
@@ -806,13 +825,20 @@ class _LocationCard extends StatelessWidget {
 
 // ── Online toggle ────────────────────────────────────────────────────────────
 
-class _OnlineToggle extends StatelessWidget {
-  const _OnlineToggle({
+/// Tarjeta con un switch. Nació como `_OnlineToggle` para "doy clases
+/// virtuales" y se generalizó al sumar el de consultas (#637): mismo control,
+/// mismo contenedor, distinto contenido.
+class _ToggleCard extends StatelessWidget {
+  const _ToggleCard({
     required this.palette,
+    required this.title,
+    required this.subtitle,
     required this.value,
     required this.onChanged,
   });
   final AppPalette palette;
+  final String title;
+  final String subtitle;
   final bool value;
   final ValueChanged<bool> onChanged;
 
@@ -828,14 +854,14 @@ class _OnlineToggle extends StatelessWidget {
       child: SwitchListTile(
         contentPadding: EdgeInsets.zero,
         title: Text(
-          'Doy clases virtuales',
+          title,
           style: TextStyle(
             color: palette.textPrimary,
             fontWeight: FontWeight.w600,
           ),
         ),
         subtitle: Text(
-          'Atletas de cualquier zona pueden contactarte.',
+          subtitle,
           style: TextStyle(color: palette.textMuted, fontSize: 12),
         ),
         value: value,

@@ -926,6 +926,18 @@ abstract class AppL10n {
   /// **'No encontramos un vínculo activo con un PF.'**
   String get athleteLinkRequired;
 
+  /// Toggle del perfil del PF: si acepta consultas previas de alumnos sin vínculo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Acepto consultas'**
+  String get trainerAcceptsInquiriesTitle;
+
+  /// Subtítulo del toggle de consultas. Dice qué pasa al apagarlo, no sólo qué es.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Un alumno puede escribirte antes de pedirte el vínculo. Si lo apagás, sólo te escriben tus alumnos.'**
+  String get trainerAcceptsInquiriesSubtitle;
+
   /// Gate de vínculo cuando el servidor no contestó a tiempo. Es una causa DISTINTA de athleteLinkRequired: allá el servidor dijo que no hay vínculo, acá no pudimos preguntarle. Mezclarlas fue el bug que este gate existe para no repetir.
   ///
   /// In es_AR, this message translates to:

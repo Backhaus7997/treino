@@ -270,6 +270,14 @@
   "@athleteLinkRequired": {
     "description": "Gate de las rutas que necesitan un vínculo activo (agenda, nutrición). Dice NO ENCONTRAMOS y no NO TENÉS a propósito: el provider emite lo mismo cuando el servidor contesta que no hay vínculo y cuando se agota la espera sin llegar al servidor, y afirmar la segunda como la primera sería una advertencia falsa."
   },
+  "trainerAcceptsInquiriesTitle": "Acepto consultas",
+  "@trainerAcceptsInquiriesTitle": {
+    "description": "Toggle del perfil del PF: si acepta consultas previas de alumnos sin vínculo."
+  },
+  "trainerAcceptsInquiriesSubtitle": "Un alumno puede escribirte antes de pedirte el vínculo. Si lo apagás, sólo te escriben tus alumnos.",
+  "@trainerAcceptsInquiriesSubtitle": {
+    "description": "Subtítulo del toggle de consultas. Dice qué pasa al apagarlo, no sólo qué es."
+  },
   "athleteLinkUnconfirmed": "No pudimos confirmar tu vínculo con tu PF.",
   "@athleteLinkUnconfirmed": {
     "description": "Gate de vínculo cuando el servidor no contestó a tiempo. Es una causa DISTINTA de athleteLinkRequired: allá el servidor dijo que no hay vínculo, acá no pudimos preguntarle. Mezclarlas fue el bug que este gate existe para no repetir."

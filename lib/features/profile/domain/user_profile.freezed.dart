@@ -91,7 +91,16 @@ mixin _$UserProfile {
   List<TrainerLocation> get trainerLocations =>
       throw _privateConstructorUsedError;
   List<String> get trainerGeohashes => throw _privateConstructorUsedError;
-  bool get trainerOffersOnline =>
+  bool get trainerOffersOnline => throw _privateConstructorUsedError;
+
+  /// Kill switch del PF para las consultas previas (#637).
+  ///
+  /// Arranca en `true`, al revés que [trainerOffersOnline], y no es
+  /// cosmética: `firestore.rules` lee este campo con
+  /// `.get('acceptsInquiries', true)`, o sea que un PF sin el campo ES
+  /// consultable. Un `@Default(false)` acá le apagaría las consultas a
+  /// TODOS los PF existentes sin que ninguno lo haya pedido.
+  bool get acceptsInquiries =>
       throw _privateConstructorUsedError; // ── Athlete active routine (home today's card PR#2) ───────────────────
 // Points to the user-created routine the athlete picked as "the one I'm
 // currently training". Used by [todaysRoutineProvider] to resolve the home
@@ -182,6 +191,7 @@ abstract class $UserProfileCopyWith<$Res> {
       List<TrainerLocation> trainerLocations,
       List<String> trainerGeohashes,
       bool trainerOffersOnline,
+      bool acceptsInquiries,
       String? activeRoutineId,
       TrainerSubscription? subscription,
       double? weightedLoad,
@@ -235,6 +245,7 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
     Object? trainerLocations = null,
     Object? trainerGeohashes = null,
     Object? trainerOffersOnline = null,
+    Object? acceptsInquiries = null,
     Object? activeRoutineId = freezed,
     Object? subscription = freezed,
     Object? weightedLoad = freezed,
@@ -354,6 +365,10 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
           ? _value.trainerOffersOnline
           : trainerOffersOnline // ignore: cast_nullable_to_non_nullable
               as bool,
+      acceptsInquiries: null == acceptsInquiries
+          ? _value.acceptsInquiries
+          : acceptsInquiries // ignore: cast_nullable_to_non_nullable
+              as bool,
       activeRoutineId: freezed == activeRoutineId
           ? _value.activeRoutineId
           : activeRoutineId // ignore: cast_nullable_to_non_nullable
@@ -444,6 +459,7 @@ abstract class _$$UserProfileImplCopyWith<$Res>
       List<TrainerLocation> trainerLocations,
       List<String> trainerGeohashes,
       bool trainerOffersOnline,
+      bool acceptsInquiries,
       String? activeRoutineId,
       TrainerSubscription? subscription,
       double? weightedLoad,
@@ -497,6 +513,7 @@ class __$$UserProfileImplCopyWithImpl<$Res>
     Object? trainerLocations = null,
     Object? trainerGeohashes = null,
     Object? trainerOffersOnline = null,
+    Object? acceptsInquiries = null,
     Object? activeRoutineId = freezed,
     Object? subscription = freezed,
     Object? weightedLoad = freezed,
@@ -616,6 +633,10 @@ class __$$UserProfileImplCopyWithImpl<$Res>
           ? _value.trainerOffersOnline
           : trainerOffersOnline // ignore: cast_nullable_to_non_nullable
               as bool,
+      acceptsInquiries: null == acceptsInquiries
+          ? _value.acceptsInquiries
+          : acceptsInquiries // ignore: cast_nullable_to_non_nullable
+              as bool,
       activeRoutineId: freezed == activeRoutineId
           ? _value.activeRoutineId
           : activeRoutineId // ignore: cast_nullable_to_non_nullable
@@ -672,6 +693,7 @@ class _$UserProfileImpl implements _UserProfile {
       final List<TrainerLocation> trainerLocations = const <TrainerLocation>[],
       final List<String> trainerGeohashes = const <String>[],
       this.trainerOffersOnline = false,
+      this.acceptsInquiries = true,
       this.activeRoutineId,
       this.subscription,
       this.weightedLoad,
@@ -801,6 +823,17 @@ class _$UserProfileImpl implements _UserProfile {
   @override
   @JsonKey()
   final bool trainerOffersOnline;
+
+  /// Kill switch del PF para las consultas previas (#637).
+  ///
+  /// Arranca en `true`, al revés que [trainerOffersOnline], y no es
+  /// cosmética: `firestore.rules` lee este campo con
+  /// `.get('acceptsInquiries', true)`, o sea que un PF sin el campo ES
+  /// consultable. Un `@Default(false)` acá le apagaría las consultas a
+  /// TODOS los PF existentes sin que ninguno lo haya pedido.
+  @override
+  @JsonKey()
+  final bool acceptsInquiries;
 // ── Athlete active routine (home today's card PR#2) ───────────────────
 // Points to the user-created routine the athlete picked as "the one I'm
 // currently training". Used by [todaysRoutineProvider] to resolve the home
@@ -872,7 +905,7 @@ class _$UserProfileImpl implements _UserProfile {
 
   @override
   String toString() {
-    return 'UserProfile(uid: $uid, email: $email, displayName: $displayName, role: $role, createdAt: $createdAt, updatedAt: $updatedAt, gymId: $gymId, bodyWeightKg: $bodyWeightKg, heightCm: $heightCm, gender: $gender, experienceLevel: $experienceLevel, avatarUrl: $avatarUrl, firstName: $firstName, lastName: $lastName, phone: $phone, bornAt: $bornAt, termsAcceptedAt: $termsAcceptedAt, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerMonthlyRate: $trainerMonthlyRate, paymentAlias: $paymentAlias, trainerExperienceYears: $trainerExperienceYears, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerGeohash: $trainerGeohash, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline, activeRoutineId: $activeRoutineId, subscription: $subscription, weightedLoad: $weightedLoad, onboardingSeen: $onboardingSeen, templatePreferences: $templatePreferences)';
+    return 'UserProfile(uid: $uid, email: $email, displayName: $displayName, role: $role, createdAt: $createdAt, updatedAt: $updatedAt, gymId: $gymId, bodyWeightKg: $bodyWeightKg, heightCm: $heightCm, gender: $gender, experienceLevel: $experienceLevel, avatarUrl: $avatarUrl, firstName: $firstName, lastName: $lastName, phone: $phone, bornAt: $bornAt, termsAcceptedAt: $termsAcceptedAt, trainerBio: $trainerBio, trainerSpecialty: $trainerSpecialty, trainerMonthlyRate: $trainerMonthlyRate, paymentAlias: $paymentAlias, trainerExperienceYears: $trainerExperienceYears, trainerLatitude: $trainerLatitude, trainerLongitude: $trainerLongitude, trainerGeohash: $trainerGeohash, trainerLocations: $trainerLocations, trainerGeohashes: $trainerGeohashes, trainerOffersOnline: $trainerOffersOnline, acceptsInquiries: $acceptsInquiries, activeRoutineId: $activeRoutineId, subscription: $subscription, weightedLoad: $weightedLoad, onboardingSeen: $onboardingSeen, templatePreferences: $templatePreferences)';
   }
 
   @override
@@ -929,6 +962,8 @@ class _$UserProfileImpl implements _UserProfile {
                 .equals(other._trainerGeohashes, _trainerGeohashes) &&
             (identical(other.trainerOffersOnline, trainerOffersOnline) ||
                 other.trainerOffersOnline == trainerOffersOnline) &&
+            (identical(other.acceptsInquiries, acceptsInquiries) ||
+                other.acceptsInquiries == acceptsInquiries) &&
             (identical(other.activeRoutineId, activeRoutineId) ||
                 other.activeRoutineId == activeRoutineId) &&
             (identical(other.subscription, subscription) ||
@@ -973,6 +1008,7 @@ class _$UserProfileImpl implements _UserProfile {
         const DeepCollectionEquality().hash(_trainerLocations),
         const DeepCollectionEquality().hash(_trainerGeohashes),
         trainerOffersOnline,
+        acceptsInquiries,
         activeRoutineId,
         subscription,
         weightedLoad,
@@ -1026,6 +1062,7 @@ abstract class _UserProfile implements UserProfile {
       final List<TrainerLocation> trainerLocations,
       final List<String> trainerGeohashes,
       final bool trainerOffersOnline,
+      final bool acceptsInquiries,
       final String? activeRoutineId,
       final TrainerSubscription? subscription,
       final double? weightedLoad,
@@ -1130,8 +1167,18 @@ abstract class _UserProfile implements UserProfile {
   @override
   List<String> get trainerGeohashes;
   @override
+  bool get trainerOffersOnline;
+
+  /// Kill switch del PF para las consultas previas (#637).
+  ///
+  /// Arranca en `true`, al revés que [trainerOffersOnline], y no es
+  /// cosmética: `firestore.rules` lee este campo con
+  /// `.get('acceptsInquiries', true)`, o sea que un PF sin el campo ES
+  /// consultable. Un `@Default(false)` acá le apagaría las consultas a
+  /// TODOS los PF existentes sin que ninguno lo haya pedido.
+  @override
   bool
-      get trainerOffersOnline; // ── Athlete active routine (home today's card PR#2) ───────────────────
+      get acceptsInquiries; // ── Athlete active routine (home today's card PR#2) ───────────────────
 // Points to the user-created routine the athlete picked as "the one I'm
 // currently training". Used by [todaysRoutineProvider] to resolve the home
 // card when the user has multiple self-created routines and no trainer

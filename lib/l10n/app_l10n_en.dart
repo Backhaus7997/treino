@@ -454,6 +454,13 @@ class AppL10nEn extends AppL10n {
   String get athleteLinkRequired => 'We couldn\'t find an active trainer link.';
 
   @override
+  String get trainerAcceptsInquiriesTitle => 'Accept inquiries';
+
+  @override
+  String get trainerAcceptsInquiriesSubtitle =>
+      'Athletes can message you before requesting a link. Turn it off and only your athletes can write to you.';
+
+  @override
   String get athleteLinkUnconfirmed =>
       'We couldn\'t confirm your trainer link.';
 

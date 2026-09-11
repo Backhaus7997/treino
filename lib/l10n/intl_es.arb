@@ -526,6 +526,8 @@
   "athleteNutritionPlanLoadError": "No pudimos cargar tu plan nutricional.",
   "athleteNutritionNeedsActiveLink": "Necesitás un vínculo activo con un PF para ver tu plan nutricional.",
   "athleteLinkRequired": "No encontramos un vínculo activo con un PF.",
+  "trainerAcceptsInquiriesTitle": "Acepto consultas",
+  "trainerAcceptsInquiriesSubtitle": "Un alumno puede escribirte antes de pedirte el vínculo. Si lo apagás, sólo te escriben tus alumnos.",
   "athleteLinkUnconfirmed": "No pudimos confirmar tu vínculo con tu PF.",
   "athleteLinkRequiredRetry": "Reintentar",
   "athleteSessionMissing": "Tu sesión se cerró. Volvé a entrar.",
