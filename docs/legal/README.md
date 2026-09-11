@@ -71,6 +71,17 @@ descargo médico, términos de suscripción, arrepentimiento— dependen de
 decisiones del titular. Están relevados en la guía de tareas que acompaña a este
 directorio.
 
+## Cuentas de las tiendas — decidido
+
+**Quedan a nombre personal** (decisión del titular, 2026-09-11). No se convierten
+a organización y **no hace falta el D-U-N-S**.
+
+El Aviso Legal declara la relación: quien publica actúa por cuenta de
+BACKHAUSTIN S.A.S., y la responsabilidad del servicio no se desplaza. Lo que esa
+decisión deja abierto está registrado en la sección 4 de
+[`guia-legal-treino.pdf`](./guia-legal-treino.pdf) — en particular el flujo de
+fondos, que es tema del contador.
+
 ## Dónde se publica cada documento
 
 Mapa completo en la **sección 9** de [`guia-legal-treino.pdf`](./guia-legal-treino.pdf):

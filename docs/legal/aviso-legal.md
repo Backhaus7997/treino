@@ -23,6 +23,20 @@ TREINO es un servicio prestado por:
 | **Correo de contacto** | treino@gettreino.com |
 | **Sitio** | gettreino.com |
 
+## Quién publica la aplicación en las tiendas
+
+TREINO se distribuye en App Store y Google Play a través de cuentas de
+desarrollador a nombre de **Martin Backhaus**, persona humana, que actúa por
+cuenta de BACKHAUSTIN S.A.S.
+
+Se aclara para que no haya dudas: **el responsable del servicio, del tratamiento
+de tus datos y de la relación de consumo es BACKHAUSTIN S.A.S.**, identificada
+arriba. El nombre que figura como desarrollador en las tiendas no desplaza esa
+responsabilidad ni crea una relación con otra persona o empresa.
+
+Cualquier reclamo, consulta o ejercicio de derechos se dirige a la sociedad, por
+los canales de este documento.
+
 ## Naturaleza del servicio
 
 TREINO es una aplicación de organización y registro de entrenamiento físico,

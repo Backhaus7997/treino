@@ -535,152 +535,54 @@ def build_story():
     A(PageBreak())
 
     # ---- 4 cuentas de tiendas
-    A(P("4. Cuentas de las tiendas", "h1"))
+    A(P("4. Cuentas de las tiendas — decidido", "h1"))
     A(callout(
-        "<b>Decisión del Product Owner, y la más urgente del documento.</b> El "
-        "equipo de desarrollo tiene acceso a las dos consolas, pero cambiar la "
-        "titularidad de una cuenta de desarrollador no es una tarea técnica: "
-        "compromete a la sociedad, define a quién le paga la tienda y quién "
-        "responde ante el usuario.", warn=True))
-    sp(8)
+        "<b>Las cuentas quedan a nombre personal.</b> Decisión del titular, "
+        "tomada el 11 de septiembre de 2026 con los argumentos en contra sobre "
+        "la mesa. No se convierten a organización y <b>no hace falta tramitar "
+        "el D-U-N-S</b>, que era el paso de mayor plazo de todo este documento."))
+    sp(10)
 
-    A(P("4.1 Estado verificado", "h3"))
-    A(P("Ambas consolas se revisaron el 31 de agosto de 2026. Las dos están a "
-        "nombre personal."))
-    sp(4)
+    A(P("4.1 Estado", "h3"))
     A(table([
         ["", "Apple Developer Program", "Google Play Console"],
-        ["<b>Tipo de cuenta</b>", "<b>Individual</b>", "<b>Personal</b>"],
+        ["Tipo de cuenta", "<b>Individual</b>", "<b>Personal</b>"],
         ["Identificador", "Team ID J66AQRRM96",
          "Developer account ID 6318906944253642995"],
         ["Nombre legal", "Martin Backhaus", "Martin Backhaus"],
-        ["Nombre público", "Martin Backhaus",
-         "<b>Code assurance dev</b>"],
-        ["Domicilio cargado", "Cordoba, Córdoba 5000, Argentina "
-         "(incompleto: «Cordoba» figura como calle)",
-         "MZA 9 LOTE 21 S/N, Córdoba 5021, Argentina"],
-        ["Sitio declarado", "—", "code-assurance.com"],
-        ["Correo de la cuenta", "—", "martin.backhaus@code-assurance.com"],
-        ["Vencimiento", "<b>5 de septiembre de 2026, US$99</b>", "—"],
+        ["Nombre público", "Martin Backhaus", "Code assurance dev"],
     ], [30, 67, 68]))
 
     sp(10)
-    A(P("4.2 Qué publica Play, y qué está mal hoy", "h3"))
-    A(P("Publicar bajo un nombre de fantasía es práctica estándar y no tiene "
-        "nada de irregular: Play tiene un campo de «nombre de desarrollador» "
-        "separado de la identidad legal, público y modificable cuando se "
-        "quiera. Lo que Play hace por su cuenta es <b>mostrar la identidad "
-        "legal al lado</b>, y ahí es donde está el problema."))
+    A(P("4.2 Lo que esa decisión deja abierto", "h3"))
+    A(P("Se registra sin volver a discutirlo, para que quede escrito qué se "
+        "aceptó a cambio:"))
     sp(4)
     A(table([
-        ["Tipo de cuenta", "Qué publica Play en la ficha"],
-        ["<b>Personal</b>",
-         "Nombre legal, país y correo del desarrollador. "
-         "<b>Si la cuenta monetiza, además el domicilio completo</b>"],
-        ["<b>Organización</b>",
-         "Nombre legal, domicilio legal, correo y teléfono"],
-    ], [35, 130]))
+        ["Qué", "Consecuencia"],
+        ["<b>Responsabilidad</b>",
+         "El acuerdo de desarrollador lo firma una persona humana, así que "
+         "obliga a su patrimonio. Parte de la protección que da haber "
+         "constituido la sociedad no aplica en este frente"],
+        ["<b>Flujo de fondos</b>",
+         "Lo que paguen las tiendas se liquida a la persona, mientras la "
+         "sociedad es la que factura. Hoy pega poco porque el cobro del "
+         "entrenador va por Mercado Pago; con la suscripción del atleta por "
+         "compra integrada, pega de lleno. <b>Es tema del contador, no del "
+         "abogado</b>"],
+        ["<b>Identificación</b>",
+         "Los documentos identifican a BACKHAUSTIN S.A.S. y la ficha muestra a "
+         "Martin Backhaus. <b>Resuelto</b>: el Aviso Legal ahora declara la "
+         "relación — quién publica actúa por cuenta de la sociedad, y la "
+         "responsabilidad no se desplaza"],
+        ["<b>Convertir más adelante</b>",
+         "Con la app publicada deja de ser conversión de cuenta y pasa a ser "
+         "transferencia, con reseñas e instalaciones colgando de la ficha"]],
+        [42, 123]))
     sp(8)
-    A(P("Con la cuenta como está, el nombre de fantasía «Code assurance dev» "
-        "queda respaldado por <b>Martin Backhaus, persona física</b> — no por "
-        "BACKHAUSTIN S.A.S., que es quien firma los trece documentos legales. "
-        "El nombre comercial no hay por qué tocarlo; lo que hay que corregir "
-        "es la identidad legal que aparece detrás."))
-    sp(6)
-    A(callout(
-        "<b>No hay un campo suelto de «razón social» que se edite.</b> En Play "
-        "la identidad legal la determina el tipo de cuenta, así que conectar "
-        "el nombre comercial con la sociedad ES la conversión a cuenta de "
-        "organización. Hecha eso, la ficha queda «Code assurance dev» con "
-        "BACKHAUSTIN S.A.S. y su sede detrás. Si el nombre comercial conviene "
-        "o no junto a TREINO es una decisión de marca, no de cumplimiento."))
-
-    sp(8)
-    A(P("4.3 El domicilio se publica en los dos casos", "h3"))
-    A(P("La sede social inscripta de BACKHAUSTIN S.A.S. y el domicilio "
-        "particular del titular <b>son el mismo</b>: Molino de Torres 5301. "
-        "Eso tiene una consecuencia que conviene tener clara antes de decidir."))
-    sp(4)
-    A(callout(
-        "<b>Convertir a cuenta de organización NO evita que se publique esa "
-        "dirección.</b> Play publica el domicilio legal de la organización, y "
-        "acá el domicilio legal de la organización es la casa. Con cuenta "
-        "personal que monetiza pasa lo mismo. Es decir: proteger la dirección "
-        "particular <b>no</b> es un argumento válido para la conversión en "
-        "este caso, y no debe usarse como tal.", warn=True))
-    sp(8)
-    A(P("Si que la dirección no sea pública importa, se resuelve por otro "
-        "lado: cambiando la sede social inscripta ante IPJ a otro domicilio "
-        "—estudio contable, espacio de trabajo, servicio de domicilio legal—. "
-        "Es un trámite societario independiente de las tiendas, y es decisión "
-        "del titular."))
-    sp(6)
-    A(P("Aparte: la cuenta de Play tiene cargado hoy «MZA 9 LOTE 21 S/N, "
-        "Córdoba 5021», que probablemente sea el mismo lugar escrito de otra "
-        "forma. Para los trámites hay que usar <b>una sola</b> y tiene que ser "
-        "la inscripta, porque el D-U-N-S y la verificación de las tiendas "
-        "comparan contra el registro.", "small"))
-
-    A(PageBreak())
-
-    A(P("4.4 La bifurcación", "h3"))
-    A(P("Para Apple el camino es uno solo: convertir la cuenta existente de "
-        "Individual a Organization. Para Play hay dos, y cuál conviene depende "
-        "de un dato que el equipo de desarrollo no puede determinar."))
-    sp(4)
-    A(table([
-        ["Camino", "Cuándo conviene", "Costo"],
-        ["<b>Convertir</b> la cuenta actual a organización = BACKHAUSTIN "
-         "S.A.S., y cambiarle el nombre público a TREINO o Backhaustin",
-         "Si TREINO es lo único publicado en esa cuenta",
-         "Sin costo adicional. Sin transferencia de app"],
-        ["<b>Crear una cuenta nueva</b> para la sociedad y mover TREINO con "
-         "App transfers",
-         "Si «Code assurance dev» es una cuenta en uso para otros productos, "
-         "que convertirla arrastraría entera",
-         "US$25 y tiempos de espera de la transferencia"],
-    ], [55, 65, 45]))
-    sp(8)
-    A(callout(
-        "<b>Pregunta abierta para el Product Owner:</b> ¿la cuenta de Play "
-        "tiene otras aplicaciones además de TREINO, o «Code assurance dev» se "
-        "usa para otros productos? De esa respuesta sale cuál de los dos "
-        "caminos se toma.", warn=True))
-
-    sp(10)
-    A(P("4.5 Qué hay que hacer, y en qué orden", "h3"))
-    A(table([
-        ["#", "Paso", "Plazo"],
-        ["1", "<b>Tramitar el número D-U-N-S</b> para BACKHAUSTIN S.A.S. Lo "
-         "exigen Apple y Google para cuentas de organización. Lo emite Dun "
-         "&amp; Bradstreet, es gratis. Apple tiene un buscador para ver si ya "
-         "existe uno emitido. Datos: CUIT 30-71929587-4, matrícula 46468-A",
-         "<b>Hasta 5 días hábiles</b> que D&amp;B lo crea, más hasta 2 que "
-         "Apple lo reciba: <b>unos 7 días hábiles</b>. Acelerarlo no acorta "
-         "el plazo. Arranca primero igual, porque todo lo demás lo espera"],
-        ["2", "<b>Dejar que la membresía de Apple se renueve</b> el 5 de "
-         "septiembre",
-         "Una membresía vencida saca las apps de la tienda y complica el "
-         "trámite. Los US$99 son irrelevantes frente a eso"],
-        ["3", "Responder la pregunta de 4.4 y elegir camino para Play",
-         "Product Owner"],
-        ["4", "Pedir la conversión a Apple. Piden el D-U-N-S y acreditar "
-         "facultades para obligar a la sociedad",
-         "Después del D-U-N-S"],
-        ["5", "Ejecutar el camino elegido en Play, y corregir el nombre "
-         "público y el sitio declarado",
-         "Después del D-U-N-S"],
-        ["6", "Cargar en ambas la <b>sede social real</b> de la sociedad",
-         "Es además el dato que falta para cerrar los documentos legales"],
-    ], [8, 82, 75]))
-    sp(8)
-    A(callout(
-        "<b>El momento es ahora, y es barato.</b> La aplicación todavía no "
-        "está publicada — el registro de cambios dice «Primera versión pública "
-        "de TREINO». Sin app publicada no hay reseñas, calificaciones ni "
-        "instalaciones atadas a la ficha, así que en Apple es conversión de "
-        "cuenta y no transferencia. Una vez publicada, lo mismo se convierte "
-        "en un trámite con soporte, esperas y riesgo sobre la ficha viva."))
+    A(P("El domicilio se publica igual en los dos escenarios, así que ese punto "
+        "no cambia: la sede social inscripta y el domicilio particular son el "
+        "mismo.", "small"))
 
     A(PageBreak())
 
@@ -707,10 +609,10 @@ def build_story():
          "encargado del tratamiento"],
         ["<b>Ídem con Resend y con Vercel</b>",
          "Sus paneles", "Mismo trámite, dos minutos cada uno"],
-        ["<b>Conversión de las cuentas de las tiendas</b>",
-         "Apple y Google",
-         "Ver la sección 4. Incluye el trámite del D-U-N-S, que es el de mayor "
-         "plazo de todo este documento"],
+        ["<s>Conversión de las cuentas y D-U-N-S</s>",
+         "—",
+         "<b>Ya no aplica.</b> Las cuentas quedan personales por decisión del "
+         "titular. Ver la sección 4"],
         ["<b>Registro de la marca TREINO</b>",
          "INPI",
          "A nombre de la sociedad. No bloquea el lanzamiento, pero da respaldo "
@@ -821,11 +723,9 @@ def build_story():
         ["<b>1. Decidir</b>",
          "[OK] Las seis decisiones de la sección 3 están tomadas",
          "Product Owner"],
-        ["<b>1.b Cuentas de tiendas</b>",
-         "Tramitar el D-U-N-S ya, dejar renovar Apple el 5/9 y elegir camino "
-         "para Play. Corre en paralelo con todo lo demás y es lo de mayor "
-         "plazo. Ver sección 4",
-         "Product Owner"],
+        ["<s>1.b Cuentas de tiendas</s>",
+         "<b>Resuelto:</b> quedan personales. Sin D-U-N-S y sin conversión",
+         "—"],
         ["<b>2. Identificar</b>",
          "[OK] Sociedad constituida e inscripta. Falta el domicilio de la sede social, la casilla atendida y verificar a nombre de quién están las cuentas de las tiendas",
          "Vos"],
