@@ -3,6 +3,43 @@
 > **Es lo único que falta para poder ENCENDER el paywall del alumno.**
 > Mientras esto no esté, no se toca `kAthletePaywallEnabled` ni la CF que
 > escribe `athletePaywallEnforced`. Ver §5.
+>
+> ---
+>
+> ### Estado al 2026-09-11 (#1108)
+>
+> **Los cuatro pasos están escritos.** Lo que falta es la verificación en
+> device del §5, que necesita una Mac y un reloj.
+>
+> | Paso | Estado |
+> |---|---|
+> | 1 — fixture + función pura + **la mitad Swift** | ✅ verificado: `Conformance (Swift)` corre los 8 casos en CI |
+> | 2 — el dato hasta la pantalla | ⚠️ escrito, **sin verificar por ejecución** |
+> | 3 — los dos puntos de arranque | ⚠️ escrito, **sin verificar por ejecución** |
+> | 4 — renderizar `syncError` | ⚠️ escrito, **sin verificar por ejecución** |
+>
+> Lo que CI compila es **sólo** `CatalogGate.swift`, porque entra al runner de
+> conformidad. El actor, el resolver y las vistas no los tocó nadie: se
+> escribieron desde Windows, verificados por lectura y citados con
+> `archivo:línea`, igual que este documento.
+>
+> **Dos apartes del plan, con su motivo:**
+>
+> 1. `isPremium` fue a `TodaysWorkout`, no a `RoutineSummary` (§2.1). Es el
+>    cuello de botella real —los dos puntos de arranque pasan por uno— y se
+>    construye en un solo lugar, así que una línea cubre los tres `resolve`.
+>    `RoutineSummary` sólo alimenta filas de lista; ponerle el campo hoy sería
+>    un campo sin lectores.
+> 2. El envoltorio que consigue el entitlement vive en `CatalogGateWiring.swift`
+>    y no junto a la función pura. **Estuvieron juntos y el job se puso rojo**
+>    con cinco `cannot find type ... in scope`: el runner compila
+>    `CatalogGate.swift` SIN la app. El archivo puro tiene ahora un cartel que
+>    lo dice.
+>
+> **Y algo que el plan no tenía**: `kAthletePaywallEnabled` ahora existe en Dart
+> y en Swift. Dos constantes en dos lenguajes divergen, así que hay un test que
+> lee los dos archivos y falla si no coinciden
+> (`test/conformance/paywall_flag_parity_test.dart`).
 
 Contexto: [paywall-alumno-suelto.md](./paywall-alumno-suelto.md) §4.1.1 — seguir
 una plantilla de nivel principiante es gratis; las de intermedio y avanzado son
@@ -23,7 +60,7 @@ suposición, está marcada.
 | Catálogo — UI del teléfono | ✅ | #1066 |
 | Catálogo — regla server-side sobre `sessions` | ✅ | #1087 |
 | Catálogo — gate del reloj **Wear OS** | ✅ | #1087 |
-| **Catálogo — gate del reloj de Apple** | ❌ | **este documento** |
+| **Catálogo — gate del reloj de Apple** | ⚠️ escrito, sin verificar en device | **este documento** + #1108 |
 
 La regla del #1087 **nace inerte**: `athletePaywallEnforced` ausente ⇒ no se
 aplica, y hoy la CF lo escribe en `false` en todos lados. Por eso se pudo

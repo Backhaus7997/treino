@@ -67,16 +67,46 @@ enum AthleteEntitlement {
 /// hoja de límite) está construido y testeado, pero no muerde hasta que se
 /// ponga en `true`.
 ///
-/// Por qué: hoy NO existe forma de que un alumno pague. El checkout web del
-/// alumno no está construido (`docs/paywall-alumno-suelto.md` §7.1: el hub web
-/// manda a `/not-allowed` a todo el que no sea PF) y el webhook que escribiría
-/// `athleteSubscription` tampoco. Con el gate encendido, **todos** los usuarios
-/// serían `free` sin ninguna manera de destrabarse: le sacaríamos a los
-/// testers la posibilidad de armar una rutina de 3 días a cambio de nada.
+/// ─── Lo que ya NO es el motivo ───
 ///
-/// Encenderlo requiere, en este orden: (1) checkout web del alumno, (2)
-/// webhook escribiendo `athleteSubscription`, (3) la regla de `firestore.rules`
-/// que es el enforcement REAL — este flag sólo gobierna la UX del cliente.
+/// Este dartdoc decía que el bloqueante era que no existía forma de pagar: ni
+/// checkout, ni webhook. **Las dos cosas existen** desde el 2026-09-10, sólo
+/// que por un camino distinto del que decía la spec — el alumno paga por IAP,
+/// no por web, y el porqué está en `docs/paywall-alumno-suelto.md` §7.1.
+///
+///   • la compra: `athlete_checkout.dart` + `athlete_paywall_screen.dart`
+///   • el webhook: `functions/src/subscriptions/rc/webhook.ts`
+///
+/// Lo que sigue valiendo del razonamiento viejo, y por eso no se borra: con el
+/// gate encendido y sin forma de pagar, **todos** los usuarios serían `free`
+/// sin ninguna manera de destrabarse. Esa sigue siendo la prueba a pasar antes
+/// de tocar este valor.
+///
+/// ─── Lo que falta HOY ───
+///
+///   1. **La verificación en device del gate del reloj de Apple.** El código
+///      está (`ios/TreinoWatch Watch App/CatalogGate*.swift`) pero se escribió
+///      desde Windows: CI compila la función pura del contrato de conformidad
+///      y nada más. El checklist está en `docs/paywall-watchos-plan.md` §5, y
+///      el caso que más importa no es el obvio — es el CONTROL NEGATIVO: que
+///      un free entrene una plantilla de principiante sin fricción.
+///   2. **El grandfathering.** Hoy hay alumnos free con rutinas de 4 y 5 días
+///      creadas cuando no había tope. El día que esto se prenda dejan de ser
+///      editables. Ver `functions/src/subscriptions/athlete-paywall-enforced.ts`.
+///   3. **Los tres carteles de steering** de la app móvil del PF, declarados
+///      con fecha límite en `test/features/paywall/anti_steering_movil_test.dart`.
+///
+/// ─── Y EL ORDEN, QUE NO ES ARBITRARIO ───
+///
+/// **Primero el servidor, después el cliente**: encender la CF que escribe
+/// `athletePaywallEnforced`, y recién ahí este flag. Al revés, el cliente gatea
+/// cosas que el servidor todavía permite y el alumno ve un candado que no
+/// corresponde.
+///
+/// Ojo con la otra mitad del cliente: `kAthletePaywallEnabled` **también existe
+/// en Swift** (`ios/TreinoWatch Watch App/PaywallEntitlement.swift`), porque el
+/// reloj de Apple no puede importar Dart. Hay un test que se pone rojo si los
+/// dos no coinciden — `test/conformance/paywall_flag_parity_test.dart`.
 const bool kAthletePaywallEnabled = false;
 
 /// Días máximos de una rutina PROPIA en el plan free.
