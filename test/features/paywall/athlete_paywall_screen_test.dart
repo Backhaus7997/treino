@@ -22,25 +22,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/features/paywall/application/athlete_checkout.dart';
 import 'package:treino/features/paywall/presentation/athlete_paywall_screen.dart';
-import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
 
-import 'helpers/rc_models.dart';
+import 'helpers/store_falso.dart';
 
 AthleteCheckout _conPaquetes(
-  List<Package> paquetes, {
-  Object? tiraAlComprar,
-  CustomerInfo Function(Package)? alComprar,
+  List<AthletePlanOferta> ofertas, {
+  AthleteStoreException? tira,
+  Set<String>? activos,
 }) =>
     resolveAthleteCheckout(
-      store: StoreFalso(
-        offering: oferta(paquetes),
-        tiraAlComprar: tiraAlComprar,
-        alComprar: alComprar,
-      ),
+      store: StoreFalso(ofrece: ofertas, tira: tira, activosAlComprar: activos),
     );
 
 Widget _app(AthleteCheckout checkout) => ProviderScope(
@@ -91,8 +86,8 @@ void main() {
       // review.
       await tester.pumpWidget(
         _app(_conPaquetes([
-          paquete(PackageType.monthly),
-          paquete(PackageType.annual, porMes: 'USD 0,83')
+          ofertaDe(AthletePlan.mensual),
+          ofertaDe(AthletePlan.anual, porMes: 'USD 0,83')
         ])),
       );
       await tester.pumpAndSettle();
@@ -118,7 +113,7 @@ void main() {
       // La obligación de informar el precio final es del vendedor, y frente al
       // consumidor argentino el vendedor somos nosotros, no Apple.
       await tester
-          .pumpWidget(_app(_conPaquetes([paquete(PackageType.monthly)])));
+          .pumpWidget(_app(_conPaquetes([ofertaDe(AthletePlan.mensual)])));
       await tester.pumpAndSettle();
 
       expect(
@@ -132,8 +127,8 @@ void main() {
     testWidgets('salen de la tienda, no de un literal', (tester) async {
       await tester.pumpWidget(
         _app(_conPaquetes([
-          paquete(PackageType.monthly, precio: 'PRECIO-DE-LA-TIENDA-M'),
-          paquete(PackageType.annual,
+          ofertaDe(AthletePlan.mensual, precio: 'PRECIO-DE-LA-TIENDA-M'),
+          ofertaDe(AthletePlan.anual,
               precio: 'PRECIO-DE-LA-TIENDA-A', porMes: 'POR-MES-DE-LA-TIENDA'),
         ])),
       );
@@ -149,7 +144,7 @@ void main() {
       // En el mensual repetiría el mismo número dos veces.
       await tester.pumpWidget(
         _app(_conPaquetes([
-          paquete(PackageType.monthly,
+          ofertaDe(AthletePlan.mensual,
               precio: 'USD 2,99', porMes: 'NO-DEBERIA-VERSE'),
         ])),
       );
@@ -164,7 +159,7 @@ void main() {
   group('lo que Apple exige en el flujo de compra', () {
     testWidgets('hay botón de restaurar compras', (tester) async {
       await tester
-          .pumpWidget(_app(_conPaquetes([paquete(PackageType.monthly)])));
+          .pumpWidget(_app(_conPaquetes([ofertaDe(AthletePlan.mensual)])));
       await tester.pumpAndSettle();
 
       expect(
@@ -177,7 +172,7 @@ void main() {
         (tester) async {
       // Guideline 3.1.2. Es el motivo de rechazo número uno de suscripciones.
       await tester
-          .pumpWidget(_app(_conPaquetes([paquete(PackageType.monthly)])));
+          .pumpWidget(_app(_conPaquetes([ofertaDe(AthletePlan.mensual)])));
       await tester.pumpAndSettle();
 
       expect(find.textContaining('Términos', findRichText: true), findsWidgets);
@@ -186,8 +181,8 @@ void main() {
 
   group('el resultado de la compra', () {
     testWidgets('cancelar NO le muestra nada al alumno', (tester) async {
-      final checkout = _conPaquetes([paquete(PackageType.monthly)],
-          tiraAlComprar: falla(PurchasesErrorCode.purchaseCancelledError));
+      final checkout = _conPaquetes([ofertaDe(AthletePlan.mensual)],
+          tira: const AthleteStoreException(AthleteStoreFalla.cancelada));
       await tester.pumpWidget(_app(checkout));
       await tester.pumpAndSettle();
 
@@ -200,9 +195,10 @@ void main() {
 
     testWidgets('un pago pendiente avisa, y NO dice que está listo',
         (tester) async {
-      final checkout = _conPaquetes([paquete(PackageType.monthly)],
-          alComprar: (_) =>
-              cliente(nombre: kAthleteEntitlement, activo: false));
+      // La tienda cobra pero el entitlement todavia no esta activo: pago
+      // diferido en Android, o un "Ask to Buy" esperando al adulto.
+      final checkout =
+          _conPaquetes([ofertaDe(AthletePlan.mensual)], activos: const {});
       await tester.pumpWidget(_app(checkout));
       await tester.pumpAndSettle();
 

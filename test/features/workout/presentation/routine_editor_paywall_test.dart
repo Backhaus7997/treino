@@ -36,7 +36,6 @@ import 'package:treino/features/workout/domain/routine_visibility.dart';
 import 'package:treino/features/workout/presentation/routine_editor_mode.dart';
 import 'package:treino/features/workout/presentation/routine_editor_screen.dart';
 import 'package:treino/l10n/app_l10n.dart';
-import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:treino/features/paywall/application/athlete_checkout.dart';
 
 import '../../../fixtures/exercises.dart';
@@ -765,15 +764,15 @@ void main() {
 /// le pregunta nada a la tienda, así que ningún método de acá se llama.
 final class _StoreDeMentira implements AthleteStore {
   @override
-  Future<void> logIn(String uid) async => throw UnimplementedError();
+  Future<void> identificar(String uid) async => throw UnimplementedError();
 
   @override
-  Future<Offering?> currentOffering() async => throw UnimplementedError();
+  Future<List<AthletePlanOferta>> ofertas() async => throw UnimplementedError();
 
   @override
-  Future<CustomerInfo> purchase(Package package) async =>
+  Future<Set<String>> comprar(AthletePlan plan) async =>
       throw UnimplementedError();
 
   @override
-  Future<CustomerInfo> restore() async => throw UnimplementedError();
+  Future<Set<String>> restaurar() async => throw UnimplementedError();
 }
