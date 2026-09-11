@@ -52,9 +52,14 @@
 library;
 
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
-import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:purchases_flutter/purchases_flutter.dart';
+
+// Se re-exporta a proposito: quien consume la capacidad necesita tambien
+// `AthletePlanOferta`, y pedirle dos imports para una sola idea es ruido.
+export 'athlete_store.dart';
+
+import 'athlete_store.dart';
+import 'revenuecat_store.dart' show crearRevenueCatStore;
 
 /// Qué está comprando el alumno.
 ///
@@ -62,42 +67,8 @@ import 'package:purchases_flutter/purchases_flutter.dart';
 /// propósito: la doc recomienda no inventar identifiers custom, porque los
 /// estándar son los que el dashboard entiende para armar los Offerings.
 enum AthletePlan {
-  mensual(PackageType.monthly),
-  anual(PackageType.annual);
-
-  const AthletePlan(this.packageType);
-
-  final PackageType packageType;
-}
-
-/// Un plan tal como la tienda lo cotiza HOY.
-///
-/// Existe para que la PANTALLA no tenga que importar `purchases_flutter`. No es
-/// una capa de abstraccion por gusto: el guard de `superficie_de_cobro_alumno_test.dart`
-/// marca cualquier archivo que importe el SDK, y una pantalla no deberia estar
-/// nunca en esa lista — tiene que hablarle a este archivo, no a la tienda.
-final class AthletePlanOferta {
-  const AthletePlanOferta({
-    required this.plan,
-    required this.precio,
-    this.precioPorMes,
-  });
-
-  final AthletePlan plan;
-
-  /// El precio **ya formateado por la tienda**, con su moneda y su separador.
-  ///
-  /// Nunca se arma a mano. Apple exige que el importe que se va a facturar sea
-  /// el elemento de precio mas prominente del layout, y armarlo nosotros abre
-  /// la puerta a que diga algo distinto de lo que cobra la hoja de pago del
-  /// sistema — que es el peor lugar posible para una discrepancia.
-  final String precio;
-
-  /// Lo que sale por mes el plan anual, formateado por la tienda.
-  ///
-  /// Va SUBORDINADO al [precio], nunca en su lugar: la doc de Apple dice que
-  /// estos desgloses «should be displayed in a subordinate position and size».
-  final String? precioPorMes;
+  mensual,
+  anual,
 }
 
 /// Cómo terminó un intento de compra.
@@ -137,64 +108,6 @@ enum AthletePurchaseOutcome {
 /// no el plan que lo vende.
 const String kAthleteEntitlement = 'alumno_pro';
 
-/// Clave pública del SDK de RevenueCat.
-///
-/// **No es un secreto.** Viaja en el binario de todos modos, es read-only por
-/// diseño, y RevenueCat la publica como "public SDK key". Mismo caso que la
-/// client key de Google Places, que este repo ya resolvió igual: default
-/// committeado para que TODO build ande sin flags, y `--dart-define` que la
-/// pisa para rotarla sin recompilar.
-///
-/// Hoy el default está VACÍO porque el proyecto de RevenueCat todavía no
-/// existe. Mientras esté vacío, [resolveAthleteCheckout] devuelve
-/// [AthleteCheckoutUnavailable] y la app no ofrece comprar — que es lo
-/// correcto: un botón sin SDK configurado es una promesa rota.
-const String kRevenueCatPublicKey = String.fromEnvironment(
-  'REVENUECAT_PUBLIC_KEY',
-);
-
-/// El puerto contra RevenueCat.
-///
-/// Existe por una sola razón: `Purchases` habla por platform channel, y un
-/// test de Dart puro no tiene canal. Sin esta costura, toda la lógica de
-/// arriba —elegir el package, traducir el error de cancelación, distinguir un
-/// pago diferido— sólo se podría probar en un dispositivo.
-abstract interface class AthleteStore {
-  /// Identifica al comprador ANTES de cobrarle. Ver el encabezado.
-  Future<void> logIn(String uid);
-
-  /// El Offering marcado como `current` en el dashboard.
-  Future<Offering?> currentOffering();
-
-  /// Dispara la compra. Tira si la tienda falla o si el alumno cancela.
-  Future<CustomerInfo> purchase(Package package);
-
-  /// Le devuelve al alumno lo que ya habia comprado, en un telefono nuevo o
-  /// despues de reinstalar.
-  Future<CustomerInfo> restore();
-}
-
-/// La implementación real. Delgada a propósito: acá no hay decisiones.
-final class RevenueCatStore implements AthleteStore {
-  const RevenueCatStore();
-
-  @override
-  Future<void> logIn(String uid) => Purchases.logIn(uid);
-
-  @override
-  Future<Offering?> currentOffering() async =>
-      (await Purchases.getOfferings()).current;
-
-  // `Purchases.purchase(PurchaseParams)` y no `purchasePackage`: la segunda
-  // quedo deprecada en el SDK 10.x y usarla deja un warning en cada build.
-  @override
-  Future<CustomerInfo> purchase(Package package) async =>
-      (await Purchases.purchase(PurchaseParams.package(package))).customerInfo;
-
-  @override
-  Future<CustomerInfo> restore() => Purchases.restorePurchases();
-}
-
 /// Dónde puede comprar el alumno. Sellada: ver el encabezado.
 sealed class AthleteCheckout {
   const AthleteCheckout._();
@@ -223,19 +136,16 @@ final class AthleteCheckoutOnStore extends AthleteCheckout {
 
   /// Restaura las compras del alumno [uid].
   ///
-  /// Apple lo EXIGE para suscripciones: una app que cobra y no ofrece
-  /// restaurar es rechazo. Y no es burocracia — el alumno que cambia de
-  /// telefono, reinstala, o entra desde el iPad de la casa necesita esto.
+  /// Apple lo EXIGE para suscripciones. Y no es burocracia: el alumno que
+  /// cambia de teléfono, reinstala, o entra desde el iPad de la casa necesita
+  /// esto.
   ///
-  /// El `logIn` va antes por el MISMO motivo que en [start]: sin el, la
-  /// restauracion se aplica sobre un id anonimo y no le devuelve nada.
-  ///
-  /// Devuelve `true` si despues de restaurar el alumno tiene el entitlement.
+  /// El `identificar` va antes por el MISMO motivo que en [start]: sin él, la
+  /// restauración se aplica sobre un id anónimo y no le devuelve nada.
   Future<bool> restaurar({required String uid}) async {
     try {
-      await _store.logIn(uid);
-      final info = await _store.restore();
-      return info.entitlements.all[kAthleteEntitlement]?.isActive ?? false;
+      await _store.identificar(uid);
+      return (await _store.restaurar()).contains(kAthleteEntitlement);
     } catch (e) {
       debugPrint('athlete_checkout: no se pudo restaurar — $e');
       return false;
@@ -244,35 +154,11 @@ final class AthleteCheckoutOnStore extends AthleteCheckout {
 
   /// Los planes que la tienda cotiza hoy, con su precio ya formateado.
   ///
-  /// Lista vacia = el Offering `current` no existe o no tiene ninguno de
-  /// nuestros package types. Es un error de CONFIGURACION del dashboard, y la
-  /// pantalla tiene que mostrar eso y no un paywall vacio.
+  /// Lista vacía = no hay oferta publicada. Es un error de CONFIGURACIÓN del
+  /// dashboard, y la pantalla tiene que mostrar eso y no un paywall vacío.
   Future<List<AthletePlanOferta>> planes() async {
     try {
-      final offering = await _store.currentOffering();
-      if (offering == null) {
-        debugPrint('athlete_checkout: no hay Offering `current` en RevenueCat');
-        return const [];
-      }
-      final out = <AthletePlanOferta>[];
-      for (final plan in AthletePlan.values) {
-        final p = offering.availablePackages
-            .where((x) => x.packageType == plan.packageType)
-            .firstOrNull;
-        if (p == null) continue;
-        out.add(
-          AthletePlanOferta(
-            plan: plan,
-            precio: p.storeProduct.priceString,
-            // Solo tiene sentido en el anual: en el mensual repetiria el mismo
-            // numero dos veces.
-            precioPorMes: plan == AthletePlan.anual
-                ? p.storeProduct.pricePerMonthString
-                : null,
-          ),
-        );
-      }
-      return out;
+      return await _store.ofertas();
     } catch (e) {
       debugPrint('athlete_checkout: no se pudieron leer los planes — $e');
       return const [];
@@ -288,7 +174,7 @@ final class AthleteCheckoutOnStore extends AthleteCheckout {
   /// una firma"*.
   ///
   /// **No escribe nada en Firestore.** El entitlement lo escribe `rcWebhook`
-  /// del lado servidor, después de re-consultarle la verdad a RevenueCat con
+  /// del lado servidor, después de re-consultarle la verdad al proveedor con
   /// nuestra key. Que el cliente diga "compré" no alcanza y no tiene por qué:
   /// el SDK puede otorgar un entitlement localmente sin haber hablado con el
   /// servidor, y ese es exactamente el camino que un cliente modificado
@@ -304,52 +190,32 @@ final class AthleteCheckoutOnStore extends AthleteCheckout {
     try {
       // Antes de cobrar. Ver el encabezado: sin esto la compra queda a nombre
       // de un id anónimo y el webhook no encuentra a quién acreditarle.
-      await _store.logIn(uid);
+      await _store.identificar(uid);
 
-      final offering = await _store.currentOffering();
-      if (offering == null) {
-        debugPrint('athlete_checkout: no hay Offering `current` en RevenueCat');
-        return AthletePurchaseOutcome.sinProducto;
-      }
+      final activos = await _store.comprar(plan);
 
-      final package = offering.availablePackages
-          .where((p) => p.packageType == plan.packageType)
-          .firstOrNull;
-      if (package == null) {
-        debugPrint(
-            'athlete_checkout: el Offering no tiene ${plan.packageType}');
-        return AthletePurchaseOutcome.sinProducto;
-      }
-
-      final info = await _store.purchase(package);
-      final entitlement = info.entitlements.all[kAthleteEntitlement];
-
-      if (entitlement != null && entitlement.isActive) {
+      // Compró y el derecho ya está: listo.
+      if (activos.contains(kAthleteEntitlement)) {
         return AthletePurchaseOutcome.comprado;
       }
-
-      // Compró, la tienda no tiró, pero el entitlement todavía no está activo.
-      // En Android es el caso del pago diferido; en iOS, un "Ask to Buy" que
-      // espera al adulto. En los dos, la compra llega despues por el webhook.
+      // Cobró, la tienda no tiró, pero el entitlement todavía no está activo.
+      // En Android es el pago diferido; en iOS, un "Ask to Buy" que espera al
+      // adulto. En los dos, la compra llega después por el webhook.
       return AthletePurchaseOutcome.pendiente;
-    } on PlatformException catch (e) {
-      final codigo = PurchasesErrorHelper.getErrorCode(e);
-
-      // Cerrar el diálogo de pago NO es un error. Ver el enum.
-      if (codigo == PurchasesErrorCode.purchaseCancelledError) {
-        return AthletePurchaseOutcome.cancelado;
+    } on AthleteStoreException catch (e) {
+      // La traducción de los códigos del proveedor vive en el ADAPTADOR. Acá
+      // sólo se decide qué hacer con cada caso, que es lo que de verdad es una
+      // decisión de producto.
+      if (e.falla != AthleteStoreFalla.cancelada) {
+        debugPrint('athlete_checkout: la compra no se completó — $e');
       }
-      if (codigo == PurchasesErrorCode.paymentPendingError) {
-        return AthletePurchaseOutcome.pendiente;
-      }
-      if (codigo == PurchasesErrorCode.productNotAvailableForPurchaseError ||
-          codigo == PurchasesErrorCode.configurationError) {
-        debugPrint('athlete_checkout: producto no disponible ($codigo)');
-        return AthletePurchaseOutcome.sinProducto;
-      }
-
-      debugPrint('athlete_checkout: la compra falló ($codigo)');
-      return AthletePurchaseOutcome.error;
+      return switch (e.falla) {
+        // Cerrar el diálogo de pago NO es un error. Ver el enum.
+        AthleteStoreFalla.cancelada => AthletePurchaseOutcome.cancelado,
+        AthleteStoreFalla.pendiente => AthletePurchaseOutcome.pendiente,
+        AthleteStoreFalla.sinProducto => AthletePurchaseOutcome.sinProducto,
+        AthleteStoreFalla.otra => AthletePurchaseOutcome.error,
+      };
     } catch (e) {
       debugPrint('athlete_checkout: error inesperado — $e');
       return AthletePurchaseOutcome.error;
@@ -366,37 +232,15 @@ AthleteCheckout resolveAthleteCheckout({AthleteStore? store}) {
   if (kIsWeb) {
     return const AthleteCheckoutUnavailable._('el alumno no compra por web');
   }
-  if (kRevenueCatPublicKey.isEmpty && store == null) {
-    return const AthleteCheckoutUnavailable._('falta REVENUECAT_PUBLIC_KEY');
+  // Lo unico que este archivo sabe del proveedor: como pedirle uno, y que
+  // puede no haberlo. El nombre del proveedor no aparece ni en el motivo.
+  final elegido = store ?? crearRevenueCatStore();
+  if (elegido == null) {
+    return const AthleteCheckoutUnavailable._(
+      'no hay proveedor de compras configurado',
+    );
   }
-  return AthleteCheckoutOnStore._(store ?? const RevenueCatStore());
-}
-
-/// Arranca el SDK de RevenueCat. Se llama UNA vez, desde `lib/main.dart`.
-///
-/// ─── Por qué acá y no en el entry point web ───
-///
-/// RevenueCat es móvil-only, y el repo ya tiene el precedente exacto:
-/// `main_coach_hub.dart` NO inicializa Google Sign-In y lo dice en un
-/// comentario. Hay 7 entry points en `lib/*.dart` y sólo `main.dart` necesita
-/// esto.
-///
-/// ─── Por qué NO recibe el uid ───
-///
-/// En el momento en que corre esto el alumno puede no estar logueado todavía.
-/// RevenueCat arranca anónimo y se identifica en el `logIn` que hace
-/// [AthleteCheckoutOnStore.start] justo antes de cobrar. Ese es el orden
-/// correcto y además el que no se puede olvidar de cablear: el uid entra por
-/// la firma de `start`, no por un listener en otro archivo.
-///
-/// Devuelve `false` si no había clave. No tira: un binario sin clave tiene que
-/// arrancar igual y simplemente no ofrecer comprar.
-Future<bool> configurarRevenueCat() async {
-  if (kIsWeb || kRevenueCatPublicKey.isEmpty) return false;
-  await Purchases.configure(
-    PurchasesConfiguration(kRevenueCatPublicKey),
-  );
-  return true;
+  return AthleteCheckoutOnStore._(elegido);
 }
 
 /// La capacidad de comprar, para la UI.

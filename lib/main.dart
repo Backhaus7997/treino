@@ -17,7 +17,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'app/app.dart';
 import 'core/persistence/shared_prefs_provider.dart';
 import 'firebase_options.dart';
-import 'features/paywall/application/athlete_checkout.dart';
+import 'features/paywall/application/revenuecat_store.dart';
 
 Future<void> main() async {
   // runZonedGuarded captura excepciones async no atrapadas (futures sin await,

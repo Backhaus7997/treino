@@ -1,15 +1,16 @@
 // athlete_checkout_test.dart — la capacidad de comprar del ALUMNO.
 //
-// LOCAL, sin dispositivo y sin platform channels: el SDK entra por el puerto
-// `AthleteStore`.
+// LOCAL, sin dispositivo y sin platform channels. Y desde que el puerto habla
+// nuestro vocabulario, **sin un solo tipo de RevenueCat**: la traducción desde
+// el SDK se prueba aparte, en `revenuecat_store_test.dart`.
 //
 // Lo que estos tests cuidan son cinco cosas, y ninguna es "que ande":
 //
-//   1. Que el `logIn` con el uid pase SIEMPRE ANTES de cobrar. Si la compra
-//      sale anónima, RevenueCat le inventa un id, el webhook recibe ESE id, no
-//      encuentra `users/{uid}`, y contesta 200 sin acreditar nada. El alumno
-//      pagó y no tiene nada — y el bug no hace ruido: falla en silencio, en
-//      producción, después de que alguien puso plata.
+//   1. Que la identificación con el uid pase SIEMPRE ANTES de cobrar. Si la
+//      compra sale anónima, el proveedor le inventa un id, el webhook recibe
+//      ESE id, no encuentra `users/{uid}`, y contesta 200 sin acreditar nada.
+//      El alumno pagó y no tiene nada — y el bug no hace ruido: falla en
+//      silencio, en producción, después de que alguien puso plata.
 //
 //   2. Que cancelar NO sea un error. El alumno que cierra la hoja de pago tomó
 //      una decisión; mostrarle un cartel rojo por eso es maltratarlo.
@@ -18,33 +19,43 @@
 //      distintas. El entitlement lo escribe el webhook del lado servidor; este
 //      código NUNCA escribe en Firestore.
 //
-//   4. Que un problema de CONFIGURACIÓN del dashboard (falta el Offering, falta
-//      el package) no se confunda con un problema del alumno.
+//   4. Que un problema de CONFIGURACIÓN del dashboard no se confunda con un
+//      problema del alumno.
 //
-//   5. Que sin clave del SDK la app NO ofrezca comprar. Un botón sin SDK
-//      configurado es una promesa rota.
+//   5. Que sin proveedor configurado la app NO ofrezca comprar. Un botón sin
+//      SDK es una promesa rota.
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:treino/features/paywall/application/athlete_checkout.dart';
 
-import 'helpers/rc_models.dart';
+import 'helpers/store_falso.dart';
 
-AthleteCheckoutOnStore _checkout(StoreFalso store) =>
-    resolveAthleteCheckout(store: store) as AthleteCheckoutOnStore;
-
-// ---------------------------------------------------------------------------
+StoreFalso _conPlanes(
+  List<AthletePlan> planes, {
+  Set<String>? activos,
+  AthleteStoreException? tira,
+}) =>
+    StoreFalso(
+      ofrece: planes.map(ofertaDe).toList(),
+      activosAlComprar: activos,
+      tira: tira,
+    );
 
 void main() {
   group('resolveAthleteCheckout — quién puede comprar', () {
-    test('sin clave del SDK NO se puede comprar, y dice por qué', () {
-      // Es el estado de HOY: el proyecto de RevenueCat todavía no existe.
-      // Un botón de compra sin SDK configurado prometería una salida que no
-      // está, que es exactamente lo que el dartdoc de la hoja de límite dice
-      // que hay que evitar.
+    test('sin proveedor configurado NO se puede comprar, y dice por qué', () {
+      // Es el estado de HOY: el proyecto de RevenueCat todavía no existe, así
+      // que `crearRevenueCatStore()` devuelve null.
       final r = resolveAthleteCheckout();
       expect(r, isA<AthleteCheckoutUnavailable>());
-      expect((r as AthleteCheckoutUnavailable).motivo, contains('KEY'));
+      expect((r as AthleteCheckoutUnavailable).motivo, contains('proveedor'));
+    });
+
+    test('el motivo NO nombra al proveedor', () {
+      // El archivo de la capacidad no debería saber contra quién habla. Si
+      // este test se pone rojo, algo del adaptador se filtró a la lógica.
+      final r = resolveAthleteCheckout() as AthleteCheckoutUnavailable;
+      expect(r.motivo.toLowerCase(), isNot(contains('revenuecat')));
     });
 
     test('con un store inyectado sí se puede — es el camino de los tests', () {
@@ -56,8 +67,6 @@ void main() {
 
     test('el sealed cubre los dos casos y nada más', () {
       // Si alguien agrega una tercera variante, este switch deja de compilar.
-      // Es el mismo recordatorio que el tipo del PF: la compra no es un
-      // booleano, es una capacidad.
       final AthleteCheckout r = resolveAthleteCheckout();
       final nombre = switch (r) {
         AthleteCheckoutOnStore() => 'compra',
@@ -68,183 +77,131 @@ void main() {
   });
 
   group('start — EL ORDEN: identificar antes de cobrar', () {
-    test('EL TEST QUE IMPORTA: logIn pasa ANTES de purchase', () async {
-      final store =
-          StoreFalso(offering: oferta([paquete(PackageType.monthly)]));
+    test('EL TEST QUE IMPORTA: identificar pasa ANTES de comprar', () async {
+      final store = _conPlanes([AthletePlan.mensual]);
 
-      await _checkout(store).start(uid: 'alumno-42', plan: AthletePlan.mensual);
+      await checkoutCon(store)
+          .start(uid: 'alumno-42', plan: AthletePlan.mensual);
 
-      expect(store.llamadas, ['logIn', 'currentOffering', 'purchase']);
+      expect(store.llamadas, ['identificar', 'comprar']);
       expect(store.uidIdentificado, 'alumno-42');
-      // Si este test se pone rojo porque alguien movió el `logIn` después de
-      // la compra —o lo sacó— la compra va a salir a nombre de un id anónimo,
-      // el webhook no va a encontrar a quién acreditarle, y el alumno va a
-      // pagar sin recibir nada. No lo arregles moviendo el expect.
-      expect(store.llamadas.indexOf('logIn'),
-          lessThan(store.llamadas.indexOf('purchase')));
-    });
-
-    test('si no hay Offering NO se cobra', () async {
-      final store = StoreFalso();
-
-      final r = await _checkout(store)
-          .start(uid: 'alumno-1', plan: AthletePlan.mensual);
-
-      expect(r, AthletePurchaseOutcome.sinProducto);
-      expect(store.llamadas, isNot(contains('purchase')));
-    });
-
-    test('si el Offering no tiene el plan pedido NO se cobra', () async {
-      // El alumno toca "anual" y el dashboard sólo publicó el mensual. Es un
-      // error de configuración nuestro, y cobrarle el mensual sería peor que
-      // no cobrarle nada.
-      final store =
-          StoreFalso(offering: oferta([paquete(PackageType.monthly)]));
-
-      final r = await _checkout(store)
-          .start(uid: 'alumno-1', plan: AthletePlan.anual);
-
-      expect(r, AthletePurchaseOutcome.sinProducto);
-      expect(store.llamadas, isNot(contains('purchase')));
-    });
-
-    test('compra el package del plan pedido, no el primero de la lista',
-        () async {
-      final store = StoreFalso(
-        offering:
-            oferta([paquete(PackageType.monthly), paquete(PackageType.annual)]),
+      // Si este test se pone rojo porque alguien movió la identificación
+      // después de la compra —o la sacó— la compra va a salir a nombre de un
+      // id anónimo, el webhook no va a encontrar a quién acreditarle, y el
+      // alumno va a pagar sin recibir nada. No lo arregles moviendo el expect.
+      expect(
+        store.llamadas.indexOf('identificar'),
+        lessThan(store.llamadas.indexOf('comprar')),
       );
+    });
 
-      await _checkout(store).start(uid: 'alumno-1', plan: AthletePlan.anual);
+    test('compra el plan pedido, no otro', () async {
+      final store = _conPlanes([AthletePlan.mensual, AthletePlan.anual]);
 
-      expect(store.comprados.single.packageType, PackageType.annual);
+      await checkoutCon(store).start(uid: 'a', plan: AthletePlan.anual);
+
+      expect(store.comprados.single, AthletePlan.anual);
+    });
+
+    test('restaurar también identifica primero', () async {
+      final store = StoreFalso(activosAlRestaurar: {kAthleteEntitlement});
+
+      expect(await checkoutCon(store).restaurar(uid: 'alumno-7'), isTrue);
+      expect(store.llamadas, ['identificar', 'restaurar']);
+      expect(store.uidIdentificado, 'alumno-7');
+    });
+
+    test('restaurar sin nuestro entitlement devuelve false', () async {
+      final store = StoreFalso(activosAlRestaurar: const {'otra_cosa'});
+      expect(await checkoutCon(store).restaurar(uid: 'a'), isFalse);
     });
   });
 
   group('start — cómo termina', () {
-    test('entitlement activo → comprado', () async {
-      final store =
-          StoreFalso(offering: oferta([paquete(PackageType.monthly)]));
-
+    test('el entitlement vino activo → comprado', () async {
       expect(
-        await _checkout(store)
-            .start(uid: 'alumno-1', plan: AthletePlan.mensual),
+        await checkoutCon(_conPlanes([AthletePlan.mensual]))
+            .start(uid: 'a', plan: AthletePlan.mensual),
         AthletePurchaseOutcome.comprado,
       );
     });
 
-    test('cobró pero el entitlement NO está activo → pendiente', () async {
+    test('cobró y no vino nuestro entitlement → pendiente', () async {
       // Android con pago diferido, o un "Ask to Buy" de iOS esperando al
       // adulto. Decirle "listo" sería mentir; decirle "error" también.
-      final store = StoreFalso(
-        offering: oferta([paquete(PackageType.monthly)]),
-        alComprar: (_) => cliente(nombre: kAthleteEntitlement, activo: false),
-      );
+      final store = _conPlanes([AthletePlan.mensual], activos: const {});
 
       expect(
-        await _checkout(store)
-            .start(uid: 'alumno-1', plan: AthletePlan.mensual),
-        AthletePurchaseOutcome.pendiente,
-      );
-    });
-
-    test('cobró y no vino NINGÚN entitlement → pendiente', () async {
-      final store = StoreFalso(
-        offering: oferta([paquete(PackageType.monthly)]),
-        alComprar: (_) => cliente(),
-      );
-
-      expect(
-        await _checkout(store)
-            .start(uid: 'alumno-1', plan: AthletePlan.mensual),
+        await checkoutCon(store).start(uid: 'a', plan: AthletePlan.mensual),
         AthletePurchaseOutcome.pendiente,
       );
     });
 
     test('vino OTRO entitlement, no el nuestro → pendiente', () async {
-      // Un alumno que compró otra cosa en otra app del mismo proyecto de
-      // RevenueCat. No le da acceso a TREINO.
-      final store = StoreFalso(
-        offering: oferta([paquete(PackageType.monthly)]),
-        alComprar: (_) => cliente(nombre: 'otra_cosa'),
-      );
+      final store =
+          _conPlanes([AthletePlan.mensual], activos: const {'otra_cosa'});
 
       expect(
-        await _checkout(store)
-            .start(uid: 'alumno-1', plan: AthletePlan.mensual),
+        await checkoutCon(store).start(uid: 'a', plan: AthletePlan.mensual),
         AthletePurchaseOutcome.pendiente,
       );
     });
 
     test('EL OTRO TEST QUE IMPORTA: cancelar NO es un error', () async {
-      final store = StoreFalso(
-        offering: oferta([paquete(PackageType.monthly)]),
-        tiraAlComprar: falla(PurchasesErrorCode.purchaseCancelledError),
+      final store = _conPlanes(
+        [AthletePlan.mensual],
+        tira: const AthleteStoreException(AthleteStoreFalla.cancelada),
       );
 
       expect(
-        await _checkout(store)
-            .start(uid: 'alumno-1', plan: AthletePlan.mensual),
+        await checkoutCon(store).start(uid: 'a', plan: AthletePlan.mensual),
         AthletePurchaseOutcome.cancelado,
       );
     });
 
-    test('pago pendiente de la tienda → pendiente', () async {
-      final store = StoreFalso(
-        offering: oferta([paquete(PackageType.monthly)]),
-        tiraAlComprar: falla(PurchasesErrorCode.paymentPendingError),
-      );
+    test('cada falla del puerto mapea a su outcome', () async {
+      const esperado = {
+        AthleteStoreFalla.cancelada: AthletePurchaseOutcome.cancelado,
+        AthleteStoreFalla.pendiente: AthletePurchaseOutcome.pendiente,
+        AthleteStoreFalla.sinProducto: AthletePurchaseOutcome.sinProducto,
+        AthleteStoreFalla.otra: AthletePurchaseOutcome.error,
+      };
+      // Exhaustivo a propósito: si alguien agrega una falla nueva al puerto y
+      // se olvida de mapearla, este test lo dice.
+      expect(esperado.keys.toSet(), AthleteStoreFalla.values.toSet());
 
-      expect(
-        await _checkout(store)
-            .start(uid: 'alumno-1', plan: AthletePlan.mensual),
-        AthletePurchaseOutcome.pendiente,
-      );
-    });
-
-    test('producto mal configurado → sinProducto, no error', () async {
-      for (final codigo in [
-        PurchasesErrorCode.productNotAvailableForPurchaseError,
-        PurchasesErrorCode.configurationError,
-      ]) {
-        final store = StoreFalso(
-          offering: oferta([paquete(PackageType.monthly)]),
-          tiraAlComprar: falla(codigo),
+      for (final e in esperado.entries) {
+        final store = _conPlanes(
+          [AthletePlan.mensual],
+          tira: AthleteStoreException(e.key),
         );
-
         expect(
-          await _checkout(store)
-              .start(uid: 'alumno-1', plan: AthletePlan.mensual),
-          AthletePurchaseOutcome.sinProducto,
-          reason: 'el código $codigo es de configuración, no del alumno',
+          await checkoutCon(store).start(uid: 'a', plan: AthletePlan.mensual),
+          e.value,
+          reason: 'la falla ${e.key} tiene que dar ${e.value}',
         );
       }
     });
+  });
 
-    test('la tienda falla de verdad → error', () async {
+  group('planes', () {
+    test('devuelve lo que publica la tienda', () async {
       final store = StoreFalso(
-        offering: oferta([paquete(PackageType.monthly)]),
-        tiraAlComprar: falla(PurchasesErrorCode.storeProblemError),
+        ofrece: [
+          ofertaDe(AthletePlan.mensual, precio: 'USD 2,99'),
+          ofertaDe(AthletePlan.anual, precio: 'USD 29,90', porMes: 'USD 2,49'),
+        ],
       );
+
+      final planes = await checkoutCon(store).planes();
 
       expect(
-        await _checkout(store)
-            .start(uid: 'alumno-1', plan: AthletePlan.mensual),
-        AthletePurchaseOutcome.error,
-      );
+          planes.map((p) => p.plan), [AthletePlan.mensual, AthletePlan.anual]);
+      expect(planes.last.precioPorMes, 'USD 2,49');
     });
 
-    test('un error que NO es del SDK tampoco explota', () async {
-      final store = StoreFalso(
-        offering: oferta([paquete(PackageType.monthly)]),
-        tiraAlComprar: StateError('algo raro'),
-      );
-
-      expect(
-        await _checkout(store)
-            .start(uid: 'alumno-1', plan: AthletePlan.mensual),
-        AthletePurchaseOutcome.error,
-      );
+    test('sin oferta publicada devuelve vacío, no explota', () async {
+      expect(await checkoutCon(StoreFalso()).planes(), isEmpty);
     });
   });
 
