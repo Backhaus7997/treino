@@ -108,7 +108,8 @@ void main() {
         // temporizador que pueda redispararse sobre un valor ya asentado.
         async.elapse(const Duration(seconds: 30));
         async.flushMicrotasks();
-        expect(container.read(currentAthleteLinkProvider).valueOrNull, isNotNull);
+        expect(
+            container.read(currentAthleteLinkProvider).valueOrNull, isNotNull);
 
         ctrl.close();
         container.dispose();

@@ -56,8 +56,7 @@ const _kAthleteErrorText = 'No encontramos un vínculo activo con un PF.';
 
 // Causa DISTINTA: el servidor no contestó a tiempo. Mezclarla con la de
 // arriba es el bug que este gate existe para no repetir.
-const _kNoConfirmadoText =
-    'No pudimos confirmar tu vínculo con tu PF.';
+const _kNoConfirmadoText = 'No pudimos confirmar tu vínculo con tu PF.';
 
 /// Trainer con perfil COMPLETO (ADR-TPO-003): sin bio/specialty/rate el
 /// authRedirect lo mandaría a /profile/edit-trainer?mode=onboarding y el test

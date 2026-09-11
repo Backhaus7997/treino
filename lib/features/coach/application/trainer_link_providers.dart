@@ -137,17 +137,14 @@ final currentAthleteLinkAnyStatusProvider =
   final uid = ref.watch(currentUidProvider);
   if (uid == null) return Stream<TrainerLink?>.value(null);
   // Ver [currentAthleteLinkProvider]: tampoco lleva ventana de gracia.
-  return ref
-      .read(trainerLinkRepositoryProvider)
-      .watchForAthlete(
-        uid,
-        statuses: {
-          TrainerLinkStatus.pending,
-          TrainerLinkStatus.active,
-          TrainerLinkStatus.paused,
-        },
-      )
-      .map((links) => links.isEmpty ? null : links.first);
+  return ref.read(trainerLinkRepositoryProvider).watchForAthlete(
+    uid,
+    statuses: {
+      TrainerLinkStatus.pending,
+      TrainerLinkStatus.active,
+      TrainerLinkStatus.paused,
+    },
+  ).map((links) => links.isEmpty ? null : links.first);
 });
 
 /// Ventana en la que el stream de vínculos SOBREVIVE a que lo suelten.
