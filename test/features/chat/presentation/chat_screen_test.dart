@@ -18,6 +18,7 @@ import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
+import 'package:treino/features/feed/application/follow_providers.dart';
 import 'package:treino/features/feed/domain/follow.dart';
 import 'package:treino/features/feed/domain/follow_status.dart';
 
@@ -467,6 +468,49 @@ void main() {
     testWidgets('chat de pre-consulta con CERO aristas → HABILITADO',
         (tester) async {
       await pump(tester, await seed(inquiry: true));
+
+      expect(composerEnabled(tester), isTrue);
+      expect(find.textContaining('tiene que seguirte'), findsNothing);
+    });
+
+    // EL FRAME QUE NINGÚN TEST MIRABA.
+    //
+    // Todos los de arriba pasan por `pump()`, que termina en `pumpAndSettle`:
+    // observan el estado YA RESUELTO. El bug vivía en el anterior. Con los dos
+    // streams en `AsyncLoading`, `valueOrNull` daba null en los tres términos
+    // del OR y `canWrite` quedaba en false: composer gris y el cartel de "esta
+    // persona tiene que seguirte" en CADA apertura de chat, diciendo un motivo
+    // que ni siquiera se había evaluado.
+    //
+    // Y no es cold start: `chatByIdProvider` y `followEdgeProvider` son
+    // `autoDispose` sin `keepAlive`, así que salir de la pantalla los destruye
+    // y volver a entrar arranca de cero.
+    //
+    // Sin el `!gateResuelto`, este test falla: composer deshabilitado y aviso
+    // presente. Verificado rompiéndolo a propósito.
+    testWidgets('mientras los dos streams cargan → HABILITADO y sin aviso',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        const ChatScreen(chatId: 'aaa_bbb', otherUid: 'bbb'),
+        overrides: [
+          firestoreProvider.overrideWithValue(await seed()),
+          currentUidProvider.overrideWith((_) => 'aaa'),
+          analyticsServiceProvider.overrideWithValue(FakeAnalyticsService()),
+          messagesProvider('aaa_bbb').overrideWith(
+            (_) => Stream.value(const <Message>[]),
+          ),
+          userPublicProfileProvider('bbb').overrideWith(
+            (_) => Stream.value(_pub('bbb', 'Coach Joe')),
+          ),
+          // Streams que no emiten nunca: los dos providers quedan en
+          // AsyncLoading, que es el estado de cada entrada al chat.
+          chatByIdProvider('aaa_bbb').overrideWith((_) => const Stream.empty()),
+          followEdgeProvider(Follow.edgeId('bbb', 'aaa'))
+              .overrideWith((_) => const Stream.empty()),
+        ],
+      ));
+      // pump() a secas, NO pumpAndSettle: el punto es mirar el frame de carga.
+      await tester.pump();
 
       expect(composerEnabled(tester), isTrue);
       expect(find.textContaining('tiene que seguirte'), findsNothing);
