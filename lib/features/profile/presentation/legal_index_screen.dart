@@ -50,7 +50,7 @@ class LegalIndexScreen extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.barlowCondensed(
                       fontWeight: FontWeight.w700,
-                      fontSize: 20,
+                      fontSize: AppTextSize.titleLarge,
                       color: palette.textPrimary,
                     ),
                   ),
@@ -108,7 +108,7 @@ class LegalIndexScreen extends StatelessWidget {
                 Text(
                   'Consultas sobre estos documentos: $kLegalContactEmail',
                   style: GoogleFonts.barlow(
-                    fontSize: 12,
+                    fontSize: AppTextSize.caption,
                     height: 1.5,
                     color: palette.textMuted,
                   ),
