@@ -803,6 +803,75 @@ private func runSetLogWriteTarget(fixtureURL: URL) {
     }
 }
 
+// MARK: - catalog_gate
+
+/// Lee un booleano del fixture.
+///
+/// `as? Bool` alcanzaria en Darwin — y ese es justamente el problema. Este
+/// corredor corre en CI sobre **ubuntu**, y en swift-corelibs-foundation el
+/// bridging entre los booleanos de JSON y `NSNumber` no es el de Darwin: un
+/// `true` que salio de `JSONSerialization` puede no castear a `Bool` ahi.
+///
+/// Es la misma trampa que ya documenta `int64(_:)` unas lineas mas arriba, y
+/// aca pesa mas todavia, porque **el valor que mas importa de este contrato es
+/// la AUSENCIA**: `nil` significa "no se sabe" y no gatea. Si un `false` o un
+/// `true` legitimo se leyera como `nil` por un problema de bridging, los casos
+/// pasarian igual por el camino equivocado y el corredor se pondria verde sin
+/// haber probado lo que dice probar.
+private func boolOpt(_ any: Any?) -> Bool? {
+    // `guard let` y no `any == nil`: comparar un `Any?` con nil compila, pero
+    // por una sobrecarga que conviene no ejercitar cuando el archivo no se
+    // puede compilar en la maquina del que lo escribe. Desenvolver es
+    // inequivoco.
+    guard let value = any else { return nil }
+    if value is NSNull { return nil }
+    if let v = value as? Bool { return v }
+    if let n = value as? NSNumber { return n.boolValue }
+    return nil
+}
+
+private func runCatalogGate(fixtureURL: URL) {
+    guard let data = try? Data(contentsOf: fixtureURL),
+          let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+          let cases = json["cases"] as? [[String: Any]], !cases.isEmpty
+    else {
+        fail("No se pudo leer \(fixtureURL.lastPathComponent) o no tiene casos.")
+        return
+    }
+
+    for testCase in cases {
+        totalCases += 1
+        let name = testCase["name"] as? String ?? "(sin nombre)"
+
+        guard let given = testCase["given"] as? [String: Any],
+              let expected = testCase["expect"] as? [String: Any],
+              let enabled = boolOpt(given["paywallEnabled"]),
+              let expectedBlocked = boolOpt(expected["blocked"])
+        else {
+            fail("  · \"\(name)\": el caso no tiene la forma esperada.")
+            continue
+        }
+
+        // `paywallEnforced` e `isPremium` son OPCIONALES a proposito: su
+        // ausencia ES un caso del contrato —"no se sabe"— y exigirlos en el
+        // guard de arriba pondria en rojo justamente los casos que mas
+        // importan.
+        let actual = catalogGateBlocks(
+            paywallEnabled: enabled,
+            paywallEnforced: boolOpt(given["paywallEnforced"]),
+            isPremium: boolOpt(given["isPremium"])
+        )
+
+        if actual != expectedBlocked {
+            fail("""
+              · "\(name)"
+                  esperado: \(expectedBlocked)
+                  obtenido: \(actual)
+            """)
+        }
+    }
+}
+
 // MARK: - main
 
 // El script pasa la raíz de `conformance/` como primer argumento.
@@ -821,6 +890,7 @@ runSetLogWriteTarget(fixtureURL: conformanceDir.appendingPathComponent("set_log_
 runSupersetOrder(fixtureURL: conformanceDir.appendingPathComponent("superset_order.json"))
 runDurationTimer(fixtureURL: conformanceDir.appendingPathComponent("duration_timer.json"))
 runEffortPayload(fixtureURL: conformanceDir.appendingPathComponent("effort_payload.json"))
+runCatalogGate(fixtureURL: conformanceDir.appendingPathComponent("catalog_gate.json"))
 
 if failures.isEmpty {
     print("✓ conformidad Swift: \(totalCases) casos, todos en verde")

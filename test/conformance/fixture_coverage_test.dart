@@ -32,14 +32,19 @@ import 'package:flutter_test/flutter_test.dart';
 /// guard es que acá la deuda se declara, se explica y se ve en el diff: nadie
 /// la contrae sin querer.
 const Map<String, String> _pendientesDeSwift = {
-  'catalog_gate.json':
-      'La implementación Swift del gate del catálogo pago no existe todavía. '
-          'El contrato está escrito y el lado Dart lo cumple '
-          '(catalog_gate_conformance_test.dart); falta el reloj de Apple, y el '
-          'plan completo está en docs/paywall-watchos-plan.md. Cuando se '
-          'implemente: cablear runCatalogGate(...) en conformance/swift/'
-          'main.swift y SACAR esta entrada — el guard empieza a exigirlo solo.',
+  // VACÍA, y ojalá siga así.
+  //
+  // `catalog_gate.json` estuvo acá mientras la mitad Swift del gate del
+  // catálogo pago no existía. Ya existe —`ios/TreinoWatch Watch App/
+  // CatalogGate.swift`, cableada en `conformance/swift/main.swift`— así que la
+  // entrada se fue, y desde ahora el guard lo exige solo.
+  //
+  // Antes de agregar una entrada nueva: esto es una ventana en la que el
+  // contrato es unilateral. Un fixture que sólo corre de un lado no prueba
+  // conformidad, prueba una implementación. Declarala con su motivo, y sacala
+  // apenas se pueda.
 };
+
 
 void main() {
   group('cobertura de fixtures de conformidad', () {
