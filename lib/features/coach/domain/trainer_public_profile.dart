@@ -39,6 +39,7 @@ class TrainerPublicProfile with _$TrainerPublicProfile {
     @Default(<TrainerLocation>[]) List<TrainerLocation> trainerLocations,
     @Default(<String>[]) List<String> trainerGeohashes,
     @Default(false) bool trainerOffersOnline,
+
     /// Ver [UserProfile.acceptsInquiries]. Default `true` a propósito: espeja
     /// el `.get('acceptsInquiries', true)` de `firestore.rules`, así que un
     /// perfil legacy sin el campo sigue siendo consultable.

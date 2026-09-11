@@ -97,7 +97,7 @@ class _ConsultasCardState extends ConsumerState<ConsultasCard> {
               style: TextStyle(
                 fontFamily: AppFonts.barlowCondensed,
                 fontWeight: AppFonts.w700,
-                fontSize: 14,
+                fontSize: AppTextSize.body,
                 letterSpacing: AppFonts.headingTracking,
                 color: palette.textPrimary,
               ),
@@ -122,7 +122,7 @@ class _ConsultasCardState extends ConsumerState<ConsultasCard> {
                         l10n.trainerAcceptsInquiriesSubtitle,
                         style: TextStyle(
                           color: palette.textMuted,
-                          fontSize: 12,
+                          fontSize: AppTextSize.caption,
                         ),
                       ),
                     ],

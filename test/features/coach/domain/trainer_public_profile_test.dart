@@ -14,7 +14,8 @@ void main() {
     // ya existen— aparecería con las consultas apagadas en la UI mientras el
     // servidor se las sigue aceptando. Dos fuentes de verdad en desacuerdo
     // sobre quién puede hablarte.
-    test('un perfil SIN el campo acepta consultas (espeja el default de la rule)',
+    test(
+        'un perfil SIN el campo acepta consultas (espeja el default de la rule)',
         () {
       final restored = TrainerPublicProfile.fromJson(const {
         'uid': 'trainer-legacy',

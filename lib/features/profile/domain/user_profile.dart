@@ -91,6 +91,7 @@ class UserProfile with _$UserProfile {
     @Default(<TrainerLocation>[]) List<TrainerLocation> trainerLocations,
     @Default(<String>[]) List<String> trainerGeohashes,
     @Default(false) bool trainerOffersOnline,
+
     /// Kill switch del PF para las consultas previas (#637).
     ///
     /// Arranca en `true`, al revés que [trainerOffersOnline], y no es

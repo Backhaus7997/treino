@@ -478,7 +478,8 @@ void main() {
 
       await repo.update('trainer-ai-3', {'acceptsInquiries': false});
 
-      final snap = await firestore.collection('users').doc('trainer-ai-3').get();
+      final snap =
+          await firestore.collection('users').doc('trainer-ai-3').get();
       expect(snap.data()!['acceptsInquiries'], isFalse);
     });
 
