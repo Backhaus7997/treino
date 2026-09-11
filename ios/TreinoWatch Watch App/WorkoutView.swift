@@ -131,6 +131,25 @@ struct WorkoutView: View {
                     if let motivo = workout.closeFailure {
                         closeFailureBanner(motivo)
                     }
+
+                    // Por que la sesion no se esta sincronizando.
+                    //
+                    // `syncError` existia desde siempre y NINGUNA vista lo
+                    // leia — lo dice el comentario de arriba, cuatro lineas
+                    // mas arriba. El coordinador lo asigna en cuatro lugares
+                    // (`:243`, `:270`, `:466`, `:786`) y moria ahi.
+                    //
+                    // El sintoma para el atleta: entrena una hora contra una
+                    // sesion que el servidor rechazo, y se entera cuando abre
+                    // el telefono. Es el MISMO agujero que el #1087 cerro del
+                    // lado Wear, donde el deny moria en un `developer.log`.
+                    //
+                    // Va DESPUES del de cierre a proposito: si los dos estan,
+                    // el que importa primero es el que dice que no se pudo
+                    // cerrar. Este es contexto de fondo, no una accion.
+                    if let sync = workout.syncError {
+                        syncErrorBanner(sync)
+                    }
                 }
                 .padding(.horizontal, 2)
             }
@@ -387,6 +406,48 @@ struct WorkoutView: View {
             .font(.caption2)
             .buttonStyle(.plain)
             .foregroundStyle(.orange)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 6)
+        .background(Color.orange.opacity(0.15), in: RoundedRectangle(cornerRadius: 8))
+        .padding(.top, 6)
+    }
+
+    /// La sesion no se esta sincronizando con el servidor.
+    ///
+    /// ─── Por que NO tiene boton de reintentar, y el de cierre si ───
+    ///
+    /// Porque no hay nada que reintentar a mano: `sync()` ya se re-dispara
+    /// solo con cada serie que se marca. Un boton aca prometeria una accion que
+    /// el atleta no necesita tomar.
+    ///
+    /// ─── Por que NO distingue sin-red de rechazo, y el Wear si ───
+    ///
+    /// Porque en watchOS no hace falta. Este codigo usa `async throws` y solo
+    /// llega aca cuando la peticion REST fallo DE VERDAD; en Dart un `Future`
+    /// sin red queda pendiente, y por eso el lado Wear tuvo que separar los dos
+    /// casos. Aca `syncError` ya es la senal correcta — le faltaba pantalla.
+    ///
+    /// ─── Por que naranja y no rojo ───
+    ///
+    /// Mismo criterio que el banner de cierre: lo hecho esta guardado en el
+    /// reloj y se va a subir cuando haya senal. Rojo diria "pasa algo grave", y
+    /// lo que pasa es que no hay red.
+    private func syncErrorBanner(_ detalle: String) -> some View {
+        VStack(spacing: 2) {
+            Text("No se esta guardando en el servidor")
+                .font(.system(size: 11))
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.orange)
+
+            // El detalle crudo, chiquito. Al atleta no le dice nada, pero es lo
+            // unico que hay para diagnosticar desde una muneca: sin esto, el
+            // reporte que llega es "no se guardo" y nada mas.
+            Text(detalle)
+                .font(.system(size: 9))
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 6)
