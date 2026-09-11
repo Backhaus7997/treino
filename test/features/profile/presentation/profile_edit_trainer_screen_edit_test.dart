@@ -370,8 +370,17 @@ void main() {
       expect(tester.widget<SwitchListTile>(toggleFinder).value, isFalse);
     });
 
-    testWidgets(
-        'save manda acceptsInquiries:false cuando el toggle sigue apagado',
+    // EL QUE ENCONTRÓ CODEX EN EL PR #1111.
+    //
+    // Antes este test afirmaba que el partial manda `acceptsInquiries` SIEMPRE,
+    // y eso era el bug: el switch también se edita desde el Coach Hub, que
+    // persiste al instante. Con el form abierto en mobile, cambiarlo allá y
+    // después guardar cualquier otro campo acá revertía en silencio el valor
+    // más nuevo — `_initFromProfile` corre una sola vez, así que el valor en
+    // mano puede estar viejo y no hay forma de saberlo desde este lado.
+    //
+    // Ahora sólo viaja si el PF lo tocó EN ESTA PANTALLA.
+    testWidgets('save NO manda acceptsInquiries si el PF no tocó el switch acá',
         (tester) async {
       final mockRepo = MockUserRepository();
       when(() => mockRepo.update(any(), any())).thenAnswer((_) async {});
@@ -393,7 +402,9 @@ void main() {
           verify(() => mockRepo.update('trainer-uid', captureAny()))
               .captured
               .single as Map<String, Object?>;
-      expect(captured['acceptsInquiries'], isFalse);
+      expect(captured.containsKey('acceptsInquiries'), isFalse,
+          reason: 'mandarlo sin que lo hayan tocado pisa lo que el PF acaba '
+              'de decidir en el Coach Hub');
     });
 
     testWidgets(

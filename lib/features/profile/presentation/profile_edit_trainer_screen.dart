@@ -68,6 +68,9 @@ class _ProfileEditTrainerScreenState
   // Arranca en true: es el default de la rule, y un PF que nunca tocó el
   // toggle SÍ acepta consultas.
   bool _acceptsInquiries = true;
+
+  /// Si el PF tocó el switch en ESTA pantalla. Ver el `_save()`.
+  bool _acceptsInquiriesTocado = false;
   bool _initialized = false;
   bool _saving = false;
   String? _error;
@@ -201,7 +204,12 @@ class _ProfileEditTrainerScreenState
       'trainerLocations': _locations.map((l) => l.toJson()).toList(),
       'trainerGeohashes': _locations.map((l) => l.geohash).toSet().toList(),
       'trainerOffersOnline': _offersOnline,
-      'acceptsInquiries': _acceptsInquiries,
+      // Sólo si el PF lo tocó ACÁ. El switch se edita también desde el Coach
+      // Hub, que persiste al instante: si el form quedó abierto, mandarlo
+      // siempre revierte en silencio el valor más nuevo al guardar cualquier
+      // otro campo. `_initFromProfile` corre una sola vez, así que el valor
+      // que tenemos en mano puede estar viejo y no hay forma de saberlo.
+      if (_acceptsInquiriesTocado) 'acceptsInquiries': _acceptsInquiries,
       // Limpiar legacy singular — este form trabaja con el modelo array-based.
       // Si no los nulleamos, quedan zombi en Firestore (de la migration original)
       // y el mapa los renderea como pin físico aunque el PF haya borrado
@@ -380,7 +388,10 @@ class _ProfileEditTrainerScreenState
               title: l10n.trainerAcceptsInquiriesTitle,
               subtitle: l10n.trainerAcceptsInquiriesSubtitle,
               value: _acceptsInquiries,
-              onChanged: (v) => setState(() => _acceptsInquiries = v),
+              onChanged: (v) => setState(() {
+                _acceptsInquiries = v;
+                _acceptsInquiriesTocado = true;
+              }),
             ),
             if (_error != null) ...[
               const SizedBox(height: 14),

@@ -467,7 +467,7 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get trainerAcceptsInquiriesSubtitle =>
-      'Un alumno puede escribirte antes de pedirte el vínculo. Si lo apagás, sólo te escriben tus alumnos.';
+      'Un alumno puede escribirte antes de pedirte el vínculo. Si lo apagás, no te llegan consultas nuevas — las conversaciones ya abiertas siguen.';
 
   @override
   String get athleteLinkUnconfirmed =>
@@ -4950,7 +4950,7 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get trainerAcceptsInquiriesSubtitle =>
-      'Un alumno puede escribirte antes de pedirte el vínculo. Si lo apagás, sólo te escriben tus alumnos.';
+      'Un alumno puede escribirte antes de pedirte el vínculo. Si lo apagás, no te llegan consultas nuevas — las conversaciones ya abiertas siguen.';
 
   @override
   String get athleteLinkUnconfirmed =>

@@ -458,7 +458,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get trainerAcceptsInquiriesSubtitle =>
-      'Athletes can message you before requesting a link. Turn it off and only your athletes can write to you.';
+      'Athletes can message you before requesting a link. Turn it off and no new inquiries reach you — conversations already open stay open.';
 
   @override
   String get athleteLinkUnconfirmed =>

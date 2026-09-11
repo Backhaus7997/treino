@@ -527,7 +527,7 @@
   "athleteNutritionNeedsActiveLink": "Necesitás un vínculo activo con un PF para ver tu plan nutricional.",
   "athleteLinkRequired": "No encontramos un vínculo activo con un PF.",
   "trainerAcceptsInquiriesTitle": "Acepto consultas",
-  "trainerAcceptsInquiriesSubtitle": "Un alumno puede escribirte antes de pedirte el vínculo. Si lo apagás, sólo te escriben tus alumnos.",
+  "trainerAcceptsInquiriesSubtitle": "Un alumno puede escribirte antes de pedirte el vínculo. Si lo apagás, no te llegan consultas nuevas — las conversaciones ya abiertas siguen.",
   "athleteLinkUnconfirmed": "No pudimos confirmar tu vínculo con tu PF.",
   "athleteLinkRequiredRetry": "Reintentar",
   "athleteSessionMissing": "Tu sesión se cerró. Volvé a entrar.",
