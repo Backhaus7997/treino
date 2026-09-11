@@ -53,6 +53,7 @@ library;
 
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:flutter/services.dart' show PlatformException;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 
 /// Qué está comprando el alumno.
@@ -397,3 +398,11 @@ Future<bool> configurarRevenueCat() async {
   );
   return true;
 }
+
+/// La capacidad de comprar, para la UI.
+///
+/// Existe para que las pantallas no llamen a [resolveAthleteCheckout] en cada
+/// `build` y —sobre todo— para que los tests la puedan pisar sin tener que
+/// inyectar un [AthleteStore] a mano por toda la jerarquia de widgets.
+final athleteCheckoutProvider =
+    Provider<AthleteCheckout>((ref) => resolveAthleteCheckout());
