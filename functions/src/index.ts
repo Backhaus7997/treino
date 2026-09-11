@@ -136,7 +136,10 @@ export { syncEntitlementsOnSubscription, sweepEntitlements } from "./subscriptio
 //
 // Hoy escriben `false` en todos lados: el interruptor
 // ATHLETE_PAYWALL_ENFORCEMENT_ENABLED arranca apagado. Ver el encabezado del
-// modulo antes de prenderlo — falta el grandfathering.
+// modulo antes de prenderlo: el grandfathering de RUTINAS PROPIAS ya esta
+// resuelto (`noCreceLaForma` en las reglas), pero sigue abierto el de las
+// PLANTILLAS PAGAS que un alumno ya venia siguiendo — ver
+// `routine_detail_screen.dart`.
 export {
   syncAthletePaywallOnUser,
   syncAthletePaywallOnTrainerLink,

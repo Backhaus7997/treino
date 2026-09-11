@@ -405,9 +405,15 @@ class _FollowTemplateBar extends ConsumerWidget {
     // `locked` le gana a `yaLaSigue` a propósito. Un alumno que ya venía
     // siguiendo una premium de antes del gate ve el candado acá Y en la acción
     // de EMPEZAR — las dos superficies dicen lo mismo. Que ese alumno quede sin
-    // poder entrenar lo que ya tenía activo es el problema de grandfathering
-    // que sigue abierto, y se resuelve antes de prender el interruptor, no
+    // poder entrenar lo que ya tenía activo es un problema de grandfathering
+    // que SIGUE ABIERTO, y se resuelve antes de prender el interruptor, no
     // dejando que una pantalla prometa lo que la otra rebota.
+    //
+    // OJO, es OTRO que el que se cerró el 2026-09-11. Aquél era de FORMA: una
+    // rutina PROPIA fuera de tope no se podía ni renombrar, y lo arregla
+    // `noCreceLaForma` en las reglas. Éste es de ACCESO a una plantilla PAGA
+    // ajena, gatea en `sessions` y no en `routines`, y `noCreceLaForma` no lo
+    // toca. Que uno diga "resuelto" no dice nada del otro.
     final locked = routine.isPremium && ref.watch(catalogLockActiveProvider);
 
     final palette = AppPalette.of(context);

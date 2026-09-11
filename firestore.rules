@@ -422,6 +422,40 @@ service cloud.firestore {
                && data.get('numWeeks', 1) <= freeMaxRoutineWeeks();
       }
 
+      // `true` si la rutina RESULTANTE no es más grande que la que ya había.
+      //
+      // ─── El grandfathering, sin grandfathering ─────────────────────────────
+      //
+      // El problema que resuelve: el día que el paywall se encienda, un alumno
+      // free con una rutina propia que quedó por encima del tope no podría ni
+      // RENOMBRARLA — `withinFreeRoutineShape` mide el documento resultante, y
+      // 5 días siguen siendo 5 aunque no la hayas agrandado.
+      //
+      // Se midió sobre producción el 2026-09-11: son 5 alumnos de los 18 que
+      // alguna vez armaron una rutina. Y el eje que muerde NO es el que decían
+      // los comentarios: sólo 2 exceden el tope de DÍAS; los otros 4 exceden el
+      // de SEMANAS, y tres de ellos están apenas en 2.
+      //
+      // La alternativa clásica —marcar usuarios o rutinas como exentos por
+      // haber estado antes— pide un campo nuevo, una fecha de corte y una
+      // migración, y deja dos clases de usuario para siempre. Esto no pide
+      // nada: el grandfathering deja de ser un dato que mantener y pasa a ser
+      // una propiedad de la regla.
+      //
+      // ─── Por qué NO abre el agujero que la cláusula existe para tapar ──────
+      //
+      // La comparación es contra lo que el documento YA TENÍA, no contra el
+      // tope. Crear con 3 días y editar a 7 sigue rebotando: 7 > 3. Lo único
+      // que se habilita es tocar una rutina sin agrandarla.
+      //
+      // Y sólo vive en el UPDATE. En el CREATE no hay `resource.data` contra
+      // qué comparar —ni tendría sentido: una rutina nueva no viene de ningún
+      // lado—, así que copiar una plantilla paga de 8 semanas sigue rebotando.
+      function noCreceLaForma(nueva, vieja) {
+        return nueva.days.size() <= vieja.days.size()
+               && nueva.get('numWeeks', 1) <= vieja.get('numWeeks', 1);
+      }
+
       function userCreatedRoutineFields() {
         return ['name', 'level', 'days',
                 'source', 'createdBy', 'visibility', 'createdAt', 'status',
@@ -659,11 +693,16 @@ service cloud.firestore {
                     // qué puede hacer el dueño de una rutina que quedó de
                     // antes por encima del tope:
                     //
-                    //   • Renombrarla SIN tocar los días: **rebota**. El
-                    //     resultante sigue teniendo 4 días y 4 > 3. No hay
-                    //     excepción por "no la agrandé".
-                    //   • Recortarla a 3 días o menos: **pasa**. El resultante
-                    //     entra en la forma free.
+                    //   • Renombrarla SIN tocar los días: **pasa**, desde
+                    //     que existe `noCreceLaForma`. Antes rebotaba —el
+                    //     resultante seguía teniendo 4 días— y era el caso más
+                    //     difícil de explicarle a alguien: "podés entrenarla
+                    //     pero no podés cambiarle el nombre".
+                    //   • Recortarla: **pasa**, por las dos vías — entra en
+                    //     la forma free, y además no creció.
+                    //   • AGRANDARLA: **rebota**, que es todo el punto. La
+                    //     comparación es contra lo que ya tenía, no contra el
+                    //     tope, así que crear con 3 y editar a 7 sigue cerrado.
                     //   • Archivarla: **pasa**, por UPDATE path 1
                     //     (`affectedKeys == ['status']`), que no lleva esta
                     //     cláusula. Es la salida de emergencia y tiene que
@@ -671,18 +710,28 @@ service cloud.firestore {
                     //     edición, no se borra nada).
                     //   • ENTRENARLA entera: **pasa**, no toca esta regla.
                     //
-                    // ⚠️  Una versión anterior de este comentario decía "se
-                    // puede seguir tocando mientras no crezca". Era FALSO y se
-                    // contradecía con su propia frase siguiente. Quien lo
-                    // leyera concluía que renombrar estaba cubierto, y el
-                    // alumno se comía un permission-denied que el comentario
-                    // acababa de descartar. AGENTS.md §11.1: una advertencia
-                    // falsa es peor que ninguna.
+                    // ⚠️  Ojo con la historia de este comentario, porque
+                    // tiene una vuelta. Una versión vieja decía "se puede
+                    // seguir tocando mientras no crezca", y era FALSO: no
+                    // existía ninguna cláusula que lo hiciera cierto, así que
+                    // quien lo leía concluía que renombrar estaba cubierto y
+                    // el alumno se comía un permission-denied.
                     //
-                    // El cliente ANTICIPA estos tres casos antes de escribir
-                    // (`RoutineEditorScreen._freePlanBlocksShape`) para que el
-                    // rebote no llegue nunca como "no tenés permisos".
+                    // Hoy esa frase describe exactamente lo que hace
+                    // `noCreceLaForma`. No es que el cartel tuviera razón: es
+                    // que el código se movió hasta donde el cartel decía. La
+                    // lección de AGENTS.md §11.1 no cambia —una advertencia
+                    // falsa es peor que ninguna— y el motivo de dejar esto
+                    // escrito es que el próximo que quiera "simplificar" el
+                    // comentario sepa que la frase fue mentira antes de ser
+                    // verdad.
+                    //
+                    // El cliente ANTICIPA el caso que REBOTA antes de escribir
+                    // (`RoutineEditorScreen._freePlanBlocksShape`, que tiene su
+                    // propio `_noCreceRespectoDeLoCargado`) para que el rebote
+                    // no llegue nunca como "no tenés permisos".
                     && (withinFreeRoutineShape(request.resource.data)
+                        || noCreceLaForma(request.resource.data, resource.data)
                         || !paywallEnforcedFor(request.auth.uid));
 
       // UPDATE path 3: trainer edits content of a trainer-assigned plan.
