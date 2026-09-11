@@ -218,21 +218,34 @@ class TrainerLinkRepository {
         .orderBy('requestedAt', descending: true);
     return query
         .snapshots()
+        .map((snap) {
+          final links =
+              snap.docs.map(_fromDoc).whereType<TrainerLink>().toList();
+          final filtrados = statuses == null
+              ? links
+              : links.where((l) => statuses.contains(l.status)).toList();
+          return (filtrados, snap.metadata.isFromCache);
+        })
         // Misma guarda que `user_repository.dart`,
         // `athlete_entitlement_provider.dart` y `blocked_athletes_providers.dart`:
-        // una snapshot VACÍA servida desde la caché no es "no hay vínculos", es
-        // "todavía no sé", y la descartamos esperando la del servidor.
+        // un resultado VACÍO servido desde la caché no es "no hay vínculos", es
+        // "todavía no sé", y lo descartamos esperando al servidor.
         //
-        // Una snapshot CON documentos sí sirve aunque venga de caché: ahí el
-        // dato está, y filtrar por estado sobre datos reales es correcto —
-        // incluso si el filtro termina dando vacío, porque eso ya es un hecho
-        // ("tiene vínculos, ninguno activo") y no una ignorancia.
-        .where((snap) => snap.docs.isNotEmpty || !snap.metadata.isFromCache)
-        .map((snap) {
-      final links = snap.docs.map(_fromDoc).whereType<TrainerLink>().toList();
-      if (statuses == null) return links;
-      return links.where((l) => statuses.contains(l.status)).toList();
-    });
+        // La guarda va DESPUÉS del filtro por estado, no antes, y la diferencia
+        // no es cosmética. Una snapshot con documentos NO prueba que el estado
+        // pedido esté ausente: la caché puede tener un vínculo `terminated`
+        // viejo mientras el `active` nuevo —creado desde el dispositivo del
+        // PF— existe sólo en el servidor. Con la guarda antes del filtro, esa
+        // snapshot pasaba por "tiene datos", el filtro la dejaba vacía, y el
+        // provider publicaba `null` sin confirmación del servidor. O sea, el
+        // bug original entrando por otra puerta.
+        //
+        // (La versión anterior de este comentario afirmaba que un filtro vacío
+        // sobre datos reales "ya es un hecho y no una ignorancia". Es falso
+        // cuando la caché está incompleta, que es exactamente el caso que
+        // importa. Lo encontró Codex en el PR #1109.)
+        .where((par) => par.$1.isNotEmpty || !par.$2)
+        .map((par) => par.$1);
   }
 
   // ─── watchForTrainer ────────────────────────────────────────────────────

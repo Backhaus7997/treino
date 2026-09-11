@@ -1248,11 +1248,11 @@ Widget _montarConPista(
   return linkAsync.when(
     loading: () => (pista != null && pista.isNotEmpty)
         ? montar(pista)
-        : const Scaffold(body: Center(child: CircularProgressIndicator())),
-    // Un error resolviendo el vínculo es "no pudimos averiguarlo", que es
-    // justo lo que dice el gate — y encima ofrece reintentar. Antes acá se
-    // pintaba `'Error: $err'` con el stack de Firestore en pantalla.
-    error: (_, __) => const _GateDeVinculo(),
+        : const _EsperandoVinculo(),
+    // Un error resolviendo el vínculo es "no pudimos averiguarlo", NO "no
+    // tenés vínculo": mismo copy que el plazo vencido. Antes acá se pintaba
+    // `'Error: $err'` con el stack de Firestore en pantalla.
+    error: (_, __) => const _GateDeVinculo(sinConfirmar: true),
     data: (link) {
       final trainerId = link?.trainerId ?? '';
       if (trainerId.isEmpty) return const _GateDeVinculo();
@@ -1267,11 +1267,58 @@ Widget _montarConPista(
 /// español y sin l10n, nutrición con su propia key, y ninguna con salida —
 /// un `Center` con un `Text`, sin reintentar, sin `RefreshIndicator`, sin
 /// `ref.invalidate`. El usuario quedaba contra una pared.
+/// Spinner con plazo. Pasada la espera, admite que no pudo confirmar.
+///
+/// Los providers se quedan en `AsyncLoading` mientras el servidor no conteste,
+/// y eso es lo correcto: un `AsyncData(null)` tiene que significar "el servidor
+/// dijo que no tenés vínculo" y nada más. Pero un spinner eterno es la misma
+/// pared contra la que chocaba el usuario antes, con otra cara — así que el
+/// plazo y la salida van acá, en la UI, y no adentro del provider corrompiendo
+/// el dato para todos los demás consumidores.
+class _EsperandoVinculo extends StatefulWidget {
+  const _EsperandoVinculo();
+
+  @override
+  State<_EsperandoVinculo> createState() => _EsperandoVinculoState();
+}
+
+class _EsperandoVinculoState extends State<_EsperandoVinculo> {
+  bool _seAgoto = false;
+  Timer? _plazo;
+
+  @override
+  void initState() {
+    super.initState();
+    _plazo = Timer(kEsperaDelServidorDeVinculo, () {
+      if (mounted) setState(() => _seAgoto = true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _plazo?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => _seAgoto
+      ? const _GateDeVinculo(sinConfirmar: true)
+      : const Scaffold(body: Center(child: CircularProgressIndicator()));
+}
+
 class _GateDeVinculo extends ConsumerWidget {
-  const _GateDeVinculo({this.faltaLaSesion = false});
+  const _GateDeVinculo({
+    this.faltaLaSesion = false,
+    this.sinConfirmar = false,
+  });
 
   /// `true` cuando lo que falta es el uid y no el vínculo.
   final bool faltaLaSesion;
+
+  /// `true` cuando el servidor no contestó a tiempo. Es una causa DISTINTA de
+  /// "no tenés vínculo", y mezclarlas es justo el bug que este gate existe para
+  /// no repetir.
+  final bool sinConfirmar;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1286,7 +1333,9 @@ class _GateDeVinculo extends ConsumerWidget {
               Text(
                 faltaLaSesion
                     ? l10n.athleteSessionMissing
-                    : l10n.athleteLinkRequired,
+                    : sinConfirmar
+                        ? l10n.athleteLinkUnconfirmed
+                        : l10n.athleteLinkRequired,
                 textAlign: TextAlign.center,
               ),
               // Reintentar sólo aplica al vínculo: si no hay sesión, volver a

@@ -926,6 +926,12 @@ abstract class AppL10n {
   /// **'No encontramos un vínculo activo con un PF.'**
   String get athleteLinkRequired;
 
+  /// Gate de vínculo cuando el servidor no contestó a tiempo. Es una causa DISTINTA de athleteLinkRequired: allá el servidor dijo que no hay vínculo, acá no pudimos preguntarle. Mezclarlas fue el bug que este gate existe para no repetir.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos confirmar tu vínculo con tu PF.'**
+  String get athleteLinkUnconfirmed;
+
   /// Botón del gate de vínculo: invalida el provider y vuelve a preguntar.
   ///
   /// In es_AR, this message translates to:

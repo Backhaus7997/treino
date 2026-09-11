@@ -21,6 +21,7 @@ import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/coach_screen.dart';
 import 'package:treino/features/coach/domain/appointment.dart';
+import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/presentation/trainer_agenda_tab.dart';
 import 'package:treino/features/coach/trainer_coach_view.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
@@ -52,6 +53,11 @@ final DateTime _kDate = DateTime.utc(2026, 1, 1);
 // servidor contesta que no hay vínculo y cuando se agota la espera sin
 // llegar al servidor.
 const _kAthleteErrorText = 'No encontramos un vínculo activo con un PF.';
+
+// Causa DISTINTA: el servidor no contestó a tiempo. Mezclarla con la de
+// arriba es el bug que este gate existe para no repetir.
+const _kNoConfirmadoText =
+    'No pudimos confirmar tu vínculo con tu PF.';
 
 /// Trainer con perfil COMPLETO (ADR-TPO-003): sin bio/specialty/rate el
 /// authRedirect lo mandaría a /profile/edit-trainer?mode=onboarding y el test
@@ -165,6 +171,78 @@ void main() {
     // El gate ya no es una pared: antes era un Center con un Text y nada
     // más, sin reintentar, sin RefreshIndicator y sin ref.invalidate.
     expect(find.widgetWithText(TextButton, 'Reintentar'), findsOneWidget);
+  });
+
+  // El spinner NO puede ser eterno (PR #1109).
+  //
+  // Los providers se quedan en `AsyncLoading` mientras el servidor no conteste
+  // —a propósito: `AsyncData(null)` tiene que significar "no tenés vínculo" y
+  // nada más—. Pero sin plazo, un alumno sin red queda mirando un spinner para
+  // siempre, que es la misma pared del bug original con otra cara.
+  testWidgets(
+      'el vínculo que no resuelve muestra spinner y, pasado el plazo, admite '
+      'que no pudo confirmar — con salida', (tester) async {
+    // Streams que nunca emiten: el server no contesta. Uno por provider —
+    // un StreamController normal no admite dos oyentes, y el segundo tiraría
+    // un error que el gate mostraría como si fuera una respuesta.
+    final vinculoCtrl = StreamController<TrainerLink?>();
+    final anyStatusCtrl = StreamController<TrainerLink?>();
+    addTearDown(vinculoCtrl.close);
+    addTearDown(anyStatusCtrl.close);
+
+    final container = ProviderContainer(
+      overrides: [
+        authNotifierProvider.overrideWith(
+          () => _StubAuthNotifier(AsyncData(_MockUser())),
+        ),
+        userProfileProvider.overrideWith(
+          (ref) => Stream<UserProfile?>.value(_athleteProfile()),
+        ),
+        authStateChangesProvider.overrideWith((_) => Stream.value(null)),
+        currentUidProvider.overrideWithValue('a1'),
+        currentAthleteLinkProvider.overrideWith((ref) => vinculoCtrl.stream),
+        currentAthleteLinkAnyStatusProvider
+            .overrideWith((ref) => anyStatusCtrl.stream),
+        unreadFromCoachProvider.overrideWith((ref) => 0),
+        unreadFromFriendsProvider.overrideWith((ref) => 0),
+      ],
+    );
+    addTearDown(container.dispose);
+    await container.read(authNotifierProvider.future);
+    await container.read(userProfileProvider.future);
+
+    final router = buildRouter(
+      refreshListenable: ValueNotifier<int>(0),
+      read: container.read,
+    );
+    router.go('/coach/agenda');
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp.router(
+          theme: AppTheme.dark(),
+          locale: const Locale('es', 'AR'),
+          localizationsDelegates: AppL10n.localizationsDelegates,
+          supportedLocales: AppL10n.supportedLocales,
+          routerConfig: router,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    // Mientras el plazo corre: spinner, y NINGÚN cartel — decir algo acá sería
+    // afirmar lo que todavía no sabemos.
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.text(_kAthleteErrorText), findsNothing);
+    expect(find.text(_kNoConfirmadoText), findsNothing);
+
+    // Pasado el plazo: lo admite, y ofrece salida.
+    await tester.pump(const Duration(seconds: 9));
+    expect(find.text(_kNoConfirmadoText), findsOneWidget);
+    expect(find.widgetWithText(TextButton, 'Reintentar'), findsOneWidget);
+    // Y NO dice "no encontramos vínculo": el servidor nunca contestó.
+    expect(find.text(_kAthleteErrorText), findsNothing);
   });
 
   testWidgets(

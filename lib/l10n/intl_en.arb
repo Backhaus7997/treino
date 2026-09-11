@@ -166,6 +166,7 @@
   "athleteNutritionPlanLoadError": "We couldn't load your nutrition plan.",
   "athleteNutritionNeedsActiveLink": "You need an active trainer link to view your nutrition plan.",
   "athleteLinkRequired": "We couldn't find an active trainer link.",
+  "athleteLinkUnconfirmed": "We couldn't confirm your trainer link.",
   "athleteLinkRequiredRetry": "Retry",
   "athleteSessionMissing": "Your session ended. Please sign in again.",
   "athleteFilesScreenTitle": "MY FILES",

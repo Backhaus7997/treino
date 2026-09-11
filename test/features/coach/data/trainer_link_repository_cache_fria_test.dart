@@ -203,6 +203,46 @@ void main() {
     await sub.cancel();
   });
 
+  // EL QUE ENCONTRÓ CODEX EN EL PR #1109.
+  //
+  // La primera versión ponía la guarda ANTES del filtro por estado, y el
+  // comentario afirmaba que un filtro vacío sobre datos reales "ya es un hecho
+  // y no una ignorancia". Es FALSO cuando la caché está incompleta, que es
+  // justo el caso que importa: el alumno tiene cacheado un vínculo
+  // `terminated` viejo, y el `active` nuevo —creado desde el dispositivo del
+  // PF— existe sólo en el servidor. La snapshot pasaba por "tiene documentos",
+  // el filtro la dejaba vacía, y el provider publicaba `null` sin confirmación.
+  // O sea, el bug original entrando por otra puerta.
+  test(
+      'caché con documentos pero NINGUNO del estado pedido: NO se emite '
+      '(regresión #1109)', () async {
+    final terminated =
+        link(id: 'terminated-viejo', status: TrainerLinkStatus.terminated);
+    final realDocs = await realDocsFor([terminated]);
+
+    final emissions = <List<TrainerLink>>[];
+    final sub = repo.watchForAthlete(athleteId,
+        statuses: {TrainerLinkStatus.active}).listen(emissions.add);
+
+    snapshots.add(fakeSnapshot(docs: realDocs, isFromCache: true));
+    await Future<void>.delayed(Duration.zero);
+
+    expect(emissions, isEmpty,
+        reason: 'tener documentos cacheados NO prueba que el estado pedido '
+            'esté ausente — el active nuevo puede estar sólo en el servidor');
+
+    // Y cuando el servidor contesta con el activo, ahí sí emite.
+    final active = link(id: 'active-nuevo');
+    final desdeServidor = await realDocsFor([active, terminated]);
+    snapshots.add(fakeSnapshot(docs: desdeServidor, isFromCache: false));
+    await Future<void>.delayed(Duration.zero);
+
+    expect(emissions, hasLength(1));
+    expect(emissions.single.single.id, active.id);
+
+    await sub.cancel();
+  });
+
   test('el filtro por statuses sigue funcionando', () async {
     final active = link(id: 'active-1');
     final pending = link(id: 'pending-1', status: TrainerLinkStatus.pending);

@@ -454,6 +454,10 @@ class AppL10nEn extends AppL10n {
   String get athleteLinkRequired => 'We couldn\'t find an active trainer link.';
 
   @override
+  String get athleteLinkUnconfirmed =>
+      'We couldn\'t confirm your trainer link.';
+
+  @override
   String get athleteLinkRequiredRetry => 'Retry';
 
   @override

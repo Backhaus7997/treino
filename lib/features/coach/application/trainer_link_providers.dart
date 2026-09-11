@@ -55,40 +55,25 @@ final linksForAthleteProvider =
   },
 );
 
-/// Cuánto esperamos a que conteste el servidor antes de contestar nosotros.
+/// Cuánto puede esperar un CONSUMIDOR a que conteste el servidor.
 ///
-/// [TrainerLinkRepository.watchForAthlete] descarta la snapshot VACÍA que sirve
-/// la caché fría, porque esa dice "todavía no sé" y no "no tenés vínculo". El
-/// precio de esa honestidad es que un dispositivo que nunca llega al servidor
-/// se quedaría en `AsyncLoading` para siempre — y hay consumidores que hacen
-/// `await ...future` adentro de un handler de usuario
-/// (`profile_share_toggle_tile.dart:47`, `invite_gate.dart:133`), donde eso es
-/// un control que se deshabilita y no se recupera nunca.
+/// Los providers de acá NO la usan: con [TrainerLinkRepository.watchForAthlete]
+/// descartando los resultados vacíos que vienen de caché, un dispositivo que no
+/// llega al servidor se queda en `AsyncLoading`, y eso es lo correcto — un
+/// `AsyncData(null)` significa "el servidor dijo que no tenés vínculo activo",
+/// nunca "nos cansamos de esperar".
 ///
-/// Pasado este lapso emitimos la lista vacía: después de ocho segundos sin
-/// servidor, "no encontramos un vínculo activo" ya es la mejor respuesta
-/// disponible. El copy del gate está escrito para ser cierto en los DOS casos
-/// —el servidor dijo que no, o no pudimos preguntarle— y ofrece reintentar.
-const _kEsperaDelServidor = Duration(seconds: 8);
-
-/// Acota la espera de [origen] sin pisar un valor que ya llegó.
+/// Al principio esta espera vivía adentro de los providers y emitía la lista
+/// vacía al vencerse. Eso convertía un timeout en una ausencia CONFIRMADA:
+/// `AthleteCoachView` mandaba a discovery a un alumno vinculado, el entitlement
+/// le sacaba el acceso derivado del Coach, y los `.future` resolvían con "no
+/// hay vínculo". El bug original, otra vez, por otra puerta. Lo encontró Codex
+/// en el PR #1109.
 ///
-/// `Stream.timeout` reinicia su temporizador con cada evento y vuelve a
-/// dispararse en CADA hueco. Sin el flag, borraría un vínculo perfectamente
-/// válido a los ocho segundos de quietud — que es el estado normal de un
-/// stream de Firestore ya resuelto.
-Stream<List<TrainerLink>> _conEsperaAcotada(Stream<List<TrainerLink>> origen) {
-  var llegoAlgo = false;
-  return origen.timeout(
-    _kEsperaDelServidor,
-    onTimeout: (sink) {
-      if (!llegoAlgo) sink.add(const []);
-    },
-  ).map((links) {
-    llegoAlgo = true;
-    return links;
-  });
-}
+/// La espera pasó a los DOS consumidores que no pueden quedarse colgados —los
+/// que hacen `await ...future` adentro de un handler de usuario— porque ahí sí
+/// se puede representar "no pude confirmar" sin mentirle a nadie más.
+const kEsperaDelServidorDeVinculo = Duration(seconds: 8);
 
 /// Vínculo activo del atleta actual con su PF, o null si no tiene.
 /// Si hay múltiples activos (no debería pasar — un atleta solo se vincula
@@ -117,11 +102,9 @@ final currentAthleteLinkProvider =
   // provider —el shell entero, sin ir más lejos— muere con `!timersPending`
   // sin tener nada que ver con vínculos. Medido:
   // `router_post_login_bottom_bar_test.dart` se cayó por esto.
-  return _conEsperaAcotada(
-    ref
-        .read(trainerLinkRepositoryProvider)
-        .watchForAthlete(uid, statuses: {TrainerLinkStatus.active}),
-  ).map(
+  return ref
+      .read(trainerLinkRepositoryProvider)
+      .watchForAthlete(uid, statuses: {TrainerLinkStatus.active}).map(
     // watchForAthlete viene ordenado por requestedAt DESC.
     (links) => links.isEmpty ? null : links.first,
   );
@@ -154,16 +137,17 @@ final currentAthleteLinkAnyStatusProvider =
   final uid = ref.watch(currentUidProvider);
   if (uid == null) return Stream<TrainerLink?>.value(null);
   // Ver [currentAthleteLinkProvider]: tampoco lleva ventana de gracia.
-  return _conEsperaAcotada(
-    ref.read(trainerLinkRepositoryProvider).watchForAthlete(
-      uid,
-      statuses: {
-        TrainerLinkStatus.pending,
-        TrainerLinkStatus.active,
-        TrainerLinkStatus.paused,
-      },
-    ),
-  ).map((links) => links.isEmpty ? null : links.first);
+  return ref
+      .read(trainerLinkRepositoryProvider)
+      .watchForAthlete(
+        uid,
+        statuses: {
+          TrainerLinkStatus.pending,
+          TrainerLinkStatus.active,
+          TrainerLinkStatus.paused,
+        },
+      )
+      .map((links) => links.isEmpty ? null : links.first);
 });
 
 /// Ventana en la que el stream de vínculos SOBREVIVE a que lo suelten.

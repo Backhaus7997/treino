@@ -1,21 +1,24 @@
-// Regresión de `_conEsperaAcotada` (trainer_link_providers.dart:83-100),
-// parte del fix del bug de caché fría (commit f7dbb4ef).
+// Quién acota la espera, y por qué NO es el provider.
 //
-// `watchForAthlete` puede quedarse esperando al servidor para siempre (p.ej.
-// sin red). Sin un límite, `currentAthleteLinkProvider` se colgaría en
-// `AsyncLoading`, y hay consumidores que hacen `await ...future` adentro de
-// un handler de usuario (`profile_share_toggle_tile.dart:47`,
-// `invite_gate.dart:133`) — ahí eso es un control que se deshabilita y no se
-// recupera nunca. `_conEsperaAcotada` acota esa espera a 8s con
-// `Stream.timeout`, pero `Stream.timeout` reinicia su temporizador con CADA
-// hueco y se redispara en cada uno — sin el flag `llegoAlgo`, un vínculo ya
-// resuelto se borraría a los 8 segundos de quietud, que es el estado normal
-// de un stream de Firestore ya asentado.
+// La primera versión del fix de caché fría metía la espera adentro de
+// `currentAthleteLinkProvider`: a los 8s emitía la lista vacía. Eso convertía
+// un timeout en una ausencia CONFIRMADA — `AthleteCoachView` mandaba a
+// discovery a un alumno vinculado, el entitlement le sacaba el acceso derivado
+// del Coach, y los `.future` resolvían con "no hay vínculo". O sea el bug
+// original entrando por otra puerta. Lo encontró Codex en el PR #1109.
 //
-// Se usa `fake_async` (transitivo vía flutter_test — no está declarado en
-// pubspec.yaml, por eso el analyzer marca un `info` de
-// `depend_on_referenced_packages`; no es un error) para avanzar el reloj sin
-// esperar 8s/20s reales.
+// El contrato quedó así:
+//   - el provider NO acota nada. `AsyncLoading` significa "todavía no sé", y
+//     `AsyncData(null)` significa "el SERVIDOR dijo que no hay vínculo activo".
+//     Nunca "nos cansamos de esperar".
+//   - la acotan los DOS consumidores que no pueden colgarse, los que hacen
+//     `await ...future` adentro de un handler de usuario
+//     (`profile_share_toggle_tile.dart`, `invite_gate.dart`), porque ahí sí se
+//     puede representar "no pude confirmar" sin mentirle a nadie más.
+//   - y la UI del gate (`_EsperandoVinculo` en `router.dart`) le pone plazo al
+//     spinner, para que "honesto" no signifique "pared".
+//
+// `fake_async` avanza el reloj sin esperar 8s/20s reales.
 
 import 'dart:async';
 
@@ -32,123 +35,110 @@ import 'package:treino/features/workout/application/session_providers.dart';
 class _MockTrainerLinkRepository extends Mock
     implements TrainerLinkRepository {}
 
-void main() {
-  const athleteId = 'athlete-1';
+/// Arma un container con un repo cuyo `watchForAthlete` devuelve [stream].
+({ProviderContainer container, StreamController<List<TrainerLink>> ctrl})
+    _armar() {
+  final ctrl = StreamController<List<TrainerLink>>();
+  final repo = _MockTrainerLinkRepository();
+  when(() => repo.watchForAthlete(any(), statuses: any(named: 'statuses')))
+      .thenAnswer((_) => ctrl.stream);
+  final container = ProviderContainer(
+    overrides: [
+      currentUidProvider.overrideWithValue('athlete-1'),
+      trainerLinkRepositoryProvider.overrideWithValue(repo),
+    ],
+  );
+  container.listen(currentAthleteLinkProvider, (_, __) {},
+      fireImmediately: true);
+  return (container: container, ctrl: ctrl);
+}
 
+TrainerLink _link() => TrainerLink(
+      id: 'link-1',
+      trainerId: 'trainer-1',
+      athleteId: 'athlete-1',
+      status: TrainerLinkStatus.active,
+      requestedAt: DateTime.utc(2026, 9, 1),
+    );
+
+void main() {
   test(
-    'si el server no contesta, a los 8s el provider resuelve en null '
-    'en vez de colgarse',
+    'si el server no contesta, el provider NO resuelve: AsyncData(null) está '
+    'reservado para una respuesta del servidor',
     () {
       fakeAsync((async) {
-        // Un stream que nunca emite y nunca se cierra: modela "sin red / el
-        // server no contesta nunca".
-        final controller = StreamController<List<TrainerLink>>();
-        final repo = _MockTrainerLinkRepository();
-        when(
-          () => repo.watchForAthlete(any(), statuses: any(named: 'statuses')),
-        ).thenAnswer((_) => controller.stream);
+        final (:container, :ctrl) = _armar();
 
-        final container = ProviderContainer(
-          overrides: [
-            currentUidProvider.overrideWithValue(athleteId),
-            trainerLinkRepositoryProvider.overrideWithValue(repo),
-          ],
-        );
-        addTearDown(() {
-          controller.close();
-          container.dispose();
-        });
+        var completo = false;
+        container
+            .read(currentAthleteLinkProvider.future)
+            .then((_) => completo = true);
 
-        // Mantiene vivo el provider autoDispose mientras esperamos.
-        container.listen(currentAthleteLinkProvider, (_, __) {},
-            fireImmediately: true);
+        // Mucho más que la espera de los consumidores.
+        async.elapse(const Duration(seconds: 30));
+        async.flushMicrotasks();
 
-        TrainerLink? resolved;
-        var completed = false;
-        container.read(currentAthleteLinkProvider.future).then((value) {
-          completed = true;
-          resolved = value;
-        });
+        expect(completo, isFalse,
+            reason: 'un timeout no puede publicarse como "no tenés vínculo"');
+        expect(container.read(currentAthleteLinkProvider).isLoading, isTrue);
 
-        // Antes de los 8s: el future TODAVÍA no debe resolver — si esto
-        // fallara solo, no probaría nada del bug (probaría que el mock no
-        // emite nada, que es lo esperado); el assert que importa es el de
-        // abajo.
-        async.elapse(const Duration(seconds: 7));
-        expect(completed, isFalse,
-            reason: 'no debería resolver antes de la ventana de espera');
-
-        async.elapse(const Duration(seconds: 2)); // total: 9s > 8s
-
-        expect(
-          completed,
-          isTrue,
-          reason: 'el future no debe quedarse colgado esperando al servidor '
-              'para siempre — a los 8s tiene que resolver igual',
-        );
-        expect(resolved, isNull);
+        ctrl.close();
+        container.dispose();
       });
     },
   );
 
   test(
-    'un vínculo ya emitido NO se borra a los 8 segundos de quietud',
+    'cuando el server contesta, emite el vínculo y ahí sí resuelve',
     () {
       fakeAsync((async) {
-        final controller = StreamController<List<TrainerLink>>();
-        final repo = _MockTrainerLinkRepository();
-        when(
-          () => repo.watchForAthlete(any(), statuses: any(named: 'statuses')),
-        ).thenAnswer((_) => controller.stream);
+        final (:container, :ctrl) = _armar();
 
-        final container = ProviderContainer(
-          overrides: [
-            currentUidProvider.overrideWithValue(athleteId),
-            trainerLinkRepositoryProvider.overrideWithValue(repo),
-          ],
-        );
-        addTearDown(() {
-          controller.close();
-          container.dispose();
-        });
+        TrainerLink? resuelto;
+        container
+            .read(currentAthleteLinkProvider.future)
+            .then((v) => resuelto = v);
 
-        container.listen(currentAthleteLinkProvider, (_, __) {},
-            fireImmediately: true);
-
-        final link = TrainerLink(
-          id: 'link-1',
-          trainerId: 'trainer-1',
-          athleteId: athleteId,
-          status: TrainerLinkStatus.active,
-          requestedAt: DateTime.utc(2026, 1, 1),
-        );
-
-        TrainerLink? resolved;
-        container.read(currentAthleteLinkProvider.future).then((value) {
-          resolved = value;
-        });
-
-        controller.add([link]);
+        ctrl.add([_link()]);
         async.flushMicrotasks();
 
-        expect(resolved, isNotNull,
-            reason: 'setup: el vínculo tiene que haber llegado antes de '
-                'poder probar que no se borra');
-        expect(resolved!.id, link.id);
+        expect(resuelto?.trainerId, 'trainer-1');
 
-        // CONTROL NEGATIVO del flag `llegoAlgo`: 20s de silencio del server
-        // (más de dos ventanas de 8s) sin ningún evento nuevo.
-        async.elapse(const Duration(seconds: 20));
+        // Y no se pisa con el paso del tiempo: el provider no tiene ningún
+        // temporizador que pueda redispararse sobre un valor ya asentado.
+        async.elapse(const Duration(seconds: 30));
+        async.flushMicrotasks();
+        expect(container.read(currentAthleteLinkProvider).valueOrNull, isNotNull);
 
-        final current = container.read(currentAthleteLinkProvider);
-        expect(
-          current.value,
-          isNotNull,
-          reason: 'Stream.timeout se redispara en cada hueco de 8s; sin el '
-              'flag llegoAlgo esto se pisa con null aunque el vínculo real '
-              'siga vigente',
-        );
-        expect(current.value!.id, link.id);
+        ctrl.close();
+        container.dispose();
+      });
+    },
+  );
+
+  test(
+    'el CONSUMIDOR acota la espera: .timeout sobre .future cae en null a los 8s',
+    () {
+      // Es exactamente lo que hacen `profile_share_toggle_tile.dart` e
+      // `invite_gate.dart`. Sin esto, un handler con `_busy` puesto quedaría
+      // muerto para siempre — que es el motivo por el que la espera existía, y
+      // el que hay que seguir cubriendo ahora que se mudó de capa.
+      fakeAsync((async) {
+        final (:container, :ctrl) = _armar();
+
+        Object? resultado = #sinResolver;
+        container
+            .read(currentAthleteLinkProvider.future)
+            .timeout(kEsperaDelServidorDeVinculo, onTimeout: () => null)
+            .then((v) => resultado = v);
+
+        async.elapse(kEsperaDelServidorDeVinculo + const Duration(seconds: 1));
+        async.flushMicrotasks();
+
+        expect(resultado, isNull);
+
+        ctrl.close();
+        container.dispose();
       });
     },
   );

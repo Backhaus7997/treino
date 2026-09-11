@@ -463,6 +463,10 @@ class AppL10nEs extends AppL10n {
       'No encontramos un vínculo activo con un PF.';
 
   @override
+  String get athleteLinkUnconfirmed =>
+      'No pudimos confirmar tu vínculo con tu PF.';
+
+  @override
   String get athleteLinkRequiredRetry => 'Reintentar';
 
   @override
@@ -4933,6 +4937,10 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get athleteLinkRequired =>
       'No encontramos un vínculo activo con un PF.';
+
+  @override
+  String get athleteLinkUnconfirmed =>
+      'No pudimos confirmar tu vínculo con tu PF.';
 
   @override
   String get athleteLinkRequiredRetry => 'Reintentar';
