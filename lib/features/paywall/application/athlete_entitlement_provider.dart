@@ -7,6 +7,7 @@ import '../../profile/application/user_providers.dart' show firestoreProvider;
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../domain/athlete_entitlement.dart';
+import '../domain/catalog_gate.dart';
 
 /// Si el paywall del alumno muerde. Default: [kAthletePaywallEnabled].
 ///
@@ -130,9 +131,24 @@ final athleteEntitlementProvider = Provider.autoDispose<AthleteEntitlement>(
 /// Consumidores: el chip de la grilla (`plantillas_tab.dart`), el botón de
 /// seguir y la acción de EMPEZAR (`routine_detail_screen.dart`). Los tres
 /// cruzan `isPremium` porque los tres hablan de "entrenar ESTA plantilla".
+/// La decisión NO vive acá: la toma `catalogGateBlocks`, que es una función
+/// pura y por eso se puede correr desde `conformance/catalog_gate.json` —el
+/// contrato con la implementación Swift del reloj de Apple, que reescribe esta
+/// misma regla porque no puede usar el SDK de Firestore.
+///
+/// `isPremium: true` fijo, y no es un atajo: es LA DEFINICIÓN de este provider.
+/// "El candado está activo" significa exactamente "una plantilla paga le
+/// quedaría bloqueada", y por eso el call site tiene que cruzarlo con el campo
+/// de SU plantilla (`routine.isPremium && ref.watch(catalogLockActiveProvider)`).
+/// Preguntándolo así, el provider y el reloj corren el mismo código con las
+/// mismas ramas, en vez de dos aritméticas parecidas que se parecen hasta que
+/// alguien toca una.
 final catalogLockActiveProvider = Provider.autoDispose<bool>((ref) {
-  if (!ref.watch(athletePaywallEnabledProvider)) return false;
-  return ref.watch(athleteEntitlementProvider).gatesFreeLimits;
+  return catalogGateBlocks(
+    paywallEnabled: ref.watch(athletePaywallEnabledProvider),
+    paywallEnforced: ref.watch(athleteEntitlementProvider).paywallEnforced,
+    isPremium: true,
+  );
 });
 
 /// Eje 2 — PERSONALIZAR. `true` cuando copiar una plantilla del catálogo para
