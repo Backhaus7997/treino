@@ -4414,6 +4414,66 @@ class AppL10nEs extends AppL10n {
   @override
   String get paywallFreePlanLimitChartHistoryBody =>
       'Con el plan gratis mirás hasta un mes de historial. Los períodos de 3 meses y 1 año son del plan pago.';
+
+  @override
+  String get paywallAlumnoTitulo => 'TREINO Pro';
+
+  @override
+  String get paywallAlumnoBajada =>
+      'Programá en serio: rutinas largas, periodización y todo tu historial.';
+
+  @override
+  String get paywallAlumnoPlanMensual => 'Mensual';
+
+  @override
+  String get paywallAlumnoPlanAnual => 'Anual';
+
+  @override
+  String get paywallAlumnoAhorro => '2 meses gratis';
+
+  @override
+  String get paywallAlumnoBeneficio1 => 'Rutinas de hasta 7 días';
+
+  @override
+  String get paywallAlumnoBeneficio2 => '16 semanas con periodización';
+
+  @override
+  String get paywallAlumnoBeneficio3 => 'Gráficos de 3 meses y 1 año';
+
+  @override
+  String get paywallAlumnoBeneficio4 => 'Las plantillas premium del catálogo';
+
+  @override
+  String get paywallAlumnoImpuestos =>
+      'Tu banco le suma los impuestos argentinos a este precio (IVA y percepción). No los cobra TREINO: los vas a ver en el resumen de tu tarjeta.';
+
+  @override
+  String get paywallAlumnoCta => 'Suscribirme';
+
+  @override
+  String get paywallAlumnoRestaurar => 'Restaurar compras';
+
+  @override
+  String get paywallAlumnoSinPlanes =>
+      'No pudimos cargar los planes. Probá de nuevo en un rato.';
+
+  @override
+  String get paywallAlumnoReintentar => 'Reintentar';
+
+  @override
+  String get paywallAlumnoListo => '¡Listo! Ya tenés TREINO Pro.';
+
+  @override
+  String get paywallAlumnoPendiente =>
+      'Tu pago quedó pendiente de confirmación. Te avisamos cuando se acredite.';
+
+  @override
+  String get paywallAlumnoErrorCompra =>
+      'No pudimos completar la compra. No se te cobró nada.';
+
+  @override
+  String get paywallAlumnoSinRestaurar =>
+      'No encontramos compras para restaurar en esta cuenta.';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -8823,4 +8883,64 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get paywallFreePlanLimitChartHistoryBody =>
       'Con el plan gratis mirás hasta un mes de historial. Los períodos de 3 meses y 1 año son del plan pago.';
+
+  @override
+  String get paywallAlumnoTitulo => 'TREINO Pro';
+
+  @override
+  String get paywallAlumnoBajada =>
+      'Programá en serio: rutinas largas, periodización y todo tu historial.';
+
+  @override
+  String get paywallAlumnoPlanMensual => 'Mensual';
+
+  @override
+  String get paywallAlumnoPlanAnual => 'Anual';
+
+  @override
+  String get paywallAlumnoAhorro => '2 meses gratis';
+
+  @override
+  String get paywallAlumnoBeneficio1 => 'Rutinas de hasta 7 días';
+
+  @override
+  String get paywallAlumnoBeneficio2 => '16 semanas con periodización';
+
+  @override
+  String get paywallAlumnoBeneficio3 => 'Gráficos de 3 meses y 1 año';
+
+  @override
+  String get paywallAlumnoBeneficio4 => 'Las plantillas premium del catálogo';
+
+  @override
+  String get paywallAlumnoImpuestos =>
+      'Tu banco le suma los impuestos argentinos a este precio (IVA y percepción). No los cobra TREINO: los vas a ver en el resumen de tu tarjeta.';
+
+  @override
+  String get paywallAlumnoCta => 'Suscribirme';
+
+  @override
+  String get paywallAlumnoRestaurar => 'Restaurar compras';
+
+  @override
+  String get paywallAlumnoSinPlanes =>
+      'No pudimos cargar los planes. Probá de nuevo en un rato.';
+
+  @override
+  String get paywallAlumnoReintentar => 'Reintentar';
+
+  @override
+  String get paywallAlumnoListo => '¡Listo! Ya tenés TREINO Pro.';
+
+  @override
+  String get paywallAlumnoPendiente =>
+      'Tu pago quedó pendiente de confirmación. Te avisamos cuando se acredite.';
+
+  @override
+  String get paywallAlumnoErrorCompra =>
+      'No pudimos completar la compra. No se te cobró nada.';
+
+  @override
+  String get paywallAlumnoSinRestaurar =>
+      'No encontramos compras para restaurar en esta cuenta.';
 }

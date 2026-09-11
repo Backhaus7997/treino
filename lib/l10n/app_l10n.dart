@@ -7640,6 +7640,114 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Con el plan gratis mirás hasta un mes de historial. Los períodos de 3 meses y 1 año son del plan pago.'**
   String get paywallFreePlanLimitChartHistoryBody;
+
+  /// Titulo del paywall del alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TREINO Pro'**
+  String get paywallAlumnoTitulo;
+
+  /// Bajada del paywall del alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Programá en serio: rutinas largas, periodización y todo tu historial.'**
+  String get paywallAlumnoBajada;
+
+  /// Nombre del plan mensual en el paywall del alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Mensual'**
+  String get paywallAlumnoPlanMensual;
+
+  /// Nombre del plan anual en el paywall del alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Anual'**
+  String get paywallAlumnoPlanAnual;
+
+  /// Etiqueta del plan anual. NO dice un porcentaje: el descuento sale del precio de la tienda y un numero fijo se puede desincronizar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'2 meses gratis'**
+  String get paywallAlumnoAhorro;
+
+  /// Beneficio 1 del plan pago del alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Rutinas de hasta 7 días'**
+  String get paywallAlumnoBeneficio1;
+
+  /// Beneficio 2 del plan pago del alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'16 semanas con periodización'**
+  String get paywallAlumnoBeneficio2;
+
+  /// Beneficio 3 del plan pago del alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Gráficos de 3 meses y 1 año'**
+  String get paywallAlumnoBeneficio3;
+
+  /// Beneficio 4 del plan pago del alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Las plantillas premium del catálogo'**
+  String get paywallAlumnoBeneficio4;
+
+  /// Aviso de impuestos del paywall del alumno. VA SIN MONTO Y SIN TIPO DE CAMBIO a proposito: el importe final lo define el emisor de la tarjeta al liquidar, asi que no lo podemos saber, y publicar un numero que puede salir mal es 'promoting a false price' (guideline 2.3.1(a), cuya pena escrita es la baja de la app y la terminacion de la cuenta). Ademas Google exige que 'In-app pricing must match the pricing displayed in the user-facing Play billing interface'.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu banco le suma los impuestos argentinos a este precio (IVA y percepción). No los cobra TREINO: los vas a ver en el resumen de tu tarjeta.'**
+  String get paywallAlumnoImpuestos;
+
+  /// CTA del paywall del alumno. NO lleva el precio adentro: el boton dispara la hoja del sistema, que muestra el precio de la tienda, y que el boton prometa otro numero es el peor lugar posible para una discrepancia.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Suscribirme'**
+  String get paywallAlumnoCta;
+
+  /// Restaurar compras. Apple lo EXIGE para suscripciones.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Restaurar compras'**
+  String get paywallAlumnoRestaurar;
+
+  /// Estado de error del paywall del alumno cuando la tienda no devuelve ningun plan.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar los planes. Probá de nuevo en un rato.'**
+  String get paywallAlumnoSinPlanes;
+
+  /// Boton de reintento del paywall del alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Reintentar'**
+  String get paywallAlumnoReintentar;
+
+  /// Resultado: la compra se acredito.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¡Listo! Ya tenés TREINO Pro.'**
+  String get paywallAlumnoListo;
+
+  /// Resultado: pago diferido (Android) o Ask to Buy (iOS). NO es un error.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu pago quedó pendiente de confirmación. Te avisamos cuando se acredite.'**
+  String get paywallAlumnoPendiente;
+
+  /// Resultado: la compra fallo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos completar la compra. No se te cobró nada.'**
+  String get paywallAlumnoErrorCompra;
+
+  /// Resultado de restaurar cuando no hay nada.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No encontramos compras para restaurar en esta cuenta.'**
+  String get paywallAlumnoSinRestaurar;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

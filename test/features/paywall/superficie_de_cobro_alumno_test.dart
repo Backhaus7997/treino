@@ -302,31 +302,110 @@ void main() {
     });
   });
 
-  group('la hoja de límite sigue sin CTA de compra', () {
-    // No es lo mismo que el guard de arriba. Ahí se prohíbe ABRIR algo; acá se
-    // fija el estado de hoy: el botón todavía no se dibuja porque el checkout
-    // del alumno no existe (`docs/paywall-alumno-suelto.md` §7.1).
+  group('quién puede ABRIR el paywall del alumno', () {
+    // ─── Este grupo REEMPLAZA a «ningún call site pasa `onUpgrade`» ──────────
     //
-    // Cuando exista, este test se va a poner rojo — y eso está bien: es el
-    // recordatorio de leer 3.1.3(f) antes de decidir qué hace el botón. Un CTA
-    // que sólo EXPLICA que se paga por web es discutible pero defendible; uno
-    // que abre la web, no.
-    test('ningún call site pasa `onUpgrade`', () {
-      final conCallback = <String>[];
+    // Aquel fijaba el estado de entonces: la hoja de límite no dibujaba botón
+    // porque el checkout del alumno no existía, y su comentario decía que
+    // ponerse rojo el día del cableado era su función — el recordatorio de
+    // leer 3.1.3 antes de decidir qué hacía el botón.
+    //
+    // El recordatorio se cobró: se leyó, y la decisión fue sacar `onUpgrade`
+    // de la firma. Eran 8 call sites pasando la MISMA closure, o sea 8
+    // lugares donde alguien podía pasar una distinta —una que abriera la
+    // web— sin que el tipo sellado se enterara. Ahora la hoja mira
+    // `athleteCheckoutProvider` y decide sola.
+    //
+    // Con el parámetro afuera, aquel test no vigilaba nada: pasaba por
+    // construcción. Lo que SÍ hay que vigilar ahora es el otro extremo —
+    // **desde dónde se llega a la pantalla que vende**.
+    const permitidos = <String, String>{
+      'lib/features/paywall/presentation/free_plan_limit_sheet.dart':
+          'la hoja de límite: es el instante en que el tope muerde, y el '
+              'único lugar donde hoy se ofrece comprar',
+    };
+
+    test('la lista de archivos que abren el paywall es la declarada', () {
+      final encontrados = <String>{};
       for (final f in _dartsDe('lib')) {
-        if (f.path.endsWith('free_plan_limit_sheet.dart')) continue;
+        if (f.path.endsWith('athlete_paywall_screen.dart')) continue;
         final codigo = _sinComentarios(f);
-        if (codigo.contains('onUpgrade')) conCallback.add(f.path);
+        if (codigo.contains('AthletePaywallScreen')) {
+          encontrados.add(f.path.replaceAll(r'\', '/'));
+        }
       }
 
+      final nuevos = encontrados.difference(permitidos.keys.toSet());
       expect(
-        conCallback,
+        nuevos,
         isEmpty,
-        reason: 'alguien cableó el CTA de la hoja de límite:\n'
-            '${conCallback.join("\n")}\n\n'
-            'Antes de que esto pase a verde: bajo 3.1.3(f) ese botón NO puede '
-            'llevar al checkout. Actualizá este test explicando qué hace, y '
-            'dejá el guard de `launchUrl` de arriba intacto.',
+        reason: 'lugares nuevos que abren el paywall del alumno:\n'
+            '${nuevos.join("\n")}\n\n'
+            'No está prohibido — el alumno TIENE que poder comprar. Pero cada '
+            'entrada nueva es una pantalla más que un revisor de Apple puede '
+            'abrir, así que sumala acá con su razón y mirá que el contexto '
+            'tenga sentido: el paywall se ofrece cuando el límite MUERDE, no '
+            'porque sí.',
+      );
+
+      final desaparecidos = permitidos.keys.toSet().difference(encontrados);
+      expect(
+        desaparecidos,
+        isEmpty,
+        reason: 'estos ya no abren el paywall: sacalos de `permitidos`\n'
+            '${desaparecidos.join("\n")}',
+      );
+    });
+
+    test('`onUpgrade` no volvió a la firma de la hoja', () {
+      // El parámetro se sacó a propósito. Si vuelve, vuelve con él la
+      // posibilidad de que un call site pase una closure que abra otra cosa.
+      final hoja = File(
+        'lib/features/paywall/presentation/free_plan_limit_sheet.dart',
+      );
+      expect(hoja.existsSync(), isTrue);
+      expect(
+        _sinComentarios(hoja).contains('onUpgrade'),
+        isFalse,
+        reason: 'volvió `onUpgrade` a la hoja de límite. Antes de reponerlo: '
+            'eran 8 call sites pasando la misma closure, y cada uno era un '
+            'lugar donde se podía pasar otra. La hoja decide sola mirando '
+            '`athleteCheckoutProvider`.',
+      );
+    });
+  });
+
+  group('los guards de esta carpeta se normalizan bien', () {
+    // ─── Por que existe este test ───────────────────────────────────────────
+    //
+    // Los guards de arriba comparan rutas contra una allowlist, y en Windows
+    // `File.path` usa `\\`. Por eso todos normalizan con
+    // `replaceAll(r'\\', '/')`.
+    //
+    // Escribir esa linea es sorprendentemente facil de arruinar: si la barra
+    // invertida se pierde en el camino queda `replaceAll(r'', '/')`, o sea
+    // patron VACIO, y Dart mete una barra entre CADA caracter. El path pasa a
+    // ser `/l/i/b/...` y NINGUNA clave de la allowlist matchea.
+    //
+    // Lo peligroso es que el guard igual se pone rojo cuando corresponde, asi
+    // que una prueba de mutacion lo da por bueno. Lo que se rompe es el
+    // MENSAJE: el que lo dispare recibe un path ilegible y pierde diez minutos
+    // entendiendo que le quisieron decir.
+    //
+    // Paso tres veces en un mismo dia. Tres veces es patron, no accidente.
+    test('ningun replaceAll quedo con el patron vacio', () {
+      final rotos = <String>[];
+      for (final f in _dartsDe('test/features/paywall')) {
+        if (f.path.endsWith('superficie_de_cobro_alumno_test.dart')) continue;
+        if (f.readAsStringSync().contains("replaceAll(r'', ")) {
+          rotos.add(f.path.replaceAll(r'\', '/'));
+        }
+      }
+      expect(
+        rotos,
+        isEmpty,
+        reason: 'estos guards normalizan con un patron vacio, asi que su '
+            'mensaje de error va a salir ilegible: ${rotos.join(", ")}',
       );
     });
   });
