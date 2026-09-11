@@ -212,6 +212,40 @@ TreinoBarLayout resolveBarLayout({
 /// entra entera y el pill se sigue viendo bien redondeado.
 const double _kPillRadius = 20;
 
+/// Redondeo de la barra.
+///
+/// 36 sobre los 72 de la barra expandida la vuelve un STADIUM: las puntas son
+/// semicírculos perfectos, sin tramo recto. Eso es deliberado y es la silueta
+/// que el diseño quiere.
+///
+/// ⚠️ NO lo "arregles" para que quede concéntrico con [_kPillRadius].
+///
+/// Dos rectángulos redondeados anidados se ven concéntricos cuando el interior
+/// mide `exterior - separación`. Con 36 de barra y [_kPillInset] de 6, el pill
+/// debería medir 30 y mide 20, así que en las puntas el hueco cae de los 6 px
+/// de los lados rectos a 1,86 px sobre la diagonal. Se sabe, se midió, y se
+/// decidió dejarlo.
+///
+/// El motivo por el que NO se puede cerrar esa diferencia subiendo el pill: a
+/// 30 la curva se come 6,78 px por lado a la altura del label, la caja del
+/// label cae de 47,72 a 38,43 y "ENTRENAR" mide 44,36 pt. En 360 dp, el ancho
+/// más común del parque Android, la barra se quedaría en ÍCONOS PARA SIEMPRE.
+/// Es exactamente la regresión que el comentario de [_kPillRadius] cuenta que
+/// ya pasó una vez (era 28 y recortaba la palabra: "ENTRENAR" → "ENTRENR").
+///
+/// Y no se puede resolver animando el radio del pill con el colapso: el estado
+/// compacto NO tiene label (el `heightFactor: expansion` del `ClipRect` lo
+/// colapsa a alto cero y la `Column` centra solo el ícono de 22), así que el
+/// estado sin la restricción del texto es justo el que YA está bien. Compactada
+/// la barra mide 52, Flutter recorta el radio a 26 (`RRect.scaleRadii`), y
+/// 26 - 6 = 20 = [_kPillRadius]: concéntrico. El desajuste nace al expandirse.
+///
+/// La salida, si algún día se quiere cerrar, es bajar ESTA constante a 26 (el
+/// pill no se toca y el label ni se entera), o sacar el label de adentro del
+/// pill y recién ahí subir el pill a 30. Las dos cambian la silueta o el
+/// layout del tab; ninguna es un ajuste de un número sin consecuencia visual.
+const double _kBarRadius = 36;
+
 /// Bottom bar de TREINO: pill flotante de vidrio (fill translúcido + reflejo
 /// especular, SIN blur — ver [TreinoGlassSurface]), pill de gradient que se
 /// desliza al tab activo, íconos `TreinoIcon` + labels Barlow Condensed.
@@ -454,7 +488,7 @@ class TreinoBottomBar extends StatelessWidget {
                   // Shadow lives OUTSIDE the ClipRRect — inside it gets
                   // clipped.
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(36),
+                    borderRadius: BorderRadius.circular(_kBarRadius),
                     boxShadow: [
                       BoxShadow(
                         color: palette.bg.withValues(alpha: 0.45),
@@ -464,11 +498,11 @@ class TreinoBottomBar extends StatelessWidget {
                     ],
                   ),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(36),
+                    borderRadius: BorderRadius.circular(_kBarRadius),
                     child: SizedBox(
                       height: lerpDouble(collapsedHeight, barHeight, expansion),
                       child: TreinoGlassSurface(
-                        borderRadius: BorderRadius.circular(36),
+                        borderRadius: BorderRadius.circular(_kBarRadius),
                         // Filo REFORZADO, no el `palette.border` que trae por
                         // defecto [TreinoGlassSurface].
                         //
