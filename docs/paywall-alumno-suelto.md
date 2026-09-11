@@ -237,6 +237,11 @@ tope de días de la sección 4, porque no depende de que el alumno quiera
 diseñar algo propio — todo el que progresa sale de principiante tarde o
 temprano, use catálogo o rutina propia.
 
+> **Estado del enforcement de este eje (2026-09-10).** La UI del teléfono la
+> cerró el #1066; la regla server-side sobre `sessions` y el gate del reloj
+> **Wear OS**, el #1087. Falta el reloj de **Apple**, y es lo único que bloquea
+> encender el paywall: [paywall-watchos-plan.md](./paywall-watchos-plan.md).
+
 **Flag explícito, no `level` reutilizado — decisión de esta sesión.** Gatear
 directo por `level` sería gratis en código (el campo ya existe), pero ata el
 PRECIO a la DIFICULTAD, y son decisiones distintas: el día de mañana puede
