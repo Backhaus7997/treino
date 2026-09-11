@@ -46,8 +46,12 @@ class _StubAuthNotifier extends AuthNotifier {
 
 final DateTime _kDate = DateTime.utc(2026, 1, 1);
 
-const _kAthleteErrorText =
-    'Necesitás un vínculo activo con un PF para ver su agenda.';
+// El copy dejó de estar hardcodeado en el router y de ser distinto por
+// pantalla: agenda y nutrición comparten `athleteLinkRequired`. Dice NO
+// ENCONTRAMOS y no NO TENÉS porque el provider emite lo mismo cuando el
+// servidor contesta que no hay vínculo y cuando se agota la espera sin
+// llegar al servidor.
+const _kAthleteErrorText = 'No encontramos un vínculo activo con un PF.';
 
 /// Trainer con perfil COMPLETO (ADR-TPO-003): sin bio/specialty/rate el
 /// authRedirect lo mandaría a /profile/edit-trainer?mode=onboarding y el test
@@ -121,6 +125,9 @@ Future<ProviderContainer> _pumpCoachAgenda(
       container: container,
       child: MaterialApp.router(
         theme: AppTheme.dark(),
+        // El copy del gate dejó de estar hardcodeado en el router, así que el
+        // test tiene que fijar el locale o resuelve en inglés (el del host).
+        locale: const Locale('es', 'AR'),
         localizationsDelegates: AppL10n.localizationsDelegates,
         supportedLocales: AppL10n.supportedLocales,
         routerConfig: router,
@@ -155,6 +162,9 @@ void main() {
 
     expect(find.text(_kAthleteErrorText), findsOneWidget);
     expect(find.byType(CoachScreen), findsNothing);
+    // El gate ya no es una pared: antes era un Center con un Text y nada
+    // más, sin reintentar, sin RefreshIndicator y sin ref.invalidate.
+    expect(find.widgetWithText(TextButton, 'Reintentar'), findsOneWidget);
   });
 
   testWidgets(

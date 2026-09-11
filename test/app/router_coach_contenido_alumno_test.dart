@@ -163,7 +163,7 @@ void main() {
     expect(find.byType(AthleteNutritionPlanScreen), findsNothing);
     expect(
       find.text(
-        'Necesitás un vínculo activo con un PF para ver tu plan nutricional.',
+        'No encontramos un vínculo activo con un PF.',
       ),
       findsOneWidget,
     );

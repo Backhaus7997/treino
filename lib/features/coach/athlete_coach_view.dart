@@ -243,7 +243,7 @@ class LinkStateCard extends ConsumerWidget {
                 const SizedBox(height: 12),
                 _AgendaButton(trainerId: link.trainerId),
                 const SizedBox(height: 12),
-                const _NutritionPlanButton(),
+                _NutritionPlanButton(trainerId: link.trainerId),
                 const SizedBox(height: 12),
                 const _AthleteFilesButton(),
                 const SizedBox(height: 16),
@@ -629,7 +629,12 @@ class _AgendaButton extends StatelessWidget {
     return SizedBox(
       width: double.infinity,
       child: OutlinedButton.icon(
-        onPressed: () => context.push('/coach/agenda'),
+        // El trainerId viaja por la ruta para que el host NO tenga que
+        // volver a preguntar lo que esta pantalla ya sabe: estos botones
+        // sólo se dibujan si el vínculo está activo.
+        onPressed: () => context.push(
+          '/coach/agenda?trainerId=${Uri.encodeComponent(trainerId)}',
+        ),
         style: OutlinedButton.styleFrom(
           side: BorderSide(color: palette.accent, width: 1),
           foregroundColor: palette.accent,
@@ -653,7 +658,8 @@ class _AgendaButton extends StatelessWidget {
 }
 
 class _NutritionPlanButton extends StatelessWidget {
-  const _NutritionPlanButton();
+  const _NutritionPlanButton({required this.trainerId});
+  final String trainerId;
 
   @override
   Widget build(BuildContext context) {
@@ -662,7 +668,9 @@ class _NutritionPlanButton extends StatelessWidget {
     return SizedBox(
       width: double.infinity,
       child: OutlinedButton.icon(
-        onPressed: () => context.push('/coach/nutricion'),
+        onPressed: () => context.push(
+          '/coach/nutricion?trainerId=${Uri.encodeComponent(trainerId)}',
+        ),
         style: OutlinedButton.styleFrom(
           side: BorderSide(color: palette.accent, width: 1),
           foregroundColor: palette.accent,

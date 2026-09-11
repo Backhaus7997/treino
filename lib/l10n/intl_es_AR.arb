@@ -266,6 +266,18 @@
   "@athleteNutritionNeedsActiveLink": {
     "description": "Estado de la ruta nutricional cuando el alumno no tiene un vínculo activo."
   },
+  "athleteLinkRequired": "No encontramos un vínculo activo con un PF.",
+  "@athleteLinkRequired": {
+    "description": "Gate de las rutas que necesitan un vínculo activo (agenda, nutrición). Dice NO ENCONTRAMOS y no NO TENÉS a propósito: el provider emite lo mismo cuando el servidor contesta que no hay vínculo y cuando se agota la espera sin llegar al servidor, y afirmar la segunda como la primera sería una advertencia falsa."
+  },
+  "athleteLinkRequiredRetry": "Reintentar",
+  "@athleteLinkRequiredRetry": {
+    "description": "Botón del gate de vínculo: invalida el provider y vuelve a preguntar."
+  },
+  "athleteSessionMissing": "Tu sesión se cerró. Volvé a entrar.",
+  "@athleteSessionMissing": {
+    "description": "Gate de las rutas de alumno cuando falta el uid. Es una causa DISTINTA de no tener vínculo, y antes las dos mostraban el mismo cartel."
+  },
   "athleteFilesScreenTitle": "MIS ARCHIVOS",
   "@athleteFilesScreenTitle": {
     "description": "Título de la pantalla de archivos compartidos con el alumno."
