@@ -385,19 +385,44 @@ Para el `get()` del vínculo hace falta un doc con id determinístico
 
 ---
 
-## 7. Cobro: por web con Mercado Pago, no por IAP
+## 7. Cobro: por IAP, no por web
 
-Argentina no está en la lista de países del External Purchase Link Entitlement
-de Apple ni en el User Choice Billing de Google, y el régimen post-*Epic* es
-solo storefront de EEUU. Las tiendas cobran en USD y encima cae la percepción de
-Ganancias del 30% (RG 5617). Resultado: para el mismo neto, IAP haría que el
-alumno pague ~ARS 7.000 contra ARS 4.000 por web (brief, 2026-09-03).
+> **Esta sección se dio vuelta el 2026-09-10.** Decía «por web con Mercado Pago,
+> no por IAP» y la decisión se revirtió. Se reescribió entera en vez de
+> parcharse porque cuatro archivos de `lib/` la citan, y una spec que dice lo
+> contrario de lo construido es peor que ninguna: el que la lee trabaja con una
+> constitución vieja y cree que está al día.
 
-La vía limpia es la Guideline 3.1.3(f) — *Free Stand-alone App*: la app móvil no
-vende nada ni linkea al checkout; el alumno paga en la web y el entitlement
-llega por Firestore. Es **el mismo patrón que ya usa el entrenador**.
+**El alumno paga por in-app purchase (App Store + Google Play), vía RevenueCat.**
+El entrenador sigue cobrando por Mercado Pago desde la web, y eso no cambió.
 
-### 7.1 Hoy no existe superficie web para el alumno
+### 7.1 Por qué se dio vuelta: la exención no aplicaba
+
+La versión anterior apoyaba todo en la Guideline 3.1.3(f) de Apple. El texto
+literal, verificado el 2026-09-10:
+
+> «Free apps acting as a stand-alone companion to a **paid web based tool**
+> (i.e. VoIP, Cloud Storage, Email Services, Web Hosting) do not need to use
+> in-app purchase, provided there is no purchasing inside the app, or calls to
+> action for purchase outside of the app.»
+
+La exención exige una *paid web based tool* de la cual la app sea companion.
+
+**Para el ENTRENADOR eso existe de verdad**: el Coach Hub es una herramienta web
+paga donde arma rutinas, gestiona alumnos y factura. La exención le aplica, y
+por eso su cobro sigue como está.
+
+**Para el ALUMNO no existe ninguna superficie web** — lo dice la sección 7.2 de
+abajo, que era el argumento de por qué había que construirla y terminó siendo el
+argumento de por qué no se podía usar la exención. Sin web no hay *paid web
+based tool*, sin eso no hay exención, y cae 3.1.1: la compra pasa por la tienda.
+
+No es una preferencia. Es la única puerta que quedaba abierta.
+
+### 7.2 Hoy no existe superficie web para el alumno
+
+*(Sección original, sin cambios — sigue siendo cierta, y es exactamente la razón
+por la que la exención no aplica.)*
 
 `coachHubRedirect` manda a `/not-allowed` a todo `role != trainer`
 ([coach_hub_router.dart:84-86](../lib/app/coach_hub_router.dart)). La única ruta
@@ -409,30 +434,104 @@ web es [main_coach_hub.dart](../lib/main_coach_hub.dart), separado de
 Del lado del alumno en mobile existe `lib/features/payments/` (`mi_cuota`), pero
 es **read-only**: el alumno le paga la cuota al PF *offline* y la app solo
 muestra lo que debe ([mi_cuota_provider.dart:36-37](../lib/features/payments/application/mi_cuota_provider.dart)).
-No hay checkout del alumno en ningún lado.
 
-### 7.2 Qué habría que construir (estimación en piezas, no en horas)
+### 7.3 Lo que COSTÓ la decisión, dicho de frente
 
-| Pieza | ¿Existe algo reusable? | Riesgo |
-|---|---|---|
-| Entry point web del alumno (o un modo del hub que no redirija por rol) | `main_coach_hub.dart` como molde; el redirect hay que bifurcarlo, no relajarlo | medio — el hub asume trainer en 23 secciones |
-| Login web del alumno | `coach_hub_login_screen.dart` (solo email/password; el hub no inicializa Google Sign-In, :47-49). El alumno mobile sí usa Google/Apple → hay que agregar OAuth web o aceptar solo email | alto — es el primer contacto |
-| Pantalla de planes + botón de pago | `sections/facturacion_planes/` del PF — **fuera de alcance de esta spec**, otra sesión la está cableando; reusar cuando esté | bajo si se espera |
-| Retorno del checkout + estado "pendiente" | idem | bajo si se espera |
-| Webhook MP → campo de entitlement en `users/{uid}` | `functions/src/subscriptions/**` del PF — **fuera de alcance**; el del alumno sería un hermano, no una extensión | medio — dos productos en un webhook |
-| Lectura del entitlement en mobile (para mostrar el paywall antes de que rebote la regla) | patrón `blockedAthleteIds` del PF | bajo |
-| Deploy target y dominio | `vercel.json` / `firebase.json` — no verifiqué cuál sirve el hub hoy | bajo |
+La sección vieja tenía razón en los números, y conviene no perderlos: **IAP es
+peor para el bolsillo del alumno.** Se aceptó igual porque la alternativa no
+existía.
 
-El orden importa: **nada de esto arranca hasta que el checkout del PF esté
-mergeado**. Construir dos checkouts de Mercado Pago en paralelo es duplicar el
-código más delicado del repo.
+Verificado el 2026-09-10:
 
----
+- La storefront de Argentina **cotiza en USD** en las dos tiendas. No hay precio
+  en pesos: la API de Apple con `country=ar` devuelve `currency: USD`, y la
+  tabla oficial de Google lista `Argentina | USD`.
+- Al alumno le caen **IVA 21%** (RG 4240) y **percepción 30%** (RG 5617) encima
+  del precio de lista, y **ni Apple ni Google los recaudan** — Argentina no está
+  en sus listas de países donde retienen. El precio en USD que ve es la BASE; la
+  sorpresa llega en el resumen de la tarjeta.
+- La comisión de la tienda es 15% (Small Business Program) contra ~4–6% de
+  Mercado Pago.
+
+Por cada USD 1 de lista: el alumno paga ~ARS 2.318 y a TREINO le llegan
+~ARS 1.282. **Se queda el 55% de lo que el alumno gasta.**
+
+> ⚠️ **El «+51%» NO es una constante, y esto importa para la pantalla.** La
+> RG 4240 art. 4 acota la percepción de IVA a pagos de hasta USD 10 para los
+> prestadores del Apartado B, y en el listado vigente de ARCA la línea de
+> `APPLE` tiene exactamente ese tope mientras la de `GOOGLE PLAY` no. O sea que
+> el mismo porcentaje sería falso en el plan anual de iOS.
+>
+> No verificado: cuál de las dos entradas de Apple del listado (`APPLE`, con
+> tope, o `ITUNES.COM`, sin tope) matchea un IAP de App Store. Se resuelve
+> mirando un resumen real o preguntándole al contador.
+
+Por eso el paywall **no muestra ningún monto en pesos**: el importe final lo
+define el emisor de la tarjeta al liquidar, el porcentaje no es fijo, y publicar
+un número que puede salir mal es la guideline 2.3.1(a) —*promoting a false
+price*— cuya pena escrita es la baja de la app y la terminación de la cuenta.
+Muestra el precio de la tienda y una advertencia cualitativa.
+
+### 7.4 Qué se construyó
+
+| Pieza | Dónde |
+|---|---|
+| Capacidad de comprar (tipo sellado) | `lib/features/paywall/application/athlete_checkout.dart` |
+| El puerto, sin tipos de terceros | `lib/features/paywall/application/athlete_store.dart` |
+| El adaptador — **único archivo de `lib/` que importa el SDK** | `lib/features/paywall/application/revenuecat_store.dart` |
+| Pantalla de paywall | `lib/features/paywall/presentation/athlete_paywall_screen.dart` |
+| Webhook que escribe `athleteSubscription` | `functions/src/subscriptions/rc/webhook.ts` |
+| UUID por usuario (seguro para un futuro sin RevenueCat) | `functions/src/subscriptions/store-account-token.ts` |
+
+### 7.5 La deuda que dejó la reversión
+
+3.1.3(f) tiene **dos** condiciones, no una: no vender adentro **y** no tener
+*calls to action* hacia afuera. La app móvil tiene tres carteles que dicen dónde
+se paga —«Regularizá tu suscripción desde TREINO web»— y eso ya es un call to
+action.
+
+Están declarados en `test/features/paywall/anti_steering_movil_test.dart` con su
+fecha límite: **antes de la primera submission de iOS que incluya la suscripción
+del alumno**, porque ése es el momento en que un revisor humano abre esas
+pantallas.
+
 
 ## 8. Precio
 
+> ⚠️ **La banda de abajo quedó vieja el 2026-09-10.** Se calculó asumiendo cobro
+> por web, o sea **sin comisión de tienda y en pesos**. Con IAP el precio se
+> fija en USD —la storefront argentina no admite pesos— y le entra un 15% de
+> comisión. Las referencias de §8.1 siguen sirviendo; la banda, no.
+
+**Propuesto: USD 2,99/mes y USD 29,90/año.** Sin confirmar por el dueño.
+
+| | Lista | Lo que ve el alumno en el resumen | Lo que le llega a TREINO |
+|---|---|---|---|
+| Mensual | USD 2,99 | ~ARS 6.931 | ~ARS 3.833 |
+| Anual | USD 29,90 | ~ARS 69.308 (= ARS 5.776/mes) | ~ARS 38.332 |
+
+El múltiplo 10x no es arbitrario: es la convención de la casa, ya cobrada al
+entrenador (`functions/src/subscriptions/tier-config.ts:56-58` — 12.000/120.000,
+22.000/220.000, 39.000/390.000, con un test que lo fija).
+
+**Por qué ese número y no más:** el mercado de apps de entrenamiento es
+bimodal —seis apps entre USD 1,99 y 4,99, seis entre 11,99 y 15,99, y **cero en
+el medio**— y la línea que separa los racimos no es la calidad: es si la app
+**genera el plan**. TREINO le da al alumno el contenedor para programar; no le
+programa. El piso lo fija Hevy, que cobra lo mismo con un free más ancho.
+
+**El punto débil es el múltiplo del anual, no el nivel del mensual.** Setgraph,
+que sí localizó para Argentina, cobra el anual a USD 16,49: el 29,90 está 81%
+arriba, mientras que el mensual está a 11% del suyo. Si el anual no convierte,
+la palanca es bajar de 10x a 8x → USD 23,99, que es exactamente el anual de Hevy.
+
+<details>
+<summary>La banda original, para referencia histórica</summary>
+
 Banda **ARS 2.500–3.500/mes**, o **ARS 25.000 anual** (≈ 8,3 meses de 3.000: un
 30% de descuento).
+
+</details>
 
 ### 8.1 Referencias argentinas — verificadas el 2026-09-03
 
