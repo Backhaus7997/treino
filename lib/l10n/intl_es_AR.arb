@@ -2546,6 +2546,18 @@
   "@profileRoutinesActiveChip": {
     "description": "Chip label shown on the user-created routine card that is currently marked as active by the athlete (UserProfile.activeRoutineId). Mirrors the chip in workoutMisRutinasActiveChip."
   },
+  "profileSectionLegal": "Legales",
+  "@profileSectionLegal": {
+    "description": "Header of the Legal section group in the profile settings list."
+  },
+  "legalDocumentsTitle": "Documentos legales",
+  "@legalDocumentsTitle": {
+    "description": "Title of the legal documents index screen and its tile in the profile settings list."
+  },
+  "legalDocumentsSubtitle": "Términos, privacidad y más",
+  "@legalDocumentsSubtitle": {
+    "description": "Subtitle under the legal documents tile in the profile settings list."
+  },
   "appearanceTitle": "Apariencia",
   "@appearanceTitle": {
     "description": "Title of the Appearance settings screen and the tile label in the profile settings list."

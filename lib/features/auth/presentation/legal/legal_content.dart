@@ -217,3 +217,28 @@ const List<LegalSection> kPrivacySections = <LegalSection>[
         'privacidad o para ejercer tus derechos, escribinos a $kLegalContactEmail.',
   ),
 ];
+
+/// Índice de los documentos legales, para la pantalla Perfil → Legales.
+///
+/// PROVISORIO: hoy sólo existen Términos y Privacidad. Cuando se resuelvan los
+/// pendientes de `docs/legal/` y corra `scripts/build_legal_content.py`, este
+/// archivo entero se regenera y esta lista pasa a tener los nueve documentos
+/// sin tocar la pantalla que la consume.
+typedef LegalDocumentEntry = ({
+  String title,
+  List<LegalSection> sections,
+  String lastUpdated,
+});
+
+const List<LegalDocumentEntry> kLegalDocuments = <LegalDocumentEntry>[
+  (
+    title: 'Términos y Condiciones',
+    sections: kTermsSections,
+    lastUpdated: kTermsLastUpdated,
+  ),
+  (
+    title: 'Política de Privacidad',
+    sections: kPrivacySections,
+    lastUpdated: kPrivacyLastUpdated,
+  ),
+];

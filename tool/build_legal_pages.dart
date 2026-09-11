@@ -12,8 +12,20 @@
 // confundido: es que la política que aceptó el usuario en la app diga una cosa
 // y la que declaraste en la tienda diga otra.
 //
-// La fuente de verdad es y sigue siendo `legal_content.dart`. Esto es un
-// renderer.
+// Esto es un renderer, y es el SEGUNDO eslabón de una cadena de dos:
+//
+//     docs/legal/*.md  ->  legal_content.dart  ->  web/legal/*.html
+//   (build_legal_content.py)   (eslabón)            (este archivo)
+//
+// La fuente de verdad son los markdown de `docs/legal/`, que es donde se
+// redactan y se revisan los textos. `legal_content.dart` dejó de ser fuente y
+// pasó a ser un artefacto intermedio: lo genera `scripts/build_legal_content.py`
+// y lleva un encabezado que dice que no se edita a mano. Editarlo directamente
+// hace que la app diga una cosa y el markdown otra, que es el mismo problema
+// que este archivo vino a resolver, un nivel más arriba.
+//
+// Cada eslabón tiene su guarda: el gate de `ci.yml` compara markdown contra
+// Dart, y `test/legal/paginas_legales_sync_test.dart` compara Dart contra HTML.
 //
 // ─── Uso ─────────────────────────────────────────────────────────────────────
 //

@@ -67,6 +67,7 @@ import '../features/profile/application/user_providers.dart';
 import '../features/profile/domain/user_profile_trainer_completeness.dart';
 import '../features/profile/domain/user_role.dart';
 import '../features/profile/presentation/appearance_screen.dart';
+import '../features/profile/presentation/legal_index_screen.dart';
 import '../features/profile/presentation/profile_edit_personal_screen.dart';
 import '../features/profile/presentation/profile_edit_trainer_screen.dart';
 import '../features/profile/presentation/profile_gym_screen.dart';
@@ -922,6 +923,13 @@ GoRouter buildRouter({
               GoRoute(
                 path: 'settings/appearance',
                 builder: (_, __) => _withBg(const AppearanceScreen()),
+              ),
+              // Índice de documentos legales. Hasta acá los legales sólo se
+              // alcanzaban desde el registro y el login, así que con la cuenta
+              // ya creada nadie podía releer lo que había aceptado.
+              GoRoute(
+                path: 'settings/legales',
+                builder: (_, __) => _withBg(const LegalIndexScreen()),
               ),
               GoRoute(
                 // Trainer availability editor reached from TrainerProfileView's
