@@ -232,14 +232,24 @@ de refilón: el caso "listar `postPhotos/`" de
 
 ### 1.3 De dónde salen estos números
 
-No son una estimación. Para el relevamiento se leyeron **los 28 archivos** de
-test de reglas que existían antes de este change (20 en `functions/`, 8 en
-`scripts/rules_test/`) y se clasificó **cada una de sus 509 aserciones** por
-`(path, operación, positiva/negativa)`: 302 negativas y 207 positivas. El total
-reconcilia exactamente contra el conteo mecánico — 296 `assertFails(` + 202
-`assertSucceeds(` en las suites que usan el SDK, más 6 `toBe(403)` y 5
-`toBe(200)` en las dos suites REST del reloj, que ejercitan las mismas reglas
-por HTTP crudo en vez de por SDK.
+**Foto forense al 2026-08-24 (`7b3d27dc`), no un contador vivo.** Para el
+relevamiento se leyeron **los 28 archivos** de test de reglas que existían
+entonces (20 en `functions/`, 8 en `scripts/rules_test/`) y se clasificó **cada
+una de sus 509 aserciones** por `(path, operación, positiva/negativa)`: 302
+negativas y 207 positivas. El total reconcilia exactamente contra el conteo
+mecánico — 296 `assertFails(` + 202 `assertSucceeds(` en las suites que usan el
+SDK, más 6 `toBe(403)` y 5 `toBe(200)` en las dos suites REST del reloj, que
+ejercitan las mismas reglas por HTTP crudo en vez de por SDK.
+
+Se dejan porque **siguen siendo reproducibles**, que es todo el valor de una
+foto: el mismo comando contra `git show 7b3d27dc:<archivo>` devuelve 296 y 202
+clavados. Lo que no son es el presente — hoy dan **765 y 441**, dos veces y
+media, sobre 56 archivos en vez de 28.
+
+⚠️ Y ojo con ese **`8 en scripts/rules_test/`**: es exactamente de donde §1.4
+copió el 8 que quedó podrido hasta que alguien recontó y encontró 14. Si venís a
+verificar §1.4 contra esta sección, estás comparando contra agosto. Los conteos
+vivos están en §1.4; acá hay historia.
 
 Para recontar (los números cambian a medida que se agregan tests):
 
