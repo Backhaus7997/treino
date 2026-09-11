@@ -110,7 +110,25 @@ en `ubuntu-latest`**, no en macOS
 se compila y se ejercita en CI de verdad. Un fixture no es documentación: es la
 única parte de este trabajo que da verificación real sin una Mac.
 
-### Paso 1 — `conformance/catalog_gate.json`
+### Paso 1 — el fixture y la función pura ✅ HECHO
+
+> Quedan hechos: `conformance/catalog_gate.json` (8 casos), su test Dart, y la
+> extracción de `catalogGateBlocks` a
+> [`lib/features/paywall/domain/catalog_gate.dart`](../lib/features/paywall/domain/catalog_gate.dart).
+> **El contrato ya existe y el lado Dart lo cumple.** Lo que sigue es escribir
+> la mitad Swift y cablearla en `conformance/swift/main.swift`.
+>
+> Se agregó además `test/conformance/fixture_coverage_test.dart`, un guard que
+> falla si un fixture no está invocado en el runner Swift — porque ese runner
+> no descubre nada solo y un `.json` olvidado deja el contrato unilateral **en
+> silencio**. `catalog_gate.json` está declarado ahí como deuda consciente, con
+> su motivo.
+>
+> **Sacarlo de esa allowlist es parte de terminar este trabajo.** Cuando lo
+> saques, el guard empieza a exigir el runner Swift por su cuenta.
+
+<details>
+<summary>El contenido del fixture, para referencia (ya está en el repo)</summary>
 
 La regla portada es: **¿este alumno puede entrenar esta plantilla?**
 
@@ -150,7 +168,9 @@ La regla portada es: **¿este alumno puede entrenar esta plantilla?**
 }
 ```
 
-Con su test Dart en `test/conformance/catalog_gate_conformance_test.dart`,
+</details>
+
+El test Dart está en `test/conformance/catalog_gate_conformance_test.dart`,
 copiando el patrón de
 [`routine_selection_conformance_test.dart`](../test/conformance/routine_selection_conformance_test.dart)
 — incluidos los dos guards que ese archivo trae y que valen oro: que el fixture
@@ -158,12 +178,17 @@ apunte a la implementación que el test ejercita, y que **no esté vacío** (*"u
 fixture sin casos hace que la suite pase sin verificar nada — el modo de falla
 más peligroso de este mecanismo"*).
 
-> **Ojo con el lado Dart.** Hoy la lógica vive en `catalogLockActiveProvider`,
-> que es un `Provider` y toma sus entradas de otros providers. Para que el
-> fixture la ejercite hay que extraer la decisión pura a una función —algo como
-> `catalogGateBlocks({required bool enabled, required bool? enforced, required
-> bool? isPremium})`— y que el provider la llame. Es refactor mecánico y sin
-> cambio de comportamiento, pero **es parte del paso 1**, no un extra.
+> **El lado Dart ya está resuelto.** La lógica vivía embebida en
+> `catalogLockActiveProvider`, que es un `Provider` y por lo tanto no se puede
+> ejercitar desde un fixture. Ahora la decisión es `catalogGateBlocks(...)` y el
+> provider la llama con `isPremium: true` fijo — que no es un atajo, es la
+> definición del provider: "el candado está activo" significa exactamente "una
+> plantilla paga le quedaría bloqueada".
+>
+> El puente entre el enum y el tri-estado del contrato es
+> `AthleteEntitlement.paywallEnforced` (`entitled`→false, `free`→true,
+> `unknown`→**null**). Ese `null` es lo que hace que "no se sabe" viaje como tal
+> hasta la decisión, en vez de que cada plataforma elija su propio default.
 
 ### Paso 2 — el dato hasta la pantalla
 

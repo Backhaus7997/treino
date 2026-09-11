@@ -34,6 +34,31 @@ enum AthleteEntitlement {
   /// una cache fría — mucho peor que dejar pasar un tap cuya escritura el
   /// servidor rebota igual. Client-side es UX; server-side es la ley.
   bool get gatesFreeLimits => this == AthleteEntitlement.free;
+
+  /// Este estado, expresado como el tri-estado que comparten las DOS
+  /// implementaciones del gate del catálogo — la de Dart y la de Swift.
+  ///
+  /// Es el puente hacia `catalogGateBlocks`, y existe porque el reloj de Apple
+  /// no resuelve un `AthleteEntitlement`: lee
+  /// `users/{uid}.athletePaywallEnforced` por REST, que puede estar en `true`,
+  /// en `false`, o **ausente**. Los tres valores de este enum mapean uno a uno
+  /// contra esos tres:
+  ///
+  /// | este enum  | `athletePaywallEnforced` | gatea |
+  /// |------------|--------------------------|-------|
+  /// | `entitled` | `false`                  | no    |
+  /// | `free`     | `true`                   | sí    |
+  /// | `unknown`  | **ausente** (`null`)     | no    |
+  ///
+  /// El `null` de `unknown` NO es una conveniencia de tipos: es lo que hace
+  /// que "no se sabe" viaje como tal hasta la decisión, en vez de que cada
+  /// plataforma elija su propio default y diverjan. Ver el dartdoc de
+  /// `catalogGateBlocks`.
+  bool? get paywallEnforced => switch (this) {
+        AthleteEntitlement.entitled => false,
+        AthleteEntitlement.free => true,
+        AthleteEntitlement.unknown => null,
+      };
 }
 
 /// Interruptor maestro del paywall del alumno. **Apagado a propósito.**
