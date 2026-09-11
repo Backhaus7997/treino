@@ -765,7 +765,12 @@ class _DialogoDePublicarState extends State<_DialogoDePublicar> {
     if (alumno == null || alumno.isEmpty) return null;
 
     final enLaRutina = _palabras(_ctrl.text).toSet();
-    for (final palabra in alumno.split(RegExp(r'\s+'))) {
+    // Los DOS lados se parten igual. Partiendo el del alumno sólo por espacios,
+    // un «Ana-María Pérez» daba el token «ana-maria», que no matchea contra
+    // [ana, maria] del lado de la rutina — y el aviso no salía, en silencio,
+    // justo para los nombres compuestos. Vale para el guión, el apóstrofe
+    // («D'Angelo») y el punto.
+    for (final palabra in _separar(alumno)) {
       final plana = _plano(palabra);
       if (plana.length < 3) continue;
       if (enLaRutina.contains(plana)) return palabra;
@@ -775,8 +780,17 @@ class _DialogoDePublicarState extends State<_DialogoDePublicar> {
 
   /// Las palabras de [s], normalizadas: sin acentos, en minúscula y sin nada
   /// que no sea letra o número (para que «Sofía,» y «(Sofía)» cuenten igual).
-  static Iterable<String> _palabras(String s) => _plano(s)
-      .split(RegExp(r'[^a-z0-9]+'))
+  static Iterable<String> _palabras(String s) =>
+      _separar(_plano(s)).map((p) => p);
+
+  /// Parte [s] en palabras SIN normalizar, para conservar el original.
+  ///
+  /// Corta por cualquier cosa que no sea letra o número —espacio, guión,
+  /// apóstrofe, punto—. `unicode: true` con `\p{L}` y no `[a-z]`: acá todavía
+  /// pueden venir acentos, y con una clase ASCII «María» se partiría en «Mar»
+  /// e «a».
+  static Iterable<String> _separar(String s) => s
+      .split(RegExp(r'[^\p{L}\p{N}]+', unicode: true))
       .where((p) => p.isNotEmpty);
 
   static String _plano(String s) {

@@ -189,8 +189,15 @@ romperlo (las encontró Codex en la review):
 - Comparando contra el `displayName` entero, «Sofía García» NO matcheaba «Plan
   de Sofía», que es el caso que esto existe para agarrar.
 
-Se tokenizan los dos lados, se ignoran las palabras de menos de tres letras
-(conectores) y se devuelve la palabra ORIGINAL, que es la que se muestra.
+Se parten los dos lados **con la misma regla** —por cualquier cosa que no sea
+letra o número, así entran el guión y el apóstrofe—, se ignoran las palabras de
+menos de tres letras (conectores) y se devuelve la palabra ORIGINAL, que es la
+que se muestra.
+
+Que los dos lados usen la MISMA regla no es un detalle de estilo: partiendo el
+del alumno sólo por espacios, «Ana-María Pérez» daba el token `ana-maria` y no
+matcheaba contra `[plan, ana, maria]`. El aviso se saltaba en silencio para
+todos los nombres compuestos, y este doc afirmaba que se tokenizaban los dos.
 
 **No se bloquea la publicación.** La review pedía que el diálogo no cierre
 mientras el nombre nombre al alumno. No se hizo: la decisión sigue siendo del PF
@@ -322,8 +329,15 @@ Ordenadas por cuánto tiempo hacen perder.
     heurística se equivoca. Cambiar el LABEL del botón a «Publicar igual» saca
     el camino por reflejo sin trabar a nadie.
 
-13. **Si tu rama crea un documento, fijate qué evento emiten las otras.**
-    `logRoutineCreated` es el evento de TODA rutina nueva —su dartdoc dice que
+13. **Si tu rama crea un documento, fijate qué evento emite su GEMELO.**
+    `logRoutineCreated` quiere contar toda rutina nueva —su dartdoc dice que
     las del PF se cuentan igual, «omitirlas dejaría el evento ciego a la mitad
-    de las rutinas»— y el camino nuevo no lo emitía. Va con el `source` de lo
-    que se ESCRIBIÓ, no de la pantalla.
+    de las rutinas»— y en `routines` faltaba en DOS caminos del Coach Hub web:
+    la plantilla de §4.3 y, desde #1091, la asignación desde el ⋮. Las dos
+    tenían gemelo en mobile que sí lo emitía (`trainer_workout_view.dart`), así
+    que las mismas operaciones se contaban desde el teléfono y no desde la web
+    — el peor caso para un número que se compara entre superficies.
+
+    Va con el `source` de lo que se ESCRIBIÓ, no de la pantalla. Y el criterio
+    para saber si falta es comparar con la pantalla equivalente de mobile, no
+    razonarlo: los dos huecos se encontraron así.

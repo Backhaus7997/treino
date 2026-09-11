@@ -557,6 +557,22 @@ void _menuDeRutinasTests() {
           findsNothing);
     });
 
+    // El nombre compuesto. Partiendo el lado del alumno sólo por espacios,
+    // «Ana-María Pérez» daba el token «ana-maria» y no matcheaba contra
+    // [plan, ana, maria] — el aviso se saltaba EN SILENCIO justo para los
+    // nombres con guión. Y el doc afirmaba que los dos lados se tokenizaban.
+    testWidgets('un nombre con guión también se detecta', (tester) async {
+      await abrirDialogo(
+        tester,
+        nombreRutina: 'Plan Ana-María',
+        displayName: 'Ana-María Pérez',
+      );
+
+      expect(find.byKey(const Key('publicar_aviso_nombre_alumno')),
+          findsOneWidget);
+      expect(find.text('Ojo: dice «Ana».'), findsOneWidget);
+    });
+
     testWidgets('sin nombre del alumno resuelto NO inventa una sospecha',
         (tester) async {
       // El perfil puede no haber cargado. «No sé» no es «está limpio», pero

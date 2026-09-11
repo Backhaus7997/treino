@@ -360,6 +360,32 @@ void main() {
       expect(listCalls, 1);
     });
 
+    // Faltaba sólo del lado WEB: el gemelo de mobile
+    // (`trainer_workout_view.dart`) ya lo emitía con el mismo `source`. Las
+    // asignaciones hechas desde el Coach Hub desaparecían de la medición
+    // mientras las del teléfono se contaban — el peor caso para un número que
+    // se compara entre superficies.
+    test('cuenta la copia asignada como routine_created', () async {
+      when(() => mockRepo.assignTemplateToAthlete(
+            template: any(named: 'template'),
+            athleteId: any(named: 'athleteId'),
+          )).thenAnswer((_) async => plantilla);
+
+      final container = makeContainer();
+      addTearDown(container.dispose);
+
+      await container.read(routineActionsProvider.notifier).assignTemplate(
+            template: plantilla,
+            athleteId: _athleteId,
+            trainerId: _trainerId,
+          );
+
+      final params = analytics.paramsOf('routine_created').single;
+      // `trainer_assigned`: lo que se escribió es la copia del alumno, no una
+      // plantilla. La plantilla no se toca.
+      expect(params['source'], 'trainer_assigned');
+    });
+
     test('si el repo falla devuelve false y no rompe', () async {
       when(() => mockRepo.assignTemplateToAthlete(
             template: any(named: 'template'),
