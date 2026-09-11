@@ -119,8 +119,8 @@ class _Item extends StatelessWidget {
     final color = !action.enabled
         ? palette.textFaint
         : action.danger
-        ? palette.danger
-        : palette.textPrimary;
+            ? palette.danger
+            : palette.textPrimary;
 
     return Semantics(
       button: true,

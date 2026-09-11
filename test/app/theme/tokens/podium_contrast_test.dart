@@ -95,7 +95,8 @@ void main() {
         }
       });
 
-      test('ninguno colisiona con textMuted, que es el color del 4º en adelante',
+      test(
+          'ninguno colisiona con textMuted, que es el color del 4º en adelante',
           () {
         for (final medal in medals.entries) {
           expect(medal.value, isNot(p.textMuted));

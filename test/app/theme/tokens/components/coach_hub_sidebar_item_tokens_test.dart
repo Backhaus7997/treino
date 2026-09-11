@@ -118,8 +118,7 @@ void main() {
   });
 
   group('CoachHubSidebarItemTokens — light (mintMagentaLight)', () {
-    testWidgets('activeBackground == acento al 16% (light)',
-        (tester) async {
+    testWidgets('activeBackground == acento al 16% (light)', (tester) async {
       late Color value;
       await tester.pumpWidget(_withTheme(
         palette: AppPalette.mintMagentaLight,

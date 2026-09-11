@@ -17,7 +17,8 @@ void main() {
     // sembraría una invitación fantasma.
     for (final q in ['to=agenda', 'to=solicitudes', 'to=facturacion']) {
       expect(
-        trainerIdDeInvitacion(Uri.parse('https://app.gettreino.com/abrir/profe?$q')),
+        trainerIdDeInvitacion(
+            Uri.parse('https://app.gettreino.com/abrir/profe?$q')),
         isNull,
         reason: q,
       );
@@ -45,7 +46,8 @@ void main() {
   });
 
   test('una URL sin query tampoco', () {
-    expect(trainerIdDeInvitacion(Uri.parse('https://app.gettreino.com/')), isNull);
+    expect(
+        trainerIdDeInvitacion(Uri.parse('https://app.gettreino.com/')), isNull);
     expect(trainerIdDeInvitacion(Uri.parse('/home')), isNull);
   });
 }

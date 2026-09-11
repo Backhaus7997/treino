@@ -525,7 +525,9 @@ void main() {
       final container = makeContainer();
       addTearDown(container.dispose);
 
-      await container.read(routineActionsProvider.notifier).publicarComoPlantilla(
+      await container
+          .read(routineActionsProvider.notifier)
+          .publicarComoPlantilla(
             plan: plan,
             nombre: 'Fuerza',
             trainerId: _trainerId,
@@ -546,7 +548,9 @@ void main() {
       final container = makeContainer();
       addTearDown(container.dispose);
 
-      await container.read(routineActionsProvider.notifier).publicarComoPlantilla(
+      await container
+          .read(routineActionsProvider.notifier)
+          .publicarComoPlantilla(
             plan: plan,
             nombre: 'Fuerza',
             trainerId: _trainerId,
@@ -561,7 +565,9 @@ void main() {
       final container = makeContainer();
       addTearDown(container.dispose);
 
-      await container.read(routineActionsProvider.notifier).publicarComoPlantilla(
+      await container
+          .read(routineActionsProvider.notifier)
+          .publicarComoPlantilla(
             plan: plan,
             nombre: 'Fuerza',
             trainerId: _trainerId,

@@ -147,8 +147,7 @@ class DashboardKpiStrip extends ConsumerWidget {
       builder: (ctx, constraints) {
         const separacion = AppSpacing.s12;
         final huecos = separacion * (cards.length - 1);
-        final anchoPorCard =
-            (constraints.maxWidth - huecos) / cards.length;
+        final anchoPorCard = (constraints.maxWidth - huecos) / cards.length;
 
         if (anchoPorCard >= _anchoMinimoCard) {
           return Row(

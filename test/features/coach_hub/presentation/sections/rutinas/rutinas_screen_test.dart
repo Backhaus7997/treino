@@ -139,8 +139,7 @@ void main() {
       expect(find.textContaining('Todavía no creaste'), findsNothing);
     });
 
-    testWidgets('si falla lo DICE, no muestra una lista vacía',
-        (tester) async {
+    testWidgets('si falla lo DICE, no muestra una lista vacía', (tester) async {
       // Un error servido como «no tenés rutinas» sería una afirmación falsa
       // sobre el trabajo del PF (AGENTS.md §11.1).
       await _pump(tester, error: Exception('boom'));
@@ -166,8 +165,7 @@ void main() {
       expect(find.text('Fuerza para principiantes'), findsOneWidget);
     });
 
-    testWidgets('el subtítulo ya no habla de elegir un alumno',
-        (tester) async {
+    testWidgets('el subtítulo ya no habla de elegir un alumno', (tester) async {
       await _pump(tester, rutinas: _mezcla());
       expect(find.textContaining('Elegí un alumno'), findsNothing);
     });

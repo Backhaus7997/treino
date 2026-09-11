@@ -114,6 +114,30 @@ jobs:
       - name: Analyze
         run: flutter analyze --no-fatal-warnings --no-fatal-infos
 
+      # El quality gate #2 del template de PR (`dart format .`), hecho cumplir.
+      #
+      # Iba en el template y en AGENTS.md §7 desde siempre, pero NINGÚN job lo
+      # verificaba: `flutter analyze` no mira formato. Honor system, y terminó
+      # como terminan los honor systems — el 2026-09-11 había 44 archivos sin
+      # formatear en `main`.
+      #
+      # El costo de eso no es estético. `dart format` sobre un archivo sucio
+      # mete hunks que no son tuyos: en `routine_editor_screen.dart` eran 14, y
+      # uno rompía un lint (partía un `if (...) return; // comentario` en dos
+      # líneas sin llaves). O sea que el dev que SÍ corría el gate se llevaba un
+      # diff ajeno y un CI rojo, y el que no lo corría no pagaba nada. El
+      # incentivo estaba exactamente al revés.
+      #
+      # Va DESPUÉS de `analyze` a propósito: si los dos fallan, el dev ve
+      # primero los problemas reales y después el mecánico.
+      - name: Format
+        run: |
+          if ! dart format --output=none --set-exit-if-changed . ; then
+            echo ""
+            echo "::error::Hay archivos sin formatear. Corré 'dart format .' y commiteá."
+            exit 1
+          fi
+
   test:
     name: Test (shard ${{ matrix.shard }})
     runs-on: ubuntu-latest

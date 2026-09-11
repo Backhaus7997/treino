@@ -240,8 +240,7 @@ void main() {
       final container = makeContainer(repo);
       addTearDown(container.dispose);
 
-      final sub =
-          container.listen(routinesAuthoredByProvider(''), (_, __) {});
+      final sub = container.listen(routinesAuthoredByProvider(''), (_, __) {});
       addTearDown(sub.close);
 
       await Future<void>.delayed(Duration.zero);

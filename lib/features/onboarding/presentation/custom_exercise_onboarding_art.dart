@@ -44,8 +44,7 @@ class CustomExerciseOnboardingArt extends StatelessWidget {
   const CustomExerciseOnboardingArt.library() : this._(_Variant.library);
 
   /// Slide 4 — one-line entry converted into a complete prescription.
-  const CustomExerciseOnboardingArt.quickEntry()
-      : this._(_Variant.quickEntry);
+  const CustomExerciseOnboardingArt.quickEntry() : this._(_Variant.quickEntry);
 
   /// Slide 5 — a routine row being moved by its drag handle.
   const CustomExerciseOnboardingArt.drag() : this._(_Variant.drag);
@@ -135,7 +134,9 @@ class _ArtHeader extends StatelessWidget {
         Text(
           switch (variant) {
             _Variant.form || _Variant.video => 'NUEVO EJERCICIO',
-            _Variant.library || _Variant.drag || _Variant.menu =>
+            _Variant.library ||
+            _Variant.drag ||
+            _Variant.menu =>
               'EDITOR DE RUTINA',
             _Variant.quickEntry => 'ENTRADA RÁPIDA',
           }, // i18n

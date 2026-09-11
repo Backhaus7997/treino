@@ -54,8 +54,7 @@ void main() {
         expect(tema.hoverColor.a, greaterThan(0));
       });
 
-      test('$nombre: el thumb del scrollbar sale de la paleta y se aclara',
-          () {
+      test('$nombre: el thumb del scrollbar sale de la paleta y se aclara', () {
         // En el sidebar aparecía como una píldora gris oscura flotando al
         // costado de los items, sin relación con nada.
         final thumb = tema.scrollbarTheme.thumbColor;

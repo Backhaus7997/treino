@@ -212,3 +212,13 @@ export { mpWebhook } from "./subscriptions/mp/webhook";
 //   firebase functions:secrets:set RC_WEBHOOK_SECRET  --project prod
 //   RC_PROJECT_ID=proj...  (no es secreto)
 export { rcWebhook } from "./subscriptions/rc/webhook";
+
+// Un UUID v4 por usuario, que HOY NO SE USA PARA NADA. Es un seguro: el dia
+// que se le hable directo a las tiendas hace falta un token propio para saber
+// a quien acreditarle una compra —Google no manda ningun identificador de
+// usuario y Apple consulta por transactionId— y `appAccountToken` TIENE que
+// ser un UUID, cosa que el uid de Firebase no es.
+//
+// Su valor es retroactivo: el dia que haga falta se necesita para todo el que
+// YA compro. Por eso se emite desde hoy. Ver el encabezado del archivo.
+export { ensureStoreAccountToken } from "./subscriptions/store-account-token";

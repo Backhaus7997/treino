@@ -264,9 +264,11 @@ void main() {
       // Una PANTALLA no deberia entrar nunca a esta lista: tiene que llamar a
       // este archivo, no hablarle al SDK por su cuenta. Si estas por agregar
       // una, ese es el olor.
-      'lib/features/paywall/application/athlete_checkout.dart':
-          'la capacidad de comprar del alumno: `start` es el unico camino a un '
-              'cobro del alumno en toda la app, y el uid entra por su firma',
+      'lib/features/paywall/application/revenuecat_store.dart':
+          'EL UNICO archivo de lib/ que le habla a RevenueCat. Todo lo que hay '
+              'adentro es traduccion: del SDK a nuestros tipos, y de sus '
+              'codigos de error a AthleteStoreFalla. Si aparece una decision '
+              'de producto ahi, esta en el lugar equivocado',
     };
 
     test('la lista de archivos que compran es exactamente la declarada', () {

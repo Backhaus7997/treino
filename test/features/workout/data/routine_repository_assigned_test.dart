@@ -43,6 +43,7 @@ void main() {
     String source = 'trainer-assigned',
     String visibility = 'private',
     Timestamp? createdAt,
+
     /// `null` = el documento NO trae el campo, que es la forma de los docs
     /// anteriores a Fase 6 y el caso que este filtro no puede romper.
     String? status,

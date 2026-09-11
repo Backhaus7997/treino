@@ -503,9 +503,8 @@ class RoutineRepository {
   Future<List<Routine>> listAuthoredBy(String trainerId) async {
     if (trainerId.isEmpty) return const [];
 
-    final snap = await _collection
-        .where('assignedBy', isEqualTo: trainerId)
-        .get();
+    final snap =
+        await _collection.where('assignedBy', isEqualTo: trainerId).get();
 
     // `is Timestamp` y no un cast: un solo doc con `createdAt` de otra forma
     // —un import viejo que lo dejó como String— tiraría `TypeError` y se
