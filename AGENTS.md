@@ -334,8 +334,9 @@ bookmarks y notificaciones vivas apuntándoles. No lo confundas con
 - PR con **1+ approve**, **squash and merge**, branch auto-delete.
 - Cambios no triviales → ciclo SDD vía gentle-ai (`/sdd-new <name>`).
 - Si modificás `AGENTS.md` o algo en `docs/` → reviewer aprueba **explícitamente** la modificación de las reglas.
-- **Después de todo rebase y antes de todo force-push**, por cada archivo del diff:
-  `diff <(git show origin/main:ARCHIVO) ARCHIVO | rg '^<'` — ver §11.
+- **Después de todo rebase y antes de todo force-push**:
+  `git diff origin/main HEAD | rg '^-[^-]'` — ver §11.2, que explica por qué NO va con
+  `diff` a secas (en Windows reporta el archivo entero como borrado).
 
 → Detalle en [docs/workflow.md](./docs/workflow.md).
 
@@ -438,16 +439,46 @@ Pasó con `scripts/README.md`: el rebase lo auto-mergeó sin conflicto y el resu
 reintroducía, palabra por palabra, las afirmaciones falsas que el PR pisado existía
 para corregir.
 
-**El chequeo, obligatorio antes de todo force-push post-rebase**, por cada archivo del
-diff:
+**El chequeo, obligatorio antes de todo force-push post-rebase.** Compara tu rama contra
+`main` y lista lo que estás sacando:
 
 ```bash
-diff <(git show origin/main:ARCHIVO) ARCHIVO | rg '^<'
+git diff origin/main HEAD | rg '^-[^-]'
 ```
 
 - Salida vacía → tu cambio es **aditivo**. Seguí.
 - Cualquier salida → estás **borrando** algo que está en `main`. Que sea a propósito, y
-  que quede escrito en el mensaje del commit por qué.
+  que quede escrito en el mensaje del commit por qué. El header de cada hunk (`--- a/…`)
+  dice de qué archivo es cada línea.
+
+### ⚠️ Por qué NO se usa `diff` a secas
+
+Este chequeo vivió escrito como `diff <(git show origin/main:ARCHIVO) ARCHIVO | rg '^<'`,
+por archivo. **En Windows eso da un falso positivo total**, y el modo de falla es el peor
+posible para una verificación: grita en TODOS los archivos, todo el tiempo.
+
+El motivo es `core.autocrlf=true`, que es la configuración normal de este repo en Windows.
+Git deja los archivos del working tree en **CRLF** —después de un `checkout`, un `reset`,
+un `stash pop` o, justamente, un **rebase**— mientras que `git show` escribe el blob a un
+pipe en **LF**. `diff` compara las dos cosas byte a byte, ve todas las líneas distintas, y
+reporta el archivo entero como borrado.
+
+Medido el 2026-09-11 sobre un archivo cuyo contenido no había cambiado: **69 líneas**
+"borradas" con `diff`, **0** con `git diff`. En otro, **222** sobre un cambio real de 2.
+
+Y aparece justo donde este chequeo se aplica: post-rebase los archivos vienen de git, o
+sea CRLF. Lo hace parecer inofensivo que NO falle cuando el archivo lo escribió otra
+herramienta (un script, un editor con LF) — así que el mismo comando miente o no según
+quién tocó el archivo por última vez, que es lo peor de los dos mundos.
+
+`git diff` no tiene el problema porque aplica las reglas de fin de línea del repo en vez
+de comparar bytes crudos. Si por algún motivo necesitás la forma con `diff`, va con
+`--strip-trailing-cr` —medido, también da 0— pero preferí `git diff`: no depende de qué
+implementación de `diff` tengas en el PATH.
+
+Es el mismo principio de §11.1, del otro lado: una advertencia falsa desactiva la
+sospecha, y una que grita siempre entrena a ignorarla. Las dos terminan igual — el día
+que el chequeo tenga algo real que decir, nadie lo va a estar mirando.
 
 ## Setup desde una máquina nueva
 
