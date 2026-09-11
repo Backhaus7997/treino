@@ -154,12 +154,20 @@ export async function runPromoteChatToInquiry(
 }
 
 export const promoteChatToInquiry = functions.onCall(
-  // CON enforceAppCheck, a diferencia de acceptTrainerLink: aquella está
-  // exenta porque el Coach Hub WEB la llama y el web no activa App Check
-  // (`main.dart` lo envuelve en `!kIsWeb`). Esta la llama SÓLO la app mobile
-  // del alumno — `TrainerInquiryCta` vive en `trainer_public_profile_screen`,
-  // que no está en el árbol del target web (`main_coach_hub.dart`).
-  { region: "southamerica-east1", enforceAppCheck: true },
+  // SIN enforceAppCheck, y NO por la razón de acceptTrainerLink. Ésta la llama
+  // sólo la app mobile del alumno, que sí activa App Check — así que por
+  // plataforma el flag correspondería.
+  //
+  // No va porque la atestación de esta app no funciona. La medición ancha del
+  // #961 (24 días, 6 callables, 159 verificaciones) encontró `acceptTrainerLink`
+  // y `requestPasswordReset` en CERO atestaciones válidas, y `mintWatchCredential`
+  // en 53%. Con el flag puesto, CONSULTAR no fallaría "a veces": fallaría casi
+  // siempre. Es la historia de `deleteAccount` (#811), que tuvo el flag un mes y
+  // en ese lapso el borrado de cuenta no funcionó nunca.
+  //
+  // Un flag que convierte un botón en un error permanente no da seguridad, da
+  // un botón roto (PR #704). Ver la entrada de este callable en EXEMPTIONS.
+  { region: "southamerica-east1" },
   async (request): Promise<PromoteChatToInquiryResult> => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Authentication required.");

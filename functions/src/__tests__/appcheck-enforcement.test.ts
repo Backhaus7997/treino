@@ -82,6 +82,37 @@ const EXEMPTIONS: Readonly<Record<string, Exemption>> = {
       "jsonPayload.verifications.app y pedir cero INVALID por plataforma " +
       "antes de volver a poner el flag.",
   },
+  "chat/promote-chat-to-inquiry:promoteChatToInquiry": {
+    // `debt` y no `decided`: a diferencia de los tres del Coach Hub web, acá
+    // NO hay un impedimento de plataforma. La app del alumno activa App Check
+    // (main.dart, dentro del `!kIsWeb`). Lo unico que falta es que la
+    // atestacion funcione, y eso queremos revertirlo.
+    permanence: "debt",
+    reason:
+      "La llama SOLO la app mobile del alumno (TrainerInquiryCta vive en " +
+      "trainer_public_profile_screen, fuera del arbol del target web), asi que " +
+      "por plataforma el flag corresponderia. No va porque la atestacion de " +
+      "esta app no funciona: la medicion ancha del #961 (24 dias, 6 callables, " +
+      "159 verificaciones) encontro acceptTrainerLink y requestPasswordReset " +
+      "en CERO validas y mintWatchCredential en 53%. Con el flag, CONSULTAR no " +
+      "fallaria a veces: fallaria casi siempre — la historia de deleteAccount " +
+      "(#811) otra vez. " +
+      "La superficie de abuso queda acotada por diseño, no por atestacion: el " +
+      "uid sale del token, el chatId se DERIVA de ese uid y del trainerId (no " +
+      "se acepta del cliente), el unico campo que escribe es kind:'inquiry' " +
+      "sobre un chat que ya existe y del que el llamador es miembro, y exige " +
+      "los MISMOS tres hechos que chatCreateOk valida al crear. O sea que un " +
+      "llamador autenticado solo puede llegar al estado al que ya habria " +
+      "llegado abriendo la consulta por la via normal. " +
+      "Ver promote-chat-to-inquiry.ts.",
+    exitCondition:
+      "El mismo del resto del inventario: que el cliente emita atestacion " +
+      "valida. Como este callable es mobile-only, no depende del App Check del " +
+      "Coach Hub web — le alcanza con que iOS y Android atestiguen. Contar " +
+      "sobre jsonPayload.verifications.app con el filtro ANCHO del #961 (no el " +
+      "angosto del §4.8.2, que mide un callable y un dia) y pedir cero INVALID " +
+      "por plataforma antes de poner el flag.",
+  },
   "subscriptions/accept-trainer-link:acceptTrainerLink": {
     permanence: "decided",
     reason:
@@ -315,7 +346,7 @@ describe("QA-SEC-016: el guard falla cuando tiene que fallar", () => {
       module: "chat/promote-chat-to-inquiry",
       symbol: "promoteChatToInquiry",
       as: "promoteChatToInquiry",
-      attested: true,
+      attested: false,
     },
     {
       module: "subscriptions/accept-trainer-link",
