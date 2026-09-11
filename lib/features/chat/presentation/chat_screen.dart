@@ -193,19 +193,35 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     // escape el entrenador perdería el composer aunque el servidor se lo
     // permita.
     //
-    // `valueOrNull` en vez de bloquear con el AsyncValue: mientras carga se
-    // asume que SÍ puede escribir. Un falso positivo momentáneo termina en un
-    // `permission-denied` recuperable; un falso negativo le tapa el composer a
-    // alguien que sí puede, en cada apertura de chat.
-    final chat = ref.watch(chatByIdProvider(widget.chatId)).valueOrNull;
+    // Mientras carga se asume que SÍ puede escribir. Un falso positivo
+    // momentáneo termina en un `permission-denied` recuperable; un falso
+    // negativo le tapa el composer a alguien que sí puede, en cada apertura
+    // de chat.
+    //
+    // Eso es lo que este comentario prometía y lo que el código hacía al
+    // revés. `valueOrNull` sobre un `AsyncLoading` da null, así que
+    // `isCoachChat` daba false, `chat?.isInquiry == true` daba false y
+    // `incomingEdge?.status` daba null: los tres términos en false y el
+    // composer gris con el cartel de "esta persona tiene que seguirte" en
+    // CADA entrada al chat. La única escapatoria era `currentUid == null`,
+    // que es justo el caso que no le importa a nadie.
+    //
+    // Y no era un edge case de cold start: los dos providers son
+    // `autoDispose` sin `keepAlive`, así que salir de la pantalla los
+    // destruye y cada `ChatScreen` nuevo vuelve a arrancar en `AsyncLoading`.
+    final chatAsync = ref.watch(chatByIdProvider(widget.chatId));
+    final chat = chatAsync.valueOrNull;
     final isCoachChat = chat?.linkId != null;
-    final incomingEdge = currentUid == null
+    final edgeAsync = currentUid == null
         ? null
-        : ref
-            .watch(followEdgeProvider(
-              Follow.edgeId(widget.otherUid, currentUid),
-            ))
-            .valueOrNull;
+        : ref.watch(followEdgeProvider(
+            Follow.edgeId(widget.otherUid, currentUid),
+          ));
+    final incomingEdge = edgeAsync?.valueOrNull;
+    // "Ya sé la respuesta", no "la respuesta es que no". `hasValue` es false
+    // mientras carga Y ante un error sin valor previo: en los dos casos no
+    // sabemos, y no saber no puede leerse como una negativa.
+    final gateResuelto = chatAsync.hasValue && (edgeAsync?.hasValue ?? true);
     // Las TRES ramas por las que escapa `senderMayPost` en las reglas
     // (`firestore.rules`): vínculo, pre-consulta, y arista social aceptada.
     //
@@ -214,7 +230,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     // alguien a quien Firestore le habría aceptado el mensaje. Justo el caso
     // que motiva la feature — consultarle algo a un entrenador ANTES de
     // pedirle el vínculo—, que sin escribir no existe.
-    final canWrite = isCoachChat ||
+    final canWrite = !gateResuelto ||
+        isCoachChat ||
         chat?.isInquiry == true ||
         incomingEdge?.status == FollowStatus.accepted ||
         currentUid == null;

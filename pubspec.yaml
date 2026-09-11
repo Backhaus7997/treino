@@ -114,6 +114,12 @@ dev_dependencies:
   # `flutter analyze` tiraba 15 issues sobre código que en realidad está bien.
   integration_test:
     sdk: flutter
+  # Mismo caso que `integration_test` de arriba: llegaba como transitiva de
+  # `flutter_test`, así que el import resolvía pero `flutter analyze` tiraba
+  # `depend_on_referenced_packages`. Lo usa el test de la espera acotada de
+  # `currentAthleteLinkProvider`, que necesita adelantar 8 y 20 segundos de
+  # tiempo virtual sin esperarlos de verdad.
+  fake_async: ^1.3.3
   flutter_lints: ^4.0.0
   build_runner: ^2.4.13
   freezed: ^2.5.7

@@ -111,7 +111,7 @@ void main() {
       await tester.pumpWidget(_wrap(
         const TrainerContactCtaStub(trainerId: 'trainer-1'),
         overrides: [
-          currentAthleteLinkProvider.overrideWith((ref) async => null),
+          currentAthleteLinkProvider.overrideWith((ref) => Stream.value(null)),
         ],
       ));
       await tester.pumpAndSettle();
@@ -127,9 +127,9 @@ void main() {
       await tester.pumpWidget(_wrap(
         const TrainerContactCtaStub(trainerId: 'trainer-1'),
         overrides: [
-          currentAthleteLinkProvider.overrideWith((ref) async {
+          currentAthleteLinkProvider.overrideWith((ref) {
             // Vínculo activo con OTRO trainer (no el de esta pantalla)
-            return null;
+            return Stream.value(null);
           }),
         ],
       ));

@@ -920,6 +920,30 @@ abstract class AppL10n {
   /// **'Necesitás un vínculo activo con un PF para ver tu plan nutricional.'**
   String get athleteNutritionNeedsActiveLink;
 
+  /// Gate de las rutas que necesitan un vínculo activo (agenda, nutrición). Dice NO ENCONTRAMOS y no NO TENÉS a propósito: el provider emite lo mismo cuando el servidor contesta que no hay vínculo y cuando se agota la espera sin llegar al servidor, y afirmar la segunda como la primera sería una advertencia falsa.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No encontramos un vínculo activo con un PF.'**
+  String get athleteLinkRequired;
+
+  /// Gate de vínculo cuando el servidor no contestó a tiempo. Es una causa DISTINTA de athleteLinkRequired: allá el servidor dijo que no hay vínculo, acá no pudimos preguntarle. Mezclarlas fue el bug que este gate existe para no repetir.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos confirmar tu vínculo con tu PF.'**
+  String get athleteLinkUnconfirmed;
+
+  /// Botón del gate de vínculo: invalida el provider y vuelve a preguntar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Reintentar'**
+  String get athleteLinkRequiredRetry;
+
+  /// Gate de las rutas de alumno cuando falta el uid. Es una causa DISTINTA de no tener vínculo, y antes las dos mostraban el mismo cartel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu sesión se cerró. Volvé a entrar.'**
+  String get athleteSessionMissing;
+
   /// Título de la pantalla de archivos compartidos con el alumno.
   ///
   /// In es_AR, this message translates to:

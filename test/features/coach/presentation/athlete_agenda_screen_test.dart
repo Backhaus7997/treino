@@ -66,7 +66,7 @@ void main() {
           ProviderScope(
             overrides: [
               currentAthleteLinkProvider
-                  .overrideWith((ref) async => _makeLink()),
+                  .overrideWith((ref) => Stream.value(_makeLink())),
               appointmentsForAthleteStreamProvider('athlete-1').overrideWith(
                 (ref) => Stream.value([]),
               ),
@@ -109,7 +109,7 @@ void main() {
           ProviderScope(
             overrides: [
               currentAthleteLinkProvider
-                  .overrideWith((ref) async => _makeLink()),
+                  .overrideWith((ref) => Stream.value(_makeLink())),
               appointmentsForAthleteStreamProvider('athlete-1').overrideWith(
                 (ref) => Stream.value([]),
               ),
@@ -172,7 +172,7 @@ void main() {
           ProviderScope(
             overrides: [
               currentAthleteLinkProvider
-                  .overrideWith((ref) async => _makeLink()),
+                  .overrideWith((ref) => Stream.value(_makeLink())),
               appointmentsForAthleteStreamProvider('athlete-1').overrideWith(
                 (ref) => Stream.value(appointments),
               ),
@@ -229,7 +229,7 @@ void main() {
           ProviderScope(
             overrides: [
               currentAthleteLinkProvider
-                  .overrideWith((ref) async => _makeLink()),
+                  .overrideWith((ref) => Stream.value(_makeLink())),
               appointmentsForAthleteStreamProvider('athlete-1').overrideWith(
                 (ref) => Stream.value(appointments),
               ),
@@ -282,7 +282,7 @@ void main() {
           ProviderScope(
             overrides: [
               currentAthleteLinkProvider
-                  .overrideWith((ref) async => _makeLink()),
+                  .overrideWith((ref) => Stream.value(_makeLink())),
               appointmentsForAthleteStreamProvider('athlete-1').overrideWith(
                 (ref) => Stream.value([appt]),
               ),
@@ -327,7 +327,7 @@ void main() {
           ProviderScope(
             overrides: [
               currentAthleteLinkProvider
-                  .overrideWith((ref) async => _makeLink()),
+                  .overrideWith((ref) => Stream.value(_makeLink())),
               appointmentsForAthleteStreamProvider('athlete-1').overrideWith(
                 (ref) => Stream.value([]),
               ),

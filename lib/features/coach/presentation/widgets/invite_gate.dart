@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -7,6 +9,7 @@ import '../../application/pending_invite_providers.dart';
 import '../../data/pending_invite_store.dart';
 import '../../application/trainer_link_providers.dart';
 import '../../domain/invite_outcome.dart';
+import '../../domain/trainer_link.dart';
 import 'invite_dialog.dart';
 
 /// Widget invisible que aplica una invitación pendiente, una vez, apenas hay
@@ -129,8 +132,23 @@ class _InviteGateState extends ConsumerState<InviteGate> {
         trainerId: uid,
       );
     } else {
-      final vinculo =
-          await ref.read(currentAthleteLinkAnyStatusProvider.future);
+      final TrainerLink? vinculo;
+      try {
+        // El provider se queda en `AsyncLoading` mientras no llegue el
+        // servidor, a propósito: un `AsyncData(null)` significa "no tenés
+        // vínculo", nunca "no pudimos preguntar". Pero esto corre adentro de un
+        // handler, así que acota la espera acá.
+        vinculo = await ref
+            .read(currentAthleteLinkAnyStatusProvider.future)
+            .timeout(kEsperaDelServidorDeVinculo);
+      } on TimeoutException {
+        // Resolver con `null` haría que `resolveInvite` le mande una solicitud
+        // a un PF con el que el alumno quizás YA está vinculado. Soltamos el
+        // latch y dejamos la invitación guardada: el próximo arranque
+        // reintenta.
+        _resueltaPara = null;
+        return;
+      }
       if (!mounted) return;
       outcome = resolveInvite(
         inviteTrainerId: trainerId,

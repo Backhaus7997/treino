@@ -115,6 +115,12 @@ export { acceptTrainerLink } from "./subscriptions/accept-trainer-link";
 // so pause 2 / accept 1 / resume 2 lands over the limit unseen. Both
 // weight-raising transitions have to live behind the gate.
 export { resumeTrainerLink } from "./subscriptions/resume-trainer-link";
+// #637 (secuela): la marca de pre-consulta sólo se estampaba al CREAR el chat,
+// y `firestore.rules` la tiene pineada como inmutable. Un chat social que ya
+// existía entre el alumno y el PF dejaba al alumno sin poder escribirle NUNCA
+// MÁS. El Admin SDK no pasa por rules, así que valida los mismos tres hechos
+// que `chatCreateOk` y estampa — sin relajar el pin del cliente.
+export { promoteChatToInquiry } from "./chat/promote-chat-to-inquiry";
 // Paywall Fase 7 (downgrade): reconcilian `entitlement` cuando el PF queda
 // por encima de su limite. Hacen falta LOS DOS — el trigger ve los cambios de
 // suscripcion al instante, y el barrido ve lo que ningun trigger puede ver:

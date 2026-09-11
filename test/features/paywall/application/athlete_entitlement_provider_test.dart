@@ -48,7 +48,7 @@ Future<ProviderContainer> _containerWith({
     overrides: [
       firestoreProvider.overrideWithValue(firestore),
       currentUidProvider.overrideWithValue(_uid),
-      currentAthleteLinkProvider.overrideWith((ref) async => link),
+      currentAthleteLinkProvider.overrideWith((ref) => Stream.value(link)),
     ],
   );
   addTearDown(container.dispose);
@@ -110,8 +110,8 @@ void main() {
           firestoreProvider.overrideWithValue(firestore),
           currentUidProvider.overrideWithValue(_uid),
           // Nunca completa: modela el read en vuelo.
-          currentAthleteLinkProvider
-              .overrideWith((ref) => Completer<TrainerLink?>().future),
+          currentAthleteLinkProvider.overrideWith(
+              (ref) => Completer<TrainerLink?>().future.asStream()),
         ],
       );
       addTearDown(container.dispose);
@@ -129,7 +129,7 @@ void main() {
         overrides: [
           firestoreProvider.overrideWithValue(FakeFirebaseFirestore()),
           currentUidProvider.overrideWithValue(null),
-          currentAthleteLinkProvider.overrideWith((ref) async => null),
+          currentAthleteLinkProvider.overrideWith((ref) => Stream.value(null)),
         ],
       );
       addTearDown(container.dispose);

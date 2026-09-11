@@ -53,8 +53,8 @@ Widget _wrap({TrainerLink? existingLink}) => ProviderScope(
         // El stub lee el provider ANY-STATUS: es el que hace que un `pending`
         // con otro PF deshabilite el botón (QA-COA-001).
         currentAthleteLinkAnyStatusProvider
-            .overrideWith((ref) async => existingLink),
-        currentAthleteLinkProvider.overrideWith((ref) async => null),
+            .overrideWith((ref) => Stream.value(existingLink)),
+        currentAthleteLinkProvider.overrideWith((ref) => Stream.value(null)),
         trainerReviewsProvider(_trainerUid)
             .overrideWith((ref) => Stream.value(const [])),
       ],

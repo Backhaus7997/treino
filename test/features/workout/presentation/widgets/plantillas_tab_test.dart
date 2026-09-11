@@ -69,7 +69,7 @@ Widget _wrap(
 }) =>
     ProviderScope(
       overrides: [
-        currentAthleteLinkProvider.overrideWith((ref) async => link),
+        currentAthleteLinkProvider.overrideWith((ref) => Stream.value(link)),
         ...overrides,
       ],
       child: MaterialApp(
@@ -128,7 +128,7 @@ void main() {
         (tester) async {
       final container = ProviderContainer(
         overrides: [
-          currentAthleteLinkProvider.overrideWith((ref) async => null),
+          currentAthleteLinkProvider.overrideWith((ref) => Stream.value(null)),
           routinesProvider.overrideWith((ref) async => []),
         ],
       );
@@ -462,7 +462,8 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            currentAthleteLinkProvider.overrideWith((ref) async => makeLink()),
+            currentAthleteLinkProvider
+                .overrideWith((ref) => Stream.value(makeLink())),
             routinesProvider.overrideWith((ref) async => catalog),
             ...coachOverrides(coach),
           ],

@@ -459,6 +459,20 @@ class AppL10nEs extends AppL10n {
       'Necesitás un vínculo activo con un PF para ver tu plan nutricional.';
 
   @override
+  String get athleteLinkRequired =>
+      'No encontramos un vínculo activo con un PF.';
+
+  @override
+  String get athleteLinkUnconfirmed =>
+      'No pudimos confirmar tu vínculo con tu PF.';
+
+  @override
+  String get athleteLinkRequiredRetry => 'Reintentar';
+
+  @override
+  String get athleteSessionMissing => 'Tu sesión se cerró. Volvé a entrar.';
+
+  @override
   String get athleteFilesScreenTitle => 'MIS ARCHIVOS';
 
   @override
@@ -4919,6 +4933,20 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get athleteNutritionNeedsActiveLink =>
       'Necesitás un vínculo activo con un PF para ver tu plan nutricional.';
+
+  @override
+  String get athleteLinkRequired =>
+      'No encontramos un vínculo activo con un PF.';
+
+  @override
+  String get athleteLinkUnconfirmed =>
+      'No pudimos confirmar tu vínculo con tu PF.';
+
+  @override
+  String get athleteLinkRequiredRetry => 'Reintentar';
+
+  @override
+  String get athleteSessionMissing => 'Tu sesión se cerró. Volvé a entrar.';
 
   @override
   String get athleteFilesScreenTitle => 'MIS ARCHIVOS';

@@ -33,7 +33,7 @@ TrainerPublicProfile _makeProfile({required int? monthlyRate}) =>
 Widget _wrap({required TrainerPublicProfile profile}) => ProviderScope(
       overrides: [
         trainerByIdProvider(_trainerUid).overrideWith((ref) async => profile),
-        currentAthleteLinkProvider.overrideWith((ref) async => null),
+        currentAthleteLinkProvider.overrideWith((ref) => Stream.value(null)),
         trainerReviewsProvider(_trainerUid)
             .overrideWith((ref) => Stream.value(const [])),
         // Fallback profile for any athlete uid queries from ReviewTile.

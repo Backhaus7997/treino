@@ -848,12 +848,19 @@ GoRouter buildRouter({
               // nav bar — see the top-level GoRoutes above.
               GoRoute(
                 path: 'agenda',
-                builder: (_, __) => _withBg(const _AthleteAgendaRouteHost()),
+                builder: (_, state) => _withBg(
+                  _AthleteAgendaRouteHost(
+                    pistaDeTrainerId: state.uri.queryParameters['trainerId'],
+                  ),
+                ),
               ),
               GoRoute(
                 path: 'nutricion',
-                builder: (_, __) =>
-                    _withBg(const _AthleteNutritionPlanRouteHost()),
+                builder: (_, state) => _withBg(
+                  _AthleteNutritionPlanRouteHost(
+                    pistaDeTrainerId: state.uri.queryParameters['trainerId'],
+                  ),
+                ),
               ),
               GoRoute(
                 path: 'archivos',
@@ -1151,7 +1158,11 @@ class _VolumeByGroupRouteHost extends ConsumerWidget {
 /// "Necesitás un vínculo activo con un PF". Ahora un trainer aterriza en su
 /// propia agenda (misma vista que /coach?tab=agenda).
 class _AthleteAgendaRouteHost extends ConsumerWidget {
-  const _AthleteAgendaRouteHost();
+  const _AthleteAgendaRouteHost({this.pistaDeTrainerId});
+
+  /// El `trainerId` que vino en la URL, si vino. Es una PISTA, no una
+  /// autorización — ver [_montarConPista].
+  final String? pistaDeTrainerId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1168,77 +1179,178 @@ class _AthleteAgendaRouteHost extends ConsumerWidget {
     }
 
     final athleteId = ref.watch(currentUidProvider) ?? '';
-    final linkAsync = ref.watch(currentAthleteLinkProvider);
+    // Falta el UID, no el vínculo. Son dos causas distintas: antes las dos
+    // caían en el mismo `if` y mostraban el mismo cartel.
+    if (athleteId.isEmpty) {
+      return const _GateDeVinculo(faltaLaSesion: true);
+    }
 
-    return linkAsync.when(
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+    return _montarConPista(
+      ref,
+      pista: pistaDeTrainerId,
+      montar: (trainerId) => AthleteAgendaScreen(
+        trainerId: trainerId,
+        athleteId: athleteId,
       ),
-      error: (err, _) => Scaffold(
-        body: Center(child: Text('Error: $err')),
-      ),
-      data: (link) {
-        final trainerId = link?.trainerId ?? '';
-        if (trainerId.isEmpty || athleteId.isEmpty) {
-          return const Scaffold(
-            body: Center(
-              child: Padding(
-                padding: EdgeInsets.all(24),
-                child: Text(
-                  'Necesitás un vínculo activo con un PF para ver su agenda.',
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ),
-          );
-        }
-        return AthleteAgendaScreen(
-          trainerId: trainerId,
-          athleteId: athleteId,
-        );
-      },
     );
   }
 }
 
 /// Resuelve el vínculo activo y el uid del alumno para abrir su plan.
 class _AthleteNutritionPlanRouteHost extends ConsumerWidget {
-  const _AthleteNutritionPlanRouteHost();
+  const _AthleteNutritionPlanRouteHost({this.pistaDeTrainerId});
+
+  /// Ver [_AthleteAgendaRouteHost.pistaDeTrainerId].
+  final String? pistaDeTrainerId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final athleteId = ref.watch(currentUidProvider) ?? '';
-    final linkAsync = ref.watch(currentAthleteLinkProvider);
+    if (athleteId.isEmpty) {
+      return const _GateDeVinculo(faltaLaSesion: true);
+    }
 
-    return linkAsync.when(
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+    return _montarConPista(
+      ref,
+      pista: pistaDeTrainerId,
+      montar: (trainerId) => AthleteNutritionPlanScreen(
+        trainerId: trainerId,
+        athleteId: athleteId,
       ),
-      error: (_, __) => Scaffold(
-        body: Center(
-          child: Text(AppL10n.of(context).athleteNutritionPlanLoadError),
+    );
+  }
+}
+
+/// Resuelve el vínculo y monta la pantalla, o muestra el gate.
+///
+/// ## Por qué la `pista` no alcanza sola
+///
+/// La vista que dibuja los botones de AGENDA / NUTRICIÓN sólo los dibuja
+/// porque YA sabe que el vínculo está activo (`athlete_coach_view.dart`), y
+/// después navegaba acá tirando ese dato: la ruta lo volvía a preguntar desde
+/// cero, con otro provider y otra query, y cuando esa segunda pregunta salía
+/// mal el gate mentía. Pasar el `trainerId` por la URL arregla eso y además
+/// hace la navegación idempotente y deep-linkeable.
+///
+/// Pero la URL la escribe cualquiera. Si el `trainerId` de la query fuera la
+/// respuesta final, `/coach/agenda?trainerId=<el-que-sea>` montaría la
+/// pantalla de un PF con el que no hay vínculo, salteando el gate entero. Por
+/// eso la pista sólo sirve para NO MOSTRAR EL SPINNER mientras el provider
+/// resuelve: apenas resuelve, manda el provider. Las reglas de Firestore son
+/// la barrera de verdad, pero un gate que se saltea con un query param es
+/// exactamente la advertencia falsa que AGENTS.md §11.1 prohíbe.
+Widget _montarConPista(
+  WidgetRef ref, {
+  required String? pista,
+  required Widget Function(String trainerId) montar,
+}) {
+  final linkAsync = ref.watch(currentAthleteLinkProvider);
+  return linkAsync.when(
+    loading: () => (pista != null && pista.isNotEmpty)
+        ? montar(pista)
+        : const _EsperandoVinculo(),
+    // Un error resolviendo el vínculo es "no pudimos averiguarlo", NO "no
+    // tenés vínculo": mismo copy que el plazo vencido. Antes acá se pintaba
+    // `'Error: $err'` con el stack de Firestore en pantalla.
+    error: (_, __) => const _GateDeVinculo(sinConfirmar: true),
+    data: (link) {
+      final trainerId = link?.trainerId ?? '';
+      if (trainerId.isEmpty) return const _GateDeVinculo();
+      return montar(trainerId);
+    },
+  );
+}
+
+/// El cartel de las rutas de alumno que exigen un vínculo activo.
+///
+/// Antes cada pantalla tenía el suyo: agenda con el texto hardcodeado en
+/// español y sin l10n, nutrición con su propia key, y ninguna con salida —
+/// un `Center` con un `Text`, sin reintentar, sin `RefreshIndicator`, sin
+/// `ref.invalidate`. El usuario quedaba contra una pared.
+/// Spinner con plazo. Pasada la espera, admite que no pudo confirmar.
+///
+/// Los providers se quedan en `AsyncLoading` mientras el servidor no conteste,
+/// y eso es lo correcto: un `AsyncData(null)` tiene que significar "el servidor
+/// dijo que no tenés vínculo" y nada más. Pero un spinner eterno es la misma
+/// pared contra la que chocaba el usuario antes, con otra cara — así que el
+/// plazo y la salida van acá, en la UI, y no adentro del provider corrompiendo
+/// el dato para todos los demás consumidores.
+class _EsperandoVinculo extends StatefulWidget {
+  const _EsperandoVinculo();
+
+  @override
+  State<_EsperandoVinculo> createState() => _EsperandoVinculoState();
+}
+
+class _EsperandoVinculoState extends State<_EsperandoVinculo> {
+  bool _seAgoto = false;
+  Timer? _plazo;
+
+  @override
+  void initState() {
+    super.initState();
+    _plazo = Timer(kEsperaDelServidorDeVinculo, () {
+      if (mounted) setState(() => _seAgoto = true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _plazo?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => _seAgoto
+      ? const _GateDeVinculo(sinConfirmar: true)
+      : const Scaffold(body: Center(child: CircularProgressIndicator()));
+}
+
+class _GateDeVinculo extends ConsumerWidget {
+  const _GateDeVinculo({
+    this.faltaLaSesion = false,
+    this.sinConfirmar = false,
+  });
+
+  /// `true` cuando lo que falta es el uid y no el vínculo.
+  final bool faltaLaSesion;
+
+  /// `true` cuando el servidor no contestó a tiempo. Es una causa DISTINTA de
+  /// "no tenés vínculo", y mezclarlas es justo el bug que este gate existe para
+  /// no repetir.
+  final bool sinConfirmar;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppL10n.of(context);
+    return Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                faltaLaSesion
+                    ? l10n.athleteSessionMissing
+                    : sinConfirmar
+                        ? l10n.athleteLinkUnconfirmed
+                        : l10n.athleteLinkRequired,
+                textAlign: TextAlign.center,
+              ),
+              // Reintentar sólo aplica al vínculo: si no hay sesión, volver a
+              // preguntar por el vínculo no arregla nada.
+              if (!faltaLaSesion) ...[
+                const SizedBox(height: 18),
+                TextButton(
+                  onPressed: () => ref.invalidate(currentAthleteLinkProvider),
+                  child: Text(l10n.athleteLinkRequiredRetry),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
-      data: (link) {
-        final trainerId = link?.trainerId ?? '';
-        if (trainerId.isEmpty || athleteId.isEmpty) {
-          return Scaffold(
-            body: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Text(
-                  AppL10n.of(context).athleteNutritionNeedsActiveLink,
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ),
-          );
-        }
-        return AthleteNutritionPlanScreen(
-          trainerId: trainerId,
-          athleteId: athleteId,
-        );
-      },
     );
   }
 }

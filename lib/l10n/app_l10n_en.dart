@@ -451,6 +451,20 @@ class AppL10nEn extends AppL10n {
       'You need an active trainer link to view your nutrition plan.';
 
   @override
+  String get athleteLinkRequired => 'We couldn\'t find an active trainer link.';
+
+  @override
+  String get athleteLinkUnconfirmed =>
+      'We couldn\'t confirm your trainer link.';
+
+  @override
+  String get athleteLinkRequiredRetry => 'Retry';
+
+  @override
+  String get athleteSessionMissing =>
+      'Your session ended. Please sign in again.';
+
+  @override
   String get athleteFilesScreenTitle => 'MY FILES';
 
   @override

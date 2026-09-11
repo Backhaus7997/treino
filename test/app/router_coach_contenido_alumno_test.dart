@@ -95,7 +95,11 @@ Future<void> _pumpRoute(
       ),
       authStateChangesProvider.overrideWith((_) => Stream.value(null)),
       currentUidProvider.overrideWithValue(_athleteUid),
-      currentAthleteLinkProvider.overrideWith((ref) async => link),
+      currentAthleteLinkProvider.overrideWith((ref) => Stream.value(link)),
+      // AthleteCoachView watchea el AnyStatus, no el active-only: sin este
+      // override el test le pega a la instancia real igual que los de abajo.
+      currentAthleteLinkAnyStatusProvider
+          .overrideWith((ref) => Stream.value(link)),
       // Las dos pantallas watchean Firestore apenas montan: sin estos
       // overrides el test pegaría contra la instancia real.
       nutritionPlanProvider.overrideWith((ref, key) => Stream.value(null)),
@@ -159,7 +163,7 @@ void main() {
     expect(find.byType(AthleteNutritionPlanScreen), findsNothing);
     expect(
       find.text(
-        'Necesitás un vínculo activo con un PF para ver tu plan nutricional.',
+        'No encontramos un vínculo activo con un PF.',
       ),
       findsOneWidget,
     );
