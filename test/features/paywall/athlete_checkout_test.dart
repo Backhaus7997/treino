@@ -24,112 +24,13 @@
 //   5. Que sin clave del SDK la app NO ofrezca comprar. Un botón sin SDK
 //      configurado es una promesa rota.
 
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:treino/features/paywall/application/athlete_checkout.dart';
 
-// ---------------------------------------------------------------------------
-// Andamio: los modelos del SDK, armados a mano
-// ---------------------------------------------------------------------------
+import 'helpers/rc_models.dart';
 
-/// Un [Package] con lo mínimo que este código mira: su `packageType`.
-Package _paquete(PackageType tipo) => Package(
-      'paq_${tipo.name}',
-      tipo,
-      StoreProduct(
-        'treino_alumno_${tipo.name}',
-        'Suscripción TREINO',
-        'TREINO',
-        2.99,
-        'USD 2,99',
-        'USD',
-      ),
-      const PresentedOfferingContext('default', null, null),
-    );
-
-Offering _oferta(List<PackageType> tipos) => Offering(
-      'default',
-      'El offering de prueba',
-      const {},
-      tipos.map(_paquete).toList(),
-    );
-
-/// Un [CustomerInfo] con el entitlement [nombre] en el estado [activo].
-///
-/// `null` en [nombre] = el cliente no tiene NINGÚN entitlement.
-CustomerInfo _cliente({String? nombre, bool activo = true}) {
-  final infos = <String, EntitlementInfo>{
-    if (nombre != null)
-      nombre: EntitlementInfo(
-        nombre,
-        activo,
-        true,
-        '2026-09-10T12:00:00Z',
-        '2026-09-10T12:00:00Z',
-        'treino_alumno_monthly',
-        true,
-      ),
-  };
-  return CustomerInfo(
-    EntitlementInfos(
-      infos,
-      {
-        for (final e in infos.entries)
-          if (e.value.isActive) e.key: e.value
-      },
-    ),
-    const {},
-    const [],
-    const [],
-    const [],
-    '2026-09-10T12:00:00Z',
-    'alumno-1',
-    const {},
-    '2026-09-10T12:00:00Z',
-  );
-}
-
-/// Un `PlatformException` como los que tira el SDK: el código es el ÍNDICE del
-/// enum, en texto. Así lo lee `PurchasesErrorHelper.getErrorCode`.
-PlatformException _falla(PurchasesErrorCode codigo) =>
-    PlatformException(code: '${codigo.index}', message: codigo.name);
-
-/// El doble del SDK. Registra el ORDEN de las llamadas, que es lo que hace
-/// falta para probar que el `logIn` va antes que la compra.
-final class _StoreFalso implements AthleteStore {
-  _StoreFalso({this.offering, this.alComprar, this.tiraAlComprar});
-
-  final Offering? offering;
-  final CustomerInfo Function(Package)? alComprar;
-  final Object? tiraAlComprar;
-
-  final List<String> llamadas = <String>[];
-  final List<Package> comprados = <Package>[];
-  String? uidIdentificado;
-
-  @override
-  Future<void> logIn(String uid) async {
-    llamadas.add('logIn');
-    uidIdentificado = uid;
-  }
-
-  @override
-  Future<Offering?> currentOffering() async {
-    llamadas.add('currentOffering');
-    return offering;
-  }
-
-  @override
-  Future<CustomerInfo> purchase(Package package) async {
-    llamadas.add('purchase');
-    comprados.add(package);
-    if (tiraAlComprar != null) throw tiraAlComprar!;
-    return (alComprar ?? (_) => _cliente(nombre: kAthleteEntitlement))(package);
-  }
-}
-
-AthleteCheckoutOnStore _checkout(_StoreFalso store) =>
+AthleteCheckoutOnStore _checkout(StoreFalso store) =>
     resolveAthleteCheckout(store: store) as AthleteCheckoutOnStore;
 
 // ---------------------------------------------------------------------------
@@ -148,7 +49,7 @@ void main() {
 
     test('con un store inyectado sí se puede — es el camino de los tests', () {
       expect(
-        resolveAthleteCheckout(store: _StoreFalso()),
+        resolveAthleteCheckout(store: StoreFalso()),
         isA<AthleteCheckoutOnStore>(),
       );
     });
@@ -168,7 +69,8 @@ void main() {
 
   group('start — EL ORDEN: identificar antes de cobrar', () {
     test('EL TEST QUE IMPORTA: logIn pasa ANTES de purchase', () async {
-      final store = _StoreFalso(offering: _oferta([PackageType.monthly]));
+      final store =
+          StoreFalso(offering: oferta([paquete(PackageType.monthly)]));
 
       await _checkout(store).start(uid: 'alumno-42', plan: AthletePlan.mensual);
 
@@ -183,7 +85,7 @@ void main() {
     });
 
     test('si no hay Offering NO se cobra', () async {
-      final store = _StoreFalso();
+      final store = StoreFalso();
 
       final r = await _checkout(store)
           .start(uid: 'alumno-1', plan: AthletePlan.mensual);
@@ -196,7 +98,8 @@ void main() {
       // El alumno toca "anual" y el dashboard sólo publicó el mensual. Es un
       // error de configuración nuestro, y cobrarle el mensual sería peor que
       // no cobrarle nada.
-      final store = _StoreFalso(offering: _oferta([PackageType.monthly]));
+      final store =
+          StoreFalso(offering: oferta([paquete(PackageType.monthly)]));
 
       final r = await _checkout(store)
           .start(uid: 'alumno-1', plan: AthletePlan.anual);
@@ -207,8 +110,9 @@ void main() {
 
     test('compra el package del plan pedido, no el primero de la lista',
         () async {
-      final store = _StoreFalso(
-        offering: _oferta([PackageType.monthly, PackageType.annual]),
+      final store = StoreFalso(
+        offering:
+            oferta([paquete(PackageType.monthly), paquete(PackageType.annual)]),
       );
 
       await _checkout(store).start(uid: 'alumno-1', plan: AthletePlan.anual);
@@ -219,7 +123,8 @@ void main() {
 
   group('start — cómo termina', () {
     test('entitlement activo → comprado', () async {
-      final store = _StoreFalso(offering: _oferta([PackageType.monthly]));
+      final store =
+          StoreFalso(offering: oferta([paquete(PackageType.monthly)]));
 
       expect(
         await _checkout(store)
@@ -231,9 +136,9 @@ void main() {
     test('cobró pero el entitlement NO está activo → pendiente', () async {
       // Android con pago diferido, o un "Ask to Buy" de iOS esperando al
       // adulto. Decirle "listo" sería mentir; decirle "error" también.
-      final store = _StoreFalso(
-        offering: _oferta([PackageType.monthly]),
-        alComprar: (_) => _cliente(nombre: kAthleteEntitlement, activo: false),
+      final store = StoreFalso(
+        offering: oferta([paquete(PackageType.monthly)]),
+        alComprar: (_) => cliente(nombre: kAthleteEntitlement, activo: false),
       );
 
       expect(
@@ -244,9 +149,9 @@ void main() {
     });
 
     test('cobró y no vino NINGÚN entitlement → pendiente', () async {
-      final store = _StoreFalso(
-        offering: _oferta([PackageType.monthly]),
-        alComprar: (_) => _cliente(),
+      final store = StoreFalso(
+        offering: oferta([paquete(PackageType.monthly)]),
+        alComprar: (_) => cliente(),
       );
 
       expect(
@@ -259,9 +164,9 @@ void main() {
     test('vino OTRO entitlement, no el nuestro → pendiente', () async {
       // Un alumno que compró otra cosa en otra app del mismo proyecto de
       // RevenueCat. No le da acceso a TREINO.
-      final store = _StoreFalso(
-        offering: _oferta([PackageType.monthly]),
-        alComprar: (_) => _cliente(nombre: 'otra_cosa'),
+      final store = StoreFalso(
+        offering: oferta([paquete(PackageType.monthly)]),
+        alComprar: (_) => cliente(nombre: 'otra_cosa'),
       );
 
       expect(
@@ -272,9 +177,9 @@ void main() {
     });
 
     test('EL OTRO TEST QUE IMPORTA: cancelar NO es un error', () async {
-      final store = _StoreFalso(
-        offering: _oferta([PackageType.monthly]),
-        tiraAlComprar: _falla(PurchasesErrorCode.purchaseCancelledError),
+      final store = StoreFalso(
+        offering: oferta([paquete(PackageType.monthly)]),
+        tiraAlComprar: falla(PurchasesErrorCode.purchaseCancelledError),
       );
 
       expect(
@@ -285,9 +190,9 @@ void main() {
     });
 
     test('pago pendiente de la tienda → pendiente', () async {
-      final store = _StoreFalso(
-        offering: _oferta([PackageType.monthly]),
-        tiraAlComprar: _falla(PurchasesErrorCode.paymentPendingError),
+      final store = StoreFalso(
+        offering: oferta([paquete(PackageType.monthly)]),
+        tiraAlComprar: falla(PurchasesErrorCode.paymentPendingError),
       );
 
       expect(
@@ -302,9 +207,9 @@ void main() {
         PurchasesErrorCode.productNotAvailableForPurchaseError,
         PurchasesErrorCode.configurationError,
       ]) {
-        final store = _StoreFalso(
-          offering: _oferta([PackageType.monthly]),
-          tiraAlComprar: _falla(codigo),
+        final store = StoreFalso(
+          offering: oferta([paquete(PackageType.monthly)]),
+          tiraAlComprar: falla(codigo),
         );
 
         expect(
@@ -317,9 +222,9 @@ void main() {
     });
 
     test('la tienda falla de verdad → error', () async {
-      final store = _StoreFalso(
-        offering: _oferta([PackageType.monthly]),
-        tiraAlComprar: _falla(PurchasesErrorCode.storeProblemError),
+      final store = StoreFalso(
+        offering: oferta([paquete(PackageType.monthly)]),
+        tiraAlComprar: falla(PurchasesErrorCode.storeProblemError),
       );
 
       expect(
@@ -330,8 +235,8 @@ void main() {
     });
 
     test('un error que NO es del SDK tampoco explota', () async {
-      final store = _StoreFalso(
-        offering: _oferta([PackageType.monthly]),
+      final store = StoreFalso(
+        offering: oferta([paquete(PackageType.monthly)]),
         tiraAlComprar: StateError('algo raro'),
       );
 

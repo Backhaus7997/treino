@@ -69,6 +69,36 @@ enum AthletePlan {
   final PackageType packageType;
 }
 
+/// Un plan tal como la tienda lo cotiza HOY.
+///
+/// Existe para que la PANTALLA no tenga que importar `purchases_flutter`. No es
+/// una capa de abstraccion por gusto: el guard de `superficie_de_cobro_alumno_test.dart`
+/// marca cualquier archivo que importe el SDK, y una pantalla no deberia estar
+/// nunca en esa lista — tiene que hablarle a este archivo, no a la tienda.
+final class AthletePlanOferta {
+  const AthletePlanOferta({
+    required this.plan,
+    required this.precio,
+    this.precioPorMes,
+  });
+
+  final AthletePlan plan;
+
+  /// El precio **ya formateado por la tienda**, con su moneda y su separador.
+  ///
+  /// Nunca se arma a mano. Apple exige que el importe que se va a facturar sea
+  /// el elemento de precio mas prominente del layout, y armarlo nosotros abre
+  /// la puerta a que diga algo distinto de lo que cobra la hoja de pago del
+  /// sistema — que es el peor lugar posible para una discrepancia.
+  final String precio;
+
+  /// Lo que sale por mes el plan anual, formateado por la tienda.
+  ///
+  /// Va SUBORDINADO al [precio], nunca en su lugar: la doc de Apple dice que
+  /// estos desgloses «should be displayed in a subordinate position and size».
+  final String? precioPorMes;
+}
+
 /// Cómo terminó un intento de compra.
 ///
 /// `cancelado` NO es un error y por eso tiene su propio caso: el alumno que
@@ -137,6 +167,10 @@ abstract interface class AthleteStore {
 
   /// Dispara la compra. Tira si la tienda falla o si el alumno cancela.
   Future<CustomerInfo> purchase(Package package);
+
+  /// Le devuelve al alumno lo que ya habia comprado, en un telefono nuevo o
+  /// despues de reinstalar.
+  Future<CustomerInfo> restore();
 }
 
 /// La implementación real. Delgada a propósito: acá no hay decisiones.
@@ -155,6 +189,9 @@ final class RevenueCatStore implements AthleteStore {
   @override
   Future<CustomerInfo> purchase(Package package) async =>
       (await Purchases.purchase(PurchaseParams.package(package))).customerInfo;
+
+  @override
+  Future<CustomerInfo> restore() => Purchases.restorePurchases();
 }
 
 /// Dónde puede comprar el alumno. Sellada: ver el encabezado.
@@ -182,6 +219,64 @@ final class AthleteCheckoutOnStore extends AthleteCheckout {
   const AthleteCheckoutOnStore._(this._store) : super._();
 
   final AthleteStore _store;
+
+  /// Restaura las compras del alumno [uid].
+  ///
+  /// Apple lo EXIGE para suscripciones: una app que cobra y no ofrece
+  /// restaurar es rechazo. Y no es burocracia — el alumno que cambia de
+  /// telefono, reinstala, o entra desde el iPad de la casa necesita esto.
+  ///
+  /// El `logIn` va antes por el MISMO motivo que en [start]: sin el, la
+  /// restauracion se aplica sobre un id anonimo y no le devuelve nada.
+  ///
+  /// Devuelve `true` si despues de restaurar el alumno tiene el entitlement.
+  Future<bool> restaurar({required String uid}) async {
+    try {
+      await _store.logIn(uid);
+      final info = await _store.restore();
+      return info.entitlements.all[kAthleteEntitlement]?.isActive ?? false;
+    } catch (e) {
+      debugPrint('athlete_checkout: no se pudo restaurar — $e');
+      return false;
+    }
+  }
+
+  /// Los planes que la tienda cotiza hoy, con su precio ya formateado.
+  ///
+  /// Lista vacia = el Offering `current` no existe o no tiene ninguno de
+  /// nuestros package types. Es un error de CONFIGURACION del dashboard, y la
+  /// pantalla tiene que mostrar eso y no un paywall vacio.
+  Future<List<AthletePlanOferta>> planes() async {
+    try {
+      final offering = await _store.currentOffering();
+      if (offering == null) {
+        debugPrint('athlete_checkout: no hay Offering `current` en RevenueCat');
+        return const [];
+      }
+      final out = <AthletePlanOferta>[];
+      for (final plan in AthletePlan.values) {
+        final p = offering.availablePackages
+            .where((x) => x.packageType == plan.packageType)
+            .firstOrNull;
+        if (p == null) continue;
+        out.add(
+          AthletePlanOferta(
+            plan: plan,
+            precio: p.storeProduct.priceString,
+            // Solo tiene sentido en el anual: en el mensual repetiria el mismo
+            // numero dos veces.
+            precioPorMes: plan == AthletePlan.anual
+                ? p.storeProduct.pricePerMonthString
+                : null,
+          ),
+        );
+      }
+      return out;
+    } catch (e) {
+      debugPrint('athlete_checkout: no se pudieron leer los planes — $e');
+      return const [];
+    }
+  }
 
   /// Compra [plan] para el alumno [uid]. ÚNICO camino a un cobro del alumno en
   /// toda la app.
