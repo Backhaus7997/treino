@@ -436,6 +436,67 @@ void main() {
   // ---------------------------------------------------------------------------
   // Fase 6 Etapa 0 — Multi-location
   // ---------------------------------------------------------------------------
+  // #637 — el kill switch de consultas previas.
+  //
+  // Lo que prueba de verdad este grupo es el ALLOWLIST, que en este repo no
+  // vive en `firestore.rules` sino en Dart (`_trainerPublicFields`). Las rules
+  // de `trainerPublicProfiles` son owner-only SIN allowlist de campos, así que
+  // el campo se escribiría igual — lo que lo frena es el filtro de acá. Sin la
+  // entrada, el toggle guarda en `users/{uid}` y NUNCA llega al doc que mira la
+  // regla: el interruptor queda mudo y la UI no se entera.
+  group('UserRepository dual-write de acceptsInquiries (#637)', () {
+    test('acceptsInquiries:false propaga a trainerPublicProfiles', () async {
+      await seedDoc('trainer-ai-1');
+
+      await repo.update('trainer-ai-1', {'acceptsInquiries': false});
+
+      final snap = await firestore
+          .collection('trainerPublicProfiles')
+          .doc('trainer-ai-1')
+          .get();
+      expect(snap.exists, isTrue);
+      expect(snap.data()!['acceptsInquiries'], isFalse,
+          reason: 'es el único doc que lee la rule — si no llega acá, el '
+              'interruptor no apaga nada');
+    });
+
+    test('acceptsInquiries:true también propaga (volver a encender)', () async {
+      await seedDoc('trainer-ai-2');
+
+      await repo.update('trainer-ai-2', {'acceptsInquiries': false});
+      await repo.update('trainer-ai-2', {'acceptsInquiries': true});
+
+      final snap = await firestore
+          .collection('trainerPublicProfiles')
+          .doc('trainer-ai-2')
+          .get();
+      expect(snap.data()!['acceptsInquiries'], isTrue);
+    });
+
+    test('y también queda en users/{uid}', () async {
+      await seedDoc('trainer-ai-3');
+
+      await repo.update('trainer-ai-3', {'acceptsInquiries': false});
+
+      final snap = await firestore.collection('users').doc('trainer-ai-3').get();
+      expect(snap.data()!['acceptsInquiries'], isFalse);
+    });
+
+    test('un partial que NO lo menciona no lo pisa', () async {
+      await seedDoc('trainer-ai-4');
+      await repo.update('trainer-ai-4', {'acceptsInquiries': false});
+
+      // Guardar otra cosa cualquiera no puede resucitar las consultas.
+      await repo.update('trainer-ai-4', {'trainerBio': 'Otra bio bien larga.'});
+
+      final snap = await firestore
+          .collection('trainerPublicProfiles')
+          .doc('trainer-ai-4')
+          .get();
+      expect(snap.data()!['acceptsInquiries'], isFalse);
+    });
+  });
+
   group('UserRepository multi-location dual-write', () {
     test('trainerLocations partial propaga a trainerPublicProfiles', () async {
       await seedDoc('trainer-ml-1');
