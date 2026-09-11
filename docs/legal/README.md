@@ -19,6 +19,7 @@ su reemplazo, y hay que portarlos ahí y publicarlos en `gettreino.com/legal/*`.
 | [retencion-y-borrado.md](./retencion-y-borrado.md) | Qué se borra, qué se conserva. URL para Google Play | Borrador |
 | [aviso-legal.md](./aviso-legal.md) | Identificación del titular | Borrador |
 | [guia-legal-treino.pdf](./guia-legal-treino.pdf) | Guía de decisiones y trámites para el Product Owner | Vigente |
+| [briefing-revision-legal.pdf](./briefing-revision-legal.pdf) | El briefing en PDF — es lo que se le manda al abogado junto con los documentos | Generado |
 | [documentos-legales-treino.pdf](./documentos-legales-treino.pdf) | Los nueve documentos compilados en un PDF, con los pendientes resaltados. Para que el PO y el abogado lean sin abrir el repo | Generado |
 
 ## Lo que falta, y por qué

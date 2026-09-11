@@ -19,7 +19,7 @@ tres partes:
    vinculan con alumnos: chat privado, planes, turnos, y acceso a los datos
    corporales que el alumno comparta.
 
-## Cuatro decisiones del titular que condicionan todo
+## Cinco decisiones del titular que condicionan todo
 
 | # | Decisión |
 |---|---|
@@ -27,6 +27,7 @@ tres partes:
 | 2 | **Alcance mundial** |
 | 3 | **Cobro por pasarela de pago externa**, liquidando a cuenta de la sociedad |
 | 4 | **La plataforma NO intermedia** el dinero entre alumno y entrenador |
+| 5 | **Las cuentas de las tiendas quedan a nombre de una persona humana**, no de la sociedad |
 
 ## Datos que importan para el análisis
 
@@ -37,8 +38,11 @@ tres partes:
 - El vínculo alumno-entrenador habilita **mensajería privada**.
 - El entrenador puede llevar **notas y archivos privados sobre el alumno** que el
   alumno no ve en su aplicación.
-- **Las dos suscripciones ya están implementadas y cobrando**: la del entrenador
-  por Mercado Pago en la web, la del atleta por compra integrada.
+- **Las dos suscripciones ya están implementadas y cobrando** — esto no es
+  hipotético: la del entrenador por Mercado Pago en la web, la del atleta por
+  compra integrada de las tiendas.
+- La aplicación **todavía no está publicada**. Se puede corregir cualquier cosa
+  antes de que haya usuarios reales.
 
 ---
 
@@ -65,7 +69,7 @@ Aviso Legal
 
 ---
 
-## Las seis preguntas concretas
+## Las siete preguntas concretas
 
 No hace falta una revisión general. Lo que necesitamos dictaminado es esto:
 
@@ -106,6 +110,21 @@ tres sin nombre, sólo con identificador. ¿Es sostenible?
 Pedimos validar que el encuadre se sostiene, y en particular **el tratamiento
 fiscal de cada vía**: son dos regímenes distintos conviviendo en el mismo
 producto, en todos los mercados donde se cobre.
+
+---
+
+**7. Publicación a nombre de una persona humana.** Las cuentas de App Store y
+Google Play quedan a nombre de **Martin Backhaus**, persona humana, aunque el
+responsable del servicio sea BACKHAUSTIN S.A.S.
+
+Para resolver la discordancia, el Aviso Legal declara que quien publica **actúa
+por cuenta de la sociedad** y que eso no desplaza la responsabilidad. Se pide
+dictaminar si esa declaración alcanza frente a un consumidor, o si hace falta
+algo más — y qué exposición personal genera que el acuerdo de desarrollador lo
+firme una persona humana.
+
+*(El tratamiento del flujo de fondos —las tiendas liquidan a la persona, la
+sociedad factura— se consulta con el contador, no acá.)*
 
 ---
 
