@@ -75,7 +75,7 @@ Widget _wrapWorkout(
         // RutinasSection: resolve the unified list to empty so tests that
         // only care about EXPLORAR / HISTORIAL don't need a full stack.
         authStateChangesProvider.overrideWith((ref) => const Stream.empty()),
-        currentAthleteLinkProvider.overrideWith((ref) async => null),
+        currentAthleteLinkProvider.overrideWith((ref) => Stream.value(null)),
         assignedRoutinesProvider('test-uid').overrideWith((ref) async => []),
         userCreatedRoutinesProvider('test-uid')
             .overrideWith((ref) => Stream.value(const <Routine>[])),
@@ -424,7 +424,7 @@ void main() {
           currentUidProvider.overrideWithValue('test-uid'),
           sessionsByUidProvider.overrideWith((ref, uid) async => []),
           authStateChangesProvider.overrideWith((ref) => const Stream.empty()),
-          currentAthleteLinkProvider.overrideWith((ref) async => makeLink()),
+          currentAthleteLinkProvider.overrideWith((ref) => Stream.value(makeLink())),
           assignedRoutinesProvider('test-uid').overrideWith((ref) async => []),
           userCreatedRoutinesProvider('test-uid')
               .overrideWith((ref) => Stream.value(const <Routine>[])),

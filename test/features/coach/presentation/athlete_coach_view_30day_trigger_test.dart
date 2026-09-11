@@ -67,7 +67,7 @@ Widget _wrap({
   final reviewKey = '$linkId:$athleteId';
   return ProviderScope(
     overrides: [
-      currentAthleteLinkProvider.overrideWith((ref) async => link),
+      currentAthleteLinkProvider.overrideWith((ref) => Stream.value(link)),
       if (link != null)
         userPublicProfileProvider(link.trainerId)
             .overrideWith((ref) => Stream.value(_makePub())),

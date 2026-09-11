@@ -197,6 +197,44 @@ class TrainerLinkRepository {
     return links.where((l) => statuses.contains(l.status)).toList();
   }
 
+  // ─── watchForAthlete ────────────────────────────────────────────────────
+  //
+  // Espejo de [watchForTrainer] para el lado del atleta, y la razón por la que
+  // existe es que [listForAthlete] no alcanza.
+  //
+  // Un `.get()` servido desde la caché local fría no devuelve un error:
+  // devuelve una lista VACÍA. Quien pregunta no tiene forma de distinguir "no
+  // tenés vínculo" de "todavía no sé", y como el `.get()` es una sola
+  // resolución, esa confusión queda pegada hasta que el usuario sale de la
+  // pantalla y vuelve. El lado del PF nunca lo vio porque siempre fue stream:
+  // le llega una segunda snapshot y se repara solo.
+
+  Stream<List<TrainerLink>> watchForAthlete(
+    String athleteId, {
+    Set<TrainerLinkStatus>? statuses,
+  }) {
+    final query = _links
+        .where('athleteId', isEqualTo: athleteId)
+        .orderBy('requestedAt', descending: true);
+    return query
+        .snapshots()
+        // Misma guarda que `user_repository.dart`,
+        // `athlete_entitlement_provider.dart` y `blocked_athletes_providers.dart`:
+        // una snapshot VACÍA servida desde la caché no es "no hay vínculos", es
+        // "todavía no sé", y la descartamos esperando la del servidor.
+        //
+        // Una snapshot CON documentos sí sirve aunque venga de caché: ahí el
+        // dato está, y filtrar por estado sobre datos reales es correcto —
+        // incluso si el filtro termina dando vacío, porque eso ya es un hecho
+        // ("tiene vínculos, ninguno activo") y no una ignorancia.
+        .where((snap) => snap.docs.isNotEmpty || !snap.metadata.isFromCache)
+        .map((snap) {
+      final links = snap.docs.map(_fromDoc).whereType<TrainerLink>().toList();
+      if (statuses == null) return links;
+      return links.where((l) => statuses.contains(l.status)).toList();
+    });
+  }
+
   // ─── watchForTrainer ────────────────────────────────────────────────────
   //
   // Real-time stream para que el dashboard del PF refleje requests y

@@ -43,7 +43,7 @@ void main() {
       () async {
         final container = ProviderContainer(
           overrides: [
-            currentAthleteLinkProvider.overrideWith((ref) async => _link()),
+            currentAthleteLinkProvider.overrideWith((ref) => Stream.value(_link())),
             athletePaymentsProvider.overrideWith(
               (ref) => Stream<List<Payment>>.error(Exception('boom')),
             ),
@@ -71,8 +71,7 @@ void main() {
         final container = ProviderContainer(
           overrides: [
             currentAthleteLinkProvider.overrideWith(
-              (ref) async => throw Exception('link boom'),
-            ),
+              (ref) => Stream.value(throw Exception('link boom'),)),
             athletePaymentsProvider.overrideWith(
               (ref) => Stream<List<Payment>>.value(const []),
             ),

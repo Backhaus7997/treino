@@ -41,7 +41,7 @@ ProviderContainer _container({
 }) =>
     ProviderContainer(
       overrides: [
-        currentAthleteLinkProvider.overrideWith((ref) async => _link()),
+        currentAthleteLinkProvider.overrideWith((ref) => Stream.value(_link())),
         athletePaymentsProvider.overrideWith((ref) => Stream.value(payments)),
         athleteBillingPairProvider.overrideWith(
           (ref, pair) => Stream<AthleteBilling?>.value(billing),

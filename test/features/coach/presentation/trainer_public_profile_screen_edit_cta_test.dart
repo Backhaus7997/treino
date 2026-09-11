@@ -59,7 +59,7 @@ Widget _wrap({
     overrides: [
       trainerByIdProvider(_trainerUid)
           .overrideWith((ref) async => _makeProfile()),
-      currentAthleteLinkProvider.overrideWith((ref) async => link),
+      currentAthleteLinkProvider.overrideWith((ref) => Stream.value(link)),
       reviewRepositoryProvider.overrideWithValue(mockRepo),
       if (link != null)
         userReviewForLinkProvider(reviewKey)

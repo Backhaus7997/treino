@@ -51,7 +51,7 @@ Future<void> _pumpWorkout(
         userProfileProvider.overrideWith((ref) => Stream.value(_athlete())),
         sessionsByUidProvider.overrideWith((ref, uid) async => []),
         authStateChangesProvider.overrideWith((ref) => const Stream.empty()),
-        currentAthleteLinkProvider.overrideWith((ref) async => null),
+        currentAthleteLinkProvider.overrideWith((ref) => Stream.value(null)),
         assignedRoutinesProvider('test-uid').overrideWith((ref) async => []),
         userCreatedRoutinesProvider('test-uid')
             .overrideWith((ref) => Stream.value(const <Routine>[])),

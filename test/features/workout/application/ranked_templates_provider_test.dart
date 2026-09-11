@@ -59,7 +59,7 @@ Future<List<String>> _rankedIds(
 ) async {
   final container = ProviderContainer(overrides: [
     routinesProvider.overrideWith((ref) async => catalog),
-    currentAthleteLinkProvider.overrideWith((ref) async => null),
+    currentAthleteLinkProvider.overrideWith((ref) => Stream.value(null)),
     userProfileProvider.overrideWith((ref) => Stream.value(_profile(prefs))),
   ]);
   addTearDown(container.dispose);
