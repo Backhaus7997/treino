@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../app/theme/tokens/primitives.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
@@ -59,7 +60,7 @@ Future<void> showModerationMenu(
               l10n.moderationReportAction,
               style: GoogleFonts.barlow(
                 fontWeight: FontWeight.w400,
-                fontSize: 14,
+                fontSize: AppTextSize.body,
                 color: palette.textPrimary,
               ),
             ),
@@ -80,7 +81,7 @@ Future<void> showModerationMenu(
               l10n.moderationBlockAction,
               style: GoogleFonts.barlow(
                 fontWeight: FontWeight.w400,
-                fontSize: 14,
+                fontSize: AppTextSize.body,
                 color: palette.danger,
               ),
             ),

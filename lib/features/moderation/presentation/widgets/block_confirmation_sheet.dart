@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../app/theme/tokens/primitives.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
@@ -61,7 +62,7 @@ class BlockConfirmationSheet extends StatelessWidget {
               l10n.moderationBlockConfirmTitle(targetDisplayName),
               style: GoogleFonts.barlowCondensed(
                 fontWeight: FontWeight.w700,
-                fontSize: 18,
+                fontSize: AppTextSize.title,
                 color: palette.textPrimary,
               ),
               textAlign: TextAlign.center,
@@ -70,7 +71,7 @@ class BlockConfirmationSheet extends StatelessWidget {
             Text(
               l10n.moderationBlockConfirmBody,
               style: GoogleFonts.barlow(
-                fontSize: 13,
+                fontSize: AppTextSize.bodyDense,
                 color: palette.textMuted,
                 height: 1.4,
               ),
@@ -148,7 +149,7 @@ class _SheetButton extends StatelessWidget {
             label,
             style: GoogleFonts.barlowCondensed(
               fontWeight: FontWeight.w700,
-              fontSize: 13,
+              fontSize: AppTextSize.bodyDense,
               letterSpacing: 1.0,
               color: textColor,
             ),

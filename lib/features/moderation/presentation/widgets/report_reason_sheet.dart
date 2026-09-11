@@ -89,7 +89,7 @@ class _ReportReasonSheetState extends State<ReportReasonSheet> {
                 l10n.moderationReportSheetTitle,
                 style: GoogleFonts.barlowCondensed(
                   fontWeight: FontWeight.w700,
-                  fontSize: 18,
+                  fontSize: AppTextSize.title,
                   color: palette.textPrimary,
                 ),
                 textAlign: TextAlign.center,
@@ -130,7 +130,7 @@ class _ReportReasonSheetState extends State<ReportReasonSheet> {
                           controller: _detailController,
                           style: TextStyle(
                             color: palette.textPrimary,
-                            fontSize: 14,
+                            fontSize: AppTextSize.body,
                           ),
                           maxLines: 3,
                           minLines: 1,
@@ -240,7 +240,7 @@ class _ReasonRow extends StatelessWidget {
                   child: Text(
                     label,
                     style: GoogleFonts.barlow(
-                      fontSize: 14,
+                      fontSize: AppTextSize.body,
                       fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
                       color: selected ? palette.accent : palette.textPrimary,
                     ),
@@ -289,7 +289,7 @@ class _SheetButton extends StatelessWidget {
             label,
             style: GoogleFonts.barlowCondensed(
               fontWeight: FontWeight.w700,
-              fontSize: 13,
+              fontSize: AppTextSize.bodyDense,
               letterSpacing: 1.0,
               color: textColor,
             ),
