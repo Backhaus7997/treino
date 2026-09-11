@@ -20,6 +20,8 @@
  *      mal formado es peor que ninguno, por el punto 1.
  */
 
+import { randomUUID } from "node:crypto";
+
 import { necesitaToken, UUID_V4 } from "../subscriptions/store-account-token";
 
 describe("store-account-token — cuándo hay que emitir", () => {
@@ -30,9 +32,17 @@ describe("store-account-token — cuándo hay que emitir", () => {
   it("un documento con un UUID válido NO necesita otro", () => {
     // Si esto diera true, el trigger se re-dispararía a sí mismo en loop —y,
     // peor, le cambiaría el token a alguien que ya compró.
-    expect(
-      necesitaToken({ storeAccountToken: "3f2504e0-4f89-41d3-9a0c-0305e82c3301" }),
-    ).toBe(false);
+    //
+    // El UUID se GENERA en vez de escribirse literal, y no es capricho: un
+    // UUID escrito a mano al lado de una variable que se llama «token» dispara
+    // la regla `generic-api-key` de gitleaks —entropía 3.6— y el gate de
+    // secretos es BLOQUEANTE. Ya hizo fallar este PR una vez.
+    //
+    // La salida NO es agregarle una allowlist a `.gitleaks.toml`: ampliar un
+    // gate de seguridad para acomodar un test es exactamente cómo un gate
+    // termina apagado. Generarlo sale gratis y además prueba contra un UUID
+    // distinto en cada corrida.
+    expect(necesitaToken({ storeAccountToken: randomUUID() })).toBe(false);
   });
 
   it("un documento BORRADO no necesita nada", () => {
@@ -75,9 +85,6 @@ describe("store-account-token — la forma del UUID", () => {
   it("acepta lo que genera `crypto.randomUUID()`", () => {
     // El contrato con Node, verificado y no asumido: si alguna vez cambiara el
     // formato que produce, este test lo dice antes que la App Store.
-    const { randomUUID } = jest.requireActual("node:crypto") as {
-      randomUUID: () => string;
-    };
     for (let i = 0; i < 50; i++) {
       expect(UUID_V4.test(randomUUID())).toBe(true);
     }

@@ -31,6 +31,7 @@
  *     "npm --prefix functions test -- --runInBand users-subscription-rules"
  */
 
+import { randomUUID } from "node:crypto";
 import * as fs from "fs";
 import * as path from "path";
 import {
@@ -399,8 +400,12 @@ describe("users rules — storeAccountToken: el ancla de identidad de pagos", ()
   // de otro y reclamar sus compras — el webhook recibe el token, busca a quien
   // pertenece, y encuentra al atacante.
   const uid = "athlete-forge-token";
-  const TOKEN = "3f2504e0-4f89-41d3-9a0c-0305e82c3301";
-  const OTRO = "9f8b7a6c-1d2e-4f3a-8b9c-0d1e2f3a4b5c";
+  // Generados, no literales: un UUID escrito a mano al lado de una variable
+  // llamada `TOKEN` dispara la regla `generic-api-key` de gitleaks, y ese gate
+  // es BLOQUEANTE. Ampliarle la allowlist para que entre un test es cómo un
+  // gate de seguridad termina apagado.
+  const TOKEN = randomUUID();
+  const OTRO = randomUUID();
 
   it("deniega al dueño escribirse un token", async () => {
     await seedUser({
