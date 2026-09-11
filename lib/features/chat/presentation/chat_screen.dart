@@ -17,6 +17,8 @@ import '../../feed/application/follow_providers.dart';
 import '../../feed/domain/follow.dart';
 import '../../feed/domain/follow_status.dart';
 import '../../feed/presentation/widgets/post_avatar.dart';
+import '../../moderation/domain/report_target_kind.dart';
+import '../../moderation/presentation/moderation_actions.dart';
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
@@ -346,6 +348,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           message: msg,
                           isMine: isMine,
                           palette: palette,
+                          ref: ref,
                         );
                       },
                     );
@@ -390,11 +393,16 @@ class _Bubble extends StatelessWidget {
     required this.message,
     required this.isMine,
     required this.palette,
+    required this.ref,
   });
 
   final Message message;
   final bool isMine;
   final AppPalette palette;
+
+  /// Sólo para disparar `reportContent` desde el long-press — mismo `ref` de
+  /// `_ChatScreenState`, no un provider propio.
+  final WidgetRef ref;
 
   @override
   Widget build(BuildContext context) {
@@ -428,30 +436,48 @@ class _Bubble extends StatelessWidget {
       bottomLeft: Radius.circular(isMine ? 14 : 4),
       bottomRight: Radius.circular(isMine ? 4 : 14),
     );
+    Widget bubble = Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: isMine ? palette.accent : palette.bgCard,
+        borderRadius: radius,
+        border: isMine ? null : Border.all(color: palette.border),
+      ),
+      child: Text(
+        message.text,
+        style: TextStyle(
+          color: isMine
+              ? TreinoButtonTokens.foreground(context)
+              : palette.textPrimary,
+          fontSize: 14,
+        ),
+      ),
+    );
+
+    // Reportar por long-press — sólo en mensajes AJENOS
+    // (moderacion-reporte-y-bloqueo). Reportarse a uno mismo no tiene
+    // sentido, mismo criterio que el gate `isOwner` de `PostCard`.
+    if (!isMine) {
+      bubble = GestureDetector(
+        onLongPress: () => reportContent(
+          context,
+          ref,
+          targetKind: ReportTargetKind.message,
+          targetId: message.id,
+          targetOwnerUid: message.senderId,
+        ),
+        child: bubble,
+      );
+    }
+
     return Align(
       alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: MediaQuery.of(context).size.width * 0.75,
         ),
-        child: Container(
-          margin: const EdgeInsets.symmetric(vertical: 4),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            color: isMine ? palette.accent : palette.bgCard,
-            borderRadius: radius,
-            border: isMine ? null : Border.all(color: palette.border),
-          ),
-          child: Text(
-            message.text,
-            style: TextStyle(
-              color: isMine
-                  ? TreinoButtonTokens.foreground(context)
-                  : palette.textPrimary,
-              fontSize: 14,
-            ),
-          ),
-        ),
+        child: bubble,
       ),
     );
   }

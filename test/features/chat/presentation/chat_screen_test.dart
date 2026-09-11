@@ -516,4 +516,56 @@ void main() {
       expect(find.textContaining('tiene que seguirte'), findsNothing);
     });
   });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // moderacion-reporte-y-bloqueo — la burbuja de texto no tenía NINGÚN gesto.
+  // ─────────────────────────────────────────────────────────────────────────
+  group('ChatScreen — burbuja: reportar por long-press', () {
+    testWidgets('long-press en un mensaje AJENO abre el sheet de reporte',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        const ChatScreen(chatId: 'aaa_bbb', otherUid: 'bbb'),
+        overrides: [
+          currentUidProvider.overrideWith((_) => 'aaa'),
+          messagesProvider('aaa_bbb').overrideWith(
+            (_) => Stream.value([
+              _msg(id: 'm1', senderId: 'bbb', text: 'mensaje ajeno'),
+            ]),
+          ),
+          userPublicProfileProvider('bbb').overrideWith(
+            (_) => Stream.value(_pub('bbb', 'Coach Joe')),
+          ),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.longPress(find.text('mensaje ajeno'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('¿Por qué lo reportás?'), findsOneWidget);
+    });
+
+    testWidgets('long-press en un mensaje PROPIO no abre nada', (tester) async {
+      await tester.pumpWidget(_wrap(
+        const ChatScreen(chatId: 'aaa_bbb', otherUid: 'bbb'),
+        overrides: [
+          currentUidProvider.overrideWith((_) => 'aaa'),
+          messagesProvider('aaa_bbb').overrideWith(
+            (_) => Stream.value([
+              _msg(id: 'm1', senderId: 'aaa', text: 'mensaje propio'),
+            ]),
+          ),
+          userPublicProfileProvider('bbb').overrideWith(
+            (_) => Stream.value(_pub('bbb', 'Coach Joe')),
+          ),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.longPress(find.text('mensaje propio'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('¿Por qué lo reportás?'), findsNothing);
+    });
+  });
 }

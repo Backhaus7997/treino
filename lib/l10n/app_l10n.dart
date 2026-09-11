@@ -5030,7 +5030,7 @@ abstract class AppL10n {
   /// **'Post publicado.'**
   String get feedPostPublishedSuccess;
 
-  /// Semantics label for the post card overflow (3-dot) menu button, shown only on the viewer's own posts.
+  /// Semantics label for the post card overflow (3-dot) menu button. Shown for both the owner (Editar/Eliminar) and, since moderacion-reporte-y-bloqueo, any other signed-in viewer (Reportar/Bloquear).
   ///
   /// In es_AR, this message translates to:
   /// **'Opciones del post'**
@@ -7766,6 +7766,150 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'No encontramos compras para restaurar en esta cuenta.'**
   String get paywallAlumnoSinRestaurar;
+
+  /// Semantics label for the overflow (3-dot) menu button that opens Reportar/Bloquear on content that isn't the viewer's own (ReviewTile, PublicProfileScreen header).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Más opciones'**
+  String get moderationMenuA11y;
+
+  /// Label of the Reportar item in the moderation overflow menu.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Reportar'**
+  String get moderationReportAction;
+
+  /// Label of the Bloquear item in the moderation overflow menu.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Bloquear'**
+  String get moderationBlockAction;
+
+  /// Title of the report-reason bottom sheet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Por qué lo reportás?'**
+  String get moderationReportSheetTitle;
+
+  /// Report reason: harassment.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Acoso'**
+  String get moderationReportReasonHarassment;
+
+  /// Report reason: sexual content.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Contenido sexual'**
+  String get moderationReportReasonSexualContent;
+
+  /// Report reason: violence or self-harm.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Violencia o autolesión'**
+  String get moderationReportReasonViolenceOrSelfHarm;
+
+  /// Report reason: dangerous health advice.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Consejo de salud peligroso'**
+  String get moderationReportReasonDangerousHealthAdvice;
+
+  /// Report reason: impersonation.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Suplantación de identidad'**
+  String get moderationReportReasonImpersonation;
+
+  /// Report reason: spam.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Spam'**
+  String get moderationReportReasonSpam;
+
+  /// Report reason: third-party data (sharing someone else's personal data without consent).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Datos de terceros'**
+  String get moderationReportReasonThirdPartyData;
+
+  /// Report reason: intellectual property infringement.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Propiedad intelectual'**
+  String get moderationReportReasonIntellectualProperty;
+
+  /// Report reason: other / none of the above.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Otro'**
+  String get moderationReportReasonOther;
+
+  /// Hint text of the optional free-text detail field in the report sheet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Contanos más (opcional)'**
+  String get moderationReportDetailHint;
+
+  /// Submit button of the report sheet. Disabled until a reason is selected.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ENVIAR REPORTE'**
+  String get moderationReportSubmit;
+
+  /// Cancel/dismiss button of the report sheet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CANCELAR'**
+  String get moderationReportCancel;
+
+  /// Success snackbar after submitting a report.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Gracias, lo vamos a revisar.'**
+  String get moderationReportSuccess;
+
+  /// Error snackbar when submitting a report fails.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos enviar el reporte. Probá de nuevo.'**
+  String get moderationReportError;
+
+  /// Title of the block confirmation sheet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Bloquear a {name}?'**
+  String moderationBlockConfirmTitle(String name);
+
+  /// Body line of the block confirmation sheet, explaining what blocking does.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No va a poder escribirte, seguirte ni reaccionar a tus posts.'**
+  String get moderationBlockConfirmBody;
+
+  /// Button that confirms blocking.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'BLOQUEAR'**
+  String get moderationBlockConfirmAction;
+
+  /// Button that dismisses the block confirmation sheet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CANCELAR'**
+  String get moderationBlockDismiss;
+
+  /// Success snackbar after blocking someone.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Bloqueaste a {name}.'**
+  String moderationBlockSuccess(String name);
+
+  /// Error snackbar when blocking fails.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos bloquear. Probá de nuevo.'**
+  String get moderationBlockError;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

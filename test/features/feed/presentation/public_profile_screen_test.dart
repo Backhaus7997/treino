@@ -394,4 +394,42 @@ void main() {
       expect(find.text('SEGUIR'), findsNothing);
     });
   });
+
+  group('PublicProfileScreen — moderación (moderacion-reporte-y-bloqueo)', () {
+    testWidgets('menú de moderación visible en el header para un perfil ajeno',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        child: const PublicProfileScreen(targetUid: 'target'),
+        view: AsyncData(_view(authorDisplayName: 'Tincho')),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(TreinoIcon.dotsThree), findsOneWidget);
+    });
+
+    testWidgets('menú de moderación ausente en el propio perfil',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        child: const PublicProfileScreen(targetUid: 'target'),
+        view: AsyncData(_view(isSelf: true)),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(TreinoIcon.dotsThree), findsNothing);
+    });
+
+    testWidgets('tocar el menú abre Reportar/Bloquear', (tester) async {
+      await tester.pumpWidget(_wrap(
+        child: const PublicProfileScreen(targetUid: 'target'),
+        view: AsyncData(_view(authorDisplayName: 'Tincho')),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(TreinoIcon.dotsThree));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Reportar'), findsOneWidget);
+      expect(find.text('Bloquear'), findsOneWidget);
+    });
+  });
 }

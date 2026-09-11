@@ -7,6 +7,7 @@ import 'package:treino/features/feed/application/feed_screen_providers.dart';
 import 'package:treino/features/feed/application/follow_providers.dart';
 import 'package:treino/features/feed/application/post_providers.dart';
 import 'package:treino/features/feed/domain/feed_segment.dart';
+import 'package:treino/features/moderation/application/moderation_providers.dart';
 import 'package:treino/features/feed/domain/post.dart';
 import 'package:treino/features/feed/domain/post_privacy.dart';
 import 'package:treino/features/feed/domain/routine_tag.dart';
@@ -81,6 +82,8 @@ void main() {
           authStateChangesProvider.overrideWith((ref) => Stream.value(user)),
           followingProvider('u1')
               .overrideWith((ref) => Stream.value(['u2', 'u3'])),
+          blockedUidsProvider('u1')
+              .overrideWith((ref) => Stream.value(const <String>[])),
           feedForFriendsProvider.overrideWith((ref, _) => Future.value(posts)),
         ],
       );
@@ -103,6 +106,8 @@ void main() {
           authStateChangesProvider.overrideWith((ref) => Stream.value(user)),
           followingProvider('u1')
               .overrideWith((ref) => Stream.value(['u2', 'u3'])),
+          blockedUidsProvider('u1')
+              .overrideWith((ref) => Stream.value(const <String>[])),
           feedForFriendsProvider.overrideWith((ref, key) {
             capturedKey = key;
             return Future.value(const <Post>[]);
@@ -129,6 +134,8 @@ void main() {
         overrides: [
           authStateChangesProvider.overrideWith((ref) => Stream.value(user)),
           followingProvider('u1')
+              .overrideWith((ref) => Stream.value(const <String>[])),
+          blockedUidsProvider('u1')
               .overrideWith((ref) => Stream.value(const <String>[])),
           feedForFriendsProvider
               .overrideWith((ref, _) => Future.value(ownPosts)),
@@ -161,6 +168,8 @@ void main() {
           // u3 sigue a u1 — no tiene que aportar nada al feed de u1.
           followingProvider('u3')
               .overrideWith((ref) => Stream.value(const ['u1'])),
+          blockedUidsProvider('u1')
+              .overrideWith((ref) => Stream.value(const <String>[])),
           feedForFriendsProvider.overrideWith((ref, key) {
             capturedKey = key;
             return Future.value(const <Post>[]);
