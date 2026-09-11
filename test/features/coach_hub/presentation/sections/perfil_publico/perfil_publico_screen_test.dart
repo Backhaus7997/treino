@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/features/coach_hub/presentation/sections/perfil_publico/perfil_publico_screen.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
@@ -57,6 +58,12 @@ Future<void> _pump(
       ],
       child: MaterialApp(
         theme: theme ?? AppTheme.dark(),
+        // `coach_hub_app.dart:48` sí los monta. Sin esto, cualquier widget de
+        // la sección que use `AppL10n.of(context)` revienta SÓLO en el test,
+        // que es un rojo que no dice nada del producto.
+        locale: const Locale('es', 'AR'),
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
         home: const Scaffold(body: PerfilPublicoScreen()),
       ),
     ),
@@ -228,6 +235,9 @@ void main() {
           ],
           child: MaterialApp(
             theme: AppTheme.dark(),
+            locale: const Locale('es', 'AR'),
+            localizationsDelegates: AppL10n.localizationsDelegates,
+            supportedLocales: AppL10n.supportedLocales,
             home: const Scaffold(body: PerfilPublicoScreen()),
           ),
         ),
