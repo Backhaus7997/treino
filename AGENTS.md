@@ -322,10 +322,19 @@ bookmarks y notificaciones vivas apuntándoles. No lo confundas con
 
 ### 7. Calidad gates (antes de cada commit)
 
-1. `flutter analyze` → **0 issues**.
-2. `dart format .`.
+1. `flutter analyze` → sin **errores**. (El CI corre
+   `--no-fatal-warnings --no-fatal-infos`: hay deuda de `info` preexistente en el l10n
+   generado que no traba los PRs. No introduzcas nuevos.)
+2. `dart format .` — **lo verifica el CI** (job `Analyze`, paso `Format`). Un PR con
+   archivos sin formatear se pone rojo.
 3. `flutter test` (verde si hay tests del cambio).
 4. Si tocaste freezed → `dart run build_runner build --delete-conflicting-outputs`.
+
+El paso 2 fue honor system hasta el 2026-09-11, y para entonces `main` tenía **44
+archivos sin formatear**. El costo no era estético: `dart format` sobre un archivo sucio
+mete hunks ajenos —14 en `routine_editor_screen.dart`, uno de ellos rompiendo un lint—
+así que el que corría el gate se llevaba un diff que no era suyo y el que no lo corría no
+pagaba nada. El incentivo estaba al revés; ahora lo verifica el CI.
 
 ### 8. Branching y PRs
 

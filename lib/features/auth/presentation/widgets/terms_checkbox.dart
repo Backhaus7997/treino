@@ -48,11 +48,10 @@ class _TermsCheckboxState extends State<TermsCheckbox> {
   void _openTerms() =>
       _openDoc('Términos y Condiciones', kTermsSections, kTermsLastUpdated);
 
-  void _openPrivacy() => _openDoc(
-      'Política de Privacidad', kPrivacySections, kPrivacyLastUpdated);
+  void _openPrivacy() =>
+      _openDoc('Política de Privacidad', kPrivacySections, kPrivacyLastUpdated);
 
-  void _openDoc(
-      String title, List<LegalSection> sections, String lastUpdated) {
+  void _openDoc(String title, List<LegalSection> sections, String lastUpdated) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => LegalDocumentScreen(

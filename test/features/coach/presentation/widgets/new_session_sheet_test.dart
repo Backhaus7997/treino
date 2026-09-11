@@ -181,7 +181,8 @@ List<Override> _overrides({
 }) {
   return [
     currentUidProvider.overrideWithValue(_kTrainerId),
-    if (analytics != null) analyticsServiceProvider.overrideWithValue(analytics),
+    if (analytics != null)
+      analyticsServiceProvider.overrideWithValue(analytics),
     trainerLinksStreamProvider.overrideWith(
       (ref) => errorLinks
           ? Stream<List<TrainerLink>>.error(Exception('links failed'))

@@ -515,8 +515,8 @@ void _menuDeRutinasTests() {
         displayName: 'Ana',
       );
 
-      expect(find.byKey(const Key('publicar_aviso_nombre_alumno')),
-          findsNothing);
+      expect(
+          find.byKey(const Key('publicar_aviso_nombre_alumno')), findsNothing);
       expect(find.text('Publicar'), findsOneWidget);
     });
 
@@ -553,8 +553,8 @@ void _menuDeRutinasTests() {
 
       expect(find.text('Publicar'), findsOneWidget);
       expect(find.text('Publicar igual'), findsNothing);
-      expect(find.byKey(const Key('publicar_aviso_nombre_alumno')),
-          findsNothing);
+      expect(
+          find.byKey(const Key('publicar_aviso_nombre_alumno')), findsNothing);
     });
 
     // El nombre compuesto. Partiendo el lado del alumno sólo por espacios,

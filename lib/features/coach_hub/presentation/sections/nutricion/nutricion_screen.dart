@@ -109,8 +109,8 @@ class NutricionScreen extends ConsumerWidget {
                             // derecho, y si vuelvo atras me manda a la lista
                             // de alumnos, no de nutricion».
                             context.push(
-                              '/alumnos/${entry.link.athleteId}?tab=plan',
-                            ),
+                          '/alumnos/${entry.link.athleteId}?tab=plan',
+                        ),
                       ),
                       if (entry != filtered.last)
                         const SizedBox(height: AppSpacing.s8),

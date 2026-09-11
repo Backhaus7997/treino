@@ -670,14 +670,15 @@ class _NewSessionSheetState extends ConsumerState<NewSessionSheet> {
       // tira — justo en el camino que este evento quiere cubrir.
       final analytics = ref.read(analyticsServiceProvider);
 
-      final appt = await ref.read(appointmentRepositoryProvider).createByTrainer(
-            trainerId: trainerId,
-            athleteId: athleteId,
-            athleteDisplayName: athleteDisplayName,
-            startsAt: startsAt,
-            durationMin: dur,
-            noteBefore: note.isEmpty ? null : note,
-          );
+      final appt =
+          await ref.read(appointmentRepositoryProvider).createByTrainer(
+                trainerId: trainerId,
+                athleteId: athleteId,
+                athleteDisplayName: athleteDisplayName,
+                startsAt: startsAt,
+                durationMin: dur,
+                noteBefore: note.isEmpty ? null : note,
+              );
 
       // Antes del guard de `mounted`: la cita YA existe en Firestore. Que el
       // sheet se haya cerrado no la des-crea, y saltear el evento por eso

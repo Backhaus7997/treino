@@ -264,10 +264,9 @@ class _TemplatesGrid extends ConsumerWidget {
             // discrepancia: seguirla es gratis y copiarla no. El detalle usa
             // `customizeLockActiveProvider`, que es el otro eje. Antes de
             // "arreglar" esta asimetría, leer el dartdoc de los dos providers.
-            TemplateOrigin.system =>
-              catalogLocked && entry.routine.isPremium
-                  ? PremiumChip(routineId: entry.routine.id)
-                  : null,
+            TemplateOrigin.system => catalogLocked && entry.routine.isPremium
+                ? PremiumChip(routineId: entry.routine.id)
+                : null,
           },
         ),
     ];

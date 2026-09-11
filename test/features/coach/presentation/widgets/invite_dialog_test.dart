@@ -34,8 +34,10 @@ Future<void> _pump(
         currentUidProvider.overrideWithValue('atleta'),
         trainerLinkRepositoryProvider.overrideWithValue(repo),
         // El nombre es decorativo: el diálogo tiene que andar sin él.
-        userPublicProfileProvider('pf-nuevo').overrideWith((_) => Stream.value(null)),
-        userPublicProfileProvider('pf-1').overrideWith((_) => Stream.value(null)),
+        userPublicProfileProvider('pf-nuevo')
+            .overrideWith((_) => Stream.value(null)),
+        userPublicProfileProvider('pf-1')
+            .overrideWith((_) => Stream.value(null)),
       ],
       child: MaterialApp(
         theme: AppTheme.dark(),

@@ -9,7 +9,8 @@ void main() {
     // que del otro lado no resuelven, y enterarse por un alumno que no pudo
     // vincularse.
     final link = buildTrainerInviteLink('pf-123')!;
-    final destino = DeepLinkDestination.fromQuery(Uri.parse(link).queryParameters);
+    final destino =
+        DeepLinkDestination.fromQuery(Uri.parse(link).queryParameters);
 
     expect(destino, isNotNull);
     expect(destino!.to, DeepLinkTo.invitacion);

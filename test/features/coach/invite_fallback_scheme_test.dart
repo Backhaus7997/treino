@@ -30,8 +30,8 @@ void main() {
     });
 
     test('Android lo declara en el manifest', () {
-      final manifest =
-          File('$raiz/android/app/src/main/AndroidManifest.xml').readAsStringSync();
+      final manifest = File('$raiz/android/app/src/main/AndroidManifest.xml')
+          .readAsStringSync();
       expect(
         manifest.contains('android:scheme="treino"'),
         isTrue,
@@ -73,8 +73,7 @@ void main() {
   });
 
   group('La captura no depende del esquema —', () {
-    test('una invitación por treino:// se parsea igual que por https',
-        () {
+    test('una invitación por treino:// se parsea igual que por https', () {
       const query = 'to=invitacion&pf=PF123';
       expect(
         trainerIdDeInvitacion(Uri.parse('treino:///abrir/alumno?$query')),

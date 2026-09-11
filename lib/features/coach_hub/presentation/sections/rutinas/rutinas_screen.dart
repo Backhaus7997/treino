@@ -72,8 +72,8 @@ class RutinasScreen extends ConsumerWidget {
               error: (_, __) =>
                   _muted(palette, 'No pudimos cargar tus rutinas.'), // i18n
               data: (rutinas) => rutinas.isEmpty
-                  ? _muted(palette,
-                      'Todavía no creaste ninguna rutina.') // i18n
+                  ? _muted(
+                      palette, 'Todavía no creaste ninguna rutina.') // i18n
                   : _RutinasView(rutinas: rutinas),
             ),
           ),

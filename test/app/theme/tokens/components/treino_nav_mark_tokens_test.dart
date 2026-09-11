@@ -55,7 +55,8 @@ void main() {
         // contra blanco) pero compone ~1,6:1, que es exactamente el defecto
         // que `accentText` existe para evitar. Un delta perceptual lo daba
         // por bueno; el ratio no.
-        for (final marca in {'contenido': t.content, 'atención': t.attention}.entries) {
+        for (final marca
+            in {'contenido': t.content, 'atención': t.attention}.entries) {
           expect(
             _ratio(_on(marca.value, fondo), fondo),
             greaterThanOrEqualTo(3.0),
