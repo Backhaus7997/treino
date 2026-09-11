@@ -1864,5 +1864,43 @@
   "paywallAlumnoErrorCompra": "",
   "@paywallAlumnoErrorCompra": {},
   "paywallAlumnoSinRestaurar": "",
-  "@paywallAlumnoSinRestaurar": {}
+  "@paywallAlumnoSinRestaurar": {},
+  "moderationMenuA11y": "More options",
+  "moderationReportAction": "Report",
+  "moderationBlockAction": "Block",
+  "moderationReportSheetTitle": "Why are you reporting this?",
+  "moderationReportReasonHarassment": "Harassment",
+  "moderationReportReasonSexualContent": "Sexual content",
+  "moderationReportReasonViolenceOrSelfHarm": "Violence or self-harm",
+  "moderationReportReasonDangerousHealthAdvice": "Dangerous health advice",
+  "moderationReportReasonImpersonation": "Impersonation",
+  "moderationReportReasonSpam": "Spam",
+  "moderationReportReasonThirdPartyData": "Third-party data",
+  "moderationReportReasonIntellectualProperty": "Intellectual property",
+  "moderationReportReasonOther": "Other",
+  "moderationReportDetailHint": "Tell us more (optional)",
+  "moderationReportSubmit": "SUBMIT REPORT",
+  "moderationReportCancel": "CANCEL",
+  "moderationReportSuccess": "Thanks, we'll review it.",
+  "moderationReportError": "We couldn't send the report. Try again.",
+  "moderationBlockConfirmTitle": "Block {name}?",
+  "@moderationBlockConfirmTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "moderationBlockConfirmBody": "They won't be able to message you, follow you, or react to your posts.",
+  "moderationBlockConfirmAction": "BLOCK",
+  "moderationBlockDismiss": "CANCEL",
+  "moderationBlockSuccess": "You blocked {name}.",
+  "@moderationBlockSuccess": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "moderationBlockError": "We couldn't block them. Try again."
 }

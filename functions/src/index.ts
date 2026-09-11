@@ -222,3 +222,12 @@ export { rcWebhook } from "./subscriptions/rc/webhook";
 // Su valor es retroactivo: el dia que haga falta se necesita para todo el que
 // YA compro. Por eso se emite desde hoy. Ver el encabezado del archivo.
 export { ensureStoreAccountToken } from "./subscriptions/store-account-token";
+
+// Moderación (change `moderacion-reporte-y-bloqueo`): bloquear borra las
+// aristas de follow en las dos direcciones, así que el tier `followers` de
+// `posts` queda protegido por la regla de lectura que YA EXISTE
+// (`followAccepted`) sin tocar `posts/{postId} allow read` — eso hubiera
+// roto el feed entero (una regla de `list` rechaza la query COMPLETA si un
+// solo doc del resultado no pasa). Ver el encabezado de
+// `moderation/remove-follows-on-block.ts`.
+export { removeFollowEdgesOnBlock } from "./moderation/remove-follows-on-block";

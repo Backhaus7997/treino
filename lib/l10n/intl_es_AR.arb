@@ -2197,7 +2197,7 @@
   "postCardMenuA11y": "Opciones del post",
   "coachHubAlumnosRowActionsA11y": "Opciones del alumno",
   "@postCardMenuA11y": {
-    "description": "Semantics label for the post card overflow (3-dot) menu button, shown only on the viewer's own posts."
+    "description": "Semantics label for the post card overflow (3-dot) menu button. Shown for both the owner (Editar/Eliminar) and, since moderacion-reporte-y-bloqueo, any other signed-in viewer (Reportar/Bloquear)."
   },
   "postCardMenuEdit": "Editar",
   "@postCardMenuEdit": {
@@ -3921,5 +3921,111 @@
   "paywallAlumnoSinRestaurar": "No encontramos compras para restaurar en esta cuenta.",
   "@paywallAlumnoSinRestaurar": {
     "description": "Resultado de restaurar cuando no hay nada."
+  },
+  "moderationMenuA11y": "Más opciones",
+  "@moderationMenuA11y": {
+    "description": "Semantics label for the overflow (3-dot) menu button that opens Reportar/Bloquear on content that isn't the viewer's own (ReviewTile, PublicProfileScreen header)."
+  },
+  "moderationReportAction": "Reportar",
+  "@moderationReportAction": {
+    "description": "Label of the Reportar item in the moderation overflow menu."
+  },
+  "moderationBlockAction": "Bloquear",
+  "@moderationBlockAction": {
+    "description": "Label of the Bloquear item in the moderation overflow menu."
+  },
+  "moderationReportSheetTitle": "¿Por qué lo reportás?",
+  "@moderationReportSheetTitle": {
+    "description": "Title of the report-reason bottom sheet."
+  },
+  "moderationReportReasonHarassment": "Acoso",
+  "@moderationReportReasonHarassment": {
+    "description": "Report reason: harassment."
+  },
+  "moderationReportReasonSexualContent": "Contenido sexual",
+  "@moderationReportReasonSexualContent": {
+    "description": "Report reason: sexual content."
+  },
+  "moderationReportReasonViolenceOrSelfHarm": "Violencia o autolesión",
+  "@moderationReportReasonViolenceOrSelfHarm": {
+    "description": "Report reason: violence or self-harm."
+  },
+  "moderationReportReasonDangerousHealthAdvice": "Consejo de salud peligroso",
+  "@moderationReportReasonDangerousHealthAdvice": {
+    "description": "Report reason: dangerous health advice."
+  },
+  "moderationReportReasonImpersonation": "Suplantación de identidad",
+  "@moderationReportReasonImpersonation": {
+    "description": "Report reason: impersonation."
+  },
+  "moderationReportReasonSpam": "Spam",
+  "@moderationReportReasonSpam": {
+    "description": "Report reason: spam."
+  },
+  "moderationReportReasonThirdPartyData": "Datos de terceros",
+  "@moderationReportReasonThirdPartyData": {
+    "description": "Report reason: third-party data (sharing someone else's personal data without consent)."
+  },
+  "moderationReportReasonIntellectualProperty": "Propiedad intelectual",
+  "@moderationReportReasonIntellectualProperty": {
+    "description": "Report reason: intellectual property infringement."
+  },
+  "moderationReportReasonOther": "Otro",
+  "@moderationReportReasonOther": {
+    "description": "Report reason: other / none of the above."
+  },
+  "moderationReportDetailHint": "Contanos más (opcional)",
+  "@moderationReportDetailHint": {
+    "description": "Hint text of the optional free-text detail field in the report sheet."
+  },
+  "moderationReportSubmit": "ENVIAR REPORTE",
+  "@moderationReportSubmit": {
+    "description": "Submit button of the report sheet. Disabled until a reason is selected."
+  },
+  "moderationReportCancel": "CANCELAR",
+  "@moderationReportCancel": {
+    "description": "Cancel/dismiss button of the report sheet."
+  },
+  "moderationReportSuccess": "Gracias, lo vamos a revisar.",
+  "@moderationReportSuccess": {
+    "description": "Success snackbar after submitting a report."
+  },
+  "moderationReportError": "No pudimos enviar el reporte. Probá de nuevo.",
+  "@moderationReportError": {
+    "description": "Error snackbar when submitting a report fails."
+  },
+  "moderationBlockConfirmTitle": "¿Bloquear a {name}?",
+  "@moderationBlockConfirmTitle": {
+    "description": "Title of the block confirmation sheet.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "moderationBlockConfirmBody": "No va a poder escribirte, seguirte ni reaccionar a tus posts.",
+  "@moderationBlockConfirmBody": {
+    "description": "Body line of the block confirmation sheet, explaining what blocking does."
+  },
+  "moderationBlockConfirmAction": "BLOQUEAR",
+  "@moderationBlockConfirmAction": {
+    "description": "Button that confirms blocking."
+  },
+  "moderationBlockDismiss": "CANCELAR",
+  "@moderationBlockDismiss": {
+    "description": "Button that dismisses the block confirmation sheet."
+  },
+  "moderationBlockSuccess": "Bloqueaste a {name}.",
+  "@moderationBlockSuccess": {
+    "description": "Success snackbar after blocking someone.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "moderationBlockError": "No pudimos bloquear. Probá de nuevo.",
+  "@moderationBlockError": {
+    "description": "Error snackbar when blocking fails."
   }
 }

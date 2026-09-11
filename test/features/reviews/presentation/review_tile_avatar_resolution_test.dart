@@ -7,6 +7,8 @@ import 'package:treino/features/profile/application/user_public_profile_provider
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/reviews/domain/review.dart';
 import 'package:treino/features/reviews/presentation/widgets/review_tile.dart';
+import 'package:treino/features/workout/application/session_providers.dart'
+    show currentUidProvider;
 import 'package:treino/l10n/app_l10n.dart';
 
 const _athleteId = 'athlete-1';
@@ -32,6 +34,10 @@ Widget _wrap({
       overrides: [
         userPublicProfileProvider(_athleteId)
             .overrideWith((ref) => Stream.value(profile)),
+        // moderacion-reporte-y-bloqueo: ReviewTile ahora lee currentUidProvider
+        // para el menú de moderación — sin overridearlo pega contra
+        // FirebaseAuth.instance real.
+        currentUidProvider.overrideWith((_) => 'viewer-uid'),
       ],
       child: MaterialApp(
         theme: AppTheme.dark(),

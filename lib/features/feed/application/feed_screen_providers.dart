@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/application/auth_providers.dart';
+import '../../moderation/application/moderation_providers.dart';
 import '../../profile/application/user_providers.dart';
 import '../domain/feed_segment.dart';
 import '../domain/post.dart';
@@ -27,13 +28,21 @@ final myFollowingFeedPaginationKeyProvider =
   if (auth == null) return null;
 
   final friendUids = await ref.watch(followingProvider(auth.uid).future);
+  // moderacion-reporte-y-bloqueo: restar los bloqueados ANTES de armar la key
+  // del whereIn. Es UX, no control de seguridad — el trigger onCreate de
+  // `blocks` ya borra la arista de follow en las dos direcciones (design.md),
+  // así que en régimen esto es casi siempre un no-op; la resta cubre la
+  // ventana entre el write del bloqueo y que ese trigger corra.
+  final blockedUids = await ref.watch(blockedUidsProvider(auth.uid).future);
+  final visibleFriendUids =
+      friendUids.where((uid) => !blockedUids.contains(uid)).toList();
   // QA-FEED-003: incluir el propio uid para que los posts del tier SEGUIDORES
   // del autor aparezcan en su propio feed (consistente con MI GYM / PÚBLICO,
   // donde los propios sí se ven). Sin esto, el autor publica y no ve nada. No
   // hay early-return por conjunto vacío: alguien que no sigue a nadie igual
   // debe ver sus propios posts. La regla de posts ya permite leer los propios
   // (request.auth.uid == authorUid), así que la query no falla.
-  final authorUids = <String>{...friendUids, auth.uid}.toList();
+  final authorUids = <String>{...visibleFriendUids, auth.uid}.toList();
   return friendsFeedPaginationKey(friendUidsKey(authorUids));
 });
 

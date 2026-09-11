@@ -4485,6 +4485,87 @@ class AppL10nEs extends AppL10n {
   @override
   String get paywallAlumnoSinRestaurar =>
       'No encontramos compras para restaurar en esta cuenta.';
+
+  @override
+  String get moderationMenuA11y => 'Más opciones';
+
+  @override
+  String get moderationReportAction => 'Reportar';
+
+  @override
+  String get moderationBlockAction => 'Bloquear';
+
+  @override
+  String get moderationReportSheetTitle => '¿Por qué lo reportás?';
+
+  @override
+  String get moderationReportReasonHarassment => 'Acoso';
+
+  @override
+  String get moderationReportReasonSexualContent => 'Contenido sexual';
+
+  @override
+  String get moderationReportReasonViolenceOrSelfHarm =>
+      'Violencia o autolesión';
+
+  @override
+  String get moderationReportReasonDangerousHealthAdvice =>
+      'Consejo de salud peligroso';
+
+  @override
+  String get moderationReportReasonImpersonation => 'Suplantación de identidad';
+
+  @override
+  String get moderationReportReasonSpam => 'Spam';
+
+  @override
+  String get moderationReportReasonThirdPartyData => 'Datos de terceros';
+
+  @override
+  String get moderationReportReasonIntellectualProperty =>
+      'Propiedad intelectual';
+
+  @override
+  String get moderationReportReasonOther => 'Otro';
+
+  @override
+  String get moderationReportDetailHint => 'Contanos más (opcional)';
+
+  @override
+  String get moderationReportSubmit => 'ENVIAR REPORTE';
+
+  @override
+  String get moderationReportCancel => 'CANCELAR';
+
+  @override
+  String get moderationReportSuccess => 'Gracias, lo vamos a revisar.';
+
+  @override
+  String get moderationReportError =>
+      'No pudimos enviar el reporte. Probá de nuevo.';
+
+  @override
+  String moderationBlockConfirmTitle(String name) {
+    return '¿Bloquear a $name?';
+  }
+
+  @override
+  String get moderationBlockConfirmBody =>
+      'No va a poder escribirte, seguirte ni reaccionar a tus posts.';
+
+  @override
+  String get moderationBlockConfirmAction => 'BLOQUEAR';
+
+  @override
+  String get moderationBlockDismiss => 'CANCELAR';
+
+  @override
+  String moderationBlockSuccess(String name) {
+    return 'Bloqueaste a $name.';
+  }
+
+  @override
+  String get moderationBlockError => 'No pudimos bloquear. Probá de nuevo.';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -8965,4 +9046,85 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get paywallAlumnoSinRestaurar =>
       'No encontramos compras para restaurar en esta cuenta.';
+
+  @override
+  String get moderationMenuA11y => 'Más opciones';
+
+  @override
+  String get moderationReportAction => 'Reportar';
+
+  @override
+  String get moderationBlockAction => 'Bloquear';
+
+  @override
+  String get moderationReportSheetTitle => '¿Por qué lo reportás?';
+
+  @override
+  String get moderationReportReasonHarassment => 'Acoso';
+
+  @override
+  String get moderationReportReasonSexualContent => 'Contenido sexual';
+
+  @override
+  String get moderationReportReasonViolenceOrSelfHarm =>
+      'Violencia o autolesión';
+
+  @override
+  String get moderationReportReasonDangerousHealthAdvice =>
+      'Consejo de salud peligroso';
+
+  @override
+  String get moderationReportReasonImpersonation => 'Suplantación de identidad';
+
+  @override
+  String get moderationReportReasonSpam => 'Spam';
+
+  @override
+  String get moderationReportReasonThirdPartyData => 'Datos de terceros';
+
+  @override
+  String get moderationReportReasonIntellectualProperty =>
+      'Propiedad intelectual';
+
+  @override
+  String get moderationReportReasonOther => 'Otro';
+
+  @override
+  String get moderationReportDetailHint => 'Contanos más (opcional)';
+
+  @override
+  String get moderationReportSubmit => 'ENVIAR REPORTE';
+
+  @override
+  String get moderationReportCancel => 'CANCELAR';
+
+  @override
+  String get moderationReportSuccess => 'Gracias, lo vamos a revisar.';
+
+  @override
+  String get moderationReportError =>
+      'No pudimos enviar el reporte. Probá de nuevo.';
+
+  @override
+  String moderationBlockConfirmTitle(String name) {
+    return '¿Bloquear a $name?';
+  }
+
+  @override
+  String get moderationBlockConfirmBody =>
+      'No va a poder escribirte, seguirte ni reaccionar a tus posts.';
+
+  @override
+  String get moderationBlockConfirmAction => 'BLOQUEAR';
+
+  @override
+  String get moderationBlockDismiss => 'CANCELAR';
+
+  @override
+  String moderationBlockSuccess(String name) {
+    return 'Bloqueaste a $name.';
+  }
+
+  @override
+  String get moderationBlockError => 'No pudimos bloquear. Probá de nuevo.';
 }

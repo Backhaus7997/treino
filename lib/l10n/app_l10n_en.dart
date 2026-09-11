@@ -4395,4 +4395,85 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get paywallAlumnoSinRestaurar => '';
+
+  @override
+  String get moderationMenuA11y => 'More options';
+
+  @override
+  String get moderationReportAction => 'Report';
+
+  @override
+  String get moderationBlockAction => 'Block';
+
+  @override
+  String get moderationReportSheetTitle => 'Why are you reporting this?';
+
+  @override
+  String get moderationReportReasonHarassment => 'Harassment';
+
+  @override
+  String get moderationReportReasonSexualContent => 'Sexual content';
+
+  @override
+  String get moderationReportReasonViolenceOrSelfHarm =>
+      'Violence or self-harm';
+
+  @override
+  String get moderationReportReasonDangerousHealthAdvice =>
+      'Dangerous health advice';
+
+  @override
+  String get moderationReportReasonImpersonation => 'Impersonation';
+
+  @override
+  String get moderationReportReasonSpam => 'Spam';
+
+  @override
+  String get moderationReportReasonThirdPartyData => 'Third-party data';
+
+  @override
+  String get moderationReportReasonIntellectualProperty =>
+      'Intellectual property';
+
+  @override
+  String get moderationReportReasonOther => 'Other';
+
+  @override
+  String get moderationReportDetailHint => 'Tell us more (optional)';
+
+  @override
+  String get moderationReportSubmit => 'SUBMIT REPORT';
+
+  @override
+  String get moderationReportCancel => 'CANCEL';
+
+  @override
+  String get moderationReportSuccess => 'Thanks, we\'ll review it.';
+
+  @override
+  String get moderationReportError =>
+      'We couldn\'t send the report. Try again.';
+
+  @override
+  String moderationBlockConfirmTitle(String name) {
+    return 'Block $name?';
+  }
+
+  @override
+  String get moderationBlockConfirmBody =>
+      'They won\'t be able to message you, follow you, or react to your posts.';
+
+  @override
+  String get moderationBlockConfirmAction => 'BLOCK';
+
+  @override
+  String get moderationBlockDismiss => 'CANCEL';
+
+  @override
+  String moderationBlockSuccess(String name) {
+    return 'You blocked $name.';
+  }
+
+  @override
+  String get moderationBlockError => 'We couldn\'t block them. Try again.';
 }

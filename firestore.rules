@@ -106,6 +106,35 @@ service cloud.firestore {
           && get(/databases/$(database)/documents/follows/$(id)).data.status == 'accepted';
     }
 
+    // ── Bloqueo — notBlocked() (change `moderacion-reporte-y-bloqueo`) ───────
+    // A scope raíz, espejando `followAccepted()` de arriba: lo consumen cuatro
+    // bloques `match` que no se contienen entre sí (`posts/{id}/reactions`,
+    // `chats/{id}/messages`, `follows`, `reviews`). Duplicarlo sería el mismo
+    // riesgo que ya evita `followAccepted` — dos copias de un predicado de
+    // AUTORIZACIÓN que divergen en silencio.
+    //
+    // Chequea LAS DOS DIRECCIONES contra `blocks/{a}_{b}` y `blocks/{b}_{a}`.
+    // El doc de bloqueo es de UNA vía (`blocks/{blockerUid}_{blockedUid}`),
+    // pero el EFECTO tiene que ser de las dos: si A bloquea a B, ninguno le
+    // escribe al otro. Con un solo `exists()` el bloqueador seguiría
+    // recibiendo interacciones de la persona que bloqueó, que es justo de lo
+    // que se quería evitar (design.md, "Las dos direcciones").
+    //
+    // A PROPÓSITO no se usa en `posts/{postId} allow read`: las rules de
+    // `list` se evalúan contra la QUERY, y si un solo doc del resultado no
+    // pasa, Firestore rechaza la query ENTERA en vez de filtrar la fila. El
+    // feed público se rompería para cualquiera con un bloqueo activo. El corte
+    // va en la ESCRITURA, que es donde está el daño real (design.md, "El
+    // error que casi cometo").
+    //
+    // Costo: 2 lecturas por llamada. Como sólo corre en escrituras (mensaje,
+    // reacción, follow, review) y no por cada post de cada scroll, es
+    // despreciable.
+    function notBlocked(a, b) {
+      return !exists(/databases/$(database)/documents/blocks/$(a + '_' + b))
+          && !exists(/databases/$(database)/documents/blocks/$(b + '_' + a));
+    }
+
     // ── Paywall del alumno suelto — el predicado de "¿a éste se le aplica?" ──
     //
     // Vive en el scope RAÍZ, no adentro de un match, porque lo consumen dos
@@ -1220,10 +1249,14 @@ service cloud.firestore {
         allow read: if request.auth != null
                     && reactionPostReadable();
 
+        // notBlocked() en create Y update (change `moderacion-reporte-y-
+        // bloqueo`): una reacción existente que cambia de tipo después de un
+        // bloqueo es la misma clase de contacto no deseado que crearla.
         allow create, update: if request.auth != null
                               && request.auth.uid == reactorUid
                               && reactionPostReadable()
-                              && reactionPayloadOk();
+                              && reactionPayloadOk()
+                              && notBlocked(reactorUid, reactionPost().authorUid);
 
         allow delete: if request.auth != null
                       && request.auth.uid == reactorUid;
@@ -1878,6 +1911,13 @@ service cloud.firestore {
                                    + request.resource.data.followeeUid
                     && request.resource.data.followerUid
                        != request.resource.data.followeeUid
+                    // notBlocked() (change `moderacion-reporte-y-bloqueo`):
+                    // sin esto, el trigger `removeFollowEdgesOnBlock`
+                    // (functions/src/moderation/) que borra las dos aristas
+                    // de follow al bloquear se deshacía con sólo volver a
+                    // seguir.
+                    && notBlocked(request.resource.data.followerUid,
+                                  request.resource.data.followeeUid)
                     && request.resource.data.id == followId
                     && request.resource.data.keys().hasOnly(
                          ['id', 'followerUid', 'followeeUid', 'status',
@@ -2229,7 +2269,12 @@ service cloud.firestore {
         function senderMayPost(uid) {
           let chat = get(/databases/$(database)/documents/chats/$(chatId)).data;
           let other = chat.members[0] == uid ? chat.members[1] : chat.members[0];
+          // notBlocked() afuera del paréntesis: un bloqueo corta el mensaje
+          // sin importar POR QUÉ rama se habilitaba (Coach, consulta o
+          // follow) — moderación va antes que cualquier motivo de contacto
+          // (change `moderacion-reporte-y-bloqueo`).
           return uid in chat.members
+              && notBlocked(uid, other)
               && (
                    'linkId' in chat
                    || chat.get('kind', '') == 'inquiry'
@@ -4042,6 +4087,8 @@ service cloud.firestore {
                     && get(/databases/$(database)/documents/trainer_links/$(request.resource.data.linkId)).data.athleteId == request.auth.uid
                     && get(/databases/$(database)/documents/trainer_links/$(request.resource.data.linkId)).data.trainerId == request.resource.data.trainerId
                     && get(/databases/$(database)/documents/trainer_links/$(request.resource.data.linkId)).data.status in ['active', 'paused']
+                    // notBlocked() (change `moderacion-reporte-y-bloqueo`).
+                    && notBlocked(request.auth.uid, request.resource.data.trainerId)
                     && request.resource.data.rating >= 1
                     && request.resource.data.rating <= 5
                     && (!('comment' in request.resource.data)
@@ -4145,6 +4192,93 @@ service cloud.firestore {
     // el alumno que pago no cobra nunca su acreditacion.
     match /rc_webhook_events/{eventId} {
       allow read, write: if false;
+    }
+
+    // ── Moderación: bloqueo de usuario (change `moderacion-reporte-y-bloqueo`) ──
+    //
+    // blocks/{blockerUid}_{blockedUid} — copia el molde de `follows` (:103,
+    // match /follows/{followId} más arriba): arista DIRIGIDA, id compuesto
+    // SIN ordenar (si se ordenara, las dos direcciones colisionarían en el
+    // mismo doc), y un `members` redundante sólo para array-contains. Más
+    // simple que `follows`: no hay `pending → accepted`, bloquear no se
+    // negocia. Sólo create y delete.
+    //
+    // QA-SEC-010 (oráculo de existencia), mismo idiom que `follows` y
+    // `athlete_notes`, pero MÁS CERRADO: ahí el disyunto se abre para
+    // terceros bajo ciertas condiciones (arista accepted, doc propio). Acá
+    // NO — sólo el bloqueador (prefijo del id) lee, exista o no el doc, así
+    // que "no existe" y "existe pero no sos vos" son indistinguibles para
+    // cualquier otro uid. Decisión de producto encima de la de seguridad: el
+    // bloqueado no puede confirmar que lo bloquearon (design.md).
+    match /blocks/{blockId} {
+      allow read: if request.auth != null
+                  && blockId.split('_')[0] == request.auth.uid;
+
+      // Create: sólo el bloqueador, id fijado a blockerUid_blockedUid, no
+      // auto-bloqueo. hasOnly + hasAll: acá TODOS los campos son
+      // obligatorios (a diferencia de `follows`, no hay opcionales).
+      allow create: if request.auth != null
+                    && request.auth.uid == request.resource.data.blockerUid
+                    && blockId == request.resource.data.blockerUid + '_'
+                                  + request.resource.data.blockedUid
+                    && request.resource.data.blockerUid
+                       != request.resource.data.blockedUid
+                    && request.resource.data.keys().hasOnly(
+                         ['blockerUid', 'blockedUid', 'members', 'createdAt'])
+                    && request.resource.data.keys().hasAll(
+                         ['blockerUid', 'blockedUid', 'members', 'createdAt'])
+                    && request.resource.data.members ==
+                         [request.resource.data.blockerUid,
+                          request.resource.data.blockedUid]
+                    && request.resource.data.createdAt is timestamp;
+
+      // Update: if false — se borra y se recrea, nunca se edita.
+      allow update: if false;
+
+      // Delete: sólo el bloqueador. El trigger `removeFollowEdgesOnBlock`
+      // sólo corre en el CREATE del bloqueo — desbloquear NO restaura las
+      // aristas de follow que se borraron; quedan como estaban, cada uno
+      // vuelve a seguir si quiere.
+      allow delete: if request.auth != null
+                    && request.auth.uid == resource.data.blockerUid;
+    }
+
+    // ── Moderación: reportes (change `moderacion-reporte-y-bloqueo`) ───────────
+    //
+    // reports/{targetKind}_{targetId}_{reporterUid} — mismo truco que
+    // `posts/{postId}/reactions/{reactorUid}`: el uid del que escribe es
+    // PARTE DEL ID. Eso hace imposible falsificar el reporterUid de un
+    // tercero, y hace idempotente el doble reporte del mismo target por la
+    // misma persona — sin ningún contador (design.md).
+    //
+    // read/update/delete cerrados a TODO cliente, reporterUid incluido: los
+    // reportes se revisan por consola. Un denunciante que pudiera leer
+    // reportes (propios o ajenos) es un canal de acoso nuevo.
+    match /reports/{reportId} {
+      allow read: if false;
+
+      allow create: if request.auth != null
+                    && request.auth.uid == request.resource.data.reporterUid
+                    && reportId == request.resource.data.targetKind + '_'
+                                   + request.resource.data.targetId + '_'
+                                   + request.resource.data.reporterUid
+                    && request.resource.data.targetKind in
+                         ['post', 'message', 'review', 'profile']
+                    && request.resource.data.targetId is string
+                    && request.resource.data.targetId.size() > 0
+                    && request.resource.data.targetOwnerUid is string
+                    && request.resource.data.targetOwnerUid.size() > 0
+                    && request.resource.data.reason in
+                         ['harassment', 'sexualContent', 'violenceOrSelfHarm',
+                          'dangerousHealthAdvice', 'impersonation', 'spam',
+                          'thirdPartyData', 'intellectualProperty', 'other']
+                    && optStrMaxLen(request.resource.data.get('detail', null), 1000)
+                    && request.resource.data.keys().hasOnly(
+                         ['reporterUid', 'targetKind', 'targetId',
+                          'targetOwnerUid', 'reason', 'detail', 'createdAt'])
+                    && request.resource.data.createdAt is timestamp;
+
+      allow update, delete: if false;
     }
   }
 }

@@ -9,6 +9,8 @@ import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../chat/application/chat_providers.dart';
+import '../../moderation/domain/report_target_kind.dart';
+import '../../moderation/presentation/moderation_actions.dart';
 import '../../workout/application/user_routines_providers.dart';
 import '../application/follow_list_providers.dart';
 import '../application/post_providers.dart';
@@ -45,6 +47,9 @@ class PublicProfileScreen extends ConsumerWidget {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     final viewAsync = ref.watch(publicProfileViewProvider(targetUid));
+    // Sólo para el botón de moderación del AppBar — el resto de la pantalla
+    // sigue leyendo `viewAsync.when(...)` para loading/error/data.
+    final view = viewAsync.valueOrNull;
 
     // Transparent Scaffold + AppBar so the screen still composites over the
     // shell's AppBackground, while providing an on-screen back affordance
@@ -67,6 +72,28 @@ class PublicProfileScreen extends ConsumerWidget {
           onPressed: () =>
               context.canPop() ? context.pop() : context.go('/feed'),
         ),
+        // Reportar/Bloquear el perfil — sólo cuando ya resolvió Y no es el
+        // propio (moderacion-reporte-y-bloqueo). Nada mientras carga: no hay
+        // targetOwnerDisplayName todavía.
+        actions: [
+          if (view != null && !view.isSelf)
+            Semantics(
+              button: true,
+              label: l10n.moderationMenuA11y,
+              child: IconButton(
+                icon: Icon(TreinoIcon.dotsThree, color: palette.textPrimary),
+                onPressed: () => showModerationMenu(
+                  context,
+                  ref,
+                  targetKind: ReportTargetKind.profile,
+                  targetId: targetUid,
+                  targetOwnerUid: targetUid,
+                  targetOwnerDisplayName: view.authorDisplayName,
+                ),
+                tooltip: null,
+              ),
+            ),
+        ],
       ),
       body: viewAsync.when(
         data: (view) {
