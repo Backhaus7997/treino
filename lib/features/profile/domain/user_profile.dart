@@ -92,6 +92,15 @@ class UserProfile with _$UserProfile {
     @Default(<String>[]) List<String> trainerGeohashes,
     @Default(false) bool trainerOffersOnline,
 
+    /// Kill switch del PF para las consultas previas (#637).
+    ///
+    /// Arranca en `true`, al revés que [trainerOffersOnline], y no es
+    /// cosmética: `firestore.rules` lee este campo con
+    /// `.get('acceptsInquiries', true)`, o sea que un PF sin el campo ES
+    /// consultable. Un `@Default(false)` acá le apagaría las consultas a
+    /// TODOS los PF existentes sin que ninguno lo haya pedido.
+    @Default(true) bool acceptsInquiries,
+
     // ── Athlete active routine (home today's card PR#2) ───────────────────
     // Points to the user-created routine the athlete picked as "the one I'm
     // currently training". Used by [todaysRoutineProvider] to resolve the home

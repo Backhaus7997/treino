@@ -926,6 +926,18 @@ abstract class AppL10n {
   /// **'No encontramos un vínculo activo con un PF.'**
   String get athleteLinkRequired;
 
+  /// Toggle del perfil del PF: si acepta consultas previas de alumnos sin vínculo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Acepto consultas'**
+  String get trainerAcceptsInquiriesTitle;
+
+  /// Subtítulo del toggle de consultas. Dice NUEVAS a propósito: `senderMayPost` autoriza incondicionalmente todo chat que ya tiene kind:inquiry, así que apagar el switch NO calla a quien ya venía hablando. Decir «sólo te escriben tus alumnos» era una promesa que el sistema no cumple.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Un alumno puede escribirte antes de pedirte el vínculo. Si lo apagás, no te llegan consultas nuevas — las conversaciones ya abiertas siguen.'**
+  String get trainerAcceptsInquiriesSubtitle;
+
   /// Gate de vínculo cuando el servidor no contestó a tiempo. Es una causa DISTINTA de athleteLinkRequired: allá el servidor dijo que no hay vínculo, acá no pudimos preguntarle. Mezclarlas fue el bug que este gate existe para no repetir.
   ///
   /// In es_AR, this message translates to:

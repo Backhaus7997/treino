@@ -33,8 +33,16 @@ const _trainerUid = 'trainer-visited';
 const _otherTrainerUid = 'trainer-already-mine';
 const _athleteId = 'athlete-1';
 
-TrainerPublicProfile _profile(String uid, String name) =>
-    TrainerPublicProfile(uid: uid, displayName: name);
+TrainerPublicProfile _profile(
+  String uid,
+  String name, {
+  bool acceptsInquiries = true,
+}) =>
+    TrainerPublicProfile(
+      uid: uid,
+      displayName: name,
+      acceptsInquiries: acceptsInquiries,
+    );
 
 TrainerLink _link(TrainerLinkStatus status, String trainerId) => TrainerLink(
       id: 'link-1',
@@ -44,10 +52,15 @@ TrainerLink _link(TrainerLinkStatus status, String trainerId) => TrainerLink(
       requestedAt: DateTime.utc(2026, 8, 24),
     );
 
-Widget _wrap({TrainerLink? existingLink}) => ProviderScope(
+Widget _wrap(
+        {TrainerLink? existingLink, bool trainerAcceptsInquiries = true}) =>
+    ProviderScope(
       overrides: [
-        trainerByIdProvider(_trainerUid)
-            .overrideWith((ref) async => _profile(_trainerUid, 'Coach Nuevo')),
+        trainerByIdProvider(_trainerUid).overrideWith((ref) async => _profile(
+              _trainerUid,
+              'Coach Nuevo',
+              acceptsInquiries: trainerAcceptsInquiries,
+            )),
         trainerByIdProvider(_otherTrainerUid).overrideWith(
             (ref) async => _profile(_otherTrainerUid, 'Coach Actual')),
         // El stub lee el provider ANY-STATUS: es el que hace que un `pending`
@@ -144,5 +157,27 @@ void main() {
         );
       });
     }
+  });
+
+  group(
+      'TrainerPublicProfileScreen — acceptsInquiries es el kill switch del '
+      'CTA de consulta (#637)', () {
+    testWidgets('acceptsInquiries:true → el CTA de consulta se dibuja',
+        (tester) async {
+      await tester.pumpWidget(_wrap());
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TrainerInquiryCta), findsOneWidget);
+    });
+
+    testWidgets(
+        'acceptsInquiries:false → el CTA de consulta NO se dibuja, y PEDIR '
+        'VÍNCULO sigue estando', (tester) async {
+      await tester.pumpWidget(_wrap(trainerAcceptsInquiries: false));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TrainerInquiryCta), findsNothing);
+      expect(find.byType(TrainerContactCtaStub), findsOneWidget);
+    });
   });
 }
