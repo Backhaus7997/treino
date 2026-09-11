@@ -33,6 +33,18 @@ struct TodaysWorkout: Equatable {
     let numWeeks: Int
     let exercises: [WatchExercise]
 
+    /// Si esta rutina es una plantilla del catálogo PAGO.
+    ///
+    /// Vive acá y no en `RoutineSummary` porque `TodaysWorkout` es el cuello de
+    /// botella real: **los dos puntos de arranque del reloj pasan por uno**
+    /// —el "Empezar" de HOY y el de la lista— así que el gate se escribe una
+    /// vez y cubre los dos. `RoutineSummary` sólo alimenta filas de lista.
+    ///
+    /// Ausente en el documento ⇒ `false`. Replica el `@Default(false)` de
+    /// `Routine.isPremium` y el `get('isPremium', false)` de `firestore.rules`:
+    /// un error de siembra abre, no cobra.
+    let isPremium: Bool
+
     var exerciseCount: Int { exercises.count }
 }
 
@@ -150,7 +162,8 @@ enum TodaysWorkoutResolver {
             exercises: exercises(
                 from: FS.array(dayFields?["slots"]) ?? [],
                 week: position.weekNumber
-            )
+            ),
+            isPremium: FS.bool(routine["isPremium"]) ?? false
         )
     }
 

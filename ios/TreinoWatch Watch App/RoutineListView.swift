@@ -281,6 +281,12 @@ struct RoutineDetailView: View {
                 errorMessage = "Esta rutina no tiene ejercicios para hoy"
                 return false
             }
+            // El gate del catálogo pago. Va DESPUÉS de resolver el entreno
+            // porque necesita `isPremium`, que viaja en `TodaysWorkout`.
+            if await CatalogGate.blocks(workout: workout, client: client, uid: uid) {
+                errorMessage = CatalogGate.mensajeBloqueado
+                return false
+            }
             workoutCoordinator.start(workout: workout)
             return true
         }
