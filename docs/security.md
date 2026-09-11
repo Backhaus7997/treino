@@ -60,7 +60,7 @@ porque son permisos distintos: `get` protege un documento, `list` protege la
 enumeración, y una regla puede tapar uno y dejar el otro abierto). En Storage
 son `get` / `list` / `write` / `delete`.
 
-### 1.1 Firestore — 34 paths declarados en `firestore.rules`
+### 1.1 Firestore — 36 paths declarados en `firestore.rules`
 
 | Colección | get | list | create | update | delete |
 |---|---|---|---|---|---|
@@ -98,16 +98,18 @@ son `get` / `list` / `write` / `delete`.
 | `payments` | ✅ | ✅ | 🟡 | ✅ | ✅ |
 | `reviews` | — | — | ✅ | — | — |
 | `mail_queue` | — | — | — | — | — |
+| `blocks` | ✅ | — | ✅ | ✅ | ✅ |
+| `reports` | ✅ | — | ✅ | ✅ | ✅ |
 
-**103 de 170 celdas** tienen test negativo (61%). Por operación:
+**111 de 180 celdas** tienen test negativo (62%). Por operación:
 
 | Operación | Paths con test negativo |
 |---|---|
-| `get` | 21 / 34 |
-| `list` | 15 / 34 |
-| `create` | 28 / 34 |
-| `update` | 22 / 34 |
-| `delete` | 12 / 34 |
+| `get` | 23 / 36 |
+| `list` | 15 / 36 |
+| `create` | 32 / 36 |
+| `update` | 27 / 36 |
+| `delete` | 14 / 36 |
 
 Cinco paths siguen **sin una sola aserción negativa**:
 `users/{uid}/customExercises`, `exercises`, `coach_availability_rules`,
