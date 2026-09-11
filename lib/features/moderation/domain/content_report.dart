@@ -19,10 +19,16 @@ part 'content_report.g.dart';
 ///
 /// El `read` está cerrado a todo cliente — los reportes se revisan por
 /// consola de Firestore, nunca desde la app.
+///
+/// ⚠️ [id] lleva `includeToJson: false`: la regla de `create` de `reports`
+/// (`firestore.rules:4276-4278`) hace `hasOnly(['reporterUid', 'targetKind',
+/// 'targetId', 'targetOwnerUid', 'reason', 'detail', 'createdAt'])` — SIN
+/// `id`. Mismo motivo que en `Block`; ver su dartdoc.
 @freezed
 class ContentReport with _$ContentReport {
   const factory ContentReport({
-    required String id,
+    // ignore: invalid_annotation_target — falso positivo de freezed, ver dartdoc de clase.
+    @JsonKey(includeToJson: false) required String id,
     required String reporterUid,
     required ReportTargetKind targetKind,
     required String targetId,

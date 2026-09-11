@@ -20,6 +20,7 @@ ContentReport _$ContentReportFromJson(Map<String, dynamic> json) {
 
 /// @nodoc
 mixin _$ContentReport {
+  @JsonKey(includeToJson: false)
   String get id => throw _privateConstructorUsedError;
   String get reporterUid => throw _privateConstructorUsedError;
   ReportTargetKind get targetKind => throw _privateConstructorUsedError;
@@ -55,7 +56,7 @@ abstract class $ContentReportCopyWith<$Res> {
       _$ContentReportCopyWithImpl<$Res, ContentReport>;
   @useResult
   $Res call(
-      {String id,
+      {@JsonKey(includeToJson: false) String id,
       String reporterUid,
       ReportTargetKind targetKind,
       String targetId,
@@ -135,7 +136,7 @@ abstract class _$$ContentReportImplCopyWith<$Res>
   @override
   @useResult
   $Res call(
-      {String id,
+      {@JsonKey(includeToJson: false) String id,
       String reporterUid,
       ReportTargetKind targetKind,
       String targetId,
@@ -208,7 +209,7 @@ class __$$ContentReportImplCopyWithImpl<$Res>
 @JsonSerializable()
 class _$ContentReportImpl implements _ContentReport {
   const _$ContentReportImpl(
-      {required this.id,
+      {@JsonKey(includeToJson: false) required this.id,
       required this.reporterUid,
       required this.targetKind,
       required this.targetId,
@@ -221,6 +222,7 @@ class _$ContentReportImpl implements _ContentReport {
       _$$ContentReportImplFromJson(json);
 
   @override
+  @JsonKey(includeToJson: false)
   final String id;
   @override
   final String reporterUid;
@@ -294,7 +296,7 @@ class _$ContentReportImpl implements _ContentReport {
 
 abstract class _ContentReport implements ContentReport {
   const factory _ContentReport(
-          {required final String id,
+          {@JsonKey(includeToJson: false) required final String id,
           required final String reporterUid,
           required final ReportTargetKind targetKind,
           required final String targetId,
@@ -308,6 +310,7 @@ abstract class _ContentReport implements ContentReport {
       _$ContentReportImpl.fromJson;
 
   @override
+  @JsonKey(includeToJson: false)
   String get id;
   @override
   String get reporterUid;

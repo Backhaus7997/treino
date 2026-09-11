@@ -21,7 +21,6 @@ _$ContentReportImpl _$$ContentReportImplFromJson(Map<String, dynamic> json) =>
 
 Map<String, dynamic> _$$ContentReportImplToJson(_$ContentReportImpl instance) =>
     <String, dynamic>{
-      'id': instance.id,
       'reporterUid': instance.reporterUid,
       'targetKind': _$ReportTargetKindEnumMap[instance.targetKind]!,
       'targetId': instance.targetId,

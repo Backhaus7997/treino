@@ -20,6 +20,7 @@ Block _$BlockFromJson(Map<String, dynamic> json) {
 
 /// @nodoc
 mixin _$Block {
+  @JsonKey(includeToJson: false)
   String get id => throw _privateConstructorUsedError;
   String get blockerUid => throw _privateConstructorUsedError;
   String get blockedUid => throw _privateConstructorUsedError;
@@ -42,7 +43,7 @@ abstract class $BlockCopyWith<$Res> {
       _$BlockCopyWithImpl<$Res, Block>;
   @useResult
   $Res call(
-      {String id,
+      {@JsonKey(includeToJson: false) String id,
       String blockerUid,
       String blockedUid,
       List<String> members,
@@ -103,7 +104,7 @@ abstract class _$$BlockImplCopyWith<$Res> implements $BlockCopyWith<$Res> {
   @override
   @useResult
   $Res call(
-      {String id,
+      {@JsonKey(includeToJson: false) String id,
       String blockerUid,
       String blockedUid,
       List<String> members,
@@ -158,7 +159,7 @@ class __$$BlockImplCopyWithImpl<$Res>
 @JsonSerializable()
 class _$BlockImpl extends _Block {
   const _$BlockImpl(
-      {required this.id,
+      {@JsonKey(includeToJson: false) required this.id,
       required this.blockerUid,
       required this.blockedUid,
       required final List<String> members,
@@ -170,6 +171,7 @@ class _$BlockImpl extends _Block {
       _$$BlockImplFromJson(json);
 
   @override
+  @JsonKey(includeToJson: false)
   final String id;
   @override
   final String blockerUid;
@@ -230,7 +232,7 @@ class _$BlockImpl extends _Block {
 
 abstract class _Block extends Block {
   const factory _Block(
-      {required final String id,
+      {@JsonKey(includeToJson: false) required final String id,
       required final String blockerUid,
       required final String blockedUid,
       required final List<String> members,
@@ -240,6 +242,7 @@ abstract class _Block extends Block {
   factory _Block.fromJson(Map<String, dynamic> json) = _$BlockImpl.fromJson;
 
   @override
+  @JsonKey(includeToJson: false)
   String get id;
   @override
   String get blockerUid;

@@ -18,7 +18,6 @@ _$BlockImpl _$$BlockImplFromJson(Map<String, dynamic> json) => _$BlockImpl(
 
 Map<String, dynamic> _$$BlockImplToJson(_$BlockImpl instance) =>
     <String, dynamic>{
-      'id': instance.id,
       'blockerUid': instance.blockerUid,
       'blockedUid': instance.blockedUid,
       'members': instance.members,
