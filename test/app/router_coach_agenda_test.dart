@@ -99,6 +99,8 @@ Future<ProviderContainer> _pumpCoachAgenda(
       ),
       // Flujo de atleta: sin vínculo activo.
       currentAthleteLinkProvider.overrideWith((ref) => Stream.value(null)),
+      currentAthleteLinkAnyStatusProvider
+          .overrideWith((ref) => Stream.value(null)),
       // Badges del shell (bottom nav).
       unreadFromCoachProvider.overrideWith((ref) => 0),
       unreadFromFriendsProvider.overrideWith((ref) => 0),
@@ -171,6 +173,8 @@ void main() {
         authStateChangesProvider.overrideWith((_) => Stream.value(null)),
         currentUidProvider.overrideWithValue('t1'),
         currentAthleteLinkProvider.overrideWith((ref) => Stream.value(null)),
+        currentAthleteLinkAnyStatusProvider
+            .overrideWith((ref) => Stream.value(null)),
         unreadFromCoachProvider.overrideWith((ref) => 0),
         unreadFromFriendsProvider.overrideWith((ref) => 0),
       ],
