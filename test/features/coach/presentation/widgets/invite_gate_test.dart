@@ -60,7 +60,8 @@ void main() {
     // está capturada —o las prefs no resolvieron—, `_resolver` se rinde y el
     // latch ya quedó puesto: no reintenta nunca. Salir y volver remonta el
     // widget con el latch limpio, y por eso "se arregla" solo.
-    testWidgets('una invitación que llega DESPUÉS de montado abre el diálogo '
+    testWidgets(
+        'una invitación que llega DESPUÉS de montado abre el diálogo '
         'sin remontar nada', (tester) async {
       final store = await _storeWith(null);
       await _pumpGate(tester, profile: _trainer('pf-1'), store: store);

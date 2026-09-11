@@ -69,7 +69,6 @@ final List<SidebarItem> sidebarRegistry = [
   ...nutricionSidebarItems,
   ...rutinasSidebarItems,
   ...pagosSidebarItems,
-
 ];
 
 /// Devuelve el [SidebarItem] de `sidebarRegistry` cuya `route` matchea

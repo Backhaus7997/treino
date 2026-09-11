@@ -4,7 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:treino/features/coach/data/pending_invite_store.dart';
 
-Future<PendingInviteStore> _store([Map<String, Object> inicial = const {}]) async {
+Future<PendingInviteStore> _store(
+    [Map<String, Object> inicial = const {}]) async {
   SharedPreferences.setMockInitialValues(inicial);
   return PendingInviteStore(await SharedPreferences.getInstance());
 }

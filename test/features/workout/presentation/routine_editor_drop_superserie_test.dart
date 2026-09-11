@@ -204,8 +204,10 @@ void main() {
     await tester.pumpAndSettle();
 
     final saved = await _guardar(tester, repo);
-    expect(saved.days.single.slots.map((slot) => slot.exerciseId), ['a', 'b', 'c']);
-    expect(saved.days.single.slots.map((slot) => slot.supersetGroup), [7, 7, 7]);
+    expect(saved.days.single.slots.map((slot) => slot.exerciseId),
+        ['a', 'b', 'c']);
+    expect(
+        saved.days.single.slots.map((slot) => slot.supersetGroup), [7, 7, 7]);
   });
 
   testWidgets('soltar junto al borde sólo reordena y no une', (tester) async {
@@ -234,8 +236,10 @@ void main() {
     await tester.pumpAndSettle();
 
     final saved = await _guardar(tester, repo);
-    expect(saved.days.single.slots.map((slot) => slot.exerciseId), ['c', 'a', 'b']);
-    expect(saved.days.single.slots.map((slot) => slot.supersetGroup), [null, 7, 7]);
+    expect(saved.days.single.slots.map((slot) => slot.exerciseId),
+        ['c', 'a', 'b']);
+    expect(saved.days.single.slots.map((slot) => slot.supersetGroup),
+        [null, 7, 7]);
   });
 
   testWidgets('arrastrar una superserie nunca activa un destino de unión',
@@ -254,7 +258,8 @@ void main() {
       () => tester.getCenter(find.byKey(const Key('slot_drag_handle_2'))),
     );
     expect(
-      tester.widgetList<SupersetBlock>(find.byType(SupersetBlock))
+      tester
+          .widgetList<SupersetBlock>(find.byType(SupersetBlock))
           .every((block) => !block.resaltadoParaUnir),
       isTrue,
     );
@@ -262,8 +267,10 @@ void main() {
     await tester.pumpAndSettle();
 
     final saved = await _guardar(tester, repo);
-    expect(saved.days.single.slots.map((slot) => slot.exerciseId), ['c', 'a', 'b']);
-    expect(saved.days.single.slots.map((slot) => slot.supersetGroup), [null, 7, 7]);
+    expect(saved.days.single.slots.map((slot) => slot.exerciseId),
+        ['c', 'a', 'b']);
+    expect(saved.days.single.slots.map((slot) => slot.supersetGroup),
+        [null, 7, 7]);
   });
 
   testWidgets('la unión compacta el grupo aunque haya un slot oculto en medio',
@@ -292,12 +299,13 @@ void main() {
     await tester.pumpAndSettle();
 
     final saved = await _guardar(tester, repo);
-    expect(saved.days.single.slots.map((slot) => slot.exerciseId), ['a', 'b', 'c', 'd']);
-    expect(saved.days.single.slots.map((slot) => slot.supersetGroup), [7, 7, 7, null]);
+    expect(saved.days.single.slots.map((slot) => slot.exerciseId),
+        ['a', 'b', 'c', 'd']);
+    expect(saved.days.single.slots.map((slot) => slot.supersetGroup),
+        [7, 7, 7, null]);
   });
 
-  testWidgets(
-      'soltar en la zona central SIN cruzar el punto medio también une',
+  testWidgets('soltar en la zona central SIN cruzar el punto medio también une',
       (tester) async {
     // El caso que el test del centro exacto no toca. Flutter llama `onReorder`
     // SÓLO si el índice cambió: `SliverReorderableListState._dropCompleted`
@@ -595,7 +603,8 @@ void main() {
     await tester.pumpAndSettle();
 
     // Y al soltar el timer se frena: si quedara vivo seguiría scrolleando sola.
-    final alSoltar = tester.state<ScrollableState>(vertical.first).position.pixels;
+    final alSoltar =
+        tester.state<ScrollableState>(vertical.first).position.pixels;
     await tester.pump(const Duration(milliseconds: 300));
     expect(
       tester.state<ScrollableState>(vertical.first).position.pixels,
@@ -671,7 +680,10 @@ void main() {
     await tester.pumpAndSettle();
 
     final superset = find.byType(SupersetBlock);
-    if (superset.evaluate().isEmpty) return; // el grupo se disolvió: nada que medir
+    // El grupo se disolvió: nada que medir.
+    if (superset.evaluate().isEmpty) {
+      return;
+    }
     final bloque = tester.widget<SupersetBlock>(superset);
     expect(
       find

@@ -27,7 +27,6 @@ import '../../../../core/utils/kg_format.dart';
 import '../../domain/set_enums.dart';
 import 'duration_text_field.dart' show secondsToMmss;
 
-
 /// Un set, reducido a lo que el resumen necesita.
 typedef SetDeResumen = ({int? reps, int? durationSeconds, double? weightKg});
 

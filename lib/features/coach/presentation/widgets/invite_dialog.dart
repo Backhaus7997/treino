@@ -39,7 +39,9 @@ class _InviteDialogState extends ConsumerState<_InviteDialog> {
         InviteYaSolicitado(:final trainerId) => trainerId,
         InviteYaVinculado(:final trainerId) => trainerId,
         InviteRequiereDesvincular(:final nuevoTrainerId) => nuevoTrainerId,
-        InviteSoloParaAlumnos() || InviteLinkPropio() || InviteNoAplica() =>
+        InviteSoloParaAlumnos() ||
+        InviteLinkPropio() ||
+        InviteNoAplica() =>
           null,
       };
 

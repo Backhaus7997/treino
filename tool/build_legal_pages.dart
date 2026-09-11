@@ -58,10 +58,8 @@ const _bannerGenerado = '''
       dart run tool/build_legal_pages.dart
 -->''';
 
-String _escape(String s) => s
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;');
+String _escape(String s) =>
+    s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 
 /// Convierte el cuerpo de una sección en párrafos. Los saltos de línea dobles
 /// del Dart separan párrafos; los simples son sólo wrapping del código fuente y
@@ -80,13 +78,11 @@ String _pagina({
   required List<LegalSection> secciones,
   required String ultimaActualizacion,
 }) {
-  final cuerpo = secciones
-      .map((s) => '''
+  final cuerpo = secciones.map((s) => '''
   <section>
     <h2>${_escape(s.heading)}</h2>
 ${_cuerpo(s.body)}
-  </section>''')
-      .join('\n\n');
+  </section>''').join('\n\n');
 
   return '''<!doctype html>
 <html lang="es-AR">
@@ -235,8 +231,8 @@ void main() {
   stdout.writeln('  web/legal/_estilo.css');
   stdout.writeln(
       '  web/legal/privacidad.html  (${kPrivacySections.length} secciones)');
-  stdout
-      .writeln('  web/legal/terminos.html    (${kTermsSections.length} secciones)');
+  stdout.writeln(
+      '  web/legal/terminos.html    (${kTermsSections.length} secciones)');
   stdout.writeln('');
   stdout.writeln('web/legal/eliminar-cuenta.html NO se genera: no sale del');
   stdout.writeln('Dart, se edita a mano.');

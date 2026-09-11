@@ -2219,8 +2219,14 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       for (final s in _days[dayIndex].slots)
         if (s.exercise != null) s.exercise!.id: s,
     };
-    final vuelven = [for (final e in nuevos) if (porId.containsKey(e.id)) e];
-    final aCrear = [for (final e in nuevos) if (!porId.containsKey(e.id)) e];
+    final vuelven = [
+      for (final e in nuevos)
+        if (porId.containsKey(e.id)) e
+    ];
+    final aCrear = [
+      for (final e in nuevos)
+        if (!porId.containsKey(e.id)) e
+    ];
 
     // Determine presence scope for the new slots (ADR-WPRES-04).
     // Prompt only when multi-week AND viewing week ≥ 2 (index ≥ 1).
@@ -4034,6 +4040,7 @@ class _DayExpansionTile extends StatefulWidget {
   final void Function(int absIndex)? onMergeSlotWithPrevious;
   final void Function(int absIndex)? onMergeSlotWithNext;
   final void Function(int absIndex, int groupId) onMergeSlotIntoGroup;
+
   /// Saca un miembro del grupo. `arriba` dice de qué lado aterriza el que
   /// sale: lo usa el drag, que sí tiene dirección. El ⋮ no la tiene y usa
   /// el default.
@@ -4053,7 +4060,6 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
   final Map<_EditableSlot, GlobalKey> _supersetHitTestKeys = {};
   int? _draggedStandaloneAbsIndex;
   int? _highlightedSupersetGroup;
-
 
   /// Cuánto tiene que salirse el dedo del bloque para que soltar signifique
   /// SACAR al miembro del grupo, en dp.
@@ -4152,7 +4158,10 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
     final p = scrollable.position;
     final destino = (p.pixels + factor * _kVelocidadAutoScroll)
         .clamp(p.minScrollExtent, p.maxScrollExtent);
-    if (destino == p.pixels) return; // tope: nada que hacer, pero el gesto sigue
+    // Tope: nada que hacer, pero el gesto sigue.
+    if (destino == p.pixels) {
+      return;
+    }
     p.jumpTo(destino);
     // La lista se movió debajo de un dedo quieto: los rects de los bloques
     // cambiaron y el resaltado hay que recalcularlo con la posición vieja.
@@ -4163,7 +4172,6 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
     _autoScroll?.cancel();
     _autoScroll = null;
   }
-
 
   /// Si el panel de entrada rápida está abierto. Presentación local pura: no
   /// sobrevive a cerrar el día ni viaja al modelo.
@@ -4545,7 +4553,8 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
       return true;
     }
     if (separacion != null) {
-      widget.onUngroupSlot?.call(separacion.absIndex, arriba: separacion.arriba);
+      widget.onUngroupSlot
+          ?.call(separacion.absIndex, arriba: separacion.arriba);
       return true;
     }
     return false;
@@ -4774,8 +4783,8 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
                         isDense: true,
                         contentPadding: EdgeInsets.zero,
                         border: InputBorder.none,
-                        hintText: l10n
-                            .routineEditorDayName(widget.day.dayNumber),
+                        hintText:
+                            l10n.routineEditorDayName(widget.day.dayNumber),
                         hintStyle: GoogleFonts.barlowCondensed(
                           fontWeight: FontWeight.w600,
                           fontSize: 15,
@@ -4785,8 +4794,7 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
                     ),
                   ),
                   IconButton(
-                    key: Key(
-                        'day_name_commit_button_${widget.day.dayNumber}'),
+                    key: Key('day_name_commit_button_${widget.day.dayNumber}'),
                     icon: Icon(TreinoIcon.check,
                         size: 18, color: palette.accentText),
                     tooltip: l10n.routineEditorEditDayNameA11y,
@@ -4801,8 +4809,7 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
           else
             Row(
               children: [
-                if (widget.onQuickSearch != null &&
-                    widget.onQuickAdd != null)
+                if (widget.onQuickSearch != null && widget.onQuickAdd != null)
                   QuickEntryToggle(
                     active: _quickEntryOpen,
                     onTap: () => setState(() {
@@ -4815,10 +4822,9 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
                   ),
                 const Spacer(),
                 IconButton(
-                  key:
-                      Key('day_name_edit_button_${widget.day.dayNumber}'),
-                  icon: Icon(TreinoIcon.edit,
-                      size: 16, color: palette.textMuted),
+                  key: Key('day_name_edit_button_${widget.day.dayNumber}'),
+                  icon:
+                      Icon(TreinoIcon.edit, size: 16, color: palette.textMuted),
                   tooltip: l10n.routineEditorEditDayNameA11y,
                   onPressed: _startEditing,
                   constraints:
@@ -4838,8 +4844,7 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
                   ),
               ],
             ),
-          if (widget.onQuickSearch != null &&
-              widget.onQuickAdd != null) ...[
+          if (widget.onQuickSearch != null && widget.onQuickAdd != null) ...[
             if (_quickEntryOpen) ...[
               const SizedBox(height: AppSpacing.s8),
               ValueListenableBuilder<TextEditingValue>(
@@ -4894,17 +4899,15 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
                           .split(RegExp(r'\s+'))
                           .where((p) => p.isNotEmpty)
                           .toList();
-                      final resto =
-                          value.text.split(RegExp(r'\s+')).where((p) {
+                      final resto = value.text.split(RegExp(r'\s+')).where((p) {
                         if (p.isEmpty) return false;
                         final i = pendientes.indexOf(p.toLowerCase());
                         if (i < 0) return true;
                         pendientes.removeAt(i);
                         return false;
                       }).join(' ');
-                      final texto = resto.isEmpty
-                          ? '${r.name} '
-                          : '${r.name} $resto';
+                      final texto =
+                          resto.isEmpty ? '${r.name} ' : '${r.name} $resto';
                       _quickEntryCtrl.value = TextEditingValue(
                         text: texto,
                         // Cursor AL FINAL, listo para seguir. Sin esto
@@ -5592,7 +5595,6 @@ class _SlotEditorState extends State<_SlotEditor> {
         ],
         unidadDePeso: l10n.monthlyReportVolumeUnit,
       );
-
 
   String _restSummary(int seconds) {
     final display = secondsToMmss(seconds);
