@@ -226,13 +226,85 @@ describe('paywall del alumno — UPDATE de rutina propia', () => {
   // siguiente. Quien lo leyera daba por cubierto un camino que rebotaba.
   // AGENTS.md §11.1. Ahora el comportamiento lo fija el emulador y no la prosa.
 
-  it('con enforced=true: RENOMBRAR una de 4 días REBOTA', async () => {
-    // El caso que el comentario viejo daba por permitido. No se tocaron los
-    // días y rebota igual, porque el documento resultante sigue teniendo 4.
+  it('con enforced=true: RENOMBRAR una de 4 días PASA', async () => {
+    // ⚠️ Este test decía REBOTA hasta el 2026-09-11, y la historia vale.
+    //
+    // El comentario original de la regla daba por permitido renombrar. Era
+    // FALSO —la cláusula medía el resultante— y se escribió este test para
+    // fijar la verdad incómoda: no se podía ni cambiarle el nombre.
+    //
+    // Después se midió la población real: 5 alumnos de 18. Y "podés entrenarla
+    // pero no podés renombrarla" resultó imposible de explicar. Así que se
+    // cambió LA REGLA, no el comentario: `noCreceLaForma` deja pasar un update
+    // que no agranda la rutina.
+    //
+    // O sea que el comentario viejo describía el comportamiento que hoy es
+    // correcto. Se equivocaba de tiempo verbal, no de idea.
+    await seedUser(ATHLETE, { athletePaywallEnforced: true });
+    await seedRoutine(ID, rutina(ATHLETE, { days: 4 }));
+    await assertSucceeds(
+      as(ATHLETE).collection('routines').doc(ID).update({ name: 'Renombrada' }),
+    );
+  });
+
+  it('con enforced=true: RECORTAR de 5 a 4 pasa, aunque siga sobre el tope', async () => {
+    // El caso que `noCreceLaForma` existe para habilitar, y que
+    // `withinFreeRoutineShape` no cubre: 4 sigue siendo > 3, pero 4 < 5.
+    //
+    // Sin esto, el alumno con una rutina de 5 días tenía una sola salida —
+    // recortar de golpe hasta 3— y nada intermedio.
+    await seedUser(ATHLETE, { athletePaywallEnforced: true });
+    await seedRoutine(ID, rutina(ATHLETE, { days: 5 }));
+    await assertSucceeds(
+      as(ATHLETE)
+        .collection('routines')
+        .doc(ID)
+        .update({ days: [day(1), day(2), day(3), day(4)] }),
+    );
+  });
+
+  it('EL QUE IMPORTA: agrandar una que YA estaba sobre el tope REBOTA', async () => {
+    // `noCreceLaForma` compara contra lo que el documento YA TENÍA, no contra
+    // el tope. Si comparara contra el tope, una rutina de 4 días sería una
+    // licencia para crecer sin límite.
     await seedUser(ATHLETE, { athletePaywallEnforced: true });
     await seedRoutine(ID, rutina(ATHLETE, { days: 4 }));
     await assertFails(
-      as(ATHLETE).collection('routines').doc(ID).update({ name: 'Renombrada' }),
+      as(ATHLETE)
+        .collection('routines')
+        .doc(ID)
+        .update({ days: [day(1), day(2), day(3), day(4), day(5)] }),
+    );
+  });
+
+  it('con enforced=true: bajar de 8 a 4 semanas pasa, aunque siga sobre el tope', async () => {
+    // El eje que de verdad muerde. Medido el 2026-09-11: de los 5 alumnos
+    // afectados, 4 lo estaban por SEMANAS y sólo 2 por días.
+    await seedUser(ATHLETE, { athletePaywallEnforced: true });
+    await seedRoutine(ID, rutina(ATHLETE, { days: 2, numWeeks: 8 }));
+    await assertSucceeds(
+      as(ATHLETE).collection('routines').doc(ID).update({ numWeeks: 4 }),
+    );
+  });
+
+  it('con enforced=true: subir de 2 a 3 semanas REBOTA', async () => {
+    await seedUser(ATHLETE, { athletePaywallEnforced: true });
+    await seedRoutine(ID, rutina(ATHLETE, { days: 2, numWeeks: 2 }));
+    await assertFails(
+      as(ATHLETE).collection('routines').doc(ID).update({ numWeeks: 3 }),
+    );
+  });
+
+  it('LOS DOS EJES: recortar días pero agrandar semanas REBOTA', async () => {
+    // `noCreceLaForma` exige que NINGUNO de los dos crezca. Con un `||` en vez
+    // de un `&&`, recortar un día compraría semanas gratis.
+    await seedUser(ATHLETE, { athletePaywallEnforced: true });
+    await seedRoutine(ID, rutina(ATHLETE, { days: 5, numWeeks: 2 }));
+    await assertFails(
+      as(ATHLETE)
+        .collection('routines')
+        .doc(ID)
+        .update({ days: [day(1), day(2), day(3), day(4)], numWeeks: 3 }),
     );
   });
 

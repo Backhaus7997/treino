@@ -514,10 +514,28 @@ void main() {
       return repo;
     }
 
-    testWidgets('alumno free: la hoja aparece al ENTRAR, no al guardar',
+    // ⚠️ ESTOS CUATRO TESTS DECÍAN LO CONTRARIO HASTA EL 2026-09-11.
+    //
+    // Fijaban que al ABRIR una rutina propia fuera de tope aparecía la hoja, y
+    // que guardarla sin recortar no escribía. Era correcto para la regla de
+    // entonces: `withinFreeRoutineShape` medía el documento RESULTANTE, así que
+    // una rutina de 4 días no se podía ni renombrar.
+    //
+    // Se midió la población real (5 alumnos de 18, y 4 de ellos pasados por
+    // SEMANAS y no por días) y "podés entrenarla pero no podés renombrarla"
+    // resultó imposible de explicar. Se cambió la REGLA: `noCreceLaForma` de
+    // `firestore.rules` deja pasar un update que no agranda la rutina.
+    //
+    // Lo que estos tests fijan ahora es el espejo de esa regla en el cliente.
+    // Y el espejo no es opcional: sin él el cliente sería MÁS ESTRICTO que el
+    // servidor, que es el peor lado del error — el alumno ve un candado por
+    // algo que el servidor le permite, y no tiene forma de descubrirlo.
+
+    testWidgets('abrirla NO dice nada: ya no hay nada que recortar',
         (tester) async {
-      // El punto entero del cambio. Enterarse al abrir es lo que le ahorra
-      // reacomodar ejercicios media hora para después perder el trabajo.
+      // El aviso al entrar existía porque el alumno TENÍA que hacer algo antes
+      // de poder guardar. Ya no. Seguir mostrándolo sería avisarle de un
+      // problema que no tiene.
       final repo = repoCon(mia(dias: 4));
       await _pumpEditor(
         tester,
@@ -529,15 +547,18 @@ void main() {
         ),
       );
 
-      expect(_sheet, findsOneWidget);
+      expect(_sheet, findsNothing);
+      expect(find.byKey(const Key('editor_name_field')), findsOneWidget);
     });
 
-    testWidgets('el aviso NO bloquea: el editor queda usable para recortar',
+    testWidgets('EL QUE IMPORTA: renombrarla y guardar SÍ escribe',
         (tester) async {
-      // La asimetría deliberada con el gate del catálogo. Allá no hay nada que
-      // el alumno pueda hacer, así que se le corta la entrada. Acá la salida
-      // está adentro —sacar los días que sobran— y bloquear el editor sería
-      // dejarlo con una rutina que no puede ni tocar ni arreglar.
+      // El caso que le daba sentido a todo el trabajo del grandfathering, y el
+      // espejo exacto del test de reglas "RENOMBRAR una de 4 días PASA".
+      //
+      // Si este se pone rojo, el cliente volvió a ser más estricto que el
+      // servidor: la escritura ni sale, y el alumno no se entera de que estaba
+      // permitida.
       final repo = repoCon(mia(dias: 4));
       await _pumpEditor(
         tester,
@@ -548,45 +569,61 @@ void main() {
           repo: repo,
         ),
       );
-      await tester.tap(find.byKey(const Key('free_plan_limit_dismiss')));
-      await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('editor_name_field')), findsOneWidget,
-          reason: 'sin editor el alumno no tiene con qué recortar');
-      expect(find.byKey(const Key('day_tab_3')), findsOneWidget,
-          reason: 'los 4 días se hidrataron: se pueden sacar');
-    });
-
-    testWidgets('guardar sin recortar no escribe, y explica por qué',
-        (tester) async {
-      // El reemplazo del `permission-denied` crudo: la escritura ni sale.
-      final repo = repoCon(mia(dias: 4));
-      await _pumpEditor(
-        tester,
-        mode: const SelfCreating(existingRoutineId: 'mia-1'),
-        overrides: _overrides(
-          paywallEnabled: true,
-          entitlement: AthleteEntitlement.free,
-          repo: repo,
-        ),
+      await tester.enterText(
+        find.byKey(const Key('editor_name_field')),
+        'Renombrada',
       );
-      await tester.tap(find.byKey(const Key('free_plan_limit_dismiss')));
-      await tester.pumpAndSettle();
-
       await tester.tap(find.widgetWithText(ElevatedButton, 'GUARDAR CAMBIOS'));
       await tester.pumpAndSettle();
 
-      expect(_sheet, findsOneWidget);
-      expect(
-        find.text('No tenés permisos para hacer esto. Recargá la app.'),
-        findsNothing,
-        reason: 'ese mensaje es el que este trabajo vino a sacar: manda a '
-            'recargar, que no arregla nada',
-      );
-      verifyNever(() => repo.updateUserOwned(
+      expect(_sheet, findsNothing);
+      verify(() => repo.updateUserOwned(
             uid: any(named: 'uid'),
             draft: any(named: 'draft'),
-          ));
+          )).called(1);
+    });
+
+    testWidgets('el eje SEMANAS tampoco molesta al abrir', (tester) async {
+      // El eje que de verdad mordía: 4 de los 5 alumnos afectados lo estaban
+      // por semanas, y tres de ellos apenas en 2.
+      final repo = repoCon(mia(dias: 2, numWeeks: 4));
+      await _pumpEditor(
+        tester,
+        mode: const SelfCreating(existingRoutineId: 'mia-1'),
+        overrides: _overrides(
+          paywallEnabled: true,
+          entitlement: AthleteEntitlement.free,
+          repo: repo,
+        ),
+      );
+
+      expect(_sheet, findsNothing);
+    });
+
+    testWidgets('CREAR una de 4 días sigue rebotando', (tester) async {
+      // El control que impide que la excepción se derrame. `noCreceLaForma`
+      // vive SÓLO en el UPDATE: sin una rutina previa contra qué comparar, el
+      // tope se aplica entero.
+      //
+      // `SelfCreating` SIN `existingRoutineId` es el modo de crear, y el guard
+      // del cliente lo distingue a mano porque el servidor lo distingue solo
+      // (el CREATE no tiene `resource.data`).
+      final repo = repoCon(mia(dias: 4));
+      await _pumpEditor(
+        tester,
+        mode: const SelfCreating(),
+        overrides: _overrides(
+          paywallEnabled: true,
+          entitlement: AthleteEntitlement.free,
+          repo: repo,
+        ),
+      );
+      await _tapAgregarDia(tester);
+      await _tapAgregarDia(tester);
+      await _tapAgregarDia(tester);
+
+      expect(_sheet, findsOneWidget);
     });
 
     testWidgets('una rutina propia DENTRO del tope no ve nada', (tester) async {
@@ -640,10 +677,14 @@ void main() {
       expect(find.byKey(const Key('editor_name_field')), findsOneWidget);
     });
 
-    testWidgets('el eje SEMANAS también se anticipa', (tester) async {
-      // `withinFreeRoutineShape` mide las dos dimensiones en la misma
-      // cláusula. Cubrir sólo los días dejaría la rutina periodizada cayendo
-      // en el mismo permission-denied crudo.
+    testWidgets('SEMANAS: abrir una de 4 semanas tampoco molesta',
+        (tester) async {
+      // El gemelo del test de días, sobre el eje que de verdad mordía.
+      //
+      // Decía `findsOneWidget` hasta el 2026-09-11 —la hoja aparecía al abrir—
+      // por la misma razón que los otros: la cláusula medía el resultante.
+      // `noCreceLaForma` mide los DOS ejes contra lo que ya había, así que 4
+      // semanas se pueden seguir editando mientras no pasen a 5.
       final repo = repoCon(mia(dias: 2, numWeeks: 4));
       await _pumpEditor(
         tester,
@@ -655,7 +696,16 @@ void main() {
         ),
       );
 
-      expect(_sheet, findsOneWidget);
+      // Se chequea el ABRIR y no el guardar, y conviene decir por qué: una
+      // rutina de 4 semanas armada con slots sin `weeklySets` no pasa la
+      // validación de `_submit`, que corre ANTES del paywall. Forzar un save
+      // acá probaría la validación, no el gate.
+      //
+      // El camino de guardado lo cubre el test de días de arriba, que es el
+      // mismo código: `_freePlanBlocksShape` mira los dos ejes en la misma
+      // función.
+      expect(_sheet, findsNothing);
+      expect(find.byKey(const Key('editor_name_field')), findsOneWidget);
     });
   });
 
@@ -685,6 +735,64 @@ void main() {
       when(() => repo.getById(any())).thenAnswer((_) async => fuente);
       return repo;
     }
+
+    testWidgets('EL AGUJERO: copiar una rutina AJENA de 4 días sigue rebotando',
+        (tester) async {
+      // Lo encontró una prueba de mutación, y vale contar cómo: se aflojó a
+      // mano el chequeo de modo de `_noCreceRespectoDeLoCargado` para que la
+      // excepción alcanzara a `SelfCustomizing`, y NINGÚN test se puso rojo.
+      //
+      // El motivo por el que no se notaba: al alumno free se le frena
+      // `SelfCustomizing` antes, en el gate del catálogo. Pero ese gate mira
+      // `isPremium`, así que sólo cubre las plantillas PAGAS. Una rutina
+      // pública de OTRO alumno lo pasa, y ahí sí llega a este guard.
+      //
+      // Y el caso importa: `SelfCustomizing` HIDRATA desde la fuente, así que
+      // `_diasAlCargar` queda en 4. Sin el chequeo de modo, el cliente
+      // concluiría "no creció" y dejaría guardar un doc NUEVO de 4 días —
+      // que el servidor rebota, porque `noCreceLaForma` vive sólo en el
+      // UPDATE. El alumno se comería un `permission-denied` crudo.
+      // Los días son REALES y con ejercicios, y eso es load-bearing: con
+      // `days: []` el editor hidrata un día por defecto, la cuenta pasa de 0 a
+      // 1, y el guard bloquea por "creció" — o sea que el test pasaría sin
+      // ejercitar el chequeo de modo. Se descubrió mutando.
+      const slotAjeno = RoutineSlot(
+        exerciseId: 'squat',
+        exerciseName: 'Sentadilla',
+        muscleGroup: 'legs',
+        targetSets: 3,
+        targetRepsMin: 8,
+        targetRepsMax: 12,
+        restSeconds: 90,
+        targetReps: [10],
+      );
+      final ajena = Routine(
+        id: 'otra-1',
+        name: 'Rutina de otro alumno',
+        split: null,
+        level: ExperienceLevel.beginner,
+        days: [
+          for (var i = 1; i <= 4; i++)
+            RoutineDay(dayNumber: i, name: 'Día $i', slots: const [slotAjeno]),
+        ],
+        // NO es del catálogo: el gate de `isPremium` no la toca.
+        source: RoutineSource.userCreated,
+        visibility: RoutineVisibility.public,
+      );
+      final repo = repoCon(ajena);
+      await _pumpEditor(
+        tester,
+        mode: const SelfCustomizing(sourceRoutineId: 'otra-1'),
+        overrides: _overrides(
+          paywallEnabled: true,
+          entitlement: AthleteEntitlement.free,
+          repo: repo,
+        ),
+      );
+
+      expect(_sheet, findsOneWidget,
+          reason: 'copiar es CREAR: la excepción del "no crece" es del UPDATE');
+    });
 
     testWidgets('alumno free: no entra al editor, ve la hoja', (tester) async {
       final repo = repoCon(plantilla());

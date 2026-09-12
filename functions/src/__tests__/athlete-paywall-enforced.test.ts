@@ -134,9 +134,14 @@ function installDb(opts: FakeDbOpts) {
 const ALUMNO: DocumentData = { role: "athlete", uid: "a1" };
 
 describe("el interruptor arranca apagado", () => {
-  // Trinquete. Prenderlo sin resolver el grandfathering le rompe la edicion de
-  // rutinas a todo alumno free que hoy tiene mas de 2 dias — ver el encabezado
-  // del modulo. Si alguien lo prende, que rompa este test y lea el porque.
+  // Trinquete. No es que el paywall este roto: es que prenderlo tiene
+  // consecuencias para usuarios que ya existen, y ese repaso se hace una vez.
+  //
+  // El grandfathering de rutinas propias se cerro el 2026-09-11 con
+  // `noCreceLaForma`. Lo que queda abierto es OTRO: el alumno que ya venia
+  // siguiendo una plantilla PAGA del catalogo deja de poder entrenarla.
+  //
+  // Si alguien lo prende, que rompa este test y lea el encabezado del modulo.
   it("ATHLETE_PAYWALL_ENFORCEMENT_ENABLED es false", () => {
     expect(ATHLETE_PAYWALL_ENFORCEMENT_ENABLED).toBe(false);
   });
