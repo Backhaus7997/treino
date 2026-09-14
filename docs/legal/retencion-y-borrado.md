@@ -22,12 +22,16 @@ dart: kDataRetentionSections
 **Desde la app:** Perfil → Ajustes → Eliminar cuenta. No hace falta pedírselo a
 nadie ni esperar aprobación.
 
-**Desde la web:** [[PENDIENTE — publicar en `gettreino.com/eliminar-cuenta`]]
+**Desde la web:** entrá a
+[gettreino.com/es/eliminar-cuenta](https://gettreino.com/es/eliminar-cuenta) y
+seguí las instrucciones. No hace falta tener la app instalada ni iniciar
+sesión.
 
 > **Requisito de Google Play.** Play exige que exista una URL **accesible desde
 > un navegador, sin instalar la app**, donde se pueda solicitar la eliminación
-> de la cuenta y de los datos. Hoy el borrado in-app funciona; la URL no existe.
-> Es bloqueante de publicación.
+> de la cuenta y de los datos. La página ya está publicada y lo cumple. Lo que
+> queda es **declararla en Play Console**, que es un trámite de consola, no de
+> producto.
 
 ---
 
@@ -138,17 +142,28 @@ recuperar una cuenta eliminada.
 
 ## 6. Cuentas inactivas
 
-[[PENDIENTE — DECISIÓN DEL TITULAR.]]
+[[PENDIENTE — IMPLEMENTACIÓN, no decisión. El plazo está resuelto y es el que
+dice esta sección; lo que falta es el proceso que lo ejecute. El marcador
+bloquea la publicación A PROPÓSITO: hasta que exista, el texto de abajo promete
+una baja automática que no ocurre, y una cláusula que promete lo que el sistema
+no hace es peor que no tenerla. Se saca cuando el proceso esté corriendo.]]
 
-Hoy **no hay política de cuentas inactivas**: una cuenta sin uso conserva sus
-datos indefinidamente. El principio de calidad del dato del art. 4 inc. 7 de la
-Ley 25.326 dice que los datos deben destruirse cuando dejan de ser necesarios
-para la finalidad que motivó su recolección.
+Si no usás tu cuenta durante **24 meses**, te avisamos por correo a la
+dirección con la que te registraste. Si seguís sin usarla, **a los 36 meses de
+inactividad damos de baja la cuenta** y borramos tus datos personales con el
+mismo alcance que si hubieras pedido la eliminación vos (sección 3).
 
-Con datos de salud sobre la mesa, conviene definir un plazo —por ejemplo, aviso
-a los 24 meses de inactividad y baja a los 36— e implementarlo. No es urgente
-para lanzar, pero sí para sostener el argumento de que la retención es
-proporcional.
+Usar la cuenta significa iniciar sesión o registrar cualquier actividad en la
+app. El aviso de los 24 meses llega con doce meses de antelación a la baja, así
+que alcanza con entrar una vez para que el plazo vuelva a empezar.
+
+Conservamos únicamente lo que la ley obliga a conservar, igual que en cualquier
+otra baja.
+
+Este plazo responde al principio de calidad del dato del art. 4 inc. 7 de la
+Ley 25.326: los datos deben destruirse cuando dejan de ser necesarios para la
+finalidad que motivó su recolección. Con datos de salud de por medio, sostener
+que la retención es proporcional exige un plazo escrito y cumplido.
 
 ---
 

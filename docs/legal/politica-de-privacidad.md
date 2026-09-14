@@ -319,8 +319,9 @@ y sesiones, tus medidas y tests, tus check-ins, tus molestias reportadas y sus
 fotos, tus publicaciones, tus archivos, tus vínculos con entrenadores, y **los
 registros privados que tu entrenador llevaba sobre vos**.
 
-También podés solicitarlo en:
-[[PENDIENTE — URL pública de solicitud de borrado, exigida por Google Play]]
+También podés solicitarlo desde la web, sin instalar la app y sin iniciar
+sesión, en
+[gettreino.com/es/eliminar-cuenta](https://gettreino.com/es/eliminar-cuenta).
 
 Detalle técnico en [`retencion-y-borrado.md`](./retencion-y-borrado.md).
 

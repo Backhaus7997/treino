@@ -113,25 +113,31 @@ planes de alimentación: son **registros**, no diagnósticos ni tratamientos.
 
 ---
 
-## 5. Rutinas generadas automáticamente
+## 5. Rutinas del catálogo y plantillas de otras personas
 
-[[REVISAR — al 2026-08-31 la función de generación automática de rutinas
-("Entreno IA") figura en `docs/product.md` pero **no está implementada**: no
-existen ni la clase `WorkoutAIView` ni la ruta `/workout/ai`. Esta cláusula
-queda redactada para cuando exista. Confirmar el alcance real antes de
-publicar.]]
+TREINO **no arma rutinas a pedido**: no hay ninguna función que genere una
+rutina para vos a partir de tus datos. Lo que sí podés hacer es adoptar rutinas
+ya hechas desde la sección Explorar, y vienen de dos lugares:
 
-Si TREINO ofrece rutinas generadas de forma automática:
+- **El catálogo de TREINO.** Plantillas preparadas de antemano, producidas con
+  herramientas automáticas o tomadas de rutinas ya existentes. Ninguna se armó
+  para vos.
+- **Plantillas publicadas por entrenadores de la plataforma.** Las escribió un
+  profesional independiente que no te conoce ni evaluó tu caso.
 
-- **Las genera un sistema informático, no una persona.** No hay un profesional
-  revisando la rutina que te toca.
-- **El sistema no conoce tu estado de salud.** No sabe si tenés una lesión, una
-  contraindicación o una condición médica, aunque hayas cargado datos en la
-  app.
+En los dos casos:
+
+- **Nadie revisó esa rutina para tu situación.** No se construyó a partir de tu
+  estado de salud, aunque hayas cargado datos en la app.
+- **No contempla si tenés una lesión, una contraindicación o una condición
+  médica.**
 - **No sustituye la evaluación de un profesional**, y es especialmente
   inadecuada si tenés cualquiera de las condiciones de la sección 2.
-- Puede producir resultados **inapropiados o inseguros** para tu caso
-  particular. Revisá siempre lo que te propone antes de ejecutarlo.
+- Puede resultar **inapropiada o insegura** para tu caso particular. Revisá lo
+  que propone antes de ejecutarlo.
+
+Si en el futuro TREINO ofrece generación automática de rutinas a pedido, esta
+sección se amplía antes de que la función esté disponible.
 
 ---
 
