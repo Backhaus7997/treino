@@ -8,6 +8,8 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
+import '../../notifications/presentation/permission_gate.dart'
+    show permissionPromptSettledProvider;
 import '../../onboarding/application/onboarding_providers.dart'
     show onboardingBlocksProvider;
 import '../application/trainer_location_consent_providers.dart';
@@ -168,11 +170,25 @@ class _TrainerLocationConsentSheetState
 ///
 /// Mirrors `OnboardingGate` (`../../onboarding/presentation/onboarding_gate.dart`):
 /// instance-level uid latch (a stream re-emission for the SAME trainer must
-/// not re-show it), `addPostFrameCallback` (Riverpod forbids mutating
-/// providers mid-build and the navigator is not ready mid-frame), and waits
-/// on `!onboardingBlocksProvider` — same condition `PermissionGate` waits on
-/// (`permission_gate.dart:49-51`) — so the welcome tour / permission prompt
-/// never stacks with this one on the same frame.
+/// not re-show it) y `addPostFrameCallback` (Riverpod forbids mutating
+/// providers mid-build and the navigator is not ready mid-frame).
+///
+/// Espera DOS cosas, no una (P2-b):
+///
+///  - `!onboardingBlocksProvider`, que cubre el tour de bienvenida.
+///  - `permissionPromptSettledProvider`, que cubre el alert del SO.
+///
+/// Una version anterior de este dartdoc decia que esperar
+/// `!onboardingBlocksProvider` alcanzaba porque era "the same condition
+/// PermissionGate waits on", y que asi el prompt de permisos "never stacks
+/// with this one on the same frame". Era falso, y del modo peor: dos gates
+/// hermanos esperando la MISMA condicion la ven cumplirse en el MISMO frame y
+/// encolan los dos su post-frame callback. Para un PF que ya vio el tour en
+/// otra sesion, `onboardingBlocksProvider` da false desde el primer frame de
+/// cada cold start, y este sheet aparecia DEBAJO del alert del sistema.
+///
+/// Y no alcanzaba con mirar `permissionGateAttemptedProvider`: ese se levanta
+/// ANTES del `await`, o sea antes de que el alert siquiera aparezca.
 class TrainerLocationConsentGate extends ConsumerStatefulWidget {
   const TrainerLocationConsentGate({super.key});
 
@@ -193,11 +209,13 @@ class _TrainerLocationConsentGateState
       userProfileProvider.select((async) => async.valueOrNull?.uid),
     );
     final onboardingPending = ref.watch(onboardingBlocksProvider);
+    final permisosResueltos = ref.watch(permissionPromptSettledProvider);
 
     if (shouldAsk &&
         uid != null &&
         uid != _presentedFor &&
-        !onboardingPending) {
+        !onboardingPending &&
+        permisosResueltos) {
       _presentedFor = uid;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
