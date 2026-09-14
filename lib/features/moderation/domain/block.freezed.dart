@@ -20,6 +20,7 @@ Block _$BlockFromJson(Map<String, dynamic> json) {
 
 /// @nodoc
 mixin _$Block {
+// ignore: invalid_annotation_target — falso positivo de freezed, ver dartdoc de clase.
   @JsonKey(includeToJson: false)
   String get id => throw _privateConstructorUsedError;
   String get blockerUid => throw _privateConstructorUsedError;
@@ -170,6 +171,7 @@ class _$BlockImpl extends _Block {
   factory _$BlockImpl.fromJson(Map<String, dynamic> json) =>
       _$$BlockImplFromJson(json);
 
+// ignore: invalid_annotation_target — falso positivo de freezed, ver dartdoc de clase.
   @override
   @JsonKey(includeToJson: false)
   final String id;
@@ -241,6 +243,7 @@ abstract class _Block extends Block {
 
   factory _Block.fromJson(Map<String, dynamic> json) = _$BlockImpl.fromJson;
 
+// ignore: invalid_annotation_target — falso positivo de freezed, ver dartdoc de clase.
   @override
   @JsonKey(includeToJson: false)
   String get id;
