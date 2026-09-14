@@ -6,7 +6,7 @@
  * EMULATOR-ONLY full-stack seed for manual testing.
  * Creates Auth users + Firestore docs for 13 athletes and 3 coaches,
  * with trainer links, routines, historical sessions, posts (all privacy
- * levels), friendships, and appointments.
+ * levels), follows, chats, and appointments.
  *
  * ────────────────────────────────────────────────────────────────────
  * WARNING: EMULATOR-ONLY CREDENTIALS — DO NOT USE IN PRODUCTION
@@ -312,43 +312,89 @@ const TRAINER_LINKS = [
   },
 ];
 
-// ── Friendships ──────────────────────────────────────────────────────────────
-// Martin ↔ Sofia  (accepted) — same gym, feed shows gym + friends posts
-// Martin ↔ Mateo  (accepted) — different gyms, feed shows friends posts
-// Sofia ↔ Nicolas (pending)  — inbox view test
+// ── Follows ──────────────────────────────────────────────────────────────────
+//
+// Grafo social DIRIGIDO. Reemplaza a `friendships` (change `follow-model`),
+// NO lo acompaña, y el motivo no es higiene: `friendships` está CONGELADO en
+// `firestore.rules:1873` (`create`/`update`/`delete` en `if false`) y el gate
+// de lectura de posts ya pregunta por `follows` — `postFollowerAccepted()` en
+// `firestore.rules:1236` resuelve `followAccepted(lector, autor)`. Mientras
+// este seed sembró `friendships`, los 27 posts con `privacy: 'friends'` no los
+// podía leer NADIE: la colección que los habilitaba tenía cero documentos.
+// Medido contra el emulador antes del cambio. Un post que no aparece no grita,
+// así que el seed se veía sano.
+//
+// `friendships` sigue teniendo `allow read` a propósito (ADR-FOLLOW-012, para
+// el rollback), pero en `lib/` no queda una sola lectura viva — las 5
+// menciones que devuelve `rg -n "friendships" lib/` son todas comentarios que
+// explican la migración. El comando, para que se pueda refutar:
+//
+//   rg -n "friendships" lib/ | rg -v ":\s*(///|//|\*)"    → cero hits
+//   rg -n "'follows'" lib/  | rg -v ":\s*(///|//|\*)"     → follow_repository.dart:27
+//
+// ── Por qué una relación mutua son DOS documentos ───────────────────────────
+//
+// El doc id es `{follower}_{followee}` SIN ordenar (`Follow.edgeId`,
+// lib/features/feed/domain/follow.dart:46). `{A}_{B}` y `{B}_{A}` son
+// documentos DISTINTOS — ahí vive toda la asimetría del modelo. Las 3
+// friendships viejas NO se traducen a 3 follows.
+//
+// `members` tampoco se ordena: la regla exige `members == [followerUid,
+// followeeUid]` en ese orden exacto (`firestore.rules:2030`), y la allowlist
+// de claves es CERRADA — sólo estas 6 (`firestore.rules:2027`).
+//
+// Martin ↔ Sofia  (mutuo, accepted)  — mismo gym: feed con posts de gym + follows
+// Martin ↔ Mateo  (mutuo, accepted)  — gyms distintos: sólo posts de follows
+// Sofia  → Nicolas (pending)         — vista de solicitudes pendientes
+// Valentina → Martin (accepted, UNA vía) — el caso que `friendships` no podía
+//   representar y que este modelo existe para representar: Valentina ve los
+//   posts `friends` de Martín, Martín NO ve los de ella. Sin al menos una
+//   arista asimétrica, el seed no distingue un modelo del otro y cualquier
+//   test que pase con él pasaría igual con el modelo viejo.
 
 function sortedDocId(a, b) {
   return a.localeCompare(b) <= 0 ? `${a}_${b}` : `${b}_${a}`;
 }
 
-const FRIENDSHIPS = [
-  {
-    id: sortedDocId('seed-athlete-001', 'seed-athlete-002'),
-    uidA: 'seed-athlete-001',
-    uidB: 'seed-athlete-002',
-    status: 'accepted',
-    requesterId: 'seed-athlete-001',
-    members: ['seed-athlete-001', 'seed-athlete-002'],
-    createdAt: daysAgo(50),
-  },
-  {
-    id: sortedDocId('seed-athlete-001', 'seed-athlete-003'),
-    uidA: 'seed-athlete-001',
-    uidB: 'seed-athlete-003',
-    status: 'accepted',
-    requesterId: 'seed-athlete-003',
-    members: ['seed-athlete-001', 'seed-athlete-003'],
-    createdAt: daysAgo(40),
-  },
-  {
-    id: sortedDocId('seed-athlete-002', 'seed-athlete-005'),
-    uidA: 'seed-athlete-002',
-    uidB: 'seed-athlete-005',
-    status: 'pending',
-    requesterId: 'seed-athlete-002',
-    members: ['seed-athlete-002', 'seed-athlete-005'],
-    createdAt: daysAgo(3),
-  },
+/// Doc id de una arista de follow: NO ordena. Ver `Follow.edgeId`.
+/// No confundir con `sortedDocId`, que sí ordena y es para `chats`.
+function followEdgeId(follower, followee) {
+  return `${follower}_${followee}`;
+}
+
+function followEdge(follower, followee, status, createdAt) {
+  return {
+    id: followEdgeId(follower, followee),
+    followerUid: follower,
+    followeeUid: followee,
+    status,
+    members: [follower, followee],
+    createdAt,
+  };
+}
+
+/// Doc ids que sembraba la versión anterior de este script en `friendships`.
+/// Sólo los usa `--clear`: ver el comentario ahí.
+const LEGACY_FRIENDSHIP_IDS = [
+  sortedDocId('seed-athlete-001', 'seed-athlete-002'),
+  sortedDocId('seed-athlete-001', 'seed-athlete-003'),
+  sortedDocId('seed-athlete-002', 'seed-athlete-005'),
+];
+
+const FOLLOWS = [
+  // Martín ↔ Sofía — mutuo
+  followEdge('seed-athlete-001', 'seed-athlete-002', 'accepted', daysAgo(50)),
+  followEdge('seed-athlete-002', 'seed-athlete-001', 'accepted', daysAgo(50)),
+
+  // Martín ↔ Mateo — mutuo
+  followEdge('seed-athlete-001', 'seed-athlete-003', 'accepted', daysAgo(40)),
+  followEdge('seed-athlete-003', 'seed-athlete-001', 'accepted', daysAgo(40)),
+
+  // Sofía → Nicolás — pendiente, una sola vía
+  followEdge('seed-athlete-002', 'seed-athlete-005', 'pending', daysAgo(3)),
+
+  // Valentina → Martín — aceptada y UNA sola vía (asimetría a propósito)
+  followEdge('seed-athlete-004', 'seed-athlete-001', 'accepted', daysAgo(15)),
 ];
 
 // ── Routines ──────────────────────────────────────────────────────────────────
@@ -1179,20 +1225,24 @@ async function seedTrainerLinks() {
   }
 }
 
-async function seedFriendships() {
-  console.log('\n── Friendships ──────────────────────────────────────────────────');
-  for (const f of FRIENDSHIPS) {
+async function seedFollows() {
+  console.log('\n── Follows ──────────────────────────────────────────────────────');
+  for (const f of FOLLOWS) {
+    // Las 6 claves de la allowlist cerrada de `firestore.rules:2027`, y nada
+    // más. El Admin SDK saltea las rules, así que una clave de sobra acá no
+    // fallaría al sembrar — fallaría recién el día que el cliente intente
+    // reescribir el doc. Lo que el seed produce tiene que ser un documento que
+    // la app podría haber escrito.
     const data = {
       id: f.id,
-      uidA: f.uidA,
-      uidB: f.uidB,
+      followerUid: f.followerUid,
+      followeeUid: f.followeeUid,
       status: f.status,
-      requesterId: f.requesterId,
       members: f.members,
       createdAt: ts(f.createdAt),
     };
-    await db.collection('friendships').doc(f.id).set(data);
-    console.log(`  ✓ friendships/${f.id} [${f.status}] ${f.uidA} ↔ ${f.uidB}`);
+    await db.collection('follows').doc(f.id).set(data);
+    console.log(`  ✓ follows/${f.id} [${f.status}] ${f.followerUid} → ${f.followeeUid}`);
   }
 }
 
@@ -1405,7 +1455,14 @@ async function clear() {
   ]);
   await deleteCollection('trainerPublicProfiles', COACHES.map(c => c.uid));
   await deleteCollection('trainer_links', TRAINER_LINKS.map(l => l.id));
-  await deleteCollection('friendships', FRIENDSHIPS.map(f => f.id));
+  await deleteCollection('follows', FOLLOWS.map(f => f.id));
+  // El seed ya no siembra `friendships`, pero `--clear` tiene que seguir
+  // borrándolas: cualquier emulador donde haya corrido una versión anterior
+  // conserva esos 3 documentos, y como la colección está congelada
+  // (`firestore.rules:1873`) nada los va a limpiar después. Un reset que deja
+  // basura del modelo viejo es justo el estado en el que alguien depura un
+  // feed vacío mirando la colección equivocada.
+  await deleteCollection('friendships', LEGACY_FRIENDSHIP_IDS);
   await deleteCollection('routines', ROUTINES.map(r => r.id));
   await deleteCollection('posts', POSTS.map(p => p.id));
   await deleteCollection('coach_availability_rules', AVAILABILITY_RULES.map(r => r.id));
@@ -1444,7 +1501,7 @@ async function seed() {
   await seedCoaches();
   await seedAthletes();
   await seedTrainerLinks();
-  await seedFriendships();
+  await seedFollows();
   await seedExercisesCatalog();
   await seedRoutines();
   await seedSessions();
