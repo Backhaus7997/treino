@@ -104,6 +104,7 @@ dependencies:
   # repo: `ios/Podfile:1` fija 14.0 y `android/app/build.gradle.kts:37` fija
   # minSdk 24. No hay que subir nada.
   purchases_flutter: ^10.12.0
+  flutter_local_notifications: ^22.3.1
 
 dev_dependencies:
   flutter_test:

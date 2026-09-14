@@ -24,6 +24,10 @@ android {
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
+        // Requisito DURO de flutter_local_notifications (su README lo pide
+        // explícito): sin esto el build de Android falla al linkear las APIs de
+        // java.time que el plugin usa en minSdk 24. No es una optimización.
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
@@ -233,6 +237,11 @@ gradle.taskGraph.whenReady {
 }
 
 dependencies {
+    // Va con `isCoreLibraryDesugaringEnabled` de arriba — las dos mitades del
+    // mismo requisito de flutter_local_notifications, y ninguna sirve sola.
+    // Versión tomada del README del plugin.
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+
     // `wearImplementation` = SOLO el flavor `wear`. El APK del teléfono no
     // carga nada de esto: no tiene sensores de muñeca ni corre entrenos.
     //

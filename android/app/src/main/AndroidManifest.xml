@@ -98,6 +98,20 @@
             android:name="com.yalantis.ucrop.UCropActivity"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+        <!-- Canal por el que el SDK de FCM dibuja las notificaciones de
+             BACKGROUND, donde Dart no corre.
+
+             Tiene que ser EXACTAMENTE el mismo id que `kCanalDeAvisos`
+             (lib/features/notifications/data/local_notifications_service.dart),
+             que es el canal de las de primer plano. Si se desincronizan, el
+             usuario termina con DOS entradas de configuración para la misma
+             app y silenciar una no silencia la otra.
+
+             Lo fija `test/features/notifications/data/canal_unico_test.dart`,
+             que lee este archivo y compara contra la constante de Dart. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="treino_avisos" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
+
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -111,7 +113,25 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
     // hecha desde la muñeca con el teléfono en otra pantalla no llegaría nunca.
     ref.read(watchTimerControlNotifierProvider);
 
-    // (a) Attach foreground SnackBar listener. (ADR-PN-010, REQ-PN-HANDLER-001)
+    // (a0) Notificaciones LOCALES: las que se dibujan con la app abierta.
+    //
+    // El tap de éstas NO pasa por `onMessageOpenedApp` —esa la dispara el SDK
+    // nativo sólo para las de background—, así que la navegación del tap se
+    // engancha acá, contra el MISMO `goDeepLink` que usan las otras dos
+    // puertas. Si no, tocar un aviso con la app abierta no haría nada.
+    //
+    // `init` es async y no se espera: lo único que hace antes de estar listo es
+    // que un `show()` muy temprano se descarte con un log. Bloquear el arranque
+    // de la app por el canal de notificaciones sería un intercambio malo.
+    unawaited(ref.read(localNotificationsServiceProvider).init(
+      onTap: (deepLink) {
+        final ctx = _router.routerDelegate.navigatorKey.currentContext;
+        if (ctx == null || !ctx.mounted) return;
+        goDeepLink(ctx, deepLink);
+      },
+    ));
+
+    // (a) Attach foreground handler. (REQ-PN-HANDLER-001)
     final fcm = ref.read(fcmServiceProvider);
     _fgSub = fcm.onForegroundMessage.listen(_onForeground);
 
@@ -167,8 +187,18 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
     return config.uri.toString();
   }
 
-  /// Foreground message handler — shows SnackBar via root ScaffoldMessenger.
-  /// ADR-PN-010, REQ-PN-HANDLER-001, SCENARIO-652, 653, 654.
+  /// Handler de mensajes con la app en PRIMER PLANO.
+  ///
+  /// FCM no dibuja nada en foreground: te entrega el mensaje y se desentiende.
+  /// En el teléfono la notificación la dibuja la app
+  /// ([LocalNotificationsService]); en web, donde no hay notificación del
+  /// sistema, sigue el SnackBar de ADR-PN-010.
+  ///
+  /// Dos guardas antes de mostrar, y cubren cosas distintas: [isOwnChatMessage]
+  /// ("lo mandaste vos desde otro dispositivo") y
+  /// [shouldSuppressForegroundNotification] ("ya lo estás mirando").
+  ///
+  /// REQ-PN-HANDLER-001.
   void _onForeground(RemoteMessage message) {
     // Never show the sender their own message (token may be cross-registered
     // on a shared device). See [isOwnChatMessage].
@@ -193,11 +223,34 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
       return;
     }
 
-    final messenger = ref.read(rootScaffoldMessengerKeyProvider).currentState;
-    if (messenger == null) return;
-
     final title = message.notification?.title ?? '';
     final body = message.notification?.body ?? '';
+
+    // En WEB sigue el SnackBar, y no por vagancia: el Coach Hub es Flutter web
+    // y ahí no hay notificación del sistema que mostrar. Sacarlo dejaría a esa
+    // superficie SIN ningún aviso, que es peor que el cartel in-app que tenía.
+    // En el teléfono, en cambio, el cartel era justo el problema del E2E.
+    if (kIsWeb) {
+      _mostrarSnackBar(title: title, body: body, deepLink: deepLink);
+      return;
+    }
+
+    unawaited(ref.read(localNotificationsServiceProvider).show(
+          title: title,
+          body: body,
+          deepLink: deepLink,
+        ));
+  }
+
+  /// Cartel in-app. Camino de WEB únicamente — ver [_onForeground].
+  /// ADR-PN-010, SCENARIO-652, 653, 654.
+  void _mostrarSnackBar({
+    required String title,
+    required String body,
+    required String? deepLink,
+  }) {
+    final messenger = ref.read(rootScaffoldMessengerKeyProvider).currentState;
+    if (messenger == null) return;
 
     // Capture context from the navigator so goDeepLink has GoRouter access.
     final ctx = _router.routerDelegate.navigatorKey.currentContext;
