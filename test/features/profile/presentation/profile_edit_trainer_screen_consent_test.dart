@@ -47,6 +47,15 @@ class _FakeEspejo extends Fake
 
 const _uid = 'trainer-uid';
 
+const _location2 = TrainerLocation(
+  id: 'loc-2',
+  type: TrainerLocationType.custom,
+  customLabel: 'Parque Chacabuco',
+  lat: -34.635,
+  lng: -58.440,
+  geohash: '69y7pkxg0',
+);
+
 const _location = TrainerLocation(
   id: 'loc-1',
   type: TrainerLocationType.custom,
@@ -138,6 +147,18 @@ MockUserRepository _repo() {
   return repo;
 }
 
+/// Quita una ubicación, que es lo que hace que el guardado TOQUE la lista.
+///
+/// Desde P1-c el gate de consentimiento no se dispara con sólo tener
+/// ubicaciones y no tener consentimiento: se dispara cuando el guardado las
+/// cambia. Un test que guarda sin tocarlas ya no ejercita el gate.
+Future<void> _quitarUnaUbicacion(WidgetTester tester) async {
+  final quitar = find.byTooltip('Quitar').first;
+  await tester.ensureVisible(quitar);
+  await tester.tap(quitar);
+  await tester.pumpAndSettle();
+}
+
 Future<void> _tapSave(WidgetTester tester) async {
   await tester.ensureVisible(
     find.byKey(const Key('profile_edit_trainer_save_button')),
@@ -158,10 +179,17 @@ void main() {
         'ANTES de persistir', (tester) async {
       final repo = _repo();
       await tester.pumpWidget(
-        _buildScreen(profile: _trainer(consentAt: null), repo: repo),
+        _buildScreen(
+          profile: _trainer(
+            locations: const [_location, _location2],
+            consentAt: null,
+          ),
+          repo: repo,
+        ),
       );
       await tester.pumpAndSettle();
 
+      await _quitarUnaUbicacion(tester);
       await _tapSave(tester);
 
       // La confirmación está en pantalla...
@@ -180,10 +208,17 @@ void main() {
         (tester) async {
       final repo = _repo();
       await tester.pumpWidget(
-        _buildScreen(profile: _trainer(consentAt: null), repo: repo),
+        _buildScreen(
+          profile: _trainer(
+            locations: const [_location, _location2],
+            consentAt: null,
+          ),
+          repo: repo,
+        ),
       );
       await tester.pumpAndSettle();
 
+      await _quitarUnaUbicacion(tester);
       await _tapSave(tester);
       await tester.tap(
         find.byKey(const Key('profile_edit_trainer_consent_accept')),
@@ -207,6 +242,42 @@ void main() {
           any(),
           grantLocationConsent: true,
         ),
+      ).called(1);
+    });
+
+    testWidgets(
+        'P1-c: el PF que revocó guarda sin que le vuelvan a pedir '
+        'consentimiento', (tester) async {
+      // Estado (consentAt null, promptedAt set): revocó, o cerró el sheet sin
+      // decidir. El gate miraba sólo `consentAt == null`, así que le volvía a
+      // pedir consentimiento en CADA guardado —aunque sólo hubiera tocado la
+      // bio o la tarifa— y decir que no abortaba el guardado entero.
+      //
+      // Acá no se toca la lista de ubicaciones. No hay nada nuevo que
+      // publicar, así que no hay nada que consentir: el guardado tiene que
+      // pasar derecho.
+      final repo = _repo();
+      await tester.pumpWidget(
+        _buildScreen(
+          profile: _trainer(
+            consentAt: null,
+            promptedAt: DateTime.utc(2026, 9, 3),
+          ),
+          repo: repo,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await _tapSave(tester);
+
+      expect(
+        find.byKey(const Key('profile_edit_trainer_consent_confirm')),
+        findsNothing,
+        reason: 'no tiene que aparecer el diálogo: no cambió ninguna ubicación',
+      );
+      // Y guarda de verdad, sin otorgar un consentimiento que nadie dio.
+      verify(
+        () => repo.update(_uid, any(), grantLocationConsent: false),
       ).called(1);
     });
 
@@ -243,10 +314,17 @@ void main() {
         (tester) async {
       final repo = _repo();
       await tester.pumpWidget(
-        _buildScreen(profile: _trainer(consentAt: null), repo: repo),
+        _buildScreen(
+          profile: _trainer(
+            locations: const [_location, _location2],
+            consentAt: null,
+          ),
+          repo: repo,
+        ),
       );
       await tester.pumpAndSettle();
 
+      await _quitarUnaUbicacion(tester);
       await _tapSave(tester);
       await tester.tap(
         find.byKey(const Key('profile_edit_trainer_consent_cancel')),
