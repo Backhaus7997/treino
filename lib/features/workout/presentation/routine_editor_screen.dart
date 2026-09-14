@@ -2925,12 +2925,14 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             numWeeks: _numWeeks,
             summary: _summaryOrNull,
           );
-          final created = await repo.createAssigned(routine);
-          analytics.logPlanAssigned(
-            routineId: created.id,
-            assignedBy: uid,
-            assignedTo: athleteId,
-          );
+          // `plan_assigned` ya NO va acá: lo emite `createAssigned`, que es
+          // donde su dartdoc siempre dijo que estaba. Dejarlo también acá lo
+          // contaría DOS veces desde esta pantalla y una sola desde las otras
+          // cuatro — peor que el agujero que vino a tapar.
+          //
+          // `routine_created` sí se queda: lleva un `source` que sólo conoce
+          // esta pantalla.
+          await repo.createAssigned(routine);
           analytics.logRoutineCreated(
             source: analyticsSource,
             daysCount: days.length,
