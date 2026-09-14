@@ -10,6 +10,8 @@ import '../../app/theme/app_palette.dart';
 import '../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../core/widgets/treino_icon.dart';
 import '../../l10n/app_l10n.dart';
+import '../coach/application/trainer_link_providers.dart';
+import '../coach/domain/trainer_link.dart';
 import '../coach/presentation/trainer_dashboard_tab.dart';
 import '../notifications/presentation/permission_gate.dart';
 import '../onboarding/presentation/onboarding_gate.dart';
@@ -145,6 +147,25 @@ class _AthleteHome extends ConsumerWidget {
         : _isEmptyData(ref.watch(userCreatedRoutinesProvider(uid))) &&
             _isEmptyData(ref.watch(assignedRoutinesProvider(uid)));
 
+    // El tercer camino ("Buscar entrenador") sólo se ofrece cuando el servidor
+    // CONFIRMÓ que el atleta no tiene PF activo — mismo criterio que
+    // `_isEmptyData`, del otro lado del dato.
+    //
+    // Se mira ACÁ y no adentro de `_AthleteFirstRunCard` a propósito: así la
+    // suscripción arranca en el mismo frame que las dos consultas de rutinas,
+    // y como la card no se monta hasta que ESAS confirman contra el servidor,
+    // para cuando aparece el vínculo ya resolvió. Mirándolo adentro de la card
+    // la consulta recién empezaría al montarse, y el primer arranque —el caso
+    // más común de esta card— mostraría dos caminos y saltaría a tres.
+    //
+    // Con `select` y no watcheando el `AsyncValue` entero: de todo el vínculo
+    // acá sólo se usa un booleano, y sin el select cualquier re-emisión del
+    // stream —un cambio de `status`, un `updatedAt`— rebuildea _AthleteHome
+    // entera sin que se dibuje nada distinto.
+    final showFindTrainer = ref.watch(
+      currentAthleteLinkProvider.select(_confirmedWithoutTrainer),
+    );
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       // SingleChildScrollView + Column (no ListView(children:)): un
@@ -175,7 +196,7 @@ class _AthleteHome extends ConsumerWidget {
             TreinoFadeSlideIn(
               delay: AppMotion.stagger(1),
               child: hasNoRoutine
-                  ? const _AthleteFirstRunCard()
+                  ? _AthleteFirstRunCard(showFindTrainer: showFindTrainer)
                   : const EmpezarEntrenamientoCard(),
             ),
             const SizedBox(height: 12),
@@ -204,9 +225,31 @@ class _AthleteHome extends ConsumerWidget {
 bool _isEmptyData(AsyncValue<List<Object?>> async) =>
     async.valueOrNull?.isEmpty ?? false;
 
+/// True sólo cuando el vínculo resolvió a "este atleta NO tiene PF activo".
+/// Loading y error devuelven false, así que el primer arranque cae a dos
+/// caminos y nunca le ofrece buscar entrenador a alguien que ya tiene uno.
+///
+/// **No sirve `valueOrNull`**, que es el idioma del resto del archivo: el dato
+/// de este provider ya es `TrainerLink?`, así que `valueOrNull` da `null`
+/// tanto para "todavía no sé" como para "confirmado que no hay", y colapsa
+/// justo la distinción que decide qué botón se dibuja. `hasValue` es lo único
+/// que separa las dos — mismo criterio que el gate del composer de chat
+/// (`chat_screen.dart`) y que `mi_cuota_provider.dart`, que leen este mismo
+/// provider.
+///
+/// Que el default bajo incertidumbre sea "ocultá el CTA" y no "mostralo" sale
+/// de la misma doctrina que `_isEmptyData`: no afirmar sobre el usuario algo
+/// que no se confirmó. Acá la afirmación es "no tenés entrenador", y es
+/// exactamente la que el hallazgo del E2E vino a sacar. Si el vínculo nunca
+/// resuelve, el atleta sin PF sigue teniendo la tab Coach, que es donde vive
+/// el discovery (AGENTS.md §5) — el CTA es un atajo, nunca la única puerta.
+bool _confirmedWithoutTrainer(AsyncValue<TrainerLink?> async) =>
+    async.hasValue && async.value == null;
+
 /// First-run empty state shown on Home when the athlete has no self-created
 /// routine and no trainer-assigned plan. Replaces the hardcoded fake workout
-/// card with an honest onboarding surface and three CTAs (finding 5, #636).
+/// card with an honest onboarding surface and up to three CTAs (finding 5,
+/// #636) — el tercero depende de si ya tiene PF, ver [showFindTrainer].
 ///
 /// ## Los tres caminos y su orden (#636)
 ///
@@ -229,10 +272,28 @@ bool _isEmptyData(AsyncValue<List<Object?>> async) =>
 ///    verdad, y ahí PLANES va primero. Ahí es donde la hipótesis del issue
 ///    se puede aplicar sin romper el punto 1.
 ///
-/// El body de l10n enumera los tres caminos EN ESTE MISMO ORDEN. Si alguien
+/// El body de l10n enumera los caminos EN ESTE MISMO ORDEN. Si alguien
 /// reordena los botones, tiene que reescribir `homeAthleteFirstRunBody`.
+///
+/// ## El tercer camino es condicional
+///
+/// Un atleta que YA tiene PF activo pero todavía no recibió su plan cae igual
+/// en esta card —la condición de arriba mira rutinas, no vínculo— y ofrecerle
+/// "Buscar entrenador" es decirle que busque lo que ya tiene. Con
+/// [showFindTrainer] en false el tercer botón no se dibuja.
+///
+/// **Y el body cambia con él.** Sacar un botón sin tocar el texto deja la
+/// card prometiendo tres caminos y mostrando dos: ése es justo el desfasaje
+/// que el dartdoc de arriba venía avisando. Por eso son DOS strings
+/// (`homeAthleteFirstRunBody` / `homeAthleteFirstRunBodyWithTrainer`) elegidos
+/// por la MISMA condición que dibuja el botón, y un test que assertea las dos
+/// cosas juntas — texto y cantidad de botones— para que no puedan divergir.
 class _AthleteFirstRunCard extends StatelessWidget {
-  const _AthleteFirstRunCard();
+  const _AthleteFirstRunCard({required this.showFindTrainer});
+
+  /// Si se ofrece el tercer camino. Sólo true cuando el servidor confirmó que
+  /// el atleta no tiene PF activo — ver `_confirmedWithoutTrainer`.
+  final bool showFindTrainer;
 
   @override
   Widget build(BuildContext context) {
@@ -259,7 +320,11 @@ class _AthleteFirstRunCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              l10n.homeAthleteFirstRunBody,
+              // Atado al mismo booleano que el tercer botón, y no a una copia
+              // del criterio: si divergen, la card miente sobre sí misma.
+              showFindTrainer
+                  ? l10n.homeAthleteFirstRunBody
+                  : l10n.homeAthleteFirstRunBodyWithTrainer,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: palette.textMuted,
               ),
@@ -286,14 +351,17 @@ class _AthleteFirstRunCard extends StatelessWidget {
               icon: TreinoIcon.dumbbell,
               onPressed: () => context.go('/workout?tab=plantillas'),
             ),
-            const SizedBox(height: 10),
             // Secondary CTA: route to the Coach tab where athletes browse and
-            // request a trainer.
-            _FirstRunSecondaryCta(
-              label: l10n.homeAthleteFirstRunFindTrainerCta,
-              icon: TreinoIcon.search,
-              onPressed: () => context.go('/coach'),
-            ),
+            // request a trainer. Se omite —con su separador— cuando el atleta
+            // ya tiene PF activo: ver el dartdoc de la clase.
+            if (showFindTrainer) ...[
+              const SizedBox(height: 10),
+              _FirstRunSecondaryCta(
+                label: l10n.homeAthleteFirstRunFindTrainerCta,
+                icon: TreinoIcon.search,
+                onPressed: () => context.go('/coach'),
+              ),
+            ],
           ],
         ),
       ),
