@@ -149,12 +149,10 @@ class _CoachHubPlanPreviewScreenState
         athleteId: athleteId,
       );
       try {
-        final created = await repo.createAssigned(routine);
-        analytics.logPlanAssigned(
-          routineId: created.id,
-          assignedBy: trainerUid,
-          assignedTo: athleteId,
-        );
+        // `plan_assigned` ya NO va acá: lo emite `createAssigned`, que es donde
+        // su dartdoc siempre dijo que estaba. `routine_created` sí se queda —
+        // lleva un `source` que sólo conoce el llamador.
+        await repo.createAssigned(routine);
         analytics.logRoutineCreated(
           source: RoutineCreationSource.trainerAssigned,
           daysCount: routine.days.length,
