@@ -121,7 +121,8 @@ class _TrainerLocationConsentSheetState
                 const SizedBox(height: 8),
                 Text(
                   l10n.trainerLocationConsentSheetBody,
-                  style: TextStyle(color: palette.textMuted, fontSize: 14),
+                  style: TextStyle(
+                      color: palette.textMuted, fontSize: AppTextSize.body),
                 ),
                 const SizedBox(height: 20),
                 ElevatedButton(
@@ -129,6 +130,12 @@ class _TrainerLocationConsentSheetState
                   onPressed: _busy ? null : _accept,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: palette.accent,
+                    // Sin esto hereda `ColorScheme.onPrimary`, que en los DOS
+                    // temas es `palette.bg`: sobre el mint da 1,57:1 en claro.
+                    // Es el caso que nombra la regla 2 de AGENTS.md, y el
+                    // mismo que #767 corrigio en 166 lugares diez dias antes
+                    // de que este sheet existiera.
+                    foregroundColor: TreinoButtonTokens.foreground(context),
                     minimumSize: const Size.fromHeight(48),
                     shape: const StadiumBorder(),
                   ),

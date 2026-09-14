@@ -79,7 +79,7 @@ class LegacyPrivacyNoticeBanner extends ConsumerWidget {
                           l10n.legacyPrivacyNoticeTitle,
                           style: TextStyle(
                             color: palette.textPrimary,
-                            fontSize: 14,
+                            fontSize: AppTextSize.body,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -88,7 +88,7 @@ class LegacyPrivacyNoticeBanner extends ConsumerWidget {
                           l10n.legacyPrivacyNoticeBody,
                           style: TextStyle(
                             color: palette.textMuted,
-                            fontSize: 13,
+                            fontSize: AppTextSize.bodyDense,
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -99,7 +99,7 @@ class LegacyPrivacyNoticeBanner extends ConsumerWidget {
                             l10n.legacyPrivacyNoticeAction,
                             style: TextStyle(
                               color: palette.accent,
-                              fontSize: 13,
+                              fontSize: AppTextSize.bodyDense,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
