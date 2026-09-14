@@ -106,7 +106,11 @@ Widget _buildScreen({
 
 MockUserRepository _repo() {
   final repo = MockUserRepository();
-  when(() => repo.update(any(), any())).thenAnswer((_) async {});
+  when(() => repo.update(
+        any(),
+        any(),
+        grantLocationConsent: any(named: 'grantLocationConsent'),
+      )).thenAnswer((_) async {});
   when(() => repo.grantTrainerLocationConsent(any())).thenAnswer((_) async {});
   return repo;
 }
@@ -149,7 +153,7 @@ void main() {
       verifyNever(() => repo.grantTrainerLocationConsent(any()));
     });
 
-    testWidgets('aceptar otorga el consentimiento y recién ahí persiste',
+    testWidgets('aceptar persiste consentimiento y formulario en UN commit',
         (tester) async {
       final repo = _repo();
       await tester.pumpWidget(
@@ -163,8 +167,53 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      verify(() => repo.grantTrainerLocationConsent(_uid)).called(1);
-      verify(() => repo.update(_uid, any())).called(1);
+      // P1-d. La versión anterior de este test afirmaba
+      // `verify(grantTrainerLocationConsent).called(1)` — o sea, medía QUÉ
+      // MÉTODO se llamó. Por eso pasaba en verde sobre el bug: los dos commits
+      // eran exactamente lo que verificaba.
+      //
+      // Lo que importa es que haya UN solo commit. `grantTrainerLocationConsent`
+      // relee de Firestore y republica las ubicaciones VIEJAS, así que llamarlo
+      // antes del guardado exponía en el espejo público coordenadas que el PF
+      // no consintió — y las dejaba ahí para siempre si el segundo commit
+      // fallaba.
+      verifyNever(() => repo.grantTrainerLocationConsent(any()));
+      verify(
+        () => repo.update(
+          _uid,
+          any(),
+          grantLocationConsent: true,
+        ),
+      ).called(1);
+    });
+
+    testWidgets('con el consentimiento ya otorgado NO lo vuelve a otorgar',
+        (tester) async {
+      // Control negativo del test de arriba: sin esto, `grantLocationConsent`
+      // podría estar cableado en `true` siempre y el test anterior no se
+      // enteraría.
+      final repo = _repo();
+      await tester.pumpWidget(
+        _buildScreen(
+          profile: _trainer(
+            consentAt: DateTime.utc(2026, 3, 1),
+            promptedAt: DateTime.utc(2026, 3, 1),
+          ),
+          repo: repo,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await _tapSave(tester);
+      await tester.pumpAndSettle();
+
+      verify(
+        () => repo.update(
+          _uid,
+          any(),
+          grantLocationConsent: false,
+        ),
+      ).called(1);
     });
 
     testWidgets('cancelar no persiste NI pierde lo cargado en silencio',

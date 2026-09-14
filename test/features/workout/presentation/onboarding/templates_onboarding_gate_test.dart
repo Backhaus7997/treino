@@ -31,7 +31,11 @@ class _CapturingUserRepository extends Fake implements UserRepository {
   }
 
   @override
-  Future<void> update(String uid, Map<String, Object?> partial) async {
+  Future<void> update(
+    String uid,
+    Map<String, Object?> partial, {
+    bool grantLocationConsent = false,
+  }) async {
     updates.add(partial);
   }
 }

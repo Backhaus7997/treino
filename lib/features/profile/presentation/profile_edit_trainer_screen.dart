@@ -235,6 +235,9 @@ class _ProfileEditTrainerScreenState
       return;
     }
 
+    // Se resuelve acá y se aplica abajo, en el único `update()`.
+    var otorgaConsentimiento = false;
+
     // consentimiento-legal-versionado (T2): pedir el consentimiento ANTES
     // del primer publish.
     //
@@ -253,8 +256,13 @@ class _ProfileEditTrainerScreenState
       // en pantalla. Un "cancelar" que además le vacía la lista sería otra
       // falla silenciosa, en la dirección opuesta.
       if (!consented) return;
-      await ref.read(userRepositoryProvider).grantTrainerLocationConsent(uid);
-      if (!mounted) return;
+      // P1-d: NO se otorga con un commit aparte. `grantTrainerLocationConsent`
+      // relee de Firestore y republica las ubicaciones VIEJAS —las nuevas
+      // todavía están sólo en el form—, así que entre ese commit y el del
+      // guardado el espejo público mostraba coordenadas que el PF no
+      // consintió. Y si el segundo fallaba, quedaban ahí para siempre.
+      // El consentimiento viaja en el MISMO batch que el formulario.
+      otorgaConsentimiento = true;
     }
 
     setState(() {
@@ -292,7 +300,11 @@ class _ProfileEditTrainerScreenState
     };
 
     try {
-      await ref.read(userRepositoryProvider).update(uid, partial);
+      await ref.read(userRepositoryProvider).update(
+            uid,
+            partial,
+            grantLocationConsent: otorgaConsentimiento,
+          );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

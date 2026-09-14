@@ -409,17 +409,46 @@ class UserRepository {
   ///     REQ-COACH-DISC-DUAL-001.
   ///
   /// All three writes are in a single batch.commit() — no partial state.
-  Future<void> update(String uid, Map<String, Object?> partial) async {
-    _assertTrainerLocationStateIsValid(partial);
-    final sanitized = Map<String, Object?>.fromEntries(
-      partial.entries.where((e) => !_immutableFields.contains(e.key)),
-    )..['updatedAt'] = Timestamp.fromDate(DateTime.now().toUtc());
+  ///
+  /// [grantLocationConsent] (P1-d): otorga el consentimiento de publicación
+  /// DENTRO de este mismo batch, en vez de pedirle al caller que llame antes a
+  /// [grantTrainerLocationConsent].
+  ///
+  /// Sin esto, el flujo de "acepto y guardo" del form eran DOS commits: el
+  /// primero republicaba en el espejo las ubicaciones VIEJAS —las que
+  /// [grantTrainerLocationConsent] relee de Firestore, porque las nuevas
+  /// todavía no se guardaron— y el segundo recién escribía las del formulario.
+  /// Entre los dos, el espejo público quedaba con coordenadas que el PF no
+  /// consintió publicar; y si el segundo fallaba, quedaban ahí para siempre.
+  ///
+  /// Con el flag no hay relectura ni ventana: los timestamps entran al mismo
+  /// partial, la primera rama de [_resolveEffectiveLocationConsent] resuelve
+  /// el gate sin `get()`, y el espejo recibe las ubicaciones del FORMULARIO
+  /// —lo que el PF efectivamente consintió— en el único commit que hay.
+  Future<void> update(
+    String uid,
+    Map<String, Object?> partial, {
+    bool grantLocationConsent = false,
+  }) async {
+    final now = Timestamp.fromDate(DateTime.now().toUtc());
+    final efectivo = grantLocationConsent
+        ? <String, Object?>{
+            ...partial,
+            'trainerLocationConsentAt': now,
+            'trainerLocationConsentPromptedAt': now,
+          }
+        : partial;
 
-    final publicSubset = await _publicSubsetFromPartial(partial, uid: uid);
+    _assertTrainerLocationStateIsValid(efectivo);
+    final sanitized = Map<String, Object?>.fromEntries(
+      efectivo.entries.where((e) => !_immutableFields.contains(e.key)),
+    )..['updatedAt'] = now;
+
+    final publicSubset = await _publicSubsetFromPartial(efectivo, uid: uid);
     final hasLocationConsent =
-        await _resolveEffectiveLocationConsent(uid, partial);
+        await _resolveEffectiveLocationConsent(uid, efectivo);
     final trainerPublicSubset = _trainerPublicSubsetFromPartial(
-      partial,
+      efectivo,
       uid: uid,
       hasLocationConsent: hasLocationConsent,
     );

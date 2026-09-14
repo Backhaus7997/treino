@@ -19,7 +19,11 @@ class _CapturingUserRepository extends Fake implements UserRepository {
   bool shouldThrow = false;
 
   @override
-  Future<void> update(String uid, Map<String, Object?> partial) async {
+  Future<void> update(
+    String uid,
+    Map<String, Object?> partial, {
+    bool grantLocationConsent = false,
+  }) async {
     updateCount++;
     capturedPartial = partial;
     if (shouldThrow) throw Exception('simulated failure');
