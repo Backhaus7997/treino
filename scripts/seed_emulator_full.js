@@ -904,9 +904,17 @@ const POSTS = [
     'public',
     index + 1,
   )),
+  // Valentina (004) entra en la rotación de `friends` a propósito, y es lo que
+  // hace OBSERVABLE la arista asimétrica de FOLLOWS: ella sigue a Martín (001)
+  // y él no la sigue de vuelta. Sin posts suyos en este tier, esa asimetría
+  // existía en `follows` y no se podía ver desde ninguna pantalla — o sea, no
+  // se podía testear. Ahora el par (001, 004) se lee distinto según la
+  // dirección: 004 ve los `friends` de 001, y 001 NO ve los de 004.
+  // El total por tier no cambia: siguen siendo 24 generados, repartidos entre
+  // tres autores en vez de dos.
   ...FRIENDS_POST_TEXTS.map((text, index) => generatedPost(
     `seed-post-friends-${String(index + 1).padStart(2, '0')}`,
-    ['seed-athlete-002', 'seed-athlete-003'][index % 2],
+    ['seed-athlete-002', 'seed-athlete-003', 'seed-athlete-004'][index % 3],
     text,
     'friends',
     index + 25,
