@@ -94,5 +94,45 @@ void main() {
         containsAll(['ppl-beginner', 'full-body-3day', 'calistenia-beginner']),
       );
     });
+
+    test('NINGUNA plantilla paga entra en la forma del plan gratis', () {
+      // ─── El candado que el servidor no puede poner ───────────────────────
+      //
+      // `isPremium` frena ENTRENAR la plantilla (el CREATE de `sessions` lo
+      // mira). No frena COPIARLA: el CREATE de `/routines` no mira ese campo
+      // ni una vez, y no puede — el payload de una rutina copiada es idéntico
+      // al de una escrita a mano. El servidor no tiene con qué distinguirlos.
+      //
+      // Lo único que queda en pie es la FORMA. Si una plantilla paga entra en
+      // `withinFreeRoutineShape` —hasta 3 días y 1 semana—, un alumno free la
+      // copia, el servidor la acepta, y desde ahí la entrena para siempre sin
+      // pasar por ningún gate: la copia es `user-created` y el cliente nunca
+      // escribe `isPremium`.
+      //
+      // El 2026-09-14 `hipertrofia-intermedio` entraba EXACTO: 3 días, sin
+      // `numWeeks`. Se la llevó a 6 (PPL dos veces por semana), que además
+      // resolvió que fuera casi un clon de `ppl-beginner` —3 días, PPL, 58
+      // series contra 60— o sea que se cobraba por un 3% más de volumen.
+      //
+      // Este test es lo que evita que vuelva sola. No es un detalle de
+      // implementación: es el único lugar del repo donde el candado del
+      // catálogo es verificable.
+      const maxDiasFree = 3; // kFreeMaxRoutineDays
+      const maxSemanasFree = 1; // kFreeMaxRoutineWeeks
+
+      for (final t in templates.cast<Map<String, dynamic>>()) {
+        if (t['isPremium'] != true) continue;
+        final dias = (t['days'] as List<dynamic>).length;
+        final semanas = (t['numWeeks'] as int?) ?? 1;
+        expect(
+          dias > maxDiasFree || semanas > maxSemanasFree,
+          isTrue,
+          reason:
+              '${t['id']} tiene $dias día(s) y $semanas semana(s): entra en la '
+              'forma free, así que un alumno gateado puede copiarla y el '
+              'servidor no tiene con qué rebotarla.',
+        );
+      }
+    });
   });
 }
