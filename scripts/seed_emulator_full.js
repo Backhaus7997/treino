@@ -398,6 +398,34 @@ const FOLLOWS = [
   followEdge('seed-athlete-004', 'seed-athlete-001', 'accepted', daysAgo(15)),
 ];
 
+/// `followersCount` / `followingCount` DERIVADOS de FOLLOWS, no hardcodeados.
+///
+/// Estaban los dos en 0 mientras el grafo decía otra cosa, y no se arreglaba
+/// solo por dos caminos distintos (hallazgo de Codex en el #1127):
+///
+///   · Con `SKIP_FUNCTIONS=1` —que es justo lo que recomienda el README de
+///     `integration_test/` y lo más barato para correr el seed— el trigger
+///     `maintainFollowCounters` no existe. Los contadores se quedan en 0 para
+///     siempre y el perfil de Martín dice "0 seguidores" con tres aristas
+///     aceptadas apuntándole.
+///   · Con Functions encendidas tampoco alcanza en una RE-corrida sin
+///     `--clear`: `seedAthletes` corre ANTES que `seedFollows` y vuelve a
+///     poner los contadores en 0; después el `.set()` de las aristas es una
+///     transición `accepted → accepted`, que el trigger trata como no-op a
+///     propósito (ver la tabla en maintain-follow-counters.ts:39). El
+///     resultado es 0 otra vez.
+///
+/// Derivarlos acá los deja correctos en los dos modos y no depende de que el
+/// emulador de Functions esté levantado. Cuenta sólo las aceptadas: una
+/// `pending` no es efectiva (`isEffective`, maintain-follow-counters.ts:67).
+function followCountsFor(uid) {
+  const efectivas = FOLLOWS.filter((f) => f.status === 'accepted');
+  return {
+    followersCount: efectivas.filter((f) => f.followeeUid === uid).length,
+    followingCount: efectivas.filter((f) => f.followerUid === uid).length,
+  };
+}
+
 // ── Chats ────────────────────────────────────────────────────────────────────
 //
 // Este seed nunca sembró `chats`, y por eso la suite E2E del chat
@@ -1231,8 +1259,7 @@ async function seedCoaches() {
       gymId: null,
       workoutsCount: 0,
       racha: 0,
-      followersCount: 0,
-      followingCount: 0,
+      ...followCountsFor(c.uid),
       sharedTemplatesWithAthletes: false,
     };
 
@@ -1281,8 +1308,7 @@ async function seedAthletes() {
       gymId: a.gymId || null,
       workoutsCount: completedSessions,
       racha: completedSessions > 0 ? Math.min(completedSessions, 7) : 0,
-      followersCount: 0,
-      followingCount: 0,
+      ...followCountsFor(a.uid),
       sharedTemplatesWithAthletes: false,
     };
 
