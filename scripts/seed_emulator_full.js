@@ -6,7 +6,7 @@
  * EMULATOR-ONLY full-stack seed for manual testing.
  * Creates Auth users + Firestore docs for 13 athletes and 3 coaches,
  * with trainer links, routines, historical sessions, posts (all privacy
- * levels), friendships, and appointments.
+ * levels), follows, chats, and appointments.
  *
  * ────────────────────────────────────────────────────────────────────
  * WARNING: EMULATOR-ONLY CREDENTIALS — DO NOT USE IN PRODUCTION
@@ -64,6 +64,13 @@ const {
   exercises: CATALOG_EXERCISES,
   buildExerciseDoc,
 } = require('./seed_workout_catalog.js');
+
+// Los identificadores que este seed le PROMETE a las suites de
+// `integration_test/`. Módulo puro: de él sale también
+// `integration_test/support/seed_ids.dart` (ver `export_seed_ids.js`), y
+// `test/e2e_seed_contract.test.js` falla si el generado quedó viejo. Lo que
+// viva acá adentro tiene UN solo lugar donde cambiar.
+const E2E = require('./lib/e2e_seed_contract');
 
 // ────────────────────────────────────────────────────────────────────────────
 // Geohash5 — port of lib/core/utils/geohash.dart
@@ -135,7 +142,7 @@ const COACHES = [
   {
     uid: 'seed-coach-001',
     email: 'coach.lautaro@emulator.treino',  // EMULATOR-ONLY
-    password: 'Emulator1234!',               // EMULATOR-ONLY
+    password: E2E.PASSWORD,                  // EMULATOR-ONLY
     displayName: 'Lautaro Pérez',
     gymId: 'seed-gym-baires-001',
     trainerBio: 'Powerlifter competitivo desde 2018. Especializado en sentadilla, banco y peso muerto.',
@@ -148,7 +155,7 @@ const COACHES = [
   {
     uid: 'seed-coach-002',
     email: 'coach.camila@emulator.treino',   // EMULATOR-ONLY
-    password: 'Emulator1234!',               // EMULATOR-ONLY
+    password: E2E.PASSWORD,                  // EMULATOR-ONLY
     displayName: 'Camila Ruiz',
     gymId: 'seed-gym-baires-002',
     trainerBio: 'Crossfit Level 2. Fuerza + condicionamiento metabólico. Atención personalizada.',
@@ -161,7 +168,7 @@ const COACHES = [
   {
     uid: 'seed-coach-003',
     email: 'coach.diego@emulator.treino',    // EMULATOR-ONLY
-    password: 'Emulator1234!',               // EMULATOR-ONLY
+    password: E2E.PASSWORD,                  // EMULATOR-ONLY
     displayName: 'Diego Aguirre',
     gymId: null,
     trainerBio: 'Kinesiología + entrenamiento. Recupero post-lesión, runners, fortalecimiento de core.',
@@ -179,7 +186,7 @@ const ATHLETES = [
   {
     uid: 'seed-athlete-001',
     email: 'martin@emulator.treino',         // EMULATOR-ONLY
-    password: 'Emulator1234!',               // EMULATOR-ONLY
+    password: E2E.PASSWORD,                  // EMULATOR-ONLY
     displayName: 'Martín López',
     gymId: 'seed-gym-baires-001',
     gender: 'male',
@@ -190,7 +197,7 @@ const ATHLETES = [
   {
     uid: 'seed-athlete-002',
     email: 'sofia@emulator.treino',          // EMULATOR-ONLY
-    password: 'Emulator1234!',               // EMULATOR-ONLY
+    password: E2E.PASSWORD,                  // EMULATOR-ONLY
     displayName: 'Sofía Ramírez',
     gymId: 'seed-gym-baires-001',
     gender: 'female',
@@ -201,7 +208,7 @@ const ATHLETES = [
   {
     uid: 'seed-athlete-003',
     email: 'mateo@emulator.treino',          // EMULATOR-ONLY
-    password: 'Emulator1234!',               // EMULATOR-ONLY
+    password: E2E.PASSWORD,                  // EMULATOR-ONLY
     displayName: 'Mateo Quiroga',
     gymId: 'seed-gym-baires-002',
     gender: 'male',
@@ -212,7 +219,7 @@ const ATHLETES = [
   {
     uid: 'seed-athlete-004',
     email: 'valentina@emulator.treino',      // EMULATOR-ONLY
-    password: 'Emulator1234!',               // EMULATOR-ONLY
+    password: E2E.PASSWORD,                  // EMULATOR-ONLY
     displayName: 'Valentina Peralta',
     gymId: 'seed-gym-baires-002',
     gender: 'female',
@@ -223,7 +230,7 @@ const ATHLETES = [
   {
     uid: 'seed-athlete-005',
     email: 'nicolas@emulator.treino',        // EMULATOR-ONLY
-    password: 'Emulator1234!',               // EMULATOR-ONLY
+    password: E2E.PASSWORD,                  // EMULATOR-ONLY
     displayName: 'Nicolás Fernández',
     gymId: null,
     gender: 'male',
@@ -245,7 +252,7 @@ const ATHLETES = [
   ].map(([suffix, email, displayName, gender, experienceLevel, bodyWeightKg, heightCm]) => ({
     uid: `seed-athlete-${suffix}`,
     email: `${email}@emulator.treino`,       // EMULATOR-ONLY
-    password: 'Emulator1234!',               // EMULATOR-ONLY
+    password: E2E.PASSWORD,                  // EMULATOR-ONLY
     displayName,
     gymId: 'seed-gym-baires-001',
     gender,
@@ -312,44 +319,200 @@ const TRAINER_LINKS = [
   },
 ];
 
-// ── Friendships ──────────────────────────────────────────────────────────────
-// Martin ↔ Sofia  (accepted) — same gym, feed shows gym + friends posts
-// Martin ↔ Mateo  (accepted) — different gyms, feed shows friends posts
-// Sofia ↔ Nicolas (pending)  — inbox view test
+// ── Follows ──────────────────────────────────────────────────────────────────
+//
+// Grafo social DIRIGIDO. Reemplaza a `friendships` (change `follow-model`),
+// NO lo acompaña, y el motivo no es higiene: `friendships` está CONGELADO en
+// `firestore.rules:1873` (`create`/`update`/`delete` en `if false`) y el gate
+// de lectura de posts ya pregunta por `follows` — `postFollowerAccepted()` en
+// `firestore.rules:1236` resuelve `followAccepted(lector, autor)`. Mientras
+// este seed sembró `friendships`, los 27 posts con `privacy: 'friends'` no los
+// podía leer NADIE: la colección que los habilitaba tenía cero documentos.
+// Medido contra el emulador antes del cambio. Un post que no aparece no grita,
+// así que el seed se veía sano.
+//
+// `friendships` sigue teniendo `allow read` a propósito (ADR-FOLLOW-012, para
+// el rollback), pero en `lib/` no queda una sola lectura viva — las 5
+// menciones que devuelve `rg -n "friendships" lib/` son todas comentarios que
+// explican la migración. El comando, para que se pueda refutar:
+//
+//   rg -n "friendships" lib/ | rg -v ":\s*(///|//|\*)"    → cero hits
+//   rg -n "'follows'" lib/  | rg -v ":\s*(///|//|\*)"     → follow_repository.dart:27
+//
+// ── Por qué una relación mutua son DOS documentos ───────────────────────────
+//
+// El doc id es `{follower}_{followee}` SIN ordenar (`Follow.edgeId`,
+// lib/features/feed/domain/follow.dart:46). `{A}_{B}` y `{B}_{A}` son
+// documentos DISTINTOS — ahí vive toda la asimetría del modelo. Las 3
+// friendships viejas NO se traducen a 3 follows.
+//
+// `members` tampoco se ordena: la regla exige `members == [followerUid,
+// followeeUid]` en ese orden exacto (`firestore.rules:2030`), y la allowlist
+// de claves es CERRADA — sólo estas 6 (`firestore.rules:2027`).
+//
+// Martin ↔ Sofia  (mutuo, accepted)  — mismo gym: feed con posts de gym + follows
+// Martin ↔ Mateo  (mutuo, accepted)  — gyms distintos: sólo posts de follows
+// Sofia  → Nicolas (pending)         — vista de solicitudes pendientes
+// Valentina → Martin (accepted, UNA vía) — el caso que `friendships` no podía
+//   representar y que este modelo existe para representar: Valentina ve los
+//   posts `friends` de Martín, Martín NO ve los de ella. Sin al menos una
+//   arista asimétrica, el seed no distingue un modelo del otro y cualquier
+//   test que pase con él pasaría igual con el modelo viejo.
 
 function sortedDocId(a, b) {
   return a.localeCompare(b) <= 0 ? `${a}_${b}` : `${b}_${a}`;
 }
 
-const FRIENDSHIPS = [
-  {
-    id: sortedDocId('seed-athlete-001', 'seed-athlete-002'),
-    uidA: 'seed-athlete-001',
-    uidB: 'seed-athlete-002',
-    status: 'accepted',
-    requesterId: 'seed-athlete-001',
-    members: ['seed-athlete-001', 'seed-athlete-002'],
-    createdAt: daysAgo(50),
-  },
-  {
-    id: sortedDocId('seed-athlete-001', 'seed-athlete-003'),
-    uidA: 'seed-athlete-001',
-    uidB: 'seed-athlete-003',
-    status: 'accepted',
-    requesterId: 'seed-athlete-003',
-    members: ['seed-athlete-001', 'seed-athlete-003'],
-    createdAt: daysAgo(40),
-  },
-  {
-    id: sortedDocId('seed-athlete-002', 'seed-athlete-005'),
-    uidA: 'seed-athlete-002',
-    uidB: 'seed-athlete-005',
-    status: 'pending',
-    requesterId: 'seed-athlete-002',
-    members: ['seed-athlete-002', 'seed-athlete-005'],
-    createdAt: daysAgo(3),
-  },
+function followEdge(follower, followee, status, createdAt) {
+  return {
+    id: E2E.followEdgeId(follower, followee),
+    followerUid: follower,
+    followeeUid: followee,
+    status,
+    members: [follower, followee],
+    createdAt,
+  };
+}
+
+/// Doc ids que sembraba la versión anterior de este script en `friendships`.
+/// Sólo los usa `--clear`: ver el comentario ahí.
+const LEGACY_FRIENDSHIP_IDS = [
+  sortedDocId('seed-athlete-001', 'seed-athlete-002'),
+  sortedDocId('seed-athlete-001', 'seed-athlete-003'),
+  sortedDocId('seed-athlete-002', 'seed-athlete-005'),
 ];
+
+const FOLLOWS = [
+  // Martín ↔ Sofía — mutuo
+  followEdge('seed-athlete-001', 'seed-athlete-002', 'accepted', daysAgo(50)),
+  followEdge('seed-athlete-002', 'seed-athlete-001', 'accepted', daysAgo(50)),
+
+  // Martín ↔ Mateo — mutuo
+  followEdge('seed-athlete-001', 'seed-athlete-003', 'accepted', daysAgo(40)),
+  followEdge('seed-athlete-003', 'seed-athlete-001', 'accepted', daysAgo(40)),
+
+  // Sofía → Nicolás — pendiente, una sola vía
+  followEdge('seed-athlete-002', 'seed-athlete-005', 'pending', daysAgo(3)),
+
+  // Valentina → Martín — aceptada y UNA sola vía (asimetría a propósito)
+  followEdge('seed-athlete-004', 'seed-athlete-001', 'accepted', daysAgo(15)),
+];
+
+/// `followersCount` / `followingCount` DERIVADOS de FOLLOWS, no hardcodeados.
+///
+/// Estaban los dos en 0 mientras el grafo decía otra cosa, y no se arreglaba
+/// solo por dos caminos distintos (hallazgo de Codex en el #1127):
+///
+///   · Con `SKIP_FUNCTIONS=1` —que es justo lo que recomienda el README de
+///     `integration_test/` y lo más barato para correr el seed— el trigger
+///     `maintainFollowCounters` no existe. Los contadores se quedan en 0 para
+///     siempre y el perfil de Martín dice "0 seguidores" con tres aristas
+///     aceptadas apuntándole.
+///   · Con Functions encendidas tampoco alcanza en una RE-corrida sin
+///     `--clear`: `seedAthletes` corre ANTES que `seedFollows` y vuelve a
+///     poner los contadores en 0; después el `.set()` de las aristas es una
+///     transición `accepted → accepted`, que el trigger trata como no-op a
+///     propósito (ver la tabla en maintain-follow-counters.ts:39). El
+///     resultado es 0 otra vez.
+///
+/// Derivarlos acá los deja correctos en los dos modos y no depende de que el
+/// emulador de Functions esté levantado. Cuenta sólo las aceptadas: una
+/// `pending` no es efectiva (`isEffective`, maintain-follow-counters.ts:67).
+function followCountsFor(uid) {
+  const efectivas = FOLLOWS.filter((f) => f.status === 'accepted');
+  return {
+    followersCount: efectivas.filter((f) => f.followeeUid === uid).length,
+    followingCount: efectivas.filter((f) => f.followerUid === uid).length,
+  };
+}
+
+// ── Chats ────────────────────────────────────────────────────────────────────
+//
+// Este seed nunca sembró `chats`, y por eso la suite E2E del chat
+// (`integration_test/coach_athlete_chat_test.dart`) tenía
+// `kChatId = 'REPLACE_WITH_SEEDED_CHAT_ID'`: no había con qué llenarlo.
+//
+// `chatCreateOk` (`firestore.rules:2210`) habilita un chat por TRES ramas
+// EXCLUYENTES — es un ternario anidado, no un `||`. Se siembra una de cada una,
+// porque las tres tienen precondiciones distintas y un seed que sólo cubra la
+// de Coach deja las otras dos sin ninguna forma de probarse:
+//
+//   1. Coach    — `linkId` apunta a un `trainer_links` con status
+//                 `active`/`paused` y con trainerId y athleteId AMBOS en
+//                 members. De los 5 links sembrados sólo 001/002/003 sirven:
+//                 004 es `pending` y 005 `terminated`.
+//   2. Consulta — `kind: 'inquiry'`. El OTRO tiene que ser trainer con
+//                 `trainerPublicProfiles` y `acceptsInquiries != false`. El
+//                 seed no escribe ese campo, y la regla lo lee con
+//                 `.get('acceptsInquiries', true)`, así que resuelve true.
+//   3. Social   — ni `linkId` ni `kind`: exige `followAccepted(other, me)`.
+//                 Depende de FOLLOWS de arriba, y por eso no existía hasta
+//                 ahora: con `friendships` esta rama era imposible de sembrar.
+//
+// Dos cosas que la regla exige y es fácil equivocar:
+//   · `members` va ORDENADO y el doc id es `members[0] + '_' + members[1]`
+//     (`firestore.rules:2296-2298`). No es el par sin ordenar de `follows`.
+//   · `lastMessageAt` NO lo pide ninguna regla, pero `watchChatsForUser`
+//     (chat_repository.dart:219) ordena por ese campo, y Firestore excluye del
+//     `orderBy` los docs que no lo tienen. Un chat sembrado sin él existe, se
+//     abre por deep link, y NO aparece en la lista — que es la peor variante:
+//     parece un bug de la pantalla.
+
+const CHATS = [
+  // 1. Coach — Lautaro (coach-001) ↔ Martín (athlete-001), vía seed-link-001.
+  {
+    members: E2E.CHATS.coach.members,
+    createdAt: daysAgo(55),
+    linkId: E2E.CHATS.coach.linkId,
+    messages: [
+      { id: 'seed-msg-coach-01', senderId: 'seed-coach-001', text: 'Arrancamos con el bloque de fuerza. Cualquier duda, por acá.', createdAt: daysAgo(55) },
+      { id: 'seed-msg-coach-02', senderId: 'seed-athlete-001', text: 'Dale. La sentadilla la sentí pesada hoy.', createdAt: daysAgo(2) },
+      { id: 'seed-msg-coach-03', senderId: 'seed-coach-001', text: 'Bajale 5 kg y subí una repe. Mañana lo vemos.', createdAt: daysAgo(1) },
+    ],
+    // Martín leyó hasta el anteúltimo: queda 1 sin leer, que es lo que hace
+    // visible el badge de no-leídos sin tener que mandar nada a mano.
+    lastRead: { 'seed-coach-001': daysAgo(1), 'seed-athlete-001': daysAgo(2) },
+  },
+
+  // 2. Consulta — Nicolás (athlete-005) le escribe a Diego (coach-003), sin
+  //    vínculo. Diego es el único PF sin gym y con seed-link-004 en `pending`,
+  //    así que la consulta no se pisa con ningún chat de Coach.
+  {
+    members: E2E.CHATS.inquiry.members,
+    createdAt: daysAgo(2),
+    kind: E2E.CHATS.inquiry.kind,
+    messages: [
+      { id: 'seed-msg-inq-01', senderId: 'seed-athlete-005', text: 'Hola Diego, ¿tomás alumnos para recuperación de rodilla?', createdAt: daysAgo(2) },
+    ],
+    lastRead: { 'seed-athlete-005': daysAgo(2) },
+  },
+
+  // 3. Social — Martín (001) ↔ Sofía (002). Se apoya en el follow mutuo
+  //    aceptado de FOLLOWS: los DOS pueden escribir porque existen las dos
+  //    aristas. Con una sola, escribiría uno y el otro se comería un
+  //    permission-denied — `senderMayPost` pide `followAccepted(other, uid)`.
+  {
+    members: E2E.CHATS.social.members,
+    createdAt: daysAgo(45),
+    messages: [
+      { id: 'seed-msg-social-01', senderId: 'seed-athlete-002', text: '¿Vas al gym mañana temprano?', createdAt: daysAgo(3) },
+      { id: 'seed-msg-social-02', senderId: 'seed-athlete-001', text: 'Sí, 7am. Toca pierna.', createdAt: daysAgo(3) },
+    ],
+    lastRead: { 'seed-athlete-001': daysAgo(3), 'seed-athlete-002': daysAgo(3) },
+  },
+].map((c) => {
+  // `lastMessage*` se DERIVA de los mensajes en vez de escribirse a mano: si se
+  // escriben por separado, el preview de la lista y el último globo del hilo
+  // pueden decir cosas distintas, y eso no lo detecta ningún test de reglas.
+  const last = c.messages[c.messages.length - 1];
+  return {
+    ...c,
+    chatId: c.members.join('_'),
+    lastMessageAt: last.createdAt,
+    lastMessageText: last.text,
+    lastMessageSenderId: last.senderId,
+  };
+});
 
 // ── Routines ──────────────────────────────────────────────────────────────────
 // 2 trainer-assigned plans (multi-week) + 1 system template.
@@ -858,9 +1021,17 @@ const POSTS = [
     'public',
     index + 1,
   )),
+  // Valentina (004) entra en la rotación de `friends` a propósito, y es lo que
+  // hace OBSERVABLE la arista asimétrica de FOLLOWS: ella sigue a Martín (001)
+  // y él no la sigue de vuelta. Sin posts suyos en este tier, esa asimetría
+  // existía en `follows` y no se podía ver desde ninguna pantalla — o sea, no
+  // se podía testear. Ahora el par (001, 004) se lee distinto según la
+  // dirección: 004 ve los `friends` de 001, y 001 NO ve los de 004.
+  // El total por tier no cambia: siguen siendo 24 generados, repartidos entre
+  // tres autores en vez de dos.
   ...FRIENDS_POST_TEXTS.map((text, index) => generatedPost(
     `seed-post-friends-${String(index + 1).padStart(2, '0')}`,
-    ['seed-athlete-002', 'seed-athlete-003'][index % 2],
+    ['seed-athlete-002', 'seed-athlete-003', 'seed-athlete-004'][index % 3],
     text,
     'friends',
     index + 25,
@@ -1088,8 +1259,7 @@ async function seedCoaches() {
       gymId: null,
       workoutsCount: 0,
       racha: 0,
-      followersCount: 0,
-      followingCount: 0,
+      ...followCountsFor(c.uid),
       sharedTemplatesWithAthletes: false,
     };
 
@@ -1138,8 +1308,7 @@ async function seedAthletes() {
       gymId: a.gymId || null,
       workoutsCount: completedSessions,
       racha: completedSessions > 0 ? Math.min(completedSessions, 7) : 0,
-      followersCount: 0,
-      followingCount: 0,
+      ...followCountsFor(a.uid),
       sharedTemplatesWithAthletes: false,
     };
 
@@ -1179,20 +1348,63 @@ async function seedTrainerLinks() {
   }
 }
 
-async function seedFriendships() {
-  console.log('\n── Friendships ──────────────────────────────────────────────────');
-  for (const f of FRIENDSHIPS) {
+async function seedFollows() {
+  console.log('\n── Follows ──────────────────────────────────────────────────────');
+  for (const f of FOLLOWS) {
+    // Las 6 claves de la allowlist cerrada de `firestore.rules:2027`, y nada
+    // más. El Admin SDK saltea las rules, así que una clave de sobra acá no
+    // fallaría al sembrar — fallaría recién el día que el cliente intente
+    // reescribir el doc. Lo que el seed produce tiene que ser un documento que
+    // la app podría haber escrito.
     const data = {
       id: f.id,
-      uidA: f.uidA,
-      uidB: f.uidB,
+      followerUid: f.followerUid,
+      followeeUid: f.followeeUid,
       status: f.status,
-      requesterId: f.requesterId,
       members: f.members,
       createdAt: ts(f.createdAt),
     };
-    await db.collection('friendships').doc(f.id).set(data);
-    console.log(`  ✓ friendships/${f.id} [${f.status}] ${f.uidA} ↔ ${f.uidB}`);
+    await db.collection('follows').doc(f.id).set(data);
+    console.log(`  ✓ follows/${f.id} [${f.status}] ${f.followerUid} → ${f.followeeUid}`);
+  }
+}
+
+async function seedChats() {
+  console.log('\n── Chats ────────────────────────────────────────────────────────');
+  for (const c of CHATS) {
+    const data = {
+      chatId: c.chatId,
+      members: c.members,
+      createdAt: ts(c.createdAt),
+      lastMessageAt: ts(c.lastMessageAt),
+      lastMessageText: c.lastMessageText,
+      lastMessageSenderId: c.lastMessageSenderId,
+      lastRead: Object.fromEntries(
+        Object.entries(c.lastRead).map(([uid, at]) => [uid, ts(at)]),
+      ),
+    };
+    // `linkId` y `kind` sólo si corresponden: las tres ramas de `chatCreateOk`
+    // son excluyentes, y `update` los tiene PINEADOS con el idiom
+    // `get(clave, null)`. Un `linkId: null` explícito NO es lo mismo que la
+    // clave ausente — convertiría un chat social en uno que la regla lee como
+    // "tiene linkId" y rompería el pin en el primer update del cliente.
+    if (c.linkId) data.linkId = c.linkId;
+    if (c.kind) data.kind = c.kind;
+
+    const ref = db.collection('chats').doc(c.chatId);
+    await ref.set(data);
+    const variante = c.linkId ? 'coach' : c.kind === 'inquiry' ? 'inquiry' : 'social';
+    console.log(`  ✓ chats/${c.chatId} [${variante}]`);
+
+    for (const m of c.messages) {
+      await ref.collection('messages').doc(m.id).set({
+        id: m.id,
+        senderId: m.senderId,
+        text: m.text,
+        createdAt: ts(m.createdAt),
+      });
+    }
+    console.log(`    ↪ ${c.messages.length} mensajes`);
   }
 }
 
@@ -1405,7 +1617,22 @@ async function clear() {
   ]);
   await deleteCollection('trainerPublicProfiles', COACHES.map(c => c.uid));
   await deleteCollection('trainer_links', TRAINER_LINKS.map(l => l.id));
-  await deleteCollection('friendships', FRIENDSHIPS.map(f => f.id));
+  await deleteCollection('follows', FOLLOWS.map(f => f.id));
+  // El seed ya no siembra `friendships`, pero `--clear` tiene que seguir
+  // borrándolas: cualquier emulador donde haya corrido una versión anterior
+  // conserva esos 3 documentos, y como la colección está congelada
+  // (`firestore.rules:1873`) nada los va a limpiar después. Un reset que deja
+  // basura del modelo viejo es justo el estado en el que alguien depura un
+  // feed vacío mirando la colección equivocada.
+  await deleteCollection('friendships', LEGACY_FRIENDSHIP_IDS);
+  // Los mensajes primero: borrar el doc padre deja la subcolección huérfana
+  // (mismo motivo que `sessions`/`setLogs` más abajo), y una subcolección
+  // huérfana sobrevive a `--clear` sin que nada la muestre.
+  for (const c of CHATS) {
+    const ref = db.collection('chats').doc(c.chatId);
+    await deleteAllDocs(ref.collection('messages'));
+    await ref.delete().catch(() => {});
+  }
   await deleteCollection('routines', ROUTINES.map(r => r.id));
   await deleteCollection('posts', POSTS.map(p => p.id));
   await deleteCollection('coach_availability_rules', AVAILABILITY_RULES.map(r => r.id));
@@ -1444,7 +1671,8 @@ async function seed() {
   await seedCoaches();
   await seedAthletes();
   await seedTrainerLinks();
-  await seedFriendships();
+  await seedFollows();
+  await seedChats();
   await seedExercisesCatalog();
   await seedRoutines();
   await seedSessions();
