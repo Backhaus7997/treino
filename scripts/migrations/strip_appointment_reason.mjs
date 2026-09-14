@@ -113,6 +113,8 @@
 import { createRequire } from "node:module";
 
 import admin from "firebase-admin";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
+import { applicationDefault, initializeApp } from "firebase-admin/app";
 
 // Los dos módulos del #826 son CommonJS y viven en `scripts/lib/`. Se cargan
 // con `createRequire` en vez de un `import` porque el interop de nombres sobre
@@ -227,12 +229,15 @@ if (apply && !contraEmulador) {
   }
 }
 
-admin.initializeApp({
-  credential: admin.credential.applicationDefault(),
+// El `App` se captura: `getFirestore(app)` lo necesita, y este script NO pasa
+// por `lib/admin.js` — es de `migrations/`, que la frontera del #834 todavía no
+// cubre (ver AGENTS.md § Entornos).
+const app = initializeApp({
+  credential: applicationDefault(),
   ...(projectId ? { projectId } : {}),
 });
 
-const db = admin.firestore();
+const db = getFirestore(app);
 const BATCH_SIZE = 400;
 
 // No hay índice por "tiene tal campo": Firestore no consulta por presencia de
@@ -270,7 +275,7 @@ for (let i = 0; i < afectados.length; i += BATCH_SIZE) {
   for (const d of chunk) {
     const motivo = d.get("reason");
     const update = {
-      reason: admin.firestore.FieldValue.delete(),
+      reason: FieldValue.delete(),
     };
     // El motivo no se tira: se reescribe donde el modelo y la allowlist SÍ lo
     // aceptan. `byUid` es el atleta del turno, que es de quien salió la baja
@@ -283,7 +288,7 @@ for (let i = 0; i < afectados.length; i += BATCH_SIZE) {
         cancelledAt && typeof cancelledAt.toMillis === "function"
           ? cancelledAt.toMillis()
           : Date.now();
-      update.cancellationLog = admin.firestore.FieldValue.arrayUnion({
+      update.cancellationLog = FieldValue.arrayUnion({
         byUid: d.get("athleteId") ?? "unknown",
         atMs,
         reason: motivo,

@@ -1592,7 +1592,7 @@
   {
     "id": "hipertrofia-intermedio",
     "name": "Hipertrofia — Intermedio",
-    "summary": "Apunta a aumentar el tamaño del músculo, con más repeticiones y menos peso que un plan de fuerza.",
+    "summary": "Recorrés empujar, tirar y piernas dos veces por semana, con ejercicios distintos en cada vuelta.",
     "split": "Push/Pull/Legs",
     "level": "intermediate",
     "estimatedMinutesPerDay": 65,
@@ -1600,7 +1600,7 @@
     "days": [
       {
         "dayNumber": 1,
-        "name": "Push",
+        "name": "Push A",
         "estimatedMinutes": 65,
         "slots": [
           {
@@ -1673,7 +1673,7 @@
       },
       {
         "dayNumber": 2,
-        "name": "Pull",
+        "name": "Pull A",
         "estimatedMinutes": 65,
         "slots": [
           {
@@ -1746,7 +1746,7 @@
       },
       {
         "dayNumber": 3,
-        "name": "Legs",
+        "name": "Legs A",
         "estimatedMinutes": 70,
         "slots": [
           {
@@ -1814,6 +1814,225 @@
             "restSeconds": 45,
             "targetWeightKg": null,
             "notes": "Soleo en trabajo, talón bien abajo en la fase negativa."
+          }
+        ]
+      },
+      {
+        "dayNumber": 4,
+        "name": "Push B",
+        "estimatedMinutes": 65,
+        "slots": [
+          {
+            "exerciseId": "incline-bench-press-mancuerna",
+            "exerciseName": "Press de banca inclinado (Mancuerna)",
+            "muscleGroup": "chest",
+            "targetSets": 4,
+            "targetRepsMin": 10,
+            "targetRepsMax": 12,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Mancuernas: más rango que la barra del día 1. Bajá hasta sentir el pecho abierto."
+          },
+          {
+            "exerciseId": "pec-fly-maquina",
+            "exerciseName": "Apertura de pecho (Máquina)",
+            "muscleGroup": "chest",
+            "targetSets": 3,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Codos fijos. Apretá un segundo en el cierre."
+          },
+          {
+            "exerciseId": "overhead-press-mancuerna",
+            "exerciseName": "Press militar (Mancuerna)",
+            "muscleGroup": "shoulders",
+            "targetSets": 4,
+            "targetRepsMin": 10,
+            "targetRepsMax": 12,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Sentado con respaldo. No arquees la lumbar para sacar la última."
+          },
+          {
+            "exerciseId": "lateral-raise-polea",
+            "exerciseName": "Elevación lateral (Cable)",
+            "muscleGroup": "shoulders",
+            "targetSets": 4,
+            "targetRepsMin": 12,
+            "targetRepsMax": 20,
+            "restSeconds": 45,
+            "targetWeightKg": null,
+            "notes": "La polea mantiene tensión abajo, que es donde la mancuerna la pierde."
+          },
+          {
+            "exerciseId": "overhead-tricep-extension-polea",
+            "exerciseName": "Extensión de tríceps por encima de la cabeza (Cable)",
+            "muscleGroup": "triceps",
+            "targetSets": 3,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Codos quietos y altos: el estiramiento arriba es el punto."
+          },
+          {
+            "exerciseId": "dips-pesocorporal",
+            "exerciseName": "Fondos (Peso corporal)",
+            "muscleGroup": "fullbody",
+            "targetSets": 3,
+            "targetRepsMin": 8,
+            "targetRepsMax": 12,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Torso adelante para pecho. Si salen 12 limpias, sumá peso."
+          }
+        ]
+      },
+      {
+        "dayNumber": 5,
+        "name": "Pull B",
+        "estimatedMinutes": 65,
+        "slots": [
+          {
+            "exerciseId": "single-arm-row-mancuerna",
+            "exerciseName": "Remo a un brazo (Mancuerna)",
+            "muscleGroup": "back",
+            "targetSets": 4,
+            "targetRepsMin": 10,
+            "targetRepsMax": 12,
+            "restSeconds": 75,
+            "targetWeightKg": null,
+            "notes": "Un brazo por vez: más rango y menos compensación que el remo con barra."
+          },
+          {
+            "exerciseId": "narrow-pulldown-maquina",
+            "exerciseName": "Jalón al pecho en agarre cerrado",
+            "muscleGroup": "back",
+            "targetSets": 4,
+            "targetRepsMin": 10,
+            "targetRepsMax": 12,
+            "restSeconds": 75,
+            "targetWeightKg": null,
+            "notes": "Agarre cerrado: pega más en dorsal bajo que el jalón ancho del día 2."
+          },
+          {
+            "exerciseId": "loaded-low-row-maquina",
+            "exerciseName": "Remo bajo en máquina",
+            "muscleGroup": "back",
+            "targetSets": 3,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Pecho firme contra el apoyo. Tirá con los codos, no con las manos."
+          },
+          {
+            "exerciseId": "rear-delt-fly-polea",
+            "exerciseName": "Apertura de deltoides posterior (Cable)",
+            "muscleGroup": "shoulders",
+            "targetSets": 3,
+            "targetRepsMin": 15,
+            "targetRepsMax": 20,
+            "restSeconds": 45,
+            "targetWeightKg": null,
+            "notes": "Deltoides posterior: el que queda corto en todo plan con mucho press."
+          },
+          {
+            "exerciseId": "incline-curl-mancuerna",
+            "exerciseName": "Curl inclinado",
+            "muscleGroup": "biceps",
+            "targetSets": 3,
+            "targetRepsMin": 10,
+            "targetRepsMax": 12,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Banco a 45°: el brazo queda atrás y la porción larga estira."
+          },
+          {
+            "exerciseId": "bar-curl-polea",
+            "exerciseName": "Curl con barra",
+            "muscleGroup": "biceps",
+            "targetSets": 3,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 45,
+            "targetWeightKg": null,
+            "notes": "Cierre del día. Sin balanceo: si hace falta impulso, bajá el peso."
+          }
+        ]
+      },
+      {
+        "dayNumber": 6,
+        "name": "Legs B",
+        "estimatedMinutes": 70,
+        "slots": [
+          {
+            "exerciseId": "bulgarian-split-squat-barra",
+            "exerciseName": "Sentadilla búlgara (Barra)",
+            "muscleGroup": "quads",
+            "targetSets": 4,
+            "targetRepsMin": 8,
+            "targetRepsMax": 12,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Por pierna. Corrige el desbalance que la sentadilla del día 3 esconde."
+          },
+          {
+            "exerciseId": "leg-press-maquina",
+            "exerciseName": "Prensa de piernas (Máquina)",
+            "muscleGroup": "quads",
+            "targetSets": 4,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 90,
+            "targetWeightKg": null,
+            "notes": "Más repeticiones que el día 3: acá el trabajo es metabólico."
+          },
+          {
+            "exerciseId": "seated-leg-extension-polea",
+            "exerciseName": "Extensión de piernas sentado",
+            "muscleGroup": "quads",
+            "targetSets": 3,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Pausa de un segundo arriba."
+          },
+          {
+            "exerciseId": "seated-hamstring-curl-maquina",
+            "exerciseName": "Curl femoral sentado",
+            "muscleGroup": "hamstrings",
+            "targetSets": 4,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 60,
+            "targetWeightKg": null,
+            "notes": "Sentado estira más el isquio que acostado. Bajá controlado."
+          },
+          {
+            "exerciseId": "hip-thrust-maquina",
+            "exerciseName": "Hip thrust (Máquina)",
+            "muscleGroup": "glutes",
+            "targetSets": 3,
+            "targetRepsMin": 12,
+            "targetRepsMax": 15,
+            "restSeconds": 75,
+            "targetWeightKg": null,
+            "notes": "Mentón al pecho y bloqueo arriba, sin arquear la lumbar."
+          },
+          {
+            "exerciseId": "standing-calf-raises-maquina",
+            "exerciseName": "Elevación de gemelos de pie",
+            "muscleGroup": "calves",
+            "targetSets": 4,
+            "targetRepsMin": 15,
+            "targetRepsMax": 20,
+            "restSeconds": 45,
+            "targetWeightKg": null,
+            "notes": "De pie apunta al gemelo; el sentado del día 3, al sóleo."
           }
         ]
       }

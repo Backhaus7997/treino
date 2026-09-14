@@ -201,17 +201,20 @@ void main() {
         ),
         findsOneWidget,
       );
+      // El chip Rechazadas ya no existe, y el `terminated` sembrado arriba no
+      // se cuenta en ningún otro: el badge de Aceptadas se queda en 0.
+      expect(find.byKey(const Key('filter_chip_Rechazadas')), findsNothing);
       expect(
         find.descendant(
-          of: find.byKey(const Key('filter_chip_Rechazadas')),
+          of: find.byKey(const Key('filter_chip_Aceptadas')),
           matching: find.text('1'),
         ),
-        findsOneWidget,
+        findsNothing,
       );
     });
   });
 
-  group('InvitacionesScreen — tabs Aceptadas y Rechazadas (WU-05)', () {
+  group('InvitacionesScreen — tab Aceptadas (WU-05)', () {
     testWidgets('Aceptadas: sin solicitudes aceptadas → estado vacío honesto',
         (tester) async {
       await _pump(
@@ -229,7 +232,7 @@ void main() {
       );
     });
 
-    testWidgets('Rechazadas: sin solicitudes rechazadas → estado vacío honesto',
+    testWidgets('no hay chip Rechazadas: sólo Pendientes y Aceptadas',
         (tester) async {
       await _pump(
         tester,
@@ -237,51 +240,44 @@ void main() {
         profiles: [_prof('a1', 'Ana García')],
       );
 
-      await tester.tap(find.byKey(const Key('filter_chip_Rechazadas')));
-      await tester.pumpAndSettle();
-
-      expect(
-        find.text('No rechazaste ninguna solicitud.'),
-        findsOneWidget,
-      );
+      expect(find.byKey(const Key('filter_chip_Pendientes')), findsOneWidget);
+      expect(find.byKey(const Key('filter_chip_Aceptadas')), findsOneWidget);
+      expect(find.byKey(const Key('filter_chip_Rechazadas')), findsNothing);
     });
 
-    testWidgets('Rechazadas filtra solo terminated', (tester) async {
+    testWidgets('un terminated no aparece en ningún tab', (tester) async {
+      // Los rechazos ya no se persisten (purge-rejected-link.ts), pero los
+      // `terminated` con acceptedAt != null —vínculos reales terminados—
+      // SIGUEN llegando por el stream. No tienen que colarse en Aceptadas.
       await _pump(
         tester,
         links: [
           _link('a1', TrainerLinkStatus.pending, id: 'l_a1'),
-          _link('a2', TrainerLinkStatus.active, id: 'l_a2'),
           _link('a3', TrainerLinkStatus.terminated, id: 'l_a3'),
         ],
         profiles: [
           _prof('a1', 'Ana García'),
-          _prof('a2', 'Beto López'),
           _prof('a3', 'Caro Díaz'),
         ],
       );
 
-      await tester.tap(find.byKey(const Key('filter_chip_Rechazadas')));
-      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('solicitud_card_l_a3')), findsNothing);
 
-      expect(find.byKey(const Key('solicitud_card_l_a1')), findsNothing);
-      expect(find.byKey(const Key('solicitud_card_l_a2')), findsNothing);
-      expect(find.byKey(const Key('solicitud_card_l_a3')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('filter_chip_Aceptadas')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('solicitud_card_l_a3')), findsNothing);
+      expect(
+        find.text('Todavía no aceptaste ninguna solicitud.'),
+        findsOneWidget,
+      );
     });
 
-    testWidgets(
-        'Aceptadas y Rechazadas son read-only: sin botones aceptar/rechazar',
+    testWidgets('Aceptadas es read-only: sin botones aceptar/rechazar',
         (tester) async {
       await _pump(
         tester,
-        links: [
-          _link('a2', TrainerLinkStatus.active, id: 'l_a2'),
-          _link('a3', TrainerLinkStatus.terminated, id: 'l_a3'),
-        ],
-        profiles: [
-          _prof('a2', 'Beto López'),
-          _prof('a3', 'Caro Díaz'),
-        ],
+        links: [_link('a2', TrainerLinkStatus.active, id: 'l_a2')],
+        profiles: [_prof('a2', 'Beto López')],
       );
 
       await tester.tap(find.byKey(const Key('filter_chip_Aceptadas')));
@@ -289,12 +285,6 @@ void main() {
       expect(find.byKey(const Key('accept_l_a2')), findsNothing);
       expect(find.byKey(const Key('decline_l_a2')), findsNothing);
       expect(find.text('ACEPTADA'), findsOneWidget);
-
-      await tester.tap(find.byKey(const Key('filter_chip_Rechazadas')));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('accept_l_a3')), findsNothing);
-      expect(find.byKey(const Key('decline_l_a3')), findsNothing);
-      expect(find.text('RECHAZADA'), findsOneWidget);
     });
 
     testWidgets('ordena las tarjetas por requestedAt DESC dentro del tab',
@@ -373,29 +363,18 @@ void main() {
       );
     });
 
-    testWidgets('Aceptadas y Rechazadas: smoke dark+light sin crash',
-        (tester) async {
+    testWidgets('Aceptadas: smoke dark+light sin crash', (tester) async {
       for (final theme in [AppTheme.dark(), AppTheme.light()]) {
         await _pump(
           tester,
           theme: theme,
-          links: [
-            _link('a2', TrainerLinkStatus.active, id: 'l_a2'),
-            _link('a3', TrainerLinkStatus.terminated, id: 'l_a3'),
-          ],
-          profiles: [
-            _prof('a2', 'Beto López'),
-            _prof('a3', 'Caro Díaz'),
-          ],
+          links: [_link('a2', TrainerLinkStatus.active, id: 'l_a2')],
+          profiles: [_prof('a2', 'Beto López')],
         );
 
         await tester.tap(find.byKey(const Key('filter_chip_Aceptadas')));
         await tester.pumpAndSettle();
         expect(find.byKey(const Key('solicitud_card_l_a2')), findsOneWidget);
-
-        await tester.tap(find.byKey(const Key('filter_chip_Rechazadas')));
-        await tester.pumpAndSettle();
-        expect(find.byKey(const Key('solicitud_card_l_a3')), findsOneWidget);
       }
     });
   });

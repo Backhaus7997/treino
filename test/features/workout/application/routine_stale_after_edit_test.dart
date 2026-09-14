@@ -26,7 +26,9 @@ void main() {
         'SCENARIO-STALE-001: without invalidation the one-shot read replays '
         'the pre-edit routine — this is the bug', () async {
       final repo = MockRoutineRepository();
-      final before = makeRoutine(days: [makeDay(slots: [makeSlot()])]);
+      final before = makeRoutine(days: [
+        makeDay(slots: [makeSlot()])
+      ]);
       final after = makeRoutine(
         days: [
           makeDay(slots: [makeSlot(), makeSlot(exerciseId: 'e-nuevo')]),
@@ -53,14 +55,17 @@ void main() {
       final replayed =
           await container.read(routineByIdProvider(before.id).future);
       expect(replayed!.days.first.slots, hasLength(1),
-          reason: 'keepAlive holds the success forever until something drops it');
+          reason:
+              'keepAlive holds the success forever until something drops it');
     });
 
     test(
         'SCENARIO-STALE-002: invalidateRoutineById drops the cache so the next '
         'session build sees the added exercise', () async {
       final repo = MockRoutineRepository();
-      final before = makeRoutine(days: [makeDay(slots: [makeSlot()])]);
+      final before = makeRoutine(days: [
+        makeDay(slots: [makeSlot()])
+      ]);
       final after = makeRoutine(
         days: [
           makeDay(slots: [makeSlot(), makeSlot(exerciseId: 'e-nuevo')]),

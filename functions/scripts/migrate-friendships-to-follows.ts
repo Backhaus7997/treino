@@ -81,7 +81,8 @@
 import * as fs from "fs";
 import * as path from "path";
 
-import * as admin from "firebase-admin";
+import { Firestore, getFirestore } from "firebase-admin/firestore";
+import { initializeApp } from "firebase-admin/app";
 
 export type FollowStatus = "pending" | "accepted";
 
@@ -524,8 +525,8 @@ async function main(): Promise<void> {
   const apply = process.argv.includes("--apply");
   const since = parseSince(process.argv);
 
-  admin.initializeApp();
-  const db = admin.firestore();
+  initializeApp();
+  const db = getFirestore();
 
   console.log(
     `\n=== migrate-friendships-to-follows (${apply ? "APPLY" : "DRY RUN"}` +
@@ -591,7 +592,7 @@ async function main(): Promise<void> {
  * pasan a `skippedPair`.
  */
 async function writeEdges(
-  db: admin.firestore.Firestore,
+  db: Firestore,
   plan: Plan,
 ): Promise<Edge[]> {
   const written: Edge[] = [];

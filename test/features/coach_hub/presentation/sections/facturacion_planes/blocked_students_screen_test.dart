@@ -25,6 +25,7 @@ import 'package:treino/features/profile/application/user_public_profile_provider
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
 
 UserProfile _trainer({TrainerSubscription? subscription}) => UserProfile(
       uid: 'pf1',
@@ -139,7 +140,7 @@ void main() {
       await tester.pumpWidget(_harness(blocked: const AsyncLoading()));
       await tester.pump();
 
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.byType(CoachHubSkeleton), findsOneWidget);
       // Lo importante del loading: NO decir «ninguno» todavía. Un PF que llegó
       // acá porque algo le rebotó leería eso como «no es tu plan» y se iría.
       expect(_allText(tester), isNot(contains('NINGUNO')));
@@ -161,7 +162,7 @@ void main() {
       );
       await tester.pump();
 
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.byType(CoachHubSkeleton), findsOneWidget);
       final text = _allText(tester);
       expect(text, isNot(contains('Free')));
       expect(text, isNot(contains('2 alumnos')));

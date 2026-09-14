@@ -19,6 +19,24 @@
       ]
     },
     {
+      "collectionGroup": "athlete_files",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "athleteId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "sharedWithAthlete",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "uploadedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "follow_up_entries",
       "queryScope": "COLLECTION",
       "fields": [

@@ -60,7 +60,7 @@ porque son permisos distintos: `get` protege un documento, `list` protege la
 enumeración, y una regla puede tapar uno y dejar el otro abierto). En Storage
 son `get` / `list` / `write` / `delete`.
 
-### 1.1 Firestore — 34 paths declarados en `firestore.rules`
+### 1.1 Firestore — 39 paths declarados en `firestore.rules`
 
 | Colección | get | list | create | update | delete |
 |---|---|---|---|---|---|
@@ -68,7 +68,9 @@ son `get` / `list` / `write` / `delete`.
 | `users/{uid}/notifications` | ✅ | — | ✅ | ✅ | ✅ |
 | `users/{uid}/sessions` | ✅ | ✅ | ✅ | — | — |
 | `users/{uid}/sessions/{sid}/setLogs` | ✅ | ✅ | ✅ | — | — |
+| `users/{uid}/sessions/{sid}/exerciseFeedback` | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `users/{uid}/checkIns` | 🟡 | — | 🟡 | — | — |
+| `users/{uid}/wellbeingCheckIns` | ✅ | ✅ | ✅ | — | ✅ |
 | `users/{uid}/customExercises` | — | — | — | — | — |
 | `exercises` | — | — | — | — | — |
 | `routines` | ✅ | ✅ | ✅ | ✅ | — |
@@ -98,20 +100,43 @@ son `get` / `list` / `write` / `delete`.
 | `payments` | ✅ | ✅ | 🟡 | ✅ | ✅ |
 | `reviews` | — | — | ✅ | — | — |
 | `mail_queue` | — | — | — | — | — |
+| `retention_notices` | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `blocks` | ✅ | — | ✅ | ✅ | ✅ |
+| `reports` | ✅ | — | ✅ | ✅ | ✅ |
 
-**103 de 170 celdas** tienen test negativo (61%). Por operación:
+**125 de 195 celdas** tienen test negativo (64%). Por operación:
 
 | Operación | Paths con test negativo |
 |---|---|
-| `get` | 21 / 34 |
-| `list` | 15 / 34 |
-| `create` | 28 / 34 |
-| `update` | 22 / 34 |
-| `delete` | 12 / 34 |
+| `get` | 26 / 39 |
+| `list` | 18 / 39 |
+| `create` | 35 / 39 |
+| `update` | 29 / 39 |
+| `delete` | 17 / 39 |
 
-Cinco paths siguen **sin una sola aserción negativa**:
-`users/{uid}/customExercises`, `exercises`, `coach_availability_rules`,
-`coach_availability_overrides`, `mail_queue`.
+Tres paths siguen **sin una sola aserción negativa**:
+`users/{uid}/customExercises`, `exercises`, `mail_queue`.
+
+> **`exerciseFeedback` y `wellbeingCheckIns` entran acá recién ahora, y las dos
+> ya tenían suite propia.** No son `match` nuevos: estaban en `firestore.rules`
+> con sus tests (`exercise-feedback-rules.test.ts`, 30 negativas;
+> `wellbeing-checkins-rules.test.ts`, 8) y nunca les tocó fila. El §1.8 punto 1
+> ya pedía la fila; lo que faltaba era algo que **avisara** cuando no se hacía,
+> porque una fila ausente no se ve — a diferencia de una celda en `—`, que grita
+> desde la tabla.
+>
+> Lo que costó: `users/{uid}/wellbeingCheckIns` es, según el comentario de su
+> propia regla, *el dato más sensible que guarda la app* —salud autorreportada,
+> dolor y zona— y estuvo fuera de la matriz de cobertura desde que existe. Bien
+> cubierto en los tests, invisible en el inventario. Un hueco de cobertura ahí
+> no lo habría detectado nadie leyendo esta sección, que es exactamente para lo
+> que existe.
+>
+> `wellbeingCheckIns` queda con `update` en `—` a propósito: su regla es un
+> `allow read, write` único, y los dos negativos de escritura corren sobre un
+> documento que **no existe**, o sea que ejercitan `create`. El único `set`
+> sobre un doc ya guardado es un positivo (el dueño editando lo suyo). La celda
+> está vacía porque está vacía, no por omisión al transcribir.
 
 > **QA-SEC-010 (oráculo de existencia) no mueve los totales, y conviene que se
 > entienda por qué.** `existence-oracle-rules.test.ts` agregó 8 negativos
@@ -210,14 +235,24 @@ de refilón: el caso "listar `postPhotos/`" de
 
 ### 1.3 De dónde salen estos números
 
-No son una estimación. Para el relevamiento se leyeron **los 28 archivos** de
-test de reglas que existían antes de este change (20 en `functions/`, 8 en
-`scripts/rules_test/`) y se clasificó **cada una de sus 509 aserciones** por
-`(path, operación, positiva/negativa)`: 302 negativas y 207 positivas. El total
-reconcilia exactamente contra el conteo mecánico — 296 `assertFails(` + 202
-`assertSucceeds(` en las suites que usan el SDK, más 6 `toBe(403)` y 5
-`toBe(200)` en las dos suites REST del reloj, que ejercitan las mismas reglas
-por HTTP crudo en vez de por SDK.
+**Foto forense al 2026-08-24 (`7b3d27dc`), no un contador vivo.** Para el
+relevamiento se leyeron **los 28 archivos** de test de reglas que existían
+entonces (20 en `functions/`, 8 en `scripts/rules_test/`) y se clasificó **cada
+una de sus 509 aserciones** por `(path, operación, positiva/negativa)`: 302
+negativas y 207 positivas. El total reconcilia exactamente contra el conteo
+mecánico — 296 `assertFails(` + 202 `assertSucceeds(` en las suites que usan el
+SDK, más 6 `toBe(403)` y 5 `toBe(200)` en las dos suites REST del reloj, que
+ejercitan las mismas reglas por HTTP crudo en vez de por SDK.
+
+Se dejan porque **siguen siendo reproducibles**, que es todo el valor de una
+foto: el mismo comando contra `git show 7b3d27dc:<archivo>` devuelve 296 y 202
+clavados. Lo que no son es el presente — hoy dan **736 y 429**, dos veces y
+media, sobre 54 archivos en vez de 28.
+
+⚠️ Y ojo con ese **`8 en scripts/rules_test/`**: es exactamente de donde §1.4
+copió el 8 que quedó podrido hasta que alguien recontó y encontró 14. Si venís a
+verificar §1.4 contra esta sección, estás comparando contra agosto. Los conteos
+vivos están en §1.4; acá hay historia.
 
 Para recontar (los números cambian a medida que se agregan tests):
 
@@ -236,9 +271,22 @@ números de arriba son call sites reales, no líneas.
 Esto es lo primero que hay que saber antes de tocar una regla:
 
 | Suite | Archivos | Job de CI | Cómo se corre a mano |
-|---|---|---|---|---|
-| `functions/src/__tests__/*-rules.test.ts` | 34 | *Functions Test* | `npm --prefix functions run test:rules:emulator` |
-| `scripts/rules_test/*.test.js` | 8 | *Rules Test* | `bash scripts/test_rules.sh` |
+|---|---|---|---|
+| `functions/src/__tests__/*-rules.test.ts` | 39 | *Functions Test* | `npm --prefix functions run test:rules:emulator` |
+| `scripts/rules_test/*.test.js` | 14 | *Rules Test* | `bash scripts/test_rules.sh` |
+
+La columna **Archivos** es un conteo, no una impresión, y crece sola. Recontala
+en vez de confiar en el número escrito — las dos cifras llegaron a estar en 34 y
+8 cuando ya eran 39 y 14:
+
+```bash
+fd -e ts -- '-rules\.test\.ts$' functions/src/__tests__ | wc -l
+fd -e js '\.test\.js$' scripts/rules_test | wc -l
+```
+
+Ninguna de las dos suites tiene lista que mantener: jest globea el directorio
+(`scripts/test_rules.sh` lo dice en su header), así que un archivo nuevo entra
+a CI solo — y este número se queda atrás solo.
 
 La segunda entró en CI con **#680 Slice B**. Hasta ahí era un ítem de checklist
 de PR — `scripts/test_rules.sh` lo decía en su propio header — y ocho
@@ -425,8 +473,60 @@ sección en el mismo PR.** Concretamente:
    no porque el otro job valga menos (los dos corren igual en cada PR), sino
    porque ahí está TypeScript y es donde las dos suites van a converger algún
    día (§1.6, punto 7).
-3. Recalculá los totales de §1.1 y §1.2. Son conteos, no impresiones.
-4. Los tests de reglas se corren con:
+3. Recalculá los totales de §1.1 y §1.2. Son conteos, no impresiones. Y
+   recalculalos **desde la tabla**, no a mano sobre tu diff: el total, el
+   desglose por operación y el párrafo de "paths sin una sola aserción
+   negativa" tienen que salir del mismo parseo, o se separan. Los tres se
+   habían separado a la vez — el párrafo nombraba cinco paths cuando eran tres,
+   y dos de los que nombraba ya tenían `create` y `update` en ✅.
+4. **Reconciliá el universo, no sólo los totales.** Un total puede cuadrar
+   perfecto con una fila que nunca se escribió: `exerciseFeedback` y
+   `wellbeingCheckIns` vivieron así, con tests y sin fila. Lo único que lo
+   detecta es comparar los dos lados. **Comparar los CONJUNTOS, no los
+   tamaños**: un renombre saca un `match` y mete otro, la cardinalidad no se
+   mueve y el chequeo pasa en verde con una fila rancia *y* un path sin fila.
+   Medido: renombrar `follows` → `followEdges` deja 42 `match`, 36 filas y la
+   resta sigue dando 5.
+
+   ```bash
+   python3 - <<'PY'
+   import re
+   EXCL = {"mp_checkouts","mp_plans","mp_preapprovals",
+           "mp_webhook_events","rc_webhook_events"}   # §2.0 punto 1
+   rules = open("firestore.rules").read(); doc = open("docs/security.md").read()
+   paths, pila, d = [], [], 0
+   for raw in rules.splitlines():
+       s = re.sub(r"//.*$", "", raw).strip()
+       m = re.match(r"match\s+(\S+)\s*\{", s)
+       if m:
+           seg = m.group(1).strip("/")
+           paths.append("/".join([p for p, _ in pila] + [seg])); pila.append((seg, d))
+       d += s.count("{") - s.count("}")
+       while pila and d <= pila[-1][1]: pila.pop()
+   W = "databases/{database}/documents"
+   norm = lambda p: re.sub(r"\{[^}]+\}", "{}", p.strip("/"))
+   reglas = {norm(p[len(W) + 1:]) for p in paths if p != W}
+   b = doc[doc.index("### 1.1 "):doc.index("### 1.2 ")]
+   filas = {norm(l.strip().strip("|").split("|")[0].strip().strip("`"))
+            for l in b[:b.index("**")].splitlines() if l.startswith("| `")}
+   cubre = lambda p: p in filas or "/".join(p.split("/")[:-1]) in filas
+   sin_fila = {p.split("/")[0] for p in reglas if not cubre(p)} - EXCL
+   huerfanas = {f for f in filas
+                if not any(f == p or f == "/".join(p.split("/")[:-1]) for p in reglas)}
+   print("match sin fila :", sorted(sin_fila) or "ninguno")
+   print("filas huérfanas:", sorted(huerfanas) or "ninguna")
+   PY
+   ```
+
+   Las dos listas tienen que salir vacías. La primera caza un `match` que nunca
+   entró a la matriz; la segunda, una fila que quedó nombrando un path que ya no
+   existe. Un conteo no distingue ninguna de las dos.
+
+   Y las cinco exclusiones van **nombradas** en `EXCL`, no deducidas por ser
+   `if false`: **`mail_queue` y `retention_notices` también son `if false` y sí
+   tienen fila**. "Cerrado a todo cliente" no es el criterio que separa las dos
+   listas, así que deducirlas deja pasar DOS filas de menos.
+5. Los tests de reglas se corren con:
 
    ```bash
    npm --prefix functions run test:rules:emulator   # requiere Java 21+
@@ -527,11 +627,39 @@ que el borrado de cuenta se lleva todo eso, y que la política dice la verdad.
 **Método.** Nada acá sale de memoria ni de suposición:
 
 1. El universo de stores se enumeró con `rg '^\s*match /' firestore.rules` →
-   **34 paths** (el mismo número que reporta §1.1),
-   más `audit_log/{uid}`, que **no tiene bloque `match`** —lo escribe sólo el
+   **45 líneas**, que son **44 colecciones** una vez descontado el wrapper
+   `match /databases/{database}/documents`.
+
+   Ese 44 **no es** el número de §1.1, y conviene dejar escrito por qué, porque
+   la cifra ya derivó una vez por no estarlo: §1.1 declara **39 paths** y las
+   **5** que faltan son `mp_checkouts`, `mp_plans`, `mp_preapprovals`,
+   `mp_webhook_events` y `rc_webhook_events`. Las cinco son `allow read, write:
+   if false` — bloques **documentales**, escritos sólo por el Admin SDK, que
+   existen para que el default-deny quede explícito en el archivo. No ejercitan
+   ningún permiso de cliente y por eso no aportan celdas a aquella matriz
+   (`mp-collections-rules.test.ts` sí las testea: verifica justamente que estén
+   cerradas). **44 = 39 + 5.**
+
+   ⚠️ `if false` **no** es el criterio, aunque lo parezca: `mail_queue` y
+   `retention_notices` son igual de CF-only, igual de `if false`, y **sí**
+   ocupan fila en §1.1. Las dos formas de tratar un bloque cerrado conviven acá
+   y ninguna está escrita como decisión. Si alguna vez se unifica, mueve el
+   total de §1.1 —dos filas de menos, o cinco de más— y no es cosmético.
+
+   Y las dos filas que sí están **no son equivalentes entre sí**, que es la
+   parte que importa: `mail_queue` tiene las cinco celdas en `—` porque nunca
+   se le escribió un test negativo; `retention_notices` las tiene en ✅ porque
+   `retention-notices-rules.test.ts` prueba las cinco. Estar cerrada y estar
+   PROBADA que está cerrada son cosas distintas, y en una unión permisiva la
+   segunda es la única que protege.
+
+   Más `audit_log/{uid}`, que **no tiene bloque `match`** —lo escribe sólo el
    Admin SDK y por default-deny ningún cliente lo alcanza— y por eso no aparece
    en aquella matriz pero sí guarda un dato personal.
-2. Storage: `storage.rules` declara **6 paths** + el catch-all `deny`.
+2. Storage: `storage.rules` declara **7 paths** + el wrapper
+   `match /b/{bucket}/o` y el catch-all `deny` — el mismo número que la tabla
+   de §1.2. Decía 6: `sessionFeedback/{uid}/{sid}/{file}` entró a las reglas y
+   a §1.2, y este punto se quedó atrás. Mismo modo de falla que el punto 1.
 3. Los campos salen de las `keys().hasOnly([...])` de `firestore.rules` y, donde
    la regla no tiene allowlist, de los modelos `freezed` en `lib/**/domain/`.
 4. La cobertura de borrado sale de leer `functions/src/delete-account.ts` y los
@@ -556,7 +684,7 @@ Leyenda de la columna **De quién**:
 | 🫱 | Dato **sobre el usuario, escrito por un tercero** (típicamente su PF) |
 | 🔗 | Dato **del usuario que vive dentro del documento de otra persona** (denormalización) |
 
-#### 2.1.1 Firestore — 35 stores (34 con `match` + `audit_log`)
+#### 2.1.1 Firestore — 36 stores (35 con `match` + `audit_log`)
 
 | # | Path | Datos personales que contiene | De quién | Quién lo lee |
 |---|---|---|---|---|
@@ -595,8 +723,9 @@ Leyenda de la columna **De quién**:
 | 33 | `reviews/{id}` | `athleteId`, `trainerId`, `rating`, `comment` (≤500 chars, texto libre del alumno) | 👤 | **Cualquier autenticado** |
 | 34 | `mail_queue/{id}` | `toUid`, `kind`, `params{}` (parámetros de plantilla: montos, nombres), `status` | 👤 | Nadie (`read, write: if false`; sólo Admin SDK) |
 | 35 | `audit_log/{uid}` | `uid`, `provider` (método de login), `startedAt`, `completedAt`, `deletedCollections[]`, `errors[]` | 👤 | Nadie (sin bloque `match` → default deny) |
+| 36 | `retention_notices/{uid}` | `noticeSentAt`, `lastSeenAt` (última actividad al momento del aviso), `deletedAt` — el registro de la baja automática por inactividad | 👤 | Nadie (`read, write: if false`; sólo Admin SDK) |
 
-**34 de los 35 stores contienen datos personales.** El único que no es
+**35 de los 36 stores contienen datos personales.** El único que no es
 `exercises` (catálogo global, sin autor). `gyms` está al borde: lo único
 personal que guarda es el uid del PF que lo dio de alta.
 
@@ -676,6 +805,7 @@ uno en su `try/catch`, y borra el usuario de Auth al final. Esto es lo que cada
 | 33 | `reviews` | ⚪ retención deliberada | **Pero el alcance escrito no coincide con el código** → §2.3.2 |
 | 34 | `mail_queue` | ❌ **hueco** | Sin paso, sin TTL → QA-CMP-010 |
 | 35 | `audit_log/{uid}` | ⚪ retención deliberada | Sin período de retención definido |
+| 36 | `retention_notices/{uid}` | ✅ | `deleteUserDocs` (doc id = uid, paso 4 del módulo). Es el molde huérfano de `blocks`/`reports` —id, no campo—, así que se borra **nombrándolo**: ninguna query `where athleteId ==` lo alcanza |
 | S1 | `avatars/` | ✅ | `deleteAvatar` (cualquier extensión, QA-CMP-002) |
 | S2 | `temp/uploads/{uid}/` | ✅ | `deleteAthleteStorage` |
 | S3 | `customExerciseVideos/{uid}/` | ✅ | `deleteAthleteStorage` |
@@ -686,18 +816,18 @@ uno en su `try/catch`, y borra el usuario de Auth al final. Esto es lo que cada
 
 #### 2.2.2 El número
 
-De los **40 ítems** del inventario (34 Firestore con PII + 6 Storage), midiendo
+De los **41 ítems** del inventario (35 Firestore con PII + 6 Storage), midiendo
 sobre el borrado de una cuenta **athlete**:
 
 | Estado | Ítems | Cuáles |
 |---|---|---|
-| ✅ Cubierto | **25** | 1, 4, 7, 9, 10, 13, 16-21, 25-31 + S1-S6 |
+| ✅ Cubierto | **26** | 1, 4, 7, 9, 10, 13, 16-21, 25-31, 36 + S1-S6 |
 | 🟡 Parcial (queda PII recuperable) | **4** | 2, 6, 8, 24 |
 | ⚪ Retenido a propósito, con decisión escrita en el código | **5** | 14, 15, 32, 33, 35 |
 | ❌ Hueco sin decisión escrita | **3** | 5, 12, 34 |
 | n/a para una cuenta athlete (PII de un PF) | **3** | 11, 22, 23 |
 
-**Titular: 6 de 40 ítems dejan datos personales recuperables sin que exista
+**Titular: 6 de 41 ítems dejan datos personales recuperables sin que exista
 ninguna decisión escrita que lo justifique** (los 3 huecos + los 3 parciales sin
 decisión escrita: `posts/*/reactions` en posts ajenos, `appointments` y
 `notifications`). El parcial restante, `trainer_links`, sí tiene decisión
@@ -1047,22 +1177,38 @@ existe, y la §7 de la política no la excluye.
 
 ### 2.5 Retención
 
-No hay ninguna política de retención implementada en el repo. Ni un TTL de
-Firestore configurado, ni un job programado de limpieza (el único `onSchedule`
-es `sweepEntitlements`, que es de suscripciones, no de retención).
+Hay **una** política de retención implementada, y todavía **no está
+ejerciendo**: `sweepInactiveAccounts`
+(`functions/src/retention/sweep-inactive-accounts.ts`) avisa por correo a los 24
+meses de inactividad y da de baja la cuenta a los 36, con la cascada completa de
+`deleteAccount`. Se despliega con `RETENTION_SWEEP_DRY_RUN = true`: cuenta,
+lista y loguea, y no escribe nada.
+
+Ese matiz no es prolijidad. La señal de actividad sale de los metadatos de
+Firebase Auth, que ya tienen historia, así que la primera corrida ve de una todo
+el backlog de cuentas que ya pasaron los 24 meses. Mientras el interruptor esté
+en `true`, **la columna "de hecho hoy" de la tabla de abajo no cambia para nadie**
+— y decir que la retención ya corre sería exactamente la advertencia falsa del
+§11.1 de `AGENTS.md`, del lado que tranquiliza.
+
+Fuera de esa, no hay ninguna otra: ni un TTL de Firestore configurado, ni un job
+de limpieza para el resto de las filas.
 
 | Dato | Retención de hecho hoy | Retención declarada |
 |---|---|---|
 | Todo lo del §1 mientras la cuenta vive | Indefinida | "mientras mantengas tu cuenta" (§6) |
+| Cuenta inactiva | Indefinida **hasta que se apague el `dryRun`**; después, 36 meses | 36 meses, `docs/legal/retencion-y-borrado.md` §6 (marcador puesto) |
 | `payments` post-borrado | Indefinida | No declarada |
 | `reviews` (con `comment`) post-borrado | Indefinida | No declarada |
 | `chats` / `messages` post-borrado | Indefinida | No declarada |
 | `audit_log/{uid}` | Indefinida | No declarada |
 | `users/*/notifications` | Indefinida — TODO abierto | No declarada |
 | `mail_queue` | Indefinida | No declarada |
+| `retention_notices/{uid}` | Hasta la baja de la cuenta (se va en el cascade) | No declarada |
 
 Definir plazos es una decisión de producto y legal, no de ingeniería, así que
-este documento no propone números. Sí deja anotado que **hoy no hay ninguno**.
+este documento no propone números. Los 24/36 meses de la primera fila no los
+propuso: los decidió el titular el 2026-09-14 y este documento los registra.
 
 ---
 
@@ -1598,6 +1744,28 @@ con token la sigue pudiendo bajar aunque acá diga DENY.
 | A6 | **Anónimo / sin auth** | `request.auth == null` | Nada. Un cliente HTTP |
 | A7 | **Cloud Function (Admin SDK)** | **no la ve** — bypassea las reglas por diseño (ADR-ACCDEL-013) | Deploy. Es la TCB del sistema |
 
+> **Actualización 2026-09-08 — A6 dejó de ser sólo un actor de `firestore.rules`.**
+>
+> Esta tabla describe a los siete actores **como los ve una regla de Firestore**,
+> y mientras todo `functions/` fue `onCall` (con `request.auth`) o trigger, A6 no
+> tenía ninguna superficie de cómputo: llegaba al SDK de Firestore y ahí lo
+> frenaban las reglas.
+>
+> `mpWebhook` (`functions/src/subscriptions/mp/webhook.ts`) es el **primer
+> endpoint HTTP público del repo**: cualquiera puede POSTearlo sin cuenta. O sea
+> que A6 ahora puede hacer que corra código nuestro.
+>
+> Lo que eso NO le da, y es deliberado: del evento entrante se usa **un solo
+> dato, el id del recurso**, y el estado se le pregunta a Mercado Pago con
+> nuestro token. Un body forjado no decide nada — el payload no se mira. Lo que
+> SÍ le da es la posibilidad de gastarnos cuota de la API de MP mandando ids al
+> azar; contra eso están el chequeo de forma del id, el dedupe y un
+> `maxInstances: 3` que es el único tope de instancias de todo el repo.
+>
+> La firma `x-signature` se valida **si hay secreto configurado**, y puede no
+> haberlo: la doc de MP se contradice sobre si una aplicación de Suscripciones
+> puede generar clave. El encabezado del archivo tiene la cita textual.
+
 A2 y A5 se parecen pero **no son el mismo actor y conviene no fusionarlos**. A2
 es una persona concreta que intenta llegar al dato de otra persona concreta; A5
 es la audiencia que una regla se dio a sí misma cuando escribió
@@ -2101,6 +2269,13 @@ Apple Guideline 5.1.1(v) exige que el borrado de cuenta funcione.
 > `mintWatchCredential` — conviene restaurar los dos juntos el día que Android
 > emita atestación válida.
 
+> **Leer §4.8.3 antes de usar los números de acá.** La medición del
+> 2026-09-04 cubre 24 días y los 6 callables con tráfico, y encuentra algo que
+> este corte —un callable, un día— no podía ver: `acceptTrainerLink` y
+> `requestPasswordReset` no producen **ninguna** atestación válida. La tabla de
+> abajo sigue siendo válida como corte histórico; la condición de salida para
+> encender el enforcement es la de §4.8.3, no la de acá.
+
 Ese cliente era un **simulador** (`hw/sim`), no un tester de TestFlight — pero el
 modo de falla no es exclusivo del simulador. Cruzando cada verificación con su
 user-agent sobre `mintWatchCredential`, que recibe tráfico real y no tiene el
@@ -2135,6 +2310,81 @@ El campo `jsonPayload.verifications.app` vale `VALID` / `INVALID` / `MISSING`, y
 distingue *"no mandó token"* de *"mandó uno que no se pudo decodificar"* — que es
 justamente la distinción entre la web y el móvil. Es la fuente de la que dependen
 el plan de restore de #704 y la condición de salida de `mintWatchCredential`.
+
+#### 4.8.3 La medición ancha (2026-09-04): dos callables en CERO
+
+La de §4.8.2 miró **un callable y un día**. Repetida sobre **24 días y los 6
+callables** que reciben tráfico —159 verificaciones, filtro
+`jsonPayload.verifications:*`— aparece algo que ese corte no podía ver.
+
+| callable | `VALID` | `INVALID` | `MISSING` | tasa entre los que mandan token |
+|---|---|---|---|---|
+| `mintWatchCredential` | 49 | 44 | 5 | 49/93 — **53%** |
+| **`acceptTrainerLink`** | **0** | **10** | 17 | **0/10** |
+| **`requestPasswordReset`** | **0** | 1 | 16 | **0/1** |
+| `deleteAccount` | 1 | 3 | 8 | 1/4 |
+| `resumeTrainerLink` | 0 | 1 | 1 | 0/1 |
+| `addAlias` | — | — | 3 | — (nunca manda token, §4.10) |
+| **TOTAL** | **50** | **59** | **50** | 50/109 |
+
+**Tres cosas que corrige respecto de §4.8.2.**
+
+1. **El "1 de cada 9" era el peor corte, no la tasa.** Sobre 24 días
+   `mintWatchCredential` va 53%. El número viejo salía de cruzar por
+   user-agent contra Android en una ventana angosta; sigue siendo cierto que
+   Android es el que falla, pero la tasa global del callable no es 11%.
+
+2. **El problema no es una tasa baja: son DOS CALLABLES EN CERO.**
+   `acceptTrainerLink` no produjo **ni una** atestación válida en 10 intentos.
+   Es el gate del paywall —promueve `pending → active` detrás del límite de
+   plan (`subscriptions/accept-trainer-link.ts`)—, o sea el flujo por el que un
+   PF empieza a trabajar con un alumno. Con enforcement encendido no falla "8
+   de cada 9": **falla siempre**. Es exactamente la historia de
+   `deleteAccount` (§4.8.2) en dos flujos más, uno de ellos el que cobra.
+
+3. **El user-agent NO está en estos logs.** Las 159 entradas salen de
+   `run.googleapis.com/stderr` y **cero tienen `httpRequest`**, así que el
+   cruce por cliente de §4.8.2 no se puede reproducir con este filtro. Los
+   user-agents viven en los logs de *request* de Cloud Run, que son otro
+   `logName` y se cruzan por el campo `trace`. Hasta hacer ese cruce, **la
+   separación iOS/Android de la tabla de §4.8.2 no está re-verificada**.
+
+**Cómo repetir esta medición** (no depende del texto del mensaje, sólo de que
+el campo exista):
+
+```bash
+gcloud logging read 'jsonPayload.verifications:*' \
+  --project=treino-dev --limit=200 --freshness=30d \
+  --format='value(timestamp,resource.labels.service_name,jsonPayload.verifications.app)'
+```
+
+⚠️ Con `jsonPayload.message="Callable request verification"` —comparación
+exacta— **devuelve cero filas**: el mensaje real trae más texto. En §4.8.2 el
+filtro va con `:` (contiene), y esa diferencia de un carácter parece "no hay
+tráfico".
+
+**La condición de salida para encender el enforcement.** La primera versión de
+esta sección decía "que esos dos callables dejen de dar cero", y era un piso
+trivial: con 1 `VALID` y 27 fallando, la condición se cumplía y el flujo seguía
+roto para el 96% de la gente. La condición real tiene tres partes, y las tres
+son por CALLABLE que se vaya a enforzar:
+
+1. **`INVALID` ~ 0 sobre una ventana con tráfico real**, no una llamada
+   afortunada. `INVALID` es un cliente que manda token y no lo puede
+   producir bien — cada uno de esos es un usuario que se queda afuera.
+2. **Tráfico medido desde TODAS las plataformas que llaman a ese callable.**
+   Una tasa buena que sólo vio iOS no dice nada de Android, y hoy el cruce por
+   cliente ni siquiera se puede reproducir con este filtro (punto 3 de arriba).
+3. **Los `MISSING` resueltos aparte.** No son un problema de atestación: son
+   clientes que no mandan token. El Coach Hub web no activa App Check
+   (§4.10), así que un callable que recibe tráfico web O se le activa al
+   cliente, O no se puede enforzar. `acceptTrainerLink` tiene 17 `MISSING`
+   sobre 27 — enforzarlo con el hub como está lo rompe entero, aunque el móvil
+   atestigüe perfecto.
+
+Mientras eso no se cumpla, encender el enforcement rompe el alta de alumnos y
+la recuperación de cuenta el mismo día, y el síntoma no se va a parecer a App
+Check.
 
 ---
 

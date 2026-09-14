@@ -44,7 +44,13 @@ class _ProfileShareToggleTileState
 
     // Read everything we need synchronously before any await
     final profile = ref.read(userProfileProvider).valueOrNull;
-    final link = await ref.read(currentAthleteLinkProvider.future);
+    // Acotado: el provider espera al servidor indefinidamente a propósito, y
+    // esto corre adentro de un handler con `_busy` puesto. Al vencerse cae en
+    // el mismo camino que ya existía para `link == null` — suelta el control en
+    // vez de dejarlo muerto.
+    final link = await ref
+        .read(currentAthleteLinkProvider.future)
+        .timeout(kEsperaDelServidorDeVinculo, onTimeout: () => null);
     final repo = ref.read(profileShareRepositoryProvider);
 
     if (profile == null || link == null) {

@@ -16,7 +16,8 @@
  *     doc (same reasoning as rankingAggregate, QA-507).
  */
 
-import * as admin from "firebase-admin";
+import { App, getApp, initializeApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 
@@ -24,11 +25,11 @@ import { logger } from "firebase-functions";
  * Initialize the default Admin SDK app lazily so the module can be imported
  * without an app already existing (e.g. in test environments).
  */
-function getApp(): admin.app.App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -66,10 +67,10 @@ export function aggregateFromRatings(ratings: { rating?: unknown }[]): {
  * the trigger handler AND by test suites.
  */
 export async function recomputeTemplateRating(
-  app: admin.app.App,
+  app: App,
   routineId: string,
 ): Promise<void> {
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
 
   try {
     // 1. Query all ratings for this routine.
@@ -126,6 +127,6 @@ export const templateRatingAggregate = onDocumentWritten(
     region: "southamerica-east1",
   },
   async (event) => {
-    await recomputeTemplateRating(getApp(), event.params.routineId);
+    await recomputeTemplateRating(ensureApp(), event.params.routineId);
   },
 );

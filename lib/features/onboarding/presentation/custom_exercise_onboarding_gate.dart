@@ -195,6 +195,7 @@ class _OnboardingSheet extends StatelessWidget {
 
   final List<OnboardingCardContent> slides;
   final AppL10n l10n;
+
   /// Separados a propósito: el CTA navega al editor de ejercicios y SALTAR no.
   /// Con un solo callback para los dos, el botón que dice "CREAR MI EJERCICIO"
   /// no se distinguía de saltear.
@@ -246,6 +247,7 @@ class _OnboardingDialog extends StatelessWidget {
 
   final List<OnboardingCardContent> slides;
   final AppL10n l10n;
+
   /// Separados a propósito: el CTA navega al editor de ejercicios y SALTAR no.
   /// Con un solo callback para los dos, el botón que dice "CREAR MI EJERCICIO"
   /// no se distinguía de saltear.

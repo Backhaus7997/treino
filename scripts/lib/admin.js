@@ -47,6 +47,8 @@
 
 'use strict';
 
+const { cert, getApp, getApps, initializeApp } = require('firebase-admin/app');
+
 const {
   ErrorDeCredencial,
   VAR_ADC,
@@ -58,7 +60,12 @@ const PROJECT_ID_EMULADOR = 'treino-dev';
 
 /**
  * Inicializa `firebase-admin` pasando por la frontera y devuelve
- * `{ admin, contexto }`.
+ * `{ app, contexto }`.
+ *
+ * `app` es el `App` con el que se llama a `getFirestore(app)`, `getAuth(app)`,
+ * `getStorage(app)`. Hasta el bump a v14 esto devolvía además el módulo
+ * namespaced en `{ admin }`, como puente para los scripts sin migrar; ya no hay
+ * ninguno, y en v14 ese objeto no tiene `.firestore()`.
  *
  * @param {object}  [opciones]
  * @param {string}  [opciones.projectId]  Fuerza el proyecto (p. ej. `--project=X`).
@@ -66,7 +73,8 @@ const PROJECT_ID_EMULADOR = 'treino-dev';
  * @param {object}  [opciones.extra]      Opciones crudas para `initializeApp`
  *                                        (`storageBucket`, …).
  * @param {object}  [opciones.env]        Ambiente. Inyectable para tests.
- * @param {object}  [opciones.admin]      El SDK. Inyectable para tests.
+ * @param {object}  [opciones.sdk]        Las cuatro funciones de `firebase-admin/app`
+ *                                        que este módulo usa. Inyectable para tests.
  * @param {object}  [opciones.consola]    Dónde escribir avisos. Inyectable.
  * @param {Function}[opciones.salir]      Cómo abortar. Inyectable.
  */
@@ -74,7 +82,7 @@ function inicializarAdmin({
   projectId = null,
   extra = {},
   env = process.env,
-  admin = require('firebase-admin'),
+  sdk = { cert, getApp, getApps, initializeApp },
   consola = console,
   salir = (codigo) => process.exit(codigo),
   ...io
@@ -83,7 +91,7 @@ function inicializarAdmin({
   // `seed_emulator_full.js`, que ya inicializó su app apuntada al emulador. Un
   // segundo `initializeApp` explotaría. No se re-resuelve credencial: la app que
   // ya existe sólo pudo nacer pasando por acá.
-  if (admin.apps.length) return { admin, contexto: null };
+  if (sdk.getApps().length) return { app: sdk.getApp(), contexto: null };
 
   let contexto;
   try {
@@ -99,20 +107,20 @@ function inicializarAdmin({
   for (const aviso of contexto.avisos) consola.error(aviso);
 
   if (contexto.modo === 'emulador') {
-    admin.initializeApp({ projectId: projectId || contexto.projectId, ...extra });
-    return { admin, contexto };
+    const app = sdk.initializeApp({ projectId: projectId || contexto.projectId, ...extra });
+    return { app, contexto };
   }
 
   // Ver (3) en el encabezado: el resto del proceso hereda la ruta validada.
   env[VAR_ADC] = contexto.ruta;
 
-  admin.initializeApp({
-    credential: admin.credential.cert(contexto.credencial),
+  const app = sdk.initializeApp({
+    credential: sdk.cert(contexto.credencial),
     projectId: projectId || contexto.credencial.project_id || undefined,
     ...extra,
   });
 
-  return { admin, contexto };
+  return { app, contexto };
 }
 
 /**

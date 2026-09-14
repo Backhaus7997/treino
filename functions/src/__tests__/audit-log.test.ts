@@ -6,7 +6,8 @@
  * Set FIRESTORE_EMULATOR_HOST before running.
  */
 
-import * as admin from "firebase-admin";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
 
 // Point Admin SDK to the emulator
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
@@ -14,10 +15,10 @@ process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
 process.env.GCLOUD_PROJECT = "treino-dev";
 
 // Initialize a dedicated app for tests to avoid conflicts
-let testApp: admin.app.App;
+let testApp: App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp(
+  testApp = initializeApp(
     {
       projectId: "treino-dev",
     },
@@ -26,14 +27,14 @@ beforeAll(() => {
 });
 
 afterAll(async () => {
-  await testApp.delete();
+  await deleteApp(testApp);
 });
 
 // Import after env vars are set
 import { writeStarted, writeFinal } from "../cascade/audit-log";
 import { AuditLogEntry } from "../types";
 
-const db = () => admin.firestore(testApp);
+const db = () => getFirestore(testApp);
 
 async function clearAuditLog(uid: string): Promise<void> {
   await db().collection("audit_log").doc(uid).delete();
@@ -81,7 +82,7 @@ describe("audit-log — writeFinal", () => {
     await db().collection("audit_log").doc(uid).set({
       status: "started",
       provider: "password",
-      startedAt: admin.firestore.FieldValue.serverTimestamp(),
+      startedAt: FieldValue.serverTimestamp(),
       uid,
     });
 
@@ -100,7 +101,7 @@ describe("audit-log — writeFinal", () => {
     await db().collection("audit_log").doc(uid).set({
       status: "started",
       provider: "password",
-      startedAt: admin.firestore.FieldValue.serverTimestamp(),
+      startedAt: FieldValue.serverTimestamp(),
       uid,
     });
 
@@ -118,7 +119,7 @@ describe("audit-log — writeFinal", () => {
     await db().collection("audit_log").doc(uid).set({
       status: "started",
       provider: "google.com",
-      startedAt: admin.firestore.FieldValue.serverTimestamp(),
+      startedAt: FieldValue.serverTimestamp(),
       uid,
     });
 

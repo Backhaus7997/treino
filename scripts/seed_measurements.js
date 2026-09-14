@@ -21,9 +21,10 @@
 // Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla cerrado
 // con la migración; contra el emulador no pide nada. Ver scripts/lib/admin.js.
 const { inicializarAdmin } = require('./lib/admin');
+const { Timestamp, getFirestore } = require('firebase-admin/firestore');
 
-const { admin } = inicializarAdmin();
-const db = admin.firestore();
+const { app } = inicializarAdmin();
+const db = getFirestore(app);
 
 const TRAINER_ID = 'zCqIMvyJNpeZFdyHAD0zjhZu13g1';
 const ATHLETE_ID = 'UVjNGDxHc1PB6GppssbLEu8htRS2';
@@ -98,7 +99,7 @@ async function main() {
     const data = {
       athleteId: ATHLETE_ID,
       recordedBy: TRAINER_ID,
-      recordedAt: admin.firestore.Timestamp.fromDate(when),
+      recordedAt: Timestamp.fromDate(when),
       ...metrics,
       seedMock: true,
     };

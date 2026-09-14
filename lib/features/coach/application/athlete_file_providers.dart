@@ -28,3 +28,10 @@ final athleteFilesProvider =
       .watch(athleteFileRepositoryProvider)
       .watch(key.trainerId, key.athleteId),
 );
+
+/// Archivos que los PFs compartieron con el alumno, ordenados del más nuevo.
+final sharedAthleteFilesProvider =
+    StreamProvider.autoDispose.family<List<AthleteFile>, String>(
+  (ref, athleteId) =>
+      ref.watch(athleteFileRepositoryProvider).watchSharedForAthlete(athleteId),
+);

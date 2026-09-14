@@ -9,9 +9,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_motion.dart';
+import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/features/coach_hub/presentation/sections/biblioteca/biblioteca_web_screen.dart';
+import 'package:treino/features/coach_hub/presentation/sections/biblioteca/widgets/biblioteca_filter_chips.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/workout/application/custom_exercise_providers.dart';
@@ -105,7 +107,7 @@ Widget _wrap() {
 /// Wraps BibliotecaWebScreen with resolved (non-loading) providers so the
 /// counts settle to real values — 2 catalog + 1 custom = 3 ejercicios,
 /// 2 templates.
-Widget _wrapWithData() {
+Widget _wrapWithData({ThemeData? theme}) {
   return ProviderScope(
     overrides: [
       currentUidProvider.overrideWithValue(_kTrainerId),
@@ -118,7 +120,7 @@ Widget _wrapWithData() {
       ),
     ],
     child: MaterialApp(
-      theme: AppTheme.dark(),
+      theme: theme ?? AppTheme.dark(),
       home: const Scaffold(
         body: BibliotecaWebScreen(),
       ),
@@ -126,30 +128,57 @@ Widget _wrapWithData() {
   );
 }
 
+void _setSurfaceSize(WidgetTester tester, double width) {
+  tester.view.physicalSize = Size(width, 900);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+}
+
+Finder _inside(Key hostKey, Finder matching) => find.descendant(
+      of: find.byKey(hostKey),
+      matching: matching,
+    );
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 void main() {
+  // AppTheme.* toca GoogleFonts. Si algun ThemeData llegara a construirse
+  // fuera del cuerpo de un testWidgets, sin esto revienta con "Binding has
+  // not yet been initialized" antes de la primera asercion.
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   setUp(() {
     TestWidgetsFlutterBinding.ensureInitialized();
   });
 
   group('BibliotecaWebScreen — contract', () {
-    testWidgets('mounts successfully and has 2 tabs — SCENARIO-BIBW-02a',
+    testWidgets('monta sin TabBar: la sección es sólo Ejercicios',
         (tester) async {
+      // Tenía dos tabs. «Templates Rutinas» se retiró porque las plantillas
+      // del PF se listaban acá Y en la sección Rutinas, con capacidades
+      // distintas — acá eran inertes. Con una sola tab, la TabBar sobra: es
+      // un encabezado que promete una elección que no existe.
       tester.view.physicalSize = const Size(1280, 900);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
-      await tester.pumpWidget(_wrap());
-      await tester.pump(); // single frame
+      // `_wrapWithData` y `pumpAndSettle`, no un frame suelto: el hero está
+      // adentro de un `TreinoFadeSlideIn` con stagger, que no construye a su
+      // hijo hasta que corre el delay. La versión anterior de este test se
+      // apoyaba en las etiquetas de la TabBar, que sí estaban en el primer
+      // frame por estar FUERA de la animación — al sacar la tab, no queda
+      // nada que assertear en frame 1.
+      await tester.pumpWidget(_wrapWithData());
+      await tester.pumpAndSettle();
 
-      // TabBar with 2 tabs must exist
-      expect(find.byType(TabBar), findsOneWidget);
-
-      // Both tab labels visible (labels include counts: "Ejercicios · N")
-      expect(find.textContaining('Ejercicios'), findsWidgets);
-      expect(find.textContaining('Templates Rutinas'), findsOneWidget);
+      expect(find.byType(TabBar), findsNothing);
+      expect(find.byType(Tab), findsNothing);
+      expect(find.textContaining('Templates Rutinas'), findsNothing);
+      // La sección se sigue anunciando. `TreinoSectionHeader` uppercasea el
+      // título (design system). El subtítulo lo cubre el test de abajo.
+      expect(find.text('BIBLIOTECA'), findsOneWidget);
     });
 
     testWidgets('does not render a Scaffold inside itself — SCENARIO-BIBW-02a',
@@ -224,7 +253,7 @@ void main() {
       expect(fadeSlideInAncestor.delay, AppMotion.stagger(0));
     });
 
-    testWidgets('shows honest subtitle with real exercise + template counts',
+    testWidgets('el subtítulo cuenta ejercicios, y ya no habla de templates',
         (tester) async {
       tester.view.physicalSize = const Size(1280, 900);
       tester.view.devicePixelRatio = 1.0;
@@ -234,13 +263,17 @@ void main() {
       await tester.pumpWidget(_wrapWithData());
       await tester.pumpAndSettle();
 
-      // 2 catalog + 1 custom = 3 ejercicios · 2 templates.
+      // 2 de catálogo + 1 propio = 3 ejercicios.
       expect(find.textContaining('3 ejercicios'), findsOneWidget);
-      expect(find.textContaining('2 templates'), findsOneWidget);
+      // El contador de templates se fue con la tab. Un subtítulo que sigue
+      // prometiendo plantillas en una sección que ya no las tiene es
+      // exactamente la clase de cartel que AGENTS.md §11.1 prohíbe.
+      expect(find.textContaining('templates'), findsNothing);
     });
 
-    testWidgets('still has exactly 2 tabs with no own Scaffold/SafeArea',
-        (tester) async {
+    // Lo que importa de este test sobrevive a la tab: el contrato de sección
+    // de ADR-CHW-005. El chrome lo pone el shell, no la pantalla.
+    testWidgets('sigue sin Scaffold ni SafeArea propios', (tester) async {
       tester.view.physicalSize = const Size(1280, 900);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -249,9 +282,175 @@ void main() {
       await tester.pumpWidget(_wrap());
       await tester.pump();
 
-      expect(find.byType(Tab), findsNWidgets(2));
       expect(find.byType(Scaffold), findsOneWidget);
       expect(find.byType(SafeArea), findsNothing);
+    });
+  });
+
+  group('Biblioteca Ejercicios — layout responsivo', () {
+    const filtersKey = Key('biblioteca_filter_column');
+    const gridKey = Key('biblioteca_exercise_grid');
+    const panelKey = Key('biblioteca_detail_panel');
+
+    testWidgets('desktop: los filtros van a la DERECHA de la grilla',
+        (tester) async {
+      _setSurfaceSize(tester, 1512);
+      await tester.pumpWidget(_wrapWithData());
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(filtersKey), findsOneWidget);
+      expect(find.byKey(gridKey), findsOneWidget);
+      expect(
+        tester.getCenter(find.byKey(filtersKey)).dx,
+        greaterThan(tester.getCenter(find.byKey(gridKey)).dx),
+        reason: 'mismo lado que el picker del editor de rutinas: la lista '
+            'auxiliar a la derecha, el contenido al centro',
+      );
+    });
+
+    testWidgets(
+        'desktop angosto (1512): tocar una card abre el drawer, NO el modal',
+        (tester) async {
+      // 1512 es un MacBook Pro de 14 pulgadas. El diseño anterior exigía 1528
+      // de SECCION —o sea ~1768 de viewport con el sidebar expandido— asi que
+      // en la maquina del dueño del producto el panel no aparecia nunca.
+      _setSurfaceSize(tester, 1512);
+      await tester.pumpWidget(_wrapWithData());
+      await tester.pumpAndSettle();
+
+      await tester.tap(_inside(gridKey, find.text('Press de Banca')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(panelKey), findsOneWidget);
+      expect(find.byType(TreinoDialog), findsNothing);
+    });
+
+    testWidgets('el drawer mide un cuarto del ancho y va pegado a la derecha',
+        (tester) async {
+      _setSurfaceSize(tester, 1600);
+      await tester.pumpWidget(_wrapWithData());
+      await tester.pumpAndSettle();
+
+      await tester.tap(_inside(gridKey, find.text('Press de Banca')));
+      await tester.pumpAndSettle();
+
+      final drawer = tester.getRect(find.byKey(panelKey));
+      expect(drawer.width, closeTo(1600 / 4, 1));
+      expect(drawer.right, closeTo(1600, 1),
+          reason: 'se despliega desde la derecha, pegado al borde');
+      expect(drawer.height, closeTo(900, 1),
+          reason: 'ocupa todo el alto disponible');
+    });
+
+    testWidgets('el drawer se SUPERPONE: la grilla mantiene 4 columnas',
+        (tester) async {
+      _setSurfaceSize(tester, 1600);
+      await tester.pumpWidget(_wrapWithData());
+      await tester.pumpAndSettle();
+
+      final anchoAntes = tester.getRect(find.byKey(gridKey)).width;
+
+      await tester.tap(_inside(gridKey, find.text('Press de Banca')));
+      await tester.pumpAndSettle();
+
+      final grid = tester.widget<GridView>(find.byKey(gridKey));
+      final delegate =
+          grid.gridDelegate as SliverGridDelegateWithFixedCrossAxisCount;
+      expect(delegate.crossAxisCount, 4);
+      expect(
+        tester.getRect(find.byKey(gridKey)).width,
+        closeTo(anchoAntes, 0.5),
+        reason: 'superpuesto, no en fila: abrir el detalle no puede reflowear '
+            'la grilla',
+      );
+    });
+
+    testWidgets('compact (1100) conserva filtros arriba y abre modal',
+        (tester) async {
+      _setSurfaceSize(tester, 1100);
+      await tester.pumpWidget(_wrapWithData());
+      await tester.pumpAndSettle();
+
+      expect(find.byType(BibliotecaFilterChips), findsOneWidget);
+      expect(find.byKey(filtersKey), findsNothing);
+
+      final grid = tester.widget<GridView>(find.byKey(gridKey));
+      expect(
+          grid.gridDelegate, isA<SliverGridDelegateWithMaxCrossAxisExtent>());
+
+      await tester.tap(_inside(gridKey, find.text('Press de Banca')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TreinoDialog), findsOneWidget);
+      expect(find.byKey(panelKey), findsNothing);
+    });
+
+    testWidgets('abrir y cerrar el drawer NO reinicia la pantalla',
+        (tester) async {
+      // El sintoma que reporto el dueño del producto: al cerrar el detalle
+      // "se reinicia la pagina". La causa es estructural — si el arbol pasa de
+      // `Column` en la raiz a `Stack > Column`, Flutter ve otro tipo de widget
+      // en la misma posicion, destruye el subarbol y remonta TODO: el
+      // TabBarView, la grilla, el scroll y la busqueda.
+      _setSurfaceSize(tester, 1600);
+      await tester.pumpWidget(_wrapWithData());
+      await tester.pumpAndSettle();
+
+      // El texto vive en el State del TextField (no se le pasa controller),
+      // asi que si el arbol remonta la caja se vacia sola. Es el sintoma
+      // visible: el buscador se borra pero la lista sigue filtrada.
+      await tester.enterText(find.byType(TextField), 'Press');
+      await tester.pumpAndSettle();
+      expect(find.text('Press'), findsOneWidget);
+
+      // El elemento se captura DESPUES de escribir: `TreinoStateSwitcher`
+      // remonta la grilla a proposito cuando cambia el filtro (es el
+      // cross-fade entre resultados), asi que capturarlo antes mediria ese
+      // remonte legitimo en vez del que estamos cazando.
+      final elementoAntes = tester.element(find.byKey(gridKey));
+
+      await tester.tap(_inside(gridKey, find.text('Press de Banca')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(panelKey), findsOneWidget);
+
+      expect(
+        tester.element(find.byKey(gridKey)),
+        same(elementoAntes),
+        reason: 'abrir el drawer no puede remontar la grilla',
+      );
+
+      await tester.tap(find.byTooltip('Cerrar detalle'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(panelKey), findsNothing);
+
+      expect(
+        tester.element(find.byKey(gridKey)),
+        same(elementoAntes),
+        reason: 'cerrar el drawer tampoco: tiene que quedar todo como estaba',
+      );
+      expect(
+        find.text('Press'),
+        findsOneWidget,
+        reason: 'la busqueda escrita sobrevive a abrir y cerrar el detalle',
+      );
+    });
+
+    testWidgets('tema claro: el drawer usa la paleta light', (tester) async {
+      _setSurfaceSize(tester, 1600);
+      await tester.pumpWidget(_wrapWithData(theme: AppTheme.light()));
+      await tester.pumpAndSettle();
+
+      await tester.tap(_inside(gridKey, find.text('Press de Banca')));
+      await tester.pumpAndSettle();
+
+      final contenedor = tester.widget<Container>(
+        find
+            .descendant(
+                of: find.byKey(panelKey), matching: find.byType(Container))
+            .first,
+      );
+      final decoracion = contenedor.decoration! as BoxDecoration;
+      expect(decoracion.color, AppPalette.mintMagentaLight.bgCard);
     });
   });
 }

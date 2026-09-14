@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../../app/theme/app_palette.dart';
@@ -16,6 +16,7 @@ import '../../../../profile/application/user_providers.dart';
 import '../../../../profile/application/user_public_profile_providers.dart';
 import 'plan_copy.dart';
 import 'plan_limit_paywall.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
 
 /// La ruta de esta pantalla, en UN solo lugar.
 ///
@@ -93,9 +94,9 @@ class BlockedStudentsScreen extends ConsumerWidget {
                 profileLoaded: profileAsync.valueOrNull != null,
                 palette: palette,
               ),
-            _ => const Padding(
-                padding: EdgeInsets.only(top: 48),
-                child: Center(child: CircularProgressIndicator()),
+            _ => const CoachHubSkeleton(
+                filas: 3,
+                padding: EdgeInsets.only(top: 32, left: 12, right: 12),
               ),
           },
         ),
@@ -168,9 +169,10 @@ class _Loaded extends ConsumerWidget {
         Text(
           'ALUMNOS EN SOLO LECTURA', // i18n: Fase W3
           textAlign: TextAlign.center,
-          style: GoogleFonts.barlowCondensed(
+          style: TextStyle(
+            fontFamily: AppFonts.barlowCondensed,
             color: palette.textPrimary,
-            fontSize: 24,
+            fontSize: AppTextSize.heading,
             fontWeight: FontWeight.w800,
             letterSpacing: 0.5,
           ),
@@ -184,7 +186,8 @@ class _Loaded extends ConsumerWidget {
             subscription: subscription,
           ),
           textAlign: TextAlign.center,
-          style: TextStyle(color: palette.textMuted, fontSize: 14),
+          style:
+              TextStyle(color: palette.textMuted, fontSize: AppTextSize.body),
         ),
         const SizedBox(height: 12),
         // La mitad que más importa y la que más fácil se malentiende. Va en
@@ -514,7 +517,8 @@ class _AthleteSideBox extends StatelessWidget {
               'Del lado de ellos no cambia nada: siguen entrenando con sus '
               'rutinas, su historial y el chat. No se elimina ni se pausa '
               'ningún alumno.', // i18n: Fase W3
-              style: TextStyle(color: palette.textMuted, fontSize: 13),
+              style: TextStyle(
+                  color: palette.textMuted, fontSize: AppTextSize.bodyDense),
             ),
           ),
         ],
@@ -550,9 +554,10 @@ class _StudentRow extends StatelessWidget {
             ),
             child: Text(
               displayName.isNotEmpty ? displayName[0].toUpperCase() : '?',
-              style: GoogleFonts.barlowCondensed(
+              style: TextStyle(
+                fontFamily: AppFonts.barlowCondensed,
                 color: palette.accent,
-                fontSize: 16,
+                fontSize: AppTextSize.bodyLarge,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -571,7 +576,7 @@ class _StudentRow extends StatelessWidget {
                   displayName,
                   style: TextStyle(
                     color: palette.textPrimary,
-                    fontSize: 14,
+                    fontSize: AppTextSize.body,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -580,7 +585,8 @@ class _StudentRow extends StatelessWidget {
                 // alumno, no lo que le pasa al alumno.
                 Text(
                   'solo lectura', // i18n: Fase W3
-                  style: TextStyle(color: palette.textMuted, fontSize: 12),
+                  style: TextStyle(
+                      color: palette.textMuted, fontSize: AppTextSize.caption),
                 ),
               ],
             ),
@@ -636,9 +642,10 @@ class _UpgradeCta extends StatelessWidget {
           isInactive
               ? 'REGULARIZAR MI SUSCRIPCIÓN' // i18n: Fase W3
               : 'AMPLIAR MI PLAN', // i18n: Fase W3
-          style: GoogleFonts.barlowCondensed(
+          style: TextStyle(
+            fontFamily: AppFonts.barlowCondensed,
             color: palette.bg,
-            fontSize: 14,
+            fontSize: AppTextSize.body,
             fontWeight: FontWeight.w700,
             letterSpacing: 0.6,
           ),
@@ -672,7 +679,8 @@ class _Message extends StatelessWidget {
         Text(
           title,
           textAlign: TextAlign.center,
-          style: GoogleFonts.barlowCondensed(
+          style: TextStyle(
+            fontFamily: AppFonts.barlowCondensed,
             color: palette.textPrimary,
             fontSize: 22,
             fontWeight: FontWeight.w800,
@@ -683,7 +691,8 @@ class _Message extends StatelessWidget {
         Text(
           body,
           textAlign: TextAlign.center,
-          style: TextStyle(color: palette.textMuted, fontSize: 14),
+          style:
+              TextStyle(color: palette.textMuted, fontSize: AppTextSize.body),
         ),
       ],
     );

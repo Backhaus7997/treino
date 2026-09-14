@@ -35,5 +35,15 @@ void main() {
       const dest = DeepLinkDestination(DeepLinkTo.alumno, 'uid-456');
       expect(mobileTrainerEntryPath(dest), '/coach/athlete/uid-456');
     });
+
+    test('to=invitacion -> agenda: esta función es la entrada del PF', () {
+      // Pasa de verdad: el PF abre el link que él mismo generó, probando que
+      // anda o porque se lo reenviaron. Mandarlo a una pantalla de vinculación
+      // sería ofrecerle vincularse consigo mismo, y el repositorio lo rechaza
+      // igual con un ArgumentError. La invitación la consume el ALUMNO, por
+      // otro camino (`InviteGate`).
+      const dest = DeepLinkDestination(DeepLinkTo.invitacion, null, 'pf-1');
+      expect(mobileTrainerEntryPath(dest), mobileTrainerEntryPath(null));
+    });
   });
 }

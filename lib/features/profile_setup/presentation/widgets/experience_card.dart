@@ -31,7 +31,7 @@ class ExperienceCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(AppRadius.md),
         child: AnimatedContainer(
-          duration: AppMotion.fast,
+          duration: AppMotion.resolve(context, AppMotion.fast),
           curve: AppMotion.standard,
           width: double.infinity,
           padding: const EdgeInsets.all(18),

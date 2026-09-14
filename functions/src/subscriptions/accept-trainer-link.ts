@@ -18,18 +18,18 @@
  * file adds nothing but wiring — deliberately.
  */
 
-import * as admin from "firebase-admin";
+import { App, getApp, initializeApp } from "firebase-admin/app";
 import * as functions from "firebase-functions/v2/https";
 import { HttpsError } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions";
 
 import { syncTrainerLoad } from "./promote-link";
 
-function getApp(): admin.app.App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -48,7 +48,7 @@ export interface AcceptTrainerLinkResult {
  * re-wrapping it here would erase `details` and silently break that branch.
  */
 export async function runAcceptTrainerLink(
-  app: admin.app.App,
+  app: App,
   callerUid: string,
   linkId: string,
 ): Promise<AcceptTrainerLinkResult> {
@@ -103,6 +103,6 @@ export const acceptTrainerLink = functions.onCall(
       throw new HttpsError("invalid-argument", "linkId is required.");
     }
 
-    return runAcceptTrainerLink(getApp(), request.auth.uid, linkId);
+    return runAcceptTrainerLink(ensureApp(), request.auth.uid, linkId);
   },
 );

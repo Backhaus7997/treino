@@ -109,7 +109,7 @@
  * dos.
  */
 
-import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
 
 import { enqueueMail } from "../mail/enqueue-mail";
 import { artDateKey } from "../mail/format";
@@ -343,7 +343,7 @@ export function decideExpiryMail(
  *                       cuenta, no que cambio en este evento.
  */
 export async function enqueueSubscriptionMail(
-  app: admin.app.App,
+  app: App,
   trainerId: string,
   plan: SubscriptionMailPlan,
   blockedCount: number,

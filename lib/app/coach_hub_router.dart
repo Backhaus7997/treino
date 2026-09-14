@@ -30,6 +30,7 @@ import '../features/coach_hub/presentation/sections/rutinas/routes.dart';
 import '../features/coach_hub/presentation/sections/suplementos/routes.dart';
 import '../features/coach_hub/presentation/sections/templates/routes.dart';
 import '../features/coach_hub/presentation/shell/coach_hub_scaffold.dart';
+import '../features/coach_hub/presentation/shell/content_max_width.dart';
 import '../features/profile/application/user_providers.dart';
 import '../features/profile/domain/user_role.dart';
 
@@ -55,7 +56,9 @@ const _coachHubPublicRoutes = {'/login'};
 /// plano, y eso no es un detalle: esta función lo APAGA (`box.value = null`)
 /// apenas el gate de abajo lo consulta — no solo cuando produce un path
 /// no-nulo. Sin esa distinción quedaba un bug real, encontrado en revisión:
-/// "Salir" (`coach_hub_top_bar.dart`) es `FirebaseAuth.signOut()` puro, SIN
+/// "Cerrar sesión" (`sections/ajustes/ajustes_screen.dart`, antes en el top
+/// bar, que dejó de tener menú propio cuando los tres accesos a cuenta se
+/// unificaron en uno) es `FirebaseAuth.signOut()` puro, SIN
 /// reload de página, así que `isPublic` (`location == '/login'`) SÍ vuelve
 /// a ser cierto dentro de la MISMA pestaña en cuanto alguien cierra sesión.
 /// Con un valor plano, el PF (u otro PF, en una compu compartida) que se
@@ -104,35 +107,73 @@ String? coachHubRedirect(
       return isNotAllowed ? null : '/not-allowed';
     }
 
-    // Trainer autenticado → si está en /login, /not-allowed, o en la RAÍZ
-    // (`/abrir/profe` termina acá — Vercel redirige a `app.gettreino.com/`,
-    // sin ninguna ruta propia definida para `/`), mandalo al dashboard, o al
-    // destino fino que trajo el mail si trajo uno.
+    // Trainer autenticado → si está en una de las rutas de ATERRIZAJE,
+    // mandalo al dashboard o al destino fino que trajo el link.
     //
-    // El chequeo de `location == '/'` importa por su cuenta, más allá del
-    // destino fino: sin él, un PF YA logueado en el navegador que toca el
-    // botón de CUALQUIER mail aterriza en `/` y esta función devuelve
-    // `null` — go_router no tiene ninguna GoRoute para `/` y muestra su
-    // pantalla de error genérica. No es nuevo de este cambio: ya pasaba con
-    // cualquiera que tipeara `app.gettreino.com` pelado en la barra: el
-    // redirect de Vercel a `/abrir/profe` (agregado en el PR que sacó el
-    // parpadeo) solo lo hizo alcanzable con un click.
+    // ── Por qué `kCoachHubInitialLocation` está en esta lista ──
     //
-    // Si ya está en alguna ruta protegida (no en ninguna de las tres de
-    // arriba), dejalo — un `to` viejo en la URL no lo saca de donde está.
-    if (isPublic || isNotAllowed || location == '/') {
+    // Porque es dónde aterriza de verdad un PF que YA tiene sesión, y sin él
+    // los destinos finos NUNCA funcionaron para ese caso.
+    //
+    // El Coach Hub usa HASH routing: no hay una sola llamada a
+    // `usePathUrlStrategy` en el repo, así que Flutter cae al
+    // `HashUrlStrategy` por default. Una URL como `app.gettreino.com/?to=X`
+    // —que es a donde Vercel manda `/abrir/profe`, y por donde entran TODOS
+    // los mails al PF y el `back_url` de Mercado Pago— llega con el FRAGMENTO
+    // vacío. Y con el fragmento vacío go_router no arranca en `/` sino en su
+    // [initialLocation]. Así que el `location == '/'` de acá abajo, que se
+    // escribió para cubrir ese caso, no da true nunca.
+    //
+    // El bug sobrevivió porque **sólo falla para el que ya está logueado**:
+    // sin sesión la landing es `/login`, que sí es `isPublic`, y después del
+    // login el destino se aplica bien. Probarlo deslogueado da verde. Y el
+    // test que lo cubría llamaba con `location: '/'`, fijando la misma
+    // suposición equivocada.
+    //
+    // `location == '/'` se conserva igual: si un PF llega efectivamente ahí,
+    // devolver `null` le muestra la pantalla de error de go_router, porque no
+    // hay ninguna GoRoute para `/`.
+    //
+    // Y la lista sigue siendo de ATERRIZAJES, no "cualquier ruta": un `to`
+    // viejo no puede sacar a un PF de una ruta protegida en la que ya está.
+    // Eso importa porque `refreshListenable` revalida el redirect con cada
+    // cambio de auth/profile, y sin ese límite una revalidación podría
+    // secuestrarlo de vuelta al destino del mail sin que haya tocado nada.
+    if (isPublic ||
+        isNotAllowed ||
+        location == '/' ||
+        location == kCoachHubInitialLocation) {
       // Se apaga ACÁ, apenas el gate lo consulta — no recién cuando resulta
       // en un path no-nulo. Un logout+login posterior en la MISMA pestaña
       // también pasa por este mismo branch (vía `isPublic`), y tiene que
       // encontrar la caja vacía, no reciclar el destino de la sesión previa.
       final dest = initialDestination?.value;
       initialDestination?.value = null;
-      return _coachHubPathFor(dest) ?? '/dashboard';
+      final destino = _coachHubPathFor(dest);
+      if (destino != null) return destino;
+
+      // Sin destino fino: al dashboard — salvo que ya estemos ahí, porque
+      // devolver la misma ruta es un redirect a sí mismo. Antes no hacía
+      // falta distinguirlo: `/dashboard` no estaba en la lista de aterrizajes.
+      return location == kCoachHubInitialLocation
+          ? null
+          : kCoachHubInitialLocation;
     }
   }
 
   return null;
 }
+
+/// Dónde arranca el Coach Hub, y por lo tanto dónde ATERRIZA todo el que
+/// entra desde afuera con sesión abierta.
+///
+/// Es una constante y no dos literales sueltos porque `coachHubRedirect`
+/// necesita reconocer esta ruta como aterrizaje: bajo hash routing, una URL
+/// externa llega con el fragmento vacío y go_router arranca acá, no en `/`.
+/// Si el `initialLocation` del router y el chequeo del redirect se
+/// desincronizaran, los destinos finos volverían a caer en silencio — que es
+/// exactamente el bug que esto cierra.
+const String kCoachHubInitialLocation = '/dashboard';
 
 /// Caja mutable para pasar un [DeepLinkDestination] por REFERENCIA a
 /// [coachHubRedirect]. Ver el docstring de esa función para el bug que
@@ -155,6 +196,11 @@ String? _coachHubPathFor(DeepLinkDestination? dest) => switch (dest?.to) {
       DeepLinkTo.agenda => '/agenda',
       DeepLinkTo.solicitudes => '/invitaciones',
       DeepLinkTo.alumno => '/alumnos/${dest!.athleteId}',
+      // Misma razón que en `mobileTrainerEntryPath`: el Coach Hub es
+      // trainer-only por construcción (`coachHubRedirect` manda a cualquier
+      // otro rol a `/not-allowed`), así que acá NUNCA hay un alumno esperando
+      // vincularse. `null` cae al dashboard, que es lo correcto.
+      DeepLinkTo.invitacion => null,
       null => null,
     };
 
@@ -215,7 +261,7 @@ GoRouter buildCoachHubRouter({
   );
 
   return GoRouter(
-    initialLocation: '/dashboard',
+    initialLocation: kCoachHubInitialLocation,
     refreshListenable: refreshListenable,
     redirect: (ctx, state) => coachHubRedirect(
       read,
@@ -233,7 +279,10 @@ GoRouter buildCoachHubRouter({
       ),
       ShellRoute(
         pageBuilder: (ctx, state, child) => NoTransitionPage(
-          child: CoachHubScaffold(child: child),
+          child: CoachHubScaffold(
+            contentMaxWidth: contentMaxWidthForRoute(state.uri.path),
+            child: child,
+          ),
         ),
         routes: _signedInRoutes,
       ),

@@ -51,7 +51,17 @@ export type MailKind =
   | "subscription-grace"
   // El limite efectivo BAJO y ya hay consecuencia. Cubre pausa, cancelacion
   // vencida y bajada de tier — el disparador es el limite, no el status.
-  | "subscription-downgraded";
+  | "subscription-downgraded"
+  // ── Baja automatica por inactividad ─────────────────────────────────────
+  //
+  // El aviso de los 24 meses. Lo produce `sweepInactiveAccounts`, y es el
+  // UNICO canal posible: el destinatario es, por definicion, alguien que no
+  // abre la app. Un aviso in-app no llegaria nunca.
+  //
+  // Sin `prefKey`, como `payment-overdue` y `discomfort-reported`: es un aviso
+  // legal sobre la vida de la cuenta, no una notificacion de producto. Que se
+  // pueda apagar desde preferencias significaria borrar cuentas sin aviso.
+  | "inactive-account-notice";
 
 /**
  * Per-kind template parameters.

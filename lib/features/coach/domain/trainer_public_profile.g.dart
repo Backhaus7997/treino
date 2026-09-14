@@ -29,6 +29,7 @@ _$TrainerPublicProfileImpl _$$TrainerPublicProfileImplFromJson(
               .toList() ??
           const <String>[],
       trainerOffersOnline: json['trainerOffersOnline'] as bool? ?? false,
+      acceptsInquiries: json['acceptsInquiries'] as bool? ?? true,
       averageRating: (json['averageRating'] as num?)?.toDouble(),
       reviewCount: (json['reviewCount'] as num?)?.toInt() ?? 0,
       trainerExperienceYears: (json['trainerExperienceYears'] as num?)?.toInt(),
@@ -53,6 +54,7 @@ Map<String, dynamic> _$$TrainerPublicProfileImplToJson(
           instance.trainerLocations.map((e) => e.toJson()).toList(),
       'trainerGeohashes': instance.trainerGeohashes,
       'trainerOffersOnline': instance.trainerOffersOnline,
+      'acceptsInquiries': instance.acceptsInquiries,
       'averageRating': instance.averageRating,
       'reviewCount': instance.reviewCount,
       'trainerExperienceYears': instance.trainerExperienceYears,

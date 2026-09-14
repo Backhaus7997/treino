@@ -30,6 +30,7 @@ import '../../../../profile/application/user_public_profile_providers.dart';
 import '../pagos/widgets/payment_format.dart' show fmtArs, groupThousands;
 import '../pagos/widgets/thousands_input_formatter.dart';
 import 'agenda_web_helpers.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 // ─── AppointmentDetailDialog ──────────────────────────────────────────────────
 
@@ -491,52 +492,20 @@ class _AppointmentDetailDialogState
           Row(
             children: [
               Expanded(
-                child: OutlinedButton(
+                child: TreinoButton(
+                  label: 'Cancelar', // i18n
+                  variant: TreinoButtonVariant.secondary,
+                  expand: true,
                   onPressed: _billing ? null : _closeCobrarForm,
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: palette.border),
-                    foregroundColor: palette.textPrimary,
-                    minimumSize: const Size.fromHeight(44),
-                    shape: const StadiumBorder(),
-                  ),
-                  child: Text(
-                    'Cancelar', // i18n
-                    style: GoogleFonts.barlowCondensed(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                    ),
-                  ),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: ElevatedButton(
-                  onPressed: _billing ? null : _confirmCobrar,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: palette.accent,
-                    foregroundColor: TreinoButtonTokens.foreground(context),
-                    minimumSize: const Size.fromHeight(44),
-                    shape: const StadiumBorder(),
-                    disabledBackgroundColor:
-                        palette.accent.withValues(alpha: 0.3),
-                  ),
-                  child: _billing
-                      ? SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: TreinoButtonTokens.foreground(context),
-                          ),
-                        )
-                      : Text(
-                          'CONFIRMAR COBRO', // i18n
-                          style: GoogleFonts.barlowCondensed(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13,
-                            letterSpacing: 0.8,
-                          ),
-                        ),
+                child: TreinoButton(
+                  label: 'CONFIRMAR COBRO', // i18n
+                  expand: true,
+                  loading: _billing,
+                  onPressed: _confirmCobrar,
                 ),
               ),
             ],
@@ -734,33 +703,11 @@ class _AppointmentDetailDialogState
                 const SizedBox(height: 20),
 
                 // ── Guardar notas ─────────────────────────────────────────
-                ElevatedButton(
-                  onPressed: _saving ? null : _saveNotes,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: palette.accent,
-                    foregroundColor: TreinoButtonTokens.foreground(context),
-                    minimumSize: const Size.fromHeight(48),
-                    shape: const StadiumBorder(),
-                    disabledBackgroundColor:
-                        palette.accent.withValues(alpha: 0.3),
-                  ),
-                  child: _saving
-                      ? SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: TreinoButtonTokens.foreground(context),
-                          ),
-                        )
-                      : Text(
-                          'GUARDAR NOTAS', // i18n
-                          style: GoogleFonts.barlowCondensed(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                            letterSpacing: 1.4,
-                          ),
-                        ),
+                TreinoButton(
+                  label: 'GUARDAR NOTAS', // i18n
+                  expand: true,
+                  loading: _saving,
+                  onPressed: _saveNotes,
                 ),
 
                 // ── Cobrar (Slice 2a — Agenda→cobro bridge) ───────────────
@@ -801,22 +748,11 @@ class _AppointmentDetailDialogState
                             ),
                           )
                         : (!_showCobrarForm
-                            ? OutlinedButton(
+                            ? TreinoButton(
+                                label: 'COBRAR', // i18n
+                                variant: TreinoButtonVariant.secondaryAccent,
+                                expand: true,
                                 onPressed: _openCobrarForm,
-                                style: OutlinedButton.styleFrom(
-                                  side: BorderSide(color: palette.accent),
-                                  foregroundColor: palette.accent,
-                                  minimumSize: const Size.fromHeight(48),
-                                  shape: const StadiumBorder(),
-                                ),
-                                child: Text(
-                                  'COBRAR', // i18n
-                                  style: GoogleFonts.barlowCondensed(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 14,
-                                    letterSpacing: 1.4,
-                                  ),
-                                ),
                               )
                             : _buildCobrarForm(palette, appt)),
                   ),
@@ -826,22 +762,16 @@ class _AppointmentDetailDialogState
                 if (!widget.isPast) ...[
                   const SizedBox(height: 12),
                   if (canCancel)
-                    OutlinedButton(
+                    // Las dos cancelaciones iban en COLORES DISTINTOS —ésta en
+                    // `highlight` (magenta), la de la serie en `danger` (rojo)—
+                    // y las dos destruyen algo. La escalación la dice el LABEL
+                    // («esta reserva» vs «toda la serie»), no el color: dos
+                    // rojos distintos uno arriba del otro no enseñan nada.
+                    TreinoButton(
+                      label: 'CANCELAR RESERVA', // i18n
+                      variant: TreinoButtonVariant.danger,
+                      expand: true,
                       onPressed: _cancelAppointment,
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: palette.highlight),
-                        foregroundColor: palette.highlight,
-                        minimumSize: const Size.fromHeight(48),
-                        shape: const StadiumBorder(),
-                      ),
-                      child: Text(
-                        'CANCELAR RESERVA', // i18n
-                        style: GoogleFonts.barlowCondensed(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                          letterSpacing: 1.4,
-                        ),
-                      ),
                     )
                   else if (isWithin24h)
                     Center(
@@ -855,22 +785,11 @@ class _AppointmentDetailDialogState
                     ),
                   if (isRecurring) ...[
                     const SizedBox(height: 8),
-                    OutlinedButton(
+                    TreinoButton(
+                      label: 'CANCELAR TODA LA SERIE', // i18n
+                      variant: TreinoButtonVariant.danger,
+                      expand: true,
                       onPressed: _cancelSeries,
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: palette.danger),
-                        foregroundColor: palette.danger,
-                        minimumSize: const Size.fromHeight(48),
-                        shape: const StadiumBorder(),
-                      ),
-                      child: Text(
-                        'CANCELAR TODA LA SERIE', // i18n
-                        style: GoogleFonts.barlowCondensed(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                          letterSpacing: 1.4,
-                        ),
-                      ),
                     ),
                   ],
                 ],
@@ -881,16 +800,10 @@ class _AppointmentDetailDialogState
         ),
       ),
       actions: [
-        TextButton(
+        TreinoButton(
+          label: 'Cerrar', // i18n
+          variant: TreinoButtonVariant.ghost,
           onPressed: () => Navigator.of(context).pop(),
-          style: TextButton.styleFrom(foregroundColor: palette.textMuted),
-          child: Text(
-            'Cerrar', // i18n
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-            ),
-          ),
         ),
       ],
     );
@@ -928,30 +841,16 @@ Future<bool> confirmActionDialog(
         style: GoogleFonts.barlow(fontSize: 14, color: palette.textPrimary),
       ),
       actions: [
-        OutlinedButton(
+        TreinoButton(
+          label: cancelLabel,
+          variant: TreinoButtonVariant.ghost,
           onPressed: () => Navigator.of(ctx).pop(false),
-          child: Text(
-            cancelLabel,
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-              color: palette.textPrimary,
-            ),
-          ),
         ),
-        ElevatedButton(
+        const SizedBox(width: AppSpacing.s8),
+        TreinoButton(
+          label: confirmLabel,
+          variant: TreinoButtonVariant.danger,
           onPressed: () => Navigator.of(ctx).pop(true),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: palette.highlight,
-            foregroundColor: palette.bg,
-          ),
-          child: Text(
-            confirmLabel,
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-            ),
-          ),
         ),
       ],
     ),

@@ -39,6 +39,45 @@
 const MP_API = "https://api.mercadopago.com";
 
 /**
+ * El valor de `status` que da de BAJA una suscripcion.
+ *
+ * Es la unica constante de este archivo que hay que justificar con tres fuentes,
+ * porque **la documentacion oficial de MP se contradice con su propio SDK** y
+ * elegir mal significa un 400 silencioso — o sea el cobro doble que esto viene a
+ * cerrar, intacto y sin que nadie se entere.
+ *
+ * Las tres fuentes, consultadas el 2026-09-08:
+ *
+ *   1. La guia en prosa dice `canceled`, con UNA ele:
+ *      https://www.mercadopago.com.ar/developers/en/docs/subscriptions/subscription-management
+ *      «To cancel a subscription, send a PUT with the `status` attribute and the
+ *      `canceled` value to the /preapproval/{id} endpoint».
+ *
+ *   2. El SDK oficial de Node documenta el campo del REQUEST —no el de la
+ *      respuesta— con DOS eles:
+ *      https://github.com/mercadopago/sdk-nodejs/blob/master/src/clients/preApproval/commonTypes.ts
+ *      `PreApprovalRequest.status?: string`, comentado
+ *      «Desired subscription status (e.g. `authorized`, `paused`, `cancelled`)».
+ *
+ *   3. La API REAL, medida contra dos suscripciones de la misma cuenta el
+ *      2026-09-07 (los payloads estan en `mp-reconcile.test.ts`): devuelve
+ *      `cancelled`, con dos eles. Es el mismo valor que `map-status.ts` sabe
+ *      traducir.
+ *
+ * **Gana `cancelled`**: dos de las tres fuentes son el sistema hablando de si
+ * mismo, y la tercera es una guia traducida. Escribir el vocabulario de la
+ * lectura tambien vale por si solo — un dominio partido en dos ortografias es
+ * como se cuelan los bugs que `effective-limit.ts` documenta haber pagado con un
+ * `"canceled"` de una sola ele que se caia por afuera de un switch.
+ *
+ * Y si igual estuviera mal, el diseño lo absorbe: la baja NO se da por hecha
+ * porque el PUT haya salido bien. `reconcile.ts` no marca nada terminal hasta
+ * que la llamada resuelve, y el barrido de la noche siguiente vuelve a
+ * intentarlo. Un 400 acá se ve en Cloud Logging con el body de MP adentro.
+ */
+const STATUS_BAJA = "cancelled";
+
+/**
  * Corto a proposito. Esto corre adentro de una Cloud Function, y una llamada
  * colgada consume el timeout de la funcion entera. Si MP no contesta en 10s,
  * el reconciliador lo va a reintentar en su proxima corrida — que es
@@ -90,6 +129,15 @@ export interface MpPreapproval {
   init_point?: unknown;
   /** Nuestro enganche al uid de Firebase. Lo mandamos nosotros al crear. */
   external_reference?: unknown;
+  /**
+   * El plan contra el que se creo la suscripcion.
+   *
+   * Es lo que hace posible el webhook: un evento trae un id de SUSCRIPCION, y
+   * este campo es el unico puente hasta el plan —que es lo que `mp_plans`
+   * keyea y lo que `reconcileSubscription` recibe—. Verificado en la respuesta
+   * de ejemplo de `GET /preapproval/{id}` de la referencia oficial.
+   */
+  preapproval_plan_id?: unknown;
   /** ISO 8601 del proximo cobro programado. */
   next_payment_date?: unknown;
   payer_id?: unknown;
@@ -99,25 +147,41 @@ export interface MpPreapproval {
 }
 
 /**
- * Lo que hay que decirle a MP para abrir una suscripcion.
+ * Un PLAN de suscripcion. Es a donde se manda al PF, y la razon por la que
+ * existe es de producto, no tecnica.
  *
- * NO lleva `preapproval_plan_id`. Se crea la suscripcion con el monto EXPLICITO
- * y no contra un plan preconfigurado en el panel de MP, por una razon que
- * condiciona todo lo que viene: **MP no devuelve `preapproval_plan_id` en la
- * respuesta**, solo lo acepta en el request. Atarse a planes del panel nos
- * dejaria sin poder preguntar de que plan es una suscripcion — y encima con la
- * tabla de precios viviendo en dos lugares, el panel y `tier-config.ts`.
+ * ── Por que planes y no `/preapproval` directo ──
  *
- * Con monto explicito la tabla queda en UN lugar, el servidor, y el tier se
- * recupera del monto (ver `tier-mapping.ts`).
+ * Crear una suscripcion SIN plan obliga a mandar `payer_email`, y MP ATA el
+ * cobro a ese mail: quien paga tiene que estar logueado con el. Eso dejaba sin
+ * poder pagar a todo PF cuya cuenta de Mercado Pago use otro mail que su cuenta
+ * de TREINO — la mitad de la gente — y el error le aparecia recien adentro del
+ * checkout, donde ya no lo puede corregir. Verificado a mano contra la API.
+ *
+ * El plan NO pide `payer_email`: devuelve su propio `init_point` y **MP le
+ * pregunta al pagador quien es**. Cualquier cuenta, cualquier mail.
+ *
+ * ── Un plan POR CHECKOUT, no seis planes fijos ──
+ *
+ * El `external_reference` vive en el PLAN, no en cada suscripcion. Con seis
+ * planes fijos (3 tiers x 2 ciclos) todos los PF que compren el mismo plan
+ * compartirian ese campo y perderiamos a quien acreditarle el cupo.
+ *
+ * Creando uno por checkout, cada plan lleva el uid de SU comprador.
  */
-export interface CreatePreapprovalInput {
+export interface MpPreapprovalPlan {
+  id?: unknown;
+  init_point?: unknown;
+  external_reference?: unknown;
+  status?: unknown;
+  auto_recurring?: unknown;
+}
+
+export interface CreatePreapprovalPlanInput {
   /** Lo que el PF ve como concepto del cobro en su resumen. */
   reason: string;
-  /** Nuestro enganche: el uid de Firebase. Vuelve en cada GET. */
+  /** Nuestro enganche: el uid de Firebase. */
   externalReference: string;
-  /** MP lo exige. Es el mail con el que el PF paga, no necesariamente el suyo. */
-  payerEmail: string;
   /** A donde vuelve el navegador despues del checkout. */
   backUrl: string;
   transactionAmount: number;
@@ -129,14 +193,57 @@ export interface MpClient {
   /** Lee una suscripcion. Es la FUENTE DE LA VERDAD de todo el sistema. */
   getPreapproval(preapprovalId: string): Promise<MpPreapproval>;
   /**
-   * Abre una suscripcion. Devuelve el preapproval con `id` e `init_point` —
-   * la URL a la que hay que mandar al PF para que autorice el pago.
-   *
-   * NO deja la suscripcion activa: la deja en `pending` hasta que el PF pone
-   * su medio de pago. Por eso quien llame a esto NO puede escribir
-   * `subscription` — eso lo hace el reconciliador cuando MP diga `authorized`.
+   * Crea un plan y devuelve su `init_point`. Ver [MpPreapprovalPlan] para por
+   * que el checkout va por acá y no por `createPreapproval`.
    */
-  createPreapproval(input: CreatePreapprovalInput): Promise<MpPreapproval>;
+  createPreapprovalPlan(
+    input: CreatePreapprovalPlanInput,
+  ): Promise<MpPreapprovalPlan>;
+  /**
+   * Las suscripciones creadas contra un plan. Normalmente 0 (nadie pago
+   * todavia) o 1.
+   *
+   * El reconciliador busca POR PLAN y no por el `external_reference` de la
+   * suscripcion, a proposito: no esta verificado que la suscripcion herede ese
+   * campo del plan, y el plan lo creamos nosotros con un id que ya guardamos.
+   * Buscar por lo que sabemos con certeza en vez de por lo que suponemos.
+   */
+  searchPreapprovalsByPlan(planId: string): Promise<MpPreapproval[]>;
+  /**
+   * Da de BAJA una suscripcion. Es lo unico que frena un cobro recurrente.
+   *
+   * ── Por que este metodo tuvo que existir ──
+   *
+   * Hasta que aparecio, `MpClient` solo hacia GET y POST: sabia ABRIR cobros y
+   * LEERLOS, y no sabia cerrarlos. Como `create-preapproval.ts` no mira si el PF
+   * ya tiene una suscripcion viva, un entrenador que pasaba de plan1 a plan2
+   * quedaba con DOS suscripciones autorizadas en MP —la vieja nunca se daba de
+   * baja— **y MP le cobraba las dos**. No es un caso raro: es exactamente lo que
+   * pasa cuando a alguien le va bien y quiere pagarnos mas.
+   *
+   * ── Es TERMINAL, y por eso quien la llama tiene que estar seguro ──
+   *
+   * Un preapproval cancelado no se reactiva: para volver atras hay que crear uno
+   * NUEVO, con otro id, y el PF tiene que pasar por el checkout de nuevo. Es la
+   * misma propiedad que `reconcile.ts` ya usa para sacar del barrido lo que MP
+   * dio de baja.
+   *
+   * Corolario de diseño, y esta escrito en el encabezado de `reconcile.ts`: esto
+   * NO se llama al abrir un checkout. Se llama cuando la suscripcion NUEVA ya
+   * quedo confirmada por MP. Cancelar antes deja sin plan a quien todavia no
+   * compro nada.
+   *
+   * ── Se cancela la SUSCRIPCION, no el plan ──
+   *
+   * El `preapproval_plan` no cobra: es una plantilla con un `init_point`. Lo que
+   * cobra es el `preapproval` que nace cuando alguien paga contra ese plan, y es
+   * lo unico que hay que dar de baja. La doc de MP para gestionar planes
+   * (`/docs/subscription-plans/manage-subscription-plan`, consultada el
+   * 2026-09-08) solo describe el panel web: **no hay baja de plan por API**, y no
+   * hace falta. Un plan viejo que queda vivo no le cuesta un peso a nadie, y del
+   * barrido lo saca `terminal` en `mp_plans`.
+   */
+  cancelPreapproval(preapprovalId: string): Promise<MpPreapproval>;
 }
 
 /**
@@ -155,13 +262,13 @@ export function createMpClient(
   }
 
   /**
-   * El unico lugar que toca la red. Las dos operaciones comparten timeout,
-   * clasificacion de errores y validacion de la respuesta — tenerlo dos veces
+   * El unico lugar que toca la red. Las cuatro operaciones comparten timeout,
+   * clasificacion de errores y validacion de la respuesta — tenerlo repetido
    * garantizaba que un dia divergieran.
    */
   async function request(
     path: string,
-    method: "GET" | "POST",
+    method: "GET" | "POST" | "PUT",
     body?: unknown,
   ): Promise<MpPreapproval> {
     let response: Response;
@@ -217,17 +324,14 @@ export function createMpClient(
       );
     },
 
-    async createPreapproval(
-      input: CreatePreapprovalInput,
-    ): Promise<MpPreapproval> {
-      // Chequeos que fallan ANTES de salir a la red. Un monto en 0 o un
-      // externalReference vacio no son errores de MP: son bugs nuestros, y
-      // descubrirlos por un 400 los disfraza de problema de ellos.
+    async createPreapprovalPlan(
+      input: CreatePreapprovalPlanInput,
+    ): Promise<MpPreapprovalPlan> {
+      // Falla ANTES de salir a la red: un monto en 0 o un externalReference
+      // vacio no son errores de MP, son bugs nuestros, y descubrirlos por un
+      // 400 los disfraza de problema de ellos.
       if (!input.externalReference) {
         throw new MpApiError("mp/client: externalReference vacio", 0);
-      }
-      if (!input.payerEmail) {
-        throw new MpApiError("mp/client: payerEmail vacio", 0);
       }
       if (!Number.isFinite(input.transactionAmount) ||
           input.transactionAmount <= 0) {
@@ -244,24 +348,60 @@ export function createMpClient(
         );
       }
 
-      return request("/preapproval", "POST", {
+      // SIN `payer_email`: ese es el punto entero de usar un plan. MP le
+      // pregunta al pagador quien es en el checkout.
+      return request("/preapproval_plan", "POST", {
         reason: input.reason,
         external_reference: input.externalReference,
-        payer_email: input.payerEmail,
         back_url: input.backUrl,
-        // `pending` y no `authorized`: la suscripcion nace SIN medio de pago.
-        // El PF lo carga en el `init_point` y recien ahi MP la mueve.
-        status: "pending",
         auto_recurring: {
           frequency: input.frequencyMonths,
-          // "months" y no "years" para el anual: `months` esta documentado en
-          // los tipos del SDK y `years` no aparece. 12 meses es lo mismo y no
-          // depende de un valor que no pudimos verificar.
           frequency_type: "months",
           transaction_amount: input.transactionAmount,
           currency_id: "ARS",
         },
       });
     },
+
+    async searchPreapprovalsByPlan(planId: string): Promise<MpPreapproval[]> {
+      if (!planId) {
+        throw new MpApiError("mp/client: planId vacio", 0);
+      }
+      const res = await request(
+        `/preapproval/search?preapproval_plan_id=${encodeURIComponent(planId)}`,
+        "GET",
+      );
+      const results = (res as { results?: unknown }).results;
+      // Un `results` que no es array se trata como vacio y NO como error: MP
+      // devolviendo algo raro no puede hacer que el barrido se caiga para
+      // todos los demas PF.
+      return Array.isArray(results) ? (results as MpPreapproval[]) : [];
+    },
+
+    async cancelPreapproval(preapprovalId: string): Promise<MpPreapproval> {
+      // Falla ANTES de salir a la red, igual que las otras. Y acá pesa mas que
+      // en un GET: con el id vacio la ruta queda en `/preapproval/`, que no
+      // identifica ninguna suscripcion, y lo que MP hace con un PUT ahi no lo
+      // sabemos. Un request cuyo efecto no conocemos no se manda — menos uno
+      // cuyo cuerpo dice "dar de baja".
+      if (!preapprovalId) {
+        throw new MpApiError("mp/client: preapprovalId vacio", 0);
+      }
+      // `PUT /preapproval/{id}` con `{ status }` es el endpoint de actualizacion
+      // de suscripciones; la baja es un caso particular de el. Verificado en la
+      // referencia oficial el 2026-09-08:
+      // https://www.mercadopago.com.ar/developers/en/reference/online-payments/subscriptions/update-preapproval/put
+      //
+      // Se manda SOLO `status`: el body de ese endpoint tambien acepta `reason`,
+      // `auto_recurring`, `back_url` y los tokens de tarjeta, y mandar cualquiera
+      // de esos de mas seria reescribir el cobro de alguien en el mismo request
+      // en el que lo damos de baja.
+      return request(
+        `/preapproval/${encodeURIComponent(preapprovalId)}`,
+        "PUT",
+        { status: STATUS_BAJA },
+      );
+    },
+
   };
 }

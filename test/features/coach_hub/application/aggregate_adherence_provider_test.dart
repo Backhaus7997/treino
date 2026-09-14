@@ -20,9 +20,9 @@ import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach_hub/application/aggregate_adherence_provider.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart'
-    show assignedRoutinesProvider;
+    show assignedRoutinesByTrainerProvider;
 import 'package:treino/features/workout/application/session_providers.dart'
-    show finishedInWindowByUidProvider;
+    show currentUidProvider, finishedInWindowByUidProvider;
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_day.dart';
 import 'package:treino/features/workout/domain/routine_status.dart';
@@ -103,6 +103,8 @@ Session _abandonedSession(String athleteId, {required DateTime finishedAt}) =>
       weekNumber: 0,
     );
 
+const _trainerUid = 'trainer-1';
+
 // ─── Helper ────────────────────────────────────────────────────────────────────
 
 /// Builds a container with the given links, per-athlete sessions and routines.
@@ -124,9 +126,14 @@ ProviderContainer _buildContainer({
         (ref, key) async =>
             sessionsByAthleteId[key.athleteId] ?? const <Session>[],
       ),
-      assignedRoutinesProvider.overrideWith(
-        (ref, athleteId) async =>
-            routinesByAthleteId[athleteId] ?? const <Routine>[],
+      // El PF logueado ahora es parte de la clave del listado de rutinas: el
+      // `list` del entrenador filtra por `assignedBy` para que las reglas lo
+      // puedan probar. Sin este override el provider corta temprano y devuelve
+      // null, que es como se rompieron estos tests al migrar.
+      currentUidProvider.overrideWithValue(_trainerUid),
+      assignedRoutinesByTrainerProvider.overrideWith(
+        (ref, key) async =>
+            routinesByAthleteId[key.athleteId] ?? const <Routine>[],
       ),
     ],
   );

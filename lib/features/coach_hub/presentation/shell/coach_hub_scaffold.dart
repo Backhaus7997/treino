@@ -10,6 +10,7 @@ import 'content_max_width.dart';
 import 'coach_hub_sidebar.dart';
 import 'coach_hub_top_bar.dart';
 import 'mobile_banner.dart';
+import 'navigator_semantics_boundary.dart';
 import 'responsive.dart' as rsp;
 import 'sidebar_item.dart';
 
@@ -25,9 +26,18 @@ import 'sidebar_item.dart';
 ///   escribe, así el valor guardado se preserva al volver a desktop.
 /// - `>= 1280 px` (desktop) → el sidebar respeta `sidebarCollapsedProvider`.
 class CoachHubScaffold extends ConsumerWidget {
-  const CoachHubScaffold({super.key, required this.child, this.itemsOverride});
+  const CoachHubScaffold({
+    super.key,
+    required this.child,
+    this.itemsOverride,
+    this.contentMaxWidth = CoachHubLayoutTokens.contentMaxWidth,
+  });
 
   final Widget child;
+
+  /// Techo del slot de contenido. Las secciones comunes conservan 1240;
+  /// Biblioteca lo eleva desde el router porque necesita alojar su catálogo.
+  final double contentMaxWidth;
 
   /// Si es no-nulo, reemplaza `sidebarRegistry` en el `CoachHubSidebar` —
   /// solo para tests/evidencia (eg. demostrar badges sin depender del
@@ -62,8 +72,13 @@ class CoachHubScaffold extends ConsumerWidget {
                   const CoachHubTourGate(),
                   Expanded(
                     child: ContentMaxWidth(
-                      maxWidth: CoachHubLayoutTokens.contentMaxWidth,
-                      child: child,
+                      maxWidth: contentMaxWidth,
+                      // El `child` es el `Navigator` del `ShellRoute`, y sin
+                      // esta frontera su `ModalBarrier` borraba la semántica
+                      // de todos sus hermanos anteriores: la top bar de acá
+                      // arriba y el sidebar entero. Ver
+                      // [NavigatorSemanticsBoundary].
+                      child: NavigatorSemanticsBoundary(child: child),
                     ),
                   ),
                 ],

@@ -6,6 +6,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/coach/application/agenda_providers.dart';
 import 'package:treino/features/coach/data/availability_repository.dart';
@@ -15,6 +16,7 @@ import 'package:treino/features/coach_hub/presentation/sections/agenda/agenda_we
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
 import 'package:treino/l10n/app_l10n.dart';
+import 'package:treino/core/widgets/treino_icon.dart';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -180,8 +182,18 @@ void main() {
       if (btn.evaluate().isNotEmpty) {
         await tester.tap(btn);
         await tester.pump();
-        // Should show spinner, not the empty state hint
-        expect(find.byType(CircularProgressIndicator), findsWidgets);
+        // Tiene que mostrar el estado de CARGA, no el hint de vacío.
+        //
+        // El assert era `find.byType(CircularProgressIndicator)`: fijaba la
+        // implementación en vez de la intención, así que cuando el panel pasó
+        // del spinner al skeleton del kit el test se puso rojo sin que nada de
+        // lo que le importa hubiera cambiado.
+        //
+        // Sigue en `findsWidgets` y no `findsOneWidget` porque la pantalla de
+        // Agenda monta varios bloques que cargan a la vez. Lo que este test
+        // prueba es la SEGUNDA línea: que mientras carga NO se vea «Sin
+        // excepciones», que sería mentirle al PF sobre sus datos.
+        expect(find.byType(CoachHubSkeleton), findsWidgets);
         expect(find.textContaining('Sin excepciones'), findsNothing);
       }
     });
@@ -293,7 +305,7 @@ void main() {
       await _openPanel(tester, overrides: [_blockOverride()], repo: stub);
 
       // Find delete icon button in overrides section
-      final deleteIcons = find.byIcon(Icons.delete_outline);
+      final deleteIcons = find.byIcon(TreinoIcon.trash);
       expect(deleteIcons, findsWidgets);
       await tester.tap(deleteIcons.last);
       await tester.pumpAndSettle();

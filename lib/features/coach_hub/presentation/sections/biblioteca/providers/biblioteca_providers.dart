@@ -34,6 +34,22 @@ final bibliotecaEquipmentFilterProvider =
   (ref) => const {},
 );
 
+/// Referencia mínima al ejercicio elegido para el panel lateral de detalle.
+///
+/// El documento completo sigue resolviéndose con `slotExerciseProvider`: esta
+/// selección no duplica datos ni convierte la proyección de la grilla en fuente
+/// de verdad.
+typedef BibliotecaExerciseSelection = ({
+  String exerciseId,
+  String? ownerId,
+  String exerciseName,
+});
+
+final bibliotecaSelectedExerciseProvider =
+    StateProvider.autoDispose<BibliotecaExerciseSelection?>(
+  (ref) => null,
+);
+
 // ── Merged + filtered provider ────────────────────────────────────────────────
 
 /// Merged exercise list (catalog ∪ custom) with active filters applied.

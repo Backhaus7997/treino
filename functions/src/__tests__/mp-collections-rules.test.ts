@@ -1,7 +1,7 @@
 /**
  * Reglas de las dos colecciones del cobro con Mercado Pago.
  *
- * `mp_checkouts` y `mp_preapprovals` las escribe SOLO el Admin SDK, desde
+ * `mp_checkouts` y `mp_plans` las escribe SOLO el Admin SDK, desde
  * `createPreapproval` y `reconcileMpSubscriptions`. Ningún cliente las toca.
  *
  * ── ESTE ARCHIVO ES LA ÚNICA PROTECCIÓN REAL, y está medido ──
@@ -32,7 +32,7 @@
  * minutos, así que plantar un `initPoint` propio manda al PF a pagarle a un
  * tercero desde nuestra app.
  *
- * `mp_preapprovals/{id}` es el mapeo suscripción → (PF, plan). El reconciliador
+ * `mp_plans/{id}` es el mapeo suscripción → (PF, plan). El reconciliador
  * lee de acá para saber qué límite otorgar: un cliente con escritura se firma
  * `plan3` gratis.
  *
@@ -57,7 +57,9 @@ const RULES_PATH = path.resolve(__dirname, "../../../firestore.rules");
 
 const TRAINER = "trainer-mp";
 const OTRO = "otro-pf";
-const PREAPPROVAL = "2c938084";
+const PLAN = "2c938084";
+/** El id de un evento de webhook ya procesado (= el id del preapproval). */
+const EVENTO = "2c938084726fca480172750000000000";
 
 let testEnv: RulesTestEnvironment;
 
@@ -85,16 +87,21 @@ beforeEach(async () => {
   await testEnv.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();
     await db.collection("mp_checkouts").doc(TRAINER).set({
-      preapprovalId: PREAPPROVAL,
+      preapprovalId: PLAN,
       tier: "plan2",
       cycle: "monthly",
       initPoint: "https://www.mercadopago.com.ar/subscriptions/checkout?pref_id=x",
       createdAtMs: 1_000_000,
     });
-    await db.collection("mp_preapprovals").doc(PREAPPROVAL).set({
+    await db.collection("mp_plans").doc(PLAN).set({
       uid: TRAINER,
       tier: "plan2",
       cycle: "monthly",
+    });
+    await db.collection("mp_webhook_events").doc(EVENTO).set({
+      procesadoMs: 1_000_000,
+      outcome: "written",
+      planId: PLAN,
     });
   });
 });
@@ -141,7 +148,7 @@ describe("mp_checkouts — el init_point es un link de pago vivo", () => {
     // Plantar uno mandaría al PF a pagarle a un tercero desde nuestra app.
     await assertFails(
       dbDe(TRAINER).collection("mp_checkouts").doc(TRAINER).set({
-        preapprovalId: PREAPPROVAL,
+        preapprovalId: PLAN,
         tier: "plan2",
         cycle: "monthly",
         initPoint: "https://atacante.com/cobrame",
@@ -163,24 +170,24 @@ describe("mp_checkouts — el init_point es un link de pago vivo", () => {
   });
 });
 
-describe("mp_preapprovals — escribir acá es elegirse el plan", () => {
+describe("mp_plans — escribir acá es elegirse el plan", () => {
   it("nadie lo lee: ni el dueño, ni un tercero, ni un anónimo", async () => {
     const p = (db: firebase.firestore.Firestore) =>
-      db.collection("mp_preapprovals").doc(PREAPPROVAL).get();
+      db.collection("mp_plans").doc(PLAN).get();
     await assertFails(p(dbDe(TRAINER)));
     await assertFails(p(dbDe(OTRO)));
     await assertFails(p(anonimo()));
   });
 
   it("el listado tampoco", async () => {
-    await assertFails(dbDe(TRAINER).collection("mp_preapprovals").get());
+    await assertFails(dbDe(TRAINER).collection("mp_plans").get());
   });
 
   it("nadie se puede firmar un plan3 gratis", async () => {
     // El reconciliador lee de acá para saber qué límite otorgar. Con escritura,
     // el tier lo elige el cliente.
     await assertFails(
-      dbDe(TRAINER).collection("mp_preapprovals").doc(PREAPPROVAL).set({
+      dbDe(TRAINER).collection("mp_plans").doc(PLAN).set({
         uid: TRAINER,
         tier: "plan3",
         cycle: "annual",
@@ -190,21 +197,54 @@ describe("mp_preapprovals — escribir acá es elegirse el plan", () => {
 
   it("ni robarle la suscripción a otro apuntándola a su propio uid", async () => {
     await assertFails(
-      dbDe(OTRO).collection("mp_preapprovals").doc(PREAPPROVAL).update({
+      dbDe(OTRO).collection("mp_plans").doc(PLAN).update({
         uid: OTRO,
       }),
     );
   });
 
   it("ni crear un mapeo inventado, ni borrar el que existe", async () => {
-    const col = dbDe(TRAINER).collection("mp_preapprovals");
+    const col = dbDe(TRAINER).collection("mp_plans");
     await assertFails(
       col.doc("inventado").set({ uid: TRAINER, tier: "plan3", cycle: "annual" }),
     );
     // Borrar el mapeo obliga al reconciliador a caer al fallback por monto, que
     // logea warn — ruido, y un paso más cerca de que no se pueda determinar el
     // plan.
-    await assertFails(col.doc(PREAPPROVAL).delete());
+    await assertFails(col.doc(PLAN).delete());
+  });
+});
+
+describe("mp_webhook_events — escribirlo es hacer desaparecer un pago", () => {
+  it("nadie lo lee: ni un PF, ni un tercero, ni un anónimo", async () => {
+    // Leerlo filtra qué ids de suscripción existen y cuándo se movieron.
+    const p = (db: firebase.firestore.Firestore) =>
+      db.collection("mp_webhook_events").doc(EVENTO).get();
+    await assertFails(p(dbDe(TRAINER)));
+    await assertFails(p(dbDe(OTRO)));
+    await assertFails(p(anonimo()));
+  });
+
+  it("el listado tampoco", async () => {
+    await assertFails(dbDe(TRAINER).collection("mp_webhook_events").get());
+  });
+
+  it("nadie puede marcar un evento como ya procesado", async () => {
+    // Es el ataque que esta colección habilita si se abre: el dedupe corta
+    // ANTES de consultarle a Mercado Pago, así que plantar el doc de un evento
+    // que todavía no llegó hace que el webhook lo descarte — y al PF que pagó
+    // no se le acredita el plan hasta el barrido de las 03:00.
+    await assertFails(
+      dbDe(OTRO).collection("mp_webhook_events").doc("evento-que-viene").set({
+        procesadoMs: 9_999_999_999,
+      }),
+    );
+  });
+
+  it("ni empujar hacia adelante el de uno que ya existe, ni borrarlo", async () => {
+    const col = dbDe(TRAINER).collection("mp_webhook_events");
+    await assertFails(col.doc(EVENTO).update({ procesadoMs: 9_999_999_999 }));
+    await assertFails(col.doc(EVENTO).delete());
   });
 });
 
@@ -216,11 +256,11 @@ describe("el Admin SDK sí puede — si no, las Cloud Functions no andarían", (
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       const db = ctx.firestore();
       await db.collection("mp_checkouts").doc(TRAINER).set({ initPoint: "ok" });
-      await db.collection("mp_preapprovals").doc(PREAPPROVAL).set({
+      await db.collection("mp_plans").doc(PLAN).set({
         uid: TRAINER, tier: "plan1", cycle: "monthly",
       });
       const a = await db.collection("mp_checkouts").doc(TRAINER).get();
-      const b = await db.collection("mp_preapprovals").doc(PREAPPROVAL).get();
+      const b = await db.collection("mp_plans").doc(PLAN).get();
       expect(a.exists).toBe(true);
       expect(b.data()?.tier).toBe("plan1");
     });

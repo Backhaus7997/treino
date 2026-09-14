@@ -182,7 +182,7 @@ class _Divider extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: 1,
-      color: palette.textMuted.withValues(alpha: 0.10),
+      color: palette.textMuted.withValues(alpha: 0.1),
     );
   }
 }

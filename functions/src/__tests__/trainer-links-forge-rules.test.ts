@@ -190,6 +190,135 @@ describe("trainer_links update — QA-SEC-002 self-promotion", () => {
   });
 });
 
+// ── terminationReason: quién puede escribir cada razón ──────────────────────
+//
+// `terminationReason` no estaba pineado ni acotado: cualquiera de los dos
+// members podía escribir la razón que quisiera. Eso subió de prioridad cuando
+// ese campo pasó a ser INPUT DE UN DELETE (`clasificarTerminacion` en
+// functions/src/purge-rejected-link.ts decide con él si el doc se borra).
+//
+// El ataque concreto: el PF rechaza una solicitud pero estampa
+// `cancelled-by-athlete`. La notificación y la fila de historial van SÓLO al
+// PF; el atleta no se entera de nada, y el doc después se purga. La solicitud
+// desaparece sin dejar rastro del lado del atleta.
+//
+// La regla NO puede pinear el campo inmutable —`decline`, `cancel` y
+// `terminate` lo escriben todos como parte de la transición—. Lo que hace es
+// atar las DOS razones que disparan el borrado a quien de verdad puede
+// causarlas.
+describe("trainer_links — terminationReason atado al actor", () => {
+  it("DENIEGA que el PF estampe 'cancelled-by-athlete' (silenciaría al atleta)", async () => {
+    await seedLink(LINK, {
+      trainerId: TRAINER,
+      athleteId: ATHLETE,
+      status: "pending",
+      requestedAt: 1,
+    });
+
+    await assertFails(
+      ctxDb(TRAINER).collection(COL_LINKS).doc(LINK).update({
+        status: "terminated",
+        terminationReason: "cancelled-by-athlete",
+      }),
+    );
+  });
+
+  it("DENIEGA que el atleta estampe 'declined'", async () => {
+    await seedLink(LINK, {
+      trainerId: TRAINER,
+      athleteId: ATHLETE,
+      status: "pending",
+      requestedAt: 1,
+    });
+
+    await assertFails(
+      ctxDb(ATHLETE).collection(COL_LINKS).doc(LINK).update({
+        status: "terminated",
+        terminationReason: "declined",
+      }),
+    );
+  });
+
+  it("PERMITE el rechazo legítimo del PF ('declined')", async () => {
+    await seedLink(LINK, {
+      trainerId: TRAINER,
+      athleteId: ATHLETE,
+      status: "pending",
+      requestedAt: 1,
+    });
+
+    await assertSucceeds(
+      ctxDb(TRAINER).collection(COL_LINKS).doc(LINK).update({
+        status: "terminated",
+        terminationReason: "declined",
+      }),
+    );
+  });
+
+  it("PERMITE la cancelación legítima del atleta ('cancelled-by-athlete')", async () => {
+    await seedLink(LINK, {
+      trainerId: TRAINER,
+      athleteId: ATHLETE,
+      status: "pending",
+      requestedAt: 1,
+    });
+
+    await assertSucceeds(
+      ctxDb(ATHLETE).collection(COL_LINKS).doc(LINK).update({
+        status: "terminated",
+        terminationReason: "cancelled-by-athlete",
+      }),
+    );
+  });
+
+  it.each([
+    ["athlete-terminated"],
+    ["trainer-terminated"],
+    ["switched_trainer"],
+  ])(
+    "los DOS members siguen pudiendo terminar un vínculo real (reason=%s)",
+    async (reason) => {
+      // Estas razones NO disparan el borrado, así que no se acotan: el modelo
+      // sigue sin saber quién cortó, y atarlas sería inventar una regla que el
+      // producto no tiene.
+      for (const uid of [TRAINER, ATHLETE]) {
+        await seedLink(LINK, {
+          trainerId: TRAINER,
+          athleteId: ATHLETE,
+          status: "active",
+          requestedAt: 1,
+          acceptedAt: 2,
+        });
+
+        await assertSucceeds(
+          ctxDb(uid).collection(COL_LINKS).doc(LINK).update({
+            status: "terminated",
+            terminationReason: reason,
+          }),
+        );
+
+        await testEnv.clearFirestore();
+      }
+    },
+  );
+
+  it("PERMITE terminar sin razón (el campo es opcional)", async () => {
+    await seedLink(LINK, {
+      trainerId: TRAINER,
+      athleteId: ATHLETE,
+      status: "active",
+      requestedAt: 1,
+      acceptedAt: 2,
+    });
+
+    await assertSucceeds(
+      ctxDb(ATHLETE).collection(COL_LINKS).doc(LINK).update({
+        status: "terminated",
+      }),
+    );
+  });
+});
+
 describe("reviews — QA-SEC-002 forge closed end-to-end", () => {
   function review() {
     return {

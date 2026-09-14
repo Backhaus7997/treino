@@ -14,13 +14,13 @@ class AthleteFileTooLargeException implements Exception {
   String toString() => 'AthleteFileTooLargeException($bytes bytes)';
 }
 
-/// Repository de archivos privados del PF sobre un alumno.
+/// Repository de archivos que el PF carga para un alumno.
 ///
 /// - Firestore: colección `athlete_files/{id}` con metadatos.
 /// - Storage: `athleteFiles/{trainerId}_{athleteId}/{timestamp}.{ext}` con
 ///   el binario.
-/// - Rules gate: trainer-only en ambos lados (ver `firestore.rules` y
-///   `storage.rules`).
+/// - El PF administra todos los archivos y decide cuáles comparte con el
+///   alumno desde los metadatos de Firestore.
 class AthleteFileRepository {
   AthleteFileRepository({
     required FirebaseFirestore firestore,
@@ -56,6 +56,7 @@ class AthleteFileRepository {
     required String fileName,
     required String contentType,
     required Uint8List bytes,
+    bool sharedWithAthlete = true,
   }) async {
     if (bytes.length > maxBytes) {
       throw AthleteFileTooLargeException(bytes.length);
@@ -89,6 +90,7 @@ class AthleteFileRepository {
       storagePath: path,
       downloadUrl: downloadUrl,
       uploadedAt: now,
+      sharedWithAthlete: sharedWithAthlete,
     );
     await _collection.doc(id).set(file.toJson());
     return file;
@@ -106,6 +108,24 @@ class AthleteFileRepository {
             .map(_fromDoc)
             .whereType<AthleteFile>()
             .toList(growable: false));
+  }
+
+  /// Observa los archivos que cualquier PF compartió con [athleteId].
+  Stream<List<AthleteFile>> watchSharedForAthlete(String athleteId) {
+    return _collection
+        .where('athleteId', isEqualTo: athleteId)
+        .where('sharedWithAthlete', isEqualTo: true)
+        .orderBy('uploadedAt', descending: true)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map(_fromDoc)
+            .whereType<AthleteFile>()
+            .toList(growable: false));
+  }
+
+  /// Cambia únicamente la visibilidad del archivo para el alumno.
+  Future<void> setShared(AthleteFile file, bool shared) {
+    return _collection.doc(file.id).update({'sharedWithAthlete': shared});
   }
 
   /// Borra el archivo del Storage y luego el doc de Firestore. Si Storage

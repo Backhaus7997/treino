@@ -185,6 +185,11 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
             if (body.isNotEmpty) Text(body),
           ],
         ),
+        // `persist: false` A MANO. `SnackBar` hace
+        // `persist = persist ?? action != null`: con acción es eterno por
+        // default y el `duration` de acá abajo NO se mira. Sin esto el cartel
+        // se queda hasta recargar la página.
+        persist: false,
         duration: const Duration(seconds: 4),
         action: SnackBarAction(
           label:

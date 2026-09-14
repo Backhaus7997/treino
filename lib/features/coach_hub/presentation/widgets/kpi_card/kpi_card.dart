@@ -3,6 +3,7 @@ import 'package:flutter/widget_previews.dart';
 
 import '../../../../../app/theme/app_motion.dart';
 import '../../../../../app/theme/app_palette.dart';
+import '../../../../../app/theme/tokens/components/treino_card_tokens.dart';
 import '../../../../../app/theme/tokens/components/treino_kpi_card_tokens.dart';
 import '../../../../../app/theme/tokens/primitives.dart';
 import '../../../../../core/widgets/motion/treino_shimmer.dart';
@@ -135,12 +136,31 @@ class KpiCard extends StatelessWidget {
 
         return AnimatedContainer(
           key: const Key('kpi_card_root'),
-          duration: AppMotion.resolve(ctx, AppMotion.fast),
+          // EL HOVER NO ANIMA. Un puntero es manipulación directa: el fondo tiene
+          // que estar donde está el cursor, no llegando. A 120/180 ms, barrer
+          // deja ESTELA — el anterior sigue apagándose cuando el siguiente ya se
+          // encendió. Mismo criterio de #1063, que no llegó hasta acá.
+          duration: Duration.zero,
           curve: AppMotion.standard,
           decoration: BoxDecoration(
-            color: highlighted
-                ? tokens.border.withValues(alpha: 0.08)
-                : tokens.background,
+            // EN REPOSO NO HAY GLOW. Sólo aparece con el hover.
+            //
+            // Bajarlo al 6% no alcanzaba: el problema de cuatro KPIs en fila
+            // no es la intensidad, es la REPETICIÓN. Cuatro degradados
+            // idénticos uno al lado del otro dejan de leerse como un acento y
+            // pasan a leerse como una textura de fondo — y encima le comen la
+            // jerarquía al hero, que es exactamente lo que el dartdoc de
+            // `TreinoCardTokens.glow` dice que hay que evitar.
+            //
+            // El acento se gasta en UN lugar. Ese lugar es el hero, que es uno
+            // solo y domina la pantalla; la tira de KPIs se apoya en el borde,
+            // que ya la separa del fondo.
+            //
+            // Con el hover sí vuelve, y ahí sirve: es UNA card iluminándose
+            // entre cuatro apagadas, o sea información, no decoración.
+            gradient:
+                highlighted ? TreinoCardTokens.glow(ctx, alpha: 0.14) : null,
+            color: highlighted ? null : tokens.background,
             border: Border.all(
               color: highlighted ? p.borderHover : tokens.border,
             ),
@@ -233,7 +253,7 @@ class _CardContent extends StatelessWidget {
           style: TextStyle(
             fontFamily: AppFonts.barlow,
             fontWeight: FontWeight.w400,
-            fontSize: 12,
+            fontSize: AppTextSize.caption,
             color: tokens.titleColor,
           ),
         ),
@@ -243,7 +263,7 @@ class _CardContent extends StatelessWidget {
             final valueStyle = TextStyle(
               fontFamily: AppFonts.barlowCondensed,
               fontWeight: FontWeight.w700,
-              fontSize: 28,
+              fontSize: AppTextSize.display,
               color: tokens.valueColor,
             );
             return valueBuilder?.call(ctx, valueStyle) ??
@@ -257,7 +277,7 @@ class _CardContent extends StatelessWidget {
             style: TextStyle(
               fontFamily: AppFonts.barlow,
               fontWeight: FontWeight.w600,
-              fontSize: 12,
+              fontSize: AppTextSize.caption,
               color: deltaPositive == true
                   ? tokens.variationPositiveColor
                   : tokens.variationNegativeColor,
@@ -271,7 +291,7 @@ class _CardContent extends StatelessWidget {
             style: TextStyle(
               fontFamily: AppFonts.barlow,
               fontWeight: FontWeight.w400,
-              fontSize: 11,
+              fontSize: AppTextSize.caption,
               color: tokens.titleColor,
             ),
           ),

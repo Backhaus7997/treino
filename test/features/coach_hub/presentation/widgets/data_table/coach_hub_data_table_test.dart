@@ -33,6 +33,11 @@ final _rows = [
   ),
 ];
 
+// Los rótulos de header se renderizan en MAYÚSCULA desde que la transformación
+// vive en `_HeaderCell` y no en cada string. Antes venían mezclados —«ALUMNO»
+// de l10n contra «Rutina» escrito a mano— y la fila se veía a dos alturas
+// tipográficas. Por eso los finders de acá buscan el rótulo transformado y no
+// el `label` que se declara en la columna.
 void main() {
   group('CoachHubDataTable —', () {
     // -------------------------------------------------------------------------
@@ -47,8 +52,8 @@ void main() {
         ),
       ));
       await tester.pump();
-      expect(find.text('Nombre'), findsOneWidget);
-      expect(find.text('Estado'), findsOneWidget);
+      expect(find.text('NOMBRE'), findsOneWidget);
+      expect(find.text('ESTADO'), findsOneWidget);
       expect(find.text('Ana García'), findsOneWidget);
       expect(find.text('Carlos López'), findsOneWidget);
     });
@@ -93,7 +98,7 @@ void main() {
         ),
       ));
       await tester.pump();
-      await tester.tap(find.text('Nombre'));
+      await tester.tap(find.text('NOMBRE'));
       await tester.pump();
       expect(sortedKey, 'name');
     });
@@ -113,7 +118,7 @@ void main() {
         ),
       ));
       await tester.pump();
-      await tester.tap(find.text('Estado'));
+      await tester.tap(find.text('ESTADO'));
       await tester.pump();
       expect(called, isFalse);
     });
@@ -309,6 +314,66 @@ void main() {
     });
 
     // -------------------------------------------------------------------------
+    // El hover pinta EN EL MISMO FRAME, sin estela
+    // -------------------------------------------------------------------------
+    testWidgets('el hover llega a su color en UN frame', (tester) async {
+      // El PF: «parpadeo al pasar el cursor sobre una lista». La fila fundía
+      // su fondo en 180 ms, así que al barrer quedaban tres o cuatro
+      // encendidas a la vez — la anterior todavía apagándose cuando la
+      // siguiente ya prendió.
+      //
+      // Un puntero es manipulación directa: el fondo tiene que ESTAR donde
+      // está el cursor, no llegando. El assert es «un frame», no «rápido»:
+      // cualquier duración mayor a cero vuelve a dejar estela.
+      await tester.pumpWidget(_wrap(
+        CoachHubDataTable(
+          columns: _columns,
+          rows: _rows,
+          onRowTap: (_) {},
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      // El `DecoratedBox` que el `AnimatedContainer` construye, NO la
+      // decoración que le pasamos al widget.
+      //
+      // La primera versión leía `AnimatedContainer.decoration`, que es el
+      // OBJETIVO: cambia al instante aunque la animación dure 180 ms. O sea
+      // que el test pasaba con la animación puesta y no probaba nada. Lo
+      // encontró el control negativo.
+      Color? fondoDeLaFila() {
+        final d = tester.widget<DecoratedBox>(
+          find
+              .descendant(
+                of: find.byKey(const Key('data_table_row_1')),
+                matching: find.byType(DecoratedBox),
+              )
+              .first,
+        );
+        return (d.decoration as BoxDecoration).color;
+      }
+
+      final enReposo = fondoDeLaFila();
+
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      addTearDown(() => mouse.removePointer());
+      await mouse.addPointer(location: Offset.zero);
+      await mouse.moveTo(
+        tester.getCenter(find.byKey(const Key('data_table_row_1'))),
+      );
+      // UN solo frame. Con una animación de por medio, acá habría un color
+      // intermedio y no el final.
+      await tester.pump();
+
+      final enHover = fondoDeLaFila();
+      expect(enHover, isNot(enReposo), reason: 'el hover pinta');
+
+      // Y no se mueve más: ya está en su valor final.
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(fondoDeLaFila(), enHover, reason: 'sin animación pendiente');
+    });
+
+    // -------------------------------------------------------------------------
     // Sin onRowTap: fila no focusable, sin Semantics(button)
     // -------------------------------------------------------------------------
     testWidgets(
@@ -432,7 +497,7 @@ void main() {
           theme: theme,
         ));
         await tester.pump();
-        expect(find.text('Nombre'), findsOneWidget);
+        expect(find.text('NOMBRE'), findsOneWidget);
         expect(find.text('Ana García'), findsOneWidget);
       }
     });

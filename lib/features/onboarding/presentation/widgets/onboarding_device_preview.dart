@@ -99,7 +99,7 @@ class OnboardingDevicePreview extends StatelessWidget {
                               center: const Alignment(-0.7, -0.76),
                               radius: 0.7,
                               colors: [
-                                palette.accent.withValues(alpha: 0.20),
+                                palette.accent.withValues(alpha: 0.2),
                                 palette.accent.withValues(alpha: 0),
                               ],
                               stops: const [0, 0.85],

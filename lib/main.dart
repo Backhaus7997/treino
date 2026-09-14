@@ -17,6 +17,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'app/app.dart';
 import 'core/persistence/shared_prefs_provider.dart';
 import 'firebase_options.dart';
+import 'features/paywall/application/revenuecat_store.dart';
 
 Future<void> main() async {
   // runZonedGuarded captura excepciones async no atrapadas (futures sin await,
@@ -101,7 +102,13 @@ Future<void> main() async {
     // `deleteAccount` lo tuvo del 2026-07-20 al 2026-08-25 y en ese mes el
     // borrado de cuenta no funcionó nunca; se sacó por eso (§4.8.2). No
     // confundir "el callable exige atestación" con "el cliente puede
-    // producirla": al 2026-08-25 Android va 1 token válido cada 9.
+    // producirla".
+    //
+    // Medido ancho el 2026-09-04 (24 días, 6 callables, docs/security.md
+    // §4.8.3): el problema no es una tasa baja, son DOS CALLABLES EN CERO.
+    // `acceptTrainerLink` —el gate del paywall— no produjo ni una atestación
+    // válida en 10 intentos, y `requestPasswordReset` tampoco. Con enforcement
+    // encendido esos dos flujos no fallan a veces: fallan siempre.
     //
     // El inventario de qué callable exige qué —y por qué los que no, no— vive
     // en functions/src/__tests__/appcheck-enforcement.test.ts, derivado del
@@ -169,6 +176,18 @@ Future<void> main() async {
     // native bundles (Info.plist URL scheme on iOS, google-services.json on
     // Android), so no explicit args are needed here.
     await GoogleSignIn.instance.initialize();
+
+    // RevenueCat: el SDK con el que el ALUMNO compra su suscripcion por IAP.
+    // Va DESPUES de Firebase porque la compra se identifica con el uid de
+    // Firebase Auth (ver el encabezado de athlete_checkout.dart).
+    //
+    // Movil-only, como App Check y Crashlytics arriba: `main_coach_hub.dart`
+    // NO llama a esto, por el mismo motivo por el que no inicializa
+    // GoogleSignIn. El guard `kIsWeb` vive adentro de la funcion.
+    //
+    // Devuelve false si todavia no hay clave configurada. No tira: un binario
+    // sin clave tiene que arrancar igual y simplemente no ofrecer comprar.
+    await configurarRevenueCat();
 
     const useEmulator = bool.fromEnvironment(
       'USE_EMULATOR',

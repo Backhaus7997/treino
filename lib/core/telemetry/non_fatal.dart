@@ -63,8 +63,26 @@ Future<void> reportNonFatal(
   // comportamiento que ya tenían los call sites antes de esta costura.
   developer.log(reason, error: error, stackTrace: stack);
 
-  // Crashlytics no soporta web — mismo guard que el wire de `main.dart`.
-  if (kIsWeb) return;
+  // ⚠ EN WEB LA LÍNEA DE ARRIBA NO IMPRIME NADA. El patch de `dart:developer`
+  // para JS tiene el cuerpo vacío —literalmente `// TODO.` en
+  // `dart-sdk/lib/_internal/js_runtime/lib/developer_patch.dart`—, así que
+  // `log()` es un no-op. Sumado al `return` de acá abajo, esta función era
+  // **completamente muda en web**: cada non-fatal del Coach Hub se perdía sin
+  // dejar rastro, y el guard de Crashlytics leía como un scoping deliberado en
+  // vez de como el agujero que era.
+  //
+  // Se encontró persiguiendo "el chat no envía mensajes": el PF abrió la
+  // consola del navegador y no había una sola línea de la app. No la había
+  // para NINGÚN error, no sólo para ese.
+  //
+  // `debugPrint` sí sale por `console.log` en web y sobrevive al build de
+  // release (es de `foundation`, no de `dart:developer`). No reemplaza al
+  // `log()` de arriba: en mobile ese es el que se ve con el debugger enchufado.
+  if (kIsWeb) {
+    debugPrint('[non-fatal] $reason\n$error\n$stack');
+    // Crashlytics no soporta web — mismo guard que el wire de `main.dart`.
+    return;
+  }
 
   // Sin app de Firebase inicializada, `FirebaseCrashlytics.instance` tira
   // `[core/no-app]`. En `flutter test` nunca la hay. Mismo criterio que

@@ -18,7 +18,8 @@
  * REQ-ACCDEL-CF-005 | ADR-ACCDEL-001 | ADR-FOLLOW-002
  */
 
-import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 
 const BATCH_SIZE = 500;
 
@@ -27,10 +28,10 @@ const BATCH_SIZE = 500;
  * Returns the count of deleted documents.
  */
 export async function sweepFollows(
-  app: admin.app.App,
+  app: App,
   uid: string
 ): Promise<{ count: number }> {
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
 
   const snapshot = await db
     .collection("follows")

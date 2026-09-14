@@ -18,6 +18,7 @@ import '../../../workout/domain/equipment_type.dart';
 import '../../../workout/domain/muscle_group.dart';
 import '../../../workout/presentation/widgets/exercise_video_player.dart';
 import 'custom_exercise_video_web_uploader.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 /// Web-native "crear ejercicio nuevo" form for the Coach Hub exercise picker.
 ///
@@ -194,15 +195,16 @@ class _CustomExerciseFormDialogState
                     child: Text(
                       _isEdit ? 'Editar ejercicio' : 'Nuevo ejercicio', // i18n
                       style: GoogleFonts.barlowCondensed(
-                        fontSize: 20,
+                        fontSize: AppTextSize.titleLarge,
                         fontWeight: FontWeight.w700,
                         color: palette.textPrimary,
                       ),
                     ),
                   ),
-                  IconButton(
+                  TreinoIconButton(
+                    icon: TreinoIcon.close,
                     tooltip: 'Cerrar', // i18n
-                    icon: Icon(TreinoIcon.close, color: palette.textMuted),
+                    color: palette.textMuted,
                     onPressed:
                         _saving ? null : () => Navigator.of(context).pop(),
                   ),
@@ -220,7 +222,7 @@ class _CustomExerciseFormDialogState
                 textCapitalization: TextCapitalization.sentences,
                 style: GoogleFonts.barlow(
                   color: palette.textPrimary,
-                  fontSize: 14,
+                  fontSize: AppTextSize.body,
                 ),
                 decoration: _inputDecoration(
                   palette,
@@ -260,7 +262,7 @@ class _CustomExerciseFormDialogState
                 enabled: !_saving && !_uploadingVideo,
                 style: GoogleFonts.barlow(
                   color: palette.textPrimary,
-                  fontSize: 14,
+                  fontSize: AppTextSize.body,
                 ),
                 decoration: _inputDecoration(
                   palette,
@@ -269,34 +271,19 @@ class _CustomExerciseFormDialogState
                 onChanged: (_) => setState(() {}),
               ),
               const SizedBox(height: 8),
-              OutlinedButton.icon(
+              // El progreso va en el LABEL y no en un spinner: acá el usuario
+              // quiere saber cuánto falta, no sólo que algo pasa. Por eso este
+              // no usa `loading`, que oculta el texto.
+              TreinoButton(
                 key: const Key('create_exercise_upload_video_button'),
+                label: _uploadingVideo
+                    ? 'Subiendo video — ${(_uploadProgress * 100).clamp(0, 100).toInt()}%' // i18n
+                    : 'Subir mi propio video', // i18n
+                icon: _uploadingVideo ? null : TreinoIcon.plus,
+                variant: TreinoButtonVariant.secondaryAccent,
+                expand: true,
                 onPressed:
                     (_saving || _uploadingVideo) ? null : _onPickAndUpload,
-                icon: _uploadingVideo
-                    ? SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: palette.accent,
-                        ),
-                      )
-                    : Icon(TreinoIcon.plus, size: 16, color: palette.accent),
-                label: Text(
-                  _uploadingVideo
-                      ? 'Subiendo video — ${(_uploadProgress * 100).clamp(0, 100).toInt()}%' // i18n
-                      : 'Subir mi propio video', // i18n
-                  style: GoogleFonts.barlowCondensed(
-                    color: palette.accent,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                  ),
-                ),
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: palette.border),
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                ),
               ),
               if (_videoCtrl.text.trim().isNotEmpty) ...[
                 const SizedBox(height: 12),
@@ -311,7 +298,7 @@ class _CustomExerciseFormDialogState
                   _error!,
                   style: GoogleFonts.barlow(
                     color: palette.danger,
-                    fontSize: 13,
+                    fontSize: AppTextSize.bodyDense,
                   ),
                 ),
               ],
@@ -320,45 +307,18 @@ class _CustomExerciseFormDialogState
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  TextButton(
+                  TreinoButton(
+                    label: 'Cancelar', // i18n
+                    variant: TreinoButtonVariant.ghost,
                     onPressed:
                         _saving ? null : () => Navigator.of(context).pop(),
-                    child: Text(
-                      'Cancelar', // i18n
-                      style: GoogleFonts.barlow(color: palette.textMuted),
-                    ),
                   ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
+                  const SizedBox(width: AppSpacing.s8),
+                  TreinoButton(
                     key: const Key('create_exercise_submit_button'),
-                    onPressed: _saving ? null : _save,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: palette.accent,
-                      foregroundColor: TreinoButtonTokens.foreground(context),
-                      disabledBackgroundColor: palette.accent.withValues(
-                        alpha: 0.3,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.full),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 22),
-                    ),
-                    child: _saving
-                        ? SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: TreinoButtonTokens.foreground(context),
-                            ),
-                          )
-                        : Text(
-                            _isEdit ? 'Guardar' : 'Crear', // i18n
-                            style: GoogleFonts.barlowCondensed(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
-                            ),
-                          ),
+                    label: _isEdit ? 'Guardar' : 'Crear', // i18n
+                    loading: _saving,
+                    onPressed: _save,
                   ),
                 ],
               ),
@@ -376,7 +336,8 @@ class _CustomExerciseFormDialogState
         );
     return InputDecoration(
       hintText: hint,
-      hintStyle: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
+      hintStyle: GoogleFonts.barlow(
+          color: palette.textMuted, fontSize: AppTextSize.body),
       filled: true,
       fillColor: palette.bg,
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -399,7 +360,7 @@ class _FieldLabel extends StatelessWidget {
     return Text(
       text,
       style: GoogleFonts.barlowCondensed(
-        fontSize: 11,
+        fontSize: AppTextSize.caption,
         fontWeight: FontWeight.w700,
         color: palette.textMuted,
         letterSpacing: 1,
@@ -449,7 +410,7 @@ class _SelectChips<T> extends StatelessWidget {
               child: Text(
                 labelOf(value).toUpperCase(),
                 style: GoogleFonts.barlowCondensed(
-                  fontSize: 11,
+                  fontSize: AppTextSize.caption,
                   fontWeight: FontWeight.w700,
                   color: selected == value ? palette.accent : palette.textMuted,
                   letterSpacing: 0.6,

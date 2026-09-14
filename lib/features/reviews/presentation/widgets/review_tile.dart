@@ -3,10 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/widgets/treino_icon.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../../feed/presentation/widgets/post_avatar.dart';
+import '../../../moderation/domain/report_target_kind.dart';
+import '../../../moderation/presentation/moderation_actions.dart';
 import '../../../profile/application/user_public_profile_providers.dart';
 import '../../../profile/domain/user_public_profile.dart';
+import '../../../workout/application/session_providers.dart'
+    show currentUidProvider;
 import '../../domain/review.dart';
 import 'star_rating_display.dart';
 
@@ -71,18 +76,19 @@ class ReviewTile extends ConsumerWidget {
     // (deleted account). Otherwise fall back to the single-author stream so the
     // tile still works standalone and during the batch's brief load window.
     if (profileResolved) {
-      return _content(context, resolvedProfile);
+      return _content(context, ref, resolvedProfile);
     }
 
     final profileAsync = ref.watch(userPublicProfileProvider(review.athleteId));
     return profileAsync.when(
       loading: () => const SizedBox.shrink(),
       error: (_, __) => const SizedBox.shrink(),
-      data: (profile) => _content(context, profile),
+      data: (profile) => _content(context, ref, profile),
     );
   }
 
-  Widget _content(BuildContext context, UserPublicProfile? profile) {
+  Widget _content(
+      BuildContext context, WidgetRef ref, UserPublicProfile? profile) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
 
@@ -91,6 +97,13 @@ class ReviewTile extends ConsumerWidget {
     // avatar; only a missing profile falls back to "Usuario eliminado".
     final name = profile?.displayName ?? l10n.reviewTileDeletedUser;
     final avatarUrl = profile?.avatarUrl;
+
+    // Reportar/Bloquear al ATLETA que escribió la review — nunca sobre la
+    // propia (moderacion-reporte-y-bloqueo). Mismo criterio de gate que
+    // `isOwner` en PostCard, en espejo: acá lo que se esconde es la propia
+    // reseña, no la ajena.
+    final viewerUid = ref.watch(currentUidProvider);
+    final canModerate = viewerUid != null && viewerUid != review.athleteId;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -129,6 +142,31 @@ class ReviewTile extends ConsumerWidget {
                   color: palette.textMuted,
                 ),
               ),
+              if (canModerate) ...[
+                const SizedBox(width: 8),
+                Semantics(
+                  button: true,
+                  label: l10n.moderationMenuA11y,
+                  child: IconButton(
+                    icon: Icon(
+                      TreinoIcon.dotsThree,
+                      color: palette.textMuted,
+                      size: 18,
+                    ),
+                    onPressed: () => showModerationMenu(
+                      context,
+                      ref,
+                      targetKind: ReportTargetKind.review,
+                      targetId: review.id,
+                      targetOwnerUid: review.athleteId,
+                      targetOwnerDisplayName: name,
+                    ),
+                    tooltip: null,
+                    constraints: const BoxConstraints(),
+                    padding: EdgeInsets.zero,
+                  ),
+                ),
+              ],
             ],
           ),
           if (review.comment != null && review.comment!.isNotEmpty) ...[

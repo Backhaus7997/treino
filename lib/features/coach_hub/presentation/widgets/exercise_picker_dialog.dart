@@ -23,6 +23,9 @@ import '../../../workout/domain/muscle_group.dart';
 import '../sections/biblioteca/widgets/exercise_detail_dialog.dart'
     show showExerciseDetailDialog;
 import 'create_custom_exercise_dialog.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
+import 'package:treino/features/coach_hub/application/picker_panel_width_provider.dart';
 
 /// Web equivalent of [showExercisePicker] (mobile's `exercise_picker_sheet.dart`
 /// bottom sheet) — a multi-select exercise picker for the Coach Hub routine
@@ -109,7 +112,8 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
     super.dispose();
   }
 
-  int get _cantidadDeFiltros => _muscleFilters.length + _equipmentFilters.length;
+  int get _cantidadDeFiltros =>
+      _muscleFilters.length + _equipmentFilters.length;
 
   bool _matches(Exercise e) => exerciseMatchesFilters(
         e,
@@ -145,9 +149,8 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
         result.add(customToExercise(fromCustom));
       }
     }
-    final alAgregar = enSuperserie
-        ? widget.onAgregarEnSuperserie
-        : widget.onAgregar;
+    final alAgregar =
+        enSuperserie ? widget.onAgregarEnSuperserie : widget.onAgregar;
     if (alAgregar == null) {
       Navigator.of(context).pop(result);
       return;
@@ -186,7 +189,7 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
           style: GoogleFonts.barlowCondensed(
             color: palette.textPrimary,
             fontWeight: FontWeight.w700,
-            fontSize: 18,
+            fontSize: AppTextSize.title,
           ),
         ),
         content: Text(
@@ -194,25 +197,20 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
           // routines keep working after the library entry is gone.
           'Se borra "${exercise.name}" de tu biblioteca. Las rutinas que ya lo '
           'usan no se tocan.', // i18n
-          style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 13),
+          style: GoogleFonts.barlow(
+              color: palette.textMuted, fontSize: AppTextSize.bodyDense),
         ),
         actions: [
-          TextButton(
+          TreinoButton(
+            label: 'Cancelar', // i18n
+            variant: TreinoButtonVariant.ghost,
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(
-              'Cancelar', // i18n
-              style: GoogleFonts.barlow(color: palette.textMuted),
-            ),
           ),
-          TextButton(
+          const SizedBox(width: AppSpacing.s8),
+          TreinoButton(
+            label: 'Eliminar', // i18n
+            variant: TreinoButtonVariant.danger,
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(
-              'Eliminar', // i18n
-              style: GoogleFonts.barlow(
-                color: palette.danger,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
           ),
         ],
       ),
@@ -265,15 +263,16 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
                 child: Text(
                   'Elegir ejercicios', // i18n
                   style: GoogleFonts.barlowCondensed(
-                    fontSize: 18,
+                    fontSize: AppTextSize.title,
                     fontWeight: FontWeight.w700,
                     color: palette.textPrimary,
                   ),
                 ),
               ),
-              IconButton(
+              TreinoIconButton(
+                icon: TreinoIcon.close,
                 tooltip: 'Cerrar', // i18n
-                icon: Icon(TreinoIcon.close, color: palette.textMuted),
+                color: palette.textMuted,
                 onPressed: () => Navigator.of(context).pop(),
               ),
             ],
@@ -286,19 +285,17 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
             controller: _searchController,
             style: GoogleFonts.barlow(
               color: palette.textPrimary,
-              fontSize: 14,
+              fontSize: AppTextSize.body,
             ),
             decoration: InputDecoration(
               prefixIcon: Icon(TreinoIcon.search, color: palette.textMuted),
               suffixIcon: _query.isEmpty
                   ? null
-                  : IconButton(
-                      icon: Icon(
-                        TreinoIcon.close,
-                        color: palette.textMuted,
-                        size: 18,
-                      ),
+                  : TreinoIconButton(
+                      icon: TreinoIcon.close,
                       tooltip: 'Borrar', // i18n
+                      color: palette.textMuted,
+                      size: TreinoButtonSize.xs,
                       onPressed: () {
                         _searchController.clear();
                         setState(() => _query = '');
@@ -307,7 +304,7 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
               hintText: 'Buscar ejercicio…', // i18n
               hintStyle: GoogleFonts.barlow(
                 color: palette.textMuted,
-                fontSize: 14,
+                fontSize: AppTextSize.body,
               ),
               filled: true,
               fillColor: palette.bg,
@@ -340,29 +337,22 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
           alignment: Alignment.centerLeft,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 0, 20, 0),
-            child: TextButton.icon(
+            // Con filtros puestos el botón pasa a acento: la variante DICE si
+            // hay filtros activos, en vez de un `color:` calculado a mano.
+            child: TreinoButton(
               key: const Key('picker_filtros_toggle'),
+              label: _cantidadDeFiltros == 0
+                  ? 'Filtros' // i18n
+                  : 'Filtros ($_cantidadDeFiltros)', // i18n
+              icon: _filtrosAbiertos
+                  ? TreinoIcon.chevronUp
+                  : TreinoIcon.chevronDown,
+              variant: _cantidadDeFiltros == 0
+                  ? TreinoButtonVariant.ghost
+                  : TreinoButtonVariant.ghostAccent,
+              size: TreinoButtonSize.sm,
               onPressed: () =>
                   setState(() => _filtrosAbiertos = !_filtrosAbiertos),
-              icon: Icon(
-                _filtrosAbiertos
-                    ? TreinoIcon.chevronUp
-                    : TreinoIcon.chevronDown,
-                size: 16,
-                color: palette.textMuted,
-              ),
-              label: Text(
-                _cantidadDeFiltros == 0
-                    ? 'Filtros' // i18n
-                    : 'Filtros ($_cantidadDeFiltros)', // i18n
-                style: GoogleFonts.barlowCondensed(
-                  color: _cantidadDeFiltros == 0
-                      ? palette.textMuted
-                      : palette.accentText,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                ),
-              ),
             ),
           ),
         ),
@@ -374,8 +364,7 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
               muscleFilters: _muscleFilters,
               equipmentFilters: _equipmentFilters,
               onMuscleChanged: (v) => setState(() => _muscleFilters = v),
-              onEquipmentChanged: (v) =>
-                  setState(() => _equipmentFilters = v),
+              onEquipmentChanged: (v) => setState(() => _equipmentFilters = v),
             ),
           ),
         const Divider(height: 1),
@@ -400,22 +389,29 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
           decoration: BoxDecoration(
             border: Border(top: BorderSide(color: palette.border)),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+          // `Wrap` y no `Row`: acá conviven hasta TRES botones —Cancelar, En
+          // superserie, Agregar (N)— y este pie vive tanto en un diálogo como
+          // en un panel lateral de 400 px. Con `Row` la tercera opción hacía
+          // desbordar la fila; envueltos, bajan a una segunda línea. Los
+          // labels además se traducen, así que el ancho no es un número que
+          // podamos fijar de antemano.
+          child: Wrap(
+            alignment: WrapAlignment.end,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 0,
+            runSpacing: AppSpacing.s8,
             children: [
               // "Cancelar" SÓLO en modo diálogo. En el panel no hay ruta que
               // cerrar: `Navigator.pop()` saldría del editor entero, que es
               // exactamente lo contrario de lo que el botón promete. El panel
               // se cierra con su propia X.
               if (widget.onAgregar == null) ...[
-                TextButton(
+                TreinoButton(
+                  label: 'Cancelar', // i18n
+                  variant: TreinoButtonVariant.ghost,
                   onPressed: () => Navigator.of(context).pop(),
-                  child: Text(
-                    'Cancelar', // i18n
-                    style: GoogleFonts.barlow(color: palette.textMuted),
-                  ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSpacing.s8),
               ],
               // "Agregar en superserie" SÓLO con 2 o más elegidos: una
               // superserie de uno no existe, y un botón deshabilitado que
@@ -428,55 +424,28 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
               if (widget.onAgregarEnSuperserie != null && _selected.length >= 2)
                 Padding(
                   padding: const EdgeInsets.only(right: AppSpacing.s8),
-                  child: TextButton.icon(
+                  child: TreinoButton(
                     key: const Key('picker_agregar_superserie'),
+                    label: 'En superserie', // i18n
+                    icon: TreinoIcon.streak,
+                    variant: TreinoButtonVariant.secondary,
                     onPressed: () => _confirm(
                       defaultsAsync.valueOrNull ?? const [],
                       customsAsync.valueOrNull ?? const [],
                       enSuperserie: true,
                     ),
-                    icon: Icon(
-                      TreinoIcon.streak,
-                      size: 15,
-                      color: palette.highlight,
-                    ),
-                    label: Text(
-                      'En superserie', // i18n
-                      style: GoogleFonts.barlowCondensed(
-                        color: palette.textPrimary,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                      ),
-                    ),
                   ),
                 ),
-              ElevatedButton(
+              TreinoButton(
+                label: _selected.isEmpty
+                    ? 'Agregar' // i18n
+                    : 'Agregar (${_selected.length})', // i18n
                 onPressed: _selected.isEmpty
                     ? null
                     : () => _confirm(
                           defaultsAsync.valueOrNull ?? const [],
                           customsAsync.valueOrNull ?? const [],
                         ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: palette.accent,
-                  foregroundColor: TreinoButtonTokens.foreground(context),
-                  disabledBackgroundColor: palette.accent.withValues(
-                    alpha: 0.3,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppRadius.full),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                ),
-                child: Text(
-                  _selected.isEmpty
-                      ? 'Agregar' // i18n
-                      : 'Agregar (${_selected.length})', // i18n
-                  style: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                  ),
-                ),
               ),
             ],
           ),
@@ -513,13 +482,14 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
     required AsyncValue<List<CustomExercise>> customs,
   }) {
     if (defaults.isLoading || customs.isLoading) {
-      return Center(child: CircularProgressIndicator(color: palette.accent));
+      return const CoachHubSkeleton(filas: 6);
     }
     if (defaults.hasError) {
       return Center(
         child: Text(
           'No pudimos cargar ejercicios.', // i18n
-          style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
+          style: GoogleFonts.barlow(
+              color: palette.textMuted, fontSize: AppTextSize.body),
         ),
       );
     }
@@ -537,7 +507,8 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
           child: Text(
             'No encontramos ejercicios con esos filtros.', // i18n
             textAlign: TextAlign.center,
-            style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
+            style: GoogleFonts.barlow(
+                color: palette.textMuted, fontSize: AppTextSize.body),
           ),
         ),
       );
@@ -693,7 +664,7 @@ class _Chip extends StatelessWidget {
         child: Text(
           label,
           style: GoogleFonts.barlowCondensed(
-            fontSize: 11,
+            fontSize: AppTextSize.caption,
             fontWeight: FontWeight.w700,
             color: active ? palette.accent : palette.textMuted,
             letterSpacing: 0.6,
@@ -839,7 +810,7 @@ class _ExerciseRow extends StatelessWidget {
             name,
             style: GoogleFonts.barlow(
               color: palette.textPrimary,
-              fontSize: 14,
+              fontSize: AppTextSize.body,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -848,7 +819,7 @@ class _ExerciseRow extends StatelessWidget {
                   subtitle!,
                   style: GoogleFonts.barlow(
                     color: palette.textMuted,
-                    fontSize: 12,
+                    fontSize: AppTextSize.caption,
                   ),
                 )
               : null,
@@ -869,7 +840,7 @@ class _ExerciseRow extends StatelessWidget {
                     badge!,
                     style: GoogleFonts.barlowCondensed(
                       color: palette.accent,
-                      fontSize: 10,
+                      fontSize: AppTextSize.micro,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.8,
                     ),
@@ -878,35 +849,26 @@ class _ExerciseRow extends StatelessWidget {
                 const SizedBox(width: 8),
               ],
               if (onEdit != null)
-                IconButton(
+                TreinoIconButton(
+                  icon: TreinoIcon.edit,
                   tooltip: 'Editar', // i18n
-                  icon: Icon(
-                    TreinoIcon.edit,
-                    size: 15,
-                    color: palette.textMuted,
-                  ),
-                  visualDensity: VisualDensity.compact,
+                  color: palette.textMuted,
+                  size: TreinoButtonSize.xs,
                   onPressed: onEdit,
                 ),
               if (onDelete != null)
-                IconButton(
+                TreinoIconButton(
+                  icon: TreinoIcon.trash,
                   tooltip: 'Eliminar', // i18n
-                  icon: Icon(
-                    TreinoIcon.trash,
-                    size: 15,
-                    color: palette.textMuted,
-                  ),
-                  visualDensity: VisualDensity.compact,
+                  color: palette.textMuted,
+                  size: TreinoButtonSize.xs,
                   onPressed: onDelete,
                 ),
-              IconButton(
+              TreinoIconButton(
+                icon: TreinoIcon.chartBar,
                 tooltip: 'Ver detalle', // i18n
-                icon: Icon(
-                  TreinoIcon.chartBar,
-                  size: 16,
-                  color: palette.textMuted,
-                ),
-                visualDensity: VisualDensity.compact,
+                color: palette.textMuted,
+                size: TreinoButtonSize.xs,
                 onPressed: () => showExerciseDetailDialog(
                   context,
                   exerciseId: id,
@@ -936,7 +898,7 @@ class _SectionHeader extends StatelessWidget {
         label.toUpperCase(),
         style: GoogleFonts.barlowCondensed(
           color: palette.textMuted,
-          fontSize: 11,
+          fontSize: AppTextSize.caption,
           fontWeight: FontWeight.w700,
           letterSpacing: 1.2,
         ),
@@ -968,7 +930,7 @@ class _CreateNewExerciseButton extends StatelessWidget {
               'Crear ejercicio nuevo', // i18n
               style: GoogleFonts.barlow(
                 color: palette.accent,
-                fontSize: 14,
+                fontSize: AppTextSize.body,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -995,13 +957,28 @@ CustomExercise? _customWithId(List<CustomExercise> items, String id) {
   return null;
 }
 
-/// Ancho del panel lateral, en px lógicos.
+/// Ancho POR DEFECTO del panel lateral, en px lógicos.
 ///
-/// 400 y no más: el editor de la izquierda tiene que seguir siendo LEGIBLE
-/// mientras se elige, que es el punto del #860. A 1280 —el piso donde el panel
-/// aparece— esto le deja 880 al editor, más que los 560 que ocupaba el modal
-/// tapándolo todo.
-const double kAnchoPanelPicker = 400;
+/// Era fijo, y ahí estaba el problema: el editor de la izquierda tiene que
+/// seguir siendo legible mientras se elige (el punto del #860), pero clavar el
+/// panel en 400 significaba que un monitor de 1920 no le sumaba un píxel a
+/// NADIE — ni al panel ni a la rutina. Ahora es el punto de partida y lo mueve
+/// quien quiera, entre `kAnchoPanelPickerMin` y lo que deje la rutina.
+///
+/// Ver `picker_panel_width_provider.dart` para el rango y por qué.
+const double kAnchoPanelPicker = kAnchoPanelPickerDefault;
+
+/// Ancho del asa de arrastre: `AppSpacing.s12`.
+///
+/// Es el primer separador arrastrable del hub, así que no hay precedente que
+/// copiar — el número sale de la escala de spacing, que es lo que el guard
+/// `no_off_scale_spacing_scan` permite.
+///
+/// Doce y no uno: un asa del ancho del borde que dibuja es imposible de
+/// agarrar sin apuntar. El borde sigue midiendo 1 px; lo que mide 12 es el
+/// blanco de agarre, invisible salvo por el cursor. Empezó en 8 y lo subió el
+/// PF después de probarlo en la pantalla real, que es donde se decide esto.
+const double kAnchoAsaPanel = AppSpacing.s12;
 
 /// El picker como PANEL LATERAL persistente (#860).
 ///
@@ -1024,8 +1001,19 @@ class ExercisePickerPanel extends StatelessWidget {
     required this.onAgregar,
     required this.onAgregarEnSuperserie,
     this.alreadySelectedIds = const {},
+    this.width = kAnchoPanelPicker,
+    this.onResize,
     super.key,
   });
+
+  /// Ancho actual del panel. Lo decide el llamador, que es el único que sabe
+  /// cuánto lugar hay — ver `maxAnchoPanelPicker`.
+  final double width;
+
+  /// Arrastre del asa, en px. Positivo = el panel se ENSANCHA.
+  ///
+  /// `null` apaga el asa: en el modal no hay nada que redimensionar.
+  final ValueChanged<double>? onResize;
 
   /// Los nombres de los días del plan, en orden.
   final List<String> dias;
@@ -1050,11 +1038,13 @@ class ExercisePickerPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    return Container(
-      width: kAnchoPanelPicker,
+    final panel = Container(
+      width: width,
       decoration: BoxDecoration(
         color: palette.bgCard,
-        border: Border(left: BorderSide(color: palette.border)),
+        border: onResize == null
+            ? Border(left: BorderSide(color: palette.border))
+            : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1074,7 +1064,7 @@ class ExercisePickerPanel extends StatelessWidget {
                   style: GoogleFonts.barlowCondensed(
                     color: palette.textMuted,
                     fontWeight: FontWeight.w700,
-                    fontSize: 12,
+                    fontSize: AppTextSize.caption,
                     letterSpacing: 1.1,
                   ),
                 ),
@@ -1107,6 +1097,50 @@ class ExercisePickerPanel extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+
+    if (onResize == null) return panel;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [_AsaDeArrastre(onResize: onResize!), panel],
+    );
+  }
+}
+
+/// El asa que ensancha y angosta el panel.
+///
+/// Va en su BORDE IZQUIERDO, que es el que da contra la rutina: arrastrar
+/// hacia la izquierda agranda el panel, y es el mismo gesto que en cualquier
+/// otro panel redimensionable. El delta llega en px de pantalla, así que
+/// ensanchar es `-delta`; esa inversión la hace el llamador, que es el que
+/// sabe de qué lado está.
+///
+/// El asa mide 8 px de ancho pero sólo DIBUJA el borde de 1 que ya estaba. Los
+/// otros 7 son blanco de agarre: invisibles salvo por el cursor, que cambia a
+/// `resizeLeftRight` al pasar por encima. Sin eso el asa sería del ancho del
+/// borde y habría que apuntarle.
+class _AsaDeArrastre extends StatelessWidget {
+  const _AsaDeArrastre({required this.onResize});
+
+  final ValueChanged<double> onResize;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return MouseRegion(
+      cursor: SystemMouseCursors.resizeLeftRight,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onHorizontalDragUpdate: (d) => onResize(d.delta.dx),
+        child: SizedBox(
+          width: kAnchoAsaPanel,
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: Container(width: 1, color: palette.border),
+          ),
+        ),
       ),
     );
   }
@@ -1155,7 +1189,7 @@ class _ChipDeDia extends StatelessWidget {
                   ? TreinoButtonTokens.foreground(context)
                   : palette.textMuted,
               fontWeight: FontWeight.w700,
-              fontSize: 12.5,
+              fontSize: AppTextSize.caption,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -1165,4 +1199,3 @@ class _ChipDeDia extends StatelessWidget {
     );
   }
 }
-

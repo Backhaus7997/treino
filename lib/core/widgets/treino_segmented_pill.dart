@@ -217,7 +217,7 @@ class _TreinoSegmentedPillState extends State<TreinoSegmentedPill> {
           ),
           onTap: widget.onTap,
           tabs: [
-            for (final label in widget.labels)
+            for (var index = 0; index < widget.labels.length; index++)
               Tab(
                 height: segmentHeight,
                 // `FittedBox` subsume las tres estrategias de overflow que
@@ -237,7 +237,7 @@ class _TreinoSegmentedPillState extends State<TreinoSegmentedPill> {
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
                   child: Text(
-                    label,
+                    widget.labels[index],
                     maxLines: 1,
                     softWrap: false,
                     overflow: TextOverflow.fade,

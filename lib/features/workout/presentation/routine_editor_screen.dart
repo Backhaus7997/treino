@@ -953,6 +953,16 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   /// inner lists (REQ-PERIOD-013). Capped at 16 (REQ-PERIOD-011).
   int _numWeeks = 1;
 
+  /// La forma con la que la rutina llegó al editor, o `null` si es nueva.
+  ///
+  /// Existe sólo para espejar `noCreceLaForma` de `firestore.rules`: el
+  /// servidor deja pasar un update que no agranda la rutina, aunque el
+  /// resultante siga por encima del tope free. Sin estos dos números, el
+  /// cliente sería MÁS estricto que el servidor y le mostraría un candado al
+  /// alumno por algo que el servidor le permite.
+  int? _diasAlCargar;
+  int? _semanasAlCargar;
+
   /// Whether this user-created routine is shared on the athlete's public
   /// profile ("RUTINAS PÚBLICAS" tab). Defaults to `false` (private) — the
   /// same default as before the toggle existed, so nothing changes for users
@@ -979,6 +989,15 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
 
   /// Shown when the routine to edit no longer exists in Firestore.
   bool _loadNotFound = false;
+
+  /// El alumno free entró a copiar una plantilla del catálogo, que es del plan
+  /// pago (`docs/paywall-alumno-suelto.md` §4).
+  ///
+  /// Vive acá y no en el widget que empuja la ruta porque el chip "Usar como
+  /// base" es UN call site y la ruta tiene más puertas — `treino://` no declara
+  /// `pathPrefix`, así que un deep link entra derecho. El gate va en el
+  /// destino.
+  bool _paywallBlocked = false;
 
   /// True once the user has touched anything (name/split text, level, or any
   /// day/slot/set mutation). Drives the unsaved-changes guard (PopScope +
@@ -1128,6 +1147,49 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         });
         return;
       }
+      // ── El gate del catálogo, en el DESTINO y no en el botón ─────────────
+      //
+      // El chip "Usar como base" del detalle ya lo frena, pero ese es UN call
+      // site y la ruta tiene más de una puerta: `treino://` está declarado sin
+      // `pathPrefix` (`AndroidManifest.xml`), así que
+      // `treino:///workout/customize-routine/<id>` entra derecho acá, y el
+      // `redirect` global del router sólo resuelve sesión y rol — de
+      // entitlements no sabe nada.
+      //
+      // Gatear en el destino cubre esa puerta y todas las que vengan después.
+      // Es el mismo principio que hace que el servidor sea la ley y el cliente
+      // la UX: el chequeo vive donde ocurre la cosa, no donde se la pide.
+      //
+      // Va acá, apenas resuelve la rutina fuente y ANTES de hidratar, para que
+      // el alumno no llegue a ver un editor cargado que después no puede
+      // guardar.
+      if (_isCustomizing &&
+          routine.source == RoutineSource.system &&
+          ref.read(customizeLockActiveProvider)) {
+        // El estado terminal PRIMERO, la hoja después. Así el formulario no se
+        // dibuja nunca —ni por un frame— detrás del modal, y si el alumno lo
+        // descarta queda en una pantalla que le explica por qué, con su botón
+        // de volver, en vez de en un editor vacío que no va a poder guardar.
+        setState(() {
+          _loading = false;
+          _paywallBlocked = true;
+        });
+        // La hoja NO se awaitea para después hacer `pop()`, y la primera
+        // versión de esto sí lo hacía al revés: llamaba a
+        // `showFreePlanLimitSheet(...)` y le pegaba un `context.pop()` en la
+        // línea siguiente. Ese pop se comía la hoja —`showModalBottomSheet`
+        // empuja una ruta, así que el pop cerraba el modal en el mismo frame en
+        // que se abría— y el alumno veía un parpadeo y nada más. Lo agarró el
+        // test de este gate.
+        unawaited(
+          showFreePlanLimitSheet(
+            context,
+            limit: FreePlanLimit.customizeTemplate,
+          ),
+        );
+        return;
+      }
+
       // Map Routine → editor state — inverse of the create path in _submit().
       // Applies equally to SelfCreating / TrainerAssigning / TrainerTemplating.
       // Guard against the controller listeners marking a freshly-loaded
@@ -1145,6 +1207,14 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       // Defensive clamp — a hand-edited doc can't exceed the editor cap nor
       // drop below one week (REQ-PERIOD-011/018).
       _numWeeks = routine.numWeeks.clamp(1, _kMaxWeeks);
+      // La forma con la que la rutina LLEGÓ, para el espejo de
+      // `noCreceLaForma` de `firestore.rules`. Ver `_freePlanBlocksShape`.
+      //
+      // Se guarda después del clamp a propósito: es el número contra el que el
+      // servidor va a comparar, y el servidor lee el documento tal cual está.
+      // Si acá se guardara el crudo y allá el clampeado, el cliente dejaría
+      // pasar un guardado que el servidor rebota.
+      _semanasAlCargar = routine.numWeeks;
       // Restore the athlete's routine-visibility toggle. Only meaningful in
       // SelfCreating mode; trainer flows ignore this state.
       //
@@ -1185,6 +1255,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       if (!_isCustomizing && routine.summary != null) {
         _summaryController.text = routine.summary!;
       }
+      _diasAlCargar = routine.days.length;
       _days = routine.days.map((day) {
         final editableDay = _EditableDay(
           dayNumber: day.dayNumber,
@@ -1249,6 +1320,29 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       }
       _hydrating = false;
       setState(() => _loading = false);
+      // Avisar apenas se ve la rutina, no recién al guardar.
+      //
+      // Éste es el "antes de invertir trabajo" del gate: si la rutina que
+      // acaba de abrir ya está fuera de la forma free, el alumno tiene que
+      // saberlo AHORA, no después de reacomodar ejercicios media hora. El
+      // chequeo de `_submit` es la red; esto es lo que hace que casi nunca
+      // haga falta.
+      //
+      // NO bloquea, a diferencia del gate del catálogo de más arriba, y la
+      // asimetría es el punto: acá el alumno SÍ puede resolverlo —recortando
+      // los días que sobran— y la herramienta para hacerlo es justamente el
+      // editor que se le está abriendo. Un estado terminal lo dejaría con una
+      // rutina que no puede ni tocar ni arreglar.
+      //
+      // Se llama al MISMO predicado que usa `_submit`, y no a una copia del
+      // umbral, para que el aviso de entrada y el freno de guardado no puedan
+      // discrepar. Si divergieran, el alumno vería la hoja al entrar y
+      // guardaría igual — o peor, no la vería y rebotaría al guardar, que es
+      // el agujero que esto cierra.
+      //
+      // El valor de retorno se descarta a propósito: acá no se decide nada,
+      // sólo se avisa.
+      _freePlanBlocksShape();
     } catch (_) {
       if (!mounted) return;
       _hydrating = false;
@@ -1408,7 +1502,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       if (key.currentContext == null) return;
       Scrollable.ensureVisible(
         key.currentContext!,
-        duration: AppMotion.slow,
+        duration: AppMotion.resolve(context, AppMotion.slow),
         curve: AppMotion.emphasized,
         alignment: 0.1,
       );
@@ -1532,15 +1626,140 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     final max = switch (limit) {
       FreePlanLimit.days => kFreeMaxRoutineDays,
       FreePlanLimit.weeks => kFreeMaxRoutineWeeks,
-      // El editor no gatea por plantilla paga: ese eje se decide ANTES, en el
-      // detalle de la plantilla — si el alumno llegó hasta acá con una copia,
-      // es porque tenía derecho a copiarla. `null` = este límite no aplica.
+      // El editor no gatea por catálogo: los DOS ejes de ese límite —seguir una
+      // plantilla paga, y personalizar cualquiera— se deciden ANTES, en el
+      // detalle de la plantilla. Si el alumno llegó hasta acá con una copia, es
+      // porque tenía derecho a copiarla. `null` = este límite no aplica.
       FreePlanLimit.premiumTemplate => null,
+      FreePlanLimit.customizeTemplate => null,
+      // El tope de rutinas no es un contador de la pantalla: se mide contra la
+      // lista guardada, así que lo resuelve `_freePlanBlocksNewRoutine` al
+      // guardar. Acá no aplica.
+      FreePlanLimit.routineCount => null,
+      // El historial de gráficos no se toca desde el editor: vive en las
+      // pantallas de Insights.
+      FreePlanLimit.chartHistory => null,
+      // Los dos de FORMA no entran acá y no es una omisión: este método mide
+      // una operación que el alumno ACABA de pedir (`next` = el total que
+      // quedaría), mientras que shapeDays/shapeWeeks describen el documento
+      // que YA está cargado. Los resuelve `_freePlanBlocksShape` contra el
+      // estado actual, no contra un delta.
+      FreePlanLimit.shapeDays => null,
+      FreePlanLimit.shapeWeeks => null,
     };
     if (max == null || next <= max) return false;
     if (!ref.read(athleteEntitlementProvider).gatesFreeLimits) return false;
     showFreePlanLimitSheet(context, limit: limit);
     return true;
+  }
+
+  /// `true` si el plan free frena la creación de UNA RUTINA MÁS — y en ese
+  /// caso ya abrió la hoja que lo explica.
+  ///
+  /// [actuales] es cuántas rutinas propias ACTIVAS tiene hoy. Archivadas no
+  /// cuentan, igual que en el tope estructural: `listUserCreated` filtra por
+  /// `status == 'active'`. Es el agujero conocido de este cap —documentado en
+  /// [kFreeMaxOwnRoutines]— y se mantiene igual a propósito, para no tener dos
+  /// semánticas de "cuántas tengo" conviviendo en la misma pantalla.
+  bool _freePlanBlocksNewRoutine(int actuales) {
+    if (!ref.read(athletePaywallEnabledProvider)) return false;
+    if (!_isAthleteOwnedMode) return false;
+    if (actuales < kFreeMaxOwnRoutines) return false;
+    if (!ref.read(athleteEntitlementProvider).gatesFreeLimits) return false;
+    showFreePlanLimitSheet(context, limit: FreePlanLimit.routineCount);
+    return true;
+  }
+
+  /// `true` si el plan free frena el GUARDADO porque la rutina que está en
+  /// pantalla YA excede la forma free — y en ese caso ya abrió la hoja que lo
+  /// explica y ofrece la salida.
+  ///
+  /// ## Por qué `_freePlanBlocks` no alcanzaba
+  ///
+  /// Aquél gatea DELTAS: se lo llama desde `_addDay` y `_addWeek` con el total
+  /// que quedaría, así que sólo ve rutinas que cruzan el tope mientras el
+  /// alumno mira. Una rutina que ya nació del otro lado del tope no pasa por
+  /// ningún "+", y por eso se colaba entera hasta `updateUserOwned`.
+  ///
+  /// Y no es un caso de borde: hoy `kAthletePaywallEnabled` está en `false` y
+  /// la CF escribe `athletePaywallEnforced: false` en todos lados, o sea que
+  /// **todas** las rutinas que existan el día del encendido se armaron sin
+  /// tope. A eso se suman las dos formas de perder el derecho con la rutina ya
+  /// guardada: que se termine el vínculo con el PF que pagaba por vos, y que
+  /// se te venza la suscripción. Las tres poblaciones caían en el mismo lugar
+  /// —el `catch` de `_submit`— y leían "No tenés permisos. Recargá la app.",
+  /// que además de no explicar nada manda a hacer algo que no arregla nada.
+  ///
+  /// ## Por qué frena acá y no en la entrada del editor
+  ///
+  /// Deliberado, y es la diferencia con el gate del catálogo de
+  /// `_loadExistingRoutine`. Allá el alumno no puede hacer NADA para destrabar
+  /// la plantilla del sistema, así que entrar sólo le hace perder tiempo. Acá
+  /// la salida está adentro: `firestore.rules` mide el documento RESULTANTE
+  /// (`withinFreeRoutineShape`), así que sacar los días que sobran guarda
+  /// bien. Bloquear la entrada le sacaría la única herramienta que tiene para
+  /// arreglarlo, y lo dejaría con una rutina que no puede ni tocar.
+  ///
+  /// Lo que sí se le debe es avisarle ANTES de invertir trabajo, y por eso
+  /// `_loadExistingRoutine` llama a este mismo método apenas termina de
+  /// hidratar: ahí el retorno se descarta —no frena nada— y sólo queda la
+  /// hoja abierta sobre un editor que el alumno ya puede usar para recortar.
+  ///
+  /// El orden de las guardas replica el de `_freePlanBlocks`: el entitlement
+  /// —lo único que toca Firestore— se lee último.
+  bool _freePlanBlocksShape() {
+    if (!ref.read(athletePaywallEnabledProvider)) return false;
+    if (!_isAthleteOwnedMode) return false;
+    final excedeDias = _days.length > kFreeMaxRoutineDays;
+    final excedeSemanas = _numWeeks > kFreeMaxRoutineWeeks;
+    if (!excedeDias && !excedeSemanas) return false;
+    // Espejo de `noCreceLaForma` de `firestore.rules`: una rutina que quedó
+    // por encima del tope se puede seguir tocando mientras no CREZCA.
+    //
+    // Sin esto el cliente sería MÁS estricto que el servidor, y le mostraría
+    // un candado al alumno por algo que el servidor le permite — que es el
+    // peor lado del error, porque no hay forma de descubrir que estaba
+    // permitido.
+    if (_noCreceRespectoDeLoCargado()) return false;
+    if (!ref.read(athleteEntitlementProvider).gatesFreeLimits) return false;
+    // Los días primero cuando fallan los dos: es el eje que el alumno puede
+    // arreglar sin resignar nada del programa, y el cuerpo de esa hoja es el
+    // único que le pide una acción concreta. Si además le sobran semanas, el
+    // segundo intento de guardar se lo dice.
+    showFreePlanLimitSheet(
+      context,
+      limit: excedeDias ? FreePlanLimit.shapeDays : FreePlanLimit.shapeWeeks,
+      actual: excedeDias ? _days.length : _numWeeks,
+    );
+    return true;
+  }
+
+  /// `true` si esto es la EDICIÓN de una rutina que ya existía y no la agranda.
+  ///
+  /// ─── Por qué no alcanza con `_isAthleteOwnedMode` ─────────────────────────
+  ///
+  /// Porque ese getter cubre tres operaciones y sólo una es un UPDATE:
+  ///
+  ///   • `SelfCreating(existingRoutineId: null)` — crea un doc nuevo.
+  ///   • `SelfCreating(existingRoutineId: 'x')`  — **edita uno que existe**.
+  ///   • `SelfCustomizing`                       — copia: escribe un doc NUEVO.
+  ///
+  /// La excepción es del UPDATE y de nadie más. En el servidor eso sale gratis
+  /// —el CREATE no tiene `resource.data` contra qué comparar— pero acá hay que
+  /// distinguirlo a mano, y equivocarse tiene un costo concreto: el alumno
+  /// copiaría una plantilla paga de 8 semanas creyendo que puede, y se comería
+  /// un `permission-denied` crudo al guardar. Es exactamente el rebote que
+  /// este guard existe para que no llegue nunca.
+  bool _noCreceRespectoDeLoCargado() {
+    final mode = widget.mode;
+    if (mode is! SelfCreating || mode.existingRoutineId == null) return false;
+    final dias = _diasAlCargar;
+    final semanas = _semanasAlCargar;
+    // Sin los originales no se puede afirmar que no creció, y ante la duda se
+    // gatea: el servidor va a rebotar igual, y un rebote anticipado con su
+    // explicación es mejor que un `permission-denied` crudo.
+    if (dias == null || semanas == null) return false;
+    return _days.length <= dias && _numWeeks <= semanas;
   }
 
   /// Dimensión `source` de los eventos de forma de rutina (`routine_created`,
@@ -2024,18 +2243,19 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   /// Passes [alreadySelectedIds] so the picker pre-marks exercises already in
   /// the day — the user avoids accidental re-adds. (ADR-RER-01)
   Future<void> _pickExercisesForDay(BuildContext context, int dayIndex) async {
-    final existingIds = _days[dayIndex]
-        .slots
-        .where((s) => s.exercise != null)
-        .map((s) => s.exercise!.id)
-        .toSet();
     // Ver la nota de `_addSupersetForDay`: el picker pre-marca lo que el día
-    // ya tiene, así el usuario no elige un repetido sin darse cuenta.
+    // ya tiene, así el usuario no elige un repetido sin darse cuenta. Pero
+    // pre-marca lo que ya tiene EN ESTA SEMANA, no en el día entero, y esa
+    // diferencia es el bug que esto cierra: un slot sacado «solo de esta
+    // semana» seguía en `slots`, no se dibujaba (`_slotsVisibles` lo filtra) y
+    // encima el picker lo daba por puesto. El ejercicio quedaba INALCANZABLE
+    // desde la semana de la que lo habían sacado.
+    final presentes = _idsPresentesEnLaSemana(dayIndex);
     final picked = await showExercisePicker(context,
-        alreadySelectedIds: _resolublesPorElPicker(existingIds));
+        alreadySelectedIds: _resolublesPorElPicker(presentes));
     if (picked == null || picked.isEmpty || !mounted) return;
 
-    final nuevos = picked.where((e) => !existingIds.contains(e.id)).toList();
+    final nuevos = picked.where((e) => !presentes.contains(e.id)).toList();
     if (nuevos.isEmpty) {
       // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2045,15 +2265,46 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       return;
     }
 
+    // Lo elegido se parte en dos: lo que NACE acá y lo que VUELVE. Un
+    // ejercicio que el día ya tiene oculto en esta semana no puede dar de alta
+    // otro slot —un ejercicio por día es invariante del dominio
+    // (QA-WKT-004)—, así que se le prende la semana en la máscara. De paso
+    // vuelve con sus series, su descanso y sus notas.
+    final porId = {
+      for (final s in _days[dayIndex].slots)
+        if (s.exercise != null) s.exercise!.id: s,
+    };
+    final vuelven = [
+      for (final e in nuevos)
+        if (porId.containsKey(e.id)) e
+    ];
+    final aCrear = [
+      for (final e in nuevos)
+        if (!porId.containsKey(e.id)) e
+    ];
+
     // Determine presence scope for the new slots (ADR-WPRES-04).
     // Prompt only when multi-week AND viewing week ≥ 2 (index ≥ 1).
-    // ignore: use_build_context_synchronously
-    final scope = await _promptAddScope(context);
-    if (scope == null || !mounted) return;
+    //
+    // Sólo para los que NACEN: preguntarlo cuando todo lo elegido es un
+    // regreso sería ofrecer una decisión que después no se respeta. Un regreso
+    // devuelve el ejercicio a la semana que se está mirando y a ninguna otra
+    // —es lo único que se pidió al agregarlo acá— y nunca lo saca de las
+    // semanas donde ya estaba.
+    var scope = _AddScope.thisWeek;
+    if (aCrear.isNotEmpty) {
+      // ignore: use_build_context_synchronously
+      final elegido = await _promptAddScope(context);
+      if (elegido == null || !mounted) return;
+      scope = elegido;
+    }
 
     _markDirty();
     setState(() {
-      for (final ex in nuevos) {
+      for (final e in vuelven) {
+        _prenderSemana(porId[e.id]!, _selectedWeek);
+      }
+      for (final ex in aCrear) {
         final slot = _EditableSlot()
           ..expandido = false
           ..exercise = ex
@@ -2064,6 +2315,27 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         _days[dayIndex].slots = [..._days[dayIndex].slots, slot];
       }
     });
+  }
+
+  /// Ejercicios que el día [dayIndex] YA muestra en la semana en curso.
+  ///
+  /// Scopeado por presencia a propósito: es la contracara exacta de
+  /// `_slotsVisibles`. Lo que no se ve, se puede volver a agregar.
+  Set<String> _idsPresentesEnLaSemana(int dayIndex) => _days[dayIndex]
+      .slots
+      .where((s) => s.exercise != null && s.isPresentInWeek(_selectedWeek))
+      .map((s) => s.exercise!.id)
+      .toSet();
+
+  /// Prende [week] en la máscara de [slot].
+  ///
+  /// Canonicaliza a máscara VACÍA cuando pasa a cubrir todas las semanas:
+  /// `[0, 1]` en un plan de dos semanas tiene que guardarse indistinguible de
+  /// "sin máscara", que es la forma canónica de "en todas" ([isPresentInWeek]).
+  void _prenderSemana(_EditableSlot slot, int week) {
+    if (slot.isPresentInWeek(week)) return;
+    final mask = Set<int>.from(slot.activeWeeks)..add(week);
+    slot.activeWeeks = mask.length == _numWeeks ? <int>{} : mask;
   }
 
   /// El catálogo que el usuario puede ver: el del sistema más sus ejercicios
@@ -2099,14 +2371,14 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   /// están en el día — un ejercicio por día es invariante del dominio
   /// (QA-WKT-004), y ofrecerlo para que el tap no haga nada es peor que no
   /// ofrecerlo.
+  ///
+  /// "Ya están" es POR SEMANA, no por día: uno sacado «solo de esta semana»
+  /// tiene que volver a aparecer acá, o el atajo se convierte en la tercera
+  /// puerta cerrada —lista, picker y entrada rápida— sobre el mismo ejercicio.
   List<QuickEntryResult> _buscarParaEntradaRapida(String query, int dayIndex) {
     final texto = query.trim();
     if (texto.isEmpty) return const [];
-    final yaEstan = _days[dayIndex]
-        .slots
-        .where((s) => s.exercise != null)
-        .map((s) => s.exercise!.id)
-        .toSet();
+    final yaEstan = _idsPresentesEnLaSemana(dayIndex);
     // Catálogo del sistema MÁS los ejercicios propios. Buscar "sentadilla" y
     // no encontrar la variante que uno mismo cargó es peor que no tener el
     // atajo: el picker sí los muestra, y dos búsquedas que difieren en la
@@ -2166,11 +2438,42 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     final ex = catalogo.where((e) => e.id == exerciseId).firstOrNull;
     if (ex == null) return;
 
-    final scope = await _promptAddScope(context);
-    if (scope == null || !mounted) return;
+    // ¿Nace o vuelve? La búsqueda ofrece lo que no está PRESENTE en esta
+    // semana, así que lo elegido puede ser un slot que el día ya tiene y que
+    // está oculto acá.
+    final yaEnElDia =
+        _days[dayIndex].slots.indexWhere((s) => s.exercise?.id == ex.id);
+
+    // El scope sólo se pregunta para los que NACEN: un regreso vuelve a la
+    // semana que se está mirando y a ninguna otra, así que ofrecer «todas las
+    // semanas» sería ofrecer una decisión que después no se respeta.
+    var scope = _AddScope.thisWeek;
+    if (yaEnElDia < 0) {
+      final elegido = await _promptAddScope(context);
+      if (elegido == null || !mounted) return;
+      scope = elegido;
+    }
 
     _markDirty();
     setState(() {
+      if (yaEnElDia >= 0) {
+        // Vuelve prendiendo su máscara —un ejercicio por día es invariante
+        // (QA-WKT-004), no puede entrar un segundo slot— y la prescripción
+        // recién tipeada se aplica a ESTA semana: es lo que se pidió al
+        // escribirla, y las otras semanas quedan como estaban.
+        final existente = _days[dayIndex].slots[yaEnElDia];
+        _prenderSemana(existente, _selectedWeek);
+        existente.exerciseMode =
+            entry.esDuracion ? ExerciseMode.duration : ExerciseMode.reps;
+        existente.weeklySets[_selectedWeek] = List.generate(
+          entry.sets,
+          (i) => _EditableSet()
+            ..reps = entry.repsDeSet(i)
+            ..weightKg = entry.pesoDeSet(i)
+            ..durationSeconds = entry.duracionDeSet(i),
+        );
+        return;
+      }
       final slot = _EditableSlot()
         ..expandido = false
         ..exercise = ex
@@ -2214,6 +2517,12 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     // (ADR-RER-01). El parámetro existía y ninguna de las tres llamadas del
     // editor lo pasaba: el usuario elegía un ejercicio repetido sin saberlo,
     // el editor lo filtraba, y no pasaba nada.
+    //
+    // Acá `existingIds` va CRUDO —el día entero, no la semana— a diferencia de
+    // `_pickExercisesForDay`. No es un olvido: armar una superserie nueva con
+    // un slot que ya existe oculto exigiría MOVERLO para dejarlo contiguo al
+    // grupo, que es otra operación. El camino de vuelta de ese ejercicio es
+    // «Agregar ejercicio» suelto, que sí lo devuelve con todo lo suyo.
     final picked = await showExercisePicker(context,
         alreadySelectedIds: _resolublesPorElPicker(existingIds));
     if (picked == null || picked.isEmpty || !mounted) return;
@@ -2422,7 +2731,8 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         .where((s) => s.exercise != null)
         .map((s) => s.exercise!.id)
         .toSet();
-    // Ver la nota de `_addSupersetForDay`.
+    // Ver la nota de `_addSupersetForDay`, incluido por qué `existingIds` va
+    // crudo y no scopeado por semana.
     final l10n = AppL10n.of(context);
     final messenger = ScaffoldMessenger.of(context);
     final picked = await showExercisePicker(context,
@@ -2525,7 +2835,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
             if (key.currentContext != null) {
               Scrollable.ensureVisible(
                 key.currentContext!,
-                duration: AppMotion.slow,
+                duration: AppMotion.resolve(context, AppMotion.slow),
                 curve: AppMotion.emphasized,
                 alignment: 0.1,
               );
@@ -2535,6 +2845,22 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       }
       return;
     }
+
+    // El tope de FORMA del plan free, antes de tocar la red.
+    //
+    // Va después de la validación y antes de cualquier escritura, y las dos
+    // cosas importan. Después, porque una rutina inválida tiene un problema
+    // más urgente que el paywall y su mensaje es más específico. Antes,
+    // porque `firestore.rules` va a rebotar esta escritura igual: anticiparla
+    // le ahorra al alumno el round-trip y —lo que de verdad importa— cambia
+    // "No tenés permisos. Recargá la app." por una hoja que le dice cuántos
+    // días le sobran y que entrenarla completa no tiene tope.
+    //
+    // El `catch` de abajo SIGUE traduciendo `permission-denied`, y tiene que
+    // seguir: este chequeo es UX y puede quedar corto (un doc con una forma
+    // que el editor no modela, un tope que cambió en el servidor y todavía no
+    // en el cliente). La ley es la regla; esto es la cortesía de avisar antes.
+    if (_freePlanBlocksShape()) return;
 
     // A successful save persists the work, so the editor is no longer "dirty":
     // clear the flag up front so the post-save context.pop()/context.go() in the
@@ -2678,9 +3004,25 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
         // construction, not by a field-stripping step someone can forget.
         case SelfCreating(existingRoutineId: null) || SelfCustomizing():
           // Client-side cap check (ADR-USR-02).
+          //
+          // Son DOS topes con significados distintos, y por eso avisan
+          // distinto: el del plan free se puede levantar pagando y abre la
+          // hoja; el estructural es el techo del producto y muestra el aviso
+          // de siempre. Mostrar la hoja de plan pago a alguien que ya paga y
+          // llegó a las 10 sería venderle algo que ya tiene.
+          //
+          // Va al GUARDAR y no al tocar "+", al revés que los topes de días y
+          // semanas: la cuenta sólo se conoce contra la lista existente, no
+          // contra lo que hay en pantalla.
           final userRoutines =
               ref.read(userCreatedRoutinesProvider(uid)).valueOrNull ?? [];
-          if (userRoutines.length >= 10) {
+          if (_freePlanBlocksNewRoutine(userRoutines.length)) {
+            if (!mounted) return;
+            _isDirty = true;
+            setState(() => _submitting = false);
+            return;
+          }
+          if (userRoutines.length >= kMaxOwnRoutines) {
             if (!mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(l10n.workoutSelfEditorCapReached)),
@@ -2969,7 +3311,23 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     // este watch, cada read lo crea en frío, el stream todavía no emitió,
     // devuelve `unknown` — y el gate no muerde NUNCA. Con el watch queda vivo
     // mientras el editor está montado y el read ve el valor real.
-    if (_isAthleteOwnedMode) ref.watch(athleteEntitlementProvider);
+    if (_isAthleteOwnedMode) {
+      ref.watch(athleteEntitlementProvider);
+      // Y el cupo de rutinas, por el MISMO motivo — pero acá el síntoma ya
+      // existía antes de este cambio. `_submit` lee
+      // `userCreatedRoutinesProvider` con un `read`, y es autoDispose: sin
+      // nadie mirándolo, el read lo crea en frío, el stream todavía no emitió,
+      // `valueOrNull` da null y el `?? []` lo vuelve CERO rutinas. El cap no
+      // muerde.
+      //
+      // Venía zafando de casualidad: al editor se llega desde MIS RUTINAS, que
+      // lo tiene vivo. Por cualquier otro camino —deep link, la CTA del home—
+      // el tope de 10 nunca se aplicaba. Ahora que además decide un límite de
+      // plan, depender de qué pantalla quedó montada abajo no alcanza.
+      if (uidCatalogo.isNotEmpty) {
+        ref.watch(userCreatedRoutinesProvider(uidCatalogo));
+      }
+    }
 
     // Loading state: hydrating from Firestore.
     if (_loading) {
@@ -2982,9 +3340,20 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     }
 
     // Not-found state: routine was deleted before the user opened it.
-    if (_loadNotFound) {
+    // Estado terminal: la rutina no está, o el plan free no deja copiarla.
+    //
+    // Los dos comparten el shell porque comparten la propiedad que importa: el
+    // formulario NO se dibuja. Un editor vacío detrás de una hoja —con nombre,
+    // días y botón de guardar— es peor que no dejar entrar, porque invita a
+    // trabajar sobre algo que no se va a poder guardar.
+    //
+    // Y es un estado ESTÁTICO, no el shell de carga. Dejar `_loading` en alto
+    // parecía más simple, pero el esqueleto tiene shimmer: la pantalla se queda
+    // animando para siempre y `pumpAndSettle` de los tests no asienta nunca. Un
+    // cuelgue en un test suele ser un cuelgue en la UI.
+    if (_loadNotFound || _paywallBlocked) {
       return _shell(
-        bodyKey: const ValueKey('notfound'),
+        bodyKey: ValueKey(_paywallBlocked ? 'paywall-blocked' : 'notfound'),
         body: SafeArea(
           child: Column(
             children: [
@@ -3005,7 +3374,12 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
               Expanded(
                 child: Center(
                   child: Text(
-                    l10n.workoutSelfEditorNotFound,
+                    _paywallBlocked
+                        ? l10n.paywallFreePlanLimitCustomizeTemplateBody(
+                            kFreeMaxRoutineDays,
+                          )
+                        : l10n.workoutSelfEditorNotFound,
+                    textAlign: TextAlign.center,
                     style: TextStyle(color: palette.textMuted),
                   ),
                 ),
@@ -3721,6 +4095,7 @@ class _DayExpansionTile extends StatefulWidget {
   final void Function(int absIndex)? onMergeSlotWithPrevious;
   final void Function(int absIndex)? onMergeSlotWithNext;
   final void Function(int absIndex, int groupId) onMergeSlotIntoGroup;
+
   /// Saca un miembro del grupo. `arriba` dice de qué lado aterriza el que
   /// sale: lo usa el drag, que sí tiene dirección. El ⋮ no la tiene y usa
   /// el default.
@@ -3740,7 +4115,6 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
   final Map<_EditableSlot, GlobalKey> _supersetHitTestKeys = {};
   int? _draggedStandaloneAbsIndex;
   int? _highlightedSupersetGroup;
-
 
   /// Cuánto tiene que salirse el dedo del bloque para que soltar signifique
   /// SACAR al miembro del grupo, en dp.
@@ -3839,7 +4213,10 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
     final p = scrollable.position;
     final destino = (p.pixels + factor * _kVelocidadAutoScroll)
         .clamp(p.minScrollExtent, p.maxScrollExtent);
-    if (destino == p.pixels) return; // tope: nada que hacer, pero el gesto sigue
+    // Tope: nada que hacer, pero el gesto sigue.
+    if (destino == p.pixels) {
+      return;
+    }
     p.jumpTo(destino);
     // La lista se movió debajo de un dedo quieto: los rects de los bloques
     // cambiaron y el resaltado hay que recalcularlo con la posición vieja.
@@ -3850,7 +4227,6 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
     _autoScroll?.cancel();
     _autoScroll = null;
   }
-
 
   /// Si el panel de entrada rápida está abierto. Presentación local pura: no
   /// sobrevive a cerrar el día ni viaja al modelo.
@@ -4232,7 +4608,8 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
       return true;
     }
     if (separacion != null) {
-      widget.onUngroupSlot?.call(separacion.absIndex, arriba: separacion.arriba);
+      widget.onUngroupSlot
+          ?.call(separacion.absIndex, arriba: separacion.arriba);
       return true;
     }
     return false;
@@ -4461,8 +4838,8 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
                         isDense: true,
                         contentPadding: EdgeInsets.zero,
                         border: InputBorder.none,
-                        hintText: l10n
-                            .routineEditorDayName(widget.day.dayNumber),
+                        hintText:
+                            l10n.routineEditorDayName(widget.day.dayNumber),
                         hintStyle: GoogleFonts.barlowCondensed(
                           fontWeight: FontWeight.w600,
                           fontSize: 15,
@@ -4472,8 +4849,7 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
                     ),
                   ),
                   IconButton(
-                    key: Key(
-                        'day_name_commit_button_${widget.day.dayNumber}'),
+                    key: Key('day_name_commit_button_${widget.day.dayNumber}'),
                     icon: Icon(TreinoIcon.check,
                         size: 18, color: palette.accentText),
                     tooltip: l10n.routineEditorEditDayNameA11y,
@@ -4488,8 +4864,7 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
           else
             Row(
               children: [
-                if (widget.onQuickSearch != null &&
-                    widget.onQuickAdd != null)
+                if (widget.onQuickSearch != null && widget.onQuickAdd != null)
                   QuickEntryToggle(
                     active: _quickEntryOpen,
                     onTap: () => setState(() {
@@ -4502,10 +4877,9 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
                   ),
                 const Spacer(),
                 IconButton(
-                  key:
-                      Key('day_name_edit_button_${widget.day.dayNumber}'),
-                  icon: Icon(TreinoIcon.edit,
-                      size: 16, color: palette.textMuted),
+                  key: Key('day_name_edit_button_${widget.day.dayNumber}'),
+                  icon:
+                      Icon(TreinoIcon.edit, size: 16, color: palette.textMuted),
                   tooltip: l10n.routineEditorEditDayNameA11y,
                   onPressed: _startEditing,
                   constraints:
@@ -4525,8 +4899,7 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
                   ),
               ],
             ),
-          if (widget.onQuickSearch != null &&
-              widget.onQuickAdd != null) ...[
+          if (widget.onQuickSearch != null && widget.onQuickAdd != null) ...[
             if (_quickEntryOpen) ...[
               const SizedBox(height: AppSpacing.s8),
               ValueListenableBuilder<TextEditingValue>(
@@ -4581,17 +4954,15 @@ class _DayExpansionTileState extends State<_DayExpansionTile> {
                           .split(RegExp(r'\s+'))
                           .where((p) => p.isNotEmpty)
                           .toList();
-                      final resto =
-                          value.text.split(RegExp(r'\s+')).where((p) {
+                      final resto = value.text.split(RegExp(r'\s+')).where((p) {
                         if (p.isEmpty) return false;
                         final i = pendientes.indexOf(p.toLowerCase());
                         if (i < 0) return true;
                         pendientes.removeAt(i);
                         return false;
                       }).join(' ');
-                      final texto = resto.isEmpty
-                          ? '${r.name} '
-                          : '${r.name} $resto';
+                      final texto =
+                          resto.isEmpty ? '${r.name} ' : '${r.name} $resto';
                       _quickEntryCtrl.value = TextEditingValue(
                         text: texto,
                         // Cursor AL FINAL, listo para seguir. Sin esto
@@ -5280,7 +5651,6 @@ class _SlotEditorState extends State<_SlotEditor> {
         unidadDePeso: l10n.monthlyReportVolumeUnit,
       );
 
-
   String _restSummary(int seconds) {
     final display = secondsToMmss(seconds);
     return display.startsWith('0') ? display.substring(1) : display;
@@ -5440,6 +5810,12 @@ class _SetTableState extends State<_SetTable> {
 
     messenger.showSnackBar(
       SnackBar(
+        // `persist: false` A MANO. `SnackBar` hace
+        // `persist = persist ?? action != null`: con acción es eterno por
+        // default, así que este cartel se quedaba hasta recargar. Es el
+        // gemelo del que el PF reportó en el editor web.
+        persist: false,
+        duration: const Duration(seconds: 6),
         content: Text(l10n.routineEditorFillKgApplied),
         action: SnackBarAction(
           key: const Key('fill_kg_undo_action'),

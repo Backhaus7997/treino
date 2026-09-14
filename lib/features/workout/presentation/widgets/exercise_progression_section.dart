@@ -32,6 +32,8 @@ class ChartPeriodLabels {
     required this.last30dLabel,
     required this.thisWeekLabel,
     required this.monthLabel,
+    required this.last3mLabel,
+    required this.last1yLabel,
   });
 
   /// E.g. 'Últimos 30 días' — [ChartPeriod.last30d] (default).
@@ -43,6 +45,12 @@ class ChartPeriodLabels {
   /// E.g. 'Este mes' — [ChartPeriod.month].
   final String monthLabel;
 
+  /// E.g. '3 meses' — [ChartPeriod.last3m].
+  final String last3mLabel;
+
+  /// E.g. '1 año' — [ChartPeriod.last1y].
+  final String last1yLabel;
+
   String labelFor(ChartPeriod period) {
     switch (period) {
       case ChartPeriod.last30d:
@@ -51,6 +59,10 @@ class ChartPeriodLabels {
         return thisWeekLabel;
       case ChartPeriod.month:
         return monthLabel;
+      case ChartPeriod.last3m:
+        return last3mLabel;
+      case ChartPeriod.last1y:
+        return last1yLabel;
     }
   }
 }
@@ -157,7 +169,16 @@ class ExerciseProgressionSection extends ConsumerStatefulWidget {
     required this.labels,
     this.externalExerciseSelection,
     this.initialExerciseId,
+    this.lockedPeriods = const {},
+    this.onLockedPeriodTap,
   });
+
+  /// Se reenvian tal cual a [ChartPeriodSelector] — ver su dartdoc. Van acá y
+  /// no se resuelven adentro porque esta seccion la comparten las pantallas
+  /// del alumno y las del PF, y el paywall del alumno no puede recortarle al
+  /// entrenador lo que ve de el.
+  final Set<ChartPeriod> lockedPeriods;
+  final void Function(ChartPeriod)? onLockedPeriodTap;
 
   /// Preselecciona un ejercicio al montar — p. ej. cuando se llega desde
   /// "Ejercicios frecuentes" tocando una fila. Null → default: el más
@@ -393,6 +414,8 @@ class _ExerciseProgressionSectionState
                     selected: _selectedPeriod,
                     labels: labels.periodLabels,
                     onSelect: (p) => setState(() => _selectedPeriod = p),
+                    lockedPeriods: widget.lockedPeriods,
+                    onLockedTap: widget.onLockedPeriodTap,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -478,11 +501,27 @@ class ChartPeriodSelector extends StatelessWidget {
     required this.selected,
     required this.labels,
     required this.onSelect,
+    this.lockedPeriods = const {},
+    this.onLockedTap,
   });
 
   final ChartPeriod selected;
   final ChartPeriodLabels labels;
   final void Function(ChartPeriod) onSelect;
+
+  /// Períodos que este viewer NO puede elegir. Se dibujan con candado y
+  /// atenuados, pero **se dibujan**: esconderlos dejaría al alumno sin saber
+  /// que existen, y acá el punto es justamente mostrar qué da pagar.
+  ///
+  /// Lo decide el CALL SITE y no este widget, que es compartido con las
+  /// pantallas del PF — el entrenador ve el historial completo de su alumno
+  /// siempre, y meter el paywall acá adentro se lo recortaría a él también.
+  /// Default vacío: nada bloqueado, que es el comportamiento de antes.
+  final Set<ChartPeriod> lockedPeriods;
+
+  /// Qué hacer cuando tocan un período bloqueado. Si es `null`, el tap sobre
+  /// uno bloqueado simplemente no hace nada.
+  final void Function(ChartPeriod)? onLockedTap;
 
   @override
   Widget build(BuildContext context) {
@@ -490,27 +529,43 @@ class ChartPeriodSelector extends StatelessWidget {
 
     return PopupMenuButton<ChartPeriod>(
       initialValue: selected,
-      onSelected: onSelect,
+      // El bloqueado NO pasa por `onSelect`: si pasara, el período quedaría
+      // seleccionado y el gráfico mostraría el año igual. Se desvía antes.
+      onSelected: (p) =>
+          lockedPeriods.contains(p) ? onLockedTap?.call(p) : onSelect(p),
       color: palette.bgCard,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadius.sm),
         side: BorderSide(color: palette.border),
       ),
-      itemBuilder: (context) => ChartPeriod.values
-          .map(
-            (p) => PopupMenuItem<ChartPeriod>(
-              value: p,
-              child: Text(
+      itemBuilder: (context) => ChartPeriod.values.map((p) {
+        final locked = lockedPeriods.contains(p);
+        return PopupMenuItem<ChartPeriod>(
+          // `enabled` queda en true a propósito aunque esté bloqueado: un item
+          // deshabilitado no emite `onSelected`, y entonces el tap no abriría
+          // la hoja que explica por qué. Un candado que no dice nada al
+          // tocarlo es peor que no tener candado.
+          value: p,
+          child: Row(
+            children: [
+              if (locked) ...[
+                Icon(TreinoIcon.lock, size: 12, color: palette.textMuted),
+                const SizedBox(width: AppSpacing.s8),
+              ],
+              Text(
                 labels.labelFor(p),
                 style: GoogleFonts.barlow(
                   fontSize: 13,
                   fontWeight: p == selected ? FontWeight.w700 : FontWeight.w400,
-                  color: p == selected ? palette.accent : palette.textPrimary,
+                  color: locked
+                      ? palette.textMuted
+                      : (p == selected ? palette.accent : palette.textPrimary),
                 ),
               ),
-            ),
-          )
-          .toList(),
+            ],
+          ),
+        );
+      }).toList(),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(

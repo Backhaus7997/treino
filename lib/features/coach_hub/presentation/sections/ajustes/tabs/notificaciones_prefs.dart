@@ -6,26 +6,42 @@ import 'package:treino/features/profile/application/user_providers.dart';
 ///
 /// ESTADO REAL DE CADA CANAL (mantener sincronizado con `functions/`):
 ///
-/// - `push`   — implementado (FCM). Las CFs mandan SIEMPRE, sin leer estas
-///              preferencias todavía. Ese es el follow-up pendiente del canal.
+/// - `push`   — implementado (FCM). `send-fcm.ts` lee
+///              `notificationPrefs[fila].push`; sólo `false` explícito frena
+///              el envío y una preferencia ausente manda. Las cinco filas de
+///              [kPushBackedTypes] están cableadas desde sus productores.
 /// - `email`  — implementado para los dos tipos que el outbox transaccional
 ///              cubre hoy: `nueva_solicitud` y `sesion_cancelada`. Esos dos SÍ
 ///              respetan el toggle: `enqueueMail` recibe el `prefKey` y
 ///              `sendQueuedMail` descarta el envío si el canal está apagado.
 ///              El resto de las filas no tienen envío por email.
-/// - `whatsapp` — sin implementar. Queda como placeholder de roadmap y arranca
-///              apagado en todas las filas, así no promete nada.
+/// WHATSAPP YA NO ES UNA COLUMNA. Existió desde W3.2 como placeholder de
+/// roadmap: cinco casillas tildeables, indistinguibles de las dos que sí
+/// entregan, detrás de las cuales no había ningún canal. Una casilla que se
+/// tilda y no hace nada es un botón roto, y el pie de la pantalla admitiendo
+/// "se activa próximamente" no arregla lo que el usuario toca.
+///
+/// ⚠️ QUEDA DATO MUERTO EN FIRESTORE, y quien implemente el canal tiene que
+/// saberlo. Los documentos escritos entre W3.2 y hoy pueden llevar
+/// `notificationPrefs.<fila>.whatsapp: true`. Ese valor NO se limpia solo:
+/// `UserRepository.update` escribe con `SetOptions(merge: true)`, que mergea
+/// en profundidad, así que al sacar el campo del modelo nada vuelve a pisarlo.
+///
+/// Ese `true` NO ES UN OPT-IN. Nadie eligió recibir WhatsApp: eligieron tildar
+/// una casilla que no entregaba nada. Tratarlo como consentimiento el día que
+/// el canal exista sería mandarle mensajes a gente que nunca los pidió — y por
+/// WhatsApp, que es el canal más invasivo de los tres. Al reimplementar:
+/// arrancar de cero, no leer lo persistido.
 ///
 /// Las preferencias se persisten en `users/{uid}.notificationPrefs`, un campo
 /// libremente escribible por el dueño del doc (`firestore.rules`, regla update
 /// de `users`: solo pinea uid/role/email/createdAt/subscription/weightedLoad).
-enum NotifChannel { email, push, whatsapp }
+enum NotifChannel { email, push }
 
 extension NotifChannelX on NotifChannel {
   String get label => switch (this) {
         NotifChannel.email => 'EMAIL', // i18n: Fase W3
         NotifChannel.push => 'PUSH', // i18n: Fase W3
-        NotifChannel.whatsapp => 'WHATSAPP', // i18n: Fase W3
       };
 }
 
@@ -53,6 +69,13 @@ class NotifType {
 /// Trazabilidad fila → Cloud Function (`functions/src/`):
 ///   nueva_solicitud    → notifications/notify-link-change.ts, rama `pending`
 ///   vinculo_finalizado → notifications/notify-link-change.ts, rama `terminated`
+///                        — pero YA NO las cuatro causas. Desde que esa rama se
+///                        parte por `terminationReason`, al PF le llega el fin
+///                        de un vínculo real y la cancelación del alumno; su
+///                        PROPIO rechazo (`declined`) ya no, porque avisarle de
+///                        lo que acaba de hacer era ruido. La fila sigue siendo
+///                        honesta: "Vínculo finalizado" es exactamente lo que
+///                        queda debajo.
 ///   resena_nueva       → notifications/notify-review.ts
 ///   sesion_cancelada   → notifications/notify-appointment.ts, rama `cancelled`
 ///   mensaje_nuevo      → notifications/notify-chat-message.ts
@@ -71,10 +94,22 @@ const kNotifTypes = <NotifType>[
 /// sumá la clave acá también.
 const kEmailBackedTypes = <String>{'nueva_solicitud', 'sesion_cancelada'};
 
+/// Filas cuyo canal `push` está cableado a `sendFcm`.
+///
+/// Este conjunto tiene que coincidir con los `prefKey` que pasan los
+/// productores en `functions/src/notifications/`.
+const kPushBackedTypes = <String>{
+  'nueva_solicitud',
+  'vinculo_finalizado',
+  'resena_nueva',
+  'sesion_cancelada',
+  'mensaje_nuevo',
+};
+
 /// Preferencias de notificación: matriz `tipo -> canal -> bool`.
 ///
 /// Inmutable; `toggle` devuelve una copia. `fromFirestore` completa los huecos
-/// con los defaults para que la UI siempre tenga las 5 filas × 3 canales.
+/// con los defaults para que la UI siempre tenga las 5 filas × 2 canales.
 class NotifPrefs {
   const NotifPrefs(this._matrix);
 
@@ -101,6 +136,24 @@ class NotifPrefs {
           },
       };
 
+  /// Un canal de [kUnimplementedChannels] se lee SIEMPRE como `false`, ignore
+  /// lo que haya guardado.
+  ///
+  /// La columna de WhatsApp se pudo tildar desde W3.2, así que hay documentos
+  /// con `whatsapp: true`. Deshabilitar la casilla arregla lo que se VE, y
+  /// nada más: [toFirestore] serializa desde la matriz, no desde lo que la UI
+  /// muestra, así que ese `true` sobrevivía a cada guardado. El PF apagaba
+  /// Email en una fila y sin querer volvía a firmar el opt-in de un canal que
+  /// la pantalla le mostraba apagado — y el día que WhatsApp entregue, recibe
+  /// mensajes que creía haber apagado. La UI decía una cosa y el dato otra.
+  ///
+  /// Va en la LECTURA y no en [toFirestore] a propósito: desde acá quedan
+  /// consistentes de una sola vez el render, [toggle] y el guardado, y el
+  /// primer save del PF limpia el valor viejo en vez de arrastrarlo.
+  /// Una clave `whatsapp` guardada se ignora sola: el `for` recorre
+  /// [NotifChannel.values], que ya no la incluye. No hace falta filtrarla — y
+  /// tampoco se puede limpiar desde acá, ver el ⚠️ del docstring de
+  /// [NotifChannel].
   factory NotifPrefs.fromFirestore(Map<String, dynamic>? raw) {
     return NotifPrefs({
       for (final t in kNotifTypes)
@@ -112,8 +165,7 @@ class NotifPrefs {
     });
   }
 
-  /// Defaults: push siempre on; email on SOLO donde hay envío real; whatsapp
-  /// off en todo (sin canal implementado).
+  /// Defaults: push siempre on; email on SOLO donde hay envío real.
   ///
   /// El default anterior dejaba `mensaje_nuevo` con email en ON. Eso era una
   /// bomba de tiempo: el día que alguien conectara la matriz al backend, cada
@@ -126,8 +178,6 @@ class NotifPrefs {
         return true;
       case NotifChannel.email:
         return kEmailBackedTypes.contains(typeKey);
-      case NotifChannel.whatsapp:
-        return false;
     }
   }
 }

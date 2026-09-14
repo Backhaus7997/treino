@@ -16,6 +16,7 @@ import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/data/user_repository.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 class _MockUserRepo extends Mock implements UserRepository {}
 
@@ -102,7 +103,7 @@ void main() {
     testWidgets('GUARDAR deshabilitado sin cambios en la bio', (tester) async {
       await _pump(tester, profile: _trainerProfile());
 
-      final saveButton = tester.widget<ElevatedButton>(
+      final saveButton = tester.widget<TreinoButton>(
         find.byKey(const Key('identidad_card_save_button')),
       );
       expect(saveButton.onPressed, isNull);
@@ -120,7 +121,7 @@ void main() {
       );
       await tester.pump();
 
-      final saveButton = tester.widget<ElevatedButton>(
+      final saveButton = tester.widget<TreinoButton>(
         find.byKey(const Key('identidad_card_save_button')),
       );
       expect(saveButton.onPressed, isNotNull);
@@ -145,7 +146,7 @@ void main() {
       );
       await tester.pump();
 
-      final saveButton = tester.widget<ElevatedButton>(
+      final saveButton = tester.widget<TreinoButton>(
         find.byKey(const Key('identidad_card_save_button')),
       );
       expect(saveButton.onPressed, isNull);

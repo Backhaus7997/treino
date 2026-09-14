@@ -1,0 +1,111 @@
+{
+  "rule": "catalog-gate",
+  "source_of_truth": "lib/features/paywall/domain/catalog_gate.dart",
+  "description": "Si el candado del catalogo pago frena ENTRENAR una plantilla. Contrato compartido entre la implementacion Dart (telefono y reloj Wear) y la Swift (reloj de Apple, que no puede usar el SDK de Firestore). Si divergen, el mismo alumno entrena una plantilla en un reloj y le queda bloqueada en el otro.",
+  "inputs": {
+    "paywallEnabled": "El interruptor maestro. En Dart es kAthletePaywallEnabled; en Swift, su equivalente. false = no se gatea nada, sea cual sea el resto.",
+    "paywallEnforced": "Si al usuario se le aplica el paywall. TRI-ESTADO. En Dart sale de AthleteEntitlement (entitled=false, free=true, unknown=null); en Swift, de users/{uid}.athletePaywallEnforced leido por REST (true, false, o AUSENTE=null). null significa 'no se sabe' y NO gatea: es el mismo default que AthleteEntitlement.gatesFreeLimits y que paywallEnforcedFor() en firestore.rules.",
+    "isPremium": "El flag de la plantilla. null = el campo no esta en el documento, que es el caso de los docs sembrados antes de que improved-templates.json lo trajera. Ausente = gratis, igual que el @Default(false) de Routine.isPremium y el get('isPremium', false) de firestore.rules."
+  },
+  "expect": {
+    "blocked": "true si el alumno NO puede entrenar esa plantilla."
+  },
+  "cases": [
+    {
+      "name": "flag apagado: ni la plantilla paga se frena",
+      "why": "El estado en que esto shipea. El interruptor maestro corta antes que todo lo demas — si este caso se rompe, se le esta cobrando a gente que todavia no tiene forma de pagar.",
+      "given": {
+        "paywallEnabled": false,
+        "paywallEnforced": true,
+        "isPremium": true
+      },
+      "expect": {
+        "blocked": false
+      }
+    },
+    {
+      "name": "enforced ausente: no se aplica",
+      "why": "El default INERTE, y el caso mas importante del archivo. Hoy la CF escribe false en todos lados y en el reloj de Apple el campo puede estar directamente ausente. Es lo que permitio que la regla de firestore (#1087) se deployara sin el gate del reloj: mientras nadie escriba true, nada muerde.",
+      "given": {
+        "paywallEnabled": true,
+        "paywallEnforced": null,
+        "isPremium": true
+      },
+      "expect": {
+        "blocked": false
+      }
+    },
+    {
+      "name": "enforced false: no se aplica",
+      "why": "El alumno paga, o su PF paga por el. Distinto de 'no se sabe' aunque el resultado coincida: aca la respuesta llego y dijo que no.",
+      "given": {
+        "paywallEnabled": true,
+        "paywallEnforced": false,
+        "isPremium": true
+      },
+      "expect": {
+        "blocked": false
+      }
+    },
+    {
+      "name": "free + plantilla paga: FRENA",
+      "why": "El unico caso que bloquea. Si este se rompe, el eje del catalogo es decorativo.",
+      "given": {
+        "paywallEnabled": true,
+        "paywallEnforced": true,
+        "isPremium": true
+      },
+      "expect": {
+        "blocked": true
+      }
+    },
+    {
+      "name": "free + plantilla de principiante: pasa",
+      "why": "La mitad facil de romper de mas. La spec (§4.1.1) promete que las tres de principiante se siguen gratis; gatear el catalogo entero deja al free sin nada que entrenar y convierte el paywall en un muro.",
+      "given": {
+        "paywallEnabled": true,
+        "paywallEnforced": true,
+        "isPremium": false
+      },
+      "expect": {
+        "blocked": false
+      }
+    },
+    {
+      "name": "isPremium ausente: se asume gratis",
+      "why": "Falla ABIERTO. Un doc sembrado antes de que el campo existiera, o un error de siembra, tiene que abrir y no cobrar. Mismo default que Routine.isPremium y que firestore.rules.",
+      "given": {
+        "paywallEnabled": true,
+        "paywallEnforced": true,
+        "isPremium": null
+      },
+      "expect": {
+        "blocked": false
+      }
+    },
+    {
+      "name": "los dos nulos a la vez: no gatea",
+      "why": "El estado real de un reloj recien abierto: el entitlement todavia no llego y la plantilla puede venir sin el campo. Los dos defaults tienen que componer hacia ABIERTO, no cancelarse entre si.",
+      "given": {
+        "paywallEnabled": true,
+        "paywallEnforced": null,
+        "isPremium": null
+      },
+      "expect": {
+        "blocked": false
+      }
+    },
+    {
+      "name": "flag apagado con todo lo demas nulo",
+      "why": "El caso degenerado, para que ninguna implementacion se apoye en que los otros dos parametros digan algo cuando el maestro esta apagado.",
+      "given": {
+        "paywallEnabled": false,
+        "paywallEnforced": null,
+        "isPremium": null
+      },
+      "expect": {
+        "blocked": false
+      }
+    }
+  ]
+}

@@ -255,4 +255,17 @@ class TreinoIcon {
   // bienestar a algo que no tiene nada que ver, que es justo lo que el
   // comentario de heartRate ya pidió no hacer.
   static const IconData wellbeing = PhosphorIconsRegular.smiley;
+
+  // Moderación (reporte y bloqueo) — feature moderacion-reporte-y-bloqueo.
+  // Deliberadamente NO reusa [warning] (ámbar, "algo salió mal") ni [trash]
+  // (rojo, "esto se borra"): reportar y bloquear son acciones del VISITANTE
+  // sobre contenido ajeno, un significado distinto al de esos dos.
+  static const IconData report = PhosphorIconsRegular.flag;
+
+  /// `prohibit` no existe en el peso Regular de `phosphor_flutter: ^2.1.0`
+  /// (sólo en Light/Duotone) — verificado contra el paquete pineado antes de
+  /// usarlo. Persona + signo menos en un círculo comunica "sacar/bloquear a
+  /// esta persona" igual de claro y mantiene el resto del kit en un solo
+  /// peso de ícono.
+  static const IconData block = PhosphorIconsRegular.userCircleMinus;
 }

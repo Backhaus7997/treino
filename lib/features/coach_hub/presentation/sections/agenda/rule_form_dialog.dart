@@ -15,6 +15,7 @@ import '../../../../../core/widgets/motion/treino_tappable.dart';
 import '../../../../coach/application/agenda_providers.dart';
 import '../../../../coach/domain/availability_rule.dart';
 import '../../../../coach/presentation/agenda_formatters.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 // ─── RuleFormDialog ───────────────────────────────────────────────────────────
 
@@ -182,30 +183,16 @@ class _RuleFormDialogState extends ConsumerState<RuleFormDialog> {
         ),
       ),
       actions: [
-        OutlinedButton(
+        TreinoButton(
+          label: 'CANCELAR', // i18n
+          variant: TreinoButtonVariant.ghost,
           onPressed: _saving ? null : () => Navigator.of(context).pop(),
-          child: Text(
-            'CANCELAR', // i18n
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-              color: palette.textPrimary,
-            ),
-          ),
         ),
-        ElevatedButton(
-          onPressed: _saving ? null : () => _save(context),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: palette.accent,
-            foregroundColor: TreinoButtonTokens.foreground(context),
-          ),
-          child: Text(
-            'GUARDAR', // i18n
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-            ),
-          ),
+        const SizedBox(width: AppSpacing.s8),
+        TreinoButton(
+          label: 'GUARDAR', // i18n
+          loading: _saving,
+          onPressed: () => _save(context),
         ),
       ],
     );

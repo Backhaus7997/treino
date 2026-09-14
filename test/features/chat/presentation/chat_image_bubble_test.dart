@@ -34,6 +34,36 @@ void main() {
       expect(find.byType(CachedNetworkImage), findsOneWidget);
     });
 
+    // moderacion-reporte-y-bloqueo: la foto tiene que poder reportarse. El
+    // long-press entra por parámetro y lo registra el `TreinoTappable` que ya
+    // maneja el tap, no un `GestureDetector` por encima — envolver desde
+    // afuera haría competir a los dos recognizers en el gesture arena.
+    testWidgets('long-press dispara onLongPress', (tester) async {
+      var reported = 0;
+      final bubble = ChatImageBubble(
+        message: _imageMsg(),
+        onLongPress: () => reported++,
+      );
+      await tester.pumpWidget(_wrap(bubble));
+      await tester.pump();
+
+      await tester.longPress(find.byType(ChatImageBubble));
+      await tester.pump();
+
+      expect(reported, 1);
+    });
+
+    testWidgets('sin onLongPress el long-press no dispara nada',
+        (tester) async {
+      await tester.pumpWidget(_wrap(ChatImageBubble(message: _imageMsg())));
+      await tester.pump();
+
+      await tester.longPress(find.byType(ChatImageBubble));
+      await tester.pump();
+
+      expect(find.byType(PhotoViewerScreen), findsNothing);
+    });
+
     testWidgets('tap navigates to PhotoViewerScreen', (tester) async {
       await tester.pumpWidget(MaterialApp(
         theme: AppTheme.dark(),

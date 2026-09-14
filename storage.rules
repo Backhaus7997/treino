@@ -118,12 +118,84 @@ service firebase.storage {
     // `functions/src/cascade/storage.ts`, con Admin SDK, que ignora estas
     // reglas — ADR-ACCDEL-013). Mismo patrón que `postPhotos` y `chatMedia`.
     match /customExerciseVideos/{userId}/{file=**} {
+      // ── El tope de costo (#video-quota) ────────────────────────────────
+      //
+      // El bloque tenía cap de TAMAÑO por archivo y NINGUNO de CANTIDAD, y el
+      // paywall del alumno no lo tocaba. Medido sobre el bucket de producción
+      // el 2026-09-10: 3 objetos, 2,84 MB, de UN solo dueño, y ese dueño es un
+      // PF. Ningún alumno subió jamás un video. O sea que esto NO se está
+      // desangrando hoy — se cierra antes de que haya algo que recortar.
+      //
+      // Qué costaba dejarlo abierto: sin tope de cantidad el peor caso es
+      // infinito, y el egress lo multiplica. Estos videos se sirven por la URL
+      // `?alt=media&token=` de `getDownloadURL()` — GCS directo, sin CDN (ver
+      // el comentario de `get` acá abajo y `docs/security.md` §3.1), así que
+      // cada play es egress a USD 0,12/GB contra USD 0,026/GB-mes de guardarlo.
+      // Por eso el cap POR ARCHIVO es la palanca principal: pega en las dos
+      // líneas de costo, no en una.
+      //
+      // Los cuatro números viven en `athlete_entitlement.dart`
+      // (`kFreeMaxCustomExerciseVideos`, `kFreeMaxCustomExerciseVideoBytes`,
+      // `kMaxCustomExerciseVideos`, `kMaxCustomExerciseVideoBytes`) y están
+      // duplicados A MANO acá, igual que `freeMaxRoutineDays()` en
+      // `firestore.rules`. Si cambiás uno, cambiá el otro: si no, el cliente
+      // muestra un tope y el servidor aplica otro.
+      //
+      // ── Por qué el conteo se lee y no se calcula ────────────────────────
+      //
+      // Las reglas de Storage NO tienen agregación: no pueden listar ni contar
+      // objetos de un prefijo. Igual que con `athletePaywallEnforced`, la
+      // conclusión se denormaliza en Firestore —acá en
+      // `users/{uid}.customExerciseVideoUsage.count`, que escribe
+      // `maintainCustomExerciseVideoQuota`— y la regla lee ese número.
+      //
+      // Ese contador VA ATRASADO por diseño: el trigger de Storage corre
+      // DESPUÉS de que el objeto aterrizó. Un cliente que dispare N subidas en
+      // paralelo las ve todas contra el mismo valor viejo y se pasa del tope
+      // por el tamaño de la ráfaga. Por eso la CF además BORRA lo que sobra:
+      // la regla es el gate preventivo que atrapa el 99,9% y la CF es la red
+      // reactiva que cierra la carrera. Ninguna de las dos alcanza sola, y la
+      // CF sola tampoco serviría — cuando corre, los bytes ya entraron.
+      //
+      // ── Fail-open, y hasta dónde ───────────────────────────────────────
+      //
+      // `firestore.get()` devuelve null si el doc no existe, y hay escrituras
+      // legítimas de usuarios sin doc de perfil todavía (mismo caso que
+      // documenta `paywallEnforcedFor` en `firestore.rules`). Sin doc ⇒ no
+      // enforced, igual que allá. Pero el TECHO ESTRUCTURAL (100 MB, 50
+      // videos) se aplica siempre, con doc o sin él: el fail-open afloja el
+      // tope del paywall, nunca el del producto.
+      //
+      // Y el PF nunca cae en el tope free: `athletePaywallEnforced` sale de
+      // `resolveAthletePaywallEnforced`, que arranca con
+      // `if (userData?.role !== "athlete") return false`. Eso importa porque
+      // este editor es superficie COMPARTIDA — lo abren el alumno
+      // (`profile_screen.dart`, `exercise_picker_sheet.dart`) y el PF
+      // (`trainer_profile_view.dart`, Coach Hub web). Gatear sobre el
+      // entitlement del cliente en vez de sobre este campo le rompería la
+      // videoteca a todos los PF, porque `athleteEntitlementProvider` SÍ
+      // devuelve `free` para un PF (no mira `role`).
+      // UNA sola función y UNA sola lectura de Firestore. Tres helpers
+      // (tamaño, cantidad, tier) se leerían mejor pero serían tres
+      // `firestore.get()` sobre el mismo path, y cada uno es una lectura
+      // facturada — el mismo costo que `docs/paywall-alumno-suelto.md` §320
+      // marca para los `get()` de las reglas.
+      function videoWriteAllowed(userId) {
+        let u = firestore.get(/databases/(default)/documents/users/$(userId));
+        let d = u == null ? {} : u.data;
+        let enforced = d.get('athletePaywallEnforced', false) == true;
+        let usage = d.get('customExerciseVideoUsage', {});
+        return request.resource.size
+                 < (enforced ? 25 * 1024 * 1024 : 100 * 1024 * 1024)
+               && usage.get('count', 0) < (enforced ? 3 : 50);
+      }
+
       allow get: if request.auth != null;
       allow list: if false;
       allow write: if request.auth != null
                   && request.auth.uid == userId
-                  && request.resource.size < 100 * 1024 * 1024
-                  && request.resource.contentType.matches('video/.*');
+                  && request.resource.contentType.matches('video/.*')
+                  && videoWriteAllowed(userId);
       allow delete: if request.auth != null && request.auth.uid == userId;
     }
 
@@ -147,8 +219,8 @@ service firebase.storage {
     // `match /databases/{database}/documents` header, which does not exist
     // in this rules file).
     //
-    // Size limits: images < 15 MB, videos < 100 MB (server-side guard mirrors
-    // the client-side guard in ChatMediaUploadService).
+    // Size limits: images < 15 MB, videos < 25 MB (free) / 50 MB (techo), y un
+    // tope de BYTES TOTALES por usuario. Ver `chatMediaWriteAllowed()` abajo.
     match /chatMedia/{chatId}/{userId}/{file=**} {
       // Only members of this chat can download individual media objects.
       allow get: if request.auth != null
@@ -159,28 +231,136 @@ service firebase.storage {
       // not even to members.
       allow list: if false;
 
+      // ── El tope de costo (#chat-media-quota) ───────────────────────────
+      //
+      // Este bloque tenía cap de TAMAÑO por archivo y NINGUNO de total, y el
+      // paywall del alumno no lo tocaba — el mismo agujero que se cerró en
+      // `customExerciseVideos`, pero sobre el prefijo donde de verdad se
+      // acumula el UGC. Medido el 2026-09-14 sobre `treino-dev`: 127,18 MB en
+      // 15 objetos, **45x** los bytes de la videoteca. Y a diferencia de una
+      // videoteca de tutoriales, que se arma una vez, el chat genera bytes de
+      // forma CONTINUA. Ver `docs/costos-storage.md` §7.
+      //
+      // ── Por qué el eje es BYTES TOTALES y no cantidad ni «por chat» ─────
+      //
+      // No se puede copiar el tope de `customExerciseVideos`, y el motivo es
+      // la forma del uso:
+      //
+      //   • Aquél es una BIBLIOTECA —pocos archivos, se arma una vez— así que
+      //     `cantidad × por-archivo` acota el total.
+      //   • El chat es un FLUJO. Un PF con 30 alumnos manda cientos de
+      //     archivos por año legítimamente: el tope de cantidad tendría que
+      //     ser enorme para no romperle el producto, y con la cantidad enorme
+      //     ese producto deja de ser un techo útil. El total en bytes sí lo es.
+      //
+      // Y tampoco es «por chat», aunque sea la unidad que el path sugiere:
+      // `firestore.rules` (~1973) tiene TRES ramas de creación de chat
+      // —vínculo de Coach, social direccional (REQ-FOLLOW-012) e inquiry
+      // (#637, cualquier atleta a cualquier PF publicado)— así que la cantidad
+      // de chats por usuario NO tiene techo. N chats × tope-por-chat = sin
+      // techo. Medido: de 17 chats, 10 son sociales, 3 inquiry y 4 de Coach, y
+      // el chat que concentra el 94% de los bytes es SOCIAL, no de Coach.
+      //
+      // ── Los números ────────────────────────────────────────────────────
+      //
+      // El video baja de 100 MB a 50 (25 en free). El máximo observado del
+      // bucket —un MP4 de 90,31 MB— es el **71% de todo el prefijo**, y el
+      // segundo video más grande pesa 9,25 MB: un salto de 10x. Por eso acá el
+      // múltiplo se saca contra el p90 real (9,12 MB) y no contra el máximo,
+      // al revés que en `customExerciseVideos`, donde el máximo era un dato
+      // sano. Bajar el techo a 50 rechaza EXACTAMENTE ese archivo y ninguno
+      // más de los que existen.
+      //
+      // La imagen queda en 15 MB a propósito: el máximo observado es 4,98 MB y
+      // las imágenes son el 10% de los bytes. No lleva variante free — el eje
+      // del costo son los videos (89,8% de los bytes) y el tope de bytes
+      // totales ya acota lo que las fotos acumulan.
+      //
+      // Los cinco números viven en `athlete_entitlement.dart`
+      // (`kFreeMaxChatMediaBytes`, `kMaxChatMediaBytes`,
+      // `kFreeMaxChatVideoBytes`, `kMaxChatVideoBytes`, `kMaxChatImageBytes`)
+      // y están duplicados A MANO acá y en `chat-media-quota.ts`. Si cambiás
+      // uno, cambiá los tres.
+      //
+      // ── El contador, y por qué va atrasado ─────────────────────────────
+      //
+      // Las reglas de Storage no tienen agregación: no pueden listar ni sumar
+      // los bytes de un prefijo. La conclusión se denormaliza en
+      // `users/{uid}.chatMediaUsage.bytes`, que escribe
+      // `maintainChatMediaQuota*`, y la regla lee ese número — mismo patrón y
+      // mismo motivo que `athletePaywallEnforced` y que el bloque
+      // `customExerciseVideos` de más arriba.
+      //
+      // Va ATRASADO por construcción: el trigger corre DESPUÉS de que el
+      // objeto aterrizó. Una ráfaga de N subidas paralelas se evalúa toda
+      // contra el mismo valor viejo y se pasa por el tamaño de la ráfaga. La
+      // regla es el gate preventivo que atrapa el caso normal —el composer
+      // sube de a uno (`if (state.uploading) return`)— y la CF es la red
+      // reactiva que borra el excedente.
+      //
+      // ⚠️ La suma incluye el archivo entrante (`used + size <= cap`) y no
+      // sólo el acumulado: con `used < cap` alguien a 249 MB metería otros
+      // 50 y el tope se pasaría por un archivo entero cada vez. La CF espeja
+      // este mismo corte acumulando de más viejo a más nuevo.
+      //
+      // ── Fail-open, y hasta dónde ───────────────────────────────────────
+      //
+      // Sin doc de perfil `firestore.get()` devuelve null ⇒ no enforced, igual
+      // que en `customExerciseVideos` y que `paywallEnforcedFor` en
+      // `firestore.rules`. Pero el TECHO ESTRUCTURAL (50 MB por video, 5 GB
+      // totales) se aplica siempre: el fail-open afloja el tope del paywall,
+      // nunca el del producto.
+      //
+      // Y el PF nunca cae en el tope free: `athletePaywallEnforced` sale de
+      // `resolveAthletePaywallEnforced`, que corta en
+      // `if (userData?.role !== "athlete") return false` y también ante un
+      // vínculo activo. O sea que el chat del Coach queda intacto EN LAS DOS
+      // PUNTAS —el PF y su alumno vinculado— y el tope free pega sólo en el
+      // atleta suelto, que es justo quien usa los chats sociales y de consulta
+      // donde está el 94% de los bytes medidos.
+      //
+      // UNA sola función y UNA sola lectura de Firestore, por el mismo motivo
+      // que en `customExerciseVideos`: cada `firestore.get()` es una lectura
+      // facturada. Este bloque ya paga una en el `get` (la membresía); ésta es
+      // la del `write`, y son caminos distintos, así que no se suman.
+      function chatMediaWriteAllowed(userId) {
+        let u = firestore.get(/databases/(default)/documents/users/$(userId));
+        let d = u == null ? {} : u.data;
+        let enforced = d.get('athletePaywallEnforced', false) == true;
+        let usage = d.get('chatMediaUsage', {});
+        let size = request.resource.size;
+        return (
+                 (request.resource.contentType.matches('image/.*')
+                  && size < 15 * 1024 * 1024)
+                 ||
+                 (request.resource.contentType.matches('video/.*')
+                  && size < (enforced ? 25 * 1024 * 1024 : 50 * 1024 * 1024))
+               )
+               && usage.get('bytes', 0) + size
+                    <= (enforced ? 250 * 1024 * 1024
+                                 : 5 * 1024 * 1024 * 1024);
+      }
+
       // Only the owner can upload; content type and size are allowlisted.
       allow write: if request.auth != null
                   && request.auth.uid == userId
-                  && (
-                       (request.resource.contentType.matches('image/.*')
-                        && request.resource.size < 15 * 1024 * 1024)
-                       ||
-                       (request.resource.contentType.matches('video/.*')
-                        && request.resource.size < 100 * 1024 * 1024)
-                     );
+                  && chatMediaWriteAllowed(userId);
 
       // Only the owner can delete (cleanup on send failure or exercise removal).
       allow delete: if request.auth != null && request.auth.uid == userId;
     }
 
-    // Coach Hub — archivos privados que el PF sube sobre un alumno.
+    // Coach Hub — archivos que el PF sube para un alumno.
     //
     // Path: /athleteFiles/{trainerId}_{athleteId}/{file}
     //
-    // Trainer-only. El alumno NUNCA lee estos archivos. Nadie más los ve.
-    // Enforce del par en el prefijo del path (`trainerId_athleteId`) para
-    // que un attacker no pueda listar archivos de otro PF.
+    // Storage queda trainer-only. El alumno abre `downloadUrl` desde
+    // `_ArchivoRow._open()` con `LaunchMode.externalApplication`: esas URLs
+    // llevan un token de descarga y no pasan por estas rules. Autorizar por
+    // `pairId.split('_')[1] == uid` también abriría los archivos no compartidos
+    // a quien conozca su path; la visibilidad se decide en el doc de Firestore.
+    // Enforce del par en el prefijo del path (`trainerId_athleteId`) evita que
+    // otro PF liste archivos ajenos.
     //
     // Content types permitidos: PDF + imágenes. Videos y otros formatos
     // se rechazan explícitamente para MVP.

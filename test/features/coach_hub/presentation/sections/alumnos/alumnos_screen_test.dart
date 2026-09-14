@@ -15,6 +15,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/app/theme/tokens/primitives.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/chat/domain/chat.dart';
@@ -165,6 +166,11 @@ Future<void> _pump(
   // Ancho lógico de la ventana (px) — default 1200 (wide, breakpoint 900px).
   // Los tests de responsive lo bajan a <900 para forzar el layout angosto.
   double width = 1200,
+  // Retraso del batch de perfiles. Con `Duration.zero` (el default) el
+  // override resuelve SINCRÓNICAMENTE y el provider nunca pasa por `loading`,
+  // que es lo que asumen los ~40 tests de acá. Con un valor > 0 el ciclo
+  // `loading -> data` sí ocurre: es el que remontaba la pantalla entera.
+  Duration profilesDelay = Duration.zero,
 }) async {
   tester.view.physicalSize = Size(width, 900);
   tester.view.devicePixelRatio = 1.0;
@@ -208,9 +214,11 @@ Future<void> _pump(
         trainerLinksStreamProvider.overrideWith(
           (ref) => linksStream ?? Stream.value(links ?? const []),
         ),
-        userPublicProfilesBatchProvider.overrideWith(
-          (ref, key) => {for (final p in profiles) p.uid: p},
-        ),
+        userPublicProfilesBatchProvider.overrideWith((ref, key) {
+          final data = {for (final p in profiles) p.uid: p};
+          if (profilesDelay == Duration.zero) return data;
+          return Future.delayed(profilesDelay, () => data);
+        }),
         pagosPorCobrarProvider.overrideWith((ref) => AsyncData(cobros)),
         trainerPaymentsProvider.overrideWith((ref) => Stream.value(payments)),
         finishedInWindowByUidProvider.overrideWith(
@@ -218,9 +226,9 @@ Future<void> _pump(
               sessionsInWindowByAthleteId[key.athleteId] ?? const <Session>[],
         ),
         gymsProvider.overrideWith((ref) => const <Gym>[]),
-        assignedRoutinesProvider.overrideWith(
-          (ref, athleteId) async =>
-              routinesByAthleteId[athleteId] ?? const <Routine>[],
+        assignedRoutinesByTrainerProvider.overrideWith(
+          (ref, key) async =>
+              routinesByAthleteId[key.athleteId] ?? const <Routine>[],
         ),
         currentUidProvider.overrideWithValue(_trainerId),
         // Botón «Chat» del roster: resuelve/crea el chat 1-1 con el alumno
@@ -463,10 +471,98 @@ void main() {
       expect(find.text('ALUMNOS'), findsOneWidget);
       expect(find.text('Sofía'), findsOneWidget);
       expect(find.text('Diego'), findsOneWidget);
-      expect(find.text('Aldo'), findsOneWidget);
       expect(find.text('Activo'), findsOneWidget);
       expect(find.text('Pausado'), findsOneWidget);
-      expect(find.text('Inactivo'), findsOneWidget);
+
+      // Aldo tiene el vinculo TERMINADO, y «Todos» son tus alumnos, no el
+      // archivo historico. Este test afirmaba lo contrario: con 12 vinculos
+      // de los cuales 10 estaban terminados, el roster abria en 12 filas donde
+      // 10 no tenian un solo dato util y cuatro de las siete columnas quedaban
+      // en blanco.
+      expect(find.text('Aldo'), findsNothing);
+      expect(find.text('Inactivo'), findsNothing);
+    });
+
+    testWidgets('con 30 alumnos el roster muestra 25 y aparece el pie',
+        (tester) async {
+      await _pump(
+        tester,
+        links: [
+          for (var i = 0; i < 30; i++) _link('a$i', TrainerLinkStatus.active),
+        ],
+        profiles: [
+          // Nombre con padding: sin el cero a la izquierda, «Alumno 10» cae
+          // antes que «Alumno 2» en cualquier orden alfabetico y el test
+          // hablaria de la pagina equivocada.
+          for (var i = 0; i < 30; i++)
+            _prof('a$i', 'Alumno ${i.toString().padLeft(2, '0')}'),
+        ],
+      );
+
+      expect(find.text('Alumno 00'), findsOneWidget);
+      expect(find.text('1–25 de 30'), findsOneWidget);
+
+      // Con 25 filas el pie cae abajo del pliegue: sin `ensureVisible` el tap
+      // le pega al aire y el hit-test NO avisa.
+      await tester.ensureVisible(find.byKey(const Key('coach_hub_pager_next')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('coach_hub_pager_next')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('26–30 de 30'), findsOneWidget);
+      expect(find.text('Alumno 00'), findsNothing);
+    });
+
+    testWidgets('cambiar de chip vuelve a la pagina 1', (tester) async {
+      // Sin esto el PF sale de la pagina 2 y entra en la pagina 2 de otra
+      // lista, que puede no existir: ve una tabla vacia y nada que lo
+      // explique.
+      await _pump(
+        tester,
+        links: [
+          for (var i = 0; i < 30; i++) _link('a$i', TrainerLinkStatus.active),
+        ],
+        profiles: [
+          for (var i = 0; i < 30; i++)
+            _prof('a$i', 'Alumno ${i.toString().padLeft(2, '0')}'),
+        ],
+      );
+
+      await tester.ensureVisible(find.byKey(const Key('coach_hub_pager_next')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('coach_hub_pager_next')));
+      await tester.pumpAndSettle();
+      expect(find.text('26–30 de 30'), findsOneWidget);
+
+      await tester.ensureVisible(find.text('Activos'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Activos'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('1–25 de 30'), findsOneWidget);
+    });
+
+    testWidgets('el chip Inactivos sigue siendo la puerta a los terminados',
+        (tester) async {
+      // La salida esta a un click, y el chip los sigue CONTANDO aunque
+      // «Todos» ya no los liste: sin esto, sacarlos de «Todos» seria
+      // esconderlos.
+      await _pump(
+        tester,
+        links: [
+          _link('a1', TrainerLinkStatus.active),
+          _link('a3', TrainerLinkStatus.terminated),
+        ],
+        profiles: [_prof('a1', 'Sofía'), _prof('a3', 'Aldo')],
+      );
+
+      expect(find.text('Aldo'), findsNothing);
+
+      await tester.tap(find.text('Inactivos'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Aldo'), findsOneWidget);
+      expect(find.text('Sofía'), findsNothing);
     });
 
     testWidgets('filtro Pausados muestra solo pausados', (tester) async {
@@ -960,15 +1056,95 @@ void main() {
         ],
       );
 
-      expect(find.byTooltip('Chat'), findsNWidgets(3));
-      expect(find.byTooltip('Rutinas'), findsNWidgets(3));
-      expect(find.byTooltip('Registrar pago'), findsNWidgets(3));
+      // Dos, no tres: el vinculo TERMINADO ya no entra en «Todos» (son tus
+      // alumnos, no el archivo). La afirmacion de fondo de este test —los 3
+      // botones salen sin importar el estado— se conserva entera unos
+      // renglones mas abajo, entrando por el chip «Inactivos».
+      expect(find.byTooltip('Chat'), findsNWidgets(2));
+      expect(find.byTooltip('Rutinas'), findsNWidgets(2));
+      expect(find.byTooltip('Registrar pago'), findsNWidgets(2));
       // #568: las acciones de vínculo ya no están sueltas en la fila — viven
       // en el menú ⋮, que aparece sólo cuando hay alguna disponible (activo o
       // pausado; el terminado no ofrece ninguna).
       expect(find.byTooltip('Pausar'), findsNothing);
       expect(find.byTooltip('Reanudar'), findsNothing);
       expect(find.byTooltip('Opciones del alumno'), findsNWidgets(2));
+
+      // El terminado, donde vive ahora: los 3 accesos rapidos siguen ahi.
+      await tester.tap(find.text('Inactivos'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Ana'), findsOneWidget);
+      expect(find.byTooltip('Chat'), findsOneWidget);
+      expect(find.byTooltip('Rutinas'), findsOneWidget);
+      expect(find.byTooltip('Registrar pago'), findsOneWidget);
+      // Sin operaciones de vinculo NO hay ⋮ USABLE. `hitTestable` y no
+      // `findsNothing`: el widget sigue en el arbol como separador invisible
+      // —es la unica forma de que el hueco mida exactamente lo mismo que el
+      // boton— pero no recibe el mouse ni llega a la semantica.
+      expect(find.byTooltip('Opciones del alumno').hitTestable(), findsNothing);
+    });
+
+    testWidgets('la fila sin ⋮ reserva su hueco y no descuadra la grilla',
+        (tester) async {
+      // El PF lo reporto como «las acciones quedan feas»: la columna esta
+      // alineada a la derecha, asi que una fila sin operaciones de vinculo
+      // corria sus tres iconos hacia afuera y la grilla quedaba dentada.
+      await _pump(
+        tester,
+        links: [
+          _link('a1', TrainerLinkStatus.active),
+          _link('a3', TrainerLinkStatus.terminated),
+        ],
+        profiles: [_prof('a1', 'Sofía'), _prof('a3', 'Ana')],
+      );
+
+      final xConMenu = tester.getCenter(find.byTooltip('Chat')).dx;
+
+      await tester.tap(find.text('Inactivos'));
+      await tester.pumpAndSettle();
+
+      // Misma columna, mismo x: el hueco de 32px ocupa el lugar del ⋮ que no
+      // va. Sin el hueco, este icono se corre 32px a la derecha.
+      expect(tester.getCenter(find.byTooltip('Chat')).dx, xConMenu);
+    });
+
+    testWidgets('los cuatro botones de acción miden IGUAL', (tester) async {
+      // El PF: «todos estos botoncitos están horribles». Lo objetivo debajo de
+      // eso: el ⋮ no es el mismo componente que sus tres hermanos.
+      // `PopupMenuButton` usa `iconSize` 24 por default y le suma 8 de
+      // padding, o sea 40x40 al lado de los 32x32 de `_IconAction`. Ocho
+      // píxeles de más, con la píldora de hover saliendo de otro tamaño y
+      // otro centro — que es lo que se ve en su captura.
+      await _pump(
+        tester,
+        links: [_link('a1', TrainerLinkStatus.active)],
+        profiles: [_prof('a1', 'Sofía')],
+      );
+
+      // Se mide la caja RENDERIZADA por el tooltip, no un tipo de widget.
+      //
+      // Antes esto buscaba el `IconButton` que envolvía al tooltip, y eso ató
+      // el test a la implementación: al migrar los tres rápidos a
+      // `TreinoIconButton` —que no tiene `IconButton` adentro— el finder se
+      // quedó sin candidatos y el test reventó sin que nada se hubiera roto
+      // en pantalla. Lo que el usuario ve es el tamaño de la caja; eso es lo
+      // que hay que afirmar.
+      Size cajaDe(String tooltip) => tester.getSize(find.byTooltip(tooltip));
+
+      final chat = cajaDe('Chat');
+      final rutinas = cajaDe('Rutinas');
+      final pago = cajaDe('Registrar pago');
+      final menu = cajaDe('Opciones del alumno');
+
+      expect(rutinas, chat, reason: 'los tres rápidos ya coincidían');
+      expect(pago, chat);
+      expect(
+        menu,
+        chat,
+        reason: 'el ⋮ es otro componente y hay que igualarlo A MANO: '
+            'sin `iconSize`/`constraints` propios mide 40x40 contra 32x32',
+      );
     });
 
     testWidgets('tap en Chat resuelve/crea el chat y navega a /chat',
@@ -1080,9 +1256,9 @@ void main() {
       expect(find.text('ESTADO'), findsOneWidget);
       expect(find.text('ACCIONES'), findsOneWidget);
       expect(find.text('ÚLTIMO ENTRENO'), findsNothing);
-      expect(find.text('Rutina'), findsNothing);
-      expect(find.text('Plan'), findsNothing);
-      expect(find.text('Vence'), findsNothing);
+      expect(find.text('RUTINA'), findsNothing);
+      expect(find.text('PLAN'), findsNothing);
+      expect(find.text('VENCE'), findsNothing);
       // Las celdas de las columnas colapsadas tampoco se renderizan.
       expect(find.text('Sin entrenos'), findsNothing);
       expect(find.text('Activa'), findsNothing);
@@ -1105,10 +1281,208 @@ void main() {
       expect(find.text('ALUMNO'), findsOneWidget);
       expect(find.text('ESTADO'), findsOneWidget);
       expect(find.text('ÚLTIMO ENTRENO'), findsOneWidget);
-      expect(find.text('Rutina'), findsOneWidget);
-      expect(find.text('Plan'), findsOneWidget);
-      expect(find.text('Vence'), findsOneWidget);
+      expect(find.text('RUTINA'), findsOneWidget);
+      // MAYÚSCULA como el resto: la transformación vive en `_HeaderCell`, no
+      // en cada string. Antes «Rutina», «Plan» y «Vence» estaban escritos a
+      // mano capitalizados contra «ALUMNO»/«ESTADO» de l10n, y la fila de
+      // headers se veía a dos alturas tipográficas distintas.
+      expect(find.text('PLAN'), findsOneWidget);
+      expect(find.text('VENCE'), findsOneWidget);
       expect(find.text('ACCIONES'), findsOneWidget);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Parpadeo al entrar (hallazgo A del diagnóstico web del 2026-09-09)
+  // ---------------------------------------------------------------------------
+  group('AlumnosScreen — un solo frame montado a la vez', () {
+    // Medido en producción con un contador de subárboles duplicados a 16 ms:
+    // entrando Dashboard -> Alumnos había DOS `_RosterFrame` completos
+    // pintados a la vez durante ~205 ms (3 corridas de 3, también con caché
+    // caliente). Dos hero «ALUMNOS», dos «Nuevo alumno», dos filas de chips,
+    // dos cabeceras de tabla, uno desvaneciéndose sobre el otro.
+    //
+    // La causa eran dos `TreinoStateSwitcher` anidados donde el de adentro
+    // envolvía la pantalla ENTERA: al cambiar la key de `loading` a `data`,
+    // Flutter desmontaba el frame viejo y montaba uno nuevo, y el nuevo
+    // volvía a correr su entrada escalonada porque `TreinoFadeSlideIn` es
+    // one-shot por State.
+    //
+    // El hero es la sonda: es único por definición. Si hay dos, hay dos
+    // copias del frame apiladas.
+    testWidgets(
+        'links loading -> data y perfiles loading -> data: nunca hay dos hero '
+        '[SCENARIO-CHW-ALU-30]', (tester) async {
+      final linksCtl = StreamController<List<TrainerLink>>();
+      addTearDown(linksCtl.close);
+
+      await _pump(
+        tester,
+        linksStream: linksCtl.stream,
+        profiles: [_prof('a1', 'Ana García')],
+        profilesDelay: const Duration(milliseconds: 120),
+        settle: false,
+      );
+
+      void unSoloFrame(String cuando) {
+        expect(
+          find.byType(CoachHubSectionHero),
+          findsOneWidget,
+          reason: 'en $cuando había más de un frame montado — eso es el '
+              'parpadeo que reportó el PF',
+        );
+      }
+
+      unSoloFrame('el arranque (links en loading)');
+
+      linksCtl.add([_link('a1', TrainerLinkStatus.active)]);
+
+      // Barrido frame a frame cubriendo el cross-fade completo
+      // (`AppMotion.base` = 240 ms) más el retraso de los perfiles.
+      for (var t = 16; t <= 480; t += 16) {
+        await tester.pump(const Duration(milliseconds: 16));
+        unSoloFrame('t=${t}ms');
+      }
+
+      // Y al final, la pantalla resolvió de verdad.
+      expect(find.text('Ana García'), findsOneWidget);
+    });
+
+    // El hero afirmaba «ALUMNOS 0» antes de decir «ALUMNOS 12», porque la
+    // rama `loading` le pasaba `roster: []` y el hero hacía `roster.length`.
+    // Un cero que dura medio segundo y es falso es peor que ningún número.
+    testWidgets(
+        'mientras los links cargan el hero NO afirma un total '
+        '[SCENARIO-CHW-ALU-31]', (tester) async {
+      final linksCtl = StreamController<List<TrainerLink>>();
+      addTearDown(linksCtl.close);
+
+      await _pump(
+        tester,
+        linksStream: linksCtl.stream,
+        profiles: [_prof('a1', 'Ana García'), _prof('a2', 'Beto Díaz')],
+        settle: false,
+      );
+      await tester.pump();
+
+      final hero = tester.widget<CoachHubSectionHero>(
+        find.byType(CoachHubSectionHero),
+      );
+      expect(
+        hero.count,
+        isNull,
+        reason: 'todavía no sabemos cuántos hay: `null`, no `0`',
+      );
+
+      linksCtl.add([
+        _link('a1', TrainerLinkStatus.active),
+        _link('a2', TrainerLinkStatus.active),
+      ]);
+      await tester.pump();
+      await tester.pump();
+
+      expect(
+        tester
+            .widget<CoachHubSectionHero>(find.byType(CoachHubSectionHero))
+            .count,
+        2,
+      );
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Geometría del roster (hallazgos D y F del diagnóstico web del 2026-09-09)
+  // ---------------------------------------------------------------------------
+  group('AlumnosScreen — la fila respira', () {
+    // Medido en producción a 1440x900: la columna ALUMNO recibía 142 px de
+    // 1160, y de esos el avatar (36) y su gap (12) más el padding (28) se
+    // comían casi todo. Quedaban ~66 px para el nombre y en pantalla se leía
+    // «Mateo Pr...» — mientras ÚLTIMO ENTRENO se llevaba 275 px para mostrar
+    // «Hace 5 días».
+    //
+    // No se mide el ANCHO DEL TEXTO a propósito: en tests `GoogleFonts` no
+    // resuelve la familia del design system y mide con el fallback, así que
+    // cualquier assert sobre métricas tipográficas miente. Lo que sí es
+    // fiable es la POSICIÓN de las celdas, que sale del flex.
+    testWidgets(
+        'en desktop ALUMNO es más ancha que ÚLTIMO ENTRENO '
+        '[SCENARIO-CHW-ALU-32]', (tester) async {
+      await _pump(
+        tester,
+        width: 1400,
+        links: [_link('a1', TrainerLinkStatus.active)],
+        profiles: [_prof('a1', 'Mateo Presset')],
+      );
+
+      double anchoDeColumna(String desde, String hasta) =>
+          tester.getTopLeft(find.text(hasta)).dx -
+          tester.getTopLeft(find.text(desde)).dx;
+
+      final alumno = anchoDeColumna('ALUMNO', 'ESTADO');
+      final ultimoEntreno = anchoDeColumna('ÚLTIMO ENTRENO', 'RUTINA');
+
+      expect(
+        alumno,
+        greaterThan(ultimoEntreno),
+        reason: 'ALUMNO ($alumno px) es el dato que identifica la fila y '
+            'tenía menos lugar que ÚLTIMO ENTRENO ($ultimoEntreno px), que '
+            'muestra «Hace 5 días»',
+      );
+    });
+
+    // En angosto manda la otra restricción: «ÚLTIMO ENTRENO» es el header más
+    // largo del roster y a 900 px desbordaba por 43 px. Ahí la calibración
+    // vieja sigue siendo la correcta — por eso son dos y no una.
+    testWidgets(
+        'a 900px se conserva la calibración vieja '
+        '[SCENARIO-CHW-ALU-33]', (tester) async {
+      await _pump(
+        tester,
+        width: 1000,
+        links: [_link('a1', TrainerLinkStatus.active)],
+        profiles: [_prof('a1', 'Mateo Presset')],
+      );
+
+      final alumno = tester.getTopLeft(find.text('ESTADO')).dx -
+          tester.getTopLeft(find.text('ALUMNO')).dx;
+      final ultimoEntreno = tester.getTopLeft(find.text('RUTINA')).dx -
+          tester.getTopLeft(find.text('ÚLTIMO ENTRENO')).dx;
+
+      expect(
+        ultimoEntreno,
+        greaterThan(alumno),
+        reason: 'abajo de 1200 px el header largo sigue mandando',
+      );
+    });
+
+    // Los cuatro botones de acción tenían paso 24 px con ancho 24 px: los
+    // blancos de click SE TOCABAN. Un desvío de 1 px del cursor cambiaba de
+    // acción, y una de las cuatro abre el menú con «Terminar vínculo».
+    testWidgets(
+        'los íconos de acción no se tocan entre sí '
+        '[SCENARIO-CHW-ALU-34]', (tester) async {
+      await _pump(
+        tester,
+        width: 1400,
+        links: [_link('a1', TrainerLinkStatus.active)],
+        profiles: [_prof('a1', 'Mateo Presset')],
+      );
+
+      final chat = tester.getRect(find.byTooltip('Chat'));
+      final rutinas = tester.getRect(find.byTooltip('Rutinas'));
+      final pago = tester.getRect(find.byTooltip('Registrar pago'));
+
+      for (final (a, b, nombres) in [
+        (chat, rutinas, 'Chat → Rutinas'),
+        (rutinas, pago, 'Rutinas → Registrar pago'),
+      ]) {
+        expect(
+          b.left - a.right,
+          greaterThanOrEqualTo(AppSpacing.s8),
+          reason: '$nombres: los blancos de click quedan a '
+              '${b.left - a.right} px. Se tocaban a 0.',
+        );
+      }
     });
   });
 }

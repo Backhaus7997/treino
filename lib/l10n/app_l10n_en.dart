@@ -421,7 +421,65 @@ class AppL10nEn extends AppL10n {
   String get coachExercisePicker => '';
 
   @override
-  String get agendaButtonLabel => '';
+  String get agendaButtonLabel => 'VIEW TRAINER AGENDA';
+
+  @override
+  String get athleteNutritionPlanButtonLabel => 'MY NUTRITION PLAN';
+
+  @override
+  String get athleteFilesButtonLabel => 'MY FILES';
+
+  @override
+  String get athleteNutritionPlanScreenTitle => 'NUTRITION PLAN';
+
+  @override
+  String get athleteNutritionChooseOneHint => 'Choose one';
+
+  @override
+  String get athleteNutritionAllHint => 'Include all';
+
+  @override
+  String get athleteNutritionPlanEmpty =>
+      'Your trainer hasn\'t added your nutrition plan yet.';
+
+  @override
+  String get athleteNutritionPlanLoadError =>
+      'We couldn\'t load your nutrition plan.';
+
+  @override
+  String get athleteNutritionNeedsActiveLink =>
+      'You need an active trainer link to view your nutrition plan.';
+
+  @override
+  String get athleteLinkRequired => 'We couldn\'t find an active trainer link.';
+
+  @override
+  String get trainerAcceptsInquiriesTitle => 'Accept inquiries';
+
+  @override
+  String get trainerAcceptsInquiriesSubtitle =>
+      'Athletes can message you before requesting a link. Turn it off and no new inquiries reach you — conversations already open stay open.';
+
+  @override
+  String get athleteLinkUnconfirmed =>
+      'We couldn\'t confirm your trainer link.';
+
+  @override
+  String get athleteLinkRequiredRetry => 'Retry';
+
+  @override
+  String get athleteSessionMissing =>
+      'Your session ended. Please sign in again.';
+
+  @override
+  String get athleteFilesScreenTitle => 'MY FILES';
+
+  @override
+  String get athleteFilesEmpty =>
+      'Your trainer hasn\'t shared any files with you yet.';
+
+  @override
+  String get athleteFilesLoadError => 'We couldn\'t load your files.';
 
   @override
   String get agendaScreenTitle => '';
@@ -2466,7 +2524,7 @@ class AppL10nEn extends AppL10n {
   String get coachHubAlumnosSearchHint => 'Search by name…';
 
   @override
-  String get coachHubAlumnosFilterAll => 'All';
+  String get coachHubAlumnosFilterAll => 'Current';
 
   @override
   String get coachHubAlumnosFilterActivos => 'Active';
@@ -2518,10 +2576,10 @@ class AppL10nEn extends AppL10n {
   String get coachHubAlumnosStatusDebt => 'Overdue';
 
   @override
-  String get coachHubAlumnosStatusBlocked => 'Blocked';
+  String get coachHubAlumnosStatusBlocked => 'No access';
 
   @override
-  String get coachHubAlumnosFilterBloqueados => 'Blocked';
+  String get coachHubAlumnosFilterBloqueados => 'No access';
 
   @override
   String get coachHubAlumnosBlockedHint =>
@@ -2575,11 +2633,11 @@ class AppL10nEn extends AppL10n {
       'We couldn\'t load the note.';
 
   @override
-  String get coachHubAlumnoDetailArchivosTitle => 'Private files';
+  String get coachHubAlumnoDetailArchivosTitle => 'Athlete files';
 
   @override
   String get coachHubAlumnoDetailArchivosSubtitle =>
-      'PDFs and photos you upload about this athlete. Only you can see them.';
+      'PDFs and photos you upload about this athlete. Choose which ones you share.';
 
   @override
   String get coachHubAlumnoDetailArchivosUploadButton => 'UPLOAD FILE';
@@ -2620,6 +2678,23 @@ class AppL10nEn extends AppL10n {
   @override
   String get coachHubAlumnoDetailArchivosDeleteError =>
       'We couldn\'t delete the file.';
+
+  @override
+  String get coachHubAlumnoDetailArchivosSharedLabel => 'SHARED';
+
+  @override
+  String get coachHubAlumnoDetailArchivosPrivateLabel => 'PRIVATE';
+
+  @override
+  String get coachHubAlumnoDetailArchivosShareTooltip => 'Share with athlete';
+
+  @override
+  String get coachHubAlumnoDetailArchivosUnshareTooltip =>
+      'Stop sharing with athlete';
+
+  @override
+  String get coachHubAlumnoDetailArchivosShareError =>
+      'We couldn\'t change who can see the file.';
 
   @override
   String get feedLoadError => 'We couldn\'t load your feed. Please try again.';
@@ -2817,6 +2892,21 @@ class AppL10nEn extends AppL10n {
       'We couldn\'t upload the file. Please try again.';
 
   @override
+  String chatMediaQuotaFull(String maxMb) {
+    return 'You\'ve reached the $maxMb MB limit for chat photos and videos.';
+  }
+
+  @override
+  String chatMediaFileTooLarge(String fileMb, String maxMb) {
+    return 'The file is $fileMb MB and the maximum is $maxMb MB.';
+  }
+
+  @override
+  String chatMediaQuotaNotEnough(String fileMb, String remainingMb) {
+    return 'The file is $fileMb MB and you have $remainingMb MB left.';
+  }
+
+  @override
   String get chatMediaPreviewPhoto => '📷 Photo';
 
   @override
@@ -2982,6 +3072,15 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get profileRoutinesActiveChip => '';
+
+  @override
+  String get profileSectionLegal => 'Legal';
+
+  @override
+  String get legalDocumentsTitle => 'Legal documents';
+
+  @override
+  String get legalDocumentsSubtitle => 'Terms, privacy and more';
 
   @override
   String get appearanceTitle => 'Appearance';
@@ -4209,10 +4308,22 @@ class AppL10nEn extends AppL10n {
   String get paywallFreePlanLimitTitle => '';
 
   @override
-  String get paywallFreePlanLimitDaysBody => '';
+  String paywallFreePlanLimitDaysBody(int max) {
+    return '';
+  }
 
   @override
   String get paywallFreePlanLimitWeeksBody => '';
+
+  @override
+  String paywallFreePlanLimitShapeDaysBody(int actual, int max) {
+    return '';
+  }
+
+  @override
+  String paywallFreePlanLimitShapeWeeksBody(int actual, int max) {
+    return '';
+  }
 
   @override
   String get paywallFreePlanLimitUpgrade => '';
@@ -4224,5 +4335,169 @@ class AppL10nEn extends AppL10n {
   String get paywallFreePlanLimitTemplateBody => '';
 
   @override
+  String paywallFreePlanLimitCustomizeTemplateBody(int max) {
+    return '';
+  }
+
+  @override
   String get workoutPlantillasPremiumChip => '';
+
+  @override
+  String get progressionPeriodLast3Months => '';
+
+  @override
+  String get progressionPeriodLast1Year => '';
+
+  @override
+  String get workoutRoutineFollow => '';
+
+  @override
+  String get workoutRoutineFollowing => '';
+
+  @override
+  String get workoutRoutineFollowSuccess => '';
+
+  @override
+  String get workoutRoutineFollowError => '';
+
+  @override
+  String get paywallFreePlanLimitRoutineCountBody => '';
+
+  @override
+  String get paywallFreePlanLimitChartHistoryBody => '';
+
+  @override
+  String get paywallAlumnoTitulo => '';
+
+  @override
+  String get paywallAlumnoBajada => '';
+
+  @override
+  String get paywallAlumnoPlanMensual => '';
+
+  @override
+  String get paywallAlumnoPlanAnual => '';
+
+  @override
+  String get paywallAlumnoAhorro => '';
+
+  @override
+  String get paywallAlumnoBeneficio1 => '';
+
+  @override
+  String get paywallAlumnoBeneficio2 => '';
+
+  @override
+  String get paywallAlumnoBeneficio3 => '';
+
+  @override
+  String get paywallAlumnoBeneficio4 => '';
+
+  @override
+  String get paywallAlumnoImpuestos => '';
+
+  @override
+  String get paywallAlumnoCta => '';
+
+  @override
+  String get paywallAlumnoRestaurar => '';
+
+  @override
+  String get paywallAlumnoSinPlanes => '';
+
+  @override
+  String get paywallAlumnoReintentar => '';
+
+  @override
+  String get paywallAlumnoListo => '';
+
+  @override
+  String get paywallAlumnoPendiente => '';
+
+  @override
+  String get paywallAlumnoErrorCompra => '';
+
+  @override
+  String get paywallAlumnoSinRestaurar => '';
+
+  @override
+  String get moderationMenuA11y => 'More options';
+
+  @override
+  String get moderationReportAction => 'Report';
+
+  @override
+  String get moderationBlockAction => 'Block';
+
+  @override
+  String get moderationReportSheetTitle => 'Why are you reporting this?';
+
+  @override
+  String get moderationReportReasonHarassment => 'Harassment';
+
+  @override
+  String get moderationReportReasonSexualContent => 'Sexual content';
+
+  @override
+  String get moderationReportReasonViolenceOrSelfHarm =>
+      'Violence or self-harm';
+
+  @override
+  String get moderationReportReasonDangerousHealthAdvice =>
+      'Dangerous health advice';
+
+  @override
+  String get moderationReportReasonImpersonation => 'Impersonation';
+
+  @override
+  String get moderationReportReasonSpam => 'Spam';
+
+  @override
+  String get moderationReportReasonThirdPartyData => 'Third-party data';
+
+  @override
+  String get moderationReportReasonIntellectualProperty =>
+      'Intellectual property';
+
+  @override
+  String get moderationReportReasonOther => 'Other';
+
+  @override
+  String get moderationReportDetailHint => 'Tell us more (optional)';
+
+  @override
+  String get moderationReportSubmit => 'SUBMIT REPORT';
+
+  @override
+  String get moderationReportCancel => 'CANCEL';
+
+  @override
+  String get moderationReportSuccess => 'Thanks, we\'ll review it.';
+
+  @override
+  String get moderationReportError =>
+      'We couldn\'t send the report. Try again.';
+
+  @override
+  String moderationBlockConfirmTitle(String name) {
+    return 'Block $name?';
+  }
+
+  @override
+  String get moderationBlockConfirmBody =>
+      'They won\'t be able to message you, follow you, or react to your posts.';
+
+  @override
+  String get moderationBlockConfirmAction => 'BLOCK';
+
+  @override
+  String get moderationBlockDismiss => 'CANCEL';
+
+  @override
+  String moderationBlockSuccess(String name) {
+    return 'You blocked $name.';
+  }
+
+  @override
+  String get moderationBlockError => 'We couldn\'t block them. Try again.';
 }

@@ -1,3 +1,4 @@
+import 'package:firebase_core/firebase_core.dart' show FirebaseException;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -235,25 +236,10 @@ class _CuentaFormState extends ConsumerState<_CuentaForm> {
       children: [
         Align(
           alignment: Alignment.centerRight,
-          child: ElevatedButton(
-            onPressed: (_canSave && !_saving) ? _save : null,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: palette.accent,
-              foregroundColor: TreinoButtonTokens.foreground(context),
-              disabledBackgroundColor: palette.bgCard,
-              disabledForegroundColor: palette.textMuted,
-              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
-            ),
-            child: _saving
-                ? SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: TreinoButtonTokens.foreground(context),
-                    ),
-                  )
-                : const Text('GUARDAR CAMBIOS'), // i18n: Fase W3
+          child: TreinoButton(
+            label: 'GUARDAR CAMBIOS', // i18n: Fase W3
+            loading: _saving,
+            onPressed: _canSave ? _save : null,
           ),
         ),
         const SizedBox(height: 16),
@@ -441,13 +427,40 @@ class _FotoEditorState extends ConsumerState<_FotoEditor> {
       // huérfano en avatars/{uid}.jpg con la UI diciendo que lo quitó. Hasta
       // #765 esto era best-effort y mentía siempre. `deleteStored()` sí tolera
       // `object-not-found` — que no haya objeto es el estado deseado.
-      await ref.read(avatarWebUploaderProvider).deleteStored();
-      await ref
-          .read(userRepositoryProvider)
-          .update(widget.profile.uid, {'avatarUrl': null});
+      //
+      // Los dos pasos van en `try` SEPARADOS: son dos backends distintos
+      // (Storage y Firestore) con reglas distintas, y el `catch (_)` único que
+      // había hacía imposible saber cuál de los dos falló. Un PF reportó
+      // «no me funciona lo de sacar la foto» y lo único que había para
+      // diagnosticar era ese mensaje genérico, que sirve igual para un permiso
+      // de Storage denegado que para una escritura de Firestore rechazada.
+      try {
+        await ref.read(avatarWebUploaderProvider).deleteStored();
+      } on FirebaseException catch (e) {
+        // i18n: Fase W3
+        _toast('No se pudo borrar la imagen del servidor (${e.code}). '
+            'Probá de nuevo.');
+        return;
+      }
+
+      try {
+        await ref
+            .read(userRepositoryProvider)
+            .update(widget.profile.uid, {'avatarUrl': null});
+      } on FirebaseException catch (e) {
+        // La imagen YA se borró de Storage pero el perfil sigue apuntándola:
+        // el estado es inconsistente y el mensaje tiene que decirlo, no un
+        // «probá de nuevo» que sugiere que no pasó nada.
+        // i18n: Fase W3
+        _toast('La imagen se borró pero el perfil no se actualizó '
+            '(${e.code}). Recargá la página.');
+        return;
+      }
+
       _toast('Foto quitada'); // i18n: Fase W3
-    } catch (_) {
-      _toast('No se pudo quitar la foto. Probá de nuevo.'); // i18n: Fase W3
+    } catch (e) {
+      // i18n: Fase W3
+      _toast('No se pudo quitar la foto: $e');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -503,23 +516,17 @@ class _FotoEditorState extends ConsumerState<_FotoEditor> {
                 runSpacing: 8,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  OutlinedButton(
-                    onPressed: _busy ? null : _changePhoto,
-                    child: _busy
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('CAMBIAR FOTO'), // i18n: Fase W3
+                  TreinoButton(
+                    label: 'CAMBIAR FOTO', // i18n: Fase W3
+                    variant: TreinoButtonVariant.secondary,
+                    loading: _busy,
+                    onPressed: _changePhoto,
                   ),
                   if (hasAvatar)
-                    TextButton(
+                    TreinoButton(
+                      label: 'QUITAR', // i18n: Fase W3
+                      variant: TreinoButtonVariant.danger,
                       onPressed: _busy ? null : _removePhoto,
-                      style: TextButton.styleFrom(
-                        foregroundColor: palette.danger,
-                      ),
-                      child: const Text('QUITAR'), // i18n: Fase W3
                     ),
                 ],
               ),
@@ -576,21 +583,20 @@ class _DangerZone extends ConsumerWidget {
             spacing: 12,
             runSpacing: 12,
             children: [
-              OutlinedButton(
+              // Pausar NO es destructivo —se revierte— así que se queda en
+              // secundario. Eliminar la cuenta sí, y ahora se ve distinto.
+              // Antes eran dos pills iguales salvo por el color del borde:
+              // `warning` y `danger` uno al lado del otro, que a ojo son «dos
+              // botones de peligro» y no una escalación.
+              TreinoButton(
+                label: 'PAUSAR CUENTA', // i18n: Fase W3
+                variant: TreinoButtonVariant.secondary,
                 onPressed: () => _confirmPausarCuenta(context),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: palette.warning,
-                  side: BorderSide(color: palette.warning),
-                ),
-                child: const Text('PAUSAR CUENTA'), // i18n: Fase W3
               ),
-              OutlinedButton(
+              TreinoButton(
+                label: 'ELIMINAR CUENTA', // i18n: Fase W3
+                variant: TreinoButtonVariant.danger,
                 onPressed: () => _confirmEliminarCuenta(context),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: palette.danger,
-                  side: BorderSide(color: palette.danger),
-                ),
-                child: const Text('ELIMINAR CUENTA'), // i18n: Fase W3
               ),
             ],
           ),

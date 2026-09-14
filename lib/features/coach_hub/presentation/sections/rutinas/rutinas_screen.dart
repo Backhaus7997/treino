@@ -4,103 +4,77 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/motion/treino_state_switcher.dart';
 import 'package:treino/core/widgets/motion/treino_tappable.dart';
-import 'package:treino/core/widgets/treino_icon.dart';
-import 'package:treino/features/coach/application/trainer_link_providers.dart';
-import 'package:treino/features/coach/domain/trainer_link.dart';
-import 'package:treino/features/coach/domain/trainer_link_status.dart';
-import 'package:treino/features/coach_hub/presentation/sections/chat/widgets/avatar_color.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
-import 'package:treino/features/profile/application/user_public_profile_providers.dart';
-import 'package:treino/features/profile/domain/user_public_profile.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
+import 'package:treino/features/profile/application/user_public_profile_providers.dart';
+import 'package:treino/features/workout/application/session_providers.dart'
+    show currentUidProvider;
+import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_status.dart';
+import 'package:treino/features/workout/domain/routine_visibility.dart';
+
+import 'routine_card_grid.dart';
 
 /// Sección «Rutinas» del Coach Hub web.
 ///
-/// Una rutina se asigna a UN alumno, así que el flujo necesita un destino.
-/// El sidebar es global (no está parado sobre ningún alumno), por eso esta
-/// pantalla es el punto de entrada: lista los alumnos vinculados y, al tocar
-/// uno, abre sus rutinas (`/rutinas/:athleteId`) donde el PF ve las que ya le
-/// cargó y puede crear o editar. Mismo espíritu que mobile, expuesto desde el
-/// menú lateral.
+/// Lista LAS RUTINAS del PF, no sus alumnos.
 ///
-/// Redesign (triage list): cada fila ahora también muestra el gimnasio, un
-/// estado del vínculo y la cantidad de rutinas ACTIVAS ya asignadas — así el
-/// PF ve de un vistazo a quién todavía le falta armar una rutina, sin abrir
-/// cada alumno. Mismos patrones visuales que la lista de Alumnos ya
-/// rediseñada (avatar de color, pill de estado).
+/// Antes esta pantalla era un roster: listaba personas y contaba cuántas
+/// rutinas activas tenía cada una. Eso dejaba afuera la mitad del trabajo de
+/// un PF —una plantilla sin asignar no le pertenece a ningún alumno, así que
+/// no aparecía en ninguna fila— y obligaba a entrar alumno por alumno para
+/// encontrar un plan cuyo nombre ya se sabía.
 ///
-/// Filtros/búsqueda/toggle Tabla-Cards (port de Alumnos): a diferencia de
-/// Alumnos, acá el eje propio de esta pantalla es la CANTIDAD DE RUTINAS —
-/// no hay dimensión de deuda. Por eso el filtro se define localmente
-/// (`RutinaFiltro`) en vez de reusar `RosterFiltro` de Alumnos.
+/// El eje es el AUTOR: `routinesAuthoredByProvider` trae todo lo que el PF
+/// creó, plantillas y planes juntos, y cada card dice qué es con sus
+/// etiquetas. Es la primera pantalla del Hub donde esas dos formas conviven —
+/// hasta ahora los planes vivían acá y las plantillas en Biblioteca.
 class RutinasScreen extends ConsumerWidget {
   const RutinasScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
-    final linksAsync = ref.watch(trainerLinksStreamProvider);
+    final uid = ref.watch(currentUidProvider) ?? '';
+    final rutinasAsync = ref.watch(routinesAuthoredByProvider(uid));
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const TreinoSectionHeader(title: 'Rutinas'), // i18n
-          const SizedBox(height: 6),
           TreinoFadeSlideIn(
-            delay: AppMotion.stagger(1),
-            child: Text(
-              'Elegí un alumno para armarle una rutina.', // i18n
-              style: TextStyle(
-                fontFamily: AppFonts.barlow,
-                color: palette.textMuted,
-                fontSize: 14,
-              ),
+            delay: AppMotion.stagger(0),
+            child: const CoachHubSectionHero(
+              title: 'Rutinas', // i18n
+              subtitle: 'Todo lo que creaste: planes y plantillas.', // i18n
             ),
           ),
           const SizedBox(height: 20),
           TreinoStateSwitcher(
-            childKey: ValueKey(linksAsync.when(
+            childKey: ValueKey(rutinasAsync.when(
               loading: () => 'loading',
               error: (_, __) => 'error',
-              data: (links) => links
-                      .where((l) => l.status != TrainerLinkStatus.pending)
-                      .isEmpty
-                  ? 'empty'
-                  : 'data',
+              data: (rs) => rs.isEmpty ? 'empty' : 'data',
             )),
-            child: linksAsync.when(
-              loading: () => const Padding(
-                padding: EdgeInsets.symmetric(vertical: 40),
-                child: Center(child: CircularProgressIndicator()),
+            child: rutinasAsync.when(
+              loading: () => const CoachHubSkeleton(
+                filas: 4,
+                padding: EdgeInsets.symmetric(vertical: 24, horizontal: 12),
               ),
               error: (_, __) =>
-                  _muted(palette, 'No pudimos cargar los alumnos.'), // i18n
-              data: (links) {
-                // Una fila por alumno: colapsamos al link más reciente (el stream
-                // viene requestedAt DESC) y excluimos `pending` (esas son
-                // solicitudes, todavía no son alumnos).
-                final seen = <String>{};
-                final athletes = <TrainerLink>[];
-                for (final l in links) {
-                  if (l.status == TrainerLinkStatus.pending) continue;
-                  if (seen.add(l.athleteId)) athletes.add(l);
-                }
-                if (athletes.isEmpty) {
-                  return _muted(
-                      palette, 'Todavía no tenés alumnos vinculados.'); // i18n
-                }
-                return _RutinasRosterView(athletes: athletes);
-              },
+                  _muted(palette, 'No pudimos cargar tus rutinas.'), // i18n
+              data: (rutinas) => rutinas.isEmpty
+                  ? _muted(
+                      palette, 'Todavía no creaste ninguna rutina.') // i18n
+                  : _RutinasView(rutinas: rutinas),
             ),
           ),
         ],
@@ -115,194 +89,223 @@ Widget _muted(AppPalette palette, String text) => Padding(
           style: TextStyle(
               fontFamily: AppFonts.barlow,
               color: palette.textMuted,
-              fontSize: 14)),
+              fontSize: AppTextSize.body)),
     );
 
-/// Estado simplificado del vínculo para esta lista — a diferencia de
-/// `AlumnoEstado` (alumnos_screen.dart) no factoriza deuda: acá solo importa
-/// si el vínculo está activo, pausado o inactivo para decidir si tiene
-/// sentido armarle una rutina.
-enum _LinkEstado { activo, pausado, inactivo }
+/// Los filtros de la sección, sobre el ESTADO de la rutina.
+///
+/// Antes eran cinco: `todas · asignadas · plantillas · publicas · archivadas`.
+/// Los dos del medio se fueron, y no por simplificar: **«asignadas» y
+/// «plantillas» dejaron de ser filtros para ser los dos BLOQUES** en que la
+/// pantalla se divide (ver [_RutinasView]). Un chip que muestra exactamente el
+/// contenido de un bloque que ya está en pantalla no filtra nada, sólo esconde
+/// el otro.
+///
+/// Lo que queda es un eje de estado, que sí es transversal a los dos bloques:
+/// qué está en uso, qué está publicado, qué se guardó.
+enum RutinaFiltro { vigentes, publicas, archivadas }
 
-_LinkEstado _estadoFor(TrainerLinkStatus status) => switch (status) {
-      TrainerLinkStatus.active => _LinkEstado.activo,
-      TrainerLinkStatus.paused => _LinkEstado.pausado,
-      TrainerLinkStatus.terminated ||
-      TrainerLinkStatus.pending =>
-        _LinkEstado.inactivo,
-    };
-
-extension on _LinkEstado {
+extension RutinaFiltroX on RutinaFiltro {
   String get label => switch (this) {
-        _LinkEstado.activo => 'Activo', // i18n
-        _LinkEstado.pausado => 'Pausado', // i18n
-        _LinkEstado.inactivo => 'Inactivo', // i18n
-      };
-
-  Color color(AppPalette p) => switch (this) {
-        _LinkEstado.activo => p.accent,
-        _LinkEstado.pausado => p.highlight,
-        _LinkEstado.inactivo => p.textMuted,
+        RutinaFiltro.vigentes => 'Vigentes', // i18n
+        RutinaFiltro.publicas => 'Públicas', // i18n
+        RutinaFiltro.archivadas => 'Archivadas', // i18n
       };
 }
 
-/// Filtro de la lista de Rutinas (chips). A diferencia de `RosterFiltro`
-/// (Alumnos) no hay `conDeuda` — el eje propio de esta pantalla es la
-/// cantidad de rutinas activas asignadas.
-enum RutinaFiltro { todos, sinRutina, conRutina, activos, inactivos }
+/// Si [r] entra en [f].
+///
+/// «Vigentes» excluye las ARCHIVADAS, igual que el chip equivalente del roster
+/// de Alumnos excluye a los inactivos: lo archivado sigue existiendo y tiene su
+/// propio chip, pero no compite por la atención con lo que está en uso. Sin
+/// esa exclusión, un PF con años de planes terminados vería su biblioteca
+/// enterrada bajo lo que ya no usa.
+bool matchesFiltro(Routine r, RutinaFiltro f) {
+  final archivada = r.status == RoutineStatus.archived;
 
-extension on RutinaFiltro {
-  String get label => switch (this) {
-        RutinaFiltro.todos => 'Todos', // i18n
-        RutinaFiltro.sinRutina => 'Sin rutina', // i18n
-        RutinaFiltro.conRutina => 'Con rutina', // i18n
-        RutinaFiltro.activos => 'Activos', // i18n
-        RutinaFiltro.inactivos => 'Inactivos', // i18n
-      };
+  return switch (f) {
+    RutinaFiltro.vigentes => !archivada,
+    RutinaFiltro.publicas =>
+      r.visibility == RoutineVisibility.public && !archivada,
+    RutinaFiltro.archivadas => archivada,
+  };
 }
 
-/// Un alumno matchea el filtro según:
-/// - `todos`/`activos`/`inactivos`: solo dependen del estado del vínculo, ya
-///   resuelto sync (no hay red de por medio) — siempre evaluables.
-/// - `sinRutina`/`conRutina`: dependen de `activeRoutinesCount`, que puede
-///   estar `null` mientras el provider por-alumno todavía está cargando. Un
-///   alumno en ese estado NO matchea ninguno de los dos filtros basados en
-///   conteo (se excluye de ambos hasta resolver) — así nunca aparece como
-///   "Sin rutina" de forma incorrecta solo porque todavía no cargó.
-bool _matchesFiltro(
-        _LinkEstado estado, int? activeRoutinesCount, RutinaFiltro f) =>
-    switch (f) {
-      RutinaFiltro.todos => true,
-      RutinaFiltro.sinRutina =>
-        activeRoutinesCount != null && activeRoutinesCount == 0,
-      RutinaFiltro.conRutina =>
-        activeRoutinesCount != null && activeRoutinesCount > 0,
-      RutinaFiltro.activos => estado == _LinkEstado.activo,
-      RutinaFiltro.inactivos => estado == _LinkEstado.inactivo,
-    };
-
-final _rutinaFiltroProvider =
-    StateProvider.autoDispose<RutinaFiltro>((_) => RutinaFiltro.todos);
+final _filtroProvider =
+    StateProvider.autoDispose<RutinaFiltro>((_) => RutinaFiltro.vigentes);
 final _queryProvider = StateProvider.autoDispose<String>((_) => '');
 
-/// Modo de visualización (toggle Tabla / Cards), mismo patrón que Alumnos.
-enum RutinaViewMode { tabla, cards }
+class _RutinasView extends ConsumerWidget {
+  const _RutinasView({required this.rutinas});
 
-final _rutinaViewModeProvider =
-    StateProvider.autoDispose<RutinaViewMode>((_) => RutinaViewMode.tabla);
-
-/// Vista con los datos ya resueltos por alumno.
-///
-/// Antes cada `_AthleteRow` leía su propio perfil y conteo de rutinas. Para
-/// poder filtrar/contar por la dimensión de rutinas a nivel de LISTA (chips
-/// con contador, ej. "SIN RUTINA · 5") hace falta conocer el estado y el
-/// conteo de TODOS los alumnos acá arriba, no fila por fila. Por eso este
-/// widget mira (`.watch`) `userPublicProfileProvider` y
-/// `assignedRoutinesProvider` una vez por alumno — sí, es un `.family`
-/// provider por alumno en un loop en el padre, pero es la única forma de que
-/// el padre conozca todo antes de filtrar (mismo costo de red que antes,
-/// solo que leído un nivel más arriba).
-class _RutinasRosterView extends ConsumerWidget {
-  const _RutinasRosterView({required this.athletes});
-
-  final List<TrainerLink> athletes;
+  final List<Routine> rutinas;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
-    final filtro = ref.watch(_rutinaFiltroProvider);
+    final filtro = ref.watch(_filtroProvider);
     final query = ref.watch(_queryProvider).trim().toLowerCase();
-    final viewMode = ref.watch(_rutinaViewModeProvider);
 
-    final profileById = <String, UserPublicProfile?>{};
-    final countById = <String, int?>{};
-    final estadoById = <String, _LinkEstado>{};
-    for (final link in athletes) {
-      final athleteId = link.athleteId;
-      profileById[athleteId] =
-          ref.watch(userPublicProfileProvider(athleteId)).valueOrNull;
-      countById[athleteId] = ref
-          .watch(assignedRoutinesProvider(athleteId))
-          .valueOrNull
-          ?.where((r) => r.status == RoutineStatus.active)
-          .length;
-      estadoById[athleteId] = _estadoFor(link.status);
-    }
+    int countFor(RutinaFiltro f) =>
+        rutinas.where((r) => matchesFiltro(r, f)).length;
 
-    String nameFor(String athleteId) {
-      final raw = profileById[athleteId]?.displayName ?? '';
-      return raw.isEmpty ? 'Alumno' : raw; // i18n
-    }
-
-    int countFor(RutinaFiltro f) => athletes
-        .where((l) =>
-            _matchesFiltro(estadoById[l.athleteId]!, countById[l.athleteId], f))
-        .length;
-
-    final visibles = athletes.where((l) {
-      final athleteId = l.athleteId;
-      if (!_matchesFiltro(
-          estadoById[athleteId]!, countById[athleteId], filtro)) {
-        return false;
-      }
+    final visibles = rutinas.where((r) {
+      if (!matchesFiltro(r, filtro)) return false;
       if (query.isEmpty) return true;
-      // Match against the REAL name, not the "Alumno" fallback. If the profile
-      // hasn't loaded yet (name null), don't exclude the athlete from search —
-      // same loading-safety principle as the count filters (a still-loading
-      // row is never wrongly hidden just because its data hasn't arrived).
-      final realName = profileById[athleteId]?.displayName;
-      if (realName == null || realName.isEmpty) return true;
-      return realName.toLowerCase().contains(query);
+      // Se busca por NOMBRE y por split: son las dos cosas que el PF recuerda
+      // de una rutina cuando la está buscando.
+      final enNombre = r.name.toLowerCase().contains(query);
+      final enSplit = (r.split ?? '').toLowerCase().contains(query);
+      return enNombre || enSplit;
     }).toList();
+
+    // El corte que ordena la sección. Una plantilla y la copia que entrena un
+    // alumno son cosas distintas —una se reutiliza, la otra tiene dueño— y
+    // mezcladas se pierden: con 20 alumnos y 5 rutinas cada uno, las 5
+    // plantillas del PF son el 5% de una grilla de 100 tarjetas.
+    //
+    // Se parte por `assignedTo` y NADA MÁS, a propósito. Los chips que esto
+    // reemplaza usaban dos predicados distintos —«Plantillas» miraba `source`,
+    // «Asignadas» miraba `assignedTo`— y dos predicados pueden discrepar: una
+    // rutina podía caer en los dos o en ninguno, y en el segundo caso
+    // desaparecía de la pantalla sin que nada fallara. Con un solo predicado
+    // booleano cada rutina cae en exactamente un bloque, siempre. (Hoy los dos
+    // coinciden: las reglas exigen `assignedTo == null` en una plantilla y
+    // `assignTemplateToAthlete` mueve `source` y `assignedTo` juntos. Pero no
+    // hace falta confiar en eso para que la suma cierre.)
+    final plantillas = visibles.where((r) => (r.assignedTo ?? '').isEmpty);
+    final asignadas = visibles.where((r) => (r.assignedTo ?? '').isNotEmpty);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(child: _FilterBar(filtro: filtro, countFor: countFor)),
-            const SizedBox(width: 12),
-            const _ViewModeToggle(),
-          ],
-        ),
-        const SizedBox(height: 12),
-        _SearchField(),
-        const SizedBox(height: 14),
+        _FilterBar(filtro: filtro, countFor: countFor),
+        const SizedBox(height: AppSpacing.s12),
+        const _SearchField(),
+        const SizedBox(height: AppSpacing.s18),
         if (visibles.isEmpty)
-          _muted(palette, 'No encontramos alumnos con esos filtros.') // i18n
-        else if (viewMode == RutinaViewMode.tabla)
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (final (i, link) in visibles.indexed)
-                // key por athleteId: sin ella el matching de Elements es
-                // posicional, y cualquier cambio de la lista visible (filtro,
-                // búsqueda, o una inserción del stream) hace que las filas
-                // existentes reusen el State one-shot corrido de posición y
-                // la última infle una animación nueva — exactamente al revés
-                // de la intención.
-                TreinoFadeSlideIn(
-                  key: ValueKey(link.athleteId),
-                  delay: AppMotion.stagger(i),
-                  child: _AthleteRow(
-                    athleteId: link.athleteId,
-                    name: nameFor(link.athleteId),
-                    avatarUrl: profileById[link.athleteId]?.avatarUrl,
-                    gymName: profileById[link.athleteId]?.gymName,
-                    estado: estadoById[link.athleteId]!,
-                    activeRoutinesCount: countById[link.athleteId],
-                  ),
-                ),
+          _muted(palette, 'No encontramos rutinas con esos filtros.') // i18n
+        else ...[
+          if (plantillas.isNotEmpty) ...[
+            _BloqueHeader(
+              titulo: 'Mis plantillas', // i18n
+              cuenta: plantillas.length,
+            ),
+            const SizedBox(height: AppSpacing.s12),
+            RoutineCardGrid(routines: plantillas.toList()),
+          ],
+          if (plantillas.isNotEmpty && asignadas.isNotEmpty)
+            const SizedBox(height: AppSpacing.s20),
+          if (asignadas.isNotEmpty) ...[
+            _BloqueHeader(
+              titulo: 'Lo que entrena cada alumno', // i18n
+              cuenta: asignadas.length,
+            ),
+            for (final grupo in _agruparPorAlumno(asignadas)) ...[
+              const SizedBox(height: AppSpacing.s14),
+              _GrupoDeAlumno(athleteId: grupo.key, rutinas: grupo.value),
             ],
-          )
-        else
-          _RutinasCardsGrid(
-            athletes: visibles,
-            nameFor: nameFor,
-            profileById: profileById,
-            countById: countById,
+          ],
+        ],
+      ],
+    );
+  }
+}
+
+/// Parte [rutinas] por alumno, **conservando el orden de llegada**.
+///
+/// El orden importa y es gratis: `listAuthoredBy` ya devuelve la lista ordenada
+/// por `createdAt` descendente, así que respetarlo deja arriba al alumno cuya
+/// rutina se tocó más recientemente — que es por dónde el PF vuelve a entrar.
+///
+/// **Alfabético sería mejor y no se puede pagar acá.** Ordenar por nombre
+/// obliga a resolver los perfiles de los N alumnos ANTES de dibujar el primer
+/// grupo, y esta pantalla evita eso a propósito desde #1065: cada card —y ahora
+/// cada encabezado— resuelve su nombre por su cuenta y muestra un placeholder
+/// mientras tanto. Con nombres en el padre, un perfil lento deja la sección
+/// entera en blanco, y uno que resuelve tarde REORDENA los grupos bajo el
+/// cursor. Un `LinkedHashMap` no necesita ningún nombre.
+List<MapEntry<String, List<Routine>>> _agruparPorAlumno(
+  Iterable<Routine> rutinas,
+) {
+  final porAlumno = <String, List<Routine>>{};
+  for (final r in rutinas) {
+    porAlumno.putIfAbsent(r.assignedTo!, () => <Routine>[]).add(r);
+  }
+  return porAlumno.entries.toList();
+}
+
+/// El encabezado de uno de los dos bloques de la sección.
+class _BloqueHeader extends StatelessWidget {
+  const _BloqueHeader({required this.titulo, required this.cuenta});
+
+  final String titulo;
+  final int cuenta;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Row(
+      children: [
+        Text(
+          titulo.toUpperCase(),
+          style: TextStyle(
+            fontFamily: AppFonts.barlowCondensed,
+            fontWeight: AppFonts.w700,
+            fontSize: AppTextSize.body,
+            letterSpacing: 0.5,
+            color: palette.textPrimary,
           ),
+        ),
+        const SizedBox(width: AppSpacing.s8),
+        Text(
+          '$cuenta',
+          style: TextStyle(
+            fontFamily: AppFonts.barlow,
+            fontWeight: AppFonts.w700,
+            fontSize: AppTextSize.caption,
+            color: palette.textMuted,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Las rutinas de UN alumno, bajo su nombre.
+///
+/// Resuelve el nombre por su cuenta, igual que las etiquetas de cada card. Es
+/// lo que permite que [_agruparPorAlumno] no necesite perfiles: mientras el
+/// suyo carga —o si la cuenta se borró— dice «Alumno», nunca un uid ni un
+/// nombre inventado.
+class _GrupoDeAlumno extends ConsumerWidget {
+  const _GrupoDeAlumno({required this.athleteId, required this.rutinas});
+
+  final String athleteId;
+  final List<Routine> rutinas;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = AppPalette.of(context);
+    final perfil = ref.watch(userPublicProfileProvider(athleteId));
+    final limpio = perfil.valueOrNull?.displayName?.trim();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          limpio == null || limpio.isEmpty
+              ? 'Alumno' // i18n
+              : limpio,
+          style: TextStyle(
+            fontFamily: AppFonts.barlow,
+            fontWeight: AppFonts.w600,
+            fontSize: AppTextSize.bodyDense,
+            color: palette.accentText,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.s8),
+        RoutineCardGrid(routines: rutinas),
       ],
     );
   }
@@ -314,29 +317,18 @@ class _FilterBar extends ConsumerWidget {
   final RutinaFiltro filtro;
   final int Function(RutinaFiltro) countFor;
 
-  static const _chips = [
-    RutinaFiltro.todos,
-    RutinaFiltro.sinRutina,
-    RutinaFiltro.conRutina,
-    RutinaFiltro.activos,
-    RutinaFiltro.inactivos,
-  ];
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final palette = AppPalette.of(context);
     return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+      spacing: AppSpacing.s8,
+      runSpacing: AppSpacing.s8,
       children: [
-        for (final f in _chips)
+        for (final f in RutinaFiltro.values)
           _Chip(
-            // "TODOS · 12" — label mayúscula + punto medio + contador, mismo
-            // patrón que Alumnos.
-            label: '${f.label.toUpperCase()} · ${countFor(f)}',
+            label: f.label,
+            count: countFor(f),
             selected: f == filtro,
-            onTap: () => ref.read(_rutinaFiltroProvider.notifier).state = f,
-            palette: palette,
+            onTap: () => ref.read(_filtroProvider.notifier).state = f,
           ),
       ],
     );
@@ -346,38 +338,60 @@ class _FilterBar extends ConsumerWidget {
 class _Chip extends StatelessWidget {
   const _Chip({
     required this.label,
+    required this.count,
     required this.selected,
     required this.onTap,
-    required this.palette,
   });
 
   final String label;
+  final int count;
   final bool selected;
   final VoidCallback onTap;
-  final AppPalette palette;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
+    final palette = AppPalette.of(context);
+    return TreinoTappable(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-        decoration: BoxDecoration(
-          color: selected ? palette.accent : Colors.transparent,
-          border: Border.all(color: selected ? palette.accent : palette.border),
-          borderRadius: BorderRadius.circular(AppRadius.lg),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.s14,
+          vertical: AppSpacing.s8,
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected
-                ? TreinoButtonTokens.foreground(context)
-                : palette.textMuted,
-            fontSize: 12,
-            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-            letterSpacing: 0.4,
+        decoration: BoxDecoration(
+          color: selected
+              ? palette.accent.withValues(alpha: 0.16)
+              : Colors.transparent,
+          border: Border.all(
+            color: selected ? palette.accent : palette.border,
           ),
+          borderRadius: BorderRadius.circular(AppRadius.full),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontFamily: AppFonts.barlow,
+                fontWeight: AppFonts.w600,
+                fontSize: AppTextSize.bodyDense,
+                // `accentText` y no `accent`: esto es TEXTO, y el acento como
+                // tinta sobre claro no llega a 4,5:1.
+                color: selected ? palette.accentText : palette.textPrimary,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.s8),
+            Text(
+              '$count',
+              style: TextStyle(
+                fontFamily: AppFonts.barlow,
+                fontWeight: AppFonts.w700,
+                fontSize: AppTextSize.caption,
+                color: palette.textMuted,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -385,16 +399,24 @@ class _Chip extends StatelessWidget {
 }
 
 class _SearchField extends ConsumerStatefulWidget {
+  const _SearchField();
+
   @override
   ConsumerState<_SearchField> createState() => _SearchFieldState();
 }
 
 class _SearchFieldState extends ConsumerState<_SearchField> {
-  final _controller = TextEditingController();
+  late final TextEditingController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: ref.read(_queryProvider));
+  }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _ctrl.dispose();
     super.dispose();
   }
 
@@ -402,430 +424,17 @@ class _SearchFieldState extends ConsumerState<_SearchField> {
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     return TextField(
-      controller: _controller,
+      key: const Key('rutinas_search_field'),
+      controller: _ctrl,
       onChanged: (v) => ref.read(_queryProvider.notifier).state = v,
-      style: TextStyle(color: palette.textPrimary, fontSize: 14),
+      style: TextStyle(
+        fontFamily: AppFonts.barlow,
+        color: palette.textPrimary,
+        fontSize: AppTextSize.body,
+      ),
       decoration: InputDecoration(
-        hintText: 'Buscar por nombre…', // i18n
-        hintStyle: TextStyle(color: palette.textMuted),
-        prefixIcon: Icon(TreinoIcon.search, color: palette.textMuted, size: 18),
-        isDense: true,
-        filled: true,
-        fillColor: palette.bgCard,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-          borderSide: BorderSide(color: palette.border),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-          borderSide: BorderSide(color: palette.border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-          borderSide: BorderSide(color: palette.accent),
-        ),
-      ),
-    );
-  }
-}
-
-class _ViewModeToggle extends ConsumerWidget {
-  const _ViewModeToggle();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final palette = AppPalette.of(context);
-    final mode = ref.watch(_rutinaViewModeProvider);
-    Widget option(RutinaViewMode m, IconData icon, String label) {
-      final selected = m == mode;
-      return GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => ref.read(_rutinaViewModeProvider.notifier).state = m,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-          decoration: BoxDecoration(
-            color: selected ? palette.accent : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon,
-                  size: 15,
-                  color: selected
-                      ? TreinoButtonTokens.foreground(context)
-                      : palette.textMuted),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  color: selected
-                      ? TreinoButtonTokens.foreground(context)
-                      : palette.textMuted,
-                  fontSize: 13,
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        border: Border.all(color: palette.border),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          option(RutinaViewMode.tabla, TreinoIcon.viewTable, 'Tabla'), // i18n
-          option(RutinaViewMode.cards, TreinoIcon.viewCards, 'Cards'), // i18n
-        ],
-      ),
-    );
-  }
-}
-
-/// Fila de un alumno — tap abre el editor de rutinas para ese alumno.
-///
-/// Recibe todo ya resuelto por el padre (`_RutinasRosterView`) en vez de
-/// mirar sus propios providers: así el padre (que necesita los mismos datos
-/// para filtrar/contar) y la fila siempre coinciden — una única fuente de
-/// verdad por alumno.
-class _AthleteRow extends StatefulWidget {
-  const _AthleteRow({
-    required this.athleteId,
-    required this.name,
-    required this.avatarUrl,
-    required this.gymName,
-    required this.estado,
-    required this.activeRoutinesCount,
-  });
-
-  final String athleteId;
-  final String name;
-  final String? avatarUrl;
-  final String? gymName;
-  final _LinkEstado estado;
-  final int? activeRoutinesCount;
-
-  @override
-  State<_AthleteRow> createState() => _AthleteRowState();
-}
-
-class _AthleteRowState extends State<_AthleteRow> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    final gymName = widget.gymName;
-
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      // TreinoTappable ya aplica HitTestBehavior.opaque internamente, así que
-      // el box padeado entero sigue siendo tappeable (el avatar mide 36px,
-      // debajo del mínimo de 44pt) y además suma el feedback de presión.
-      child: TreinoTappable(
-        onTap: () => context.push('/rutinas/${widget.athleteId}'),
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: palette.bgCard,
-            borderRadius: BorderRadius.circular(AppRadius.sm),
-            border: Border.all(
-                color: _hovered ? palette.borderHover : palette.border),
-          ),
-          child: Row(
-            children: [
-              _Avatar(
-                  name: widget.name,
-                  url: widget.avatarUrl,
-                  athleteId: widget.athleteId),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.name,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          fontFamily: AppFonts.barlow,
-                          color: palette.textPrimary,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600),
-                    ),
-                    if (gymName != null && gymName.isNotEmpty)
-                      Text(
-                        gymName,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                            fontFamily: AppFonts.barlow,
-                            color: palette.textMuted,
-                            fontSize: 12),
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              // Fixed widths so the pills form aligned columns across rows
-              // regardless of label length ("Activo" vs "Inactivo", "1 rutina"
-              // vs "Sin rutina"). Pills are left-aligned within their slot.
-              SizedBox(
-                width: 96,
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: _EstadoPill(estado: widget.estado),
-                ),
-              ),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 92,
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: _RoutineCountBadge(count: widget.activeRoutinesCount),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Icon(TreinoIcon.chevronRight, size: 18, color: palette.textMuted),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Grilla responsive de cards (modo Cards). A diferencia de Alumnos, la card
-/// acá es deliberadamente simple (decisión del usuario): solo avatar + nombre
-/// + badge de conteo de rutinas — sin gimnasio, sin pill de estado, sin
-/// último entreno ni deuda.
-class _RutinasCardsGrid extends StatelessWidget {
-  const _RutinasCardsGrid({
-    required this.athletes,
-    required this.nameFor,
-    required this.profileById,
-    required this.countById,
-  });
-
-  final List<TrainerLink> athletes;
-  final String Function(String athleteId) nameFor;
-  final Map<String, UserPublicProfile?> profileById;
-  final Map<String, int?> countById;
-
-  static const double _targetCardWidth = 300;
-  static const double _runSpacing = 12;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final availableWidth = constraints.maxWidth;
-        final rawColumns =
-            ((availableWidth + _runSpacing) / (_targetCardWidth + _runSpacing))
-                .floor();
-        final columns = rawColumns < 1 ? 1 : rawColumns;
-        final totalSpacing = _runSpacing * (columns - 1);
-        final cardWidth = (availableWidth - totalSpacing) / columns;
-        return Wrap(
-          spacing: _runSpacing,
-          runSpacing: _runSpacing,
-          children: [
-            for (final link in athletes)
-              SizedBox(
-                width: cardWidth,
-                child: _RutinasCard(
-                  athleteId: link.athleteId,
-                  name: nameFor(link.athleteId),
-                  avatarUrl: profileById[link.athleteId]?.avatarUrl,
-                  activeRoutinesCount: countById[link.athleteId],
-                ),
-              ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _RutinasCard extends StatelessWidget {
-  const _RutinasCard({
-    required this.athleteId,
-    required this.name,
-    required this.avatarUrl,
-    required this.activeRoutinesCount,
-  });
-
-  final String athleteId;
-  final String name;
-  final String? avatarUrl;
-  final int? activeRoutinesCount;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => context.push('/rutinas/$athleteId'),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: palette.bgCard,
-          border: Border.all(color: palette.border),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Row(
-          children: [
-            _Avatar(name: name, url: avatarUrl, athleteId: athleteId),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                name,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontFamily: AppFonts.barlow,
-                  color: palette.textPrimary,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            _RoutineCountBadge(count: activeRoutinesCount),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Avatar de color estable por alumno (patrón de Alumnos' `_Avatar`,
-/// alumnos_screen.dart:589-622) — fondo `avatarColorFor(athleteId)` + inicial
-/// blanca cuando no hay foto; `NetworkImage` cuando sí.
-class _Avatar extends StatelessWidget {
-  const _Avatar(
-      {required this.name, required this.url, required this.athleteId});
-
-  final String name;
-  final String? url;
-  final String athleteId;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    final initial = name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
-    final hasNetworkImage = url != null && url!.isNotEmpty;
-    return CircleAvatar(
-      radius: 18,
-      backgroundColor: hasNetworkImage ? palette.bg : avatarColorFor(athleteId),
-      backgroundImage: hasNetworkImage ? NetworkImage(url!) : null,
-      child: hasNetworkImage
-          ? null
-          : Text(
-              initial,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-    );
-  }
-}
-
-/// Pill de estado del vínculo — mismo look que `_EstadoBadge` de Alumnos
-/// (alumnos_screen.dart:624-664): fondo tinte @0.15 alpha + punto de color +
-/// label. Replicado acá (no importado) porque Alumnos usa `AlumnoEstado`
-/// (con dimensión de deuda) que esta pantalla no necesita.
-class _EstadoPill extends StatelessWidget {
-  const _EstadoPill({required this.estado});
-
-  final _LinkEstado estado;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    final color = estado.color(palette);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 7,
-            height: 7,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              estado.label,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                  color: color, fontSize: 12, fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Badge de cantidad de rutinas activas — la info más importante de la
-/// redesign: distingue de un vistazo quién necesita una rutina ("Sin
-/// rutina", chip muted) de quién ya tiene ("N rutinas", chip accent).
-/// Mientras `count` es null (todavía cargando) muestra un placeholder sutil
-/// en vez de "Sin rutina", que sería incorrecto durante la carga.
-class _RoutineCountBadge extends StatelessWidget {
-  const _RoutineCountBadge({required this.count});
-
-  final int? count;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    if (count == null) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        decoration: BoxDecoration(
-          color: palette.textMuted.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-        ),
-        child: Text(
-          '…', // i18n
-          style: TextStyle(color: palette.textMuted, fontSize: 12),
-        ),
-      );
-    }
-
-    final hasRoutines = count! > 0;
-    final label = hasRoutines
-        ? (count == 1 ? '1 rutina' : '$count rutinas') // i18n
-        : 'Sin rutina'; // i18n
-    final color = hasRoutines ? palette.accent : palette.textMuted;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: hasRoutines
-            ? color.withValues(alpha: 0.15)
-            : palette.textMuted.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-      ),
-      child: Text(
-        label,
-        style:
-            TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600),
+        hintText: 'Buscar por nombre o split...', // i18n
+        prefixIcon: Icon(Icons.search, color: palette.textMuted, size: 18),
       ),
     );
   }

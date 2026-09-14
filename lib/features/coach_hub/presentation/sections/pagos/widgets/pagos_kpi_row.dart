@@ -20,6 +20,8 @@ import '../../../widgets/coach_hub_widgets.dart' show KpiCard;
 import 'pagos_buckets_provider.dart';
 import 'payment_format.dart';
 import 'package:treino/core/utils/argentina_time.dart';
+import 'package:treino/app/theme/app_motion.dart';
+import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 
 // ── PagosKpiRow ───────────────────────────────────────────────────────────────
 
@@ -131,7 +133,19 @@ class PagosKpiRow extends ConsumerWidget {
             children: [
               for (var i = 0; i < cards.length; i++) ...[
                 if (i > 0) const SizedBox(width: _spacing),
-                Expanded(child: cards[i]),
+                // Entrada escalonada, igual que la tira de KPIs del dashboard.
+                //
+                // Son el MISMO componente en las dos pantallas —`KpiCard` del
+                // kit— y se comportaban distinto: en el dashboard entraban
+                // escalonadas y acá aparecían de golpe. Que un mismo elemento
+                // se mueva distinto según la pantalla es lo que hace que una
+                // app se sienta armada de partes.
+                Expanded(
+                  child: TreinoFadeSlideIn(
+                    delay: AppMotion.stagger(i),
+                    child: cards[i],
+                  ),
+                ),
               ],
             ],
           );
@@ -142,7 +156,14 @@ class PagosKpiRow extends ConsumerWidget {
           spacing: _spacing,
           runSpacing: _spacing,
           children: [
-            for (final card in cards) SizedBox(width: itemWidth, child: card),
+            for (var i = 0; i < cards.length; i++)
+              SizedBox(
+                width: itemWidth,
+                child: TreinoFadeSlideIn(
+                  delay: AppMotion.stagger(i),
+                  child: cards[i],
+                ),
+              ),
           ],
         );
       },

@@ -5,6 +5,7 @@ import 'package:treino/core/utils/date_labels.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/utils/app_clock.dart';
 import 'package:treino/core/utils/argentina_time.dart';
 import 'package:treino/features/insights/presentation/monthly_report_screen.dart';
 import 'package:treino/features/insights/presentation/widgets/monthly_report_chart.dart';
@@ -20,11 +21,101 @@ import '../../workout/application/stub_factories.dart';
 
 class MockSessionRepository extends Mock implements SessionRepository {}
 
+/// Ancla FIJA de TODO el archivo — el `setUp` de `main()` la congela para
+/// cada test, no sólo para los dos que dependen de en qué semana ART caen las
+/// sesiones. No se deriva de `DateTime.now()` a propósito.
+///
+/// ## Por qué (el flake real, no uno hipotético)
+///
+/// El fixture armaba las sesiones con `DateTime(now.year, now.month, now.day)`
+/// —medianoche LOCAL— y las ponía en `today` y `today - 1 día`, esperando que
+/// las dos cayeran en la misma semana. Pero `Session.startedAt` viene SIEMPRE
+/// UTC-flagged (lo garantiza `TimestampConverter`) y por eso `weeklyStreakOf`
+/// hace `toArgentina(session.startedAt)` **sin** un `.toUtc()` previo — a
+/// diferencia de lo que hace con su `now`, dos líneas más arriba. Con un
+/// `DateTime` local esa resta de 3 h no convierte nada: corre el día
+/// calendario para atrás (00:00 → 21:00 del día anterior).
+///
+/// Con las dos sesiones corridas un día, el par cruza el borde del lunes
+/// **según qué día de la semana sea hoy**. Medido el martes 2026-09-08 sobre
+/// `main` limpio: la sesión de hoy caía en la semana en curso y la de ayer en
+/// la anterior → "Racha de 2 semanas". El lunes anterior las dos caían en la
+/// misma → "Racha de 1 semana" y el CI pasaba. Un test que cambia de veredicto
+/// con el almanaque no está midiendo la pantalla.
+///
+/// ## El ancla
+///
+/// Semana ART lunes 16/03/2026 – domingo 22/03/2026.
+///
+/// [_anchorNow] es LOCAL-flagged porque `AppClock.freeze` reemplaza a
+/// `DateTime.now()`, que devuelve local (lo assertea). Jueves al mediodía: aun
+/// con el offset de zona más extremo el instante no se sale de esa semana, así
+/// que la semana en curso es la misma corra donde corra el CI.
+final _anchorNow = DateTime(2026, 3, 19, 12);
+
+/// Martes y miércoles de la semana de [_anchorNow], como instantes UTC reales
+/// —que es lo que el dominio garantiza— a las 12:00: `toArgentina` los deja en
+/// las 09:00 ART del MISMO día, lejos de los dos bordes de medianoche.
+final _anchorTuesday = DateTime.utc(2026, 3, 17, 12);
+final _anchorWednesday = DateTime.utc(2026, 3, 18, 12);
+
+/// Ancla propia del test del radar: **septiembre**, y es a propósito.
+///
+/// Ese test es el único del archivo cuyo veredicto depende del NOMBRE del mes,
+/// y es justo el que rompió `main` el 01/09/2026 comparando el label contra
+/// `DateFormat('MMM yyyy')` en vez de `monthAbbrev`. Medido mes por mes en
+/// `es_AR`:
+///
+///     meses 1-8 y 10-12:  monthAbbrev == DateFormat('MMM')
+///     mes 9:              monthAbbrev="sep"   DateFormat="sept"  ← difieren
+///
+/// Once de doce coinciden **por casualidad**. Con el ancla en marzo —la de
+/// [_anchorNow], que comparte el resto del archivo— un `DateFormat` que se
+/// vuelva a colar volvería a pasar desapercibido once meses al año. En
+/// septiembre falla siempre: el bug estacional se vuelve determinístico.
+///
+/// El comentario que ya estaba adentro del test explica el mecanismo. Lo que
+/// faltaba era que el test lo COMPROBARA en vez de sólo advertirlo.
+///
+/// Jueves al mediodía, igual que [_anchorNow]: ni el offset de zona más
+/// extremo lo saca de septiembre. Re-congelar pisa el instante del `setUp`
+/// —está en el dartdoc de [AppClock] y lo fija `app_clock_test.dart`—, así que
+/// alcanza con llamar a `freeze` de nuevo adentro del test.
+final _septemberAnchorNow = DateTime(2026, 9, 17, 12);
+
+/// El día 1 del mes ancla del radar, **UTC a mediodía**.
+///
+/// UTC y no local, y esto no es cosmético: `toArgentina` resta 3 h sin mirar
+/// el flag, así que `DateTime(2026, 9, 1)` local aterriza en **31/08 21:00
+/// ART**. Medido sobre el fixture que había —`DateTime(2026, 3, 1)`— da
+/// `2026-02-28 21:00`: la sesión caía en FEBRERO mientras el test verificaba
+/// el label de MARZO. Pasaba sin medir el radar que dice medir.
+final _septemberAnchorDay1 = DateTime.utc(2026, 9, 1, 12);
+
 void main() {
   setUpAll(() {
     registerFallbackValue(makeSession());
     registerFallbackValue(makeSetLog());
   });
+
+  // Reloj congelado para TODO el archivo, no sólo para los dos tests de racha.
+  //
+  // #999 dejó el seam puesto y arregló el test que estaba rojo. Pero los otros
+  // nueve seguían armando su fixture con `DateTime.now()`, y este archivo ya
+  // rompió `main` DOS veces por leerle la fecha al runner, por causas
+  // distintas:
+  //
+  //   1. 01/09 — el label del radar se comparaba contra `DateFormat('MMM yyyy')`,
+  //      que en es-AR devuelve `sept` (4 chars) sólo para septiembre. Los otros
+  //      once meses coincidían de casualidad.
+  //   2. 08/09 — el fixture de la racha. Es el que arregló #999.
+  //
+  // Cerrar sólo (2) deja la puerta de (1) abierta. Con el `setUp` acá, ningún
+  // test del archivo puede volver a preguntarle la fecha al almanaque: los
+  // fixtures leen `AppClock.now()`, que es el mismo seam que ya usan
+  // `argentinaNow()` y el default de `computeWeeklyStreak`.
+  setUp(() => AppClock.freeze(_anchorNow));
+  tearDown(AppClock.unfreeze);
 
   Widget wrap(
     Widget child, {
@@ -53,7 +144,7 @@ void main() {
 
   testWidgets('renders chart + summary cards when data loads', (tester) async {
     final repo = MockSessionRepository();
-    final now = DateTime.now();
+    final now = AppClock.now();
     when(() => repo.listByUid('u1', limit: any(named: 'limit')))
         .thenAnswer((_) async => [
               makeSession(
@@ -156,7 +247,7 @@ void main() {
       'QA-498: Reintentar en el radar RECUPERA — re-fetchea el catálogo, '
       'no repite su error cacheado', (tester) async {
     final repo = MockSessionRepository();
-    final now = DateTime.now();
+    final now = AppClock.now();
     when(() => repo.listByUid('u1', limit: any(named: 'limit')))
         .thenAnswer((_) async => [
               makeSession(
@@ -219,14 +310,12 @@ void main() {
   testWidgets('switching to POR DÍA renders the daily duration chart',
       (tester) async {
     final repo = MockSessionRepository();
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
 
     when(() => repo.listByUid('u1', limit: any(named: 'limit')))
         .thenAnswer((_) async => [
               makeSession(
                 id: 's1',
-                startedAt: today,
+                startedAt: _anchorTuesday,
                 status: SessionStatus.finished,
                 wasFullyCompleted: true,
                 durationMin: 45,
@@ -251,20 +340,18 @@ void main() {
       'renders the workout-days streak calendar below the summary cards '
       'for the selected month', (tester) async {
     final repo = MockSessionRepository();
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
     when(() => repo.listByUid('u1', limit: any(named: 'limit')))
         .thenAnswer((_) async => [
               makeSession(
                 id: 's1',
-                startedAt: today,
+                startedAt: _anchorTuesday,
                 status: SessionStatus.finished,
                 wasFullyCompleted: true,
                 durationMin: 45,
               ),
               makeSession(
                 id: 's2',
-                startedAt: today.subtract(const Duration(days: 1)),
+                startedAt: _anchorWednesday,
                 status: SessionStatus.finished,
                 wasFullyCompleted: true,
               ),
@@ -291,8 +378,9 @@ void main() {
 
     expect(streakFinder, findsOneWidget);
     // Sin rutina activa el objetivo cae al fallback de 1 sesión por
-    // semana, y las dos sesiones del fixture caen en la MISMA semana:
-    // eso es una semana cumplida, no dos.
+    // semana, y las dos sesiones del fixture caen en la MISMA semana ART
+    // (martes y miércoles del lunes ancla): eso es una semana cumplida, no
+    // dos. La semana anterior está vacía, así que la racha corta ahí.
     expect(find.text('Racha de 1 semana'), findsOneWidget);
   });
 
@@ -300,7 +388,7 @@ void main() {
       'selecting a different month re-fetches and updates the calendar '
       "trained-day marks (not just a no-crash smoke check)", (tester) async {
     final repo = MockSessionRepository();
-    final now = DateTime.now();
+    final now = AppClock.now();
     final olderMonth = DateTime(now.year, now.month - 2);
 
     when(() => repo.listByUid('u1', limit: any(named: 'limit')))
@@ -369,15 +457,19 @@ void main() {
       'renders the month-vs-month muscle distribution radar below the '
       'workout-days calendar, with month-name legend labels (AD6/PR5c)',
       (tester) async {
+    // Ancla propia, en septiembre, y con el día 1 en UTC: ver los dartdocs de
+    // [_septemberAnchorNow] y [_septemberAnchorDay1].
+    AppClock.freeze(_septemberAnchorNow);
+
     final repo = MockSessionRepository();
-    final now = DateTime.now();
+    final now = AppClock.now();
     final currentMonthStart = DateTime(now.year, now.month, 1);
 
     when(() => repo.listByUid('u1', limit: any(named: 'limit')))
         .thenAnswer((_) async => [
               makeSession(
                 id: 's1',
-                startedAt: currentMonthStart,
+                startedAt: _septemberAnchorDay1,
                 status: SessionStatus.finished,
                 wasFullyCompleted: true,
                 durationMin: 45,
@@ -425,7 +517,7 @@ void main() {
       'volume-by-group card (real data-delta, not a smoke check)',
       (tester) async {
     final repo = MockSessionRepository();
-    final now = DateTime.now();
+    final now = AppClock.now();
     final olderMonth = DateTime(now.year, now.month - 2);
 
     when(() => repo.listByUid('u1', limit: any(named: 'limit')))
@@ -497,7 +589,7 @@ void main() {
   testWidgets('initialMonth abre la pantalla en ese mes, no en el más reciente',
       (tester) async {
     final repo = MockSessionRepository();
-    final now = DateTime.now();
+    final now = AppClock.now();
     final currentMonthStart = DateTime(now.year, now.month, 1);
     // El mes que el push reportaría: el que cerró.
     final reportedMonth = DateTime(now.year, now.month - 1, 1);
@@ -556,7 +648,7 @@ void main() {
       'un initialMonth fuera de la ventana de 12 meses cae al más reciente, '
       'no a una pantalla vacía', (tester) async {
     final repo = MockSessionRepository();
-    final now = DateTime.now();
+    final now = AppClock.now();
     final currentMonthStart = DateTime(now.year, now.month, 1);
 
     when(() => repo.listByUid('u1', limit: any(named: 'limit')))

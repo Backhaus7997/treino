@@ -64,9 +64,11 @@
 // Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla cerrado
 // con la migración; contra el emulador no pide nada. Ver scripts/lib/admin.js.
 const { inicializarAdmin } = require('./lib/admin');
+const { getApp } = require('firebase-admin/app');
+const { getFirestore } = require('firebase-admin/firestore');
 
-const { admin } = inicializarAdmin();
-const db = admin.firestore();
+const { app } = inicializarAdmin();
+const db = getFirestore(app);
 
 const asJson = process.argv.includes('--json');
 
@@ -107,7 +109,7 @@ function pct(part, whole) {
   const projectId =
     process.env.FIRESTORE_EMULATOR_HOST
       ? 'treino-dev (EMULATOR)'
-      : admin.app().options.credential.projectId ?? 'unknown';
+      : getApp().options.credential.projectId ?? 'unknown';
 
   const col = db.collection('userPublicProfiles');
 

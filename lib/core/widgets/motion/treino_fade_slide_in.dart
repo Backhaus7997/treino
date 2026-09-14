@@ -124,6 +124,20 @@ class _TreinoFadeSlideInState extends State<TreinoFadeSlideIn>
     // FadeTransition con opacity 1.0 y translate 0 son no-ops baratos.
     return FadeTransition(
       opacity: _progress,
+      // El contenido sigue en el árbol de semántica mientras entra.
+      //
+      // Por defecto `FadeTransition` excluye al hijo cuando la opacidad es 0,
+      // así que durante la entrada —y durante TODO el retardo del escalonado,
+      // que para el octavo item son casi 300 ms— el contenido no existía para
+      // un lector de pantalla ni para el foco de teclado.
+      //
+      // Lo encontró el test de foco de las filas de `CoachHubDataTable`
+      // (SCENARIO-CK-DT-11) al escalonarlas: la fila dejaba de exponer
+      // `Semantics(button)`. Pero no era de la tabla — le pasaba a cada uso de
+      // este widget en toda la app.
+      //
+      // Una animación de entrada es decoración: no puede decidir qué existe.
+      alwaysIncludeSemantics: true,
       child: AnimatedBuilder(
         animation: _progress,
         child: widget.child,

@@ -9,6 +9,30 @@ import 'exercise_progression_aggregator.dart';
 import 'session_providers.dart'
     show sessionRepositoryProvider, sessionsByUidProvider;
 
+/// Los períodos cuya ventana ensancha el scan de [athleteExerciseListProvider].
+///
+/// **Los largos (3 meses, 1 año) quedan deliberadamente afuera, y es una
+/// decisión de costo, no un olvido.**
+///
+/// Ese provider escanea desde el `currentStart` MÁS ANTIGUO de los períodos que
+/// mira, y por cada sesión escaneada hace un read de `setLogs`. Si [last1y]
+/// participara, abrir la pantalla de progresión escanearía un año de sesiones
+/// —cientos de reads— para TODO el mundo, incluido quien nunca va a tocar ese
+/// período. Cuatro veces el costo actual a cambio de nada.
+///
+/// Lo que se pierde: `periodsWithData` es una APROXIMACIÓN para los períodos
+/// largos — un ejercicio con datos hace ocho meses y ninguno en el último mes
+/// puede no traer su flag. Y eso es tolerable porque ese flag sólo decide la
+/// PRE-SELECCIÓN del picker: la membresía de la lista no se toca (el ejercicio
+/// igual aparece), y el gráfico en sí lo arma [exerciseProgressionProvider],
+/// que sí ensancha por el período elegido — así que quien selecciona 1 año ve
+/// el año completo, correcto, y paga ese scan sólo cuando lo pide.
+const Set<ChartPeriod> kScanWideningPeriods = {
+  ChartPeriod.last30d,
+  ChartPeriod.thisWeek,
+  ChartPeriod.month,
+};
+
 /// Number of sessions to scan for exercise progression.
 /// Shared constant — mirrors the design's D6 bound.
 const int kProgressionSessionScan = 60;
@@ -159,9 +183,10 @@ final athleteExerciseListProvider = FutureProvider.autoDispose
   // cap must never silently cut off sessions inside a selectable period's
   // current window, or a heavy trainer's in-period exercise could miss both
   // its flag and its picker entry. Bounded by the earliest current-window
-  // start across the 3 periods.
-  final earliestCurrentStart = windows.values
-      .map((w) => w.currentStart)
+  // start across the periods que ENSANCHAN — ver [kScanWideningPeriods].
+  final earliestCurrentStart = windows.entries
+      .where((e) => kScanWideningPeriods.contains(e.key))
+      .map((e) => e.value.currentStart)
       .reduce((a, b) => a.isBefore(b) ? a : b);
   final neededForWindows =
       sessions.where((s) => !s.startedAt.isBefore(earliestCurrentStart)).length;

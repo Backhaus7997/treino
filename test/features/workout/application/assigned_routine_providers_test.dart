@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -145,6 +146,107 @@ void main() {
 
       expect(resultA2, hasLength(1));
       expect(resultA2[0].id, equals('r-a2'));
+    });
+  });
+
+  group('assignedRoutinesByTrainerProvider — uid sin resolver', () {
+    // REGRESION. La guarda devolvía `const []` con el trainerId vacío, o sea un
+    // AsyncData: un HECHO. Pero `currentUidProvider` sale de un stream y es
+    // null hasta que emite, así que en un hard reload del Hub la ficha del
+    // alumno le mostraba «Todavía no le asignaste planes.» a un PF que sí le
+    // asignó. Estos dos tests fijan que "no sé todavía" se sirva como loading
+    // y que "no hay" se siga sirviendo como lista vacía.
+    test('trainerId vacío queda en loading, NO resuelve a lista vacía',
+        () async {
+      final repo = RoutineRepository(firestore: FakeFirebaseFirestore());
+      final container = makeContainer(repo);
+      addTearDown(container.dispose);
+
+      final key = (trainerId: '', athleteId: 'athlete-a');
+      final sub = container.listen(
+        assignedRoutinesByTrainerProvider(key),
+        (_, __) {},
+      );
+      addTearDown(sub.close);
+
+      // Un microtask alcanza para que un `return const []` ya hubiera
+      // resuelto. Si esto pasa a AsyncData, la regresión volvió.
+      await Future<void>.delayed(Duration.zero);
+
+      expect(container.read(assignedRoutinesByTrainerProvider(key)).isLoading,
+          isTrue);
+      expect(container.read(assignedRoutinesByTrainerProvider(key)).hasValue,
+          isFalse);
+    });
+
+    test('athleteId vacío SÍ resuelve a lista vacía (no hay a quién pedirle)',
+        () async {
+      final repo = RoutineRepository(firestore: FakeFirebaseFirestore());
+      final container = makeContainer(repo);
+      addTearDown(container.dispose);
+
+      final result = await container.read(
+        assignedRoutinesByTrainerProvider(
+          (trainerId: 'trainer-1', athleteId: ''),
+        ).future,
+      );
+      expect(result, isEmpty);
+    });
+  });
+
+  group('routinesAuthoredByProvider', () {
+    test('trae plantillas y planes del PF, más nuevas primero', () async {
+      final firestore = FakeFirebaseFirestore();
+      await firestore.collection('routines').doc('r-plan').set({
+        'id': 'r-plan',
+        'name': 'Plan asignado',
+        'split': 'PPL',
+        'level': 'beginner',
+        'days': <dynamic>[],
+        'source': 'trainer-assigned',
+        'assignedBy': 'trainer-1',
+        'assignedTo': 'athlete-a',
+        'visibility': 'private',
+        'createdAt': Timestamp.fromMillisecondsSinceEpoch(1000),
+      });
+      await firestore.collection('routines').doc('r-tpl').set({
+        'id': 'r-tpl',
+        'name': 'Plantilla',
+        'split': 'Full Body',
+        'level': 'beginner',
+        'days': <dynamic>[],
+        'source': 'trainer-template',
+        'assignedBy': 'trainer-1',
+        'assignedTo': null,
+        'visibility': 'public',
+        'createdAt': Timestamp.fromMillisecondsSinceEpoch(9000),
+      });
+
+      final container = makeContainer(RoutineRepository(firestore: firestore));
+      addTearDown(container.dispose);
+
+      final result =
+          await container.read(routinesAuthoredByProvider('trainer-1').future);
+
+      expect(result.map((r) => r.id), ['r-tpl', 'r-plan']);
+    });
+
+    test('trainerId vacío queda en LOADING, no en lista vacía', () async {
+      // Misma regresión que arriba, un provider más allá. «Todavía no sé quién
+      // es el PF» servido como `AsyncData([])` haría que la pantalla nueva le
+      // diga «no creaste ninguna rutina» a un PF que tiene veinte, durante los
+      // primeros frames de un hard reload.
+      final repo = RoutineRepository(firestore: FakeFirebaseFirestore());
+      final container = makeContainer(repo);
+      addTearDown(container.dispose);
+
+      final sub = container.listen(routinesAuthoredByProvider(''), (_, __) {});
+      addTearDown(sub.close);
+
+      await Future<void>.delayed(Duration.zero);
+
+      expect(container.read(routinesAuthoredByProvider('')).isLoading, isTrue);
+      expect(container.read(routinesAuthoredByProvider('')).hasValue, isFalse);
     });
   });
 }

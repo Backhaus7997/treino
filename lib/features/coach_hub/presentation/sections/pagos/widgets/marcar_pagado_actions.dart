@@ -24,6 +24,9 @@ import 'package:treino/features/workout/application/session_providers.dart'
 
 import 'payment_format.dart';
 import 'registrar_pago_dialog.dart';
+import 'package:treino/app/theme/tokens/primitives.dart';
+import 'package:treino/app/theme/tokens/components/treino_button_tokens.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 // ── Helpers internos ──────────────────────────────────────────────────────────
 
@@ -73,15 +76,16 @@ Future<void> marcarPagado(
       content: Text('${cobro.concept} — ${fmtArs(cobro.amountArs)}',
           style: TextStyle(color: palette.textMuted, fontSize: 14)),
       actions: [
-        TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text('Cancelar', // i18n
-                style: TextStyle(color: palette.textMuted))),
-        TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text('Cobrado', // i18n
-                style: TextStyle(
-                    color: palette.accent, fontWeight: FontWeight.w700))),
+        TreinoButton(
+          label: 'Cancelar', // i18n
+          variant: TreinoButtonVariant.ghost,
+          onPressed: () => Navigator.of(ctx).pop(false),
+        ),
+        const SizedBox(width: AppSpacing.s8),
+        TreinoButton(
+          label: 'Cobrado', // i18n
+          onPressed: () => Navigator.of(ctx).pop(true),
+        ),
       ],
     ),
   );
@@ -142,15 +146,16 @@ Future<void> marcarPagadoDoc(
       content: Text('${payment.concept} — ${fmtArs(payment.amountArs)}',
           style: TextStyle(color: palette.textMuted, fontSize: 14)),
       actions: [
-        TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text('Cancelar', // i18n
-                style: TextStyle(color: palette.textMuted))),
-        TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text('Cobrado', // i18n
-                style: TextStyle(
-                    color: palette.accent, fontWeight: FontWeight.w700))),
+        TreinoButton(
+          label: 'Cancelar', // i18n
+          variant: TreinoButtonVariant.ghost,
+          onPressed: () => Navigator.of(ctx).pop(false),
+        ),
+        const SizedBox(width: AppSpacing.s8),
+        TreinoButton(
+          label: 'Cobrado', // i18n
+          onPressed: () => Navigator.of(ctx).pop(true),
+        ),
       ],
     ),
   );
@@ -287,16 +292,15 @@ class _RecordarDialogState extends State<_RecordarDialog> {
         ),
       ),
       actions: [
-        TextButton(
+        TreinoButton(
+          label: 'Cancelar', // i18n
+          variant: TreinoButtonVariant.ghost,
           onPressed: () => Navigator.of(context).pop(),
-          child: Text('Cancelar', // i18n
-              style: TextStyle(color: palette.textMuted)),
         ),
-        TextButton(
+        const SizedBox(width: AppSpacing.s8),
+        TreinoButton(
+          label: 'Enviar', // i18n
           onPressed: () => Navigator.of(context).pop(_controller.text),
-          child: Text('Enviar', // i18n
-              style: TextStyle(
-                  color: palette.accent, fontWeight: FontWeight.w700)),
         ),
       ],
     );

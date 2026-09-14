@@ -24,13 +24,31 @@
  * dejar que el PF elija cuanto pagar, y no hay validacion que arregle eso —
  * cualquier monto que "parezca razonable" tambien lo parece $1.
  *
- * ── El mail tampoco ──
+ * ── NO se le pregunta el mail a nadie, y esa es la historia de este archivo ──
  *
- * `payer_email` sale de `request.auth.token.email`, que lo firma Firebase Auth.
- * Un mail del cliente dejaria abrir suscripciones a nombre de otro.
+ * La primera version creaba la suscripcion con `POST /preapproval`, que EXIGE
+ * `payer_email`. Y MP ATA el cobro a ese mail: quien paga tiene que estar
+ * logueado con el. O sea que un PF que se registra en TREINO con
+ * `juan@gmail.com` pero cuya cuenta de Mercado Pago es `jperez@hotmail.com`
+ * **no podia pagar nunca**, y el error le aparecia recien adentro del checkout
+ * —"Tu e-mail no coincide con el de la suscripcion"— donde ya no lo puede
+ * corregir. No es un caso raro: es la mitad de la gente.
+ *
+ * Se intento preguntarselo en un dialogo antes de comprar y era peor: friccion
+ * en el camino de pago para el 90% que tiene los dos mails iguales, por un
+ * detalle de la pasarela que no deberia ver nunca.
+ *
+ * Ahora el checkout va contra un PLAN (`POST /preapproval_plan`), que NO pide
+ * `payer_email`: devuelve su propio `init_point` y MP le pregunta al pagador
+ * quien es. Cualquier cuenta, cualquier mail. Verificado a mano contra la API.
+ *
+ * Se crea un plan POR CHECKOUT y no seis fijos, porque el `external_reference`
+ * vive en el plan: con planes compartidos perderiamos a quien acreditarle el
+ * cupo. Ver el encabezado de `client.ts`.
  */
 
-import * as admin from "firebase-admin";
+import { App, getApp, initializeApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 import * as functions from "firebase-functions/v2/https";
 import { HttpsError } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions";
@@ -42,7 +60,7 @@ import {
   PAID_TIERS,
   amountFor,
   frequencyMonthsFor,
-  recordPreapproval,
+  recordPlan,
 } from "./tier-mapping";
 import { MpApiError, MpClient, createMpClient } from "./client";
 
@@ -53,10 +71,39 @@ const MP_ACCESS_TOKEN = defineSecret("MP_ACCESS_TOKEN");
  * proposito: si viniera del cliente seria un open redirect firmado por nosotros
  * — MP mandaria al PF a donde diga el atacante, saliendo de una URL nuestra.
  *
- * `/ajustes` es la seccion de Facturacion del Coach Hub, el mismo destino que
- * usan los callsites web del paywall (`billingRoute: '/ajustes'`).
+ * ── Por que NO es `https://app.gettreino.com/ajustes` ──
+ *
+ * Porque esa URL no lleva a Facturacion. **El Coach Hub web usa HASH routing**:
+ * no hay una sola llamada a `usePathUrlStrategy` en el repo, asi que Flutter cae
+ * al `HashUrlStrategy` por default y el PATH se ignora entero. Verificado contra
+ * produccion el 2026-09-08: pedir `/ajustes` termina en
+ * `https://app.gettreino.com/ajustes#/login`, con el path intacto en la barra y
+ * la app resolviendo por el fragmento. Con el hash vacio, go_router arranca en
+ * su `initialLocation: '/dashboard'` (`coach_hub_router.dart`).
+ *
+ * O sea: durante toda la vida de esta constante, el PF que pagaba volvia al
+ * DASHBOARD. El `/ajustes` era decorativo.
+ *
+ * ── Por que `/abrir/profe?to=facturacion` SI funciona ──
+ *
+ * Es la misma entrada que ya usan los mails al PF (`APP_ENTRY_TRAINER` en
+ * `mail/templates.ts`), y anda por tres piezas que ya existen y estan probadas:
+ *
+ *   1. `vercel.json` redirige `/abrir/profe` a la raiz PRESERVANDO el query
+ *      string. Verificado en produccion: queda `/?to=facturacion`.
+ *   2. `buildCoachHubRouter` lee `Uri.base.queryParameters` —o sea
+ *      `location.search`, que el hash no toca— una vez al construir el router.
+ *   3. `DeepLinkDestination.fromQuery` ya entiende `to=facturacion`, y
+ *      `coachHubRedirect` lo aplica porque la landing es `location == '/'`.
+ *
+ * MP le agrega SUS parametros (`collection_status`, etc.) a este mismo query
+ * string, sin pisar el nuestro.
+ *
+ * La leccion general, que vale para cualquier link que entre desde afuera —
+ * mail, pasarela, QR—: al Coach Hub se entra por `/abrir/profe?to=...`, NUNCA
+ * por el path directo.
  */
-const BACK_URL = "https://app.gettreino.com/ajustes";
+const BACK_URL = "https://app.gettreino.com/abrir/profe?to=facturacion";
 
 /** Coleccion del checkout en curso por PF. Un doc por uid, se pisa. */
 export const MP_CHECKOUTS_COLLECTION = "mp_checkouts";
@@ -82,7 +129,7 @@ export interface CreatePreapprovalRequest {
 export interface CreatePreapprovalResult {
   /** La URL a la que hay que mandar al PF. Es lo unico que el cliente usa. */
   initPoint: string;
-  preapprovalId: string;
+  planId: string;
   /** `reused` cuando se devolvio un checkout ya abierto (doble click). */
   status: "created" | "reused";
 }
@@ -93,11 +140,11 @@ export interface CreatePreapprovalDeps {
   nowMs: number;
 }
 
-function getApp(): admin.app.App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -119,13 +166,13 @@ function parseCycle(raw: unknown): SubscriptionCycle | null {
  * El handler. Todo lo que decide entra por parametro: el uid y el mail ya
  * verificados, la entrada cruda, y las dependencias.
  *
- * Recibe `uid` y `email` YA extraidos del token y no el `request` entero para
+ *
+ * Recibe el `uid` YA extraido del token y no el `request` entero, para
  * que sea imposible leer del body algo que tiene que salir del token.
  */
 export async function runCreatePreapproval(
-  app: admin.app.App,
+  app: App,
   uid: string,
-  email: string,
   raw: unknown,
   deps: CreatePreapprovalDeps,
 ): Promise<CreatePreapprovalResult> {
@@ -152,7 +199,7 @@ export async function runCreatePreapproval(
   // El rol se lee del documento, no del token: `role` es intrinseco y se
   // provisiona server-side (AGENTS.md regla 3). Un custom claim viejo en un
   // token sin refrescar seria una fuente mas debil.
-  const userSnap = await app.firestore().collection("users").doc(uid).get();
+  const userSnap = await getFirestore(app).collection("users").doc(uid).get();
   if (!userSnap.exists || userSnap.data()?.role !== "trainer") {
     throw new HttpsError(
       "permission-denied",
@@ -168,8 +215,7 @@ export async function runCreatePreapproval(
     throw new HttpsError("internal", `sin precio para ${tier}/${cycle}`);
   }
 
-  const checkoutRef = app
-    .firestore()
+  const checkoutRef = getFirestore(app)
     .collection(MP_CHECKOUTS_COLLECTION)
     .doc(uid);
 
@@ -184,17 +230,17 @@ export async function runCreatePreapproval(
       previo.tier === tier &&
       previo.cycle === cycle &&
       typeof previo.initPoint === "string" && previo.initPoint !== "" &&
-      typeof previo.preapprovalId === "string" && previo.preapprovalId !== ""
+      typeof previo.planId === "string" && previo.planId !== ""
     ) {
       logger.info("mp/create-preapproval: se reusa el checkout abierto", {
         uid,
         tier,
         cycle,
-        preapprovalId: previo.preapprovalId,
+        planId: previo.planId,
       });
       return {
         initPoint: previo.initPoint,
-        preapprovalId: previo.preapprovalId,
+        planId: previo.planId,
         status: "reused",
       };
     }
@@ -202,10 +248,9 @@ export async function runCreatePreapproval(
 
   let creado;
   try {
-    creado = await deps.mpClient.createPreapproval({
+    creado = await deps.mpClient.createPreapprovalPlan({
       reason: `TREINO — ${tier} (${cycle === "annual" ? "anual" : "mensual"})`,
       externalReference: uid,
-      payerEmail: email,
       backUrl: BACK_URL,
       transactionAmount: amount,
       frequencyMonths: frequencyMonthsFor(cycle),
@@ -228,10 +273,10 @@ export async function runCreatePreapproval(
     );
   }
 
-  const preapprovalId = creado.id;
+  const planId = creado.id;
   const initPoint = (creado as { init_point?: unknown }).init_point;
-  if (typeof preapprovalId !== "string" || preapprovalId === "") {
-    throw new HttpsError("internal", "MP no devolvio un id de preapproval");
+  if (typeof planId !== "string" || planId === "") {
+    throw new HttpsError("internal", "MP no devolvio un id de plan");
   }
   if (typeof initPoint !== "string" || initPoint === "") {
     // Sin `init_point` el PF no tiene a donde ir. Falla ruidoso en vez de
@@ -242,10 +287,10 @@ export async function runCreatePreapproval(
   // El mapeo va PRIMERO, antes del doc de checkout: si algo falla despues, lo
   // que no se puede perder es de que plan es esta suscripcion. El checkout es
   // una comodidad; el mapeo es lo que hace reconciliable el cobro.
-  await recordPreapproval(app, preapprovalId, { uid, tier, cycle });
+  await recordPlan(app, planId, { uid, tier, cycle });
 
   await checkoutRef.set({
-    preapprovalId,
+    planId,
     tier,
     cycle,
     initPoint,
@@ -258,10 +303,10 @@ export async function runCreatePreapproval(
     uid,
     tier,
     cycle,
-    preapprovalId,
+    planId,
   });
 
-  return { initPoint, preapprovalId, status: "created" };
+  return { initPoint, planId, status: "created" };
 }
 
 export const createPreapproval = functions.onCall(
@@ -270,8 +315,9 @@ export const createPreapproval = functions.onCall(
   // ahi. Con el flag puesto, todo checkout desde la web seria rechazado.
   //
   // La cerradura es otra: `request.auth`, el rol leido del documento, y el
-  // hecho de que ni el monto ni el mail ni la URL de retorno vengan del
-  // cliente.
+  // hecho de que ni el MONTO ni la URL de retorno vengan del cliente. El mail
+  // del pagador SI puede venir —ver el encabezado—; lo que no puede elegir es
+  // cuanto paga ni a quien se le acredita el plan.
   {
     region: "southamerica-east1",
     secrets: [MP_ACCESS_TOKEN],
@@ -280,21 +326,12 @@ export const createPreapproval = functions.onCall(
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "hay que estar logueado");
     }
-    const email = request.auth.token.email;
-    if (typeof email !== "string" || email === "") {
-      // MP exige un mail de pagador. Sin uno verificado por Firebase Auth no
-      // se abre nada: el fallback obvio —pedirselo al cliente— es justo el
-      // agujero que este chequeo cierra.
-      throw new HttpsError(
-        "failed-precondition",
-        "la cuenta no tiene un mail asociado",
-      );
-    }
+    // Ya NO se lee el mail del token: el plan no lo pide y MP le pregunta al
+    // pagador quien es. Un PF sin mail en su token puede comprar igual.
 
     return runCreatePreapproval(
-      getApp(),
+      ensureApp(),
       request.auth.uid,
-      email,
       request.data,
       {
         mpClient: createMpClient(MP_ACCESS_TOKEN.value()),

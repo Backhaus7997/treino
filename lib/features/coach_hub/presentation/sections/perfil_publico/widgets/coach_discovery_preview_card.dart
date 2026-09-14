@@ -33,9 +33,18 @@ import 'package:treino/features/coach/presentation/widgets/trainer_specialty_chi
     show SpecialtyLabels;
 import 'package:treino/features/feed/presentation/widgets/post_avatar.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
+import 'package:treino/app/theme/tokens/primitives.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 const double _bannerHeight = 56;
 const double _avatarSize = 64;
+
+/// Cuánto del avatar cuelga POR DEBAJO del banner.
+///
+/// El avatar se posiciona en `_bannerHeight - _avatarSize / 2` dentro de un
+/// `Stack` que mide sólo `_bannerHeight`, con `clipBehavior: Clip.none`: esta
+/// es la parte que se sale y que el contenido de abajo tiene que despejar.
+const double _avatarOverhang = _avatarSize / 2;
 
 /// Card "PREVIEW EN TREINO COACH DISCOVERY" — WU-02.
 class CoachDiscoveryPreviewCard extends ConsumerWidget {
@@ -114,9 +123,22 @@ class CoachDiscoveryPreviewCard extends ConsumerWidget {
                   ],
                 ),
                 Padding(
+                  // El aire de arriba tiene que despejar el AVATAR, no el
+                  // banner.
+                  //
+                  // El `Stack` mide lo que mide el banner (56px), pero el
+                  // avatar está posicionado en `56 - 64/2` con
+                  // `clipBehavior: Clip.none`: **32px suyos cuelgan por debajo
+                  // del Stack** y caen encima de lo que venga después. Con 18
+                  // de padding, el nombre se comía 14px de la foto — que es
+                  // exactamente lo que se veía.
+                  //
+                  // Ahora el padding se DERIVA del voladizo en vez de ser un
+                  // número suelto que hay que acordarse de mover: si mañana
+                  // cambia `_avatarSize` o `_bannerHeight`, esto acompaña solo.
                   padding: const EdgeInsets.fromLTRB(
                     AppSpacing.s18,
-                    AppSpacing.s18,
+                    _avatarOverhang + AppSpacing.s12,
                     AppSpacing.s18,
                     AppSpacing.s18,
                   ),
@@ -237,35 +259,15 @@ class CoachDiscoveryPreviewCard extends ConsumerWidget {
                         ),
                       ],
                       const SizedBox(height: AppSpacing.s18),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: null,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: palette.accent,
-                            disabledBackgroundColor:
-                                palette.accent.withValues(alpha: 0.4),
-                            foregroundColor:
-                                TreinoButtonTokens.foreground(context),
-                            // WARNING-1 (verify fase-11): palette.bg casi
-                            // invisible sobre el disabledBackgroundColor
-                            // (accent tintado) — ratio ≈1.13:1 en light.
-                            // textMuted es el mismo patrón que el resto de
-                            // los botones disabled del kit (identidad_card,
-                            // especialidad_precio_card, cuenta_tab,
-                            // trainer_contact_cta_stub).
-                            disabledForegroundColor: palette.textMuted,
-                            padding: const EdgeInsets.symmetric(
-                              vertical: AppSpacing.s12,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(AppRadius.sm),
-                            ),
-                          ),
-                          child: const Text(
-                            'Solicitar contacto', // i18n: Fase 11
-                          ),
-                        ),
+                      // Preview inerte: `onPressed: null` a propósito. El
+                      // comentario que estaba acá describía cómo pintar un
+                      // botón deshabilitado sin que el texto desapareciera —
+                      // ese problema ahora lo resuelve el componente, con la
+                      // misma opacidad para todos.
+                      const TreinoButton(
+                        label: 'Solicitar contacto', // i18n: Fase 11
+                        expand: true,
+                        onPressed: null,
                       ),
                     ],
                   ),

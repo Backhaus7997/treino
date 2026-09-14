@@ -227,29 +227,11 @@ class _IdentidadCardState extends ConsumerState<IdentidadCard> {
             const SizedBox(height: AppSpacing.s12),
             Align(
               alignment: Alignment.centerRight,
-              child: ElevatedButton(
+              child: TreinoButton(
                 key: const Key('identidad_card_save_button'),
-                onPressed: (_canSave && !_saving) ? _save : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: palette.accent,
-                  foregroundColor: TreinoButtonTokens.foreground(context),
-                  disabledBackgroundColor: palette.bgCard,
-                  disabledForegroundColor: palette.textMuted,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.s18,
-                    vertical: AppSpacing.s12,
-                  ),
-                ),
-                child: _saving
-                    ? SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: TreinoButtonTokens.foreground(context),
-                        ),
-                      )
-                    : const Text('GUARDAR'), // i18n: Fase 11
+                label: 'GUARDAR', // i18n: Fase 11
+                loading: _saving,
+                onPressed: _canSave ? _save : null,
               ),
             ),
           ],

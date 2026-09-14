@@ -334,8 +334,20 @@ void main() {
     });
 
     testWidgets(
-        'SCENARIO 10 — pago ya pagado con showActions:true muestra Recordar '
-        'pero NO Pagado', (tester) async {
+        'SCENARIO 10 — un pago ya cobrado NO ofrece Recordar, aunque la '
+        'columna esté visible', (tester) async {
+      // ⚠ ESTE TEST FIJABA EL BUG. Su versión anterior afirmaba
+      // `expect(find.text('Recordar'), findsOneWidget)` sobre un pago `paid`,
+      // y describía eso como el comportamiento correcto.
+      //
+      // No lo era, y en producción se veía: con los 12 pagos cobrados, el tab
+      // "Todos" mostraba la campanita en las 12 filas. La regla existía —"un
+      // pago cobrado no necesita recordatorio"— pero vivía en el screen, como
+      // `showActions: filtro != PagosFiltro.pagados`. Eso funciona sólo
+      // mientras cada pestaña sea homogénea, y "Todos" no lo es.
+      //
+      // La regla vale por FILA. `showActions` gobierna si la COLUMNA existe;
+      // el estado del pago gobierna qué botones hay adentro.
       tester.view.physicalSize = _kDesktopSize;
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -357,7 +369,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Recordar'), findsOneWidget); // i18n
+      expect(find.text('Recordar'), findsNothing); // i18n
       // Por Key, no por texto: el payment está `paid`, así que el badge
       // ESTADO ya rinde el texto 'Pagado' — buscar por texto sería un falso
       // positivo/negativo ambiguo con esa celda.
@@ -365,6 +377,44 @@ void main() {
         find.byKey(const Key('pagos_accion_marcar_pagado_pay-1')),
         findsNothing,
       );
+    });
+
+    testWidgets(
+        'SCENARIO 10b — lista mezclada (tab Todos): la campanita sale sólo '
+        'en la fila pendiente', (tester) async {
+      // El caso exacto que reportó el PF. Una lista homogénea no lo detecta:
+      // hace falta que convivan las dos filas para que se note que la
+      // decisión es por fila y no por pestaña.
+      tester.view.physicalSize = _kDesktopSize;
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      final profiles = {
+        'uid-ana': const UserPublicProfile(uid: 'uid-ana', displayName: 'Ana'),
+      };
+
+      await tester.pumpWidget(
+        _wrap(
+          PagosWebTable(
+            payments: [_paid(), _vencidoHaceDias(3)],
+            profiles: profiles,
+            emptyMessage: 'Sin pagos',
+            onMarcarPagado: (_) {},
+            onRecordar: (_) {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('pagos_accion_recordar_pay-1')), findsNothing,
+          reason: 'pay-1 está cobrado');
+      expect(
+        find.byKey(const Key('pagos_accion_recordar_pay-2')),
+        findsOneWidget,
+        reason: 'pay-2 está vencido: ahí sí hay algo que recordar',
+      );
+      // La columna sigue existiendo porque ALGUNA fila tiene acción.
+      expect(find.text('ACCIONES'), findsOneWidget); // i18n
     });
 
     testWidgets(

@@ -13,6 +13,8 @@ import '../application/plan_import_providers.dart';
 import '../data/plan_import_repository.dart';
 import '../data/template_builder.dart';
 import '../infrastructure/browser_download.dart';
+import 'package:treino/app/theme/tokens/components/treino_button_tokens.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 /// Upload screen del Coach Hub — paso 1 del flujo de import.
 ///
@@ -144,35 +146,11 @@ class _CoachHubUploadPlanScreenState
                     ),
                   ],
                   const SizedBox(height: 18),
-                  ElevatedButton(
-                    onPressed: (_pickedFile == null || _submitting)
-                        ? null
-                        : _processFile,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: palette.accent,
-                      foregroundColor: TreinoButtonTokens.foreground(context),
-                      minimumSize: const Size.fromHeight(48),
-                      shape: const StadiumBorder(),
-                      disabledBackgroundColor:
-                          palette.accent.withValues(alpha: 0.3),
-                    ),
-                    child: _submitting
-                        ? SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: TreinoButtonTokens.foreground(context),
-                            ),
-                          )
-                        : Text(
-                            'PROCESAR PLAN',
-                            style: GoogleFonts.barlowCondensed(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
-                              letterSpacing: 1.4,
-                            ),
-                          ),
+                  TreinoButton(
+                    label: 'PROCESAR PLAN',
+                    expand: true,
+                    loading: _submitting,
+                    onPressed: _pickedFile == null ? null : _processFile,
                   ),
                 ],
               ),
@@ -192,13 +170,14 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        IconButton(
+        TreinoIconButton(
+          icon: TreinoIcon.arrowLeft,
+          tooltip: 'Volver',
+          color: palette.textPrimary,
           // pop back to the dashboard (the push origin); fall back to go()
           // when there's no stack to pop (e.g. deep-linked directly here).
           onPressed: () =>
               context.canPop() ? context.pop() : context.go('/dashboard'),
-          icon: Icon(TreinoIcon.arrowLeft, color: palette.textPrimary),
-          tooltip: 'Volver',
         ),
         const SizedBox(width: 8),
         Expanded(
@@ -280,20 +259,11 @@ class _TemplateCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                OutlinedButton(
-                  onPressed: loading ? null : onDownload,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: palette.accent,
-                    side: BorderSide(color: palette.accent),
-                    shape: const StadiumBorder(),
-                  ),
-                  child: loading
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Descargar template'),
+                TreinoButton(
+                  label: 'Descargar template',
+                  variant: TreinoButtonVariant.secondaryAccent,
+                  loading: loading,
+                  onPressed: onDownload,
                 ),
               ],
             ),
@@ -341,16 +311,12 @@ class _UploadCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           if (file == null)
-            OutlinedButton.icon(
+            TreinoButton(
+              label: 'Elegir archivo',
+              icon: TreinoIcon.upload,
+              variant: TreinoButtonVariant.secondaryAccent,
+              expand: true,
               onPressed: onPick,
-              icon: Icon(TreinoIcon.upload, size: 18, color: palette.accent),
-              label: const Text('Elegir archivo'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: palette.accent,
-                side: BorderSide(color: palette.accent),
-                minimumSize: const Size.fromHeight(48),
-                shape: const StadiumBorder(),
-              ),
             )
           else
             Container(
@@ -388,9 +354,11 @@ class _UploadCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  TextButton(
+                  TreinoButton(
+                    label: 'Cambiar',
+                    variant: TreinoButtonVariant.ghostAccent,
+                    size: TreinoButtonSize.sm,
                     onPressed: onPick,
-                    child: const Text('Cambiar'),
                   ),
                 ],
               ),

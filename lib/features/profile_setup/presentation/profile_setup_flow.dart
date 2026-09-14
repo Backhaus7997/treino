@@ -170,7 +170,7 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
         if (!_pageController.hasClients) return;
         _pageController.animateToPage(
           next,
-          duration: AppMotion.slow,
+          duration: AppMotion.resolve(context, AppMotion.slow),
           curve: AppMotion.standard,
         );
       },

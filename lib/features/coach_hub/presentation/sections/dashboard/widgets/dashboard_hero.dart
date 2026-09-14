@@ -25,6 +25,8 @@ import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/workout/application/session_providers.dart'
     show currentUidProvider;
 import 'package:treino/l10n/app_l10n.dart';
+import '../../../widgets/invite_athlete_dialog.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 // ── Alert banner (REAL — composes vencidos + solicitudes + inactivos) ────────
 
@@ -240,16 +242,7 @@ class DashboardWelcomeCard extends ConsumerWidget {
         // a ser los dos últimos stops: fuera del glow se ve idéntico.
         borderRadius: BorderRadius.circular(TreinoCardTokens.borderRadius),
         border: Border.all(color: TreinoCardTokens.border(context)),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            palette.accent.withValues(alpha: 0.12),
-            TreinoCardTokens.background(context),
-            TreinoCardTokens.background(context),
-          ],
-          stops: const [0.0, 0.45, 1.0],
-        ),
+        gradient: TreinoCardTokens.glow(context),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -279,7 +272,10 @@ class DashboardWelcomeCard extends ConsumerWidget {
                     _PrimaryQuickAction(
                       label: l10n.dashboardQuickActionNuevoAlumno,
                       icon: TreinoIcon.plus,
-                      onTap: () => context.go('/alumnos'),
+                      // Antes iba a `/alumnos`: la lista de los que YA tenés,
+                      // que es justo donde no está el que querés sumar. El
+                      // alta arranca por el link de invitación.
+                      onTap: () => showInviteAthleteDialog(context),
                     ),
                     _QuickAction(
                       key: const Key('quick_action_crear_rutina'),
@@ -436,28 +432,12 @@ class _QuickAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    return OutlinedButton.icon(
+    return TreinoButton(
+      label: label,
+      icon: icon,
+      variant: TreinoButtonVariant.secondary,
+      size: TreinoButtonSize.sm,
       onPressed: onTap,
-      icon: Icon(icon, size: 15, color: palette.textPrimary),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: palette.textPrimary,
-        side: BorderSide(color: palette.border),
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.s12,
-          vertical: AppSpacing.s8,
-        ),
-        shape: const StadiumBorder(),
-      ),
-      label: Text(
-        label,
-        style: const TextStyle(
-          fontFamily: AppFonts.barlowCondensed,
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 1.1,
-        ),
-      ),
     );
   }
 }

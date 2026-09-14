@@ -7,6 +7,8 @@ import 'package:treino/features/profile/domain/experience_level.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 import 'package:treino/features/workout/application/assigned_routine_providers.dart';
+import 'package:treino/features/workout/application/routine_providers.dart'
+    show routinesProvider;
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/application/user_routines_providers.dart';
 import 'package:treino/features/workout/domain/routine.dart';
@@ -104,6 +106,14 @@ ProviderContainer _container({
       userProfileProvider.overrideWith(
         (ref) => Stream.value(_profile(activeRoutineId: activeRoutineId)),
       ),
+      // Obligatorio desde "seguir sin copiar": con un marcador que no matchea
+      // contra los planes, el provider resuelve el catálogo del sistema para
+      // ver si el atleta está SIGUIENDO una plantilla. Sin este override esos
+      // casos pegan contra Firestore de verdad y explotan.
+      //
+      // Vacío a propósito: los escenarios de este archivo son de planes, no de
+      // catálogo. Los de catálogo viven en todays_routine_catalog_test.dart.
+      routinesProvider.overrideWith((ref) async => const <Routine>[]),
     ],
   );
   addTearDown(c.dispose);

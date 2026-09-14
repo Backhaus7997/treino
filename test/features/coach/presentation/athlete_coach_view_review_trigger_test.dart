@@ -41,7 +41,7 @@ Widget _wrap(List<Override> overrides) => ProviderScope(
         // QA-COA-001: the harness reads currentAthleteLinkAnyStatusProvider;
         // bridge it to the currentAthleteLinkProvider override each test provides.
         currentAthleteLinkAnyStatusProvider.overrideWith(
-            (ref) => ref.watch(currentAthleteLinkProvider.future)),
+            (ref) => ref.watch(currentAthleteLinkProvider.future).asStream()),
         ...overrides,
       ],
       child: MaterialApp(
@@ -71,11 +71,11 @@ void main() {
       // Sequence: link is active → user taps TERMINAR → confirms → sheet shows
       int resolveCount = 0;
       await tester.pumpWidget(_wrap([
-        currentAthleteLinkProvider.overrideWith((ref) async {
+        currentAthleteLinkProvider.overrideWith((ref) {
           resolveCount++;
           // After first resolve, return active link.
           // After invalidation, return null (terminated).
-          return resolveCount == 1 ? _makeActiveLink() : null;
+          return Stream.value(resolveCount == 1 ? _makeActiveLink() : null);
         }),
         userPublicProfileProvider('trainer-1')
             .overrideWith((ref) => Stream.value(_makePub())),
@@ -107,9 +107,9 @@ void main() {
       // which would dispose the _ActionRow widget before the sheet is shown.
       int resolveCount = 0;
       await tester.pumpWidget(_wrap([
-        currentAthleteLinkProvider.overrideWith((ref) async {
+        currentAthleteLinkProvider.overrideWith((ref) {
           resolveCount++;
-          return resolveCount == 1 ? _makeActiveLink() : null;
+          return Stream.value(resolveCount == 1 ? _makeActiveLink() : null);
         }),
         userPublicProfileProvider('trainer-1')
             .overrideWith((ref) => Stream.value(_makePub())),
