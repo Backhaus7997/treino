@@ -19,6 +19,8 @@ import '../../feed/domain/follow_status.dart';
 import '../../feed/presentation/widgets/post_avatar.dart';
 import '../../moderation/domain/report_target_kind.dart';
 import '../../moderation/presentation/moderation_actions.dart';
+import '../../paywall/application/athlete_entitlement_provider.dart'
+    show chatMediaQuotaProvider;
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
@@ -130,9 +132,56 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
+  /// Muestra un aviso del gate de cuota. Local y no por el messenger root: a
+  /// diferencia de la falla de envío (#435), acá la pantalla está viva por
+  /// construcción — el usuario acaba de tocar el clip.
+  void _toastQuota(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  static String _mb(int bytes) => (bytes / (1024 * 1024)).toStringAsFixed(1);
+
+  /// El gate de UX del tope de media de chat (#chat-media-quota).
+  ///
+  /// **Client-side es UX; server-side es la ley.** El enforcement real vive en
+  /// `chatMediaWriteAllowed()` de `storage.rules` y en la CF
+  /// `maintainChatMediaQuota*`. Esto sólo existe para no hacerle gastar datos
+  /// móviles al usuario en bytes que el servidor va a rebotar igual.
+  ///
+  /// Los dos chequeos están donde están por un motivo, y no son
+  /// intercambiables:
+  ///
+  ///   • **Cupo agotado, ANTES de abrir la galería.** Si ya no entra nada, no
+  ///     hay archivo que pueda elegir que sirva: ofrecerle el picker es
+  ///     hacerle perder el tiempo. Es un gate de entrada legítimo porque acá
+  ///     NO hay salida adentro — los mensajes son inmutables y la app no tiene
+  ///     UI para borrar media de un chat.
+  ///   • **Tamaño, DESPUÉS de elegir.** Recién ahí se sabe cuánto pesa. Frenar
+  ///     acá es lo que evita el peor desperdicio del flujo: sin esto el usuario
+  ///     sube hasta 50 MB de datos móviles para que el servidor los rechace al
+  ///     final, cuando ya los pagó él.
+  ///
+  /// Con cupo PARCIAL no se puede gatear en la entrada: 10 MB libres alcanzan
+  /// para una foto y no para un video, y hasta no ver el archivo no se sabe
+  /// cuál de los dos es. Por eso después de elegir se chequean los DOS topes
+  /// —el del archivo y el del cupo que queda— con mensajes distintos.
+  ///
+  /// El `quota == null` NO gatea, mismo criterio que `AthleteEntitlement
+  /// .unknown`: mientras el read no aterrizó no se sabe, y bloquearle el clip a
+  /// alguien que tiene cupo es peor que dejar pasar un tap que el servidor
+  /// rebota igual.
   Future<void> _onAttach() async {
     if (_sending || _mediaSendInFlight) return;
     final l10n = AppL10n.of(context);
+
+    final quota = ref.read(chatMediaQuotaProvider).valueOrNull;
+    if (quota != null && quota.isFull) {
+      _toastQuota(l10n.chatMediaQuotaFull(_mb(quota.maxBytes)));
+      return;
+    }
+
     // Capturado antes de los awaits: el envío pertenece a ESTE chat pase lo
     // que pase con la pantalla mientras el sheet/picker están abiertos.
     final chatId = widget.chatId;
@@ -161,6 +210,32 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
 
     if (file == null || !mounted) return;
+
+    // `XFile.length()` y no `File(path).length()`: el chat también se renderiza
+    // en el Coach Hub web, donde `dart:io` no existe.
+    final bytes = await file.length();
+    if (!mounted) return;
+    if (quota != null) {
+      final isVideo = mediaType == MediaType.video;
+      final perFile = isVideo ? quota.maxVideoBytes : quota.maxImageBytes;
+      // Los dos mensajes se separan a propósito: «el máximo es 25 MB» y «te
+      // quedan 3 MB» le dicen al usuario cosas distintas sobre qué hacer, y un
+      // solo mensaje genérico lo dejaría probando con archivos más chicos
+      // contra un tope que no se mueve.
+      if (bytes >= perFile) {
+        _toastQuota(l10n.chatMediaFileTooLarge(_mb(bytes), _mb(perFile)));
+        return;
+      }
+      if (bytes > quota.remainingBytes) {
+        _toastQuota(
+          l10n.chatMediaQuotaNotEnough(
+            _mb(bytes),
+            _mb(quota.remainingBytes < 0 ? 0 : quota.remainingBytes),
+          ),
+        );
+        return;
+      }
+    }
 
     // Fire-and-forget A PROPÓSITO (issue #435): el controller vive en el
     // ProviderContainer y completa upload+send aunque esta pantalla muera.

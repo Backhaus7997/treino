@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show immutable;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../insights/domain/chart_period.dart';
@@ -308,4 +309,106 @@ final customExerciseVideoCapsProvider =
     );
   }
   return videoCapsFor(ref.watch(athleteEntitlementProvider));
+});
+
+// ─── Media de chat (#chat-media-quota) ──────────────────────────────────────
+
+/// El campo que la CF `maintainChatMediaQuota*` denormaliza en `users/{uid}`,
+/// y que `storage.rules` lee para autorizar la próxima subida a `chatMedia/`.
+///
+/// Se lee crudo y no se modela en `UserProfile` por el MISMO motivo que
+/// [kCustomExerciseVideoUsageField]: es CF-write-only y está pineado en
+/// `firestore.rules`, así que si viviera en el modelo que el cliente también
+/// escribe, el primer `update` que mande el objeto entero se comería una
+/// denegación por un campo que nadie quiso tocar.
+const String kChatMediaUsageField = 'chatMediaUsage';
+
+/// Lo que el gate de UX del chat necesita saber, ya resuelto.
+@immutable
+class ChatMediaQuota {
+  const ChatMediaQuota({required this.usedBytes, required this.enforced});
+
+  /// Bytes de media de chat que el usuario ya tiene subidos, sumando todos sus
+  /// chats. Es el valor que escribió la CF: **va atrasado por construcción**,
+  /// igual que el que lee la regla.
+  final int usedBytes;
+
+  /// Si le corresponden los topes free. Sale de
+  /// `users/{uid}.athletePaywallEnforced`.
+  final bool enforced;
+
+  int get maxBytes => enforced ? kFreeMaxChatMediaBytes : kMaxChatMediaBytes;
+
+  int get maxVideoBytes =>
+      enforced ? kFreeMaxChatVideoBytes : kMaxChatVideoBytes;
+
+  int get maxImageBytes => kMaxChatImageBytes;
+
+  /// Cuánto le queda antes del tope. Puede dar negativo si la CF recontó
+  /// después de una ráfaga — de ahí el `clamp` en los call sites.
+  int get remainingBytes => maxBytes - usedBytes;
+
+  /// Si ya no entra NADA más. Es el único caso en que el gate puede frenar
+  /// ANTES de abrir la galería: con cupo parcial no se sabe si el archivo
+  /// entra hasta saber cuánto pesa.
+  bool get isFull => remainingBytes <= 0;
+}
+
+/// El tope de media de chat del usuario actual.
+///
+/// `null` mientras el read no aterrizó. **No colapsar a un default optimista**:
+/// mismo criterio que [customExerciseVideoCountProvider] — un 0 optimista le
+/// deja tocar «adjuntar» a alguien que ya está en el tope, y la negación le
+/// llega recién después de mandar los bytes, que es exactamente el desperdicio
+/// que este gate existe para evitar.
+///
+/// ## ⚠️ Por qué el tier sale de `athletePaywallEnforced` y NO de
+/// [athleteEntitlementProvider]
+///
+/// Ésta es la diferencia deliberada con [customExerciseVideoCapsProvider], y no
+/// es estilo: **[athleteEntitlementProvider] devuelve `free` para un PF.** No
+/// mira `role`, y un PF no tiene ni vínculo como alumno ni `athleteSubscription`
+/// — así que cae por la rama de «ninguna de las dos otorga».
+///
+/// Allá eso es latente y sale bien de casualidad, porque el provider devuelve el
+/// techo estructural mientras [kAthletePaywallEnabled] esté apagado. Acá no me
+/// quiero apoyar en esa casualidad: el chat es superficie COMPARTIDA de uso
+/// CONSTANTE entre el PF y el alumno, y el día que se prenda el interruptor un
+/// gate colgado de aquel provider le mostraría «llegaste al límite» a todos los
+/// PF del producto.
+///
+/// `users/{uid}.athletePaywallEnforced` no tiene ese problema: lo escribe
+/// `resolveAthletePaywallEnforced`, que corta en `role !== 'athlete'` y ante un
+/// vínculo activo. Es **el mismo campo que lee `storage.rules`**, así que el
+/// cliente y el servidor no pueden discrepar sobre de qué lado del paywall está
+/// alguien — que es la propiedad que querés de un gate de UX.
+///
+/// Y no cuesta una lectura extra: el contador y el tier viven en el MISMO
+/// documento, así que salen del mismo snapshot.
+final chatMediaQuotaProvider =
+    StreamProvider.autoDispose<ChatMediaQuota?>((ref) {
+  final uid = ref.watch(currentUidProvider);
+  if (uid == null || uid.isEmpty) return Stream.value(null);
+
+  // El interruptor gobierna la UX entera y no cada call site, igual que en
+  // `catalogLockActiveProvider` y `customExerciseVideoCapsProvider`.
+  final paywallOn = ref.watch(athletePaywallEnabledProvider);
+
+  return ref
+      .watch(firestoreProvider)
+      .collection('users')
+      .doc(uid)
+      .snapshots()
+      // Misma guarda de cache fría que `_athleteSubscriptionStatusProvider`.
+      .where((snap) => snap.exists || !snap.metadata.isFromCache)
+      .map<ChatMediaQuota?>((snap) {
+    final data = snap.data();
+    final raw = data?[kChatMediaUsageField];
+    final bytes = raw is Map ? raw['bytes'] : null;
+    return ChatMediaQuota(
+      usedBytes: bytes is int ? bytes : 0,
+      enforced: paywallOn && data?['athletePaywallEnforced'] == true,
+    );
+  }).distinct(
+          (a, b) => a?.usedBytes == b?.usedBytes && a?.enforced == b?.enforced);
 });

@@ -92,6 +92,9 @@ interface UserFixture {
   /// El contador de videos de ejercicio custom. CF-write-only: lo escribe
   /// `maintainCustomExerciseVideoQuota*` y lo lee `storage.rules`.
   customExerciseVideoUsage?: Record<string, unknown> | null;
+  /// El total de BYTES de media de chat. CF-write-only: lo escribe
+  /// `maintainChatMediaQuota*` y lo lee `storage.rules`.
+  chatMediaUsage?: Record<string, unknown> | null;
 }
 
 /** Seed a users/{uid} doc via an Admin-privileged context (rules disabled). */
@@ -858,6 +861,122 @@ describe("users rules — customExerciseVideoUsage: el contador del tope de vide
       email: `${uid}-normal@example.test`,
       createdAt: 0,
       customExerciseVideoUsage: { count: 1, bytes: 1000 },
+    });
+
+    const client = testEnv.authenticatedContext(`${uid}-normal`);
+    const ref = client.firestore().collection(COL_USERS).doc(`${uid}-normal`);
+
+    await assertSucceeds(ref.update({ displayName: "Martin" }));
+  });
+});
+
+describe("users rules — chatMediaUsage: el contador del tope de media de chat", () => {
+  // Hermano del de arriba y por el mismo motivo, sobre el prefijo donde de
+  // verdad se acumula el UGC. `storage.rules` lo lee para autorizar la proxima
+  // subida a `chatMedia/`, asi que quien pueda escribirlo manda.
+  //
+  // El eje que acota es BYTES y no cantidad —el chat es un flujo continuo, no
+  // una biblioteca— pero el modo de falla del pin es identico: UNA escritura,
+  // `{chatMediaUsage: {bytes: 0}}`, y el tope entero deja de existir.
+  const uid = "athlete-forge-chat-usage";
+
+  it("deniega al dueno escribirse el contador de la nada", async () => {
+    await seedUser({
+      uid,
+      role: "athlete",
+      email: `${uid}@example.test`,
+      createdAt: 0,
+    });
+
+    const client = testEnv.authenticatedContext(uid);
+    const ref = client.firestore().collection(COL_USERS).doc(uid);
+
+    await assertFails(ref.update({ chatMediaUsage: { bytes: 0, count: 0 } }));
+  });
+
+  it("deniega BAJARLO a cero teniendo el cupo lleno", async () => {
+    // El caso que de verdad da plata: el alumno que llego a los 250 MB se pone
+    // el contador en cero y sigue subiendo videos de 25 MB para siempre.
+    await seedUser({
+      uid: `${uid}-reset`,
+      role: "athlete",
+      email: `${uid}-reset@example.test`,
+      createdAt: 0,
+      chatMediaUsage: { bytes: 262144000, count: 20 },
+    });
+
+    const client = testEnv.authenticatedContext(`${uid}-reset`);
+    const ref = client.firestore().collection(COL_USERS).doc(`${uid}-reset`);
+
+    await assertFails(ref.update({ chatMediaUsage: { bytes: 0, count: 0 } }));
+  });
+
+  it("deniega BORRARLO — el pin es en los dos sentidos", async () => {
+    // Un pin que solo mira el valor nuevo se evade borrando el campo: ausente
+    // significa cero para la regla de Storage, que lee con `.get('bytes', 0)`.
+    await seedUser({
+      uid: `${uid}-delete`,
+      role: "athlete",
+      email: `${uid}-delete@example.test`,
+      createdAt: 0,
+      chatMediaUsage: { bytes: 262144000, count: 20 },
+    });
+
+    const client = testEnv.authenticatedContext(`${uid}-delete`);
+    const ref = client.firestore().collection(COL_USERS).doc(`${uid}-delete`);
+
+    await assertFails(
+      ref.update({
+        chatMediaUsage: firebase.firestore.FieldValue.delete(),
+      }),
+    );
+  });
+
+  it("deniega PLANTARLO en el create — medio pin es peor que ninguno", async () => {
+    // Los tres casos de arriba prueban el verbo UPDATE. Este prueba el otro, y
+    // sin el la defensa esta al reves de como se lee: quien se auto-crea el doc
+    // con `{bytes: 0}` planta un cero que el pin del update vuelve INDELEBLE, y
+    // se queda con cupo infinito para siempre. Es la misma leccion textual que
+    // documenta el pin de `subscription`.
+    const freshUid = "athlete-plants-chat-usage-on-create";
+    const client = testEnv.authenticatedContext(freshUid);
+    const ref = client.firestore().collection(COL_USERS).doc(freshUid);
+
+    await assertFails(
+      ref.set({
+        uid: freshUid,
+        role: "athlete",
+        email: `${freshUid}@example.test`,
+        createdAt: 0,
+        chatMediaUsage: { bytes: 0, count: 0 },
+      }),
+    );
+  });
+
+  it("el signup normal sigue pasando — el pin rechaza el CAMPO, no el alta", async () => {
+    const freshUid = "athlete-signup-sin-chat-usage";
+    const client = testEnv.authenticatedContext(freshUid);
+    const ref = client.firestore().collection(COL_USERS).doc(freshUid);
+
+    await assertSucceeds(
+      ref.set({
+        uid: freshUid,
+        role: "athlete",
+        email: `${freshUid}@example.test`,
+        createdAt: 0,
+      }),
+    );
+  });
+
+  it("deja pasar un update normal del perfil que NO lo toca", async () => {
+    // Mismo contrapeso que arriba: el pin restringe UN campo, no le congela el
+    // documento al dueno.
+    await seedUser({
+      uid: `${uid}-normal`,
+      role: "athlete",
+      email: `${uid}-normal@example.test`,
+      createdAt: 0,
+      chatMediaUsage: { bytes: 1000, count: 1 },
     });
 
     const client = testEnv.authenticatedContext(`${uid}-normal`);

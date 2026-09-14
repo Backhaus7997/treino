@@ -268,6 +268,20 @@ service cloud.firestore {
                     // contar objetos de un prefijo. Por eso el numero vive aca y
                     // no se calcula alla, y por eso quien lo escriba manda.
                     && request.resource.data.get('customExerciseVideoUsage', null) == null
+                    // chatMediaUsage: CF-write-only, mismo peso y mismo modo de
+                    // falla que el de arriba. Es el total de BYTES de media de
+                    // chat de este usuario, que escribe `maintainChatMediaQuota*`
+                    // y que `storage.rules` LEE para autorizar la proxima subida
+                    // a `chatMedia/`.
+                    //
+                    // Sin este pin el bypass es una sola escritura
+                    // —`{chatMediaUsage: {bytes: 0}}`— y el tope entero deja de
+                    // existir para quien la mande.
+                    //
+                    // Acota BYTES y no cantidad porque el chat es un flujo
+                    // continuo y no una biblioteca; el porque largo esta en el
+                    // bloque `chatMedia` de `storage.rules`.
+                    && request.resource.data.get('chatMediaUsage', null) == null
                     // storeAccountToken: el UUID con el que una tienda
                     // identifica la cuenta del comprador. Lo emite
                     // `ensureStoreAccountToken` y NUNCA el cliente.
@@ -367,6 +381,15 @@ service cloud.firestore {
                     // contar objetos de un prefijo. Por eso el numero vive aca y
                     // no se calcula alla, y por eso quien lo escriba manda.
                     && request.resource.data.get('customExerciseVideoUsage', null) == resource.data.get('customExerciseVideoUsage', null)
+                    // chatMediaUsage: CF-write-only, pineado en los DOS verbos
+                    // por la misma razon que el resto — medio pin es peor que
+                    // ninguno: vuelve INDELEBLE lo que se sembro al crear.
+                    //
+                    // Es el total de BYTES de media de chat, que escribe
+                    // `maintainChatMediaQuota*` y que `storage.rules` LEE para
+                    // autorizar la proxima subida a `chatMedia/`. Sin el pin,
+                    // `{chatMediaUsage: {bytes: 0}}` desactiva el tope entero.
+                    && request.resource.data.get('chatMediaUsage', null) == resource.data.get('chatMediaUsage', null)
                     // storeAccountToken: CF-write-only, en los DOS verbos por
                     // la misma razon de siempre — medio pin es peor que
                     // ninguno, porque vuelve INDELEBLE lo que se sembro al

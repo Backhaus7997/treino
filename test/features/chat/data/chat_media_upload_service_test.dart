@@ -104,21 +104,40 @@ void main() {
     });
   });
 
-  group('guardSize — video limits (100 MB)', () {
-    test('video exactly at 100 MB does not throw', () {
-      const hundredMb = 100 * 1024 * 1024;
+  // #chat-media-quota: bajó de 100 MB a 50. Los 100 eran 11x el p90 real del
+  // bucket —un techo decorativo—, y el único archivo que los aprovechó es un
+  // MP4 de 90,31 MB que por sí solo es el 71% de todo `chatMedia/`.
+  //
+  // Éste es el techo ESTRUCTURAL, el único que el service conoce: no tiene
+  // contexto de usuario. El tope free (25 MB) y el de bytes totales viven en
+  // `ChatScreen._onAttach`, que sí puede leer los providers, y sobre todo en
+  // `storage.rules`, que es donde está la ley.
+  group('guardSize — video limits (50 MB)', () {
+    test('video exactly at 50 MB does not throw', () {
+      const fiftyMb = 50 * 1024 * 1024;
       expect(
-        () =>
-            service.guardSize(sizeBytes: hundredMb, mediaType: MediaType.video),
+        () => service.guardSize(sizeBytes: fiftyMb, mediaType: MediaType.video),
         returnsNormally,
       );
     });
 
-    test('video over 100 MB throws ArgumentError before upload', () {
-      const hundredMbPlus = 100 * 1024 * 1024 + 1;
+    test('video over 50 MB throws ArgumentError before upload', () {
+      const fiftyMbPlus = 50 * 1024 * 1024 + 1;
       expect(
         () => service.guardSize(
-            sizeBytes: hundredMbPlus, mediaType: MediaType.video),
+            sizeBytes: fiftyMbPlus, mediaType: MediaType.video),
+        throwsA(isA<ArgumentError>()),
+      );
+    });
+
+    test('el video de 90 MB que motivó el cambio ahora rebota', () {
+      // El objeto real medido en `treino-dev` el 2026-09-14. Escrito literal a
+      // propósito: si alguien vuelve a subir el techo, este test es el que
+      // pregunta por qué.
+      const elVideoDe90Mb = 90 * 1024 * 1024 + 330000;
+      expect(
+        () => service.guardSize(
+            sizeBytes: elVideoDe90Mb, mediaType: MediaType.video),
         throwsA(isA<ArgumentError>()),
       );
     });

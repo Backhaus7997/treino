@@ -2945,6 +2945,21 @@ class AppL10nEs extends AppL10n {
       'No pudimos subir el archivo. Inténtalo de nuevo.';
 
   @override
+  String chatMediaQuotaFull(String maxMb) {
+    return 'Llegaste al tope de $maxMb MB en fotos y videos de chat.';
+  }
+
+  @override
+  String chatMediaFileTooLarge(String fileMb, String maxMb) {
+    return 'El archivo pesa $fileMb MB y el máximo es $maxMb MB.';
+  }
+
+  @override
+  String chatMediaQuotaNotEnough(String fileMb, String remainingMb) {
+    return 'El archivo pesa $fileMb MB y te quedan $remainingMb MB de cupo.';
+  }
+
+  @override
   String get chatMediaPreviewPhoto => '📷 Foto';
 
   @override
@@ -3217,10 +3232,7 @@ class AppL10nEs extends AppL10n {
 
   @override
   String dashboardAlertBannerSummary(
-    int vencidos,
-    int solicitudes,
-    int inactivos,
-  ) {
+      int vencidos, int solicitudes, int inactivos) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,
@@ -7519,6 +7531,21 @@ class AppL10nEsAr extends AppL10nEs {
       'No pudimos subir el archivo. Probá de nuevo.';
 
   @override
+  String chatMediaQuotaFull(String maxMb) {
+    return 'Llegaste al tope de $maxMb MB en fotos y videos de chat.';
+  }
+
+  @override
+  String chatMediaFileTooLarge(String fileMb, String maxMb) {
+    return 'El archivo pesa $fileMb MB y el máximo es $maxMb MB.';
+  }
+
+  @override
+  String chatMediaQuotaNotEnough(String fileMb, String remainingMb) {
+    return 'El archivo pesa $fileMb MB y te quedan $remainingMb MB de cupo.';
+  }
+
+  @override
   String get chatMediaPreviewPhoto => '📷 Foto';
 
   @override
@@ -7791,10 +7818,7 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String dashboardAlertBannerSummary(
-    int vencidos,
-    int solicitudes,
-    int inactivos,
-  ) {
+      int vencidos, int solicitudes, int inactivos) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,

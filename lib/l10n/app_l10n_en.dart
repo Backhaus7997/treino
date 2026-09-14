@@ -2892,6 +2892,21 @@ class AppL10nEn extends AppL10n {
       'We couldn\'t upload the file. Please try again.';
 
   @override
+  String chatMediaQuotaFull(String maxMb) {
+    return 'You\'ve reached the $maxMb MB limit for chat photos and videos.';
+  }
+
+  @override
+  String chatMediaFileTooLarge(String fileMb, String maxMb) {
+    return 'The file is $fileMb MB and the maximum is $maxMb MB.';
+  }
+
+  @override
+  String chatMediaQuotaNotEnough(String fileMb, String remainingMb) {
+    return 'The file is $fileMb MB and you have $remainingMb MB left.';
+  }
+
+  @override
   String get chatMediaPreviewPhoto => '📷 Photo';
 
   @override
@@ -3161,10 +3176,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String dashboardAlertBannerSummary(
-    int vencidos,
-    int solicitudes,
-    int inactivos,
-  ) {
+      int vencidos, int solicitudes, int inactivos) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,

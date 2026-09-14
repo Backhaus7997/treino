@@ -54,13 +54,26 @@ void main() {
       );
     });
 
-    test('video below 100MB does not throw', () {
+    test('video at 50MB does not throw', () {
       expect(
         () => service.guardSize(
           sizeBytes: 50 * 1024 * 1024,
           mediaType: MediaType.video,
         ),
         returnsNormally,
+      );
+    });
+
+    // #chat-media-quota: el techo bajó de 100 MB a 50, y el camino web importa
+    // tanto como el de mobile — el Coach Hub sube por acá, y `image_picker` en
+    // web ignora `imageQuality`, así que es el camino SIN compresión.
+    test('video above 50MB throws ArgumentError', () {
+      expect(
+        () => service.guardSize(
+          sizeBytes: 50 * 1024 * 1024 + 1,
+          mediaType: MediaType.video,
+        ),
+        throwsA(isA<ArgumentError>()),
       );
     });
   });
