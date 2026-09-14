@@ -118,12 +118,84 @@ service firebase.storage {
     // `functions/src/cascade/storage.ts`, con Admin SDK, que ignora estas
     // reglas — ADR-ACCDEL-013). Mismo patrón que `postPhotos` y `chatMedia`.
     match /customExerciseVideos/{userId}/{file=**} {
+      // ── El tope de costo (#video-quota) ────────────────────────────────
+      //
+      // El bloque tenía cap de TAMAÑO por archivo y NINGUNO de CANTIDAD, y el
+      // paywall del alumno no lo tocaba. Medido sobre el bucket de producción
+      // el 2026-09-10: 3 objetos, 2,84 MB, de UN solo dueño, y ese dueño es un
+      // PF. Ningún alumno subió jamás un video. O sea que esto NO se está
+      // desangrando hoy — se cierra antes de que haya algo que recortar.
+      //
+      // Qué costaba dejarlo abierto: sin tope de cantidad el peor caso es
+      // infinito, y el egress lo multiplica. Estos videos se sirven por la URL
+      // `?alt=media&token=` de `getDownloadURL()` — GCS directo, sin CDN (ver
+      // el comentario de `get` acá abajo y `docs/security.md` §3.1), así que
+      // cada play es egress a USD 0,12/GB contra USD 0,026/GB-mes de guardarlo.
+      // Por eso el cap POR ARCHIVO es la palanca principal: pega en las dos
+      // líneas de costo, no en una.
+      //
+      // Los cuatro números viven en `athlete_entitlement.dart`
+      // (`kFreeMaxCustomExerciseVideos`, `kFreeMaxCustomExerciseVideoBytes`,
+      // `kMaxCustomExerciseVideos`, `kMaxCustomExerciseVideoBytes`) y están
+      // duplicados A MANO acá, igual que `freeMaxRoutineDays()` en
+      // `firestore.rules`. Si cambiás uno, cambiá el otro: si no, el cliente
+      // muestra un tope y el servidor aplica otro.
+      //
+      // ── Por qué el conteo se lee y no se calcula ────────────────────────
+      //
+      // Las reglas de Storage NO tienen agregación: no pueden listar ni contar
+      // objetos de un prefijo. Igual que con `athletePaywallEnforced`, la
+      // conclusión se denormaliza en Firestore —acá en
+      // `users/{uid}.customExerciseVideoUsage.count`, que escribe
+      // `maintainCustomExerciseVideoQuota`— y la regla lee ese número.
+      //
+      // Ese contador VA ATRASADO por diseño: el trigger de Storage corre
+      // DESPUÉS de que el objeto aterrizó. Un cliente que dispare N subidas en
+      // paralelo las ve todas contra el mismo valor viejo y se pasa del tope
+      // por el tamaño de la ráfaga. Por eso la CF además BORRA lo que sobra:
+      // la regla es el gate preventivo que atrapa el 99,9% y la CF es la red
+      // reactiva que cierra la carrera. Ninguna de las dos alcanza sola, y la
+      // CF sola tampoco serviría — cuando corre, los bytes ya entraron.
+      //
+      // ── Fail-open, y hasta dónde ───────────────────────────────────────
+      //
+      // `firestore.get()` devuelve null si el doc no existe, y hay escrituras
+      // legítimas de usuarios sin doc de perfil todavía (mismo caso que
+      // documenta `paywallEnforcedFor` en `firestore.rules`). Sin doc ⇒ no
+      // enforced, igual que allá. Pero el TECHO ESTRUCTURAL (100 MB, 50
+      // videos) se aplica siempre, con doc o sin él: el fail-open afloja el
+      // tope del paywall, nunca el del producto.
+      //
+      // Y el PF nunca cae en el tope free: `athletePaywallEnforced` sale de
+      // `resolveAthletePaywallEnforced`, que arranca con
+      // `if (userData?.role !== "athlete") return false`. Eso importa porque
+      // este editor es superficie COMPARTIDA — lo abren el alumno
+      // (`profile_screen.dart`, `exercise_picker_sheet.dart`) y el PF
+      // (`trainer_profile_view.dart`, Coach Hub web). Gatear sobre el
+      // entitlement del cliente en vez de sobre este campo le rompería la
+      // videoteca a todos los PF, porque `athleteEntitlementProvider` SÍ
+      // devuelve `free` para un PF (no mira `role`).
+      // UNA sola función y UNA sola lectura de Firestore. Tres helpers
+      // (tamaño, cantidad, tier) se leerían mejor pero serían tres
+      // `firestore.get()` sobre el mismo path, y cada uno es una lectura
+      // facturada — el mismo costo que `docs/paywall-alumno-suelto.md` §320
+      // marca para los `get()` de las reglas.
+      function videoWriteAllowed(userId) {
+        let u = firestore.get(/databases/(default)/documents/users/$(userId));
+        let d = u == null ? {} : u.data;
+        let enforced = d.get('athletePaywallEnforced', false) == true;
+        let usage = d.get('customExerciseVideoUsage', {});
+        return request.resource.size
+                 < (enforced ? 25 * 1024 * 1024 : 100 * 1024 * 1024)
+               && usage.get('count', 0) < (enforced ? 3 : 50);
+      }
+
       allow get: if request.auth != null;
       allow list: if false;
       allow write: if request.auth != null
                   && request.auth.uid == userId
-                  && request.resource.size < 100 * 1024 * 1024
-                  && request.resource.contentType.matches('video/.*');
+                  && request.resource.contentType.matches('video/.*')
+                  && videoWriteAllowed(userId);
       allow delete: if request.auth != null && request.auth.uid == userId;
     }
 

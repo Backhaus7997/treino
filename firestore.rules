@@ -252,6 +252,22 @@ service cloud.firestore {
                     // nada. Lo escribe el webhook de la tienda, nunca el
                     // cliente.
                     && request.resource.data.get('athleteSubscription', null) == null
+                    // customExerciseVideoUsage: CF-write-only. Es el contador
+                    // denormalizado de cuantos videos de ejercicio custom tiene
+                    // subidos este usuario y cuantos bytes ocupan, que escribe
+                    // `maintainCustomExerciseVideoQuota*`.
+                    //
+                    // NO es inerte: `storage.rules` lo LEE para autorizar la
+                    // subida del proximo video. Sin este pin el bypass es una
+                    // sola escritura —`{customExerciseVideoUsage: {count: 0}}`—
+                    // y el tope de cantidad deja de existir para quien la mande.
+                    // Mismo peso y mismo modo de falla que
+                    // `athletePaywallEnforced`, que se pinea tres lineas arriba.
+                    //
+                    // Las reglas de Storage no tienen agregacion: no pueden
+                    // contar objetos de un prefijo. Por eso el numero vive aca y
+                    // no se calcula alla, y por eso quien lo escriba manda.
+                    && request.resource.data.get('customExerciseVideoUsage', null) == null
                     // storeAccountToken: el UUID con el que una tienda
                     // identifica la cuenta del comprador. Lo emite
                     // `ensureStoreAccountToken` y NUNCA el cliente.
@@ -335,6 +351,22 @@ service cloud.firestore {
                     // indeleble lo que se sembró al crear, y el que lee el
                     // comentario da por cerrado lo que quedó abierto.
                     && request.resource.data.get('athleteSubscription', null) == resource.data.get('athleteSubscription', null)
+                    // customExerciseVideoUsage: CF-write-only. Es el contador
+                    // denormalizado de cuantos videos de ejercicio custom tiene
+                    // subidos este usuario y cuantos bytes ocupan, que escribe
+                    // `maintainCustomExerciseVideoQuota*`.
+                    //
+                    // NO es inerte: `storage.rules` lo LEE para autorizar la
+                    // subida del proximo video. Sin este pin el bypass es una
+                    // sola escritura —`{customExerciseVideoUsage: {count: 0}}`—
+                    // y el tope de cantidad deja de existir para quien la mande.
+                    // Mismo peso y mismo modo de falla que
+                    // `athletePaywallEnforced`, que se pinea tres lineas arriba.
+                    //
+                    // Las reglas de Storage no tienen agregacion: no pueden
+                    // contar objetos de un prefijo. Por eso el numero vive aca y
+                    // no se calcula alla, y por eso quien lo escriba manda.
+                    && request.resource.data.get('customExerciseVideoUsage', null) == resource.data.get('customExerciseVideoUsage', null)
                     // storeAccountToken: CF-write-only, en los DOS verbos por
                     // la misma razon de siempre — medio pin es peor que
                     // ninguno, porque vuelve INDELEBLE lo que se sembro al

@@ -89,6 +89,9 @@ interface UserFixture {
   storeAccountToken?: string | null;
   weightedLoad?: number | null;
   blockedAthleteIds?: string[];
+  /// El contador de videos de ejercicio custom. CF-write-only: lo escribe
+  /// `maintainCustomExerciseVideoQuota*` y lo lee `storage.rules`.
+  customExerciseVideoUsage?: Record<string, unknown> | null;
 }
 
 /** Seed a users/{uid} doc via an Admin-privileged context (rules disabled). */
@@ -774,5 +777,92 @@ describe("users rules — blockedAthleteIds: create verb + real write shapes", (
         blockedAthleteIds: firebase.firestore.FieldValue.arrayRemove("athlete-a"),
       }),
     );
+  });
+});
+
+describe("users rules — customExerciseVideoUsage: el contador del tope de videos", () => {
+  // El contador que `storage.rules` lee para autorizar la subida del proximo
+  // video. Las reglas de Storage no tienen agregacion —no pueden contar objetos
+  // de un prefijo— asi que el numero vive aca, denormalizado por
+  // `maintainCustomExerciseVideoQuota*`, y quien pueda escribirlo manda.
+  //
+  // Sin pin el bypass es UNA escritura: `{customExerciseVideoUsage: {count: 0}}`
+  // y el tope de cantidad deja de existir para quien la mande. Mismo peso y
+  // mismo modo de falla que `athletePaywallEnforced`.
+  const uid = "athlete-forge-video-usage";
+
+  it("deniega al dueno escribirse el contador de la nada", async () => {
+    await seedUser({
+      uid,
+      role: "athlete",
+      email: `${uid}@example.test`,
+      createdAt: 0,
+    });
+
+    const client = testEnv.authenticatedContext(uid);
+    const ref = client.firestore().collection(COL_USERS).doc(uid);
+
+    await assertFails(
+      ref.update({ customExerciseVideoUsage: { count: 0, bytes: 0 } }),
+    );
+  });
+
+  it("deniega BAJARLO a cero teniendo el tope lleno", async () => {
+    // El caso que de verdad importa: el alumno que ya llego al tope se pone el
+    // contador en cero y sigue subiendo. Es el unico camino por el que el
+    // bypass da plata.
+    await seedUser({
+      uid: `${uid}-reset`,
+      role: "athlete",
+      email: `${uid}-reset@example.test`,
+      createdAt: 0,
+      customExerciseVideoUsage: { count: 3, bytes: 30000000 },
+    });
+
+    const client = testEnv.authenticatedContext(`${uid}-reset`);
+    const ref = client.firestore().collection(COL_USERS).doc(`${uid}-reset`);
+
+    await assertFails(
+      ref.update({ customExerciseVideoUsage: { count: 0, bytes: 0 } }),
+    );
+  });
+
+  it("deniega BORRARLO — el pin es en los dos sentidos", async () => {
+    // Un pin que solo mira el valor nuevo se evade borrando el campo: ausente
+    // significa cero para la regla de Storage, que lee con `.get('count', 0)`.
+    await seedUser({
+      uid: `${uid}-delete`,
+      role: "athlete",
+      email: `${uid}-delete@example.test`,
+      createdAt: 0,
+      customExerciseVideoUsage: { count: 3, bytes: 30000000 },
+    });
+
+    const client = testEnv.authenticatedContext(`${uid}-delete`);
+    const ref = client.firestore().collection(COL_USERS).doc(`${uid}-delete`);
+
+    await assertFails(
+      ref.update({
+        customExerciseVideoUsage: firebase.firestore.FieldValue.delete(),
+      }),
+    );
+  });
+
+  it("deja pasar un update normal del perfil que NO lo toca", async () => {
+    // El contrapeso: el pin restringe UN campo, no le congela el documento al
+    // dueno. Sin este caso, un pin de mas —o un `hasOnly` mal puesto— pasaria
+    // desapercibido detras de tres rojos que dan verde por el motivo correcto.
+    await seedUser({
+      uid: `${uid}-normal`,
+      role: "athlete",
+      email: `${uid}-normal@example.test`,
+      createdAt: 0,
+      customExerciseVideoUsage: { count: 1, bytes: 1000 },
+    });
+
+    const client = testEnv.authenticatedContext(`${uid}-normal`);
+    const ref = client.firestore().collection(COL_USERS).doc(`${uid}-normal`);
+
+    await assertSucceeds(ref.update({ displayName: "Martin" }));
   });
 });

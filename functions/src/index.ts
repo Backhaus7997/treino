@@ -42,6 +42,14 @@ export { reassignFcmToken } from "./notifications/reassign-fcm-token";
 export { notifyWearOnWorkoutStarted } from "./notifications/notify-wear-workout";
 export { maintainFollowCounters } from "./social/maintain-follow-counters";
 export { maintainReactionCounters } from "./social/maintain-reaction-counters";
+// Tope de costo de los videos de ejercicio custom. Son DOS triggers y no uno:
+// el de finalize cuenta y borra lo que se colo por la carrera, y el de delete
+// devuelve el cupo cuando el usuario borra un video suyo. Sin el segundo, el
+// contador solo sube y el tope se vuelve permanente.
+export {
+  maintainCustomExerciseVideoQuotaOnFinalize,
+  maintainCustomExerciseVideoQuotaOnDelete,
+} from "./storage/custom-exercise-video-quota";
 export { notifyOnReview } from "./notifications/notify-review";
 // #628: canal alumno → PF durante la sesión. Notifica SOLO cuando
 // kind === 'discomfort' — un comment no debe vibrarle el teléfono al PF.
