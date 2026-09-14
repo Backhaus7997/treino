@@ -397,6 +397,105 @@ const FOLLOWS = [
   followEdge('seed-athlete-004', 'seed-athlete-001', 'accepted', daysAgo(15)),
 ];
 
+// ── Chats ────────────────────────────────────────────────────────────────────
+//
+// Este seed nunca sembró `chats`, y por eso la suite E2E del chat
+// (`integration_test/coach_athlete_chat_test.dart`) tenía
+// `kChatId = 'REPLACE_WITH_SEEDED_CHAT_ID'`: no había con qué llenarlo.
+//
+// `chatCreateOk` (`firestore.rules:2210`) habilita un chat por TRES ramas
+// EXCLUYENTES — es un ternario anidado, no un `||`. Se siembra una de cada una,
+// porque las tres tienen precondiciones distintas y un seed que sólo cubra la
+// de Coach deja las otras dos sin ninguna forma de probarse:
+//
+//   1. Coach    — `linkId` apunta a un `trainer_links` con status
+//                 `active`/`paused` y con trainerId y athleteId AMBOS en
+//                 members. De los 5 links sembrados sólo 001/002/003 sirven:
+//                 004 es `pending` y 005 `terminated`.
+//   2. Consulta — `kind: 'inquiry'`. El OTRO tiene que ser trainer con
+//                 `trainerPublicProfiles` y `acceptsInquiries != false`. El
+//                 seed no escribe ese campo, y la regla lo lee con
+//                 `.get('acceptsInquiries', true)`, así que resuelve true.
+//   3. Social   — ni `linkId` ni `kind`: exige `followAccepted(other, me)`.
+//                 Depende de FOLLOWS de arriba, y por eso no existía hasta
+//                 ahora: con `friendships` esta rama era imposible de sembrar.
+//
+// Dos cosas que la regla exige y es fácil equivocar:
+//   · `members` va ORDENADO y el doc id es `members[0] + '_' + members[1]`
+//     (`firestore.rules:2296-2298`). No es el par sin ordenar de `follows`.
+//   · `lastMessageAt` NO lo pide ninguna regla, pero `watchChatsForUser`
+//     (chat_repository.dart:219) ordena por ese campo, y Firestore excluye del
+//     `orderBy` los docs que no lo tienen. Un chat sembrado sin él existe, se
+//     abre por deep link, y NO aparece en la lista — que es la peor variante:
+//     parece un bug de la pantalla.
+
+/// Orden de `members` y doc id de un chat. Se escribe con `<` y no con
+/// `localeCompare` (como `sortedDocId`) a propósito: acá el orden ES la regla
+/// (`members[0] < members[1]`), que compara code units, no locale.
+function chatMembers(a, b) {
+  return a < b ? [a, b] : [b, a];
+}
+
+function chatIdOf(a, b) {
+  return chatMembers(a, b).join('_');
+}
+
+const CHATS = [
+  // 1. Coach — Lautaro (coach-001) ↔ Martín (athlete-001), vía seed-link-001.
+  {
+    members: chatMembers('seed-coach-001', 'seed-athlete-001'),
+    createdAt: daysAgo(55),
+    linkId: 'seed-link-001',
+    messages: [
+      { id: 'seed-msg-coach-01', senderId: 'seed-coach-001', text: 'Arrancamos con el bloque de fuerza. Cualquier duda, por acá.', createdAt: daysAgo(55) },
+      { id: 'seed-msg-coach-02', senderId: 'seed-athlete-001', text: 'Dale. La sentadilla la sentí pesada hoy.', createdAt: daysAgo(2) },
+      { id: 'seed-msg-coach-03', senderId: 'seed-coach-001', text: 'Bajale 5 kg y subí una repe. Mañana lo vemos.', createdAt: daysAgo(1) },
+    ],
+    // Martín leyó hasta el anteúltimo: queda 1 sin leer, que es lo que hace
+    // visible el badge de no-leídos sin tener que mandar nada a mano.
+    lastRead: { 'seed-coach-001': daysAgo(1), 'seed-athlete-001': daysAgo(2) },
+  },
+
+  // 2. Consulta — Nicolás (athlete-005) le escribe a Diego (coach-003), sin
+  //    vínculo. Diego es el único PF sin gym y con seed-link-004 en `pending`,
+  //    así que la consulta no se pisa con ningún chat de Coach.
+  {
+    members: chatMembers('seed-athlete-005', 'seed-coach-003'),
+    createdAt: daysAgo(2),
+    kind: 'inquiry',
+    messages: [
+      { id: 'seed-msg-inq-01', senderId: 'seed-athlete-005', text: 'Hola Diego, ¿tomás alumnos para recuperación de rodilla?', createdAt: daysAgo(2) },
+    ],
+    lastRead: { 'seed-athlete-005': daysAgo(2) },
+  },
+
+  // 3. Social — Martín (001) ↔ Sofía (002). Se apoya en el follow mutuo
+  //    aceptado de FOLLOWS: los DOS pueden escribir porque existen las dos
+  //    aristas. Con una sola, escribiría uno y el otro se comería un
+  //    permission-denied — `senderMayPost` pide `followAccepted(other, uid)`.
+  {
+    members: chatMembers('seed-athlete-001', 'seed-athlete-002'),
+    createdAt: daysAgo(45),
+    messages: [
+      { id: 'seed-msg-social-01', senderId: 'seed-athlete-002', text: '¿Vas al gym mañana temprano?', createdAt: daysAgo(3) },
+      { id: 'seed-msg-social-02', senderId: 'seed-athlete-001', text: 'Sí, 7am. Toca pierna.', createdAt: daysAgo(3) },
+    ],
+    lastRead: { 'seed-athlete-001': daysAgo(3), 'seed-athlete-002': daysAgo(3) },
+  },
+].map((c) => {
+  // `lastMessage*` se DERIVA de los mensajes en vez de escribirse a mano: si se
+  // escriben por separado, el preview de la lista y el último globo del hilo
+  // pueden decir cosas distintas, y eso no lo detecta ningún test de reglas.
+  const last = c.messages[c.messages.length - 1];
+  return {
+    ...c,
+    chatId: c.members.join('_'),
+    lastMessageAt: last.createdAt,
+    lastMessageText: last.text,
+    lastMessageSenderId: last.senderId,
+  };
+});
+
 // ── Routines ──────────────────────────────────────────────────────────────────
 // 2 trainer-assigned plans (multi-week) + 1 system template.
 // Slots use the simple legacy model (targetSets/targetRepsMin/Max/restSeconds)
@@ -1254,6 +1353,45 @@ async function seedFollows() {
   }
 }
 
+async function seedChats() {
+  console.log('\n── Chats ────────────────────────────────────────────────────────');
+  for (const c of CHATS) {
+    const data = {
+      chatId: c.chatId,
+      members: c.members,
+      createdAt: ts(c.createdAt),
+      lastMessageAt: ts(c.lastMessageAt),
+      lastMessageText: c.lastMessageText,
+      lastMessageSenderId: c.lastMessageSenderId,
+      lastRead: Object.fromEntries(
+        Object.entries(c.lastRead).map(([uid, at]) => [uid, ts(at)]),
+      ),
+    };
+    // `linkId` y `kind` sólo si corresponden: las tres ramas de `chatCreateOk`
+    // son excluyentes, y `update` los tiene PINEADOS con el idiom
+    // `get(clave, null)`. Un `linkId: null` explícito NO es lo mismo que la
+    // clave ausente — convertiría un chat social en uno que la regla lee como
+    // "tiene linkId" y rompería el pin en el primer update del cliente.
+    if (c.linkId) data.linkId = c.linkId;
+    if (c.kind) data.kind = c.kind;
+
+    const ref = db.collection('chats').doc(c.chatId);
+    await ref.set(data);
+    const variante = c.linkId ? 'coach' : c.kind === 'inquiry' ? 'inquiry' : 'social';
+    console.log(`  ✓ chats/${c.chatId} [${variante}]`);
+
+    for (const m of c.messages) {
+      await ref.collection('messages').doc(m.id).set({
+        id: m.id,
+        senderId: m.senderId,
+        text: m.text,
+        createdAt: ts(m.createdAt),
+      });
+    }
+    console.log(`    ↪ ${c.messages.length} mensajes`);
+  }
+}
+
 async function seedRoutines() {
   console.log('\n── Routines ─────────────────────────────────────────────────────');
   for (const r of ROUTINES) {
@@ -1471,6 +1609,14 @@ async function clear() {
   // basura del modelo viejo es justo el estado en el que alguien depura un
   // feed vacío mirando la colección equivocada.
   await deleteCollection('friendships', LEGACY_FRIENDSHIP_IDS);
+  // Los mensajes primero: borrar el doc padre deja la subcolección huérfana
+  // (mismo motivo que `sessions`/`setLogs` más abajo), y una subcolección
+  // huérfana sobrevive a `--clear` sin que nada la muestre.
+  for (const c of CHATS) {
+    const ref = db.collection('chats').doc(c.chatId);
+    await deleteAllDocs(ref.collection('messages'));
+    await ref.delete().catch(() => {});
+  }
   await deleteCollection('routines', ROUTINES.map(r => r.id));
   await deleteCollection('posts', POSTS.map(p => p.id));
   await deleteCollection('coach_availability_rules', AVAILABILITY_RULES.map(r => r.id));
@@ -1510,6 +1656,7 @@ async function seed() {
   await seedAthletes();
   await seedTrainerLinks();
   await seedFollows();
+  await seedChats();
   await seedExercisesCatalog();
   await seedRoutines();
   await seedSessions();
