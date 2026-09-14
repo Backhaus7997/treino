@@ -1,5 +1,3 @@
-import 'dart:async' show unawaited;
-
 import 'package:cloud_firestore/cloud_firestore.dart'
     show
         CollectionReference,
@@ -11,6 +9,7 @@ import 'package:cloud_firestore/cloud_firestore.dart'
         Timestamp;
 
 import '../../../core/analytics/analytics_service.dart';
+import '../../../core/telemetry/non_fatal.dart';
 import '../../profile/domain/experience_level.dart';
 import '../domain/routine.dart';
 import '../domain/routine_source.dart';
@@ -613,11 +612,21 @@ class RoutineRepository {
 
     // Después del `add`, no antes: el evento dice "se asignó", y antes de que
     // el servidor confirme todavía puede fallar.
-    unawaited(_analytics.logPlanAssigned(
-      routineId: ref.id,
-      assignedBy: routine.assignedBy!,
-      assignedTo: routine.assignedTo!,
-    ));
+    // `fireAndForget` y NO `unawaited` pelado: si el evento rechaza —el
+    // plugin de analytics valida sus parámetros y tira— un `unawaited` deja
+    // ese error sin dueño y `main.dart` lo reporta como FATAL. O sea que una
+    // asignación que salió bien se convierte en un crash a la vista del PF.
+    //
+    // No es hipotético: pasó igual con `appointment_created`, y por eso existe
+    // este helper. Ver su dartdoc en `core/telemetry/non_fatal.dart`.
+    fireAndForget(
+      _analytics.logPlanAssigned(
+        routineId: ref.id,
+        assignedBy: routine.assignedBy!,
+        assignedTo: routine.assignedTo!,
+      ),
+      reason: 'logPlanAssigned',
+    );
 
     return routine.copyWith(id: ref.id);
   }
