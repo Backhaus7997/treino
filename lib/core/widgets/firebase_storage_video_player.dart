@@ -170,14 +170,14 @@ class _FirebaseStorageVideoPlayerState
               ),
               AnimatedOpacity(
                 opacity: isPlaying ? 0 : 1,
-                duration: AppMotion.fast,
+                duration: AppMotion.resolve(context, AppMotion.fast),
                 child: Container(
                     color: Colors.black
                         .withValues(alpha: 0.22)), // intentional: media surface
               ),
               AnimatedOpacity(
                 opacity: isPlaying ? 0 : 1,
-                duration: AppMotion.fast,
+                duration: AppMotion.resolve(context, AppMotion.fast),
                 child: const VideoPlayOverlay(),
               ),
               Positioned(

@@ -13,6 +13,7 @@ import '../../../../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../chat_section_screen.dart' show selectedChatIdProvider;
 import 'avatar_color.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/list_row/list_row.dart';
 
 /// Panel izquierdo del split-pane: lista de conversaciones del PF.
 ///
@@ -54,7 +55,10 @@ class _ChatListPaneState extends ConsumerState<ChatListPane> {
     // Solo mostramos loading/error si NUNCA hubo datos (primer load real).
     if (chats == null) {
       if (chatsAsync.isLoading) {
-        return Center(child: CircularProgressIndicator(color: palette.accent));
+        return const Padding(
+          padding: EdgeInsets.all(AppSpacing.s12),
+          child: _FilasSkeleton(),
+        );
       }
       return _ErrorState();
     }
@@ -396,6 +400,35 @@ class _NoMatchState extends StatelessWidget {
             fontSize: 13,
             color: palette.textMuted),
       ),
+    );
+  }
+}
+
+/// Skeleton de carga — filas en shimmer, el mismo patrón del dashboard.
+///
+/// Reemplaza un `CircularProgressIndicator` centrado. La diferencia no es
+/// estética: un spinner dice "esperá" y no dice nada más; el shimmer dibuja la
+/// FORMA de lo que viene, así que cuando llegan los datos no hay salto de
+/// layout — el bloque ya ocupaba su lugar.
+///
+/// Mismo criterio que dejó el dashboard cuando sacó sus spinners crudos:
+/// «todo estado de carga pasa por el shimmer del kit».
+class _FilasSkeleton extends StatelessWidget {
+  const _FilasSkeleton();
+
+  /// Seis filas: alcanza para llenar el alto del panel sin que el shimmer
+  /// parezca una lista corta que ya cargó.
+  static const filas = 6;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        for (var i = 0; i < filas; i++) ...[
+          if (i > 0) const SizedBox(height: AppSpacing.s8),
+          const TreinoListRow(title: '', loading: true),
+        ],
+      ],
     );
   }
 }

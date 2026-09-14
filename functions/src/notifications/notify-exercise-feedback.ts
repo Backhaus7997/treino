@@ -110,18 +110,20 @@
  * #628.
  */
 
-import * as admin from "firebase-admin";
+import { App, getApp, initializeApp } from "firebase-admin/app";
+import { Messaging } from "firebase-admin/messaging";
+import { getFirestore } from "firebase-admin/firestore";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 import { sendFcm } from "./send-fcm";
 import { enqueueMail } from "../mail/enqueue-mail";
-import { APP_ENTRY_TRAINER } from "../mail/templates";
+import { trainerEntry } from "../mail/templates";
 
-function getApp(): admin.app.App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -137,11 +139,11 @@ type FeedbackData = Record<string, unknown>;
  * @param messaging    - Instancia de messaging opcional, para inyección en tests.
  */
 export async function notifyOnExerciseFeedbackHandler(
-  app: admin.app.App,
+  app: App,
   athleteUid: string,
   sessionId: string,
   feedbackData: FeedbackData,
-  messaging?: admin.messaging.Messaging,
+  messaging?: Messaging,
 ): Promise<void> {
   const kind = feedbackData.kind as string | undefined;
 
@@ -170,7 +172,7 @@ export async function notifyOnExerciseFeedbackHandler(
     return;
   }
 
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
 
   // Destinatario CANDIDATO: el PF que el grant dice. Candidato y no destinatario
   // a secas — este doc es client-writable y el alumno lo apunta a quien quiera
@@ -279,7 +281,14 @@ export async function notifyOnExerciseFeedbackHandler(
     // El destinatario es el PF, asi que el CTA va a SU entrada. El default del
     // template es la del atleta, que aca dejaria al profe mirando la pantalla
     // equivocada. Mismo patron que `link-requested`.
-    params: { athleteName, ctaUrl: APP_ENTRY_TRAINER },
+    //
+    // `to: "alumno"` con el uid del ATLETA (no del PF, que ya es `trainerId`
+    // arriba): manda directo al perfil de quien reporto la molestia, no a un
+    // listado generico de alumnos que el profe tendria que volver a filtrar.
+    params: {
+      athleteName,
+      ctaUrl: trainerEntry({ to: "alumno", athleteId: athleteUid }),
+    },
     // Sin `prefKey` A PROPOSITO: es transaccional. Ver el header.
   }).catch((error: unknown) => {
     logger.warn("notifyOnExerciseFeedback: mail enqueue failed", {
@@ -308,6 +317,6 @@ export const notifyOnExerciseFeedback = onDocumentCreated(
     }
 
     const { uid: athleteUid, sessionId } = event.params;
-    await notifyOnExerciseFeedbackHandler(getApp(), athleteUid, sessionId, feedbackData);
+    await notifyOnExerciseFeedbackHandler(ensureApp(), athleteUid, sessionId, feedbackData);
   },
 );

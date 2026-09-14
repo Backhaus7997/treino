@@ -13,33 +13,35 @@
  *   SCENARIO-NOTIF-06 — legacy payment without dueAt → skipped (not in query)
  */
 
-import * as admin from "firebase-admin";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
+import { BatchResponse, Messaging, MulticastMessage } from "firebase-admin/messaging";
+import { DocumentReference, FieldValue, Timestamp, getFirestore } from "firebase-admin/firestore";
 import { notifyOverduePaymentsHandler } from "../payments/notify-overdue-payments";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.GCLOUD_PROJECT = "treino-dev";
 
-let testApp: admin.app.App;
+let testApp: App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp(
+  testApp = initializeApp(
     { projectId: "treino-dev" },
     "notify-overdue-payments-test",
   );
 });
 
 afterAll(async () => {
-  await testApp.delete();
+  await deleteApp(testApp);
 });
 
-const db = () => admin.firestore(testApp);
+const db = () => getFirestore(testApp);
 
 // ---------------------------------------------------------------------------
 // Mock messaging factory
 // ---------------------------------------------------------------------------
 
-type MockMessaging = admin.messaging.Messaging & {
-  calls: Array<admin.messaging.MulticastMessage>;
+type MockMessaging = Messaging & {
+  calls: Array<MulticastMessage>;
 };
 
 /**
@@ -47,12 +49,12 @@ type MockMessaging = admin.messaging.Messaging & {
  * to sendEachForMulticast.
  */
 function makeMockMessaging(): MockMessaging {
-  const calls: Array<admin.messaging.MulticastMessage> = [];
+  const calls: Array<MulticastMessage> = [];
   const mock = {
     calls,
     sendEachForMulticast: async (
-      message: admin.messaging.MulticastMessage,
-    ): Promise<admin.messaging.BatchResponse> => {
+      message: MulticastMessage,
+    ): Promise<BatchResponse> => {
       calls.push(message);
       return {
         responses: message.tokens.map(() => ({
@@ -98,8 +100,8 @@ async function seedPayment(
   trainerId: string,
   athleteId: string,
   status: string,
-  dueAt: admin.firestore.Timestamp | null,
-  lastOverdueNotifiedAt?: admin.firestore.Timestamp | null,
+  dueAt: Timestamp | null,
+  lastOverdueNotifiedAt?: Timestamp | null,
 ): Promise<void> {
   const data: Record<string, unknown> = {
     id: docId,
@@ -108,7 +110,7 @@ async function seedPayment(
     amountArs: 10000,
     concept: "test",
     status,
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    createdAt: FieldValue.serverTimestamp(),
   };
   if (dueAt !== null) {
     data.dueAt = dueAt;
@@ -120,7 +122,7 @@ async function seedPayment(
 }
 
 async function cleanupDocs(
-  ...refs: Array<admin.firestore.DocumentReference>
+  ...refs: Array<DocumentReference>
 ): Promise<void> {
   for (const ref of refs) {
     await ref.delete().catch(() => undefined);
@@ -132,19 +134,19 @@ async function cleanupDocs(
 // ---------------------------------------------------------------------------
 const NOW = new Date(Date.UTC(2026, 6, 6, 10, 0, 0));
 // A dueAt in the past (overdue)
-const DUE_PAST = admin.firestore.Timestamp.fromDate(
+const DUE_PAST = Timestamp.fromDate(
   new Date(Date.UTC(2026, 6, 1, 23, 59, 59)),
 );
 // A dueAt in the future (not yet due)
-const DUE_FUTURE = admin.firestore.Timestamp.fromDate(
+const DUE_FUTURE = Timestamp.fromDate(
   new Date(Date.UTC(2026, 7, 1, 23, 59, 59)),
 );
 // lastOverdueNotifiedAt 3 days ago (within 7-day window)
-const NOTIFIED_RECENT = admin.firestore.Timestamp.fromDate(
+const NOTIFIED_RECENT = Timestamp.fromDate(
   new Date(Date.UTC(2026, 6, 3, 10, 0, 0)),
 );
 // lastOverdueNotifiedAt 10 days ago (outside 7-day window)
-const NOTIFIED_OLD = admin.firestore.Timestamp.fromDate(
+const NOTIFIED_OLD = Timestamp.fromDate(
   new Date(Date.UTC(2026, 5, 26, 10, 0, 0)),
 );
 
@@ -187,7 +189,7 @@ describe("SCENARIO-NOTIF-01: overdue + never-notified → sends push and sets la
     // lastOverdueNotifiedAt must be set to NOW
     const snap = await db().collection("payments").doc(paymentId).get();
     const data = snap.data()!;
-    const writtenAt = (data.lastOverdueNotifiedAt as admin.firestore.Timestamp).toDate();
+    const writtenAt = (data.lastOverdueNotifiedAt as Timestamp).toDate();
     expect(writtenAt.getTime()).toBe(NOW.getTime());
   });
 });
@@ -343,7 +345,7 @@ describe("SCENARIO-NOTIF-05: overdue + notified >7 days ago → re-notified", ()
     // lastOverdueNotifiedAt must be updated to NOW
     const snap = await db().collection("payments").doc(paymentId).get();
     const data = snap.data()!;
-    const writtenAt = (data.lastOverdueNotifiedAt as admin.firestore.Timestamp).toDate();
+    const writtenAt = (data.lastOverdueNotifiedAt as Timestamp).toDate();
     expect(writtenAt.getTime()).toBe(NOW.getTime());
   });
 });

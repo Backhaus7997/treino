@@ -82,6 +82,37 @@ const EXEMPTIONS: Readonly<Record<string, Exemption>> = {
       "jsonPayload.verifications.app y pedir cero INVALID por plataforma " +
       "antes de volver a poner el flag.",
   },
+  "chat/promote-chat-to-inquiry:promoteChatToInquiry": {
+    // `debt` y no `decided`: a diferencia de los tres del Coach Hub web, acá
+    // NO hay un impedimento de plataforma. La app del alumno activa App Check
+    // (main.dart, dentro del `!kIsWeb`). Lo unico que falta es que la
+    // atestacion funcione, y eso queremos revertirlo.
+    permanence: "debt",
+    reason:
+      "La llama SOLO la app mobile del alumno (TrainerInquiryCta vive en " +
+      "trainer_public_profile_screen, fuera del arbol del target web), asi que " +
+      "por plataforma el flag corresponderia. No va porque la atestacion de " +
+      "esta app no funciona: la medicion ancha del #961 (24 dias, 6 callables, " +
+      "159 verificaciones) encontro acceptTrainerLink y requestPasswordReset " +
+      "en CERO validas y mintWatchCredential en 53%. Con el flag, CONSULTAR no " +
+      "fallaria a veces: fallaria casi siempre — la historia de deleteAccount " +
+      "(#811) otra vez. " +
+      "La superficie de abuso queda acotada por diseño, no por atestacion: el " +
+      "uid sale del token, el chatId se DERIVA de ese uid y del trainerId (no " +
+      "se acepta del cliente), el unico campo que escribe es kind:'inquiry' " +
+      "sobre un chat que ya existe y del que el llamador es miembro, y exige " +
+      "los MISMOS tres hechos que chatCreateOk valida al crear. O sea que un " +
+      "llamador autenticado solo puede llegar al estado al que ya habria " +
+      "llegado abriendo la consulta por la via normal. " +
+      "Ver promote-chat-to-inquiry.ts.",
+    exitCondition:
+      "El mismo del resto del inventario: que el cliente emita atestacion " +
+      "valida. Como este callable es mobile-only, no depende del App Check del " +
+      "Coach Hub web — le alcanza con que iOS y Android atestiguen. Contar " +
+      "sobre jsonPayload.verifications.app con el filtro ANCHO del #961 (no el " +
+      "angosto del §4.8.2, que mide un callable y un dia) y pedir cero INVALID " +
+      "por plataforma antes de poner el flag.",
+  },
   "subscriptions/accept-trainer-link:acceptTrainerLink": {
     permanence: "decided",
     reason:
@@ -99,6 +130,53 @@ const EXEMPTIONS: Readonly<Record<string, Exemption>> = {
       "Coach Hub web. Gatear solo accept no alcanza —pause baja el peso de 1.0 " +
       "a 0.5— asi que las dos transiciones que suben peso van juntas, con o sin " +
       "atestacion. Ver resume-trainer-link.ts:77.",
+  },
+  "subscriptions/mp/create-preapproval:createPreapproval": {
+    // `debt` y no `decided`, a diferencia de los dos de arriba, y la diferencia
+    // NO es el motivo —es el mismo: el Coach Hub web no activa App Check y este
+    // callable se llama SOLO desde ahi— sino si lo queremos revertir. En un
+    // endpoint que abre un cobro, si.
+    permanence: "debt",
+    reason:
+      "Mismo motivo de plataforma que acceptTrainerLink: lo llama el Coach Hub " +
+      "web, que no activa App Check, asi que con el flag puesto ningun PF " +
+      "podria contratar. Pero es el unico callable del repo que inicia un " +
+      "COBRO, y por eso vale mas para un atacante que los otros dos. " +
+      "La superficie de abuso queda acotada por diseño, no por atestacion: el " +
+      "uid sale del token, el tier y el ciclo son enums cerrados, el monto sale " +
+      "de TIER_PRICES_ARS, y la URL de retorno es una constante. El mail ya no " +
+      "entra en la cuenta: desde que el checkout va contra un PLAN, no se lee " +
+      "de ningun lado — MP le pregunta al pagador quien es. Ver " +
+      "create-preapproval.ts:329. Un atacante autenticado solo puede abrir " +
+      "checkouts a nombre PROPIO, y la ventana de idempotencia de " +
+      "mp_checkouts/{uid} los limita a uno por par (tier, ciclo) cada 30 " +
+      "minutos — seis en total. Ver create-preapproval.ts:263.",
+    exitCondition:
+      "Cuando el Coach Hub web active App Check (ReCaptcha v3 + site key en " +
+      "consola), poner el flag ACA PRIMERO, antes que en acceptTrainerLink y " +
+      "resumeTrainerLink: es el de mayor valor para un atacante de los que hoy " +
+      "salen sin atestacion. (Decia `addAlias` y estaba mal: addAlias es el " +
+      "unico callable del repo que YA tiene enforceAppCheck: true, " +
+      "add-alias.ts:148.)",
+  },
+  "subscriptions/mp/reconcile-my-checkout:reconcileMyCheckout": {
+    // `decided` y no `debt`, a diferencia de createPreapproval, y la diferencia
+    // es real: aquel ABRE un cobro, este solo pregunta por el estado de uno que
+    // ya existe. No hay nada que un atacante autenticado pueda mover desde acá.
+    permanence: "decided",
+    reason:
+      "Mismo motivo de plataforma que acceptTrainerLink y createPreapproval: " +
+      "lo llama el Coach Hub web, que no activa App Check, asi que con el flag " +
+      "puesto ningun PF veria acreditado su pago al volver de Mercado Pago. " +
+      "La superficie es la mas chica de todos los callables del repo: NO HAY " +
+      "BODY. La entrada es el uid del token y nada mas — el planId no viaja, " +
+      "sale de consultar mp_plans filtrado por ese uid, asi que no se puede " +
+      "pedir la reconciliacion de un plan ajeno ni enumerar quien compro que. " +
+      "Y no escribe nada que el llamador elija: lo que se escribe es lo que " +
+      "MP conteste por GET con nuestro token. Lo unico que un atacante " +
+      "autenticado puede hacer es preguntar por sus propios planes, y para eso " +
+      "esta el cooldown de RECONCILE_COOLDOWN_MS, que corta ANTES de la llamada " +
+      "a MP. Ver reconcile-my-checkout.ts.",
   },
   "auth/request-auth-email:requestPasswordReset": {
     permanence: "debt",
@@ -161,8 +239,11 @@ const EXEMPTIONS: Readonly<Record<string, Exemption>> = {
 const EXPECTED_DEPLOYED = [
   "acceptTrainerLink",
   "addAlias",
+  "createPreapproval",
   "deleteAccount",
   "mintWatchCredential",
+  "promoteChatToInquiry",
+  "reconcileMyCheckout",
   "requestEmailVerification",
   "requestPasswordReset",
   "resumeTrainerLink",
@@ -262,6 +343,12 @@ describe("QA-SEC-016: el guard falla cuando tiene que fallar", () => {
     },
     { module: "add-alias", symbol: "addAlias", as: "addAlias", attested: true },
     {
+      module: "chat/promote-chat-to-inquiry",
+      symbol: "promoteChatToInquiry",
+      as: "promoteChatToInquiry",
+      attested: false,
+    },
+    {
       module: "subscriptions/accept-trainer-link",
       symbol: "acceptTrainerLink",
       as: "acceptTrainerLink",
@@ -271,6 +358,18 @@ describe("QA-SEC-016: el guard falla cuando tiene que fallar", () => {
       module: "subscriptions/resume-trainer-link",
       symbol: "resumeTrainerLink",
       as: "resumeTrainerLink",
+      attested: false,
+    },
+    {
+      module: "subscriptions/mp/create-preapproval",
+      symbol: "createPreapproval",
+      as: "createPreapproval",
+      attested: false,
+    },
+    {
+      module: "subscriptions/mp/reconcile-my-checkout",
+      symbol: "reconcileMyCheckout",
+      as: "reconcileMyCheckout",
       attested: false,
     },
     { module: "mint-watch-credential", symbol: "mintWatchCredential", as: "mintWatchCredential", attested: false },

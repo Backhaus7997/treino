@@ -76,8 +76,8 @@ Future<void> _pumpScreen(
             const UserPublicProfile(uid: _kAthlete, displayName: 'Martín G'),
           ),
         ),
-        assignedRoutinesProvider(_kAthlete)
-            .overrideWith((ref) async => const []),
+        assignedRoutinesByTrainerProvider
+            .overrideWith((ref, key) async => const []),
         athleteNoteRepositoryProvider.overrideWithValue(repo),
         athleteNoteProvider((trainerId: _kTrainer, athleteId: _kAthlete))
             .overrideWith((ref) => Stream.value(existing)),

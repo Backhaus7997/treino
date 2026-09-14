@@ -18,11 +18,12 @@
  */
 
 const { inicializarAdmin } = require('./lib/admin');
+const { Timestamp, getFirestore } = require('firebase-admin/firestore');
 
 // Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla cerrado
 // con la migración; contra el emulador no pide nada. Ver scripts/lib/admin.js.
-const { admin } = inicializarAdmin();
-const db = admin.firestore();
+const { app } = inicializarAdmin();
+const db = getFirestore(app);
 
 // ---------------------------------------------------------------------------
 // Seed data — 10 finished sessions for seed_user_001
@@ -51,8 +52,8 @@ function makeSession(index) {
     uid: UID,
     routineId: routine.routineId,
     routineName: routine.routineName,
-    startedAt: admin.firestore.Timestamp.fromDate(startedAt),
-    finishedAt: admin.firestore.Timestamp.fromDate(
+    startedAt: Timestamp.fromDate(startedAt),
+    finishedAt: Timestamp.fromDate(
       new Date(startedAt.getTime() + durationMin * 60_000),
     ),
     totalVolumeKg,

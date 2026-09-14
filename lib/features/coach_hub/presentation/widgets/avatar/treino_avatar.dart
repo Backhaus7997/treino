@@ -91,7 +91,7 @@ class _TreinoAvatarTint {
     return _TreinoAvatarTint._(
       // 20% de opacidad: visible sobre bgCard en ambos temas sin competir
       // con el texto del row.
-      background: tone.withValues(alpha: 0.20),
+      background: tone.withValues(alpha: 0.2),
       foreground: tone,
     );
   }

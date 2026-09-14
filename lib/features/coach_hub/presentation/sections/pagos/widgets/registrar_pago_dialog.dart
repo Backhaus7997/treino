@@ -27,6 +27,7 @@ import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/payments/domain/payment.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart'
     show userPublicProfilesBatchProvider;
+import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 
 import 'thousands_input_formatter.dart';
 
@@ -221,15 +222,16 @@ class _RegistrarPagoDialogState extends ConsumerState<RegistrarPagoDialog> {
         ),
       ),
       actions: [
-        TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text('Cancelar', // i18n
-                style: TextStyle(color: palette.textMuted))),
-        TextButton(
-            onPressed: _submit,
-            child: Text('Registrar', // i18n
-                style: TextStyle(
-                    color: palette.accent, fontWeight: FontWeight.w700))),
+        TreinoButton(
+          label: 'Cancelar', // i18n
+          variant: TreinoButtonVariant.ghost,
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        const SizedBox(width: AppSpacing.s8),
+        TreinoButton(
+          label: 'Registrar', // i18n
+          onPressed: _submit,
+        ),
       ],
     );
   }
@@ -294,11 +296,8 @@ class _RegistrarPagoDialogState extends ConsumerState<RegistrarPagoDialog> {
           });
         }
 
-        return DropdownButtonFormField<String>(
+        return TreinoDropdown<String>(
           initialValue: validSelection,
-          isExpanded: true,
-          dropdownColor: palette.bgCard,
-          style: TextStyle(color: palette.textPrimary, fontSize: 14),
           decoration: deco('Alumno', 'Elegí un alumno'), // i18n
           hint: Text('Elegí un alumno', // i18n
               style: TextStyle(color: palette.textMuted)),

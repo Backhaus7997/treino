@@ -132,7 +132,31 @@ enum RoutineCatalog {
             ]),
             "limit": 50,
         ])
-        let system = try await client.runQuery([
+        let system = try await systemTemplateDocs(client: client)
+        // Las publicadas por entrenadores van primero, igual que en el grid del
+        // teléfono: el catálogo de TREINO es el fondo, no el titular.
+        return community.map { summary($0, origin: .community) }
+            + system.map { summary($0, origin: .system) }
+    }
+
+    /// Sólo el catálogo de TREINO (`source == system`), como DOCUMENTOS.
+    ///
+    /// Espejo exacto de `RoutineRepository.listSystemTemplates` del teléfono, y
+    /// la MISMA query que consume `templates(client:)` — extraída para que no
+    /// exista dos veces: si los filtros divergieran, la lista sobre la que
+    /// `resolveActiveRoutineId` decide dejaría de ser la que el atleta ve.
+    ///
+    /// Devuelve documentos y no `RoutineSummary` porque `findRoutine` necesita
+    /// el doc crudo para armar la rutina resuelta.
+    ///
+    /// Sólo el catálogo del sistema es "seguible" sin copiar. Las plantillas
+    /// publicadas por entrenadores se pueden copiar ("usar como base") pero no
+    /// seguir: son contenido de un tercero que puede despublicarlas, y el
+    /// marcador quedaría apuntando a la nada sin que el atleta hiciera nada.
+    static func systemTemplateDocs(
+        client: FirestoreREST
+    ) async throws -> [FirestoreDocument] {
+        try await client.runQuery([
             "from": [["collectionId": "routines"]],
             "where": allOf([
                 equals("source", "system"),
@@ -140,10 +164,6 @@ enum RoutineCatalog {
             ]),
             "limit": 50,
         ])
-        // Las publicadas por entrenadores van primero, igual que en el grid del
-        // teléfono: el catálogo de TREINO es el fondo, no el titular.
-        return community.map { summary($0, origin: .community) }
-            + system.map { summary($0, origin: .system) }
     }
 
     // MARK: - Activación

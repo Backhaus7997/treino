@@ -1,4 +1,7 @@
+import 'dart:convert';
 import 'dart:typed_data';
+
+import 'package:archive/archive.dart';
 
 import 'package:excel/excel.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -69,6 +72,75 @@ Uint8List _buildWorkbook({
 }
 
 void main() {
+  group('parseExcelBytes — targets absolutos en las relaciones', () {
+    /// Reescribe el mapa de relaciones del workbook a la forma ABSOLUTA:
+    ///
+    ///     Target="worksheets/sheet1.xml"   →   Target="/xl/worksheets/sheet1.xml"
+    ///
+    /// Las dos son OOXML valido. La segunda la escriben openpyxl y varias
+    /// herramientas mas, y es la que traia el archivo con el que el PF pego
+    /// contra «El archivo no es un Excel valido» — armado con NUESTRO template
+    /// y con las seis hojas correctas.
+    Uint8List conTargetsAbsolutos(Uint8List bytes) {
+      const rels = 'xl/_rels/workbook.xml.rels';
+      final entrada = ZipDecoder().decodeBytes(bytes);
+      final original = entrada.findFile(rels)!;
+      final xml = utf8.decode(original.content as List<int>);
+      final absoluto = xml.replaceAllMapped(
+        RegExp(r'Target="(?!/)([^"]*)"'),
+        (m) => 'Target="/xl/${m.group(1)}"',
+      );
+
+      final salida = Archive();
+      for (final f in entrada.files) {
+        if (f.name == rels) {
+          salida.addFile(ArchiveFile.string(rels, absoluto));
+        } else {
+          salida.addFile(f);
+        }
+      }
+      return Uint8List.fromList(ZipEncoder().encode(salida)!);
+    }
+
+    test('un workbook con targets absolutos se lee igual', () {
+      final relativo = _buildWorkbook();
+      final absoluto = conTargetsAbsolutos(relativo);
+
+      // CONTROL: los bytes tienen que haber cambiado de verdad. Sin esto, un
+      // `conTargetsAbsolutos` que no reescribiera nada dejaria el test
+      // pasando por el camino de siempre y sin probar nada.
+      expect(absoluto, isNot(relativo));
+
+      final plan = parseExcelBytes(absoluto);
+      final esperado = parseExcelBytes(relativo);
+      expect(plan.name, esperado.name);
+      expect(plan.days.length, esperado.days.length);
+      expect(
+        plan.days.map((d) => d.items.length),
+        esperado.days.map((d) => d.items.length),
+      );
+    });
+
+    test('un archivo que no es ZIP sigue diciendo que no se pudo leer', () {
+      // La normalizacion NO puede tapar el caso en que el mensaje era cierto.
+      expect(
+        () => parseExcelBytes(Uint8List.fromList([1, 2, 3, 4, 5])),
+        throwsA(isA<ExcelParseException>()),
+      );
+    });
+
+    test('el error nombra el motivo en vez de un texto fijo', () {
+      // Antes era un `catch (_)` con «El archivo no es un Excel valido», que
+      // sobre un archivo valido es una afirmacion falsa y deja sin rastro.
+      try {
+        parseExcelBytes(Uint8List.fromList([1, 2, 3, 4, 5]));
+        fail('tenia que tirar');
+      } on ExcelParseException catch (e) {
+        expect(e.message, contains('Detalle:'));
+      }
+    });
+  });
+
   group('parseExcelBytes', () {
     test('parsea un plan válido', () {
       final result = parseExcelBytes(_buildWorkbook());

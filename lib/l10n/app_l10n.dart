@@ -503,7 +503,7 @@ abstract class AppL10n {
   /// No description provided for @authTrainerInquiryDialogBody.
   ///
   /// In es_AR, this message translates to:
-  /// **'Para alta de entrenador, escribinos a equipo@treino.app'**
+  /// **'Para alta de entrenador, escribinos a treino@gettreino.com'**
   String get authTrainerInquiryDialogBody;
 
   /// No description provided for @authTrainerInquiryDialogClose.
@@ -871,6 +871,108 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'VER AGENDA DEL PF'**
   String get agendaButtonLabel;
+
+  /// Botón de la tab Coach que abre el plan nutricional del alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MI PLAN NUTRICIONAL'**
+  String get athleteNutritionPlanButtonLabel;
+
+  /// Botón de la tab Coach que abre los archivos compartidos con el alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MIS ARCHIVOS'**
+  String get athleteFilesButtonLabel;
+
+  /// Título de la pantalla read-only del plan nutricional del alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PLAN NUTRICIONAL'**
+  String get athleteNutritionPlanScreenTitle;
+
+  /// Indica que el alumno debe elegir una sola opción del grupo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Elegí una'**
+  String get athleteNutritionChooseOneHint;
+
+  /// Indica que el alumno debe incluir todas las opciones del grupo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Va todo'**
+  String get athleteNutritionAllHint;
+
+  /// Estado vacío cuando el PF todavía no creó un plan nutricional.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu PF todavía no cargó tu plan nutricional.'**
+  String get athleteNutritionPlanEmpty;
+
+  /// Error al cargar el plan nutricional del alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar tu plan nutricional.'**
+  String get athleteNutritionPlanLoadError;
+
+  /// Estado de la ruta nutricional cuando el alumno no tiene un vínculo activo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Necesitás un vínculo activo con un PF para ver tu plan nutricional.'**
+  String get athleteNutritionNeedsActiveLink;
+
+  /// Gate de las rutas que necesitan un vínculo activo (agenda, nutrición). Dice NO ENCONTRAMOS y no NO TENÉS a propósito: el provider emite lo mismo cuando el servidor contesta que no hay vínculo y cuando se agota la espera sin llegar al servidor, y afirmar la segunda como la primera sería una advertencia falsa.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No encontramos un vínculo activo con un PF.'**
+  String get athleteLinkRequired;
+
+  /// Toggle del perfil del PF: si acepta consultas previas de alumnos sin vínculo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Acepto consultas'**
+  String get trainerAcceptsInquiriesTitle;
+
+  /// Subtítulo del toggle de consultas. Dice NUEVAS a propósito: `senderMayPost` autoriza incondicionalmente todo chat que ya tiene kind:inquiry, así que apagar el switch NO calla a quien ya venía hablando. Decir «sólo te escriben tus alumnos» era una promesa que el sistema no cumple.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Un alumno puede escribirte antes de pedirte el vínculo. Si lo apagás, no te llegan consultas nuevas — las conversaciones ya abiertas siguen.'**
+  String get trainerAcceptsInquiriesSubtitle;
+
+  /// Gate de vínculo cuando el servidor no contestó a tiempo. Es una causa DISTINTA de athleteLinkRequired: allá el servidor dijo que no hay vínculo, acá no pudimos preguntarle. Mezclarlas fue el bug que este gate existe para no repetir.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos confirmar tu vínculo con tu PF.'**
+  String get athleteLinkUnconfirmed;
+
+  /// Botón del gate de vínculo: invalida el provider y vuelve a preguntar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Reintentar'**
+  String get athleteLinkRequiredRetry;
+
+  /// Gate de las rutas de alumno cuando falta el uid. Es una causa DISTINTA de no tener vínculo, y antes las dos mostraban el mismo cartel.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu sesión se cerró. Volvé a entrar.'**
+  String get athleteSessionMissing;
+
+  /// Título de la pantalla de archivos compartidos con el alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'MIS ARCHIVOS'**
+  String get athleteFilesScreenTitle;
+
+  /// Estado vacío cuando ningún PF compartió archivos con el alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu PF todavía no compartió archivos con vos.'**
+  String get athleteFilesEmpty;
+
+  /// Error al cargar los archivos compartidos con el alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar tus archivos.'**
+  String get athleteFilesLoadError;
 
   /// No description provided for @agendaScreenTitle.
   ///
@@ -4610,10 +4712,10 @@ abstract class AppL10n {
   /// **'Buscar por nombre…'**
   String get coachHubAlumnosSearchHint;
 
-  /// Coach Hub web alumnos section — 'All' filter chip label.
+  /// Coach Hub web alumnos section — filter chip for links that are NOT inactive. Deliberately not 'All': its count is lower than the hero total and than the Inactivos chip, and 'All' made that read as a counting bug.
   ///
   /// In es_AR, this message translates to:
-  /// **'Todos'**
+  /// **'Vigentes'**
   String get coachHubAlumnosFilterAll;
 
   /// Coach Hub web alumnos section — 'Active' filter chip label. Lowercase spelling to match filter chip vs the dashboard's uppercase filter.
@@ -4715,13 +4817,13 @@ abstract class AppL10n {
   /// Coach Hub alumnos — status badge for a link blocked by the trainer plan limit (paywall Fase 7 downgrade). NOT the athlete fault: the trainer subscription lapsed.
   ///
   /// In es_AR, this message translates to:
-  /// **'Bloqueado'**
+  /// **'Sin acceso'**
   String get coachHubAlumnosStatusBlocked;
 
   /// Coach Hub web alumnos section — filter chip for athletes blocked by the plan limit.
   ///
   /// In es_AR, this message translates to:
-  /// **'Bloqueados'**
+  /// **'Sin acceso'**
   String get coachHubAlumnosFilterBloqueados;
 
   /// Coach Hub alumnos — tooltip explaining why an athlete is blocked and that the trainer must fix their subscription.
@@ -4811,13 +4913,13 @@ abstract class AppL10n {
   /// Coach Hub web alumno detail — title of the Archivos tab body.
   ///
   /// In es_AR, this message translates to:
-  /// **'Archivos privados'**
+  /// **'Archivos del alumno'**
   String get coachHubAlumnoDetailArchivosTitle;
 
-  /// Coach Hub web alumno detail — subtitle explaining privacy: only the trainer sees these files, the athlete never does.
+  /// Coach Hub web alumno detail — explica que el PF controla qué archivos comparte con el alumno.
   ///
   /// In es_AR, this message translates to:
-  /// **'PDFs y fotos que subís sobre este alumno. Solo vos los ves.'**
+  /// **'PDFs y fotos que subís sobre este alumno. Elegí cuáles compartís con él.'**
   String get coachHubAlumnoDetailArchivosSubtitle;
 
   /// Coach Hub web alumno detail — primary CTA to open the file picker.
@@ -4885,6 +4987,36 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'No pudimos eliminar el archivo.'**
   String get coachHubAlumnoDetailArchivosDeleteError;
+
+  /// Estado visible de un archivo compartido con el alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'COMPARTIDO'**
+  String get coachHubAlumnoDetailArchivosSharedLabel;
+
+  /// Estado visible de un archivo que el alumno no puede ver.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PRIVADO'**
+  String get coachHubAlumnoDetailArchivosPrivateLabel;
+
+  /// Tooltip para habilitar el acceso del alumno a un archivo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Compartir con el alumno'**
+  String get coachHubAlumnoDetailArchivosShareTooltip;
+
+  /// Tooltip para quitarle al alumno el acceso a un archivo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Dejar de compartir con el alumno'**
+  String get coachHubAlumnoDetailArchivosUnshareTooltip;
+
+  /// Snackbar cuando falla el cambio de visibilidad de un archivo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cambiar quién ve el archivo.'**
+  String get coachHubAlumnoDetailArchivosShareError;
 
   /// Feed error branch text, replacing the hardcoded literal repeated 3x in feed_screen.dart (finding 9). Pair with coachRetryLabel for the retry CTA.
   ///
@@ -4982,7 +5114,7 @@ abstract class AppL10n {
   /// **'Post publicado.'**
   String get feedPostPublishedSuccess;
 
-  /// Semantics label for the post card overflow (3-dot) menu button, shown only on the viewer's own posts.
+  /// Semantics label for the post card overflow (3-dot) menu button. Shown for both the owner (Editar/Eliminar) and, since moderacion-reporte-y-bloqueo, any other signed-in viewer (Reportar/Bloquear).
   ///
   /// In es_AR, this message translates to:
   /// **'Opciones del post'**
@@ -5233,6 +5365,24 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'No pudimos subir el archivo. Probá de nuevo.'**
   String get chatMediaUploadFailed;
+
+  /// Shown when the athlete's total chat media quota is exhausted, before opening the picker (#chat-media-quota). The MB figure is interpolated from kFreeMaxChatMediaBytes / kMaxChatMediaBytes — never hardcode it in the string.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Llegaste al tope de {maxMb} MB en fotos y videos de chat.'**
+  String chatMediaQuotaFull(String maxMb);
+
+  /// Shown after picking a file that exceeds the per-file cap (#chat-media-quota).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'El archivo pesa {fileMb} MB y el máximo es {maxMb} MB.'**
+  String chatMediaFileTooLarge(String fileMb, String maxMb);
+
+  /// Shown after picking a file that fits the per-file cap but would cross the total byte quota (#chat-media-quota).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'El archivo pesa {fileMb} MB y te quedan {remainingMb} MB de cupo.'**
+  String chatMediaQuotaNotEnough(String fileMb, String remainingMb);
 
   /// No description provided for @chatMediaPreviewPhoto.
   ///
@@ -5503,6 +5653,24 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'ACTIVA'**
   String get profileRoutinesActiveChip;
+
+  /// Header of the Legal section group in the profile settings list.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Legales'**
+  String get profileSectionLegal;
+
+  /// Title of the legal documents index screen and its tile in the profile settings list.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Documentos legales'**
+  String get legalDocumentsTitle;
+
+  /// Subtitle under the legal documents tile in the profile settings list.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Términos, privacidad y más'**
+  String get legalDocumentsSubtitle;
 
   /// Title of the Appearance settings screen and the tile label in the profile settings list.
   ///
@@ -7502,6 +7670,366 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'Unir con el de abajo'**
   String get routineEditorSlotMenuMergeDown;
+
+  /// Titulo de la hoja que se abre cuando un alumno en plan free toca el + que cruzaria el tope de dias o semanas de su propia rutina.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esto es parte del plan pago'**
+  String get paywallFreePlanLimitTitle;
+
+  /// Cuerpo para el tope de DIAS, al tocar el + que lo cruzaria. El numero va por placeholder y no escrito a mano: vivia como un 2 literal en esta cadena y quedo mintiendo el dia que kFreeMaxRoutineDays paso a 3. Aclara que el catalogo de principiante sigue libre, para que el limite no se lea como que no puede entrenar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Con el plan gratis armás rutinas de hasta {max} días. Las plantillas de principiante del catálogo las seguís completas, sin tope.'**
+  String paywallFreePlanLimitDaysBody(int max);
+
+  /// Cuerpo para el tope de SEMANAS.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Periodizar en varias semanas es parte del plan pago. Con el gratis tu rutina propia va de a una semana.'**
+  String get paywallFreePlanLimitWeeksBody;
+
+  /// Cuerpo de la hoja cuando el alumno free intenta GUARDAR una rutina propia que YA tiene mas dias que el tope — tipicamente una que armo antes de que el paywall se encendiera, o mientras estaba vinculado a un PF. Distinto de paywallFreePlanLimitDaysBody: aquel frena un + que todavia no paso, este explica un documento que ya existe. Tiene que ser ACCIONABLE porque hay salida real: firestore.rules mide el documento RESULTANTE, asi que recortar a {max} dias guarda bien. La ultima frase no es relleno: entrenar escribe en sessions y no pasa por la regla de forma, y sin decirlo el alumno cree que perdio la rutina.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esta rutina tiene {actual} días y con el plan gratis guardás hasta {max}. Sacá los que sobren y vas a poder guardar los cambios. Entrenarla completa no tiene tope.'**
+  String paywallFreePlanLimitShapeDaysBody(int actual, int max);
+
+  /// El hermano de paywallFreePlanLimitShapeDaysBody para el eje SEMANAS. Existe porque firestore.rules mide las dos dimensiones en la misma clausula (withinFreeRoutineShape): cubrir solo los dias dejaria la rutina periodizada cayendo en el permission-denied crudo que este trabajo vino a sacar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esta rutina está periodizada en {actual} semanas y con el plan gratis guardás hasta {max}. Podés dejarla en {max} para guardar los cambios, o pasarte al plan pago. Entrenarla completa no tiene tope.'**
+  String paywallFreePlanLimitShapeWeeksBody(int actual, int max);
+
+  /// CTA de la hoja de limite. Solo se dibuja cuando existe checkout: hoy la hoja se muestra sin este boton.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ver el plan pago'**
+  String get paywallFreePlanLimitUpgrade;
+
+  /// No description provided for @paywallFreePlanLimitDismiss.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Entendido'**
+  String get paywallFreePlanLimitDismiss;
+
+  /// Cuerpo de la hoja cuando el alumno toca una plantilla del catalogo marcada isPremium. Nombra la salida gratis (las de principiante) para que el limite no se lea como que el catalogo entero esta cerrado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Esta plantilla es parte del plan pago. Las de nivel principiante las podés usar completas con el plan gratis.'**
+  String get paywallFreePlanLimitTemplateBody;
+
+  /// Cuerpo de la hoja cuando el alumno free toca 'Usar como base' sobre una plantilla del catalogo. Distinto del caso isPremium: aca la plantilla puede ser gratis y lo pago es COPIARLA. Nombra las DOS salidas gratis (seguirla tal cual, o armar una propia) para que no se lea como que el catalogo se cerro. El numero va por placeholder por el mismo motivo que en DaysBody.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Personalizar una plantilla del catálogo es parte del plan pago. Con el gratis la seguís tal cual, sin tope de días, o armás tu propia rutina de hasta {max} días.'**
+  String paywallFreePlanLimitCustomizeTemplateBody(int max);
+
+  /// Pildora con candado sobre las cards del catalogo que el alumno no puede usar con su plan actual. Solo se dibuja cuando la plantilla esta realmente bloqueada para quien mira.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'PLAN PAGO'**
+  String get workoutPlantillasPremiumChip;
+
+  /// Pill del selector de periodo de los graficos: los ultimos 3 meses calendario terminando hoy.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'3 meses'**
+  String get progressionPeriodLast3Months;
+
+  /// Pill del selector de periodo de los graficos: los ultimos 12 meses calendario. Es el periodo mas largo que se puede ofrecer: el historial de sesiones esta acotado a 365 (kSessionHistoryFetchLimit), asi que un 'todo' seria mentira.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'1 año'**
+  String get progressionPeriodLast1Year;
+
+  /// Accion del detalle de una plantilla del catalogo que la marca como la rutina activa SIN copiarla. Es la otra mitad de 'Usar como base': copiar es 'quiero mi version', seguir es 'quiero hacer esto tal cual'.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Seguir esta plantilla'**
+  String get workoutRoutineFollow;
+
+  /// Estado del boton cuando esa plantilla YA es la rutina activa. El boton queda deshabilitado: para cambiar de rutina se elige otra, no se desactiva esta.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'La estas siguiendo'**
+  String get workoutRoutineFollowing;
+
+  /// No description provided for @workoutRoutineFollowSuccess.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Listo, ahora seguís esta plantilla.'**
+  String get workoutRoutineFollowSuccess;
+
+  /// No description provided for @workoutRoutineFollowError.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos marcarla. Probá de nuevo.'**
+  String get workoutRoutineFollowError;
+
+  /// Cuerpo de la hoja cuando el alumno free intenta guardar una rutina propia mas alla del tope. Aclara que seguir plantillas no consume cupo, porque desde #963 seguir no copia.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Con el plan gratis guardás hasta 3 rutinas propias. Las plantillas del catálogo que seguís no ocupan lugar.'**
+  String get paywallFreePlanLimitRoutineCountBody;
+
+  /// Cuerpo de la hoja cuando el alumno free toca un periodo de grafico del plan pago. Es el unico limite que no restringe lo que puede HACER sino hasta donde puede MIRAR lo que ya hizo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Con el plan gratis mirás hasta un mes de historial. Los períodos de 3 meses y 1 año son del plan pago.'**
+  String get paywallFreePlanLimitChartHistoryBody;
+
+  /// Titulo del paywall del alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'TREINO Pro'**
+  String get paywallAlumnoTitulo;
+
+  /// Bajada del paywall del alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Programá en serio: rutinas largas, periodización y todo tu historial.'**
+  String get paywallAlumnoBajada;
+
+  /// Nombre del plan mensual en el paywall del alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Mensual'**
+  String get paywallAlumnoPlanMensual;
+
+  /// Nombre del plan anual en el paywall del alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Anual'**
+  String get paywallAlumnoPlanAnual;
+
+  /// Etiqueta del plan anual. NO dice un porcentaje: el descuento sale del precio de la tienda y un numero fijo se puede desincronizar.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'2 meses gratis'**
+  String get paywallAlumnoAhorro;
+
+  /// Beneficio 1 del plan pago del alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Rutinas de hasta 7 días'**
+  String get paywallAlumnoBeneficio1;
+
+  /// Beneficio 2 del plan pago del alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'16 semanas con periodización'**
+  String get paywallAlumnoBeneficio2;
+
+  /// Beneficio 3 del plan pago del alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Gráficos de 3 meses y 1 año'**
+  String get paywallAlumnoBeneficio3;
+
+  /// Beneficio 4 del plan pago del alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Las plantillas premium del catálogo'**
+  String get paywallAlumnoBeneficio4;
+
+  /// Aviso de impuestos del paywall del alumno. VA SIN MONTO Y SIN TIPO DE CAMBIO a proposito: el importe final lo define el emisor de la tarjeta al liquidar, asi que no lo podemos saber, y publicar un numero que puede salir mal es 'promoting a false price' (guideline 2.3.1(a), cuya pena escrita es la baja de la app y la terminacion de la cuenta). Ademas Google exige que 'In-app pricing must match the pricing displayed in the user-facing Play billing interface'.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu banco le suma los impuestos argentinos a este precio (IVA y percepción). No los cobra TREINO: los vas a ver en el resumen de tu tarjeta.'**
+  String get paywallAlumnoImpuestos;
+
+  /// CTA del paywall del alumno. NO lleva el precio adentro: el boton dispara la hoja del sistema, que muestra el precio de la tienda, y que el boton prometa otro numero es el peor lugar posible para una discrepancia.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Suscribirme'**
+  String get paywallAlumnoCta;
+
+  /// Restaurar compras. Apple lo EXIGE para suscripciones.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Restaurar compras'**
+  String get paywallAlumnoRestaurar;
+
+  /// Estado de error del paywall del alumno cuando la tienda no devuelve ningun plan.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos cargar los planes. Probá de nuevo en un rato.'**
+  String get paywallAlumnoSinPlanes;
+
+  /// Boton de reintento del paywall del alumno.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Reintentar'**
+  String get paywallAlumnoReintentar;
+
+  /// Resultado: la compra se acredito.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¡Listo! Ya tenés TREINO Pro.'**
+  String get paywallAlumnoListo;
+
+  /// Resultado: pago diferido (Android) o Ask to Buy (iOS). NO es un error.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu pago quedó pendiente de confirmación. Te avisamos cuando se acredite.'**
+  String get paywallAlumnoPendiente;
+
+  /// Resultado: la compra fallo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos completar la compra. No se te cobró nada.'**
+  String get paywallAlumnoErrorCompra;
+
+  /// Resultado de restaurar cuando no hay nada.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No encontramos compras para restaurar en esta cuenta.'**
+  String get paywallAlumnoSinRestaurar;
+
+  /// Semantics label for the overflow (3-dot) menu button that opens Reportar/Bloquear on content that isn't the viewer's own (ReviewTile, PublicProfileScreen header).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Más opciones'**
+  String get moderationMenuA11y;
+
+  /// Label of the Reportar item in the moderation overflow menu.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Reportar'**
+  String get moderationReportAction;
+
+  /// Label of the Bloquear item in the moderation overflow menu.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Bloquear'**
+  String get moderationBlockAction;
+
+  /// Title of the report-reason bottom sheet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Por qué lo reportás?'**
+  String get moderationReportSheetTitle;
+
+  /// Report reason: harassment.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Acoso'**
+  String get moderationReportReasonHarassment;
+
+  /// Report reason: sexual content.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Contenido sexual'**
+  String get moderationReportReasonSexualContent;
+
+  /// Report reason: violence or self-harm.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Violencia o autolesión'**
+  String get moderationReportReasonViolenceOrSelfHarm;
+
+  /// Report reason: dangerous health advice.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Consejo de salud peligroso'**
+  String get moderationReportReasonDangerousHealthAdvice;
+
+  /// Report reason: impersonation.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Suplantación de identidad'**
+  String get moderationReportReasonImpersonation;
+
+  /// Report reason: spam.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Spam'**
+  String get moderationReportReasonSpam;
+
+  /// Report reason: third-party data (sharing someone else's personal data without consent).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Datos de terceros'**
+  String get moderationReportReasonThirdPartyData;
+
+  /// Report reason: intellectual property infringement.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Propiedad intelectual'**
+  String get moderationReportReasonIntellectualProperty;
+
+  /// Report reason: other / none of the above.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Otro'**
+  String get moderationReportReasonOther;
+
+  /// Hint text of the optional free-text detail field in the report sheet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Contanos más (opcional)'**
+  String get moderationReportDetailHint;
+
+  /// Submit button of the report sheet. Disabled until a reason is selected.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'ENVIAR REPORTE'**
+  String get moderationReportSubmit;
+
+  /// Cancel/dismiss button of the report sheet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CANCELAR'**
+  String get moderationReportCancel;
+
+  /// Success snackbar after submitting a report.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Gracias, lo vamos a revisar.'**
+  String get moderationReportSuccess;
+
+  /// Error snackbar when submitting a report fails.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos enviar el reporte. Probá de nuevo.'**
+  String get moderationReportError;
+
+  /// Title of the block confirmation sheet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'¿Bloquear a {name}?'**
+  String moderationBlockConfirmTitle(String name);
+
+  /// Body line of the block confirmation sheet, explaining what blocking does.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No va a poder escribirte, seguirte ni reaccionar a tus posts.'**
+  String get moderationBlockConfirmBody;
+
+  /// Button that confirms blocking.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'BLOQUEAR'**
+  String get moderationBlockConfirmAction;
+
+  /// Button that dismisses the block confirmation sheet.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'CANCELAR'**
+  String get moderationBlockDismiss;
+
+  /// Success snackbar after blocking someone.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Bloqueaste a {name}.'**
+  String moderationBlockSuccess(String name);
+
+  /// Error snackbar when blocking fails.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'No pudimos bloquear. Probá de nuevo.'**
+  String get moderationBlockError;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

@@ -12,7 +12,10 @@
  * re-throw so the platform redelivers; permanent ones land on `failed` and stop.
  */
 
-import * as admin from "firebase-admin";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
+import { Messaging } from "firebase-admin/messaging";
+import { getAuth } from "firebase-admin/auth";
 import { enqueueMail, dedupeKey } from "../mail/enqueue-mail";
 import { sendQueuedMailHandler } from "../mail/send-queued-mail";
 import { MAIL_QUEUE_COLLECTION, MailQueueDoc } from "../mail/types";
@@ -24,17 +27,17 @@ process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
 process.env.GCLOUD_PROJECT = "treino-dev";
 
-let testApp: admin.app.App;
+let testApp: App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp({ projectId: "treino-dev" }, "mail-outbox-test");
+  testApp = initializeApp({ projectId: "treino-dev" }, "mail-outbox-test");
 });
 
 afterAll(async () => {
-  await testApp.delete();
+  await deleteApp(testApp);
 });
 
-const db = () => admin.firestore(testApp);
+const db = () => getFirestore(testApp);
 
 async function readQueueDoc(id: string): Promise<MailQueueDoc | undefined> {
   const snap = await db().collection(MAIL_QUEUE_COLLECTION).doc(id).get();
@@ -224,14 +227,14 @@ describe("producers: prefKey is set only for recipients who have a screen", () =
   const trainerId = "trainer-prefkey";
   const athleteId = "athlete-prefkey";
 
-  function noopMessaging(): admin.messaging.Messaging {
+  function noopMessaging(): Messaging {
     return {
       sendEachForMulticast: jest.fn(async () => ({
         successCount: 0,
         failureCount: 0,
         responses: [],
       })),
-    } as unknown as admin.messaging.Messaging;
+    } as unknown as Messaging;
   }
 
   // The trainer's Coach Hub settings expose the `nueva_solicitud` row, so their
@@ -316,21 +319,20 @@ describe("sendQueuedMailHandler", () => {
         params: { trainerName: "Jose" },
         status: "pending",
         attempts: 0,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(),
         ...overrides,
       });
   }
 
   beforeEach(async () => {
-    await admin
-      .auth(testApp)
+    await getAuth(testApp)
       .createUser({ uid, email: "consumer1@example.com" })
       .catch(() => undefined);
   });
 
   afterEach(async () => {
     await purge(mailId);
-    await admin.auth(testApp).deleteUser(uid).catch(() => undefined);
+    await getAuth(testApp).deleteUser(uid).catch(() => undefined);
   });
 
   it("sends and marks the document sent", async () => {
@@ -351,6 +353,49 @@ describe("sendQueuedMailHandler", () => {
   });
 
   // Covers the window where the Resend call landed but the status write did not.
+  // ── El snapshot del evento no es la verdad ──────────────────────────────
+  //
+  //  es , así que  congela el
+  // documento tal como nació. Si algo lo actualiza entre la creación y el
+  // envío, renderizar desde ese snapshot manda contenido viejo.
+  //
+  // No es teórico:  existe para
+  // pisarle el link de reseteo al mail encolado cuando un segundo pedido
+  // invalida el anterior. Sin releer, esa actualización se escribe en
+  // Firestore y el mail sale igual con el link muerto — el arreglo del
+  // throttle quedaba en cosmético y los tests que miran SÓLO el documento no
+  // lo veían.
+  it("renderiza los params ACTUALES, no los de la creación", async () => {
+    await seedQueueDoc({ params: { trainerName: "Jose" } });
+    // Lo que el trigger le pasaría al handler: el snapshot de la creación.
+    const snapshotDeLaCreacion = await readQueueDoc(mailId);
+
+    // Alguien actualiza el doc antes de que salga el mail.
+    await db()
+      .collection(MAIL_QUEUE_COLLECTION)
+      .doc(mailId)
+      .update({ params: { trainerName: "Coti" } });
+
+    const sender = makeOkSender();
+    await sendQueuedMailHandler(testApp, mailId, snapshotDeLaCreacion, sender);
+
+    expect(sender.sent).toHaveLength(1);
+    const cuerpo = sender.sent[0].html + sender.sent[0].text;
+    expect(cuerpo).toContain("Coti");
+    expect(cuerpo).not.toContain("Jose");
+  });
+
+  it("no manda nada si el documento fue borrado antes del envío", async () => {
+    await seedQueueDoc();
+    const snapshotDeLaCreacion = await readQueueDoc(mailId);
+    await db().collection(MAIL_QUEUE_COLLECTION).doc(mailId).delete();
+
+    const sender = makeOkSender();
+    await sendQueuedMailHandler(testApp, mailId, snapshotDeLaCreacion, sender);
+
+    expect(sender.sent).toHaveLength(0);
+  });
+
   it("does not re-send a document already marked sent", async () => {
     await seedQueueDoc({ status: "sent" });
     const sender = makeOkSender();
@@ -416,7 +461,7 @@ describe("sendQueuedMailHandler", () => {
   });
 
   it("fails permanently when the recipient has no address", async () => {
-    await admin.auth(testApp).deleteUser(uid).catch(() => undefined);
+    await getAuth(testApp).deleteUser(uid).catch(() => undefined);
     await seedQueueDoc();
     const sender = makeOkSender();
 

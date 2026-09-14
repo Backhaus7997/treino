@@ -15,8 +15,7 @@ import 'package:treino/features/coach/data/trainer_link_promotion_service.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_entitlement.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
-import 'package:treino/features/coach_hub/presentation/sections/chat/chat_section_screen.dart'
-    show selectedChatIdProvider;
+import 'package:treino/features/coach_hub/presentation/sections/chat/abrir_chat_con_alumno.dart';
 import 'package:treino/features/coach_hub/presentation/sections/nutricion/nutricion_providers.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/marcar_pagado_actions.dart'
     show registrarPago;
@@ -24,6 +23,7 @@ import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pa
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pagos_estado.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/payment_format.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/invite_athlete_dialog.dart';
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_limit_paywall.dart';
 import 'package:treino/features/gyms/application/gym_providers.dart';
 import '../../../../../l10n/app_l10n.dart';
@@ -94,7 +94,33 @@ AlumnoEstado estadoForLink(TrainerLink link, Set<String> conDeudaIds) {
 /// alumno con deuda cuenta solo bajo «Con deuda», igual que el mockup
 /// (view-general.png: Activos 14 · Con deuda 2 · … = total).
 bool _matchesFiltro(AlumnoEstado e, RosterFiltro f) => switch (f) {
-      RosterFiltro.todos => true,
+      // «Todos» son TUS ALUMNOS, no el archivo historico. Un vinculo
+      // `terminated` es un ex-alumno: no lo entrenas, no le cobras, y sus
+      // celdas de ultimo entreno / rutina / plan / vence estan todas vacias.
+      //
+      // Con 12 vinculos de los cuales 10 estaban terminados, el roster abria
+      // en 12 filas donde 10 no tenian un solo dato util y cuatro de las siete
+      // columnas quedaban en blanco. El PF lo reporto como «muchos datos de
+      // mas que no me sirven de nada» y como «todos los inactivos por que los
+      // querria ver».
+      //
+      // La salida sigue a un click: el chip «Inactivos» los muestra, y sigue
+      // contandolos aunque «Vigentes» ya no los liste.
+      //
+      // EL CHIP SE LLAMA «VIGENTES», NO «TODOS», y ese es el punto.
+      //
+      // La logica de aca abajo esta bien y este comentario la defiende bien.
+      // El problema era la PALABRA: un chip que dice literalmente «Todos» y
+      // muestra 2 al lado de «Inactivos 10», con un hero que arriba dice «12
+      // en total», se lee como un bug de conteo aunque no lo sea. El usuario
+      // no tiene forma de saber que «todos» excluye a los inactivos — la
+      // palabra le promete lo contrario.
+      //
+      // NO se toco el DEFAULT del filtro (sigue en `todos`) a proposito.
+      // Arrancar en «Activos» parece la solucion obvia y es peor: los chips
+      // son DISJUNTOS —un alumno con deuda cuenta solo bajo «Con deuda»—, asi
+      // que el roster abriria escondiendo justo a los que hay que mirar.
+      RosterFiltro.todos => e != AlumnoEstado.inactivo,
       RosterFiltro.activos => e == AlumnoEstado.activo,
       RosterFiltro.pausados => e == AlumnoEstado.pausado,
       RosterFiltro.bloqueados => e == AlumnoEstado.bloqueado,
@@ -105,6 +131,14 @@ bool _matchesFiltro(AlumnoEstado e, RosterFiltro f) => switch (f) {
 final _filtroProvider =
     StateProvider.autoDispose<RosterFiltro>((_) => RosterFiltro.todos);
 final _queryProvider = StateProvider.autoDispose<String>((_) => '');
+
+/// Pagina visible del roster, 0-based.
+///
+/// Se resetea a 0 cuando cambia el filtro o la busqueda: quedarse en la
+/// pagina 3 despues de cambiar de chip deja al PF mirando un tramo del medio
+/// de una lista distinta —o una tabla vacia, si esa lista tiene 2 filas— sin
+/// nada que explique por que arranca ahi.
+final _pageProvider = StateProvider.autoDispose<int>((_) => 0);
 
 /// Modo de visualización del roster (toggle Tabla / Cards, mockup
 /// view-general.png vs view-general-cards.png). Viene de #347; la ronda de
@@ -132,47 +166,42 @@ class AlumnosScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final l10n = AppL10n.of(context);
-    final linksAsync = ref.watch(trainerLinksStreamProvider);
-
-    return TreinoStateSwitcher(
-      childKey: ValueKey('alumnos_links_${_stateKeyOf(linksAsync)}'),
-      child: linksAsync.when(
-        loading: () => const _RosterFrame(
-          roster: [],
-          profiles: {},
-          gymNameById: {},
-          tableLoading: true,
-        ),
-        error: (e, _) => _RosterFrame(
-          roster: const [],
-          profiles: const {},
-          gymNameById: const {},
-          errorMessage: l10n.coachHubAlumnosLoadError,
-          onRetry: () => ref.invalidate(trainerLinksStreamProvider),
-        ),
-        data: (links) => _LinksLoaded(links: links),
-      ),
-    );
+    // NO hay `TreinoStateSwitcher` acá, y es a propósito.
+    //
+    // Había dos anidados —uno por los links, otro por los perfiles— y el de
+    // adentro envolvía la PANTALLA ENTERA, no la tabla. Cuando la key pasaba
+    // de `loading` a `data`, Flutter desmontaba el `_RosterFrame` viejo y
+    // montaba uno nuevo, y durante los 240 ms de `AppMotion.base` los dos
+    // quedaban pintados encima: dos hero «ALUMNOS», dos botones «Nuevo
+    // alumno», dos filas de chips, dos cabeceras de tabla. Medido en
+    // producción: ~205 ms con el frame duplicado, 3 corridas de 3.
+    //
+    // El agravante era que el frame nuevo volvía a correr su entrada
+    // escalonada: `TreinoFadeSlideIn` es one-shot POR STATE, y el State se iba
+    // con el desmonte. Hero, chips y buscador hacían fade + slide de 12 px
+    // otra vez, encima de la copia vieja apagándose. Eso es el parpadeo.
+    //
+    // El chrome no depende del estado de carga: no tiene por qué desmontarse.
+    // Sólo la TABLA cross-fadea, y lo hace adentro de `_RosterFrame`.
+    return _LinksLoaded(linksAsync: ref.watch(trainerLinksStreamProvider));
   }
 }
 
-String _stateKeyOf(AsyncValue<Object?> value) {
-  if (value.hasError) return 'error';
-  if (value.isLoading && !value.hasValue) return 'loading';
-  return 'data';
-}
-
-/// Resuelve perfiles + gyms + deuda una vez que el stream de links ya emitió,
-/// y cross-fadea la tabla entre loading/error/data de los perfiles.
+/// Resuelve perfiles + gyms + deuda y colapsa los DOS `AsyncValue` (links y
+/// perfiles) en un único estado de tabla.
+///
+/// Se construye siempre, en los tres estados — por eso recibe el `AsyncValue`
+/// y no la lista ya resuelta. Mientras los links no llegaron trabaja con una
+/// lista vacía y le avisa al hero que todavía no sabe cuántos hay.
 class _LinksLoaded extends ConsumerWidget {
-  const _LinksLoaded({required this.links});
+  const _LinksLoaded({required this.linksAsync});
 
-  final List<TrainerLink> links;
+  final AsyncValue<List<TrainerLink>> linksAsync;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppL10n.of(context);
+    final links = linksAsync.valueOrNull ?? const <TrainerLink>[];
 
     // Un alumno = una fila: colapsamos a su link más reciente (el stream
     // viene requestedAt DESC) y excluimos `pending` (esos son solicitudes,
@@ -200,29 +229,40 @@ class _LinksLoaded extends ConsumerWidget {
       for (final l in roster) (link: l, estado: estadoForLink(l, conDeudaIds)),
     ];
 
-    return TreinoStateSwitcher(
-      childKey: ValueKey('alumnos_profiles_${_stateKeyOf(profilesAsync)}'),
-      child: profilesAsync.when(
-        loading: () => _RosterFrame(
-          roster: rosterWithEstado,
-          profiles: const {},
-          gymNameById: gymNameById,
-          tableLoading: true,
+    // Los dos asyncs, colapsados en UN estado de tabla. El de links manda:
+    // si falló, el mensaje de perfiles sobra.
+    final (String tableState, String? errorMessage, VoidCallback? onRetry) =
+        switch ((linksAsync, profilesAsync)) {
+      (final l, _) when l.hasError => (
+          'error',
+          l10n.coachHubAlumnosLoadError,
+          () => ref.invalidate(trainerLinksStreamProvider),
         ),
-        error: (e, _) => _RosterFrame(
-          roster: rosterWithEstado,
-          profiles: const {},
-          gymNameById: gymNameById,
-          errorMessage: l10n.coachHubAlumnosProfilesLoadError,
-          onRetry: () =>
-              ref.invalidate(userPublicProfilesBatchProvider(ids.join(','))),
+      (_, final p) when p.hasError => (
+          'error',
+          l10n.coachHubAlumnosProfilesLoadError,
+          () => ref.invalidate(userPublicProfilesBatchProvider(ids.join(','))),
         ),
-        data: (profiles) => _RosterFrame(
-          roster: rosterWithEstado,
-          profiles: profiles,
-          gymNameById: gymNameById,
+      (final l, final p) when !l.hasValue || !p.hasValue => (
+          'loading',
+          null,
+          null,
         ),
-      ),
+      _ => ('data', null, null),
+    };
+
+    return _RosterFrame(
+      roster: rosterWithEstado,
+      profiles: profilesAsync.valueOrNull ?? const {},
+      gymNameById: gymNameById,
+      // `null`, no `0`. En la entrada fría el hero afirmaba «ALUMNOS 0» antes
+      // de decir «ALUMNOS 12»: un dato falso durante medio segundo es peor que
+      // ningún dato.
+      rosterCount: linksAsync.hasValue ? rosterWithEstado.length : null,
+      tableState: tableState,
+      tableLoading: tableState == 'loading',
+      errorMessage: errorMessage,
+      onRetry: onRetry,
     );
   }
 }
@@ -230,13 +270,16 @@ class _LinksLoaded extends ConsumerWidget {
 /// Header (título CAPS + subtítulo) + filtros + búsqueda + tabla.
 ///
 /// El bloque header/filtros/búsqueda entra con `TreinoFadeSlideIn` staggered
-/// (índices 0/1/2); la tabla queda fuera de ese stagger — su propio
-/// cross-fade lo resuelve el `TreinoStateSwitcher` del caller.
+/// (índices 0/1/2) UNA sola vez: este frame se monta una vez por visita y ya
+/// no lo desmonta ningún switcher de arriba. El cross-fade de estados vive
+/// adentro y envuelve **sólo la tabla**.
 class _RosterFrame extends ConsumerWidget {
   const _RosterFrame({
     required this.roster,
     required this.profiles,
     required this.gymNameById,
+    this.rosterCount,
+    this.tableState = 'data',
     this.tableLoading = false,
     this.errorMessage,
     this.onRetry,
@@ -245,13 +288,22 @@ class _RosterFrame extends ConsumerWidget {
   final List<_RosterEntry> roster;
   final Map<String, UserPublicProfile> profiles;
   final Map<String, String> gymNameById;
+
+  /// Cuántos alumnos hay — `null` mientras todavía no se sabe.
+  ///
+  /// No es `roster.length`: durante la carga `roster` está vacío y eso NO
+  /// significa «tenés 0 alumnos», significa «todavía no sé». El hero omite el
+  /// número en vez de afirmar un cero que dura medio segundo y es mentira.
+  final int? rosterCount;
+
+  /// Estado del cross-fade de la tabla (`loading` / `error` / `data`).
+  final String tableState;
   final bool tableLoading;
   final String? errorMessage;
   final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     final filtro = ref.watch(_filtroProvider);
     final query = ref.watch(_queryProvider).trim().toLowerCase();
@@ -272,6 +324,12 @@ class _RosterFrame extends ConsumerWidget {
       return name.contains(query);
     }).toList();
 
+    // `visibles` es la lista COMPLETA que pasa el filtro y la busqueda —
+    // sigue siendo la que cuenta el pie y la que decide si hay mas de una
+    // pagina. `enPagina` es lo unico que se dibuja.
+    final page = ref.watch(_pageProvider);
+    final enPagina = pageOf(visibles, page: page);
+
     final activos = roster.where((e) => e.estado == AlumnoEstado.activo).length;
 
     // Breakpoint responsive (900px, mismo estándar que el resto del hub —
@@ -282,6 +340,11 @@ class _RosterFrame extends ConsumerWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= 900;
+        // Segundo umbral. Los flex del roster estaban calibrados contra el
+        // PEOR caso (900 px, el propio breakpoint, donde el header «ÚLTIMO
+        // ENTRENO» desbordaba). Arriba de 1200 px esa calibración deja de
+        // tener sentido y empieza a hacer daño — ver `_RosterTable.columns`.
+        final roomy = constraints.maxWidth >= 1200;
         return SingleChildScrollView(
           padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.s20,
@@ -292,17 +355,21 @@ class _RosterFrame extends ConsumerWidget {
             children: [
               TreinoFadeSlideIn(
                 delay: AppMotion.stagger(0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TreinoSectionHeader(
-                      title: l10n.coachHubAlumnosTitle,
-                      count: roster.length,
-                    ),
-                    const SizedBox(height: AppSpacing.hairline),
-                    Text(
-                      l10n.coachHubAlumnosSummary(roster.length, activos),
-                      style: TextStyle(color: palette.textMuted, fontSize: 13),
+                child: CoachHubSectionHero(
+                  title: l10n.coachHubAlumnosTitle,
+                  count: rosterCount,
+                  subtitle: rosterCount == null
+                      ? null
+                      : l10n.coachHubAlumnosSummary(rosterCount!, activos),
+                  actions: [
+                    CoachHubHeroAction(
+                      label: l10n.dashboardQuickActionNuevoAlumno,
+                      icon: TreinoIcon.plus,
+                      // Mismo destino que la quick action del dashboard: el
+                      // alta arranca por el link de invitación, no por la
+                      // lista de los que ya tenés.
+                      onTap: () => showInviteAthleteDialog(context),
+                      primary: true,
                     ),
                   ],
                 ),
@@ -324,37 +391,57 @@ class _RosterFrame extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: AppSpacing.s14),
-              // #347: el toggle Tabla/Cards. La tabla es la enriquecida por la
-              // ronda de revisión (último entreno, rutina, nutrición,
-              // vencimiento, acciones rápidas); el modo cards muestra el
-              // resumen, que es para lo que existe.
-              if (ref.watch(_viewModeProvider) == AlumnosViewMode.tabla)
-                _RosterTable(
-                  visibles: visibles,
-                  profiles: profiles,
-                  gymNameFor: gymNameFor,
-                  loading: tableLoading,
-                  errorMessage: errorMessage,
-                  onRetry: onRetry,
-                  wide: wide,
-                  emptyMessage: roster.isEmpty
-                      ? l10n.coachHubAlumnosEmpty
-                      : l10n.coachHubAlumnosEmptyFiltered,
-                )
-              else
-                _RosterCardsGrid(
-                  links: [for (final e in visibles) e.link],
-                  profiles: profiles,
-                  // La deuda ya viene resuelta en el estado compuesto del
-                  // entry, así que no hace falta el mapa aparte que usaba la
-                  // versión anterior de la grilla.
-                  conDeudaIds: {
-                    for (final e in visibles)
-                      if (e.estado == AlumnoEstado.conDeuda) e.link.athleteId,
-                  },
-                  deudaByAthlete: const {},
-                  gymNameFor: gymNameFor,
-                ),
+              // ÚNICO cross-fade de la pantalla, y envuelve SÓLO esto.
+              //
+              // Antes el switcher estaba arriba de todo y remontaba el frame
+              // entero; el header, los chips y el buscador se desmontaban con
+              // él aunque no dependan del estado de carga. Acá adentro, lo
+              // único que cambia entre loading/error/data es la tabla, que es
+              // exactamente lo que tiene que cambiar.
+              TreinoStateSwitcher(
+                childKey: ValueKey('alumnos_tabla_$tableState'),
+                // #347: el toggle Tabla/Cards. La tabla es la enriquecida por
+                // la ronda de revisión (último entreno, rutina, nutrición,
+                // vencimiento, acciones rápidas); el modo cards muestra el
+                // resumen, que es para lo que existe.
+                child: ref.watch(_viewModeProvider) == AlumnosViewMode.tabla
+                    ? _RosterTable(
+                        visibles: enPagina,
+                        profiles: profiles,
+                        gymNameFor: gymNameFor,
+                        loading: tableLoading,
+                        errorMessage: errorMessage,
+                        onRetry: onRetry,
+                        wide: wide,
+                        roomy: roomy,
+                        emptyMessage: roster.isEmpty
+                            ? l10n.coachHubAlumnosEmpty
+                            : l10n.coachHubAlumnosEmptyFiltered,
+                      )
+                    : _RosterCardsGrid(
+                        links: [for (final e in enPagina) e.link],
+                        profiles: profiles,
+                        // La deuda ya viene resuelta en el estado compuesto del
+                        // entry, así que no hace falta el mapa aparte que usaba la
+                        // versión anterior de la grilla.
+                        conDeudaIds: {
+                          for (final e in enPagina)
+                            if (e.estado == AlumnoEstado.conDeuda)
+                              e.link.athleteId,
+                        },
+                        deudaByAthlete: const {},
+                        gymNameFor: gymNameFor,
+                      ),
+              ),
+              // Un solo pie para los dos modos: el paginado es de la LISTA,
+              // no de como se la esta dibujando. Se esconde solo con una
+              // pagina, asi que hoy —con 12 alumnos— no aparece.
+              CoachHubPager(
+                total: visibles.length,
+                page: page,
+                onPageChanged: (p) =>
+                    ref.read(_pageProvider.notifier).state = p,
+              ),
             ],
           ),
         );
@@ -398,7 +485,10 @@ class _FiltroChips extends ConsumerWidget {
         // así que un tap que vacía la selección es un no-op.
         if (newSelected.isEmpty) return;
         final f = filtroByLabel[newSelected.first];
-        if (f != null) ref.read(_filtroProvider.notifier).state = f;
+        if (f != null) {
+          ref.read(_filtroProvider.notifier).state = f;
+          ref.read(_pageProvider.notifier).state = 0;
+        }
       },
     );
   }
@@ -426,7 +516,10 @@ class _SearchFieldState extends ConsumerState<_SearchField> {
     final l10n = AppL10n.of(context);
     return TextField(
       controller: _controller,
-      onChanged: (v) => ref.read(_queryProvider.notifier).state = v,
+      onChanged: (v) {
+        ref.read(_queryProvider.notifier).state = v;
+        ref.read(_pageProvider.notifier).state = 0;
+      },
       style: TextStyle(color: palette.textPrimary, fontSize: 14),
       decoration: InputDecoration(
         hintText: l10n.coachHubAlumnosSearchHint,
@@ -464,6 +557,7 @@ class _RosterTable extends ConsumerWidget {
     required this.errorMessage,
     required this.emptyMessage,
     required this.wide,
+    required this.roomy,
     this.onRetry,
   });
 
@@ -484,6 +578,20 @@ class _RosterTable extends ConsumerWidget {
   /// `columns`, así que basta con no declarar la columna acá — no hace falta
   /// tocar el kit compartido (prohibido para esta pieza).
   final bool wide;
+
+  /// `true` con >=1200px de tabla — hay lugar para que ALUMNO respire.
+  ///
+  /// Los flex de abajo nacieron calibrados contra el peor caso (900px, con
+  /// las 7 columnas a la vez y «ÚLTIMO ENTRENO» desbordando por 43px). Esa
+  /// calibración, aplicada en desktop, le regala 275px a una celda que dice
+  /// «Hace 5 días» y le deja 142 a ALUMNO — de los cuales el avatar (36) y su
+  /// gap (12) se comen casi la mitad. El nombre se queda con ~66px y sale
+  /// «Mateo Pr...»: el dato más importante de la fila, truncado a la mitad,
+  /// mientras la columna de la fecha desperdicia 200px.
+  ///
+  /// Con lugar, la calibración es otra. No es un caso especial: es una tabla
+  /// responsive haciendo lo que tiene que hacer.
+  final bool roomy;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -513,17 +621,21 @@ class _RosterTable extends ConsumerWidget {
         // Flexible) — absorbe el recorte sin riesgo real de overflow (a
         // diferencia del resto, cuyo header es un `Text` sin ellipsis en el
         // kit compartido).
+        //
+        // Los flex viven en DOS calibraciones (ver `roomy`). Con lugar, el
+        // nombre —el dato que identifica la fila— se lleva lo que necesita;
+        // en angosto manda no desbordar el header más largo.
         CoachHubColumn(
           key: 'alumno',
           label: l10n.coachHubAlumnosColumnStudent,
-          flex: 14,
+          flex: roomy ? 26 : 14,
         ),
         // «ESTADO» (l10n, 6 mayúsculas) necesita más aire que un flex:1
         // sobre 11 columnas totales — mismo criterio que «Rutina».
         CoachHubColumn(
           key: 'estado',
           label: l10n.coachHubAlumnosColumnStatus,
-          flex: 14,
+          flex: roomy ? 12 : 14,
         ),
         // Responsive (breakpoint 900px): último entreno/rutina/nutrición/
         // vencimiento colapsan en angosto — alumno/estado/acciones quedan
@@ -535,13 +647,18 @@ class _RosterTable extends ConsumerWidget {
         if (wide) ...[
           // «ÚLTIMO ENTRENO» (l10n, 14 caracteres con espacio) es el header
           // más largo del roster — el que más flex necesita.
+          //
+          // Los 27 eran para que el header no desbordara a 900px. En desktop
+          // esos 27 son 275px para mostrar «Hace 5 días», mientras el nombre
+          // del alumno trunca a los 66. Con lugar bajan a 16 y el header
+          // sigue entrando entero.
           CoachHubColumn(
             key: 'ultimoEntreno',
             label: l10n.coachHubAlumnosColumnLastWorkout,
-            flex: 27,
+            flex: roomy ? 16 : 27,
           ),
-          const CoachHubColumn(
-              key: 'rutina', label: 'Rutina', flex: 14), // i18n
+          CoachHubColumn(
+              key: 'rutina', label: 'Rutina', flex: roomy ? 13 : 14), // i18n
           // Header corto ("Plan") en vez de "Nutrición": el ancho de columna
           // disponible (flex compartido con el resto de la fila, sin
           // ellipsis en `_HeaderCell` del kit) no entra con la palabra
@@ -551,7 +668,8 @@ class _RosterTable extends ConsumerWidget {
           const CoachHubColumn(
               key: 'nutricion', label: 'Plan', flex: 12), // i18n
           // Header corto ("Vence") por la misma razón que "Plan"/"Rutina".
-          const CoachHubColumn(key: 'vencimiento', label: 'Vence', flex: 13),
+          CoachHubColumn(
+              key: 'vencimiento', label: 'Vence', flex: roomy ? 12 : 13),
         ],
         // «ACCIONES» (l10n) + hasta 5 icon-buttons en la fila (pieza
         // «acciones» previa) — necesita el flex más alto después de
@@ -559,7 +677,13 @@ class _RosterTable extends ConsumerWidget {
         CoachHubColumn(
           key: 'acciones',
           label: l10n.coachHubAlumnosColumnActions,
-          flex: 20,
+          // Con `roomy` entran los 4 botones de 24px más sus 3 separaciones
+          // de 8 (120px) con margen, y sobra menos desperdicio que con 20.
+          flex: roomy ? 17 : 20,
+          // Los botones ya se dibujaban a la derecha; el rótulo se quedaba a
+          // la izquierda del slot, a media tabla de distancia. Declararlo acá
+          // los mueve a los dos.
+          align: CoachHubColumnAlign.end,
         ),
       ],
       rows: [
@@ -731,7 +855,7 @@ class _EstadoBadge extends StatelessWidget {
 }
 
 /// Celda «Rutina»: chip compacto (dot + label) que deriva su estado de
-/// `assignedRoutinesProvider(athleteId)` — "Activa" si el alumno tiene al
+/// `assignedRoutinesByTrainerProvider` — "Activa" si el alumno tiene al
 /// menos una rutina con `status == active` asignada, "Sin rutina" en
 /// cualquier otro caso (incluye loading/error, `valueOrNull` — mismo
 /// criterio "barato" que la celda de último entreno). Tap navega al detalle
@@ -747,13 +871,22 @@ class _RutinaCell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final routines =
-        ref.watch(assignedRoutinesProvider(athleteId)).valueOrNull ?? const [];
+    final trainerId = ref.watch(currentUidProvider) ?? '';
+    final routines = ref
+            .watch(assignedRoutinesByTrainerProvider(
+              (trainerId: trainerId, athleteId: athleteId),
+            ))
+            .valueOrNull ??
+        const [];
     final activa = routines.any((r) => r.status == RoutineStatus.active);
     return _TappableDotLabel(
       color: activa ? palette.accent : palette.textMuted,
       label: activa ? 'Activa' : 'Sin rutina', // i18n
-      onTap: () => context.go('/rutinas/$athleteId'),
+      // `push` y no `go`: la pantalla de rutinas del alumno tiene flecha
+      // atras, y `go` REEMPLAZA la entrada de historial — llegando desde aca,
+      // esa flecha no tenia a donde volver y quedaba muerta. El PF: «el boton
+      // de ir para atras no funciona».
+      onTap: () => context.push('/rutinas/$athleteId'),
     );
   }
 }
@@ -1054,17 +1187,8 @@ class _RowActionsState extends ConsumerState<_RowActions> {
   /// del Coach Hub dejando la conversación ya seleccionada
   /// (`selectedChatIdProvider`, mismo mecanismo que usa `ChatListPane` al
   /// tocar un ítem de la lista).
-  Future<void> _openChat(BuildContext context, WidgetRef ref) async {
-    // El router se captura ANTES del await: las filas del roster se
-    // rebuildean por sus streams y el context de la fila puede morir mientras
-    // getOrCreate resuelve — con `if (!context.mounted) return` la navegación
-    // se perdía silenciosamente (bug reportado en revisión en vivo).
-    final router = GoRouter.of(context);
-    final chat =
-        await ref.read(chatForOtherUidProvider(widget.link.athleteId).future);
-    ref.read(selectedChatIdProvider.notifier).state = chat.chatId;
-    router.go('/chat');
-  }
+  Future<void> _openChat(BuildContext context, WidgetRef ref) =>
+      abrirChatConAlumno(context, ref, widget.link.athleteId);
 
   @override
   Widget build(BuildContext context) {
@@ -1085,7 +1209,9 @@ class _RowActionsState extends ConsumerState<_RowActions> {
         icon: TreinoIcon.dumbbell,
         tooltip: 'Rutinas', // i18n
         color: widget.palette.textMuted,
-        onPressed: () => context.go('/rutinas/${widget.link.athleteId}'),
+        // `push` por el mismo motivo que el tap de la card: con `go` la
+        // flecha atras de la pantalla de rutinas queda sin destino.
+        onPressed: () => context.push('/rutinas/${widget.link.athleteId}'),
       ),
       _IconAction(
         icon: TreinoIcon.money,
@@ -1122,20 +1248,90 @@ class _RowActionsState extends ConsumerState<_RowActions> {
       ));
     }
     if (menuItems.isNotEmpty) {
-      buttons.add(PopupMenuButton<VoidCallback>(
-        tooltip: l10n.coachHubAlumnosRowActionsA11y,
-        icon: Icon(TreinoIcon.dotsThree,
-            size: 18, color: widget.palette.textMuted),
-        onSelected: (action) => action(),
-        itemBuilder: (_) => menuItems,
+      buttons.add(_menuButton(l10n, items: menuItems));
+    } else {
+      // Hueco del ancho del ⋮ que no va. La columna esta alineada a la
+      // derecha, asi que sin esto las filas sin operaciones de vinculo
+      // —terminadas, sin acceso— corren sus tres iconos hacia afuera y la
+      // grilla queda dentada. El PF lo reporto como «las acciones quedan
+      // feas».
+      //
+      // Es el MISMO widget, invisible, y no un `SizedBox` con un numero: el
+      // ancho real del boton sale de su `padding` mas el tamano del icono, y
+      // un 32 escrito a mano ya salio 16px corto en el primer intento. Asi
+      // coincide por construccion y sigue coincidiendo si el kit cambia.
+      //
+      // `maintainInteractivity` queda en false (el default): ocupa lugar, no
+      // recibe el mouse ni aparece en el arbol de semantica. Un ⋮
+      // deshabilitado seria peor que la ausencia, porque promete algo.
+      buttons.add(Visibility(
+        visible: false,
+        maintainSize: true,
+        maintainAnimation: true,
+        maintainState: true,
+        child: _menuButton(l10n, items: const []),
       ));
     }
+    // SEPARACIÓN entre blancos de click.
+    //
+    // El paso entre botones era exactamente su ancho, o sea CERO píxeles de
+    // aire: los targets se tocaban y un desvío de 1 px del cursor cambiaba de
+    // acción — con «Terminar vínculo» adentro de una de las cuatro. WCAG 2.2
+    // (2.5.8) pide 24x24 **o** separación suficiente; acá se cumplía el
+    // mínimo de tamaño justo y se incumplía la separación.
+    //
+    // Y miden 24, no 32: `visualDensity: compact` resta 2 unidades por eje y
+    // cada unidad son 4 px, así que el `minimumSize: Size(32, 32)` de #1062
+    // termina en 24x24 efectivos. Por eso no alcanza con agrandar la caja —
+    // el alto útil de la fila son 24 px (48 de `rowHeight` menos 12+12 de
+    // `cellPaddingV`) y no hay margen para crecer. Lo que sí hay es ancho:
+    // con 8 px entre botones la fila pasa de 96 a 120 px y la columna tiene
+    // 183.
     return Row(
       mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.end,
-      children: buttons,
+      children: [
+        for (var i = 0; i < buttons.length; i++) ...[
+          if (i > 0) const SizedBox(width: AppSpacing.s8),
+          buttons[i],
+        ],
+      ],
     );
   }
+
+  /// El ⋮ de la fila. Se usa DOS veces: visible cuando hay operaciones de
+  /// vínculo, e invisible —reservando su ancho— cuando no las hay.
+  ///
+  /// Estaba duplicado literal entre las dos ramas, con su comentario largo
+  /// repetido palabra por palabra. Treinta líneas iguales en dos lugares es
+  /// una invitación a cambiar la caja en una rama y no en la otra, que es
+  /// exactamente cómo la columna se desalineó en #1062.
+  Widget _menuButton(
+    AppL10n l10n, {
+    required List<PopupMenuEntry<VoidCallback>> items,
+  }) =>
+      TreinoPopupMenuButton<VoidCallback>(
+        tooltip: l10n.coachHubAlumnosRowActionsA11y,
+        icon: Icon(TreinoIcon.dotsThree,
+            size: 18, color: widget.palette.textMuted),
+        // MISMA caja que `_IconAction`, y va por `style` porque es la única
+        // perilla que llega: `PopupMenuButton` le reenvía al `IconButton` su
+        // `padding`, `iconSize` y `style`, pero NO `constraints` — ese parámetro
+        // suyo es para el MENÚ. Sin esto el ⋮ mide 40x24 al lado de los 24x24 de
+        // sus tres hermanos, con la píldora de hover saliendo de otro tamaño y
+        // otro centro: el PF lo reportó como «todos estos botoncitos están
+        // horribles».
+        iconSize: 18,
+        padding: EdgeInsets.zero,
+        style: IconButton.styleFrom(
+          padding: EdgeInsets.zero,
+          minimumSize: const Size(32, 32),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          visualDensity: VisualDensity.compact,
+        ),
+        onSelected: (action) => action(),
+        itemBuilder: (_) => items,
+      );
 }
 
 class _IconAction extends StatelessWidget {
@@ -1153,25 +1349,22 @@ class _IconAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Hasta 5 botones conviven en la columna «Acciones» (3 acciones rápidas
-    // siempre visibles + hasta 2 de vínculo pausar/reanudar + terminar). Con
-    // Material 3 (ADR de tema, `useMaterial3: true`), `constraints`/`padding`
-    // por sí solos NO alcanzan: `MaterialTapTargetSize.padded` (default del
-    // tema) fuerza un tap target mínimo de 48x48 vía `_InputPadding` —
-    // invisible pero SÍ cuenta para el layout del `Row` padre, y overflowea
-    // igual aunque el `IconButton` se vea de 32x32. `tapTargetSize:
-    // shrinkWrap` en el `style` es lo que realmente reduce el tamaño de caja
-    // que el botón reporta al `Row`.
-    return IconButton(
+    // Antes esto era un `IconButton` con `padding`, `constraints`,
+    // `visualDensity` y `tapTargetSize` combinados a mano, y el comentario que
+    // vivía acá explicaba —bien— que sin `shrinkWrap` el `_InputPadding` de
+    // Material 3 mete 48x48 invisibles que igual cuentan para el layout.
+    //
+    // Todo eso era conocimiento necesario para escribir UN botón, y lo pagaba
+    // cada callsite: en `coach_hub` había 156 botones Material crudos y en el
+    // detalle del alumno conviven siete paddings distintos. Ahora lo sabe el
+    // kit. Acá sólo queda el tamaño, y `xs` es el que impone la fila: 48 px de
+    // `rowHeight` menos 12+12 de `cellPaddingV` son 24 de alto útil.
+    return TreinoIconButton(
+      icon: icon,
       tooltip: tooltip,
-      icon: Icon(icon, size: 18, color: color),
+      color: color,
+      size: TreinoButtonSize.xs,
       onPressed: onPressed,
-      padding: EdgeInsets.zero,
-      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-      visualDensity: VisualDensity.compact,
-      style: IconButton.styleFrom(
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      ),
     );
   }
 }

@@ -9,6 +9,7 @@ export 'primitives.dart';
 export 'motion_tokens.dart';
 export 'components/treino_button_tokens.dart';
 export 'components/treino_card_tokens.dart';
+export 'components/treino_nav_mark_tokens.dart';
 // Tokens de layout y componentes del shell Coach Hub Web (Fase 1).
 export 'components/coach_hub_layout_tokens.dart';
 export 'components/coach_hub_sidebar_item_tokens.dart';

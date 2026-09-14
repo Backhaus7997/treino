@@ -11,7 +11,12 @@ import '../../../core/widgets/motion/treino_shimmer.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
-import '../../profile/application/user_providers.dart' show userProfileProvider;
+import '../../paywall/application/athlete_entitlement_provider.dart';
+import '../../paywall/domain/athlete_entitlement.dart'
+    show kFreeMaxRoutineDays, kFreeMaxRoutineWeeks;
+import '../../paywall/presentation/free_plan_limit_sheet.dart';
+import '../../profile/application/user_providers.dart'
+    show userProfileProvider, userRepositoryProvider;
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../profile/domain/user_role.dart';
 import '../application/routine_providers.dart';
@@ -196,6 +201,7 @@ class _RoutineDetailScreenState extends ConsumerState<RoutineDetailScreen> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              _FollowTemplateBar(routineAsync: routineAsync),
               _UseAsBaseBar(routineAsync: routineAsync),
               _EditBar(routineAsync: routineAsync),
             ],
@@ -318,6 +324,140 @@ class _EditBar extends ConsumerWidget {
 ///
 /// The copy keeps NO link to its origin — nothing to reconcile when the
 /// trainer later edits or unpublishes the original.
+/// "Seguir esta plantilla" — marca una plantilla del CATÁLOGO como la rutina
+/// activa del atleta **sin copiarla**.
+///
+/// Es la otra mitad de "Usar como base", y la diferencia es lo que cada una
+/// significa: copiar es "quiero MI versión de esto", seguir es "quiero hacer
+/// esto tal cual". Hasta ahora sólo existía la primera, así que para entrenar
+/// un programa del catálogo había que copiarlo — con dos consecuencias que la
+/// spec del paywall (§4.1) dejó anotadas: consumía cupo de rutinas propias, y
+/// la copia heredaba los días de la plantilla, así que un tope de días la
+/// rebotaba entera.
+///
+/// Escribe el MISMO campo que "marcar como activa" de MIS RUTINAS
+/// (`users/{uid}.activeRoutineId`). Lo que hace que esto funcione es que
+/// `resolveActiveRoutineId` ahora acepta un id del catálogo en su tier 0; antes
+/// lo trataba como marcador obsoleto y lo descartaba.
+///
+/// Sólo sobre `source == system`: una plantilla publicada por un PF se puede
+/// copiar pero no seguir, porque su dueño puede despublicarla y el marcador
+/// quedaría apuntando a la nada sin que el atleta hiciera nada.
+class _FollowTemplateBar extends ConsumerWidget {
+  const _FollowTemplateBar({required this.routineAsync});
+
+  final AsyncValue<Routine?> routineAsync;
+
+  Future<void> _follow(BuildContext context, WidgetRef ref, Routine r) async {
+    final uid = ref.read(currentUidProvider) ?? '';
+    if (uid.isEmpty) return;
+    final l10n = AppL10n.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(userRepositoryProvider).update(uid, {
+        'activeRoutineId': r.id,
+      });
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.workoutRoutineFollowSuccess)),
+      );
+    } catch (_) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.workoutRoutineFollowError)),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final routine = routineAsync.valueOrNull;
+    if (routine == null) return const SizedBox.shrink();
+    if (routine.source != RoutineSource.system) return const SizedBox.shrink();
+    // Una plantilla sin días no se puede seguir: `todaysRoutineProvider`
+    // devuelve null y el atleta quedaría con un marcador que no resuelve.
+    if (routine.days.isEmpty) return const SizedBox.shrink();
+
+    // El PF no entrena en la app — misma guarda que las otras dos afordancias.
+    final role = ref.watch(
+      userProfileProvider.select((async) => async.valueOrNull?.role),
+    );
+    if (role == UserRole.trainer) return const SizedBox.shrink();
+
+    final uid = ref.watch(currentUidProvider);
+    if (uid == null || uid.isEmpty) return const SizedBox.shrink();
+
+    final activeId = ref.watch(
+      userProfileProvider.select((a) => a.valueOrNull?.activeRoutineId),
+    );
+    final yaLaSigue = activeId == routine.id;
+
+    // Plantilla de nivel intermedio/avanzado y alumno sin derecho. Mismo
+    // criterio que `_UseAsBaseBar`: el botón SIGUE visible y abre la hoja en
+    // vez de desaparecer, porque esconderlo dejaría al alumno sin saber que la
+    // función existe y el candado de la grilla ya se lo anticipó.
+    //
+    // Este era el agujero grande del eje: `_follow` escribía
+    // `users/{uid}.activeRoutineId` sin consultar entitlement, así que el
+    // candado de la grilla y el de "Usar como base" tapaban dos de las TRES
+    // puertas del catálogo. La spec parte el catálogo por nivel
+    // (`docs/paywall-alumno-suelto.md` §4): seguir una de principiante es
+    // gratis y sin tope de días, seguir una intermedia/avanzada es del pago.
+    //
+    // `locked` le gana a `yaLaSigue` a propósito. Un alumno que ya venía
+    // siguiendo una premium de antes del gate ve el candado acá Y en la acción
+    // de EMPEZAR — las dos superficies dicen lo mismo. Que ese alumno quede sin
+    // poder entrenar lo que ya tenía activo es un problema de grandfathering
+    // que SIGUE ABIERTO, y se resuelve antes de prender el interruptor, no
+    // dejando que una pantalla prometa lo que la otra rebota.
+    //
+    // OJO, es OTRO que el que se cerró el 2026-09-11. Aquél era de FORMA: una
+    // rutina PROPIA fuera de tope no se podía ni renombrar, y lo arregla
+    // `noCreceLaForma` en las reglas. Éste es de ACCESO a una plantilla PAGA
+    // ajena, gatea en `sessions` y no en `routines`, y `noCreceLaForma` no lo
+    // toca. Que uno diga "resuelto" no dice nada del otro.
+    final locked = routine.isPremium && ref.watch(catalogLockActiveProvider);
+
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    final label =
+        yaLaSigue ? l10n.workoutRoutineFollowing : l10n.workoutRoutineFollow;
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 12, top: 8),
+      child: Material(
+        color: palette.scrimDark.withValues(alpha: 0.35),
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: Semantics(
+          button: true,
+          label: label,
+          child: IconButton(
+            key: const Key('routine_follow_template'),
+            tooltip: label,
+            icon: Icon(
+              locked
+                  ? TreinoIcon.lock
+                  : (yaLaSigue ? TreinoIcon.check : TreinoIcon.play),
+              color: locked
+                  ? palette.textMuted
+                  : (yaLaSigue ? palette.accent : palette.textPrimary),
+            ),
+            // Ya seguirla no es un estado que haya que "deshacer" desde acá:
+            // para cambiar de rutina activa se elige OTRA. Un botón que la
+            // desactiva dejaría al atleta sin ninguna, que no es algo que
+            // haya pedido.
+            onPressed: locked
+                ? () => showFreePlanLimitSheet(
+                      context,
+                      limit: FreePlanLimit.premiumTemplate,
+                    )
+                : (yaLaSigue ? null : () => _follow(context, ref, routine)),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _UseAsBaseBar extends ConsumerWidget {
   const _UseAsBaseBar({required this.routineAsync});
 
@@ -346,6 +486,49 @@ class _UseAsBaseBar extends ConsumerWidget {
     final uid = ref.watch(currentUidProvider);
     if (uid == null || uid.isEmpty) return const SizedBox.shrink();
 
+    // Plantilla paga y alumno sin derecho: el botón SIGUE visible y abre la
+    // hoja que lo explica, en vez de desaparecer. Esconderlo dejaría al alumno
+    // sin saber que la función existe, y el candado de la grilla ya le anticipó
+    // que esta plantilla es del plan pago — que el detalle no diga nada sería
+    // la app cambiando de idea entre dos pantallas.
+    //
+    // El gate mide DOS ejes distintos, y antes medía solo medio del primero.
+    //
+    // Eje 1 — el catálogo. `docs/paywall-alumno-suelto.md` §4 le da fila propia
+    // a "Editar / personalizar una plantilla del catálogo": free NO. O sea que
+    // no alcanza con `isPremium` — personalizar una de PRINCIPIANTE también es
+    // del plan pago, aunque seguirla tal cual sea gratis. Y no es un detalle
+    // de política: las tres plantillas gratis tienen 3 días contra un tope free
+    // de 2, así que con el gate viejo el alumno entraba al editor, cargaba todo,
+    // tocaba Guardar, y `firestore.rules` lo rebotaba con "No tenés permisos.
+    // Recargá la app." Perdía el trabajo y encima el mensaje le pedía algo que
+    // no arreglaba nada. Frenarlo en la ENTRADA es lo que hace honesta a la
+    // pantalla.
+    //
+    // Eje 2 — la forma, para las plantillas de PF públicas, que la spec no
+    // cubre. Ahí el límite no es el catálogo sino el tope de la rutina propia:
+    // si la plantilla excede la forma free, la copia se rebota al guardar por
+    // el mismo camino. Se frena antes, con el motivo REAL (días o semanas), no
+    // con el del catálogo.
+    // `customizeLockActiveProvider` y NO `catalogLockActiveProvider`: son dos
+    // ejes distintos y el segundo se cruza con `isPremium` por contrato. Ver el
+    // dartdoc de los dos, que explica por qué el catálogo necesita dos.
+    final customizeLocked = ref.watch(customizeLockActiveProvider);
+    final esDelCatalogo = routine.source == RoutineSource.system;
+    final excedeDias = routine.days.length > kFreeMaxRoutineDays;
+    final excedeSemanas = routine.numWeeks > kFreeMaxRoutineWeeks;
+
+    final FreePlanLimit? lockedReason = !customizeLocked
+        ? null
+        : esDelCatalogo
+            ? FreePlanLimit.customizeTemplate
+            : excedeDias
+                ? FreePlanLimit.days
+                : excedeSemanas
+                    ? FreePlanLimit.weeks
+                    : null;
+    final locked = lockedReason != null;
+
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
     return Padding(
@@ -360,9 +543,13 @@ class _UseAsBaseBar extends ConsumerWidget {
           child: IconButton(
             key: const Key('routine_use_as_base'),
             tooltip: l10n.workoutRoutineUseAsBase,
-            icon: Icon(TreinoIcon.copy, color: palette.textPrimary),
-            onPressed: () =>
-                context.push('/workout/customize-routine/${routine.id}'),
+            icon: Icon(
+              locked ? TreinoIcon.lock : TreinoIcon.copy,
+              color: locked ? palette.textMuted : palette.textPrimary,
+            ),
+            onPressed: () => lockedReason != null
+                ? showFreePlanLimitSheet(context, limit: lockedReason)
+                : context.push('/workout/customize-routine/${routine.id}'),
           ),
         ),
       ),
@@ -550,6 +737,27 @@ class _RoutineDetailContent extends ConsumerWidget {
 
     final showStartAction = _startActionVisible(ref);
 
+    // El paywall gatea la ACCIÓN, nunca la VISIBILIDAD, y eso es deliberado por
+    // dos motivos que apuntan al mismo lado.
+    //
+    // Uno es de layout y ya se pagó una vez: los encabezados de
+    // `_StartSessionAction` y `_PeriodizedStartAction` explican que un guard
+    // que viva DENTRO del widget encoge el botón a nada mientras el padre
+    // sigue reservando la altura de la barra (#641). Por eso se decide acá y
+    // se baja como parámetro: el slot fijado y su ocupante no pueden discrepar.
+    //
+    // El otro es de producto, el mismo de `_UseAsBaseBar`: un botón que
+    // desaparece no le enseña a nadie que la función existe. Que quede visible
+    // y explique es lo que convierte un límite en una oferta.
+    //
+    // Y va sobre EMPEZAR además de sobre "Seguir", porque seguir no es
+    // requisito para entrenar: `_startActionVisible` devolvía `true`
+    // incondicional sobre una plantilla del sistema, así que el candado de
+    // "Seguir" solo tapaba el camino largo.
+    final startLocked = routine.source == RoutineSource.system &&
+        routine.isPremium &&
+        ref.watch(catalogLockActiveProvider);
+
     return Column(
       children: [
         Expanded(
@@ -706,8 +914,13 @@ class _RoutineDetailContent extends ConsumerWidget {
                     routine: routine,
                     day: day,
                     viewedWeek: viewedWeek,
+                    paywallLocked: startLocked,
                   )
-                : _StartSessionAction(routine: routine, day: day),
+                : _StartSessionAction(
+                    routine: routine,
+                    day: day,
+                    paywallLocked: startLocked,
+                  ),
           ),
       ],
     );
@@ -976,7 +1189,7 @@ class _AssignedByChip extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
-        color: palette.accent.withValues(alpha: 0.20),
+        color: palette.accent.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(AppRadius.full),
       ),
       child: Text(
@@ -1222,6 +1435,7 @@ class _PeriodizedStartAction extends ConsumerWidget {
     required this.routine,
     required this.day,
     required this.viewedWeek,
+    required this.paywallLocked,
   });
 
   final Routine routine;
@@ -1229,6 +1443,14 @@ class _PeriodizedStartAction extends ConsumerWidget {
 
   /// 0-based week currently displayed by the parent screen.
   final int viewedWeek;
+
+  /// Plantilla del catálogo del plan pago y alumno sin derecho.
+  ///
+  /// Lo decide el padre por el mismo motivo que la visibilidad — ver el
+  /// encabezado de la clase y `_RoutineDetailContent.startLocked`. Acá NO se
+  /// recalcula: dos lecturas del mismo entitlement en dos widgets es
+  /// exactamente cómo se llega a que el slot y su ocupante discrepen.
+  final bool paywallLocked;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1248,6 +1470,17 @@ class _PeriodizedStartAction extends ConsumerWidget {
           ? AppL10n.of(context).routineDetailRepeat
           : AppL10n.of(context).routineDetailStart,
       onPressed: () {
+        // La hoja va ANTES del log: `logRoutineStarted` significa "empezó a
+        // entrenar", y una sesión que el paywall no dejó empezar no lo es.
+        // Loguearla igual metería ruido en la única métrica que dice si la
+        // gente entrena.
+        if (paywallLocked) {
+          showFreePlanLimitSheet(
+            context,
+            limit: FreePlanLimit.premiumTemplate,
+          );
+          return;
+        }
         ref.read(analyticsServiceProvider).logRoutineStarted(
               routineId: routine.id,
               routineName: routine.name,
@@ -1444,16 +1677,32 @@ class _EmptyState extends StatelessWidget {
 /// lived in this widget would shrink the button to nothing while the parent
 /// still reserved the bar's height (#641).
 class _StartSessionAction extends ConsumerWidget {
-  const _StartSessionAction({required this.routine, required this.day});
+  const _StartSessionAction({
+    required this.routine,
+    required this.day,
+    required this.paywallLocked,
+  });
 
   final Routine routine;
   final RoutineDay day;
+
+  /// Plantilla del catálogo del plan pago y alumno sin derecho. Lo decide el
+  /// padre — ver el encabezado de la clase y `_PeriodizedStartAction`.
+  final bool paywallLocked;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return _StartActionButton(
       label: AppL10n.of(context).routineDetailStart,
       onPressed: () {
+        // Antes del log, por el mismo motivo que en `_PeriodizedStartAction`.
+        if (paywallLocked) {
+          showFreePlanLimitSheet(
+            context,
+            limit: FreePlanLimit.premiumTemplate,
+          );
+          return;
+        }
         ref.read(analyticsServiceProvider).logRoutineStarted(
               routineId: routine.id,
               routineName: routine.name,

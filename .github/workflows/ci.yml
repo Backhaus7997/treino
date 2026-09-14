@@ -114,6 +114,30 @@ jobs:
       - name: Analyze
         run: flutter analyze --no-fatal-warnings --no-fatal-infos
 
+      # El quality gate #2 del template de PR (`dart format .`), hecho cumplir.
+      #
+      # Iba en el template y en AGENTS.md §7 desde siempre, pero NINGÚN job lo
+      # verificaba: `flutter analyze` no mira formato. Honor system, y terminó
+      # como terminan los honor systems — el 2026-09-11 había 44 archivos sin
+      # formatear en `main`.
+      #
+      # El costo de eso no es estético. `dart format` sobre un archivo sucio
+      # mete hunks que no son tuyos: en `routine_editor_screen.dart` eran 14, y
+      # uno rompía un lint (partía un `if (...) return; // comentario` en dos
+      # líneas sin llaves). O sea que el dev que SÍ corría el gate se llevaba un
+      # diff ajeno y un CI rojo, y el que no lo corría no pagaba nada. El
+      # incentivo estaba exactamente al revés.
+      #
+      # Va DESPUÉS de `analyze` a propósito: si los dos fallan, el dev ve
+      # primero los problemas reales y después el mecánico.
+      - name: Format
+        run: |
+          if ! dart format --output=none --set-exit-if-changed . ; then
+            echo ""
+            echo "::error::Hay archivos sin formatear. Corré 'dart format .' y commiteá."
+            exit 1
+          fi
+
   test:
     name: Test (shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
@@ -203,6 +227,23 @@ jobs:
           echo "shard $SHARD_INDEX/$SHARD_TOTAL: ${#FILES[@]} de $TOTAL_FILES archivos"
           flutter test "${FILES[@]}"
 
+      # Los textos legales de la app se GENERAN desde `docs/legal/*.md`
+      # (scripts/build_legal_content.py). Si alguien edita el markdown y no
+      # regenera, la app y gettreino.com quedan diciendo cosas distintas — y
+      # entonces no hay forma de probar qué aceptó el usuario. Este paso lo
+      # convierte en error de CI en vez de en un bug legal silencioso.
+      # No corre si nunca se generó (mientras queden [[PENDIENTE]] el
+      # generador aborta a propósito y el archivo todavía no existe).
+      - name: Gate de desfasaje legal
+        run: |
+          if [ -f lib/features/auth/presentation/legal/legal_content.dart ] \
+             && head -1 lib/features/auth/presentation/legal/legal_content.dart \
+                | grep -q "GENERADO POR"; then
+            python3 scripts/build_legal_content.py --check
+          else
+            echo "Textos legales todavía no generados — gate omitido."
+          fi
+
   # Gate de regresion visual del Coach Hub (#761).
   #
   # Job APARTE, y no un paso de "Analyze & Test", por dos motivos:
@@ -256,7 +297,7 @@ jobs:
 
       - name: Subir los diffs de imagen si el gate rompio
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: visual-gate-failures
           path: test/visual_gate/failures/
@@ -436,7 +477,7 @@ jobs:
 
       # El Emulator Suite de firebase-tools 15+ no arranca sin Java 21+.
       - name: Set up Java 21
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '21'
@@ -506,7 +547,7 @@ jobs:
 
       # El Emulator Suite de firebase-tools 15+ no arranca sin Java 21+.
       - name: Set up Java 21
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '21'
@@ -606,6 +647,26 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: '20'
+
+      # Este paso NO estaba, y esa ausencia es la que dejó pasar el #901.
+      #
+      # La suite corría igual —sale verde con `scripts/node_modules` borrado,
+      # medido: 469/469— porque `lib/admin.js` recibe el SDK por parámetro
+      # (`admin = require('firebase-admin')` es un default, se evalúa sólo si
+      # nadie inyecta) y los tests que cargan scripts de verdad lo interceptan
+      # con `fixtures/stub_firebase_admin.js`. O sea: CI validaba 469 cosas
+      # sobre un paquete que nunca descargaba, y dependabot podía subir
+      # `firebase-admin` a cualquier versión sin ponerse rojo. Lo hizo dos veces
+      # (cac2d6fa y de77562a), y la segunda dejó los 44 scripts de `scripts/`
+      # muertos con un `TypeError` en la primera línea de `lib/admin.js`.
+      #
+      # Con el install puesto, `test/firebase_admin_superficie.test.js` tiene
+      # por fin un módulo real que mirar. Sin él, ese test tira MODULE_NOT_FOUND.
+      #
+      # `npm ci` y no `npm install`: instala exactamente el lockfile, que es la
+      # versión que este job tiene que estar probando.
+      - name: Install scripts deps
+        run: npm --prefix scripts ci
 
       - name: Run scripts test suite
         run: npm --prefix scripts test

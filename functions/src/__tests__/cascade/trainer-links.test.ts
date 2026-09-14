@@ -6,26 +6,27 @@
  *   SCENARIO-543 — Active trainer link is terminated (REQ-ACCDEL-CF-008)
  */
 
-import * as admin from "firebase-admin";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
 process.env.GCLOUD_PROJECT = "treino-dev";
 
-let testApp: admin.app.App;
+let testApp: App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp({ projectId: "treino-dev" }, "trainer-links-cascade-test");
+  testApp = initializeApp({ projectId: "treino-dev" }, "trainer-links-cascade-test");
 });
 
 afterAll(async () => {
-  await testApp.delete();
+  await deleteApp(testApp);
 });
 
 // Import the module under test — will fail until implementation exists
 import { terminateTrainerLinks } from "../../cascade/trainer-links";
 
-const db = () => admin.firestore(testApp);
+const db = () => getFirestore(testApp);
 
 async function seedLink(
   uid: string,
@@ -36,7 +37,7 @@ async function seedLink(
     athleteId: uid,
     trainerId: "trainer-123",
     status,
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    createdAt: FieldValue.serverTimestamp(),
   });
 }
 

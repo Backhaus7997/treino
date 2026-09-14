@@ -163,7 +163,7 @@
   "authForgotEditEmail": "Usar otra dirección",
   "@authForgotEditEmail": {"description": "Forgot-password success state: return to the form to correct a mistyped address. Needed because the anti-enumeration success copy hides a typo (ux-audit-2026-06-16)."},
   "authTrainerInquiryDialogTitle": "Acceso de entrenador",
-  "authTrainerInquiryDialogBody": "Para alta de entrenador, escribinos a equipo@treino.app",
+  "authTrainerInquiryDialogBody": "Para alta de entrenador, escribinos a treino@gettreino.com",
   "authTrainerInquiryDialogClose": "Cerrar",
   "authTermsPlaceholder": "Próximamente",
   "authGoogleLabel": "GOOGLE",
@@ -234,6 +234,74 @@
   "coachUpdatePlanSuccess": "Plan actualizado.",
   "coachExercisePicker": "Buscar ejercicio",
   "agendaButtonLabel": "VER AGENDA DEL PF",
+  "athleteNutritionPlanButtonLabel": "MI PLAN NUTRICIONAL",
+  "@athleteNutritionPlanButtonLabel": {
+    "description": "Botón de la tab Coach que abre el plan nutricional del alumno."
+  },
+  "athleteFilesButtonLabel": "MIS ARCHIVOS",
+  "@athleteFilesButtonLabel": {
+    "description": "Botón de la tab Coach que abre los archivos compartidos con el alumno."
+  },
+  "athleteNutritionPlanScreenTitle": "PLAN NUTRICIONAL",
+  "@athleteNutritionPlanScreenTitle": {
+    "description": "Título de la pantalla read-only del plan nutricional del alumno."
+  },
+  "athleteNutritionChooseOneHint": "Elegí una",
+  "@athleteNutritionChooseOneHint": {
+    "description": "Indica que el alumno debe elegir una sola opción del grupo."
+  },
+  "athleteNutritionAllHint": "Va todo",
+  "@athleteNutritionAllHint": {
+    "description": "Indica que el alumno debe incluir todas las opciones del grupo."
+  },
+  "athleteNutritionPlanEmpty": "Tu PF todavía no cargó tu plan nutricional.",
+  "@athleteNutritionPlanEmpty": {
+    "description": "Estado vacío cuando el PF todavía no creó un plan nutricional."
+  },
+  "athleteNutritionPlanLoadError": "No pudimos cargar tu plan nutricional.",
+  "@athleteNutritionPlanLoadError": {
+    "description": "Error al cargar el plan nutricional del alumno."
+  },
+  "athleteNutritionNeedsActiveLink": "Necesitás un vínculo activo con un PF para ver tu plan nutricional.",
+  "@athleteNutritionNeedsActiveLink": {
+    "description": "Estado de la ruta nutricional cuando el alumno no tiene un vínculo activo."
+  },
+  "athleteLinkRequired": "No encontramos un vínculo activo con un PF.",
+  "@athleteLinkRequired": {
+    "description": "Gate de las rutas que necesitan un vínculo activo (agenda, nutrición). Dice NO ENCONTRAMOS y no NO TENÉS a propósito: el provider emite lo mismo cuando el servidor contesta que no hay vínculo y cuando se agota la espera sin llegar al servidor, y afirmar la segunda como la primera sería una advertencia falsa."
+  },
+  "trainerAcceptsInquiriesTitle": "Acepto consultas",
+  "@trainerAcceptsInquiriesTitle": {
+    "description": "Toggle del perfil del PF: si acepta consultas previas de alumnos sin vínculo."
+  },
+  "trainerAcceptsInquiriesSubtitle": "Un alumno puede escribirte antes de pedirte el vínculo. Si lo apagás, no te llegan consultas nuevas — las conversaciones ya abiertas siguen.",
+  "@trainerAcceptsInquiriesSubtitle": {
+    "description": "Subtítulo del toggle de consultas. Dice NUEVAS a propósito: `senderMayPost` autoriza incondicionalmente todo chat que ya tiene kind:inquiry, así que apagar el switch NO calla a quien ya venía hablando. Decir «sólo te escriben tus alumnos» era una promesa que el sistema no cumple."
+  },
+  "athleteLinkUnconfirmed": "No pudimos confirmar tu vínculo con tu PF.",
+  "@athleteLinkUnconfirmed": {
+    "description": "Gate de vínculo cuando el servidor no contestó a tiempo. Es una causa DISTINTA de athleteLinkRequired: allá el servidor dijo que no hay vínculo, acá no pudimos preguntarle. Mezclarlas fue el bug que este gate existe para no repetir."
+  },
+  "athleteLinkRequiredRetry": "Reintentar",
+  "@athleteLinkRequiredRetry": {
+    "description": "Botón del gate de vínculo: invalida el provider y vuelve a preguntar."
+  },
+  "athleteSessionMissing": "Tu sesión se cerró. Volvé a entrar.",
+  "@athleteSessionMissing": {
+    "description": "Gate de las rutas de alumno cuando falta el uid. Es una causa DISTINTA de no tener vínculo, y antes las dos mostraban el mismo cartel."
+  },
+  "athleteFilesScreenTitle": "MIS ARCHIVOS",
+  "@athleteFilesScreenTitle": {
+    "description": "Título de la pantalla de archivos compartidos con el alumno."
+  },
+  "athleteFilesEmpty": "Tu PF todavía no compartió archivos con vos.",
+  "@athleteFilesEmpty": {
+    "description": "Estado vacío cuando ningún PF compartió archivos con el alumno."
+  },
+  "athleteFilesLoadError": "No pudimos cargar tus archivos.",
+  "@athleteFilesLoadError": {
+    "description": "Error al cargar los archivos compartidos con el alumno."
+  },
   "agendaScreenTitle": "Agenda",
   "agendaEmptyAvailability": "Tu PF todavía no configuró horarios.",
   "agendaBookingConfirmTitle": "Confirmar reserva",
@@ -1853,9 +1921,9 @@
   "@coachHubAlumnosSearchHint": {
     "description": "Coach Hub web alumnos section — search field hint text."
   },
-  "coachHubAlumnosFilterAll": "Todos",
+  "coachHubAlumnosFilterAll": "Vigentes",
   "@coachHubAlumnosFilterAll": {
-    "description": "Coach Hub web alumnos section — 'All' filter chip label."
+    "description": "Coach Hub web alumnos section — filter chip for links that are NOT inactive. Deliberately not 'All': its count is lower than the hero total and than the Inactivos chip, and 'All' made that read as a counting bug."
   },
   "coachHubAlumnosFilterActivos": "Activos",
   "@coachHubAlumnosFilterActivos": {
@@ -1921,11 +1989,11 @@
   "@coachHubAlumnosStatusDebt": {
     "description": "Coach Hub web alumnos section — status badge for athletes with outstanding payments."
   },
-  "coachHubAlumnosStatusBlocked": "Bloqueado",
+  "coachHubAlumnosStatusBlocked": "Sin acceso",
   "@coachHubAlumnosStatusBlocked": {
     "description": "Coach Hub alumnos — status badge for a link blocked by the trainer plan limit (paywall Fase 7 downgrade). NOT the athlete fault: the trainer subscription lapsed."
   },
-  "coachHubAlumnosFilterBloqueados": "Bloqueados",
+  "coachHubAlumnosFilterBloqueados": "Sin acceso",
   "@coachHubAlumnosFilterBloqueados": {
     "description": "Coach Hub web alumnos section — filter chip for athletes blocked by the plan limit."
   },
@@ -1996,13 +2064,13 @@
   "@coachHubAlumnoDetailNotasLoadError": {
     "description": "Coach Hub web alumno detail — error state when the note stream errors."
   },
-  "coachHubAlumnoDetailArchivosTitle": "Archivos privados",
+  "coachHubAlumnoDetailArchivosTitle": "Archivos del alumno",
   "@coachHubAlumnoDetailArchivosTitle": {
     "description": "Coach Hub web alumno detail — title of the Archivos tab body."
   },
-  "coachHubAlumnoDetailArchivosSubtitle": "PDFs y fotos que subís sobre este alumno. Solo vos los ves.",
+  "coachHubAlumnoDetailArchivosSubtitle": "PDFs y fotos que subís sobre este alumno. Elegí cuáles compartís con él.",
   "@coachHubAlumnoDetailArchivosSubtitle": {
-    "description": "Coach Hub web alumno detail — subtitle explaining privacy: only the trainer sees these files, the athlete never does."
+    "description": "Coach Hub web alumno detail — explica que el PF controla qué archivos comparte con el alumno."
   },
   "coachHubAlumnoDetailArchivosUploadButton": "SUBIR ARCHIVO",
   "@coachHubAlumnoDetailArchivosUploadButton": {
@@ -2053,6 +2121,26 @@
   "coachHubAlumnoDetailArchivosDeleteError": "No pudimos eliminar el archivo.",
   "@coachHubAlumnoDetailArchivosDeleteError": {
     "description": "Coach Hub web alumno detail — snackbar when the delete flow fails."
+  },
+  "coachHubAlumnoDetailArchivosSharedLabel": "COMPARTIDO",
+  "@coachHubAlumnoDetailArchivosSharedLabel": {
+    "description": "Estado visible de un archivo compartido con el alumno."
+  },
+  "coachHubAlumnoDetailArchivosPrivateLabel": "PRIVADO",
+  "@coachHubAlumnoDetailArchivosPrivateLabel": {
+    "description": "Estado visible de un archivo que el alumno no puede ver."
+  },
+  "coachHubAlumnoDetailArchivosShareTooltip": "Compartir con el alumno",
+  "@coachHubAlumnoDetailArchivosShareTooltip": {
+    "description": "Tooltip para habilitar el acceso del alumno a un archivo."
+  },
+  "coachHubAlumnoDetailArchivosUnshareTooltip": "Dejar de compartir con el alumno",
+  "@coachHubAlumnoDetailArchivosUnshareTooltip": {
+    "description": "Tooltip para quitarle al alumno el acceso a un archivo."
+  },
+  "coachHubAlumnoDetailArchivosShareError": "No pudimos cambiar quién ve el archivo.",
+  "@coachHubAlumnoDetailArchivosShareError": {
+    "description": "Snackbar cuando falla el cambio de visibilidad de un archivo."
   },
   "feedLoadError": "No pudimos cargar tu feed. Probá de nuevo.",
   "@feedLoadError": {
@@ -2123,7 +2211,7 @@
   "postCardMenuA11y": "Opciones del post",
   "coachHubAlumnosRowActionsA11y": "Opciones del alumno",
   "@postCardMenuA11y": {
-    "description": "Semantics label for the post card overflow (3-dot) menu button, shown only on the viewer's own posts."
+    "description": "Semantics label for the post card overflow (3-dot) menu button. Shown for both the owner (Editar/Eliminar) and, since moderacion-reporte-y-bloqueo, any other signed-in viewer (Reportar/Bloquear)."
   },
   "postCardMenuEdit": "Editar",
   "@postCardMenuEdit": {
@@ -2280,6 +2368,39 @@
   "@chatMediaUploading": {},
   "chatMediaUploadFailed": "No pudimos subir el archivo. Probá de nuevo.",
   "@chatMediaUploadFailed": {},
+  "chatMediaQuotaFull": "Llegaste al tope de {maxMb} MB en fotos y videos de chat.",
+  "@chatMediaQuotaFull": {
+    "description": "Shown when the athlete's total chat media quota is exhausted, before opening the picker (#chat-media-quota). The MB figure is interpolated from kFreeMaxChatMediaBytes / kMaxChatMediaBytes — never hardcode it in the string.",
+    "placeholders": {
+      "maxMb": {
+        "type": "String"
+      }
+    }
+  },
+  "chatMediaFileTooLarge": "El archivo pesa {fileMb} MB y el máximo es {maxMb} MB.",
+  "@chatMediaFileTooLarge": {
+    "description": "Shown after picking a file that exceeds the per-file cap (#chat-media-quota).",
+    "placeholders": {
+      "fileMb": {
+        "type": "String"
+      },
+      "maxMb": {
+        "type": "String"
+      }
+    }
+  },
+  "chatMediaQuotaNotEnough": "El archivo pesa {fileMb} MB y te quedan {remainingMb} MB de cupo.",
+  "@chatMediaQuotaNotEnough": {
+    "description": "Shown after picking a file that fits the per-file cap but would cross the total byte quota (#chat-media-quota).",
+    "placeholders": {
+      "fileMb": {
+        "type": "String"
+      },
+      "remainingMb": {
+        "type": "String"
+      }
+    }
+  },
   "chatMediaPreviewPhoto": "📷 Foto",
   "@chatMediaPreviewPhoto": {},
   "chatMediaPreviewVideo": "🎥 Video",
@@ -2471,6 +2592,18 @@
   "profileRoutinesActiveChip": "ACTIVA",
   "@profileRoutinesActiveChip": {
     "description": "Chip label shown on the user-created routine card that is currently marked as active by the athlete (UserProfile.activeRoutineId). Mirrors the chip in workoutMisRutinasActiveChip."
+  },
+  "profileSectionLegal": "Legales",
+  "@profileSectionLegal": {
+    "description": "Header of the Legal section group in the profile settings list."
+  },
+  "legalDocumentsTitle": "Documentos legales",
+  "@legalDocumentsTitle": {
+    "description": "Title of the legal documents index screen and its tile in the profile settings list."
+  },
+  "legalDocumentsSubtitle": "Términos, privacidad y más",
+  "@legalDocumentsSubtitle": {
+    "description": "Subtitle under the legal documents tile in the profile settings list."
   },
   "appearanceTitle": "Apariencia",
   "@appearanceTitle": {
@@ -3683,5 +3816,275 @@
   "routineEditorSlotMenuMergeDown": "Unir con el de abajo",
   "@routineEditorSlotMenuMergeDown": {
     "description": "Agrupa este ejercicio con el siguiente. Sirve sobre todo para sumarse a una superserie que ya existe más abajo."
+  },
+  "paywallFreePlanLimitTitle": "Esto es parte del plan pago",
+  "@paywallFreePlanLimitTitle": {
+    "description": "Titulo de la hoja que se abre cuando un alumno en plan free toca el + que cruzaria el tope de dias o semanas de su propia rutina."
+  },
+  "paywallFreePlanLimitDaysBody": "Con el plan gratis armás rutinas de hasta {max} días. Las plantillas de principiante del catálogo las seguís completas, sin tope.",
+  "@paywallFreePlanLimitDaysBody": {
+    "description": "Cuerpo para el tope de DIAS, al tocar el + que lo cruzaria. El numero va por placeholder y no escrito a mano: vivia como un 2 literal en esta cadena y quedo mintiendo el dia que kFreeMaxRoutineDays paso a 3. Aclara que el catalogo de principiante sigue libre, para que el limite no se lea como que no puede entrenar.",
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "paywallFreePlanLimitWeeksBody": "Periodizar en varias semanas es parte del plan pago. Con el gratis tu rutina propia va de a una semana.",
+  "@paywallFreePlanLimitWeeksBody": {
+    "description": "Cuerpo para el tope de SEMANAS."
+  },
+  "paywallFreePlanLimitShapeDaysBody": "Esta rutina tiene {actual} días y con el plan gratis guardás hasta {max}. Sacá los que sobren y vas a poder guardar los cambios. Entrenarla completa no tiene tope.",
+  "@paywallFreePlanLimitShapeDaysBody": {
+    "description": "Cuerpo de la hoja cuando el alumno free intenta GUARDAR una rutina propia que YA tiene mas dias que el tope — tipicamente una que armo antes de que el paywall se encendiera, o mientras estaba vinculado a un PF. Distinto de paywallFreePlanLimitDaysBody: aquel frena un + que todavia no paso, este explica un documento que ya existe. Tiene que ser ACCIONABLE porque hay salida real: firestore.rules mide el documento RESULTANTE, asi que recortar a {max} dias guarda bien. La ultima frase no es relleno: entrenar escribe en sessions y no pasa por la regla de forma, y sin decirlo el alumno cree que perdio la rutina.",
+    "placeholders": {
+      "actual": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "paywallFreePlanLimitShapeWeeksBody": "Esta rutina está periodizada en {actual} semanas y con el plan gratis guardás hasta {max}. Podés dejarla en {max} para guardar los cambios, o pasarte al plan pago. Entrenarla completa no tiene tope.",
+  "@paywallFreePlanLimitShapeWeeksBody": {
+    "description": "El hermano de paywallFreePlanLimitShapeDaysBody para el eje SEMANAS. Existe porque firestore.rules mide las dos dimensiones en la misma clausula (withinFreeRoutineShape): cubrir solo los dias dejaria la rutina periodizada cayendo en el permission-denied crudo que este trabajo vino a sacar.",
+    "placeholders": {
+      "actual": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "paywallFreePlanLimitUpgrade": "Ver el plan pago",
+  "@paywallFreePlanLimitUpgrade": {
+    "description": "CTA de la hoja de limite. Solo se dibuja cuando existe checkout: hoy la hoja se muestra sin este boton."
+  },
+  "paywallFreePlanLimitDismiss": "Entendido",
+  "@paywallFreePlanLimitDismiss": {},
+  "paywallFreePlanLimitTemplateBody": "Esta plantilla es parte del plan pago. Las de nivel principiante las podés usar completas con el plan gratis.",
+  "@paywallFreePlanLimitTemplateBody": {
+    "description": "Cuerpo de la hoja cuando el alumno toca una plantilla del catalogo marcada isPremium. Nombra la salida gratis (las de principiante) para que el limite no se lea como que el catalogo entero esta cerrado."
+  },
+  "paywallFreePlanLimitCustomizeTemplateBody": "Personalizar una plantilla del catálogo es parte del plan pago. Con el gratis la seguís tal cual, sin tope de días, o armás tu propia rutina de hasta {max} días.",
+  "@paywallFreePlanLimitCustomizeTemplateBody": {
+    "description": "Cuerpo de la hoja cuando el alumno free toca 'Usar como base' sobre una plantilla del catalogo. Distinto del caso isPremium: aca la plantilla puede ser gratis y lo pago es COPIARLA. Nombra las DOS salidas gratis (seguirla tal cual, o armar una propia) para que no se lea como que el catalogo se cerro. El numero va por placeholder por el mismo motivo que en DaysBody.",
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "workoutPlantillasPremiumChip": "PLAN PAGO",
+  "@workoutPlantillasPremiumChip": {
+    "description": "Pildora con candado sobre las cards del catalogo que el alumno no puede usar con su plan actual. Solo se dibuja cuando la plantilla esta realmente bloqueada para quien mira."
+  },
+  "progressionPeriodLast3Months": "3 meses",
+  "@progressionPeriodLast3Months": {
+    "description": "Pill del selector de periodo de los graficos: los ultimos 3 meses calendario terminando hoy."
+  },
+  "progressionPeriodLast1Year": "1 año",
+  "@progressionPeriodLast1Year": {
+    "description": "Pill del selector de periodo de los graficos: los ultimos 12 meses calendario. Es el periodo mas largo que se puede ofrecer: el historial de sesiones esta acotado a 365 (kSessionHistoryFetchLimit), asi que un 'todo' seria mentira."
+  },
+  "workoutRoutineFollow": "Seguir esta plantilla",
+  "@workoutRoutineFollow": {
+    "description": "Accion del detalle de una plantilla del catalogo que la marca como la rutina activa SIN copiarla. Es la otra mitad de 'Usar como base': copiar es 'quiero mi version', seguir es 'quiero hacer esto tal cual'."
+  },
+  "workoutRoutineFollowing": "La estas siguiendo",
+  "@workoutRoutineFollowing": {
+    "description": "Estado del boton cuando esa plantilla YA es la rutina activa. El boton queda deshabilitado: para cambiar de rutina se elige otra, no se desactiva esta."
+  },
+  "workoutRoutineFollowSuccess": "Listo, ahora seguís esta plantilla.",
+  "@workoutRoutineFollowSuccess": {},
+  "workoutRoutineFollowError": "No pudimos marcarla. Probá de nuevo.",
+  "@workoutRoutineFollowError": {},
+  "paywallFreePlanLimitRoutineCountBody": "Con el plan gratis guardás hasta 3 rutinas propias. Las plantillas del catálogo que seguís no ocupan lugar.",
+  "@paywallFreePlanLimitRoutineCountBody": {
+    "description": "Cuerpo de la hoja cuando el alumno free intenta guardar una rutina propia mas alla del tope. Aclara que seguir plantillas no consume cupo, porque desde #963 seguir no copia."
+  },
+  "paywallFreePlanLimitChartHistoryBody": "Con el plan gratis mirás hasta un mes de historial. Los períodos de 3 meses y 1 año son del plan pago.",
+  "@paywallFreePlanLimitChartHistoryBody": {
+    "description": "Cuerpo de la hoja cuando el alumno free toca un periodo de grafico del plan pago. Es el unico limite que no restringe lo que puede HACER sino hasta donde puede MIRAR lo que ya hizo."
+  },
+  "paywallAlumnoTitulo": "TREINO Pro",
+  "@paywallAlumnoTitulo": {
+    "description": "Titulo del paywall del alumno."
+  },
+  "paywallAlumnoBajada": "Programá en serio: rutinas largas, periodización y todo tu historial.",
+  "@paywallAlumnoBajada": {
+    "description": "Bajada del paywall del alumno."
+  },
+  "paywallAlumnoPlanMensual": "Mensual",
+  "@paywallAlumnoPlanMensual": {
+    "description": "Nombre del plan mensual en el paywall del alumno."
+  },
+  "paywallAlumnoPlanAnual": "Anual",
+  "@paywallAlumnoPlanAnual": {
+    "description": "Nombre del plan anual en el paywall del alumno."
+  },
+  "paywallAlumnoAhorro": "2 meses gratis",
+  "@paywallAlumnoAhorro": {
+    "description": "Etiqueta del plan anual. NO dice un porcentaje: el descuento sale del precio de la tienda y un numero fijo se puede desincronizar."
+  },
+  "paywallAlumnoBeneficio1": "Rutinas de hasta 7 días",
+  "@paywallAlumnoBeneficio1": {
+    "description": "Beneficio 1 del plan pago del alumno."
+  },
+  "paywallAlumnoBeneficio2": "16 semanas con periodización",
+  "@paywallAlumnoBeneficio2": {
+    "description": "Beneficio 2 del plan pago del alumno."
+  },
+  "paywallAlumnoBeneficio3": "Gráficos de 3 meses y 1 año",
+  "@paywallAlumnoBeneficio3": {
+    "description": "Beneficio 3 del plan pago del alumno."
+  },
+  "paywallAlumnoBeneficio4": "Las plantillas premium del catálogo",
+  "@paywallAlumnoBeneficio4": {
+    "description": "Beneficio 4 del plan pago del alumno."
+  },
+  "paywallAlumnoImpuestos": "Tu banco le suma los impuestos argentinos a este precio (IVA y percepción). No los cobra TREINO: los vas a ver en el resumen de tu tarjeta.",
+  "@paywallAlumnoImpuestos": {
+    "description": "Aviso de impuestos del paywall del alumno. VA SIN MONTO Y SIN TIPO DE CAMBIO a proposito: el importe final lo define el emisor de la tarjeta al liquidar, asi que no lo podemos saber, y publicar un numero que puede salir mal es 'promoting a false price' (guideline 2.3.1(a), cuya pena escrita es la baja de la app y la terminacion de la cuenta). Ademas Google exige que 'In-app pricing must match the pricing displayed in the user-facing Play billing interface'."
+  },
+  "paywallAlumnoCta": "Suscribirme",
+  "@paywallAlumnoCta": {
+    "description": "CTA del paywall del alumno. NO lleva el precio adentro: el boton dispara la hoja del sistema, que muestra el precio de la tienda, y que el boton prometa otro numero es el peor lugar posible para una discrepancia."
+  },
+  "paywallAlumnoRestaurar": "Restaurar compras",
+  "@paywallAlumnoRestaurar": {
+    "description": "Restaurar compras. Apple lo EXIGE para suscripciones."
+  },
+  "paywallAlumnoSinPlanes": "No pudimos cargar los planes. Probá de nuevo en un rato.",
+  "@paywallAlumnoSinPlanes": {
+    "description": "Estado de error del paywall del alumno cuando la tienda no devuelve ningun plan."
+  },
+  "paywallAlumnoReintentar": "Reintentar",
+  "@paywallAlumnoReintentar": {
+    "description": "Boton de reintento del paywall del alumno."
+  },
+  "paywallAlumnoListo": "¡Listo! Ya tenés TREINO Pro.",
+  "@paywallAlumnoListo": {
+    "description": "Resultado: la compra se acredito."
+  },
+  "paywallAlumnoPendiente": "Tu pago quedó pendiente de confirmación. Te avisamos cuando se acredite.",
+  "@paywallAlumnoPendiente": {
+    "description": "Resultado: pago diferido (Android) o Ask to Buy (iOS). NO es un error."
+  },
+  "paywallAlumnoErrorCompra": "No pudimos completar la compra. No se te cobró nada.",
+  "@paywallAlumnoErrorCompra": {
+    "description": "Resultado: la compra fallo."
+  },
+  "paywallAlumnoSinRestaurar": "No encontramos compras para restaurar en esta cuenta.",
+  "@paywallAlumnoSinRestaurar": {
+    "description": "Resultado de restaurar cuando no hay nada."
+  },
+  "moderationMenuA11y": "Más opciones",
+  "@moderationMenuA11y": {
+    "description": "Semantics label for the overflow (3-dot) menu button that opens Reportar/Bloquear on content that isn't the viewer's own (ReviewTile, PublicProfileScreen header)."
+  },
+  "moderationReportAction": "Reportar",
+  "@moderationReportAction": {
+    "description": "Label of the Reportar item in the moderation overflow menu."
+  },
+  "moderationBlockAction": "Bloquear",
+  "@moderationBlockAction": {
+    "description": "Label of the Bloquear item in the moderation overflow menu."
+  },
+  "moderationReportSheetTitle": "¿Por qué lo reportás?",
+  "@moderationReportSheetTitle": {
+    "description": "Title of the report-reason bottom sheet."
+  },
+  "moderationReportReasonHarassment": "Acoso",
+  "@moderationReportReasonHarassment": {
+    "description": "Report reason: harassment."
+  },
+  "moderationReportReasonSexualContent": "Contenido sexual",
+  "@moderationReportReasonSexualContent": {
+    "description": "Report reason: sexual content."
+  },
+  "moderationReportReasonViolenceOrSelfHarm": "Violencia o autolesión",
+  "@moderationReportReasonViolenceOrSelfHarm": {
+    "description": "Report reason: violence or self-harm."
+  },
+  "moderationReportReasonDangerousHealthAdvice": "Consejo de salud peligroso",
+  "@moderationReportReasonDangerousHealthAdvice": {
+    "description": "Report reason: dangerous health advice."
+  },
+  "moderationReportReasonImpersonation": "Suplantación de identidad",
+  "@moderationReportReasonImpersonation": {
+    "description": "Report reason: impersonation."
+  },
+  "moderationReportReasonSpam": "Spam",
+  "@moderationReportReasonSpam": {
+    "description": "Report reason: spam."
+  },
+  "moderationReportReasonThirdPartyData": "Datos de terceros",
+  "@moderationReportReasonThirdPartyData": {
+    "description": "Report reason: third-party data (sharing someone else's personal data without consent)."
+  },
+  "moderationReportReasonIntellectualProperty": "Propiedad intelectual",
+  "@moderationReportReasonIntellectualProperty": {
+    "description": "Report reason: intellectual property infringement."
+  },
+  "moderationReportReasonOther": "Otro",
+  "@moderationReportReasonOther": {
+    "description": "Report reason: other / none of the above."
+  },
+  "moderationReportDetailHint": "Contanos más (opcional)",
+  "@moderationReportDetailHint": {
+    "description": "Hint text of the optional free-text detail field in the report sheet."
+  },
+  "moderationReportSubmit": "ENVIAR REPORTE",
+  "@moderationReportSubmit": {
+    "description": "Submit button of the report sheet. Disabled until a reason is selected."
+  },
+  "moderationReportCancel": "CANCELAR",
+  "@moderationReportCancel": {
+    "description": "Cancel/dismiss button of the report sheet."
+  },
+  "moderationReportSuccess": "Gracias, lo vamos a revisar.",
+  "@moderationReportSuccess": {
+    "description": "Success snackbar after submitting a report."
+  },
+  "moderationReportError": "No pudimos enviar el reporte. Probá de nuevo.",
+  "@moderationReportError": {
+    "description": "Error snackbar when submitting a report fails."
+  },
+  "moderationBlockConfirmTitle": "¿Bloquear a {name}?",
+  "@moderationBlockConfirmTitle": {
+    "description": "Title of the block confirmation sheet.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "moderationBlockConfirmBody": "No va a poder escribirte, seguirte ni reaccionar a tus posts.",
+  "@moderationBlockConfirmBody": {
+    "description": "Body line of the block confirmation sheet, explaining what blocking does."
+  },
+  "moderationBlockConfirmAction": "BLOQUEAR",
+  "@moderationBlockConfirmAction": {
+    "description": "Button that confirms blocking."
+  },
+  "moderationBlockDismiss": "CANCELAR",
+  "@moderationBlockDismiss": {
+    "description": "Button that dismisses the block confirmation sheet."
+  },
+  "moderationBlockSuccess": "Bloqueaste a {name}.",
+  "@moderationBlockSuccess": {
+    "description": "Success snackbar after blocking someone.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "moderationBlockError": "No pudimos bloquear. Probá de nuevo.",
+  "@moderationBlockError": {
+    "description": "Error snackbar when blocking fails."
   }
 }

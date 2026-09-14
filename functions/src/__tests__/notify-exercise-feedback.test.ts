@@ -32,39 +32,42 @@
  * #628.
  */
 
-import * as admin from "firebase-admin";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
+import { Messaging, MulticastMessage } from "firebase-admin/messaging";
+import { Timestamp, getFirestore } from "firebase-admin/firestore";
 import { notifyOnExerciseFeedbackHandler } from "../notifications/notify-exercise-feedback";
 import { dedupeKey } from "../mail/enqueue-mail";
 import { MAIL_QUEUE_COLLECTION, MailQueueDoc } from "../mail/types";
+import { trainerEntry } from "../mail/templates";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
 process.env.GCLOUD_PROJECT = "treino-dev";
 
-let testApp: admin.app.App;
+let testApp: App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp(
+  testApp = initializeApp(
     { projectId: "treino-dev" },
     "notify-exercise-feedback-test",
   );
 });
 
 afterAll(async () => {
-  await testApp.delete();
+  await deleteApp(testApp);
 });
 
-const db = () => admin.firestore(testApp);
+const db = () => getFirestore(testApp);
 
 /** Minimal mock messaging that tracks sendEachForMulticast calls. */
-function makeMockMessaging(): admin.messaging.Messaging {
+function makeMockMessaging(): Messaging {
   return {
-    sendEachForMulticast: jest.fn(async (msg: admin.messaging.MulticastMessage) => ({
+    sendEachForMulticast: jest.fn(async (msg: MulticastMessage) => ({
       successCount: msg.tokens.length,
       failureCount: 0,
       responses: msg.tokens.map(() => ({ success: true, messageId: "id" })),
     })),
-  } as unknown as admin.messaging.Messaging;
+  } as unknown as Messaging;
 }
 
 async function seedUser(uid: string, fcmTokens: string[]): Promise<void> {
@@ -167,7 +170,7 @@ function makeFeedback(overrides: Partial<Record<string, unknown>> = {}): Record<
     text: "Me tiró la rodilla derecha en la última serie",
     photoUrl: "https://firebasestorage.googleapis.com/v0/b/x/o/sessionFeedback%2Fsecret?alt=media&token=abc123",
     photoPath: "sessionFeedback/athlete-1/session-1/feedback-1.jpg",
-    createdAt: admin.firestore.Timestamp.now(),
+    createdAt: Timestamp.now(),
     ...overrides,
   };
 }
@@ -205,7 +208,7 @@ describe("kind: discomfort with a live session_shares grant → sends the push",
 
     expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock
-      .calls[0][0] as admin.messaging.MulticastMessage;
+      .calls[0][0] as MulticastMessage;
     expect(callArg.tokens).toEqual(["trainer-token"]);
     expect(callArg.data?.kind).toBe("discomfort");
   });
@@ -222,7 +225,7 @@ describe("kind: discomfort with a live session_shares grant → sends the push",
     );
 
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock
-      .calls[0][0] as admin.messaging.MulticastMessage;
+      .calls[0][0] as MulticastMessage;
     expect(callArg.notification?.body).toContain("Ana Atleta");
     expect(callArg.notification?.body).toContain("Sentadilla");
   });
@@ -349,7 +352,7 @@ describe("session_shares points to a specific trainer → only that trainer is n
     );
 
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock
-      .calls[0][0] as admin.messaging.MulticastMessage;
+      .calls[0][0] as MulticastMessage;
     expect(callArg.tokens).toEqual(["linked-token"]);
     expect(callArg.tokens).not.toContain("other-token");
   });
@@ -390,7 +393,7 @@ describe("FCM payload excludes the report's free text and photoUrl (health data)
     );
 
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock
-      .calls[0][0] as admin.messaging.MulticastMessage;
+      .calls[0][0] as MulticastMessage;
 
     const serialized = JSON.stringify(callArg);
     expect(serialized).not.toContain(secretText);
@@ -609,7 +612,7 @@ describe("legitimate active trainer_link → still dispatches", () => {
 
     expect(mock.sendEachForMulticast as jest.Mock).toHaveBeenCalledTimes(1);
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock
-      .calls[0][0] as admin.messaging.MulticastMessage;
+      .calls[0][0] as MulticastMessage;
     expect(callArg.tokens).toEqual(["legit-token"]);
   });
 
@@ -772,7 +775,11 @@ describe("mail al PF: se encola junto con el push", () => {
     );
 
     const [doc] = await queuedMailFor(trainerId);
-    expect(doc.params.ctaUrl).toBe("https://app.gettreino.com/abrir/profe");
+    // No la entrada bare: manda directo al perfil del atleta que reporto la
+    // molestia, con `to=alumno` y su uid.
+    expect(doc.params.ctaUrl).toBe(
+      trainerEntry({ to: "alumno", athleteId: athleteUid }),
+    );
   });
 
   // Decisión 1: transaccional. No existe un ajuste razonable que diga "no me

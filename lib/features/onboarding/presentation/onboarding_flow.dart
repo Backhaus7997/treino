@@ -182,8 +182,18 @@ class _SlideView extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
+                // El aire de abajo era `s8`: 8px, el escalón más chico de la
+                // escala, para separar una ilustración de casi media pantalla
+                // del titular que la explica. La imagen y el texto se leían
+                // como un solo bloque pegoteado.
+                //
+                // Sube a `s20` y el de arriba baja de `s18` a `s12`: como el
+                // slide está centrado verticalmente entre la barra de progreso
+                // y el CTA, correr aire de arriba hacia abajo levanta la
+                // ilustración Y le abre espacio al texto con el mismo
+                // movimiento.
                 padding: const EdgeInsets.fromLTRB(
-                    0, AppSpacing.s18, 0, AppSpacing.s8),
+                    0, AppSpacing.s12, 0, AppSpacing.s20),
                 child: OnboardingDevicePreview(child: slide.preview),
               ),
               Padding(

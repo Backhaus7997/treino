@@ -82,8 +82,7 @@ void main() {
       // parámetro explícito obliga a que cada call site diga qué precisión
       // pide y por qué — y hace que este test pueda auditarlo.
       final implicitas = dartDeLib()
-          .where((f) =>
-              f.readAsStringSync().contains('getCurrentPosition()'))
+          .where((f) => f.readAsStringSync().contains('getCurrentPosition()'))
           .map((f) => f.path)
           .toList();
 
@@ -143,8 +142,9 @@ void main() {
       // La versión anterior decía "Tu ubicación no es visible para otros
       // usuarios" a secas, y para un entrenador eso era falso: su pin se
       // publica en el mapa. Es el agujero que este cambio cierra.
-      final src = File('lib/features/auth/presentation/legal/legal_content.dart')
-          .readAsStringSync();
+      final src =
+          File('lib/features/auth/presentation/legal/legal_content.dart')
+              .readAsStringSync();
       expect(src, contains('SÍ es visible para los atletas'),
           reason: 'la sección Ubicación volvió a ocultar el caso del PF');
       expect(src, isNot(contains('Tu ubicación no es visible para otros')),
@@ -152,15 +152,15 @@ void main() {
     });
 
     test('la política afirma el redondeo del bias, y el código lo cumple', () {
-      final legal = File('lib/features/auth/presentation/legal/legal_content.dart')
-          .readAsStringSync();
+      final legal =
+          File('lib/features/auth/presentation/legal/legal_content.dart')
+              .readAsStringSync();
       expect(legal, contains('zona aproximada de unos 5 km'));
 
       // Si el bias vuelve a mandar el punto exacto, esa frase pasa a ser
       // falsa. El código tiene que seguir mandando el centro de la celda.
-      final places =
-          File('lib/features/gyms/application/places_providers.dart')
-              .readAsStringSync();
+      final places = File('lib/features/gyms/application/places_providers.dart')
+          .readAsStringSync();
       expect(places, isNot(contains('biasLatitude: position?.latitude')),
           reason: 'volvieron las coordenadas crudas al request de Places, '
               'y el texto legal promete una celda de ~5 km');

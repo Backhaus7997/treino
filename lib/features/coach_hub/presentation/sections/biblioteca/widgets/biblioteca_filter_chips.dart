@@ -32,7 +32,11 @@ const _kTodosLabel = 'TODOS'; // i18n
 /// REQ-BIBW-06, SCENARIO-BIBW-06a, SCENARIO-BIBW-06b, SCENARIO-BIBW-06c,
 /// SCENARIO-BIBW-06d.
 class BibliotecaFilterChips extends ConsumerWidget {
-  const BibliotecaFilterChips({super.key});
+  const BibliotecaFilterChips({super.key, this.vertical = false});
+
+  /// En la columna lateral el host aporta el padding y este widget ocupa el
+  /// alto disponible con scroll. En compact conserva el bloque inline actual.
+  final bool vertical;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -56,45 +60,52 @@ class BibliotecaFilterChips extends ConsumerWidget {
         ? {_kTodosLabel}
         : selectedEquipment.map((e) => e.label.toUpperCase()).toSet();
 
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: vertical ? MainAxisSize.min : MainAxisSize.max,
+      children: [
+        // ── Muscle row ────────────────────────────────────────────────────
+        _SectionLabel(label: 'MÚSCULO', palette: palette), // i18n
+        const SizedBox(height: AppSpacing.hairline),
+        TreinoFilterChips(
+          options: muscleOptions,
+          selected: selectedMuscleLabels,
+          multiSelect: true,
+          onChanged: (newSelected) {
+            ref.read(bibliotecaMuscleFilterProvider.notifier).state =
+                _resolveMuscleSelection(
+              previousSelected: selectedMuscleLabels,
+              newSelected: newSelected,
+            );
+          },
+        ),
+        const SizedBox(height: AppSpacing.s12),
+        // ── Equipment row ─────────────────────────────────────────────────
+        _SectionLabel(label: 'EQUIPAMIENTO', palette: palette), // i18n
+        const SizedBox(height: AppSpacing.hairline),
+        TreinoFilterChips(
+          options: equipmentOptions,
+          selected: selectedEquipmentLabels,
+          multiSelect: true,
+          onChanged: (newSelected) {
+            ref.read(bibliotecaEquipmentFilterProvider.notifier).state =
+                _resolveEquipmentSelection(
+              previousSelected: selectedEquipmentLabels,
+              newSelected: newSelected,
+            );
+          },
+        ),
+        const SizedBox(height: AppSpacing.s12),
+      ],
+    );
+
+    if (vertical) {
+      return SingleChildScrollView(child: content);
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── Muscle row ────────────────────────────────────────────────────
-          _SectionLabel(label: 'MÚSCULO', palette: palette), // i18n
-          const SizedBox(height: AppSpacing.hairline),
-          TreinoFilterChips(
-            options: muscleOptions,
-            selected: selectedMuscleLabels,
-            multiSelect: true,
-            onChanged: (newSelected) {
-              ref.read(bibliotecaMuscleFilterProvider.notifier).state =
-                  _resolveMuscleSelection(
-                previousSelected: selectedMuscleLabels,
-                newSelected: newSelected,
-              );
-            },
-          ),
-          const SizedBox(height: AppSpacing.s12),
-          // ── Equipment row ─────────────────────────────────────────────────
-          _SectionLabel(label: 'EQUIPAMIENTO', palette: palette), // i18n
-          const SizedBox(height: AppSpacing.hairline),
-          TreinoFilterChips(
-            options: equipmentOptions,
-            selected: selectedEquipmentLabels,
-            multiSelect: true,
-            onChanged: (newSelected) {
-              ref.read(bibliotecaEquipmentFilterProvider.notifier).state =
-                  _resolveEquipmentSelection(
-                previousSelected: selectedEquipmentLabels,
-                newSelected: newSelected,
-              );
-            },
-          ),
-          const SizedBox(height: AppSpacing.s12),
-        ],
-      ),
+      child: content,
     );
   }
 

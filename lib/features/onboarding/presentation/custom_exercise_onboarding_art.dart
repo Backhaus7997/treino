@@ -44,8 +44,7 @@ class CustomExerciseOnboardingArt extends StatelessWidget {
   const CustomExerciseOnboardingArt.library() : this._(_Variant.library);
 
   /// Slide 4 — one-line entry converted into a complete prescription.
-  const CustomExerciseOnboardingArt.quickEntry()
-      : this._(_Variant.quickEntry);
+  const CustomExerciseOnboardingArt.quickEntry() : this._(_Variant.quickEntry);
 
   /// Slide 5 — a routine row being moved by its drag handle.
   const CustomExerciseOnboardingArt.drag() : this._(_Variant.drag);
@@ -77,7 +76,7 @@ class CustomExerciseOnboardingArt extends StatelessWidget {
             // `textPrimary` inverts with the theme for free.
             color: palette.textPrimary.withValues(alpha: 0.05),
             border: Border.all(
-              color: palette.textPrimary.withValues(alpha: 0.10),
+              color: palette.textPrimary.withValues(alpha: 0.1),
             ),
             borderRadius: BorderRadius.circular(AppRadius.md),
           ),
@@ -135,7 +134,9 @@ class _ArtHeader extends StatelessWidget {
         Text(
           switch (variant) {
             _Variant.form || _Variant.video => 'NUEVO EJERCICIO',
-            _Variant.library || _Variant.drag || _Variant.menu =>
+            _Variant.library ||
+            _Variant.drag ||
+            _Variant.menu =>
               'EDITOR DE RUTINA',
             _Variant.quickEntry => 'ENTRADA RÁPIDA',
           }, // i18n
@@ -317,7 +318,7 @@ class _VideoBody extends StatelessWidget {
         const SizedBox(height: 12),
         _DashedBox(
           color: palette.accent,
-          fill: palette.accent.withValues(alpha: 0.10),
+          fill: palette.accent.withValues(alpha: 0.1),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(
@@ -390,7 +391,7 @@ class _VideoPlayer extends StatelessWidget {
           Icon(
             TreinoIcon.play,
             size: 24,
-            color: AppColors.bone.withValues(alpha: 0.90),
+            color: AppColors.bone.withValues(alpha: 0.9),
           ),
           Positioned(
             top: 8,
@@ -803,7 +804,7 @@ class _FieldLabel extends StatelessWidget {
         fontSize: 10,
         fontWeight: FontWeight.w600,
         height: 1.0,
-        color: palette.textPrimary.withValues(alpha: 0.50),
+        color: palette.textPrimary.withValues(alpha: 0.5),
       ),
     );
   }

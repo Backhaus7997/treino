@@ -16,6 +16,7 @@ import 'package:treino/features/payments/application/pagos_por_cobrar_provider.d
     show CobroPendiente;
 
 import 'payment_format.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 /// Tarjeta de estado de cuenta: muestra cobros pendientes y permite marcarlos
 /// como pagados. Incluye el guard `_inFlight` para evitar doble-cobro mientras
@@ -113,20 +114,12 @@ class _EstadoCuentaCardState extends State<EstadoCuentaCard> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  OutlinedButton(
+                  TreinoButton(
+                    label: 'Marcar pagado', // i18n
+                    variant: TreinoButtonVariant.secondaryAccent,
+                    size: TreinoButtonSize.sm,
                     onPressed:
                         _inFlight.contains(_key(c)) ? null : () => _tap(c),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: palette.accent,
-                      side: BorderSide(color: palette.border),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: const Text('Marcar pagado', // i18n
-                        style: TextStyle(
-                            fontSize: 12, fontWeight: FontWeight.w600)),
                   ),
                 ],
               ),

@@ -77,7 +77,7 @@ Widget _wrap(
 }) =>
     ProviderScope(
       overrides: [
-        currentAthleteLinkProvider.overrideWith((ref) async => link),
+        currentAthleteLinkProvider.overrideWith((ref) => Stream.value(link)),
         ...overrides,
       ],
       child: MaterialApp(

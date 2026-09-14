@@ -33,8 +33,9 @@ import 'package:treino/features/coach/domain/nutrition_plan.dart';
 import 'package:treino/features/coach/domain/nutrition_plan_presets.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach/domain/trainer_link_status.dart';
+import 'package:treino/features/coach_hub/presentation/sections/chat/abrir_chat_con_alumno.dart';
 import 'package:treino/features/coach_hub/presentation/sections/chat/widgets/avatar_color.dart';
-import 'package:treino/features/coach_hub/presentation/sections/chat/widgets/chat_detail_pane.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 import 'package:treino/features/gyms/application/gym_providers.dart';
 import 'package:treino/features/insights/domain/chart_period.dart';
 import 'package:treino/features/insights/presentation/widgets/daily_heatmap_section.dart';
@@ -80,50 +81,236 @@ import '../pagos/widgets/pagos_table.dart';
 import '../pagos/widgets/payment_format.dart';
 import 'alumnos_screen.dart' show AlumnoEstado, AlumnoEstadoX, estadoForLink;
 import 'resumen_metrics.dart';
-import 'package:treino/core/widgets/treino_segmented_pill.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
+
+/// Estado de un grupo de la ficha, para su marca en la barra.
+///
+/// Tiene un cuarto valor —[desconocido]— y ése es el punto de todo el enum.
+/// Con un `bool` "hay contenido", el `false` significa a la vez «está vacío» y
+/// «todavía no cargó», y la marca queda igual en los dos casos. Visualmente
+/// pasa (no hay punto, y no hay punto es ambiguo), pero el anuncio del lector
+/// de pantalla NO: decir «Progreso, sin contenido» sobre un stream que sigue
+/// cargando es afirmar algo falso justo en la pregunta que estas marcas
+/// existen para contestar. `AGENTS.md` §11.1: una advertencia falsa es peor
+/// que ninguna. Con [desconocido] no se afirma nada — se anuncia el nombre del
+/// grupo pelado.
+enum AlumnoGrupoEstado {
+  /// Alguna de las fuentes del grupo está cargando o falló. Sin marca y sin
+  /// afirmación.
+  desconocido,
+
+  /// Se sabe, y adentro no hay nada. Sin marca, pero el anuncio SÍ lo dice.
+  vacio,
+
+  /// Hay contenido. Punto neutro.
+  conContenido,
+
+  /// Hay algo esperando una acción del PF. Punto de acento.
+  requiereAtencion,
+}
+
+/// Qué mostrar en la barra por cada grupo de la ficha.
+@immutable
+class AlumnoDetailIndicators {
+  const AlumnoDetailIndicators({
+    this.entrenamiento = AlumnoGrupoEstado.desconocido,
+    this.progreso = AlumnoGrupoEstado.desconocido,
+    this.plan = AlumnoGrupoEstado.desconocido,
+    this.chat = AlumnoGrupoEstado.desconocido,
+    this.privado = AlumnoGrupoEstado.desconocido,
+    this.pagos = AlumnoGrupoEstado.desconocido,
+  });
+
+  final AlumnoGrupoEstado entrenamiento;
+  final AlumnoGrupoEstado progreso;
+  final AlumnoGrupoEstado plan;
+  final AlumnoGrupoEstado chat;
+  final AlumnoGrupoEstado privado;
+  final AlumnoGrupoEstado pagos;
+
+  @override
+  bool operator ==(Object other) =>
+      other is AlumnoDetailIndicators &&
+      other.entrenamiento == entrenamiento &&
+      other.progreso == progreso &&
+      other.plan == plan &&
+      other.chat == chat &&
+      other.privado == privado &&
+      other.pagos == pagos;
+
+  @override
+  int get hashCode =>
+      Object.hash(entrenamiento, progreso, plan, chat, privado, pagos);
+}
+
+/// Traduce dos fuentes async a un estado de grupo, sin inventar certeza.
+///
+/// [hayContenido] sólo se llama cuando las DOS tienen valor; si alguna está
+/// cargando o falló, el grupo queda [AlumnoGrupoEstado.desconocido].
+AlumnoGrupoEstado _estadoDeFuentes(
+  List<AsyncValue<Object?>> fuentes,
+  bool Function() hayContenido,
+) {
+  if (fuentes.any((f) => !f.hasValue)) return AlumnoGrupoEstado.desconocido;
+  return hayContenido()
+      ? AlumnoGrupoEstado.conContenido
+      : AlumnoGrupoEstado.vacio;
+}
+
+/// Único punto de composición para responder, por grupo, si hay algo adentro y
+/// si eso reclama acción.
+///
+/// **Está centralizado a propósito.** Contestar «¿cargó mediciones?» sin entrar
+/// obliga a suscribir streams que hoy no se abren, porque `TabBarView` sólo
+/// construye la pestaña montada. No hay forma de evitar ese costo —es el precio
+/// de la pregunta—, pero teniéndolo en un solo provider queda UN lugar donde
+/// medirlo y optimizarlo, y se puede testear sin levantar la pantalla.
+final alumnoDetailIndicatorsProvider =
+    Provider.autoDispose.family<AlumnoDetailIndicators, String>(
+  (ref, athleteId) {
+    final trainerId = ref.watch(currentUidProvider);
+    if (trainerId == null) return const AlumnoDetailIndicators();
+
+    final key = (trainerId: trainerId, athleteId: athleteId);
+    final sessions = ref.watch(sessionsByUidProvider(athleteId));
+    final routines = ref.watch(assignedRoutinesByTrainerProvider(key));
+    final measurements = ref.watch(measurementsForAthleteProvider(athleteId));
+    final performance =
+        ref.watch(performanceTestsForAthleteProvider(athleteId));
+    final nutrition = ref.watch(nutritionPlanProvider(key));
+    final files = ref.watch(athleteFilesProvider(key));
+    final note = ref.watch(athleteNoteProvider(key));
+    final followUp = ref.watch(followUpEntriesProvider(key));
+    final pagos = ref.watch(pagosPorCobrarProvider);
+
+    return AlumnoDetailIndicators(
+      entrenamiento: _estadoDeFuentes(
+        [sessions, routines],
+        () =>
+            sessions.requireValue.isNotEmpty ||
+            routines.requireValue
+                .any((routine) => routine.status == RoutineStatus.active),
+      ),
+      progreso: _estadoDeFuentes(
+        [measurements, performance],
+        () =>
+            measurements.requireValue.isNotEmpty ||
+            performance.requireValue.isNotEmpty,
+      ),
+      plan: _estadoDeFuentes(
+        [nutrition, files],
+        () => nutrition.requireValue != null || files.requireValue.isNotEmpty,
+      ),
+      // `hasUnreadFromProvider` ya colapsa loading y error a false y deriva de
+      // un stream que el hub tiene abierto — sin listener nuevo. Su "no hay sin
+      // leer" no distingue desconocido de vacío, así que acá tampoco se afirma
+      // más de lo que se sabe.
+      chat: ref.watch(hasUnreadFromProvider(athleteId))
+          ? AlumnoGrupoEstado.requiereAtencion
+          : AlumnoGrupoEstado.desconocido,
+      privado: _estadoDeFuentes(
+        [note, followUp],
+        () =>
+            (note.requireValue?.note.trim().isNotEmpty ?? false) ||
+            followUp.requireValue.isNotEmpty,
+      ),
+      pagos: !pagos.hasValue
+          ? AlumnoGrupoEstado.desconocido
+          : pagos.requireValue.any((cobro) => cobro.athleteId == athleteId)
+              ? AlumnoGrupoEstado.requiereAtencion
+              : AlumnoGrupoEstado.vacio,
+    );
+  },
+);
 
 /// Detalle del alumno (`/alumnos/:id`, Fase W2 PR2).
 ///
-/// Header (identidad + estado + métricas denormalizadas) + tab bar de 10
-/// secciones. En PR2 sólo **Progreso › Antropometría** está implementado
-/// (reusa `measurementsForAthleteProvider` + `MeasurementProgressChart`); el
-/// resto de tabs son placeholder. Rendimiento (performance), Nutrición,
-/// Historial, Notas, Archivos, Seguimiento y los botones de acción del header
-/// llegan en PRs siguientes (varios necesitan backend nuevo / l10n en
-/// CoachHubApp). Renderiza DENTRO del shell — sin Scaffold (ADR-CHW-005).
+/// Header (identidad + estado + métricas denormalizadas) y siete grupos
+/// orientados a las tareas del PF. Entrenamiento, Progreso, Plan y Privado
+/// contienen un segundo nivel segmentado. Renderiza DENTRO del shell, sin
+/// Scaffold (ADR-CHW-005).
 class AlumnoDetailScreen extends ConsumerWidget {
-  const AlumnoDetailScreen({super.key, required this.athleteId});
+  const AlumnoDetailScreen({
+    super.key,
+    required this.athleteId,
+    this.tabInicial,
+  });
 
   final String athleteId;
 
+  /// Seccion en la que abrir la ficha, por su clave (`plan`, `entrenamiento`,
+  /// `pagos`, …). `null` abre en Resumen, que es el comportamiento de siempre.
+  ///
+  /// Se compara contra [_clavesDeTab] y NO contra la etiqueta visible: las
+  /// etiquetas son copy —cambian en la pasada de i18n— y una URL no puede
+  /// depender de eso.
+  final String? tabInicial;
+
+  /// Clave estable de cada pestana, en el mismo orden que [_tabs].
+  static const _clavesDeTab = <String>[
+    'resumen',
+    'entrenamiento',
+    'progreso',
+    'plan',
+    'privado',
+    'pagos',
+  ];
+
   static const _tabs = <String>[
     'Resumen', // i18n: Fase W2
-    'Entrenamientos',
-    'Nutrición',
+    'Entrenamiento',
     'Progreso',
+    'Plan',
+    'Privado',
     'Pagos',
-    'Historial',
-    'Chat',
-    'Notas privadas',
-    'Archivos',
-    'Seguimiento',
-    'Mediciones',
   ];
   static const _resumenIndex = 0;
   static const _entrenamientoIndex = 1;
-  static const _nutricionIndex = 2;
-  static const _progresoIndex = 3;
-  static const _pagosIndex = 4;
-  static const _historialIndex = 5;
-  static const _chatIndex = 6;
-  static const _notasPrivadasIndex = 7;
-  static const _archivosIndex = 8;
-  static const _seguimientoIndex = 9;
-  static const _medicionesIndex = 10;
+  static const _progresoIndex = 2;
+  static const _planIndex = 3;
+  static const _privadoIndex = 4;
+  static const _pagosIndex = 5;
+
+  /// El estado de cada grupo, en el orden EXACTO de [_tabs].
+  ///
+  /// Indexado por posición y no por el texto del label: un `switch` sobre el
+  /// string haría que renombrar una pestaña apagara su marca en silencio, sin
+  /// que ningún test lo notara —el test también usaría el nombre nuevo—. Acá
+  /// un desalineo es un desborde de índice, que sí se ve.
+  static List<AlumnoGrupoEstado> _estados(AlumnoDetailIndicators i) => [
+        AlumnoGrupoEstado.desconocido, // Resumen: derivado, nunca lleva marca.
+        i.entrenamiento,
+        i.progreso,
+        i.plan,
+        i.privado,
+        i.pagos,
+      ];
+
+  /// Lo que el punto dice, en palabras. El color solo no es información
+  /// accesible (WCAG 1.4.1).
+  ///
+  /// Con el estado en [AlumnoGrupoEstado.desconocido] se anuncia el nombre
+  /// pelado: mientras el stream carga NO se afirma que no haya nada.
+  static List<String> _semanticsLabels(AlumnoDetailIndicators i) {
+    final estados = _estados(i);
+    return [
+      for (var n = 0; n < _tabs.length; n++)
+        switch ((_tabs[n], estados[n])) {
+          (final label, AlumnoGrupoEstado.desconocido) => label,
+          ('Pagos', AlumnoGrupoEstado.requiereAtencion) =>
+            'Pagos, con cobro pendiente', // i18n: Fase W2
+          ('Pagos', _) => 'Pagos, sin cobros pendientes', // i18n: Fase W2
+          (final label, AlumnoGrupoEstado.conContenido) =>
+            '$label, con contenido', // i18n: Fase W2
+          (final label, _) => '$label, sin contenido', // i18n: Fase W2
+        },
+    ];
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
+    final indicators = ref.watch(alumnoDetailIndicatorsProvider(athleteId));
     final profile = ref.watch(userPublicProfileProvider(athleteId)).valueOrNull;
     // Mismo criterio que el roster: el link más reciente NO-pending del alumno
     // (el stream viene requestedAt DESC). Sin el filtro de pending, un alumno
@@ -147,7 +334,13 @@ class AlumnoDetailScreen extends ConsumerWidget {
 
     return DefaultTabController(
       length: _tabs.length,
-      initialIndex: _resumenIndex,
+      initialIndex: () {
+        final i = _clavesDeTab.indexOf(tabInicial ?? '');
+        // Una clave que no existe cae en Resumen en vez de tirar: la URL la
+        // puede escribir cualquiera, y un link viejo tiene que abrir la ficha,
+        // no romperla.
+        return i < 0 ? _resumenIndex : i;
+      }(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -166,14 +359,28 @@ class AlumnoDetailScreen extends ConsumerWidget {
                   gymName: gymName,
                   billing: billing,
                   onPago: () => registrarPago(context, ref, athleteId),
+                  // Va al Chat, no a un modal. El PF tocaba este botón
+                  // esperando el chat y se quedaba adentro de un `Dialog`:
+                  // «si toco el chat que me redirija al chat directamente».
+                  //
+                  // Es EXACTAMENTE lo que hace el botón de chat del roster
+                  // —misma función compartida—, así que el mismo ícono lleva
+                  // al mismo lugar desde los dos lados.
+                  onChat: () => abrirChatConAlumno(context, ref, athleteId),
+                  chatSinLeer:
+                      indicators.chat == AlumnoGrupoEstado.requiereAtencion,
                   palette: palette,
                 ),
-                const SizedBox(height: 14),
-                const TreinoSegmentedPill(labels: _tabs, scrollable: true),
+                const SizedBox(height: 12),
+                _SeccionesTabBar(
+                  labels: _tabs,
+                  estados: _estados(indicators),
+                  semanticsLabels: _semanticsLabels(indicators),
+                  palette: palette,
+                ),
               ],
             ),
           ),
-          const SizedBox(height: 8),
           Expanded(
             child: TabBarView(
               physics: const NeverScrollableScrollPhysics(),
@@ -183,24 +390,14 @@ class AlumnoDetailScreen extends ConsumerWidget {
                     _ResumenTab(athleteId: athleteId)
                   else if (i == _entrenamientoIndex)
                     _EntrenamientoTab(athleteId: athleteId)
-                  else if (i == _nutricionIndex)
-                    _NutricionTab(athleteId: athleteId)
                   else if (i == _progresoIndex)
                     _ProgresoTab(athleteId: athleteId)
+                  else if (i == _planIndex)
+                    _PlanTab(athleteId: athleteId)
+                  else if (i == _privadoIndex)
+                    _PrivadoTab(athleteId: athleteId)
                   else if (i == _pagosIndex)
                     _PagosTab(athleteId: athleteId)
-                  else if (i == _historialIndex)
-                    _HistorialTab(athleteId: athleteId)
-                  else if (i == _chatIndex)
-                    _ChatTab(athleteId: athleteId)
-                  else if (i == _notasPrivadasIndex)
-                    _NotasPrivadasTab(athleteId: athleteId)
-                  else if (i == _archivosIndex)
-                    _ArchivosTab(athleteId: athleteId)
-                  else if (i == _seguimientoIndex)
-                    _SeguimientoTab(athleteId: athleteId)
-                  else if (i == _medicionesIndex)
-                    _MedicionesTab(athleteId: athleteId)
                   else
                     const SizedBox.shrink(),
               ],
@@ -244,6 +441,8 @@ class _Header extends StatelessWidget {
     required this.gymName,
     required this.billing,
     required this.onPago,
+    required this.onChat,
+    required this.chatSinLeer,
     required this.palette,
   });
 
@@ -254,6 +453,8 @@ class _Header extends StatelessWidget {
   final String? gymName;
   final AthleteBilling? billing;
   final VoidCallback onPago;
+  final VoidCallback onChat;
+  final bool chatSinLeer;
   final AppPalette palette;
 
   @override
@@ -279,7 +480,7 @@ class _Header extends StatelessWidget {
     final avatarColor = avatarColorFor(link?.athleteId ?? athleteId);
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: palette.bgCard,
         border: Border.all(color: palette.border),
@@ -292,7 +493,7 @@ class _Header extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               CircleAvatar(
-                radius: 26,
+                radius: 22,
                 backgroundColor: hasNetworkAvatar ? palette.bg : avatarColor,
                 backgroundImage:
                     hasNetworkAvatar ? NetworkImage(avatarUrl) : null,
@@ -313,7 +514,7 @@ class _Header extends StatelessWidget {
                       name,
                       style: GoogleFonts.barlowCondensed(
                         color: palette.textPrimary,
-                        fontSize: 24,
+                        fontSize: 20,
                         fontWeight: FontWeight.w700,
                         height: 1,
                       ),
@@ -363,42 +564,318 @@ class _Header extends StatelessWidget {
                             style: TextStyle(
                                 color: palette.textMuted, fontSize: 13),
                           ),
+                        // Sesiones y racha entran ACÁ y no en cards propias.
+                        // Como cards costaban ~85px de alto en una pantalla
+                        // cuyo contenido es lo que el PF vino a mirar: dos
+                        // números de dos dígitos no justifican una fila
+                        // entera. El número en negrita mantiene la jerarquía
+                        // sin la caja.
+                        _MetricInline(
+                          value: '$sesiones',
+                          label: 'sesiones', // i18n: Fase W2
+                          palette: palette,
+                        ),
+                        _MetricInline(
+                          value: '$racha d',
+                          label: 'de racha', // i18n: Fase W2
+                          palette: palette,
+                        ),
                       ],
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: 12),
-              OutlinedButton(
+              // El chat vive ACÁ y no en una pestaña. Como pestaña ocupaba un
+              // destino de primer nivel para algo que ya tiene su propia
+              // sección en el sidebar; como acción del header no gasta alto y
+              // conserva el acceso de un click a ESTE alumno — que la sección
+              // no da, porque `/chat` no toma parámetro de alumno.
+              _ChatAction(
+                onTap: onChat,
+                sinLeer: chatSinLeer,
+                palette: palette,
+              ),
+              const SizedBox(width: 8),
+              // Par con `_ChatAction`: MISMO padding y misma altura, y ahora
+              // por construcción y no por acuerdo. Tenían 14 y 12 de
+              // horizontal sin ninguna razón, y aun después de igualar el
+              // padding declarado seguían reportando cajas de 16 y 19 px de
+              // alto. Con `TreinoButtonSize.sm` los dos miden 32.
+              //
+              // La variante lleva el `accentText` adentro: ese arreglo de
+              // contraste (#1056) ahora vive en el token, no en este callsite.
+              TreinoButton(
+                label: 'Pago', // i18n: Fase W2
+                variant: TreinoButtonVariant.secondaryAccent,
+                size: TreinoButtonSize.sm,
                 onPressed: onPago,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: palette.accent,
-                  side: BorderSide(color: palette.border),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: const Text('Pago', // i18n: Fase W2
-                    style:
-                        TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              _MetricChip(
-                  label: 'Sesiones',
-                  value: '$sesiones',
-                  palette: palette), // i18n: Fase W2
-              const SizedBox(width: 10),
-              _MetricChip(
-                  label: 'Racha',
-                  value: '$racha d',
-                  palette: palette), // i18n: Fase W2
-            ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Sub-navegación de un grupo — el mismo subrayado que arriba, en chico.
+///
+/// **Por qué no la píldora del kit.** Era lo que había acá, y su contorno
+/// oscuro es lo que se pidió ablandar. No se puede: ese contorno sale de #646
+/// (cinco participantes de las pruebas de usabilidad no detectaron el control)
+/// y su opacidad ya está en el mínimo que cruza 3:1 —WCAG 1.4.11— en las dos
+/// paletas. Medido, componiendo el borde sobre la pista contra el fondo de
+/// página:
+///
+/// | borde | dark | light |
+/// |---|---|---|
+/// | `textMuted@45` (el actual) | 4,84 | 3,21 |
+/// | `textMuted@30` | 2,88 | 2,02 |
+/// | `AppPalette.border` | 1,41 | 1,21 |
+///
+/// Y un relleno no lo reemplaza: `bgCard` contra `bg` da 1,04 en light. O sea
+/// que aflojar el contorno ES bajar de 3:1. En vez de debilitar un guard con
+/// pruebas de usuario atrás —y en un widget que comparten otras cuatro
+/// pantallas— acá se cambia de control: el subrayado no depende de un contorno
+/// para leerse como navegación, y es el patrón que esta pantalla ya usa arriba.
+///
+/// Subordinado a propósito: 13px contra 14, `isScrollable` para que abrace su
+/// contenido en vez de repartir el ancho, y sin divisor. Dos barras de
+/// subrayado apiladas sólo confunden si pesan igual.
+class _SubNav extends StatelessWidget {
+  const _SubNav({required this.labels});
+
+  final List<String> labels;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    const estilo = TextStyle(
+      fontFamily: AppFonts.barlow,
+      fontWeight: FontWeight.w600,
+      fontSize: 13,
+    );
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TabBar(
+        isScrollable: true,
+        tabAlignment: TabAlignment.start,
+        labelColor: palette.accentText,
+        unselectedLabelColor: palette.textMuted,
+        indicatorColor: palette.accentText,
+        indicatorWeight: 2,
+        indicatorSize: TabBarIndicatorSize.label,
+        dividerColor: Colors.transparent,
+        labelStyle: estilo,
+        // El MISMO estilo en los dos estados: `TabBar` interpola entre ambos y
+        // con pesos distintos la tira se re-layoutea en cada cambio.
+        unselectedLabelStyle: estilo,
+        labelPadding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.s8,
+        ),
+        tabs: [for (final l in labels) Tab(height: 34, text: l)],
+      ),
+    );
+  }
+}
+
+/// Key estable del punto de la pestaña [index].
+///
+/// Pública y de nivel superior porque el widget que la usa es privado, y lo que
+/// hace falta afirmar desde un test es el COLOR del punto — lo único de esto
+/// que puede romperse en silencio, y sólo en tema claro.
+Key alumnoDetailMarcaKey(int index) => Key('alumno-detail-marca-$index');
+
+/// Navegación de primer nivel de la ficha — `TabBar` con subrayado.
+///
+/// **Por qué no `TreinoSegmentedPill`.** Ese control es la sub-navegación
+/// MOBILE: una pista con contorno y un thumb relleno, pensada para dos o tres
+/// celdas angostas. Estirado a seis celdas a lo ancho de un desktop, su
+/// contorno y su relleno pesan más que el contenido que encabezan, y no se
+/// parece a ninguna otra pantalla del Coach Hub web. La Biblioteca —la otra
+/// sección web con pestañas— usa exactamente esto: `labelColor: accent`,
+/// `indicatorColor: accent`, `indicatorWeight: 2`. Este es el idioma de acá.
+///
+/// El contorno de la píldora NO era un capricho: sale de #646 (WCAG 1.4.11,
+/// 3:1 para identificar un control) y ahí resolvía que el pill se leyera como
+/// un badge decorativo. Acá ese riesgo no aplica del mismo modo — una fila de
+/// pestañas con subrayado es un patrón que el usuario ya reconoce, y el
+/// indicador de 2px en acento marca la selección con contraste de sobra.
+class _SeccionesTabBar extends StatelessWidget {
+  const _SeccionesTabBar({
+    required this.labels,
+    required this.estados,
+    required this.semanticsLabels,
+    required this.palette,
+  });
+
+  final List<String> labels;
+  final List<AlumnoGrupoEstado> estados;
+  final List<String> semanticsLabels;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return TabBar(
+      isScrollable: false,
+      labelColor: palette.accentText,
+      unselectedLabelColor: palette.textMuted,
+      indicatorColor: palette.accentText,
+      indicatorWeight: 2,
+      indicatorSize: TabBarIndicatorSize.label,
+      dividerColor: palette.border,
+      // El default de `TabBar` son 16 por lado, que con seis celdas y un punto
+      // desborda antes de los 900px de ancho. Mismo valor que usa el pill del
+      // kit por la misma razón.
+      labelPadding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.s8,
+      ),
+      labelStyle: const TextStyle(
+        fontFamily: AppFonts.barlow,
+        fontWeight: FontWeight.w700,
+        fontSize: 14,
+      ),
+      // El MISMO estilo en los dos estados: `TabBar` interpola entre ambos, y
+      // con pesos distintos la tira entera se re-layoutea en cada cambio.
+      unselectedLabelStyle: const TextStyle(
+        fontFamily: AppFonts.barlow,
+        fontWeight: FontWeight.w700,
+        fontSize: 14,
+      ),
+      tabs: [
+        for (var i = 0; i < labels.length; i++)
+          Tab(
+            height: 40,
+            child: Semantics(
+              label: semanticsLabels[i],
+              excludeSemantics: true,
+              // `FittedBox` y no `Expanded`+ellipsis: es la estrategia que el
+              // kit ya eligió para este problema —encoger antes que
+              // desbordar— y la que mantiene legible la etiqueta más larga
+              // («Entrenamiento») cuando el navegador está angosto. Sin esto
+              // la fila desborda 23px a 800 de ancho.
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(labels[i]),
+                    if (_colorDeMarca(context, estados[i])
+                        case final color?) ...[
+                      const SizedBox(width: TreinoNavMarkTokens.gap),
+                      Container(
+                        key: alumnoDetailMarcaKey(i),
+                        width: TreinoNavMarkTokens.size,
+                        height: TreinoNavMarkTokens.size,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
           ),
+      ],
+    );
+  }
+
+  /// Sin marca cuando el estado se desconoce — un punto sobre un stream que
+  /// todavía carga afirmaría algo que no sabemos.
+  Color? _colorDeMarca(BuildContext ctx, AlumnoGrupoEstado estado) {
+    final t = TreinoNavMarkTokens.of(ctx);
+    return switch (estado) {
+      AlumnoGrupoEstado.conContenido => t.content,
+      AlumnoGrupoEstado.requiereAtencion => t.attention,
+      _ => null,
+    };
+  }
+}
+
+/// Abre el chat con el alumno en un panel, sin salir de la ficha.
+/// Botón de chat del header, con punto cuando hay mensajes sin leer.
+class _ChatAction extends StatelessWidget {
+  const _ChatAction({
+    required this.onTap,
+    required this.sinLeer,
+    required this.palette,
+  });
+
+  final VoidCallback onTap;
+  final bool sinLeer;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'Chat', // i18n: Fase W2
+      // El nombre accesible lo pone `semanticsLabel`; sin esto el lector lo
+      // diría dos veces.
+      excludeFromSemantics: true,
+      child: TreinoButton(
+        // Sin label visible: es un botón de ícono que igual tiene que medir lo
+        // mismo que el «Pago» de al lado. Ése es todo el punto del tamaño del
+        // kit.
+        icon: TreinoIcon.chat,
+        semanticsLabel: sinLeer
+            ? 'Chat, con mensajes sin leer' // i18n: Fase W2
+            : 'Chat', // i18n: Fase W2
+        variant: TreinoButtonVariant.secondary,
+        size: TreinoButtonSize.sm,
+        onPressed: onTap,
+        trailing: sinLeer
+            ? Container(
+                width: TreinoNavMarkTokens.size,
+                height: TreinoNavMarkTokens.size,
+                decoration: BoxDecoration(
+                  color: TreinoNavMarkTokens.of(context).attention,
+                  shape: BoxShape.circle,
+                ),
+              )
+            : null,
+      ),
+    );
+  }
+}
+
+/// Un número del header con su etiqueta, en línea.
+///
+/// Reemplaza a las cards de «Sesiones» y «Racha», que ocupaban una fila propia
+/// de ~85px arriba de la navegación. En esta pantalla el alto es el recurso
+/// escaso: todo lo que gasta el encabezado se lo saca al contenido.
+class _MetricInline extends StatelessWidget {
+  const _MetricInline({
+    required this.value,
+    required this.label,
+    required this.palette,
+  });
+
+  final String value;
+  final String label;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    // `Text.rich` y NO `RichText`: el segundo no hereda el `DefaultTextStyle`
+    // ambiente, así que su span queda sin familia tipográfica y el texto sale
+    // en tofu (cuadraditos) cuando la fuente por defecto no tiene los glifos.
+    // Se vio renderizando la pantalla contra el seed del gate visual, al lado
+    // del golden de CI que sí los mostraba bien.
+    return Text.rich(
+      TextSpan(
+        style: TextStyle(color: palette.textMuted, fontSize: 13),
+        children: [
+          TextSpan(
+            text: value,
+            style: TextStyle(
+              color: palette.textPrimary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          TextSpan(text: ' $label'),
         ],
       ),
     );
@@ -416,190 +893,481 @@ class _Dot extends StatelessWidget {
       );
 }
 
-class _MetricChip extends StatelessWidget {
-  const _MetricChip(
-      {required this.label, required this.value, required this.palette});
-  final String label;
-  final String value;
-  final AppPalette palette;
+class _PlanTab extends StatelessWidget {
+  const _PlanTab({required this.athleteId});
+
+  final String athleteId;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: palette.bg,
-        border: Border.all(color: palette.border),
-        borderRadius: BorderRadius.circular(10),
-      ),
+    return DefaultTabController(
+      length: 2,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(label, style: TextStyle(color: palette.textMuted, fontSize: 11)),
-          const SizedBox(height: 2),
-          Text(value,
-              style: TextStyle(
-                  color: palette.textPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700)),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(24, 12, 24, 0),
+            child: _SubNav(labels: ['Nutrición', 'Archivos']), // i18n: Fase W2
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: TabBarView(
+              physics: const NeverScrollableScrollPhysics(),
+              children: [
+                _NutricionTab(athleteId: athleteId),
+                _ArchivosTab(athleteId: athleteId),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-/// Tab «Chat» del Alumno detalle: reusa el [ChatDetailPane] del chat web
-/// global (split-pane sidebar), resolviendo el [Chat] entre PF y este alumno
-/// puntual vía [chatForOtherUidProvider]. Sin lista de conversaciones — el
-/// alumno YA está fijado por el route, no hay nada que elegir.
-///
-/// V1 (2026-06-30): solo texto. La V2 con media reusa el mismo upgrade que
-/// la sección de chat global del sidebar.
-///
-/// Name-flash fix: [AlumnoDetailScreen.build] ya watchea
-/// `userPublicProfileProvider(athleteId)` para el header de arriba (misma
-/// pantalla, línea 117) — ese watch mantiene el stream warm mientras este
-/// tab está montado. Volver a watchearlo acá es una lectura cacheada
-/// (autoDispose cuenta listeners activos, no reinicia el stream), NO un
-/// fetch nuevo. Pasamos `athleteId` + el nombre ya resuelto a
-/// [ChatDetailPane] para que su header muestre el nombre real desde el
-/// primer frame en vez de re-derivarlo en frío vía
-/// `chatsForCurrentUserProvider` (issue: flash "Usuario eliminado" → "…").
-class _ChatTab extends ConsumerWidget {
-  const _ChatTab({required this.athleteId});
+class _PrivadoTab extends StatelessWidget {
+  const _PrivadoTab({required this.athleteId});
+
   final String athleteId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
-    final chatAsync = ref.watch(chatForOtherUidProvider(athleteId));
-    // El nombre ya está cargado en el header de la ficha (mismo provider,
-    // warm) — se lo pasamos al pane para evitar el flash "Usuario eliminado"
-    // → "…" al abrir el chat.
-    final peerName = ref
-        .watch(userPublicProfileProvider(athleteId))
-        .valueOrNull
-        ?.displayName;
-    return TreinoStateSwitcher(
-      childKey: ValueKey(chatAsync.when(
-        loading: () => 'loading',
-        error: (_, __) => 'error',
-        data: (_) => 'data',
-      )),
-      child: chatAsync.when(
-        loading: () => Center(
-          child: CircularProgressIndicator(color: palette.accent),
-        ),
-        error: (_, __) => Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-          child: Text(
-            'No pudimos abrir el chat. Reintentá.', // i18n: Fase W2
-            style: TextStyle(color: palette.textMuted, fontSize: 15),
+    return DefaultTabController(
+      length: 2,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+            child: Row(
+              children: [
+                const _SubNav(
+                    labels: ['Notas', 'Seguimiento']), // i18n: Fase W2
+                const SizedBox(width: 18),
+                // El aviso comparte fila con la sub-navegación en vez de
+                // gastar una línea propia: dice lo mismo y no le come alto al
+                // contenido, que es lo que el PF vino a leer.
+                Flexible(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(TreinoIcon.lock, size: 14, color: palette.textMuted),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          'Nada de esto lo ve el alumno.', // i18n: Fase W2
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              TextStyle(color: palette.textMuted, fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        data: (chat) => ChatDetailPane(
-          chatId: chat.chatId,
-          peerUid: athleteId,
-          peerNameInitial: peerName,
-        ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: TabBarView(
+              physics: const NeverScrollableScrollPhysics(),
+              children: [
+                _NotasPrivadasTab(athleteId: athleteId),
+                _SeguimientoTab(athleteId: athleteId),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _ProgresoTab extends ConsumerWidget {
+class _ProgresoTab extends ConsumerStatefulWidget {
   const _ProgresoTab({required this.athleteId});
   final String athleteId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final palette = AppPalette.of(context);
-    final measAsync = ref.watch(measurementsForAthleteProvider(athleteId));
-    final perfAsync = ref.watch(performanceTestsForAthleteProvider(athleteId));
+  ConsumerState<_ProgresoTab> createState() => _ProgresoTabState();
+}
 
-    // Antropometría y Rendimiento son fuentes independientes: gateamos juntas
-    // (spinner hasta que ambas tengan valor, error si alguna falla) y mostramos
-    // cada sección por separado según haya datos.
-    if (measAsync.isLoading || perfAsync.isLoading) {
-      return const TreinoStateSwitcher(
-        childKey: ValueKey('loading'),
-        child: Center(child: CircularProgressIndicator()),
+class _ProgresoTabState extends ConsumerState<_ProgresoTab> {
+  Future<void> _openAntropoDialog({Measurement? initial}) async {
+    final trainerUid = ref.read(currentUidProvider);
+    if (trainerUid == null) return;
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _NuevaMedicionDialog(
+        athleteId: widget.athleteId,
+        trainerUid: trainerUid,
+        initial: initial,
+      ),
+    );
+  }
+
+  Future<void> _openRendimientoDialog({PerformanceTest? initial}) async {
+    final trainerUid = ref.read(currentUidProvider);
+    if (trainerUid == null) return;
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _NuevoRendimientoDialog(
+        athleteId: widget.athleteId,
+        trainerUid: trainerUid,
+        initial: initial,
+      ),
+    );
+  }
+
+  Future<void> _confirmDeleteMedicion(Measurement m) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('¿Eliminar medición?'), // i18n: Fase W2
+        content: Text(
+          'La medición del ${fmtDate(m.recordedAt)} se va a borrar. '
+          'No se puede deshacer.', // i18n: Fase W2
+        ),
+        actions: [
+          TreinoButton(
+            label: 'Cancelar', // i18n: Fase W2
+            variant: TreinoButtonVariant.ghost,
+            onPressed: () => Navigator.of(ctx).pop(false),
+          ),
+          const SizedBox(width: AppSpacing.s8),
+          TreinoButton(
+            label: 'Confirmar', // i18n: Fase W2
+            onPressed: () => Navigator.of(ctx).pop(true),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ref.read(measurementRepositoryProvider).delete(m.id);
+    } catch (_) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('No pudimos eliminar la medición.'), // i18n: Fase W2
+        ),
       );
     }
-    if (measAsync.hasError || perfAsync.hasError) {
+  }
+
+  Future<void> _confirmDeleteRendimiento(PerformanceTest t) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('¿Eliminar prueba?'), // i18n: Fase W2
+        content: Text(
+          'La prueba del ${fmtDate(t.recordedAt)} se va a borrar. '
+          'No se puede deshacer.', // i18n: Fase W2
+        ),
+        actions: [
+          TreinoButton(
+            label: 'Cancelar', // i18n: Fase W2
+            variant: TreinoButtonVariant.ghost,
+            onPressed: () => Navigator.of(ctx).pop(false),
+          ),
+          const SizedBox(width: AppSpacing.s8),
+          TreinoButton(
+            label: 'Confirmar', // i18n: Fase W2
+            onPressed: () => Navigator.of(ctx).pop(true),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ref.read(performanceTestRepositoryProvider).delete(t.id);
+    } catch (_) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('No pudimos eliminar la prueba.'), // i18n: Fase W2
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final measAsync =
+        ref.watch(measurementsForAthleteProvider(widget.athleteId));
+    final perfAsync =
+        ref.watch(performanceTestsForAthleteProvider(widget.athleteId));
+
+    return DefaultTabController(
+      length: 2,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(24, 12, 24, 0),
+            child: _SubNav(
+                labels: ['Antropometría', 'Rendimiento']), // i18n: Fase W2
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: TabBarView(
+              physics: const NeverScrollableScrollPhysics(),
+              children: [
+                _buildAntropometria(palette, measAsync, perfAsync),
+                _buildRendimiento(palette, measAsync, perfAsync),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAntropometria(
+    AppPalette palette,
+    AsyncValue<List<Measurement>> measAsync,
+    AsyncValue<List<PerformanceTest>> perfAsync,
+  ) {
+    // CustomScrollView y no SingleChildScrollView + Column: la lista de abajo
+    // puede tener cientos de filas (un alumno con dos años de tomas), y cada
+    // fila es un StatefulWidget con detalle expandible. Adentro de un
+    // SingleChildScrollView la lista queda obligada a `shrinkWrap: true` con el
+    // scroll propio apagado, que construye TODAS las filas al abrir la
+    // sub-vista. Antes de unir Progreso con Mediciones esto no pasaba: la lista
+    // colgaba de un `Expanded` y tenía su propio viewport perezoso.
+    //
+    // Con slivers hay un solo viewport, el header y el chart scrollean junto a
+    // la lista, y `SliverList` vuelve a construir sólo lo que se ve
+    // (AGENTS.md §6: «ListView.builder para listas largas»).
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
+          sliver: SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _ProgressHeader(
+                  title: 'Mediciones antropométricas', // i18n: Fase W2
+                  subtitle:
+                      'Peso, composición corporal y circunferencias.', // i18n: Fase W2
+                  actionLabel: 'NUEVA MEDICIÓN', // i18n: Fase W2
+                  onPressed: _openAntropoDialog,
+                  palette: palette,
+                ),
+                const SizedBox(height: 20),
+                _ProgressReading(
+                  measurements: measAsync,
+                  performanceTests: perfAsync,
+                  palette: palette,
+                  view: _ProgressView.antropometria,
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+          sliver: _AntropoList(
+            measurements: measAsync,
+            palette: palette,
+            onDelete: _confirmDeleteMedicion,
+            onEdit: (m) => _openAntropoDialog(initial: m),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRendimiento(
+    AppPalette palette,
+    AsyncValue<List<Measurement>> measAsync,
+    AsyncValue<List<PerformanceTest>> perfAsync,
+  ) {
+    // CustomScrollView y no SingleChildScrollView + Column: la lista de abajo
+    // puede tener cientos de filas (un alumno con dos años de tomas), y cada
+    // fila es un StatefulWidget con detalle expandible. Adentro de un
+    // SingleChildScrollView la lista queda obligada a `shrinkWrap: true` con el
+    // scroll propio apagado, que construye TODAS las filas al abrir la
+    // sub-vista. Antes de unir Progreso con Mediciones esto no pasaba: la lista
+    // colgaba de un `Expanded` y tenía su propio viewport perezoso.
+    //
+    // Con slivers hay un solo viewport, el header y el chart scrollean junto a
+    // la lista, y `SliverList` vuelve a construir sólo lo que se ve
+    // (AGENTS.md §6: «ListView.builder para listas largas»).
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 0),
+          sliver: SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _ProgressHeader(
+                  title: 'Pruebas de rendimiento', // i18n: Fase W2
+                  subtitle:
+                      'Saltos, sprints, 1RM y resistencia.', // i18n: Fase W2
+                  actionLabel: 'NUEVA PRUEBA', // i18n: Fase W2
+                  onPressed: _openRendimientoDialog,
+                  palette: palette,
+                ),
+                const SizedBox(height: 20),
+                _ProgressReading(
+                  measurements: measAsync,
+                  performanceTests: perfAsync,
+                  palette: palette,
+                  view: _ProgressView.rendimiento,
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+          sliver: _RendimientoList(
+            performanceTests: perfAsync,
+            palette: palette,
+            onDelete: _confirmDeleteRendimiento,
+            onEdit: (t) => _openRendimientoDialog(initial: t),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+enum _ProgressView { antropometria, rendimiento }
+
+class _ProgressHeader extends StatelessWidget {
+  const _ProgressHeader({
+    required this.title,
+    required this.subtitle,
+    required this.actionLabel,
+    required this.onPressed,
+    required this.palette,
+  });
+
+  final String title;
+  final String subtitle;
+  final String actionLabel;
+  final VoidCallback onPressed;
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  color: palette.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.hairline),
+              Text(
+                subtitle,
+                style: TextStyle(color: palette.textMuted, fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+        TreinoButton(
+          label: actionLabel,
+          icon: TreinoIcon.plus,
+          onPressed: onPressed,
+        ),
+      ],
+    );
+  }
+}
+
+class _ProgressReading extends StatelessWidget {
+  const _ProgressReading({
+    required this.measurements,
+    required this.performanceTests,
+    required this.palette,
+    required this.view,
+  });
+
+  final AsyncValue<List<Measurement>> measurements;
+  final AsyncValue<List<PerformanceTest>> performanceTests;
+  final AppPalette palette;
+  final _ProgressView view;
+
+  @override
+  Widget build(BuildContext context) {
+    // Antropometría y Rendimiento son fuentes independientes: gateamos juntas
+    // (spinner hasta que ambas tengan valor, error si alguna falla). Así nunca
+    // afirmamos que falta progreso cuando una de las fuentes es desconocida.
+    if (measurements.isLoading || performanceTests.isLoading) {
+      return const TreinoStateSwitcher(
+        childKey: ValueKey('reading-loading'),
+        child: CoachHubSkeleton(filas: 3),
+      );
+    }
+    if (measurements.hasError || performanceTests.hasError) {
       return TreinoStateSwitcher(
-        childKey: const ValueKey('error'),
+        childKey: const ValueKey('reading-error'),
         child:
             _muted(palette, 'No se pudo cargar el progreso.'), // i18n: Fase W2
       );
     }
 
-    final ms = measAsync.requireValue;
-    final tests = perfAsync.requireValue;
+    final ms = measurements.requireValue;
+    final tests = performanceTests.requireValue;
     if (ms.isEmpty && tests.isEmpty) {
-      return TreinoStateSwitcher(
-        childKey: const ValueKey('empty'),
-        child:
-            _muted(palette, 'Sin datos de progreso todavía.'), // i18n: Fase W2
-      );
+      return const SizedBox.shrink();
     }
 
-    final latest = ms.isEmpty ? null : ms.last;
+    if (view == _ProgressView.rendimiento) {
+      return tests.length >= 2
+          ? PerformanceProgressChart(tests: tests)
+          : const SizedBox.shrink();
+    }
 
-    return TreinoStateSwitcher(
-      childKey: const ValueKey('data'),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+    if (ms.isEmpty) return const SizedBox.shrink();
+    final latest = ms.last;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
           children: [
-            if (latest != null) ...[
-              _sectionLabel(palette, 'ANTROPOMETRÍA'), // i18n: Fase W2
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  _MeasCard(
-                      label: 'Peso',
-                      value: latest.weightKg,
-                      unit: 'kg',
-                      palette: palette), // i18n: Fase W2
-                  const SizedBox(width: 10),
-                  _MeasCard(
-                      label: '% Graso',
-                      value: latest.fatPercentage,
-                      unit: '%',
-                      palette: palette), // i18n: Fase W2
-                  const SizedBox(width: 10),
-                  _MeasCard(
-                      label: 'Cintura',
-                      value: latest.waistCm,
-                      unit: 'cm',
-                      palette: palette), // i18n: Fase W2
-                ],
-              ),
-              if (ms.length >= 2) ...[
-                const SizedBox(height: 16),
-                // El chart trae su propia card + heading; no lo re-envolvemos.
-                MeasurementProgressChart(measurements: ms),
-              ],
-            ],
-            // ── Rendimiento (W2 PR8) ──────────────────────────────────────────
-            // Ambos casos lideran con la misma sección «RENDIMIENTO» (consistencia
-            // con el módulo coach legacy). Con ≥2 tests el chart agrega ABAJO su
-            // propia card interna (heading l10n «PROGRESO»).
-            if (tests.isNotEmpty) ...[
-              if (latest != null) const SizedBox(height: 20),
-              _sectionLabel(palette, 'RENDIMIENTO'), // i18n: Fase W2
-              const SizedBox(height: 10),
-              if (tests.length >= 2)
-                PerformanceProgressChart(tests: tests)
-              else
-                _muted(palette,
-                    'Cargá al menos 2 tests para ver la evolución.'), // i18n: Fase W2
-            ],
+            _MeasCard(
+              label: 'Peso',
+              value: latest.weightKg,
+              unit: 'kg',
+              palette: palette,
+            ), // i18n: Fase W2
+            const SizedBox(width: 12),
+            _MeasCard(
+              label: '% Graso',
+              value: latest.fatPercentage,
+              unit: '%',
+              palette: palette,
+            ), // i18n: Fase W2
+            const SizedBox(width: 12),
+            _MeasCard(
+              label: 'Cintura',
+              value: latest.waistCm,
+              unit: 'cm',
+              palette: palette,
+            ), // i18n: Fase W2
           ],
         ),
-      ),
+        if (ms.length >= 2) ...[
+          const SizedBox(height: 20),
+          MeasurementProgressChart(measurements: ms),
+        ],
+      ],
     );
   }
 }
@@ -689,7 +1457,9 @@ class _ResumenTab extends ConsumerWidget {
     final trainerUid = ref.watch(currentUidProvider);
     final sessionsAsync = ref.watch(sessionsByUidProvider(athleteId));
     final measAsync = ref.watch(measurementsForAthleteProvider(athleteId));
-    final routinesAsync = ref.watch(assignedRoutinesProvider(athleteId));
+    final routinesAsync = ref.watch(assignedRoutinesByTrainerProvider(
+      (trainerId: trainerUid ?? '', athleteId: athleteId),
+    ));
 
     // El resumen combina tres fuentes async: spinner hasta que las tres tengan
     // valor, y un único error si alguna falla. Si leyéramos routines/measurements
@@ -700,7 +1470,7 @@ class _ResumenTab extends ConsumerWidget {
         routinesAsync.isLoading) {
       return const TreinoStateSwitcher(
         childKey: ValueKey('loading'),
-        child: Center(child: CircularProgressIndicator()),
+        child: CoachHubSkeleton(filas: 3),
       );
     }
     // measurements (trainer-owned) y routines SIEMPRE son legibles → si alguna
@@ -738,61 +1508,85 @@ class _ResumenTab extends ConsumerWidget {
     final peso = m.pesoActualKg;
     final pesoDelta = m.pesoDelta30dKg;
 
+    // El peso corporal es la única de las cuatro métricas que NO depende de que
+    // haya una rutina asignada: el alumno se pesa igual.
+    final pesoCard = _MetricCard(
+      palette: palette,
+      icon: TreinoIcon.scales,
+      label: 'PESO CORPORAL', // i18n: Fase W2
+      value: peso == null ? '—' : '${_trimNum(peso)} kg',
+      delta: pesoDelta == null
+          ? null
+          : '${pesoDelta >= 0 ? '+' : ''}${pesoDelta.toStringAsFixed(1)} kg',
+      deltaColor: pesoDelta == null
+          ? null
+          : (pesoDelta >= 0 ? palette.accent : palette.danger),
+      caption: pesoDelta == null ? null : '30 días',
+    );
+
+    // Sin rutina asignada, las otras tres no son cero: son indefinidas.
+    //
+    // La fila mostraba «—», «0.0» y «0 kg», con «Sin plan» susurrado dos veces
+    // en los captions. Un PF que abre la ficha ve cuatro tarjetas y tres en
+    // cero: eso se lee como un alumno que no entrena, no como un alumno al que
+    // todavía no le asignaron nada. Y la diferencia entre esas dos lecturas es
+    // de quién es el problema.
+    //
+    // Se dice una vez, con el tamaño que corresponde, y con la salida al lado.
     final kpiRow = IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _MetricCard(
-            palette: palette,
-            icon: TreinoIcon.checkCircleFill,
-            label: 'ADHERENCIA 30D', // i18n: Fase W2
-            value: adh == null ? '—' : '${adh.round()}%',
-            delta: adhDelta == null
-                ? null
-                : '${adhDelta >= 0 ? '↑' : '↓'} ${adhDelta.abs().round()} pts',
-            deltaColor: adhDelta == null
-                ? null
-                : (adhDelta >= 0 ? palette.accent : palette.danger),
-            caption: adh == null ? 'Sin plan' : 'vs 30 días previos',
-          ),
-          const SizedBox(width: 10),
-          _MetricCard(
-            palette: palette,
-            icon: TreinoIcon.calendar,
-            label: 'SESIONES / SEM', // i18n: Fase W2
-            value: m.sesionesPorSemana.toStringAsFixed(1),
-            caption:
-                m.weeklyTarget > 0 ? 'Plan: ${m.weeklyTarget}' : 'Sin plan',
-          ),
-          const SizedBox(width: 10),
-          _MetricCard(
-            palette: palette,
-            icon: TreinoIcon.dumbbell,
-            label: 'VOLUMEN', // i18n: Fase W2
-            value: _fmtVolKg(m.volumenSemanaActualKg),
-            delta: volDelta == null
-                ? null
-                : '${volDelta >= 0 ? '+' : ''}${volDelta.round()}%',
-            deltaColor: volDelta == null
-                ? null
-                : (volDelta >= 0 ? palette.accent : palette.danger),
-            caption: volDelta == null ? 'esta semana' : 'vs semana pasada',
-          ),
-          const SizedBox(width: 10),
-          _MetricCard(
-            palette: palette,
-            icon: TreinoIcon.scales,
-            label: 'PESO CORPORAL', // i18n: Fase W2
-            value: peso == null ? '—' : '${_trimNum(peso)} kg',
-            delta: pesoDelta == null
-                ? null
-                : '${pesoDelta >= 0 ? '+' : ''}${pesoDelta.toStringAsFixed(1)} kg',
-            deltaColor: pesoDelta == null
-                ? null
-                : (pesoDelta >= 0 ? palette.accent : palette.danger),
-            caption: pesoDelta == null ? null : '30 días',
-          ),
-        ],
+        children: active == null
+            ? [
+                _SinRutinaNotice(
+                  palette: palette,
+                  onAsignar: () => context.push('/routine-editor/$athleteId'),
+                ),
+                const SizedBox(width: 10),
+                pesoCard,
+              ]
+            : [
+                _MetricCard(
+                  palette: palette,
+                  icon: TreinoIcon.checkCircleFill,
+                  label: 'ADHERENCIA 30D', // i18n: Fase W2
+                  value: adh == null ? '—' : '${adh.round()}%',
+                  delta: adhDelta == null
+                      ? null
+                      : '${adhDelta >= 0 ? '↑' : '↓'} '
+                          '${adhDelta.abs().round()} pts',
+                  deltaColor: adhDelta == null
+                      ? null
+                      : (adhDelta >= 0 ? palette.accent : palette.danger),
+                  caption:
+                      adh == null ? 'Todavía sin datos' : 'vs 30 días previos',
+                ),
+                const SizedBox(width: 10),
+                _MetricCard(
+                  palette: palette,
+                  icon: TreinoIcon.calendar,
+                  label: 'SESIONES / SEM', // i18n: Fase W2
+                  value: m.sesionesPorSemana.toStringAsFixed(1),
+                  caption: 'Plan: ${m.weeklyTarget}',
+                ),
+                const SizedBox(width: 10),
+                _MetricCard(
+                  palette: palette,
+                  icon: TreinoIcon.dumbbell,
+                  label: 'VOLUMEN', // i18n: Fase W2
+                  value: _fmtVolKg(m.volumenSemanaActualKg),
+                  delta: volDelta == null
+                      ? null
+                      : '${volDelta >= 0 ? '+' : ''}${volDelta.round()}%',
+                  deltaColor: volDelta == null
+                      ? null
+                      : (volDelta >= 0 ? palette.accent : palette.danger),
+                  caption:
+                      volDelta == null ? 'esta semana' : 'vs semana pasada',
+                ),
+                const SizedBox(width: 10),
+                pesoCard,
+              ],
       ),
     );
 
@@ -863,6 +1657,78 @@ class _ResumenTab extends ConsumerWidget {
             noteBlock,
             const SizedBox(height: 20),
             proxSesionBlock,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Reemplaza a las tres métricas que dependen de una rutina cuando no hay
+/// ninguna asignada.
+///
+/// Ocupa el ancho de las tres (`flex: 3`) para que la fila mantenga su ritmo:
+/// la tarjeta de peso, que sí tiene dato, sigue midiendo lo mismo que antes y
+/// no se estira a media pantalla.
+///
+/// Es explicación, no error: borde y fondo de tarjeta normal, sin `danger`. Que
+/// un alumno todavía no tenga rutina es un paso pendiente del PF, no una falla
+/// del alumno — pintarlo en rojo se lo cobraría a quien no corresponde.
+class _SinRutinaNotice extends StatelessWidget {
+  const _SinRutinaNotice({required this.palette, required this.onAsignar});
+
+  final AppPalette palette;
+  final VoidCallback onAsignar;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      flex: 3,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: palette.bgCard,
+          border: Border.all(color: palette.border),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+        ),
+        child: Row(
+          children: [
+            Icon(TreinoIcon.dumbbell, size: 20, color: palette.textMuted),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Sin rutina asignada', // i18n
+                    style: TextStyle(
+                      fontFamily: AppFonts.barlow,
+                      fontSize: AppTextSize.body,
+                      fontWeight: AppFonts.w600,
+                      color: palette.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.hairline),
+                  Text(
+                    'Adherencia, sesiones y volumen se miden contra el plan.', // i18n
+                    style: TextStyle(
+                      fontFamily: AppFonts.barlow,
+                      fontSize: AppTextSize.caption,
+                      color: palette.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: AppSpacing.s12),
+            TreinoButton(
+              label: 'Asignar rutina', // i18n
+              icon: TreinoIcon.plus,
+              variant: TreinoButtonVariant.ghostAccent,
+              size: TreinoButtonSize.sm,
+              onPressed: onAsignar,
+            ),
           ],
         ),
       ),
@@ -1460,9 +2326,47 @@ class _AdherenciaHeatmap extends StatelessWidget {
       ? palette.border.withValues(alpha: 0.4)
       : palette.accent.withValues(alpha: 0.28 + level * 0.18);
 
+  /// `true` si en las 12 semanas no hay UNA sola sesión.
+  ///
+  /// No es lo mismo que una grilla poco poblada: con actividad esporádica la
+  /// grilla informa (se ve dónde entrenó y dónde no). Con cero, las 84 celdas
+  /// caen todas al nivel 0 y la card se convierte en un rectángulo gris del
+  /// ancho de la pantalla, que se lee como un componente roto y no como un
+  /// alumno que todavía no arrancó.
+  bool get _sinActividad =>
+      data.every((semana) => semana.every((nivel) => nivel <= 0));
+
   @override
   Widget build(BuildContext context) {
     final axisStyle = TextStyle(color: palette.textMuted, fontSize: 9);
+
+    if (_sinActividad) {
+      return Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: palette.bgCard,
+          border: Border.all(color: palette.border),
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+        ),
+        child: Row(
+          children: [
+            Icon(TreinoIcon.calendar, size: 20, color: palette.textMuted),
+            const SizedBox(width: AppSpacing.s12),
+            Expanded(
+              child: Text(
+                'Sin sesiones en las últimas 12 semanas.', // i18n
+                style: TextStyle(
+                  fontFamily: AppFonts.barlow,
+                  fontSize: AppTextSize.bodyDense,
+                  color: palette.textMuted,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -1607,7 +2511,7 @@ class _PagosTab extends ConsumerWidget {
     String stateKey;
     if (paymentsAsync.isLoading || pendingAsync.isLoading) {
       stateKey = 'loading';
-      body = const Center(child: CircularProgressIndicator());
+      body = const CoachHubSkeleton(filas: 3);
     } else if (paymentsAsync.hasError || pendingAsync.hasError) {
       stateKey = 'error';
       body =
@@ -1649,16 +2553,14 @@ class _PagosTab extends ConsumerWidget {
                 child:
                     _sectionLabel(palette, 'ESTADO DE CUENTA'), // i18n: Fase W2
               ),
-              TextButton(
+              // El «+» era parte del STRING. Ahora es el ícono, que es lo que
+              // permite que lo traduzcan sin arrastrarlo.
+              TreinoButton(
+                label: 'Registrar pago', // i18n: Fase W2
+                icon: TreinoIcon.plus,
+                variant: TreinoButtonVariant.ghostAccent,
+                size: TreinoButtonSize.sm,
                 onPressed: () => registrarPago(context, ref, athleteId),
-                child: Text(
-                  '+ Registrar pago', // i18n: Fase W2
-                  style: TextStyle(
-                    color: palette.accent,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                  ),
-                ),
               ),
             ],
           ),
@@ -1687,7 +2589,10 @@ class _PagosTab extends ConsumerWidget {
           const SizedBox(height: 14),
           Align(
             alignment: Alignment.centerLeft,
-            child: TextButton(
+            child: TreinoButton(
+              label: 'Exportar CSV', // i18n: Fase W2
+              variant: TreinoButtonVariant.ghostAccent,
+              size: TreinoButtonSize.sm,
               onPressed: () {
                 final name = ref
                         .read(userPublicProfileProvider(athleteId))
@@ -1701,14 +2606,6 @@ class _PagosTab extends ConsumerWidget {
                   mimeType: 'text/csv',
                 );
               },
-              child: Text(
-                'Exportar CSV', // i18n: Fase W2
-                style: TextStyle(
-                  color: palette.accent,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                ),
-              ),
             ),
           ),
         ],
@@ -1717,40 +2614,66 @@ class _PagosTab extends ConsumerWidget {
   }
 }
 
-/// Tab Entrenamiento (W2 PR3): rutina activa + historial de sesiones + evolución
-/// por ejercicio. Reusa `assignedRoutinesProvider`, `sessionsByUidProvider`,
-/// `athleteExerciseListProvider` y `exerciseProgressionProvider`.
-class _EntrenamientoTab extends ConsumerWidget {
+/// Grupo Entrenamiento: separa lo que el PF arma (Rutina) de lo que el alumno
+/// hizo (Sesiones y sus análisis).
+class _EntrenamientoTab extends StatelessWidget {
   const _EntrenamientoTab({required this.athleteId});
+  final String athleteId;
+
+  @override
+  Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: 2,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(24, 12, 24, 0),
+            child: _SubNav(labels: ['Rutina', 'Sesiones']), // i18n: Fase W2
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: TabBarView(
+              physics: const NeverScrollableScrollPhysics(),
+              children: [
+                _RutinaTab(athleteId: athleteId),
+                _HistorialTab(athleteId: athleteId),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RutinaTab extends ConsumerWidget {
+  const _RutinaTab({required this.athleteId});
   final String athleteId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final trainerUid = ref.watch(currentUidProvider);
-    final routinesAsync = ref.watch(assignedRoutinesProvider(athleteId));
-    final sessionsAsync = ref.watch(sessionsByUidProvider(athleteId));
+    final routinesAsync = ref.watch(assignedRoutinesByTrainerProvider(
+      (trainerId: trainerUid ?? '', athleteId: athleteId),
+    ));
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
               Expanded(child: _sectionLabel(palette, 'RUTINA ACTIVA')), // i18n
-              TextButton.icon(
+              TreinoButton(
+                label: 'Asignar rutina', // i18n: Fase W2
+                icon: TreinoIcon.plus,
+                variant: TreinoButtonVariant.ghostAccent,
+                size: TreinoButtonSize.sm,
                 onPressed: () =>
                     context.push('/routine-editor/$athleteId'), // i18n
-                icon: Icon(TreinoIcon.plus, size: 16, color: palette.accent),
-                label: Text(
-                  'Asignar rutina', // i18n: Fase W2
-                  style: TextStyle(
-                    color: palette.accent,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                  ),
-                ),
               ),
             ],
           ),
@@ -1781,41 +2704,6 @@ class _EntrenamientoTab extends ConsumerWidget {
               },
             ),
           ),
-          const SizedBox(height: 20),
-          _sectionLabel(palette, 'HISTORIAL DE SESIONES'), // i18n: Fase W2
-          const SizedBox(height: 10),
-          TreinoStateSwitcher(
-            childKey: ValueKey(sessionsAsync.when(
-              loading: () => 'loading',
-              error: (_, __) => 'error',
-              data: (_) => 'data',
-            )),
-            child: sessionsAsync.when(
-              loading: () => _muted(palette, 'Cargando…'), // i18n: Fase W2
-              error: (e, _) => _muted(
-                  palette,
-                  e is FirebaseException && e.code == 'permission-denied'
-                      ? 'El alumno no compartió su historial.' // i18n: Fase W2
-                      : 'No se pudo cargar el historial.'), // i18n: Fase W2
-              data: (sessions) {
-                // isCompletedSession excluye sesiones abandonadas (status=finished
-                // pero wasFullyCompleted=false) para no divergir del historial del
-                // propio alumno ni de los contadores públicos. // i18n: Fase W2
-                final finished =
-                    sessions.where(isCompletedSession).take(20).toList();
-                if (finished.isEmpty) {
-                  return _muted(palette,
-                      'Sin sesiones registradas todavía.'); // i18n: Fase W2
-                }
-                return _HistorialTable(
-                    sessions: finished, palette: palette, athleteId: athleteId);
-              },
-            ),
-          ),
-          const SizedBox(height: 24),
-          _DailyHeatmapTabSection(athleteId: athleteId),
-          const SizedBox(height: 24),
-          _ProgressionTabSection(athleteId: athleteId, palette: palette),
         ],
       ),
     );
@@ -1930,6 +2818,8 @@ class _ProgressionTabSectionState extends State<_ProgressionTabSection> {
               last30dLabel: 'Últimos 30 días', // i18n: Fase W2
               thisWeekLabel: 'Esta semana', // i18n: Fase W2
               monthLabel: 'Este mes', // i18n: Fase W2
+              last3mLabel: '3 meses', // i18n: Fase W2
+              last1yLabel: '1 año', // i18n: Fase W2
             ),
             localeName: 'es_AR', // hardcoded for web Coach Hub (i18n: Fase W2)
             personalRecordsLabels: const PersonalRecordsListLabels(
@@ -2006,6 +2896,8 @@ class _MostFrequentExercisesTabSectionState
               last30dLabel: 'Últimos 30 días', // i18n: Fase W2
               thisWeekLabel: 'Esta semana', // i18n: Fase W2
               monthLabel: 'Este mes', // i18n: Fase W2
+              last3mLabel: '3 meses', // i18n: Fase W2
+              last1yLabel: '1 año', // i18n: Fase W2
             ),
           ),
         ),
@@ -2048,21 +2940,13 @@ class _RutinaCard extends StatelessWidget {
                   ),
                 ),
               ),
-              TextButton.icon(
+              TreinoButton(
+                label: 'Editar', // i18n: Fase W2
+                icon: TreinoIcon.edit,
+                variant: TreinoButtonVariant.ghostAccent,
+                size: TreinoButtonSize.sm,
                 onPressed: () =>
                     context.push('/routine-editor/$athleteId/${routine.id}'),
-                icon: Icon(TreinoIcon.edit, size: 15, color: palette.accent),
-                label: Text('Editar', // i18n: Fase W2
-                    style: TextStyle(
-                        color: palette.accent,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13)),
-                style: TextButton.styleFrom(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
               ),
             ],
           ),
@@ -2099,6 +2983,7 @@ class _RutinaCard extends StatelessWidget {
 
 class _HistorialTable extends StatelessWidget {
   const _HistorialTable({
+    super.key,
     required this.sessions,
     required this.palette,
     required this.athleteId,
@@ -2109,9 +2994,7 @@ class _HistorialTable extends StatelessWidget {
   final String athleteId;
 
   /// If true, the row prefixes the session name with a small status pill
-  /// (Completada / Incompleta / En curso). Used by the Historial tab where
-  /// non-completed sessions are shown; the Entrenamientos tab filters to
-  /// completed and doesn't need it.
+  /// (Completada / Incompleta / En curso).
   final bool showStatusBadge;
 
   @override
@@ -2511,9 +3394,7 @@ class _NotasPrivadasTabState extends ConsumerState<_NotasPrivadasTab> {
         data: (_) => 'data',
       )),
       child: noteAsync.when(
-        loading: () => Center(
-          child: CircularProgressIndicator(color: palette.accent),
-        ),
+        loading: () => const CoachHubSkeleton(filas: 3),
         error: (_, __) => Center(
           child: Text(
             l10n.coachHubAlumnoDetailNotasLoadError,
@@ -2615,36 +3496,10 @@ class _NotasPrivadasTabState extends ConsumerState<_NotasPrivadasTab> {
                 // ── Save button ─────────────────────────────────────────────
                 Align(
                   alignment: Alignment.centerRight,
-                  child: ElevatedButton(
-                    onPressed: (_saving || !_hasChanges)
-                        ? null
-                        : () => _save(trainerUid),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: palette.accent,
-                      foregroundColor: TreinoButtonTokens.foreground(context),
-                      disabledBackgroundColor:
-                          palette.accent.withValues(alpha: 0.3),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 24, vertical: 12),
-                      shape: const StadiumBorder(),
-                    ),
-                    child: _saving
-                        ? SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: TreinoButtonTokens.foreground(context),
-                            ),
-                          )
-                        : Text(
-                            l10n.coachHubAlumnoDetailNotasSaveButton,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.8,
-                            ),
-                          ),
+                  child: TreinoButton(
+                    label: l10n.coachHubAlumnoDetailNotasSaveButton,
+                    loading: _saving,
+                    onPressed: _hasChanges ? () => _save(trainerUid) : null,
                   ),
                 ),
               ],
@@ -2658,20 +3513,14 @@ class _NotasPrivadasTabState extends ConsumerState<_NotasPrivadasTab> {
 
 // ── _HistorialTab ─────────────────────────────────────────────────────────────
 
-/// Coach Hub web — Tab «Historial» del alumno detail.
+/// Coach Hub web — sub-vista «Sesiones» del alumno detail.
 ///
 /// Timeline cronológico de TODAS las sesiones del alumno (finished OK,
 /// finished incompleta/abandonada, y active). Ordenadas más nuevas arriba,
 /// vienen así del `sessionsByUidProvider`.
 ///
-/// Diferencia con el tab «Entrenamientos»:
-/// - Entrenamientos: últimas 20 sesiones COMPLETAS (isCompletedSession) +
-///   evolución por ejercicio.
-/// - Historial: TODAS las sesiones (sin límite, sin filtro) con badge de
-///   status para que el PF distinga completadas, incompletas y activas.
-///
-/// Reusa el mismo `_HistorialTable` + `_ExpandableSessionRow` que
-/// Entrenamientos, activando el flag `showStatusBadge`.
+/// Muestra TODAS las sesiones (sin límite, sin filtro) con badge de estado,
+/// más los análisis del heatmap diario y la progresión por ejercicio.
 class _HistorialTab extends ConsumerWidget {
   const _HistorialTab({required this.athleteId});
 
@@ -2681,70 +3530,66 @@ class _HistorialTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final sessionsAsync = ref.watch(sessionsByUidProvider(athleteId));
-    return TreinoStateSwitcher(
-      childKey: ValueKey(sessionsAsync.when(
-        loading: () => 'loading',
-        error: (_, __) => 'error',
-        data: (_) => 'data',
-      )),
-      child: sessionsAsync.when(
-        loading: () => Center(
-          child: CircularProgressIndicator(color: palette.accent),
-        ),
-        // Un link pausado borra session_shares → permission-denied. No es un
-        // fallo de carga: el alumno dejó de compartir. Lo decimos claro, igual
-        // que Entrenamientos y el card de última sesión del Resumen.
-        error: (e, _) => Center(
-          child: Text(
-            e is FirebaseException && e.code == 'permission-denied'
-                ? 'El alumno no compartió su historial.' // i18n: Fase W2
-                : 'No pudimos cargar el historial.', // i18n: Fase W2
-            style: TextStyle(color: palette.textMuted, fontSize: 14),
-          ),
-        ),
-        data: (sessions) {
-          if (sessions.isEmpty) {
-            return Center(
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-                child: Text(
-                  'Este alumno todavía no registró sesiones.', // i18n: Fase W2
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: palette.textMuted, fontSize: 14),
-                ),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TreinoStateSwitcher(
+            childKey: ValueKey(sessionsAsync.when(
+              loading: () => 'sessions-loading',
+              error: (_, __) => 'sessions-error',
+              data: (_) => 'sessions-data',
+            )),
+            child: sessionsAsync.when(
+              loading: () => const CoachHubSkeleton(filas: 3),
+              error: (e, _) => _muted(
+                palette,
+                e is FirebaseException && e.code == 'permission-denied'
+                    ? 'El alumno no compartió su historial.' // i18n: Fase W2
+                    : 'No pudimos cargar el historial.', // i18n: Fase W2
               ),
-            );
-          }
-          return SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'Historial completo · ${sessions.length} sesiones', // i18n: Fase W2
-                  style: TextStyle(
-                    color: palette.textPrimary,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Todas las sesiones que registró — completas, incompletas y en curso.', // i18n: Fase W2
-                  style: TextStyle(color: palette.textMuted, fontSize: 13),
-                ),
-                const SizedBox(height: 16),
-                _HistorialTable(
-                  sessions: sessions,
-                  palette: palette,
-                  athleteId: athleteId,
-                  showStatusBadge: true,
-                ),
-              ],
+              data: (sessions) {
+                if (sessions.isEmpty) {
+                  return _muted(
+                    palette,
+                    'Este alumno todavía no registró sesiones.', // i18n: Fase W2
+                  );
+                }
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Historial completo · ${sessions.length} sesiones', // i18n: Fase W2
+                      style: TextStyle(
+                        color: palette.textPrimary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Todas las sesiones que registró — completas, incompletas y en curso.', // i18n: Fase W2
+                      style: TextStyle(color: palette.textMuted, fontSize: 13),
+                    ),
+                    const SizedBox(height: 20),
+                    _HistorialTable(
+                      key: const ValueKey('sesiones-table-completa'),
+                      sessions: sessions,
+                      palette: palette,
+                      athleteId: athleteId,
+                      showStatusBadge: true,
+                    ),
+                  ],
+                );
+              },
             ),
-          );
-        },
+          ),
+          const SizedBox(height: 20),
+          _DailyHeatmapTabSection(athleteId: athleteId),
+          const SizedBox(height: 20),
+          _ProgressionTabSection(athleteId: athleteId, palette: palette),
+        ],
       ),
     );
   }
@@ -2802,19 +3647,20 @@ class _SessionStatusPill extends StatelessWidget {
 
 /// Coach Hub web — Tab «Archivos» del alumno detail.
 ///
-/// Carpeta privada del PF por alumno para subir PDFs e imágenes (estudios
-/// médicos, fotos de postura/lesión, planes impresos). El alumno NUNCA los
-/// ve — es una herramienta interna del PF.
+/// Carpeta del PF por alumno para subir PDFs e imágenes (estudios médicos,
+/// fotos de postura/lesión, planes impresos). Cada fila deja claro si el
+/// archivo sigue privado o está compartido con el alumno.
 ///
 /// Data: reusa `athleteFilesProvider` + `AthleteFileRepository` (Firestore
-/// para metadata + Firebase Storage para el binario). Rules trainer-only en
-/// ambos lados.
+/// para metadata + Firebase Storage para el binario). El PF administra todos;
+/// el alumno sólo puede leer los que tienen `sharedWithAthlete == true`.
 ///
 /// V1 scope:
 /// - Solo PDF + imágenes (10 MB max).
 /// - Lista simple (más nuevos arriba).
 /// - Subir → file picker → upload + set doc.
 /// - Descargar → abre `downloadUrl` en tab nueva.
+/// - Compartir → prende o apaga el acceso read-only del alumno.
 /// - Borrar → confirm dialog → borra Storage + Firestore.
 class _ArchivosTab extends ConsumerStatefulWidget {
   const _ArchivosTab({required this.athleteId});
@@ -2890,13 +3736,15 @@ class _ArchivosTabState extends ConsumerState<_ArchivosTab> {
           l10n.coachHubAlumnoDetailArchivosDeleteBody(file.fileName),
         ),
         actions: [
-          TextButton(
+          TreinoButton(
+            label: l10n.coachHubActionCancel,
+            variant: TreinoButtonVariant.ghost,
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(l10n.coachHubActionCancel),
           ),
-          FilledButton(
+          const SizedBox(width: AppSpacing.s8),
+          TreinoButton(
+            label: l10n.coachHubActionConfirm,
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(l10n.coachHubActionConfirm),
           ),
         ],
       ),
@@ -2954,28 +3802,11 @@ class _ArchivosTabState extends ConsumerState<_ArchivosTab> {
                   ],
                 ),
               ),
-              ElevatedButton.icon(
-                onPressed: _uploading ? null : () => _pickAndUpload(trainerUid),
-                icon: _uploading
-                    ? SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: palette.bg,
-                        ),
-                      )
-                    : Icon(TreinoIcon.upload, size: 16, color: palette.bg),
-                label: Text(l10n.coachHubAlumnoDetailArchivosUploadButton),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: palette.accent,
-                  foregroundColor: TreinoButtonTokens.foreground(context),
-                  disabledBackgroundColor:
-                      palette.accent.withValues(alpha: 0.3),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                  shape: const StadiumBorder(),
-                ),
+              TreinoButton(
+                label: l10n.coachHubAlumnoDetailArchivosUploadButton,
+                icon: TreinoIcon.upload,
+                loading: _uploading,
+                onPressed: () => _pickAndUpload(trainerUid),
               ),
             ],
           ),
@@ -3028,9 +3859,7 @@ class _ArchivosTabState extends ConsumerState<_ArchivosTab> {
                       ),
                     );
                   }
-                  return Center(
-                    child: CircularProgressIndicator(color: palette.accent),
-                  );
+                  return const CoachHubSkeleton(filas: 3);
                 },
               ),
             ),
@@ -3070,7 +3899,7 @@ class _ArchivosTabState extends ConsumerState<_ArchivosTab> {
 }
 
 /// Row de un archivo dentro del tab Archivos.
-class _ArchivoRow extends StatelessWidget {
+class _ArchivoRow extends ConsumerWidget {
   const _ArchivoRow({
     required this.file,
     required this.palette,
@@ -3087,8 +3916,24 @@ class _ArchivoRow extends StatelessWidget {
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
+  Future<void> _toggleShared(BuildContext context, WidgetRef ref) async {
+    final l10n = AppL10n.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref
+          .read(athleteFileRepositoryProvider)
+          .setShared(file, !file.sharedWithAthlete);
+    } catch (_) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(l10n.coachHubAlumnoDetailArchivosShareError),
+        ),
+      );
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppL10n.of(context);
     final icon = switch (file.kind) {
       AthleteFileKind.pdf => TreinoIcon.filePdf,
@@ -3142,16 +3987,38 @@ class _ArchivoRow extends StatelessWidget {
                 ),
               ),
             ),
-            IconButton(
-              tooltip: l10n.coachHubAlumnoDetailArchivosOpenTooltip,
-              onPressed: _open,
-              icon:
-                  Icon(TreinoIcon.download, size: 18, color: palette.textMuted),
+            Tooltip(
+              message: file.sharedWithAthlete
+                  ? l10n.coachHubAlumnoDetailArchivosUnshareTooltip
+                  : l10n.coachHubAlumnoDetailArchivosShareTooltip,
+              // Compartido vs privado se dice con la VARIANTE, no con un
+              // `foregroundColor` calculado en el callsite: acento cuando el
+              // alumno lo ve, neutro cuando no.
+              child: TreinoButton(
+                label: file.sharedWithAthlete
+                    ? l10n.coachHubAlumnoDetailArchivosSharedLabel
+                    : l10n.coachHubAlumnoDetailArchivosPrivateLabel,
+                icon:
+                    file.sharedWithAthlete ? TreinoIcon.eye : TreinoIcon.eyeOff,
+                variant: file.sharedWithAthlete
+                    ? TreinoButtonVariant.ghostAccent
+                    : TreinoButtonVariant.ghost,
+                size: TreinoButtonSize.sm,
+                onPressed: () => _toggleShared(context, ref),
+              ),
             ),
-            IconButton(
+            TreinoIconButton(
+              icon: TreinoIcon.download,
+              tooltip: l10n.coachHubAlumnoDetailArchivosOpenTooltip,
+              color: palette.textMuted,
+              onPressed: _open,
+            ),
+            const SizedBox(width: AppSpacing.hairline),
+            TreinoIconButton(
+              icon: TreinoIcon.trash,
               tooltip: l10n.coachHubAlumnoDetailArchivosDeleteTooltip,
+              color: palette.danger,
               onPressed: onDelete,
-              icon: Icon(TreinoIcon.trash, size: 18, color: palette.danger),
             ),
           ],
         ),
@@ -3169,398 +4036,146 @@ class _ArchivoRow extends StatelessWidget {
   }
 }
 
-// ── _MedicionesTab ────────────────────────────────────────────────────────────
-
-/// Vistas del tab Mediciones. PR#2 (2026-07-03) sumó `rendimiento` como
-/// segunda subvista con el toggle en el header.
-enum _MedicionView { antropometricas, rendimiento }
-
-/// Coach Hub web — Tab «Mediciones» del alumno detail.
-///
-/// PR#1: CRUD antropométricas.
-/// PR#2 (2026-07-03): toggle Antropo/Rendimiento + subvista Rendimiento
-/// con el mismo pattern (ver + agregar + borrar). Reusa
-/// `performanceTestsForAthleteProvider` + `PerformanceTestRepository`.
-/// PR#3 sumará editar.
-///
-/// **Diferencia con tab Progreso**: Progreso muestra CHARTS (evolución).
-/// Mediciones muestra la DATA cruda con opción de gestionar entradas.
-class _MedicionesTab extends ConsumerStatefulWidget {
-  const _MedicionesTab({required this.athleteId});
-
-  final String athleteId;
-
-  @override
-  ConsumerState<_MedicionesTab> createState() => _MedicionesTabState();
-}
-
-class _MedicionesTabState extends ConsumerState<_MedicionesTab> {
-  _MedicionView _view = _MedicionView.antropometricas;
-
-  Future<void> _openAntropoDialog({Measurement? initial}) async {
-    final trainerUid = ref.read(currentUidProvider);
-    if (trainerUid == null) return;
-    await showDialog<void>(
-      context: context,
-      builder: (_) => _NuevaMedicionDialog(
-        athleteId: widget.athleteId,
-        trainerUid: trainerUid,
-        initial: initial,
-      ),
-    );
-  }
-
-  Future<void> _openRendimientoDialog({PerformanceTest? initial}) async {
-    final trainerUid = ref.read(currentUidProvider);
-    if (trainerUid == null) return;
-    await showDialog<void>(
-      context: context,
-      builder: (_) => _NuevoRendimientoDialog(
-        athleteId: widget.athleteId,
-        trainerUid: trainerUid,
-        initial: initial,
-      ),
-    );
-  }
-
-  Future<void> _confirmDeleteMedicion(Measurement m) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('¿Eliminar medición?'), // i18n: Fase W2
-        content: Text(
-          'La medición del ${fmtDate(m.recordedAt)} se va a borrar. '
-          'No se puede deshacer.', // i18n: Fase W2
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'), // i18n: Fase W2
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Confirmar'), // i18n: Fase W2
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    try {
-      await ref.read(measurementRepositoryProvider).delete(m.id);
-    } catch (_) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos eliminar la medición.'), // i18n: Fase W2
-        ),
-      );
-    }
-  }
-
-  Future<void> _confirmDeleteRendimiento(PerformanceTest t) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('¿Eliminar prueba?'), // i18n: Fase W2
-        content: Text(
-          'La prueba del ${fmtDate(t.recordedAt)} se va a borrar. '
-          'No se puede deshacer.', // i18n: Fase W2
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'), // i18n: Fase W2
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Confirmar'), // i18n: Fase W2
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    try {
-      await ref.read(performanceTestRepositoryProvider).delete(t.id);
-    } catch (_) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('No pudimos eliminar la prueba.'), // i18n: Fase W2
-        ),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
-    final isAntropo = _view == _MedicionView.antropometricas;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // ── Header con toggle ──────────────────────────────────────────
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      isAntropo
-                          ? 'Mediciones antropométricas' // i18n: Fase W2
-                          : 'Pruebas de rendimiento', // i18n: Fase W2
-                      style: TextStyle(
-                        color: palette.textPrimary,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      isAntropo
-                          ? 'Peso, composición corporal y circunferencias.' // i18n: Fase W2
-                          : 'Saltos, sprints, 1RM y resistencia.', // i18n: Fase W2
-                      style: TextStyle(color: palette.textMuted, fontSize: 13),
-                    ),
-                  ],
-                ),
-              ),
-              ElevatedButton.icon(
-                onPressed: isAntropo
-                    ? () => _openAntropoDialog()
-                    : () => _openRendimientoDialog(),
-                icon: const Icon(Icons.add, size: 16),
-                label: Text(isAntropo
-                    ? 'NUEVA MEDICIÓN' // i18n: Fase W2
-                    : 'NUEVA PRUEBA'), // i18n: Fase W2
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: palette.accent,
-                  foregroundColor: TreinoButtonTokens.foreground(context),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                  shape: const StadiumBorder(),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          // ── Toggle segmented ────────────────────────────────────────────
-          _MedicionesToggle(
-            view: _view,
-            palette: palette,
-            onChanged: (v) => setState(() => _view = v),
-          ),
-          const SizedBox(height: 20),
-          Expanded(
-            child: isAntropo
-                ? _AntropoList(
-                    athleteId: widget.athleteId,
-                    palette: palette,
-                    onDelete: _confirmDeleteMedicion,
-                    onEdit: (m) => _openAntropoDialog(initial: m),
-                  )
-                : _RendimientoList(
-                    athleteId: widget.athleteId,
-                    palette: palette,
-                    onDelete: _confirmDeleteRendimiento,
-                    onEdit: (t) => _openRendimientoDialog(initial: t),
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Toggle segmented del header — Antropométricas / Rendimiento.
-class _MedicionesToggle extends StatelessWidget {
-  const _MedicionesToggle({
-    required this.view,
-    required this.palette,
-    required this.onChanged,
-  });
-
-  final _MedicionView view;
-  final AppPalette palette;
-  final ValueChanged<_MedicionView> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    Widget seg(_MedicionView v, String label) {
-      final active = view == v;
-      // MouseRegion(cursor): call-site web — InkWell daba cursor de mano al
-      // hover, TreinoTappable no trae MouseRegion. Fix local seguro.
-      return Expanded(
-        child: MouseRegion(
-          cursor: SystemMouseCursors.click,
-          child: TreinoTappable(
-            onTap: () => onChanged(v),
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              decoration: BoxDecoration(
-                color: active ? palette.accent.withValues(alpha: 0.15) : null,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: active ? palette.accent : palette.border,
-                  width: active ? 1.5 : 1,
-                ),
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: active ? palette.accent : palette.textMuted,
-                  fontSize: 13,
-                  fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                  letterSpacing: 0.4,
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    return Row(
-      children: [
-        seg(_MedicionView.antropometricas, 'ANTROPOMÉTRICAS'), // i18n: Fase W2
-        const SizedBox(width: 8),
-        seg(_MedicionView.rendimiento, 'RENDIMIENTO'), // i18n: Fase W2
-      ],
-    );
-  }
-}
-
 /// Subvista de mediciones antropométricas.
-class _AntropoList extends ConsumerWidget {
+class _AntropoList extends StatelessWidget {
   const _AntropoList({
-    required this.athleteId,
+    required this.measurements,
     required this.palette,
     required this.onDelete,
     required this.onEdit,
   });
 
-  final String athleteId;
+  final AsyncValue<List<Measurement>> measurements;
   final AppPalette palette;
   final Future<void> Function(Measurement) onDelete;
   final Future<void> Function(Measurement) onEdit;
 
+  /// Devuelve un SLIVER, no una caja.
+  ///
+  /// Es lo que le devuelve el renderizado perezoso a esta lista. Como caja,
+  /// adentro del scroll de la sub-vista, la lista quedaba obligada a
+  /// `shrinkWrap: true` y construía las cientos de filas de un alumno con
+  /// historial largo apenas se abría la pestaña. `SliverList` construye sólo
+  /// lo que entra en pantalla, y comparte el viewport con el header y el chart.
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final measAsync = ref.watch(measurementsForAthleteProvider(athleteId));
-    if (measAsync.hasValue) {
-      final all = measAsync.requireValue;
+  Widget build(BuildContext context) {
+    if (measurements.hasValue) {
+      final all = measurements.requireValue;
       // Provider ordena ASC — queremos DESC para "más nuevas arriba".
       final ms = all.reversed.toList();
       if (ms.isEmpty) {
-        return TreinoStateSwitcher(
-          childKey: const ValueKey('empty'),
-          child: Center(
-            child: Text(
-              'Este alumno todavía no tiene mediciones cargadas.', // i18n: Fase W2
-              textAlign: TextAlign.center,
-              style: TextStyle(color: palette.textMuted, fontSize: 14),
+        return SliverToBoxAdapter(
+          child: TreinoStateSwitcher(
+            childKey: const ValueKey('empty'),
+            child: Center(
+              child: Text(
+                'Este alumno todavía no tiene mediciones cargadas.', // i18n: Fase W2
+                textAlign: TextAlign.center,
+                style: TextStyle(color: palette.textMuted, fontSize: 14),
+              ),
             ),
           ),
         );
       }
-      return TreinoStateSwitcher(
-        childKey: const ValueKey('data'),
-        child: ListView.separated(
-          itemCount: ms.length,
-          separatorBuilder: (_, __) =>
-              Divider(height: 1, color: palette.border),
-          itemBuilder: (_, i) => _MedicionRow(
-            measurement: ms[i],
-            palette: palette,
-            onDelete: () => onDelete(ms[i]),
-            onEdit: () => onEdit(ms[i]),
+      // Sin TreinoStateSwitcher en esta rama, a propósito: envuelve una caja y
+      // acá el hijo es un sliver. Las transiciones de estado siguen animadas en
+      // las ramas de vacío, error y carga, que son las que se alternan.
+      return SliverList.separated(
+        itemCount: ms.length,
+        separatorBuilder: (_, __) => Divider(height: 1, color: palette.border),
+        itemBuilder: (_, i) => _MedicionRow(
+          measurement: ms[i],
+          palette: palette,
+          onDelete: () => onDelete(ms[i]),
+          onEdit: () => onEdit(ms[i]),
+        ),
+      );
+    }
+    if (measurements.hasError) {
+      return SliverToBoxAdapter(
+        child: TreinoStateSwitcher(
+          childKey: const ValueKey('error'),
+          child: Center(
+            child: Text(
+              'No pudimos cargar las mediciones.', // i18n: Fase W2
+              style: TextStyle(color: palette.textMuted, fontSize: 14),
+            ),
           ),
         ),
       );
     }
-    if (measAsync.hasError) {
-      return TreinoStateSwitcher(
-        childKey: const ValueKey('error'),
-        child: Center(
-          child: Text(
-            'No pudimos cargar las mediciones.', // i18n: Fase W2
-            style: TextStyle(color: palette.textMuted, fontSize: 14),
-          ),
-        ),
-      );
-    }
-    return TreinoStateSwitcher(
-      childKey: const ValueKey('loading'),
-      child: Center(child: CircularProgressIndicator(color: palette.accent)),
+    return const SliverToBoxAdapter(
+      child: TreinoStateSwitcher(
+        childKey: ValueKey('loading'),
+        child: CoachHubSkeleton(filas: 3),
+      ),
     );
   }
 }
 
 /// Subvista de pruebas de rendimiento.
-class _RendimientoList extends ConsumerWidget {
+class _RendimientoList extends StatelessWidget {
   const _RendimientoList({
-    required this.athleteId,
+    required this.performanceTests,
     required this.palette,
     required this.onDelete,
     required this.onEdit,
   });
 
-  final String athleteId;
+  final AsyncValue<List<PerformanceTest>> performanceTests;
   final AppPalette palette;
   final Future<void> Function(PerformanceTest) onDelete;
   final Future<void> Function(PerformanceTest) onEdit;
 
+  /// Devuelve un SLIVER, no una caja — ver el dartdoc de [_AntropoList.build].
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final testsAsync = ref.watch(performanceTestsForAthleteProvider(athleteId));
-    if (testsAsync.hasValue) {
-      final all = testsAsync.requireValue;
+  Widget build(BuildContext context) {
+    if (performanceTests.hasValue) {
+      final all = performanceTests.requireValue;
       final tests = all.reversed.toList();
       if (tests.isEmpty) {
-        return TreinoStateSwitcher(
-          childKey: const ValueKey('empty'),
-          child: Center(
-            child: Text(
-              'Este alumno todavía no tiene pruebas de rendimiento cargadas.', // i18n: Fase W2
-              textAlign: TextAlign.center,
-              style: TextStyle(color: palette.textMuted, fontSize: 14),
+        return SliverToBoxAdapter(
+          child: TreinoStateSwitcher(
+            childKey: const ValueKey('empty'),
+            child: Center(
+              child: Text(
+                'Este alumno todavía no tiene pruebas de rendimiento cargadas.', // i18n: Fase W2
+                textAlign: TextAlign.center,
+                style: TextStyle(color: palette.textMuted, fontSize: 14),
+              ),
             ),
           ),
         );
       }
-      return TreinoStateSwitcher(
-        childKey: const ValueKey('data'),
-        child: ListView.separated(
-          itemCount: tests.length,
-          separatorBuilder: (_, __) =>
-              Divider(height: 1, color: palette.border),
-          itemBuilder: (_, i) => _RendimientoRow(
-            test: tests[i],
-            palette: palette,
-            onDelete: () => onDelete(tests[i]),
-            onEdit: () => onEdit(tests[i]),
+      return SliverList.separated(
+        itemCount: tests.length,
+        separatorBuilder: (_, __) => Divider(height: 1, color: palette.border),
+        itemBuilder: (_, i) => _RendimientoRow(
+          test: tests[i],
+          palette: palette,
+          onDelete: () => onDelete(tests[i]),
+          onEdit: () => onEdit(tests[i]),
+        ),
+      );
+    }
+    if (performanceTests.hasError) {
+      return SliverToBoxAdapter(
+        child: TreinoStateSwitcher(
+          childKey: const ValueKey('error'),
+          child: Center(
+            child: Text(
+              'No pudimos cargar las pruebas.', // i18n: Fase W2
+              style: TextStyle(color: palette.textMuted, fontSize: 14),
+            ),
           ),
         ),
       );
     }
-    if (testsAsync.hasError) {
-      return TreinoStateSwitcher(
-        childKey: const ValueKey('error'),
-        child: Center(
-          child: Text(
-            'No pudimos cargar las pruebas.', // i18n: Fase W2
-            style: TextStyle(color: palette.textMuted, fontSize: 14),
-          ),
-        ),
-      );
-    }
-    return TreinoStateSwitcher(
-      childKey: const ValueKey('loading'),
-      child: Center(child: CircularProgressIndicator(color: palette.accent)),
+    return const SliverToBoxAdapter(
+      child: TreinoStateSwitcher(
+        childKey: ValueKey('loading'),
+        child: CoachHubSkeleton(filas: 3),
+      ),
     );
   }
 }
@@ -3626,8 +4241,8 @@ class _MedicionRowState extends State<_MedicionRow> {
                       children: [
                         Icon(
                           _expanded
-                              ? Icons.keyboard_arrow_down
-                              : Icons.keyboard_arrow_right,
+                              ? TreinoIcon.chevronDown
+                              : TreinoIcon.chevronRight,
                           size: 22,
                           color: palette.textMuted,
                         ),
@@ -3659,15 +4274,18 @@ class _MedicionRowState extends State<_MedicionRow> {
                     ),
                   ),
                 ),
-                IconButton(
+                TreinoIconButton(
+                  icon: TreinoIcon.edit,
                   tooltip: 'Editar', // i18n: Fase W2
+                  color: palette.textMuted,
                   onPressed: widget.onEdit,
-                  icon: Icon(Icons.edit, size: 18, color: palette.textMuted),
                 ),
-                IconButton(
+                const SizedBox(width: AppSpacing.hairline),
+                TreinoIconButton(
+                  icon: TreinoIcon.trash,
                   tooltip: 'Eliminar', // i18n: Fase W2
+                  color: palette.danger,
                   onPressed: widget.onDelete,
-                  icon: Icon(TreinoIcon.trash, size: 18, color: palette.danger),
                 ),
               ],
             ),
@@ -4214,31 +4832,23 @@ class _NuevaMedicionDialogState extends ConsumerState<_NuevaMedicionDialog> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  TextButton(
+                  TreinoButton(
+                    label: 'Cancelar', // i18n: Fase W2
+                    variant: TreinoButtonVariant.ghost,
                     onPressed:
                         _saving ? null : () => Navigator.of(context).pop(),
-                    child: const Text('Cancelar'), // i18n: Fase W2
                   ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: _saving ? null : _save,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: palette.accent,
-                      foregroundColor: TreinoButtonTokens.foreground(context),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 12),
-                      shape: const StadiumBorder(),
-                    ),
-                    child: _saving
-                        ? SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: TreinoButtonTokens.foreground(context),
-                            ),
-                          )
-                        : const Text('GUARDAR'), // i18n: Fase W2
+                  const SizedBox(width: AppSpacing.s8),
+                  // `loading` ya lo deshabilita, y el spinner NO achica el botón: el
+                  // label sigue montado abajo, invisible. Antes se reemplazaba de
+                  // verdad y la fila se movía justo cuando el usuario acababa de
+                  // apretar. Aparte, era píldora (`StadiumBorder`) mientras otros
+                  // diálogos del mismo archivo usaban rectángulo — el radio ahora lo
+                  // decide el token, no el callsite.
+                  TreinoButton(
+                    label: 'GUARDAR', // i18n: Fase W2
+                    loading: _saving,
+                    onPressed: _save,
                   ),
                 ],
               ),
@@ -4276,7 +4886,7 @@ class _NuevaMedicionSection extends StatelessWidget {
         children: [
           if (onToggle != null)
             Icon(
-              expanded ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_right,
+              expanded ? TreinoIcon.chevronDown : TreinoIcon.chevronRight,
               size: 18,
               color: palette.textMuted,
             ),
@@ -4449,8 +5059,8 @@ class _RendimientoRowState extends State<_RendimientoRow> {
                       children: [
                         Icon(
                           _expanded
-                              ? Icons.keyboard_arrow_down
-                              : Icons.keyboard_arrow_right,
+                              ? TreinoIcon.chevronDown
+                              : TreinoIcon.chevronRight,
                           size: 22,
                           color: palette.textMuted,
                         ),
@@ -4482,15 +5092,18 @@ class _RendimientoRowState extends State<_RendimientoRow> {
                     ),
                   ),
                 ),
-                IconButton(
+                TreinoIconButton(
+                  icon: TreinoIcon.edit,
                   tooltip: 'Editar', // i18n: Fase W2
+                  color: palette.textMuted,
                   onPressed: widget.onEdit,
-                  icon: Icon(Icons.edit, size: 18, color: palette.textMuted),
                 ),
-                IconButton(
+                const SizedBox(width: AppSpacing.hairline),
+                TreinoIconButton(
+                  icon: TreinoIcon.trash,
                   tooltip: 'Eliminar', // i18n: Fase W2
+                  color: palette.danger,
                   onPressed: widget.onDelete,
-                  icon: Icon(TreinoIcon.trash, size: 18, color: palette.danger),
                 ),
               ],
             ),
@@ -5000,31 +5613,23 @@ class _NuevoRendimientoDialogState
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  TextButton(
+                  TreinoButton(
+                    label: 'Cancelar', // i18n: Fase W2
+                    variant: TreinoButtonVariant.ghost,
                     onPressed:
                         _saving ? null : () => Navigator.of(context).pop(),
-                    child: const Text('Cancelar'), // i18n: Fase W2
                   ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: _saving ? null : _save,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: palette.accent,
-                      foregroundColor: TreinoButtonTokens.foreground(context),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 12),
-                      shape: const StadiumBorder(),
-                    ),
-                    child: _saving
-                        ? SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: TreinoButtonTokens.foreground(context),
-                            ),
-                          )
-                        : const Text('GUARDAR'), // i18n: Fase W2
+                  const SizedBox(width: AppSpacing.s8),
+                  // `loading` ya lo deshabilita, y el spinner NO achica el botón: el
+                  // label sigue montado abajo, invisible. Antes se reemplazaba de
+                  // verdad y la fila se movía justo cuando el usuario acababa de
+                  // apretar. Aparte, era píldora (`StadiumBorder`) mientras otros
+                  // diálogos del mismo archivo usaban rectángulo — el radio ahora lo
+                  // decide el token, no el callsite.
+                  TreinoButton(
+                    label: 'GUARDAR', // i18n: Fase W2
+                    loading: _saving,
+                    onPressed: _save,
                   ),
                 ],
               ),
@@ -5082,13 +5687,15 @@ class _SeguimientoTabState extends ConsumerState<_SeguimientoTab> {
           'No se puede deshacer.', // i18n: Fase W2
         ),
         actions: [
-          TextButton(
+          TreinoButton(
+            label: 'Cancelar', // i18n: Fase W2
+            variant: TreinoButtonVariant.ghost,
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'), // i18n: Fase W2
           ),
-          FilledButton(
+          const SizedBox(width: AppSpacing.s8),
+          TreinoButton(
+            label: 'Confirmar', // i18n: Fase W2
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Confirmar'), // i18n: Fase W2
           ),
         ],
       ),
@@ -5143,17 +5750,10 @@ class _SeguimientoTabState extends ConsumerState<_SeguimientoTab> {
                   ],
                 ),
               ),
-              ElevatedButton.icon(
-                onPressed: () => _openDialog(),
-                icon: const Icon(Icons.add, size: 16),
-                label: const Text('NUEVA ENTRADA'), // i18n: Fase W2
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: palette.accent,
-                  foregroundColor: TreinoButtonTokens.foreground(context),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                  shape: const StadiumBorder(),
-                ),
+              TreinoButton(
+                label: 'NUEVA ENTRADA', // i18n: Fase W2
+                icon: TreinoIcon.plus,
+                onPressed: _openDialog,
               ),
             ],
           ),
@@ -5199,9 +5799,7 @@ class _SeguimientoTabState extends ConsumerState<_SeguimientoTab> {
                       ),
                     );
                   }
-                  return Center(
-                    child: CircularProgressIndicator(color: palette.accent),
-                  );
+                  return const CoachHubSkeleton(filas: 3);
                 },
               ),
             ),
@@ -5251,19 +5849,18 @@ class _SeguimientoEntryCard extends StatelessWidget {
               const SizedBox(width: 10),
               _TagChip(tag: entry.tag, palette: palette),
               const Spacer(),
-              IconButton(
+              TreinoIconButton(
+                icon: TreinoIcon.edit,
                 tooltip: 'Editar', // i18n: Fase W2
+                color: palette.textMuted,
                 onPressed: onEdit,
-                icon: Icon(Icons.edit, size: 18, color: palette.textMuted),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               ),
-              IconButton(
+              const SizedBox(width: AppSpacing.hairline),
+              TreinoIconButton(
+                icon: TreinoIcon.trash,
                 tooltip: 'Eliminar', // i18n: Fase W2
+                color: palette.danger,
                 onPressed: onDelete,
-                icon: Icon(TreinoIcon.trash, size: 18, color: palette.danger),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               ),
             ],
           ),
@@ -5439,7 +6036,7 @@ class _NuevaEntradaSeguimientoDialogState
                   ),
                 ),
                 const SizedBox(height: 16),
-                DropdownButtonFormField<FollowUpTag>(
+                TreinoDropdown<FollowUpTag>(
                   initialValue: _tag,
                   onChanged: (v) {
                     if (v != null) setState(() => _tag = v);
@@ -5447,15 +6044,7 @@ class _NuevaEntradaSeguimientoDialogState
                   decoration: InputDecoration(
                     labelText: 'Categoría', // i18n: Fase W2
                     labelStyle: TextStyle(color: palette.textMuted),
-                    filled: true,
-                    fillColor: palette.bgCard,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: palette.border),
-                    ),
                   ),
-                  style: TextStyle(color: palette.textPrimary, fontSize: 14),
-                  dropdownColor: palette.bgCard,
                   items: [
                     for (final t in FollowUpTag.values)
                       DropdownMenuItem(
@@ -5499,31 +6088,23 @@ class _NuevaEntradaSeguimientoDialogState
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    TextButton(
+                    TreinoButton(
+                      label: 'Cancelar', // i18n: Fase W2
+                      variant: TreinoButtonVariant.ghost,
                       onPressed:
                           _saving ? null : () => Navigator.of(context).pop(),
-                      child: const Text('Cancelar'), // i18n: Fase W2
                     ),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
-                      onPressed: _saving ? null : _save,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: palette.accent,
-                        foregroundColor: TreinoButtonTokens.foreground(context),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 12),
-                        shape: const StadiumBorder(),
-                      ),
-                      child: _saving
-                          ? SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: TreinoButtonTokens.foreground(context),
-                              ),
-                            )
-                          : const Text('GUARDAR'), // i18n: Fase W2
+                    const SizedBox(width: AppSpacing.s8),
+                    // `loading` ya lo deshabilita, y el spinner NO achica el botón: el
+                    // label sigue montado abajo, invisible. Antes se reemplazaba de
+                    // verdad y la fila se movía justo cuando el usuario acababa de
+                    // apretar. Aparte, era píldora (`StadiumBorder`) mientras otros
+                    // diálogos del mismo archivo usaban rectángulo — el radio ahora lo
+                    // decide el token, no el callsite.
+                    TreinoButton(
+                      label: 'GUARDAR', // i18n: Fase W2
+                      loading: _saving,
+                      onPressed: _save,
                     ),
                   ],
                 ),
@@ -5704,9 +6285,9 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
     }
 
     if (_draft == null) {
-      return TreinoStateSwitcher(
-        childKey: const ValueKey('loading'),
-        child: Center(child: CircularProgressIndicator(color: palette.accent)),
+      return const TreinoStateSwitcher(
+        childKey: ValueKey('loading'),
+        child: CoachHubSkeleton(filas: 3),
       );
     }
 
@@ -5740,25 +6321,10 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
                     ],
                   ),
                 ),
-                ElevatedButton(
-                  onPressed: _saving ? null : _save,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: palette.accent,
-                    foregroundColor: TreinoButtonTokens.foreground(context),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 12),
-                    shape: const StadiumBorder(),
-                  ),
-                  child: _saving
-                      ? SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: TreinoButtonTokens.foreground(context),
-                          ),
-                        )
-                      : const Text('GUARDAR PLAN'), // i18n: Fase W2
+                TreinoButton(
+                  label: 'GUARDAR PLAN', // i18n: Fase W2
+                  loading: _saving,
+                  onPressed: _save,
                 ),
               ],
             ),
@@ -5808,17 +6374,11 @@ class _NutricionTabState extends ConsumerState<_NutricionTab> {
                         ),
                       ),
                     const SizedBox(height: 4),
-                    OutlinedButton.icon(
+                    TreinoButton(
+                      label: 'AGREGAR COMIDA', // i18n: Fase W2
+                      icon: TreinoIcon.plus,
+                      variant: TreinoButtonVariant.secondaryAccent,
                       onPressed: _addMeal,
-                      icon: const Icon(Icons.add, size: 16),
-                      label: const Text('AGREGAR COMIDA'), // i18n: Fase W2
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: palette.accent,
-                        side: BorderSide(color: palette.accent),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 18, vertical: 12),
-                        shape: const StadiumBorder(),
-                      ),
                     ),
                     const SizedBox(height: 24),
                   ],
@@ -5932,7 +6492,7 @@ class _MealEditor extends StatelessWidget {
                       color: palette.textMuted.withValues(alpha: 0.6),
                       fontSize: 12,
                     ),
-                    prefixIcon: Icon(Icons.schedule,
+                    prefixIcon: Icon(TreinoIcon.clock,
                         size: 14, color: palette.textMuted),
                     prefixIconConstraints:
                         const BoxConstraints(minWidth: 22, minHeight: 22),
@@ -5944,12 +6504,16 @@ class _MealEditor extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 4),
-              IconButton(
+              // Los tres «Eliminar» anidados del editor de nutrición —comida,
+              // grupo, opción— venían en 16/14/12 px de ícono y cajas de
+              // 28/26/24. La jerarquía por tamaño de ícono no se lee: se lee
+              // por sangría, que ya está. Los tres van a `xs`.
+              TreinoIconButton(
+                icon: TreinoIcon.trash,
                 tooltip: 'Eliminar comida', // i18n: Fase W2
+                color: palette.danger,
+                size: TreinoButtonSize.xs,
                 onPressed: onDelete,
-                icon: Icon(TreinoIcon.trash, size: 16, color: palette.danger),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
               ),
             ],
           ),
@@ -5967,15 +6531,12 @@ class _MealEditor extends StatelessWidget {
               ),
             Align(
               alignment: Alignment.centerLeft,
-              child: TextButton.icon(
+              child: TreinoButton(
+                label: 'AGREGAR GRUPO', // i18n: Fase W2
+                icon: TreinoIcon.plus,
+                variant: TreinoButtonVariant.ghostAccent,
+                size: TreinoButtonSize.sm,
                 onPressed: _addGroup,
-                icon: const Icon(Icons.add, size: 14),
-                label: const Text('AGREGAR GRUPO'), // i18n: Fase W2
-                style: TextButton.styleFrom(
-                  foregroundColor: palette.accent,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                ),
               ),
             ),
           ],
@@ -6063,12 +6624,12 @@ class _GroupEditor extends StatelessWidget {
                 palette: palette,
                 onChanged: (m) => onChanged(group.copyWith(selectionMode: m)),
               ),
-              IconButton(
+              TreinoIconButton(
+                icon: TreinoIcon.trash,
                 tooltip: 'Eliminar grupo', // i18n: Fase W2
+                color: palette.danger,
+                size: TreinoButtonSize.xs,
                 onPressed: onDelete,
-                icon: Icon(TreinoIcon.trash, size: 14, color: palette.danger),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
               ),
             ],
           ),
@@ -6085,15 +6646,12 @@ class _GroupEditor extends StatelessWidget {
             ),
           Align(
             alignment: Alignment.centerLeft,
-            child: TextButton.icon(
+            child: TreinoButton(
+              label: 'AGREGAR OPCIÓN', // i18n: Fase W2
+              icon: TreinoIcon.plus,
+              variant: TreinoButtonVariant.ghostAccent,
+              size: TreinoButtonSize.xs,
               onPressed: _addOption,
-              icon: const Icon(Icons.add, size: 12),
-              label: const Text('AGREGAR OPCIÓN'), // i18n: Fase W2
-              style: TextButton.styleFrom(
-                foregroundColor: palette.accent,
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                textStyle: const TextStyle(fontSize: 11),
-              ),
             ),
           ),
         ],
@@ -6246,12 +6804,12 @@ class _OptionRow extends StatelessWidget {
                 onChanged(option.copyWith(notes: v.isEmpty ? null : v)),
           ),
         ),
-        IconButton(
+        TreinoIconButton(
+          icon: TreinoIcon.trash,
           tooltip: 'Eliminar opción', // i18n: Fase W2
+          color: palette.danger,
+          size: TreinoButtonSize.xs,
           onPressed: onDelete,
-          icon: Icon(TreinoIcon.trash, size: 12, color: palette.danger),
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
         ),
       ],
     );

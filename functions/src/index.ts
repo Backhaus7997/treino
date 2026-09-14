@@ -42,6 +42,22 @@ export { reassignFcmToken } from "./notifications/reassign-fcm-token";
 export { notifyWearOnWorkoutStarted } from "./notifications/notify-wear-workout";
 export { maintainFollowCounters } from "./social/maintain-follow-counters";
 export { maintainReactionCounters } from "./social/maintain-reaction-counters";
+// Tope de costo de los videos de ejercicio custom. Son DOS triggers y no uno:
+// el de finalize cuenta y borra lo que se colo por la carrera, y el de delete
+// devuelve el cupo cuando el usuario borra un video suyo. Sin el segundo, el
+// contador solo sube y el tope se vuelve permanente.
+export {
+  maintainCustomExerciseVideoQuotaOnFinalize,
+  maintainCustomExerciseVideoQuotaOnDelete,
+} from "./storage/custom-exercise-video-quota";
+// Tope de costo de la media de chat. Mismo par de triggers y por el mismo
+// motivo que arriba, pero el eje es BYTES TOTALES y no cantidad: el chat es un
+// flujo continuo y no una biblioteca. El porqué largo está en el encabezado de
+// `chat-media-quota.ts`.
+export {
+  maintainChatMediaQuotaOnFinalize,
+  maintainChatMediaQuotaOnDelete,
+} from "./storage/chat-media-quota";
 export { notifyOnReview } from "./notifications/notify-review";
 // #628: canal alumno → PF durante la sesión. Notifica SOLO cuando
 // kind === 'discomfort' — un comment no debe vibrarle el teléfono al PF.
@@ -115,12 +131,45 @@ export { acceptTrainerLink } from "./subscriptions/accept-trainer-link";
 // so pause 2 / accept 1 / resume 2 lands over the limit unseen. Both
 // weight-raising transitions have to live behind the gate.
 export { resumeTrainerLink } from "./subscriptions/resume-trainer-link";
+// #637 (secuela): la marca de pre-consulta sólo se estampaba al CREAR el chat,
+// y `firestore.rules` la tiene pineada como inmutable. Un chat social que ya
+// existía entre el alumno y el PF dejaba al alumno sin poder escribirle NUNCA
+// MÁS. El Admin SDK no pasa por rules, así que valida los mismos tres hechos
+// que `chatCreateOk` y estampa — sin relajar el pin del cliente.
+export { promoteChatToInquiry } from "./chat/promote-chat-to-inquiry";
 // Paywall Fase 7 (downgrade): reconcilian `entitlement` cuando el PF queda
 // por encima de su limite. Hacen falta LOS DOS — el trigger ve los cambios de
 // suscripcion al instante, y el barrido ve lo que ningun trigger puede ver:
 // el limite que cae solo por el paso del tiempo (cancelled + currentPeriodEnd
 // vencido no escribe un solo documento).
 export { syncEntitlementsOnSubscription, sweepEntitlements } from "./subscriptions/entitlement-triggers";
+// Paywall del ALUMNO: mantienen `users/{uid}.athletePaywallEnforced`, que es
+// el unico dato que firestore.rules NO puede calcular solo — el vinculo con el
+// PF vive en `trainer_links` con ids autogenerados, y las reglas no hacen
+// queries. Hacen falta LOS TRES: los dos triggers ven suscripcion y vinculo al
+// instante, y el barrido hace el backfill de los alumnos que ya existian (a
+// esos no los ve ningun trigger porque no escriben nada).
+//
+// Hoy escriben `false` en todos lados: el interruptor
+// ATHLETE_PAYWALL_ENFORCEMENT_ENABLED arranca apagado. Ver el encabezado del
+// modulo antes de prenderlo: el grandfathering de RUTINAS PROPIAS ya esta
+// resuelto (`noCreceLaForma` en las reglas), pero sigue abierto el de las
+// PLANTILLAS PAGAS que un alumno ya venia siguiendo — ver
+// `routine_detail_screen.dart`.
+export {
+  syncAthletePaywallOnUser,
+  syncAthletePaywallOnTrainerLink,
+  sweepAthletePaywall,
+} from "./subscriptions/athlete-paywall-enforced";
+// Baja automatica de cuentas inactivas: aviso a los 24 meses, baja a los 36
+// (decision del titular del 2026-09-14, `docs/legal/retencion-y-borrado.md` §6).
+//
+// SE DESPLIEGA EN dryRun. La senal de actividad sale de los metadatos de
+// Firebase Auth, que YA TIENEN HISTORIA, asi que la primera corrida ve de una
+// todo el backlog de cuentas que ya pasaron los 24 meses. Encenderlo sin mirar
+// ese numero antes es mandar ese numero de mails de golpe. Ver
+// RETENTION_SWEEP_DRY_RUN en el modulo.
+export { sweepInactiveAccounts } from "./retention/sweep-inactive-accounts";
 // SHELVED (gym-google-places, Plan B): resolveGymPlace cannot be deployed —
 // GCP project treino-dev sits under org code-assurance.com, whose
 // Domain-Restricted-Sharing policy blocks a publicly-invokable (allUsers)
@@ -136,3 +185,77 @@ export { syncEntitlementsOnSubscription, sweepEntitlements } from "./subscriptio
 // `User.refreshToken` de firebase_auth es vacio en nativo, asi que el telefono
 // no puede compartir la suya.
 export { mintWatchCredential } from "./mint-watch-credential";
+
+// Paywall del entrenador — el checkout de Mercado Pago. Es el UNICO punto de
+// la app que abre un cobro. NO escribe `subscription`: crear el preapproval lo
+// deja `pending` en MP hasta que el PF carga su medio de pago, y el tier lo
+// escribe el reconciliador cuando MP diga `authorized`. Ver el encabezado de
+// `subscriptions/mp/create-preapproval.ts`.
+//
+// Requiere el secreto MP_ACCESS_TOKEN:
+//   firebase functions:secrets:set MP_ACCESS_TOKEN --project prod
+export { createPreapproval } from "./subscriptions/mp/create-preapproval";
+
+// Paywall del entrenador — el reconciliador. Es lo que hace que pagar
+// SIGNIFIQUE algo: sin esto, `createPreapproval` abre un cobro y nadie se
+// entera. Corre a las 03:00 ART, una hora ANTES que `sweepEntitlements`, para
+// que el barrido decida bloqueos sobre datos de hoy y no de ayer.
+export { reconcileMpSubscriptions } from "./subscriptions/mp/reconcile";
+
+// Paywall del entrenador — la acreditacion EN EL ACTO. El barrido de arriba
+// tarda hasta 24 horas, y esas son 24 horas de "pague y no paso nada" para el
+// PF que acaba de comprar. Este callable reconcilia SOLO los planes del que
+// llama, cuando vuelve del checkout de Mercado Pago.
+//
+// No reemplaza al barrido: es latencia, no correccion. El barrido sigue siendo
+// lo que agarra al que paga y cierra la pestaña. Ver el encabezado de
+// `subscriptions/mp/reconcile-my-checkout.ts`.
+//
+// Usa el mismo secreto MP_ACCESS_TOKEN que los dos de arriba.
+export { reconcileMyCheckout } from "./subscriptions/mp/reconcile-my-checkout";
+
+// Paywall del entrenador — la notificacion de Mercado Pago. **El PRIMER
+// endpoint HTTP publico del repo**: todo lo demas es onCall con request.auth o
+// un trigger de Firestore, esto lo puede POSTear cualquiera.
+//
+// Lo que lo hace seguro no es la firma —que puede no existir, ver el
+// encabezado— sino que del evento se usa UN solo dato, el id, y la verdad se le
+// pregunta a MP con nuestro token.
+//
+// Requiere DOS secretos. El de firma puede quedar vacio si MP no da uno para
+// aplicaciones de Suscripciones, pero tiene que EXISTIR o el deploy falla:
+//   firebase functions:secrets:set MP_WEBHOOK_SECRET --project prod
+export { mpWebhook } from "./subscriptions/mp/webhook";
+
+// El webhook de RevenueCat: el que le acredita la suscripcion al ALUMNO.
+//
+// Mismo principio que el de MP —del evento se usa el `app_user_id` y la verdad
+// se le pregunta a RevenueCat con nuestra key— pero la POLITICA DE CODIGOS es
+// la inversa, y esa es la parte que no se puede copiar: MP reintenta cada 15
+// minutos para siempre, RevenueCat reintenta 5 veces y abandona. Aca un fallo
+// transitorio SI tiene que contestar 5xx. Ver el encabezado del archivo.
+//
+// Requiere DOS secretos y una variable de entorno:
+//   firebase functions:secrets:set RC_API_KEY         --project prod
+//   firebase functions:secrets:set RC_WEBHOOK_SECRET  --project prod
+//   RC_PROJECT_ID=proj...  (no es secreto)
+export { rcWebhook } from "./subscriptions/rc/webhook";
+
+// Un UUID v4 por usuario, que HOY NO SE USA PARA NADA. Es un seguro: el dia
+// que se le hable directo a las tiendas hace falta un token propio para saber
+// a quien acreditarle una compra —Google no manda ningun identificador de
+// usuario y Apple consulta por transactionId— y `appAccountToken` TIENE que
+// ser un UUID, cosa que el uid de Firebase no es.
+//
+// Su valor es retroactivo: el dia que haga falta se necesita para todo el que
+// YA compro. Por eso se emite desde hoy. Ver el encabezado del archivo.
+export { ensureStoreAccountToken } from "./subscriptions/store-account-token";
+
+// Moderación (change `moderacion-reporte-y-bloqueo`): bloquear borra las
+// aristas de follow en las dos direcciones, así que el tier `followers` de
+// `posts` queda protegido por la regla de lectura que YA EXISTE
+// (`followAccepted`) sin tocar `posts/{postId} allow read` — eso hubiera
+// roto el feed entero (una regla de `list` rechaza la query COMPLETA si un
+// solo doc del resultado no pasa). Ver el encabezado de
+// `moderation/remove-follows-on-block.ts`.
+export { removeFollowEdgesOnBlock } from "./moderation/remove-follows-on-block";

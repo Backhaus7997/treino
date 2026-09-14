@@ -6,6 +6,7 @@ import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/persistence/shared_prefs_provider.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
+import 'package:treino/core/widgets/treino_badge.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/domain/subscription_tier.dart';
 import 'package:treino/features/coach_hub/application/sidebar_collapsed_provider.dart';
@@ -15,12 +16,13 @@ import 'package:treino/features/profile/application/user_providers.dart';
 
 import 'sidebar_item.dart';
 import 'sidebar_registry.dart';
+import '../../../../core/widgets/treino_logo.dart';
 
 /// Sidebar del Coach Hub web (REQ-SH-001..006, ADR-SH-004).
 ///
 /// Renderiza `sidebarRegistry` agrupado por [SidebarGroup] con header por
-/// grupo (oculto al colapsar) y `Ajustes` pinneado al footer, junto al
-/// toggle dedicado y al perfil del usuario. Ancho animado
+/// grupo (oculto al colapsar). El toggle vive junto al wordmark y el perfil
+/// es el único acceso a la cuenta. Ancho animado
 /// 240↔72 px (`CoachHubLayoutTokens`). El estado colapsado viene de
 /// `sidebarCollapsedProvider`, gateado por `sharedPreferencesProvider`
 /// (optimistic-expanded mientras resuelve).
@@ -64,10 +66,6 @@ class CoachHubSidebar extends ConsumerWidget {
       if (items0.isNotEmpty) groups[group] = items0;
     }
     final groupEntries = groups.entries.toList();
-    final ajustesItems =
-        items.where((item) => item.group == SidebarGroup.ajustes).toList();
-    final ajustesItem = ajustesItems.isEmpty ? null : ajustesItems.first;
-
     var staggerIndex = 0;
 
     return AnimatedContainer(
@@ -88,7 +86,12 @@ class CoachHubSidebar extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _SidebarHeader(collapsed: collapsed),
+          _SidebarHeader(
+            collapsed: collapsed,
+            canToggle: canToggle,
+            onToggle: () =>
+                ref.read(sidebarCollapsedProvider.notifier).toggle(),
+          ),
           Container(height: 1, color: palette.border),
           Expanded(
             child: SingleChildScrollView(
@@ -96,12 +99,29 @@ class CoachHubSidebar extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // Todos los hijos van con `key`. NO es cosmética: los
+                  // `_GroupHeader` se van de la lista al colapsar, y sin keys
+                  // Flutter re-matchea por índice, así que cada fila se monta
+                  // DE NUEVO en cada toggle. Un widget recién montado no tiene
+                  // de dónde interpolar: sus animaciones implícitas nacen en el
+                  // valor final. Es decir que el `AnimatedPositioned` del label
+                  // saltaba, y parecía un bug de la animación cuando el bug
+                  // estaba acá, dos archivos más arriba en el árbol.
                   for (var i = 0; i < groupEntries.length; i++) ...[
-                    if (i > 0) Container(height: 1, color: palette.border),
+                    if (i > 0)
+                      Container(
+                        key: ValueKey('sep_${groupEntries[i].key.label}'),
+                        height: 1,
+                        color: palette.border,
+                      ),
                     if (!collapsed)
-                      _GroupHeader(label: groupEntries[i].key.label),
+                      _GroupHeader(
+                        key: ValueKey('hdr_${groupEntries[i].key.label}'),
+                        label: groupEntries[i].key.label,
+                      ),
                     for (final item in groupEntries[i].value)
                       _SidebarItemRow(
+                        key: ValueKey(item.route),
                         item: item,
                         collapsed: collapsed,
                         active: _isActive(location, item.route),
@@ -117,12 +137,6 @@ class CoachHubSidebar extends ConsumerWidget {
           ),
           _SidebarFooter(
             collapsed: collapsed,
-            canToggle: canToggle,
-            onToggle: () =>
-                ref.read(sidebarCollapsedProvider.notifier).toggle(),
-            ajustesItem: ajustesItem,
-            ajustesActive:
-                ajustesItem != null && _isActive(location, ajustesItem.route),
           ),
         ],
       ),
@@ -136,30 +150,50 @@ class CoachHubSidebar extends ConsumerWidget {
 /// Header del sidebar: logotipo TREINO (REQ-SH-002). Oculto (sin texto)
 /// cuando el sidebar está colapsado.
 class _SidebarHeader extends StatelessWidget {
-  const _SidebarHeader({required this.collapsed});
+  const _SidebarHeader({
+    required this.collapsed,
+    required this.canToggle,
+    required this.onToggle,
+  });
 
   final bool collapsed;
+  final bool canToggle;
+  final VoidCallback onToggle;
 
   @override
   Widget build(BuildContext context) {
-    final palette = AppPalette.of(context);
     return Container(
       constraints: const BoxConstraints(minHeight: 60),
-      alignment: collapsed ? Alignment.center : Alignment.centerLeft,
+      alignment: Alignment.center,
       padding: EdgeInsets.symmetric(
-        horizontal: collapsed ? 0 : AppSpacing.s20,
+        horizontal: collapsed ? 0 : AppSpacing.s14,
       ),
+      // El wordmark, no la palabra "TREINO" tipeada en Barlow Condensed.
+      //
+      // Eran dos marcas distintas: la app mobile abre con el logotipo real y
+      // el Coach Hub lo reescribía con la fuente del sistema de diseño. Un PF
+      // que entra desde el teléfono a la web veía otra marca.
+      //
+      // `TreinoLogo` es el mismo widget que usan welcome, splash, login y
+      // register, y renderiza `assets/logo/treino_logo.svg`.
       child: collapsed
-          ? const SizedBox.shrink()
-          : Text(
-              'TREINO',
-              style: TextStyle(
-                fontFamily: AppFonts.barlowCondensed,
-                fontWeight: AppFonts.w700,
-                fontSize: 20,
-                letterSpacing: 1,
-                color: palette.accent,
-              ),
+          ? _ToggleButton(
+              collapsed: collapsed,
+              canToggle: canToggle,
+              onToggle: onToggle,
+            )
+          : Row(
+              children: [
+                // En accent, no en el blanco por defecto: es el verde con el
+                // que la marca aparece en el resto de la app.
+                TreinoLogo(size: 26, color: AppPalette.of(context).accent),
+                const Spacer(),
+                _ToggleButton(
+                  collapsed: collapsed,
+                  canToggle: canToggle,
+                  onToggle: onToggle,
+                ),
+              ],
             ),
     );
   }
@@ -168,7 +202,7 @@ class _SidebarHeader extends StatelessWidget {
 /// Header de grupo (GESTIÓN, RECURSOS, …). Solo visible expandido — ya NO
 /// aloja el toggle (REQ-SH-004/006: el toggle se mudó al footer).
 class _GroupHeader extends StatelessWidget {
-  const _GroupHeader({required this.label});
+  const _GroupHeader({required this.label, super.key});
 
   final String label;
 
@@ -205,8 +239,9 @@ class _GroupHeader extends StatelessWidget {
 /// [TreinoInteractiveState]): fondo `accent` al 8% de opacidad. El cambio de
 /// fondo anima con [AppMotionTokens.cardStateChange] (interrumpible,
 /// respeta reduce-motion vía `AppMotionTokens.resolve`).
-class _SidebarItemRow extends StatelessWidget {
+class _SidebarItemRow extends StatefulWidget {
   const _SidebarItemRow({
+    super.key,
     required this.item,
     required this.collapsed,
     required this.active,
@@ -221,9 +256,37 @@ class _SidebarItemRow extends StatelessWidget {
   final int? badgeCount;
 
   @override
+  State<_SidebarItemRow> createState() => _SidebarItemRowState();
+}
+
+class _SidebarItemRowState extends State<_SidebarItemRow> {
+  /// Identidad GLOBAL del label, para que su `State` sobreviva a que lo
+  /// re-parenteen.
+  ///
+  /// Hace falta por cómo funciona `Tooltip` adentro: sólo envuelve a su hijo
+  /// en `MouseRegion`+`GestureDetector` cuando el tooltip está HABILITADO, así
+  /// que al colapsar —que es justo cuando `TooltipVisibility` lo prende— la
+  /// forma del árbol cambia y todo lo de abajo se remonta. Un widget recién
+  /// montado no tiene de dónde interpolar: el `AnimatedPositioned` del label
+  /// nacía en su valor final y el label SALTABA, que es exactamente el bug que
+  /// los comentarios de este archivo vienen persiguiendo.
+  ///
+  /// Con `GlobalKey` Flutter MUEVE el elemento en vez de recrearlo, así que el
+  /// label conserva su animación aunque el `Tooltip` cambie de forma arriba.
+  /// Lo fija el test «el label se desliza afuera en vez de desaparecer».
+  final GlobalKey _labelKey = GlobalKey();
+
+  @override
   Widget build(BuildContext context) {
+    final item = widget.item;
+    final collapsed = widget.collapsed;
+    final active = widget.active;
+    final delay = widget.delay;
+    final badgeCount = widget.badgeCount;
+
     final tokens = CoachHubSidebarItemTokens.of(context);
     final fg = active ? tokens.activeForeground : tokens.inactiveForeground;
+    final hasBadge = badgeCount != null && badgeCount > 0;
 
     final row = TreinoInteractiveState(
       onTap: () => context.go(item.route),
@@ -235,10 +298,24 @@ class _SidebarItemRow extends StatelessWidget {
                 : Colors.transparent;
 
         return AnimatedContainer(
-          duration: AppMotionTokens.resolve(
-            ctx,
-            AppMotionTokens.cardStateChange,
-          ),
+          // EL HOVER NO ANIMA; el cambio de SELECCIÓN sí.
+          //
+          // Este comentario ya explicaba, bien, por qué 180 ms dejaba dos
+          // filas prendidas al barrer — y la respuesta de entonces fue bajarlo
+          // a 120. Ciento veinte deja una estela más corta, no ninguna: el PF
+          // volvió a reportarlo. Un puntero es manipulación directa y el fondo
+          // tiene que estar donde está el cursor, no llegando.
+          //
+          // La píldora del item ACTIVO sigue animando: ése cambia al navegar,
+          // una vez, y ahí el fundido dice que algo pasó. Por eso la duración
+          // depende de `active` y no es cero a secas.
+          //
+          // Barrer una lista de 11 items es de las cosas que más veces por día
+          // hace el PF, y a esa frecuencia lo que se quiere es respuesta, no
+          // suavidad.
+          duration: active
+              ? AppMotionTokens.resolve(ctx, AppMotionTokens.tapFeedback)
+              : Duration.zero,
           curve: AppMotionTokens.enter,
           height: CoachHubLayoutTokens.sidebarItemHeight,
           margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -250,91 +327,267 @@ class _SidebarItemRow extends StatelessWidget {
             borderRadius:
                 BorderRadius.circular(CoachHubSidebarItemTokens.borderRadius),
           ),
-          child: Row(
-            mainAxisAlignment:
-                collapsed ? MainAxisAlignment.center : MainAxisAlignment.start,
+          // `Stack` y no `Row`: el label tiene que quedar MONTADO al colapsar
+          // para poder desvanecerse —sin widget no hay nada que animar— pero
+          // sin que su ancho intrínseco participe del layout de la fila.
+          //
+          // Un intento anterior lo hizo con `Row` + `AnimatedAlign(widthFactor)`
+          // y voló: adentro de un `Row`, un `Text` sin ancho acotado pide
+          // infinito y tira excepción de layout. Acá el `Positioned` con `left`
+          // Y `right` deja el label completamente acotado, y el `AnimatedAlign`
+          // sólo mueve un ícono de 20px, que es tamaño fijo.
+          child: Stack(
+            alignment: Alignment.centerLeft,
+            // El label sale de su caja a propósito mientras se desliza: quien
+            // lo recorta es el `clipBehavior` del `AnimatedContainer` del
+            // sidebar, contra el borde que se está moviendo. Si clipeara acá
+            // se cortaría contra la fila —que mide 28px colapsada— y quedaría
+            // un muñón de texto visible en vez de nada.
+            clipBehavior: Clip.none,
             children: [
-              Icon(item.iconBuilder(), size: 20, color: fg),
-              if (!collapsed) ...[
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    item.label,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontFamily: AppFonts.barlow,
-                      color: fg,
-                      fontSize: 14,
-                      fontWeight: active ? AppFonts.w600 : AppFonts.w400,
+              // El label se apaga y se enciende; NO se mueve. Moverlo además
+              // de fundirlo compite con el ancho del sidebar, que ya se está
+              // desplazando abajo suyo.
+              // El label NO se desmonta al colapsar: se DESLIZA hacia
+              // afuera, empujado por el mismo borde que ya animaba sus
+              // 240→72px. Sale de cuadro justo cuando el sidebar termina de
+              // cerrarse, así que el contenido acompaña al contenedor en vez
+              // de desaparecer en el primer frame mientras el ancho sigue
+              // viajando —que era exactamente el salto que se veía.
+              //
+              // Su ancho es FIJO (`_labelWidth`) y no `right: 0`. Atado al
+              // borde derecho se iría angostando hasta ~16px y el texto
+              // colapsaría a puntos suspensivos antes de irse: el ojo lee eso
+              // como el label rompiéndose, no como el panel cerrándose.
+              //
+              // Va a `sidebarCollapsedWidth` y no a un valor menor porque ese
+              // es el punto exacto donde el clip lo tapa entero.
+              AnimatedPositioned(
+                key: _labelKey,
+                left: collapsed
+                    ? CoachHubLayoutTokens.sidebarCollapsedWidth
+                    : _kIconSize + 12,
+                width: _labelWidth,
+                // SIN `top`/`bottom` a propósito. Con verticales el label se
+                // estira a los 48px de la fila y lo centra el `Row`; sin
+                // ellas se dimensiona por su altura intrínseca y lo centra el
+                // `Stack`. El centro es el mismo en teoría y el redondeo no:
+                // ponerlas corrió cada label 1px y movió 374px en TODOS los
+                // goldens del gate a la vez.
+                duration:
+                    AppMotionTokens.resolve(ctx, AppMotionTokens.contentEnter),
+                curve: AppMotionTokens.reposition,
+                child: IgnorePointer(
+                  // Fuera de cuadro el texto sigue en el árbol: que no reciba
+                  // el mouse. Colapsado, quien nombra al item es el Tooltip.
+                  ignoring: collapsed,
+                  child: ExcludeSemantics(
+                    // SIEMPRE, no sólo colapsado.
+                    //
+                    // Quien nombra al item es el `Semantics(label:)` de más
+                    // afuera, y lo hace en los DOS estados. Este `Text` es la
+                    // presentación de ese mismo nombre; con `excluding:
+                    // collapsed` sólo se callaba colapsado, y expandido
+                    // aportaba su propio label que el `MergeSemantics` pegaba
+                    // al de arriba. El árbol de semántica de producción
+                    // devolvía «Dashboard Dashboard», «Alumnos Alumnos»: cada
+                    // item del menú leído dos veces por el lector de pantalla.
+                    //
+                    // Lo mismo vale para el badge que viaja en este `Row`: el
+                    // label de afuera ya dice «Pagos, 3».
+                    excluding: true,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item.label,
+                            overflow: TextOverflow.ellipsis,
+                            softWrap: false,
+                            style: TextStyle(
+                              fontFamily: AppFonts.barlow,
+                              color: fg,
+                              fontSize: AppTextSize.body,
+                              fontWeight:
+                                  active ? AppFonts.w600 : AppFonts.w400,
+                            ),
+                          ),
+                        ),
+                        // La separación con el label es de esta fila, no del
+                        // badge: al lado de un chip de filtro la distancia es
+                        // otra. El badge sólo se ocupa de su propia forma.
+                        if (hasBadge) ...[
+                          const SizedBox(width: AppSpacing.s8),
+                          TreinoBadge(count: badgeCount),
+                        ],
+                      ],
                     ),
                   ),
                 ),
-                if (badgeCount != null && badgeCount! > 0)
-                  _Badge(count: badgeCount!),
-              ],
+              ),
+              // El ícono viaja de la izquierda al centro con el mismo escalón
+              // que el ancho del sidebar, así las dos cosas cuentan lo mismo.
+              AnimatedAlign(
+                alignment: collapsed ? Alignment.center : Alignment.centerLeft,
+                duration: AppMotionTokens.resolve(
+                  ctx,
+                  AppMotionTokens.contentEnter,
+                ),
+                curve: AppMotionTokens.enter,
+                child: _ItemIcon(
+                  icon: item.iconBuilder(),
+                  color: fg,
+                  // Colapsado el número no entra: el badge se degrada a un
+                  // punto pegado al ícono. Expandido el punto sobra — el número
+                  // va al final de la fila, que es donde se lee mejor.
+                  dot: collapsed && hasBadge,
+                ),
+              ),
             ],
           ),
         );
       },
     );
 
-    return TreinoFadeSlideIn(
-        delay: delay, distance: AppMotion.slideSm, child: row);
-  }
-}
-
-/// Badge numérico (Pagos/Chat) — 16px círculo `highlight`, Barlow 700 10px.
-class _Badge extends StatelessWidget {
-  const _Badge({required this.count});
-
-  final int count;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = TreinoBadgeTokens.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(left: 8),
-      child: Container(
-        constraints: const BoxConstraints(
-          minWidth: TreinoBadgeTokens.size,
-          minHeight: TreinoBadgeTokens.size,
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: tokens.background,
-          borderRadius: BorderRadius.circular(TreinoBadgeTokens.borderRadius),
-        ),
-        child: Text(
-          '$count',
-          style: TextStyle(
-            fontFamily: AppFonts.barlow,
-            fontWeight: AppFonts.w700,
-            fontSize: 10,
-            color: tokens.foreground,
+    // Colapsado el label desaparece del render, así que el ítem queda sin
+    // nombre para el mouse Y para un lector de pantalla. El tooltip cubre lo
+    // primero; el `Semantics(label:)` explícito, lo segundo —
+    // `TreinoInteractiveState` marca `button: true` pero no tiene con qué
+    // nombrarlo.
+    // `MergeSemantics` y no un `Semantics` suelto: `TreinoInteractiveState` ya
+    // aporta su propio `Semantics(button: true)` sin label, y dos anotaciones
+    // encadenadas no se combinan solas — el label quedaba en un nodo aparte
+    // que el lector nunca ata al botón. Merged, el ítem se anuncia como una
+    // sola cosa: «Pagos, 3, botón».
+    // LA FORMA DEL ÁRBOL NO CAMBIA CON `collapsed`. Lo que cambia son sus
+    // propiedades.
+    //
+    // Antes esto era `collapsed ? MergeSemantics(...Tooltip(row)) : row`, o sea
+    // dos árboles distintos en la misma posición. Flutter no los reconcilia:
+    // destruye el subárbol y monta uno nuevo, y con él el `State` del
+    // `AnimatedPositioned` del label — que entonces nace ya en su valor final y
+    // NUNCA anima. Es la misma trampa que las keys del `Column` de arriba
+    // resuelven un nivel más afuera: para que una animación implícita sirva,
+    // su elemento tiene que SOBREVIVIR al rebuild. Las dos condiciones son
+    // necesarias; con una sola, el label sigue saltando.
+    //
+    // Ahora los wrappers están siempre, y el `Semantics` lleva el mismo label
+    // en los dos estados, que es correcto en ambos.
+    //
+    // Quién apaga el tooltip expandido es `TooltipVisibility`, NO un mensaje
+    // vacío. Acá decía que «el Tooltip con mensaje vacío no se muestra» y era
+    // FALSO: Flutter no mira el mensaje, arma la burbuja igual, y quedaba un
+    // rectángulo oscuro sin texto flotando entre dos items —centrado sobre el
+    // item hovereado y 24 px abajo, que es el `verticalOffset` del tooltip—.
+    // El PF lo reportó como «ese cuadrado negro que aparece al pasar el
+    // cursor por el menú del costado». Lo fija el test del hover.
+    final labelled = MergeSemantics(
+      child: Semantics(
+        label: hasBadge ? '${item.label}, $badgeCount' : item.label,
+        child: TooltipVisibility(
+          visible: collapsed,
+          child: Tooltip(
+            message: hasBadge ? '${item.label} ($badgeCount)' : item.label,
+            // El sidebar colapsado tiene 23 íconos y el tooltip es la única
+            // forma de leerlos: 200 ms alcanzan para no dispararlo mientras
+            // el mouse cruza la columna, y se sienten instantáneos al frenar.
+            waitDuration: const Duration(milliseconds: 200),
+            // El label ya lo pone el `Semantics` de arriba; sin esto el
+            // lector lo diría dos veces.
+            excludeFromSemantics: true,
+            child: row,
           ),
         ),
       ),
     );
+
+    return TreinoFadeSlideIn(
+        delay: delay, distance: AppMotion.slideSm, child: labelled);
   }
 }
 
-/// Footer del sidebar: Ajustes pinneado, toggle dedicado y perfil del
-/// usuario (REQ-SH-005/006, ADR-SH-004).
+/// Lado del ícono de un item del sidebar.
+///
+/// Vive como constante porque el `Positioned` del label lo necesita para saber
+/// desde dónde arrancar: si el ícono cambia de tamaño y este número no, el
+/// label se le monta encima.
+const double _kIconSize = 20;
+
+/// Ancho del label de un item con el sidebar expandido.
+///
+/// Se calcula una vez y queda fijo: 240 de sidebar, menos el margen de la fila
+/// (8 por lado), menos su padding (14 por lado), menos el hueco del ícono
+/// (20 + 12). Ese resto es lo que el texto ocupa cuando está en su lugar, y es
+/// lo que conserva mientras se desliza hacia afuera.
+const double _labelWidth = CoachHubLayoutTokens.sidebarExpandedWidth -
+    _kSidebarBorderWidth -
+    8 * 2 -
+    CoachHubSidebarItemTokens.paddingH * 2 -
+    (_kIconSize + 12);
+
+/// Ancho del borde derecho del sidebar. Entra en la cuenta de `_labelWidth`
+/// porque el `Border` del `BoxDecoration` se come ese píxel del content box.
+///
+/// Olvidarlo dejaba el label 1px más ancho de lo que era con `right: 0`, lo que
+/// corría dónde ellipsiza cada texto: 374px de diferencia en los cuatro
+/// goldens del gate visual, por un píxel de aritmética.
+const double _kSidebarBorderWidth = 1;
+
+/// Ícono del ítem, con el punto de badge opcional para el estado colapsado.
+///
+/// El punto no anima: aparecer y desaparecer acá es un cambio de estado que se
+/// lee solo, y el sidebar es de las superficies que el PF más mira por día.
+class _ItemIcon extends StatelessWidget {
+  const _ItemIcon({
+    required this.icon,
+    required this.color,
+    required this.dot,
+  });
+
+  final IconData icon;
+  final Color color;
+  final bool dot;
+
+  /// Diámetro del punto — la mitad del badge numérico (`TreinoBadgeTokens.size`).
+  static const double _dotSize = 8;
+
+  @override
+  Widget build(BuildContext context) {
+    final glyph = Icon(icon, size: _kIconSize, color: color);
+    if (!dot) return glyph;
+
+    final palette = AppPalette.of(context);
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        glyph,
+        Positioned(
+          top: -1,
+          right: -2,
+          child: Container(
+            width: _dotSize,
+            height: _dotSize,
+            decoration: BoxDecoration(
+              color: TreinoBadgeTokens.of(context).background,
+              shape: BoxShape.circle,
+              // Anillo del color del sidebar: sin él el punto se pega al glifo
+              // y los dos se leen como una sola forma sucia.
+              border: Border.all(color: palette.bg, width: 1.5),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Footer del sidebar: sólo el perfil del usuario. Cuenta no aparece también
+/// como item genérico: la fila con nombre y plan es su único entrypoint.
 class _SidebarFooter extends StatelessWidget {
   const _SidebarFooter({
     required this.collapsed,
-    required this.canToggle,
-    required this.onToggle,
-    required this.ajustesItem,
-    required this.ajustesActive,
   });
 
   final bool collapsed;
-  final bool canToggle;
-  final VoidCallback onToggle;
-  final SidebarItem? ajustesItem;
-  final bool ajustesActive;
 
   @override
   Widget build(BuildContext context) {
@@ -342,17 +595,6 @@ class _SidebarFooter extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (ajustesItem != null)
-          _SidebarItemRow(
-            item: ajustesItem!,
-            collapsed: collapsed,
-            active: ajustesActive,
-            delay: Duration.zero,
-            badgeCount: null,
-          ),
-        Container(height: 1, color: palette.border),
-        _ToggleRow(
-            collapsed: collapsed, canToggle: canToggle, onToggle: onToggle),
         Container(height: 1, color: palette.border),
         _ProfileRow(collapsed: collapsed),
       ],
@@ -362,8 +604,8 @@ class _SidebarFooter extends StatelessWidget {
 
 /// Botón dedicado de contraer/expandir — REQ-SH-006. Tooltip contextual
 /// (cambia según el estado actual).
-class _ToggleRow extends StatelessWidget {
-  const _ToggleRow({
+class _ToggleButton extends StatelessWidget {
+  const _ToggleButton({
     required this.collapsed,
     required this.canToggle,
     required this.onToggle,
@@ -379,26 +621,15 @@ class _ToggleRow extends StatelessWidget {
     final tooltip =
         collapsed ? 'Expandir menú' : 'Contraer menú'; // i18n: Fase W1
 
-    final button = Tooltip(
+    return Tooltip(
       message: tooltip,
-      child: IconButton(
+      child: TreinoIconButton(
         key: const Key('sidebar_toggle_button'),
-        icon: Icon(TreinoIcon.menu, size: 20, color: palette.textMuted),
-        padding: EdgeInsets.zero,
-        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-        visualDensity: VisualDensity.compact,
+        icon: TreinoIcon.menu,
+        tooltip: 'Menú', // i18n
+        color: palette.textMuted,
         onPressed: canToggle ? onToggle : null,
       ),
-    );
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: collapsed
-          ? Center(child: button)
-          : Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s14),
-              child: Align(alignment: Alignment.centerLeft, child: button),
-            ),
     );
   }
 }
@@ -492,7 +723,11 @@ class _ProfileRow extends ConsumerWidget {
       key: Key(collapsed ? 'sidebar_profile_avatar' : 'sidebar_profile_row'),
       onTap: () => context.go('/ajustes'),
       builder: (ctx, states) => AnimatedContainer(
-        duration: AppMotionTokens.resolve(ctx, AppMotionTokens.cardStateChange),
+        // EL HOVER NO ANIMA. Un puntero es manipulación directa: el fondo tiene
+        // que estar donde está el cursor, no llegando. A 120/180 ms, barrer
+        // deja ESTELA — el anterior sigue apagándose cuando el siguiente ya se
+        // encendió. Mismo criterio de #1063, que no llegó hasta acá.
+        duration: Duration.zero,
         curve: AppMotionTokens.enter,
         padding: EdgeInsets.symmetric(
           // Colapsado el avatar va centrado en 72 px; el padding lo desalinearía.

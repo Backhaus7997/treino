@@ -54,7 +54,17 @@ const int kPrivacyVersion = 1;
 final DateTime kPrivacyV1PublishedAt = DateTime.utc(2026, 9, 3);
 
 /// Email de contacto para consultas legales / de privacidad.
-const String kLegalContactEmail = 'equipo@treino.app';
+///
+/// `equipo@treino.app` NO EXISTE. Estuvo acá —y por lo tanto en las tres
+/// páginas legales públicas que este archivo genera— hasta que se verificó
+/// contra producción: quien intentaba ejercer sus derechos de habeas data o
+/// pedir el borrado de su cuenta por esa vía recibía un rebote. La casilla
+/// real de BACKHAUSTIN S.A.S. es la de abajo.
+///
+/// Es una constante y no un literal repetido justamente por esto: el mail de
+/// contacto legal aparece en privacidad, términos y eliminar-cuenta, y tenerlo
+/// en un solo lugar es lo que hizo que corregirlo fuera una línea.
+const String kLegalContactEmail = 'treino@gettreino.com';
 
 /// Términos y Condiciones de uso.
 const List<LegalSection> kTermsSections = <LegalSection>[
@@ -230,5 +240,30 @@ const List<LegalSection> kPrivacySections = <LegalSection>[
     '11. Responsable y contacto',
     'El responsable del tratamiento de tus datos es TREINO. Por consultas sobre '
         'privacidad o para ejercer tus derechos, escribinos a $kLegalContactEmail.',
+  ),
+];
+
+/// Índice de los documentos legales, para la pantalla Perfil → Legales.
+///
+/// PROVISORIO: hoy sólo existen Términos y Privacidad. Cuando se resuelvan los
+/// pendientes de `docs/legal/` y corra `scripts/build_legal_content.py`, este
+/// archivo entero se regenera y esta lista pasa a tener los nueve documentos
+/// sin tocar la pantalla que la consume.
+typedef LegalDocumentEntry = ({
+  String title,
+  List<LegalSection> sections,
+  String lastUpdated,
+});
+
+const List<LegalDocumentEntry> kLegalDocuments = <LegalDocumentEntry>[
+  (
+    title: 'Términos y Condiciones',
+    sections: kTermsSections,
+    lastUpdated: kTermsLastUpdated,
+  ),
+  (
+    title: 'Política de Privacidad',
+    sections: kPrivacySections,
+    lastUpdated: kPrivacyLastUpdated,
   ),
 ];

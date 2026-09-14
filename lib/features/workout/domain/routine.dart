@@ -54,6 +54,39 @@ class Routine with _$Routine {
     @JsonKey(includeToJson: false) double? ratingAvg,
     // ignore: invalid_annotation_target
     @JsonKey(includeToJson: false) int? ratingsCount,
+    // ── Catálogo pago (paywall del alumno suelto, spec §4.1.1) ───────────────
+    // `true` en las plantillas del sistema que sólo puede usar un alumno con
+    // derecho. Lo siembra `scripts/seed_templates.js` (Admin SDK, saltea las
+    // reglas) desde `improved-templates.json`; el cliente sólo lo LEE.
+    //
+    // `includeToJson: false` por el mismo motivo que ratingAvg/ratingsCount, y
+    // acá el motivo es más filoso: sin eso `toJson()` lo emitiría en TODA
+    // rutina, incluidas las `user-created`, y el `hasOnly(userCreatedRoutineFields())`
+    // de firestore.rules —que no conoce este campo— rechazaría el create y el
+    // update de cualquier rutina de atleta. Es exactamente el modo de falla de
+    // #563 que el propio archivo de reglas advierte en su COUPLING WARNING.
+    // Manteniéndolo fuera del payload, las reglas no necesitan enterarse.
+    //
+    // Default `false`: una plantilla sin el campo es GRATIS. Es lo que hace
+    // que esto no necesite backfill y que un error de siembra falle del lado
+    // seguro — abre, no cobra.
+    //
+    // ⚠️  Este comentario decía "Ningún doc lo tiene hoy". Ya no es cierto:
+    // `docs/video-catalog-audit/improved-templates.json` trae `isPremium` en
+    // las 7 plantillas y `scripts/seed_templates.js` las escribe con
+    // `{ ...t }`, o sea que el campo VIAJA a Firestore. Lo que sigue siendo
+    // cierto es lo que importa: los docs sembrados antes de que el JSON ganara
+    // el campo no lo tienen, y el default los deja gratis.
+    //
+    // La distinción dejó de ser cosmética cuando `firestore.rules` empezó a
+    // LEER este campo para autorizar la creación de sesiones (el eje del
+    // catálogo, spec §4.1.1). Ahí la regla replica el mismo default: ausente
+    // ⇒ libre.
+    //
+    // NO gobierna el tope de días/semanas: ese es el otro eje del paywall y
+    // aplica a la rutina propia del alumno, no al catálogo (spec §4).
+    // ignore: invalid_annotation_target
+    @JsonKey(includeToJson: false) @Default(false) bool isPremium,
     // ── Plain-language summary (#648) ────────────────────────────────────────
     // One sentence explaining what the routine IS, in words someone who has
     // never set foot in a gym can parse. The catalogue leads with jargon —

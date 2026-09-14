@@ -101,6 +101,39 @@ export const APP_ENTRY_ATHLETE = "https://app.gettreino.com/abrir/alumno";
 export const APP_ENTRY_TRAINER = "https://app.gettreino.com/abrir/profe";
 
 /**
+ * Los destinos finos que un mail al PF puede pedir. Es la unica fuente de
+ * los valores VALIDOS de `to` — si un valor de aca no tiene case en alguno
+ * de los dos routers de Dart (`lib/app/router.dart` para mobile,
+ * `lib/app/coach_hub_router.dart` para el Coach Hub web, via
+ * `lib/core/utils/deep_link_destination.dart`), ese mail cae al dashboard
+ * en silencio: ni la app ni el Hub avisan que un `to` no matcheo nada.
+ *
+ * Union discriminada por `to` para que `athleteId` sea IMPOSIBLE de pasar
+ * con cualquier otro destino: TypeScript rechaza `{ to: "agenda",
+ * athleteId: "x" }` en tiempo de compilacion, no en runtime.
+ */
+export type TrainerDestination =
+  | { to: "facturacion" }
+  | { to: "agenda" }
+  | { to: "solicitudes" }
+  | { to: "alumno"; athleteId: string };
+
+/**
+ * A donde manda el CTA de un mail al PF, con el destino fino codificado en
+ * el query string de `APP_ENTRY_TRAINER`.
+ *
+ * Sin destino: la entrada bare, igual que siempre (usa esto
+ * `federated-signin-hint` via `entradaSegunRol` — ahi no hay contexto de
+ * "para que" entra, asi que no hay destino fino que ofrecer).
+ */
+export function trainerEntry(dest?: TrainerDestination): string {
+  if (!dest) return APP_ENTRY_TRAINER;
+  const params = new URLSearchParams({ to: dest.to });
+  if (dest.to === "alumno") params.set("id", dest.athleteId);
+  return `${APP_ENTRY_TRAINER}?${params.toString()}`;
+}
+
+/**
  * El wordmark de TREINO, servido desde el propio deploy del Coach Hub.
  *
  * PNG y no SVG porque NINGUN cliente de mail renderiza SVG — el
@@ -759,6 +792,44 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
       ctaUrl,
     );
   }
+
+  // ── Aviso de baja por inactividad ───────────────────────────────────────
+  //
+  // ESTE MAIL NO ENUMERA LO QUE SE BORRA, y es la decision del copy.
+  //
+  // La tentacion es la lista completa —"rutinas, sesiones, mediciones,
+  // chats"— y la lista es FALSA en su ultimo item: los hilos de chat se
+  // RETIENEN a proposito para el otro participante (`cascade/athlete-data.ts`,
+  // y §2.2.1 de `docs/security.md`), igual que los pagos y las resenas.
+  // Prometer que se borra algo que no se borra, en el mail que existe
+  // justamente para no prometer de mas, seria el mismo error del otro lado
+  // (AGENTS.md §11.1). Los tres que se nombran —perfil, rutinas, historial—
+  // los borra la cascada entera y sin asteriscos.
+  //
+  // La FECHA es un parametro y no la frase "dentro de doce meses". Para una
+  // cuenta que cruza los 24 meses con el barrido encendido las dos coinciden;
+  // para el backlog de la primera corrida, no. `proyeccionDeBaja` en
+  // `sweep-inactive-accounts.ts` calcula la que de verdad se va a cumplir.
+  //
+  // "A partir del" y no "el": el barrido es diario y puede correr un dia
+  // tarde. Un plazo que se corre no miente a nadie; una fecha exacta, si.
+  case "inactive-account-notice":
+    return build(
+      "Vamos a dar de baja tu cuenta de TREINO", // i18n: email transaccional
+      "Cuenta inactiva",
+      [
+        ["Hace más de dos años que no usás TREINO."],
+        [
+          "Si seguís sin entrar, a partir del ",
+          strong(params.deleteOnLabel),
+          " damos de baja tu cuenta y borramos tu perfil, tus rutinas y tu " +
+          "historial de entrenamiento.",
+        ],
+        ["Para cancelarlo alcanza con abrir la app una vez: el plazo vuelve a empezar."],
+      ],
+      "ABRIR TREINO",
+      ctaUrl,
+    );
 
   default: {
     // Exhaustiveness guard: adding a MailKind without a template fails to

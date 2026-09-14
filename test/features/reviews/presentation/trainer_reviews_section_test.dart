@@ -8,6 +8,8 @@ import 'package:treino/features/reviews/application/review_providers.dart';
 import 'package:treino/features/reviews/domain/review.dart';
 import 'package:treino/features/reviews/presentation/widgets/review_tile.dart';
 import 'package:treino/features/reviews/presentation/widgets/trainer_reviews_section.dart';
+import 'package:treino/features/workout/application/session_providers.dart'
+    show currentUidProvider;
 import 'package:treino/l10n/app_l10n.dart';
 
 const _trainerId = 'trainer-1';
@@ -48,6 +50,10 @@ Widget _wrap({required List<Review> reviews}) => ProviderScope(
             displayName: 'Test Athlete',
           )),
         ),
+        // moderacion-reporte-y-bloqueo: ReviewTile ahora lee currentUidProvider
+        // para el menú de moderación — mismo motivo que el comentario de
+        // arriba, sin overridearlo pega contra FirebaseAuth.instance real.
+        currentUidProvider.overrideWith((_) => 'viewer-uid'),
       ],
       child: MaterialApp(
         theme: AppTheme.dark(),

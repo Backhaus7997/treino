@@ -1,0 +1,342 @@
+/**
+ * create-preapproval.ts — el UNICO punto de la app que abre un cobro.
+ *
+ * Patron: handler puro (`runCreatePreapproval`) + wrapper `onCall` fino
+ * (`createPreapproval`), igual que `add-alias.ts` y `accept-trainer-link.ts`
+ * (ADR-CXP-004), asi el handler se testea sin la maquinaria de onCall y sin red.
+ *
+ * ── LO QUE ESTA FUNCION NO HACE, Y ES LA MITAD DEL DISEÑO ──
+ *
+ * **No escribe `subscription`.** Ni siquiera `pending`. Crear un preapproval no
+ * es cobrar: MP lo deja en `pending` hasta que el PF carga su medio de pago en
+ * el `init_point`. Escribir el tier acá le daria el limite del plan a alguien
+ * que todavia no pago nada — y como `subscription` es CF-write-only y esta
+ * pineado en rules, quedaria ahi hasta que otra function lo saque.
+ *
+ * El tier lo escribe el RECONCILIADOR, cuando MP diga `authorized`. Es el mismo
+ * principio que gobierna toda la integracion y que esta escrito en
+ * `mp/client.ts`: la verdad se le pregunta a MP, no se asume.
+ *
+ * ── El monto NUNCA viene del cliente ──
+ *
+ * La entrada es `{ tier, cycle }`, dos enums. El precio sale de
+ * `TIER_PRICES_ARS` en el servidor. Aceptar un `amount` del cliente seria
+ * dejar que el PF elija cuanto pagar, y no hay validacion que arregle eso —
+ * cualquier monto que "parezca razonable" tambien lo parece $1.
+ *
+ * ── NO se le pregunta el mail a nadie, y esa es la historia de este archivo ──
+ *
+ * La primera version creaba la suscripcion con `POST /preapproval`, que EXIGE
+ * `payer_email`. Y MP ATA el cobro a ese mail: quien paga tiene que estar
+ * logueado con el. O sea que un PF que se registra en TREINO con
+ * `juan@gmail.com` pero cuya cuenta de Mercado Pago es `jperez@hotmail.com`
+ * **no podia pagar nunca**, y el error le aparecia recien adentro del checkout
+ * —"Tu e-mail no coincide con el de la suscripcion"— donde ya no lo puede
+ * corregir. No es un caso raro: es la mitad de la gente.
+ *
+ * Se intento preguntarselo en un dialogo antes de comprar y era peor: friccion
+ * en el camino de pago para el 90% que tiene los dos mails iguales, por un
+ * detalle de la pasarela que no deberia ver nunca.
+ *
+ * Ahora el checkout va contra un PLAN (`POST /preapproval_plan`), que NO pide
+ * `payer_email`: devuelve su propio `init_point` y MP le pregunta al pagador
+ * quien es. Cualquier cuenta, cualquier mail. Verificado a mano contra la API.
+ *
+ * Se crea un plan POR CHECKOUT y no seis fijos, porque el `external_reference`
+ * vive en el plan: con planes compartidos perderiamos a quien acreditarle el
+ * cupo. Ver el encabezado de `client.ts`.
+ */
+
+import { App, getApp, initializeApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
+import * as functions from "firebase-functions/v2/https";
+import { HttpsError } from "firebase-functions/v2/https";
+import { logger } from "firebase-functions";
+import { defineSecret } from "firebase-functions/params";
+
+import { SubscriptionCycle, SubscriptionTier } from "../tier-config";
+import {
+  CYCLES,
+  PAID_TIERS,
+  amountFor,
+  frequencyMonthsFor,
+  recordPlan,
+} from "./tier-mapping";
+import { MpApiError, MpClient, createMpClient } from "./client";
+
+const MP_ACCESS_TOKEN = defineSecret("MP_ACCESS_TOKEN");
+
+/**
+ * A donde vuelve el navegador al salir del checkout. CONSTANTE del servidor, a
+ * proposito: si viniera del cliente seria un open redirect firmado por nosotros
+ * — MP mandaria al PF a donde diga el atacante, saliendo de una URL nuestra.
+ *
+ * ── Por que NO es `https://app.gettreino.com/ajustes` ──
+ *
+ * Porque esa URL no lleva a Facturacion. **El Coach Hub web usa HASH routing**:
+ * no hay una sola llamada a `usePathUrlStrategy` en el repo, asi que Flutter cae
+ * al `HashUrlStrategy` por default y el PATH se ignora entero. Verificado contra
+ * produccion el 2026-09-08: pedir `/ajustes` termina en
+ * `https://app.gettreino.com/ajustes#/login`, con el path intacto en la barra y
+ * la app resolviendo por el fragmento. Con el hash vacio, go_router arranca en
+ * su `initialLocation: '/dashboard'` (`coach_hub_router.dart`).
+ *
+ * O sea: durante toda la vida de esta constante, el PF que pagaba volvia al
+ * DASHBOARD. El `/ajustes` era decorativo.
+ *
+ * ── Por que `/abrir/profe?to=facturacion` SI funciona ──
+ *
+ * Es la misma entrada que ya usan los mails al PF (`APP_ENTRY_TRAINER` en
+ * `mail/templates.ts`), y anda por tres piezas que ya existen y estan probadas:
+ *
+ *   1. `vercel.json` redirige `/abrir/profe` a la raiz PRESERVANDO el query
+ *      string. Verificado en produccion: queda `/?to=facturacion`.
+ *   2. `buildCoachHubRouter` lee `Uri.base.queryParameters` —o sea
+ *      `location.search`, que el hash no toca— una vez al construir el router.
+ *   3. `DeepLinkDestination.fromQuery` ya entiende `to=facturacion`, y
+ *      `coachHubRedirect` lo aplica porque la landing es `location == '/'`.
+ *
+ * MP le agrega SUS parametros (`collection_status`, etc.) a este mismo query
+ * string, sin pisar el nuestro.
+ *
+ * La leccion general, que vale para cualquier link que entre desde afuera —
+ * mail, pasarela, QR—: al Coach Hub se entra por `/abrir/profe?to=...`, NUNCA
+ * por el path directo.
+ */
+const BACK_URL = "https://app.gettreino.com/abrir/profe?to=facturacion";
+
+/** Coleccion del checkout en curso por PF. Un doc por uid, se pisa. */
+export const MP_CHECKOUTS_COLLECTION = "mp_checkouts";
+
+/**
+ * Cuanto vale reusar un checkout ya abierto.
+ *
+ * Sin esto, dos clicks en "ELEGIR PLAN" abren DOS suscripciones en MP, y si el
+ * PF completa las dos paga dos veces. MP no deduplica: cada preapproval es
+ * independiente.
+ *
+ * 30 minutos es la vida util razonable de una sesion de checkout. Pasado eso se
+ * abre uno nuevo, porque un `init_point` viejo probablemente ya no le sirva a
+ * nadie.
+ */
+const CHECKOUT_REUSE_MS = 30 * 60 * 1000;
+
+export interface CreatePreapprovalRequest {
+  tier: SubscriptionTier;
+  cycle: SubscriptionCycle;
+}
+
+export interface CreatePreapprovalResult {
+  /** La URL a la que hay que mandar al PF. Es lo unico que el cliente usa. */
+  initPoint: string;
+  planId: string;
+  /** `reused` cuando se devolvio un checkout ya abierto (doble click). */
+  status: "created" | "reused";
+}
+
+export interface CreatePreapprovalDeps {
+  mpClient: MpClient;
+  /** Reloj inyectable: el reuso de checkout se testea sin esperar 30 minutos. */
+  nowMs: number;
+}
+
+function ensureApp(): App {
+  try {
+    return getApp();
+  } catch {
+    return initializeApp();
+  }
+}
+
+/** `unknown` → un miembro de la union, o `null`. Nunca un cast a ciegas. */
+function parseTier(raw: unknown): SubscriptionTier | null {
+  return typeof raw === "string" &&
+    (PAID_TIERS as readonly string[]).includes(raw)
+    ? (raw as SubscriptionTier)
+    : null;
+}
+
+function parseCycle(raw: unknown): SubscriptionCycle | null {
+  return typeof raw === "string" && (CYCLES as readonly string[]).includes(raw)
+    ? (raw as SubscriptionCycle)
+    : null;
+}
+
+/**
+ * El handler. Todo lo que decide entra por parametro: el uid y el mail ya
+ * verificados, la entrada cruda, y las dependencias.
+ *
+ *
+ * Recibe el `uid` YA extraido del token y no el `request` entero, para
+ * que sea imposible leer del body algo que tiene que salir del token.
+ */
+export async function runCreatePreapproval(
+  app: App,
+  uid: string,
+  raw: unknown,
+  deps: CreatePreapprovalDeps,
+): Promise<CreatePreapprovalResult> {
+  const body = (raw ?? {}) as Record<string, unknown>;
+
+  const tier = parseTier(body.tier);
+  if (!tier) {
+    // `free` cae acá y esta bien: no es un plan que se compre, es la ausencia
+    // de plan. Ofrecerlo en el checkout seria cobrarle a alguien por nada.
+    throw new HttpsError(
+      "invalid-argument",
+      `tier invalido: ${JSON.stringify(body.tier)}`,
+    );
+  }
+
+  const cycle = parseCycle(body.cycle);
+  if (!cycle) {
+    throw new HttpsError(
+      "invalid-argument",
+      `cycle invalido: ${JSON.stringify(body.cycle)}`,
+    );
+  }
+
+  // El rol se lee del documento, no del token: `role` es intrinseco y se
+  // provisiona server-side (AGENTS.md regla 3). Un custom claim viejo en un
+  // token sin refrescar seria una fuente mas debil.
+  const userSnap = await getFirestore(app).collection("users").doc(uid).get();
+  if (!userSnap.exists || userSnap.data()?.role !== "trainer") {
+    throw new HttpsError(
+      "permission-denied",
+      "solo un entrenador puede contratar un plan",
+    );
+  }
+
+  const amount = amountFor(tier, cycle);
+  if (amount === null) {
+    // Inalcanzable: `parseTier` ya excluyo `free`. Existe para que agregar un
+    // tier a PAID_TIERS sin precio falle acá y no con un monto `undefined`
+    // viajando a MP.
+    throw new HttpsError("internal", `sin precio para ${tier}/${cycle}`);
+  }
+
+  const checkoutRef = getFirestore(app)
+    .collection(MP_CHECKOUTS_COLLECTION)
+    .doc(uid);
+
+  // ── Reuso: el mismo plan, pedido de nuevo, dentro de la ventana ──
+  const previo = (await checkoutRef.get()).data();
+  if (previo) {
+    const creado = previo.createdAtMs;
+    const vigente =
+      typeof creado === "number" && deps.nowMs - creado < CHECKOUT_REUSE_MS;
+    if (
+      vigente &&
+      previo.tier === tier &&
+      previo.cycle === cycle &&
+      typeof previo.initPoint === "string" && previo.initPoint !== "" &&
+      typeof previo.planId === "string" && previo.planId !== ""
+    ) {
+      logger.info("mp/create-preapproval: se reusa el checkout abierto", {
+        uid,
+        tier,
+        cycle,
+        planId: previo.planId,
+      });
+      return {
+        initPoint: previo.initPoint,
+        planId: previo.planId,
+        status: "reused",
+      };
+    }
+  }
+
+  let creado;
+  try {
+    creado = await deps.mpClient.createPreapprovalPlan({
+      reason: `TREINO — ${tier} (${cycle === "annual" ? "anual" : "mensual"})`,
+      externalReference: uid,
+      backUrl: BACK_URL,
+      transactionAmount: amount,
+      frequencyMonths: frequencyMonthsFor(cycle),
+    });
+  } catch (e) {
+    const err = e as MpApiError;
+    logger.error("mp/create-preapproval: MP rechazo la creacion", {
+      uid,
+      tier,
+      cycle,
+      status: err.status,
+      body: err.body,
+    });
+    // `unavailable` solo cuando reintentar sirve: el cliente puede ofrecer
+    // "probá de nuevo" sin mentir. Lo demas es `internal` — un 401 nuestro no
+    // se arregla porque el PF vuelva a tocar el boton.
+    throw new HttpsError(
+      err.retryable ? "unavailable" : "internal",
+      "no se pudo abrir el checkout de Mercado Pago",
+    );
+  }
+
+  const planId = creado.id;
+  const initPoint = (creado as { init_point?: unknown }).init_point;
+  if (typeof planId !== "string" || planId === "") {
+    throw new HttpsError("internal", "MP no devolvio un id de plan");
+  }
+  if (typeof initPoint !== "string" || initPoint === "") {
+    // Sin `init_point` el PF no tiene a donde ir. Falla ruidoso en vez de
+    // devolver un string vacio que el cliente intentaria abrir.
+    throw new HttpsError("internal", "MP no devolvio init_point");
+  }
+
+  // El mapeo va PRIMERO, antes del doc de checkout: si algo falla despues, lo
+  // que no se puede perder es de que plan es esta suscripcion. El checkout es
+  // una comodidad; el mapeo es lo que hace reconciliable el cobro.
+  await recordPlan(app, planId, { uid, tier, cycle });
+
+  await checkoutRef.set({
+    planId,
+    tier,
+    cycle,
+    initPoint,
+    // Milisegundos y no serverTimestamp: la ventana de reuso se compara contra
+    // un reloj inyectado, y un sentinel no se puede leer en el mismo request.
+    createdAtMs: deps.nowMs,
+  });
+
+  logger.info("mp/create-preapproval: checkout abierto", {
+    uid,
+    tier,
+    cycle,
+    planId,
+  });
+
+  return { initPoint, planId, status: "created" };
+}
+
+export const createPreapproval = functions.onCall(
+  // SIN enforceAppCheck, por el mismo motivo que `acceptTrainerLink`: el Coach
+  // Hub web no activa App Check, y este callable se llama EXACTAMENTE desde
+  // ahi. Con el flag puesto, todo checkout desde la web seria rechazado.
+  //
+  // La cerradura es otra: `request.auth`, el rol leido del documento, y el
+  // hecho de que ni el MONTO ni la URL de retorno vengan del cliente. El mail
+  // del pagador SI puede venir —ver el encabezado—; lo que no puede elegir es
+  // cuanto paga ni a quien se le acredita el plan.
+  {
+    region: "southamerica-east1",
+    secrets: [MP_ACCESS_TOKEN],
+  },
+  async (request): Promise<CreatePreapprovalResult> => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "hay que estar logueado");
+    }
+    // Ya NO se lee el mail del token: el plan no lo pide y MP le pregunta al
+    // pagador quien es. Un PF sin mail en su token puede comprar igual.
+
+    return runCreatePreapproval(
+      ensureApp(),
+      request.auth.uid,
+      request.data,
+      {
+        mpClient: createMpClient(MP_ACCESS_TOKEN.value()),
+        nowMs: Date.now(),
+      },
+    );
+  },
+);

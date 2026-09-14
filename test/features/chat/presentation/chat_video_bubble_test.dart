@@ -33,6 +33,24 @@ void main() {
       expect(find.byType(FirebaseStorageVideoPlayer), findsOneWidget);
     });
 
+    // moderacion-reporte-y-bloqueo: el video también se reporta. Acá el
+    // `GestureDetector` va adentro de la burbuja y envuelve la Column entera,
+    // epígrafe incluido, porque esta burbuja no registra taps propios.
+    testWidgets('long-press dispara onLongPress', (tester) async {
+      var reported = 0;
+      final bubble = ChatVideoBubble(
+        message: _videoMsg(),
+        onLongPress: () => reported++,
+      );
+      await tester.pumpWidget(_wrap(bubble));
+      await tester.pump();
+
+      await tester.longPress(find.byType(ChatVideoBubble));
+      await tester.pump();
+
+      expect(reported, 1);
+    });
+
     testWidgets('caption is displayed below video when text non-empty',
         (tester) async {
       await tester.pumpWidget(

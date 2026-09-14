@@ -26,9 +26,10 @@
  *   `STUB_STORAGE_REACHED`    primer `.bucket()` de Cloud Storage
  *   `STUB_NETWORK_REACHED`    primer `getClient()` de `google-auth-library`
  *
- * Y uno que NO es un contacto sino una PRUEBA DE VIDA del propio stub:
+ * Y DOS que no son un contacto sino una PRUEBA DE VIDA del propio stub:
  *
  *   `STUB_ESM_INTERCEPTED`    el `import firebase-admin` de un `.mjs` cayó acá
+ *   `STUB_SUBPATH_INTERCEPTED` un `firebase-admin/<algo>` cayó acá
  *
  * Esos marcadores son la mitad útil de cada test — si aparecen DESPUÉS del
  * cartel (o no aparecen nunca, porque el guard abortó), queda probado que la
@@ -38,10 +39,11 @@
  * para poder correr el caso "no es producción" sin editar nada.
  *
  * ═══════════════════════════════════════════════════════════════════════════
- * ESTE ARCHIVO ES LA UNIÓN DE DOS PRs, Y LAS DOS MITADES SON OBLIGATORIAS.
+ * ESTE ARCHIVO ES LA UNIÓN DE CUATRO PRs, Y LAS CUATRO MITADES SON OBLIGATORIAS.
  *
- * Nació en el #835 (issue #826) y el #838 lo extendió. Ninguna de las dos
- * versiones sueltas sirve para la suite completa:
+ * Nació en el #835 (issue #826) y lo extendieron el #838, el #846 y la
+ * migración a los subpaths modulares. Ninguna de las versiones sueltas sirve
+ * para la suite completa:
  *
  *   Del #835 (lo consume `npm_entrypoints_banner.test.js`):
  *     · `googleAuthStub` + `STUB_NETWORK_REACHED`
@@ -54,6 +56,11 @@
  *   Del #846 (lo consume `strip_appointment_reason_gate.test.js`):
  *     · `register()` + `fixtures/esm_stub_hooks.mjs` — la intercepción ESM
  *     · `credential.applicationDefault` y `firestore.FieldValue`
+ *
+ *   De la migración a los subpaths (lo consume `subpath_stub_interception.test.js`):
+ *     · la intercepción de todo `firebase-admin/*` + `STUB_SUBPATH_INTERCEPTED`
+ *     · `fixtures/firebase_admin_subpaths.js` — la segunda puerta del doble
+ *     · `firestore.Timestamp` y `FieldValue.serverTimestamp`
  *
  * La mitad del #846 hace falta porque `scripts/migrations/*.mjs` son MÓDULOS
  * ESM, y un `import admin from "firebase-admin"` **no pasa por `Module._load`**:
@@ -111,6 +118,12 @@ let bucketDeclarado = null;
 // Prueba POSITIVA de que el import ESM cayó en el stub. Lo escribe el módulo
 // sintético de `esm_stub_hooks.mjs` por stderr apenas se evalúa. (#846)
 const STUB_ESM_INTERCEPTED = 'STUB_ESM_INTERCEPTED';
+// Prueba POSITIVA de que un `firebase-admin/<algo>` cayó en el doble. Mismo rol
+// que `STUB_ESM_INTERCEPTED` y por la misma razón: los tests de compuerta miden
+// por AUSENCIA de marcador, así que necesitan una afirmación en positivo que
+// distinga "el guard frenó" de "el stub no vio este módulo". Ver
+// `fixtures/firebase_admin_subpaths.js`.
+const STUB_SUBPATH_INTERCEPTED = 'STUB_SUBPATH_INTERCEPTED';
 
 function firestoreStub() {
   return {
@@ -141,6 +154,23 @@ function storageStub() {
 firestoreStub.FieldValue = {
   delete: () => ({ __stub: 'delete' }),
   arrayUnion: (...v) => ({ __stub: 'arrayUnion', v }),
+  serverTimestamp: () => ({ __stub: 'serverTimestamp' }),
+};
+
+// `Timestamp` sigue exactamente el mismo criterio que `FieldValue` de arriba, y
+// hace falta por la misma razón: 11 archivos de `scripts/` arman el update con
+// `admin.firestore.Timestamp.fromDate(…)`, y eso pasa DESPUÉS del primer
+// `.collection()` que tira el marcador. Sin esto, un cambio de orden falla con
+// `Cannot read properties of undefined (reading 'fromDate')` —que parece un bug
+// del script— en vez de con `STUB_FIRESTORE_REACHED`, que es lo que el test
+// quiere leer.
+//
+// Devuelven valores inertes: el doble NO simula Firestore, sólo evita el
+// TypeError que taparía el marcador.
+firestoreStub.Timestamp = {
+  now: () => ({ __stub: 'Timestamp.now' }),
+  fromDate: (fecha) => ({ __stub: 'Timestamp.fromDate', fecha }),
+  fromMillis: (ms) => ({ __stub: 'Timestamp.fromMillis', ms }),
 };
 
 /**
@@ -188,6 +218,79 @@ const adminStub = {
   storage: storageStub,
 };
 
+// ─── La segunda puerta: los subpaths modulares (`firebase-admin/*`) ─────────
+//
+// Todo el porqué está en `fixtures/firebase_admin_subpaths.js`. Acá va sólo el
+// cableado, y lo único que hay que retener leyendo este archivo es la regla:
+//
+//   TODO `firebase-admin/<algo>` SE INTERCEPTA. Sin excepciones, sin allowlist.
+//
+// No es una lista de subpaths conocidos a propósito: una lista se desactualiza
+// —el patrón del #826— y el modo de falla de este archivo en particular es un
+// VERDE, no un rojo. Un subpath que se escape cae en el SDK real y el test de
+// compuerta que lo mira sigue en verde midiendo nada.
+//
+// Los tres que el doble modela salen de `construirSubpaths`, armados con las
+// MISMAS piezas que `adminStub`. Los que no, caen en `subpathNoModelado()` y
+// gritan al primer acceso.
+
+const { construirSubpaths } = require('./firebase_admin_subpaths');
+
+const modulosModulares = construirSubpaths(adminStub, firestoreStub);
+
+/** Subpaths ya anunciados por stderr. El marcador se emite una vez por módulo. */
+const subpathsAnunciados = new Set();
+
+function anunciarSubpath(subpath) {
+  if (subpathsAnunciados.has(subpath)) return;
+  subpathsAnunciados.add(subpath);
+  process.stderr.write(`${STUB_SUBPATH_INTERCEPTED} ${subpath}\n`);
+}
+
+/**
+ * Lo que se devuelve para un `firebase-admin/<algo>` que el doble intercepta
+ * pero todavía no modela (`/auth`, `/messaging`, `/database`, y cualquiera que
+ * aparezca mañana).
+ *
+ * Interceptado y RUIDOSO: cualquier lectura tira un error que dice qué falta y
+ * dónde agregarlo. El punto es que el módulo real no llegue nunca — un doble
+ * incompleto que grita es recuperable; uno ausente que deja pasar el SDK real
+ * es el bug que este archivo existe para cerrar.
+ *
+ * Los símbolos y un puñado de propiedades que Node y los `require` interop
+ * consultan solos pasan como `undefined`: si tiraran, el error saldría en el
+ * `require`, antes de que el script llegue a pedir lo que le importa, y el
+ * mensaje apuntaría al lugar equivocado.
+ */
+const PROPIEDADES_INOCENTES = new Set(['__esModule', 'then', 'default', 'constructor', 'toJSON']);
+
+function subpathNoModelado(subpath) {
+  return new Proxy(
+    {},
+    {
+      get(_destino, prop) {
+        if (prop === '__stubDeTest') return true;
+        if (typeof prop === 'symbol' || PROPIEDADES_INOCENTES.has(prop)) return undefined;
+        throw new Error(
+          `STUB_SUBPATH_NO_MODELADO: el doble intercepta '${subpath}' pero no modela ` +
+            `'${String(prop)}'. Agregalo en fixtures/firebase_admin_subpaths.js, del mismo ` +
+            'objeto del que sale la puerta namespaced — nunca como una pieza aparte.',
+        );
+      },
+    },
+  );
+}
+
+function moduloModular(subpath) {
+  anunciarSubpath(subpath);
+  return modulosModulares[subpath] || subpathNoModelado(subpath);
+}
+
+// El hilo principal se lo publica al módulo sintético que genera el hook ESM:
+// los hooks corren en OTRO hilo y no pueden ver esto, pero el `source` que
+// devuelven se evalúa acá. Es el mismo mecanismo que `__STUB_FIREBASE_ADMIN__`.
+globalThis.__STUB_FIREBASE_ADMIN_SUBPATH__ = moduloModular;
+
 /**
  * `deploy_rules.js` no pasa por `firebase-admin`: usa `google-auth-library` y
  * pega directo contra la REST API de Firebase Rules. Sin este stub el test
@@ -209,6 +312,12 @@ const cargaOriginal = Module._load;
 
 Module._load = function cargaInterceptada(request, parent, isMain) {
   if (request === 'firebase-admin') return adminStub;
+  // `startsWith` y no una lista: ver el bloque de los subpaths más arriba. El
+  // specifier exacto era justamente el agujero — `firebase-admin/firestore` no
+  // es `firebase-admin`, y hasta este cambio se iba derecho al SDK real.
+  if (typeof request === 'string' && request.startsWith('firebase-admin/')) {
+    return moduloModular(request);
+  }
   if (request === 'google-auth-library') return googleAuthStub;
 
   // El nombre real del key (#826): `sa-key.json`, no
@@ -307,5 +416,6 @@ module.exports = {
   STUB_STORAGE_REACHED,
   STUB_NETWORK_REACHED,
   STUB_ESM_INTERCEPTED,
+  STUB_SUBPATH_INTERCEPTED,
   RUTA_CREDENCIAL_FALSA,
 };

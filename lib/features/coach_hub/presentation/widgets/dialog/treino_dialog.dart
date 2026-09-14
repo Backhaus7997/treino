@@ -10,6 +10,7 @@ import '../../../../../app/theme/tokens/primitives.dart';
 import '../../../../../core/widgets/treino_icon.dart';
 import '../preview_wrapper.dart';
 import '../treino_interactive_state.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 /// Previews del kit — Finding W3.
 @Preview(name: 'Dialog — normal', wrapper: coachHubPreviewWrapper)
@@ -189,7 +190,7 @@ class TreinoDialog extends StatelessWidget {
                           errorMessage!,
                           style: TextStyle(
                             fontFamily: AppFonts.barlow,
-                            fontSize: 13,
+                            fontSize: AppTextSize.bodyDense,
                             color: palette.danger,
                           ),
                         ),
@@ -236,16 +237,17 @@ class _Header extends StatelessWidget {
             style: TextStyle(
               fontFamily: AppFonts.barlowCondensed,
               fontWeight: FontWeight.w700,
-              fontSize: 20,
+              fontSize: AppTextSize.titleLarge,
               color: tokens.titleColor,
             ),
           ),
         ),
-        IconButton(
+        TreinoIconButton(
           key: const Key('dialog_close_button'),
+          icon: TreinoIcon.close,
+          tooltip: 'Cerrar', // i18n
+          color: tokens.contentColor,
           onPressed: () => Navigator.of(context).maybePop(),
-          icon: Icon(TreinoIcon.close, color: tokens.contentColor, size: 18),
-          splashRadius: 18,
         ),
       ],
     );
@@ -361,7 +363,7 @@ class _DialogActionButton extends StatelessWidget {
                   style: TextStyle(
                     fontFamily: AppFonts.barlow,
                     fontWeight: FontWeight.w600,
-                    fontSize: 14,
+                    fontSize: AppTextSize.body,
                     color: color,
                   ),
                 ),

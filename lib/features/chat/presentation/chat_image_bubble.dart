@@ -14,9 +14,19 @@ import 'photo_viewer_screen.dart';
 /// placeholder. Tap opens [PhotoViewerScreen] for fullscreen interaction.
 /// Caption is rendered below the image when [message.text] is non-empty.
 class ChatImageBubble extends StatelessWidget {
-  const ChatImageBubble({super.key, required this.message});
+  const ChatImageBubble({super.key, required this.message, this.onLongPress});
 
   final Message message;
+
+  /// Acción secundaria del long-press — hoy, reportar el mensaje
+  /// (moderacion-reporte-y-bloqueo). `null` en los mensajes propios.
+  ///
+  /// Entra por parámetro en vez de envolver la burbuja desde afuera porque
+  /// `TreinoTappable` ya maneja el tap de esta imagen, y su dartdoc lo dice:
+  /// un `GestureDetector` por encima de un widget que ya maneja taps hace
+  /// competir a los dos recognizers en el gesture arena. `onLongPress` es su
+  /// acción secundaria justamente para este caso.
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -29,6 +39,7 @@ class ChatImageBubble extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         TreinoTappable(
+          onLongPress: onLongPress,
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute<void>(

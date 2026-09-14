@@ -17,6 +17,10 @@ import '../../feed/application/follow_providers.dart';
 import '../../feed/domain/follow.dart';
 import '../../feed/domain/follow_status.dart';
 import '../../feed/presentation/widgets/post_avatar.dart';
+import '../../moderation/domain/report_target_kind.dart';
+import '../../moderation/presentation/moderation_actions.dart';
+import '../../paywall/application/athlete_entitlement_provider.dart'
+    show chatMediaQuotaProvider;
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
@@ -128,9 +132,56 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
+  /// Muestra un aviso del gate de cuota. Local y no por el messenger root: a
+  /// diferencia de la falla de envío (#435), acá la pantalla está viva por
+  /// construcción — el usuario acaba de tocar el clip.
+  void _toastQuota(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  static String _mb(int bytes) => (bytes / (1024 * 1024)).toStringAsFixed(1);
+
+  /// El gate de UX del tope de media de chat (#chat-media-quota).
+  ///
+  /// **Client-side es UX; server-side es la ley.** El enforcement real vive en
+  /// `chatMediaWriteAllowed()` de `storage.rules` y en la CF
+  /// `maintainChatMediaQuota*`. Esto sólo existe para no hacerle gastar datos
+  /// móviles al usuario en bytes que el servidor va a rebotar igual.
+  ///
+  /// Los dos chequeos están donde están por un motivo, y no son
+  /// intercambiables:
+  ///
+  ///   • **Cupo agotado, ANTES de abrir la galería.** Si ya no entra nada, no
+  ///     hay archivo que pueda elegir que sirva: ofrecerle el picker es
+  ///     hacerle perder el tiempo. Es un gate de entrada legítimo porque acá
+  ///     NO hay salida adentro — los mensajes son inmutables y la app no tiene
+  ///     UI para borrar media de un chat.
+  ///   • **Tamaño, DESPUÉS de elegir.** Recién ahí se sabe cuánto pesa. Frenar
+  ///     acá es lo que evita el peor desperdicio del flujo: sin esto el usuario
+  ///     sube hasta 50 MB de datos móviles para que el servidor los rechace al
+  ///     final, cuando ya los pagó él.
+  ///
+  /// Con cupo PARCIAL no se puede gatear en la entrada: 10 MB libres alcanzan
+  /// para una foto y no para un video, y hasta no ver el archivo no se sabe
+  /// cuál de los dos es. Por eso después de elegir se chequean los DOS topes
+  /// —el del archivo y el del cupo que queda— con mensajes distintos.
+  ///
+  /// El `quota == null` NO gatea, mismo criterio que `AthleteEntitlement
+  /// .unknown`: mientras el read no aterrizó no se sabe, y bloquearle el clip a
+  /// alguien que tiene cupo es peor que dejar pasar un tap que el servidor
+  /// rebota igual.
   Future<void> _onAttach() async {
     if (_sending || _mediaSendInFlight) return;
     final l10n = AppL10n.of(context);
+
+    final quota = ref.read(chatMediaQuotaProvider).valueOrNull;
+    if (quota != null && quota.isFull) {
+      _toastQuota(l10n.chatMediaQuotaFull(_mb(quota.maxBytes)));
+      return;
+    }
+
     // Capturado antes de los awaits: el envío pertenece a ESTE chat pase lo
     // que pase con la pantalla mientras el sheet/picker están abiertos.
     final chatId = widget.chatId;
@@ -159,6 +210,32 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
 
     if (file == null || !mounted) return;
+
+    // `XFile.length()` y no `File(path).length()`: el chat también se renderiza
+    // en el Coach Hub web, donde `dart:io` no existe.
+    final bytes = await file.length();
+    if (!mounted) return;
+    if (quota != null) {
+      final isVideo = mediaType == MediaType.video;
+      final perFile = isVideo ? quota.maxVideoBytes : quota.maxImageBytes;
+      // Los dos mensajes se separan a propósito: «el máximo es 25 MB» y «te
+      // quedan 3 MB» le dicen al usuario cosas distintas sobre qué hacer, y un
+      // solo mensaje genérico lo dejaría probando con archivos más chicos
+      // contra un tope que no se mueve.
+      if (bytes >= perFile) {
+        _toastQuota(l10n.chatMediaFileTooLarge(_mb(bytes), _mb(perFile)));
+        return;
+      }
+      if (bytes > quota.remainingBytes) {
+        _toastQuota(
+          l10n.chatMediaQuotaNotEnough(
+            _mb(bytes),
+            _mb(quota.remainingBytes < 0 ? 0 : quota.remainingBytes),
+          ),
+        );
+        return;
+      }
+    }
 
     // Fire-and-forget A PROPÓSITO (issue #435): el controller vive en el
     // ProviderContainer y completa upload+send aunque esta pantalla muera.
@@ -193,20 +270,46 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     // escape el entrenador perdería el composer aunque el servidor se lo
     // permita.
     //
-    // `valueOrNull` en vez de bloquear con el AsyncValue: mientras carga se
-    // asume que SÍ puede escribir. Un falso positivo momentáneo termina en un
-    // `permission-denied` recuperable; un falso negativo le tapa el composer a
-    // alguien que sí puede, en cada apertura de chat.
-    final chat = ref.watch(chatByIdProvider(widget.chatId)).valueOrNull;
+    // Mientras carga se asume que SÍ puede escribir. Un falso positivo
+    // momentáneo termina en un `permission-denied` recuperable; un falso
+    // negativo le tapa el composer a alguien que sí puede, en cada apertura
+    // de chat.
+    //
+    // Eso es lo que este comentario prometía y lo que el código hacía al
+    // revés. `valueOrNull` sobre un `AsyncLoading` da null, así que
+    // `isCoachChat` daba false, `chat?.isInquiry == true` daba false y
+    // `incomingEdge?.status` daba null: los tres términos en false y el
+    // composer gris con el cartel de "esta persona tiene que seguirte" en
+    // CADA entrada al chat. La única escapatoria era `currentUid == null`,
+    // que es justo el caso que no le importa a nadie.
+    //
+    // Y no era un edge case de cold start: los dos providers son
+    // `autoDispose` sin `keepAlive`, así que salir de la pantalla los
+    // destruye y cada `ChatScreen` nuevo vuelve a arrancar en `AsyncLoading`.
+    final chatAsync = ref.watch(chatByIdProvider(widget.chatId));
+    final chat = chatAsync.valueOrNull;
     final isCoachChat = chat?.linkId != null;
-    final incomingEdge = currentUid == null
+    final edgeAsync = currentUid == null
         ? null
-        : ref
-            .watch(followEdgeProvider(
-              Follow.edgeId(widget.otherUid, currentUid),
-            ))
-            .valueOrNull;
-    final canWrite = isCoachChat ||
+        : ref.watch(followEdgeProvider(
+            Follow.edgeId(widget.otherUid, currentUid),
+          ));
+    final incomingEdge = edgeAsync?.valueOrNull;
+    // "Ya sé la respuesta", no "la respuesta es que no". `hasValue` es false
+    // mientras carga Y ante un error sin valor previo: en los dos casos no
+    // sabemos, y no saber no puede leerse como una negativa.
+    final gateResuelto = chatAsync.hasValue && (edgeAsync?.hasValue ?? true);
+    // Las TRES ramas por las que escapa `senderMayPost` en las reglas
+    // (`firestore.rules`): vínculo, pre-consulta, y arista social aceptada.
+    //
+    // La pre-consulta faltaba, y la asimetría siempre cae para el mismo lado:
+    // la app quedaba MÁS ESTRICTA QUE EL SERVIDOR y le tapaba el composer a
+    // alguien a quien Firestore le habría aceptado el mensaje. Justo el caso
+    // que motiva la feature — consultarle algo a un entrenador ANTES de
+    // pedirle el vínculo—, que sin escribir no existe.
+    final canWrite = !gateResuelto ||
+        isCoachChat ||
+        chat?.isInquiry == true ||
         incomingEdge?.status == FollowStatus.accepted ||
         currentUid == null;
     final pubAsync = ref.watch(userPublicProfileProvider(widget.otherUid));
@@ -320,6 +423,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           message: msg,
                           isMine: isMine,
                           palette: palette,
+                          ref: ref,
                         );
                       },
                     );
@@ -364,11 +468,16 @@ class _Bubble extends StatelessWidget {
     required this.message,
     required this.isMine,
     required this.palette,
+    required this.ref,
   });
 
   final Message message;
   final bool isMine;
   final AppPalette palette;
+
+  /// Sólo para disparar `reportContent` desde el long-press — mismo `ref` de
+  /// `_ChatScreenState`, no un provider propio.
+  final WidgetRef ref;
 
   @override
   Widget build(BuildContext context) {
@@ -380,7 +489,10 @@ class _Bubble extends StatelessWidget {
         alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
-          child: ChatImageBubble(message: message),
+          child: ChatImageBubble(
+            message: message,
+            onLongPress: _onReport(context),
+          ),
         ),
       );
     }
@@ -390,7 +502,10 @@ class _Bubble extends StatelessWidget {
         alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
-          child: ChatVideoBubble(message: message),
+          child: ChatVideoBubble(
+            message: message,
+            onLongPress: _onReport(context),
+          ),
         ),
       );
     }
@@ -402,32 +517,69 @@ class _Bubble extends StatelessWidget {
       bottomLeft: Radius.circular(isMine ? 14 : 4),
       bottomRight: Radius.circular(isMine ? 4 : 14),
     );
+    Widget bubble = Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: isMine ? palette.accent : palette.bgCard,
+        borderRadius: radius,
+        border: isMine ? null : Border.all(color: palette.border),
+      ),
+      child: Text(
+        message.text,
+        style: TextStyle(
+          color: isMine
+              ? TreinoButtonTokens.foreground(context)
+              : palette.textPrimary,
+          fontSize: 14,
+        ),
+      ),
+    );
+
+    bubble = _reportable(context, bubble);
+
     return Align(
       alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: MediaQuery.of(context).size.width * 0.75,
         ),
-        child: Container(
-          margin: const EdgeInsets.symmetric(vertical: 4),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            color: isMine ? palette.accent : palette.bgCard,
-            borderRadius: radius,
-            border: isMine ? null : Border.all(color: palette.border),
-          ),
-          child: Text(
-            message.text,
-            style: TextStyle(
-              color: isMine
-                  ? TreinoButtonTokens.foreground(context)
-                  : palette.textPrimary,
-              fontSize: 14,
-            ),
-          ),
-        ),
+        child: bubble,
       ),
     );
+  }
+
+  /// Acción de reporte del long-press, o `null` si el mensaje es propio.
+  ///
+  /// La consumen las TRES ramas de [build] —texto, imagen y video—, no sólo la
+  /// de texto. Mientras el long-press vivió inline al final del método, las
+  /// ramas de `MediaType.image` y `MediaType.video` retornaban ANTES de llegar
+  /// a él: el contenido de más riesgo del chat —una foto o un video que manda
+  /// otra persona— era justamente el único sin forma de reportarse, que es lo
+  /// primero que mira la Guideline 1.2 de App Store.
+  ///
+  /// `null` en los mensajes propios (moderacion-reporte-y-bloqueo): reportarse
+  /// a uno mismo no tiene sentido, mismo criterio que el gate `isOwner` de
+  /// `PostCard`. Cada burbuja decide CÓMO registrarlo —`ChatImageBubble` por el
+  /// `onLongPress` de su `TreinoTappable`, las otras dos con un
+  /// `GestureDetector` propio— porque envolver desde afuera un widget que ya
+  /// maneja taps hace competir a los recognizers.
+  VoidCallback? _onReport(BuildContext context) {
+    if (isMine) return null;
+    return () => reportContent(
+          context,
+          ref,
+          targetKind: ReportTargetKind.message,
+          targetId: message.id,
+          targetOwnerUid: message.senderId,
+        );
+  }
+
+  /// Envuelve la burbuja de TEXTO con el long-press de [_onReport].
+  Widget _reportable(BuildContext context, Widget child) {
+    final onReport = _onReport(context);
+    if (onReport == null) return child;
+    return GestureDetector(onLongPress: onReport, child: child);
   }
 }
 

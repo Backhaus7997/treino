@@ -6,6 +6,39 @@ void main() {
   // SCENARIO-407: TrainerPublicProfile full JSON roundtrip.
   // SCENARIO-408: roundtrip with all nullable fields null.
   group('TrainerPublicProfile', () {
+    // #637 — EL DEFAULT ES LOAD-BEARING, no una preferencia de estilo.
+    //
+    // `firestore.rules` lee el campo con `.get('acceptsInquiries', true)`: un
+    // PF sin el campo ES consultable. El modelo tiene que decir lo mismo. Con
+    // `@Default(false)`, todo PF que nunca tocó el toggle —o sea TODOS los que
+    // ya existen— aparecería con las consultas apagadas en la UI mientras el
+    // servidor se las sigue aceptando. Dos fuentes de verdad en desacuerdo
+    // sobre quién puede hablarte.
+    test(
+        'un perfil SIN el campo acepta consultas (espeja el default de la rule)',
+        () {
+      final restored = TrainerPublicProfile.fromJson(const {
+        'uid': 'trainer-legacy',
+        'displayName': 'PF de antes del campo',
+      });
+
+      expect(restored.acceptsInquiries, isTrue);
+    });
+
+    test('acceptsInquiries:false sobrevive el roundtrip', () {
+      const profile = TrainerPublicProfile(
+        uid: 'trainer-1',
+        acceptsInquiries: false,
+      );
+
+      final restored = TrainerPublicProfile.fromJson(profile.toJson());
+
+      expect(restored.acceptsInquiries, isFalse);
+      // Y viaja en el JSON: si `toJson` se lo comiera, el dual-write mandaría
+      // un doc sin el campo y la rule volvería a leer el default `true`.
+      expect(profile.toJson()['acceptsInquiries'], isFalse);
+    });
+
     test('SCENARIO-407: full JSON roundtrip preserves all fields', () {
       const profile = TrainerPublicProfile(
         uid: 'trainer-1',

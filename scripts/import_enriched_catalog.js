@@ -24,6 +24,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { getFirestore } = require('firebase-admin/firestore');
 
 const WRITE = process.argv.includes('--write');
 const REPLACE = process.argv.includes('--replace');
@@ -49,8 +50,8 @@ async function main() {
 
   // Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla
   // cerrado; contra el emulador no pide nada. Ver scripts/lib/admin.js.
-  const { admin } = require('./lib/admin').inicializarAdmin();
-  const db = admin.firestore();
+  const { app } = require('./lib/admin').inicializarAdmin();
+  const db = getFirestore(app);
   const col = db.collection('exercises');
 
   const newIds = new Set(docs.map((d) => d.id));

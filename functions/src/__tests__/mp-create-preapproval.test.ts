@@ -1,0 +1,585 @@
+/**
+ * mp-create-preapproval.test.ts — el unico punto de la app que abre un cobro.
+ * LOCAL, sin emulador y SIN RED: el cliente de MP entra por parametro.
+ *
+ * Lo que estos tests cuidan no es que "ande": es que el PF no pueda elegir
+ * cuanto paga, a nombre de quien, ni a donde vuelve — y que crear un checkout
+ * NO le regale el limite del plan.
+ */
+
+jest.mock("firebase-functions", () => ({
+  logger: { warn: jest.fn(), info: jest.fn(), error: jest.fn() },
+}));
+jest.mock("firebase-functions/params", () => ({
+  defineSecret: () => ({ value: () => "TEST-token" }),
+}));
+jest.mock("firebase-admin", () => ({
+  firestore: Object.assign(jest.fn(), {
+    FieldValue: { serverTimestamp: () => "__ts__" },
+  }),
+  app: jest.fn(),
+  initializeApp: jest.fn(),
+}));
+
+// La puerta modular de `firebase-admin/app`, traducida al doble namespaced.
+//
+// Producción dejó de hacer `admin.app()` y ahora usa `getApp()`; el
+// `jest.mock("firebase-admin", …)` de arriba no cubre ese specifier. Los dobles
+// salen del MISMO objeto, así que no pueden driftear.
+//
+// Lo fija `firebase-admin-mock-surface.test.ts`.
+jest.mock("firebase-admin/app", () => (
+    jest.requireActual("./helpers/modular-from-namespaced") as Record<
+      string,
+      () => unknown
+    >
+).app());
+
+
+// La puerta modular tiene que dar EL MISMO doble que la namespaced de arriba.
+//
+// `jest.mock("firebase-admin", …)` intercepta el specifier EXACTO. Producción
+// importa FieldValue de `firebase-admin/firestore`, y sin esto le
+// llega el REAL: el Firestore de mentira de este archivo no reconoce sus
+// sentinels, guarda basura en vez de aplicarlos, y el test falla —o peor, pasa—
+// por un motivo que no tiene que ver con lo que quiere probar.
+//
+// Getters y no valores: los factories se evalúan por demanda, así que esto no
+// depende del orden entre los dos `jest.mock`.
+//
+// Lo fija `firebase-admin-mock-surface.test.ts`.
+jest.mock("firebase-admin/firestore", () => (
+    jest.requireActual("./helpers/modular-from-namespaced") as Record<
+      string,
+      () => unknown
+    >
+).firestoreDesdeApp());
+
+import { HttpsError } from "firebase-functions/v2/https";
+
+import { runCreatePreapproval } from "../subscriptions/mp/create-preapproval";
+import {
+  MpApiError,
+  MpClient,
+  MpPreapprovalPlan,
+} from "../subscriptions/mp/client";
+import { TIER_PRICES_ARS } from "../subscriptions/tier-config";
+
+// ---------------------------------------------------------------------------
+// Un Firestore de mentira, chico a proposito: solo `collection().doc().get()`
+// y `.set()`, que es todo lo que el handler usa. El helper `fake-tx-firestore`
+// del repo modela TRANSACCIONES y esta tipado a dos colecciones; acá no hay
+// transaccion y hay tres.
+// ---------------------------------------------------------------------------
+
+type Store = Record<string, Record<string, Record<string, unknown>>>;
+
+function fakeApp(seed: Store = {}) {
+  const store: Store = JSON.parse(JSON.stringify(seed));
+  const escrituras: { col: string; id: string; data: unknown }[] = [];
+
+  const app = {
+    firestore: () => ({
+      collection: (col: string) => ({
+        doc: (id: string) => ({
+          get: async () => ({
+            exists: store[col]?.[id] !== undefined,
+            data: () => store[col]?.[id],
+          }),
+          set: async (data: Record<string, unknown>) => {
+            store[col] = store[col] ?? {};
+            store[col][id] = data;
+            escrituras.push({ col, id, data });
+          },
+        }),
+      }),
+    }),
+  };
+
+  return { app: app as never, store, escrituras };
+}
+
+/** Un cliente de MP de mentira que anota con qué lo llamaron. */
+function fakeMp(
+  respuesta: MpPreapprovalPlan | Error = { id: "2c93", init_point: "https://mp/x" },
+) {
+  const llamadas: unknown[] = [];
+  const bajas: string[] = [];
+  const client: MpClient = {
+    getPreapproval: async () => ({}),
+    searchPreapprovalsByPlan: async () => [],
+    createPreapprovalPlan: async (input) => {
+      llamadas.push(input);
+      if (respuesta instanceof Error) throw respuesta;
+      return respuesta;
+    },
+    // Se anota en vez de tirar: lo que estos tests fijan es que NUNCA se llame,
+    // y una excepcion se veria como un fallo del checkout en vez de como lo que
+    // seria — una baja que no correspondia.
+    cancelPreapproval: async (id) => {
+      bajas.push(id);
+      return { id, status: "cancelled" };
+    },
+  };
+  return { client, llamadas, bajas };
+}
+
+const PF = { users: { t1: { role: "trainer" } } };
+const OK = { mpClient: fakeMp().client, nowMs: 1_000_000 };
+
+async function errorDe(fn: () => Promise<unknown>): Promise<HttpsError> {
+  try {
+    await fn();
+  } catch (e) {
+    return e as HttpsError;
+  }
+  throw new Error("se esperaba un HttpsError y la llamada resolvio bien");
+}
+
+beforeEach(() => jest.clearAllMocks());
+
+describe("runCreatePreapproval — el camino feliz", () => {
+  it("devuelve el init_point y el id que dio MP", async () => {
+    const { app } = fakeApp(PF);
+    const mp = fakeMp();
+
+    const r = await runCreatePreapproval(app, "t1", {
+      tier: "plan2",
+      cycle: "monthly",
+    }, { ...OK, mpClient: mp.client });
+
+    expect(r).toEqual({
+      initPoint: "https://mp/x",
+      planId: "2c93",
+      status: "created",
+    });
+  });
+
+  it("abrir un checkout NO da de baja la suscripcion que el PF ya tiene", async () => {
+    // Es la mitad de la decision de diseño del cobro doble, y la que se puede
+    // fijar desde acá. Abrir un checkout no es pagar: MP deja la suscripcion en
+    // `pending` hasta que el PF carga el medio de pago. Cancelar la vieja en
+    // este momento dejaria SIN PLAN al que mira el precio y cierra la pestaña —
+    // y la baja en MP es terminal, no se deshace arrepintiendose.
+    //
+    // La vieja se cancela cuando la nueva queda CONFIRMADA, desde el
+    // reconciliador. Ver el encabezado de `mp/reconcile.ts`.
+    const { app } = fakeApp({
+      users: {
+        t1: {
+          role: "trainer",
+          subscription: { tier: "plan2", status: "active" },
+        },
+      },
+    });
+    const mp = fakeMp();
+
+    await runCreatePreapproval(app, "t1", {
+      tier: "plan3",
+      cycle: "monthly",
+    }, { ...OK, mpClient: mp.client });
+
+    expect(mp.bajas).toEqual([]);
+  });
+
+  it("guarda el mapeo preapproval → (PF, plan), que es lo unico irrecuperable", async () => {
+    // Sin este documento, un webhook con un id no sabe de que plan es la
+    // suscripcion: MP no devuelve `preapproval_plan_id`.
+    const { app, store } = fakeApp(PF);
+
+    await runCreatePreapproval(app, "t1", {
+      tier: "plan3",
+      cycle: "annual",
+    }, OK);
+
+    expect(store.mp_plans["2c93"]).toMatchObject({
+      uid: "t1",
+      tier: "plan3",
+      cycle: "annual",
+    });
+  });
+
+  it("el mapeo se escribe ANTES que el doc de checkout", async () => {
+    // El orden es la politica: si algo falla en el medio, lo que no se puede
+    // perder es de que plan es el cobro. El checkout es una comodidad.
+    const { app, escrituras } = fakeApp(PF);
+
+    await runCreatePreapproval(app, "t1", {
+      tier: "plan1",
+      cycle: "monthly",
+    }, OK);
+
+    expect(escrituras.map((e) => e.col)).toEqual([
+      "mp_plans",
+      "mp_checkouts",
+    ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LA INVARIANTE. Si esto se rompe, cualquiera se regala un plan tocando un
+// boton: crear un checkout deja de ser "pedir pagar" y pasa a ser "cobrar".
+// ---------------------------------------------------------------------------
+
+describe("runCreatePreapproval — NO otorga entitlement", () => {
+  it("no escribe `subscription` en NINGUN caso", async () => {
+    const { app, escrituras, store } = fakeApp(PF);
+
+    await runCreatePreapproval(app, "t1", {
+      tier: "plan3",
+      cycle: "annual",
+    }, OK);
+
+    expect(escrituras.some((e) => e.col === "users")).toBe(false);
+    expect(store.users.t1.subscription).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Lo que el cliente NO decide. Cada uno de estos tres fue un agujero real en
+// integraciones de pago ajenas.
+// ---------------------------------------------------------------------------
+
+describe("runCreatePreapproval — el cliente no elige nada que cueste plata", () => {
+  it("el MONTO sale de la tabla del servidor, no del request", async () => {
+    const { app } = fakeApp(PF);
+    const mp = fakeMp();
+
+    await runCreatePreapproval(app, "t1", {
+      tier: "plan2",
+      cycle: "monthly",
+      // Lo que un atacante mandaria. Tiene que ser ignorado por completo.
+      amount: 1,
+      transactionAmount: 1,
+      transaction_amount: 1,
+    }, { ...OK, mpClient: mp.client });
+
+    expect((mp.llamadas[0] as { transactionAmount: number }).transactionAmount)
+      .toBe(TIER_PRICES_ARS.plan2.monthly);
+    expect((mp.llamadas[0] as { transactionAmount: number }).transactionAmount)
+      .not.toBe(1);
+  });
+
+  // ── El mail: MP ya no lo pide, y por eso desaparecieron sus tests ──
+  //
+  // Habia tres tests acá sobre de donde salia `payer_email` y cual ganaba.
+  // Ya no existen porque el dato ya no existe: el checkout va contra un PLAN,
+  // que no lo pide, y MP le pregunta al pagador quien es. El test de abajo
+  // pinea justamente eso.
+
+  it("NO se le manda ningun mail a MP — el plan no lo pide", async () => {
+    // Si alguien vuelve a mandarlo, MP ata el cobro a ese mail y reaparece el
+    // bug que este rediseño existe para matar: el PF cuya cuenta de Mercado
+    // Pago usa otro mail no puede pagar nunca.
+    const { app } = fakeApp(PF);
+    const mp = fakeMp();
+
+    await runCreatePreapproval(app, "t1", {
+      tier: "plan1",
+      cycle: "monthly",
+      payerEmail: "loquesea@x.com",
+    }, { ...OK, mpClient: mp.client });
+
+    expect(mp.llamadas[0]).not.toHaveProperty("payerEmail");
+    expect(JSON.stringify(mp.llamadas[0])).not.toContain("loquesea");
+  });
+
+  it("el PLAN se le acredita a quien PIDIO", async () => {
+    // `external_reference` lleva el uid del que llamo. Es lo que reemplaza al
+    // mail como vinculo con la persona, y ahora es el UNICO.
+    const { app, store } = fakeApp(PF);
+    const mp = fakeMp();
+
+    await runCreatePreapproval(app, "t1", {
+      tier: "plan2", cycle: "monthly",
+    }, { ...OK, mpClient: mp.client });
+
+    expect((mp.llamadas[0] as { externalReference: string }).externalReference)
+      .toBe("t1");
+    expect(store.mp_plans["2c93"]).toMatchObject({ uid: "t1" });
+  });
+
+  it("la URL de retorno es del servidor — si no, es un open redirect", async () => {
+    const { app } = fakeApp(PF);
+    const mp = fakeMp();
+
+    await runCreatePreapproval(app, "t1", {
+      tier: "plan1",
+      cycle: "monthly",
+      backUrl: "https://atacante.com",
+      back_url: "https://atacante.com",
+    }, { ...OK, mpClient: mp.client });
+
+    expect((mp.llamadas[0] as { backUrl: string }).backUrl)
+      .toBe("https://app.gettreino.com/abrir/profe?to=facturacion");
+  });
+
+  it("la URL de retorno entra por `/abrir/profe`, no por el path directo", async () => {
+    // El Coach Hub web usa HASH routing: el path se ignora entero, asi que
+    // `https://app.gettreino.com/ajustes` dejaba al PF que pago en el DASHBOARD.
+    // Se entra por la misma puerta que los mails, que Vercel redirige a la raiz
+    // preservando el query, y ahi `DeepLinkDestination` resuelve el destino.
+    // Ver el encabezado de BACK_URL en `create-preapproval.ts`.
+    const { app } = fakeApp(PF);
+    const mp = fakeMp();
+
+    await runCreatePreapproval(
+      app, "t1", { tier: "plan1", cycle: "monthly" },
+      { ...OK, mpClient: mp.client },
+    );
+
+    const { backUrl } = mp.llamadas[0] as { backUrl: string };
+    expect(backUrl).toContain("/abrir/profe");
+    expect(backUrl).toContain("to=facturacion");
+    // El path pelado es exactamente lo que NO funciona.
+    expect(backUrl).not.toBe("https://app.gettreino.com/ajustes");
+  });
+
+  it("el ciclo anual cobra 12 meses, no 1", async () => {
+    const { app } = fakeApp(PF);
+    const mp = fakeMp();
+
+    await runCreatePreapproval(app, "t1", {
+      tier: "plan2",
+      cycle: "annual",
+    }, { ...OK, mpClient: mp.client });
+
+    const call = mp.llamadas[0] as { frequencyMonths: number; transactionAmount: number };
+    expect(call.frequencyMonths).toBe(12);
+    expect(call.transactionAmount).toBe(TIER_PRICES_ARS.plan2.annual);
+  });
+});
+
+describe("runCreatePreapproval — quien puede y quien no", () => {
+  it("un alumno no puede contratar un plan de entrenador", async () => {
+    const { app, escrituras } = fakeApp({ users: { a1: { role: "athlete" } } });
+
+    const err = await errorDe(() =>
+      runCreatePreapproval(app, "a1", {
+        tier: "plan1", cycle: "monthly",
+      }, OK));
+
+    expect(err.code).toBe("permission-denied");
+    expect(escrituras).toHaveLength(0);
+  });
+
+  it("un uid sin documento tampoco", async () => {
+    const { app } = fakeApp({ users: {} });
+
+    const err = await errorDe(() =>
+      runCreatePreapproval(app, "fantasma", {
+        tier: "plan1", cycle: "monthly",
+      }, OK));
+
+    expect(err.code).toBe("permission-denied");
+  });
+
+  it("`free` NO es comprable — es la ausencia de plan, no un plan", async () => {
+    const { app } = fakeApp(PF);
+
+    const err = await errorDe(() =>
+      runCreatePreapproval(app, "t1", {
+        tier: "free", cycle: "monthly",
+      }, OK));
+
+    expect(err.code).toBe("invalid-argument");
+  });
+
+  const basura: [string, unknown][] = [
+    ["un tier inventado", "plan9"],
+    ["mayusculas", "PLAN1"],
+    ["null", null],
+    ["un numero", 1],
+    ["un objeto", { tier: "plan1" }],
+  ];
+  for (const [caso, tier] of basura) {
+    it(`rechaza ${caso} como tier`, async () => {
+      const { app } = fakeApp(PF);
+      const err = await errorDe(() =>
+        runCreatePreapproval(app, "t1", {
+          tier, cycle: "monthly",
+        }, OK));
+      expect(err.code).toBe("invalid-argument");
+    });
+  }
+
+  it("rechaza un ciclo que no existe", async () => {
+    const { app } = fakeApp(PF);
+    const err = await errorDe(() =>
+      runCreatePreapproval(app, "t1", {
+        tier: "plan1", cycle: "semanal",
+      }, OK));
+    expect(err.code).toBe("invalid-argument");
+  });
+
+  it("no sale a MP si el rol no da — se valida ANTES de gastar una llamada", async () => {
+    const { app } = fakeApp({ users: { a1: { role: "athlete" } } });
+    const mp = fakeMp();
+
+    await errorDe(() =>
+      runCreatePreapproval(app, "a1", {
+        tier: "plan1", cycle: "monthly",
+      }, { ...OK, mpClient: mp.client }));
+
+    expect(mp.llamadas).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Doble click. MP no deduplica: cada preapproval es independiente, y si el PF
+// completa dos, paga dos veces.
+// ---------------------------------------------------------------------------
+
+describe("runCreatePreapproval — idempotencia del checkout", () => {
+  const abierto = {
+    users: { t1: { role: "trainer" } },
+    mp_checkouts: {
+      t1: {
+        planId: "viejo",
+        tier: "plan2",
+        cycle: "monthly",
+        initPoint: "https://mp/viejo",
+        createdAtMs: 1_000_000,
+      },
+    },
+  };
+
+  it("el mismo plan dentro de la ventana reusa el checkout y NO llama a MP", async () => {
+    const { app } = fakeApp(abierto);
+    const mp = fakeMp();
+
+    const r = await runCreatePreapproval(app, "t1", {
+      tier: "plan2", cycle: "monthly",
+    }, { mpClient: mp.client, nowMs: 1_000_000 + 60_000 });
+
+    expect(r).toEqual({
+      initPoint: "https://mp/viejo",
+      planId: "viejo",
+      status: "reused",
+    });
+    expect(mp.llamadas).toHaveLength(0);
+  });
+
+  it("OTRO plan abre uno nuevo aunque haya checkout vigente", async () => {
+    // Cambiar de plan1 a plan2 tiene que poder hacerse sin esperar 30 minutos.
+    const { app } = fakeApp(abierto);
+    const mp = fakeMp();
+
+    const r = await runCreatePreapproval(app, "t1", {
+      tier: "plan3", cycle: "monthly",
+    }, { mpClient: mp.client, nowMs: 1_000_000 + 60_000 });
+
+    expect(r.status).toBe("created");
+    expect(mp.llamadas).toHaveLength(1);
+  });
+
+  it("el mismo plan pero VENCIDO abre uno nuevo", async () => {
+    const { app } = fakeApp(abierto);
+    const mp = fakeMp();
+
+    const r = await runCreatePreapproval(app, "t1", {
+      tier: "plan2", cycle: "monthly",
+    }, { mpClient: mp.client, nowMs: 1_000_000 + 31 * 60 * 1000 });
+
+    expect(r.status).toBe("created");
+  });
+
+  it("el mismo tier con OTRO ciclo abre uno nuevo — mensual y anual no son lo mismo", async () => {
+    const { app } = fakeApp(abierto);
+    const mp = fakeMp();
+
+    const r = await runCreatePreapproval(app, "t1", {
+      tier: "plan2", cycle: "annual",
+    }, { mpClient: mp.client, nowMs: 1_000_000 + 60_000 });
+
+    expect(r.status).toBe("created");
+  });
+
+  it("un checkout guardado sin initPoint no se reusa", async () => {
+    const { app } = fakeApp({
+      users: { t1: { role: "trainer" } },
+      mp_checkouts: {
+        t1: { planId: "x", tier: "plan2", cycle: "monthly", createdAtMs: 1_000_000 },
+      },
+    });
+    const mp = fakeMp();
+
+    const r = await runCreatePreapproval(app, "t1", {
+      tier: "plan2", cycle: "monthly",
+    }, { mpClient: mp.client, nowMs: 1_000_000 + 60_000 });
+
+    expect(r.status).toBe("created");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cuando MP falla. Lo que importa es que no quede basura escrita y que el
+// codigo de error diga la verdad sobre si vale reintentar.
+// ---------------------------------------------------------------------------
+
+describe("runCreatePreapproval — cuando MP falla", () => {
+  it("un error reintentable da `unavailable`", async () => {
+    const { app } = fakeApp(PF);
+    const mp = fakeMp(new MpApiError("MP caido", 503));
+
+    const err = await errorDe(() =>
+      runCreatePreapproval(app, "t1", {
+        tier: "plan1", cycle: "monthly",
+      }, { ...OK, mpClient: mp.client }));
+
+    expect(err.code).toBe("unavailable");
+  });
+
+  it("un error NO reintentable da `internal` — no mentirle al PF con 'probá de nuevo'", async () => {
+    const { app } = fakeApp(PF);
+    const mp = fakeMp(new MpApiError("token vencido", 401));
+
+    const err = await errorDe(() =>
+      runCreatePreapproval(app, "t1", {
+        tier: "plan1", cycle: "monthly",
+      }, { ...OK, mpClient: mp.client }));
+
+    expect(err.code).toBe("internal");
+  });
+
+  it("si MP falla no queda NADA escrito", async () => {
+    const { app, escrituras } = fakeApp(PF);
+    const mp = fakeMp(new MpApiError("MP caido", 500));
+
+    await errorDe(() =>
+      runCreatePreapproval(app, "t1", {
+        tier: "plan1", cycle: "monthly",
+      }, { ...OK, mpClient: mp.client }));
+
+    expect(escrituras).toHaveLength(0);
+  });
+
+  it("una respuesta sin init_point falla en vez de devolver un string vacio", async () => {
+    const { app, escrituras } = fakeApp(PF);
+    const mp = fakeMp({ id: "2c93" });
+
+    const err = await errorDe(() =>
+      runCreatePreapproval(app, "t1", {
+        tier: "plan1", cycle: "monthly",
+      }, { ...OK, mpClient: mp.client }));
+
+    expect(err.code).toBe("internal");
+    expect(err.message).toMatch(/init_point/);
+    expect(escrituras).toHaveLength(0);
+  });
+
+  it("una respuesta sin id tampoco escribe el mapeo", async () => {
+    // Un mapeo con id vacio seria un documento que ningun webhook va a
+    // encontrar: peor que no tenerlo, porque parece que esta.
+    const { app, escrituras } = fakeApp(PF);
+    const mp = fakeMp({ init_point: "https://mp/x" });
+
+    const err = await errorDe(() =>
+      runCreatePreapproval(app, "t1", {
+        tier: "plan1", cycle: "monthly",
+      }, { ...OK, mpClient: mp.client }));
+
+    expect(err.code).toBe("internal");
+    expect(escrituras).toHaveLength(0);
+  });
+});

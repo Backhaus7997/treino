@@ -29,24 +29,25 @@
  * `FIRESTORE_EMULATOR_HOST`, named test app, per-test seed/cleanup).
  */
 
-import * as admin from "firebase-admin";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
+import { DocumentData, Timestamp, getFirestore } from "firebase-admin/firestore";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.GCLOUD_PROJECT = "treino-dev";
 
-let testApp: admin.app.App;
+let testApp: App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp({ projectId: "treino-dev" }, "sync-session-share-emulator-test");
+  testApp = initializeApp({ projectId: "treino-dev" }, "sync-session-share-emulator-test");
 });
 
 afterAll(async () => {
-  await testApp.delete();
+  await deleteApp(testApp);
 });
 
 import { syncSessionShareHandler } from "../sync-session-share";
 
-const db = () => admin.firestore(testApp);
+const db = () => getFirestore(testApp);
 
 const TRAINER_A = "emu-share-trainer-A";
 const TRAINER_B = "emu-share-trainer-B";
@@ -65,12 +66,12 @@ function link(
 function blockedBySweep(status: string, trainerId = TRAINER_A): Record<string, unknown> {
   return link(status, trainerId, {
     entitlement: "blocked",
-    blockedAt: admin.firestore.Timestamp.now(),
+    blockedAt: Timestamp.now(),
     blockedReason: "over-limit",
   });
 }
 
-async function getShare(): Promise<admin.firestore.DocumentData | undefined> {
+async function getShare(): Promise<DocumentData | undefined> {
   const snap = await db().collection("session_shares").doc(ATHLETE).get();
   return snap.exists ? snap.data() : undefined;
 }
@@ -79,7 +80,7 @@ async function seedShare(trainerId: string): Promise<void> {
   await db()
     .collection("session_shares")
     .doc(ATHLETE)
-    .set({ trainerId, updatedAt: admin.firestore.Timestamp.now() });
+    .set({ trainerId, updatedAt: Timestamp.now() });
 }
 
 async function cleanupShare(): Promise<void> {
@@ -106,7 +107,7 @@ describe("[EMULATOR-CI] transition into active → share written to real Firesto
     // The fake store cannot check this: it keeps the sentinel object verbatim.
     // Against real Firestore the field must have RESOLVED, otherwise the doc
     // would carry an unusable placeholder.
-    expect(share?.updatedAt).toBeInstanceOf(admin.firestore.Timestamp);
+    expect(share?.updatedAt).toBeInstanceOf(Timestamp);
   });
 
   it("overwrites an existing share from the same trainer when the link goes active", async () => {
@@ -156,16 +157,16 @@ describe("[EMULATOR-CI] active → active (no transition) → guarded by content
 
     const share = await getShare();
     expect(share?.trainerId).toBe(TRAINER_A);
-    expect(share?.updatedAt).toBeInstanceOf(admin.firestore.Timestamp);
+    expect(share?.updatedAt).toBeInstanceOf(Timestamp);
   });
 
   it("leaves an already-correct share in place", async () => {
     await seedShare(TRAINER_A);
-    const before = (await getShare())?.updatedAt as admin.firestore.Timestamp;
+    const before = (await getShare())?.updatedAt as Timestamp;
 
     await syncSessionShareHandler(testApp, link("active"), link("active"));
 
-    const after = (await getShare())?.updatedAt as admin.firestore.Timestamp;
+    const after = (await getShare())?.updatedAt as Timestamp;
     expect(after.isEqual(before)).toBe(true);
   });
 });

@@ -78,6 +78,7 @@ Future<GoRouter> _pumpRouter(
   WidgetTester tester, {
   required Override authOverride,
   Override? profileOverride,
+  Uri? initialUri,
 }) async {
   // Coach Hub es un layout de escritorio (min 1024px). En el surface default
   // de 800x600 el sidebar (264px) deja muy poco ancho y el dashboard real
@@ -117,6 +118,7 @@ Future<GoRouter> _pumpRouter(
   final router = buildCoachHubRouter(
     refreshListenable: refresh,
     read: container.read,
+    initialUri: initialUri,
   );
 
   await tester.pumpWidget(
@@ -215,6 +217,107 @@ void main() {
         expect(find.byType(CoachHubScaffold), findsOneWidget);
         expect(find.byType(ProximamenteScreen), findsOneWidget);
         expect(find.text('Próximamente.'), findsOneWidget);
+      },
+    );
+  });
+
+  // Encontrado en revisión adversarial: el mapeo `to` → path está probado a
+  // fondo via la función pura `coachHubRedirect`, pero el PEGAMENTO real —
+  // `buildCoachHubRouter` leyendo `Uri.base`/`initialUri` y pasándolo por
+  // closure a cada `redirect:` — nunca se ejercitaba con un router de
+  // verdad. Si alguien rompe esa plomería (por ejemplo, deja de pasar
+  // `initialDestination: destination` en la llamada real), esto lo detecta;
+  // los tests de la función pura no pueden, porque construyen el destino a
+  // mano.
+  group('Coach Hub router — destino fino via Uri.base/initialUri', () {
+    testWidgets(
+      'un trainer que llega con to=agenda en la URL cae en /agenda',
+      (tester) async {
+        final router = await _pumpRouter(
+          tester,
+          authOverride: authNotifierProvider.overrideWith(
+            () => _StubAuthNotifier(AsyncData(_MockUser())),
+          ),
+          profileOverride: userProfileProvider.overrideWith(
+            (ref) => Stream<UserProfile?>.value(_trainerProfile()),
+          ),
+          initialUri: Uri.parse('https://app.gettreino.com/?to=agenda'),
+        );
+
+        // SIN forzar ninguna navegación: el router arranca en
+        // `initialLocation` y el destino fino tiene que aplicarse ahí mismo.
+        //
+        // Antes este test hacía `router.go('/login')` primero, con el
+        // comentario de que en `/dashboard` "el gate no se dispara, a
+        // propósito" y que forzar `/login` "simula el gate que SÍ dispara en
+        // la app real". Esa creencia era el bug: en la app real, un PF CON
+        // SESIÓN entra por `/abrir/profe?to=X`, Vercel lo manda a
+        // `app.gettreino.com/?to=X`, y como el Coach Hub usa hash routing el
+        // fragmento llega VACÍO — así que go_router arranca en
+        // `initialLocation`, no en `/`. El gate nunca se disparaba y todos los
+        // destinos finos morían en el dashboard.
+        //
+        // El rodeo del `go('/login')` hacía pasar el test por el único camino
+        // donde el bug NO aparece: el del que llega deslogueado.
+        expect(
+          router.routerDelegate.currentConfiguration.uri.toString(),
+          '/agenda',
+        );
+      },
+    );
+
+    testWidgets(
+      'el mismo destino aplica al que llega DESLOGUEADO y se autentica',
+      (tester) async {
+        // El otro camino, que antes era el unico que el test ejercitaba: sin
+        // sesion la landing es `/login`, que es `isPublic`, y el destino se
+        // aplica despues del gate de rol. Sigue andando.
+        final router = await _pumpRouter(
+          tester,
+          authOverride: authNotifierProvider.overrideWith(
+            () => _StubAuthNotifier(AsyncData(_MockUser())),
+          ),
+          profileOverride: userProfileProvider.overrideWith(
+            (ref) => Stream<UserProfile?>.value(_trainerProfile()),
+          ),
+          initialUri: Uri.parse('https://app.gettreino.com/?to=agenda'),
+        );
+
+        router.go('/login');
+        await tester.pumpAndSettle();
+
+        // Ya se consumio en el aterrizaje, asi que volver a /login cae en el
+        // dashboard — el destino es de UN solo uso, y eso es lo correcto:
+        // un `to` viejo en la URL no puede reenviarte cada vez que pasas por
+        // la pantalla de login.
+        expect(
+          router.routerDelegate.currentConfiguration.uri.toString(),
+          '/dashboard',
+        );
+      },
+    );
+
+    testWidgets(
+      'sin to en la URL, el gate sigue cayendo en /dashboard como siempre',
+      (tester) async {
+        final router = await _pumpRouter(
+          tester,
+          authOverride: authNotifierProvider.overrideWith(
+            () => _StubAuthNotifier(AsyncData(_MockUser())),
+          ),
+          profileOverride: userProfileProvider.overrideWith(
+            (ref) => Stream<UserProfile?>.value(_trainerProfile()),
+          ),
+          initialUri: Uri.parse('https://app.gettreino.com/'),
+        );
+
+        router.go('/login');
+        await tester.pumpAndSettle();
+
+        expect(
+          router.routerDelegate.currentConfiguration.uri.toString(),
+          '/dashboard',
+        );
       },
     );
   });

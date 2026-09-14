@@ -14,15 +14,16 @@
  * Region southamerica-east1 per ADR-PN-005.
  */
 
-import * as admin from "firebase-admin";
+import { App, getApp, initializeApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 
-function getApp(): admin.app.App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -69,10 +70,10 @@ export function aggregateReactionCounts(
  * existing parent post, so a late/redelivered event cannot resurrect a post.
  */
 export async function maintainReactionCountersHandler(
-  app: admin.app.App,
+  app: App,
   postId: string,
 ): Promise<void> {
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
   const postRef = db.collection("posts").doc(postId);
   const reactionsQuery = postRef.collection("reactions");
 
@@ -100,6 +101,6 @@ export const maintainReactionCounters = onDocumentWritten(
     region: "southamerica-east1",
   },
   async (event) => {
-    await maintainReactionCountersHandler(getApp(), event.params.postId);
+    await maintainReactionCountersHandler(ensureApp(), event.params.postId);
   },
 );

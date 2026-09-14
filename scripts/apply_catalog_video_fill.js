@@ -26,6 +26,8 @@ const { execFileSync } = require('child_process');
 const { randomUUID } = require('crypto');
 const { exigirDestinoCoherente } = require('./lib/storage_target');
 const { inicializarAdmin } = require('./lib/admin');
+const { getStorage } = require('firebase-admin/storage');
+const { getFirestore } = require('firebase-admin/firestore');
 
 const APPLY = process.argv.includes('--apply');
 const DO_ADD = process.argv.includes('--add-safe');
@@ -41,12 +43,12 @@ const BUCKET = DESTINO.bucket;
 // con la migración; contra el emulador no pide nada. Ver scripts/lib/admin.js.
 // El `projectId` sale del DESTINO de #838, no de la credencial: es el que el
 // guard ya validó contra el bucket.
-const { admin } = inicializarAdmin({
+const { app } = inicializarAdmin({
   projectId: DESTINO.projectId,
   extra: { storageBucket: BUCKET },
 });
-const db = admin.firestore();
-const bucket = admin.storage().bucket();
+const db = getFirestore(app);
+const bucket = getStorage(app).bucket();
 
 const FOLDER_EQUIP = { dumbbells: 'dumbbell', barbell: 'barbell', bodyweight: 'bodyweight', kettlebells: 'kettlebell', cables: 'cable', band: 'band', machine: 'machine', plate: 'plate', 'smith-machine': 'smith-machine', 'medicine-ball': 'medicine-ball', medicineball: 'medicine-ball', trx: 'suspension', 'bosu-ball': 'bosu-ball', vitruvian: 'machine', cardio: 'cardio' };
 const EQUIP_JSON = { barbell: 'barra', dumbbell: 'mancuerna', machine: 'maquina', cable: 'cable', band: 'banda', bodyweight: 'peso_corporal', kettlebell: 'otro', plate: 'otro', 'smith-machine': 'maquina', suspension: 'otro', 'medicine-ball': 'otro', 'bosu-ball': 'otro', cardio: 'cardio' };

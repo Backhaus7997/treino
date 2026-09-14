@@ -72,9 +72,10 @@
 // Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla cerrado
 // con la migración; contra el emulador no pide nada. Ver scripts/lib/admin.js.
 const { inicializarAdmin, proyectoDe } = require('./lib/admin');
+const { getFirestore } = require('firebase-admin/firestore');
 const { bannerDeProduccion } = require('./lib/firebase_projects');
 
-const { admin, contexto } = inicializarAdmin();
+const { app, contexto } = inicializarAdmin();
 
 // #826 — el cartel necesita saber el destino y si es el emulador. Los dos salen
 // ahora del contexto que resolvió la frontera, que además mira la identidad
@@ -92,7 +93,7 @@ const { admin, contexto } = inicializarAdmin();
 const PROJECT_ID = proyectoDe(contexto);
 const USANDO_EMULADOR = contexto.modo === 'emulador';
 
-const db = admin.firestore();
+const db = getFirestore(app);
 
 const NO_GYM_ID = 'no-gym';
 

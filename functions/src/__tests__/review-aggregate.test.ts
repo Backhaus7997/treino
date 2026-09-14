@@ -17,29 +17,30 @@
  * REQ-RV-CF-001..006. Fase 6 Etapa 7.
  */
 
-import * as admin from "firebase-admin";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
+import { Timestamp, getFirestore } from "firebase-admin/firestore";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
 process.env.GCLOUD_PROJECT = "treino-dev";
 
-let testApp: admin.app.App;
+let testApp: App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp(
+  testApp = initializeApp(
     { projectId: "treino-dev" },
     "review-aggregate-test",
   );
 });
 
 afterAll(async () => {
-  await testApp.delete();
+  await deleteApp(testApp);
 });
 
 // Import the module under test — will fail until implementation exists
 import { recomputeAggregate } from "../review-aggregate";
 
-const db = () => admin.firestore(testApp);
+const db = () => getFirestore(testApp);
 
 const COL_REVIEWS = "reviews";
 const COL_TRAINER_PROFILES = "trainerPublicProfiles";
@@ -51,8 +52,8 @@ type ReviewData = {
   trainerId: string;
   rating: number;
   comment?: string;
-  createdAt: admin.firestore.Timestamp;
-  updatedAt: admin.firestore.Timestamp;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
 };
 
 function buildReview(
@@ -62,7 +63,7 @@ function buildReview(
   rating: number,
   comment?: string,
 ): ReviewData {
-  const now = admin.firestore.Timestamp.now();
+  const now = Timestamp.now();
   return {
     id: `${linkId}_${athleteId}`,
     linkId,
@@ -310,8 +311,8 @@ describe("SCENARIO-REV-002: dedupe by athleteId (relink manipulation)", () => {
     const older = buildReview("link1", "athlete1", trainerId, 5);
     const newer = buildReview("link2", "athlete1", trainerId, 1);
     // Unambiguous ordering: newer.updatedAt strictly after older.
-    older.updatedAt = admin.firestore.Timestamp.fromMillis(1_000);
-    newer.updatedAt = admin.firestore.Timestamp.fromMillis(2_000);
+    older.updatedAt = Timestamp.fromMillis(1_000);
+    newer.updatedAt = Timestamp.fromMillis(2_000);
     await seedReview(older);
     await seedReview(newer);
 

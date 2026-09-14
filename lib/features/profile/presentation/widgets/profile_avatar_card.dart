@@ -177,7 +177,7 @@ class _GymChip extends ConsumerWidget {
         color: palette.bgCard,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: palette.textMuted.withValues(alpha: 0.20),
+          color: palette.textMuted.withValues(alpha: 0.2),
         ),
       ),
       child: Text(

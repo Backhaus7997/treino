@@ -7,7 +7,7 @@
 // that captures upload/delete calls without hitting Firestore/Storage.
 //
 // Covered:
-//   - loading state → CircularProgressIndicator
+//   - loading state → CoachHubSkeleton (shimmer del kit)
 //   - error state → localized error copy
 //   - empty state → localized empty copy
 //   - populated list → one row per file with size + date subtitle
@@ -26,6 +26,7 @@ import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/athlete_file_providers.dart';
 import 'package:treino/features/coach/application/athlete_note_providers.dart';
+import 'package:treino/features/coach/application/nutrition_plan_providers.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/data/athlete_file_repository.dart';
 import 'package:treino/features/coach/data/athlete_note_repository.dart';
@@ -50,6 +51,9 @@ import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/session.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
+import 'alumno_detail_test_navigation.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
+
 const _trainerUid = 't1';
 const _athleteUid = 'a1';
 
@@ -73,6 +77,7 @@ AthleteFile _file({
   AthleteFileKind kind = AthleteFileKind.pdf,
   int sizeBytes = 512 * 1024,
   DateTime? uploadedAt,
+  bool sharedWithAthlete = false,
 }) =>
     AthleteFile(
       id: id,
@@ -86,6 +91,7 @@ AthleteFile _file({
       storagePath: 'athleteFiles/${_trainerUid}_$_athleteUid/$id.pdf',
       downloadUrl: 'https://example.com/$id',
       uploadedAt: uploadedAt ?? DateTime(2026, 3, 10, 14, 30),
+      sharedWithAthlete: sharedWithAthlete,
     );
 
 class _StubNoteRepo implements AthleteNoteRepository {
@@ -100,6 +106,9 @@ class _StubFileRepo implements AthleteFileRepository {
   final List<AthleteFile> deleted = [];
   final List<Uint8List> uploadedBytes = [];
 
+  /// Toggles de visibilidad pedidos, en orden: `(id del archivo, compartido)`.
+  final List<(String, bool)> sharedToggles = [];
+
   @override
   Future<AthleteFile> upload({
     required String trainerId,
@@ -107,6 +116,7 @@ class _StubFileRepo implements AthleteFileRepository {
     required String fileName,
     required String contentType,
     required Uint8List bytes,
+    bool sharedWithAthlete = true,
   }) async {
     uploadedBytes.add(bytes);
     return _file(id: 'new-${uploadedBytes.length}', fileName: fileName);
@@ -115,6 +125,15 @@ class _StubFileRepo implements AthleteFileRepository {
   @override
   Stream<List<AthleteFile>> watch(String trainerId, String athleteId) =>
       const Stream.empty();
+
+  @override
+  Stream<List<AthleteFile>> watchSharedForAthlete(String athleteId) =>
+      const Stream.empty();
+
+  @override
+  Future<void> setShared(AthleteFile file, bool shared) async {
+    sharedToggles.add((file.id, shared));
+  }
 
   @override
   Future<void> delete(AthleteFile file) async {
@@ -128,6 +147,9 @@ List<Override> _baseOverrides({
 }) =>
     [
       currentUidProvider.overrideWithValue(_trainerUid),
+      alumnoDetailIndicatorsProvider(_athleteUid).overrideWithValue(
+        const AlumnoDetailIndicators(),
+      ),
       trainerLinksStreamProvider.overrideWith((ref) => Stream.value([_link()])),
       userPublicProfilesBatchProvider
           .overrideWith((ref, key) => {_athleteUid: _profile()}),
@@ -143,11 +165,15 @@ List<Override> _baseOverrides({
       gymsProvider.overrideWith((ref) => const <Gym>[]),
       athleteBillingProvider.overrideWith((ref, id) => Stream.value(null)),
       sessionsByUidProvider.overrideWith((ref, id) => const <Session>[]),
-      assignedRoutinesProvider.overrideWith((ref, id) => const <Routine>[]),
+      assignedRoutinesByTrainerProvider
+          .overrideWith((ref, key) => const <Routine>[]),
       athleteNoteProvider(
         (trainerId: _trainerUid, athleteId: _athleteUid),
       ).overrideWith((ref) => const Stream.empty()),
       athleteNoteRepositoryProvider.overrideWithValue(_StubNoteRepo()),
+      nutritionPlanProvider(
+        (trainerId: _trainerUid, athleteId: _athleteUid),
+      ).overrideWith((ref) => Stream.value(null)),
       if (filesState != null)
         athleteFilesProvider(
           (trainerId: _trainerUid, athleteId: _athleteUid),
@@ -189,13 +215,11 @@ void _useDesktopViewport(WidgetTester tester) {
 }
 
 Future<void> _selectArchivosTab(WidgetTester tester) async {
-  try {
-    await tester.pumpAndSettle(const Duration(milliseconds: 500));
-  } catch (_) {}
-  await tester.tap(find.text('Archivos'));
-  try {
-    await tester.pumpAndSettle(const Duration(milliseconds: 500));
-  } catch (_) {}
+  await navigateAlumnoDetail(
+    tester,
+    group: 'Plan',
+    subview: 'Archivos',
+  );
 }
 
 void main() {
@@ -212,7 +236,7 @@ void main() {
     ]));
     await _selectArchivosTab(tester);
 
-    expect(find.byType(CircularProgressIndicator), findsAtLeast(1));
+    expect(find.byType(CoachHubSkeleton), findsAtLeast(1));
   });
 
   testWidgets('empty state shows localized copy', (tester) async {
@@ -308,5 +332,23 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repo.deleted, isEmpty);
+  });
+
+  testWidgets('el control de visibilidad comparte un archivo privado',
+      (tester) async {
+    final repo = _StubFileRepo();
+    final files = [_file(id: 'f1', fileName: 'análisis.pdf')];
+    _useDesktopViewport(tester);
+    await tester.pumpWidget(_wrap(_baseOverrides(
+      filesState: AsyncData(files),
+      repo: repo,
+    )));
+    await _selectArchivosTab(tester);
+
+    expect(find.text('PRIVADO'), findsOneWidget);
+    await tester.tap(find.text('PRIVADO'));
+    await tester.pump();
+
+    expect(repo.sharedToggles, [('f1', true)]);
   });
 }

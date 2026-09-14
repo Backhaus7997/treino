@@ -9,6 +9,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_palette.dart';
+import '../../../../core/widgets/exercise_asset_image.dart';
 import '../../../../core/widgets/treino_icon.dart';
 import '../../../workout/application/custom_exercise_providers.dart';
 import '../../../workout/application/exercise_filter.dart';
@@ -22,6 +23,9 @@ import '../../../workout/domain/muscle_group.dart';
 import '../sections/biblioteca/widgets/exercise_detail_dialog.dart'
     show showExerciseDetailDialog;
 import 'create_custom_exercise_dialog.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/skeleton/coach_hub_skeleton.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
+import 'package:treino/features/coach_hub/application/picker_panel_width_provider.dart';
 
 /// Web equivalent of [showExercisePicker] (mobile's `exercise_picker_sheet.dart`
 /// bottom sheet) — a multi-select exercise picker for the Coach Hub routine
@@ -57,9 +61,23 @@ Future<List<Exercise>?> showExercisePickerDialog(
 }
 
 class _ExercisePickerDialog extends ConsumerStatefulWidget {
-  const _ExercisePickerDialog({required this.alreadySelectedIds});
+  const _ExercisePickerDialog({
+    required this.alreadySelectedIds,
+    this.onAgregar,
+    this.onAgregarEnSuperserie,
+  });
 
   final Set<String> alreadySelectedIds;
+
+  /// Qué hacer al confirmar. Cuando es **null** el contenido se hospeda en un
+  /// `Dialog` y confirmar hace `Navigator.pop(result)` — el flujo de siempre.
+  /// Cuando está, el contenido se dibuja pelado para que lo hospede un panel:
+  /// confirmar llama a esto y **no cierra nada**, así el PF agrega varios
+  /// ejercicios seguidos viendo cómo se arma el día (#860).
+  final void Function(List<Exercise>)? onAgregar;
+
+  /// Agrega los elegidos ya enlazados como superserie. Sólo en modo panel.
+  final void Function(List<Exercise>)? onAgregarEnSuperserie;
 
   @override
   ConsumerState<_ExercisePickerDialog> createState() =>
@@ -73,6 +91,15 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
   late Set<String> _selected;
   final TextEditingController _searchController = TextEditingController();
 
+  /// Los 23 chips de filtro arrancan COLAPSADOS.
+  ///
+  /// Desplegados son 4 filas y, junto con el header, el buscador y la fila de
+  /// crear, dejaban 3 ejercicios visibles sobre un catálogo de cientos (#860).
+  /// El buscador cubre el caso normal —se busca por nombre— y los filtros son
+  /// para acotar cuando eso no alcanza: cerrados por default, el alto se lo
+  /// queda la lista, que es lo único que importa acá.
+  bool _filtrosAbiertos = false;
+
   @override
   void initState() {
     super.initState();
@@ -84,6 +111,9 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
     _searchController.dispose();
     super.dispose();
   }
+
+  int get _cantidadDeFiltros =>
+      _muscleFilters.length + _equipmentFilters.length;
 
   bool _matches(Exercise e) => exerciseMatchesFilters(
         e,
@@ -102,7 +132,11 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
     });
   }
 
-  void _confirm(List<Exercise> defaults, List<CustomExercise> customs) {
+  void _confirm(
+    List<Exercise> defaults,
+    List<CustomExercise> customs, {
+    bool enSuperserie = false,
+  }) {
     final result = <Exercise>[];
     for (final id in _selected) {
       final fromDefaults = _exerciseWithId(defaults, id);
@@ -115,7 +149,16 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
         result.add(customToExercise(fromCustom));
       }
     }
-    Navigator.of(context).pop(result);
+    final alAgregar =
+        enSuperserie ? widget.onAgregarEnSuperserie : widget.onAgregar;
+    if (alAgregar == null) {
+      Navigator.of(context).pop(result);
+      return;
+    }
+    // El panel NO se cierra. Y se limpia la selección: dejarla marcada haría
+    // que el próximo "Agregar" reenvíe los mismos ejercicios.
+    alAgregar(result);
+    setState(() => _selected.clear());
   }
 
   Future<void> _openCreateNew() async {
@@ -146,7 +189,7 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
           style: GoogleFonts.barlowCondensed(
             color: palette.textPrimary,
             fontWeight: FontWeight.w700,
-            fontSize: 18,
+            fontSize: AppTextSize.title,
           ),
         ),
         content: Text(
@@ -154,25 +197,20 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
           // routines keep working after the library entry is gone.
           'Se borra "${exercise.name}" de tu biblioteca. Las rutinas que ya lo '
           'usan no se tocan.', // i18n
-          style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 13),
+          style: GoogleFonts.barlow(
+              color: palette.textMuted, fontSize: AppTextSize.bodyDense),
         ),
         actions: [
-          TextButton(
+          TreinoButton(
+            label: 'Cancelar', // i18n
+            variant: TreinoButtonVariant.ghost,
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(
-              'Cancelar', // i18n
-              style: GoogleFonts.barlow(color: palette.textMuted),
-            ),
           ),
-          TextButton(
+          const SizedBox(width: AppSpacing.s8),
+          TreinoButton(
+            label: 'Eliminar', // i18n
+            variant: TreinoButtonVariant.danger,
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(
-              'Eliminar', // i18n
-              style: GoogleFonts.barlow(
-                color: palette.danger,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
           ),
         ],
       ),
@@ -213,167 +251,228 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
     final viewportHeight = MediaQuery.sizeOf(context).height;
     final dialogHeight = (viewportHeight * 0.85).clamp(520.0, 780.0);
 
+    final contenido = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // ── Header ────────────────────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 18, 12, 0),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Elegir ejercicios', // i18n
+                  style: GoogleFonts.barlowCondensed(
+                    fontSize: AppTextSize.title,
+                    fontWeight: FontWeight.w700,
+                    color: palette.textPrimary,
+                  ),
+                ),
+              ),
+              TreinoIconButton(
+                icon: TreinoIcon.close,
+                tooltip: 'Cerrar', // i18n
+                color: palette.textMuted,
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ],
+          ),
+        ),
+        // ── Search ────────────────────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+          child: TextField(
+            controller: _searchController,
+            style: GoogleFonts.barlow(
+              color: palette.textPrimary,
+              fontSize: AppTextSize.body,
+            ),
+            decoration: InputDecoration(
+              prefixIcon: Icon(TreinoIcon.search, color: palette.textMuted),
+              suffixIcon: _query.isEmpty
+                  ? null
+                  : TreinoIconButton(
+                      icon: TreinoIcon.close,
+                      tooltip: 'Borrar', // i18n
+                      color: palette.textMuted,
+                      size: TreinoButtonSize.xs,
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() => _query = '');
+                      },
+                    ),
+              hintText: 'Buscar ejercicio…', // i18n
+              hintStyle: GoogleFonts.barlow(
+                color: palette.textMuted,
+                fontSize: AppTextSize.body,
+              ),
+              filled: true,
+              fillColor: palette.bg,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 10,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: palette.border),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: palette.border),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: palette.accent),
+              ),
+            ),
+            onChanged: (v) => setState(() => _query = v),
+          ),
+        ),
+        // ── Inline filter chips (ADR-CHW-005 — no bottom sheet) ────────
+        //
+        // Colapsados por default. El contador dice cuántos hay puestos, para
+        // que cerrarlos no esconda un filtro activo sin avisar — que sería
+        // peor que el problema de alto que esto resuelve.
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 20, 0),
+            // Con filtros puestos el botón pasa a acento: la variante DICE si
+            // hay filtros activos, en vez de un `color:` calculado a mano.
+            child: TreinoButton(
+              key: const Key('picker_filtros_toggle'),
+              label: _cantidadDeFiltros == 0
+                  ? 'Filtros' // i18n
+                  : 'Filtros ($_cantidadDeFiltros)', // i18n
+              icon: _filtrosAbiertos
+                  ? TreinoIcon.chevronUp
+                  : TreinoIcon.chevronDown,
+              variant: _cantidadDeFiltros == 0
+                  ? TreinoButtonVariant.ghost
+                  : TreinoButtonVariant.ghostAccent,
+              size: TreinoButtonSize.sm,
+              onPressed: () =>
+                  setState(() => _filtrosAbiertos = !_filtrosAbiertos),
+            ),
+          ),
+        ),
+        if (_filtrosAbiertos)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+            child: _InlineFilters(
+              palette: palette,
+              muscleFilters: _muscleFilters,
+              equipmentFilters: _equipmentFilters,
+              onMuscleChanged: (v) => setState(() => _muscleFilters = v),
+              onEquipmentChanged: (v) => setState(() => _equipmentFilters = v),
+            ),
+          ),
+        const Divider(height: 1),
+        // ── List ─────────────────────────────────────────────────────
+        Expanded(
+          child: _buildList(
+            palette: palette,
+            defaults: defaultsAsync,
+            customs: customsAsync,
+          ),
+        ),
+        // ── Crear ejercicio nuevo ────────────────────────────────────
+        //
+        // Al PIE y no arriba de la lista (#860). Arriba competía por el alto
+        // con lo único que importa acá: la lista. Al pie es alto fijo — no se
+        // scrollea, no se lo come el scroll, y sigue estando siempre visible.
+        const Divider(height: 1),
+        _CreateNewExerciseButton(palette: palette, onTap: _openCreateNew),
+        // ── Footer ───────────────────────────────────────────────────
+        Container(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+          decoration: BoxDecoration(
+            border: Border(top: BorderSide(color: palette.border)),
+          ),
+          // `Wrap` y no `Row`: acá conviven hasta TRES botones —Cancelar, En
+          // superserie, Agregar (N)— y este pie vive tanto en un diálogo como
+          // en un panel lateral de 400 px. Con `Row` la tercera opción hacía
+          // desbordar la fila; envueltos, bajan a una segunda línea. Los
+          // labels además se traducen, así que el ancho no es un número que
+          // podamos fijar de antemano.
+          child: Wrap(
+            alignment: WrapAlignment.end,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 0,
+            runSpacing: AppSpacing.s8,
+            children: [
+              // "Cancelar" SÓLO en modo diálogo. En el panel no hay ruta que
+              // cerrar: `Navigator.pop()` saldría del editor entero, que es
+              // exactamente lo contrario de lo que el botón promete. El panel
+              // se cierra con su propia X.
+              if (widget.onAgregar == null) ...[
+                TreinoButton(
+                  label: 'Cancelar', // i18n
+                  variant: TreinoButtonVariant.ghost,
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+                const SizedBox(width: AppSpacing.s8),
+              ],
+              // "Agregar en superserie" SÓLO con 2 o más elegidos: una
+              // superserie de uno no existe, y un botón deshabilitado que
+              // nunca se explica es peor que uno que aparece cuando aplica.
+              //
+              // Y va acá, al lado de "Agregar", porque la decisión se toma
+              // DONDE se hace la selección. Estaba en la fila del día, a otra
+              // parte de la pantalla, obligando a elegir los ejercicios sin
+              // haber decidido todavía si iban agrupados.
+              if (widget.onAgregarEnSuperserie != null && _selected.length >= 2)
+                Padding(
+                  padding: const EdgeInsets.only(right: AppSpacing.s8),
+                  child: TreinoButton(
+                    key: const Key('picker_agregar_superserie'),
+                    label: 'En superserie', // i18n
+                    icon: TreinoIcon.streak,
+                    variant: TreinoButtonVariant.secondary,
+                    onPressed: () => _confirm(
+                      defaultsAsync.valueOrNull ?? const [],
+                      customsAsync.valueOrNull ?? const [],
+                      enSuperserie: true,
+                    ),
+                  ),
+                ),
+              TreinoButton(
+                label: _selected.isEmpty
+                    ? 'Agregar' // i18n
+                    : 'Agregar (${_selected.length})', // i18n
+                onPressed: _selected.isEmpty
+                    ? null
+                    : () => _confirm(
+                          defaultsAsync.valueOrNull ?? const [],
+                          customsAsync.valueOrNull ?? const [],
+                        ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+
+    // DOS hospedajes para UN contenido.
+    //
+    // El panel no puede devolver un resultado: se queda abierto y va
+    // empujando ejercicios al día, que es el punto del #860 — el modal tapa
+    // la plantilla en cada iteración del loop "miro qué puse → elijo el que
+    // sigue → miro cómo quedó". Por eso el flujo de control se da vuelta:
+    // de `await` a callback.
+    //
+    // Abajo de 1280 sigue el modal. No es un número nuevo: es
+    // `Viewport.desktop` de `responsive.dart` (ADR-CHW-004), y en `compact`
+    // el sidebar ya está forzado a colapsar — meterle un panel de 400 px
+    // sería el mismo error que ese ADR decidió evitar.
+    if (widget.onAgregar != null) return contenido;
+
     return Dialog(
       backgroundColor: palette.bgCard,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.all(Radius.circular(AppRadius.lg)),
       ),
-      child: SizedBox(
-        width: 560,
-        height: dialogHeight,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // ── Header ────────────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 18, 12, 0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Elegir ejercicios', // i18n
-                      style: GoogleFonts.barlowCondensed(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: palette.textPrimary,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Cerrar', // i18n
-                    icon: Icon(TreinoIcon.close, color: palette.textMuted),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ],
-              ),
-            ),
-            // ── Search ────────────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
-              child: TextField(
-                controller: _searchController,
-                style: GoogleFonts.barlow(
-                  color: palette.textPrimary,
-                  fontSize: 14,
-                ),
-                decoration: InputDecoration(
-                  prefixIcon: Icon(TreinoIcon.search, color: palette.textMuted),
-                  suffixIcon: _query.isEmpty
-                      ? null
-                      : IconButton(
-                          icon: Icon(
-                            TreinoIcon.close,
-                            color: palette.textMuted,
-                            size: 18,
-                          ),
-                          tooltip: 'Borrar', // i18n
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() => _query = '');
-                          },
-                        ),
-                  hintText: 'Buscar ejercicio…', // i18n
-                  hintStyle: GoogleFonts.barlow(
-                    color: palette.textMuted,
-                    fontSize: 14,
-                  ),
-                  filled: true,
-                  fillColor: palette.bg,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: palette.border),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: palette.border),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide(color: palette.accent),
-                  ),
-                ),
-                onChanged: (v) => setState(() => _query = v),
-              ),
-            ),
-            // ── Inline filter chips (ADR-CHW-005 — no bottom sheet) ────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-              child: _InlineFilters(
-                palette: palette,
-                muscleFilters: _muscleFilters,
-                equipmentFilters: _equipmentFilters,
-                onMuscleChanged: (v) => setState(() => _muscleFilters = v),
-                onEquipmentChanged: (v) =>
-                    setState(() => _equipmentFilters = v),
-              ),
-            ),
-            const Divider(height: 1),
-            // ── Crear ejercicio nuevo (inline) ────────────────────────────
-            _CreateNewExerciseButton(palette: palette, onTap: _openCreateNew),
-            const Divider(height: 1),
-            // ── List ─────────────────────────────────────────────────────
-            Expanded(
-              child: _buildList(
-                palette: palette,
-                defaults: defaultsAsync,
-                customs: customsAsync,
-              ),
-            ),
-            // ── Footer ───────────────────────────────────────────────────
-            Container(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-              decoration: BoxDecoration(
-                border: Border(top: BorderSide(color: palette.border)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: Text(
-                      'Cancelar', // i18n
-                      style: GoogleFonts.barlow(color: palette.textMuted),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: _selected.isEmpty
-                        ? null
-                        : () => _confirm(
-                              defaultsAsync.valueOrNull ?? const [],
-                              customsAsync.valueOrNull ?? const [],
-                            ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: palette.accent,
-                      foregroundColor: TreinoButtonTokens.foreground(context),
-                      disabledBackgroundColor: palette.accent.withValues(
-                        alpha: 0.3,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.full),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                    ),
-                    child: Text(
-                      _selected.isEmpty
-                          ? 'Agregar' // i18n
-                          : 'Agregar (${_selected.length})', // i18n
-                      style: GoogleFonts.barlowCondensed(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+      child: SizedBox(width: 560, height: dialogHeight, child: contenido),
     );
   }
 
@@ -383,13 +482,14 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
     required AsyncValue<List<CustomExercise>> customs,
   }) {
     if (defaults.isLoading || customs.isLoading) {
-      return Center(child: CircularProgressIndicator(color: palette.accent));
+      return const CoachHubSkeleton(filas: 6);
     }
     if (defaults.hasError) {
       return Center(
         child: Text(
           'No pudimos cargar ejercicios.', // i18n
-          style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
+          style: GoogleFonts.barlow(
+              color: palette.textMuted, fontSize: AppTextSize.body),
         ),
       );
     }
@@ -407,7 +507,8 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
           child: Text(
             'No encontramos ejercicios con esos filtros.', // i18n
             textAlign: TextAlign.center,
-            style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
+            style: GoogleFonts.barlow(
+                color: palette.textMuted, fontSize: AppTextSize.body),
           ),
         ),
       );
@@ -427,6 +528,8 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
                   : muscleGroupLabel(c.muscleGroup),
               badge: 'MÍO', // i18n
               isCustom: true,
+              muscleGroup: c.muscleGroup,
+              thumbnailUrl: null,
               ownerId: ref.watch(currentUidProvider),
               selected: _selected.contains(c.id),
               palette: palette,
@@ -444,6 +547,8 @@ class _ExercisePickerDialogState extends ConsumerState<_ExercisePickerDialog> {
               subtitle: muscleGroupLabel(e.muscleGroup),
               badge: null,
               isCustom: false,
+              muscleGroup: e.muscleGroup,
+              thumbnailUrl: e.thumbnailUrl,
               ownerId: null,
               selected: _selected.contains(e.id),
               palette: palette,
@@ -559,7 +664,7 @@ class _Chip extends StatelessWidget {
         child: Text(
           label,
           style: GoogleFonts.barlowCondensed(
-            fontSize: 11,
+            fontSize: AppTextSize.caption,
             fontWeight: FontWeight.w700,
             color: active ? palette.accent : palette.textMuted,
             letterSpacing: 0.6,
@@ -579,6 +684,8 @@ class _ExerciseRow extends StatelessWidget {
     required this.subtitle,
     required this.badge,
     required this.isCustom,
+    required this.muscleGroup,
+    required this.thumbnailUrl,
     required this.ownerId,
     required this.selected,
     required this.palette,
@@ -592,6 +699,15 @@ class _ExerciseRow extends StatelessWidget {
   final String? subtitle;
   final String? badge;
   final bool isCustom;
+
+  /// Clave canónica del grupo muscular: es el último escalón de la cascada de
+  /// [ExerciseAssetImage] y el que carga el catálogo entero (los PNG con
+  /// nombre de ejercicio existen para un puñado).
+  final String muscleGroup;
+
+  /// Foto real del ejercicio (frame de su propio video). null en customs y en
+  /// docs anteriores al backfill: ahí manda la cascada de assets.
+  final String? thumbnailUrl;
   final String? ownerId;
   final bool selected;
   final AppPalette palette;
@@ -600,6 +716,12 @@ class _ExerciseRow extends StatelessWidget {
   /// Present only for the trainer's own custom exercises → renders edit/delete.
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+
+  Icon _iconoDeFallback(AppPalette palette) => Icon(
+        TreinoIcon.dumbbell,
+        size: 26,
+        color: palette.textMuted,
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -624,16 +746,71 @@ class _ExerciseRow extends StatelessWidget {
             horizontal: 12,
             vertical: 2,
           ),
-          leading: Icon(
-            selected ? TreinoIcon.check : TreinoIcon.dumbbell,
-            color: selected ? palette.accent : palette.textMuted,
-            size: 20,
+          // La foto, no un ícono repetido 800 veces. Sin esto el catálogo
+          // precargado se lee como una lista de nombres y el PF tiene que
+          // saberse de memoria a qué se parece cada variante.
+          //
+          // 56 px es el alto máximo que `ListTile` le da al leading (maxHeight
+          // fija del SDK, list_tile.dart): más grande obliga al truco del
+          // `OverflowBox` que usa el sheet del teléfono, y acá el panel es una
+          // lista densa donde el alto de fila es justo lo que el #860 vino a
+          // cuidar.
+          leading: SizedBox(
+            width: 56,
+            height: 56,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                ClipOval(
+                  child: Container(
+                    width: 56,
+                    height: 56,
+                    color: palette.bgCard,
+                    alignment: Alignment.center,
+                    // Los customs no tienen foto ni entran en la cascada:
+                    // sus ids no son los del catálogo.
+                    child: isCustom
+                        ? _iconoDeFallback(palette)
+                        : ExerciseAssetImage(
+                            exerciseId: id,
+                            muscleGroup: muscleGroup,
+                            thumbnailUrl: thumbnailUrl,
+                            width: 56,
+                            height: 56,
+                            fallback: _iconoDeFallback(palette),
+                          ),
+                  ),
+                ),
+                // El tilde pasa a badge encima de la foto: el fondo acentuado
+                // y el borde izquierdo ya dicen "elegido", pero en una lista
+                // larga el ojo busca la marca en el mismo lugar de siempre.
+                if (selected)
+                  Positioned(
+                    right: -2,
+                    bottom: -2,
+                    child: Container(
+                      width: 20,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        color: palette.accent,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: palette.bgCard, width: 2),
+                      ),
+                      child: Icon(
+                        TreinoIcon.check,
+                        size: 11,
+                        color: TreinoButtonTokens.foreground(context),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
           title: Text(
             name,
             style: GoogleFonts.barlow(
               color: palette.textPrimary,
-              fontSize: 14,
+              fontSize: AppTextSize.body,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -642,7 +819,7 @@ class _ExerciseRow extends StatelessWidget {
                   subtitle!,
                   style: GoogleFonts.barlow(
                     color: palette.textMuted,
-                    fontSize: 12,
+                    fontSize: AppTextSize.caption,
                   ),
                 )
               : null,
@@ -663,7 +840,7 @@ class _ExerciseRow extends StatelessWidget {
                     badge!,
                     style: GoogleFonts.barlowCondensed(
                       color: palette.accent,
-                      fontSize: 10,
+                      fontSize: AppTextSize.micro,
                       fontWeight: FontWeight.w700,
                       letterSpacing: 0.8,
                     ),
@@ -672,35 +849,26 @@ class _ExerciseRow extends StatelessWidget {
                 const SizedBox(width: 8),
               ],
               if (onEdit != null)
-                IconButton(
+                TreinoIconButton(
+                  icon: TreinoIcon.edit,
                   tooltip: 'Editar', // i18n
-                  icon: Icon(
-                    TreinoIcon.edit,
-                    size: 15,
-                    color: palette.textMuted,
-                  ),
-                  visualDensity: VisualDensity.compact,
+                  color: palette.textMuted,
+                  size: TreinoButtonSize.xs,
                   onPressed: onEdit,
                 ),
               if (onDelete != null)
-                IconButton(
+                TreinoIconButton(
+                  icon: TreinoIcon.trash,
                   tooltip: 'Eliminar', // i18n
-                  icon: Icon(
-                    TreinoIcon.trash,
-                    size: 15,
-                    color: palette.textMuted,
-                  ),
-                  visualDensity: VisualDensity.compact,
+                  color: palette.textMuted,
+                  size: TreinoButtonSize.xs,
                   onPressed: onDelete,
                 ),
-              IconButton(
+              TreinoIconButton(
+                icon: TreinoIcon.chartBar,
                 tooltip: 'Ver detalle', // i18n
-                icon: Icon(
-                  TreinoIcon.chartBar,
-                  size: 16,
-                  color: palette.textMuted,
-                ),
-                visualDensity: VisualDensity.compact,
+                color: palette.textMuted,
+                size: TreinoButtonSize.xs,
                 onPressed: () => showExerciseDetailDialog(
                   context,
                   exerciseId: id,
@@ -730,7 +898,7 @@ class _SectionHeader extends StatelessWidget {
         label.toUpperCase(),
         style: GoogleFonts.barlowCondensed(
           color: palette.textMuted,
-          fontSize: 11,
+          fontSize: AppTextSize.caption,
           fontWeight: FontWeight.w700,
           letterSpacing: 1.2,
         ),
@@ -762,7 +930,7 @@ class _CreateNewExerciseButton extends StatelessWidget {
               'Crear ejercicio nuevo', // i18n
               style: GoogleFonts.barlow(
                 color: palette.accent,
-                fontSize: 14,
+                fontSize: AppTextSize.body,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -787,4 +955,247 @@ CustomExercise? _customWithId(List<CustomExercise> items, String id) {
     if (c.id == id) return c;
   }
   return null;
+}
+
+/// Ancho POR DEFECTO del panel lateral, en px lógicos.
+///
+/// Era fijo, y ahí estaba el problema: el editor de la izquierda tiene que
+/// seguir siendo legible mientras se elige (el punto del #860), pero clavar el
+/// panel en 400 significaba que un monitor de 1920 no le sumaba un píxel a
+/// NADIE — ni al panel ni a la rutina. Ahora es el punto de partida y lo mueve
+/// quien quiera, entre `kAnchoPanelPickerMin` y lo que deje la rutina.
+///
+/// Ver `picker_panel_width_provider.dart` para el rango y por qué.
+const double kAnchoPanelPicker = kAnchoPanelPickerDefault;
+
+/// Ancho del asa de arrastre: `AppSpacing.s12`.
+///
+/// Es el primer separador arrastrable del hub, así que no hay precedente que
+/// copiar — el número sale de la escala de spacing, que es lo que el guard
+/// `no_off_scale_spacing_scan` permite.
+///
+/// Doce y no uno: un asa del ancho del borde que dibuja es imposible de
+/// agarrar sin apuntar. El borde sigue midiendo 1 px; lo que mide 12 es el
+/// blanco de agarre, invisible salvo por el cursor. Empezó en 8 y lo subió el
+/// PF después de probarlo en la pantalla real, que es donde se decide esto.
+const double kAnchoAsaPanel = AppSpacing.s12;
+
+/// El picker como PANEL LATERAL persistente (#860).
+///
+/// El modal dejaba 3 ejercicios visibles sobre un catálogo de cientos, pero el
+/// alto era el síntoma: el problema es que TAPA la plantilla en cada iteración
+/// del loop "miro qué puse → elijo el que sigue → miro cómo quedó". Este panel
+/// no se cierra al agregar, así que ese loop no se rompe.
+///
+/// Comparte el contenido con [showExercisePickerDialog] — misma búsqueda,
+/// mismos filtros, misma lista. Lo único que cambia es el hospedaje y que
+/// confirmar llama a [onAgregar] en vez de cerrar.
+///
+/// Quién decide si se usa esto o el modal: el llamador, por `Viewport`. Ver el
+/// comentario en el `build` del contenido.
+class ExercisePickerPanel extends StatelessWidget {
+  const ExercisePickerPanel({
+    required this.dias,
+    required this.diaElegido,
+    required this.onElegirDia,
+    required this.onAgregar,
+    required this.onAgregarEnSuperserie,
+    this.alreadySelectedIds = const {},
+    this.width = kAnchoPanelPicker,
+    this.onResize,
+    super.key,
+  });
+
+  /// Ancho actual del panel. Lo decide el llamador, que es el único que sabe
+  /// cuánto lugar hay — ver `maxAnchoPanelPicker`.
+  final double width;
+
+  /// Arrastre del asa, en px. Positivo = el panel se ENSANCHA.
+  ///
+  /// `null` apaga el asa: en el modal no hay nada que redimensionar.
+  final ValueChanged<double>? onResize;
+
+  /// Los nombres de los días del plan, en orden.
+  final List<String> dias;
+
+  /// Índice del día que recibe lo que se agregue.
+  ///
+  /// Con los días APILADOS y el panel siempre abierto, esto tiene que estar a
+  /// la vista y ser cambiable acá: los botones "Agregar ejercicio" de cada día
+  /// —que antes eran los que ataban el panel a uno— ya no existen en desktop.
+  /// Sin selector, el PF no tendría cómo saber ni elegir dónde cae.
+  final int diaElegido;
+  final ValueChanged<int> onElegirDia;
+
+  final void Function(List<Exercise>) onAgregar;
+
+  /// Agrega los elegidos YA ENLAZADOS como superserie. El botón que lo dispara
+  /// aparece sólo con 2 o más seleccionados: una superserie de uno no existe.
+  final void Function(List<Exercise>) onAgregarEnSuperserie;
+
+  final Set<String> alreadySelectedIds;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final panel = Container(
+      width: width,
+      decoration: BoxDecoration(
+        color: palette.bgCard,
+        border: onResize == null
+            ? Border(left: BorderSide(color: palette.border))
+            : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.s18,
+              AppSpacing.s14,
+              AppSpacing.s18,
+              AppSpacing.s8,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Agregar a', // i18n
+                  style: GoogleFonts.barlowCondensed(
+                    color: palette.textMuted,
+                    fontWeight: FontWeight.w700,
+                    fontSize: AppTextSize.caption,
+                    letterSpacing: 1.1,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.hairline),
+                // Un chip por día. Con un solo día igual se muestra: sacarlo
+                // haría que el destino aparezca y desaparezca al agregar el
+                // segundo, y el PF tendría que descubrirlo de nuevo.
+                Wrap(
+                  spacing: AppSpacing.hairline * 2,
+                  runSpacing: AppSpacing.hairline * 2,
+                  children: [
+                    for (var i = 0; i < dias.length; i++)
+                      _ChipDeDia(
+                        key: Key('picker_panel_dia_$i'),
+                        label: dias[i],
+                        seleccionado: i == diaElegido,
+                        palette: palette,
+                        onTap: () => onElegirDia(i),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: _ExercisePickerDialog(
+              alreadySelectedIds: alreadySelectedIds,
+              onAgregar: onAgregar,
+              onAgregarEnSuperserie: onAgregarEnSuperserie,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (onResize == null) return panel;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [_AsaDeArrastre(onResize: onResize!), panel],
+    );
+  }
+}
+
+/// El asa que ensancha y angosta el panel.
+///
+/// Va en su BORDE IZQUIERDO, que es el que da contra la rutina: arrastrar
+/// hacia la izquierda agranda el panel, y es el mismo gesto que en cualquier
+/// otro panel redimensionable. El delta llega en px de pantalla, así que
+/// ensanchar es `-delta`; esa inversión la hace el llamador, que es el que
+/// sabe de qué lado está.
+///
+/// El asa mide 8 px de ancho pero sólo DIBUJA el borde de 1 que ya estaba. Los
+/// otros 7 son blanco de agarre: invisibles salvo por el cursor, que cambia a
+/// `resizeLeftRight` al pasar por encima. Sin eso el asa sería del ancho del
+/// borde y habría que apuntarle.
+class _AsaDeArrastre extends StatelessWidget {
+  const _AsaDeArrastre({required this.onResize});
+
+  final ValueChanged<double> onResize;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return MouseRegion(
+      cursor: SystemMouseCursors.resizeLeftRight,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onHorizontalDragUpdate: (d) => onResize(d.delta.dx),
+        child: SizedBox(
+          width: kAnchoAsaPanel,
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: Container(width: 1, color: palette.border),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Chip de destino del panel: a qué día caen los ejercicios que se agreguen.
+class _ChipDeDia extends StatelessWidget {
+  const _ChipDeDia({
+    required this.label,
+    required this.seleccionado,
+    required this.palette,
+    required this.onTap,
+    super.key,
+  });
+
+  final String label;
+  final bool seleccionado;
+  final AppPalette palette;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: seleccionado ? palette.accent : Colors.transparent,
+      borderRadius: BorderRadius.circular(AppRadius.full),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.full),
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.s12,
+            vertical: AppSpacing.hairline + 2,
+          ),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.full),
+            border: Border.all(
+              color: seleccionado ? palette.accent : palette.border,
+            ),
+          ),
+          child: Text(
+            label,
+            style: GoogleFonts.barlowCondensed(
+              // Sobre `accent` va el ink invariante y NO `palette.bg`: en la
+              // paleta light, bg sobre accent mide 1,57:1 (AGENTS.md regla 2).
+              color: seleccionado
+                  ? TreinoButtonTokens.foreground(context)
+                  : palette.textMuted,
+              fontWeight: FontWeight.w700,
+              fontSize: AppTextSize.caption,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ),
+    );
+  }
 }

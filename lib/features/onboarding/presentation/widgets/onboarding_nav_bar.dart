@@ -117,7 +117,7 @@ class _ActiveTab extends StatelessWidget {
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: palette.accent.withValues(alpha: 0.60),
+              color: palette.accent.withValues(alpha: 0.6),
               blurRadius: 32,
             ),
             BoxShadow(

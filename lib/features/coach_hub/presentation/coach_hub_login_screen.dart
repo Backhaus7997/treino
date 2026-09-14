@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../auth/domain/auth_failure.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 /// Login screen del Coach Hub web.
 ///
@@ -181,31 +181,11 @@ class _CoachHubLoginScreenState extends ConsumerState<CoachHubLoginScreen> {
                       ),
                     ],
                     const SizedBox(height: 18),
-                    ElevatedButton(
-                      onPressed: _submitting ? null : _submit,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: palette.accent,
-                        foregroundColor: TreinoButtonTokens.foreground(context),
-                        minimumSize: const Size.fromHeight(48),
-                        shape: const StadiumBorder(),
-                      ),
-                      child: _submitting
-                          ? SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: TreinoButtonTokens.foreground(context),
-                              ),
-                            )
-                          : Text(
-                              l10n.coachHubLoginSubmit,
-                              style: GoogleFonts.barlowCondensed(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 14,
-                                letterSpacing: 1.4,
-                              ),
-                            ),
+                    TreinoButton(
+                      label: l10n.coachHubLoginSubmit,
+                      expand: true,
+                      loading: _submitting,
+                      onPressed: _submit,
                     ),
                     const SizedBox(height: 14),
                     Text(

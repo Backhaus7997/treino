@@ -11,7 +11,8 @@
  * REQ-ACCDEL-CF-008 | ADR-ACCDEL-006
  */
 
-import * as admin from "firebase-admin";
+import { App } from "firebase-admin/app";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
 
 const BATCH_SIZE = 500;
 
@@ -20,10 +21,10 @@ const BATCH_SIZE = 500;
  * Returns the count of terminated documents.
  */
 export async function terminateTrainerLinks(
-  app: admin.app.App,
+  app: App,
   uid: string
 ): Promise<{ count: number }> {
-  const db = admin.firestore(app);
+  const db = getFirestore(app);
 
   // Query only non-terminated links — already-terminated ones are left as-is
   const snapshot = await db
@@ -46,7 +47,7 @@ export async function terminateTrainerLinks(
       batch.update(doc.ref, {
         status: "terminated",
         reason: "account-deleted",
-        terminatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        terminatedAt: FieldValue.serverTimestamp(),
       });
     }
     await batch.commit();

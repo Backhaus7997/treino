@@ -19,7 +19,8 @@
  * REQ-PN-CF-003. Fase 6 Etapa 2.
  */
 
-import * as admin from "firebase-admin";
+import { App, getApp, initializeApp } from "firebase-admin/app";
+import { Messaging } from "firebase-admin/messaging";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 import { sendFcm } from "./send-fcm";
@@ -31,13 +32,13 @@ import {
   resolveDisplayName,
   resolveTrainerName,
 } from "../mail/format";
-import { APP_ENTRY_TRAINER } from "../mail/templates";
+import { trainerEntry } from "../mail/templates";
 
-function getApp(): admin.app.App {
+function ensureApp(): App {
   try {
-    return admin.app();
+    return getApp();
   } catch {
-    return admin.initializeApp();
+    return initializeApp();
   }
 }
 
@@ -107,7 +108,7 @@ function isAthleteAccountDeletedWrite(
  * @param toUids  - Recipients, as already resolved for the push.
  */
 async function enqueueAppointmentMail(
-  app: admin.app.App,
+  app: App,
   apptId: string,
   after: ApptData,
   status: string,
@@ -154,7 +155,12 @@ async function enqueueAppointmentMail(
         timeLabel: formatTimeAR(after.startsAt as never),
         // Mismo criterio que el prefKey: el Coach Hub solo para el PF. Al
         // atleta el dashboard del entrenador no le sirve de nada.
-        ...(toUid === trainerId ? { ctaUrl: APP_ENTRY_TRAINER } : {}),
+        //
+        // `to: "agenda"` y no la entrada bare: quien cancela un turno
+        // quiere ver la agenda, no el dashboard generico.
+        ...(toUid === trainerId
+          ? { ctaUrl: trainerEntry({ to: "agenda" }) }
+          : {}),
       },
       // Only the trainer has a settings screen (Coach Hub → Ajustes →
       // Notificaciones, row `sesion_cancelada`). Gating the ATHLETE's mail on a
@@ -176,11 +182,11 @@ async function enqueueAppointmentMail(
  * @param messaging - Optional messaging instance for test injection.
  */
 export async function notifyOnAppointmentHandler(
-  app: admin.app.App,
+  app: App,
   apptId: string,
   before: ApptData | undefined,
   after: ApptData | undefined,
-  messaging?: admin.messaging.Messaging,
+  messaging?: Messaging,
 ): Promise<void> {
   // Guard: document deleted — no notification.
   if (!after) {
@@ -223,6 +229,7 @@ export async function notifyOnAppointmentHandler(
   let body: string;
   let deepLink: string;
   let actorUid: string | undefined;
+  let prefKey: string | undefined;
 
   if (afterStatus === "requested") {
     // New appointment request → notify trainer.
@@ -257,6 +264,11 @@ export async function notifyOnAppointmentHandler(
       // cancelledBy not yet in appointments schema — defaults to both.
       recipientUids = [athleteId, trainerId];
     }
+    // Unlike enqueueMail, sendFcm does not persist prefKey as a durable claim
+    // about a recipient. It evaluates each uid live. Only the Coach Hub writes
+    // notificationPrefs, so athletes have no row and default to receiving;
+    // passing the key to every recipient is equivalent to a role check.
+    prefKey = "sesion_cancelada";
     title = "Sesión cancelada"; // i18n: Fase 6 Etapa 2
     body = "Una sesión fue cancelada."; // i18n: Fase 6 Etapa 2
     deepLink = "/coach?tab=agenda";
@@ -276,6 +288,7 @@ export async function notifyOnAppointmentHandler(
       notification: { title, body },
       data: { deepLink },
       actorUid,
+      prefKey,
     },
     messaging,
   );
@@ -297,6 +310,6 @@ export const notifyOnAppointment = onDocumentWritten(
   async (event) => {
     const before = event.data?.before?.data() as ApptData | undefined;
     const after = event.data?.after?.data() as ApptData | undefined;
-    await notifyOnAppointmentHandler(getApp(), event.params.apptId, before, after);
+    await notifyOnAppointmentHandler(ensureApp(), event.params.apptId, before, after);
   },
 );

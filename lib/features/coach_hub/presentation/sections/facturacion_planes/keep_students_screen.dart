@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../../app/theme/app_palette.dart';
@@ -81,7 +81,8 @@ class _KeepStudentsScreenState extends State<KeepStudentsScreen> {
               Text(
                 'ELEGÍ QUÉ ALUMNOS CONSERVAR', // i18n: Fase W3
                 textAlign: TextAlign.center,
-                style: GoogleFonts.barlowCondensed(
+                style: TextStyle(
+                  fontFamily: AppFonts.barlowCondensed,
                   color: palette.textPrimary,
                   fontSize: 26,
                   fontWeight: FontWeight.w800,
@@ -95,14 +96,16 @@ class _KeepStudentsScreenState extends State<KeepStudentsScreen> {
                 'bloqueado hasta que regularices. No se elimina ninguno.',
                 // i18n: Fase W3
                 textAlign: TextAlign.center,
-                style: TextStyle(color: palette.textMuted, fontSize: 14),
+                style: TextStyle(
+                    color: palette.textMuted, fontSize: AppTextSize.body),
               ),
               const SizedBox(height: 20),
               // Contador de selección.
               Text(
                 '${_selected.length} / ${widget.keepLimit} elegidos', // i18n
                 textAlign: TextAlign.center,
-                style: GoogleFonts.barlowCondensed(
+                style: TextStyle(
+                  fontFamily: AppFonts.barlowCondensed,
                   color: full ? palette.accent : palette.textMuted,
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
@@ -183,9 +186,10 @@ class _StudentRow extends StatelessWidget {
                   student.displayName.isNotEmpty
                       ? student.displayName[0].toUpperCase()
                       : '?',
-                  style: GoogleFonts.barlowCondensed(
+                  style: TextStyle(
+                    fontFamily: AppFonts.barlowCondensed,
                     color: palette.accent,
-                    fontSize: 16,
+                    fontSize: AppTextSize.bodyLarge,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -196,7 +200,7 @@ class _StudentRow extends StatelessWidget {
                   student.displayName,
                   style: TextStyle(
                     color: palette.textPrimary,
-                    fontSize: 14,
+                    fontSize: AppTextSize.body,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -241,9 +245,10 @@ class _ConfirmButton extends StatelessWidget {
           ),
           child: Text(
             'CONFIRMAR SELECCIÓN', // i18n: Fase W3
-            style: GoogleFonts.barlowCondensed(
+            style: TextStyle(
+              fontFamily: AppFonts.barlowCondensed,
               color: TreinoButtonTokens.foreground(context),
-              fontSize: 14,
+              fontSize: AppTextSize.body,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.6,
             ),

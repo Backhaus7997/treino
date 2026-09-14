@@ -741,8 +741,7 @@ void main() {
     );
 
     final monday = mondayOfWeekArt(argentinaNow());
-    final enLaSemana =
-        DateTime.utc(monday.year, monday.month, monday.day, 12);
+    final enLaSemana = DateTime.utc(monday.year, monday.month, monday.day, 12);
 
     final session = await repoWithProfile.create(
       uid: uid,
@@ -761,11 +760,9 @@ void main() {
       weeklyTarget: 1,
     );
 
-    final data = (await firestore
-            .collection('userPublicProfiles')
-            .doc(uid)
-            .get())
-        .data()!;
+    final data =
+        (await firestore.collection('userPublicProfiles').doc(uid).get())
+            .data()!;
     expect(data['workoutsCount'], equals(1));
     expect(data['rachaSemanas'], equals(1));
     // El sello viaja en el MISMO write: es lo que hace confiable al decay.
@@ -847,7 +844,8 @@ void main() {
       );
       // El reason es lo que se lee en la consola de Crashlytics: tiene que
       // decir qué operación se perdió y de quién, no sólo el tipo de error.
-      expect(reporter.reports.single.reason, contains('SessionRepository.finish'));
+      expect(
+          reporter.reports.single.reason, contains('SessionRepository.finish'));
       expect(reporter.reports.single.reason, contains(uid));
     });
 

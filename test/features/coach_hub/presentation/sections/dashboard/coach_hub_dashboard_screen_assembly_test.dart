@@ -4,8 +4,8 @@
 // RED → GREEN: cubre el contrato de ensamble de
 // coach_hub_dashboard_screen.dart (ADR-D2-05, WU-06).
 //
-// SCENARIO-ASM-01: wide (>=900, alto finito) → layout de dos columnas
-//   (IntrinsicHeight envolviendo la columna derecha).
+// SCENARIO-ASM-01: wide (>=900, alto finito) → grilla de cards de a pares
+//   (un IntrinsicHeight por FILA, no uno por columna).
 // SCENARIO-ASM-02: narrow (<900) → stack de una sola columna (sin
 //   IntrinsicHeight envolviendo la columna derecha).
 // SCENARIO-ASM-03: entrada staggered (TreinoFadeSlideIn) no rompe
@@ -26,6 +26,7 @@ import 'package:treino/features/coach/domain/trainer_link.dart';
 import 'package:treino/features/coach_hub/application/aggregate_adherence_provider.dart';
 import 'package:treino/features/coach_hub/application/inactivos_provider.dart';
 import 'package:treino/features/coach_hub/presentation/sections/dashboard/coach_hub_dashboard_screen.dart';
+import 'package:treino/features/coach_hub/presentation/sections/dashboard/widgets/dashboard_pending.dart';
 import 'package:treino/features/coach_hub/presentation/sections/dashboard/widgets/dashboard_right_column.dart';
 import 'package:treino/features/coach_hub/presentation/sections/pagos/widgets/pagos_buckets_provider.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
@@ -106,18 +107,46 @@ Future<void> _pumpAt(
 }
 
 void main() {
-  group('SCENARIO-ASM-01 — wide usa layout de dos columnas', () {
-    testWidgets('IntrinsicHeight envuelve la columna derecha', (tester) async {
+  group('SCENARIO-ASM-01 — wide usa grilla de cards de a pares', () {
+    testWidgets('las 4 cards van en 2 filas, no en 2 columnas', (tester) async {
       await _pumpAt(tester, size: const Size(1400, 900), reduceMotion: true);
       await tester.pumpAndSettle();
 
-      expect(
-        find.ancestor(
-          of: find.byType(DashboardRightColumn),
-          matching: find.byType(IntrinsicHeight),
-        ),
-        findsOneWidget,
-      );
+      // Una fila por par. Antes era UN IntrinsicHeight envolviendo la columna
+      // derecha entera: las dos columnas crecían por su cuenta y la izquierda
+      // —una sola card— quedaba a un tercio del alto de la derecha, con un
+      // agujero de dos cards abajo.
+      expect(find.byType(IntrinsicHeight), findsNWidgets(2));
+      // Y las cards de la derecha ya no van apiladas en una columna propia.
+      expect(find.byType(DashboardRightColumn), findsNothing);
+      for (final card in [
+        find.byType(DashboardPendingSection),
+        find.byType(DashboardProximasSesionesCard),
+        find.byType(DashboardVencimientos7dCard),
+        find.byType(DashboardInactivosCard),
+      ]) {
+        expect(card, findsOneWidget);
+        expect(
+          find.ancestor(of: card, matching: find.byType(IntrinsicHeight)),
+          findsOneWidget,
+          reason: 'cada card vive en la fila que le iguala el alto',
+        );
+      }
+    });
+
+    testWidgets('las dos cards de una fila terminan con el MISMO alto',
+        (tester) async {
+      await _pumpAt(tester, size: const Size(1400, 900), reduceMotion: true);
+      await tester.pumpAndSettle();
+
+      // Es lo que hace que la grilla se lea alineada: dos cards de distinto
+      // alto lado a lado leen como desprolijas, que es la mitad del problema
+      // que esto viene a arreglar.
+      final izq = tester.getSize(find.byType(DashboardPendingSection));
+      final der = tester.getSize(find.byType(DashboardProximasSesionesCard));
+      expect(izq.height, der.height);
+      // Y la proporción 55/45 del layout anterior se conserva.
+      expect(izq.width, greaterThan(der.width));
     });
   });
 

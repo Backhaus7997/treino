@@ -48,7 +48,7 @@
  * siguiente: cualquier clausula nueva se decide con la misma frase.
  */
 
-import * as admin from "firebase-admin";
+import { DocumentData } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 
 import {
@@ -153,7 +153,7 @@ function toMillisOrNull(
  * olvidar.
  */
 export function toSubscriptionState(
-  data: admin.firestore.DocumentData | undefined,
+  data: DocumentData | undefined,
   trainerId: string,
 ): MappedSubscription {
   const raw: unknown = data?.subscription;

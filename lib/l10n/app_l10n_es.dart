@@ -241,7 +241,7 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get authTrainerInquiryDialogBody =>
-      'Para alta de entrenador, escribinos a equipo@treino.app';
+      'Para alta de entrenador, escribinos a treino@gettreino.com';
 
   @override
   String get authTrainerInquiryDialogClose => 'Cerrar';
@@ -430,6 +430,64 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get agendaButtonLabel => 'VER AGENDA DEL PF';
+
+  @override
+  String get athleteNutritionPlanButtonLabel => 'MI PLAN NUTRICIONAL';
+
+  @override
+  String get athleteFilesButtonLabel => 'MIS ARCHIVOS';
+
+  @override
+  String get athleteNutritionPlanScreenTitle => 'PLAN NUTRICIONAL';
+
+  @override
+  String get athleteNutritionChooseOneHint => 'Elegí una';
+
+  @override
+  String get athleteNutritionAllHint => 'Va todo';
+
+  @override
+  String get athleteNutritionPlanEmpty =>
+      'Tu PF todavía no cargó tu plan nutricional.';
+
+  @override
+  String get athleteNutritionPlanLoadError =>
+      'No pudimos cargar tu plan nutricional.';
+
+  @override
+  String get athleteNutritionNeedsActiveLink =>
+      'Necesitás un vínculo activo con un PF para ver tu plan nutricional.';
+
+  @override
+  String get athleteLinkRequired =>
+      'No encontramos un vínculo activo con un PF.';
+
+  @override
+  String get trainerAcceptsInquiriesTitle => 'Acepto consultas';
+
+  @override
+  String get trainerAcceptsInquiriesSubtitle =>
+      'Un alumno puede escribirte antes de pedirte el vínculo. Si lo apagás, no te llegan consultas nuevas — las conversaciones ya abiertas siguen.';
+
+  @override
+  String get athleteLinkUnconfirmed =>
+      'No pudimos confirmar tu vínculo con tu PF.';
+
+  @override
+  String get athleteLinkRequiredRetry => 'Reintentar';
+
+  @override
+  String get athleteSessionMissing => 'Tu sesión se cerró. Volvé a entrar.';
+
+  @override
+  String get athleteFilesScreenTitle => 'MIS ARCHIVOS';
+
+  @override
+  String get athleteFilesEmpty =>
+      'Tu PF todavía no compartió archivos con vos.';
+
+  @override
+  String get athleteFilesLoadError => 'No pudimos cargar tus archivos.';
 
   @override
   String get agendaScreenTitle => 'Agenda';
@@ -2564,7 +2622,7 @@ class AppL10nEs extends AppL10n {
   String get coachHubAlumnosSearchHint => 'Buscar por nombre…';
 
   @override
-  String get coachHubAlumnosFilterAll => 'Todos';
+  String get coachHubAlumnosFilterAll => 'Vigentes';
 
   @override
   String get coachHubAlumnosFilterActivos => 'Activos';
@@ -2617,10 +2675,10 @@ class AppL10nEs extends AppL10n {
   String get coachHubAlumnosStatusDebt => 'Con deuda';
 
   @override
-  String get coachHubAlumnosStatusBlocked => 'Bloqueado';
+  String get coachHubAlumnosStatusBlocked => 'Sin acceso';
 
   @override
-  String get coachHubAlumnosFilterBloqueados => 'Bloqueados';
+  String get coachHubAlumnosFilterBloqueados => 'Sin acceso';
 
   @override
   String get coachHubAlumnosBlockedHint =>
@@ -2673,11 +2731,11 @@ class AppL10nEs extends AppL10n {
   String get coachHubAlumnoDetailNotasLoadError => 'No pudimos cargar la nota.';
 
   @override
-  String get coachHubAlumnoDetailArchivosTitle => 'Archivos privados';
+  String get coachHubAlumnoDetailArchivosTitle => 'Archivos del alumno';
 
   @override
   String get coachHubAlumnoDetailArchivosSubtitle =>
-      'PDFs y fotos que subes sobre este alumno. Solo tú los ves.';
+      'PDFs y fotos que subís sobre este alumno. Elegí cuáles compartís con él.';
 
   @override
   String get coachHubAlumnoDetailArchivosUploadButton => 'SUBIR ARCHIVO';
@@ -2718,6 +2776,24 @@ class AppL10nEs extends AppL10n {
   @override
   String get coachHubAlumnoDetailArchivosDeleteError =>
       'No pudimos eliminar el archivo.';
+
+  @override
+  String get coachHubAlumnoDetailArchivosSharedLabel => 'COMPARTIDO';
+
+  @override
+  String get coachHubAlumnoDetailArchivosPrivateLabel => 'PRIVADO';
+
+  @override
+  String get coachHubAlumnoDetailArchivosShareTooltip =>
+      'Compartir con el alumno';
+
+  @override
+  String get coachHubAlumnoDetailArchivosUnshareTooltip =>
+      'Dejar de compartir con el alumno';
+
+  @override
+  String get coachHubAlumnoDetailArchivosShareError =>
+      'No pudimos cambiar quién ve el archivo.';
 
   @override
   String get feedLoadError => 'No pudimos cargar tu feed. Inténtalo de nuevo.';
@@ -2916,6 +2992,21 @@ class AppL10nEs extends AppL10n {
       'No pudimos subir el archivo. Inténtalo de nuevo.';
 
   @override
+  String chatMediaQuotaFull(String maxMb) {
+    return 'Llegaste al tope de $maxMb MB en fotos y videos de chat.';
+  }
+
+  @override
+  String chatMediaFileTooLarge(String fileMb, String maxMb) {
+    return 'El archivo pesa $fileMb MB y el máximo es $maxMb MB.';
+  }
+
+  @override
+  String chatMediaQuotaNotEnough(String fileMb, String remainingMb) {
+    return 'El archivo pesa $fileMb MB y te quedan $remainingMb MB de cupo.';
+  }
+
+  @override
   String get chatMediaPreviewPhoto => '📷 Foto';
 
   @override
@@ -3082,6 +3173,15 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get profileRoutinesActiveChip => 'ACTIVA';
+
+  @override
+  String get profileSectionLegal => 'Legales';
+
+  @override
+  String get legalDocumentsTitle => 'Documentos legales';
+
+  @override
+  String get legalDocumentsSubtitle => 'Términos, privacidad y más';
 
   @override
   String get appearanceTitle => 'Apariencia';
@@ -4328,6 +4428,215 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get routineEditorSlotMenuMergeDown => 'Unir con el de abajo';
+
+  @override
+  String get paywallFreePlanLimitTitle => 'Esto es parte del plan pago';
+
+  @override
+  String paywallFreePlanLimitDaysBody(int max) {
+    return 'Con el plan gratis armás rutinas de hasta $max días. Las plantillas de principiante del catálogo las seguís completas, sin tope.';
+  }
+
+  @override
+  String get paywallFreePlanLimitWeeksBody =>
+      'Periodizar en varias semanas es parte del plan pago. Con el gratis tu rutina propia va de a una semana.';
+
+  @override
+  String paywallFreePlanLimitShapeDaysBody(int actual, int max) {
+    return 'Esta rutina tiene $actual días y con el plan gratis guardás hasta $max. Sacá los que sobren y vas a poder guardar los cambios. Entrenarla completa no tiene tope.';
+  }
+
+  @override
+  String paywallFreePlanLimitShapeWeeksBody(int actual, int max) {
+    return 'Esta rutina está periodizada en $actual semanas y con el plan gratis guardás hasta $max. Podés dejarla en $max para guardar los cambios, o pasarte al plan pago. Entrenarla completa no tiene tope.';
+  }
+
+  @override
+  String get paywallFreePlanLimitUpgrade => 'Ver el plan pago';
+
+  @override
+  String get paywallFreePlanLimitDismiss => 'Entendido';
+
+  @override
+  String get paywallFreePlanLimitTemplateBody =>
+      'Esta plantilla es parte del plan pago. Las de nivel principiante las podés usar completas con el plan gratis.';
+
+  @override
+  String paywallFreePlanLimitCustomizeTemplateBody(int max) {
+    return 'Personalizar una plantilla del catálogo es parte del plan pago. Con el gratis la seguís tal cual, sin tope de días, o armás tu propia rutina de hasta $max días.';
+  }
+
+  @override
+  String get workoutPlantillasPremiumChip => 'PLAN PAGO';
+
+  @override
+  String get progressionPeriodLast3Months => '3 meses';
+
+  @override
+  String get progressionPeriodLast1Year => '1 año';
+
+  @override
+  String get workoutRoutineFollow => 'Seguir esta plantilla';
+
+  @override
+  String get workoutRoutineFollowing => 'La estas siguiendo';
+
+  @override
+  String get workoutRoutineFollowSuccess =>
+      'Listo, ahora seguís esta plantilla.';
+
+  @override
+  String get workoutRoutineFollowError =>
+      'No pudimos marcarla. Probá de nuevo.';
+
+  @override
+  String get paywallFreePlanLimitRoutineCountBody =>
+      'Con el plan gratis guardás hasta 3 rutinas propias. Las plantillas del catálogo que seguís no ocupan lugar.';
+
+  @override
+  String get paywallFreePlanLimitChartHistoryBody =>
+      'Con el plan gratis mirás hasta un mes de historial. Los períodos de 3 meses y 1 año son del plan pago.';
+
+  @override
+  String get paywallAlumnoTitulo => 'TREINO Pro';
+
+  @override
+  String get paywallAlumnoBajada =>
+      'Programá en serio: rutinas largas, periodización y todo tu historial.';
+
+  @override
+  String get paywallAlumnoPlanMensual => 'Mensual';
+
+  @override
+  String get paywallAlumnoPlanAnual => 'Anual';
+
+  @override
+  String get paywallAlumnoAhorro => '2 meses gratis';
+
+  @override
+  String get paywallAlumnoBeneficio1 => 'Rutinas de hasta 7 días';
+
+  @override
+  String get paywallAlumnoBeneficio2 => '16 semanas con periodización';
+
+  @override
+  String get paywallAlumnoBeneficio3 => 'Gráficos de 3 meses y 1 año';
+
+  @override
+  String get paywallAlumnoBeneficio4 => 'Las plantillas premium del catálogo';
+
+  @override
+  String get paywallAlumnoImpuestos =>
+      'Tu banco le suma los impuestos argentinos a este precio (IVA y percepción). No los cobra TREINO: los vas a ver en el resumen de tu tarjeta.';
+
+  @override
+  String get paywallAlumnoCta => 'Suscribirme';
+
+  @override
+  String get paywallAlumnoRestaurar => 'Restaurar compras';
+
+  @override
+  String get paywallAlumnoSinPlanes =>
+      'No pudimos cargar los planes. Probá de nuevo en un rato.';
+
+  @override
+  String get paywallAlumnoReintentar => 'Reintentar';
+
+  @override
+  String get paywallAlumnoListo => '¡Listo! Ya tenés TREINO Pro.';
+
+  @override
+  String get paywallAlumnoPendiente =>
+      'Tu pago quedó pendiente de confirmación. Te avisamos cuando se acredite.';
+
+  @override
+  String get paywallAlumnoErrorCompra =>
+      'No pudimos completar la compra. No se te cobró nada.';
+
+  @override
+  String get paywallAlumnoSinRestaurar =>
+      'No encontramos compras para restaurar en esta cuenta.';
+
+  @override
+  String get moderationMenuA11y => 'Más opciones';
+
+  @override
+  String get moderationReportAction => 'Reportar';
+
+  @override
+  String get moderationBlockAction => 'Bloquear';
+
+  @override
+  String get moderationReportSheetTitle => '¿Por qué lo reportás?';
+
+  @override
+  String get moderationReportReasonHarassment => 'Acoso';
+
+  @override
+  String get moderationReportReasonSexualContent => 'Contenido sexual';
+
+  @override
+  String get moderationReportReasonViolenceOrSelfHarm =>
+      'Violencia o autolesión';
+
+  @override
+  String get moderationReportReasonDangerousHealthAdvice =>
+      'Consejo de salud peligroso';
+
+  @override
+  String get moderationReportReasonImpersonation => 'Suplantación de identidad';
+
+  @override
+  String get moderationReportReasonSpam => 'Spam';
+
+  @override
+  String get moderationReportReasonThirdPartyData => 'Datos de terceros';
+
+  @override
+  String get moderationReportReasonIntellectualProperty =>
+      'Propiedad intelectual';
+
+  @override
+  String get moderationReportReasonOther => 'Otro';
+
+  @override
+  String get moderationReportDetailHint => 'Contanos más (opcional)';
+
+  @override
+  String get moderationReportSubmit => 'ENVIAR REPORTE';
+
+  @override
+  String get moderationReportCancel => 'CANCELAR';
+
+  @override
+  String get moderationReportSuccess => 'Gracias, lo vamos a revisar.';
+
+  @override
+  String get moderationReportError =>
+      'No pudimos enviar el reporte. Probá de nuevo.';
+
+  @override
+  String moderationBlockConfirmTitle(String name) {
+    return '¿Bloquear a $name?';
+  }
+
+  @override
+  String get moderationBlockConfirmBody =>
+      'No va a poder escribirte, seguirte ni reaccionar a tus posts.';
+
+  @override
+  String get moderationBlockConfirmAction => 'BLOQUEAR';
+
+  @override
+  String get moderationBlockDismiss => 'CANCELAR';
+
+  @override
+  String moderationBlockSuccess(String name) {
+    return 'Bloqueaste a $name.';
+  }
+
+  @override
+  String get moderationBlockError => 'No pudimos bloquear. Probá de nuevo.';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -4567,7 +4876,7 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get authTrainerInquiryDialogBody =>
-      'Para alta de entrenador, escribinos a equipo@treino.app';
+      'Para alta de entrenador, escribinos a treino@gettreino.com';
 
   @override
   String get authTrainerInquiryDialogClose => 'Cerrar';
@@ -4756,6 +5065,64 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get agendaButtonLabel => 'VER AGENDA DEL PF';
+
+  @override
+  String get athleteNutritionPlanButtonLabel => 'MI PLAN NUTRICIONAL';
+
+  @override
+  String get athleteFilesButtonLabel => 'MIS ARCHIVOS';
+
+  @override
+  String get athleteNutritionPlanScreenTitle => 'PLAN NUTRICIONAL';
+
+  @override
+  String get athleteNutritionChooseOneHint => 'Elegí una';
+
+  @override
+  String get athleteNutritionAllHint => 'Va todo';
+
+  @override
+  String get athleteNutritionPlanEmpty =>
+      'Tu PF todavía no cargó tu plan nutricional.';
+
+  @override
+  String get athleteNutritionPlanLoadError =>
+      'No pudimos cargar tu plan nutricional.';
+
+  @override
+  String get athleteNutritionNeedsActiveLink =>
+      'Necesitás un vínculo activo con un PF para ver tu plan nutricional.';
+
+  @override
+  String get athleteLinkRequired =>
+      'No encontramos un vínculo activo con un PF.';
+
+  @override
+  String get trainerAcceptsInquiriesTitle => 'Acepto consultas';
+
+  @override
+  String get trainerAcceptsInquiriesSubtitle =>
+      'Un alumno puede escribirte antes de pedirte el vínculo. Si lo apagás, no te llegan consultas nuevas — las conversaciones ya abiertas siguen.';
+
+  @override
+  String get athleteLinkUnconfirmed =>
+      'No pudimos confirmar tu vínculo con tu PF.';
+
+  @override
+  String get athleteLinkRequiredRetry => 'Reintentar';
+
+  @override
+  String get athleteSessionMissing => 'Tu sesión se cerró. Volvé a entrar.';
+
+  @override
+  String get athleteFilesScreenTitle => 'MIS ARCHIVOS';
+
+  @override
+  String get athleteFilesEmpty =>
+      'Tu PF todavía no compartió archivos con vos.';
+
+  @override
+  String get athleteFilesLoadError => 'No pudimos cargar tus archivos.';
 
   @override
   String get agendaScreenTitle => 'Agenda';
@@ -6891,7 +7258,7 @@ class AppL10nEsAr extends AppL10nEs {
   String get coachHubAlumnosSearchHint => 'Buscar por nombre…';
 
   @override
-  String get coachHubAlumnosFilterAll => 'Todos';
+  String get coachHubAlumnosFilterAll => 'Vigentes';
 
   @override
   String get coachHubAlumnosFilterActivos => 'Activos';
@@ -6944,10 +7311,10 @@ class AppL10nEsAr extends AppL10nEs {
   String get coachHubAlumnosStatusDebt => 'Con deuda';
 
   @override
-  String get coachHubAlumnosStatusBlocked => 'Bloqueado';
+  String get coachHubAlumnosStatusBlocked => 'Sin acceso';
 
   @override
-  String get coachHubAlumnosFilterBloqueados => 'Bloqueados';
+  String get coachHubAlumnosFilterBloqueados => 'Sin acceso';
 
   @override
   String get coachHubAlumnosBlockedHint =>
@@ -7000,11 +7367,11 @@ class AppL10nEsAr extends AppL10nEs {
   String get coachHubAlumnoDetailNotasLoadError => 'No pudimos cargar la nota.';
 
   @override
-  String get coachHubAlumnoDetailArchivosTitle => 'Archivos privados';
+  String get coachHubAlumnoDetailArchivosTitle => 'Archivos del alumno';
 
   @override
   String get coachHubAlumnoDetailArchivosSubtitle =>
-      'PDFs y fotos que subís sobre este alumno. Solo vos los ves.';
+      'PDFs y fotos que subís sobre este alumno. Elegí cuáles compartís con él.';
 
   @override
   String get coachHubAlumnoDetailArchivosUploadButton => 'SUBIR ARCHIVO';
@@ -7045,6 +7412,24 @@ class AppL10nEsAr extends AppL10nEs {
   @override
   String get coachHubAlumnoDetailArchivosDeleteError =>
       'No pudimos eliminar el archivo.';
+
+  @override
+  String get coachHubAlumnoDetailArchivosSharedLabel => 'COMPARTIDO';
+
+  @override
+  String get coachHubAlumnoDetailArchivosPrivateLabel => 'PRIVADO';
+
+  @override
+  String get coachHubAlumnoDetailArchivosShareTooltip =>
+      'Compartir con el alumno';
+
+  @override
+  String get coachHubAlumnoDetailArchivosUnshareTooltip =>
+      'Dejar de compartir con el alumno';
+
+  @override
+  String get coachHubAlumnoDetailArchivosShareError =>
+      'No pudimos cambiar quién ve el archivo.';
 
   @override
   String get feedLoadError => 'No pudimos cargar tu feed. Probá de nuevo.';
@@ -7240,6 +7625,21 @@ class AppL10nEsAr extends AppL10nEs {
       'No pudimos subir el archivo. Probá de nuevo.';
 
   @override
+  String chatMediaQuotaFull(String maxMb) {
+    return 'Llegaste al tope de $maxMb MB en fotos y videos de chat.';
+  }
+
+  @override
+  String chatMediaFileTooLarge(String fileMb, String maxMb) {
+    return 'El archivo pesa $fileMb MB y el máximo es $maxMb MB.';
+  }
+
+  @override
+  String chatMediaQuotaNotEnough(String fileMb, String remainingMb) {
+    return 'El archivo pesa $fileMb MB y te quedan $remainingMb MB de cupo.';
+  }
+
+  @override
   String get chatMediaPreviewPhoto => '📷 Foto';
 
   @override
@@ -7406,6 +7806,15 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get profileRoutinesActiveChip => 'ACTIVA';
+
+  @override
+  String get profileSectionLegal => 'Legales';
+
+  @override
+  String get legalDocumentsTitle => 'Documentos legales';
+
+  @override
+  String get legalDocumentsSubtitle => 'Términos, privacidad y más';
 
   @override
   String get appearanceTitle => 'Apariencia';
@@ -8651,4 +9060,213 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get routineEditorSlotMenuMergeDown => 'Unir con el de abajo';
+
+  @override
+  String get paywallFreePlanLimitTitle => 'Esto es parte del plan pago';
+
+  @override
+  String paywallFreePlanLimitDaysBody(int max) {
+    return 'Con el plan gratis armás rutinas de hasta $max días. Las plantillas de principiante del catálogo las seguís completas, sin tope.';
+  }
+
+  @override
+  String get paywallFreePlanLimitWeeksBody =>
+      'Periodizar en varias semanas es parte del plan pago. Con el gratis tu rutina propia va de a una semana.';
+
+  @override
+  String paywallFreePlanLimitShapeDaysBody(int actual, int max) {
+    return 'Esta rutina tiene $actual días y con el plan gratis guardás hasta $max. Sacá los que sobren y vas a poder guardar los cambios. Entrenarla completa no tiene tope.';
+  }
+
+  @override
+  String paywallFreePlanLimitShapeWeeksBody(int actual, int max) {
+    return 'Esta rutina está periodizada en $actual semanas y con el plan gratis guardás hasta $max. Podés dejarla en $max para guardar los cambios, o pasarte al plan pago. Entrenarla completa no tiene tope.';
+  }
+
+  @override
+  String get paywallFreePlanLimitUpgrade => 'Ver el plan pago';
+
+  @override
+  String get paywallFreePlanLimitDismiss => 'Entendido';
+
+  @override
+  String get paywallFreePlanLimitTemplateBody =>
+      'Esta plantilla es parte del plan pago. Las de nivel principiante las podés usar completas con el plan gratis.';
+
+  @override
+  String paywallFreePlanLimitCustomizeTemplateBody(int max) {
+    return 'Personalizar una plantilla del catálogo es parte del plan pago. Con el gratis la seguís tal cual, sin tope de días, o armás tu propia rutina de hasta $max días.';
+  }
+
+  @override
+  String get workoutPlantillasPremiumChip => 'PLAN PAGO';
+
+  @override
+  String get progressionPeriodLast3Months => '3 meses';
+
+  @override
+  String get progressionPeriodLast1Year => '1 año';
+
+  @override
+  String get workoutRoutineFollow => 'Seguir esta plantilla';
+
+  @override
+  String get workoutRoutineFollowing => 'La estas siguiendo';
+
+  @override
+  String get workoutRoutineFollowSuccess =>
+      'Listo, ahora seguís esta plantilla.';
+
+  @override
+  String get workoutRoutineFollowError =>
+      'No pudimos marcarla. Probá de nuevo.';
+
+  @override
+  String get paywallFreePlanLimitRoutineCountBody =>
+      'Con el plan gratis guardás hasta 3 rutinas propias. Las plantillas del catálogo que seguís no ocupan lugar.';
+
+  @override
+  String get paywallFreePlanLimitChartHistoryBody =>
+      'Con el plan gratis mirás hasta un mes de historial. Los períodos de 3 meses y 1 año son del plan pago.';
+
+  @override
+  String get paywallAlumnoTitulo => 'TREINO Pro';
+
+  @override
+  String get paywallAlumnoBajada =>
+      'Programá en serio: rutinas largas, periodización y todo tu historial.';
+
+  @override
+  String get paywallAlumnoPlanMensual => 'Mensual';
+
+  @override
+  String get paywallAlumnoPlanAnual => 'Anual';
+
+  @override
+  String get paywallAlumnoAhorro => '2 meses gratis';
+
+  @override
+  String get paywallAlumnoBeneficio1 => 'Rutinas de hasta 7 días';
+
+  @override
+  String get paywallAlumnoBeneficio2 => '16 semanas con periodización';
+
+  @override
+  String get paywallAlumnoBeneficio3 => 'Gráficos de 3 meses y 1 año';
+
+  @override
+  String get paywallAlumnoBeneficio4 => 'Las plantillas premium del catálogo';
+
+  @override
+  String get paywallAlumnoImpuestos =>
+      'Tu banco le suma los impuestos argentinos a este precio (IVA y percepción). No los cobra TREINO: los vas a ver en el resumen de tu tarjeta.';
+
+  @override
+  String get paywallAlumnoCta => 'Suscribirme';
+
+  @override
+  String get paywallAlumnoRestaurar => 'Restaurar compras';
+
+  @override
+  String get paywallAlumnoSinPlanes =>
+      'No pudimos cargar los planes. Probá de nuevo en un rato.';
+
+  @override
+  String get paywallAlumnoReintentar => 'Reintentar';
+
+  @override
+  String get paywallAlumnoListo => '¡Listo! Ya tenés TREINO Pro.';
+
+  @override
+  String get paywallAlumnoPendiente =>
+      'Tu pago quedó pendiente de confirmación. Te avisamos cuando se acredite.';
+
+  @override
+  String get paywallAlumnoErrorCompra =>
+      'No pudimos completar la compra. No se te cobró nada.';
+
+  @override
+  String get paywallAlumnoSinRestaurar =>
+      'No encontramos compras para restaurar en esta cuenta.';
+
+  @override
+  String get moderationMenuA11y => 'Más opciones';
+
+  @override
+  String get moderationReportAction => 'Reportar';
+
+  @override
+  String get moderationBlockAction => 'Bloquear';
+
+  @override
+  String get moderationReportSheetTitle => '¿Por qué lo reportás?';
+
+  @override
+  String get moderationReportReasonHarassment => 'Acoso';
+
+  @override
+  String get moderationReportReasonSexualContent => 'Contenido sexual';
+
+  @override
+  String get moderationReportReasonViolenceOrSelfHarm =>
+      'Violencia o autolesión';
+
+  @override
+  String get moderationReportReasonDangerousHealthAdvice =>
+      'Consejo de salud peligroso';
+
+  @override
+  String get moderationReportReasonImpersonation => 'Suplantación de identidad';
+
+  @override
+  String get moderationReportReasonSpam => 'Spam';
+
+  @override
+  String get moderationReportReasonThirdPartyData => 'Datos de terceros';
+
+  @override
+  String get moderationReportReasonIntellectualProperty =>
+      'Propiedad intelectual';
+
+  @override
+  String get moderationReportReasonOther => 'Otro';
+
+  @override
+  String get moderationReportDetailHint => 'Contanos más (opcional)';
+
+  @override
+  String get moderationReportSubmit => 'ENVIAR REPORTE';
+
+  @override
+  String get moderationReportCancel => 'CANCELAR';
+
+  @override
+  String get moderationReportSuccess => 'Gracias, lo vamos a revisar.';
+
+  @override
+  String get moderationReportError =>
+      'No pudimos enviar el reporte. Probá de nuevo.';
+
+  @override
+  String moderationBlockConfirmTitle(String name) {
+    return '¿Bloquear a $name?';
+  }
+
+  @override
+  String get moderationBlockConfirmBody =>
+      'No va a poder escribirte, seguirte ni reaccionar a tus posts.';
+
+  @override
+  String get moderationBlockConfirmAction => 'BLOQUEAR';
+
+  @override
+  String get moderationBlockDismiss => 'CANCELAR';
+
+  @override
+  String moderationBlockSuccess(String name) {
+    return 'Bloqueaste a $name.';
+  }
+
+  @override
+  String get moderationBlockError => 'No pudimos bloquear. Probá de nuevo.';
 }

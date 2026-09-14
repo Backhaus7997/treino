@@ -250,11 +250,13 @@ void main() {
         'marca los períodos cuya ventana actual tiene sets con peso; '
         'un ejercicio fuera de toda ventana queda EN la lista sin flags',
         () async {
-      // "Hoy" (ART) cae siempre dentro de las ventanas actuales de los 3
-      // períodos; hace 40 días cae siempre fuera de las 3 (last30d = 29 días
-      // atrás, thisWeek ≤ 6, month ≤ 30).
+      // "Hoy" (ART) cae siempre dentro de las ventanas actuales de TODOS los
+      // períodos. Para caer fuera de todas hay que irse más atrás que el más
+      // largo, que desde los períodos largos es `last1y` — de ahí los 400
+      // días. Con 40 alcanzaba cuando el máximo era `month`, pero ese mismo
+      // fixture cae DENTRO de los últimos 3 meses.
       final sToday = _s('sToday', _artDay(0));
-      final sOld = _s('sOld', _artDay(40));
+      final sOld = _s('sOld', _artDay(400));
       final sessions = [sToday, sOld]; // DESC
 
       when(() => repo.listSetLogs(uid: 'a1', sessionId: 'sToday')).thenAnswer(

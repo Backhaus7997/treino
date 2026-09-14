@@ -106,6 +106,84 @@ service cloud.firestore {
           && get(/databases/$(database)/documents/follows/$(id)).data.status == 'accepted';
     }
 
+    // ── Bloqueo — notBlocked() (change `moderacion-reporte-y-bloqueo`) ───────
+    // A scope raíz, espejando `followAccepted()` de arriba: lo consumen cinco
+    // bloques `match` que no se contienen entre sí (`posts/{id}/reactions`,
+    // `chats/{chatId}`, `chats/{id}/messages`, `follows`, `reviews`).
+    // Duplicarlo sería el mismo riesgo que ya evita `followAccepted` — dos
+    // copias de un predicado de AUTORIZACIÓN que divergen en silencio.
+    //
+    // Chequea LAS DOS DIRECCIONES contra `blocks/{a}_{b}` y `blocks/{b}_{a}`.
+    // El doc de bloqueo es de UNA vía (`blocks/{blockerUid}_{blockedUid}`),
+    // pero el EFECTO tiene que ser de las dos: si A bloquea a B, ninguno le
+    // escribe al otro. Con un solo `exists()` el bloqueador seguiría
+    // recibiendo interacciones de la persona que bloqueó, que es justo de lo
+    // que se quería evitar (design.md, "Las dos direcciones").
+    //
+    // A PROPÓSITO no se usa en `posts/{postId} allow read`: las rules de
+    // `list` se evalúan contra la QUERY, y si un solo doc del resultado no
+    // pasa, Firestore rechaza la query ENTERA en vez de filtrar la fila. El
+    // feed público se rompería para cualquiera con un bloqueo activo. El corte
+    // va en la ESCRITURA, que es donde está el daño real (design.md, "El
+    // error que casi cometo").
+    //
+    // Costo: 2 lecturas por llamada. Como sólo corre en escrituras (mensaje,
+    // preview del chat, reacción, follow, review) y no por cada post de cada
+    // scroll, es despreciable. El `update` de `chats/{chatId}` que sólo toca
+    // `lastRead` sigue sin pagarlas: corta antes, por el otro disyunto.
+    function notBlocked(a, b) {
+      return !exists(/databases/$(database)/documents/blocks/$(a + '_' + b))
+          && !exists(/databases/$(database)/documents/blocks/$(b + '_' + a));
+    }
+
+    // ── Paywall del alumno suelto — el predicado de "¿a éste se le aplica?" ──
+    //
+    // Vive en el scope RAÍZ, no adentro de un match, porque lo consumen dos
+    // ramas del árbol que son hermanas y no se ven entre sí:
+    //   • `match /routines/{routineId}` — los topes de forma de la rutina
+    //     propia (días y semanas).
+    //   • `match /users/{uid}/sessions/{sessionId}` — que un free no ENTRENE
+    //     una plantilla paga del catálogo.
+    // Mismo criterio que los guards genéricos de más arriba: sin conocimiento
+    // de colección propia y con más de un consumidor ⇒ arriba, una sola vez.
+    // Duplicarla sería tener dos definiciones de un predicado de AUTORIZACIÓN,
+    // que es la peor clase de duplicado: divergen en silencio y la mitad que
+    // se olvida queda abierta.
+    //
+    // Lee UN campo denormalizado, `users/{uid}.athletePaywallEnforced`, que
+    // escribe una Cloud Function. NO se leen acá ni la suscripción ni los
+    // vínculos, y no es por comodidad:
+    //
+    //   • El vínculo con un PF EXIME al alumno (spec §2: el vinculado no paga
+    //     nunca, su PF ya paga por él). Pero `trainer_links` usa ids
+    //     autogenerados y las reglas NO PUEDEN hacer queries — sólo `get()` a
+    //     un path conocido. Desde acá es imposible saber si tiene vínculo.
+    //   • `session_shares/{athleteId}` sí es determinístico por atleta, pero
+    //     lo escribe el PROPIO alumno: usarlo para eximir sería dejar que
+    //     cada uno se auto-exima creando un doc.
+    //
+    // Así que la resolución (suscripción OR vínculo activo) vive en la CF, y
+    // acá se lee su conclusión.
+    //
+    // **AUSENTE ⇒ NO SE APLICA**, y ese default es deliberado: mientras el
+    // escritor no exista, toda regla que dependa de esto es INERTE. Lo
+    // contrario —ausente ⇒ se aplica— le cortaría la app a TODOS los atletas
+    // el día que se deploye, sin que ninguno tenga forma de pagar todavía.
+    // Las reglas no leen el flag del cliente: se aplican apenas se suben.
+    //
+    // El `u != null` NO es defensivo de más: `get()` devuelve null cuando el
+    // documento no existe, y tocarle `.data` a null no deniega — tira ERROR DE
+    // EVALUACIÓN, que rebota la escritura entera con un mensaje que no dice
+    // nada. Pasa de verdad: hay escrituras legítimas de usuarios sin doc de
+    // perfil todavía, y sin esta guarda rompían tests que no tienen nada que
+    // ver con el paywall.
+    //
+    // Sin doc ⇒ no se aplica, mismo default seguro que el campo ausente.
+    function paywallEnforcedFor(uid) {
+      let u = get(/databases/$(database)/documents/users/$(uid));
+      return u != null && u.data.get('athletePaywallEnforced', false) == true;
+    }
+
     match /users/{uid} {
       // Owner-only read.
       allow read: if request.auth != null
@@ -150,7 +228,73 @@ service cloud.firestore {
                     && request.resource.data.role == 'athlete'
                     && request.resource.data.get('blockedAthleteIds', null) == null
                     && request.resource.data.get('subscription', null) == null
-                    && request.resource.data.get('weightedLoad', null) == null;
+                    && request.resource.data.get('weightedLoad', null) == null
+                    // `athletePaywallEnforced` va por lo MISMO, y acá el
+                    // agujero sería peor que en los otros tres: este campo SÍ
+                    // lo lee una cláusula de autorización (`paywallEnforcedFor`,
+                    // en el match de `routines`). Como el pin de update lo
+                    // vuelve indeleble, quien se auto-creara el doc con `false`
+                    // quedaría exento para siempre y el paywall entero sería
+                    // decorativo para él. Es el mismo modo de falla que el
+                    // comentario de arriba documenta para `subscription`.
+                    && request.resource.data.get('athletePaywallEnforced', null) == null
+                    // `athleteSubscription` es la ENTRADA de ese mismo cálculo,
+                    // y hasta ahora estaba abierta mientras la salida estaba
+                    // cerrada. La CF cruza este mapa con los vínculos activos
+                    // para decidir `athletePaywallEnforced`, así que sembrarlo
+                    // acá con `{status: 'active'}` produce EXACTAMENTE el mismo
+                    // bypass que el pin de arriba evita, sólo que dando una
+                    // vuelta por la Cloud Function: el alumno se escribe la
+                    // suscripción, la CF la cree, escribe `enforced: false` con
+                    // el Admin SDK, y `paywallEnforcedFor` lo deja pasar.
+                    //
+                    // Cerrar la salida y dejar abierta la entrada no cierra
+                    // nada. Lo escribe el webhook de la tienda, nunca el
+                    // cliente.
+                    && request.resource.data.get('athleteSubscription', null) == null
+                    // customExerciseVideoUsage: CF-write-only. Es el contador
+                    // denormalizado de cuantos videos de ejercicio custom tiene
+                    // subidos este usuario y cuantos bytes ocupan, que escribe
+                    // `maintainCustomExerciseVideoQuota*`.
+                    //
+                    // NO es inerte: `storage.rules` lo LEE para autorizar la
+                    // subida del proximo video. Sin este pin el bypass es una
+                    // sola escritura —`{customExerciseVideoUsage: {count: 0}}`—
+                    // y el tope de cantidad deja de existir para quien la mande.
+                    // Mismo peso y mismo modo de falla que
+                    // `athletePaywallEnforced`, que se pinea tres lineas arriba.
+                    //
+                    // Las reglas de Storage no tienen agregacion: no pueden
+                    // contar objetos de un prefijo. Por eso el numero vive aca y
+                    // no se calcula alla, y por eso quien lo escriba manda.
+                    && request.resource.data.get('customExerciseVideoUsage', null) == null
+                    // chatMediaUsage: CF-write-only, mismo peso y mismo modo de
+                    // falla que el de arriba. Es el total de BYTES de media de
+                    // chat de este usuario, que escribe `maintainChatMediaQuota*`
+                    // y que `storage.rules` LEE para autorizar la proxima subida
+                    // a `chatMedia/`.
+                    //
+                    // Sin este pin el bypass es una sola escritura
+                    // —`{chatMediaUsage: {bytes: 0}}`— y el tope entero deja de
+                    // existir para quien la mande.
+                    //
+                    // Acota BYTES y no cantidad porque el chat es un flujo
+                    // continuo y no una biblioteca; el porque largo esta en el
+                    // bloque `chatMedia` de `storage.rules`.
+                    && request.resource.data.get('chatMediaUsage', null) == null
+                    // storeAccountToken: el UUID con el que una tienda
+                    // identifica la cuenta del comprador. Lo emite
+                    // `ensureStoreAccountToken` y NUNCA el cliente.
+                    //
+                    // Es un ANCLA DE IDENTIDAD DE PAGOS: quien pudiera
+                    // escribirlo podria ponerse el token de otro y reclamar
+                    // sus compras — el webhook recibe el token, busca a quien
+                    // pertenece, y encuentra al atacante.
+                    //
+                    // Hoy no se usa para nada. Se pinea igual, porque el dia
+                    // que se use va a estar lleno de tokens viejos que nadie
+                    // sabe quien escribio.
+                    && request.resource.data.get('storeAccountToken', null) == null;
 
       // Update: only the owner can update, and the four immutable fields
       // MUST equal their previous values. Trainers via Admin SDK only;
@@ -197,6 +341,60 @@ service cloud.firestore {
                     // que ninguno: el que lee el comentario da por cerrado lo
                     // que quedó abierto.
                     && request.resource.data.get('blockedAthleteIds', null) == resource.data.get('blockedAthleteIds', null)
+                    // athletePaywallEnforced: CF-write-only. Es la conclusión
+                    // denormalizada de "¿a este alumno se le aplica el paywall?"
+                    // — la CF cruza su `athleteSubscription` con sus vínculos
+                    // activos, que es algo que la regla NO puede resolver sola
+                    // (los `trainer_links` tienen id autogenerado y las reglas
+                    // no hacen queries).
+                    //
+                    // A diferencia de `blockedAthleteIds`, este campo NO es
+                    // inerte: `paywallEnforcedFor` lo LEE para autorizar el
+                    // create y el update de rutinas propias. Sin este pin, el
+                    // bypass es una sola escritura — `{athletePaywallEnforced:
+                    // false}` y listo, quedás exento.
+                    && request.resource.data.get('athletePaywallEnforced', null) == resource.data.get('athletePaywallEnforced', null)
+                    // athleteSubscription: CF-write-only, por la MISMA razón y
+                    // con el mismo peso. Es lo que el alumno paga y lo único
+                    // que puede volverlo `entitled`; lo escribe el webhook de
+                    // la tienda con el Admin SDK.
+                    //
+                    // Va pineado en LOS DOS verbos a propósito: el comentario
+                    // de `blockedAthleteIds`, unas líneas más arriba, ya dejó
+                    // escrito por qué medio pin es peor que ninguno — vuelve
+                    // indeleble lo que se sembró al crear, y el que lee el
+                    // comentario da por cerrado lo que quedó abierto.
+                    && request.resource.data.get('athleteSubscription', null) == resource.data.get('athleteSubscription', null)
+                    // customExerciseVideoUsage: CF-write-only. Es el contador
+                    // denormalizado de cuantos videos de ejercicio custom tiene
+                    // subidos este usuario y cuantos bytes ocupan, que escribe
+                    // `maintainCustomExerciseVideoQuota*`.
+                    //
+                    // NO es inerte: `storage.rules` lo LEE para autorizar la
+                    // subida del proximo video. Sin este pin el bypass es una
+                    // sola escritura —`{customExerciseVideoUsage: {count: 0}}`—
+                    // y el tope de cantidad deja de existir para quien la mande.
+                    // Mismo peso y mismo modo de falla que
+                    // `athletePaywallEnforced`, que se pinea tres lineas arriba.
+                    //
+                    // Las reglas de Storage no tienen agregacion: no pueden
+                    // contar objetos de un prefijo. Por eso el numero vive aca y
+                    // no se calcula alla, y por eso quien lo escriba manda.
+                    && request.resource.data.get('customExerciseVideoUsage', null) == resource.data.get('customExerciseVideoUsage', null)
+                    // chatMediaUsage: CF-write-only, pineado en los DOS verbos
+                    // por la misma razon que el resto — medio pin es peor que
+                    // ninguno: vuelve INDELEBLE lo que se sembro al crear.
+                    //
+                    // Es el total de BYTES de media de chat, que escribe
+                    // `maintainChatMediaQuota*` y que `storage.rules` LEE para
+                    // autorizar la proxima subida a `chatMedia/`. Sin el pin,
+                    // `{chatMediaUsage: {bytes: 0}}` desactiva el tope entero.
+                    && request.resource.data.get('chatMediaUsage', null) == resource.data.get('chatMediaUsage', null)
+                    // storeAccountToken: CF-write-only, en los DOS verbos por
+                    // la misma razon de siempre — medio pin es peor que
+                    // ninguno, porque vuelve INDELEBLE lo que se sembro al
+                    // crear.
+                    && request.resource.data.get('storeAccountToken', null) == resource.data.get('storeAccountToken', null)
                     // Notification inbox read cursor: owner-writeable, timestamp-only.
                     && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['notificationsLastSeenAt'])
                         || request.resource.data.notificationsLastSeenAt is timestamp);
@@ -254,6 +452,95 @@ service cloud.firestore {
       // guarde una rutina `user-created`. Si agregás uno al modelo Routine, a
       // `createUserOwned` o a `updateUserOwned`, agregalo acá también —
       // si no, se rompen create Y update a la vez.
+      // ── Paywall del alumno suelto — topes de forma de rutina ─────────────
+      //
+      // `docs/paywall-alumno-suelto.md` §4 y §6.2. El cliente ya muestra estos
+      // mismos topes (`kFreeMaxRoutineDays` / `kFreeMaxRoutineWeeks`), pero eso
+      // es UX: un cliente parcheado los ignora. Acá está la ley.
+      //
+      // ⚠️  SI CAMBIÁS ESTOS NÚMEROS, cambialos también en
+      // `lib/features/paywall/domain/athlete_entitlement.dart`. Si discrepan,
+      // el alumno ve un tope y el servidor aplica otro — y el rebote llega sin
+      // que ninguna pantalla lo haya anticipado.
+      function freeMaxRoutineDays() { return 3; }
+      function freeMaxRoutineWeeks() { return 1; }
+
+      // ¿Al usuario que escribe se le APLICA el paywall?
+      //
+      // Lee UN campo denormalizado, `users/{uid}.athletePaywallEnforced`, que
+      // escribe una Cloud Function. NO se leen acá ni la suscripción ni los
+      // vínculos, y no es por comodidad:
+      //
+      //   • El vínculo con un PF EXIME al alumno (§2: el vinculado no paga
+      //     nunca, su PF ya paga por él). Pero `trainer_links` usa ids
+      //     autogenerados y las reglas NO PUEDEN hacer queries — sólo `get()`
+      //     a un path conocido. Desde acá es imposible saber si tiene vínculo.
+      //   • `session_shares/{athleteId}` sí es determinístico por atleta, pero
+      //     lo escribe el PROPIO alumno: usarlo para eximir sería dejar que
+      //     cada uno se auto-exima creando un doc.
+      //
+      // Así que la resolución (suscripción OR vínculo activo) vive en la CF, y
+      // acá se lee su conclusión.
+      //
+      // **AUSENTE ⇒ NO SE APLICA**, y ese default es deliberado: mientras el
+      // escritor no exista, esta regla es INERTE. Lo contrario —ausente ⇒ se
+      // aplica— le cortaría la rutina de 3 días a TODOS los atletas el día que
+      // se deploye, sin que ninguno tenga forma de pagar todavía. Las reglas no
+      // leen el flag del cliente: se aplican apenas se suben.
+      //
+      // Es el mismo criterio que `AthleteEntitlement.unknown` del lado Dart:
+      // ante la duda no se gatea. Fallar cerrado le bloquea la app a alguien
+      // que no hizo nada malo.
+      //
+      // ⚠️  `paywallEnforcedFor()` YA NO VIVE ACÁ. Subió al scope raíz porque
+      // `match /users/{uid}/sessions/{sessionId}` es un match HERMANO de éste
+      // y no veía la función. Duplicarla habría dado dos definiciones del
+      // mismo predicado de autorización, que es exactamente el modo de falla
+      // que documenta el bloque de guards genéricos de arriba.
+
+      // La forma que la rutina tiene que cumplir cuando el paywall aplica.
+      // `days` es una lista del MISMO documento que se está escribiendo, así
+      // que `.size()` la mide sin agregación — que es exactamente lo que las
+      // reglas no tienen y por lo que contar RUTINAS es inviable (§6.1).
+      function withinFreeRoutineShape(data) {
+        return data.days.size() <= freeMaxRoutineDays()
+               && data.get('numWeeks', 1) <= freeMaxRoutineWeeks();
+      }
+
+      // `true` si la rutina RESULTANTE no es más grande que la que ya había.
+      //
+      // ─── El grandfathering, sin grandfathering ─────────────────────────────
+      //
+      // El problema que resuelve: el día que el paywall se encienda, un alumno
+      // free con una rutina propia que quedó por encima del tope no podría ni
+      // RENOMBRARLA — `withinFreeRoutineShape` mide el documento resultante, y
+      // 5 días siguen siendo 5 aunque no la hayas agrandado.
+      //
+      // Se midió sobre producción el 2026-09-11: son 5 alumnos de los 18 que
+      // alguna vez armaron una rutina. Y el eje que muerde NO es el que decían
+      // los comentarios: sólo 2 exceden el tope de DÍAS; los otros 4 exceden el
+      // de SEMANAS, y tres de ellos están apenas en 2.
+      //
+      // La alternativa clásica —marcar usuarios o rutinas como exentos por
+      // haber estado antes— pide un campo nuevo, una fecha de corte y una
+      // migración, y deja dos clases de usuario para siempre. Esto no pide
+      // nada: el grandfathering deja de ser un dato que mantener y pasa a ser
+      // una propiedad de la regla.
+      //
+      // ─── Por qué NO abre el agujero que la cláusula existe para tapar ──────
+      //
+      // La comparación es contra lo que el documento YA TENÍA, no contra el
+      // tope. Crear con 3 días y editar a 7 sigue rebotando: 7 > 3. Lo único
+      // que se habilita es tocar una rutina sin agrandarla.
+      //
+      // Y sólo vive en el UPDATE. En el CREATE no hay `resource.data` contra
+      // qué comparar —ni tendría sentido: una rutina nueva no viene de ningún
+      // lado—, así que copiar una plantilla paga de 8 semanas sigue rebotando.
+      function noCreceLaForma(nueva, vieja) {
+        return nueva.days.size() <= vieja.days.size()
+               && nueva.get('numWeeks', 1) <= vieja.get('numWeeks', 1);
+      }
+
       function userCreatedRoutineFields() {
         return ['name', 'level', 'days',
                 'source', 'createdBy', 'visibility', 'createdAt', 'status',
@@ -412,7 +699,13 @@ service cloud.firestore {
                     // lo que se puede crear es exactamente lo que después se
                     // puede editar. Ver `userCreatedRoutineFields()`.
                     && request.resource.data.keys()
-                         .hasOnly(userCreatedRoutineFields());
+                         .hasOnly(userCreatedRoutineFields())
+                    // Paywall del alumno. El `get()` va ÚLTIMO a propósito: es
+                    // la única cláusula que cuesta una lectura facturada, y las
+                    // reglas cortan por izquierda — un payload que ya falla por
+                    // cualquiera de las guardas de arriba no la paga.
+                    && (withinFreeRoutineShape(request.resource.data)
+                        || !paywallEnforcedFor(request.auth.uid));
 
       // UPDATE path 1 (narrow): owner flips only `status` — archive / restore.
       // REQ-USR-013, SCENARIO-607, SCENARIO-608.
@@ -474,7 +767,57 @@ service cloud.firestore {
                     // The diff must touch ONLY content fields (name/level/days/
                     // numWeeks/visibility).
                     && request.resource.data.diff(resource.data).affectedKeys()
-                         .hasOnly(['name', 'level', 'days', 'numWeeks', 'visibility']);
+                         .hasOnly(['name', 'level', 'days', 'numWeeks', 'visibility'])
+                    // Paywall del alumno, EL MISMO tope que en el create — y
+                    // acá no es opcional: sin esta cláusula se crea con 2 días
+                    // y después se edita a 7, que es una puerta con la ventana
+                    // abierta al lado.
+                    //
+                    // Se mide sobre `request.resource`, o sea el documento
+                    // RESULTANTE — y de ahí sale la única lectura correcta de
+                    // qué puede hacer el dueño de una rutina que quedó de
+                    // antes por encima del tope:
+                    //
+                    //   • Renombrarla SIN tocar los días: **pasa**, desde
+                    //     que existe `noCreceLaForma`. Antes rebotaba —el
+                    //     resultante seguía teniendo 4 días— y era el caso más
+                    //     difícil de explicarle a alguien: "podés entrenarla
+                    //     pero no podés cambiarle el nombre".
+                    //   • Recortarla: **pasa**, por las dos vías — entra en
+                    //     la forma free, y además no creció.
+                    //   • AGRANDARLA: **rebota**, que es todo el punto. La
+                    //     comparación es contra lo que ya tenía, no contra el
+                    //     tope, así que crear con 3 y editar a 7 sigue cerrado.
+                    //   • Archivarla: **pasa**, por UPDATE path 1
+                    //     (`affectedKeys == ['status']`), que no lleva esta
+                    //     cláusula. Es la salida de emergencia y tiene que
+                    //     seguir así (spec §5: al cancelar se congela la
+                    //     edición, no se borra nada).
+                    //   • ENTRENARLA entera: **pasa**, no toca esta regla.
+                    //
+                    // ⚠️  Ojo con la historia de este comentario, porque
+                    // tiene una vuelta. Una versión vieja decía "se puede
+                    // seguir tocando mientras no crezca", y era FALSO: no
+                    // existía ninguna cláusula que lo hiciera cierto, así que
+                    // quien lo leía concluía que renombrar estaba cubierto y
+                    // el alumno se comía un permission-denied.
+                    //
+                    // Hoy esa frase describe exactamente lo que hace
+                    // `noCreceLaForma`. No es que el cartel tuviera razón: es
+                    // que el código se movió hasta donde el cartel decía. La
+                    // lección de AGENTS.md §11.1 no cambia —una advertencia
+                    // falsa es peor que ninguna— y el motivo de dejar esto
+                    // escrito es que el próximo que quiera "simplificar" el
+                    // comentario sepa que la frase fue mentira antes de ser
+                    // verdad.
+                    //
+                    // El cliente ANTICIPA el caso que REBOTA antes de escribir
+                    // (`RoutineEditorScreen._freePlanBlocksShape`, que tiene su
+                    // propio `_noCreceRespectoDeLoCargado`) para que el rebote
+                    // no llegue nunca como "no tenés permisos".
+                    && (withinFreeRoutineShape(request.resource.data)
+                        || noCreceLaForma(request.resource.data, resource.data)
+                        || !paywallEnforcedFor(request.auth.uid));
 
       // UPDATE path 3: trainer edits content of a trainer-assigned plan.
       //
@@ -625,6 +968,42 @@ service cloud.firestore {
                     && request.resource.data.diff(resource.data).affectedKeys()
                          == ['visibility'].toSet()
                     && request.resource.data.visibility in ['private', 'public'];
+
+      // UPDATE path 6 (narrow): el PF dueño archiva o recupera una rutina
+      // suya — flipea SÓLO `status` entre 'active' y 'archived'. Mismo idioma
+      // que el path 1 (el atleta con las suyas) y que el path 5.
+      //
+      // Existía el cliente y no existía la regla. `RoutineRepository.archive`
+      // es de 2026-07-17 y el menú ⋮ ofrece «Archivar» desde entonces en las
+      // dos pantallas de rutinas del Hub, pero ninguno de los paths 3 y 4
+      // lista `status` en su `affectedKeys().hasOnly([...])`: son paths de
+      // CONTENIDO ('name', 'split', 'level', 'days', 'numWeeks', 'summary',
+      // + 'goals' en plantilla). Los cinco paths denegaban, `archive()`
+      // atrapaba el `permission-denied` y devolvía `false`, y el PF veía «No
+      // se pudo. Probá de nuevo.» cada vez. Dos meses de un botón que nunca
+      // hizo nada — el fallo silencioso de AGENTS.md §11.1. Lo fija
+      // `scripts/rules_test/trainer-routine-status.test.js`.
+      //
+      // Por qué NO afloja nada, aunque toque una rutina que un alumno entrena:
+      // el documento se queda donde está. Archivar es soft-delete justamente
+      // para que las `Session.routineId` del alumno no queden colgando
+      // (ADR-USR-04), y es la operación que el #1064 eligió sobre borrar al
+      // terminar un vínculo. Lo que el PF NO puede seguir haciendo por acá es
+      // mover la rutina de dueño: `assignedTo` y `source` no entran en el
+      // diff, así que convertir un plan asignado en plantilla sigue denegado.
+      //
+      // Sin gate de rol, a diferencia del path 5. Ahí hace falta porque
+      // publicar mete el doc en el catálogo público y un atleta puede tener
+      // un `trainer-template` forjado (CREATE branch 1 es anterior a los
+      // chequeos de rol). Archivar no expone nada: es estrictamente más débil
+      // que el DELETE de abajo, que ya se permite sin gate de rol. Un `get()`
+      // acá costaría una lectura facturada por archivada, a cambio de nada.
+      allow update: if request.auth != null
+                    && request.auth.uid == resource.data.assignedBy
+                    && resource.data.source in ['trainer-template', 'trainer-assigned']
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                         == ['status'].toSet()
+                    && request.resource.data.status in ['active', 'archived'];
 
       // DELETE (narrow): the owning trainer may delete their OWN
       // `trainer-template` docs (library cleanup) and `trainer-assigned`
@@ -784,6 +1163,31 @@ service cloud.firestore {
                     && request.resource.data.trainerId == resource.data.trainerId
                     && request.resource.data.athleteId == resource.data.athleteId
                     && request.resource.data.requestedAt == resource.data.requestedAt
+                    // ── terminationReason atado al ACTOR ─────────────────────
+                    //
+                    // El campo no se puede pinear inmutable: decline, cancel y
+                    // terminate lo escriben todos como parte de su transición.
+                    // Lo que se acota son las DOS razones que disparan un
+                    // BORRADO — `clasificarTerminacion`
+                    // (functions/src/purge-rejected-link.ts) decide con ellas
+                    // si el doc se destruye, así que dejaron de ser metadata
+                    // de analytics y pasaron a ser input de un delete.
+                    //
+                    // El ataque que cierra: el PF rechaza una solicitud pero
+                    // estampa `cancelled-by-athlete`. Con eso, notify-link-change
+                    // manda el push y la fila de historial SÓLO al PF, el atleta
+                    // no se entera de nada, y el doc después se purga. La
+                    // solicitud desaparece sin dejar rastro del lado del atleta.
+                    //
+                    // Las otras razones (`athlete-terminated`,
+                    // `trainer-terminated`, `switched_trainer`) NO se acotan:
+                    // no disparan borrado, y el modelo sigue sin saber quién
+                    // cortó un vínculo real. Atarlas sería inventar una regla
+                    // que el producto no tiene.
+                    && (request.resource.data.get('terminationReason', null) != 'declined'
+                        || request.auth.uid == resource.data.trainerId)
+                    && (request.resource.data.get('terminationReason', null) != 'cancelled-by-athlete'
+                        || request.auth.uid == resource.data.athleteId)
                     // acceptedAt: CF-write-only, y este pin es de DAÑO ENTRE
                     // USUARIOS, no de evasión. `acceptedAt` es la ÚNICA clave de
                     // orden de reconcileEntitlements (select-blocked-links.ts):
@@ -950,10 +1354,14 @@ service cloud.firestore {
         allow read: if request.auth != null
                     && reactionPostReadable();
 
+        // notBlocked() en create Y update (change `moderacion-reporte-y-
+        // bloqueo`): una reacción existente que cambia de tipo después de un
+        // bloqueo es la misma clase de contacto no deseado que crearla.
         allow create, update: if request.auth != null
                               && request.auth.uid == reactorUid
                               && reactionPostReadable()
-                              && reactionPayloadOk();
+                              && reactionPayloadOk()
+                              && notBlocked(reactorUid, reactionPost().authorUid);
 
         allow delete: if request.auth != null
                       && request.auth.uid == reactorUid;
@@ -1608,6 +2016,13 @@ service cloud.firestore {
                                    + request.resource.data.followeeUid
                     && request.resource.data.followerUid
                        != request.resource.data.followeeUid
+                    // notBlocked() (change `moderacion-reporte-y-bloqueo`):
+                    // sin esto, el trigger `removeFollowEdgesOnBlock`
+                    // (functions/src/moderation/) que borra las dos aristas
+                    // de follow al bloquear se deshacía con sólo volver a
+                    // seguir.
+                    && notBlocked(request.resource.data.followerUid,
+                                  request.resource.data.followeeUid)
                     && request.resource.data.id == followId
                     && request.resource.data.keys().hasOnly(
                          ['id', 'followerUid', 'followeeUid', 'status',
@@ -1824,14 +2239,31 @@ service cloud.firestore {
       // dos primeros términos ya no son payload sin validar: son hechos que
       // `chatCreateOk` verificó al crear el doc y que el `update` de abajo
       // tiene pineados. Es una disyunción de hechos confiables, no una
-      // validación. Costo de un chat de consulta: 0 llamadas, igual que Coach.
+      // validación. Costo: 2 llamadas (las de `notBlocked`) para un chat de
+      // Coach o de consulta, 4 para uno social, que además paga
+      // `followAccepted`.
+      //
+      // `notBlocked()` va AFUERA de la disyunción, igual que en
+      // `senderMayPost()` de `messages`: un bloqueo corta la escritura sin
+      // importar POR QUÉ rama se habilitaba (Coach, consulta o follow).
+      //
+      // Adentro NO alcanza, y era el agujero: las dos primeras ramas devuelven
+      // true INCONDICIONALMENTE para un chat con `linkId` o `kind == 'inquiry'`,
+      // así que el bloqueado no lograba escribir el mensaje —ese gate sí tenía
+      // `notBlocked`— pero sí `lastMessageText` en el doc padre, que es el
+      // texto que la otra persona ve en su lista de chats, con badge de
+      // no-leído. O sea, exactamente el "«No te puede escribir» sería falso"
+      // que REQ-FOLLOW-012 escribe treinta líneas más abajo.
       function chatWriterOk(uid) {
         let other = resource.data.members[0] == uid
           ? resource.data.members[1]
           : resource.data.members[0];
-        return 'linkId' in resource.data
-            || resource.data.get('kind', '') == 'inquiry'
-            || followAccepted(other, uid);
+        return notBlocked(uid, other)
+            && (
+                 'linkId' in resource.data
+                 || resource.data.get('kind', '') == 'inquiry'
+                 || followAccepted(other, uid)
+               );
       }
 
       // ⚠️  QA-SEC-010 — el disyunto `resource == null` está ACOTADO al par que
@@ -1959,7 +2391,12 @@ service cloud.firestore {
         function senderMayPost(uid) {
           let chat = get(/databases/$(database)/documents/chats/$(chatId)).data;
           let other = chat.members[0] == uid ? chat.members[1] : chat.members[0];
+          // notBlocked() afuera del paréntesis: un bloqueo corta el mensaje
+          // sin importar POR QUÉ rama se habilitaba (Coach, consulta o
+          // follow) — moderación va antes que cualquier motivo de contacto
+          // (change `moderacion-reporte-y-bloqueo`).
           return uid in chat.members
+              && notBlocked(uid, other)
               && (
                    'linkId' in chat
                    || chat.get('kind', '') == 'inquiry'
@@ -2038,7 +2475,63 @@ service cloud.firestore {
                   && (request.auth.uid == uid
                       || (exists(/databases/$(database)/documents/session_shares/$(uid))
                           && get(/databases/$(database)/documents/session_shares/$(uid)).data.trainerId == request.auth.uid));
-      allow write: if request.auth != null && request.auth.uid == uid;
+      // ── Paywall del alumno — que un free no ENTRENE una plantilla paga ─────
+      //
+      // El eje del catálogo (spec §4.1.1: principiante gratis, intermedio y
+      // avanzado pagos) tenía su enforcement SÓLO en la UI del teléfono
+      // (#1066: la grilla, "Seguir" y EMPEZAR). Los dos relojes escriben acá
+      // DIRECTO —el Wear con el SDK de Dart, el watchOS por REST con su propia
+      // credencial— y ninguno de los dos pasa por esas pantallas. Un cliente
+      // parcheado tampoco. Acá está la ley.
+      //
+      // **Sólo el CREATE**, y es la decisión más importante de este bloque.
+      // Un `update` es `finish()`: cerrar un entreno que YA existe. Si la
+      // sesión se creó cuando el alumno tenía derecho —y después se le venció
+      // la suscripción, o se terminó el vínculo con su PF— rebotarle el cierre
+      // le borraría un entrenamiento que de verdad hizo. Eso es exactamente el
+      // daño que este bloque existe para evitar, así que el tope frena ANTES
+      // de empezar y nunca en el medio. Mismo criterio que la spec §5 aplica a
+      // las rutinas: al cancelar se congela lo nuevo, no se destruye lo hecho.
+      //
+      // El orden de los disyuntos es el orden del costo: los dos `get()` son
+      // lecturas facturadas, y `||` corta por izquierda. Un alumno sin paywall
+      // aplicado paga UNA lectura y nunca la de la rutina.
+      //
+      // `routineId` es `required` en el modelo (`session.dart:16`) y el
+      // watchOS lo exige para siquiera armar la sesión
+      // (`HistorySync.swift:142`), así que en el camino gateado su ausencia no
+      // es un cliente viejo: es un payload que la app no produce. Se deniega.
+      allow create: if request.auth != null
+                    && request.auth.uid == uid
+                    && (!paywallEnforcedFor(uid)
+                        || sesionSobreRutinaLibre(request.resource.data));
+
+      // Update y delete NO llevan el gate, por lo dicho arriba: cerrar o
+      // corregir un entreno empezado no puede depender de un derecho que se
+      // pudo vencer en el medio.
+      allow update, delete: if request.auth != null && request.auth.uid == uid;
+
+      // `true` si la rutina que la sesión apunta NO es del catálogo pago.
+      //
+      // Falla ABIERTO en los dos bordes, igual que `paywallEnforcedFor`:
+      //   • rutina inexistente (`r == null`) ⇒ libre. `get()` de un doc que no
+      //     está devuelve null, y desreferenciarlo tira ERROR DE EVALUACIÓN
+      //     —que rebota la escritura con un mensaje que no dice nada—, no un
+      //     deny limpio. Y una sesión sobre una rutina borrada es un problema
+      //     de datos, no de cobro.
+      //   • `isPremium` ausente ⇒ libre. Es el mismo default que el modelo
+      //     Dart (`routine.dart`: `@Default(false)`), y hace que un error de
+      //     siembra abra en vez de cobrar.
+      function sesionSobreRutinaLibre(d) {
+        return d.get('routineId', null) is string
+            && d.routineId.size() > 0
+            && !rutinaEsPaga(d.routineId);
+      }
+
+      function rutinaEsPaga(routineId) {
+        let r = get(/databases/$(database)/documents/routines/$(routineId));
+        return r != null && r.data.get('isPremium', false) == true;
+      }
 
       // setLogs sub-collection (REQ-SETLOGS-001..004, trainer-athlete-set-logs).
       // Read mirrors parent session-share predicate: owner OR linked trainer.
@@ -3453,14 +3946,15 @@ service cloud.firestore {
       allow delete: if request.auth != null && resource.data.trainerId == request.auth.uid;
     }
 
-    // Archivos privados que el PF sube sobre un alumno (PDFs, imágenes).
-    // Mismo pattern que /athlete_notes: doc id es `{trainerId}_{athleteId}_{ts}`,
-    // trainer-only R/W, alumno NUNCA los ve. Query paginable por
-    // (trainerId, athleteId, uploadedAt desc). List gate garantiza que solo
-    // el PF vinculado lista los archivos del alumno.
+    // Archivos que el PF sube para un alumno (PDFs, imágenes).
+    // El PF ve los del par y el alumno sólo los que tengan
+    // sharedWithAthlete == true. La query del alumno debe filtrar por su
+    // athleteId Y por ese flag para que el list sea demostrablemente válido.
     match /athlete_files/{docId} {
       allow read, list: if request.auth != null
-                  && request.auth.uid == resource.data.trainerId;
+                  && (request.auth.uid == resource.data.trainerId
+                      || (request.auth.uid == resource.data.athleteId
+                          && resource.data.sharedWithAthlete == true));
       allow create: if request.auth != null
                   && request.resource.data.trainerId == request.auth.uid
                   && request.resource.data.athleteId is string
@@ -3471,10 +3965,36 @@ service cloud.firestore {
                   && request.resource.data.downloadUrl is string
                   && request.resource.data.sizeBytes is int
                   && request.resource.data.sizeBytes > 0
-                  && request.resource.data.sizeBytes <= 10 * 1024 * 1024;
-      // Update no habilitado — para reemplazar contenido se borra y sube
-      // de nuevo. Evita drift entre downloadUrl y storagePath.
-      allow update: if false;
+                  && request.resource.data.sizeBytes <= 10 * 1024 * 1024
+                  // OPCIONAL a propósito, y el tipo se valida sólo si viene.
+                  // Exigirlo rompía a cualquier cliente sin actualizar: una
+                  // versión vieja de la app en la calle sube el doc sin el
+                  // campo y quedaba bloqueada para subir archivos. Lo encontró
+                  // coach-private-collections-rules.test.ts, cuyo fileDoc() es
+                  // exactamente ese cliente viejo.
+                  && (!request.resource.data.keys().hasAny(['sharedWithAthlete'])
+                      || request.resource.data.sharedWithAthlete is bool);
+      // ⚠️ ACOPLAMIENTO: este hasOnly debe coincidir exactamente con las keys
+      // de AthleteFile.toJson(). Si el modelo suma un campo y esta lista no,
+      // todos los updates del flag fallan con permission-denied.
+      allow update: if request.auth != null
+                  && request.auth.uid == resource.data.trainerId
+                  && request.resource.data.keys().hasOnly([
+                       'id', 'trainerId', 'athleteId', 'fileName', 'kind',
+                       'contentType', 'sizeBytes', 'storagePath', 'downloadUrl',
+                       'uploadedAt', 'sharedWithAthlete'
+                     ])
+                  && request.resource.data.id == resource.data.id
+                  && request.resource.data.trainerId == resource.data.trainerId
+                  && request.resource.data.athleteId == resource.data.athleteId
+                  && request.resource.data.fileName == resource.data.fileName
+                  && request.resource.data.kind == resource.data.kind
+                  && request.resource.data.contentType == resource.data.contentType
+                  && request.resource.data.sizeBytes == resource.data.sizeBytes
+                  && request.resource.data.storagePath == resource.data.storagePath
+                  && request.resource.data.downloadUrl == resource.data.downloadUrl
+                  && request.resource.data.uploadedAt == resource.data.uploadedAt
+                  && request.resource.data.sharedWithAthlete is bool;
       allow delete: if request.auth != null
                   && request.auth.uid == resource.data.trainerId;
     }
@@ -3508,12 +4028,13 @@ service cloud.firestore {
     }
 
     // Nutrition plan — un plan por par PF↔alumno, docId `{trainerId}_{athleteId}`.
-    // Trainer-only R/W. El alumno NO lo ve en mobile todavía (feature scoped
-    // aparte). Update preserva trainerId y athleteId. `meals` es un list —
-    // no validamos la estructura en rules (validación se hace client-side).
+    // El PF y el alumno del plan pueden leerlo. Sólo el PF escribe. Update
+    // preserva trainerId y athleteId. `meals` es un list — no validamos la
+    // estructura en rules (validación se hace client-side).
     match /nutrition_plans/{docId} {
       allow read, list: if request.auth != null
-                  && request.auth.uid == resource.data.trainerId;
+                  && (request.auth.uid == resource.data.trainerId
+                      || request.auth.uid == resource.data.athleteId);
       allow create: if request.auth != null
                   && request.resource.data.trainerId == request.auth.uid
                   && request.resource.data.athleteId is string
@@ -3688,6 +4209,8 @@ service cloud.firestore {
                     && get(/databases/$(database)/documents/trainer_links/$(request.resource.data.linkId)).data.athleteId == request.auth.uid
                     && get(/databases/$(database)/documents/trainer_links/$(request.resource.data.linkId)).data.trainerId == request.resource.data.trainerId
                     && get(/databases/$(database)/documents/trainer_links/$(request.resource.data.linkId)).data.status in ['active', 'paused']
+                    // notBlocked() (change `moderacion-reporte-y-bloqueo`).
+                    && notBlocked(request.auth.uid, request.resource.data.trainerId)
                     && request.resource.data.rating >= 1
                     && request.resource.data.rating <= 5
                     && (!('comment' in request.resource.data)
@@ -3696,6 +4219,16 @@ service cloud.firestore {
 
       allow update: if request.auth != null
                     && request.auth.uid == resource.data.athleteId
+                    // notBlocked() TAMBIÉN acá, no sólo en el `create` (change
+                    // `moderacion-reporte-y-bloqueo`). La reseña tiene id
+                    // determinístico y `ReviewRepository.upsert()` escribe el
+                    // doc ya existente por ESTA rama, así que gatear sólo el
+                    // create dejaba abierto el caso que importa: quien ya había
+                    // reseñado al PF antes del bloqueo podía seguir editándole
+                    // el comentario público —reemplazarlo por acoso— con la
+                    // misma visibilidad que la reseña original. El bloqueo tiene
+                    // que cortar la edición igual que corta la reseña nueva.
+                    && notBlocked(request.auth.uid, resource.data.trainerId)
                     && request.resource.data.keys().hasOnly(
                         ['id', 'linkId', 'athleteId', 'trainerId',
                          'rating', 'comment', 'createdAt', 'updatedAt'])
@@ -3725,6 +4258,180 @@ service cloud.firestore {
     // leerlas se llevaría las direcciones de email de otros usuarios.
     match /mail_queue/{mailId} {
       allow read, write: if false;
+    }
+
+    // ── retention_notices ───────────────────────────────────────────────────
+    //
+    // Registro de la baja automática por inactividad: a quién se le avisó a los
+    // 24 meses y cuándo. Lo escribe SOLO `sweepInactiveAccounts` vía Admin SDK
+    // (que saltea estas reglas) y lo borra la cascada de `deleteAccount`.
+    //
+    // Cerrado en los cuatro verbos, **incluido para el dueño del uid**, y eso
+    // último es la parte que importa. `noticeSentAt` es lo ÚNICO que habilita
+    // borrar la cuenta a los 36 meses: un cliente que pudiera escribir su
+    // propio documento se auto-antedataría el aviso y adelantaría su baja —o la
+    // de otro, si el `{uid}` no estuviera cerrado— sin haber recibido nada.
+    // Leerlo tampoco corresponde: el canal del aviso es el correo, y exponerlo
+    // acá diría quién está por ser dado de baja.
+    //
+    // Como en `mail_queue` y en las `mp_*`, este deny NO es el enforcement —las
+    // reglas son unión permisiva y un `match` comodín futuro le ganaría. Lo que
+    // protege es `retention-notices-rules.test.ts`.
+    match /retention_notices/{uid} {
+      allow read, write: if false;
+    }
+
+    // Las dos colecciones del cobro con Mercado Pago. Escritas SOLO por
+    // `createPreapproval` y `reconcileMpSubscriptions` vía Admin SDK, que
+    // saltea estas reglas. Ningún cliente las toca, ni para leer.
+    //
+    // ⚠️ ESTAS DOS REGLAS NO PROTEGEN NADA. Son DOCUMENTACIÓN. Está medido:
+    //
+    //   - Sacándolas, `mp-collections-rules.test.ts` sigue en 12/12 verde: el
+    //     default-deny ya denegaba, porque ningún match comodín las alcanza.
+    //   - Agregando un `match /{x=**} { allow read: if request.auth != null }`
+    //     CON estas reglas puestas, caen 5 tests. El `if false` NO lo frenó.
+    //
+    // Lo segundo es lo que importa y es contraintuitivo: las reglas de Firestore
+    // son UNIÓN PERMISIVA. Si algún match permite, se permite. Un deny no le
+    // gana a un allow, así que escribir `if false` no blinda una colección
+    // contra un comodín que alguien agregue después.
+    //
+    // Entonces, ¿para qué están? Para que quien lea este archivo vea que estas
+    // colecciones existen y son CF-only, en vez de que sean invisibles. Mismo
+    // valor —y mismo límite— que el bloque de `mail_queue` de acá arriba.
+    //
+    // **Lo que de verdad protege es el test.** Si mañana entra un match más
+    // ancho, lo agarra `mp-collections-rules.test.ts` y nada más.
+    //
+    // Lo que se protege NO es simétrico entre las dos:
+    //
+    // `mp_checkouts/{uid}` guarda el `init_point`, que es un LINK DE PAGO vivo.
+    // Un cliente que pudiera leer esta colección vería los checkouts abiertos de
+    // otros entrenadores — quién está comprando qué plan, y la URL para
+    // completarlo. Y uno que pudiera ESCRIBIR podría plantar un `initPoint` a un
+    // sitio propio: la función lo reusa dentro de su ventana de 30 minutos, así
+    // que el próximo click del PF lo mandaría a pagarle a un tercero desde
+    // nuestra app. Es el vector más caro de los dos.
+    //
+    // `mp_preapprovals/{preapprovalId}` es el mapeo suscripción → (PF, plan).
+    // Escribirlo es elegirse el tier: el reconciliador lee de acá para saber qué
+    // límite otorgar, así que un cliente con escritura se firma `plan3` gratis.
+    match /mp_checkouts/{uid} {
+      allow read, write: if false;
+    }
+    // El mapeo VIGENTE: plan de MP → (PF, tier, ciclo). Escribirlo es elegirse
+    // el plan — el reconciliador lee de acá para saber qué límite otorgar.
+    match /mp_plans/{planId} {
+      allow read, write: if false;
+    }
+    // El del flujo anterior, sin plan asociado. Ya no se escribe, pero quedaron
+    // documentos de las pruebas manuales y siguen teniendo el uid de un PF.
+    match /mp_preapprovals/{preapprovalId} {
+      allow read, write: if false;
+    }
+    // El dedupe del webhook: un doc por evento de Mercado Pago ya procesado.
+    // Escribirlo es hacerle creer al sistema que un evento REAL ya se atendio,
+    // y como el dedupe corta ANTES de consultarle a MP, eso alcanza para que a
+    // un PF no se le acredite el plan que pago. Leerlo filtra que ids de
+    // suscripcion existen y cuando se movieron.
+    match /mp_webhook_events/{eventId} {
+      allow read, write: if false;
+    }
+    // El dedupe del webhook de RevenueCat, por el MISMO motivo y con un peso
+    // mayor: aca la marca no caduca. En el de MP es una ventana de 10 minutos,
+    // asi que un doc plantado se vence solo; aca es permanente, o sea que
+    // escribir un `event.id` a mano deja ese evento descartado PARA SIEMPRE y
+    // el alumno que pago no cobra nunca su acreditacion.
+    match /rc_webhook_events/{eventId} {
+      allow read, write: if false;
+    }
+
+    // ── Moderación: bloqueo de usuario (change `moderacion-reporte-y-bloqueo`) ──
+    //
+    // blocks/{blockerUid}_{blockedUid} — copia el molde de `follows` (:103,
+    // match /follows/{followId} más arriba): arista DIRIGIDA, id compuesto
+    // SIN ordenar (si se ordenara, las dos direcciones colisionarían en el
+    // mismo doc), y un `members` redundante sólo para array-contains. Más
+    // simple que `follows`: no hay `pending → accepted`, bloquear no se
+    // negocia. Sólo create y delete.
+    //
+    // QA-SEC-010 (oráculo de existencia), mismo idiom que `follows` y
+    // `athlete_notes`, pero MÁS CERRADO: ahí el disyunto se abre para
+    // terceros bajo ciertas condiciones (arista accepted, doc propio). Acá
+    // NO — sólo el bloqueador (prefijo del id) lee, exista o no el doc, así
+    // que "no existe" y "existe pero no sos vos" son indistinguibles para
+    // cualquier otro uid. Decisión de producto encima de la de seguridad: el
+    // bloqueado no puede confirmar que lo bloquearon (design.md).
+    match /blocks/{blockId} {
+      allow read: if request.auth != null
+                  && blockId.split('_')[0] == request.auth.uid;
+
+      // Create: sólo el bloqueador, id fijado a blockerUid_blockedUid, no
+      // auto-bloqueo. hasOnly + hasAll: acá TODOS los campos son
+      // obligatorios (a diferencia de `follows`, no hay opcionales).
+      allow create: if request.auth != null
+                    && request.auth.uid == request.resource.data.blockerUid
+                    && blockId == request.resource.data.blockerUid + '_'
+                                  + request.resource.data.blockedUid
+                    && request.resource.data.blockerUid
+                       != request.resource.data.blockedUid
+                    && request.resource.data.keys().hasOnly(
+                         ['blockerUid', 'blockedUid', 'members', 'createdAt'])
+                    && request.resource.data.keys().hasAll(
+                         ['blockerUid', 'blockedUid', 'members', 'createdAt'])
+                    && request.resource.data.members ==
+                         [request.resource.data.blockerUid,
+                          request.resource.data.blockedUid]
+                    && request.resource.data.createdAt is timestamp;
+
+      // Update: if false — se borra y se recrea, nunca se edita.
+      allow update: if false;
+
+      // Delete: sólo el bloqueador. El trigger `removeFollowEdgesOnBlock`
+      // sólo corre en el CREATE del bloqueo — desbloquear NO restaura las
+      // aristas de follow que se borraron; quedan como estaban, cada uno
+      // vuelve a seguir si quiere.
+      allow delete: if request.auth != null
+                    && request.auth.uid == resource.data.blockerUid;
+    }
+
+    // ── Moderación: reportes (change `moderacion-reporte-y-bloqueo`) ───────────
+    //
+    // reports/{targetKind}_{targetId}_{reporterUid} — mismo truco que
+    // `posts/{postId}/reactions/{reactorUid}`: el uid del que escribe es
+    // PARTE DEL ID. Eso hace imposible falsificar el reporterUid de un
+    // tercero, y hace idempotente el doble reporte del mismo target por la
+    // misma persona — sin ningún contador (design.md).
+    //
+    // read/update/delete cerrados a TODO cliente, reporterUid incluido: los
+    // reportes se revisan por consola. Un denunciante que pudiera leer
+    // reportes (propios o ajenos) es un canal de acoso nuevo.
+    match /reports/{reportId} {
+      allow read: if false;
+
+      allow create: if request.auth != null
+                    && request.auth.uid == request.resource.data.reporterUid
+                    && reportId == request.resource.data.targetKind + '_'
+                                   + request.resource.data.targetId + '_'
+                                   + request.resource.data.reporterUid
+                    && request.resource.data.targetKind in
+                         ['post', 'message', 'review', 'profile']
+                    && request.resource.data.targetId is string
+                    && request.resource.data.targetId.size() > 0
+                    && request.resource.data.targetOwnerUid is string
+                    && request.resource.data.targetOwnerUid.size() > 0
+                    && request.resource.data.reason in
+                         ['harassment', 'sexualContent', 'violenceOrSelfHarm',
+                          'dangerousHealthAdvice', 'impersonation', 'spam',
+                          'thirdPartyData', 'intellectualProperty', 'other']
+                    && optStrMaxLen(request.resource.data.get('detail', null), 1000)
+                    && request.resource.data.keys().hasOnly(
+                         ['reporterUid', 'targetKind', 'targetId',
+                          'targetOwnerUid', 'reason', 'detail', 'createdAt'])
+                    && request.resource.data.createdAt is timestamp;
+
+      allow update, delete: if false;
     }
   }
 }

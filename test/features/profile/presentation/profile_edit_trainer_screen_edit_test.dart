@@ -353,6 +353,111 @@ void main() {
       verifyNever(() => mockRepo.update(any(), any()));
     });
   });
+
+  group('#637: toggle "Acepto consultas"', () {
+    testWidgets(
+        'se dibuja y arranca APAGADO cuando el perfil trae '
+        'acceptsInquiries:false', (tester) async {
+      await tester.pumpWidget(_buildScreen(
+        profile:
+            _trainerProfile(complete: true).copyWith(acceptsInquiries: false),
+      ));
+      await tester.pumpAndSettle();
+
+      final toggleFinder =
+          find.widgetWithText(SwitchListTile, 'Acepto consultas');
+      expect(toggleFinder, findsOneWidget);
+      expect(tester.widget<SwitchListTile>(toggleFinder).value, isFalse);
+    });
+
+    // EL QUE ENCONTRÓ CODEX EN EL PR #1111.
+    //
+    // Antes este test afirmaba que el partial manda `acceptsInquiries` SIEMPRE,
+    // y eso era el bug: el switch también se edita desde el Coach Hub, que
+    // persiste al instante. Con el form abierto en mobile, cambiarlo allá y
+    // después guardar cualquier otro campo acá revertía en silencio el valor
+    // más nuevo — `_initFromProfile` corre una sola vez, así que el valor en
+    // mano puede estar viejo y no hay forma de saberlo desde este lado.
+    //
+    // Ahora sólo viaja si el PF lo tocó EN ESTA PANTALLA.
+    testWidgets('save NO manda acceptsInquiries si el PF no tocó el switch acá',
+        (tester) async {
+      final mockRepo = MockUserRepository();
+      when(() => mockRepo.update(any(), any())).thenAnswer((_) async {});
+
+      await tester.pumpWidget(_buildScreen(
+        profile:
+            _trainerProfile(complete: true).copyWith(acceptsInquiries: false),
+        repo: mockRepo,
+      ));
+      await tester.pumpAndSettle();
+
+      final saveBtn = find.byKey(const Key('profile_edit_trainer_save_button'));
+      await tester.ensureVisible(saveBtn);
+      await tester.pumpAndSettle();
+      await tester.tap(saveBtn);
+      await tester.pumpAndSettle();
+
+      final captured =
+          verify(() => mockRepo.update('trainer-uid', captureAny()))
+              .captured
+              .single as Map<String, Object?>;
+      expect(captured.containsKey('acceptsInquiries'), isFalse,
+          reason: 'mandarlo sin que lo hayan tocado pisa lo que el PF acaba '
+              'de decidir en el Coach Hub');
+    });
+
+    testWidgets(
+        'save manda acceptsInquiries:true cuando el PF lo prende manualmente',
+        (tester) async {
+      final mockRepo = MockUserRepository();
+      when(() => mockRepo.update(any(), any())).thenAnswer((_) async {});
+
+      await tester.pumpWidget(_buildScreen(
+        profile:
+            _trainerProfile(complete: true).copyWith(acceptsInquiries: false),
+        repo: mockRepo,
+      ));
+      await tester.pumpAndSettle();
+
+      final toggleFinder =
+          find.widgetWithText(SwitchListTile, 'Acepto consultas');
+      await tester.ensureVisible(toggleFinder);
+      await tester.pumpAndSettle();
+      await tester.tap(toggleFinder);
+      await tester.pumpAndSettle();
+
+      final saveBtn = find.byKey(const Key('profile_edit_trainer_save_button'));
+      await tester.ensureVisible(saveBtn);
+      await tester.pumpAndSettle();
+      await tester.tap(saveBtn);
+      await tester.pumpAndSettle();
+
+      final captured =
+          verify(() => mockRepo.update('trainer-uid', captureAny()))
+              .captured
+              .single as Map<String, Object?>;
+      expect(captured['acceptsInquiries'], isTrue);
+    });
+
+    // Load-bearing: la rule de Firestore lee `.get('acceptsInquiries', true)`,
+    // así que un doc legacy sin el campo (todo PF creado antes de #637) DEBE
+    // seguir aceptando consultas. Si el default del modelo fuera `false`, este
+    // form apagaría las consultas de todos los PF existentes en el primer
+    // render — sin que nadie haya tocado nada.
+    testWidgets(
+        'un perfil que NO trae el campo arranca con el toggle ENCENDIDO '
+        '(default true)', (tester) async {
+      await tester
+          .pumpWidget(_buildScreen(profile: _trainerProfile(complete: true)));
+      await tester.pumpAndSettle();
+
+      final toggleFinder =
+          find.widgetWithText(SwitchListTile, 'Acepto consultas');
+      expect(tester.widget<SwitchListTile>(toggleFinder).value, isTrue,
+          reason: 'default debe ser true — ver UserProfile.acceptsInquiries');
+    });
+  });
 }
 
 // ---------------------------------------------------------------------------

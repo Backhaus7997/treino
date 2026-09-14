@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_palette.dart';
@@ -11,6 +12,8 @@ import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/cuenta_tab.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/facturacion_tab.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/notificaciones_tab.dart';
+import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/apariencia_tab.dart';
+import 'package:treino/features/coach_hub/presentation/sections/ajustes/tabs/seguridad_tab.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets.dart';
 
 /// Tabs internos de la sección «Configuración» (Ajustes) del Coach Hub web.
@@ -19,19 +22,23 @@ import 'package:treino/features/coach_hub/presentation/widgets/coach_hub_widgets
 /// cuenta vive en la app mobile (donde se crea la cuenta y donde aplican las
 /// políticas de las stores). Se puede reintroducir si se decide tener el flujo
 /// también en web.
-enum AjustesTab { cuenta, notificaciones, facturacion }
+enum AjustesTab { cuenta, notificaciones, facturacion, apariencia, seguridad }
 
 extension AjustesTabX on AjustesTab {
   String get label => switch (this) {
         AjustesTab.cuenta => 'Cuenta', // i18n: Fase W3
         AjustesTab.notificaciones => 'Notificaciones', // i18n: Fase W3
         AjustesTab.facturacion => 'Facturación TREINO', // i18n: Fase W3
+        AjustesTab.apariencia => 'Apariencia', // i18n: Fase W3
+        AjustesTab.seguridad => 'Seguridad', // i18n: Fase W3
       };
 
   IconData get icon => switch (this) {
         AjustesTab.cuenta => TreinoIcon.users,
         AjustesTab.notificaciones => TreinoIcon.bell,
         AjustesTab.facturacion => TreinoIcon.sidebarPagos,
+        AjustesTab.apariencia => TreinoIcon.appearance,
+        AjustesTab.seguridad => TreinoIcon.lock,
       };
 }
 
@@ -52,7 +59,6 @@ class AjustesScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final palette = AppPalette.of(context);
     final selected = ref.watch(_ajustesTabProvider);
 
     return Padding(
@@ -60,11 +66,9 @@ class AjustesScreen extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const TreinoSectionHeader(title: 'CONFIGURACIÓN'), // i18n: Fase W3
-          const SizedBox(height: 4),
-          Text(
-            'Cuenta · Negocio · Preferencias', // i18n: Fase W3
-            style: TextStyle(color: palette.textMuted, fontSize: 13),
+          const CoachHubSectionHero(
+            title: 'Mi cuenta', // i18n: Fase W3
+            subtitle: 'Perfil · Plan · Preferencias', // i18n: Fase W3
           ),
           const SizedBox(height: 20),
           Expanded(
@@ -114,6 +118,55 @@ class _SubNav extends StatelessWidget {
                 onTap: () => onSelect(tabs[i]),
               ),
             ),
+          const SizedBox(height: AppSpacing.s8),
+          Container(height: 1, color: AppPalette.of(context).border),
+          const SizedBox(height: AppSpacing.s8),
+          TreinoInteractiveState(
+            onTap: () => FirebaseAuth.instance.signOut(),
+            builder: (ctx, states) => AnimatedContainer(
+              key: const Key('ajustes_sign_out'),
+              // EL HOVER NO ANIMA. Un puntero es manipulación directa: el fondo tiene
+              // que estar donde está el cursor, no llegando. A 120/180 ms, barrer
+              // deja ESTELA — el anterior sigue apagándose cuando el siguiente ya se
+              // encendió. Mismo criterio de #1063, que no llegó hasta acá.
+              duration: Duration.zero,
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.s14,
+                vertical: AppSpacing.s12,
+              ),
+              decoration: BoxDecoration(
+                color: states.hovered
+                    ? AppPalette.of(ctx).danger.withValues(alpha: 0.08)
+                    : TreinoTransparentTokens.value,
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    TreinoIcon.signOut,
+                    size: 18,
+                    color: AppPalette.of(ctx).danger,
+                  ),
+                  const SizedBox(width: AppSpacing.s12),
+                  // `Expanded` y no un `Text` suelto: la sub-nav tiene ancho
+                  // fijo y el renglón se desbordaba 23 px. Un Row que no deja
+                  // ceder a nadie no se acomoda, se rompe — y en la app eso
+                  // sale como la franja amarilla y negra.
+                  Expanded(
+                    child: Text(
+                      'Cerrar sesión', // i18n: Fase W3
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontFamily: AppFonts.barlow,
+                        fontWeight: AppFonts.w600,
+                        color: AppPalette.of(ctx).danger,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -160,7 +213,10 @@ class _SubNavItem extends StatelessWidget {
 
             return AnimatedContainer(
               key: Key('ajustes_subnav_${tab.name}'),
-              duration: AppMotion.resolve(ctx, AppMotion.fast),
+              // EL HOVER NO ANIMA; el cambio de SELECCIÓN sí — #1063.
+              duration: selected
+                  ? AppMotion.resolve(ctx, AppMotion.fast)
+                  : Duration.zero,
               curve: AppMotion.standard,
               margin: const EdgeInsets.only(bottom: AppSpacing.hairline),
               padding: const EdgeInsets.symmetric(
@@ -225,6 +281,8 @@ class _TabBody extends StatelessWidget {
         AjustesTab.cuenta => const CuentaTab(),
         AjustesTab.notificaciones => const NotificacionesTab(),
         AjustesTab.facturacion => const FacturacionTab(),
+        AjustesTab.apariencia => const AparienciaTab(),
+        AjustesTab.seguridad => const SeguridadTab(),
       },
     );
   }

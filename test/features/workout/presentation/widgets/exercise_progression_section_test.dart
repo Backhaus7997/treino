@@ -60,6 +60,8 @@ ChartPeriodLabels _periodLabels() => const ChartPeriodLabels(
       last30dLabel: 'Últimos 30 días',
       thisWeekLabel: 'Esta semana',
       monthLabel: 'Este mes',
+      last3mLabel: '3 meses',
+      last1yLabel: '1 año',
     );
 
 /// [PR4] Plain-string label bag for [PersonalRecordsList] — shared by all 3

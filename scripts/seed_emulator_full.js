@@ -32,6 +32,8 @@
  */
 
 const { inicializarAdmin } = require('./lib/admin');
+const { getAuth } = require('firebase-admin/auth');
+const { Timestamp, getFirestore } = require('firebase-admin/firestore');
 
 // ── Guard: must target the emulator ─────────────────────────────────────────
 
@@ -50,10 +52,10 @@ if (!process.env.FIREBASE_AUTH_EMULATOR_HOST || !process.env.FIRESTORE_EMULATOR_
 // Pasa igual por la frontera (#834) aunque el guard de arriba ya garantiza
 // emulador: así no queda NINGÚN `initializeApp` suelto en `scripts/`, y el
 // día que alguien afloje ese guard la credencial sigue sin estar a mano.
-const { admin } = inicializarAdmin();
+const { app } = inicializarAdmin();
 
-const auth = admin.auth();
-const db = admin.firestore();
+const auth = getAuth(app);
+const db = getFirestore(app);
 
 // Stock exercise catalogue — same data prod uses. Required AFTER
 // initializeApp: seed_workout_catalog.js guards its own init, so requiring it
@@ -964,7 +966,7 @@ const AVAILABILITY_RULES = [
 // ────────────────────────────────────────────────────────────────────────────
 
 function ts(date) {
-  return admin.firestore.Timestamp.fromDate(date);
+  return Timestamp.fromDate(date);
 }
 
 /** Deletes every doc in a (sub)collection ref. Overwriting or deleting a

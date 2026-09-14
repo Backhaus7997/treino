@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../../app/theme/app_palette.dart';
 import '../../../../../core/widgets/motion/treino_tappable.dart';
@@ -9,7 +8,9 @@ import '../../../../../core/widgets/treino_icon.dart';
 import '../../../../coach/domain/subscription_tier.dart';
 import '../../../../profile/application/user_providers.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
+import 'acreditacion_al_volver.dart';
 import 'plan_checkout.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 /// Umbral entre el layout ancho (Coach Hub web) y el apilado del teléfono.
 ///
@@ -102,14 +103,19 @@ class PricingRouteScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
+        leading: TreinoIconButton(
+          // Keyed para que el guard de superficie de la pricing page pueda
+          // EXCLUIRLA de su barrido: volver es un tap legítimo, y desde que
+          // este botón es del kit entra en `find.byType(TreinoTappable)`.
+          key: const Key('pricing_back_button'),
+          icon: TreinoIcon.back,
+          tooltip: 'Volver', // i18n: Fase W3
+          color: palette.textPrimary,
           // Al paywall se llega con `push` desde "VER PLANES", así que casi
           // siempre hay a dónde volver. El fallback cubre el deep-link directo
           // a la URL, donde `pop` no tiene destino y dejaría al PF encerrado.
           onPressed: () =>
               context.canPop() ? context.pop() : context.go('/coach'),
-          icon: Icon(TreinoIcon.back, color: palette.textPrimary),
-          tooltip: 'Volver', // i18n: Fase W3
         ),
       ),
       body: const SafeArea(top: false, child: PricingScreen()),
@@ -220,9 +226,16 @@ class _WideBody extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(24, 32, 24, 48),
       child: Column(
         children: [
+          // Sólo donde se puede comprar. Preguntar por el estado de un pago en
+          // una superficie que no vende no tiene sentido, y montarlo igual lo
+          // pondria en el arbol de los tests que fijan que la rama movil no
+          // ofrece nada. El widget decide solo si tiene algo que decir.
+          if (checkout is PlanCheckoutAvailable)
+            const AcreditacionAlVolverBanner(),
           Text(
             'PLANES Y PRECIOS', // i18n: Fase W3
-            style: GoogleFonts.barlowCondensed(
+            style: TextStyle(
+              fontFamily: AppFonts.barlowCondensed,
               color: palette.textPrimary,
               fontSize: 40,
               fontWeight: FontWeight.w800,
@@ -255,11 +268,12 @@ class _WideBody extends StatelessWidget {
           _WhereToSubscribeNote(
             checkout: checkout,
             palette: palette,
-            fontSize: 12,
+            fontSize: AppTextSize.caption,
           ),
           Text(
             _kRenewalNote,
-            style: TextStyle(color: palette.textMuted, fontSize: 12),
+            style: TextStyle(
+                color: palette.textMuted, fontSize: AppTextSize.caption),
             textAlign: TextAlign.center,
           ),
         ],
@@ -287,9 +301,10 @@ class _CycleToggle extends StatelessWidget {
       children: [
         Text(
           '¡Ahorrá 2 meses con el anual!', // i18n: Fase W3
-          style: GoogleFonts.barlowCondensed(
+          style: TextStyle(
+            fontFamily: AppFonts.barlowCondensed,
             color: palette.accent,
-            fontSize: 13,
+            fontSize: AppTextSize.bodyDense,
             fontWeight: FontWeight.w700,
             letterSpacing: 0.4,
           ),
@@ -340,9 +355,10 @@ class _CycleOption extends StatelessWidget {
         children: [
           Text(
             label,
-            style: GoogleFonts.barlowCondensed(
+            style: TextStyle(
+              fontFamily: AppFonts.barlowCondensed,
               color: selected ? palette.textPrimary : palette.textMuted,
-              fontSize: 20,
+              fontSize: AppTextSize.titleLarge,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.5,
             ),
@@ -394,12 +410,17 @@ class _NarrowBody extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
       child: Column(
         children: [
+          // Angosto NO es movil: una ventana de navegador chica llega acá y SI
+          // puede comprar. La condicion es la superficie, nunca el ancho.
+          if (checkout is PlanCheckoutAvailable)
+            const AcreditacionAlVolverBanner(),
           Text(
             // Dos líneas a propósito (artboard D). En una sola, "PLANES Y
             // PRECIOS" en Barlow Condensed 30 cruza la pantalla como una tira
             // fina y deja de leerse como título.
             'PLANES Y\nPRECIOS', // i18n: Fase W3
-            style: GoogleFonts.barlowCondensed(
+            style: TextStyle(
+              fontFamily: AppFonts.barlowCondensed,
               color: palette.textPrimary,
               fontSize: 30,
               fontWeight: FontWeight.w800,
@@ -558,9 +579,10 @@ class _NarrowCycleOption extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: GoogleFonts.barlowCondensed(
+          style: TextStyle(
+            fontFamily: AppFonts.barlowCondensed,
             color: selected ? palette.bg : palette.textMuted,
-            fontSize: 12,
+            fontSize: AppTextSize.caption,
             fontWeight: FontWeight.w700,
             letterSpacing: 1.2, // 0.1em
           ),
@@ -763,7 +785,8 @@ class _AnnualOfferRow extends StatelessWidget {
       children: [
         Text(
           listText,
-          style: GoogleFonts.barlowCondensed(
+          style: TextStyle(
+            fontFamily: AppFonts.barlowCondensed,
             color: palette.textMuted,
             fontSize: compact ? 14 : 20,
             fontWeight: FontWeight.w600,
@@ -788,7 +811,8 @@ class _AnnualOfferRow extends StatelessWidget {
           ),
           child: Text(
             pctText,
-            style: GoogleFonts.barlowCondensed(
+            style: TextStyle(
+              fontFamily: AppFonts.barlowCondensed,
               // Ink invariante: `palette.bg` sobre accent da 1.57:1 en el tema
               // claro (AGENTS.md §2). Nunca `palette.bg` acá.
               color: TreinoButtonTokens.foreground(context),
@@ -881,7 +905,8 @@ class _PlanCard extends StatelessWidget {
         children: [
           Text(
             _tierName(tier),
-            style: GoogleFonts.barlowCondensed(
+            style: TextStyle(
+              fontFamily: AppFonts.barlowCondensed,
               color: recommended ? palette.accent : palette.textPrimary,
               fontSize: 22,
               fontWeight: FontWeight.w700,
@@ -909,16 +934,18 @@ class _PlanCard extends StatelessWidget {
                   padding: const EdgeInsets.only(top: 8, right: 2),
                   child: Text(
                     '\$',
-                    style: GoogleFonts.barlowCondensed(
+                    style: TextStyle(
+                      fontFamily: AppFonts.barlowCondensed,
                       color: palette.textPrimary,
-                      fontSize: 24,
+                      fontSize: AppTextSize.heading,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
                 Text(
                   _formatArs(amount),
-                  style: GoogleFonts.barlowCondensed(
+                  style: TextStyle(
+                    fontFamily: AppFonts.barlowCondensed,
                     color: palette.textPrimary,
                     fontSize: 52,
                     fontWeight: FontWeight.w800,
@@ -932,9 +959,10 @@ class _PlanCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             price == null ? 'SIEMPRE GRATIS' : cycleLabel, // i18n: Fase W3
-            style: GoogleFonts.barlowCondensed(
+            style: TextStyle(
+              fontFamily: AppFonts.barlowCondensed,
               color: palette.textMuted,
-              fontSize: 13,
+              fontSize: AppTextSize.bodyDense,
               fontWeight: FontWeight.w600,
               letterSpacing: 0.8,
             ),
@@ -950,16 +978,18 @@ class _PlanCard extends StatelessWidget {
             children: [
               Text(
                 studentsNum,
-                style: GoogleFonts.barlowCondensed(
+                style: TextStyle(
+                  fontFamily: AppFonts.barlowCondensed,
                   color: recommended ? palette.accent : palette.textPrimary,
-                  fontSize: 18,
+                  fontSize: AppTextSize.title,
                   fontWeight: FontWeight.w800,
                 ),
               ),
               const SizedBox(width: 6),
               Text(
                 studentsLabel,
-                style: TextStyle(color: palette.textMuted, fontSize: 14),
+                style: TextStyle(
+                    color: palette.textMuted, fontSize: AppTextSize.body),
               ),
             ],
           ),
@@ -988,7 +1018,7 @@ class _PlanCard extends StatelessWidget {
           top: 0,
           child: _PopularBadge(
             palette: palette,
-            fontSize: 12,
+            fontSize: AppTextSize.caption,
             letterSpacing: 0.8,
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
           ),
@@ -1065,7 +1095,8 @@ class _NarrowPlanCard extends StatelessWidget {
                   children: [
                     Text(
                       _tierName(tier),
-                      style: GoogleFonts.barlowCondensed(
+                      style: TextStyle(
+                        fontFamily: AppFonts.barlowCondensed,
                         color:
                             recommended ? palette.accent : palette.textPrimary,
                         fontSize: 19,
@@ -1092,16 +1123,18 @@ class _NarrowPlanCard extends StatelessWidget {
                         children: [
                           Text(
                             '\$',
-                            style: GoogleFonts.barlowCondensed(
+                            style: TextStyle(
+                              fontFamily: AppFonts.barlowCondensed,
                               color: palette.textPrimary,
-                              fontSize: 16,
+                              fontSize: AppTextSize.bodyLarge,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
                           const SizedBox(width: 2),
                           Text(
                             _formatArs(amount),
-                            style: GoogleFonts.barlowCondensed(
+                            style: TextStyle(
+                              fontFamily: AppFonts.barlowCondensed,
                               color: palette.textPrimary,
                               fontSize: 36,
                               fontWeight: FontWeight.w800,
@@ -1121,7 +1154,8 @@ class _NarrowPlanCard extends StatelessWidget {
                       price == null
                           ? 'SIEMPRE GRATIS'
                           : cycleLabel, // i18n: Fase W3
-                      style: GoogleFonts.barlowCondensed(
+                      style: TextStyle(
+                        fontFamily: AppFonts.barlowCondensed,
                         color: palette.textMuted,
                         fontSize: 9.5,
                         fontWeight: FontWeight.w700,
@@ -1207,7 +1241,8 @@ class _StudentsBox extends StatelessWidget {
         children: [
           Text(
             number,
-            style: GoogleFonts.barlowCondensed(
+            style: TextStyle(
+              fontFamily: AppFonts.barlowCondensed,
               color: recommended ? palette.accent : palette.textPrimary,
               fontSize: 22,
               fontWeight: FontWeight.w800,
@@ -1249,7 +1284,8 @@ class _PopularBadge extends StatelessWidget {
       ),
       child: Text(
         'MÁS POPULAR', // i18n: Fase W3
-        style: GoogleFonts.barlowCondensed(
+        style: TextStyle(
+          fontFamily: AppFonts.barlowCondensed,
           color: TreinoButtonTokens.foreground(context),
           fontSize: fontSize,
           fontWeight: FontWeight.w800,
@@ -1361,9 +1397,10 @@ class _PlanCtaButton extends StatelessWidget {
   Widget _ctaLabel(String label, Color color) => Text(
         label,
         textAlign: TextAlign.center,
-        style: GoogleFonts.barlowCondensed(
+        style: TextStyle(
+          fontFamily: AppFonts.barlowCondensed,
           color: color,
-          fontSize: 13,
+          fontSize: AppTextSize.bodyDense,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.6,
         ),

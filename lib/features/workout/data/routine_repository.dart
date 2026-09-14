@@ -4,7 +4,9 @@ import 'package:cloud_firestore/cloud_firestore.dart'
         DocumentSnapshot,
         FieldValue,
         FirebaseException,
-        FirebaseFirestore;
+        FirebaseFirestore,
+        QueryDocumentSnapshot,
+        Timestamp;
 
 import '../../profile/domain/experience_level.dart';
 import '../domain/routine.dart';
@@ -329,9 +331,29 @@ class RoutineRepository {
   /// remain intact (ADR-USR-04). Only the `status` field is mutated,
   /// matching the narrow Firestore update rule (REQ-USR-013).
   ///
+  /// Sirve a los DOS dueños posibles: el atleta con sus `user-created`
+  /// (UPDATE path 1) y el PF con sus `trainer-*` (UPDATE path 6). El segundo
+  /// caso NO estuvo cubierto por las reglas entre 2026-07-17 y hoy: el método
+  /// existía, el menú lo ofrecía, y los cinco paths denegaban. Ver el
+  /// comentario del path 6 en `firestore.rules`.
+  ///
   /// REQ-USR-006, SCENARIO-USR-010..011.
   Future<void> archive(String routineId) async {
     await _collection.doc(routineId).update({'status': 'archived'});
+  }
+
+  /// El camino de vuelta de [archive]: devuelve la rutina a `active`.
+  ///
+  /// No es una comodidad. Sin esto, archivar es un borrado con otro nombre y
+  /// todo diálogo que diga «la podés recuperar» miente — que es exactamente
+  /// lo que decía el de `routine_card_grid.dart` mientras esto no existía. El
+  /// filtro «Archivadas» te la MUESTRA; para volver a usarla hacía falta este
+  /// método y no estaba.
+  ///
+  /// Mismo diff angosto que [archive], misma regla (UPDATE path 1 para el
+  /// atleta, path 6 para el PF): sólo `status`, y sólo hacia 'active'.
+  Future<void> unarchive(String routineId) async {
+    await _collection.doc(routineId).update({'status': 'active'});
   }
 
   Future<Routine?> getById(String id) async {
@@ -382,6 +404,19 @@ class RoutineRepository {
   /// Requires a composite index on `assignedTo + source + createdAt`
   /// (declared in `firestore.indexes.json`).
   ///
+  /// Las ARCHIVADAS no se devuelven. Cuando el vínculo con el PF termina, la
+  /// Cloud Function `cleanupAssignedPlansOnUnlink` archiva los planes que ese
+  /// PF le había asignado — antes los borraba en duro, y eso dejaba huérfanas
+  /// las sesiones ya entrenadas (ADR-USR-04). Archivar SIN filtrar acá sería
+  /// peor que borrar: el ex-alumno seguiría viendo el plan en su lista.
+  ///
+  /// El filtro va del lado del CLIENTE y no como `where('status', ...)` a
+  /// propósito. Los docs viejos no tienen el campo `status` —el modelo lo
+  /// interpreta como `active` por retro-compat—, y una igualdad en Firestore
+  /// **excluye los documentos que no tienen el campo**: filtrar en el servidor
+  /// le escondería al alumno todos sus planes anteriores a Fase 6. Además así
+  /// no hace falta índice nuevo.
+  ///
   /// REQ-COACH-PLANS-001, SCENARIO-432, SCENARIO-433.
   Future<List<Routine>> listAssignedTo(String athleteId) async {
     final snap = await _collection
@@ -390,7 +425,108 @@ class RoutineRepository {
         .orderBy('createdAt', descending: true)
         .limit(20)
         .get();
-    return snap.docs.map(_fromDoc).whereType<Routine>().toList();
+    return snap.docs
+        .map(_fromDoc)
+        .whereType<Routine>()
+        .where((r) => r.status != RoutineStatus.archived)
+        .toList();
+  }
+
+  /// Returns the plans [trainerId] assigned to [athleteId], newest first.
+  ///
+  /// This stays separate from [listAssignedTo] because athlete and trainer
+  /// reads prove different Firestore-rule branches: the athlete query proves
+  /// `uid == assignedTo`, while the trainer query must also constrain
+  /// `assignedBy == uid`. An optional parameter would make that security
+  /// distinction easy for a trainer call site to omit accidentally.
+  ///
+  /// Like [listPublishedTemplates], the Firestore query is equality-only so it
+  /// rides automatic single-field indexes. Adding `orderBy(createdAt)` would
+  /// require a composite index that is not deployed, so ordering happens in
+  /// Dart. [Routine] does not retain `createdAt`; therefore the raw snapshots
+  /// are sorted before [_fromDoc] maps them into domain objects.
+  Future<List<Routine>> listAssignedToByTrainer({
+    required String trainerId,
+    required String athleteId,
+  }) async {
+    if (trainerId.isEmpty || athleteId.isEmpty) return const [];
+
+    final snap = await _collection
+        .where('assignedTo', isEqualTo: athleteId)
+        .where('assignedBy', isEqualTo: trainerId)
+        .where('source', isEqualTo: 'trainer-assigned')
+        .get();
+    // `as Timestamp?` sería un cast, y un cast acá tira `TypeError` y se lleva
+    // puesta la LISTA ENTERA si UN solo doc trae `createdAt` con otra forma
+    // (un import viejo que lo dejó como String, por ejemplo). Sería el mismo
+    // modo de falla que este método viene a arreglar: la pantalla del PF en
+    // blanco por un doc raro. `is Timestamp` degrada ese doc a "sin fecha" y
+    // lo manda al fondo, que es un orden discutible pero nunca una excepción.
+    Timestamp? createdAtOf(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+      final value = doc.data()['createdAt'];
+      return value is Timestamp ? value : null;
+    }
+
+    final docs = snap.docs.toList()
+      ..sort((a, b) {
+        final aCreatedAt = createdAtOf(a);
+        final bCreatedAt = createdAtOf(b);
+        // A pending serverTimestamp cannot be compared honestly. Keep nulls
+        // last until Firestore resolves them instead of guessing their order.
+        if (aCreatedAt == null) return bCreatedAt == null ? 0 : 1;
+        if (bCreatedAt == null) return -1;
+        return bCreatedAt.compareTo(aCreatedAt);
+      });
+    return docs.take(20).map(_fromDoc).whereType<Routine>().toList();
+  }
+
+  /// TODAS las rutinas de las que [trainerId] es autor: sus plantillas y los
+  /// planes que le asignó a cualquier alumno, más nuevas primero.
+  ///
+  /// `assignedBy` es lo único que las une. Lo llevan las dos —una plantilla es
+  /// `trainer-template` con `assignedTo: null`, un plan es `trainer-assigned`
+  /// con el uid del alumno— y por eso alcanza una sola igualdad.
+  ///
+  /// Esta query es la contracara de [listAssignedTo]: aquélla parte del ALUMNO
+  /// y ésta parte del AUTOR. La pantalla de Rutinas del Coach Hub listaba
+  /// personas porque no existía esta segunda mirada.
+  ///
+  /// Equality-only, así que va sobre los índices automáticos de un solo campo:
+  /// **no necesita índice compuesto**. Agregarle `orderBy(createdAt)` sí lo
+  /// necesitaría, así que el orden se hace en Dart — mismo criterio que
+  /// [listAssignedToByTrainer], y por la misma razón: [Routine] no retiene
+  /// `createdAt`, así que se ordenan los snapshots crudos antes de mapear.
+  ///
+  /// Incluye las ARCHIVADAS. Para el PF son parte de su biblioteca —las suyas,
+  /// que se archivaron al terminar un vínculo— y esconderlas acá sería
+  /// perderlas; quien decide cómo mostrarlas es la pantalla.
+  Future<List<Routine>> listAuthoredBy(String trainerId) async {
+    if (trainerId.isEmpty) return const [];
+
+    final snap =
+        await _collection.where('assignedBy', isEqualTo: trainerId).get();
+
+    // `is Timestamp` y no un cast: un solo doc con `createdAt` de otra forma
+    // —un import viejo que lo dejó como String— tiraría `TypeError` y se
+    // llevaría puesta la lista entera, dejando la pantalla del PF en blanco.
+    // Degradarlo a "sin fecha" lo manda al fondo, que es discutible como orden
+    // pero nunca es una excepción.
+    Timestamp? createdAtOf(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+      final value = doc.data()['createdAt'];
+      return value is Timestamp ? value : null;
+    }
+
+    final docs = snap.docs.toList()
+      ..sort((a, b) {
+        final aAt = createdAtOf(a);
+        final bAt = createdAtOf(b);
+        // Un `serverTimestamp` pendiente no se puede comparar con honestidad:
+        // queda último hasta que Firestore lo resuelve.
+        if (aAt == null) return bAt == null ? 0 : 1;
+        if (bAt == null) return -1;
+        return bAt.compareTo(aAt);
+      });
+    return docs.map(_fromDoc).whereType<Routine>().toList();
   }
 
   /// Persists a trainer-assigned plan.

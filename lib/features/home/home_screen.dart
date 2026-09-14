@@ -34,6 +34,7 @@ import 'widgets/empezar_entrenamiento_card.dart';
 import 'widgets/esta_semana_card.dart';
 import 'widgets/home_cta_button.dart';
 import 'widgets/home_header.dart';
+import '../coach/presentation/widgets/invite_gate.dart';
 
 /// Role-aware home screen.
 ///
@@ -69,6 +70,11 @@ class HomeScreen extends ConsumerWidget {
         // sequencing (tour first, prompt second) is enforced by
         // `onboardingBlocksProvider`, not by Stack order.
         const OnboardingGate(),
+        // Invitación de un PF pendiente de aplicar (#alta de alumnos). También
+        // SizedBox.shrink(). Va después del tour por legibilidad: no compiten
+        // —el tour corre una vez por superficie y la invitación sólo existe si
+        // alguien abrió un link— y ninguno bloquea al otro.
+        const InviteGate(),
         // Trainer location-publication consent prompt
         // (consentimiento-legal-versionado, R7). Also SizedBox.shrink() —
         // waits on `onboardingBlocksProvider` internally so it never stacks
@@ -77,10 +83,11 @@ class HomeScreen extends ConsumerWidget {
         const TrainerLocationConsentGate(),
         // Aviso de política actualizada para el atleta legacy
         // (consentimiento-legal-versionado, R4). Único de este Stack que sí
-        // pinta algo: los otros tres son prompts que colapsan a
+        // pinta algo: los otros cuatro son prompts que colapsan a
         // SizedBox.shrink(). Este también colapsa cuando no corresponde, y
         // cuando corresponde se ancla abajo sin capturar los taps de la app
-        // — a diferencia de ellos, no interrumpe nada.
+        // — a diferencia de ellos, no interrumpe nada. Va último para quedar
+        // por encima en el Stack.
         const LegacyPrivacyNoticeBanner(),
       ],
     );

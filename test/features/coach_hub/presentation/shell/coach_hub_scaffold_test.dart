@@ -15,6 +15,7 @@ import 'package:treino/features/coach_hub/presentation/shell/coach_hub_top_bar.d
 import 'package:treino/features/coach_hub/presentation/shell/mobile_banner.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 /// Monta el `CoachHubScaffold` dentro de un `ShellRoute`, con el `child`
 /// provisto por la ruta activa (como en producción, ADR-CHW-008). `prefs`
@@ -138,7 +139,7 @@ void main() {
 
       expect(find.byType(CoachHubSidebar), findsOneWidget);
       expect(_sidebarWidth(tester), 72); // forzado pese a provider=false
-      final toggle = tester.widget<IconButton>(
+      final toggle = tester.widget<TreinoIconButton>(
         find.byKey(const Key('sidebar_toggle_button')),
       );
       expect(toggle.onPressed, isNull);
@@ -212,5 +213,42 @@ void main() {
       // expandido — el override de compact es solo local (ADR-CHW-004).
       expect(container.read(sidebarCollapsedProvider), isFalse);
     });
+  });
+
+  // El guard de producción del bug de semántica del shell.
+  //
+  // `ModalBarrier` (que todo `ModalRoute` siembra en el Overlay de su
+  // `Navigator`) es un `BlockSemantics`, y esa bandera sube por cada
+  // `RenderObject` que no sea semantic boundary hasta el `Row` del shell,
+  // donde borra a todos los hermanos anteriores. Sin
+  // `NavigatorSemanticsBoundary` el árbol de semántica del Coach Hub tenía 6
+  // nodos y un solo label —el del contenido—: ni el sidebar ni la top bar
+  // existían para un lector de pantalla.
+  //
+  // Va acá y no en `coach_hub_sidebar_test.dart` a propósito: aquel monta un
+  // `Row` propio, así que sólo puede probar el sidebar. Éste monta el
+  // `CoachHubScaffold` real.
+  testWidgets(
+      'el Navigator de la sección no borra la semántica del sidebar ni de la '
+      'top bar', (tester) async {
+    final handle = tester.ensureSemantics();
+    await _pumpScaffold(tester);
+
+    // 800 px → viewport compact → sidebar forzado colapsado, que es justo el
+    // estado donde el label de semántica es el ÚNICO nombre del ítem.
+    expect(_sidebarWidth(tester), 72);
+
+    expect(
+      find.bySemanticsLabel('Dashboard'),
+      findsOneWidget,
+      reason: 'el ítem del sidebar no llega al árbol de semántica',
+    );
+    expect(
+      find.bySemanticsLabel('DASHBOARD'),
+      findsOneWidget,
+      reason: 'el título de la top bar no llega al árbol de semántica',
+    );
+
+    handle.dispose();
   });
 }

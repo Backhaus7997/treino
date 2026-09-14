@@ -19,6 +19,7 @@ _$AthleteFileImpl _$$AthleteFileImplFromJson(Map<String, dynamic> json) =>
       downloadUrl: json['downloadUrl'] as String,
       uploadedAt:
           const TimestampConverter().fromJson(json['uploadedAt'] as Timestamp),
+      sharedWithAthlete: json['sharedWithAthlete'] as bool? ?? false,
     );
 
 Map<String, dynamic> _$$AthleteFileImplToJson(_$AthleteFileImpl instance) =>
@@ -33,6 +34,7 @@ Map<String, dynamic> _$$AthleteFileImplToJson(_$AthleteFileImpl instance) =>
       'storagePath': instance.storagePath,
       'downloadUrl': instance.downloadUrl,
       'uploadedAt': const TimestampConverter().toJson(instance.uploadedAt),
+      'sharedWithAthlete': instance.sharedWithAthlete,
     };
 
 const _$AthleteFileKindEnumMap = {

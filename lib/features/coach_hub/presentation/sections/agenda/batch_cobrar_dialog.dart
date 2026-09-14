@@ -26,6 +26,7 @@ import '../../../../payments/application/billing_providers.dart'
 import '../../../../payments/domain/payment.dart';
 import '../pagos/widgets/payment_format.dart' show fmtArs, groupThousands;
 import '../pagos/widgets/thousands_input_formatter.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 
 /// Dialog de cobro por LOTE (Slice 2b).
 ///
@@ -375,46 +376,16 @@ class _BatchCobrarDialogState extends ConsumerState<BatchCobrarDialog> {
         ),
       ),
       actions: [
-        OutlinedButton(
+        TreinoButton(
+          label: 'Cancelar', // i18n
+          variant: TreinoButtonVariant.ghost,
           onPressed: _billing ? null : () => Navigator.of(context).pop(false),
-          style: OutlinedButton.styleFrom(
-            side: BorderSide(color: palette.border),
-            foregroundColor: palette.textPrimary,
-            shape: const StadiumBorder(),
-          ),
-          child: Text(
-            'Cancelar', // i18n
-            style: GoogleFonts.barlowCondensed(
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-            ),
-          ),
         ),
-        ElevatedButton(
-          onPressed: _billing ? null : _confirm,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: palette.accent,
-            foregroundColor: TreinoButtonTokens.foreground(context),
-            shape: const StadiumBorder(),
-            disabledBackgroundColor: palette.accent.withValues(alpha: 0.3),
-          ),
-          child: _billing
-              ? SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: TreinoButtonTokens.foreground(context),
-                  ),
-                )
-              : Text(
-                  'CONFIRMAR COBRO', // i18n
-                  style: GoogleFonts.barlowCondensed(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                    letterSpacing: 0.8,
-                  ),
-                ),
+        const SizedBox(width: AppSpacing.s8),
+        TreinoButton(
+          label: 'CONFIRMAR COBRO', // i18n
+          loading: _billing,
+          onPressed: _confirm,
         ),
       ],
     );

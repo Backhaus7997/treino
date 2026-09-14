@@ -228,8 +228,8 @@ void main() {
           userPublicProfileProvider('athlete-1').overrideWith(
             (ref) => Stream.value(_makeProfile('athlete-1', 'Martín García')),
           ),
-          assignedRoutinesProvider('athlete-1').overrideWith(
-            (ref) async => const [],
+          assignedRoutinesByTrainerProvider.overrideWith(
+            (ref, key) async => const [],
           ),
         ],
       );
@@ -269,8 +269,8 @@ void main() {
           userPublicProfileProvider('athlete-1').overrideWith(
             (ref) => Stream.value(_makeProfile('athlete-1', 'Martín García')),
           ),
-          assignedRoutinesProvider('athlete-1').overrideWith(
-            (ref) async => [myPlan, otherPlan],
+          assignedRoutinesByTrainerProvider.overrideWith(
+            (ref, key) async => [myPlan, otherPlan],
           ),
         ],
       );
@@ -295,8 +295,8 @@ void main() {
           userPublicProfileProvider('athlete-1').overrideWith(
             (ref) => Stream.value(_makeProfile('athlete-1', 'Martín García')),
           ),
-          assignedRoutinesProvider('athlete-1').overrideWith(
-            (ref) async => const [],
+          assignedRoutinesByTrainerProvider.overrideWith(
+            (ref, key) async => const [],
           ),
         ],
       );
@@ -318,8 +318,8 @@ void main() {
           userPublicProfileProvider('athlete-1').overrideWith(
             (ref) => Stream.value(_makeProfile('athlete-1', 'Martín García')),
           ),
-          assignedRoutinesProvider('athlete-1').overrideWith(
-            (ref) async => const [],
+          assignedRoutinesByTrainerProvider.overrideWith(
+            (ref, key) async => const [],
           ),
         ],
       );
@@ -433,8 +433,8 @@ void main() {
           userPublicProfileProvider('athlete-1').overrideWith(
             (ref) => Stream.value(_makeProfile('athlete-1', 'Martín García')),
           ),
-          assignedRoutinesProvider('athlete-1').overrideWith(
-            (ref) async => [myPlan],
+          assignedRoutinesByTrainerProvider.overrideWith(
+            (ref, key) async => [myPlan],
           ),
           // RoutineDetailScreen watches this for widget.routineId — override
           // so it resolves to a routine with content instead of hanging in
@@ -496,8 +496,8 @@ void main() {
           userPublicProfileProvider('athlete-1').overrideWith(
             (ref) => Stream.value(_makeProfile('athlete-1', 'Martín García')),
           ),
-          assignedRoutinesProvider('athlete-1').overrideWith(
-            (ref) async => const [],
+          assignedRoutinesByTrainerProvider.overrideWith(
+            (ref, key) async => const [],
           ),
         ];
 
@@ -817,8 +817,8 @@ void main() {
           userPublicProfileProvider('athlete-1').overrideWith(
             (ref) => Stream.value(_makeProfile('athlete-1', 'Martín García')),
           ),
-          assignedRoutinesProvider('athlete-1').overrideWith(
-            (ref) async => const [],
+          assignedRoutinesByTrainerProvider.overrideWith(
+            (ref, key) async => const [],
           ),
           sessionsByUidProvider('athlete-1').overrideWith(
             (ref) async => const [],
@@ -859,8 +859,8 @@ void main() {
           userPublicProfileProvider('athlete-1').overrideWith(
             (ref) => Stream.value(_makeProfile('athlete-1', 'Martín García')),
           ),
-          assignedRoutinesProvider('athlete-1').overrideWith(
-            (ref) async => const [],
+          assignedRoutinesByTrainerProvider.overrideWith(
+            (ref, key) async => const [],
           ),
           sessionsByUidProvider('athlete-1').overrideWith(
             (ref) async => const [],
@@ -922,8 +922,8 @@ void main() {
           userPublicProfileProvider('athlete-1').overrideWith(
             (ref) => Stream.value(_makeProfile('athlete-1', 'Martín García')),
           ),
-          assignedRoutinesProvider('athlete-1').overrideWith(
-            (ref) async => const [],
+          assignedRoutinesByTrainerProvider.overrideWith(
+            (ref, key) async => const [],
           ),
           sessionsByUidProvider('athlete-1').overrideWith(
             (ref) async => const [],
@@ -999,8 +999,8 @@ void main() {
           userPublicProfileProvider('athlete-1').overrideWith(
             (ref) => Stream.value(_makeProfile('athlete-1', 'Martín García')),
           ),
-          assignedRoutinesProvider('athlete-1').overrideWith(
-            (ref) => Future<List<Routine>>.error(
+          assignedRoutinesByTrainerProvider.overrideWith(
+            (ref, key) => Future<List<Routine>>.error(
               FirebaseException(
                 plugin: 'cloud_firestore',
                 code: 'permission-denied',
@@ -1062,8 +1062,8 @@ void main() {
               ),
             ),
           ),
-          assignedRoutinesProvider('athlete-1').overrideWith(
-            (ref) async => const [],
+          assignedRoutinesByTrainerProvider.overrideWith(
+            (ref, key) async => const [],
           ),
         ],
       );
@@ -1094,8 +1094,8 @@ void main() {
             (ref) => Stream.value(_makeProfile('athlete-1', 'Martín García')),
           ),
           // Nunca resuelve: simula la query de rutinas colgada.
-          assignedRoutinesProvider('athlete-1').overrideWith(
-            (ref) => Completer<List<Routine>>().future,
+          assignedRoutinesByTrainerProvider.overrideWith(
+            (ref, key) => Completer<List<Routine>>().future,
           ),
         ],
       );

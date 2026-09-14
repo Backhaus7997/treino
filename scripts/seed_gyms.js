@@ -21,10 +21,11 @@
  */
 
 const { inicializarAdmin } = require('./lib/admin');
+const { FieldValue, getFirestore } = require('firebase-admin/firestore');
 // Credenciales: la única puerta (#834). Sin `$TREINO_SA_KEY` esto falla cerrado
 // con la migración; contra el emulador no pide nada. Ver scripts/lib/admin.js.
-const { admin } = inicializarAdmin();
-const db = admin.firestore();
+const { app } = inicializarAdmin();
+const db = getFirestore(app);
 
 // ── geohash5 (port of lib/core/utils/geohash.dart) ───────────────────────
 const BASE32 = '0123456789bcdefghjkmnpqrstuvwxyz';
@@ -151,7 +152,7 @@ async function run() {
   const docs = flattenDocs();
   console.log(`Seeding ${docs.length} gyms (${BRANDS.length} brands)...`);
   let written = 0;
-  const now = admin.firestore.FieldValue.serverTimestamp();
+  const now = FieldValue.serverTimestamp();
 
   for (const g of docs) {
     const geohash = geohash5(g.lat, g.lng);

@@ -6,28 +6,31 @@
  *   SCENARIO-536 — Main profile docs deleted on success (REQ-ACCDEL-CF-004)
  *   SCENARIO-537 — trainerPublicProfiles deletion is no-op when absent (REQ-ACCDEL-CF-004)
  *   SCENARIO-643 — wellbeingCheckIns leaves no residue (#643, docs/security.md §2.2)
+ *   retention_notices/{uid} — el registro de la baja automatica se va con la cuenta
  */
 
-import * as admin from "firebase-admin";
+import { App, deleteApp, initializeApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
 
 process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
 process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
 process.env.GCLOUD_PROJECT = "treino-dev";
 
-let testApp: admin.app.App;
+let testApp: App;
 
 beforeAll(() => {
-  testApp = admin.initializeApp({ projectId: "treino-dev" }, "users-cascade-test");
+  testApp = initializeApp({ projectId: "treino-dev" }, "users-cascade-test");
 });
 
 afterAll(async () => {
-  await testApp.delete();
+  await deleteApp(testApp);
 });
 
 // Import the module under test — will fail until implementation exists
 import { deleteUserDocs } from "../../cascade/users";
+import { RETENTION_NOTICES_COLLECTION } from "../../retention/collection";
 
-const db = () => admin.firestore(testApp);
+const db = () => getFirestore(testApp);
 
 async function seed(uid: string): Promise<void> {
   const batch = db().batch();
@@ -53,6 +56,7 @@ async function cleanup(uid: string): Promise<void> {
   await db().collection("audit_log").doc(uid).delete().catch(() => undefined);
   await db().collection("userPublicProfiles").doc(uid).delete().catch(() => undefined);
   await db().collection("trainerPublicProfiles").doc(uid).delete().catch(() => undefined);
+  await db().collection(RETENTION_NOTICES_COLLECTION).doc(uid).delete().catch(() => undefined);
   // recursiveDelete covers users + sub-collections
   await db().recursiveDelete(db().collection("users").doc(uid)).catch(() => undefined);
 }
@@ -215,5 +219,39 @@ describe("SCENARIO-537: trainerPublicProfiles deletion is no-op when absent", ()
 
     const snap = await db().collection("trainerPublicProfiles").doc(uid).get();
     expect(snap.exists).toBe(false);
+  });
+});
+
+describe("retention_notices/{uid}: el registro de la baja automatica", () => {
+  const uid = "users-cascade-retention";
+
+  beforeEach(() => seed(uid));
+  afterEach(() => cleanup(uid));
+
+  // ESTA ASERCION ES POR AUSENCIA, y es la unica forma de probarlo.
+  //
+  // El resto de la cascada borra por CAMPO (`where athleteId == uid`); este
+  // documento lleva el uid en el ID, asi que no lo alcanza ninguna de esas
+  // queries. Es el mismo molde huerfano de `blocks` y `reports`
+  // (docs/security.md §2.2.1), y el modo de falla es invisible: la cascada
+  // reporta exito, `deletedCollections` trae los nombres de siempre, y queda un
+  // documento con el uid de alguien que pidio que lo borraran.
+  it("se borra con el resto de los documentos del usuario", async () => {
+    await db().collection(RETENTION_NOTICES_COLLECTION).doc(uid).set({
+      noticeSentAt: new Date("2026-09-14T08:00:00.000Z"),
+      lastSeenAt: new Date("2024-09-14T08:00:00.000Z"),
+    });
+
+    await deleteUserDocs(testApp, uid);
+
+    const snap = await db().collection(RETENTION_NOTICES_COLLECTION).doc(uid).get();
+    expect(snap.exists).toBe(false);
+  });
+
+  it("no explota cuando la cuenta nunca recibio un aviso", async () => {
+    // El caso MAYORITARIO: casi ninguna baja pedida por el usuario tiene
+    // documento de retencion. Si este delete tirara, se llevaria puesto el paso
+    // 9 entero — o sea `users` y `userPublicProfiles`.
+    await expect(deleteUserDocs(testApp, uid)).resolves.not.toThrow();
   });
 });

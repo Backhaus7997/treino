@@ -13,6 +13,18 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/features/workout/domain/routine_goal.dart';
 
+import '../../../../workout/application/custom_exercise_providers.dart';
+import '../../../../workout/application/exercise_filter.dart';
+import '../../../../workout/application/exercise_providers.dart';
+import '../../../../workout/domain/custom_exercise.dart';
+import '../../../../workout/presentation/widgets/superset_block.dart';
+import '../../../../workout/presentation/widgets/quick_entry_panel.dart';
+import '../../../../workout/presentation/widgets/quick_entry_parser.dart';
+import '../../../../workout/presentation/widgets/empty_day_state.dart';
+import '../../../../workout/presentation/widgets/exercise_card.dart';
+import '../../../../workout/presentation/widgets/prescription_chips.dart';
+import '../../../../workout/presentation/widgets/prescription_summary.dart';
+import '../../../../workout/presentation/widgets/routine_action_buttons.dart';
 import '../../../../../app/theme/app_palette.dart';
 import '../../../../../core/analytics/analytics_service.dart';
 import '../../../../../core/utils/firestore_error.dart';
@@ -26,6 +38,7 @@ import '../../../../onboarding/domain/onboarding_surface.dart';
 import '../../../../onboarding/presentation/custom_exercise_onboarding_gate.dart';
 import '../../../../profile/application/user_public_profile_providers.dart';
 import '../../../../profile/domain/experience_level.dart';
+import '../../../../reviews/presentation/widgets/star_rating_display.dart';
 import '../../../../workout/application/assigned_routine_providers.dart';
 import '../../../../workout/application/routine_providers.dart'
     show invalidateRoutineById, routineRepositoryProvider;
@@ -39,7 +52,11 @@ import '../../../../workout/domain/routine_source.dart';
 import '../../../../workout/domain/routine_visibility.dart';
 import '../../../../workout/domain/set_enums.dart';
 import '../../../../workout/domain/set_spec.dart';
+import '../../shell/responsive.dart' as rsp;
+import '../../widgets/create_custom_exercise_dialog.dart';
+import '../../widgets/coach_hub_widgets.dart';
 import '../../widgets/exercise_picker_dialog.dart';
+import 'package:treino/features/coach_hub/application/picker_panel_width_provider.dart';
 
 /// Editor de rutinas web — crea o edita la rutina de UN alumno (mirrors
 /// mobile's `RoutineEditorScreen(TrainerAssigning)`). Soporta, por ejercicio:
@@ -167,6 +184,17 @@ class _EditorSlot {
   /// Whether this slot is present in 0-based [w].
   /// Rule: `activeWeeks.isEmpty || activeWeeks.contains(w)`.
   bool isPresentInWeek(int w) => activeWeeks.isEmpty || activeWeeks.contains(w);
+
+  /// Si la card se ve desplegada. Vive en el MODELO y no en el `State` del
+  /// widget, igual que `_EditableSlot.expandido` en el editor mobile — y por
+  /// la misma razón, que allá fue un bug real: mover un slot lo cambia de
+  /// lugar en el árbol, Flutter destruye y recrea su `State`, y cualquier
+  /// bandera local vuelve a su valor inicial.
+  ///
+  /// Arranca en `false`: **todo nace plegado**, incluidos los ejercicios sin
+  /// completar. A ésos los distingue el borde rojo de [ExerciseCard], que es
+  /// lo que hace innecesario abrirlos.
+  bool expandido = false;
 }
 
 /// Copies the prescription of [source] onto [target] for the 0-based [week]
@@ -207,7 +235,23 @@ class _EditorDay {
   int dayNumber;
   String name;
   List<_EditorSlot> slots = [];
+
+  /// Card cerrada. Sólo presentación: no viaja al dominio ni al guardado.
+  ///
+  /// El editor web dibuja TODOS los días a la vez —a diferencia del mobile,
+  /// que muestra uno por pestaña—, así que una rutina de 4 días por 5
+  /// ejercicios es una página que no termina más y no había forma de plegar
+  /// nada. `_EditorSlot.expandido` ya resolvía esto un nivel más abajo, para
+  /// el ejercicio; esto es la misma pieza para el día.
+  ///
+  /// Arranca abierto: cerrar por default escondería trabajo del PF.
+  bool colapsado = false;
 }
+
+/// Alto del pie fijo del editor (`EditorFooterBar`), para levantar los avisos
+/// por encima del boton de guardar. No sale de un token porque el pie lo
+/// compone el widget compartido con el editor mobile.
+const double _kAltoDelPieFijo = 88;
 
 const _kMaxDays = 7; // mirrors mobile's _kMaxDays
 const _kMaxWeeks = 16; // mirrors mobile's _kMaxWeeks
@@ -254,6 +298,7 @@ class _RoutineEditorWebScreenState
     _EditorDay(dayNumber: 1, name: 'Día 1'),
   ]; // i18n
   bool _submitting = false;
+  bool _publishing = false;
   bool _isDirty = false;
   String? _errorMessage;
 
@@ -329,6 +374,12 @@ class _RoutineEditorWebScreenState
           context: context,
           ref: ref,
           surface: OnboardingSurface.customExerciseTrainerWeb,
+          // El CTA "CREAR MI EJERCICIO" abre el diálogo, que es como se crea
+          // un ejercicio propio en el Coach Hub: acá no hay una ruta para el
+          // editor. Antes el botón sólo cerraba el modal.
+          alCrearEjercicio: () async {
+            await showCreateCustomExerciseDialog(context);
+          },
         );
       });
     }
@@ -445,17 +496,362 @@ class _RoutineEditorWebScreenState
     return editorSlot;
   }
 
+  /// El `ScaffoldMessenger` capturado, para poder limpiar en `dispose`.
+  ///
+  /// Se guarda acá y no se busca en `dispose` porque ahí el `context` ya está
+  /// desmontado y `ScaffoldMessenger.of` explota.
+  ScaffoldMessengerState? _messenger;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _messenger = ScaffoldMessenger.of(context);
+  }
+
   @override
   void dispose() {
+    // Los avisos de esta pantalla se van CON la pantalla. Un `SnackBar` vive
+    // en el `ScaffoldMessenger` de la app y no en la ruta, así que sin esto
+    // «sale de la Semana 3 · Deshacer» te seguía hasta Chat — y su Deshacer
+    // apuntaba a un editor que ya no existe.
+    _messenger?.clearSnackBars();
     _nameCtrl.dispose();
     _splitCtrl.dispose();
     _summaryCtrl.dispose();
+    _quickEntryCtrl.dispose();
+    _quickEntryFocus.dispose();
     super.dispose();
   }
 
-  // Deliberately no setState here (mirrors mobile's own _markDirty): callers
-  // already rebuild via their own setState or a TextField's onChanged.
-  void _markDirty() => _isDirty = true;
+  // ── Entrada rápida ─────────────────────────────────────────────────────
+  //
+  // Es la pieza del editor mobile que MÁS gana en la web: acá hay teclado
+  // real. Escribir `press de banca 4x10 55` y que entre con su prescripción
+  // reemplaza abrir el modal, filtrar, elegir y después completar cuatro
+  // campos a mano.
+  //
+  // UN panel a la vez, marcado por índice de día. En el teléfono se ve un día
+  // por pantalla y la pregunta no existe; acá los días están apilados, así que
+  // el panel tiene que decir a QUÉ día pertenece lo que se escriba.
+
+  final TextEditingController _quickEntryCtrl = TextEditingController();
+  final FocusNode _quickEntryFocus = FocusNode();
+
+  /// El día que tiene el panel abierto, o null si está cerrado.
+  int? _quickEntryDia;
+
+  /// El día al que el PANEL LATERAL de ejercicios está atado (#860).
+  ///
+  /// Arranca en 0 y **no se cierra**: en desktop el panel es la superficie
+  /// principal para cargar ejercicios, no un modo que se enciende. Por eso los
+  /// botones "Agregar ejercicio" / "+ Superserie" del día desaparecen ahí — el
+  /// panel los reemplaza — y por eso tampoco tiene X: cerrarlo dejaría al PF
+  /// sin ninguna forma de agregar.
+  ///
+  /// Abajo de 1280 no hay panel, así que allá los botones del día SIGUEN
+  /// estando. Sin ellos no habría cómo agregar nada.
+  ///
+  /// Uno solo para toda la pantalla, con selector de día en su encabezado: con
+  /// los días apilados hay que decir explícitamente a cuál cae lo que se
+  /// agrega, y un panel POR día multiplicaría paneles.
+  int _pickerDia = 0;
+
+  /// El ejercicio ya elegido de la lista, o null mientras se busca.
+  QuickEntryResult? _quickEntryElegido;
+
+  void _cerrarEntradaRapida() {
+    _quickEntryDia = null;
+    _quickEntryElegido = null;
+    _quickEntryCtrl.clear();
+  }
+
+  /// El catálogo del sistema MÁS los ejercicios propios del PF.
+  ///
+  /// Los dos, y no sólo el del sistema: buscar acá y no encontrar la variante
+  /// que uno mismo cargó, cuando el picker de al lado sí la muestra, confunde
+  /// más de lo que el atajo ayuda. Mismo criterio que el editor mobile.
+  List<Exercise> _catalogoCompleto() {
+    final uid = ref.read(currentUidProvider) ?? '';
+    final propios = uid.isEmpty
+        ? const <CustomExercise>[]
+        : (ref.read(customExercisesForTrainerStreamProvider(uid)).valueOrNull ??
+            const <CustomExercise>[]);
+    return <Exercise>[
+      ...?ref.read(exercisesProvider).valueOrNull,
+      ...propios.map(customToExercise),
+    ];
+  }
+
+  /// El panel armado para el día [dayIndex].
+  ///
+  /// Se construye acá y no en `_DayCard` porque el controller y el foco viven
+  /// en el `State`: elegir un resultado tiene que DEVOLVER el foco con el
+  /// cursor al final, y sin eso el usuario pierde el teclado justo cuando va a
+  /// escribir la prescripción.
+  Widget _panelDeEntradaRapida(int dayIndex) {
+    // `watch` y no `read`: `read` NO suscribe, así que si nadie más está
+    // observando el catálogo sigue en `AsyncLoading` y la búsqueda no devuelve
+    // nada. En el teléfono no se notaba porque otra parte del árbol ya lo
+    // observaba; acá el panel es el único que lo necesita.
+    final uid = ref.watch(currentUidProvider) ?? '';
+    final propios = uid.isEmpty
+        ? const <CustomExercise>[]
+        : (ref
+                .watch(customExercisesForTrainerStreamProvider(uid))
+                .valueOrNull ??
+            const <CustomExercise>[]);
+    final catalogo = <Exercise>[
+      ...?ref.watch(exercisesProvider).valueOrNull,
+      ...propios.map(customToExercise),
+    ];
+
+    // `ValueListenableBuilder` sobre el controller, no `_quickEntryCtrl.text`
+    // leído en el build: sin esto el panel no se actualiza mientras se tipea
+    // —los resultados y el hint quedan congelados en lo que había al abrirlo—
+    // porque nada dispara un rebuild por cada tecla.
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: _quickEntryCtrl,
+      builder: (context, value, _) {
+        final entry = parseQuickEntry(value.text);
+        final elegido = _quickEntryElegido;
+        // El elegido se suelta si el nombre dejó de estar en el texto: borrar
+        // el ejercicio para buscar otro tiene que devolver la lista sin cerrar
+        // el panel. Misma regla que el editor mobile.
+        final sigueElegido = elegido != null &&
+            value.text.toLowerCase().contains(elegido.name.toLowerCase());
+        if (elegido != null && !sigueElegido) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) setState(() => _quickEntryElegido = null);
+          });
+        }
+
+        return QuickEntryPanel(
+          controller: _quickEntryCtrl,
+          focusNode: _quickEntryFocus,
+          entry: entry,
+          selected: sigueElegido ? elegido : null,
+          // Una vez elegido, la lista estorba.
+          results: sigueElegido
+              ? const []
+              : _buscarParaEntradaRapida(entry.query, dayIndex, catalogo),
+          onSelect: (r) {
+            // Autocompletar, NO agregar: el usuario viene a escribir la
+            // prescripción DESPUÉS del nombre.
+            //
+            // Y hay que reescribir el texto, no sólo guardar el elegido. La
+            // primera versión hacía sólo lo segundo y el bug era inmediato:
+            // `sigueElegido` exige que el texto CONTENGA el nombre, así que
+            // elegir "Press de Banca con Mancuernas" habiendo escrito "press
+            // de banca" se auto-deseleccionaba en el frame siguiente. Con
+            // muchas variantes del mismo ejercicio, NINGUNA se podía elegir.
+            //
+            // Se CONSERVA lo que ya se tipeó: quien sigue el placeholder
+            // escribe `banca 4x10 60` de una y después toca el ejercicio, y
+            // reemplazar todo por el nombre le borraría el `4x10 60`. Se
+            // quitan sólo las palabras que el parser entendió como BÚSQUEDA, y
+            // UNA ocurrencia por palabra: hay ejercicios del catálogo con
+            // palabras repetidas.
+            final pendientes = entry.query
+                .toLowerCase()
+                .split(RegExp(r'\s+'))
+                .where((p) => p.isNotEmpty)
+                .toList();
+            final resto = value.text.split(RegExp(r'\s+')).where((p) {
+              if (p.isEmpty) return false;
+              final i = pendientes.indexOf(p.toLowerCase());
+              if (i < 0) return true;
+              pendientes.removeAt(i);
+              return false;
+            }).join(' ');
+            final texto = resto.isEmpty ? '${r.name} ' : '${r.name} $resto';
+            _quickEntryCtrl.value = TextEditingValue(
+              text: texto,
+              selection: TextSelection.collapsed(offset: texto.length),
+            );
+            setState(() {
+              _quickEntryElegido = r;
+              // El tap sobre la lista suelta el foco; sin recuperarlo se
+              // pierde el cursor justo cuando va a escribir la prescripción.
+              _quickEntryFocus.requestFocus();
+            });
+          },
+          onConfirm: () {
+            final r = _quickEntryElegido;
+            if (r == null) return;
+            _agregarPorEntradaRapida(dayIndex, r.id, entry);
+          },
+        );
+      },
+    );
+  }
+
+  List<QuickEntryResult> _buscarParaEntradaRapida(
+    String query,
+    int dayIndex,
+    List<Exercise> catalogo,
+  ) {
+    final texto = query.trim();
+    if (texto.isEmpty) return const [];
+    final yaEstan = _days[dayIndex]
+        .slots
+        .where((s) => s.exercise != null)
+        .map((s) => s.exercise!.id)
+        .toSet();
+    // El mismo matcher que el picker (ADR-BIBW-01), no un `contains`: busca
+    // por tokens y tolera diacríticos, así que "press banca" encuentra "Press
+    // de Banca" —el `de` del medio rompe un contains— y "biceps" llega a
+    // "Bíceps". La REGLA es compartida; acá sólo se repite el cableado.
+    return catalogo
+        .where((e) =>
+            !yaEstan.contains(e.id) &&
+            exerciseMatchesFilters(
+              e,
+              query: texto,
+              muscles: const {},
+              equipment: const {},
+            ))
+        .take(QuickEntryPanel.kMaxResultados)
+        .map((e) => QuickEntryResult(
+              id: e.id,
+              name: e.name,
+              muscleGroup: e.muscleGroup,
+            ))
+        .toList();
+  }
+
+  /// Agrega el ejercicio [exerciseId] al día [dayIndex] con la prescripción que
+  /// el parser entendió de la línea.
+  void _agregarPorEntradaRapida(
+    int dayIndex,
+    String exerciseId,
+    QuickEntry entry,
+  ) {
+    final ex = _catalogoCompleto().where((e) => e.id == exerciseId).firstOrNull;
+    if (ex == null) return;
+
+    _markDirty();
+    setState(() {
+      final slot = _EditorSlot()
+        ..exercise = ex
+        ..restSeconds = 0
+        // `3x30s` prescribe TIEMPO, no repeticiones: el slot entra derecho en
+        // modo duración en vez de obligar a cambiarlo después.
+        ..exerciseMode =
+            entry.esDuracion ? ExerciseMode.duration : ExerciseMode.reps
+        ..weeklySets = List.generate(
+          _numWeeks,
+          // Cada set lleva LO SUYO: `4x10,8,6,4` es una pirámide y
+          // `4x10 55,45,35,25` una descarga. Una lista más corta que la
+          // cantidad de sets repite su último valor.
+          (_) => List.generate(
+            entry.sets,
+            (i) => _EditorSet()
+              ..reps = entry.repsDeSet(i)
+              ..weightKg = entry.pesoDeSet(i)
+              ..durationSeconds = entry.duracionDeSet(i),
+          ),
+        );
+      _days[dayIndex].slots = [..._days[dayIndex].slots, slot];
+      _cerrarEntradaRapida();
+    });
+  }
+
+  // The publication control depends on dirty state, so the first edit must
+  // rebuild even when it came from a plain TextField.onChanged.
+  void _markDirty() {
+    if (_isDirty) return;
+    setState(() => _isDirty = true);
+  }
+
+  Future<void> _onTogglePublished() async {
+    if (_publishing || _submitting || _isDirty || _loadedRoutine == null) {
+      return;
+    }
+
+    // Capturado ANTES del await del diálogo: los providers one-shot guardan
+    // la visibilidad vieja durante todo el proceso si no se invalidan.
+    final container = ProviderScope.containerOf(context, listen: false);
+    final template = _loadedRoutine!;
+    final isPublished = template.visibility == RoutineVisibility.public;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppPalette.of(dialogContext).bgCard,
+        title: Text(
+          isPublished
+              ? 'Despublicar plantilla' // i18n
+              : 'Publicar plantilla', // i18n
+          style: GoogleFonts.barlowCondensed(
+            fontWeight: FontWeight.w700,
+            color: AppPalette.of(dialogContext).textPrimary,
+          ),
+        ),
+        content: Text(
+          isPublished
+              ? '"${template.name}" va a salir del catálogo público. '
+                  'Las calificaciones que ya recibió se conservan.' // i18n
+              : '"${template.name}" va a quedar visible para toda la '
+                  'comunidad de TREINO, que va a poder usarla y calificarla.', // i18n
+          style: GoogleFonts.barlow(
+            fontSize: 13,
+            color: AppPalette.of(dialogContext).textPrimary,
+          ),
+        ),
+        actions: [
+          TreinoButton(
+            label: 'Cancelar', // i18n
+            variant: TreinoButtonVariant.ghost,
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+          ),
+          const SizedBox(width: AppSpacing.s8),
+          TreinoButton(
+            label: isPublished ? 'Despublicar' : 'Publicar', // i18n
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _publishing = true);
+    try {
+      final repo = ref.read(routineRepositoryProvider);
+      final nextVisibility =
+          isPublished ? RoutineVisibility.private : RoutineVisibility.public;
+      if (isPublished) {
+        await repo.unpublishTemplate(template.id);
+      } else {
+        await repo.publishTemplate(template.id);
+      }
+      invalidateRoutineById(container, template.id);
+      if (!mounted) return;
+      setState(() {
+        _loadedRoutine = _loadedRoutine!.copyWith(
+          visibility: nextVisibility,
+        );
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isPublished
+                ? 'Tu plantilla salió del catálogo público.' // i18n
+                : '¡Tu plantilla ya está en el catálogo público!', // i18n
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No pudimos actualizar la publicación.', // i18n
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _publishing = false);
+    }
+  }
 
   // ── Week operations (periodización, Fase 4b) ────────────────────────────
 
@@ -484,9 +880,14 @@ class _RoutineEditorWebScreenState
   }
 
   /// Replaces the selected week's prescription with a deep copy of the
-  /// PREVIOUS week's, slot by slot — mirrors mobile's `_duplicateWeek`
+  /// semana ORIGEN, slot por slot — sobre mobile's `_duplicateWeek`
   /// (REQ-PERIOD-014). `_EditorSet.copy()` keeps set types, so warm-ups and
   /// failure sets survive the duplication.
+  ///
+  /// La fuente ya no es «la anterior»: la elige el PF cuando el plan tiene más
+  /// de dos semanas. Desde que la semana nueva nace pelada, copiar dejó de ser
+  /// un rescate ocasional y pasó a ser LA forma de replicar un bloque, así que
+  /// tenía que poder ir de cualquier semana a cualquier otra.
   ///
   /// Presence travels with it (ADR-WPRES-06): a slot present in the source
   /// week becomes present in the target too, and one absent from the source
@@ -500,12 +901,23 @@ class _RoutineEditorWebScreenState
   /// source week doesn't have that exercise, after the copy NO week does, and
   /// a slot scheduled nowhere is a ghost — so it's dropped instead.
   Future<void> _duplicateWeek() async {
-    if (_selectedWeek == 0) return;
-    final sourceWeek = _selectedWeek - 1;
+    if (_numWeeks < 2) return;
     final targetWeek = _selectedWeek;
 
-    final confirmed = await _confirmDuplicateWeek(sourceWeek, targetWeek);
-    if (confirmed != true || !mounted) return;
+    final int sourceWeek;
+    if (_numWeeks == 2) {
+      // Una sola fuente posible: no hay nada que elegir, se confirma y listo.
+      sourceWeek = 1 - targetWeek;
+      final confirmed = await _confirmDuplicateWeek(sourceWeek, targetWeek);
+      if (confirmed != true || !mounted) return;
+    } else {
+      // Con tres o más, «la anterior» es una suposición que falla apenas
+      // querés replicar la Semana 1 en la 3. El selector ES la confirmación:
+      // nombra el destino y avisa que reemplaza, así no van dos modales.
+      final elegida = await _elegirSemanaOrigen(targetWeek);
+      if (elegida == null || !mounted) return;
+      sourceWeek = elegida;
+    }
 
     _markDirty();
     setState(() {
@@ -522,6 +934,56 @@ class _RoutineEditorWebScreenState
         }
       }
     });
+  }
+
+  /// Elige DE QUÉ semana copiar. Sólo con tres o más: con dos, la fuente es la
+  /// única otra y preguntarlo sería un modal para una respuesta forzada.
+  ///
+  /// Hace de confirmación al mismo tiempo — el título dice a dónde va y el
+  /// cuerpo avisa que reemplaza — así elegir origen no cuesta dos diálogos
+  /// encadenados.
+  Future<int?> _elegirSemanaOrigen(int targetWeek) {
+    final palette = AppPalette.of(context);
+    return showDialog<int>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        backgroundColor: palette.bgCard,
+        title: Text(
+          '¿Copiar a la Semana ${targetWeek + 1} desde cuál?', // i18n
+          style: GoogleFonts.barlowCondensed(
+            color: palette.textPrimary,
+            fontWeight: FontWeight.w700,
+            fontSize: AppTextSize.title,
+          ),
+        ),
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 10),
+            child: Text(
+              'Se reemplaza todo lo que tengas cargado en la Semana '
+              '${targetWeek + 1}.', // i18n
+              style: GoogleFonts.barlow(
+                color: palette.textMuted,
+                fontSize: AppTextSize.bodyDense,
+              ),
+            ),
+          ),
+          for (var w = 0; w < _numWeeks; w++)
+            if (w != targetWeek)
+              SimpleDialogOption(
+                key: Key('copy_source_week_$w'),
+                onPressed: () => Navigator.of(ctx).pop(w),
+                child: Text(
+                  'Semana ${w + 1}', // i18n
+                  style: GoogleFonts.barlow(
+                    color: palette.accent,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+        ],
+      ),
+    );
   }
 
   /// Confirms the overwrite. This replaces everything already loaded in the
@@ -546,25 +1008,18 @@ class _RoutineEditorWebScreenState
           style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
         ),
         actions: [
-          TextButton(
+          TreinoButton(
             // Keyed: the form footer has its own "Cancelar" too.
             key: const Key('duplicate_week_cancel_button'),
+            label: 'Cancelar', // i18n
+            variant: TreinoButtonVariant.ghost,
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(
-              'Cancelar', // i18n
-              style: GoogleFonts.barlow(color: palette.textMuted),
-            ),
           ),
-          TextButton(
+          const SizedBox(width: AppSpacing.s8),
+          TreinoButton(
             key: const Key('duplicate_week_confirm_button'),
+            label: 'Copiar', // i18n
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(
-              'Copiar', // i18n
-              style: GoogleFonts.barlow(
-                color: palette.accent,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
           ),
         ],
       ),
@@ -617,14 +1072,26 @@ class _RoutineEditorWebScreenState
     // `weeks_count: 4`. Bajar no se cuenta — el evento mide fricción hacia
     // arriba, que es donde un tope mordería.
     final grew = clamped > _numWeeks;
+    final anterior = _numWeeks;
     _markDirty();
     setState(() {
       _numWeeks = clamped;
       for (final day in _days) {
         for (final slot in day.slots) {
           _normalizeSlotWeeks(slot);
+          // LA SEMANA NUEVA NACE PELADA. Antes heredaba el plan entero: el PF
+          // sumaba una semana y se encontraba con los mismos ejercicios ya
+          // puestos, y peor, agregar uno en cualquier semana lo metía en todas
+          // —máscara vacía significa "en todas"—, así que las semanas no eran
+          // editables por separado. Se llenan a mano o con «Copiar semana».
+          if (grew) _dejarFueraDeLasSemanasNuevas(slot, anterior);
         }
       }
+      // Al SUMAR semanas se salta a la primera nueva, como el editor del
+      // teléfono. Desde que nace pelada esto dejó de ser una comodidad: parado
+      // en la semana vieja, «Copiar acá» apunta a la semana VACÍA como
+      // destino, o sea ofrece pisar el trabajo cargado con nada.
+      if (grew) _selectedWeek = anterior;
       if (_selectedWeek > _numWeeks - 1) _selectedWeek = _numWeeks - 1;
       if (_selectedWeek < 0) _selectedWeek = 0;
     });
@@ -671,27 +1138,166 @@ class _RoutineEditorWebScreenState
   // ── Slot operations ──────────────────────────────────────────────────────
 
   Future<void> _addExercisesToDay(int dayIndex) async {
-    final day = _days[dayIndex];
-    final alreadyIds = day.slots
-        .where((s) => s.exercise != null)
-        .map((s) => s.exercise!.id)
-        .toSet();
+    // En desktop abre el PANEL LATERAL y no un modal: el panel no tapa la
+    // plantilla, así que el loop "miro qué puse → elijo el que sigue → miro
+    // cómo quedó" no se rompe en cada iteración (#860). Abajo de 1280 sigue el
+    // modal, que ahí es lo correcto.
+    if (rsp.viewportFor(MediaQuery.sizeOf(context).width) ==
+        rsp.Viewport.desktop) {
+      setState(() => _pickerDia = dayIndex);
+      return;
+    }
+
     final picked = await showExercisePickerDialog(
       context,
-      alreadySelectedIds: alreadyIds,
+      alreadySelectedIds: _idsPresentesEnLaSemana(dayIndex),
     );
     if (picked == null || picked.isEmpty || !mounted) return;
+    _agregarAlDia(dayIndex, picked);
+  }
+
+  /// Agrega varios ejercicios al día [dayIndex] YA ENLAZADOS como superserie.
+  ///
+  /// Esto faltaba en la web y no era un detalle: acá una superserie se formaba
+  /// agregando los ejercicios de a uno y después tildando "Superserie con el
+  /// siguiente" en cada uno. En el teléfono elegís tres y entran como grupo de
+  /// una. Para un PF que arma planes todo el día, esa diferencia es la mitad
+  /// del trabajo.
+  ///
+  /// `linkedToNext` va en TODOS menos el último: la corrida la define el
+  /// enlace del anterior, así que marcar el último también dejaría enganchado
+  /// al ejercicio que venga después.
+  Future<void> _addSupersetToDay(int dayIndex) async {
+    final presentes = _idsPresentesEnLaSemana(dayIndex);
+    final picked = await showExercisePickerDialog(
+      context,
+      alreadySelectedIds: presentes,
+    );
+    if (picked == null || !mounted) return;
+
+    final nuevos = picked.where((e) => !presentes.contains(e.id)).toList();
+    // Una superserie de uno no es una superserie. Y decirlo, en vez de un
+    // `return` mudo que deja el botón pareciendo roto.
+    if (nuevos.length < 2) {
+      if (!mounted) return;
+      setState(() => _errorMessage = nuevos.isEmpty
+          ? 'Esos ejercicios ya están en esta semana.' // i18n
+          : 'Una superserie necesita al menos dos ejercicios.'); // i18n
+      return;
+    }
+
+    setState(() => _errorMessage = null);
+    // Delega en el mismo camino que el panel lateral en vez de dar de alta acá.
+    // Antes esta rama tenía su propio `slots.add`, y era exactamente la
+    // divergencia contra la que advierte el doc de `_agregarSuperserieAlDia`:
+    // un ejercicio que el día YA tiene oculto en esta semana entraba de nuevo
+    // como slot duplicado, contra la invariante de un ejercicio por día
+    // (QA-WKT-004).
+    _agregarSuperserieAlDia(dayIndex, nuevos);
+  }
+
+  /// Agrega [elegidos] al día [dayIndex] YA ENLAZADOS como superserie.
+  ///
+  /// Reusa [_agregarAlDia] y después enlaza la corrida nueva: así el alta —qué
+  /// se saltea, cómo nacen los sets— no puede divergir entre agregar sueltos y
+  /// agregar agrupados.
+  ///
+  /// `linkedToNext` va en todos menos el último: la corrida la define el
+  /// enlace del anterior, así que marcar el último dejaría enganchado al
+  /// ejercicio que venga después.
+  void _agregarSuperserieAlDia(int dayIndex, List<Exercise> elegidos) {
+    if (elegidos.length < 2) return;
+    final desde = _days[dayIndex].slots.length;
+    _agregarAlDia(dayIndex, elegidos);
+    setState(() {
+      final slots = _days[dayIndex].slots;
+      for (var i = desde; i < slots.length - 1; i++) {
+        slots[i].linkedToNext = true;
+      }
+    });
+  }
+
+  /// Suma [elegidos] al día [dayIndex], salteando los que ya están.
+  ///
+  /// La comparten los dos caminos —modal y panel— justamente para que agregar
+  /// desde uno u otro no pueda divergir.
+  void _agregarAlDia(int dayIndex, List<Exercise> elegidos) {
+    if (elegidos.isEmpty) return;
+    final day = _days[dayIndex];
     _markDirty();
     setState(() {
-      for (final exercise in picked) {
-        if (day.slots.any((s) => s.exercise?.id == exercise.id)) continue;
+      for (final exercise in elegidos) {
+        final yaEstaEnElDia =
+            day.slots.indexWhere((s) => s.exercise?.id == exercise.id);
+        if (yaEstaEnElDia >= 0) {
+          // ESTE es el camino de vuelta. Un ejercicio por día es invariante
+          // del dominio (QA-WKT-004), así que re-agregar uno que el día ya
+          // tiene no puede dar de alta un slot nuevo: se le prende la semana
+          // en curso en la máscara. El slot vuelve con sus series, su
+          // descanso y sus notas — más de lo que consigue el teléfono, que
+          // ahí da de alta uno en blanco.
+          _prenderSemana(day.slots[yaEstaEnElDia], _selectedWeek);
+          continue;
+        }
         day.slots.add(
           _EditorSlot()
             ..exercise = exercise
-            ..weeklySets = List.generate(_numWeeks, (_) => [_EditorSet()]),
+            ..weeklySets = List.generate(_numWeeks, (_) => [_EditorSet()])
+            // NACE SÓLO EN LA SEMANA QUE SE ESTÁ MIRANDO. Antes nacía con
+            // máscara vacía, que en este modelo significa "en TODAS", y por eso
+            // agregar un ejercicio en una semana lo hacía aparecer en las
+            // otras. Para ponerlo en varias están los chips de «Semanas:» —por
+            // ejercicio— y «Copiar semana» —en bloque—; las dos son acciones
+            // que se ven, no un efecto lateral del alta.
+            ..activeWeeks = _soloLaSemanaEnCurso(),
         );
       }
     });
+  }
+
+  /// Máscara con la que nace un slot: sólo la semana en curso.
+  ///
+  /// En un plan de una sola semana devuelve la máscara VACÍA, que es su forma
+  /// canónica de "en todas" — `{0}` y `{}` describen lo mismo ahí, y guardar
+  /// siempre la misma evita que un plan de una semana viaje con una máscara
+  /// explícita que después no significa nada.
+  Set<int> _soloLaSemanaEnCurso() => _numWeeks <= 1 ? <int>{} : {_selectedWeek};
+
+  /// Ejercicios que el día [dayIndex] YA muestra en la semana en curso.
+  ///
+  /// Scopeado por presencia a propósito. Con la lista cruda, un slot sacado
+  /// «solo esta semana» seguía contando como "ya está": el picker lo
+  /// pre-marcaba y el alta lo descartaba por repetido, así que el ejercicio
+  /// quedaba INALCANZABLE desde la semana de la que lo habían sacado. Es el
+  /// mismo agujero que sigue teniendo el editor del teléfono.
+  Set<String> _idsPresentesEnLaSemana(int dayIndex) => _days[dayIndex]
+      .slots
+      .where((s) => s.exercise != null && s.isPresentInWeek(_selectedWeek))
+      .map((s) => s.exercise!.id)
+      .toSet();
+
+  /// Prende [week] en la máscara de [slot].
+  ///
+  /// Canonicaliza a máscara VACÍA cuando pasa a cubrir todas las semanas, por
+  /// la misma razón que `_toggleSlotWeekPresence`: `[0, 1]` en un plan de dos
+  /// semanas tiene que guardarse indistinguible de "sin máscara".
+  void _prenderSemana(_EditorSlot slot, int week) {
+    if (slot.isPresentInWeek(week)) return;
+    final mask = Set<int>.from(slot.activeWeeks)..add(week);
+    slot.activeWeeks = mask.length == _numWeeks ? <int>{} : mask;
+  }
+
+  /// Saca a [slot] de todas las semanas de [desde] en adelante — las que
+  /// acaban de nacer.
+  ///
+  /// El trabajo real lo hace el primer caso: una máscara VACÍA significa "en
+  /// todas las semanas", así que un slot sin máscara aparecía solo en cada
+  /// semana nueva. Materializarla a las semanas que ya existían es lo que hace
+  /// que la nueva venga pelada.
+  void _dejarFueraDeLasSemanasNuevas(_EditorSlot slot, int desde) {
+    slot.activeWeeks = slot.activeWeeks.isEmpty
+        ? {for (var w = 0; w < desde; w++) w}
+        : (Set<int>.from(slot.activeWeeks)..removeWhere((w) => w >= desde));
   }
 
   void _removeSlot(int dayIndex, int slotIndex) {
@@ -781,24 +1387,82 @@ class _RoutineEditorWebScreenState
       return;
     }
 
+    final maskAnterior = Set<int>.from(slot.activeWeeks);
+    final semana = _selectedWeek;
     _markDirty();
     setState(() => slot.activeWeeks = newMask);
+    if (!mounted) return;
+    _avisarSacadoDeLaSemana(slot, semana, maskAnterior);
   }
 
-  /// Swaps ONLY the exercise on a slot, keeping its sets, rest, notes,
-  /// superset link and week presence intact — mirrors mobile's in-place
-  /// "Cambiar ejercicio" (`_SlotEditorState._replaceExercise`). Reuses the
-  /// multi-select picker and takes the first pick as the replacement, so
-  /// correcting a wrong choice no longer means deleting the slot and losing
-  /// everything already configured.
-  Future<void> _replaceSlotExercise(int dayIndex, int slotIndex) async {
-    final picked = await showExercisePickerDialog(context);
-    if (picked == null || picked.isEmpty || !mounted) return;
-    final replacement = picked.first;
-    final slot = _days[dayIndex].slots[slotIndex];
-    if (slot.exercise?.id == replacement.id) return; // same exercise → no-op
-    _markDirty();
-    setState(() => slot.exercise = replacement);
+  /// Cartel de «lo saqué de esta semana», con la vuelta.
+  ///
+  /// La card DESAPARECE de la semana (`_filasDeSlots` filtra por presencia),
+  /// que es lo que el PF pedía: «si lo borro de una de las semanas, que se
+  /// borre de esa semana, no que quede ahí». Antes se atenuaba, y el cartel
+  /// decía «queda atenuado» — describía un estado que ya no existe.
+  ///
+  /// Por eso el aviso importa MÁS que antes, no menos: desaparecer sin decir
+  /// nada es indistinguible de haberlo borrado de todas. Dice de qué semana
+  /// salió y ofrece Deshacer, y el camino largo —«Agregar ejercicio», que
+  /// vuelve a ofrecerlo y le devuelve sus series— queda para después de que el
+  /// cartel se vaya.
+  ///
+  /// Lo comparten las DOS puertas que sacan un ejercicio de la semana en
+  /// curso: «Solo esta semana» y apagar el chip de la semana que se mira.
+  void _avisarSacadoDeLaSemana(
+    _EditorSlot slot,
+    int semana,
+    Set<int> maskAnterior,
+  ) {
+    final nombre = slot.exercise?.name;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        // NO PERSISTENTE, Y ESTO HAY QUE PONERLO A MANO. `SnackBar` hace
+        // `persist = persist ?? action != null`: cualquier cartel CON acción
+        // es eterno por default, y `ScaffoldMessenger` ni siquiera le agenda
+        // el timer de cierre. Como éste trae «Deshacer», se quedaba en
+        // pantalla hasta recargar la página — el PF lo reportó así, y se
+        // paseaba con él a otras secciones porque el `ScaffoldMessenger` vive
+        // en la app, no en la ruta.
+        //
+        // Seis segundos y no los cuatro de default: son los que hay para leer
+        // el nombre del ejercicio, entender qué pasó y decidir si deshacer.
+        persist: false,
+        duration: const Duration(seconds: 6),
+        // FLOTANTE Y LEVANTADO. El editor tiene un pie FIJO con «Guardar»
+        // abajo de todo, y un SnackBar normal se sienta justo encima: el PF
+        // acaba de sacar un ejercicio y el aviso le tapa el boton para
+        // guardarlo. Lo cazo un test que dejo de poder tocar submit despues
+        // de borrar.
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.fromLTRB(
+          AppSpacing.s20,
+          0,
+          AppSpacing.s20,
+          _kAltoDelPieFijo + AppSpacing.s12,
+        ),
+        content: Text(
+          nombre == null
+              ? 'Sacado de la Semana ${semana + 1}. Podés volver a agregarlo '
+                  'desde «Agregar ejercicio».' // i18n
+              : '«$nombre» sale de la Semana ${semana + 1}. Podés volver a '
+                  'agregarlo desde «Agregar ejercicio».', // i18n
+        ),
+        action: SnackBarAction(
+          label: 'Deshacer', // i18n
+          onPressed: () {
+            if (!mounted) return;
+            _markDirty();
+            // Se restaura la máscara ENTERA que había antes, no un `add` de la
+            // semana: la anterior podía estar vacía —que significa «en todas»—
+            // y agregarle una la convertiría en una máscara explícita de una
+            // sola semana, sacando el ejercicio de las otras.
+            setState(() => slot.activeWeeks = maskAnterior);
+          },
+        ),
+      ));
   }
 
   // ── Copiar prescripción entre ejercicios (#655) ──────────────────────────
@@ -879,25 +1543,18 @@ class _RoutineEditorWebScreenState
           style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
         ),
         actions: [
-          TextButton(
+          TreinoButton(
             // Keyed: the form footer has its own "Cancelar" too.
             key: const Key('copy_prescription_cancel_button'),
+            label: 'Cancelar', // i18n
+            variant: TreinoButtonVariant.ghost,
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(
-              'Cancelar', // i18n
-              style: GoogleFonts.barlow(color: palette.textMuted),
-            ),
           ),
-          TextButton(
+          const SizedBox(width: AppSpacing.s8),
+          TreinoButton(
             key: const Key('copy_prescription_confirm_button'),
+            label: 'Copiar', // i18n
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(
-              'Copiar', // i18n
-              style: GoogleFonts.barlow(
-                color: palette.accent,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
           ),
         ],
       ),
@@ -996,10 +1653,12 @@ class _RoutineEditorWebScreenState
   /// (`_firstValidationError`'s mask check is only a backstop for this).
   void _toggleSlotWeekPresence(int dayIndex, int slotIndex, int week) {
     final slot = _days[dayIndex].slots[slotIndex];
+    final maskAnterior = Set<int>.from(slot.activeWeeks);
     final mask = slot.activeWeeks.isEmpty
         ? {for (var w = 0; w < _numWeeks; w++) w}
         : Set<int>.from(slot.activeWeeks);
-    if (mask.contains(week)) {
+    final quita = mask.contains(week);
+    if (quita) {
       if (mask.length <= 1) return; // never let a removal empty the mask
       mask.remove(week);
     } else {
@@ -1011,6 +1670,14 @@ class _RoutineEditorWebScreenState
     }
     _markDirty();
     setState(() => slot.activeWeeks = mask);
+    // Apagar el chip de la semana que se está MIRANDO saca la card de la vista
+    // (`_filasDeSlots` filtra por presencia), igual que «Solo esta semana».
+    // Sin aviso la card se desvanecería bajo el cursor, sin decir qué pasó ni
+    // cómo volver — que es la queja original, servida por otra puerta.
+    // Apagar la semana de OTRA pestaña no mueve nada a la vista y no avisa.
+    if (quita && week == _selectedWeek) {
+      _avisarSacadoDeLaSemana(slot, week, maskAnterior);
+    }
   }
 
   void _onRestChanged(int dayIndex, int slotIndex, String value) {
@@ -1145,8 +1812,11 @@ class _RoutineEditorWebScreenState
     });
   }
 
-  // No setState: the notes TextField holds its own text and notes isn't
-  // rendered anywhere else (mirrors _markDirty's own no-rebuild rationale).
+  // No setState here: the notes TextField holds its own text and notes isn't
+  // rendered anywhere else. `_markDirty` DOES rebuild now — once, on the very
+  // first edit — so the PUBLICACIÓN block learns the form went dirty. Leaving
+  // this comment pointing at a "no-rebuild rationale" that no longer exists is
+  // exactly the reassuring-but-false note AGENTS.md §11.1 is about.
   void _onNotesChanged(int dayIndex, int slotIndex, String value) {
     _markDirty();
     _days[dayIndex].slots[slotIndex].notes = value;
@@ -1195,6 +1865,13 @@ class _RoutineEditorWebScreenState
     if (_splitCtrl.text.trim().isEmpty) {
       return 'Contanos el split (ej: Push/Pull/Legs).'; // i18n
     }
+    // Una semana entera sin ejercicios AVISA (dot en la pestaña, ver
+    // `_weekHasError`) pero NO bloquea el guardado, a diferencia de un día
+    // vacío. La razón es que ya existen planes así en producción: un plan de
+    // dos semanas cuyo único ejercicio está enmascarado a la semana 1 tiene la
+    // 2 vacía, y es exactamente la forma que dejaron las máscaras de presencia.
+    // Bloquear acá le sacaría el botón de guardar a un PF que abrió un plan
+    // viejo a cambiar otra cosa.
     for (final day in _days) {
       final hasExercise = day.slots.any((s) => s.exercise != null);
       if (!hasExercise) {
@@ -1308,9 +1985,24 @@ class _RoutineEditorWebScreenState
       !day.slots.any((s) => s.exercise != null) || day.slots.any(_slotHasError);
 
   /// Some scheduled exercise has an incomplete set in week [w] — drives the
-  /// warning dot on that week's tab.
+  /// warning dot on that week's tab. Una semana SIN ejercicios cuenta como
+  /// error: ver [_semanaVacia].
   bool _weekHasError(int w) =>
+      _semanaVacia(w) ||
       _days.any((day) => day.slots.any((s) => _slotHasErrorInWeek(s, w)));
+
+  /// La semana [w] no tiene NINGÚN ejercicio en ningún día.
+  ///
+  /// Antes no podía pasar: la semana nueva heredaba el plan entero. Desde que
+  /// nace pelada es el estado inicial de toda semana agregada, y sin esto se
+  /// guardaba en silencio un plan donde el alumno se queda una semana sin nada
+  /// que hacer. Un DÍA vacío ya bloqueaba el guardado desde siempre
+  /// ([_firstInvalidHint]); una semana vacía es lo mismo, una dimensión más
+  /// arriba.
+  bool _semanaVacia(int w) => !_days.any(
+        (day) =>
+            day.slots.any((s) => s.exercise != null && s.isPresentInWeek(w)),
+      );
 
   Set<int> _weeksWithError() => {
         for (var w = 0; w < _numWeeks; w++)
@@ -1457,6 +2149,20 @@ class _RoutineEditorWebScreenState
       });
       return;
     }
+
+    // La metáfora que pidió el PF, con las palabras que usó él: «o se te guarda
+    // con los cambios, o te crea una copia con los cambios manteniendo la
+    // original en la galería».
+    //
+    // Sólo al EDITAR algo que ya existe y sólo si hay cambios. Un cartel que
+    // sale siempre —incluido cuando no tocaste nada— enseña a apretar el
+    // primer botón sin leer, y ahí se pierde el peso de TODAS las
+    // confirmaciones de esta pantalla, incluida la de descartar.
+    final modo = (_isEditing && _isDirty)
+        ? await _preguntarComoGuardar()
+        : _ModoDeGuardado.pisar;
+    if (modo == null || !mounted) return;
+
     final trainerUid = ref.read(currentUidProvider);
     if (trainerUid == null) return;
 
@@ -1490,8 +2196,60 @@ class _RoutineEditorWebScreenState
     // the PF navigated away while the write was in flight.
     final analytics = ref.read(analyticsServiceProvider);
     final analyticsSource = _analyticsSource;
+    // Nombre de la copia recién creada, o null si esta pasada no creó ninguna.
+    // Se avisa al final, después de las invalidaciones — ver la rama de abajo.
+    String? copiaGuardada;
     try {
-      if (_isEditing) {
+      if (modo == _ModoDeGuardado.copia) {
+        // La copia nace como PLANTILLA, aunque se esté editando el plan de un
+        // alumno. Es el caso que el PF describió —«esto me quedó bueno, lo
+        // quiero para otros»— y el único que construye biblioteca: una copia
+        // asignada al mismo alumno le suma una tarjeta a esa persona y no le
+        // sirve para nadie más.
+        //
+        // Por eso NO lleva `assignedTo`: `createTemplate` fuerza
+        // source=trainer-template / assignedTo=null / visibility=private, que
+        // es lo único que las reglas aceptan en un `trainer-template`.
+        //
+        // Y por eso el documento original NO se toca: no hay `update` en esta
+        // rama. Ésa es toda la promesa de «mantener la original en la
+        // galería».
+        final copia = Routine(
+          id: '',
+          name: _nombreDeLaCopia(),
+          split: _splitCtrl.text.trim(),
+          level: _level,
+          days: days,
+          numWeeks: _numWeeks,
+          summary: _summaryOrNull,
+          goals: _goalsOrdered,
+          source: RoutineSource.trainerTemplate,
+          assignedBy: trainerUid,
+          visibility: RoutineVisibility.private,
+        );
+        await repo.createTemplate(copia);
+        analytics.logRoutineCreated(
+          // `trainerTemplate` fijo, y NO `analyticsSource`: ese getter sale de
+          // `widget.isTemplate`, que sigue en false cuando la copia se hizo
+          // desde el editor de un plan de alumno. El documento que se acaba de
+          // escribir es un `trainer-template`, así que reportarlo como
+          // `trainerAssigned` ensucia justo el corte que separa planes de
+          // plantillas reutilizables.
+          source: RoutineCreationSource.trainerTemplate,
+          daysCount: days.length,
+          weeksCount: _numWeeks,
+        );
+        // El aviso NO sale acá. Sale abajo, después de invalidar.
+        //
+        // `_avisarCopiaGuardada` toca `context`, y esto está después de un
+        // await: si el PF confirmó el descarte del navegador mientras el
+        // `createTemplate` estaba en vuelo, el State ya se dispuso y esa
+        // llamada TIRA. El catch la atrapa, ve `!mounted` y vuelve — con la
+        // copia YA escrita y la invalidación de la sección Rutinas sin correr.
+        // O sea: el aviso, que es cosmético, se llevaría puesto el refresco,
+        // que no lo es.
+        copiaGuardada = copia.name;
+      } else if (_isEditing) {
         // Preserve the loaded routine's identity (id, assignedBy/To, source,
         // createdAt, …). updateTemplate/updateAssigned each write only
         // name/split/level/days/numWeeks/summary — `days` is rebuilt from a
@@ -1566,17 +2324,44 @@ class _RoutineEditorWebScreenState
           weeksCount: _numWeeks,
         );
       }
+      // La grilla de la sección Rutinas. `routinesAuthoredByProvider` es un
+      // `FutureProvider.autoDispose` que esa pantalla WATCHEA, y el editor
+      // llega por `context.push`: la ruta de abajo sigue montada, así que el
+      // provider nunca se dispone y sirve la lista previa al guardado.
+      //
+      // Faltaba para TODOS los caminos de escritura de esta pantalla, no sólo
+      // para el de la copia: crear una plantilla, crear un plan o editar
+      // cualquiera de los dos dejaba la sección Rutinas mostrando lo de antes
+      // hasta recargar. No fallaba ruidosamente —es el fallo silencioso de
+      // AGENTS.md §11.1— y se explica por la fecha: la sección pasó a leer de
+      // este provider en #1065, después de que este editor se escribiera.
+      //
+      // `container` y no `ref`: es lo mismo que ya hace `invalidateRoutineById`
+      // acá arriba, y por el mismo motivo — la invalidación tiene que aterrizar
+      // aunque la pantalla se haya dispuesto durante el await.
+      container.invalidate(routinesAuthoredByProvider(trainerUid));
+
       // trainerTemplatesStreamProvider is a live stream — no invalidation
       // needed. The assigned list is a one-shot FutureProvider, so invalidate
       // it so the athlete detail's "Rutina activa" card refreshes on return.
-      if (!widget.isTemplate) {
-        ref.invalidate(assignedRoutinesProvider(widget.athleteId!));
+      //
+      // No en la rama de la copia: ahí no cambió nada del alumno. La copia es
+      // una plantilla nueva y el plan que estaba editando quedó igual.
+      if (!widget.isTemplate && modo != _ModoDeGuardado.copia) {
+        ref.invalidate(assignedRoutinesByTrainerProvider(
+          (trainerId: trainerUid, athleteId: widget.athleteId!),
+        ));
+      }
+      // Recién ahora, con todo lo que NO es cosmético ya hecho. Y bajo
+      // `mounted`, que es la condición real para tocar `context`.
+      if (copiaGuardada != null && mounted) {
+        _avisarCopiaGuardada(copiaGuardada);
       }
       if (mounted) context.pop();
     } catch (error) {
       if (!mounted) return;
       if (isPermissionDenied(error)) {
-        _onWriteDenied(trainerUid: trainerUid);
+        _onWriteDenied(trainerUid: trainerUid, modo: modo);
         return;
       }
       setState(() {
@@ -1598,8 +2383,18 @@ class _RoutineEditorWebScreenState
   /// 2. **Copy.** El mensaje genérico («probá de nuevo») es ACTIVAMENTE falso
   ///    en este caso: le pide al PF repetir algo que va a fallar siempre. Y la
   ///    causa sólo se afirma cuando se puede probar — ver [_deniedMessage].
-  void _onWriteDenied({required String trainerUid}) {
-    final athleteId = widget.athleteId;
+  void _onWriteDenied({
+    required String trainerUid,
+    required _ModoDeGuardado modo,
+  }) {
+    // Guardar como COPIA escribe una plantilla, y una plantilla no es de
+    // nadie — aunque se haya llegado acá desde el plan de un alumno y
+    // `widget.athleteId` esté seteado. Tomarlo de la pantalla haría dos cosas
+    // falsas a la vez: mandar analytics con un `athleteId` que esta escritura
+    // no tocó, y ofrecerle al PF la salida a «mirá tu cupo con Juan» sobre una
+    // denegación que no tiene nada que ver con Juan. El paywall de rutinas por
+    // forma (días/semanas) no es por-alumno.
+    final athleteId = modo == _ModoDeGuardado.copia ? null : widget.athleteId;
     // Una plantilla no es de nadie: el paywall es por-alumno, así que el campo
     // no aplica en vez de valer «desconocido». Y no se lee el provider en ese
     // caso: en modo plantilla el build NO lo observa, así que un `read` suelto
@@ -1626,7 +2421,11 @@ class _RoutineEditorWebScreenState
             trainerId: trainerUid,
             athleteId: athleteId ?? 'none',
             collection: 'routines',
-            operation: _isEditing ? 'update' : 'create',
+            // Una copia es un CREATE aunque `_isEditing` sea true: se
+            // escribe un documento nuevo y el original ni se toca.
+            operation: (_isEditing && modo != _ModoDeGuardado.copia)
+                ? 'update'
+                : 'create',
             surface: 'routine_editor_web',
             athleteEntitlement: entitlement,
           ),
@@ -1634,7 +2433,10 @@ class _RoutineEditorWebScreenState
 
     setState(() {
       _submitting = false;
-      _errorMessage = _deniedMessage(entitlement == 'blocked');
+      _errorMessage = _deniedMessage(
+        entitlement == 'blocked',
+        sinAlumno: athleteId == null,
+      );
       // La salida a la pantalla de solo-lectura se ofrece también cuando la
       // causa NO está probada: ahí es justamente donde el PF necesita poder
       // MIRAR si su cupo lo explica o no.
@@ -1656,8 +2458,15 @@ class _RoutineEditorWebScreenState
   /// sobre él; el alumno conserva rutinas, historial y chat. Decirlo al revés
   /// («este alumno quedó sin acceso») sería falso y encima le cobraría al
   /// alumno una fricción que es del entrenador.
-  String _deniedMessage(bool athleteIsOutOfPlan) {
-    if (widget.isTemplate) {
+  /// [sinAlumno] es `athleteId == null` del llamador, y NO `widget.isTemplate`.
+  /// Los dos coinciden salvo en un caso: guardar como COPIA desde el editor de
+  /// un plan de alumno escribe una plantilla, y ahí `widget.isTemplate` sigue
+  /// en false. Ramificando por la pantalla en vez de por lo que se intentó
+  /// escribir, el cartel decía «no pudimos escribir sobre este alumno» y
+  /// mandaba a mirar su cupo, sobre una escritura que no era de ese alumno —
+  /// una advertencia falsa, que es lo que AGENTS.md §11.1 prohíbe.
+  String _deniedMessage(bool athleteIsOutOfPlan, {required bool sinAlumno}) {
+    if (sinAlumno) {
       // Sin alumno de por medio el cupo no puede ser la causa; nombrarlo sería
       // inventar.
       return 'No pudimos guardar la $_noun: tu cuenta no tiene permiso para '
@@ -1672,6 +2481,76 @@ class _RoutineEditorWebScreenState
     return 'No pudimos guardar la $_noun: tu cuenta no tiene permiso para '
         'escribir sobre este alumno. Reintentar no lo va a cambiar. '
         'Fijate si quedó fuera del cupo de tu plan.'; // i18n
+  }
+
+  // ── Guardar, o guardar una copia ─────────────────────────────────────────
+
+  /// Pregunta si los cambios pisan la rutina o nacen como copia.
+  ///
+  /// Devuelve `null` si se canceló — el diálogo es `barrierDismissible`, así
+  /// que tocar afuera o Escape también cancela. Cancelar NO guarda nada, que
+  /// es la única lectura segura de un diálogo del que te podés ir sin elegir.
+  Future<_ModoDeGuardado?> _preguntarComoGuardar() async {
+    final original = _loadedRoutine?.name.trim();
+    return showTreinoDialog<_ModoDeGuardado>(
+      context,
+      builder: (ctx) => TreinoDialog(
+        title: original == null || original.isEmpty
+            ? '¿Cómo guardás los cambios?' // i18n
+            : '¿Cómo guardás los cambios en «$original»?', // i18n
+        body: Text(
+          widget.isTemplate
+              // i18n
+              ? 'Guardar pisa esta plantilla con lo que acabás de armar. Una '
+                  'copia deja la original como estaba y suma una plantilla '
+                  'nueva a tu biblioteca.'
+              // Sobre un plan de alumno hay que decir las DOS mitades: qué le
+              // pasa al alumno y dónde queda la copia. La copia no es otro
+              // plan para él —es una plantilla tuya—, y si el cartel no lo
+              // dice el PF va a buscarla en el perfil del alumno.
+              // i18n
+              : 'Guardar actualiza el plan que está entrenando. Una copia lo '
+                  'deja como está y guarda lo que armaste como una plantilla '
+                  'nueva en tu biblioteca, sin alumno.',
+        ),
+        primaryLabel: 'Guardar', // i18n
+        onPrimaryTap: () => Navigator.of(ctx).pop(_ModoDeGuardado.pisar),
+        secondaryLabel: 'Guardar como copia', // i18n
+        onSecondaryTap: () => Navigator.of(ctx).pop(_ModoDeGuardado.copia),
+      ),
+    );
+  }
+
+  /// El nombre de la copia: el del formulario con «(copia)» al final.
+  ///
+  /// No se pide en el diálogo, y es una decisión. La metáfora que pidió el PF
+  /// —la de editar una foto— no tiene paso de nombre: el teléfono guarda la
+  /// copia y listo. Un segundo diálogo para nombrarla, o un campo en el
+  /// primero que el botón «Guardar» ignora, agregan fricción justo en el
+  /// momento en que el PF quiere terminar. Se renombra abriéndola, que es
+  /// donde ya sabe cómo hacerlo.
+  ///
+  /// Copiar dos veces da «X (copia) (copia)», y está bien: dice la verdad.
+  String _nombreDeLaCopia() {
+    final base = _nameCtrl.text.trim();
+    return base.isEmpty ? 'Copia' : '$base (copia)'; // i18n
+  }
+
+  /// Avisa dónde quedó la copia, antes de que el editor se cierre.
+  ///
+  /// El `ScaffoldMessenger` vive por encima de esta ruta, así que el snackbar
+  /// sobrevive al `pop` y se lee en la pantalla de atrás — que es justo donde
+  /// el PF va a buscar la copia.
+  void _avisarCopiaGuardada(String nombre) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(
+          // i18n
+          'Se guardó «$nombre» en tus plantillas. La original quedó como '
+          'estaba.',
+        ),
+      ));
   }
 
   // ── Discard guard ────────────────────────────────────────────────────────
@@ -1699,22 +2578,18 @@ class _RoutineEditorWebScreenState
           style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
         ),
         actions: [
-          TextButton(
+          TreinoButton(
+            label: 'Volver', // i18n
+            variant: TreinoButtonVariant.ghost,
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(
-              'Volver', // i18n
-              style: GoogleFonts.barlow(color: palette.textMuted),
-            ),
           ),
-          TextButton(
+          const SizedBox(width: AppSpacing.s8),
+          // Descartar los cambios destruye trabajo: va como destructivo y no
+          // como un `TextButton` rojo, que era la misma caja que «Volver».
+          TreinoButton(
+            label: 'Descartar', // i18n
+            variant: TreinoButtonVariant.danger,
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(
-              'Descartar', // i18n
-              style: GoogleFonts.barlow(
-                color: palette.danger,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
           ),
         ],
       ),
@@ -1748,7 +2623,7 @@ class _RoutineEditorWebScreenState
     // barrido (que corren con los mismos valores) reconstruyan este árbol.
     if (!widget.isTemplate) ref.watch(blockedAthletesProvider);
 
-    return PopScope(
+    final arbol = PopScope(
       canPop: !_isDirty,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _onBackTap();
@@ -1761,8 +2636,10 @@ class _RoutineEditorWebScreenState
             padding: const EdgeInsets.fromLTRB(4, 4, 24, 12),
             child: Row(
               children: [
-                IconButton(
-                  icon: Icon(TreinoIcon.arrowLeft, color: palette.textMuted),
+                TreinoIconButton(
+                  icon: TreinoIcon.arrowLeft,
+                  tooltip: 'Volver', // i18n
+                  color: palette.textMuted,
                   onPressed: _onBackTap,
                 ),
                 const SizedBox(width: 4),
@@ -1816,6 +2693,12 @@ class _RoutineEditorWebScreenState
                             child: ConstrainedBox(
                               constraints: const BoxConstraints(maxWidth: 720),
                               child: Column(
+                                // El panel lateral vive AL LADO de esto y
+                                // lista el catálogo entero: sin un scope, un
+                                // finder por texto en los tests no distingue
+                                // "Press de Banca en el día" de "Press de
+                                // Banca en la lista del panel".
+                                key: const Key('routine_editor_form'),
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
                                   if (_errorMessage != null) ...[
@@ -1976,6 +2859,211 @@ class _RoutineEditorWebScreenState
                                       ],
                                     ),
                                   ],
+                                  if (widget.isTemplate &&
+                                      _isEditing &&
+                                      _loadedRoutine != null) ...[
+                                    const SizedBox(height: AppSpacing.s18),
+                                    _FieldLabel(
+                                      'PUBLICACIÓN',
+                                      palette,
+                                    ), // i18n
+                                    const SizedBox(
+                                      height: AppSpacing.hairline,
+                                    ),
+                                    Text(
+                                      'Definí si esta plantilla aparece en el '
+                                      'catálogo de la comunidad.', // i18n
+                                      style: GoogleFonts.barlow(
+                                        color: palette.textMuted,
+                                        fontSize: 12,
+                                        height: 1.35,
+                                      ),
+                                    ),
+                                    const SizedBox(height: AppSpacing.s8),
+                                    Builder(
+                                      builder: (context) {
+                                        final routine = _loadedRoutine!;
+                                        final isPublished =
+                                            routine.visibility ==
+                                                RoutineVisibility.public;
+                                        final count = routine.ratingsCount;
+                                        final hasRatings = isPublished &&
+                                            count != null &&
+                                            count > 0;
+                                        final disabled = _isDirty ||
+                                            _submitting ||
+                                            _publishing;
+                                        final ratingText = routine.ratingAvg
+                                                ?.toStringAsFixed(1)
+                                                .replaceAll('.', ',') ??
+                                            '0,0';
+
+                                        return Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Wrap(
+                                              spacing: AppSpacing.s8,
+                                              runSpacing: AppSpacing.s8,
+                                              crossAxisAlignment:
+                                                  WrapCrossAlignment.center,
+                                              children: [
+                                                Container(
+                                                  key: isPublished
+                                                      ? const Key(
+                                                          'routine_editor_published_badge',
+                                                        )
+                                                      : null,
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
+                                                    horizontal: AppSpacing.s8,
+                                                    vertical:
+                                                        AppSpacing.hairline,
+                                                  ),
+                                                  decoration: BoxDecoration(
+                                                    color: isPublished
+                                                        ? palette.accent
+                                                            .withValues(
+                                                            alpha: 0.14,
+                                                          )
+                                                        : palette.bgElevated,
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                      AppRadius.full,
+                                                    ),
+                                                    border: Border.all(
+                                                      color: isPublished
+                                                          ? palette.accent
+                                                          : palette.border,
+                                                    ),
+                                                  ),
+                                                  child: Row(
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
+                                                    children: [
+                                                      Icon(
+                                                        isPublished
+                                                            ? TreinoIcon.globe
+                                                            : TreinoIcon.eyeOff,
+                                                        size: 14,
+                                                        color: isPublished
+                                                            ? palette.accent
+                                                            : palette.textMuted,
+                                                      ),
+                                                      const SizedBox(
+                                                        width:
+                                                            AppSpacing.hairline,
+                                                      ),
+                                                      Text(
+                                                        isPublished
+                                                            ? 'PUBLICADA' // i18n
+                                                            : 'NO PUBLICADA', // i18n
+                                                        style: GoogleFonts
+                                                            .barlowCondensed(
+                                                          color: isPublished
+                                                              ? palette.accent
+                                                              : palette
+                                                                  .textMuted,
+                                                          fontSize: 12,
+                                                          fontWeight:
+                                                              FontWeight.w700,
+                                                          letterSpacing: 0.8,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                                TreinoButton(
+                                                  key: const Key(
+                                                    'routine_editor_publish_toggle',
+                                                  ),
+                                                  label: isPublished
+                                                      ? 'DESPUBLICAR' // i18n
+                                                      : 'PUBLICAR', // i18n
+                                                  icon: isPublished
+                                                      ? TreinoIcon.eyeOff
+                                                      : TreinoIcon.globe,
+                                                  variant: TreinoButtonVariant
+                                                      .secondaryAccent,
+                                                  // El flip es una escritura de
+                                                  // red: sin spinner el botón
+                                                  // sólo se apaga y no se
+                                                  // distingue de estar
+                                                  // deshabilitado por form
+                                                  // sucio.
+                                                  loading: _publishing,
+                                                  onPressed: disabled
+                                                      ? null
+                                                      : _onTogglePublished,
+                                                ),
+                                              ],
+                                            ),
+                                            if (_isDirty) ...[
+                                              const SizedBox(
+                                                height: AppSpacing.s8,
+                                              ),
+                                              Text(
+                                                isPublished
+                                                    ? 'Guardá los cambios '
+                                                        'antes de '
+                                                        'despublicar.' // i18n
+                                                    : 'Guardá los cambios '
+                                                        'antes de publicar.', // i18n
+                                                style: GoogleFonts.barlow(
+                                                  color: palette.warning,
+                                                  fontSize: 12,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ],
+                                            if (hasRatings) ...[
+                                              const SizedBox(
+                                                height: AppSpacing.s8,
+                                              ),
+                                              Row(
+                                                key: const Key(
+                                                  'routine_editor_rating_aggregate',
+                                                ),
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  StarRatingDisplay(
+                                                    rating: routine.ratingAvg,
+                                                    starSize: 14,
+                                                  ),
+                                                  const SizedBox(
+                                                    width: AppSpacing.s8,
+                                                  ),
+                                                  // Flexible + ellipsis: la
+                                                  // fila es informativa y en
+                                                  // una columna angosta tiene
+                                                  // que degradar, no
+                                                  // desbordar. Mismo criterio
+                                                  // que el badge PUBLICADA del
+                                                  // teléfono.
+                                                  Flexible(
+                                                    child: Text(
+                                                      '$ratingText · $count '
+                                                      '${count == 1 ? 'calificación' : 'calificaciones'}', // i18n
+                                                      maxLines: 1,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      style: GoogleFonts.barlow(
+                                                        color:
+                                                            palette.textMuted,
+                                                        fontSize: 12,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ],
+                                        );
+                                      },
+                                    ),
+                                  ],
                                   const SizedBox(height: 16),
                                   _FieldLabel('NIVEL', palette), // i18n
                                   const SizedBox(height: 8),
@@ -2014,11 +3102,18 @@ class _RoutineEditorWebScreenState
                                                 () => _selectedWeek = w),
                                           ),
                                         ),
-                                        // Nothing to copy from on week 1.
-                                        if (_selectedWeek > 0) ...[
+                                        // Cualquier semana puede RECIBIR una
+                                        // copia, no sólo las que tienen una
+                                        // anterior: con la fuente elegible, la
+                                        // Semana 1 puede tomar de la 3.
+                                        ...[
                                           const SizedBox(width: 8),
                                           _DuplicateWeekButton(
-                                            sourceWeek: _selectedWeek - 1,
+                                            // Con dos semanas la fuente es la
+                                            // otra y el botón puede nombrarla.
+                                            sourceWeek: _numWeeks == 2
+                                                ? 1 - _selectedWeek
+                                                : null,
                                             palette: palette,
                                             onPressed: _duplicateWeek,
                                           ),
@@ -2064,14 +3159,41 @@ class _RoutineEditorWebScreenState
                                       slotHasError: _slotHasError,
                                       slotErrorText: _slotErrorText,
                                       canRemove: _days.length > 1,
+                                      colapsado: _days[i].colapsado,
+                                      onToggleColapsado: () => setState(
+                                        () => _days[i].colapsado =
+                                            !_days[i].colapsado,
+                                      ),
                                       onNameChanged: (v) =>
                                           _onDayNameChanged(i, v),
                                       onRemove: () => _removeDay(i),
                                       onAddExercises: () =>
                                           _addExercisesToDay(i),
                                       onRemoveSlot: (s) => _onDeleteSlot(i, s),
-                                      onReplaceSlot: (s) =>
-                                          _replaceSlotExercise(i, s),
+                                      onToggleSlotExpanded: (s) => setState(
+                                        () => _days[i].slots[s].expandido =
+                                            !_days[i].slots[s].expandido,
+                                      ),
+                                      quickEntryAbierto: _quickEntryDia == i,
+                                      onAddSuperset: () => _addSupersetToDay(i),
+                                      panelPresente: rsp.viewportFor(
+                                            MediaQuery.sizeOf(context).width,
+                                          ) ==
+                                          rsp.Viewport.desktop,
+                                      onToggleQuickEntry: () => setState(() {
+                                        if (_quickEntryDia == i) {
+                                          _cerrarEntradaRapida();
+                                        } else {
+                                          // Abrir en otro día CIERRA el
+                                          // anterior: un solo panel a la vez.
+                                          _cerrarEntradaRapida();
+                                          _quickEntryDia = i;
+                                          _quickEntryFocus.requestFocus();
+                                        }
+                                      }),
+                                      quickEntryPanel: _quickEntryDia == i
+                                          ? _panelDeEntradaRapida(i)
+                                          : null,
                                       onMoveSlot: (s, dir) =>
                                           _moveSlot(i, s, dir),
                                       copyPreviousCallbackFor: (s) =>
@@ -2105,28 +3227,15 @@ class _RoutineEditorWebScreenState
                                     const SizedBox(height: 12),
                                   ],
                                   if (_days.length < _kMaxDays)
-                                    OutlinedButton.icon(
+                                    TreinoButton(
                                       key: const Key(
                                           'routine_editor_add_day_button'),
+                                      label: 'Agregar día', // i18n
+                                      icon: TreinoIcon.plus,
+                                      variant:
+                                          TreinoButtonVariant.secondaryAccent,
+                                      expand: true,
                                       onPressed: _addDay,
-                                      icon: Icon(
-                                        TreinoIcon.plus,
-                                        size: 18,
-                                        color: palette.accent,
-                                      ),
-                                      label: Text(
-                                        'Agregar día', // i18n
-                                        style: GoogleFonts.barlowCondensed(
-                                          color: palette.accent,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                      style: OutlinedButton.styleFrom(
-                                        side: BorderSide(color: palette.accent),
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 14,
-                                        ),
-                                      ),
                                     ),
                                 ],
                               ),
@@ -2145,44 +3254,80 @@ class _RoutineEditorWebScreenState
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  TextButton(
+                  TreinoButton(
+                    label: 'Cancelar', // i18n
+                    variant: TreinoButtonVariant.ghost,
                     onPressed: _submitting ? null : _onBackTap,
-                    child: Text(
-                      'Cancelar', // i18n
-                      style: GoogleFonts.barlow(color: palette.textMuted),
-                    ),
                   ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
+                  const SizedBox(width: AppSpacing.s8),
+                  // El label ya decía «Guardando…» mientras guardaba, así que
+                  // acá el spinner sobra: `loading` lo pondría ENCIMA del
+                  // texto y taparía la única información que el botón tenía.
+                  TreinoButton(
                     key: const Key('routine_editor_submit_button'),
+                    label: _submitting
+                        ? 'Guardando…'
+                        : _isEditing
+                            ? 'Guardar cambios'
+                            : 'Asignar rutina', // i18n
                     onPressed: _submitting ? null : _submit,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: palette.accent,
-                      foregroundColor: TreinoButtonTokens.foreground(context),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.full),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 14,
-                      ),
-                    ),
-                    child: Text(
-                      _submitting
-                          ? 'Guardando…'
-                          : _isEditing
-                              ? 'Guardar cambios'
-                              : 'Asignar rutina', // i18n
-                      style: GoogleFonts.barlowCondensed(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
                   ),
                 ],
               ),
             ),
         ],
       ),
+    );
+
+    // El panel lateral, sólo en desktop. No es un número nuevo: `>= 1280` es
+    // `Viewport.desktop` de `responsive.dart` (ADR-CHW-004). En `compact`
+    // (768-1279) el sidebar ya está forzado a colapsar, y meterle un panel de
+    // 400 px sería el mismo error que ese ADR decidió evitar — ahí sigue el
+    // modal, que es lo que el propio #860 propone.
+    if (rsp.viewportFor(MediaQuery.sizeOf(context).width) !=
+        rsp.Viewport.desktop) {
+      return arbol;
+    }
+    // El día puede haber desaparecido (se borró mientras el panel apuntaba a
+    // él): sin este clamp el panel leería un índice fuera de rango.
+    final dia = _pickerDia.clamp(0, _days.length - 1);
+
+    // `LayoutBuilder` y NO `MediaQuery`: acá adentro el viewport miente. El
+    // sidebar ya está descontado, y encima colapsa de 240 a 72 sin que el
+    // viewport cambie un píxel. El gate binario de «esto es desktop» de arriba
+    // sí sale de `MediaQuery` — ése es el número del ADR-CHW-004.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxAncho = maxAnchoPanelPicker(constraints.maxWidth);
+        // Se acota TAMBIÉN al dibujar: el ancho guardado puede venir de un
+        // monitor más grande, y ahí no entra. `ajustar` lo corrige en prefs la
+        // primera vez que se arrastra; esto lo hace ver bien mientras tanto.
+        final ancho = ref
+            .watch(pickerPanelWidthProvider)
+            .clamp(kAnchoPanelPickerMin, maxAncho);
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(child: arbol),
+            ExercisePickerPanel(
+              width: ancho,
+              // El asa vive en el borde IZQUIERDO del panel, así que arrastrar
+              // hacia la izquierda —dx negativo— lo ensancha.
+              onResize: (dx) => ref
+                  .read(pickerPanelWidthProvider.notifier)
+                  .ajustar(-dx, maxAncho: maxAncho),
+              dias: [for (final d in _days) d.name],
+              diaElegido: dia,
+              onElegirDia: (i) => setState(() => _pickerDia = i),
+              alreadySelectedIds: _idsPresentesEnLaSemana(dia),
+              onAgregar: (elegidos) => _agregarAlDia(dia, elegidos),
+              onAgregarEnSuperserie: (elegidos) =>
+                  _agregarSuperserieAlDia(dia, elegidos),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -2403,22 +3548,10 @@ class _FatalMessage extends StatelessWidget {
               style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 14),
             ),
             const SizedBox(height: 16),
-            OutlinedButton(
+            TreinoButton(
+              label: 'Volver', // i18n
+              variant: TreinoButtonVariant.secondary,
               onPressed: onBack,
-              style: OutlinedButton.styleFrom(
-                side: BorderSide(color: palette.border),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-              ),
-              child: Text(
-                'Volver', // i18n
-                style: GoogleFonts.barlowCondensed(
-                  color: palette.textPrimary,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
             ),
           ],
         ),
@@ -2583,11 +3716,18 @@ class _DayCard extends StatelessWidget {
     required this.slotHasError,
     required this.slotErrorText,
     required this.canRemove,
+    required this.colapsado,
+    required this.onToggleColapsado,
     required this.onNameChanged,
     required this.onRemove,
     required this.onAddExercises,
     required this.onRemoveSlot,
-    required this.onReplaceSlot,
+    required this.onToggleSlotExpanded,
+    required this.quickEntryAbierto,
+    required this.onToggleQuickEntry,
+    required this.onAddSuperset,
+    required this.panelPresente,
+    this.quickEntryPanel,
     required this.onMoveSlot,
     required this.copyPreviousCallbackFor,
     required this.onSetTypeChanged,
@@ -2626,10 +3766,38 @@ class _DayCard extends StatelessWidget {
   final String? Function(_EditorSlot slot) slotErrorText;
   final bool canRemove;
   final ValueChanged<String> onNameChanged;
+
+  /// Card del día cerrada — se ve el nombre y el resumen, nada más.
+  final bool colapsado;
+
+  /// Abre o cierra la card. El estado vive en `_EditorDay.colapsado`, arriba,
+  /// para que sobreviva a los rebuilds del formulario.
+  final VoidCallback onToggleColapsado;
+
   final VoidCallback onRemove;
   final VoidCallback onAddExercises;
   final void Function(int slotIndex) onRemoveSlot;
-  final void Function(int slotIndex) onReplaceSlot;
+
+  /// Abre o cierra la card del slot [slotIndex]. Sube hasta el `State` porque
+  /// la bandera vive en el modelo, no en el widget.
+  final void Function(int slotIndex) onToggleSlotExpanded;
+
+  /// Si ESTE día tiene el panel de entrada rápida abierto. Uno a la vez en toda
+  /// la pantalla: con los días apilados, dos paneles abiertos no dirían a cuál
+  /// pertenece lo que se escribe.
+  final bool quickEntryAbierto;
+  final VoidCallback onToggleQuickEntry;
+
+  /// Abre el picker y agrega los elegidos YA enlazados como superserie.
+  final VoidCallback onAddSuperset;
+
+  /// Si el panel lateral está en pantalla. Cuando está, este día no dibuja sus
+  /// botones de alta: el panel los reemplaza.
+  final bool panelPresente;
+
+  /// El panel ya construido, o null cuando este día lo tiene cerrado. Lo arma
+  /// el `State` porque el controller y el foco viven allá.
+  final Widget? quickEntryPanel;
   final void Function(int slotIndex, int dir) onMoveSlot;
 
   /// Per-slot "copiar sets del anterior" callback (#655), or null when the
@@ -2676,6 +3844,17 @@ class _DayCard extends StatelessWidget {
         children: [
           Row(
             children: [
+              TreinoIconButton(
+                key: Key('day_collapse_toggle_${day.dayNumber}'),
+                icon: colapsado
+                    ? TreinoIcon.chevronRight
+                    : TreinoIcon.chevronDown,
+                tooltip: colapsado
+                    ? 'Abrir el día' // i18n
+                    : 'Cerrar el día', // i18n
+                color: palette.textMuted,
+                onPressed: onToggleColapsado,
+              ),
               Expanded(
                 child: TextFormField(
                   initialValue: day.name,
@@ -2691,8 +3870,28 @@ class _DayCard extends StatelessWidget {
                   ),
                 ),
               ),
+              // Cerrado, el conteo es lo único que queda del contenido:
+              // sin él la card no se distingue de un día vacío.
+              if (colapsado)
+                Padding(
+                  padding: const EdgeInsets.only(right: AppSpacing.s8),
+                  child: Text(
+                    day.slots.length == 1
+                        ? '1 ejercicio' // i18n
+                        : '${day.slots.length} ejercicios', // i18n
+                    style: GoogleFonts.barlow(
+                      color: palette.textMuted,
+                      fontSize: AppTextSize.caption,
+                    ),
+                  ),
+                ),
+              // El punto de error se dibuja TAMBIÉN cerrado, a propósito: un
+              // día plegado con series sin completar sigue bloqueando el
+              // guardado, y si la card no lo dijera el PF buscaría el problema
+              // en otro lado.
               if (hasError)
                 Container(
+                  key: Key('day_error_dot_${day.dayNumber}'),
                   width: 8,
                   height: 8,
                   margin: const EdgeInsets.only(right: 8),
@@ -2702,72 +3901,188 @@ class _DayCard extends StatelessWidget {
                   ),
                 ),
               if (canRemove)
-                IconButton(
+                TreinoIconButton(
+                  icon: TreinoIcon.trash,
                   tooltip: 'Eliminar día', // i18n
-                  icon: Icon(
-                    TreinoIcon.trash,
-                    size: 18,
-                    color: palette.textMuted,
-                  ),
+                  color: palette.textMuted,
                   onPressed: onRemove,
                 ),
             ],
           ),
-          for (var i = 0; i < day.slots.length; i++) ...[
-            const SizedBox(height: 8),
-            _SlotCard(
-              slot: day.slots[i],
-              palette: palette,
-              selectedWeek: selectedWeek,
-              numWeeks: numWeeks,
-              hasError: slotHasError(day.slots[i]),
-              errorText: slotErrorText(day.slots[i]),
-              canMoveUp: i > 0,
-              canMoveDown: i < day.slots.length - 1,
-              canLink: i < day.slots.length - 1,
-              linkedToNext: day.slots[i].linkedToNext,
-              inSuperset:
-                  (i < day.slots.length - 1 && day.slots[i].linkedToNext) ||
-                      (i > 0 && day.slots[i - 1].linkedToNext),
-              onRemove: () => onRemoveSlot(i),
-              onReplace: () => onReplaceSlot(i),
-              onMoveUp: () => onMoveSlot(i, -1),
-              onMoveDown: () => onMoveSlot(i, 1),
-              onCopyPrevious: copyPreviousCallbackFor(i),
-              onRestChanged: (v) => onRestChanged(i, v),
-              onAddSet: () => onAddSet(i),
-              onRemoveSet: (set) => onRemoveSet(i, set),
-              onSetRepsChanged: (set, v) => onSetRepsChanged(i, set, v),
-              onSetRepsMinChanged: (set, v) => onSetRepsMinChanged(i, set, v),
-              onSetRepsMaxChanged: (set, v) => onSetRepsMaxChanged(i, set, v),
-              onSetDurationChanged: (set, v) => onSetDurationChanged(i, set, v),
-              onSetWeightChanged: (set, v) => onSetWeightChanged(i, set, v),
-              onSetTypeChanged: (set, t) => onSetTypeChanged(i, set, t),
-              onModeChanged: (em, rm) => onModeChanged(i, em, rm),
-              onNotesChanged: (v) => onNotesChanged(i, v),
-              onToggleLink: () => onToggleLink(i),
-              onTogglePresence: (w) => onTogglePresence(i, w),
-            ),
-          ],
-          const SizedBox(height: 10),
-          OutlinedButton.icon(
-            onPressed: onAddExercises,
-            icon: Icon(TreinoIcon.plus, size: 16, color: palette.accent),
-            label: Text(
-              'Agregar ejercicio', // i18n
-              style: GoogleFonts.barlowCondensed(
-                color: palette.accent,
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
+          if (!colapsado) ...[
+            // RÁPIDO: escribir `press de banca 4x10 55` en vez de abrir el
+            // modal, filtrar, elegir y completar cuatro campos. Es la pieza del
+            // editor mobile que más gana acá, porque en la web hay teclado real.
+            const SizedBox(height: AppSpacing.s8),
+            Align(
+              alignment: Alignment.centerLeft,
+              // Abierto vs cerrado se dice con la VARIANTE. Antes eran dos
+              // `color:` calculados a mano en el ícono y en el label, que es
+              // exactamente el patrón que se puede desincronizar.
+              child: TreinoButton(
+                label: 'RÁPIDO', // i18n
+                icon: TreinoIcon.specialty,
+                variant: quickEntryAbierto
+                    ? TreinoButtonVariant.ghostAccent
+                    : TreinoButtonVariant.ghost,
+                size: TreinoButtonSize.sm,
+                onPressed: onToggleQuickEntry,
               ),
             ),
-            style: OutlinedButton.styleFrom(
-              side: BorderSide(color: palette.border),
-              padding: const EdgeInsets.symmetric(vertical: 10),
-            ),
-          ),
+            if (quickEntryPanel != null) ...[
+              const SizedBox(height: AppSpacing.s8),
+              quickEntryPanel!,
+            ],
+            ..._filasDeSlots(),
+            // Un día sin ejercicios no dibujaba NADA entre el nombre y el botón:
+            // desde afuera no se distinguía de uno que no cargó todavía. El
+            // editor del teléfono ya tenía esta pieza.
+            if (day.slots.isEmpty) ...[
+              const SizedBox(height: AppSpacing.s12),
+              // Copy duplicado respecto de `routineEditorEmptyDayTitle/Body` a
+              // propósito: este archivo tiene PROHIBIDO llamar a `AppL10n`
+              // (constraint C-6, ver el header). Mismo criterio que `_goalLabel`
+              // más abajo — si cambia el copy, cambia en los DOS lados, hasta
+              // que el Coach Hub entre a la pasada de i18n.
+              const EmptyDayState(
+                title: 'DÍA VACÍO', // i18n
+                body: 'Agregá el primer ejercicio y ya queda listo para '
+                    'entrenar.', // i18n
+              ),
+            ],
+            const SizedBox(height: 10),
+            // El botón compartido, el mismo del teléfono. `supersetLabel` va en
+            // null a propósito: en la web una superserie se arma con el toggle
+            // "unir con el siguiente" de cada ejercicio, no con un botón de alta,
+            // y `DayActionButtons` con un solo label ocupa la fila entera.
+            // Los botones del día SÓLO abajo de 1280.
+            //
+            // En desktop el panel lateral está siempre abierto y es la
+            // superficie para cargar ejercicios: dos entradas para lo mismo, una
+            // al lado de la otra, es ruido. Y la de superserie sobra del todo —
+            // ahí la decisión se toma en el panel, donde se hace la selección.
+            //
+            // Abajo de 1280 NO hay panel, así que acá siguen: sin ellos no
+            // habría forma de agregar nada.
+            if (!panelPresente)
+              DayActionButtons(
+                exerciseLabel: 'Agregar ejercicio', // i18n
+                onAddExercise: onAddExercises,
+                supersetLabel: '+ Superserie', // i18n
+                onAddSuperset: onAddSuperset,
+              ),
+          ],
         ],
       ),
+    );
+  }
+
+  /// Agrupa los slots en corridas: un suelto es su propia fila; los enlazados
+  /// consecutivos comparten un [SupersetBlock].
+  ///
+  /// La corrida la define `linkedToNext`, igual que al guardar
+  /// (`supersetBlockIndices` del dominio ve slots CONTIGUOS con el mismo
+  /// grupo). Acá sólo se dibuja lo que ese modelo ya dice.
+  ///
+  /// Antes la web marcaba el grupo tiñendo el BORDE de cada slot, y el #869 ya
+  /// había medido que eso no se ve: 10 sobre 255 por canal contra la card.
+  /// Peor, al pasar la card a `ExerciseCard` ese borde desapareció y el grupo
+  /// quedó SIN marca — una regresión que compiló y pasó 3133 tests porque
+  /// ningún test cubría "los agrupados se ven agrupados".
+  List<Widget> _filasDeSlots() {
+    final filas = <Widget>[];
+    var i = 0;
+    while (i < day.slots.length) {
+      final desde = i;
+      var hasta = i;
+      while (hasta < day.slots.length - 1 && day.slots[hasta].linkedToNext) {
+        hasta++;
+      }
+      // Presencia (REQ-WPRES render): un slot sacado "solo de esta semana"
+      // sigue en el modelo pero NO se dibuja, igual que el editor del teléfono
+      // (`_slotsVisibles`). La corrida de superserie se arma sobre la lista
+      // CRUDA —la define `linkedToNext` entre contiguos y eso no depende de la
+      // semana— y recién después se filtra por presencia.
+      //
+      // Los índices que viajan en los callbacks siguen siendo los ORIGINALES
+      // de `day.slots`: borrar y mover tienen que apuntar al slot real, no al
+      // lugar que ocupó entre los que quedaron a la vista.
+      final visibles = [
+        for (var k = desde; k <= hasta; k++)
+          if (day.slots[k].isPresentInWeek(selectedWeek)) k,
+      ];
+      i = hasta + 1;
+      // Bloque entero ausente de la semana: no ocupa lugar, ni el separador.
+      if (visibles.isEmpty) continue;
+      filas.add(const SizedBox(height: 8));
+      // Una superserie a la que la semana le dejó UN miembro no es una
+      // superserie: va como card suelta, sin el envoltorio ni el badge A1.
+      if (visibles.length == 1) {
+        filas.add(_slotCard(visibles.first, null));
+      } else {
+        filas.add(SupersetBlock(
+          count: visibles.length,
+          children: [
+            for (var k = 0; k < visibles.length; k++) ...[
+              _slotCard(visibles[k], k),
+              if (k < visibles.length - 1)
+                const SizedBox(height: AppSpacing.s8),
+            ],
+          ],
+        ));
+      }
+    }
+    return filas;
+  }
+
+  /// Una card de slot. [posEnGrupo] alimenta el badge A1/A2 —cuenta sobre los
+  /// miembros VISIBLES, así un grupo al que la semana le ocultó el primero
+  /// numera A1/A2 y no A2/A3— y va en null cuando el ejercicio es suelto.
+  Widget _slotCard(int i, int? posEnGrupo) {
+    // Mover y unir se deciden sobre lo que se VE en la semana, no sobre el
+    // índice crudo: con slots ocultos delante o detrás, la card ofrecía
+    // "Subir" y "Unir con el siguiente" para no hacer nada. Con todo visible
+    // esto da exactamente lo mismo que el `i > 0` de antes.
+    final hayVisibleAntes =
+        day.slots.take(i).any((s) => s.isPresentInWeek(selectedWeek));
+    final hayVisibleDespues =
+        day.slots.skip(i + 1).any((s) => s.isPresentInWeek(selectedWeek));
+    // Unir engancha con el CONTIGUO: si ese está oculto, la superserie que
+    // saldría tendría un miembro invisible.
+    final siguienteVisible = i < day.slots.length - 1 &&
+        day.slots[i + 1].isPresentInWeek(selectedWeek);
+    return _SlotCard(
+      onToggleExpanded: () => onToggleSlotExpanded(i),
+      slot: day.slots[i],
+      palette: palette,
+      selectedWeek: selectedWeek,
+      numWeeks: numWeeks,
+      hasError: slotHasError(day.slots[i]),
+      errorText: slotErrorText(day.slots[i]),
+      canMoveUp: hayVisibleAntes,
+      canMoveDown: hayVisibleDespues,
+      canLink: siguienteVisible,
+      linkedToNext: day.slots[i].linkedToNext,
+      inSuperset: (i < day.slots.length - 1 && day.slots[i].linkedToNext) ||
+          (i > 0 && day.slots[i - 1].linkedToNext),
+      onRemove: () => onRemoveSlot(i),
+      onMoveUp: () => onMoveSlot(i, -1),
+      onMoveDown: () => onMoveSlot(i, 1),
+      onCopyPrevious: copyPreviousCallbackFor(i),
+      onRestChanged: (v) => onRestChanged(i, v),
+      onAddSet: () => onAddSet(i),
+      onRemoveSet: (set) => onRemoveSet(i, set),
+      onSetRepsChanged: (set, v) => onSetRepsChanged(i, set, v),
+      onSetRepsMinChanged: (set, v) => onSetRepsMinChanged(i, set, v),
+      onSetRepsMaxChanged: (set, v) => onSetRepsMaxChanged(i, set, v),
+      onSetDurationChanged: (set, v) => onSetDurationChanged(i, set, v),
+      onSetWeightChanged: (set, v) => onSetWeightChanged(i, set, v),
+      onSetTypeChanged: (set, t) => onSetTypeChanged(i, set, t),
+      onModeChanged: (em, rm) => onModeChanged(i, em, rm),
+      onNotesChanged: (v) => onNotesChanged(i, v),
+      onToggleLink: () => onToggleLink(i),
+      onTogglePresence: (w) => onTogglePresence(i, w),
+      supersetPosition: posEnGrupo,
     );
   }
 }
@@ -2776,6 +4091,8 @@ class _DayCard extends StatelessWidget {
 
 class _SlotCard extends StatelessWidget {
   const _SlotCard({
+    required this.onToggleExpanded,
+    this.supersetPosition,
     required this.slot,
     required this.palette,
     required this.selectedWeek,
@@ -2788,7 +4105,6 @@ class _SlotCard extends StatelessWidget {
     required this.linkedToNext,
     required this.inSuperset,
     required this.onRemove,
-    required this.onReplace,
     required this.onMoveUp,
     required this.onMoveDown,
     required this.onCopyPrevious,
@@ -2806,6 +4122,15 @@ class _SlotCard extends StatelessWidget {
     required this.onToggleLink,
     required this.onTogglePresence,
   });
+
+  /// Abre o cierra la card. El estado vive en `_EditorSlot.expandido` —o sea
+  /// en el MODELO— así que sobrevive a que Flutter recree el `State` de la
+  /// fila al moverse. En el editor mobile eso fue un bug real.
+  final VoidCallback onToggleExpanded;
+
+  /// Posición 0-based dentro de la superserie, o null si el ejercicio es
+  /// suelto. Es lo que pinta el badge A1/A2 y tiñe el agarre.
+  final int? supersetPosition;
 
   final _EditorSlot slot;
   final AppPalette palette;
@@ -2828,7 +4153,6 @@ class _SlotCard extends StatelessWidget {
   final bool linkedToNext;
   final bool inSuperset; // part of a >=2 superset run → accent border
   final VoidCallback onRemove;
-  final VoidCallback onReplace;
   final VoidCallback onMoveUp;
   final VoidCallback onMoveDown;
 
@@ -2856,90 +4180,90 @@ class _SlotCard extends StatelessWidget {
     // The sets for the currently-viewed week only — other weeks' rows aren't
     // rendered while a different tab is selected (Fase 4b).
     final weekSets = slot.weeklySets[selectedWeek];
-    final card = Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: palette.bg,
-        borderRadius: BorderRadius.circular(10),
-        // Slots in a superset run share an accent-tinted border to read as a
-        // group (the "link with next" toggle is what forms the run).
-        border: hasError
-            ? Border.all(
-                color: palette.danger.withValues(alpha: 0.75),
-                width: 1.5,
-              )
-            : inSuperset
-                ? Border.all(color: palette.accent.withValues(alpha: 0.55))
-                : null,
+    // Acá no hay caso "ausente de la semana": `_filasDeSlots` ya filtró por
+    // presencia, así que una card que llega hasta este build está SIEMPRE en
+    // la semana que se mira. Antes esta clase atenuaba (`Opacity`) y apagaba
+    // el mouse (dos `IgnorePointer`) para el slot ausente; eso existía porque
+    // la web no tenía forma de volver a agregarlo, y ahora la tiene desde
+    // «Agregar ejercicio».
+    // La cáscara la dibuja `ExerciseCard`, el MISMO widget que el editor del
+    // teléfono. Lo que eso trae acá y antes no había: la card se colapsa y,
+    // cerrada, muestra el resumen de la prescripción; y el borde se pinta de
+    // rojo **sólo cerrada** — abierta manda la celda del campo que falta, que
+    // es más precisa. Nunca las dos a la vez (ver el comentario de #868 en
+    // `exercise_card.dart`).
+    //
+    // NO se porta el agarre `::` ni el drag para unir/separar superseries:
+    // `reorderIndex` y `dragHandleKey` quedan en null y el agarre no se
+    // dibuja. Son gestos de pulgar; con mouse los chevrons y el ⋮ que esta
+    // pantalla ya tenía son más precisos, y siguen acá abajo.
+    final controles = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Always rendered so the shortcut is discoverable; disabled on
+        // the day's first exercise (no source to copy from).
+        // Cuatro controles de la MISMA fila que venían en 15/16/16/16 px
+        // de ícono, con `visualDensity: compact` restando 8 px por eje a
+        // una caja que nadie había fijado. Ahora los cuatro son la misma
+        // caja de 24, con aire entre medio.
+        TreinoIconButton(
+          icon: TreinoIcon.copy,
+          tooltip: 'Copiar sets del anterior', // i18n
+          color: palette.textMuted,
+          size: TreinoButtonSize.xs,
+          onPressed: onCopyPrevious,
+        ),
+        const SizedBox(width: AppSpacing.hairline),
+        TreinoIconButton(
+          icon: TreinoIcon.chevronUp,
+          tooltip: 'Subir', // i18n
+          color: palette.textMuted,
+          size: TreinoButtonSize.xs,
+          onPressed: canMoveUp ? onMoveUp : null,
+        ),
+        const SizedBox(width: AppSpacing.hairline),
+        TreinoIconButton(
+          icon: TreinoIcon.chevronDown,
+          tooltip: 'Bajar', // i18n
+          color: palette.textMuted,
+          size: TreinoButtonSize.xs,
+          onPressed: canMoveDown ? onMoveDown : null,
+        ),
+        const SizedBox(width: AppSpacing.hairline),
+        TreinoIconButton(
+          icon: TreinoIcon.trash,
+          tooltip: 'Quitar ejercicio', // i18n
+          color: palette.textMuted,
+          size: TreinoButtonSize.xs,
+          onPressed: onRemove,
+        ),
+      ],
+    );
+
+    final card = ExerciseCard(
+      title: exercise?.name ?? '—',
+      summary: PrescriptionChips(
+        prescription: resumenDePrescripcion(
+          modo: slot.exerciseMode,
+          sets: [
+            for (final set in weekSets)
+              (
+                reps: set.reps,
+                durationSeconds: set.durationSeconds,
+                weightKg: set.weightKg,
+              ),
+          ],
+          unidadDePeso: 'kg', // i18n
+        ),
       ),
+      expanded: slot.expandido,
+      onToggle: onToggleExpanded,
+      hasError: hasError,
+      supersetPosition: supersetPosition,
+      menu: controles,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: InkWell(
-                  onTap: onReplace,
-                  borderRadius: BorderRadius.circular(6),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Text(
-                      exercise?.name ?? '—',
-                      style: GoogleFonts.barlow(
-                        color: palette.textPrimary,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              IconButton(
-                tooltip: 'Cambiar ejercicio', // i18n
-                icon: Icon(TreinoIcon.edit, size: 15, color: palette.textMuted),
-                onPressed: onReplace,
-                visualDensity: VisualDensity.compact,
-              ),
-              // Always rendered so the shortcut is discoverable; disabled on
-              // the day's first exercise (no source to copy from).
-              IconButton(
-                tooltip: 'Copiar sets del anterior', // i18n
-                icon: Icon(TreinoIcon.copy, size: 15, color: palette.textMuted),
-                onPressed: onCopyPrevious,
-                visualDensity: VisualDensity.compact,
-              ),
-              IconButton(
-                tooltip: 'Subir', // i18n
-                icon: Icon(
-                  TreinoIcon.chevronUp,
-                  size: 16,
-                  color: palette.textMuted,
-                ),
-                onPressed: canMoveUp ? onMoveUp : null,
-                visualDensity: VisualDensity.compact,
-              ),
-              IconButton(
-                tooltip: 'Bajar', // i18n
-                icon: Icon(
-                  TreinoIcon.chevronDown,
-                  size: 16,
-                  color: palette.textMuted,
-                ),
-                onPressed: canMoveDown ? onMoveDown : null,
-                visualDensity: VisualDensity.compact,
-              ),
-              IconButton(
-                tooltip: 'Quitar ejercicio', // i18n
-                icon: Icon(
-                  TreinoIcon.trash,
-                  size: 16,
-                  color: palette.textMuted,
-                ),
-                onPressed: onRemove,
-                visualDensity: VisualDensity.compact,
-              ),
-            ],
-          ),
           if (errorText != null) ...[
             const SizedBox(height: 4),
             Text(
@@ -2947,36 +4271,49 @@ class _SlotCard extends StatelessWidget {
               style: GoogleFonts.barlow(color: palette.danger, fontSize: 12),
             ),
           ],
-          const SizedBox(height: 6),
-          // Modo del ejercicio: reps fijas / rango (mín–máx) / tiempo (paridad
-          // con mobile, Fases 1-2). exerciseMode + repMode combinados en 3 chips.
-          Row(
+          // ── Bloque EDITABLE de arriba ───────────────────────────────────
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _ModeChip(
-                label: 'Reps', // i18n
-                selected: slot.exerciseMode == ExerciseMode.reps &&
-                    slot.repMode == RepMode.single,
-                palette: palette,
-                onTap: () => onModeChanged(ExerciseMode.reps, RepMode.single),
-              ),
-              const SizedBox(width: 6),
-              _ModeChip(
-                label: 'Rango', // i18n
-                selected: slot.exerciseMode == ExerciseMode.reps &&
-                    slot.repMode == RepMode.range,
-                palette: palette,
-                onTap: () => onModeChanged(ExerciseMode.reps, RepMode.range),
-              ),
-              const SizedBox(width: 6),
-              _ModeChip(
-                label: 'Tiempo', // i18n
-                selected: slot.exerciseMode == ExerciseMode.duration,
-                palette: palette,
-                onTap: () =>
-                    onModeChanged(ExerciseMode.duration, RepMode.single),
+              const SizedBox(height: 6),
+              // Modo del ejercicio: reps fijas / rango (mín–máx) / tiempo (paridad
+              // con mobile, Fases 1-2). exerciseMode + repMode combinados en 3 chips.
+              Row(
+                children: [
+                  _ModeChip(
+                    label: 'Reps', // i18n
+                    selected: slot.exerciseMode == ExerciseMode.reps &&
+                        slot.repMode == RepMode.single,
+                    palette: palette,
+                    onTap: () =>
+                        onModeChanged(ExerciseMode.reps, RepMode.single),
+                  ),
+                  const SizedBox(width: 6),
+                  _ModeChip(
+                    label: 'Rango', // i18n
+                    selected: slot.exerciseMode == ExerciseMode.reps &&
+                        slot.repMode == RepMode.range,
+                    palette: palette,
+                    onTap: () =>
+                        onModeChanged(ExerciseMode.reps, RepMode.range),
+                  ),
+                  const SizedBox(width: 6),
+                  _ModeChip(
+                    label: 'Tiempo', // i18n
+                    selected: slot.exerciseMode == ExerciseMode.duration,
+                    palette: palette,
+                    onTap: () =>
+                        onModeChanged(ExerciseMode.duration, RepMode.single),
+                  ),
+                ],
               ),
             ],
           ),
+          // ── Chips de semanas ────────────────────────────────────────────
+          // Lo que la web puede y el teléfono no: prender o apagar CUALQUIER
+          // semana sin moverse de la que se está mirando. Apagar la semana en
+          // curso saca la card de la vista igual que «Solo esta semana», y
+          // avisa igual (mismo cartel, mismo Deshacer).
           const SizedBox(height: 6),
           // Presence mask (Fase 4c): which weeks this exercise is present in.
           // Only meaningful for multi-week plans.
@@ -3010,139 +4347,132 @@ class _SlotCard extends StatelessWidget {
             ),
             const SizedBox(height: 6),
           ],
-          Row(
+          // ── Bloque EDITABLE de abajo ────────────────────────────────────
+          // Descanso, series, notas y el link de superserie.
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                'Descanso (seg)', // i18n
-                style: GoogleFonts.barlow(
-                  color: palette.textMuted,
-                  fontSize: 12,
-                ),
-              ),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 60,
-                child: TextFormField(
-                  initialValue: slot.restSeconds.toString(),
-                  keyboardType: TextInputType.number,
-                  onChanged: onRestChanged,
-                  style: GoogleFonts.barlow(
-                    color: palette.textPrimary,
-                    fontSize: 13,
+              Row(
+                children: [
+                  Text(
+                    'Descanso (seg)', // i18n
+                    style: GoogleFonts.barlow(
+                      color: palette.textMuted,
+                      fontSize: 12,
+                    ),
                   ),
-                  decoration: const InputDecoration(isDense: true),
-                ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 60,
+                    child: TextFormField(
+                      initialValue: slot.restSeconds.toString(),
+                      keyboardType: TextInputType.number,
+                      onChanged: onRestChanged,
+                      style: GoogleFonts.barlow(
+                        color: palette.textPrimary,
+                        fontSize: 13,
+                      ),
+                      decoration: const InputDecoration(isDense: true),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          for (var i = 0; i < weekSets.length; i++)
-            _SetRow(
-              // Key by SET IDENTITY, not by position (#655).
-              //
-              // [_SetRow] is stateless, but its number fields are
-              // `TextFormField(initialValue: …)` — uncontrolled: each one seeds
-              // its controller ONCE, when its element is created, and ignores
-              // later `initialValue` changes. So the only way to make a field
-              // show a new model value is to give its row a key the framework
-              // can't match, forcing a fresh element.
-              //
-              // Every mutation that REPLACES set instances — "copiar sets del
-              // anterior", "Copiar Sem N acá", switching weeks, removing a row
-              // — hands us new [_EditorSet] objects, so an [ObjectKey] flips
-              // exactly then and only then. A positional key (`w0s1`) survives
-              // all of those and leaves the old text on screen while the model
-              // underneath already changed: the copy would look like a no-op
-              // and only surface on save.
-              //
-              // Typing does NOT replace the instance (the mutators write the
-              // fields in place), so the key holds and the focused field keeps
-              // its text and cursor.
-              key: ObjectKey(weekSets[i]),
-              index: i,
-              set: weekSets[i],
-              palette: palette,
-              exerciseMode: slot.exerciseMode,
-              repMode: slot.repMode,
-              showErrors: hasError,
-              canRemove: weekSets.length > 1,
-              onRemove: () => onRemoveSet(i),
-              onRepsChanged: (v) => onSetRepsChanged(i, v),
-              onRepsMinChanged: (v) => onSetRepsMinChanged(i, v),
-              onRepsMaxChanged: (v) => onSetRepsMaxChanged(i, v),
-              onDurationChanged: (v) => onSetDurationChanged(i, v),
-              onWeightChanged: (v) => onSetWeightChanged(i, v),
-              chipLabel: _setChipLabel(weekSets, i),
-              onTypeChanged: (t) => onSetTypeChanged(i, t),
-            ),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: onAddSet,
-              icon: Icon(TreinoIcon.plus, size: 14, color: palette.accent),
-              label: Text(
-                'Agregar set', // i18n
-                style: GoogleFonts.barlowCondensed(
-                  color: palette.accent,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 12,
+              const SizedBox(height: 4),
+              for (var i = 0; i < weekSets.length; i++)
+                _SetRow(
+                  // Key by SET IDENTITY, not by position (#655).
+                  //
+                  // [_SetRow] is stateless, but its number fields are
+                  // `TextFormField(initialValue: …)` — uncontrolled: each one seeds
+                  // its controller ONCE, when its element is created, and ignores
+                  // later `initialValue` changes. So the only way to make a field
+                  // show a new model value is to give its row a key the framework
+                  // can't match, forcing a fresh element.
+                  //
+                  // Every mutation that REPLACES set instances — "copiar sets del
+                  // anterior", "Copiar Sem N acá", switching weeks, removing a row
+                  // — hands us new [_EditorSet] objects, so an [ObjectKey] flips
+                  // exactly then and only then. A positional key (`w0s1`) survives
+                  // all of those and leaves the old text on screen while the model
+                  // underneath already changed: the copy would look like a no-op
+                  // and only surface on save.
+                  //
+                  // Typing does NOT replace the instance (the mutators write the
+                  // fields in place), so the key holds and the focused field keeps
+                  // its text and cursor.
+                  key: ObjectKey(weekSets[i]),
+                  index: i,
+                  set: weekSets[i],
+                  palette: palette,
+                  exerciseMode: slot.exerciseMode,
+                  repMode: slot.repMode,
+                  showErrors: hasError,
+                  canRemove: weekSets.length > 1,
+                  onRemove: () => onRemoveSet(i),
+                  onRepsChanged: (v) => onSetRepsChanged(i, v),
+                  onRepsMinChanged: (v) => onSetRepsMinChanged(i, v),
+                  onRepsMaxChanged: (v) => onSetRepsMaxChanged(i, v),
+                  onDurationChanged: (v) => onSetDurationChanged(i, v),
+                  onWeightChanged: (v) => onSetWeightChanged(i, v),
+                  chipLabel: _setChipLabel(weekSets, i),
+                  onTypeChanged: (t) => onSetTypeChanged(i, t),
                 ),
+              // `AddSetButton`, el MISMO del teléfono, en vez de un `TextButton`
+              // de 12 px con un ícono de 14. Acá era un texto chico pegado a la
+              // izquierda: se leía como un link, no como el botón que se toca una
+              // vez por serie. El compartido ocupa el ancho, tiene alto de acción
+              // y contorno punteado — y trae el rol de botón para lectores de
+              // pantalla, que el `TextButton` daba y un `InkWell` pelado pierde.
+              const SizedBox(height: AppSpacing.hairline),
+              AddSetButton(
+                label: 'Agregar set', // i18n
+                onPressed: onAddSet,
               ),
-            ),
-          ),
-          // Coaching note for this exercise (optional). Located in tests via
-          // its hint, not a Key — a Key would collide across slots.
-          TextFormField(
-            initialValue: slot.notes,
-            onChanged: onNotesChanged,
-            maxLength: 200,
-            minLines: 1,
-            maxLines: 3,
-            style: GoogleFonts.barlow(color: palette.textPrimary, fontSize: 13),
-            decoration: InputDecoration(
-              isDense: true,
-              hintText: 'Notas para el alumno (opcional)', // i18n
-              hintStyle: GoogleFonts.barlow(
-                color: palette.textMuted,
-                fontSize: 12,
-              ),
-              counterText: '',
-            ),
-          ),
-          // Superset link — only offered when there IS a next exercise to link
-          // to. A run of linked exercises becomes one superset block on save.
-          if (canLink)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: onToggleLink,
-                icon: Icon(
-                  linkedToNext ? TreinoIcon.check : TreinoIcon.plus,
-                  size: 14,
-                  color: linkedToNext ? palette.accent : palette.textMuted,
-                ),
-                label: Text(
-                  linkedToNext
-                      ? 'En superserie con el siguiente' // i18n
-                      : 'Superserie con el siguiente', // i18n
-                  style: GoogleFonts.barlowCondensed(
-                    color: linkedToNext ? palette.accent : palette.textMuted,
-                    fontWeight: FontWeight.w700,
+              // El botón y el campo de notas se tocaban: dos bordes pegados se
+              // leen como UN control partido, no como dos cosas distintas.
+              const SizedBox(height: AppSpacing.s12),
+              // Coaching note for this exercise (optional). Located in tests via
+              // its hint, not a Key — a Key would collide across slots.
+              TextFormField(
+                initialValue: slot.notes,
+                onChanged: onNotesChanged,
+                maxLength: 200,
+                minLines: 1,
+                maxLines: 3,
+                style: GoogleFonts.barlow(
+                    color: palette.textPrimary, fontSize: 13),
+                decoration: InputDecoration(
+                  isDense: true,
+                  hintText: 'Notas para el alumno (opcional)', // i18n
+                  hintStyle: GoogleFonts.barlow(
+                    color: palette.textMuted,
                     fontSize: 12,
                   ),
+                  counterText: '',
                 ),
               ),
-            ),
+              // Superset link — only offered when there IS a next exercise to link
+              // to. A run of linked exercises becomes one superset block on save.
+              if (canLink)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TreinoButton(
+                    label: linkedToNext
+                        ? 'En superserie con el siguiente' // i18n
+                        : 'Superserie con el siguiente', // i18n
+                    icon: linkedToNext ? TreinoIcon.check : TreinoIcon.plus,
+                    variant: linkedToNext
+                        ? TreinoButtonVariant.ghostAccent
+                        : TreinoButtonVariant.ghost,
+                    size: TreinoButtonSize.sm,
+                    onPressed: onToggleLink,
+                  ),
+                ),
+            ],
+          ),
         ],
       ),
     );
-    // Dim (not hide) an exercise absent from the currently-viewed week so the
-    // trainer still sees it and can re-add it via the presence chips above
-    // (Fase 4c). Opacity alone doesn't block hit-testing, so the chips stay
-    // tappable while dimmed.
-    if (numWeeks > 1 && !slot.isPresentInWeek(selectedWeek)) {
-      return Opacity(opacity: 0.45, child: card);
-    }
     return card;
   }
 }
@@ -3176,9 +4506,8 @@ class _SetTypeChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final typed = type != SetType.normal;
-    return PopupMenuButton<SetType>(
+    return TreinoPopupMenuButton<SetType>(
       tooltip: 'Tipo de serie', // i18n
-      color: palette.bgCard,
       padding: EdgeInsets.zero,
       initialValue: type,
       onSelected: onChanged,
@@ -3332,11 +4661,12 @@ class _SetRow extends StatelessWidget {
               ),
             ),
           ],
-          IconButton(
+          TreinoIconButton(
+            icon: TreinoIcon.close,
             tooltip: 'Quitar set', // i18n
-            icon: Icon(TreinoIcon.close, size: 14, color: palette.textMuted),
+            color: palette.textMuted,
+            size: TreinoButtonSize.xs,
             onPressed: canRemove ? onRemove : null,
-            visualDensity: VisualDensity.compact,
           ),
         ],
       ),
@@ -3429,28 +4759,25 @@ class _DuplicateWeekButton extends StatelessWidget {
     required this.onPressed,
   });
 
-  /// 0-based index of the week being copied FROM.
-  final int sourceWeek;
+  /// 0-based index of the week being copied FROM, cuando hay UNA sola posible
+  /// (plan de dos semanas). Con tres o más va en null: la fuente la elige el
+  /// PF en el selector, así que el botón no puede prometer cuál va a ser.
+  final int? sourceWeek;
   final AppPalette palette;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    return TextButton.icon(
+    final origen = sourceWeek;
+    return TreinoButton(
       key: const Key('duplicate_week_button'),
+      label: origen == null
+          ? 'Copiar otra semana acá' // i18n
+          : 'Copiar Sem ${origen + 1} acá', // i18n
+      icon: TreinoIcon.copy,
+      variant: TreinoButtonVariant.secondary,
+      size: TreinoButtonSize.sm,
       onPressed: onPressed,
-      icon: Icon(TreinoIcon.copy, size: 16, color: palette.textMuted),
-      label: Text(
-        'Copiar Sem ${sourceWeek + 1} acá', // i18n
-        style: GoogleFonts.barlow(color: palette.textMuted, fontSize: 13),
-      ),
-      style: TextButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-          side: BorderSide(color: palette.border),
-        ),
-      ),
     );
   }
 }
@@ -3611,4 +4938,17 @@ class _PresenceChip extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Qué hace «guardar» sobre una rutina que ya existe.
+///
+/// Es la metáfora de editar una foto en el teléfono, que fue como el PF pidió
+/// la función: o se guarda con los cambios, o se crea una copia con los cambios
+/// y la original queda en la galería.
+enum _ModoDeGuardado {
+  /// Pisa el documento actual. `updateTemplate` / `updateAssigned`.
+  pisar,
+
+  /// Crea una PLANTILLA nueva con los cambios y no toca el documento actual.
+  copia,
 }

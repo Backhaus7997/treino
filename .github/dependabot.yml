@@ -53,6 +53,16 @@ updates:
         patterns: ['*']
         update-types: [minor, patch]
 
+    # firebase-admin YA NO se ignora: `scripts/` está migrado a los subpaths
+    # modulares y corre contra la v14.
+    #
+    # Este bloque existió porque el bump a 14 se mergeó DOS veces (cac2d6fa y
+    # de77562a/#901) y las dos dejó los 44 scripts muertos. Lo que lo hacía
+    # invisible era que `scripts-test` no instalaba nada; eso lo arregló el
+    # #971, y `test/firebase_admin_superficie.test.js` es el trinquete que hoy
+    # carga el SDK de verdad. Con esa red puesta, un major de firebase-admin ya
+    # no necesita un `ignore` para ser seguro: necesita que el trinquete lo mire.
+
   # ---------------------------------------------------------------------------
   # Tests de reglas standalone (scripts/rules_test/). @firebase/rules-unit-testing
   # está en ^3 acá y en ^5 en functions/ — Dependabot va a proponer alinearlos.

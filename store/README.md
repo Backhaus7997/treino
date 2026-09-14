@@ -143,12 +143,29 @@ El mismo set en ambas stores y ambos idiomas, ordenado por lo que vende:
 
 ### 4.1 Levantar el emulador
 
-`firebase-tools` 15+ necesita **Java 21**. Si la máquina tiene 17, pinnear la
-versión 13 en vez de actualizar el JDK:
+`firebase-tools` 15+ necesita **Java 21**. El `java` del PATH de esta máquina
+es 17, pero el JDK 21 ya está instalado por Homebrew — apuntale `JAVA_HOME` en
+vez de tocar nada más:
 
 ```bash
-npx -y firebase-tools@13 emulators:start --only firestore,auth --project treino-dev
+JAVA_HOME=/opt/homebrew/opt/openjdk@21 PATH=/opt/homebrew/opt/openjdk@21/bin:$PATH firebase emulators:start --only firestore,auth --project treino-dev
 ```
+
+⚠️ **No pinnees `firebase-tools@13` para esquivar el JDK.** Acá abajo decía eso
+y el atajo tiene un costo que no se ve desde este archivo: el emulador que trae
+la 13 (`cloud-firestore-emulator v1.19.8`) hace que un `get()` sobre un
+documento **inexistente** tire `Service call error` en vez de devolver `null`,
+que es lo que hace producción y lo que hace la v1.21.0 de la 15. `firestore.rules`
+usa ese idiom a propósito para fallar abierto (`paywallEnforcedFor`,
+`rutinaEsPaga`), así que con la 13 la suite de reglas se pone **roja en cuatro
+tests sobre reglas que están perfectas**, y el mensaje que imprime es
+`PERMISSION_DENIED` — indistinguible de un agujero real. Pasó el 2026-09-10:
+alguien perdió una tarde buscando un bug inexistente. Detalle y el control
+negativo que lo aísla, en la cabecera de `scripts/test_rules.sh`.
+
+Para levantar el emulador y sembrar datos de demo la 13 alcanza, porque nada de
+eso evalúa reglas. Igual no vale la pena tener dos versiones dando vueltas: el
+`JAVA_HOME` de arriba es una línea.
 
 ### 4.2 Sembrar datos de demo
 

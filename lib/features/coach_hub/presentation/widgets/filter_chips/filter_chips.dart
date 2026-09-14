@@ -3,9 +3,9 @@ import 'package:flutter/widget_previews.dart';
 
 import '../../../../../app/theme/app_motion.dart';
 import '../../../../../app/theme/tokens/components/treino_chip_tokens.dart';
-import '../../../../../app/theme/tokens/components/treino_badge_tokens.dart';
 import '../../../../../app/theme/tokens/components/treino_focus_tokens.dart';
 import '../../../../../app/theme/tokens/primitives.dart';
+import '../../../../../core/widgets/treino_badge.dart';
 import '../preview_wrapper.dart';
 import '../treino_interactive_state.dart';
 
@@ -136,7 +136,6 @@ class _ChipItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = TreinoChipTokens.of(context);
-    final badgeTokens = TreinoBadgeTokens.of(context);
     final focusTokens = TreinoFocusTokens.of(context);
 
     return TreinoInteractiveState(
@@ -172,7 +171,14 @@ class _ChipItem extends StatelessWidget {
 
         return AnimatedContainer(
           key: Key('filter_chip_$label'),
-          duration: AppMotion.resolve(ctx, AppMotion.micro),
+          // EL HOVER NO ANIMA; el cambio de SELECCIÓN sí. Los seis chips están
+          // justo arriba de la tabla y el usuario los cruza cada vez que va del
+          // buscador a la lista: a 120 ms el barrido deja tres prendidos. Elegir
+          // uno, en cambio, pasa una vez y ahí el fundido dice que algo cambió.
+          // Mismo criterio que el item del sidebar en #1063.
+          duration: isSelected
+              ? AppMotion.resolve(ctx, AppMotion.micro)
+              : Duration.zero,
           curve: AppMotion.standard,
           decoration: BoxDecoration(
             color: bg,
@@ -196,36 +202,29 @@ class _ChipItem extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontFamily: AppFonts.barlow,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                  fontSize: 14,
-                  color: fg,
+              // Flexible + ellipsis: sin esto un label mas ancho que el
+              // constraint que baja desborda el Row y pinta la franja amarilla
+              // y negra. No se veia mientras todos los consumidores pusieron
+              // los chips en filas de ancho completo; la columna de filtros de
+              // Biblioteca (232 px) es la primera que aprieta. Donde hay lugar
+              // de sobra esto no cambia nada: un Flexible loose en un Row
+              // mainAxisSize.min le da al hijo su tamaño natural.
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: AppFonts.barlow,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                    fontSize: AppTextSize.body,
+                    color: fg,
+                  ),
                 ),
               ),
               if (badgeCount != null) ...[
                 const SizedBox(width: AppSpacing.hairline),
-                Container(
-                  width: TreinoBadgeTokens.size,
-                  height: TreinoBadgeTokens.size,
-                  decoration: BoxDecoration(
-                    color: badgeTokens.background,
-                    borderRadius:
-                        BorderRadius.circular(TreinoBadgeTokens.borderRadius),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    badgeCount!.toString(),
-                    style: TextStyle(
-                      fontFamily: AppFonts.barlow,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 10,
-                      color: badgeTokens.foreground,
-                    ),
-                  ),
-                ),
+                TreinoBadge(count: badgeCount!),
               ],
             ],
           ),
