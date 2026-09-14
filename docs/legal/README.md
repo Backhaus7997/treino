@@ -8,6 +8,8 @@ su reemplazo, y hay que portarlos ahí y publicarlos en `gettreino.com/legal/*`.
 
 | Documento | Qué es | Estado |
 |---|---|---|
+| **[ESTADO.md](./ESTADO.md)** | **Empezá por acá.** Todo el contexto, las decisiones tomadas y lo que falta, autocontenido | Vigente |
+|---|---|---|
 | [AUDITORIA-legal-vigente.md](./AUDITORIA-legal-vigente.md) | Contraste del texto vigente contra el código. 18 hallazgos | Leer primero |
 | [terminos-y-condiciones.md](./terminos-y-condiciones.md) | Reemplazo de `kTermsSections` | Borrador — 3 cláusulas esperan D2, D3, D4/D6 |
 | [terminos-suscripcion.md](./terminos-suscripcion.md) | Planes, cobro, arrepentimiento de 14 días y baja | Borrador |
