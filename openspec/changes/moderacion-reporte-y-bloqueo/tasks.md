@@ -46,6 +46,21 @@
 - [ ] Tests de widget por superficie
 - [ ] `npm --prefix functions run test:rules:emulator`
 
+## Revisión de Codex — arreglado después del primer push
+- [x] `notBlocked()` en `chatWriterOk` — el `update` del doc padre `chats/{chatId}`
+      dejaba escribir `lastMessageText` después del bloqueo
+- [x] `notBlocked()` en **update** de `reviews`, no sólo en el create — la reseña
+      anterior al bloqueo se podía seguir editando
+- [x] Long-press para reportar en `ChatImageBubble` y `ChatVideoBubble` — las dos
+      ramas de media retornaban antes del wrapper
+- [x] Tests negativos de los dos gates nuevos + el positivo de `lastRead`
+- [ ] **P2 — el doble reporte falla en vez de ser idempotente**: `reports` tiene
+      `allow update: if false` y el repo escribe con `.set()` sobre un id
+      determinístico. Ver design, `reports`
+- [ ] **P2 — la paginación del feed muere** si la primera página trae sólo autores
+      bloqueados: `_FeedContent.empty` deja `onLoadMore` en `null` con
+      `hasMore == true`. Mismo patrón en el feed de gym
+
 ## Anotado, no entra
 - [ ] **Bloqueos huérfanos al borrar cuenta** — la cascada borra por campo `athleteId`, y estos llevan los uids en el id
 - [ ] Vista de revisión de reportes para el equipo

@@ -128,8 +128,18 @@ reports/{targetKind}_{targetId}_{reporterUid}
 ```
 
 Mismo truco que `posts/{postId}/reactions/{reactorUid}`: **el uid del que escribe
-es parte del id**. Eso hace imposible falsificar el `reporterUid` de otro y hace
-idempotente el doble reporte, sin ningún contador.
+es parte del id**. Eso hace imposible falsificar el `reporterUid` de otro y
+colapsa el doble reporte en un solo documento, sin ningún contador.
+
+> ⚠️ **"Idempotente" era la palabra equivocada, y quedó escrita acá.** El id
+> determinístico evita el documento duplicado, pero `reports` tiene
+> `allow update, delete: if false` y `ReportRepository.report()` escribe con
+> `.set()`: sobre un doc que ya existe, Firestore evalúa eso como un `update` y
+> lo deniega. O sea que reportar dos veces al mismo target no es un no-op
+> silencioso, es un `PERMISSION_DENIED` y un snackbar de error — justo cuando
+> alguien reporta de nuevo para corregir el motivo o sumar detalle. Está
+> anotado en tasks como pendiente: o se permite un overwrite acotado, o el
+> repositorio trata "ya existe" como éxito.
 
 **El `read` está cerrado a todo cliente.** Los reportes se revisan por consola.
 Un denunciante que puede leer reportes ajenos es un canal de acoso nuevo.
@@ -142,3 +152,63 @@ Un denunciante que puede leer reportes ajenos es un canal de acoso nuevo.
 `blocks` y `reports` llevan los uids en el id compuesto, así que **no los
 alcanza**. Queda anotado en tasks: un bloqueo que sobrevive al borrado de cuenta
 de una de las partes es un documento huérfano.
+
+---
+
+## Lo que la primera pasada dejó abierto
+
+Tres huecos que encontró la revisión de Codex sobre el PR #1114, los tres
+confirmados contra el código antes de tocar nada. El patrón es el mismo en los
+dos primeros: la decisión de hacer cumplir el bloqueo **en la escritura** estaba
+bien, pero quedaron dos caminos de escritura sin cubrir.
+
+### El doc PADRE del chat no estaba gateado
+
+`notBlocked()` entró en `senderMayPost()`, que gobierna
+`chats/{id}/messages/create`. Pero el doc padre `chats/{chatId}` tiene su propia
+regla de `update`, y ahí el gate era `chatWriterOk()`, que devuelve `true`
+**incondicionalmente** para un chat con `linkId` o `kind == 'inquiry'`.
+
+El resultado: un cliente modificado no lograba crear el mensaje, pero sí
+escribir `lastMessageText`, `lastMessageSenderId` y `lastMessageAt` en el padre
+— que es exactamente el renglón con badge de no-leído que la otra persona ve en
+su lista de chats. Texto arbitrario, elegido por el bloqueado, en la pantalla
+del que bloqueó.
+
+Lo llamativo es que el comentario de REQ-FOLLOW-012, treinta líneas más abajo en
+el mismo archivo, ya describía este ataque palabra por palabra: *«el lado
+bloqueado no logra escribir el mensaje, pero sí `lastMessageText` […] "No te
+puede escribir" sería falso»*. La intención estaba escrita; el predicado que la
+implementaba no la cumplía.
+
+`notBlocked()` va **afuera** de la disyunción de `chatWriterOk()`, igual que en
+`senderMayPost()`: el bloqueo corta sin importar por qué rama se habilitaba la
+escritura. El disyunto de `lastRead` queda intacto y sigue sin pagar lecturas —
+el bloqueado tiene que poder marcar como leído o el badge se le clava para
+siempre (§3.3.4).
+
+### La reseña ya existente se podía seguir editando
+
+Misma forma. `notBlocked()` entró en `reviews allow create`, pero el id de la
+reseña es determinístico (`linkId_athleteId`) y `ReviewRepository.upsert()`
+reescribe el documento existente por el `allow update`, que no lo tenía.
+
+El caso abierto era el único que importa: quien **ya** había reseñado al PF
+antes del bloqueo podía seguir editándole el comentario público, reemplazándolo
+por lo que quisiera, con la misma visibilidad que la reseña original. Gatear
+sólo el `create` protege de la reseña nueva, que es el caso improbable.
+
+### Las fotos y los videos del chat no se podían reportar
+
+En `_Bubble.build`, las ramas de `MediaType.image` y `MediaType.video` retornan
+temprano, antes del wrapper de long-press que se agregó al final del método. El
+contenido de más riesgo del chat era el único sin forma de reportarse, que es lo
+primero que mira la Guideline 1.2.
+
+El long-press ahora entra **por parámetro** a cada burbuja en vez de envolverla
+desde afuera: `ChatImageBubble` ya maneja el tap con un `TreinoTappable`, cuyo
+dartdoc prohíbe expresamente ponerle un `GestureDetector` encima porque los dos
+recognizers competirían en el gesture arena. `TreinoTappable` ya tenía
+`onLongPress` como acción secundaria para este caso. `ChatVideoBubble`, que no
+registra ningún tap propio, sí lleva el `GestureDetector` adentro, envolviendo
+la Column entera para que el epígrafe también se pueda reportar.

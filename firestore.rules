@@ -107,11 +107,11 @@ service cloud.firestore {
     }
 
     // ── Bloqueo — notBlocked() (change `moderacion-reporte-y-bloqueo`) ───────
-    // A scope raíz, espejando `followAccepted()` de arriba: lo consumen cuatro
+    // A scope raíz, espejando `followAccepted()` de arriba: lo consumen cinco
     // bloques `match` que no se contienen entre sí (`posts/{id}/reactions`,
-    // `chats/{id}/messages`, `follows`, `reviews`). Duplicarlo sería el mismo
-    // riesgo que ya evita `followAccepted` — dos copias de un predicado de
-    // AUTORIZACIÓN que divergen en silencio.
+    // `chats/{chatId}`, `chats/{id}/messages`, `follows`, `reviews`).
+    // Duplicarlo sería el mismo riesgo que ya evita `followAccepted` — dos
+    // copias de un predicado de AUTORIZACIÓN que divergen en silencio.
     //
     // Chequea LAS DOS DIRECCIONES contra `blocks/{a}_{b}` y `blocks/{b}_{a}`.
     // El doc de bloqueo es de UNA vía (`blocks/{blockerUid}_{blockedUid}`),
@@ -128,8 +128,9 @@ service cloud.firestore {
     // error que casi cometo").
     //
     // Costo: 2 lecturas por llamada. Como sólo corre en escrituras (mensaje,
-    // reacción, follow, review) y no por cada post de cada scroll, es
-    // despreciable.
+    // preview del chat, reacción, follow, review) y no por cada post de cada
+    // scroll, es despreciable. El `update` de `chats/{chatId}` que sólo toca
+    // `lastRead` sigue sin pagarlas: corta antes, por el otro disyunto.
     function notBlocked(a, b) {
       return !exists(/databases/$(database)/documents/blocks/$(a + '_' + b))
           && !exists(/databases/$(database)/documents/blocks/$(b + '_' + a));
@@ -2183,14 +2184,31 @@ service cloud.firestore {
       // dos primeros términos ya no son payload sin validar: son hechos que
       // `chatCreateOk` verificó al crear el doc y que el `update` de abajo
       // tiene pineados. Es una disyunción de hechos confiables, no una
-      // validación. Costo de un chat de consulta: 0 llamadas, igual que Coach.
+      // validación. Costo: 2 llamadas (las de `notBlocked`) para un chat de
+      // Coach o de consulta, 4 para uno social, que además paga
+      // `followAccepted`.
+      //
+      // `notBlocked()` va AFUERA de la disyunción, igual que en
+      // `senderMayPost()` de `messages`: un bloqueo corta la escritura sin
+      // importar POR QUÉ rama se habilitaba (Coach, consulta o follow).
+      //
+      // Adentro NO alcanza, y era el agujero: las dos primeras ramas devuelven
+      // true INCONDICIONALMENTE para un chat con `linkId` o `kind == 'inquiry'`,
+      // así que el bloqueado no lograba escribir el mensaje —ese gate sí tenía
+      // `notBlocked`— pero sí `lastMessageText` en el doc padre, que es el
+      // texto que la otra persona ve en su lista de chats, con badge de
+      // no-leído. O sea, exactamente el "«No te puede escribir» sería falso"
+      // que REQ-FOLLOW-012 escribe treinta líneas más abajo.
       function chatWriterOk(uid) {
         let other = resource.data.members[0] == uid
           ? resource.data.members[1]
           : resource.data.members[0];
-        return 'linkId' in resource.data
-            || resource.data.get('kind', '') == 'inquiry'
-            || followAccepted(other, uid);
+        return notBlocked(uid, other)
+            && (
+                 'linkId' in resource.data
+                 || resource.data.get('kind', '') == 'inquiry'
+                 || followAccepted(other, uid)
+               );
       }
 
       // ⚠️  QA-SEC-010 — el disyunto `resource == null` está ACOTADO al par que
@@ -4146,6 +4164,16 @@ service cloud.firestore {
 
       allow update: if request.auth != null
                     && request.auth.uid == resource.data.athleteId
+                    // notBlocked() TAMBIÉN acá, no sólo en el `create` (change
+                    // `moderacion-reporte-y-bloqueo`). La reseña tiene id
+                    // determinístico y `ReviewRepository.upsert()` escribe el
+                    // doc ya existente por ESTA rama, así que gatear sólo el
+                    // create dejaba abierto el caso que importa: quien ya había
+                    // reseñado al PF antes del bloqueo podía seguir editándole
+                    // el comentario público —reemplazarlo por acoso— con la
+                    // misma visibilidad que la reseña original. El bloqueo tiene
+                    // que cortar la edición igual que corta la reseña nueva.
+                    && notBlocked(request.auth.uid, resource.data.trainerId)
                     && request.resource.data.keys().hasOnly(
                         ['id', 'linkId', 'athleteId', 'trainerId',
                          'rating', 'comment', 'createdAt', 'updatedAt'])

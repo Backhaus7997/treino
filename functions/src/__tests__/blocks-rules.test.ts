@@ -1,7 +1,7 @@
 /**
  * Tests de enforcement real de las rules de `blocks/{blockId}` y del efecto
  * cruzado de `notBlocked()` en las otras colecciones que lo consumen
- * (mensajes, reacciones, follows, reviews).
+ * (mensajes, preview del chat, reacciones, follows, reviews).
  *
  * Mismo criterio que `follows-rules.test.ts`: `@firebase/rules-unit-testing`
  * con `firestore.rules` REAL cargado y APLICADO, no el Admin SDK.
@@ -357,6 +357,142 @@ describe("blocks — notBlocked() corta la escritura en otras colecciones", () =
           members: ["dave", "carol"],
           createdAt: AT,
         }),
+    );
+  });
+
+  // ── preview del chat (doc padre) ──────────────────────────────────────────
+  //
+  // El gate de `messages/create` no alcanza solo: el doc PADRE tiene su propia
+  // regla de update y por ahí se escribe `lastMessageText`, que es el texto que
+  // la otra persona ve en su lista de chats, con badge de no-leído. Un cliente
+  // modificado que no logra crear el mensaje igual podía plantar texto ahí.
+  // Estos tres casos son los que distinguen "no te puede escribir" de "no te
+  // puede escribir el mensaje, pero sí el renglón que vos leés".
+  it("el bloqueado no actualiza el preview del chat (lastMessageText)", async () => {
+    await seedBlock("alice", "bob");
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection("chats").doc("alice_bob").set({
+        members: ["alice", "bob"],
+        kind: "inquiry",
+        createdAt: AT,
+        lastMessageText: "hola",
+        lastMessageSenderId: "alice",
+        lastMessageAt: AT,
+      });
+    });
+
+    await assertFails(
+      asUser("bob").collection("chats").doc("alice_bob").update({
+        lastMessageText: "te sigo escribiendo igual",
+        lastMessageSenderId: "bob",
+        lastMessageAt: AT,
+      }),
+    );
+  });
+
+  it("control: sin bloqueo, el mismo update del preview pasa", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection("chats").doc("carol_dave").set({
+        members: ["carol", "dave"],
+        kind: "inquiry",
+        createdAt: AT,
+        lastMessageText: "hola",
+        lastMessageSenderId: "carol",
+        lastMessageAt: AT,
+      });
+    });
+
+    await assertSucceeds(
+      asUser("dave").collection("chats").doc("carol_dave").update({
+        lastMessageText: "te contesto",
+        lastMessageSenderId: "dave",
+        lastMessageAt: AT,
+      }),
+    );
+  });
+
+  // El otro lado de la misma regla, y la razón por la que `notBlocked()` no va
+  // al principio del `allow update`: el bloqueado tiene que poder seguir
+  // marcando como leído o el badge de no-leídos se le clava para siempre
+  // (design §3.3.4). Ese disyunto corta antes y ni siquiera paga las lecturas.
+  it("el bloqueado SÍ puede seguir marcando lastRead", async () => {
+    await seedBlock("alice", "bob");
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection("chats").doc("alice_bob").set({
+        members: ["alice", "bob"],
+        kind: "inquiry",
+        createdAt: AT,
+        lastMessageText: "hola",
+        lastMessageSenderId: "alice",
+        lastMessageAt: AT,
+        lastRead: {},
+      });
+    });
+
+    await assertSucceeds(
+      asUser("bob")
+        .collection("chats")
+        .doc("alice_bob")
+        .update({ lastRead: { bob: AT } }),
+    );
+  });
+
+  // ── reseñas ya existentes ─────────────────────────────────────────────────
+  //
+  // El id de la reseña es determinístico (`linkId_athleteId`) y
+  // `ReviewRepository.upsert()` reescribe el doc que ya está, o sea por el
+  // `allow update`. Gatear sólo el `create` dejaba abierto el único caso que
+  // importa: la reseña que ya existía ANTES del bloqueo.
+  it("el bloqueado no edita la reseña que ya había dejado", async () => {
+    await seedBlock("alice", "bob");
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection("trainer_links").doc("link3").set({
+        athleteId: "bob",
+        trainerId: "alice",
+        status: "active",
+      });
+      await ctx.firestore().collection("reviews").doc("link3_bob").set({
+        id: "link3_bob",
+        linkId: "link3",
+        athleteId: "bob",
+        trainerId: "alice",
+        rating: 5,
+        comment: "muy bueno",
+        createdAt: AT,
+      });
+    });
+
+    await assertFails(
+      asUser("bob")
+        .collection("reviews")
+        .doc("link3_bob")
+        .update({ comment: "texto de acoso", updatedAt: AT }),
+    );
+  });
+
+  it("control: sin bloqueo, la misma edición de reseña pasa", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().collection("trainer_links").doc("link4").set({
+        athleteId: "dave",
+        trainerId: "carol",
+        status: "active",
+      });
+      await ctx.firestore().collection("reviews").doc("link4_dave").set({
+        id: "link4_dave",
+        linkId: "link4",
+        athleteId: "dave",
+        trainerId: "carol",
+        rating: 5,
+        comment: "muy bueno",
+        createdAt: AT,
+      });
+    });
+
+    await assertSucceeds(
+      asUser("dave")
+        .collection("reviews")
+        .doc("link4_dave")
+        .update({ comment: "lo corrijo", updatedAt: AT }),
     );
   });
 
