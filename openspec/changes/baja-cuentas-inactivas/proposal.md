@@ -255,7 +255,7 @@ no después.
 ## 10. Precondiciones para arrancar
 
 - [x] #1114 mergeado
-- [ ] #1115 mergeado, para que la rama salga de un main que ya tenga el texto
+- [x] #1115 mergeado, para que la rama salga de un main que ya tenga el texto
       nuevo de §6 y no haya que resolver el mismo conflicto dos veces
 - Rama: `feat/baja-cuentas-inactivas`, desde main
 - Anotarse en el ledger antes de empezar (`./scripts/agent-ledger.sh claim`)

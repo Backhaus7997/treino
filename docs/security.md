@@ -60,7 +60,7 @@ porque son permisos distintos: `get` protege un documento, `list` protege la
 enumeración, y una regla puede tapar uno y dejar el otro abierto). En Storage
 son `get` / `list` / `write` / `delete`.
 
-### 1.1 Firestore — 38 paths declarados en `firestore.rules`
+### 1.1 Firestore — 39 paths declarados en `firestore.rules`
 
 | Colección | get | list | create | update | delete |
 |---|---|---|---|---|---|
@@ -100,18 +100,19 @@ son `get` / `list` / `write` / `delete`.
 | `payments` | ✅ | ✅ | 🟡 | ✅ | ✅ |
 | `reviews` | — | — | ✅ | — | — |
 | `mail_queue` | — | — | — | — | — |
+| `retention_notices` | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `blocks` | ✅ | — | ✅ | ✅ | ✅ |
 | `reports` | ✅ | — | ✅ | ✅ | ✅ |
 
-**120 de 190 celdas** tienen test negativo (63%). Por operación:
+**125 de 195 celdas** tienen test negativo (64%). Por operación:
 
 | Operación | Paths con test negativo |
 |---|---|
-| `get` | 25 / 38 |
-| `list` | 17 / 38 |
-| `create` | 34 / 38 |
-| `update` | 28 / 38 |
-| `delete` | 16 / 38 |
+| `get` | 26 / 39 |
+| `list` | 18 / 39 |
+| `create` | 35 / 39 |
+| `update` | 29 / 39 |
+| `delete` | 17 / 39 |
 
 Tres paths siguen **sin una sola aserción negativa**:
 `users/{uid}/customExercises`, `exercises`, `mail_queue`.
@@ -522,9 +523,9 @@ sección en el mismo PR.** Concretamente:
    existe. Un conteo no distingue ninguna de las dos.
 
    Y las cinco exclusiones van **nombradas** en `EXCL`, no deducidas por ser
-   `if false`: **`mail_queue` también es `if false` y sí tiene fila**, con las
-   cinco celdas en `—`. "Cerrado a todo cliente" no es el criterio que separa
-   las dos listas, así que deducirlas deja pasar una fila de menos.
+   `if false`: **`mail_queue` y `retention_notices` también son `if false` y sí
+   tienen fila**. "Cerrado a todo cliente" no es el criterio que separa las dos
+   listas, así que deducirlas deja pasar DOS filas de menos.
 5. Los tests de reglas se corren con:
 
    ```bash
@@ -626,24 +627,31 @@ que el borrado de cuenta se lleva todo eso, y que la política dice la verdad.
 **Método.** Nada acá sale de memoria ni de suposición:
 
 1. El universo de stores se enumeró con `rg '^\s*match /' firestore.rules` →
-   **44 líneas**, que son **43 colecciones** una vez descontado el wrapper
+   **45 líneas**, que son **44 colecciones** una vez descontado el wrapper
    `match /databases/{database}/documents`.
 
-   Ese 43 **no es** el número de §1.1, y conviene dejar escrito por qué, porque
-   la cifra ya derivó una vez por no estarlo: §1.1 declara **38 paths** y las
+   Ese 44 **no es** el número de §1.1, y conviene dejar escrito por qué, porque
+   la cifra ya derivó una vez por no estarlo: §1.1 declara **39 paths** y las
    **5** que faltan son `mp_checkouts`, `mp_plans`, `mp_preapprovals`,
    `mp_webhook_events` y `rc_webhook_events`. Las cinco son `allow read, write:
    if false` — bloques **documentales**, escritos sólo por el Admin SDK, que
    existen para que el default-deny quede explícito en el archivo. No ejercitan
    ningún permiso de cliente y por eso no aportan celdas a aquella matriz
    (`mp-collections-rules.test.ts` sí las testea: verifica justamente que estén
-   cerradas). **43 = 38 + 5.**
+   cerradas). **44 = 39 + 5.**
 
-   ⚠️ `if false` **no** es el criterio, aunque lo parezca: `mail_queue` es
-   igual de CF-only, igual de `if false`, y **sí** ocupa fila en §1.1 con las
-   cinco celdas en `—`. Las dos formas de tratar un bloque cerrado conviven acá
+   ⚠️ `if false` **no** es el criterio, aunque lo parezca: `mail_queue` y
+   `retention_notices` son igual de CF-only, igual de `if false`, y **sí**
+   ocupan fila en §1.1. Las dos formas de tratar un bloque cerrado conviven acá
    y ninguna está escrita como decisión. Si alguna vez se unifica, mueve el
-   total de §1.1 —una fila de menos, o cinco de más— y no es cosmético.
+   total de §1.1 —dos filas de menos, o cinco de más— y no es cosmético.
+
+   Y las dos filas que sí están **no son equivalentes entre sí**, que es la
+   parte que importa: `mail_queue` tiene las cinco celdas en `—` porque nunca
+   se le escribió un test negativo; `retention_notices` las tiene en ✅ porque
+   `retention-notices-rules.test.ts` prueba las cinco. Estar cerrada y estar
+   PROBADA que está cerrada son cosas distintas, y en una unión permisiva la
+   segunda es la única que protege.
 
    Más `audit_log/{uid}`, que **no tiene bloque `match`** —lo escribe sólo el
    Admin SDK y por default-deny ningún cliente lo alcanza— y por eso no aparece
@@ -676,7 +684,7 @@ Leyenda de la columna **De quién**:
 | 🫱 | Dato **sobre el usuario, escrito por un tercero** (típicamente su PF) |
 | 🔗 | Dato **del usuario que vive dentro del documento de otra persona** (denormalización) |
 
-#### 2.1.1 Firestore — 35 stores (34 con `match` + `audit_log`)
+#### 2.1.1 Firestore — 36 stores (35 con `match` + `audit_log`)
 
 | # | Path | Datos personales que contiene | De quién | Quién lo lee |
 |---|---|---|---|---|
@@ -715,8 +723,9 @@ Leyenda de la columna **De quién**:
 | 33 | `reviews/{id}` | `athleteId`, `trainerId`, `rating`, `comment` (≤500 chars, texto libre del alumno) | 👤 | **Cualquier autenticado** |
 | 34 | `mail_queue/{id}` | `toUid`, `kind`, `params{}` (parámetros de plantilla: montos, nombres), `status` | 👤 | Nadie (`read, write: if false`; sólo Admin SDK) |
 | 35 | `audit_log/{uid}` | `uid`, `provider` (método de login), `startedAt`, `completedAt`, `deletedCollections[]`, `errors[]` | 👤 | Nadie (sin bloque `match` → default deny) |
+| 36 | `retention_notices/{uid}` | `noticeSentAt`, `lastSeenAt` (última actividad al momento del aviso), `deletedAt` — el registro de la baja automática por inactividad | 👤 | Nadie (`read, write: if false`; sólo Admin SDK) |
 
-**34 de los 35 stores contienen datos personales.** El único que no es
+**35 de los 36 stores contienen datos personales.** El único que no es
 `exercises` (catálogo global, sin autor). `gyms` está al borde: lo único
 personal que guarda es el uid del PF que lo dio de alta.
 
@@ -796,6 +805,7 @@ uno en su `try/catch`, y borra el usuario de Auth al final. Esto es lo que cada
 | 33 | `reviews` | ⚪ retención deliberada | **Pero el alcance escrito no coincide con el código** → §2.3.2 |
 | 34 | `mail_queue` | ❌ **hueco** | Sin paso, sin TTL → QA-CMP-010 |
 | 35 | `audit_log/{uid}` | ⚪ retención deliberada | Sin período de retención definido |
+| 36 | `retention_notices/{uid}` | ✅ | `deleteUserDocs` (doc id = uid, paso 4 del módulo). Es el molde huérfano de `blocks`/`reports` —id, no campo—, así que se borra **nombrándolo**: ninguna query `where athleteId ==` lo alcanza |
 | S1 | `avatars/` | ✅ | `deleteAvatar` (cualquier extensión, QA-CMP-002) |
 | S2 | `temp/uploads/{uid}/` | ✅ | `deleteAthleteStorage` |
 | S3 | `customExerciseVideos/{uid}/` | ✅ | `deleteAthleteStorage` |
@@ -806,18 +816,18 @@ uno en su `try/catch`, y borra el usuario de Auth al final. Esto es lo que cada
 
 #### 2.2.2 El número
 
-De los **40 ítems** del inventario (34 Firestore con PII + 6 Storage), midiendo
+De los **41 ítems** del inventario (35 Firestore con PII + 6 Storage), midiendo
 sobre el borrado de una cuenta **athlete**:
 
 | Estado | Ítems | Cuáles |
 |---|---|---|
-| ✅ Cubierto | **25** | 1, 4, 7, 9, 10, 13, 16-21, 25-31 + S1-S6 |
+| ✅ Cubierto | **26** | 1, 4, 7, 9, 10, 13, 16-21, 25-31, 36 + S1-S6 |
 | 🟡 Parcial (queda PII recuperable) | **4** | 2, 6, 8, 24 |
 | ⚪ Retenido a propósito, con decisión escrita en el código | **5** | 14, 15, 32, 33, 35 |
 | ❌ Hueco sin decisión escrita | **3** | 5, 12, 34 |
 | n/a para una cuenta athlete (PII de un PF) | **3** | 11, 22, 23 |
 
-**Titular: 6 de 40 ítems dejan datos personales recuperables sin que exista
+**Titular: 6 de 41 ítems dejan datos personales recuperables sin que exista
 ninguna decisión escrita que lo justifique** (los 3 huecos + los 3 parciales sin
 decisión escrita: `posts/*/reactions` en posts ajenos, `appointments` y
 `notifications`). El parcial restante, `trainer_links`, sí tiene decisión
@@ -1167,22 +1177,38 @@ existe, y la §7 de la política no la excluye.
 
 ### 2.5 Retención
 
-No hay ninguna política de retención implementada en el repo. Ni un TTL de
-Firestore configurado, ni un job programado de limpieza (el único `onSchedule`
-es `sweepEntitlements`, que es de suscripciones, no de retención).
+Hay **una** política de retención implementada, y todavía **no está
+ejerciendo**: `sweepInactiveAccounts`
+(`functions/src/retention/sweep-inactive-accounts.ts`) avisa por correo a los 24
+meses de inactividad y da de baja la cuenta a los 36, con la cascada completa de
+`deleteAccount`. Se despliega con `RETENTION_SWEEP_DRY_RUN = true`: cuenta,
+lista y loguea, y no escribe nada.
+
+Ese matiz no es prolijidad. La señal de actividad sale de los metadatos de
+Firebase Auth, que ya tienen historia, así que la primera corrida ve de una todo
+el backlog de cuentas que ya pasaron los 24 meses. Mientras el interruptor esté
+en `true`, **la columna "de hecho hoy" de la tabla de abajo no cambia para nadie**
+— y decir que la retención ya corre sería exactamente la advertencia falsa del
+§11.1 de `AGENTS.md`, del lado que tranquiliza.
+
+Fuera de esa, no hay ninguna otra: ni un TTL de Firestore configurado, ni un job
+de limpieza para el resto de las filas.
 
 | Dato | Retención de hecho hoy | Retención declarada |
 |---|---|---|
 | Todo lo del §1 mientras la cuenta vive | Indefinida | "mientras mantengas tu cuenta" (§6) |
+| Cuenta inactiva | Indefinida **hasta que se apague el `dryRun`**; después, 36 meses | 36 meses, `docs/legal/retencion-y-borrado.md` §6 (marcador puesto) |
 | `payments` post-borrado | Indefinida | No declarada |
 | `reviews` (con `comment`) post-borrado | Indefinida | No declarada |
 | `chats` / `messages` post-borrado | Indefinida | No declarada |
 | `audit_log/{uid}` | Indefinida | No declarada |
 | `users/*/notifications` | Indefinida — TODO abierto | No declarada |
 | `mail_queue` | Indefinida | No declarada |
+| `retention_notices/{uid}` | Hasta la baja de la cuenta (se va en el cascade) | No declarada |
 
 Definir plazos es una decisión de producto y legal, no de ingeniería, así que
-este documento no propone números. Sí deja anotado que **hoy no hay ninguno**.
+este documento no propone números. Los 24/36 meses de la primera fila no los
+propuso: los decidió el titular el 2026-09-14 y este documento los registra.
 
 ---
 

@@ -142,11 +142,35 @@ recuperar una cuenta eliminada.
 
 ## 6. Cuentas inactivas
 
-[[PENDIENTE — IMPLEMENTACIÓN, no decisión. El plazo está resuelto y es el que
-dice esta sección; lo que falta es el proceso que lo ejecute. El marcador
-bloquea la publicación A PROPÓSITO: hasta que exista, el texto de abajo promete
-una baja automática que no ocurre, y una cláusula que promete lo que el sistema
-no hace es peor que no tenerla. Se saca cuando el proceso esté corriendo.]]
+[[PENDIENTE — ENCENDER EL BARRIDO. El plazo está resuelto y el proceso ya
+existe: `sweepInactiveAccounts`, en
+`functions/src/retention/sweep-inactive-accounts.ts`. Lo que falta es que
+ejerza. Se despliega con `RETENTION_SWEEP_DRY_RUN = true`, o sea que cuenta,
+lista y loguea, y no manda un solo mail ni borra una sola cuenta.
+
+Ese modo no es prudencia genérica. La señal de actividad sale de los metadatos
+de Firebase Auth, que YA TIENEN HISTORIA, así que la primera corrida ve de una
+todas las cuentas que hoy superan los 24 meses. Encenderlo sin leer ese número
+antes es mandar ese número de mails de golpe.
+
+El marcador bloquea la publicación A PROPÓSITO, y sigue bloqueándola por el
+mismo motivo de siempre: mientras el barrido no ejerza, el texto de abajo
+promete una baja automática que no ocurre, y una cláusula que promete lo que el
+sistema no hace es peor que no tenerla. Que el código exista no cambia eso: lo
+que el usuario lee es lo que PASA, no lo que está deployado.
+
+PARA SACARLO hacen falta tres cosas, en este orden:
+
+  1. Leer el log de una corrida en `dryRun` y ver el tamaño del backlog.
+  2. Resolver la frase «con doce meses de antelación» del párrafo de abajo. Hoy
+     NO es cierta para ese backlog: el barrido borra a los 36 meses de
+     inactividad con un piso de 30 días desde el aviso
+     (`MIN_NOTICE_AGE_DAYS`), así que una cuenta que ya lleva 40 meses recibe el
+     aviso y se da de baja un mes después, no un año. El mail que sale dice la
+     fecha real y no repite esta frase, así que nadie recibe hoy una afirmación
+     falsa — pero si este párrafo se publica tal cual, empieza a serlo. Las dos
+     salidas son subir `MIN_NOTICE_AGE_DAYS` a 365, o acotar la frase acá.
+  3. Poner `RETENTION_SWEEP_DRY_RUN = false` y deployar.]]
 
 Si no usás tu cuenta durante **24 meses**, te avisamos por correo a la
 dirección con la que te registraste. Si seguís sin usarla, **a los 36 meses de
