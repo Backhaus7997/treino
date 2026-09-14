@@ -4205,6 +4205,27 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // ── retention_notices ───────────────────────────────────────────────────
+    //
+    // Registro de la baja automática por inactividad: a quién se le avisó a los
+    // 24 meses y cuándo. Lo escribe SOLO `sweepInactiveAccounts` vía Admin SDK
+    // (que saltea estas reglas) y lo borra la cascada de `deleteAccount`.
+    //
+    // Cerrado en los cuatro verbos, **incluido para el dueño del uid**, y eso
+    // último es la parte que importa. `noticeSentAt` es lo ÚNICO que habilita
+    // borrar la cuenta a los 36 meses: un cliente que pudiera escribir su
+    // propio documento se auto-antedataría el aviso y adelantaría su baja —o la
+    // de otro, si el `{uid}` no estuviera cerrado— sin haber recibido nada.
+    // Leerlo tampoco corresponde: el canal del aviso es el correo, y exponerlo
+    // acá diría quién está por ser dado de baja.
+    //
+    // Como en `mail_queue` y en las `mp_*`, este deny NO es el enforcement —las
+    // reglas son unión permisiva y un `match` comodín futuro le ganaría. Lo que
+    // protege es `retention-notices-rules.test.ts`.
+    match /retention_notices/{uid} {
+      allow read, write: if false;
+    }
+
     // Las dos colecciones del cobro con Mercado Pago. Escritas SOLO por
     // `createPreapproval` y `reconcileMpSubscriptions` vía Admin SDK, que
     // saltea estas reglas. Ningún cliente las toca, ni para leer.

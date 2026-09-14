@@ -793,6 +793,44 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
     );
   }
 
+  // ── Aviso de baja por inactividad ───────────────────────────────────────
+  //
+  // ESTE MAIL NO ENUMERA LO QUE SE BORRA, y es la decision del copy.
+  //
+  // La tentacion es la lista completa —"rutinas, sesiones, mediciones,
+  // chats"— y la lista es FALSA en su ultimo item: los hilos de chat se
+  // RETIENEN a proposito para el otro participante (`cascade/athlete-data.ts`,
+  // y §2.2.1 de `docs/security.md`), igual que los pagos y las resenas.
+  // Prometer que se borra algo que no se borra, en el mail que existe
+  // justamente para no prometer de mas, seria el mismo error del otro lado
+  // (AGENTS.md §11.1). Los tres que se nombran —perfil, rutinas, historial—
+  // los borra la cascada entera y sin asteriscos.
+  //
+  // La FECHA es un parametro y no la frase "dentro de doce meses". Para una
+  // cuenta que cruza los 24 meses con el barrido encendido las dos coinciden;
+  // para el backlog de la primera corrida, no. `proyeccionDeBaja` en
+  // `sweep-inactive-accounts.ts` calcula la que de verdad se va a cumplir.
+  //
+  // "A partir del" y no "el": el barrido es diario y puede correr un dia
+  // tarde. Un plazo que se corre no miente a nadie; una fecha exacta, si.
+  case "inactive-account-notice":
+    return build(
+      "Vamos a dar de baja tu cuenta de TREINO", // i18n: email transaccional
+      "Cuenta inactiva",
+      [
+        ["Hace más de dos años que no usás TREINO."],
+        [
+          "Si seguís sin entrar, a partir del ",
+          strong(params.deleteOnLabel),
+          " damos de baja tu cuenta y borramos tu perfil, tus rutinas y tu " +
+          "historial de entrenamiento.",
+        ],
+        ["Para cancelarlo alcanza con abrir la app una vez: el plazo vuelve a empezar."],
+      ],
+      "ABRIR TREINO",
+      ctaUrl,
+    );
+
   default: {
     // Exhaustiveness guard: adding a MailKind without a template fails to
     // compile here rather than shipping a blank email.
