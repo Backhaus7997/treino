@@ -40,7 +40,8 @@ jest.mock("firebase-admin", () => {
   firestore.FieldValue = {
     // El centinela, igual que el real: `serverTimestamp()` no es un valor, es
     // una instrucción para el servidor. El doble de la base lo resuelve al
-    // escribir (ver `installDb`), que es exactamente lo que pasa en Firestore.
+    // escribir (ver `installDb`), que es exactamente lo que pasa contra la base
+    // real.
     serverTimestamp: () => ({ __serverTimestamp: true }),
     delete: () => ({ __fakeFieldValue: "delete" }),
   };
@@ -61,9 +62,20 @@ jest.mock("firebase-admin/firestore", () => (
     >
 ).firestoreDesdeNamespaced());
 
-// El barrido y la cascada importan `getAuth` en el tope del módulo. Nunca se
-// llama —la fuente de cuentas se inyecta— pero el import tiene que resolver.
+// Las dos puertas que el grafo de este test alcanza SIN llamarlas nunca. No es
+// ceremonia: el barrido trae `runDeleteAccount`, y con el la cascada entera —
+// incluida `cascade/storage.ts`. Sin estos dos dobles, esos modulos resuelven
+// contra el SDK REAL con un `firebase-admin/app` de mentira al lado, que es
+// exactamente el agujero que vigila `firebase-admin-mock-surface.test.ts`.
+//
+// OJO AL ESCRIBIR ACA ARRIBA: ese gate parsea el archivo con una regex laxa que
+// arranca en la palabra i-m-p-o-r-t (o e-x-p-o-r-t) y traga hasta el `from`
+// siguiente. Un comentario que la use, puesto antes de la primera declaracion,
+// le regala sus palabras sueltas al subpath equivocado y el gate se pone rojo
+// nombrando simbolos que no existen. Por eso ninguna de estas lineas la
+// contiene. Es un bug del gate, no de este archivo — queda anotado aparte.
 jest.mock("firebase-admin/auth", () => ({ getAuth: jest.fn() }));
+jest.mock("firebase-admin/storage", () => ({ getStorage: jest.fn() }));
 
 jest.mock("firebase-functions", () => ({
   logger: {
