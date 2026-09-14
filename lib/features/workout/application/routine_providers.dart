@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/analytics/analytics_service.dart';
 import '../../../core/utils/network_timeouts.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../profile/application/user_providers.dart' show firestoreProvider;
@@ -8,7 +9,10 @@ import '../data/routine_repository.dart';
 import '../domain/routine.dart';
 
 final routineRepositoryProvider = Provider<RoutineRepository>(
-  (ref) => RoutineRepository(firestore: ref.watch(firestoreProvider)),
+  (ref) => RoutineRepository(
+    firestore: ref.watch(firestoreProvider),
+    analytics: ref.watch(analyticsServiceProvider),
+  ),
 );
 
 /// Eager-loads the system template catalogue (~6 docs). Auth-gated:
