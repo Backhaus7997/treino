@@ -20,6 +20,7 @@ ContentReport _$ContentReportFromJson(Map<String, dynamic> json) {
 
 /// @nodoc
 mixin _$ContentReport {
+// ignore: invalid_annotation_target — falso positivo de freezed, ver dartdoc de clase.
   @JsonKey(includeToJson: false)
   String get id => throw _privateConstructorUsedError;
   String get reporterUid => throw _privateConstructorUsedError;
@@ -221,6 +222,7 @@ class _$ContentReportImpl implements _ContentReport {
   factory _$ContentReportImpl.fromJson(Map<String, dynamic> json) =>
       _$$ContentReportImplFromJson(json);
 
+// ignore: invalid_annotation_target — falso positivo de freezed, ver dartdoc de clase.
   @override
   @JsonKey(includeToJson: false)
   final String id;
@@ -309,6 +311,7 @@ abstract class _ContentReport implements ContentReport {
   factory _ContentReport.fromJson(Map<String, dynamic> json) =
       _$ContentReportImpl.fromJson;
 
+// ignore: invalid_annotation_target — falso positivo de freezed, ver dartdoc de clase.
   @override
   @JsonKey(includeToJson: false)
   String get id;
