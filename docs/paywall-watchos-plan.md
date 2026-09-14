@@ -1,8 +1,24 @@
 # Plan — el gate del paywall en el reloj de Apple (watchOS)
 
-> **Es lo único que falta para poder ENCENDER el paywall del alumno.**
-> Mientras esto no esté, no se toca `kAthletePaywallEnabled` ni la CF que
-> escribe `athletePaywallEnforced`. Ver §5.
+> **Esto es UNO de los bloqueantes para encender el paywall del alumno. No es
+> el único.** Mientras esto no esté, no se toca `kAthletePaywallEnabled` ni la
+> CF que escribe `athletePaywallEnforced`. Ver §5.
+>
+> ⚠️ Este encabezado decía «**es lo único que falta**». Era cierto cuando se
+> escribió y dejó de serlo el 2026-09-11: investigando el grandfathering
+> aparecieron dos bloqueantes más, y ninguno es del reloj — el seed que le
+> borra `isPremium` al catálogo, y el candado de plantillas pagas que vive sólo
+> en el cliente.
+>
+> La frase importa porque este documento es lo que alguien lee ANTES de
+> prender. Con los cuatro pasos ya escritos (tabla de abajo), un encabezado que
+> dice «esto era lo único» se lee como luz verde.
+>
+> **La lista completa y al día está en UN solo lugar**:
+> `lib/features/paywall/domain/athlete_entitlement.dart`, arriba de
+> `kAthletePaywallEnabled`. Acá no se duplica a propósito — dos listas que se
+> mantienen por separado terminan contradiciéndose, que es exactamente lo que
+> pasó con esta frase.
 >
 > ---
 >

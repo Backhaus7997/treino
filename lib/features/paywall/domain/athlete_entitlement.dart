@@ -90,11 +90,49 @@ enum AthleteEntitlement {
 ///      y nada más. El checklist está en `docs/paywall-watchos-plan.md` §5, y
 ///      el caso que más importa no es el obvio — es el CONTROL NEGATIVO: que
 ///      un free entrene una plantilla de principiante sin fricción.
-///   2. **El grandfathering.** Hoy hay alumnos free con rutinas de 4 y 5 días
-///      creadas cuando no había tope. El día que esto se prenda dejan de ser
-///      editables. Ver `functions/src/subscriptions/athlete-paywall-enforced.ts`.
-///   3. **Los tres carteles de steering** de la app móvil del PF, declarados
+///   2. **El seed que apaga el cobro del catálogo.** `npm run seed:all` corre
+///      `scripts/seed_workout_catalog.js`, que pisa seis plantillas con
+///      `.set()` —reemplazo total, no merge— y **no conoce `isPremium`**: cero
+///      menciones en todo el archivo. Tres de las cuatro pagas quedarían
+///      gratis. Y como el campo falla ABIERTO en las tres puntas, no hay error
+///      ni log: el catálogo deja de cobrar y nadie se entera. Medido contra
+///      producción el 2026-09-11: están las 4, o sea que el bug está cargado y
+///      todavía no disparó. El que SÍ escribe el campo (`seed_templates.js`)
+///      es dry-run por default y no tiene alias npm — el camino fácil
+///      destruye, el difícil construye, y por eso esto va a volver a pasar.
+///   3. **El candado del catálogo vive sólo acá, no en el servidor.**
+///      `isPremium` aparece en `firestore.rules` únicamente dentro del bloque
+///      de `sessions`; el CREATE de `/routines` no lo mira NUNCA. Copiar una
+///      plantilla paga a rutina propia pasa el servidor si la copia entra en
+///      `withinFreeRoutineShape`, y `hipertrofia-intermedio` —3 días, sin
+///      `numWeeks`— entra exacto. No se arregla con una cláusula nueva: el
+///      servidor no puede distinguir tres días copiados de tres días escritos
+///      a mano, porque el payload es idéntico. Es una decisión de producto.
+///   4. **Los tres carteles de steering** de la app móvil del PF, declarados
 ///      con fecha límite en `test/features/paywall/anti_steering_movil_test.dart`.
+///
+/// ─── Lo que SALIÓ de esta lista, y por qué ───
+///
+/// **El grandfathering**, que estuvo acá y ya no está. Eran dos problemas con
+/// el mismo nombre y se cerraron por caminos distintos:
+///
+///   • Las **rutinas propias** fuera de tope: resuelto el 2026-09-11 con
+///     `noCreceLaForma` en las reglas. El UPDATE pasa si la rutina resultante
+///     no es más grande que la que ya había. Sin campo nuevo, sin fecha de
+///     corte, sin migración.
+///   • Las **plantillas pagas** que un alumno venía siguiendo: medido contra
+///     producción el 2026-09-11, y la población es **CERO**. Ningún alumno
+///     tiene una plantilla paga como rutina activa —que es literalmente lo que
+///     significa seguirla: `_follow` escribe `users/{uid}.activeRoutineId` y
+///     nada más—, y los 5 que alguna vez entrenaron una lo hicieron hace 31
+///     días o más, tres de ellos una sola vez. Un mecanismo de exención sería
+///     maquinaria permanente para nadie.
+///
+/// Y lo segundo no hace falta decidirlo hoy: las sesiones son un registro
+/// permanente, así que el día de encender, la CF puede calcular el
+/// grandfathering con los datos de ESE día. El dato no es perecedero — al
+/// revés que `storeAccountToken`, que sí lo era y por eso se generó desde el
+/// principio aunque no se use.
 ///
 /// ─── Y EL ORDEN, QUE NO ES ARBITRARIO ───
 ///

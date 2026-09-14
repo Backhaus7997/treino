@@ -237,10 +237,18 @@ tope de días de la sección 4, porque no depende de que el alumno quiera
 diseñar algo propio — todo el que progresa sale de principiante tarde o
 temprano, use catálogo o rutina propia.
 
-> **Estado del enforcement de este eje (2026-09-10).** La UI del teléfono la
+> **Estado del enforcement de este eje (2026-09-11).** La UI del teléfono la
 > cerró el #1066; la regla server-side sobre `sessions` y el gate del reloj
-> **Wear OS**, el #1087. Falta el reloj de **Apple**, y es lo único que bloquea
-> encender el paywall: [paywall-watchos-plan.md](./paywall-watchos-plan.md).
+> **Wear OS**, el #1087; la mitad Swift del reloj de **Apple**, el #1108 — le
+> falta la verificación en device ([paywall-watchos-plan.md](./paywall-watchos-plan.md) §5).
+>
+> ⚠️ Este párrafo decía que el reloj de Apple era «**lo único que bloquea
+> encender el paywall**». Ya no. El 2026-09-11 aparecieron dos bloqueantes más
+> de este mismo eje, y ninguno es del reloj: `npm run seed:all` le borra
+> `isPremium` al catálogo, y el candado de copiar una plantilla paga vive sólo
+> en el cliente. La lista al día está en
+> `lib/features/paywall/domain/athlete_entitlement.dart`, y se mantiene ahí y
+> en ningún otro lado.
 
 **Flag explícito, no `level` reutilizado — decisión de esta sesión.** Gatear
 directo por `level` sería gratis en código (el campo ya existe), pero ata el
@@ -253,11 +261,25 @@ campo nuevo — `isPremium: bool`, default `false` — en el seed
 es un proceso manual e infrecuente, un campo más no cambia eso.
 
 **Dónde va el enforcement — distinto del de 6.2.** Acá no hay escritura en
-`routines`: seguir sin copiar solo pisa `users/{uid}.activeRoutineId`. La
-regla que hace falta es sobre ESE campo, no sobre `routines` — un `get()` a la
-plantilla resuelta (mismo patrón de `firestore.rules:623`, que ya lee
-`users/{uid}.role`) para leer su `isPremium`, exigiendo el mismo campo de
-entitlement que 6.3 propone para `user-created`.
+`routines`: seguir sin copiar solo pisa `users/{uid}.activeRoutineId`.
+
+⚠️ **Esta sección proponía gatear ESE campo. Se construyó en otro lado, y la
+diferencia tiene consecuencias.** `firestore.rules` no menciona
+`activeRoutineId` ni una vez: el gate terminó en el CREATE de
+`users/{uid}/sessions/{sessionId}`, con `sesionSobreRutinaLibre`, que hace el
+`get()` a la plantilla y lee su `isPremium`.
+
+Por qué se movió: gatear el marcador bloquea **elegir** la plantilla, y no
+frena a quien ya la tiene elegida ni a los dos relojes, que escriben sesiones
+sin pasar por esa pantalla. Gatear la sesión frena el ENTRENAMIENTO, que es
+donde está el valor, y lo frena en las tres superficies a la vez.
+
+Pero paga un precio que el plan no previó: bloquea **cada arranque**, no sólo
+el primero. De ahí salió la pregunta del grandfathering de plantillas pagas —
+un alumno a mitad de un programa perdería el acceso. Se midió el 2026-09-11 y
+la población es cero, así que no se construyó nada; el razonamiento completo
+está arriba de `kAthletePaywallEnabled` en
+`lib/features/paywall/domain/athlete_entitlement.dart`.
 
 **La vidriera también tiene que saberlo.** El grid de Plantillas necesita un
 candado o badge visible en las 4 no-gratis ANTES de que el alumno toque
