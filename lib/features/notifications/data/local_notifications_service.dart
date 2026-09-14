@@ -67,15 +67,35 @@ class LocalNotificationsService {
 
   bool _inicializado = false;
 
+  /// Si [init] terminó bien. Mientras sea false, [show] devuelve false y el
+  /// llamador tiene que mostrar otra cosa — nunca quedarse callado.
+  bool get listo => _inicializado;
+
   /// Crea el canal de Android y deja el plugin listo para mostrar.
   ///
   /// Idempotente: llamarlo dos veces no duplica el canal ni pisa el callback
   /// con uno muerto. Android ignora un `createNotificationChannel` con un id
   /// que ya existe.
+  ///
+  /// **No tira nunca.** Ver el `catch`.
   Future<void> init({required void Function(String? deepLink) onTap}) async {
     _onTap = onTap;
     if (_inicializado) return;
+    try {
+      await _init();
+      _inicializado = true;
+      debugPrint('[local-notif] init OK — canal $kCanalDeAvisos');
+    } catch (e, st) {
+      // NO se relanza. El llamador la invoca sin await —no puede bloquear el
+      // arranque de la app por el canal de avisos— y una excepción en un
+      // future sin dueño no la ve nadie. Se deja `_inicializado` en false, que
+      // es lo que hace que `show` devuelva false y el handler caiga al
+      // SnackBar. Un aviso feo es infinitamente mejor que ninguno.
+      debugPrint('[local-notif] init FALLÓ — $e\n$st');
+    }
+  }
 
+  Future<void> _init() async {
     const android = AndroidInitializationSettings('@mipmap/ic_launcher');
 
     // Los tres `false`: el permiso NO se pide acá. Lo pide `PermissionGate` por
@@ -103,25 +123,45 @@ class LocalNotificationsService {
             importance: Importance.high,
           ),
         );
-
-    _inicializado = true;
   }
 
   /// Dibuja la notificación. [deepLink] viaja como payload y vuelve en el tap.
   ///
-  /// El id es fijo a propósito: una notificación nueva REEMPLAZA a la anterior
-  /// en vez de apilar. Con id incremental, diez mensajes seguidos de un alumno
-  /// dejan diez entradas en la bandeja y el usuario las borra todas de un
-  /// manotazo, que es la forma más rápida de que deje de mirarlas.
-  Future<void> show({
+  /// Devuelve `true` si se dibujó, `false` si NO se pudo.
+  ///
+  /// El bool no es cosmético: es el contrato con el llamador. Un `false` le
+  /// dice "mostrá vos otra cosa", y sin él una falla del plugin se comía el
+  /// aviso en silencio — el usuario nunca se enteraba de que le habían
+  /// escrito, y en el log tampoco había nada porque `init` corre sin await.
+  Future<bool> show({
     required String title,
     required String body,
     String? deepLink,
   }) async {
     if (!_inicializado) {
-      debugPrint('[local-notif] show() sin init() — se descarta');
-      return;
+      debugPrint('[local-notif] show() con init fallido o pendiente — '
+          'el llamador tiene que mostrar otra cosa');
+      return false;
     }
+    try {
+      await _mostrar(title: title, body: body, deepLink: deepLink);
+      debugPrint('[local-notif] mostrada — "$title"');
+      return true;
+    } catch (e) {
+      debugPrint('[local-notif] show() FALLÓ — $e');
+      return false;
+    }
+  }
+
+  /// El id es fijo a propósito: una notificación nueva REEMPLAZA a la anterior
+  /// en vez de apilar. Con id incremental, diez mensajes seguidos de un alumno
+  /// dejan diez entradas en la bandeja y el usuario las borra todas de un
+  /// manotazo, que es la forma más rápida de que deje de mirarlas.
+  Future<void> _mostrar({
+    required String title,
+    required String body,
+    String? deepLink,
+  }) async {
     await _plugin.show(
       id: 0,
       title: title.isEmpty ? null : title,

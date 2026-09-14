@@ -200,10 +200,15 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
   ///
   /// REQ-PN-HANDLER-001.
   void _onForeground(RemoteMessage message) {
+    // Sin volcar `message.data`: ahí viajan uids y el deep link del chat, y
+    // esto corre también en release.
+    debugPrint('[fcm] onMessage recibido');
+
     // Never show the sender their own message (token may be cross-registered
     // on a shared device). See [isOwnChatMessage].
     if (isOwnChatMessage(
         message, ref.read(firebaseAuthProvider).currentUser?.uid)) {
+      debugPrint('[fcm] suprimido: es tu propio mensaje');
       return;
     }
 
@@ -216,12 +221,15 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
     // ésta tapa "ya lo estás viendo". Un mensaje ajeno que llega mientras
     // tenés el chat abierto sólo lo agarra ésta; tu propio mensaje llegando
     // desde Home sólo lo agarra aquélla. Las dos tienen que quedar.
+    final location = _currentLocation();
     if (shouldSuppressForegroundNotification(
-      currentLocation: _currentLocation(),
+      currentLocation: location,
       deepLink: deepLink,
     )) {
+      debugPrint('[fcm] suprimido: ya lo estás mirando ($location)');
       return;
     }
+    debugPrint('[fcm] se muestra — location=$location deepLink=$deepLink');
 
     final title = message.notification?.title ?? '';
     final body = message.notification?.body ?? '';
@@ -235,11 +243,23 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
       return;
     }
 
-    unawaited(ref.read(localNotificationsServiceProvider).show(
-          title: title,
-          body: body,
-          deepLink: deepLink,
-        ));
+    // Se ESPERA el resultado, y de ahí sale el fallback.
+    //
+    // Antes esto iba con `unawaited` y el bool se tiraba a la basura: si el
+    // plugin no había inicializado —cosa que pasa en silencio, porque su
+    // `init` también corre sin await— el aviso se perdía entero y el usuario
+    // no se enteraba de que le habían escrito. Un cartel in-app es un mal
+    // premio consuelo, pero es infinitamente mejor que nada.
+    unawaited(() async {
+      final mostrada = await ref.read(localNotificationsServiceProvider).show(
+            title: title,
+            body: body,
+            deepLink: deepLink,
+          );
+      if (mostrada || !mounted) return;
+      debugPrint('[fcm] la notificación del sistema no salió — cae al cartel');
+      _mostrarSnackBar(title: title, body: body, deepLink: deepLink);
+    }());
   }
 
   /// Cartel in-app. Camino de WEB únicamente — ver [_onForeground].
