@@ -88,9 +88,13 @@ extension OnboardingSurfaceX on OnboardingSurface {
         OnboardingSurface.athleteMobile => 1,
         OnboardingSurface.trainerMobile => 1,
         OnboardingSurface.trainerWeb => 1,
-        OnboardingSurface.customExerciseAthleteMobile => 2,
-        OnboardingSurface.customExerciseTrainerMobile => 2,
-        OnboardingSurface.customExerciseTrainerWeb => 1,
+        // 3: el deck pasó de 6 a 9 slides (tipos de serie, barra sobre el
+        // teclado, semanas). Sin el bump, quien ya lo cerró no ve nunca las
+        // tres nuevas — y el punto del cambio es justamente que las vea.
+        OnboardingSurface.customExerciseAthleteMobile => 3,
+        OnboardingSurface.customExerciseTrainerMobile => 3,
+        // 2: de 3 a 7. La web además estrena entrada rápida y panel lateral.
+        OnboardingSurface.customExerciseTrainerWeb => 2,
         OnboardingSurface.templatesAthleteMobile => 1,
       };
 
