@@ -18,11 +18,18 @@ class FcmService {
   FcmService({
     required FirebaseMessaging messaging,
     required FcmTokenRepository repository,
+    Duration esperaBaseDeReintento = const Duration(seconds: 1),
   })  : _messaging = messaging,
-        _repo = repository;
+        _repo = repository,
+        _esperaBase = esperaBaseDeReintento;
 
   final FirebaseMessaging _messaging;
   final FcmTokenRepository _repo;
+
+  /// Primer escalón del backoff de [_getTokenConReintentos]; cada intento
+  /// duplica. Inyectable SÓLO para que los tests no esperen 31s de reloj real
+  /// — en producción nadie lo pasa.
+  final Duration _esperaBase;
 
   StreamSubscription<String>? _refreshSub;
   String? _disposedUid;
@@ -66,18 +73,17 @@ class FcmService {
     _refreshSub = null;
 
     try {
-      final token = await _messaging.getToken();
+      final token = await _getTokenConReintentos(generation);
       // QA-502: un dispose (o un login de otro uid) corrió mientras esperábamos
       // → NO reescribir el token que ya se borró.
       if (generation != _generation) return;
       if (token != null) {
+        debugPrint('[fcm] init: token obtenido, guardando para $uid');
         await _repo.saveToken(uid, token);
+      } else {
+        debugPrint('[fcm] init: NO se pudo obtener token para $uid — '
+            'este dispositivo no va a recibir pushes');
       }
-    } on FirebaseException catch (e) {
-      // Expected on iOS Simulator and on real iOS device pre-permission.
-      // Token will be saved later via onTokenRefresh or the PermissionGate
-      // re-init after grant.
-      debugPrint('[fcm] init: getToken deferred — ${e.code}');
     } catch (e) {
       debugPrint('[fcm] init: unexpected getToken error for $uid — $e');
     }
@@ -146,6 +152,55 @@ class FcmService {
     } catch (e) {
       debugPrint('[fcm] dispose: error deleting device token — $e');
     }
+  }
+
+  /// Pide el token de FCM reintentando mientras APNs no haya aprovisionado.
+  ///
+  /// ## El bug que esto cierra (medido en un iPhone 16, 2026-09-14)
+  ///
+  /// En iOS `getToken()` tira `apns-token-not-set` hasta que APNs le entrega
+  /// su token al dispositivo, y eso tarda un rato después del arranque. El
+  /// código anterior hacía UN intento, se tragaba esa excepción y confiaba en
+  /// dos redes de contención:
+  ///
+  /// 1. `onTokenRefresh`, que dispara cuando FCM **rota** un token — no
+  ///    garantiza nada para el PRIMERO.
+  /// 2. `PermissionGate`, que re-invoca [init] **cuando el usuario concede el
+  ///    permiso**.
+  ///
+  /// Las dos fallan a la vez en el caso más común de todos: una
+  /// **reinstalación sobre un permiso ya concedido**. Ahí el gate no vuelve a
+  /// preguntar —ya está `authorized`— así que no re-invoca nada, y el único
+  /// intento de `getToken()` corre en el login, antes de que APNs aprovisione.
+  /// Resultado: el dispositivo NUNCA registra token y no recibe un solo push,
+  /// sin un error visible en ningún lado.
+  ///
+  /// Así se veía desde afuera: la cuenta tenía 10 tokens de instalaciones
+  /// viejas, FCM aceptaba los 10 sin error, y al teléfono de la mano no le
+  /// llegaba nada.
+  ///
+  /// Backoff 1-2-4-8-16s, ~31s en total. Se corta antes si otra generación
+  /// ganó (QA-502) — no tiene sentido seguir peleando por el token de un uid
+  /// que ya se deslogueó.
+  Future<String?> _getTokenConReintentos(int generation) async {
+    for (var intento = 0; intento < 5; intento++) {
+      try {
+        final token = await _messaging.getToken();
+        if (token != null) return token;
+      } on FirebaseException catch (e) {
+        // Cualquier otro código es un problema real y no lo tapa el reintento.
+        if (e.code != 'apns-token-not-set') {
+          debugPrint('[fcm] getToken: error no reintentable — ${e.code}');
+          return null;
+        }
+        debugPrint('[fcm] getToken: APNs todavía no aprovisionó '
+            '(intento ${intento + 1}/5)');
+      }
+      if (generation != _generation) return null;
+      await Future<void>.delayed(_esperaBase * (1 << intento));
+      if (generation != _generation) return null;
+    }
+    return null;
   }
 
   /// Requests notification permission from the OS.

@@ -7,6 +7,7 @@ import '../../auth/application/auth_providers.dart';
 import '../../profile/application/user_providers.dart';
 import '../data/fcm_service.dart';
 import '../data/fcm_token_repository.dart';
+import '../data/local_notifications_service.dart';
 
 /// Provides the [FirebaseMessaging] singleton.
 final firebaseMessagingProvider = Provider<FirebaseMessaging>(
@@ -26,6 +27,15 @@ final fcmServiceProvider = Provider<FcmService>(
     messaging: ref.watch(firebaseMessagingProvider),
     repository: ref.watch(fcmTokenRepositoryProvider),
   ),
+);
+
+/// Provee el servicio que dibuja las notificaciones del SO con la app abierta.
+///
+/// Es un singleton porque el plugin nativo también lo es: dos instancias
+/// compiten por el callback del tap y gana la última que haya llamado a
+/// `initialize`.
+final localNotificationsServiceProvider = Provider<LocalNotificationsService>(
+  (ref) => LocalNotificationsService(),
 );
 
 /// Lifecycle provider that wires [FcmService] to the auth state stream.
