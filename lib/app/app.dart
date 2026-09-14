@@ -152,6 +152,21 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
     super.dispose();
   }
 
+  /// Location actual del router, o `null` si todavía no resolvió ninguna.
+  ///
+  /// La guarda de `isEmpty` NO es decorativa, y es la misma que documenta
+  /// `RouteAnalytics._currentRoute`: con la lista de matches vacía, `state`
+  /// tira `StateError: No element`. Acá además devolver `null` es lo correcto
+  /// semánticamente — "no sé dónde está" hace que la supresión falle abierta.
+  ///
+  /// Va la URI y no `state.fullPath`: `fullPath` es el PATRÓN de la ruta
+  /// (`/coach/chat/:chatId`) y hay que comparar contra un deep link CONCRETO.
+  String? _currentLocation() {
+    final config = _router.routerDelegate.currentConfiguration;
+    if (config.isEmpty) return null;
+    return config.uri.toString();
+  }
+
   /// Foreground message handler — shows SnackBar via root ScaffoldMessenger.
   /// ADR-PN-010, REQ-PN-HANDLER-001, SCENARIO-652, 653, 654.
   void _onForeground(RemoteMessage message) {
@@ -161,12 +176,28 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
         message, ref.read(firebaseAuthProvider).currentUser?.uid)) {
       return;
     }
+
+    final deepLink = message.data['deepLink'] as String?;
+
+    // No avisar de algo que la persona ya está mirando.
+    //
+    // Es una guarda DISTINTA de `isOwnChatMessage`, no una versión más amplia:
+    // aquélla tapa "este mensaje lo mandaste vos desde otro dispositivo" y
+    // ésta tapa "ya lo estás viendo". Un mensaje ajeno que llega mientras
+    // tenés el chat abierto sólo lo agarra ésta; tu propio mensaje llegando
+    // desde Home sólo lo agarra aquélla. Las dos tienen que quedar.
+    if (shouldSuppressForegroundNotification(
+      currentLocation: _currentLocation(),
+      deepLink: deepLink,
+    )) {
+      return;
+    }
+
     final messenger = ref.read(rootScaffoldMessengerKeyProvider).currentState;
     if (messenger == null) return;
 
     final title = message.notification?.title ?? '';
     final body = message.notification?.body ?? '';
-    final deepLink = message.data['deepLink'] as String?;
 
     // Capture context from the navigator so goDeepLink has GoRouter access.
     final ctx = _router.routerDelegate.navigatorKey.currentContext;
