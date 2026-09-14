@@ -953,6 +953,16 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
   /// inner lists (REQ-PERIOD-013). Capped at 16 (REQ-PERIOD-011).
   int _numWeeks = 1;
 
+  /// La forma con la que la rutina llegó al editor, o `null` si es nueva.
+  ///
+  /// Existe sólo para espejar `noCreceLaForma` de `firestore.rules`: el
+  /// servidor deja pasar un update que no agranda la rutina, aunque el
+  /// resultante siga por encima del tope free. Sin estos dos números, el
+  /// cliente sería MÁS estricto que el servidor y le mostraría un candado al
+  /// alumno por algo que el servidor le permite.
+  int? _diasAlCargar;
+  int? _semanasAlCargar;
+
   /// Whether this user-created routine is shared on the athlete's public
   /// profile ("RUTINAS PÚBLICAS" tab). Defaults to `false` (private) — the
   /// same default as before the toggle existed, so nothing changes for users
@@ -1197,6 +1207,14 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       // Defensive clamp — a hand-edited doc can't exceed the editor cap nor
       // drop below one week (REQ-PERIOD-011/018).
       _numWeeks = routine.numWeeks.clamp(1, _kMaxWeeks);
+      // La forma con la que la rutina LLEGÓ, para el espejo de
+      // `noCreceLaForma` de `firestore.rules`. Ver `_freePlanBlocksShape`.
+      //
+      // Se guarda después del clamp a propósito: es el número contra el que el
+      // servidor va a comparar, y el servidor lee el documento tal cual está.
+      // Si acá se guardara el crudo y allá el clampeado, el cliente dejaría
+      // pasar un guardado que el servidor rebota.
+      _semanasAlCargar = routine.numWeeks;
       // Restore the athlete's routine-visibility toggle. Only meaningful in
       // SelfCreating mode; trainer flows ignore this state.
       //
@@ -1237,6 +1255,7 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       if (!_isCustomizing && routine.summary != null) {
         _summaryController.text = routine.summary!;
       }
+      _diasAlCargar = routine.days.length;
       _days = routine.days.map((day) {
         final editableDay = _EditableDay(
           dayNumber: day.dayNumber,
@@ -1694,6 +1713,14 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
     final excedeDias = _days.length > kFreeMaxRoutineDays;
     final excedeSemanas = _numWeeks > kFreeMaxRoutineWeeks;
     if (!excedeDias && !excedeSemanas) return false;
+    // Espejo de `noCreceLaForma` de `firestore.rules`: una rutina que quedó
+    // por encima del tope se puede seguir tocando mientras no CREZCA.
+    //
+    // Sin esto el cliente sería MÁS estricto que el servidor, y le mostraría
+    // un candado al alumno por algo que el servidor le permite — que es el
+    // peor lado del error, porque no hay forma de descubrir que estaba
+    // permitido.
+    if (_noCreceRespectoDeLoCargado()) return false;
     if (!ref.read(athleteEntitlementProvider).gatesFreeLimits) return false;
     // Los días primero cuando fallan los dos: es el eje que el alumno puede
     // arreglar sin resignar nada del programa, y el cuerpo de esa hoja es el
@@ -1705,6 +1732,34 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
       actual: excedeDias ? _days.length : _numWeeks,
     );
     return true;
+  }
+
+  /// `true` si esto es la EDICIÓN de una rutina que ya existía y no la agranda.
+  ///
+  /// ─── Por qué no alcanza con `_isAthleteOwnedMode` ─────────────────────────
+  ///
+  /// Porque ese getter cubre tres operaciones y sólo una es un UPDATE:
+  ///
+  ///   • `SelfCreating(existingRoutineId: null)` — crea un doc nuevo.
+  ///   • `SelfCreating(existingRoutineId: 'x')`  — **edita uno que existe**.
+  ///   • `SelfCustomizing`                       — copia: escribe un doc NUEVO.
+  ///
+  /// La excepción es del UPDATE y de nadie más. En el servidor eso sale gratis
+  /// —el CREATE no tiene `resource.data` contra qué comparar— pero acá hay que
+  /// distinguirlo a mano, y equivocarse tiene un costo concreto: el alumno
+  /// copiaría una plantilla paga de 8 semanas creyendo que puede, y se comería
+  /// un `permission-denied` crudo al guardar. Es exactamente el rebote que
+  /// este guard existe para que no llegue nunca.
+  bool _noCreceRespectoDeLoCargado() {
+    final mode = widget.mode;
+    if (mode is! SelfCreating || mode.existingRoutineId == null) return false;
+    final dias = _diasAlCargar;
+    final semanas = _semanasAlCargar;
+    // Sin los originales no se puede afirmar que no creció, y ante la duda se
+    // gatea: el servidor va a rebotar igual, y un rebote anticipado con su
+    // explicación es mejor que un `permission-denied` crudo.
+    if (dias == null || semanas == null) return false;
+    return _days.length <= dias && _numWeeks <= semanas;
   }
 
   /// Dimensión `source` de los eventos de forma de rutina (`routine_created`,

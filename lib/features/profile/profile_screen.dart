@@ -169,12 +169,35 @@ class _AthleteProfile extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 12),
+          // ── Legales section ──────────────────────────────────────────────
+          TreinoFadeSlideIn(
+            delay: AppMotion.stagger(8),
+            child: _A11ySectionGroup(
+              title: l10n.profileSectionLegal.toUpperCase(),
+              palette: palette,
+              tiles: [
+                Semantics(
+                  button: true,
+                  label: l10n.legalDocumentsTitle,
+                  excludeSemantics: true,
+                  child: ProfileSectionTile(
+                    icon: TreinoIcon.file,
+                    title: l10n.legalDocumentsTitle,
+                    subtitle: l10n.legalDocumentsSubtitle,
+                    inGroup: true,
+                    onTap: () => context.push('/profile/settings/legales'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
           // ── Sesión section — PR#4 v2 pivot 2026-05-28 ────────────────────
           // Sign-out + account deletion grouped in one boxed section, mockup
           // parity polish 2026-06-01. Settings as a dedicated surface stays
           // deferred to a future SDD (notifications, theme, language).
           TreinoFadeSlideIn(
-            delay: AppMotion.stagger(8),
+            delay: AppMotion.stagger(9),
             child: _A11ySectionGroup(
               title: 'SESIÓN', // i18n: Fase 6 Etapa 3
               palette: palette,

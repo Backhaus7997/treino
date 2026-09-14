@@ -3113,6 +3113,15 @@ class AppL10nEs extends AppL10n {
   String get profileRoutinesActiveChip => 'ACTIVA';
 
   @override
+  String get profileSectionLegal => 'Legales';
+
+  @override
+  String get legalDocumentsTitle => 'Documentos legales';
+
+  @override
+  String get legalDocumentsSubtitle => 'Términos, privacidad y más';
+
+  @override
   String get appearanceTitle => 'Apariencia';
 
   @override
@@ -3208,7 +3217,10 @@ class AppL10nEs extends AppL10n {
 
   @override
   String dashboardAlertBannerSummary(
-      int vencidos, int solicitudes, int inactivos) {
+    int vencidos,
+    int solicitudes,
+    int inactivos,
+  ) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,
@@ -7675,6 +7687,15 @@ class AppL10nEsAr extends AppL10nEs {
   String get profileRoutinesActiveChip => 'ACTIVA';
 
   @override
+  String get profileSectionLegal => 'Legales';
+
+  @override
+  String get legalDocumentsTitle => 'Documentos legales';
+
+  @override
+  String get legalDocumentsSubtitle => 'Términos, privacidad y más';
+
+  @override
   String get appearanceTitle => 'Apariencia';
 
   @override
@@ -7770,7 +7791,10 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String dashboardAlertBannerSummary(
-      int vencidos, int solicitudes, int inactivos) {
+    int vencidos,
+    int solicitudes,
+    int inactivos,
+  ) {
     String _temp0 = intl.Intl.pluralLogic(
       vencidos,
       locale: localeName,
