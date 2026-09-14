@@ -76,17 +76,23 @@ function correr(script, args = [], { emulador = false, projectId = 'treino-dev',
 
 const CARTEL = /IS PRODUCTION/;
 
-// ── npm run seed:exercises / seed:routines / seed:all ─────────────────────
+// ── npm run seed:exercises ────────────────────────────────────────────────
+//
+// Estos cinco corrían con `--all`. El 2026-09-14 `--all` y `--routines`
+// pasaron a cortar con exit 1 —la mitad de rutinas del seeder sembraba un
+// catálogo fósil— así que apuntan a `--exercises`, que es el único camino de
+// datos que le queda. Lo que se prueba acá es EL CARTEL, no el flag: cambiar
+// de bandera no afloja ninguna aserción.
 
-test('seed_workout_catalog.js (npm run seed:all) escupe el cartel contra treino-dev', () => {
-  const { stderr } = correr('seed_workout_catalog.js', ['--all']);
+test('seed_workout_catalog.js (npm run seed:exercises) escupe el cartel contra treino-dev', () => {
+  const { stderr } = correr('seed_workout_catalog.js', ['--exercises']);
   assert.match(stderr, CARTEL);
   assert.match(stderr, /treino-dev/);
   assert.match(stderr, /#826/);
 });
 
 test('seed_workout_catalog.js imprime el cartel ANTES de tocar Firestore', () => {
-  const { stderr } = correr('seed_workout_catalog.js', ['--all']);
+  const { stderr } = correr('seed_workout_catalog.js', ['--exercises']);
   const cartel = stderr.search(CARTEL);
   const firestore = stderr.indexOf(STUB_FIRESTORE_REACHED);
   assert.ok(cartel >= 0, 'no salió el cartel');
@@ -95,12 +101,12 @@ test('seed_workout_catalog.js imprime el cartel ANTES de tocar Firestore', () =>
 });
 
 test('seed_workout_catalog.js con el emulador seteado no grita', () => {
-  const { stderr } = correr('seed_workout_catalog.js', ['--all'], { emulador: true });
+  const { stderr } = correr('seed_workout_catalog.js', ['--exercises'], { emulador: true });
   assert.doesNotMatch(stderr, CARTEL);
 });
 
 test('seed_workout_catalog.js contra otro proyecto no grita', () => {
-  const { stderr } = correr('seed_workout_catalog.js', ['--all'], { projectId: 'treino-otro-dev' });
+  const { stderr } = correr('seed_workout_catalog.js', ['--exercises'], { projectId: 'treino-otro-dev' });
   assert.doesNotMatch(stderr, CARTEL);
 });
 
@@ -108,7 +114,7 @@ test('seed_workout_catalog.js sin credenciales calla en vez de inventar', () => 
   // `projectIdObjetivo()` devuelve null: el SDK va a resolver el proyecto por
   // un camino que no vemos. Callar es correcto; afirmar "no es producción"
   // sería la misma falsa tranquilidad que motivó #826.
-  const { stderr } = correr('seed_workout_catalog.js', ['--all'], { credenciales: false });
+  const { stderr } = correr('seed_workout_catalog.js', ['--exercises'], { credenciales: false });
   assert.doesNotMatch(stderr, CARTEL);
 });
 

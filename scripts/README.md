@@ -342,7 +342,8 @@ fd -HI 'sa-key.json|.*-firebase-adminsdk-.*\.json' ~ --exec stat -f '%Sp %N'
 
 | `npm run …` | Runs | Blast radius |
 |---|---|---|
-| `seed:exercises` / `seed:routines` / `seed:all` | `seed_workout_catalog.js` | `set()` over the whole `exercises` + `routines` stock catalogue |
+| `seed:exercises` | `seed_workout_catalog.js` | `set()` over the whole `exercises` stock catalogue |
+| `seed:templates` | `seed_templates.js` | dry-run by default; with `--write`, `set()` over the 7 catalogue templates |
 | `seed:trainers` | `seed_trainer_profiles.js` | upserts 5 `users/{uid}` + `trainerPublicProfiles/{uid}` |
 | **`seed:trainers:clear`** | `seed_trainer_profiles.js --clear` | **`batch.delete()`** on those same 10 docs |
 | `promote:trainer` | `promote_user_to_trainer.js` | flips `users/{uid}.role`, bypassing the role-immutability rule |
@@ -415,7 +416,7 @@ node scripts/seed_emulator_full.js --clear  # remove everything it created
 Populates: Auth users (3 coaches + 5 athletes, throwaway passwords printed at
 the end), `gyms`, `users` + `userPublicProfiles` + `trainerPublicProfiles`,
 `trainer_links`, `friendships`, the **`exercises` stock catalogue** (reused
-from `seed_workout_catalog.js` — same data prod uses), `routines`
+from `seed_workout_catalog.js` — NOT the same data prod uses, see below), `routines`
 (trainer-assigned plans + a public template), historical sessions under
 `users/{uid}/sessions` **with realistic `setLogs` subcollections**
 (deterministic progressive weights ramping onto each slot's `targetWeightKg`;
@@ -427,6 +428,19 @@ Dates are relative to the run instant; pin `SEED_NOW=<ISO date>` for
 reproducible data. Session `muscleGroup` values use the canonical English keys
 (`chest`, `back`, …) exactly like app-written data — Insights' muscle pipeline
 (radar, Músculos del día, Volumen por grupo) depends on them.
+
+**The `exercises` catalogue reused here is NOT prod's.** This line said "same
+data prod uses" and that was false, measured against production on 2026-09-14:
+`seed_workout_catalog.js` carries 25 exercises on the old id scheme
+(`bench-press`, `back-squat`); production has 793 on the current one
+(`bench-press-barra`, `push-up-pesocorporal`), and the two sets share **zero**
+ids. For the emulator that is fine — all these 25 are asked to do is give the
+exercise picker something to show, and `seed_emulator_full.js:1291` already
+documents that its routines use a third id set on purpose. The problem was the
+claim, not the data: believing this file mirrored production is what made
+`npm run seed:all` look harmless while it overwrote the catalogue templates
+with 116 dead exercise references. That half of the seeder was removed on
+2026-09-14; templates now come from `seed_templates.js`.
 
 ---
 
