@@ -18,6 +18,7 @@ import '../../l10n/app_l10n.dart';
 import '../chat/application/chat_providers.dart';
 import '../gym_rankings/presentation/rankings_screen.dart' show RankingsBody;
 import '../gyms/domain/gym.dart' show kNoGymId;
+import '../moderation/application/moderation_providers.dart';
 import '../notifications/application/notification_history_providers.dart';
 import '../profile/application/user_providers.dart';
 import '../profile/domain/user_public_profile.dart';
@@ -981,6 +982,7 @@ class _MiGymBody extends ConsumerWidget {
     final suggestions = (gymId == null || gymId.isEmpty || gymId == kNoGymId)
         ? const <UserPublicProfile>[]
         : ref.watch(suggestedUsersProvider(gymId)).valueOrNull ?? const [];
+    final blockedUids = ref.watch(myBlockedUidsProvider);
 
     return _FeedAsyncBody<List<Post>?>(
       showTitle: showTitle,
@@ -1010,14 +1012,23 @@ class _MiGymBody extends ConsumerWidget {
             FeedEmptyState(message: 'Todavía no estás en un gym'),
           );
         }
-        if (posts.isEmpty) {
+        // moderacion-reporte-y-bloqueo: oculta las tarjetas de autores
+        // bloqueados. COSMÉTICO, no un control de seguridad — el read de
+        // `posts` sigue siendo el mismo para todo el tier gym (design.md →
+        // "Lo que queda cosmético, y se dice"); esto sólo evita mostrárselas
+        // en ESTE cliente. `pagination` se calcula sobre el `posts` SIN
+        // filtrar para no perder el tipo `PaginatedPostList` (isLoadingMore /
+        // hasMore) que `.where().toList()` no preserva.
+        final visiblePosts =
+            posts.where((p) => !blockedUids.contains(p.authorUid)).toList();
+        if (visiblePosts.isEmpty) {
           return const _FeedContent.empty(
             FeedEmptyState(message: 'Tu gym todavía no tiene posts'),
           );
         }
         final pagination = posts is PaginatedPostList ? posts : null;
         return _FeedContent.posts(
-          posts: posts,
+          posts: visiblePosts,
           suggestions: suggestions,
           isLoadingMore: pagination?.isLoadingMore ?? false,
           onLoadMore: () async {
@@ -1052,6 +1063,7 @@ class _PublicoBody extends ConsumerWidget {
     final suggestions = (gymId == null || gymId.isEmpty || gymId == kNoGymId)
         ? const <UserPublicProfile>[]
         : ref.watch(suggestedUsersProvider(gymId)).valueOrNull ?? const [];
+    final blockedUids = ref.watch(myBlockedUidsProvider);
     return _FeedAsyncBody<List<Post>>(
       showTitle: showTitle,
       async: ref.watch(feedPublicProvider),
@@ -1064,14 +1076,20 @@ class _PublicoBody extends ConsumerWidget {
         ref.invalidate(feedPublicProvider);
       },
       dataBuilder: (context, posts) {
-        if (posts.isEmpty) {
+        // moderacion-reporte-y-bloqueo: oculta las tarjetas de autores
+        // bloqueados. COSMÉTICO — ver la nota gemela en `_MiGymBody`.
+        // `pagination` lee del `posts` SIN filtrar para conservar
+        // `PaginatedPostList` (isLoadingMore/hasMore).
+        final visiblePosts =
+            posts.where((p) => !blockedUids.contains(p.authorUid)).toList();
+        if (visiblePosts.isEmpty) {
           return const _FeedContent.empty(
             FeedEmptyState(message: 'Aún no hay posts públicos'),
           );
         }
         final pagination = posts is PaginatedPostList ? posts : null;
         return _FeedContent.posts(
-          posts: posts,
+          posts: visiblePosts,
           suggestions: suggestions,
           isLoadingMore: pagination?.isLoadingMore ?? false,
           onLoadMore: () async {

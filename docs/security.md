@@ -60,7 +60,7 @@ porque son permisos distintos: `get` protege un documento, `list` protege la
 enumeración, y una regla puede tapar uno y dejar el otro abierto). En Storage
 son `get` / `list` / `write` / `delete`.
 
-### 1.1 Firestore — 36 paths declarados en `firestore.rules`
+### 1.1 Firestore — 38 paths declarados en `firestore.rules`
 
 | Colección | get | list | create | update | delete |
 |---|---|---|---|---|---|
@@ -100,16 +100,18 @@ son `get` / `list` / `write` / `delete`.
 | `payments` | ✅ | ✅ | 🟡 | ✅ | ✅ |
 | `reviews` | — | — | ✅ | — | — |
 | `mail_queue` | — | — | — | — | — |
+| `blocks` | ✅ | — | ✅ | ✅ | ✅ |
+| `reports` | ✅ | — | ✅ | ✅ | ✅ |
 
-**112 de 180 celdas** tienen test negativo (62%). Por operación:
+**120 de 190 celdas** tienen test negativo (63%). Por operación:
 
 | Operación | Paths con test negativo |
 |---|---|
-| `get` | 23 / 36 |
-| `list` | 17 / 36 |
-| `create` | 32 / 36 |
-| `update` | 26 / 36 |
-| `delete` | 14 / 36 |
+| `get` | 25 / 38 |
+| `list` | 17 / 38 |
+| `create` | 34 / 38 |
+| `update` | 28 / 38 |
+| `delete` | 16 / 38 |
 
 Tres paths siguen **sin una sola aserción negativa**:
 `users/{uid}/customExercises`, `exercises`, `mail_queue`.
@@ -624,18 +626,18 @@ que el borrado de cuenta se lleva todo eso, y que la política dice la verdad.
 **Método.** Nada acá sale de memoria ni de suposición:
 
 1. El universo de stores se enumeró con `rg '^\s*match /' firestore.rules` →
-   **42 líneas**, que son **41 colecciones** una vez descontado el wrapper
+   **44 líneas**, que son **43 colecciones** una vez descontado el wrapper
    `match /databases/{database}/documents`.
 
-   Ese 41 **no es** el número de §1.1, y conviene dejar escrito por qué, porque
-   la cifra ya derivó una vez por no estarlo: §1.1 declara **36 paths** y las
+   Ese 43 **no es** el número de §1.1, y conviene dejar escrito por qué, porque
+   la cifra ya derivó una vez por no estarlo: §1.1 declara **38 paths** y las
    **5** que faltan son `mp_checkouts`, `mp_plans`, `mp_preapprovals`,
    `mp_webhook_events` y `rc_webhook_events`. Las cinco son `allow read, write:
    if false` — bloques **documentales**, escritos sólo por el Admin SDK, que
    existen para que el default-deny quede explícito en el archivo. No ejercitan
    ningún permiso de cliente y por eso no aportan celdas a aquella matriz
    (`mp-collections-rules.test.ts` sí las testea: verifica justamente que estén
-   cerradas). **41 = 36 + 5.**
+   cerradas). **43 = 38 + 5.**
 
    ⚠️ `if false` **no** es el criterio, aunque lo parezca: `mail_queue` es
    igual de CF-only, igual de `if false`, y **sí** ocupa fila en §1.1 con las

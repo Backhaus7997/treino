@@ -13,6 +13,8 @@ import '../../../auth/application/auth_providers.dart';
 import '../../../gyms/application/gym_providers.dart';
 import '../../../gyms/domain/gym.dart' show kNoGymId;
 import '../../../gyms/domain/gym_display_name.dart';
+import '../../../moderation/domain/report_target_kind.dart';
+import '../../../moderation/presentation/moderation_actions.dart';
 import '../../application/post_actions_notifier.dart';
 import '../../domain/post.dart';
 import '../../domain/routine_tag.dart';
@@ -143,9 +145,11 @@ class PostCard extends ConsumerWidget {
                   ),
                 ),
               ),
-              // Overflow menu — Editar/Eliminar, own posts only
-              // (REQ-FEED-POSTCARD-006).
-              if (isOwner)
+              // Overflow menu. Dueño → Editar/Eliminar
+              // (REQ-FEED-POSTCARD-006). No-dueño autenticado → Reportar/
+              // Bloquear (feature moderacion-reporte-y-bloqueo). Sin sesión
+              // → sin menú: reportar/bloquear necesitan un uid propio.
+              if (viewerUid != null)
                 Semantics(
                   button: true,
                   label: AppL10n.of(context).postCardMenuA11y,
@@ -155,7 +159,16 @@ class PostCard extends ConsumerWidget {
                       color: palette.textMuted,
                       size: 20,
                     ),
-                    onPressed: () => _showPostMenu(context, ref),
+                    onPressed: () => isOwner
+                        ? _showPostMenu(context, ref)
+                        : showModerationMenu(
+                            context,
+                            ref,
+                            targetKind: ReportTargetKind.post,
+                            targetId: post.id,
+                            targetOwnerUid: post.authorUid,
+                            targetOwnerDisplayName: post.authorDisplayName,
+                          ),
                     tooltip: null,
                     constraints: const BoxConstraints(),
                     padding: EdgeInsets.zero,

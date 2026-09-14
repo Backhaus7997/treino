@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/profile/application/user_public_profile_providers.dart';
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/features/reviews/domain/review.dart';
 import 'package:treino/features/reviews/presentation/widgets/review_tile.dart';
 import 'package:treino/features/reviews/presentation/widgets/star_rating_display.dart';
+import 'package:treino/features/workout/application/session_providers.dart'
+    show currentUidProvider;
 import 'package:treino/l10n/app_l10n.dart';
 
 const _athleteId = 'athlete-1';
@@ -38,11 +41,17 @@ UserPublicProfile _makeProfile() => const UserPublicProfile(
 Widget _wrap({
   required Review review,
   UserPublicProfile? profile,
+  // moderacion-reporte-y-bloqueo: ReviewTile ahora lee currentUidProvider
+  // para el menú de moderación. Default a un uid que NO es el autor de la
+  // review, así el menú queda visible salvo que un test pida lo contrario —
+  // ninguno de los tests preexistentes verificaba su ausencia/presencia.
+  String? viewerUid = 'otro-uid',
 }) =>
     ProviderScope(
       overrides: [
         userPublicProfileProvider(_athleteId)
             .overrideWith((ref) => Stream.value(profile)),
+        currentUidProvider.overrideWith((_) => viewerUid),
       ],
       child: MaterialApp(
         theme: AppTheme.dark(),
@@ -120,6 +129,62 @@ void main() {
           .toList();
       expect(contentTexts.isEmpty, isTrue,
           reason: 'Comment row should be absent when comment is null');
+    });
+
+    group('moderación (moderacion-reporte-y-bloqueo)', () {
+      testWidgets('menú visible para un viewer que NO escribió la review',
+          (tester) async {
+        final review = _makeReview();
+        await tester.pumpWidget(_wrap(
+          review: review,
+          profile: _makeProfile(),
+          viewerUid: 'otro-uid',
+        ));
+        await tester.pumpAndSettle();
+
+        expect(find.byIcon(TreinoIcon.dotsThree), findsOneWidget);
+      });
+
+      testWidgets('menú oculto para el propio autor de la review',
+          (tester) async {
+        final review = _makeReview();
+        await tester.pumpWidget(_wrap(
+          review: review,
+          profile: _makeProfile(),
+          viewerUid: _athleteId,
+        ));
+        await tester.pumpAndSettle();
+
+        expect(find.byIcon(TreinoIcon.dotsThree), findsNothing);
+      });
+
+      testWidgets('menú oculto sin sesión', (tester) async {
+        final review = _makeReview();
+        await tester.pumpWidget(_wrap(
+          review: review,
+          profile: _makeProfile(),
+          viewerUid: null,
+        ));
+        await tester.pumpAndSettle();
+
+        expect(find.byIcon(TreinoIcon.dotsThree), findsNothing);
+      });
+
+      testWidgets('tocar el menú abre Reportar/Bloquear', (tester) async {
+        final review = _makeReview();
+        await tester.pumpWidget(_wrap(
+          review: review,
+          profile: _makeProfile(),
+          viewerUid: 'otro-uid',
+        ));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byIcon(TreinoIcon.dotsThree));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Reportar'), findsOneWidget);
+        expect(find.text('Bloquear'), findsOneWidget);
+      });
     });
   });
 }

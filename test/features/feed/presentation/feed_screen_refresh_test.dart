@@ -27,6 +27,7 @@ import 'package:treino/features/feed/domain/post.dart';
 import 'package:treino/features/feed/domain/post_page.dart';
 import 'package:treino/features/feed/domain/post_privacy.dart';
 import 'package:treino/features/feed/feed_screen.dart';
+import 'package:treino/features/moderation/application/moderation_providers.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
@@ -124,6 +125,8 @@ List<Override> _overrides(
         (ref) => Stream.value(_MockUser(uid: 'u1')),
       ),
       followingProvider('u1').overrideWith((ref) => Stream.value(const ['u2'])),
+      blockedUidsProvider('u1')
+          .overrideWith((ref) => Stream.value(const <String>[])),
       userProfileProvider.overrideWith(
         (ref) => Stream.value(_makeProfile(gymId: gymId)),
       ),
