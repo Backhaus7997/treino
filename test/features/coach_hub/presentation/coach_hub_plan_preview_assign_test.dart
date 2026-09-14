@@ -188,13 +188,31 @@ void main() {
       }
       await tester.pumpAndSettle();
 
-      // A dónde navega el éxito NO se assertea acá: aterriza en
-      // `/upload-plan` y eso es un bug aparte, anterior a este cambio, con su
-      // propio test más abajo. Mezclarlo con el assert de concurrencia haría
-      // que este test se ponga rojo por un motivo que no es el suyo.
-      expect(find.byType(CoachHubPlanPreviewScreen), findsNothing,
-          reason: 'tras el éxito la pantalla de preview tiene que quedar '
-              'atrás, sea cual sea el destino');
+      expect(find.text('DASHBOARD'), findsOneWidget);
+    });
+
+    testWidgets(
+        'el éxito va al dashboard y NO rebota a subir archivo '
+        '(regresión: limpiar el plan disparaba la red de seguridad)',
+        (tester) async {
+      final repo = _MockRoutineRepository();
+      when(() => repo.createAssigned(any())).thenAnswer((inv) async {
+        final routine = inv.positionalArguments.first as Routine;
+        return routine.copyWith(id: 'r-${routine.assignedTo}');
+      });
+
+      await _pumpPreview(tester, repo);
+      await _seleccionarTodosYAsignar(tester);
+      await tester.pumpAndSettle();
+
+      // El bug: `_assign` limpia `parsedPlanProvider` y NAVEGA. El plan en
+      // null hacía que `build` leyera "entraron acá sin subir nada" y agendara
+      // un `go('/upload-plan')` que le ganaba al `go('/dashboard')`. El PF
+      // asignaba bien, veía el cartel de éxito, y volvía a la pantalla de
+      // subir el Excel.
+      expect(find.text('UPLOAD'), findsNothing,
+          reason: 'rebotó a subir archivo después de asignar correctamente');
+      expect(find.text('DASHBOARD'), findsOneWidget);
     });
 
     testWidgets('si falla uno de tres, quedan seleccionados sólo los fallados',

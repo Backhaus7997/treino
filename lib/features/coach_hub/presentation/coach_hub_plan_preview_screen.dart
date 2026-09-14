@@ -58,6 +58,20 @@ class _CoachHubPlanPreviewScreenState
   /// in an ephemeral autoDispose provider and is lost on back-navigation.
   bool _hasManualMappings = false;
 
+  /// Se prende cuando la asignación salió bien y esta pantalla se está yendo
+  /// al dashboard por decisión propia.
+  ///
+  /// Existe porque el éxito hace DOS cosas: limpia `parsedPlanProvider` y
+  /// navega. Limpiarlo deja el plan en `null`, y `build` trata "plan null"
+  /// como "alguien entró acá sin haber subido nada" y agenda un
+  /// `go('/upload-plan')` en un post-frame. Esa red de seguridad le ganaba al
+  /// `go('/dashboard')` del éxito: el PF asignaba, veía el cartel de que salió
+  /// bien, y aterrizaba de nuevo en la pantalla de subir archivo.
+  ///
+  /// Medido con un test de un solo alumno contra el código anterior a la
+  /// paralelización, así que no lo trajo ese cambio: estaba desde antes.
+  bool _saliendoAlDashboard = false;
+
   /// Confirms before destroying the parsed (and possibly manually-mapped) plan
   /// by navigating back to the upload screen. Returns `true` if the trainer
   /// chose to leave, `false` (or null → treated as stay) otherwise.
@@ -215,6 +229,10 @@ class _CoachHubPlanPreviewScreenState
     }
 
     // Full success: clear the parsed plan and move on to the dashboard.
+    // El orden importa menos que la bandera: limpiar el plan dispara el
+    // rebuild con `plan == null`, y sin `_saliendoAlDashboard` la red de
+    // seguridad de `build` nos manda a `/upload-plan` pisando este `go`.
+    _saliendoAlDashboard = true;
     ref.read(parsedPlanProvider.notifier).state = null;
     final msg = athleteIds.length == 1
         ? 'Plan asignado correctamente.'
@@ -362,9 +380,13 @@ class _CoachHubPlanPreviewScreenState
     final profile = ref.watch(userProfileProvider).valueOrNull;
 
     if (plan == null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) context.go('/upload-plan');
-      });
+      // El `return` de abajo va SIEMPRE —sin plan no hay nada que dibujar—,
+      // pero el rebote a subir archivo sólo si no nos estamos yendo solos.
+      if (!_saliendoAlDashboard) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && !_saliendoAlDashboard) context.go('/upload-plan');
+        });
+      }
       return Scaffold(
         backgroundColor: palette.bg,
         body: Center(child: CircularProgressIndicator(color: palette.accent)),
