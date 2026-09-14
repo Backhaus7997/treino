@@ -541,6 +541,7 @@ void main() {
         'o buscá un entrenador que te guíe.';
     const bodyDosCaminos = 'Ya tenés entrenador. Mientras tanto, creá tu '
         'propia rutina o explorá planes ya armados.';
+    const bodyNeutro = 'Creá tu propia rutina o explorá planes ya armados.';
 
     /// Assertea el body Y los botones EN LA MISMA verificación.
     ///
@@ -548,21 +549,36 @@ void main() {
     /// no es ceremonia: el desfasaje que perseguimos es "sacaron el botón y se
     /// olvidaron del texto". Partido en dos tests, esa regresión deja uno en
     /// verde y se lee como un rojo aislado en vez de como lo que es.
-    void expectCaminos({required bool conBuscarEntrenador}) {
+    /// Los tres estados posibles de la card, con el body que le corresponde a
+    /// cada uno. Es UN solo helper y no tres asserts sueltos por el motivo de
+    /// siempre: lo que se protege es que el texto y los botones no puedan
+    /// divergir.
+    ///
+    /// `sinConfirmar` es el que agregó Codex en la review del PR: antes
+    /// compartía body con `conPf` y le afirmaba "Ya tenés entrenador" a un
+    /// atleta del que no se sabía nada.
+    void expectCard({required String esperado}) {
       expect(find.text('CREAR RUTINA'), findsOneWidget);
       expect(find.text('Explorar planes'), findsOneWidget);
+
+      final bodies = {
+        'sinPf': bodyTresCaminos,
+        'conPf': bodyDosCaminos,
+        'sinConfirmar': bodyNeutro,
+      };
+      expect(bodies.containsKey(esperado), isTrue, reason: 'estado inválido');
+
       expect(
         find.text('Buscar entrenador'),
-        conBuscarEntrenador ? findsOneWidget : findsNothing,
+        esperado == 'sinPf' ? findsOneWidget : findsNothing,
       );
-      expect(
-        find.text(bodyTresCaminos),
-        conBuscarEntrenador ? findsOneWidget : findsNothing,
-      );
-      expect(
-        find.text(bodyDosCaminos),
-        conBuscarEntrenador ? findsNothing : findsOneWidget,
-      );
+      for (final entry in bodies.entries) {
+        expect(
+          find.text(entry.value),
+          entry.key == esperado ? findsOneWidget : findsNothing,
+          reason: 'body de "${entry.key}" con el estado "$esperado"',
+        );
+      }
     }
 
     testWidgets('sin rutinas y SIN PF → tres caminos y el body que los nombra',
@@ -572,7 +588,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expectCaminos(conBuscarEntrenador: true);
+      expectCard(esperado: 'sinPf');
     });
 
     testWidgets(
@@ -586,15 +602,15 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expectCaminos(conBuscarEntrenador: false);
+      expectCard(esperado: 'conPf');
       // Y sigue siendo la card de primer arranque: el alumno tiene PF pero
       // todavía no recibió el plan, que es exactamente el caso del hallazgo.
       expect(find.byType(EmpezarEntrenamientoCard), findsNothing);
     });
 
     testWidgets(
-        'vínculo sin resolver → dos caminos: "todavía no sé" no habilita '
-        'decirle que no tiene entrenador', (tester) async {
+        'vínculo sin resolver → dos caminos y copy NEUTRO: no se afirma ni que '
+        'tiene entrenador ni que no tiene', (tester) async {
       await tester.pumpWidget(
         _wrapWithRouter(
           _firstRunRouter(),
@@ -604,11 +620,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expectCaminos(conBuscarEntrenador: false);
+      expectCard(esperado: 'sinConfirmar');
     });
 
     testWidgets(
-        'vínculo con error → dos caminos, y sin texto de error en la card',
+        'vínculo con error → dos caminos y copy NEUTRO, sin texto de error',
         (tester) async {
       await tester.pumpWidget(
         _wrapWithRouter(
@@ -620,7 +636,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expectCaminos(conBuscarEntrenador: false);
+      expectCard(esperado: 'sinConfirmar');
       expect(find.textContaining(RegExp(r'[Ee]rror|denied')), findsNothing);
     });
 

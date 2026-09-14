@@ -159,11 +159,11 @@ class _AthleteHome extends ConsumerWidget {
     // más común de esta card— mostraría dos caminos y saltaría a tres.
     //
     // Con `select` y no watcheando el `AsyncValue` entero: de todo el vínculo
-    // acá sólo se usa un booleano, y sin el select cualquier re-emisión del
+    // acá sólo se usan tres estados, y sin el select cualquier re-emisión del
     // stream —un cambio de `status`, un `updatedAt`— rebuildea _AthleteHome
     // entera sin que se dibuje nada distinto.
-    final showFindTrainer = ref.watch(
-      currentAthleteLinkProvider.select(_confirmedWithoutTrainer),
+    final estadoDelVinculo = ref.watch(
+      currentAthleteLinkProvider.select(_estadoDelVinculo),
     );
 
     return Padding(
@@ -196,7 +196,7 @@ class _AthleteHome extends ConsumerWidget {
             TreinoFadeSlideIn(
               delay: AppMotion.stagger(1),
               child: hasNoRoutine
-                  ? _AthleteFirstRunCard(showFindTrainer: showFindTrainer)
+                  ? _AthleteFirstRunCard(estadoDelVinculo: estadoDelVinculo)
                   : const EmpezarEntrenamientoCard(),
             ),
             const SizedBox(height: 12),
@@ -225,26 +225,54 @@ class _AthleteHome extends ConsumerWidget {
 bool _isEmptyData(AsyncValue<List<Object?>> async) =>
     async.valueOrNull?.isEmpty ?? false;
 
-/// True sólo cuando el vínculo resolvió a "este atleta NO tiene PF activo".
-/// Loading y error devuelven false, así que el primer arranque cae a dos
-/// caminos y nunca le ofrece buscar entrenador a alguien que ya tiene uno.
+/// Lo que la card de primer arranque sabe sobre el vínculo del atleta con un
+/// PF. Son TRES estados y no dos, y la diferencia no es teórica.
+///
+/// La primera versión de esto era un `bool showFindTrainer`, y colapsaba
+/// [sinConfirmar] contra [conPf]: bajo incertidumbre ocultaba el CTA —bien— y
+/// **además** mostraba el body que dice "Ya tenés entrenador" —mal—. Para un
+/// atleta SIN PF con la caché fría o un error de permisos, la tarjeta le
+/// afirmaba en la cara algo que nadie confirmó. Es exactamente la advertencia
+/// falsa de AGENTS.md §11.1, cometida por el mismo cambio que vino a sacar
+/// otra. Lo encontró Codex en el PR #1124.
+///
+/// Ocultar un botón y afirmar un hecho son decisiones distintas y necesitan
+/// estados distintos.
+enum _EstadoDelVinculo {
+  /// El servidor confirmó que tiene PF activo.
+  conPf,
+
+  /// El servidor confirmó que NO tiene PF. Es lo único que habilita a ofrecer
+  /// "Buscar entrenador" y a enumerar los tres caminos.
+  sinPf,
+
+  /// Todavía no se sabe: cargando, error, o un error que retuvo un valor
+  /// previo. Se ocultan los botones que dependen del vínculo y el copy no
+  /// afirma nada sobre él.
+  sinConfirmar,
+}
+
+/// Traduce el `AsyncValue` del vínculo a uno de los tres estados.
 ///
 /// **No sirve `valueOrNull`**, que es el idioma del resto del archivo: el dato
 /// de este provider ya es `TrainerLink?`, así que `valueOrNull` da `null`
 /// tanto para "todavía no sé" como para "confirmado que no hay", y colapsa
-/// justo la distinción que decide qué botón se dibuja. `hasValue` es lo único
-/// que separa las dos — mismo criterio que el gate del composer de chat
-/// (`chat_screen.dart`) y que `mi_cuota_provider.dart`, que leen este mismo
-/// provider.
+/// justo la distinción que decide qué se dibuja.
 ///
-/// Que el default bajo incertidumbre sea "ocultá el CTA" y no "mostralo" sale
-/// de la misma doctrina que `_isEmptyData`: no afirmar sobre el usuario algo
-/// que no se confirmó. Acá la afirmación es "no tenés entrenador", y es
-/// exactamente la que el hallazgo del E2E vino a sacar. Si el vínculo nunca
-/// resuelve, el atleta sin PF sigue teniendo la tab Coach, que es donde vive
-/// el discovery (AGENTS.md §5) — el CTA es un atajo, nunca la única puerta.
-bool _confirmedWithoutTrainer(AsyncValue<TrainerLink?> async) =>
-    async.hasValue && async.value == null;
+/// **Tampoco alcanza `hasValue` solo.** Riverpod retiene el último valor al
+/// entrar en error (`AsyncError.copyWithPrevious`), así que después de un
+/// `AsyncData(null)` seguido de una falla del stream, `hasValue` sigue en true
+/// y `value` sigue en null — y el estado se leería como "confirmado que no
+/// hay" cuando en realidad el vínculo dejó de estar confirmado. Por eso
+/// `hasError` e `isLoading` se miran PRIMERO. (Codex, PR #1124.)
+_EstadoDelVinculo _estadoDelVinculo(AsyncValue<TrainerLink?> async) {
+  if (async.isLoading || async.hasError || !async.hasValue) {
+    return _EstadoDelVinculo.sinConfirmar;
+  }
+  return async.value == null
+      ? _EstadoDelVinculo.sinPf
+      : _EstadoDelVinculo.conPf;
+}
 
 /// First-run empty state shown on Home when the athlete has no self-created
 /// routine and no trainer-assigned plan. Replaces the hardcoded fake workout
@@ -279,21 +307,34 @@ bool _confirmedWithoutTrainer(AsyncValue<TrainerLink?> async) =>
 ///
 /// Un atleta que YA tiene PF activo pero todavía no recibió su plan cae igual
 /// en esta card —la condición de arriba mira rutinas, no vínculo— y ofrecerle
-/// "Buscar entrenador" es decirle que busque lo que ya tiene. Con
-/// [showFindTrainer] en false el tercer botón no se dibuja.
+/// "Buscar entrenador" es decirle que busque lo que ya tiene.
 ///
-/// **Y el body cambia con él.** Sacar un botón sin tocar el texto deja la
-/// card prometiendo tres caminos y mostrando dos: ése es justo el desfasaje
-/// que el dartdoc de arriba venía avisando. Por eso son DOS strings
-/// (`homeAthleteFirstRunBody` / `homeAthleteFirstRunBodyWithTrainer`) elegidos
-/// por la MISMA condición que dibuja el botón, y un test que assertea las dos
-/// cosas juntas — texto y cantidad de botones— para que no puedan divergir.
+/// **Y el body cambia con el botón**, porque sacar un botón sin tocar el texto
+/// deja la card prometiendo tres caminos y mostrando dos — el desfasaje que el
+/// dartdoc de arriba venía avisando.
+///
+/// De ahí los TRES bodies, uno por cada [_EstadoDelVinculo]:
+///
+/// | estado | botones | body |
+/// |---|---|---|
+/// | [_EstadoDelVinculo.sinPf] | 3 | enumera los tres caminos |
+/// | [_EstadoDelVinculo.conPf] | 2 | "Ya tenés entrenador…" |
+/// | [_EstadoDelVinculo.sinConfirmar] | 2 | **neutro**: no dice nada del PF |
+///
+/// El tercero existe porque la primera versión usaba un `bool` y bajo
+/// incertidumbre mostraba el body de "ya tenés entrenador" a alguien que capaz
+/// no tiene ninguno. Ocultar un botón y afirmar un hecho son decisiones
+/// distintas — ver [_EstadoDelVinculo].
 class _AthleteFirstRunCard extends StatelessWidget {
-  const _AthleteFirstRunCard({required this.showFindTrainer});
+  const _AthleteFirstRunCard({required this.estadoDelVinculo});
 
-  /// Si se ofrece el tercer camino. Sólo true cuando el servidor confirmó que
-  /// el atleta no tiene PF activo — ver `_confirmedWithoutTrainer`.
-  final bool showFindTrainer;
+  /// Lo que se sabe del vínculo con un PF. Ver [_estadoDelVinculo].
+  final _EstadoDelVinculo estadoDelVinculo;
+
+  /// El tercer camino sólo se ofrece con confirmación del servidor de que NO
+  /// hay PF. Bajo incertidumbre no se ofrece: ver [_EstadoDelVinculo].
+  bool get _ofreceBuscarEntrenador =>
+      estadoDelVinculo == _EstadoDelVinculo.sinPf;
 
   @override
   Widget build(BuildContext context) {
@@ -320,11 +361,18 @@ class _AthleteFirstRunCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              // Atado al mismo booleano que el tercer botón, y no a una copia
+              // Atado al MISMO estado que dibuja los botones, y no a una copia
               // del criterio: si divergen, la card miente sobre sí misma.
-              showFindTrainer
-                  ? l10n.homeAthleteFirstRunBody
-                  : l10n.homeAthleteFirstRunBodyWithTrainer,
+              switch (estadoDelVinculo) {
+                _EstadoDelVinculo.sinPf => l10n.homeAthleteFirstRunBody,
+                _EstadoDelVinculo.conPf =>
+                  l10n.homeAthleteFirstRunBodyWithTrainer,
+                // Sin confirmar: se enumeran los dos caminos que SÍ se
+                // dibujan y no se dice una palabra sobre el entrenador,
+                // porque no se sabe si tiene.
+                _EstadoDelVinculo.sinConfirmar =>
+                  l10n.homeAthleteFirstRunBodyNeutral,
+              },
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: palette.textMuted,
               ),
@@ -353,8 +401,9 @@ class _AthleteFirstRunCard extends StatelessWidget {
             ),
             // Secondary CTA: route to the Coach tab where athletes browse and
             // request a trainer. Se omite —con su separador— cuando el atleta
-            // ya tiene PF activo: ver el dartdoc de la clase.
-            if (showFindTrainer) ...[
+            // ya tiene PF activo O cuando no se pudo confirmar: ver el dartdoc
+            // de la clase.
+            if (_ofreceBuscarEntrenador) ...[
               const SizedBox(height: 10),
               _FirstRunSecondaryCta(
                 label: l10n.homeAthleteFirstRunFindTrainerCta,

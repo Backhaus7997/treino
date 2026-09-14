@@ -134,6 +134,12 @@ abstract class AppL10n {
   /// **'Ya tenés entrenador. Mientras tanto, creá tu propia rutina o explorá planes ya armados.'**
   String get homeAthleteFirstRunBodyWithTrainer;
 
+  /// Home first-run empty-state body used when the athlete's trainer link could NOT be confirmed (loading, error, or a retained error). Names ONLY the two paths whose buttons are drawn, in button order, and says NOTHING about whether the athlete has a trainer — claiming either way would be an unverified statement about the user (AGENTS.md 11.1). Sibling of homeAthleteFirstRunBody (three paths, no trainer) and homeAthleteFirstRunBodyWithTrainer (two paths, trainer confirmed).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Creá tu propia rutina o explorá planes ya armados.'**
+  String get homeAthleteFirstRunBodyNeutral;
+
   /// Home first-run primary CTA to create a routine (finding 6).
   ///
   /// In es_AR, this message translates to:
