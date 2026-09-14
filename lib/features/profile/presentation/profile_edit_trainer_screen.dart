@@ -292,11 +292,21 @@ class _ProfileEditTrainerScreenState
     //
     // El caso que motivo el gate sigue cubierto: el PF que publica por primera
     // vez va de cero ubicaciones a una, o sea que la lista cambia.
+    final perfil = ref.read(userProfileProvider).valueOrNull;
     final tocaUbicaciones = !listEquals(_locations, _locationsAlAbrir);
+    // La supresion vale SOLO para quien ya decidio algo.
+    //
+    // Al PF que nunca vio el prompt hay que preguntarle igual, aunque no toque
+    // la lista, porque a esta pantalla se puede llegar SIN pasar por /home:
+    // `router.dart:190-194` REDIRIGE al PF con perfil incompleto a
+    // /profile/edit-trainer?mode=onboarding. Es un redirect, no un push, asi
+    // que HomeScreen no se monta y su `TrainerLocationConsentGate` no existe.
+    // Sin esta mitad, ese PF guardaba y se iba sin que nadie le preguntara
+    // nunca, con su ubicacion ya publicada en el espejo.
+    final yaLePreguntamos = perfil?.trainerLocationConsentPromptedAt != null;
     if (_locations.isNotEmpty &&
-        tocaUbicaciones &&
-        ref.read(userProfileProvider).valueOrNull?.trainerLocationConsentAt ==
-            null) {
+        perfil?.trainerLocationConsentAt == null &&
+        (!yaLePreguntamos || tocaUbicaciones)) {
       final consented = await _askLocationConsent();
       if (!mounted) return;
       // Cancelar aborta el guardado y deja el form intacto: lo que cargó sigue

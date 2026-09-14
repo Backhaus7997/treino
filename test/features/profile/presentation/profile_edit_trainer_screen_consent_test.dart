@@ -246,6 +246,39 @@ void main() {
     });
 
     testWidgets(
+        'al PF que NUNCA vio el prompt se le pregunta igual, aunque no toque '
+        'la lista', (tester) async {
+      // Hallazgo de Codex sobre el primer intento de este arreglo. La primera
+      // version suprimia el prompt cada vez que la lista no cambiaba, y eso
+      // abria un agujero: a esta pantalla se llega SIN pasar por /home.
+      // `router.dart:190-194` REDIRIGE al PF con perfil incompleto a
+      // /profile/edit-trainer?mode=onboarding — redirect, no push — asi que
+      // HomeScreen no se monta y su TrainerLocationConsentGate no existe.
+      //
+      // Un PF legacy (los dos timestamps en null) que entra por ahi guardaba y
+      // se iba sin que NADIE le preguntara nunca, con su ubicacion ya
+      // publicada en el espejo.
+      final repo = _repo();
+      await tester.pumpWidget(
+        _buildScreen(
+          profile: _trainer(consentAt: null, promptedAt: null),
+          repo: repo,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await _tapSave(tester);
+
+      expect(
+        find.byKey(const Key('profile_edit_trainer_consent_confirm')),
+        findsOneWidget,
+        reason: 'nunca se le preguntó: la supresión no le aplica',
+      );
+      verifyNever(() => repo.update(any(), any(),
+          grantLocationConsent: any(named: 'grantLocationConsent')));
+    });
+
+    testWidgets(
         'P1-c: el PF que revocó guarda sin que le vuelvan a pedir '
         'consentimiento', (tester) async {
       // Estado (consentAt null, promptedAt set): revocó, o cerró el sheet sin
