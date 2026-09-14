@@ -65,6 +65,13 @@ const {
   buildExerciseDoc,
 } = require('./seed_workout_catalog.js');
 
+// Los identificadores que este seed le PROMETE a las suites de
+// `integration_test/`. Módulo puro: de él sale también
+// `integration_test/support/seed_ids.dart` (ver `export_seed_ids.js`), y
+// `test/e2e_seed_contract.test.js` falla si el generado quedó viejo. Lo que
+// viva acá adentro tiene UN solo lugar donde cambiar.
+const E2E = require('./lib/e2e_seed_contract');
+
 // ────────────────────────────────────────────────────────────────────────────
 // Geohash5 — port of lib/core/utils/geohash.dart
 // ────────────────────────────────────────────────────────────────────────────
@@ -135,7 +142,7 @@ const COACHES = [
   {
     uid: 'seed-coach-001',
     email: 'coach.lautaro@emulator.treino',  // EMULATOR-ONLY
-    password: 'Emulator1234!',               // EMULATOR-ONLY
+    password: E2E.PASSWORD,                  // EMULATOR-ONLY
     displayName: 'Lautaro Pérez',
     gymId: 'seed-gym-baires-001',
     trainerBio: 'Powerlifter competitivo desde 2018. Especializado en sentadilla, banco y peso muerto.',
@@ -148,7 +155,7 @@ const COACHES = [
   {
     uid: 'seed-coach-002',
     email: 'coach.camila@emulator.treino',   // EMULATOR-ONLY
-    password: 'Emulator1234!',               // EMULATOR-ONLY
+    password: E2E.PASSWORD,                  // EMULATOR-ONLY
     displayName: 'Camila Ruiz',
     gymId: 'seed-gym-baires-002',
     trainerBio: 'Crossfit Level 2. Fuerza + condicionamiento metabólico. Atención personalizada.',
@@ -161,7 +168,7 @@ const COACHES = [
   {
     uid: 'seed-coach-003',
     email: 'coach.diego@emulator.treino',    // EMULATOR-ONLY
-    password: 'Emulator1234!',               // EMULATOR-ONLY
+    password: E2E.PASSWORD,                  // EMULATOR-ONLY
     displayName: 'Diego Aguirre',
     gymId: null,
     trainerBio: 'Kinesiología + entrenamiento. Recupero post-lesión, runners, fortalecimiento de core.',
@@ -179,7 +186,7 @@ const ATHLETES = [
   {
     uid: 'seed-athlete-001',
     email: 'martin@emulator.treino',         // EMULATOR-ONLY
-    password: 'Emulator1234!',               // EMULATOR-ONLY
+    password: E2E.PASSWORD,                  // EMULATOR-ONLY
     displayName: 'Martín López',
     gymId: 'seed-gym-baires-001',
     gender: 'male',
@@ -190,7 +197,7 @@ const ATHLETES = [
   {
     uid: 'seed-athlete-002',
     email: 'sofia@emulator.treino',          // EMULATOR-ONLY
-    password: 'Emulator1234!',               // EMULATOR-ONLY
+    password: E2E.PASSWORD,                  // EMULATOR-ONLY
     displayName: 'Sofía Ramírez',
     gymId: 'seed-gym-baires-001',
     gender: 'female',
@@ -201,7 +208,7 @@ const ATHLETES = [
   {
     uid: 'seed-athlete-003',
     email: 'mateo@emulator.treino',          // EMULATOR-ONLY
-    password: 'Emulator1234!',               // EMULATOR-ONLY
+    password: E2E.PASSWORD,                  // EMULATOR-ONLY
     displayName: 'Mateo Quiroga',
     gymId: 'seed-gym-baires-002',
     gender: 'male',
@@ -212,7 +219,7 @@ const ATHLETES = [
   {
     uid: 'seed-athlete-004',
     email: 'valentina@emulator.treino',      // EMULATOR-ONLY
-    password: 'Emulator1234!',               // EMULATOR-ONLY
+    password: E2E.PASSWORD,                  // EMULATOR-ONLY
     displayName: 'Valentina Peralta',
     gymId: 'seed-gym-baires-002',
     gender: 'female',
@@ -223,7 +230,7 @@ const ATHLETES = [
   {
     uid: 'seed-athlete-005',
     email: 'nicolas@emulator.treino',        // EMULATOR-ONLY
-    password: 'Emulator1234!',               // EMULATOR-ONLY
+    password: E2E.PASSWORD,                  // EMULATOR-ONLY
     displayName: 'Nicolás Fernández',
     gymId: null,
     gender: 'male',
@@ -245,7 +252,7 @@ const ATHLETES = [
   ].map(([suffix, email, displayName, gender, experienceLevel, bodyWeightKg, heightCm]) => ({
     uid: `seed-athlete-${suffix}`,
     email: `${email}@emulator.treino`,       // EMULATOR-ONLY
-    password: 'Emulator1234!',               // EMULATOR-ONLY
+    password: E2E.PASSWORD,                  // EMULATOR-ONLY
     displayName,
     gymId: 'seed-gym-baires-001',
     gender,
@@ -356,15 +363,9 @@ function sortedDocId(a, b) {
   return a.localeCompare(b) <= 0 ? `${a}_${b}` : `${b}_${a}`;
 }
 
-/// Doc id de una arista de follow: NO ordena. Ver `Follow.edgeId`.
-/// No confundir con `sortedDocId`, que sí ordena y es para `chats`.
-function followEdgeId(follower, followee) {
-  return `${follower}_${followee}`;
-}
-
 function followEdge(follower, followee, status, createdAt) {
   return {
-    id: followEdgeId(follower, followee),
+    id: E2E.followEdgeId(follower, followee),
     followerUid: follower,
     followeeUid: followee,
     status,
@@ -429,23 +430,12 @@ const FOLLOWS = [
 //     abre por deep link, y NO aparece en la lista — que es la peor variante:
 //     parece un bug de la pantalla.
 
-/// Orden de `members` y doc id de un chat. Se escribe con `<` y no con
-/// `localeCompare` (como `sortedDocId`) a propósito: acá el orden ES la regla
-/// (`members[0] < members[1]`), que compara code units, no locale.
-function chatMembers(a, b) {
-  return a < b ? [a, b] : [b, a];
-}
-
-function chatIdOf(a, b) {
-  return chatMembers(a, b).join('_');
-}
-
 const CHATS = [
   // 1. Coach — Lautaro (coach-001) ↔ Martín (athlete-001), vía seed-link-001.
   {
-    members: chatMembers('seed-coach-001', 'seed-athlete-001'),
+    members: E2E.CHATS.coach.members,
     createdAt: daysAgo(55),
-    linkId: 'seed-link-001',
+    linkId: E2E.CHATS.coach.linkId,
     messages: [
       { id: 'seed-msg-coach-01', senderId: 'seed-coach-001', text: 'Arrancamos con el bloque de fuerza. Cualquier duda, por acá.', createdAt: daysAgo(55) },
       { id: 'seed-msg-coach-02', senderId: 'seed-athlete-001', text: 'Dale. La sentadilla la sentí pesada hoy.', createdAt: daysAgo(2) },
@@ -460,9 +450,9 @@ const CHATS = [
   //    vínculo. Diego es el único PF sin gym y con seed-link-004 en `pending`,
   //    así que la consulta no se pisa con ningún chat de Coach.
   {
-    members: chatMembers('seed-athlete-005', 'seed-coach-003'),
+    members: E2E.CHATS.inquiry.members,
     createdAt: daysAgo(2),
-    kind: 'inquiry',
+    kind: E2E.CHATS.inquiry.kind,
     messages: [
       { id: 'seed-msg-inq-01', senderId: 'seed-athlete-005', text: 'Hola Diego, ¿tomás alumnos para recuperación de rodilla?', createdAt: daysAgo(2) },
     ],
@@ -474,7 +464,7 @@ const CHATS = [
   //    aristas. Con una sola, escribiría uno y el otro se comería un
   //    permission-denied — `senderMayPost` pide `followAccepted(other, uid)`.
   {
-    members: chatMembers('seed-athlete-001', 'seed-athlete-002'),
+    members: E2E.CHATS.social.members,
     createdAt: daysAgo(45),
     messages: [
       { id: 'seed-msg-social-01', senderId: 'seed-athlete-002', text: '¿Vas al gym mañana temprano?', createdAt: daysAgo(3) },
