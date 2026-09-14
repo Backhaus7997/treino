@@ -339,12 +339,14 @@ describe("el aviso de los 24 meses", () => {
 
   it("el mail lleva la fecha REAL de baja, no 'dentro de doce meses'", async () => {
     // Cuenta del backlog: ya tiene 40 meses. La baja NO es dentro de doce
-    // meses, es dentro de 30 días, y el mail tiene que decir eso.
+    // meses, es al cumplirse el piso desde el aviso, y el mail tiene que
+    // decir eso.
     const db = installDb({ users: { u1: ATLETA } });
     const { r } = await correr([{ uid: "u1", lastActiveAt: haceMeses(40) }]);
     expect(r.noticed).toBe(1);
 
-    // Para 40 meses de inactividad manda el piso de 30 días, no los 36 meses.
+    // Para 40 meses de inactividad manda el piso desde el aviso, no los 36
+    // meses desde la última actividad.
     const esperada = proyeccionDeBaja(haceMeses(40), HOY);
     expect(esperada.getTime())
       .toBe(HOY.getTime() + MIN_NOTICE_AGE_DAYS * 86400000);
@@ -417,16 +419,41 @@ describe("la baja de los 36 meses", () => {
     expect(r.deleted).toBe(0);
   });
 
-  it("NO borra si el aviso tiene menos de 30 días", async () => {
+  // ── El piso desde el aviso, por las dos puntas ──────────────────────────
+  //
+  // Este es EL caso del backlog, y el que justifica que el piso sea 90 y no 30.
+  // Una cuenta con 40 meses de inactividad ya cumple la condición de los 36 el
+  // día que recibe el aviso: lo único que la separa de la baja es este piso.
+  // Un off-by-one acá no se ve en ningún lado — borra a alguien un día antes de
+  // lo que le promete su propio mail.
+  it("una cuenta del backlog NO se borra un día antes del piso", async () => {
     installDb({
       users: { u1: ATLETA },
-      notices: { u1: { noticeSentAt: Timestamp.fromDate(haceDias(29)) } },
+      notices: {
+        u1: { noticeSentAt: Timestamp.fromDate(haceDias(MIN_NOTICE_AGE_DAYS - 1)) },
+      },
     });
     const { r, bajas } = await correr([
-      { uid: "u1", lastActiveAt: haceMeses(60) },
+      { uid: "u1", lastActiveAt: haceMeses(40) },
     ]);
     expect(bajas).toHaveLength(0);
     expect(r.deleted).toBe(0);
+  });
+
+  it("y SÍ el día que el piso se cumple", async () => {
+    // La otra punta. Sin esta, un piso roto hacia arriba —que no borra nunca—
+    // pasa el test de arriba en verde y el barrido no ejerce jamás.
+    installDb({
+      users: { u1: ATLETA },
+      notices: {
+        u1: { noticeSentAt: Timestamp.fromDate(haceDias(MIN_NOTICE_AGE_DAYS)) },
+      },
+    });
+    const { r, bajas } = await correr([
+      { uid: "u1", lastActiveAt: haceMeses(40) },
+    ]);
+    expect(bajas).toHaveLength(1);
+    expect(r.deleted).toBe(1);
   });
 
   it("borra con las DOS condiciones, y firma el audit log aparte", async () => {
@@ -578,6 +605,23 @@ describe("dryRun — el modo obligatorio de la primera corrida", () => {
     expect(bajas).toHaveLength(0);
     expect(db.mailQueue.size).toBe(0);
     expect(db.noticeWrites).toHaveLength(0);
+  });
+
+  it("el piso entre aviso y baja es el que promete el documento legal", () => {
+    // Un test que fija una constante suele ser ruido. Éste no: no está
+    // cuidando el número, está cuidando que el número y el documento no se
+    // separen.
+    //
+    // `docs/legal/retencion-y-borrado.md` §6 dice, PUBLICADO al usuario, "entre
+    // el aviso y la baja nunca pasan menos de 90 días". Los dos usos que este
+    // archivo hace de la constante la toman como SÍMBOLO, así que la suite
+    // seguía verde con cualquier valor: bajarla a 7 no ponía nada en rojo.
+    // Mientras el número era un detalle de implementación daba igual; desde el
+    // 2026-09-14 es la mitad de una promesa legal.
+    //
+    // Si esto se pone rojo, el arreglo NO es cambiar el 90 de acá: es cambiar
+    // la frase de §6 en el mismo commit.
+    expect(MIN_NOTICE_AGE_DAYS).toBe(90);
   });
 
   it("se despliega en dryRun", () => {

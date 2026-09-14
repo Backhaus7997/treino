@@ -138,8 +138,16 @@ auditoría, así que un valor propio deja la baja automática distinguible de un
 pedida por el usuario cuando alguien lea ese log.
 
 **Condición para borrar**: 36 meses de inactividad **y** que el aviso de los 24
-se haya mandado y tenga al menos 30 días. Nunca borrar sin aviso previo
+se haya mandado y tenga al menos 90 días. Nunca borrar sin aviso previo
 registrado, aunque la cuenta tenga 5 años de inactividad.
+
+> El piso arrancó en 30 días y pasó a 90 el 2026-09-14. En régimen estable no
+> se activa nunca —el hueco entre los 24 y los 36 meses ya es de doce meses—;
+> sólo muerde en el backlog, que es donde el aviso sale tarde. No se subió a
+> 365 porque retener un año más datos de salud de cuentas abandonadas, sólo
+> para honrar la frase «doce meses de antelación», pelearía contra el art. 4
+> inc. 7 de la Ley 25.326 que la propia §6 invoca. La frase legal ahora promete
+> el piso y no un número fijo.
 
 ### 4.4 Dónde se guarda el estado
 

@@ -52,16 +52,33 @@
  * que tenga la cuenta. El registro vive en `retention_notices/{uid}` y es lo
  * único que habilita el paso a la baja.
  *
- * ⚠️ UNA TENSIÓN CON EL TEXTO LEGAL, ANOTADA A PROPÓSITO. El spec §4.3 fija el
- * piso del aviso en 30 días ([MIN_NOTICE_AGE_DAYS]), y `docs/legal` §6 dice que
- * el aviso "llega con doce meses de antelación a la baja". Para una cuenta que
- * cruza los 24 meses estando el barrido encendido las dos cosas coinciden: se
- * avisa a los 24 y se borra a los 36. Para el BACKLOG de la primera corrida no:
- * una cuenta que ya tiene 40 meses recibe el aviso hoy y se borra en 30 días.
- * El mail dice la fecha REAL ([proyeccionDeBaja]) y no repite la frase de los
- * doce meses, así que ningún usuario recibe una afirmación falsa — pero si el
- * titular quiere que el texto legal valga también para el backlog, lo que se
- * cambia es esta constante a 365, no el copy.
+ * El piso del aviso es [MIN_NOTICE_AGE_DAYS] = 90 días, y ese número salió de
+ * una decisión, no de una convención. Vale saber cuál, porque el candidato
+ * obvio era otro.
+ *
+ * La tensión: `docs/legal` §6 decía que el aviso "llega con doce meses de
+ * antelación a la baja". En régimen estable es cierto —se avisa a los 24 y se
+ * borra a los 36— pero para el BACKLOG no: una cuenta que al encender el
+ * barrido ya tiene 40 meses recibe el aviso tarde, y el hueco lo fija el piso.
+ * Con los 30 días que pedía el spec §4.3 se borraba un mes después.
+ *
+ * **Por qué NO se subió el piso a 365**, que era la salida evidente: la
+ * cláusula quedaría peleando contra su propia justificación. El último párrafo
+ * de §6 invoca el art. 4 inc. 7 de la Ley 25.326 —los datos se destruyen cuando
+ * dejan de ser necesarios— y con 365 estaríamos reteniendo doce meses MÁS las
+ * medidas corporales, las fotos de dolor y los check-ins de ánimo de cuentas
+ * que hace más de tres años que nadie toca. No por una necesidad real: para
+ * honrar una frase escrita pensando sólo en el régimen estable. El backlog es
+ * una transición de una sola vez, no una regla.
+ *
+ * **Por qué tampoco quedaron los 30**: nacieron como baranda técnica, para que
+ * ninguna baja ocurra sin que el aviso haya tenido tiempo de llegar. Para una
+ * cuenta que guarda datos de salud, 30 días como única garantía es flaco.
+ *
+ * 90 cierra las dos puntas con UNA constante y sin una rama especial para el
+ * backlog —que es justo el código que después nadie se acuerda de sacar—, y la
+ * frase legal ahora promete un piso en vez de un número fijo. Decisión del
+ * 2026-09-14.
  */
 
 import { App, getApp, initializeApp } from "firebase-admin/app";
@@ -95,8 +112,20 @@ export const NOTICE_AFTER_MONTHS = 24;
 /** Meses de inactividad que habilitan la baja. */
 export const DELETE_AFTER_MONTHS = 36;
 
-/** Días mínimos entre el aviso y la baja. Ver la tensión del encabezado. */
-export const MIN_NOTICE_AGE_DAYS = 30;
+/**
+ * Días mínimos entre el aviso y la baja.
+ *
+ * NO es un detalle de implementación: es la mitad de una promesa escrita en
+ * `docs/legal/retencion-y-borrado.md` §6 ("entre el aviso y la baja nunca pasan
+ * menos de 90 días"). Cambiarlo sin cambiar esa frase publica una afirmación
+ * falsa, y lo fija un test — ver `sweep-inactive-accounts.test.ts`.
+ *
+ * En régimen estable **no se activa nunca**: el hueco entre
+ * [NOTICE_AFTER_MONTHS] y [DELETE_AFTER_MONTHS] ya es de doce meses. Sólo
+ * muerde en el backlog, o sea las cuentas que al encender el barrido ya superan
+ * los 24 meses y reciben el aviso tarde.
+ */
+export const MIN_NOTICE_AGE_DAYS = 90;
 
 /**
  * El `provider` con el que la baja automática firma el registro de auditoría.
@@ -239,13 +268,14 @@ function inactivaHace(lastActiveAt: Date, now: Date, months: number): boolean {
  * La fecha REAL a partir de la cual esta cuenta puede darse de baja.
  *
  * Las DOS condiciones tienen que cumplirse, así que la fecha es la más tardía
- * de las dos: 36 meses desde la última actividad, y 30 días desde el aviso.
+ * de las dos: 36 meses desde la última actividad, y [MIN_NOTICE_AGE_DAYS] días
+ * desde el aviso.
  *
  * Es el número que va al mail, y por eso se calcula acá en vez de escribir
  * "dentro de doce meses" en el copy. Para el backlog de la primera corrida esas
- * dos frases NO dicen lo mismo —una cuenta de 40 meses se borra en 30 días, no
- * en doce meses— y el mail que promete mal es exactamente lo que este trabajo
- * existe para no publicar (AGENTS.md §11.1).
+ * dos frases NO dicen lo mismo —una cuenta de 40 meses se borra al cumplirse el
+ * piso, no en doce meses— y el mail que promete mal es exactamente lo que este
+ * trabajo existe para no publicar (AGENTS.md §11.1).
  */
 export function proyeccionDeBaja(lastActiveAt: Date, noticeSentAt: Date): Date {
   const porInactividad = addMonths(lastActiveAt, DELETE_AFTER_MONTHS);
@@ -350,7 +380,7 @@ export async function evaluarCuenta(
   const aviso = await leerAviso(app, cuenta.uid);
   if (aviso === null) return { tipo: "aviso" };
 
-  // Registro de aviso sin fecha: no se puede afirmar que tenga 30 días, así
+  // Registro de aviso sin fecha: no se puede afirmar que cumpla el piso, así
   // que no habilita la baja. Falla cerrado, como todo lo de este módulo.
   if (aviso.noticeSentAt === null) return { tipo: "esperando" };
 

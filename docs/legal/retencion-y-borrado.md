@@ -159,18 +159,17 @@ promete una baja automática que no ocurre, y una cláusula que promete lo que e
 sistema no hace es peor que no tenerla. Que el código exista no cambia eso: lo
 que el usuario lee es lo que PASA, no lo que está deployado.
 
-PARA SACARLO hacen falta tres cosas, en este orden:
+El desacuerdo entre esta sección y el barrido quedó RESUELTO el 2026-09-14: el
+piso entre el aviso y la baja es de 90 días (`MIN_NOTICE_AGE_DAYS`) y el párrafo
+de abajo ya promete ese piso en vez de un número fijo, así que es cierto tanto
+en régimen estable como para el backlog. No se subió a 365 porque retener un año
+más datos de salud de cuentas abandonadas, sólo para honrar una frase, pelearía
+contra el art. 4 inc. 7 que esta misma sección invoca.
+
+PARA SACARLO quedan dos cosas, en este orden:
 
   1. Leer el log de una corrida en `dryRun` y ver el tamaño del backlog.
-  2. Resolver la frase «con doce meses de antelación» del párrafo de abajo. Hoy
-     NO es cierta para ese backlog: el barrido borra a los 36 meses de
-     inactividad con un piso de 30 días desde el aviso
-     (`MIN_NOTICE_AGE_DAYS`), así que una cuenta que ya lleva 40 meses recibe el
-     aviso y se da de baja un mes después, no un año. El mail que sale dice la
-     fecha real y no repite esta frase, así que nadie recibe hoy una afirmación
-     falsa — pero si este párrafo se publica tal cual, empieza a serlo. Las dos
-     salidas son subir `MIN_NOTICE_AGE_DAYS` a 365, o acotar la frase acá.
-  3. Poner `RETENTION_SWEEP_DRY_RUN = false` y deployar.]]
+  2. Poner `RETENTION_SWEEP_DRY_RUN = false` y deployar.]]
 
 Si no usás tu cuenta durante **24 meses**, te avisamos por correo a la
 dirección con la que te registraste. Si seguís sin usarla, **a los 36 meses de
@@ -178,8 +177,9 @@ inactividad damos de baja la cuenta** y borramos tus datos personales con el
 mismo alcance que si hubieras pedido la eliminación vos (sección 3).
 
 Usar la cuenta significa iniciar sesión o registrar cualquier actividad en la
-app. El aviso de los 24 meses llega con doce meses de antelación a la baja, así
-que alcanza con entrar una vez para que el plazo vuelva a empezar.
+app. Entre el aviso y la baja nunca pasan menos de 90 días, y en el caso normal
+pasan doce meses, porque el aviso sale a los 24 y la baja a los 36. Alcanza con
+entrar una vez para que el plazo vuelva a empezar.
 
 **Quedan fuera de esta baja automática** las cuentas de entrenador, las que
 tengan una suscripción vigente y las que mantengan un vínculo activo con un
