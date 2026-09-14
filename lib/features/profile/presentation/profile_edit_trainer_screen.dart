@@ -16,6 +16,7 @@ import '../../coach/domain/trainer_location.dart';
 import '../../coach/domain/trainer_specialty.dart';
 import '../../gyms/application/gym_providers.dart';
 import '../../gyms/domain/gym.dart';
+import '../application/trainer_location_consent_providers.dart';
 import '../application/user_providers.dart';
 import '../domain/user_profile.dart';
 
@@ -219,6 +220,24 @@ class _ProfileEditTrainerScreenState
       ),
     );
     return accepted ?? false;
+  }
+
+  /// Apaga la publicación de la ubicación desde la fila de estado (P1-a).
+  ///
+  /// Sin diálogo de confirmación, igual que el botón equivalente del sheet:
+  /// es la acción REVERSIBLE del par (volver a publicar es guardar el form), y
+  /// meterle fricción a la salida de un consentimiento es exactamente lo que
+  /// el RGPD llama un patrón oscuro. La fricción va del lado de publicar, que
+  /// es donde ya está.
+  ///
+  /// `revokeTrainerLocationConsent` NO toca `trainerLocations` en `users/`:
+  /// vacía el espejo público y nada más. El PF no pierde lo que cargó por
+  /// ejercer un derecho.
+  Future<void> _revokeLocationConsent(String uid) async {
+    await ref.read(userRepositoryProvider).revokeTrainerLocationConsent(uid);
+    // El espejo cambió y el provider ya lo leyó: sin esto la fila sigue
+    // diciendo "publicada" hasta el próximo rebuild que lo invalide solo.
+    ref.invalidate(trainerLocationPublishedProvider);
   }
 
   Future<void> _save(String uid) async {
@@ -459,19 +478,63 @@ class _ProfileEditTrainerScreenState
             // exactamente igual que le mentía el texto legal viejo.
             if (_locations.isNotEmpty) ...[
               const SizedBox(height: 14),
-              Text(
-                key: const Key('profile_edit_trainer_publication_status'),
-                profile.trainerLocationConsentAt != null
-                    ? l10n.profileEditTrainerPublished
-                    : l10n.profileEditTrainerNotPublished,
-                style: TextStyle(
-                  color: profile.trainerLocationConsentAt != null
-                      ? palette.accent
-                      : palette.textMuted,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+              ref.watch(trainerLocationPublishedProvider).when(
+                    // P1-b. Mientras el espejo no contestó no se pinta nada:
+                    // mostrar "No publicada" sobre un "todavía no sé" es el
+                    // mismo error, del otro lado.
+                    loading: () => const SizedBox.shrink(),
+                    error: (_, __) => const SizedBox.shrink(),
+                    data: (publicada) => Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            key: const Key(
+                              'profile_edit_trainer_publication_status',
+                            ),
+                            publicada
+                                ? l10n.profileEditTrainerPublished
+                                : l10n.profileEditTrainerNotPublished,
+                            style: TextStyle(
+                              color: publicada
+                                  ? palette.accent
+                                  : palette.textMuted,
+                              fontSize: AppTextSize.bodyDense,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        // P1-a. El sheet le promete al PF "Podés apagar esto
+                        // cuando quieras desde tu perfil profesional", y hasta
+                        // acá esa frase era falsa: `revokeTrainerLocationConsent`
+                        // tenía UN solo call site, adentro del sheet, y el sheet
+                        // es de una sola vez —cualquiera de sus tres salidas
+                        // estampa `promptedAt` y lo suprime para siempre—. El
+                        // dartdoc del método ya decía "and the revoke path from
+                        // profile_edit_trainer_screen.dart's status row": el
+                        // caller estaba documentado y nunca se escribió.
+                        //
+                        // Un consentimiento que no se puede retirar no es
+                        // consentimiento: la Ley 25.326 y el RGPD lo piden
+                        // revocable con la misma facilidad con que se otorgó.
+                        if (publicada)
+                          TextButton(
+                            key: const Key(
+                              'profile_edit_trainer_revoke_button',
+                            ),
+                            onPressed: () =>
+                                _revokeLocationConsent(profile.uid),
+                            child: Text(
+                              l10n.trainerLocationConsentSheetRevoke,
+                              style: TextStyle(
+                                color: palette.textMuted,
+                                fontSize: AppTextSize.bodyDense,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
             ],
             const SizedBox(height: 18),
             _ToggleCard(

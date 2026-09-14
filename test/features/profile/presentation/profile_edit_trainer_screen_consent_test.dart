@@ -15,7 +15,9 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/auth/application/auth_providers.dart';
+import 'package:treino/features/coach/application/trainer_discovery_providers.dart';
 import 'package:treino/features/coach/domain/trainer_location.dart';
+import 'package:treino/features/coach/domain/trainer_public_profile.dart';
 import 'package:treino/features/gyms/application/gym_providers.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/data/user_repository.dart';
@@ -25,6 +27,23 @@ import 'package:treino/features/profile/presentation/profile_edit_trainer_screen
 import 'package:treino/l10n/app_l10n.dart';
 
 class MockUserRepository extends Mock implements UserRepository {}
+
+/// Espejo público del PF. Sólo la fila `(consentAt null, promptedAt set)` de la
+/// tabla de estados lo lee — las otras tres se contestan con los timestamps—,
+/// pero el override tiene que estar SIEMPRE: sin él el provider sale a buscar
+/// un Firestore real.
+class _FakeEspejo extends Fake
+    implements TrainerPublicProfileRepositoryInterface {
+  _FakeEspejo({required this.publicado});
+  final bool publicado;
+
+  @override
+  Future<TrainerPublicProfile?> getById(String uid) async =>
+      TrainerPublicProfile(
+        uid: uid,
+        trainerLocations: publicado ? const [_location] : const [],
+      );
+}
 
 const _uid = 'trainer-uid';
 
@@ -62,6 +81,7 @@ UserProfile _trainer({
 Widget _buildScreen({
   required UserProfile profile,
   required MockUserRepository repo,
+  bool espejoPublicado = false,
 }) {
   final router = GoRouter(
     initialLocation: '/profile/edit-trainer',
@@ -93,6 +113,8 @@ Widget _buildScreen({
       userProfileProvider.overrideWith((_) => Stream.value(profile)),
       userRepositoryProvider.overrideWithValue(repo),
       gymsProvider.overrideWith((ref) async => const []),
+      trainerPublicProfileRepositoryProvider
+          .overrideWithValue(_FakeEspejo(publicado: espejoPublicado)),
     ],
     child: MaterialApp.router(
       theme: AppTheme.dark(),
@@ -112,6 +134,7 @@ MockUserRepository _repo() {
         grantLocationConsent: any(named: 'grantLocationConsent'),
       )).thenAnswer((_) async {});
   when(() => repo.grantTrainerLocationConsent(any())).thenAnswer((_) async {});
+  when(() => repo.revokeTrainerLocationConsent(any())).thenAnswer((_) async {});
   return repo;
 }
 
@@ -334,6 +357,116 @@ void main() {
       expect(
         tester.widget<Text>(status).data,
         AppL10n.of(tester.element(status)).profileEditTrainerPublished,
+      );
+    });
+
+    testWidgets(
+        'cerró el sheet sin decidir ⇒ "publicado", porque el espejo lo sigue '
+        'estando', (tester) async {
+      // P1-b — LA fila que estaba mal. Mismo par de timestamps que el test de
+      // "revocado" de arriba: consentAt null, promptedAt seteado. Los dos
+      // estados son indistinguibles mirando `users/{uid}`, y la pantalla los
+      // resolvía a ambos como "No publicada" leyendo `consentAt != null`.
+      //
+      // La diferencia está en el espejo: revocar lo vacía, cerrar sin decidir
+      // NO lo toca (`_stampPromptedOnly` escribe un solo campo). Así que este
+      // PF sigue con sus coordenadas visibles en el mapa para cualquier
+      // atleta, y le decíamos que estaba oculto.
+      await tester.pumpWidget(
+        _buildScreen(
+          profile: _trainer(
+            consentAt: null,
+            promptedAt: DateTime.utc(2026, 9, 3),
+          ),
+          repo: _repo(),
+          espejoPublicado: true,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final status = find.byKey(
+        const Key('profile_edit_trainer_publication_status'),
+      );
+      await tester.ensureVisible(status);
+      expect(
+        tester.widget<Text>(status).data,
+        AppL10n.of(tester.element(status)).profileEditTrainerPublished,
+      );
+    });
+
+    testWidgets('PF legacy (nunca preguntado) ⇒ "publicado" por status quo',
+        (tester) async {
+      // La otra fila que colapsaba: (null, null). El PF al que todavía no le
+      // llegó el gate sigue publicado — es el status quo, no una revocación.
+      // El espejo va VACÍO a propósito: esta fila no debe leerlo, y si el
+      // código lo leyera este test se pondría rojo.
+      await tester.pumpWidget(
+        _buildScreen(
+          profile: _trainer(consentAt: null, promptedAt: null),
+          repo: _repo(),
+          espejoPublicado: false,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final status = find.byKey(
+        const Key('profile_edit_trainer_publication_status'),
+      );
+      await tester.ensureVisible(status);
+      expect(
+        tester.widget<Text>(status).data,
+        AppL10n.of(tester.element(status)).profileEditTrainerPublished,
+      );
+    });
+
+    testWidgets('publicado ⇒ hay botón de apagar, y apaga de verdad',
+        (tester) async {
+      // P1-a. El sheet promete "Podés apagar esto cuando quieras desde tu
+      // perfil profesional" y hasta ahora esa frase era falsa: el único call
+      // site de `revokeTrainerLocationConsent` vivía adentro del sheet, que se
+      // suprime para siempre apenas el PF decide algo.
+      final repo = _repo();
+      await tester.pumpWidget(
+        _buildScreen(
+          profile: _trainer(
+            consentAt: DateTime.utc(2026, 9, 3),
+            promptedAt: DateTime.utc(2026, 9, 3),
+          ),
+          repo: repo,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final revoke = find.byKey(
+        const Key('profile_edit_trainer_revoke_button'),
+      );
+      await tester.ensureVisible(revoke);
+      expect(revoke, findsOneWidget);
+
+      await tester.tap(revoke);
+      await tester.pumpAndSettle();
+
+      verify(() => repo.revokeTrainerLocationConsent(_uid)).called(1);
+    });
+
+    testWidgets('no publicado ⇒ NO hay botón de apagar', (tester) async {
+      // Control negativo del test de arriba: sin esto, el botón podría estar
+      // siempre en pantalla y aquel pasaría igual.
+      await tester.pumpWidget(
+        _buildScreen(
+          profile: _trainer(
+            consentAt: null,
+            promptedAt: DateTime.utc(2026, 9, 3),
+          ),
+          repo: _repo(),
+          espejoPublicado: false,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('profile_edit_trainer_revoke_button')),
+        findsNothing,
       );
     });
 
