@@ -157,6 +157,14 @@ Usar la cuenta significa iniciar sesión o registrar cualquier actividad en la
 app. El aviso de los 24 meses llega con doce meses de antelación a la baja, así
 que alcanza con entrar una vez para que el plazo vuelva a empezar.
 
+**Quedan fuera de esta baja automática** las cuentas de entrenador, las que
+tengan una suscripción vigente y las que mantengan un vínculo activo con un
+entrenador. Dar de baja a un entrenador afecta a terceros: los vínculos con sus
+alumnos, las reseñas que recibió y los chats que mantuvo con ellos. Y una cuenta
+que está pagando, o que está entrenando con un profesional, no está abandonada
+aunque no la abras. Esas cuentas se revisan a mano si la inactividad se
+sostiene, y no reciben el aviso automático de los 24 meses.
+
 Conservamos únicamente lo que la ley obliga a conservar, igual que en cualquier
 otra baja.
 
