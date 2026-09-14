@@ -30,18 +30,32 @@
  * pasa a ser un cambio de valor y nada mas. Apagarlo vuelve a limpiar el campo,
  * o sea que el rollback es real y no un deploy de emergencia.
  *
- * ─── ANTES DE PRENDERLO: falta el grandfathering ────────────────────────────
+ * ─── ANTES DE PRENDERLO: el grandfathering ────────────────────────────────
  *
- * Hoy hay alumnos free con rutinas de 4 y 5 dias, creadas cuando no habia tope.
- * La regla de UPDATE exige que el doc RESULTANTE entre en la forma free, asi
- * que el dia que esto se prenda esas rutinas dejan de poder editarse — el
- * alumno no puede ni cargar una serie sobre lo que ya tenia. Prender el
- * interruptor sin resolver eso primero le rompe la app a usuarios que no
- * hicieron nada mal.
+ * ✅ **RESUELTO el 2026-09-11**, en `firestore.rules`: `noCreceLaForma`.
  *
- * No se resuelve aca a proposito: seria logica especulativa para un camino
- * apagado. Se resuelve cuando exista el checkout, que es lo unico que le da
- * sentido a cobrar.
+ * Lo que decia este parrafo, y que conviene dejar escrito porque era FALSO en
+ * un punto que importaba:
+ *
+ *   > "esas rutinas dejan de poder editarse — el alumno no puede ni cargar una
+ *   > serie sobre lo que ya tenia"
+ *
+ * La primera mitad era cierta. **La segunda no.** Cargar una serie escribe en
+ * `sessions`, no en `routines`, y esa regla gatea por otra cosa
+ * (`sesionSobreRutinaLibre`: si la rutina es una plantilla PAGA del catalogo).
+ * El alumno con una rutina propia fuera de tope siempre pudo entrenarla entera.
+ *
+ * El dano real era mas chico y mas raro: podia usarla pero no renombrarla.
+ *
+ * Y el eje tampoco era el que decia. Medido sobre produccion el 2026-09-11: de
+ * 18 alumnos con rutina propia, 5 quedaban congelados — pero solo 2 por DIAS.
+ * Los otros 4 excedian el tope de SEMANAS (`kFreeMaxRoutineWeeks = 1`), y tres
+ * de ellos estaban apenas en 2. Este comentario hablaba de dias, y el que
+ * mordia era el otro.
+ *
+ * La solucion no necesito ni campo, ni fecha de corte, ni migracion: el UPDATE
+ * ahora deja pasar si la rutina resultante NO ES MAS GRANDE que la que ya
+ * habia. Ver el comentario de `noCreceLaForma` en `firestore.rules`.
  */
 
 import { App, getApp, initializeApp } from "firebase-admin/app";
