@@ -154,3 +154,68 @@ const int kMaxOwnRoutines = 10;
 /// `activeWeeks` son justamente lo que distingue un programa intermedio de uno
 /// de principiante, y son la parte paga.
 const int kFreeMaxRoutineWeeks = 1;
+
+/// Videos de ejercicio custom que puede tener subidos un alumno del plan free.
+///
+/// Tres, igual que [kFreeMaxOwnRoutines], y por consistencia de vocabulario: el
+/// free tiene «tres de lo suyo». No hace falta otro número.
+///
+/// **La medición que lo justifica** (bucket `treino-dev`, 2026-09-10): en toda
+/// la vida del proyecto se subieron **3** videos custom, de **un solo** usuario,
+/// y ese usuario es un PF. Ningún alumno subió nunca uno. O sea que este tope
+/// no le saca nada a nadie hoy — se pone ANTES de que haya costo que recortar,
+/// que es la única vez que un tope no duele.
+///
+/// Por qué hace falta igual: sin tope de cantidad el peor caso es INFINITO.
+/// 1.000 archivos de [kFreeMaxCustomExerciseVideoBytes] son 25 GB ≈ USD 0,65/mes
+/// de storage — un cuarto del margen de un pagador quemado por UN abusador.
+/// El tope por archivo acota el tamaño de cada pieza; sólo éste acota el total.
+///
+/// ⚠️  Este número NO se puede duplicar a mano en `storage.rules` como
+/// `freeMaxRoutineDays()`: las reglas de Storage no tienen agregación y no
+/// pueden contar objetos. El conteo lo denormaliza
+/// `maintainCustomExerciseVideoQuota` en `users/{uid}.customExerciseVideoUsage`
+/// y la regla lee esa conclusión — mismo patrón que `athletePaywallEnforced`.
+/// El número vive en la regla Y acá; si cambiás uno, cambiá el otro.
+const int kFreeMaxCustomExerciseVideos = 3;
+
+/// Tamaño máximo de UN video de ejercicio custom en el plan free.
+///
+/// **25 MB, y el número sale de la medición, no del dedo.** El archivo más
+/// grande que se subió alguna vez a `customExerciseVideos/` pesa **2,59 MB**, y
+/// la mediana es **0,13 MB**. 25 MB es 10x el máximo real observado: headroom
+/// de sobra para un tutorial de un minuto en 720p, y 4x menos que el cap
+/// histórico de 100 MB, que era 39x el máximo observado — un techo decorativo.
+///
+/// **Es la palanca de costo más importante de las dos, y no es obvio por qué.**
+/// Los videos se sirven por la URL `?alt=media&token=` que emite
+/// `getDownloadURL()`: es GCS directo, sin CDN ni capa de cache adelante (ver
+/// el bloque `customExerciseVideos` de `storage.rules` y `docs/security.md`
+/// §3.1). Cada reproducción es egress facturado a USD 0,12/GB, contra USD
+/// 0,026/GB-mes de almacenamiento — **4,6x el precio del GB guardado un mes
+/// entero, cada vez que alguien le da play**. El tope por archivo es lineal en
+/// las DOS líneas de costo; el de cantidad sólo en la de almacenamiento.
+///
+/// A [kMaxCustomExerciseVideoBytes] (el techo del PF) no se lo toca: el PF vive
+/// de su videoteca y su economía es otra — paga por cupo de alumnos, no por
+/// esto.
+const int kFreeMaxCustomExerciseVideoBytes = 25 * 1024 * 1024;
+
+/// Tamaño máximo de UN video de ejercicio custom, para cualquiera.
+///
+/// Preexistente: es el `100 * 1024 * 1024` que ya vivía suelto en
+/// `storage.rules`; acá sólo se le pone nombre. NO es un límite de paywall, es
+/// el techo del producto — igual que [kMaxOwnRoutines] frente a
+/// [kFreeMaxOwnRoutines].
+const int kMaxCustomExerciseVideoBytes = 100 * 1024 * 1024;
+
+/// Videos de ejercicio custom que puede tener CUALQUIERA — pague o no, PF o
+/// alumno.
+///
+/// Techo anti-abuso, no palanca de conversión. 50 × 100 MB son 5 GB ≈ USD
+/// 0,13/mes: el 5% del margen de un pagador, que es un costo aceptable por la
+/// videoteca de un PF real. Sin él, una cuenta `trainer` —que el paywall del
+/// alumno NO gatea, y con razón— tiene subida ilimitada de 100 MB.
+///
+/// Nadie legítimo se acerca: el PF con más videos del proyecto tiene 3.
+const int kMaxCustomExerciseVideos = 50;

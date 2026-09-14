@@ -236,3 +236,76 @@ final _athleteSubscriptionStatusProvider =
     return status is String ? status : null;
   }).distinct();
 });
+
+/// El campo que la CF `maintainCustomExerciseVideoQuota*` denormaliza en
+/// `users/{uid}`, y que `storage.rules` lee para autorizar la subida.
+///
+/// Se lee crudo y no se modela en `UserProfile` por el MISMO motivo que
+/// `athleteSubscription`: es CF-write-only y está pineado en `firestore.rules`.
+/// Si viviera en el modelo que el cliente también escribe, el primer `update`
+/// que mande el objeto entero se comería una denegación por un campo que nadie
+/// quiso tocar.
+const String kCustomExerciseVideoUsageField = 'customExerciseVideoUsage';
+
+/// Cuántos videos de ejercicio custom tiene subidos el usuario actual.
+///
+/// `null` mientras el read no aterrizó. **No colapsar a 0**: un 0 optimista le
+/// deja tocar «subir video» a alguien que ya está en el tope, y la negación le
+/// llega recién después de mandar los bytes — que es exactamente el desperdicio
+/// que este gate existe para evitar.
+final customExerciseVideoCountProvider =
+    StreamProvider.autoDispose<int?>((ref) {
+  final uid = ref.watch(currentUidProvider);
+  if (uid == null || uid.isEmpty) return Stream.value(null);
+
+  return ref
+      .watch(firestoreProvider)
+      .collection('users')
+      .doc(uid)
+      .snapshots()
+      // Misma guarda de cache fría que `_athleteSubscriptionStatusProvider`.
+      .where((snap) => snap.exists || !snap.metadata.isFromCache)
+      .map((snap) {
+    final raw = snap.data()?[kCustomExerciseVideoUsageField];
+    if (raw is! Map) return 0; // sin contador todavía ⇒ ningún video subido
+    final count = raw['count'];
+    return count is int ? count : 0;
+  }).distinct();
+});
+
+/// Los topes de video que le corresponden al usuario actual, ya resueltos.
+///
+/// **Espeja `capsFor()` de la CF y el ternario de `storage.rules`.** Los tres
+/// se mantienen a mano; si cambiás uno, cambiá los otros dos.
+///
+/// Ojo con el disyunto de `unknown`: igual que [AthleteEntitlement.unknown] no
+/// gatea, acá un entitlement sin resolver recibe el techo ESTRUCTURAL y no el
+/// free. Fallar cerrado le mostraría «llegaste al límite» a un PF mientras su
+/// perfil carga — y el PF no tiene ningún límite free que mostrar.
+({int maxCount, int maxBytes}) videoCapsFor(AthleteEntitlement e) =>
+    e.gatesFreeLimits
+        ? (
+            maxCount: kFreeMaxCustomExerciseVideos,
+            maxBytes: kFreeMaxCustomExerciseVideoBytes
+          )
+        : (
+            maxCount: kMaxCustomExerciseVideos,
+            maxBytes: kMaxCustomExerciseVideoBytes
+          );
+
+/// Los topes de video vigentes para el usuario actual.
+///
+/// Devuelve el techo estructural cuando el paywall está apagado
+/// ([kAthletePaywallEnabled]), igual que hacen `catalogLockActiveProvider` y
+/// `lockedChartPeriodsProvider`: el interruptor gobierna la UX entera, no cada
+/// call site.
+final customExerciseVideoCapsProvider =
+    Provider.autoDispose<({int maxCount, int maxBytes})>((ref) {
+  if (!ref.watch(athletePaywallEnabledProvider)) {
+    return (
+      maxCount: kMaxCustomExerciseVideos,
+      maxBytes: kMaxCustomExerciseVideoBytes
+    );
+  }
+  return videoCapsFor(ref.watch(athleteEntitlementProvider));
+});

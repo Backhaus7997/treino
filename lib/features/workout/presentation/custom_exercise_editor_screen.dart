@@ -10,6 +10,8 @@ import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
+import '../../paywall/application/athlete_entitlement_provider.dart'
+    show customExerciseVideoCapsProvider, customExerciseVideoCountProvider;
 import '../application/custom_exercise_providers.dart';
 import '../application/session_providers.dart' show currentUidProvider;
 import '../domain/custom_exercise.dart';
@@ -347,7 +349,37 @@ class _CustomExerciseEditorScreenState
     );
   }
 
+  /// Gate de CLIENTE del tope de videos. Es UX: la ley vive en `storage.rules`
+  /// y en `maintainCustomExerciseVideoQuota*`, que aplican igual si esto falla.
+  ///
+  /// Los dos chequeos van en momentos distintos a propósito:
+  ///
+  ///   • **Cantidad, ANTES de abrir la galería.** Si ya está en el tope no hay
+  ///     nada que pueda elegir que entre, así que hacerlo buscar un video para
+  ///     rebotarlo después es tiempo regalado. El mensaje NOMBRA LA SALIDA
+  ///     —borrar uno— porque acá sí la hay: es la distinción entre un gate de
+  ///     entrada y uno con salida adentro.
+  ///   • **Tamaño, DESPUÉS de elegir.** Recién ahí se sabe cuánto pesa. Frenar
+  ///     acá es lo que evita el peor desperdicio del flujo: sin esto, el alumno
+  ///     manda hasta 100 MB de datos móviles y el servidor los rechaza al
+  ///     final, cuando ya los pagó él y ya los pagamos nosotros.
+  ///
+  /// El `count == null` NO gatea, mismo criterio que `AthleteEntitlement
+  /// .unknown`: mientras el read no aterrizó no se sabe, y bloquearle el botón
+  /// a alguien que tiene cupo es peor que dejar pasar un tap que el servidor
+  /// rebota igual.
   Future<void> _onPickAndUpload(BuildContext context) async {
+    final caps = ref.read(customExerciseVideoCapsProvider);
+    final count = ref.read(customExerciseVideoCountProvider).valueOrNull;
+    if (count != null && count >= caps.maxCount) {
+      _toast(
+        context,
+        'Llegaste al límite de ${caps.maxCount} videos. '
+        'Borrá uno de tus ejercicios con video para subir otro.',
+      );
+      return;
+    }
+
     final picker = ImagePicker();
     final XFile? picked;
     try {
@@ -361,6 +393,20 @@ class _CustomExerciseEditorScreenState
       return;
     }
     if (picked == null) return;
+
+    // `XFile.length()` y no `File(path).length()`: el editor también se
+    // renderiza en el Coach Hub web, donde `dart:io` no existe.
+    final bytes = await picked.length();
+    if (bytes >= caps.maxBytes) {
+      if (!context.mounted) return;
+      final maxMb = caps.maxBytes ~/ (1024 * 1024);
+      _toast(
+        context,
+        'El video pesa ${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB '
+        'y el máximo es $maxMb MB. Recortalo o bajale la calidad.',
+      );
+      return;
+    }
 
     setState(() {
       _uploadingVideo = true;
