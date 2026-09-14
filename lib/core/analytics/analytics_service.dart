@@ -71,6 +71,20 @@ abstract class AnalyticsService {
   });
 
   /// `RoutineRepository.createAssigned` — un PF asignó un plan a un atleta.
+  ///
+  /// Se emite **desde el repositorio y desde ningún otro lado**, que es la
+  /// única excepción a "los eventos viven en presentation" y está razonada en
+  /// el dartdoc de `createAssigned`. En resumen: ese método exige `assignedBy`
+  /// y `assignedTo`, así que toda llamada que sobrevive a sus guardas ES una
+  /// asignación, y hay cinco caminos de UI que terminan ahí.
+  ///
+  /// Esta línea describía ese diseño desde el principio y el código no lo
+  /// cumplía: sólo dos de los cinco caminos emitían, así que el evento contaba
+  /// menos de la mitad de las asignaciones sin que nada se viera roto. Si
+  /// alguna vez te tienta agregar la llamada en una pantalla, es que el evento
+  /// se está volviendo a escapar — arreglalo en el repositorio.
+  ///
+  /// Lo fija `test/features/workout/data/plan_assigned_una_sola_capa_test.dart`.
   Future<void> logPlanAssigned({
     required String routineId,
     required String assignedBy,

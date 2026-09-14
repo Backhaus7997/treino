@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:cloud_firestore/cloud_firestore.dart'
     show
         CollectionReference,
@@ -8,6 +10,7 @@ import 'package:cloud_firestore/cloud_firestore.dart'
         QueryDocumentSnapshot,
         Timestamp;
 
+import '../../../core/analytics/analytics_service.dart';
 import '../../profile/domain/experience_level.dart';
 import '../domain/routine.dart';
 import '../domain/routine_source.dart';
@@ -16,10 +19,30 @@ import '../domain/routine_visibility.dart';
 import '../domain/template_rating.dart';
 
 class RoutineRepository {
-  RoutineRepository({required FirebaseFirestore firestore})
-      : _firestore = firestore;
+  /// [analytics] es opcional y por default no emite nada.
+  ///
+  /// No es una puerta de atrás: es para los 24 tests que ya construían este
+  /// repo y a los que analytics no les importa. Hacerlo obligatorio los
+  /// obligaba a los 24 a pasar un mock que no miran, y triplicaba el diff de
+  /// este arreglo sin cambiar un comportamiento.
+  ///
+  /// El riesgo del default —que producción lo construya sin sink y el evento
+  /// se pierda en silencio, que es exactamente el bug que este cambio vino a
+  /// tapar— lo cierra un test que escanea `lib/` y falla si aparece una
+  /// construcción sin `analytics:`. Hoy hay una sola, en
+  /// `routine_providers.dart`.
+  RoutineRepository({
+    required FirebaseFirestore firestore,
+    AnalyticsService analytics = const NoopAnalyticsService(),
+  })  : _firestore = firestore,
+        _analytics = analytics;
 
   final FirebaseFirestore _firestore;
+
+  /// Sólo para `plan_assigned`, y la excepción está razonada en el dartdoc de
+  /// [createAssigned]. El resto de los eventos siguen viviendo en presentation,
+  /// que es la convención del repo.
+  final AnalyticsService _analytics;
 
   CollectionReference<Map<String, Object?>> get _collection =>
       _firestore.collection('routines');
@@ -541,6 +564,32 @@ class RoutineRepository {
   ///
   /// Returns the saved [Routine] with its Firestore-generated [Routine.id].
   ///
+  /// ## Acá se emite `plan_assigned`, y es la ÚNICA excepción a la convención
+  ///
+  /// En todo el resto de la app los eventos de analytics viven en
+  /// `presentation`. Éste no, por dos motivos:
+  ///
+  /// 1. **Este método ES la definición del evento.** No escribe "una rutina":
+  ///    exige `assignedBy` y `assignedTo` no vacíos y tira si faltan. Toda
+  ///    llamada que sobrevive a esas dos guardas es, por construcción, un PF
+  ///    asignándole un plan a un alumno. No hay forma de llamarlo y que el
+  ///    evento no corresponda.
+  /// 2. **Desde presentation ya se perdió dos veces.** Hay CINCO caminos que
+  ///    terminan acá —el editor de mobile, el editor web, el preview de plan,
+  ///    la card de plantilla del Coach Hub y `trainer_workout_view`— y sólo dos
+  ///    emitían el evento. `routine_created` había tenido el mismo agujero
+  ///    antes (ver el dartdoc de `RoutineActions.assignTemplate`) y se tapó
+  ///    sumándolo al call site que faltaba; el agujero volvió por otra puerta.
+  ///    Un evento que se emite en N lugares se rompe cuando aparece el N+1, y
+  ///    el síntoma es un número que se ve sano.
+  ///
+  /// Los tres parámetros salen de la rutina misma, sin nada que sepa sólo la
+  /// pantalla — otra señal de que el evento pertenece a esta capa. Compará con
+  /// `routine_created`, que lleva un `source` que SÓLO conoce el llamador: ése
+  /// se queda en presentation, y con razón.
+  ///
+  /// No se espera: el evento no puede demorar el retorno de la escritura.
+  ///
   /// REQ-COACH-PLANS-002, SCENARIO-434, SCENARIO-435.
   Future<Routine> createAssigned(Routine routine) async {
     if (routine.assignedBy == null || routine.assignedBy!.isEmpty) {
@@ -561,6 +610,15 @@ class RoutineRepository {
     final json = routine.toJson()..remove('id');
     json['createdAt'] = FieldValue.serverTimestamp();
     final ref = await _collection.add(json);
+
+    // Después del `add`, no antes: el evento dice "se asignó", y antes de que
+    // el servidor confirme todavía puede fallar.
+    unawaited(_analytics.logPlanAssigned(
+      routineId: ref.id,
+      assignedBy: routine.assignedBy!,
+      assignedTo: routine.assignedTo!,
+    ));
+
     return routine.copyWith(id: ref.id);
   }
 
