@@ -3,6 +3,8 @@
   "workoutHistorialFullTitle": "HISTORIAL",
   "homeAthleteFirstRunTitle": "Arrancá tu entrenamiento",
   "homeAthleteFirstRunBody": "Creá tu propia rutina, explorá planes ya armados o buscá un entrenador que te guíe.",
+  "homeAthleteFirstRunBodyWithTrainer": "Ya tenés entrenador. Mientras tanto, creá tu propia rutina o explorá planes ya armados.",
+  "homeAthleteFirstRunBodyNeutral": "Creá tu propia rutina o explorá planes ya armados.",
   "homeAthleteFirstRunCreateCta": "CREAR RUTINA",
   "homeAthleteFirstRunExplorePlansCta": "Explorar planes",
   "homeAthleteFirstRunFindTrainerCta": "Buscar entrenador",

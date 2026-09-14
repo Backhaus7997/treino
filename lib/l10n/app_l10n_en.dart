@@ -25,6 +25,14 @@ class AppL10nEn extends AppL10n {
       'Create your own routine, explore ready-made plans, or find a trainer to guide you.';
 
   @override
+  String get homeAthleteFirstRunBodyWithTrainer =>
+      'You already have a trainer. In the meantime, create your own routine or explore ready-made plans.';
+
+  @override
+  String get homeAthleteFirstRunBodyNeutral =>
+      'Create your own routine or explore ready-made plans.';
+
+  @override
   String get homeAthleteFirstRunCreateCta => 'CREATE ROUTINE';
 
   @override

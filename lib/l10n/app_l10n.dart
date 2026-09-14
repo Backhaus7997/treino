@@ -122,11 +122,23 @@ abstract class AppL10n {
   /// **'Arrancá tu entrenamiento'**
   String get homeAthleteFirstRunTitle;
 
-  /// Home first-run empty-state body naming the three onboarding paths: create a routine, explore ready-made plans, find a trainer (#636). Order must match the CTA order in _AthleteFirstRunCard.
+  /// Home first-run empty-state body naming the three onboarding paths: create a routine, explore ready-made plans, find a trainer (#636). Order must match the CTA order in _AthleteFirstRunCard. Shown ONLY when the athlete has no active trainer link — the two-path twin is homeAthleteFirstRunBodyWithTrainer.
   ///
   /// In es_AR, this message translates to:
   /// **'Creá tu propia rutina, explorá planes ya armados o buscá un entrenador que te guíe.'**
   String get homeAthleteFirstRunBody;
+
+  /// Home first-run empty-state body for an athlete who ALREADY has an active trainer link but no plan yet. Names only the two paths whose buttons are drawn, in button order: create a routine, explore ready-made plans. Must not promise the third path — the 'find a trainer' CTA is hidden in this state. Deliberately says nothing about what the trainer is doing: an active link is confirmed, the trainer working on a plan is not.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ya tenés entrenador. Mientras tanto, creá tu propia rutina o explorá planes ya armados.'**
+  String get homeAthleteFirstRunBodyWithTrainer;
+
+  /// Home first-run empty-state body used when the athlete's trainer link could NOT be confirmed (loading, error, or a retained error). Names ONLY the two paths whose buttons are drawn, in button order, and says NOTHING about whether the athlete has a trainer — claiming either way would be an unverified statement about the user (AGENTS.md 11.1). Sibling of homeAthleteFirstRunBody (three paths, no trainer) and homeAthleteFirstRunBodyWithTrainer (two paths, trainer confirmed).
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Creá tu propia rutina o explorá planes ya armados.'**
+  String get homeAthleteFirstRunBodyNeutral;
 
   /// Home first-run primary CTA to create a routine (finding 6).
   ///
