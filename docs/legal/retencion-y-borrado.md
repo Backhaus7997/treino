@@ -142,11 +142,34 @@ recuperar una cuenta eliminada.
 
 ## 6. Cuentas inactivas
 
-[[PENDIENTE — IMPLEMENTACIÓN, no decisión. El plazo está resuelto y es el que
-dice esta sección; lo que falta es el proceso que lo ejecute. El marcador
-bloquea la publicación A PROPÓSITO: hasta que exista, el texto de abajo promete
-una baja automática que no ocurre, y una cláusula que promete lo que el sistema
-no hace es peor que no tenerla. Se saca cuando el proceso esté corriendo.]]
+[[PENDIENTE — ENCENDER EL BARRIDO. El plazo está resuelto y el proceso ya
+existe: `sweepInactiveAccounts`, en
+`functions/src/retention/sweep-inactive-accounts.ts`. Lo que falta es que
+ejerza. Se despliega con `RETENTION_SWEEP_DRY_RUN = true`, o sea que cuenta,
+lista y loguea, y no manda un solo mail ni borra una sola cuenta.
+
+Ese modo no es prudencia genérica. La señal de actividad sale de los metadatos
+de Firebase Auth, que YA TIENEN HISTORIA, así que la primera corrida ve de una
+todas las cuentas que hoy superan los 24 meses. Encenderlo sin leer ese número
+antes es mandar ese número de mails de golpe.
+
+El marcador bloquea la publicación A PROPÓSITO, y sigue bloqueándola por el
+mismo motivo de siempre: mientras el barrido no ejerza, el texto de abajo
+promete una baja automática que no ocurre, y una cláusula que promete lo que el
+sistema no hace es peor que no tenerla. Que el código exista no cambia eso: lo
+que el usuario lee es lo que PASA, no lo que está deployado.
+
+El desacuerdo entre esta sección y el barrido quedó RESUELTO el 2026-09-14: el
+piso entre el aviso y la baja es de 90 días (`MIN_NOTICE_AGE_DAYS`) y el párrafo
+de abajo ya promete ese piso en vez de un número fijo, así que es cierto tanto
+en régimen estable como para el backlog. No se subió a 365 porque retener un año
+más datos de salud de cuentas abandonadas, sólo para honrar una frase, pelearía
+contra el art. 4 inc. 7 que esta misma sección invoca.
+
+PARA SACARLO quedan dos cosas, en este orden:
+
+  1. Leer el log de una corrida en `dryRun` y ver el tamaño del backlog.
+  2. Poner `RETENTION_SWEEP_DRY_RUN = false` y deployar.]]
 
 Si no usás tu cuenta durante **24 meses**, te avisamos por correo a la
 dirección con la que te registraste. Si seguís sin usarla, **a los 36 meses de
@@ -154,8 +177,9 @@ inactividad damos de baja la cuenta** y borramos tus datos personales con el
 mismo alcance que si hubieras pedido la eliminación vos (sección 3).
 
 Usar la cuenta significa iniciar sesión o registrar cualquier actividad en la
-app. El aviso de los 24 meses llega con doce meses de antelación a la baja, así
-que alcanza con entrar una vez para que el plazo vuelva a empezar.
+app. Entre el aviso y la baja nunca pasan menos de 90 días, y en el caso normal
+pasan doce meses, porque el aviso sale a los 24 y la baja a los 36. Alcanza con
+entrar una vez para que el plazo vuelva a empezar.
 
 **Quedan fuera de esta baja automática** las cuentas de entrenador, las que
 tengan una suscripción vigente y las que mantengan un vínculo activo con un

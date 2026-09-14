@@ -153,6 +153,15 @@ export {
   syncAthletePaywallOnTrainerLink,
   sweepAthletePaywall,
 } from "./subscriptions/athlete-paywall-enforced";
+// Baja automatica de cuentas inactivas: aviso a los 24 meses, baja a los 36
+// (decision del titular del 2026-09-14, `docs/legal/retencion-y-borrado.md` §6).
+//
+// SE DESPLIEGA EN dryRun. La senal de actividad sale de los metadatos de
+// Firebase Auth, que YA TIENEN HISTORIA, asi que la primera corrida ve de una
+// todo el backlog de cuentas que ya pasaron los 24 meses. Encenderlo sin mirar
+// ese numero antes es mandar ese numero de mails de golpe. Ver
+// RETENTION_SWEEP_DRY_RUN en el modulo.
+export { sweepInactiveAccounts } from "./retention/sweep-inactive-accounts";
 // SHELVED (gym-google-places, Plan B): resolveGymPlace cannot be deployed —
 // GCP project treino-dev sits under org code-assurance.com, whose
 // Domain-Restricted-Sharing policy blocks a publicly-invokable (allUsers)
