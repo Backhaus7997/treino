@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
@@ -65,6 +66,10 @@ class _ProfileEditTrainerScreenState
   final _experienceController = TextEditingController();
   TrainerSpecialty? _specialty;
   final List<TrainerLocation> _locations = [];
+
+  /// Las ubicaciones con las que ABRIO el formulario, para saber si el
+  /// guardado las toca. Se sella en `_initFromProfile`, que corre una sola vez.
+  final List<TrainerLocation> _locationsAlAbrir = [];
   bool _offersOnline = false;
   // Arranca en true: es el default de la rule, y un PF que nunca tocó el
   // toggle SÍ acepta consultas.
@@ -94,6 +99,9 @@ class _ProfileEditTrainerScreenState
         profile.trainerExperienceYears?.toString() ?? '';
     _specialty = trainerSpecialtyFromString(profile.trainerSpecialty);
     _locations
+      ..clear()
+      ..addAll(profile.trainerLocations);
+    _locationsAlAbrir
       ..clear()
       ..addAll(profile.trainerLocations);
     _offersOnline = profile.trainerOffersOnline;
@@ -266,9 +274,39 @@ class _ProfileEditTrainerScreenState
     // primera `_resolveEffectiveLocationConsent` descarta la ubicación del
     // espejo público **en silencio**. Guardaría feliz, y no aparecería en
     // discovery, sin un solo error que se lo explique.
+    // P1-c: y SOLO si este guardado toca las ubicaciones.
+    //
+    // Mirando unicamente `consentAt == null` volvia a preguntar en CADA
+    // guardado posterior de un PF que revoco —aunque solo hubiera editado su
+    // bio o su tarifa— y decir que no abortaba el guardado entero. Cuando se
+    // escribio esa condicion el unico modo de quedar en ese estado era cerrar
+    // el sheet sin decidir, que pasa una vez y nunca mas. Despues apareco el
+    // boton de APAGAR LA PUBLICACION en el perfil profesional y el estado paso
+    // a tener una puerta de entrada deliberada, asi que la molestia dejo de
+    // ser teorica.
+    //
+    // Lo que el consentimiento cubre es PUBLICAR ubicaciones, no guardar el
+    // perfil. Si la lista no cambio, no hay nada nuevo que publicar y no hay
+    // nada que consentir: el guardado pasa derecho y
+    // `_resolveEffectiveLocationConsent` deja el espejo como estaba.
+    //
+    // El caso que motivo el gate sigue cubierto: el PF que publica por primera
+    // vez va de cero ubicaciones a una, o sea que la lista cambia.
+    final perfil = ref.read(userProfileProvider).valueOrNull;
+    final tocaUbicaciones = !listEquals(_locations, _locationsAlAbrir);
+    // La supresion vale SOLO para quien ya decidio algo.
+    //
+    // Al PF que nunca vio el prompt hay que preguntarle igual, aunque no toque
+    // la lista, porque a esta pantalla se puede llegar SIN pasar por /home:
+    // `router.dart:190-194` REDIRIGE al PF con perfil incompleto a
+    // /profile/edit-trainer?mode=onboarding. Es un redirect, no un push, asi
+    // que HomeScreen no se monta y su `TrainerLocationConsentGate` no existe.
+    // Sin esta mitad, ese PF guardaba y se iba sin que nadie le preguntara
+    // nunca, con su ubicacion ya publicada en el espejo.
+    final yaLePreguntamos = perfil?.trainerLocationConsentPromptedAt != null;
     if (_locations.isNotEmpty &&
-        ref.read(userProfileProvider).valueOrNull?.trainerLocationConsentAt ==
-            null) {
+        perfil?.trainerLocationConsentAt == null &&
+        (!yaLePreguntamos || tocaUbicaciones)) {
       final consented = await _askLocationConsent();
       if (!mounted) return;
       // Cancelar aborta el guardado y deja el form intacto: lo que cargó sigue
