@@ -2,6 +2,8 @@
 slug: privacidad
 title: Política de Privacidad
 dart: kPrivacySections
+version: 1
+published: 2026-09-03
 -->
 
 # Política de Privacidad de TREINO
