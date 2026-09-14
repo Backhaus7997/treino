@@ -139,31 +139,51 @@ class _CoachHubPlanPreviewScreenState
 
     final repo = ref.read(routineRepositoryProvider);
     final athleteIds = _selectedAthleteIds.toList();
-    final failed = <String>[];
-
     final analytics = ref.read(analyticsServiceProvider);
-    for (final athleteId in athleteIds) {
-      final routine = _buildRoutine(
-        plan: plan,
-        trainerUid: trainerUid,
-        athleteId: athleteId,
-      );
-      try {
-        final created = await repo.createAssigned(routine);
-        analytics.logPlanAssigned(
-          routineId: created.id,
-          assignedBy: trainerUid,
-          assignedTo: athleteId,
+
+    // En PARALELO, no en serie.
+    //
+    // `createAssigned` termina en un `_collection.add(...)`, y ese future
+    // resuelve cuando el SERVIDOR confirma la escritura — no cuando entra en
+    // la caché local. Con un `for` y un `await` adentro, eso encadenaba una
+    // ida y vuelta de red POR ALUMNO: asignarle el plan a cinco costaba cinco
+    // esperas en fila cuando la red puede llevarlas juntas. Es el único lugar
+    // de las cuatro superficies de asignación donde el costo se multiplica,
+    // y por eso se arregla sin esperar la medición del resto: no hay número
+    // que pueda justificar serializarlas.
+    //
+    // Cada future atrapa SU error y devuelve el id del alumno que falló, o
+    // null si salió bien. `Future.wait` a secas aborta con el primer error y
+    // se perdería tanto el resultado de los demás como el detalle de CUÁL
+    // falló — que es justo lo que alimenta el reintento acotado de abajo.
+    // `Future.wait` preserva el orden de entrada, así que `failed` sigue
+    // saliendo en orden de selección, igual que con el loop.
+    final resultados = await Future.wait(
+      athleteIds.map((athleteId) async {
+        final routine = _buildRoutine(
+          plan: plan,
+          trainerUid: trainerUid,
+          athleteId: athleteId,
         );
-        analytics.logRoutineCreated(
-          source: RoutineCreationSource.trainerAssigned,
-          daysCount: routine.days.length,
-          weeksCount: routine.numWeeks,
-        );
-      } catch (_) {
-        failed.add(athleteId);
-      }
-    }
+        try {
+          final created = await repo.createAssigned(routine);
+          analytics.logPlanAssigned(
+            routineId: created.id,
+            assignedBy: trainerUid,
+            assignedTo: athleteId,
+          );
+          analytics.logRoutineCreated(
+            source: RoutineCreationSource.trainerAssigned,
+            daysCount: routine.days.length,
+            weeksCount: routine.numWeeks,
+          );
+          return null;
+        } catch (_) {
+          return athleteId;
+        }
+      }),
+    );
+    final failed = resultados.whereType<String>().toList();
 
     if (!mounted) return;
 
