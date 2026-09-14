@@ -138,6 +138,83 @@ jobs:
             exit 1
           fi
 
+  generados:
+    name: Generados al dia
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          # Misma version que el job Analyze. Si actualizan una, actualicen las dos.
+          flutter-version: '3.41.9'
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # El quality gate #4 de AGENTS.md §7 ("si tocaste freezed ->
+      # build_runner"), hecho cumplir. Iba en el template y en la constitucion
+      # desde siempre, pero NINGUN job lo verificaba: `rg 'build_runner|freezed'
+      # .github/workflows/*.yml` daba CERO hits. Honor system, y termino como
+      # terminan los honor systems.
+      #
+      # Como se rompe, medido: el 2026-09-11 el commit 1e4ee7a3 le agrego un
+      # `// ignore: invalid_annotation_target` a block.dart y content_report.dart
+      # y commiteo los .freezed.dart de ANTES de esa edicion. Corrieron el
+      # generador, despues editaron la fuente, y commitearon los dos juntos.
+      # Tres dias en main sin que nadie lo notara.
+      #
+      # Y el costo no son las 6 lineas. Esto no se ve leyendo un PR: aparece
+      # cuando a OTRO dev, en otra rama, un build_runner obligatorio le ensucia
+      # archivos que no toco — y pierde el rato de averiguar si lo rompio el.
+      # Paso el 2026-09-14 en la rama del #955.
+      #
+      # FALLA, no avisa. Una anotacion en un check verde no la lee nadie; un
+      # gate que solo avisa es decoracion con costo de mantenimiento. El precio
+      # de fallar hay que saberlo: un bump de `freezed` o `json_serializable`
+      # pone TODOS los PRs abiertos en rojo hasta que alguien regenere, incluso
+      # los que no tienen nada que ver. Es el mismo trade-off que ya se acepto
+      # con el gate de `dart format` en #1106, y ahi funciono: main paso de 44
+      # archivos sucios a cero porque dio vuelta el incentivo.
+      #
+      # El `rm -rf .dart_tool/build` NO es paranoia, y en CI hoy no cambia
+      # nada — es la unica forma de que el gate sea correcto, medido:
+      #
+      #   cache CALIENTE: desactive a mano un .freezed.dart, corri el job,
+      #                   y dio VERDE. build_runner consulta su grafo de
+      #                   assets, ve que ningun INPUT cambio, y ni se molesta
+      #                   en reescribir la salida manoseada.
+      #   cache FRIA:     el mismo experimento da ROJO, que es lo correcto.
+      #
+      # En CI la cache arranca fria por construccion —`subosito/flutter-action`
+      # cachea el SDK y el pub cache, no `.dart_tool/` del working dir—, asi
+      # que el borrado es no-op. Esta igual por dos razones: que el gate no
+      # dependa de un detalle de otra action que puede cambiar, y para que
+      # correr estos comandos en LOCAL de el mismo resultado que en CI. Sin
+      # el, un dev ve verde donde el CI ve rojo y no entiende por que.
+      - name: Regenerar
+        run: |
+          rm -rf .dart_tool/build
+          dart run build_runner build --delete-conflicting-outputs
+
+      # `git status --porcelain` y no `git diff`: tambien caza el generado NUEVO
+      # que alguien se olvido de commitear, que `git diff` no ve por no estar
+      # trackeado. Respeta .gitignore, asi que `.dart_tool/` y demas no cuentan.
+      - name: Verificar que no cambio nada
+        run: |
+          sucios="$(git status --porcelain)"
+          if [ -n "$sucios" ]; then
+            echo "$sucios"
+            echo ""
+            echo "::error::Hay generados desactualizados. Corre 'dart run build_runner build --delete-conflicting-outputs' y commitea el resultado."
+            exit 1
+          fi
+          echo "[OK] los generados commiteados coinciden con lo que produce el generador."
+
   test:
     name: Test (shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
