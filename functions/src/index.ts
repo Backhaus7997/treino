@@ -50,6 +50,14 @@ export {
   maintainCustomExerciseVideoQuotaOnFinalize,
   maintainCustomExerciseVideoQuotaOnDelete,
 } from "./storage/custom-exercise-video-quota";
+// Tope de costo de la media de chat. Mismo par de triggers y por el mismo
+// motivo que arriba, pero el eje es BYTES TOTALES y no cantidad: el chat es un
+// flujo continuo y no una biblioteca. El porqué largo está en el encabezado de
+// `chat-media-quota.ts`.
+export {
+  maintainChatMediaQuotaOnFinalize,
+  maintainChatMediaQuotaOnDelete,
+} from "./storage/chat-media-quota";
 export { notifyOnReview } from "./notifications/notify-review";
 // #628: canal alumno → PF durante la sesión. Notifica SOLO cuando
 // kind === 'discomfort' — un comment no debe vibrarle el teléfono al PF.

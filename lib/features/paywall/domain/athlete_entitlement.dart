@@ -287,3 +287,109 @@ const int kMaxCustomExerciseVideoBytes = 100 * 1024 * 1024;
 ///
 /// Nadie legítimo se acerca: el PF con más videos del proyecto tiene 3.
 const int kMaxCustomExerciseVideos = 50;
+
+// ─── Media de chat ─────────────────────────────────────────────────────────
+//
+// El mismo agujero que cerraron los cuatro topes de arriba, sobre el prefijo
+// donde de verdad se acumula el UGC: `chatMedia/` tenía cap por archivo y
+// NINGUNO de total, y ningún gate del paywall lo tocaba. Medido el 2026-09-14
+// sobre `treino-dev`: 127,18 MB en 15 objetos, **45x** los bytes de
+// `customExerciseVideos`. Ver `docs/costos-storage.md` §7.
+//
+// ⚠️ EL EJE ES DISTINTO Y NO SE PUEDE COPIAR EL DE ARRIBA. Allá el tope es de
+// CANTIDAD y acá es de BYTES TOTALES, y el motivo es la forma del uso, no el
+// gusto:
+//
+//   • `customExerciseVideos` es una BIBLIOTECA: pocos archivos, se arma una
+//     vez. Ahí `cantidad × por-archivo` acota el total, y por eso el docstring
+//     de [kFreeMaxCustomExerciseVideos] descarta —con razón— un tercer tope de
+//     MB totales.
+//   • El chat es un FLUJO CONTINUO: un PF con 30 alumnos manda cientos de
+//     archivos por año legítimamente. Un tope de cantidad tendría que ser
+//     enorme para no romperle el producto, y con la cantidad enorme el
+//     producto `cantidad × por-archivo` deja de ser un techo útil. El total en
+//     bytes sí lo es.
+//
+// Y el eje TAMPOCO es «por chat», aunque suene natural: `firestore.rules`
+// (~1973) tiene TRES ramas de creación de chat —vínculo de Coach, social
+// direccional (REQ-FOLLOW-012) e inquiry (#637, cualquier atleta a cualquier
+// PF publicado)—, así que la cantidad de chats por usuario no tiene techo.
+// N chats × tope-por-chat = sin techo. Medido: de 17 chats, 10 son sociales,
+// 3 inquiry y 4 de Coach, y el chat que concentra el 94% de los bytes es
+// SOCIAL.
+
+/// Bytes TOTALES de media de chat que puede acumular un alumno del plan free,
+/// sumando todos sus chats.
+///
+/// **250 MB, y el número sale de la medición.** El uploader más pesado del
+/// proyecto acumuló **104,88 MB en tres meses** — y es el `trainer`, no un
+/// atleta free. 250 MB es 2,4x eso: a [kFreeMaxChatVideoBytes] por video son
+/// ≥10 videos, o cientos de fotos.
+///
+/// Costo: 0,25 GB × USD 0,026/GB-mes = **USD 0,0065/mes** almacenado, contra
+/// un presupuesto de ARS 54,75/mes por usuario free
+/// (`docs/costos-storage.md` §2). El resto del presupuesto es para el egress,
+/// que es donde se va la plata.
+///
+/// ⚠️ **Es un tope de POR VIDA y hoy no tiene salida.** Los mensajes son
+/// inmutables (`firestore.rules`: `allow update, delete: if false` sobre
+/// `chats/{id}/messages`) y la app no tiene UI para borrar media de un chat,
+/// así que quien llega al tope no puede volver atrás. Por eso 250 y no un
+/// número más chico: un gate sin salida adentro tiene que ser generoso. El día
+/// que exista «liberar espacio», este número se puede bajar.
+const int kFreeMaxChatMediaBytes = 250 * 1024 * 1024;
+
+/// Bytes TOTALES de media de chat para cualquiera — PF, alumno vinculado o
+/// pagador.
+///
+/// Techo anti-abuso, no palanca de conversión: 5 GB ≈ **USD 0,13/mes**, el
+/// mismo costo exacto que el techo de [kMaxCustomExerciseVideos].
+///
+/// Nadie real se acerca: el usuario más pesado del proyecto tiene 105 MB, o
+/// sea el 2% de esto.
+const int kMaxChatMediaBytes = 5 * 1024 * 1024 * 1024;
+
+/// Tamaño máximo de UN video de chat en el plan free.
+///
+/// **El múltiplo se saca contra el p90, no contra el máximo — y esa es la
+/// diferencia con [kFreeMaxCustomExerciseVideoBytes].** Allá el máximo real
+/// (2,59 MB) era un dato sano y 25 MB era 10x eso. Acá el máximo observado
+/// **ES el problema**: un solo MP4 de **90,31 MB** es el **71% de todo el
+/// prefijo `chatMedia/`**, y el segundo video más grande pesa 9,25 MB — un
+/// salto de 10x. Contra el p90 real de 9,12 MB, estos 25 MB son 2,7x.
+///
+/// Nada del lado del cliente amortigua esto: `chat_screen.dart` sube con
+/// `picker.pickVideo(source: ImageSource.gallery)`, **sin `maxDuration` y sin
+/// transcode**. Lo que está en la galería es lo que viaja.
+const int kFreeMaxChatVideoBytes = 25 * 1024 * 1024;
+
+/// Tamaño máximo de UN video de chat, para cualquiera.
+///
+/// **Baja de 100 MB a 50.** Los 100 eran el valor histórico suelto en
+/// `storage.rules`, y son 11x el p90 real — un techo decorativo, igual que los
+/// 100 MB que [kFreeMaxCustomExerciseVideoBytes] documenta para la videoteca.
+/// 50 MB es 5,4x el p90.
+///
+/// Bajarlo a 50 rechaza **exactamente un archivo** de todo el bucket: el de
+/// 90,31 MB. Ningún otro objeto real se acerca.
+///
+/// ⚠️ Este cap es **puramente preventivo**: sólo lo aplica `storage.rules`, y
+/// la CF `maintainChatMediaQuota*` **no lo aplica retroactivamente**. Ver el
+/// encabezado de `functions/src/storage/chat-media-quota.ts` — borrar por
+/// tamaño al bajar el cap destruiría media de conversaciones ya existentes.
+const int kMaxChatVideoBytes = 50 * 1024 * 1024;
+
+/// Tamaño máximo de UNA imagen de chat, para cualquiera.
+///
+/// **15 MB, sin cambios, y es deliberado no tocarlo.** El máximo observado es
+/// 4,98 MB y las imágenes son el 10% de los bytes del prefijo: bajarlo es
+/// superficie de configuración a cambio de nada.
+///
+/// No lleva variante free por el mismo motivo. El eje del costo en chat son
+/// los videos (89,8% de los bytes), y el tope de bytes TOTALES ya acota lo que
+/// las fotos pueden acumular.
+///
+/// Ojo con de dónde viene ese 4,98 MB: es un PNG del Coach Hub. `image_picker`
+/// **en web ignora `imageQuality`** (ver `avatar_web_uploader.dart`), así que
+/// las fotos de mobile viajan comprimidas a 80 y las de web viajan crudas.
+const int kMaxChatImageBytes = 15 * 1024 * 1024;

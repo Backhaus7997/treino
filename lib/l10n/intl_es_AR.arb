@@ -2354,6 +2354,39 @@
   "@chatMediaUploading": {},
   "chatMediaUploadFailed": "No pudimos subir el archivo. Probá de nuevo.",
   "@chatMediaUploadFailed": {},
+  "chatMediaQuotaFull": "Llegaste al tope de {maxMb} MB en fotos y videos de chat.",
+  "@chatMediaQuotaFull": {
+    "description": "Shown when the athlete's total chat media quota is exhausted, before opening the picker (#chat-media-quota). The MB figure is interpolated from kFreeMaxChatMediaBytes / kMaxChatMediaBytes — never hardcode it in the string.",
+    "placeholders": {
+      "maxMb": {
+        "type": "String"
+      }
+    }
+  },
+  "chatMediaFileTooLarge": "El archivo pesa {fileMb} MB y el máximo es {maxMb} MB.",
+  "@chatMediaFileTooLarge": {
+    "description": "Shown after picking a file that exceeds the per-file cap (#chat-media-quota).",
+    "placeholders": {
+      "fileMb": {
+        "type": "String"
+      },
+      "maxMb": {
+        "type": "String"
+      }
+    }
+  },
+  "chatMediaQuotaNotEnough": "El archivo pesa {fileMb} MB y te quedan {remainingMb} MB de cupo.",
+  "@chatMediaQuotaNotEnough": {
+    "description": "Shown after picking a file that fits the per-file cap but would cross the total byte quota (#chat-media-quota).",
+    "placeholders": {
+      "fileMb": {
+        "type": "String"
+      },
+      "remainingMb": {
+        "type": "String"
+      }
+    }
+  },
   "chatMediaPreviewPhoto": "📷 Foto",
   "@chatMediaPreviewPhoto": {},
   "chatMediaPreviewVideo": "🎥 Video",

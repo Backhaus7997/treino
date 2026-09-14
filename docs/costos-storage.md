@@ -1,7 +1,18 @@
-# Costos de Storage y el tope de videos de ejercicio custom
+# Costos de Storage y los topes de UGC
 
-Por qué existe un tope de videos, de dónde salen los números, y por qué está
-implementado en tres capas en vez de una.
+Por qué existen los topes de subida, de dónde salen los números, y por qué están
+implementados en tres capas en vez de una.
+
+Hay **dos** topes, y aunque comparten arquitectura no comparten eje:
+
+| | `customExerciseVideos` (§3) | `chatMedia` (§7) |
+|---|---|---|
+| Forma del uso | Biblioteca: pocos archivos, se arma una vez | Flujo: bytes continuos, para siempre |
+| Eje del tope | **Cantidad** de archivos | **Bytes totales** |
+| Por archivo (free / techo) | 25 / 100 MB | video 25 / 50 MB · imagen 15 MB |
+| Total (free / techo) | — (`cantidad × por-archivo` alcanza) | 250 MB / 5 GB |
+
+La §7 explica por qué copiar el eje de la §3 habría sido un error.
 
 Hermano de [`paywall-alumno-suelto.md`](./paywall-alumno-suelto.md) (que fija el
 PRECIO) y de [`security.md`](./security.md) (que explica las reglas de Storage).
@@ -38,10 +49,10 @@ Tres conclusiones, y ninguna era la esperada:
    gatearía es cero — que es exactamente la mejor hora para poner un tope,
    porque no le saca nada a nadie.
 3. **`chatMedia` es 45x más grande con el mismo agujero.** 127 MB en 15 objetos
-   = **8,5 MB por objeto**, y `storage.rules` le da los mismos 100 MB/archivo
-   sin tope de cantidad ni gate de paywall. **Es deuda abierta, no resuelta por
-   este cambio.** Y el chat genera bytes de forma continua, mientras que una
-   videoteca de tutoriales se arma una vez.
+   = **8,5 MB por objeto**, y `storage.rules` le daba los mismos 100 MB/archivo
+   sin tope de cantidad ni gate de paywall. Y el chat genera bytes de forma
+   continua, mientras que una videoteca de tutoriales se arma una vez.
+   **Cerrado el 2026-09-14 — ver §7**, con un eje distinto al de acá.
 
 ### Cómo repetir la medición
 
@@ -223,8 +234,6 @@ cualquier otro tope, `rg` el número literal en los `.arb`.
 
 ## 6. Qué queda pendiente
 
-- **`chatMedia` tiene el mismo agujero y 45x más bytes.** 100 MB/archivo, sin
-  tope de cantidad, sin gate. Es el lugar donde hoy se acumula el UGC real.
 - **`postPhotos` y `athleteFiles`** no se revisaron en este pase.
 - **Región del trigger**: la CF se despliega en `southamerica-east1` porque el
   bucket está ahí (`roadmap.md`, Fase 1 Etapa 6). Un trigger de Storage en otra
@@ -233,3 +242,175 @@ cualquier otro tope, `rg` el número literal en los `.arb`.
   paywall del alumno. Hoy no hace falta (ningún alumno tiene videos), pero si
   eso cambia antes de prender `kAthletePaywallEnabled`, revisá el mismo problema
   que documenta `athlete-paywall-enforced.ts` para las rutinas de 4 y 5 días.
+
+---
+
+## 7. El tope de `chatMedia` — mismo agujero, otro eje
+
+`chatMedia/{chatId}/{userId}/{file}` tenía cap de tamaño por archivo (imágenes
+< 15 MB, videos < 100 MB) y **ninguno de total**, y ningún gate del paywall lo
+tocaba. Es el mismo agujero de la §3 sobre el prefijo donde de verdad se acumula
+el UGC.
+
+### 7.1 La medición — 2026-09-14, bucket `treino-dev.firebasestorage.app`
+
+**15 objetos, 127,18 MB** (45x los bytes de `customExerciseVideos`).
+
+| | obj | MB | p50 | p90 | max |
+|---|---:|---:|---:|---:|---:|
+| **video** | 5 | 114,20 | 9,12 | 9,25 | **90,31** |
+| **imagen** | 10 | 12,98 | 0,122 | 2,76 | 4,98 |
+| total | 15 | 127,18 | 1,50 | 9,12 | 90,31 |
+
+Tres hechos que ordenan todo el diseño, y ninguno era el esperado:
+
+1. **Un solo archivo es el 71% del prefijo.** Un MP4 de **90,31 MB** del 18/06.
+   El segundo video más grande pesa **9,25 MB**: un salto de 10x. Los videos son
+   el **89,8%** de los bytes; las imágenes, el 10,2%.
+2. **El chat que concentra el 94% de los bytes NO es un chat de Coach.**
+   `linkId=false`, sin `kind` ⇒ rama **social**. De 17 chats del proyecto, **10
+   son sociales, 3 inquiry y 4 de Coach**.
+3. **Nada del lado del cliente amortigua el tamaño.** `chat_screen.dart` sube
+   con `picker.pickVideo(source: ImageSource.gallery)`, **sin `maxDuration` y
+   sin transcode**. Las fotos van con `imageQuality: 80`, pero `image_picker`
+   **en web ignora `imageQuality`** — de ahí el PNG de 4,98 MB del Coach Hub,
+   que es el máximo de imágenes.
+
+Se repite con el mismo camino de la §1.
+
+### 7.2 Por qué el eje NO es «por chat» ni «por cantidad»
+
+**«Por chat» no acota nada.** `firestore.rules` (~1973) tiene **tres** ramas de
+creación de chat —vínculo de Coach, social direccional (REQ-FOLLOW-012) e
+inquiry (#637: cualquier atleta a cualquier PF publicado)—, así que la cantidad
+de chats por usuario **no tiene techo**. N chats × tope-por-chat = sin techo. Y
+no es teórico: la superficie sin vínculo ya es la mayoría de los chats, y es
+donde está el 94% de los bytes.
+
+**Contar archivos tampoco sirve.** La §3 descarta —con razón— un tope de MB
+totales para la videoteca: ahí `cantidad × por-archivo` ya acota. Acá ese
+argumento se da vuelta, y el motivo es la forma del uso:
+
+> Un PF con 30 alumnos manda **cientos de archivos por año** legítimamente. El
+> tope de cantidad tendría que ser enorme para no romperle el producto, y con la
+> cantidad enorme el producto `cantidad × por-archivo` deja de ser un techo
+> útil. **Para una biblioteca el eje es cantidad; para un flujo es bytes.**
+
+**Retención por tiempo: descartada, y con evidencia.**
+
+- Los mensajes son **inmutables**: `allow update, delete: if false` sobre
+  `chats/{id}/messages`. Borrar el objeto deja el mensaje vivo con un `mediaUrl`
+  muerto **para siempre**, sin forma de limpiarlo.
+- Los datos la desmienten como tope gradual: antigüedad máxima **87 días**, 95%
+  de los bytes >30 días, **0% >90 días**. Un corte a 90 días borra 0 MB hoy y
+  120 MB en tres días. Es un acantilado, no una pendiente.
+- En un chat PF↔alumno la conversación **es** el registro del coaching. Borrar
+  el video de técnica de hace cuatro meses destruye lo que hace valioso al
+  producto.
+
+### 7.3 Los números
+
+| | Alumno free | PF / vinculado / pagador |
+|---|---:|---:|
+| MB por video | **25** | **50** *(antes 100)* |
+| MB por imagen | 15 | 15 |
+| **MB totales en chats** | **250** | **5.120** (5 GB) |
+
+**El múltiplo del cap por archivo se saca contra el p90, no contra el máximo**, y
+ésa es la diferencia con la §3. Allá el máximo observado (2,59 MB) era un dato
+sano y 25 MB era 10x eso. Acá **el máximo observado ES el problema**: contra el
+p90 real de 9,12 MB, 25 MB es 2,7x y 50 MB es 5,4x. Los 100 MB históricos eran
+11x el p90 — un techo decorativo, y el único archivo que lo aprovechó es el de
+90,31 MB. **Bajar el techo a 50 rechaza exactamente ese archivo y ningún otro de
+los que existen.**
+
+La imagen queda en 15 MB y **no lleva variante free**, a propósito: el máximo
+observado es 4,98 MB, son el 10% de los bytes, y el tope de bytes totales ya
+acota lo que las fotos acumulan. Bajarlo es superficie de configuración a cambio
+de nada.
+
+**250 MB free** son 2,4x lo que acumuló en tres meses el uploader más pesado del
+proyecto (104,88 MB) — y ese uploader es el **trainer**, no un atleta free. A
+25 MB por video son ≥10 videos, o cientos de fotos. Cuesta USD 0,0065/mes
+almacenado, sobre el presupuesto de ARS 54,75/mes por usuario free de la §2.
+
+**5 GB de techo** cuestan USD 0,13/mes: el mismo costo exacto que el techo de 50
+videos de la §3. Anti-abuso, no palanca de conversión — el usuario más pesado
+del proyecto tiene 105 MB, el 2% de eso.
+
+> ⚠️ **250 MB es un tope de POR VIDA y hoy no tiene salida.** Los mensajes no se
+> borran y la app no tiene UI para liberar media de un chat, así que quien llega
+> al tope no puede volver atrás. Por eso 250 y no un número más chico: un gate
+> sin salida adentro tiene que ser generoso. **El día que exista «liberar
+> espacio», este número se puede bajar** — y ése es el follow-up que lo habilita.
+
+### 7.4 Las tres capas, y las dos divergencias
+
+La arquitectura es la de la §4 —regla preventiva + CF reactiva + cliente para
+UX— pero dos piezas cambian, y las dos por el mismo hecho: **en el chat, borrar
+un objeto rompe un mensaje que no se puede editar.**
+
+**Divergencia 1 — la CF NO borra por tamaño, sólo por total.** `decideQuota` de
+`custom-exercise-video-quota.ts` borra cualquier archivo con `size >= maxBytes`
+del cap **por archivo**. Copiar eso sería destructivo: el cap por video baja de
+100 a 50 MB y el bucket **tiene** ese MP4 de 90,31 MB en una conversación real
+de junio — la primera subida de ese usuario después del deploy lo habría
+borrado. Por eso acá **el cap por archivo es puramente preventivo y vive sólo en
+`storage.rules`**: gobierna lo que ENTRA. La CF gobierna el TOTAL, que es una
+magnitud que no cambia de significado cuando se mueve el cap. Los archivos de
+legado cuentan sus bytes contra el total, pero no se los señala para borrar.
+
+Eso no deja ningún archivo legítimo huérfano: el cap por archivo (50 MB) es dos
+órdenes de magnitud menor que el total (5 GB), así que un solo archivo nunca
+puede exceder el total por sí mismo.
+
+**Divergencia 2 — el uid es el TERCER segmento del path.**
+`chatMedia/{chatId}/{uid}/…` no tiene un prefijo único por usuario, así que
+recontar obliga a enumerar los chats del usuario primero (`chats where members
+array-contains uid`) y listar `chatMedia/{chatId}/{uid}/` por cada uno. Es el
+mismo camino que ya usa el cascade de borrado de cuenta, y es **completo** porque
+`chats` nunca se borra (`allow delete: if false`). Cuesta N+1 llamadas con N =
+chats del usuario, y el máximo real medido es 10; la alternativa —listar
+`chatMedia/` entero y filtrar— es O(toda la media del producto) por subida.
+
+**Lo que hace tolerable el borrado** es que los dos bubbles ya degradan solos:
+`errorWidget` en `chat_image_bubble.dart` y `_VideoErrorPlaceholder` en
+`firebase_storage_video_player.dart`. Un objeto ausente pinta un placeholder, no
+rompe la pantalla. Y la CF conserva los **más viejos**, así que lo que se borra
+es la ráfaga recién enviada —que el que la mandó ve al instante— y no un video
+de hace seis meses que no miraría nunca.
+
+**El gate de cliente cuelga de `athletePaywallEnforced`, no del entitlement.**
+Ésta es la tercera diferencia, y es la que la §4 documenta como «la trampa del
+PF». `athleteEntitlementProvider` **devuelve `free` para un PF** (no mira
+`role`). En la videoteca eso es latente y sale bien de casualidad, porque el
+provider devuelve el techo estructural mientras `kAthletePaywallEnabled` esté
+apagado. Acá no se puede depender de esa casualidad: el chat es superficie
+**compartida de uso constante**, y el día que se prenda el interruptor un gate
+colgado de aquel provider le mostraría «llegaste al límite» a todos los PF del
+producto. El gate lee `users/{uid}.athletePaywallEnforced`, que es **el mismo
+campo que lee la regla** — cliente y servidor no pueden discrepar sobre de qué
+lado del paywall está alguien. Y no cuesta una lectura extra: el contador y el
+tier viven en el mismo documento.
+
+### 7.5 Dónde viven los números
+
+| Lugar | Qué |
+|---|---|
+| `lib/features/paywall/domain/athlete_entitlement.dart` | `kFreeMaxChatMediaBytes`, `kMaxChatMediaBytes`, `kFreeMaxChatVideoBytes`, `kMaxChatVideoBytes`, `kMaxChatImageBytes` |
+| `storage.rules` | Los literales de `chatMediaWriteAllowed()` — los cinco |
+| `functions/src/storage/chat-media-quota.ts` | `FREE_MAX_CHAT_MEDIA_BYTES`, `MAX_CHAT_MEDIA_BYTES` — **sólo los de total**, ver la divergencia 1 |
+| `functions/src/__tests__/chat-media-quota.test.ts` | Escritos literales en los asserts **a propósito** |
+
+Los `.arb` **no** los duplican: los mensajes del gate reciben los MB por
+placeholder (`{maxMb}`, `{fileMb}`, `{remainingMb}`) y se arman desde las
+constantes. Ese eje no se puede desincronizar — que es más de lo que se puede
+decir del resto del paywall.
+
+### 7.6 Un hallazgo de egress que NO es parte de este tope
+
+`FirebaseStorageVideoPlayer.initState()` llama a `initialize()` **sin gate de
+visibilidad ni tap-to-load**. Scrollear un chat baja los primeros bytes de cada
+video que pasa por pantalla, sin que nadie le dé play. Las fotos van por
+`CachedNetworkImage` y pagan egress una vez por dispositivo; los videos no
+tienen esa red. Refuerza el cap por archivo, y da para issue propio.
