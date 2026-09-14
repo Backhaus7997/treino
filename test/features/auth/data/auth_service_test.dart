@@ -6,6 +6,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/features/auth/data/auth_service.dart';
 import 'package:treino/features/auth/domain/auth_failure.dart';
+import 'package:treino/features/auth/presentation/legal/legal_content.dart';
 import 'package:treino/features/profile/data/user_repository.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
@@ -75,11 +76,15 @@ void main() {
     // Default stubs so existing tests that don't care about repo still work.
     // termsAcceptedAt must be matched too — signUpWithEmail always passes it
     // now (QA-AUTH-001, issue #434), so a stub without it would not match.
+    // acceptedTermsVersion/acceptedPrivacyVersion too, in the same call
+    // (consentimiento-legal-versionado, R3).
     when(
       () => mockRepo.getOrCreate(
         uid: any(named: 'uid'),
         email: any(named: 'email'),
         termsAcceptedAt: any(named: 'termsAcceptedAt'),
+        acceptedTermsVersion: any(named: 'acceptedTermsVersion'),
+        acceptedPrivacyVersion: any(named: 'acceptedPrivacyVersion'),
       ),
     ).thenAnswer((_) async => _fakeProfile);
     when(
@@ -185,6 +190,8 @@ void main() {
           uid: any(named: 'uid'),
           email: any(named: 'email'),
           termsAcceptedAt: any(named: 'termsAcceptedAt'),
+          acceptedTermsVersion: any(named: 'acceptedTermsVersion'),
+          acceptedPrivacyVersion: any(named: 'acceptedPrivacyVersion'),
         ),
       ).called(1);
     });
@@ -210,9 +217,38 @@ void main() {
           uid: any(named: 'uid'),
           email: any(named: 'email'),
           termsAcceptedAt: captureAny(named: 'termsAcceptedAt'),
+          acceptedTermsVersion: any(named: 'acceptedTermsVersion'),
+          acceptedPrivacyVersion: any(named: 'acceptedPrivacyVersion'),
         ),
       ).captured;
       expect(captured.single, isA<DateTime>());
+    });
+
+    // consentimiento-legal-versionado (R3): la propia consulta del Register
+    // también es la aceptación de la versión vigente — signUpWithEmail debe
+    // estampar ambas versiones en la MISMA llamada que termsAcceptedAt.
+    test(
+        'consentimiento-legal-versionado: signUpWithEmail passes '
+        'kTermsVersion/kPrivacyVersion to getOrCreate', () async {
+      when(
+        () => fbAuth.createUserWithEmailAndPassword(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+        ),
+      ).thenAnswer((_) async => cred);
+
+      await sut.signUpWithEmail(email: 'a@b.c', password: 'Pass1234');
+
+      final captured = verify(
+        () => mockRepo.getOrCreate(
+          uid: any(named: 'uid'),
+          email: any(named: 'email'),
+          termsAcceptedAt: any(named: 'termsAcceptedAt'),
+          acceptedTermsVersion: captureAny(named: 'acceptedTermsVersion'),
+          acceptedPrivacyVersion: captureAny(named: 'acceptedPrivacyVersion'),
+        ),
+      ).captured;
+      expect(captured, equals([kTermsVersion, kPrivacyVersion]));
     });
 
     // T30: SCENARIO-021 — rollback: getOrCreate throws → user.delete() called
@@ -231,6 +267,8 @@ void main() {
           uid: any(named: 'uid'),
           email: any(named: 'email'),
           termsAcceptedAt: any(named: 'termsAcceptedAt'),
+          acceptedTermsVersion: any(named: 'acceptedTermsVersion'),
+          acceptedPrivacyVersion: any(named: 'acceptedPrivacyVersion'),
         ),
       ).thenThrow(Exception('firestore down'));
 
@@ -280,6 +318,8 @@ void main() {
           uid: any(named: 'uid'),
           email: any(named: 'email'),
           termsAcceptedAt: any(named: 'termsAcceptedAt'),
+          acceptedTermsVersion: any(named: 'acceptedTermsVersion'),
+          acceptedPrivacyVersion: any(named: 'acceptedPrivacyVersion'),
         ),
       ).thenThrow(Exception('firestore down'));
 

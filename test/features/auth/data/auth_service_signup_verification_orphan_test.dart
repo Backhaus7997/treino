@@ -77,6 +77,8 @@ void main() {
         uid: any(named: 'uid'),
         email: any(named: 'email'),
         termsAcceptedAt: any(named: 'termsAcceptedAt'),
+        acceptedTermsVersion: any(named: 'acceptedTermsVersion'),
+        acceptedPrivacyVersion: any(named: 'acceptedPrivacyVersion'),
       ),
     ).thenAnswer((_) async => _fakeProfile);
 
@@ -115,6 +117,8 @@ void main() {
         uid: 'uid-test',
         email: 'a@b.c',
         termsAcceptedAt: any(named: 'termsAcceptedAt'),
+        acceptedTermsVersion: any(named: 'acceptedTermsVersion'),
+        acceptedPrivacyVersion: any(named: 'acceptedPrivacyVersion'),
       ),
     ).called(1);
   }

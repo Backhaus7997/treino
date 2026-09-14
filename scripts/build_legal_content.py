@@ -297,6 +297,39 @@ def emit_dart(docs: list[dict]) -> str:
     for d in docs:
         out.append(f"/// Ultima revision de {d['title']}.")
         out.append(f"const String {d['date_const']} = {dart_str(d['updated'])};")
+    # Version de aceptacion POR DOCUMENTO. Estas tres constantes vivian
+    # escritas a mano DENTRO del archivo que este script sobreescribe entero
+    # (`dart_path.write_text`), asi que la primera corrida del generador las
+    # borraba. No en silencio —`auth_service.dart`, `profile_setup_notifier`
+    # y `legacy_privacy_notice_providers` dejan de compilar— pero borradas
+    # igual, y son la evidencia de que version acepto cada usuario.
+    # Salen del front matter: el markdown es la fuente del texto, tiene que
+    # serlo tambien de su version.
+    for d in docs:
+        if d["version"] is None:
+            continue
+        out.append("")
+        out.append(f"/// Version vigente de {d['title']}, para evidencia de")
+        out.append("/// aceptacion (`UserProfile.accepted...Version`).")
+        out.append("///")
+        out.append("/// Entero monotonico e independiente por documento:")
+        out.append("/// bumpear uno NUNCA obliga a tocar el otro.")
+        out.append(f"const int {d['version_const']} = {d['version']};")
+    for d in docs:
+        if d["published"] is None:
+            continue
+        y, mo, dy = d["published"]
+        out.append("")
+        out.append(f"/// Fecha (UTC) en la que la version {d['version']} del")
+        out.append(f"/// texto de {d['title']} entro en vigencia.")
+        out.append("///")
+        out.append("/// Machine-comparable, a diferencia del String de display")
+        out.append("/// de arriba. Se actualiza UNA sola vez por bump de")
+        out.append("/// version, no en cada edicion menor.")
+        out.append(
+            f"final DateTime {d['published_const']} = "
+            f"DateTime.utc({y}, {mo}, {dy});"
+        )
     out.append("")
     out.append("/// Email de contacto para consultas legales / de privacidad.")
     out.append(f"const String kLegalContactEmail = {dart_str(CONTACT_EMAIL)};")
@@ -447,6 +480,33 @@ def load() -> tuple[list[dict], list[str]]:
         for hit in PENDING_RE.findall(md):
             pending.append(f"{name}: {hit[:70]}")
         um = UPDATED_RE.search(text)
+
+        # `version:` y `published:` son opcionales, pero NO independientes:
+        # el nombre de la constante de fecha lleva la version adentro
+        # (kPrivacyV1PublishedAt), asi que una fecha sin version no tiene
+        # nombre posible. Fallar aca es barato; fallar en la compilacion de
+        # Dart despues de sobreescribir el archivo, no.
+        raw_v = fm.get("version")
+        version = None
+        if raw_v is not None:
+            if not raw_v.isdigit() or int(raw_v) < 1:
+                sys.exit(f"[!] {name}: 'version' debe ser un entero >= 1, "
+                         f"no {raw_v!r}")
+            version = int(raw_v)
+
+        raw_p = fm.get("published")
+        published = None
+        if raw_p is not None:
+            if version is None:
+                sys.exit(f"[!] {name}: tiene 'published' pero no 'version'. "
+                         "El nombre de la constante de fecha lleva la version "
+                         "adentro, asi que una sin la otra no se puede emitir.")
+            pm = re.fullmatch(r"(\d{4})-(\d{2})-(\d{2})", raw_p)
+            if not pm:
+                sys.exit(f"[!] {name}: 'published' debe ser YYYY-MM-DD, "
+                         f"no {raw_p!r}")
+            published = tuple(int(g) for g in pm.groups())
+
         docs.append({
             "file": name,
             "slug": fm["slug"],
@@ -456,6 +516,21 @@ def load() -> tuple[list[dict], list[str]]:
             # kTermsSections -> kTermsLastUpdated. Los nombres de #941 salen
             # solos de esta regla, asi que nada que mapear a mano.
             "date_const": fm["dart"].replace("Sections", "LastUpdated"),
+            # kTermsSections -> kTermsVersion, con la misma regla de arriba.
+            # `version` es opcional: solo los documentos que el usuario ACEPTA
+            # (Terminos y Privacidad) llevan evidencia de version. Los otros
+            # siete se informan, no se aceptan.
+            "version": version,
+            "version_const": fm["dart"].replace("Sections", "Version"),
+            # kPrivacySections + version 1 -> kPrivacyV1PublishedAt. El numero
+            # va en el NOMBRE a proposito: al bumpear la version, el call site
+            # que compara contra la fecha vieja deja de compilar en vez de
+            # seguir comparando contra un texto que ya no rige.
+            "published": published,
+            "published_const": (
+                None if version is None
+                else fm["dart"].replace("Sections", f"V{version}PublishedAt")
+            ),
             "sections": to_sections(md),
         })
     # los demas .md son internos a proposito

@@ -5,6 +5,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/application/auth_providers.dart' show firebaseAuthProvider;
+import '../../auth/presentation/legal/legal_content.dart';
 import '../../gyms/domain/gym.dart' show kNoGymId;
 import '../../profile/application/user_public_profile_providers.dart';
 import '../../profile/application/user_providers.dart';
@@ -330,8 +331,13 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
         if (avatarUrl != null) 'avatarUrl': avatarUrl,
         // Email accounts already carry the original signup consent — NEVER
         // overwrite that evidence with a later ProfileSetup timestamp.
-        if (needsTermsConsent)
+        if (needsTermsConsent) ...{
           'termsAcceptedAt': Timestamp.fromDate(DateTime.now().toUtc()),
+          // consentimiento-legal-versionado (R3): mismo checkbox, misma
+          // escritura — estampa las 2 versiones vigentes junto al timestamp.
+          'acceptedTermsVersion': kTermsVersion,
+          'acceptedPrivacyVersion': kPrivacyVersion,
+        },
       };
       await repo.update(uid, partial);
       state = state.copyWith(isSubmitting: false);

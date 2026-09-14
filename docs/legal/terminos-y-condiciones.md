@@ -2,6 +2,7 @@
 slug: terminos
 title: Términos y Condiciones
 dart: kTermsSections
+version: 1
 -->
 
 # Términos y Condiciones de TREINO
