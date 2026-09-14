@@ -13,6 +13,9 @@ import 'package:treino/features/home/home_screen.dart';
 import 'package:treino/features/home/widgets/empezar_entrenamiento_card.dart';
 import 'package:treino/features/home/widgets/esta_semana_card.dart';
 import 'package:treino/features/home/widgets/home_header.dart';
+import 'package:treino/features/coach/application/trainer_link_providers.dart';
+import 'package:treino/features/coach/domain/trainer_link.dart';
+import 'package:treino/features/coach/domain/trainer_link_status.dart';
 import 'package:treino/features/insights/application/insights_providers.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/experience_level.dart';
@@ -80,6 +83,14 @@ Routine _routine({String id = 'r1'}) => Routine(
       days: const [],
     );
 
+TrainerLink _activeLink() => TrainerLink(
+      id: 'link-1',
+      trainerId: 'pf-1',
+      athleteId: _uid,
+      status: TrainerLinkStatus.active,
+      requestedAt: DateTime.utc(2026, 9, 1),
+    );
+
 /// Overrides que ponen a Home en el estado que renderiza
 /// `_AthleteFirstRunCard`: uid resuelto y AMBAS listas de rutinas resueltas a
 /// vacío. Los providers Firestore que cuelgan del uid se cortan acá — con uid
@@ -87,6 +98,7 @@ Routine _routine({String id = 'r1'}) => Routine(
 List<Override> _firstRunOverrides({
   List<Routine> created = const [],
   List<Routine> assigned = const [],
+  Stream<TrainerLink?>? link,
 }) =>
     [
       userProfileProvider.overrideWith((ref) => Stream.value(makeProfile())),
@@ -98,6 +110,14 @@ List<Override> _firstRunOverrides({
       activeSessionForUidProvider.overrideWith((ref) async => null),
       todaysRoutineProvider.overrideWith((ref) async => null),
       weeklyInsightsProvider.overrideWith((ref) async => null),
+      // Sin este override el provider real sale a Firestore por el `_uid`, y
+      // TODOS los tests de primer arranque dejan de ser herméticos. El default
+      // —`value(null)`— es el atleta sin PF, que es el primer arranque
+      // clásico: mantiene verdes los tests de los tres caminos escritos en
+      // #636 sin tocarles una línea.
+      currentAthleteLinkProvider.overrideWith(
+        (ref) => link ?? Stream<TrainerLink?>.value(null),
+      ),
     ];
 
 /// Home montada dentro de un GoRouter real, con rutas señuelo para cada
@@ -509,6 +529,118 @@ void main() {
         reason: 'EstaSemanaCard arranca en $top, debajo del fold útil ($fold): '
             'la card de primer arranque creció de más.',
       );
+    });
+  });
+
+  // ─── E2E alumno↔PF: el tercer camino no va si ya tiene entrenador ──────────
+
+  group('HomeScreen — primer arranque con PF ya vinculado', () {
+    // Los dos bodies, literales. Si alguien edita el .arb sin mirar acá, estos
+    // tests se ponen rojos — que es el punto: el texto es parte del contrato.
+    const bodyTresCaminos = 'Creá tu propia rutina, explorá planes ya armados '
+        'o buscá un entrenador que te guíe.';
+    const bodyDosCaminos = 'Ya tenés entrenador. Mientras tanto, creá tu '
+        'propia rutina o explorá planes ya armados.';
+
+    /// Assertea el body Y los botones EN LA MISMA verificación.
+    ///
+    /// Que no sean dos tests separados es el pedido explícito del hallazgo, y
+    /// no es ceremonia: el desfasaje que perseguimos es "sacaron el botón y se
+    /// olvidaron del texto". Partido en dos tests, esa regresión deja uno en
+    /// verde y se lee como un rojo aislado en vez de como lo que es.
+    void expectCaminos({required bool conBuscarEntrenador}) {
+      expect(find.text('CREAR RUTINA'), findsOneWidget);
+      expect(find.text('Explorar planes'), findsOneWidget);
+      expect(
+        find.text('Buscar entrenador'),
+        conBuscarEntrenador ? findsOneWidget : findsNothing,
+      );
+      expect(
+        find.text(bodyTresCaminos),
+        conBuscarEntrenador ? findsOneWidget : findsNothing,
+      );
+      expect(
+        find.text(bodyDosCaminos),
+        conBuscarEntrenador ? findsNothing : findsOneWidget,
+      );
+    }
+
+    testWidgets('sin rutinas y SIN PF → tres caminos y el body que los nombra',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapWithRouter(_firstRunRouter(), _firstRunOverrides()),
+      );
+      await tester.pumpAndSettle();
+
+      expectCaminos(conBuscarEntrenador: true);
+    });
+
+    testWidgets(
+        'sin rutinas y CON PF activo → dos caminos, sin ofrecerle buscar lo '
+        'que ya tiene', (tester) async {
+      await tester.pumpWidget(
+        _wrapWithRouter(
+          _firstRunRouter(),
+          _firstRunOverrides(link: Stream.value(_activeLink())),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expectCaminos(conBuscarEntrenador: false);
+      // Y sigue siendo la card de primer arranque: el alumno tiene PF pero
+      // todavía no recibió el plan, que es exactamente el caso del hallazgo.
+      expect(find.byType(EmpezarEntrenamientoCard), findsNothing);
+    });
+
+    testWidgets(
+        'vínculo sin resolver → dos caminos: "todavía no sé" no habilita '
+        'decirle que no tiene entrenador', (tester) async {
+      await tester.pumpWidget(
+        _wrapWithRouter(
+          _firstRunRouter(),
+          // Stream que cierra sin emitir: el provider se queda en AsyncLoading.
+          _firstRunOverrides(link: const Stream<TrainerLink?>.empty()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expectCaminos(conBuscarEntrenador: false);
+    });
+
+    testWidgets(
+        'vínculo con error → dos caminos, y sin texto de error en la card',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapWithRouter(
+          _firstRunRouter(),
+          _firstRunOverrides(
+            link: Stream<TrainerLink?>.error(Exception('permission-denied')),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expectCaminos(conBuscarEntrenador: false);
+      expect(find.textContaining(RegExp(r'[Ee]rror|denied')), findsNothing);
+    });
+
+    testWidgets(
+        'con PF activo, el CTA que queda sigue llevando a su destino real',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrapWithRouter(
+          _firstRunRouter(),
+          _firstRunOverrides(link: Stream.value(_activeLink())),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Sacar un botón del medio de una Column es la forma clásica de romper
+      // el de al lado sin que ningún assert de presencia se entere.
+      await tester.tap(find.text('Explorar planes'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('WORKOUT:plantillas'), findsOneWidget);
     });
   });
 }
