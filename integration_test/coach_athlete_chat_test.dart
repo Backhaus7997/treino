@@ -59,8 +59,14 @@ void main() {
       reason: 'chat route should mount the ChatScreen',
     );
 
-    // Type into the composer TextField and send.
-    const message = 'Hola profe, ¿arranco con el plan de hoy?';
+    // El texto lleva un nonce por corrida, y no es cosmético: el chat ahora es
+    // un documento PERSISTENTE del seed, no un placeholder. Con un texto fijo,
+    // la segunda corrida contra el mismo emulador sin re-sembrar deja dos
+    // globos idénticos y el `findsOneWidget` de abajo falla aunque el envío
+    // haya andado perfecto — el rojo diría "no se mandó" sobre un mensaje que
+    // sí se mandó, dos veces. Con el nonce, la aserción habla de ESTA corrida.
+    final message = 'Hola profe, ¿arranco con el plan de hoy? '
+        '[e2e-${DateTime.now().microsecondsSinceEpoch}]';
     final composer = find.byType(TextField);
     expect(composer, findsWidgets, reason: 'composer field should be present');
     await tester.enterText(composer.last, message);
