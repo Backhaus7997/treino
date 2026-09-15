@@ -117,22 +117,36 @@ void main() {
   // ─── Los dos scanners que impiden que el agujero vuelva ────────────────────
 
   group('plan_assigned vive en UNA sola capa', () {
+    /// El path con barras normales, venga de donde venga.
+    ///
+    /// ⚠️ Sin esto el guard MIENTE en Windows, y miente del lado caro: reporta
+    /// como culpables a los dos archivos que debería excluir. `File.path` trae
+    /// `\` acá, así que un `endsWith('core/analytics/…')` no matchea nunca, el
+    /// `where` no filtra nada, y el `continue` del bucle no corta.
+    ///
+    /// Resultado: rojo en el Windows local y verde en el CI de Linux — que es
+    /// el que tiene razón. Los otros nueve guards del repo ya normalizan así
+    /// (`no_material_button_scan_test.dart`, `no_raw_clock_scan_test.dart`,
+    /// `superficie_de_cobro_alumno_test.dart`…); a éste se le pasó.
+    String ruta(File f) => f.path.replaceAll(r'\', '/');
+
     /// Todos los `.dart` de `lib/`, salvo la definición del propio evento.
     List<File> fuentesDeApp() => Directory('lib')
         .listSync(recursive: true)
         .whereType<File>()
-        .where((f) => f.path.endsWith('.dart'))
-        .where((f) => !f.path.endsWith('core/analytics/analytics_service.dart'))
+        .where((f) => ruta(f).endsWith('.dart'))
+        .where(
+            (f) => !ruta(f).endsWith('core/analytics/analytics_service.dart'))
         .toList();
 
     test('sólo el repositorio llama a logPlanAssigned', () {
       final culpables = <String>[];
       for (final archivo in fuentesDeApp()) {
         if (!archivo.readAsStringSync().contains('logPlanAssigned(')) continue;
-        if (archivo.path.endsWith('workout/data/routine_repository.dart')) {
+        if (ruta(archivo).endsWith('workout/data/routine_repository.dart')) {
           continue;
         }
-        culpables.add(archivo.path);
+        culpables.add(ruta(archivo));
       }
 
       expect(
@@ -152,10 +166,10 @@ void main() {
         final texto = archivo.readAsStringSync();
         if (!texto.contains('RoutineRepository(')) continue;
         // La declaración del constructor no es una construcción.
-        if (archivo.path.endsWith('workout/data/routine_repository.dart')) {
+        if (ruta(archivo).endsWith('workout/data/routine_repository.dart')) {
           continue;
         }
-        if (!texto.contains('analytics:')) sinAnalytics.add(archivo.path);
+        if (!texto.contains('analytics:')) sinAnalytics.add(ruta(archivo));
       }
 
       expect(
