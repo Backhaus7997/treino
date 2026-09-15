@@ -1106,12 +1106,15 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Cuatro acciones de 44 como piso de la HIG. Cuando bajaban a 36 esto
-      // daba 144 — por debajo del mínimo, y encima sin necesidad.
+      // TRES acciones de 44 como piso de la HIG. Eran cuatro hasta que la
+      // campana se mudó a la pantalla principal: el piso baja con ella, pero
+      // el punto del test no cambia —cuando las acciones bajaban a 36 esto
+      // quedaba por debajo del mínimo— y por eso se ajusta el número en vez
+      // de borrar el test.
       final actionsRect = tester.getRect(
         find.byKey(const ValueKey('feed-header-actions')),
       );
-      expect(actionsRect.width, greaterThanOrEqualTo(4 * 44));
+      expect(actionsRect.width, greaterThanOrEqualTo(3 * 44));
     });
 
     testWidgets('fixed merged header remains visible when scrolling down', (

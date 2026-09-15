@@ -9,14 +9,14 @@
  *   - Guards: after missing → skip; after.reason === 'account-deleted' → skip;
  *     before?.status === after.status → skip (no-op write).
  *   - Branches:
- *       create + pending → notify trainer, deepLink "/coach/solicitudes"
+ *       create + pending → notify trainer, deepLink al centro de notificaciones
  *       pending → active → notify athlete (aceptada), deepLink "/coach"
  *       active → paused → notify athlete (pausada), deepLink "/coach"
  *       paused → active → notify athlete (reanudada), deepLink "/coach"
  *       terminated + reason 'account-deleted' → NO notifica, pero purga
  *       terminated + reason 'declined' → notify ATHLETE (el PF rechazó)
  *       terminated + reason 'cancelled-by-athlete' → notify TRAINER,
- *         deepLink "/coach/solicitudes"
+ *         deepLink al centro de notificaciones
  *       * → terminated (resto) → notify BOTH, deepLink "/coach"
  *   - Las dos ramas que le hablan al PF de su BANDEJA apuntan a
  *     `kDeepLinkSolicitudes`; el resto se queda en "/coach".
@@ -58,15 +58,15 @@ type LinkData = Record<string, unknown>;
  * Deep link a la bandeja de solicitudes pendientes del PF.
  *
  * Es UN solo string para las DOS superficies, porque el push lo es. En la app
- * móvil `/coach/solicitudes` es una ruta real (`lib/app/router.dart`); en el
- * Coach Hub web no existe ninguna ruta bajo `/coach`, así que `coachHubRedirect`
- * la traduce a `/invitaciones`, que es donde vive la misma sección con el
- * nombre de path viejo (ADR-F4-01).
+ * móvil es la sub-pestaña «Solicitudes» del centro de notificaciones, que vive
+ * en `/home/notifications` (`lib/app/router.dart`); en el Coach Hub web no
+ * existe ninguna ruta bajo `/home`, así que `coachHubRedirect` la traduce a
+ * `/invitaciones`, la misma sección con el nombre de path viejo (ADR-F4-01).
  *
  * Si algún día cambia cualquiera de los dos lados, este string y esas dos rutas
  * tienen que moverse juntos — no hay tipo que los ate.
  */
-const kDeepLinkSolicitudes = "/coach/solicitudes";
+const kDeepLinkSolicitudes = "/home/notifications?tab=solicitudes";
 
 /**
  * Queues the email counterpart of a link push, when the branch has one.
@@ -110,7 +110,8 @@ async function enqueueLinkMail(
       //
       // (Este comentario decia que en mobile no habia pantalla propia y que
       // por eso caia en `/coach` a secas. Dejo de ser cierto: las pendientes
-      // ahora tienen ruta, `/coach/solicitudes` — ver `kDeepLinkSolicitudes`.
+      // ahora son la sub-pestaña «Solicitudes» del centro de notificaciones,
+      // en `/home/notifications` — ver `kDeepLinkSolicitudes`.
       // El CTA del MAIL sigue yendo al Hub igual, que es donde el PF lee mail.)
       params: { athleteName, ctaUrl: trainerEntry({ to: "solicitudes" }) },
       // The recipient is always the trainer, who HAS a settings screen for

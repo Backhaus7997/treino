@@ -26,7 +26,6 @@ import '../features/coach/presentation/athlete_files_screen.dart';
 import '../features/coach/presentation/athlete_nutrition_plan_screen.dart';
 import '../features/coach/presentation/athlete_detail_screen.dart';
 import '../features/coach/presentation/availability_editor_screen.dart';
-import '../features/coach/presentation/solicitudes_screen.dart';
 import '../features/coach/presentation/trainer_public_profile_screen.dart';
 import '../features/workout/application/session_providers.dart'
     show currentUidProvider;
@@ -791,10 +790,6 @@ GoRouter buildRouter({
                 builder: (_, __) => _withBg(const SearchUsersScreen()),
               ),
               GoRoute(
-                path: 'notifications',
-                builder: (_, __) => _withBg(const NotificationHistoryScreen()),
-              ),
-              GoRoute(
                 // Friend-requests inbox reached from the feed header bell.
                 // Mirror of /profile/friend-requests: _ShellScaffold derives
                 // the highlighted tab from the location's path prefix, so the
@@ -814,6 +809,22 @@ GoRouter buildRouter({
             path: '/home',
             pageBuilder: (_, __) => _noAnim(const HomeScreen()),
             routes: [
+              // Centro de notificaciones. Vive bajo /home y no bajo /feed
+              // porque la campana se movió a la pantalla principal: el
+              // `_ShellScaffold` deriva la pestaña resaltada del prefijo del
+              // path, así que registrarla acá mantiene INICIO marcado y el
+              // `pop` vuelve a /home (mismo patrón que `profile/:uid`).
+              //
+              // El `?tab=` lo escriben las Cloud Functions en su `deepLink`
+              // (ver `kTabSolicitudes`). Un valor desconocido cae en «Todas».
+              GoRoute(
+                path: 'notifications',
+                builder: (_, state) => _withBg(
+                  NotificationHistoryScreen(
+                    initialTab: state.uri.queryParameters['tab'],
+                  ),
+                ),
+              ),
               GoRoute(
                 // Public profile reached from the HomeHeader avatar. Mirror
                 // of /feed/profile/:uid: _ShellScaffold derives the
@@ -848,14 +859,6 @@ GoRouter buildRouter({
               // athlete detail + 1-1 chat moved to top-level immersive routes
               // (/coach/athlete/:id, /coach/chat/:id) so they show NO bottom
               // nav bar — see the top-level GoRoutes above.
-              // Destino del push de `nueva_solicitud` (notify-link-change.ts).
-              // Antes ese aviso caía en `/coach` a secas, que abre la pestaña
-              // ALUMNOS: la lista de los que YA están vinculados, donde la
-              // solicitud nueva no figura.
-              GoRoute(
-                path: 'solicitudes',
-                builder: (_, __) => _withBg(const SolicitudesScreen()),
-              ),
               GoRoute(
                 path: 'agenda',
                 builder: (_, state) => _withBg(

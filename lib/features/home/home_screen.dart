@@ -14,6 +14,7 @@ import '../coach/application/trainer_link_providers.dart';
 import '../coach/domain/trainer_link.dart';
 import '../coach/presentation/trainer_dashboard_tab.dart';
 import '../notifications/presentation/permission_gate.dart';
+import '../notifications/presentation/widgets/notification_bell.dart';
 import '../onboarding/presentation/onboarding_gate.dart';
 import '../profile/application/user_providers.dart';
 import '../profile/domain/user_role.dart';
@@ -127,12 +128,14 @@ class _AthleteHome extends ConsumerWidget {
     final Widget headerOrSkeleton = profileAsync.when(
       data: (profile) => HomeHeader(
         profile: profile,
+        accion: const NotificationBell(),
         onAvatarTap: profile == null
             ? null
             : () => context.push('/home/profile/${profile.uid}'),
       ),
       loading: () => const _HomeHeaderSkeleton(),
-      error: (_, __) => const HomeHeader(profile: null),
+      error: (_, __) =>
+          const HomeHeader(profile: null, accion: NotificationBell()),
     );
 
     // Gate the hero "Empezar" card behind real routine data so a brand-new

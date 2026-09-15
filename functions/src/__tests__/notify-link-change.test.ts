@@ -113,7 +113,7 @@ describe("SCENARIO-637: new link status=pending → notify trainer", () => {
     // NO es "/coach": eso abre la pestaña ALUMNOS, o sea la lista de los que
     // YA están vinculados. El PF tocaba el aviso de una solicitud nueva y
     // caía en una pantalla que no la menciona ni deja aceptarla.
-    expect(callArg.data?.deepLink).toBe("/coach/solicitudes");
+    expect(callArg.data?.deepLink).toBe("/home/notifications?tab=solicitudes");
     expect(callArg.data?.kind).toBe("link-change");
   });
 
@@ -376,7 +376,7 @@ describe("terminated partido por terminationReason", () => {
     expect(callArg.tokens).toEqual(["trainer-token-w1"]);
     expect(callArg.notification?.title).toBe("Solicitud cancelada");
     // Mismo destino que la solicitud nueva: lo que cambió es su bandeja.
-    expect(callArg.data?.deepLink).toBe("/coach/solicitudes");
+    expect(callArg.data?.deepLink).toBe("/home/notifications?tab=solicitudes");
   });
 
   it("un terminate REAL sigue notificando a los dos (ADR-PN-007 intacto)", async () => {

@@ -224,6 +224,14 @@ void main() {
     );
     await tester.pump();
 
+    // Las solicitudes dejaron de estar colgadas arriba de «Todas»: viven en su
+    // propia sub-pestaña. Abrirla acá cubre de paso que la pestaña monta.
+    expect(find.byKey(const Key('notificationPendingRequests')), findsNothing,
+        reason: 'en «Todas» no va: ahí el bloque competía con la lista');
+
+    await tester.tap(find.text('SOLICITUDES'));
+    await tester.pumpAndSettle();
+
     expect(
         find.byKey(const Key('notificationPendingRequests')), findsOneWidget);
   });

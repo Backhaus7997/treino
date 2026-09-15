@@ -59,7 +59,11 @@ String? locationActualDe(GoRouter router) {
 
 /// El centro de notificaciones in-app. Estando acá, la lista ya se actualiza
 /// sola: un aviso encima sería el mismo dato dos veces.
-const kCentroDeNotificaciones = '/feed/notifications';
+///
+/// Vivía en `/feed/notifications` hasta que la campana se movió a la pantalla
+/// principal. Se compara sólo el PATH (ver [shouldSuppressForegroundNotification]),
+/// así que el `?tab=` que traen los deep links no rompe la comparación.
+const kCentroDeNotificaciones = '/home/notifications';
 
 /// Prefijo de los deep links de chat que arma `notify-chat-message.ts`:
 /// `/coach/chat/{chatId}?other={senderId}`.

@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_palette.dart';
+import '../../notifications/presentation/widgets/notification_bell.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../../core/utils/appointment_window.dart';
@@ -75,7 +76,7 @@ class TrainerDashboardTab extends ConsumerWidget {
         const _DashboardHeader(),
         const SizedBox(height: 18),
         // #393: pending requests are NOT shown inline here anymore — they live
-        // in the bell modal (_showPendingRequestsSheet) so they don't clutter
+        // in the «Solicitudes» tab of the notification centre so they don't clutter
         // the dashboard.
         const _ResumenDelDiaCard(),
         const SizedBox(height: 20),
@@ -118,17 +119,14 @@ class _DashboardHeader extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final profileAsync = ref.watch(userProfileProvider);
-    final linksAsync = ref.watch(trainerLinksStreamProvider);
 
     final name = profileAsync.valueOrNull?.displayName ?? '';
     final firstName = name.isEmpty ? '' : name.split(RegExp(r'\s+')).first;
     final initials = _initials(name);
-    final pendingCount = (linksAsync.valueOrNull ?? const [])
-        .where((l) => l.status == TrainerLinkStatus.pending)
-        .length;
-    // A failed links read must not silently hide the badge: flag it so the bell
-    // shows an error dot (and its sheet a retry) instead of a false empty "0".
-    final linksHasError = linksAsync.hasError && !linksAsync.hasValue;
+    // El conteo de pendientes y su estado de error se fueron con la campana
+    // vieja: ahora el badge lo pone `NotificationBell` desde el centro de
+    // notificaciones, y el error de lectura lo muestra `PendingRequestsView`
+    // en su propia pestaña, con reintento.
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -161,12 +159,16 @@ class _DashboardHeader extends ConsumerWidget {
                 ),
               ),
             ),
-            _BellWithBadge(
-              badgeCount: pendingCount,
-              showError: linksHasError,
-              palette: palette,
-              onTap: () => _showPendingRequestsSheet(context),
-            ),
+            // La campana del dashboard era la ÚNICA puerta a las solicitudes
+            // pendientes (#393), y abría un bottom sheet. Ahora las solicitudes
+            // son una sub-pestaña del centro de notificaciones, así que la
+            // campana lleva ahí como en el resto de la app: un solo ícono, un
+            // solo destino.
+            //
+            // El bottom sheet que abría se elimina con ella: era su único
+            // llamador. La lista sobrevive como `PendingRequestsView`, que es
+            // lo que monta la pestaña — se muda de host, no se duplica.
+            const NotificationBell(),
             const SizedBox(width: 12),
             // Shortcut straight to the professional-profile EDITOR, not to the
             // PERFIL tab: from the dashboard the useful destination is the
@@ -903,37 +905,18 @@ class DejarFeedbackSheetTestHarness extends StatelessWidget {
   Widget build(BuildContext context) => const _DejarFeedbackSheet();
 }
 
-void _showPendingRequestsSheet(BuildContext context) {
-  final palette = AppPalette.of(context);
-  showModalBottomSheet<void>(
-    context: context,
-    useRootNavigator: true,
-    backgroundColor: palette.bgCard,
-    isScrollControlled: true,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
-    ),
-    builder: (_) => const PendingRequestsView(cerrarAlVaciarse: true),
-  );
-}
-
-/// Lista de solicitudes de vinculación pendientes del PF.
+/// Lista de solicitudes de vinculación pendientes del PF, con accept/decline.
 ///
-/// Tiene DOS hosts con ciclos de vida opuestos, y por eso el flag:
-/// - el bottom sheet de la campana (`_showPendingRequestsSheet`), que se cierra
-///   solo al quedar vacío;
-/// - la pantalla `/coach/solicitudes`, donde cae el push de `nueva_solicitud` y
-///   donde auto-cerrar sería sacarle al PF la pantalla de abajo de los pies
-///   justo después de aceptar.
+/// Vive en la sub-pestaña «Solicitudes» del centro de notificaciones. Antes era
+/// el contenido de un bottom sheet que abría la campana del dashboard, y ése
+/// era el ÚNICO camino: no existía ruta que llevara a las pendientes, así que
+/// ningún deep link podía apuntarles. El sheet se eliminó al mudarse acá.
 ///
-/// Se comparte la vista en vez de duplicarla porque lo caro de acá no es el
-/// layout: es [_PendingRequestCard], con su accept/decline, su guarda de
-/// doble-tap, su analytics y su paywall. Dos copias de eso divergen.
+/// No se auto-cierra al quedar vacía —el modal sí lo hacía— porque una pestaña
+/// que se desmonta sola le saca el piso al PF justo después de aceptar la
+/// última solicitud.
 class PendingRequestsView extends ConsumerStatefulWidget {
-  const PendingRequestsView({super.key, required this.cerrarAlVaciarse});
-
-  /// `true` en el modal, `false` en la pantalla. Ver el docstring de la clase.
-  final bool cerrarAlVaciarse;
+  const PendingRequestsView({super.key});
 
   @override
   ConsumerState<PendingRequestsView> createState() =>
@@ -941,20 +924,6 @@ class PendingRequestsView extends ConsumerStatefulWidget {
 }
 
 class _PendingRequestsViewState extends ConsumerState<PendingRequestsView> {
-  /// Latches once the sheet has shown at least one request.
-  ///
-  /// It distinguishes the two ways of ending up with an empty list, which need
-  /// OPPOSITE behaviour:
-  /// - opened with none → show the empty state and STAY (the bell is now
-  ///   always tappable, so this is a legitimate way to open the sheet);
-  /// - opened with some and the last one was just accepted/declined →
-  ///   auto-close, so the sheet does not sit there with nothing in it.
-  ///
-  /// Written during build without setState on purpose: it never needs to
-  /// trigger a rebuild of its own — the stream already rebuilds us, and this
-  /// only records what that rebuild showed.
-  bool _hadAny = false;
-
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
@@ -1007,14 +976,6 @@ class _PendingRequestsViewState extends ConsumerState<PendingRequestsView> {
         .where((l) => l.status == TrainerLinkStatus.pending)
         .toList();
 
-    if (pending.isNotEmpty) _hadAny = true;
-
-    if (widget.cerrarAlVaciarse && pending.isEmpty && _hadAny) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (context.mounted) Navigator.of(context).maybePop();
-      });
-    }
-
     return SingleChildScrollView(
       child: Padding(
         padding: EdgeInsets.only(
@@ -1065,8 +1026,7 @@ class PendingRequestsSheetTestHarness extends StatelessWidget {
   const PendingRequestsSheetTestHarness({super.key});
 
   @override
-  Widget build(BuildContext context) =>
-      const PendingRequestsView(cerrarAlVaciarse: true);
+  Widget build(BuildContext context) => const PendingRequestsView();
 }
 
 // ── Resumen del día (3 stat columns) ──────────────────────────────────────────

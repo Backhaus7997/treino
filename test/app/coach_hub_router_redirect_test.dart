@@ -169,10 +169,10 @@ void main() {
     });
 
     // El push de vinculación manda UN SOLO `deepLink` a las dos superficies.
-    // En mobile `/coach/solicitudes` es una ruta real; acá no existe NINGUNA
-    // ruta bajo `/coach`, así que sin esta traducción el PF que toca la
+    // En mobile `/home/notifications` es una ruta real; acá no existe NINGUNA
+    // ruta bajo `/home`, así que sin esta traducción el PF que toca la
     // notificación con el Hub abierto cae en la pantalla de error de go_router.
-    test('trainer en /coach/solicitudes → traduce a /invitaciones', () async {
+    test('trainer en /home/notifications → traduce a /invitaciones', () async {
       final user = _MockUser();
       final container = _container(
         authOverride: authNotifierProvider.overrideWith(
@@ -184,13 +184,13 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      expect(await _call(container, '/coach/solicitudes'), '/invitaciones');
+      expect(await _call(container, '/home/notifications'), '/invitaciones');
     });
 
-    // Control negativo: la traducción es de UNA ruta, no de todo `/coach`.
-    // Sin esto, un `startsWith('/coach')` demasiado goloso pasaría igual y se
+    // Control negativo: la traducción es de UNA ruta, no de todo `/home`.
+    // Sin esto, un `startsWith('/home')` demasiado goloso pasaría igual y se
     // llevaría puesto cualquier path futuro bajo ese prefijo.
-    test('trainer en otra ruta /coach/* → NO la traduce', () async {
+    test('trainer en otra ruta /home/* → NO la traduce', () async {
       final user = _MockUser();
       final container = _container(
         authOverride: authNotifierProvider.overrideWith(
@@ -202,12 +202,12 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      expect(await _call(container, '/coach/agenda'), isNull);
+      expect(await _call(container, '/home/profile/u1'), isNull);
     });
 
     // Un atleta que llega al Hub sigue cayendo en /not-allowed: la traducción
     // vive DESPUÉS del gate de rol, no antes.
-    test('atleta en /coach/solicitudes → /not-allowed, no /invitaciones',
+    test('atleta en /home/notifications → /not-allowed, no /invitaciones',
         () async {
       final user = _MockUser();
       final container = _container(
@@ -220,7 +220,7 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      expect(await _call(container, '/coach/solicitudes'), '/not-allowed');
+      expect(await _call(container, '/home/notifications'), '/not-allowed');
     });
 
     test('trainer en /not-allowed → redirige a /dashboard', () async {

@@ -29,7 +29,7 @@ GoRouter _router() => GoRouter(
           builder: (_, __) => const Scaffold(body: Text('CHAT')),
         ),
         GoRoute(
-          path: '/feed/notifications',
+          path: '/home/notifications',
           builder: (_, __) => const Scaffold(body: Text('NOTIFS')),
         ),
       ],
@@ -129,7 +129,7 @@ void main() {
 
     testWidgets('en el centro de notificaciones → se suprime', (tester) async {
       final router = await _montar(tester);
-      router.go('/feed/notifications');
+      router.go('/home/notifications');
       await tester.pumpAndSettle();
 
       expect(
