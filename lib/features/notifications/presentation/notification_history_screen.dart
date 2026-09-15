@@ -141,15 +141,46 @@ class _TabTodas extends ConsumerStatefulWidget {
 }
 
 class _TabTodasState extends ConsumerState<_TabTodas> {
-  @override
-  void initState() {
-    super.initState();
+  /// Se marcó una vez y no se repite: el `uid` no cambia dentro de una sesión,
+  /// y `didUpdateWidget` corre en cada rebuild del padre.
+  bool _marcado = false;
+
+  /// Marcar visto en cuanto HAYA uid, no sólo si ya lo había al montar.
+  ///
+  /// En un arranque en frío desde una notificación, `authRedirect` deja
+  /// renderizar la ruta protegida mientras auth todavía resuelve, así que
+  /// `currentUidProvider` puede venir `null` en el primer frame. Con esto sólo
+  /// en `initState`, ese `null` era DEFINITIVO: cuando el uid llegaba, el
+  /// `State` ya estaba montado y se reusaba, `initState` no volvía a correr, y
+  /// el historial nunca se daba por visto. El badge de no leídas quedaba viejo
+  /// para siempre, en silencio.
+  ///
+  /// El `build` de la pantalla —de donde vino este código— reintentaba solo en
+  /// cada frame y por eso no tenía el problema. Al mover el efecto a donde
+  /// corresponde hubo que traerse el reintento con él.
+  ///
+  /// Lo encontró Codex en la review del PR #1146.
+  void _marcarCuandoHayaUid() {
+    if (_marcado) return;
     final uid = widget.uid;
     if (uid == null) return;
+    _marcado = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       ref.read(notificationHistoryRepositoryProvider).markSeen(uid);
     });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _marcarCuandoHayaUid();
+  }
+
+  @override
+  void didUpdateWidget(covariant _TabTodas oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _marcarCuandoHayaUid();
   }
 
   @override

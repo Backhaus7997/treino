@@ -50,6 +50,8 @@ Widget _app({
   Stream<DateTime?>? lastSeen,
   int pending = 0,
   String? initialTab,
+  String? uidOverride = 'u1',
+  ProviderContainer? container,
 }) {
   final router = GoRouter(
     initialLocation: '/',
@@ -68,9 +70,19 @@ Widget _app({
       ),
     ],
   );
+  final app = MaterialApp.router(
+    theme: AppTheme.dark(),
+    locale: const Locale('es', 'AR'),
+    localizationsDelegates: AppL10n.localizationsDelegates,
+    supportedLocales: AppL10n.supportedLocales,
+    routerConfig: router,
+  );
+  if (container != null) {
+    return UncontrolledProviderScope(container: container, child: app);
+  }
   return ProviderScope(
     overrides: [
-      currentUidProvider.overrideWithValue('u1'),
+      currentUidProvider.overrideWithValue(uidOverride),
       notificationHistoryRepositoryProvider.overrideWithValue(repository),
       notificationHistoryProvider.overrideWith((ref) => notifications),
       notificationLastSeenAtProvider.overrideWith(
@@ -78,15 +90,13 @@ Widget _app({
       ),
       pendingFollowRequestCountProvider.overrideWith((ref, uid) => pending),
     ],
-    child: MaterialApp.router(
-      theme: AppTheme.dark(),
-      locale: const Locale('es', 'AR'),
-      localizationsDelegates: AppL10n.localizationsDelegates,
-      supportedLocales: AppL10n.supportedLocales,
-      routerConfig: router,
-    ),
+    child: app,
   );
 }
+
+/// `uid` movible, para simular el arranque en frío: auth resuelve DESPUÉS de
+/// que la pantalla ya se montó.
+final _uidDeLaSesion = StateProvider<String?>((ref) => null);
 
 void main() {
   test('newer createdAt than lastSeenAt is unread', () {
@@ -269,6 +279,49 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repository.markSeenCalls, 1);
+  });
+
+  // P2 de Codex en el PR #1146, y una regresión que introduje con el fix del P1.
+  //
+  // En un arranque en frío desde una notificación, `authRedirect` deja
+  // renderizar la ruta protegida mientras auth resuelve, así que el uid puede
+  // venir `null` en el primer frame. Con el `markSeen` sólo en `initState`, ese
+  // null era definitivo: el `State` YA MONTADO se reusa cuando el padre
+  // rebuildea con el uid resuelto, `initState` no vuelve a correr, y el badge
+  // de no leídas quedaba viejo para siempre.
+  //
+  // ⚠️ El uid se mueve por PROVIDER, no reconstruyendo el árbol. La primera
+  // versión de este test usaba un `ValueNotifier` alrededor de `_app`, y eso
+  // REMONTABA la pantalla: `initState` corría de nuevo y el test pasaba en
+  // verde con el bug puesto. Lo delató el control negativo.
+  testWidgets('el uid que llega TARDE igual marca el historial como visto',
+      (tester) async {
+    final repository = _FakeRepository();
+    final container = ProviderContainer(overrides: [
+      currentUidProvider.overrideWith((ref) => ref.watch(_uidDeLaSesion)),
+      notificationHistoryRepositoryProvider.overrideWithValue(repository),
+      notificationHistoryProvider
+          .overrideWith((ref) => Stream.value([_item()])),
+      notificationLastSeenAtProvider.overrideWith((ref) => Stream.value(null)),
+      pendingFollowRequestCountProvider.overrideWith((ref, uid) => 0),
+    ]);
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(_app(
+      repository: repository,
+      notifications: Stream.value([_item()]),
+      container: container,
+    ));
+    await tester.pumpAndSettle();
+
+    expect(repository.markSeenCalls, 0, reason: 'todavía no hay uid');
+
+    // Auth resuelve. El árbol NO se reconstruye: el mismo State se rebuildea.
+    container.read(_uidDeLaSesion.notifier).state = 'u1';
+    await tester.pumpAndSettle();
+
+    expect(repository.markSeenCalls, 1,
+        reason: 'el uid llegó: el historial ya se puede dar por visto');
   });
 
   // Control del anterior: abriendo en la pestaña por defecto SÍ se marca.
