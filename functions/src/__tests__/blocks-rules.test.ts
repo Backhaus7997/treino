@@ -165,6 +165,41 @@ describe("blocks — read", () => {
     );
   });
 
+  // LA query que hace la app, y que ningún test cubría.
+  //
+  // `BlockRepository.watchBlockedUids` hace exactamente esto:
+  // `blocks.where('blockerUid', isEqualTo: uid).snapshots()`. Es lo que
+  // alimenta la pestaña SEGUIDORES del feed — sin esta lista no se puede
+  // armar el `whereIn` de autores, así que si la query falla se cae el feed
+  // entero con «No pudimos cargar tu feed».
+  //
+  // El `allow read` de `blocks` mira el ID del documento
+  // (`blockId.split('_')[0]`). Para un `get` alcanza. Para un LIST no: el
+  // motor tiene que probar la condición sobre documentos cuyos IDs todavía
+  // no conoce, y no puede — deniega la query completa.
+  //
+  // Los tests de arriba pasaban porque todos leen POR DOCUMENTO.
+  it("el bloqueador LISTA sus propios bloqueos (la query del feed)", async () => {
+    await seedBlock("alice", "bob");
+    await assertSucceeds(
+      asUser("alice")
+        .collection("blocks")
+        .where("blockerUid", "==", "alice")
+        .get(),
+    );
+  });
+
+  // Control negativo: la lista sigue siendo sólo la propia.
+  it("nadie LISTA los bloqueos de otro", async () => {
+    await seedBlock("alice", "bob");
+    await assertFails(
+      asUser("mallory")
+        .collection("blocks")
+        .where("blockerUid", "==", "alice")
+        .get(),
+    );
+  });
+
   // Caso obligatorio del design: un tercero NO lee un bloqueo ajeno.
   it("un tercero NO lee un bloqueo ajeno", async () => {
     await seedBlock("alice", "bob");

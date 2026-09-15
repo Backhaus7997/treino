@@ -4364,8 +4364,28 @@ service cloud.firestore {
     // cualquier otro uid. Decisión de producto encima de la de seguridad: el
     // bloqueado no puede confirmar que lo bloquearon (design.md).
     match /blocks/{blockId} {
-      allow read: if request.auth != null
-                  && blockId.split('_')[0] == request.auth.uid;
+      // `get` y `list` SEPARADOS, y no es ceremonia: son dos preguntas que el
+      // motor de reglas evalúa distinto.
+      //
+      // El `get` sigue mirando SÓLO el id, sin tocar `resource`. Eso es lo que
+      // sostiene el oráculo de existencia (design.md, QA-SEC-010): el bloqueado
+      // no puede distinguir "no me bloquearon" de "me bloquearon y no lo sé".
+      //
+      // El `list` NO puede mirar el id. Cuando llega una query, el motor tiene
+      // que probar la condición sobre documentos cuyos ids todavía no conoce, y
+      // una regla basada en `blockId` no es analizable: deniega la query
+      // entera. Eso rompía `BlockRepository.watchBlockedUids`
+      // —`where('blockerUid', ==)`— y con ella la pestaña SEGUIDORES del feed,
+      // que necesita esa lista para armar su `whereIn` de autores. El síntoma
+      // era «No pudimos cargar tu feed» mientras MI GYM y PÚBLICO andaban.
+      //
+      // No afloja nada: el `list` sólo devuelve aristas donde quien pregunta ES
+      // el bloqueador, que es exactamente lo que el `get` ya permitía.
+      allow get: if request.auth != null
+                 && blockId.split('_')[0] == request.auth.uid;
+
+      allow list: if request.auth != null
+                  && resource.data.blockerUid == request.auth.uid;
 
       // Create: sólo el bloqueador, id fijado a blockerUid_blockedUid, no
       // auto-bloqueo. hasOnly + hasAll: acá TODOS los campos son
