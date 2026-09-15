@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/app_theme.dart';
 import 'package:treino/features/chat/application/chat_providers.dart';
 import 'package:treino/features/coach/application/trainer_discovery_providers.dart';
@@ -100,6 +101,72 @@ void main() {
       expect(find.text('TU PERSONAL TRAINER'), findsOneWidget);
       expect(find.text('Coach Joe'), findsOneWidget);
       expect(find.text('TERMINAR VÍNCULO'), findsOneWidget);
+    });
+
+    // Los tres accesos eran `OutlinedButton` idénticos, en el orden en que se
+    // fueron agregando: agenda, nutrición, archivos. Sin jerarquía visual
+    // ninguno "entraba" más que otro, y el más importante quedaba en el medio.
+    //
+    // Se testea el ORDEN y la JERARQUÍA juntos porque por separado cada uno
+    // pasa con el bug del otro puesto: reordenar sin destacar deja tres
+    // botones iguales, y destacar sin reordenar deja el primario en el medio.
+    testWidgets('el plan nutricional va primero y es el único relleno',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        const AthleteCoachView(),
+        overrides: [
+          currentAthleteLinkProvider
+              .overrideWith((ref) => Stream.value(_makeLink())),
+          userPublicProfileProvider('trainer-1')
+              .overrideWith((ref) => Stream.value(_makePub())),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      final l10n = await AppL10n.delegate.load(const Locale('es', 'AR'));
+      final yNutricion =
+          tester.getTopLeft(find.text(l10n.athleteNutritionPlanButtonLabel)).dy;
+      final yArchivos =
+          tester.getTopLeft(find.text(l10n.athleteFilesButtonLabel)).dy;
+      final yAgenda = tester.getTopLeft(find.text(l10n.agendaButtonLabel)).dy;
+
+      expect(yNutricion, lessThan(yArchivos),
+          reason: 'el plan nutricional es lo que el alumno viene a buscar');
+      expect(yArchivos, lessThan(yAgenda),
+          reason: 'la agenda queda última: hoy aporta poco dato propio');
+
+      // EL contrato, y el que este PR rompió en su primera versión: el CTA
+      // relleno es UNO POR PANTALLA (ver la grilla en `TreinoButtonTokens`).
+      // Acá ya lo ocupa «MENSAJE», así que ninguno de los tres accesos puede
+      // ser relleno — si lo fuera, habría dos verdes compitiendo y la
+      // jerarquía que este test protege no significaría nada.
+      //
+      // Lo encontró Codex en la review. La versión anterior de este test
+      // acotaba la afirmación a los tres accesos y por eso pasaba en verde con
+      // el segundo CTA puesto.
+      expect(find.byType(ElevatedButton), findsOneWidget,
+          reason: 'el único relleno de la pantalla es MENSAJE');
+
+      // Y la jerarquía entre los tres sale del COLOR del texto, no del
+      // relleno: el plan nutricional en acento, los otros dos en neutro.
+      Color colorDe(String etiqueta) =>
+          tester.widget<Text>(find.text(etiqueta)).style?.color ??
+          DefaultTextStyle.of(
+            tester.element(find.text(etiqueta)),
+          ).style.color!;
+
+      final palette = AppPalette.of(
+        tester.element(find.text(l10n.athleteFilesButtonLabel)),
+      );
+      expect(colorDe(l10n.athleteNutritionPlanButtonLabel), palette.accentText,
+          reason: 'el plan nutricional es el destacado de los tres');
+      for (final neutro in [
+        l10n.athleteFilesButtonLabel,
+        l10n.agendaButtonLabel,
+      ]) {
+        expect(colorDe(neutro), palette.textPrimary,
+            reason: '$neutro es secundario de verdad');
+      }
     });
 
     testWidgets('Fase B: status active → muestra botón MENSAJE',

@@ -208,24 +208,53 @@ class _FoodGroupSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          group.name.toUpperCase(),
-          style: GoogleFonts.barlowCondensed(
-            fontSize: AppTextSize.body,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 1.2,
-            color: palette.textPrimary,
-          ),
+        // El hint va PEGADO al título y en `textMuted`, no debajo y en verde.
+        //
+        // «Elegí una» / «Va todo» describen la REGLA del grupo que escribió el
+        // PF; no son una acción del alumno. Pintados con `accentText` —el
+        // color que en esta app significa "tocá acá"— y puestos en una línea
+        // propia debajo del título, ocupaban exactamente el lugar y el color
+        // de un control. La gente los leía como un botón para elegir algo.
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Flexible(
+              child: Text(
+                group.name.toUpperCase(),
+                style: GoogleFonts.barlowCondensed(
+                  fontSize: AppTextSize.body,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.2,
+                  color: palette.textPrimary,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              hint,
+              style: GoogleFonts.barlow(
+                fontSize: AppTextSize.caption,
+                fontWeight: FontWeight.w600,
+                color: palette.textMuted,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 8),
-        Text(
-          hint,
-          style: GoogleFonts.barlow(
-            fontSize: AppTextSize.caption,
-            fontWeight: FontWeight.w600,
-            color: palette.accentText,
+        // Un grupo SIN opciones no puede quedar en silencio: con el título y
+        // nada debajo se lee como un control esperando input. Y esconderlo
+        // tampoco sirve —el alumno no se enteraría de que su PF dejó ese grupo
+        // a medio cargar—, así que se dice.
+        if (group.options.isEmpty) ...[
+          const SizedBox(height: 8),
+          Text(
+            l10n.athleteNutritionEmptyGroup,
+            style: GoogleFonts.barlow(
+              fontSize: AppTextSize.caption,
+              color: palette.textMuted,
+            ),
           ),
-        ),
+        ],
         for (final option in group.options) ...[
           const SizedBox(height: 12),
           _FoodOptionRow(option: option),

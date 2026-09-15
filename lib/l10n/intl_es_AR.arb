@@ -254,6 +254,10 @@
   "@athleteNutritionChooseOneHint": {
     "description": "Indica que el alumno debe elegir una sola opción del grupo."
   },
+  "athleteNutritionEmptyGroup": "Tu PF todavía no cargó opciones acá.",
+  "@athleteNutritionEmptyGroup": {
+    "description": "Se muestra cuando un grupo del plan nutricional no tiene ninguna opción cargada. Sin esto el grupo quedaba con el título y nada debajo, y se leía como un control esperando que el alumno eligiera algo."
+  },
   "athleteNutritionAllHint": "Va todo",
   "@athleteNutritionAllHint": {
     "description": "Indica que el alumno debe incluir todas las opciones del grupo."

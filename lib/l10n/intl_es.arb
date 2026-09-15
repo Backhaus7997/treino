@@ -523,6 +523,7 @@
   "athleteFilesButtonLabel": "MIS ARCHIVOS",
   "athleteNutritionPlanScreenTitle": "PLAN NUTRICIONAL",
   "athleteNutritionChooseOneHint": "Elegí una",
+  "athleteNutritionEmptyGroup": "Tu PF todavía no cargó opciones acá.",
   "athleteNutritionAllHint": "Va todo",
   "athleteNutritionPlanEmpty": "Tu PF todavía no cargó tu plan nutricional.",
   "athleteNutritionPlanLoadError": "No pudimos cargar tu plan nutricional.",

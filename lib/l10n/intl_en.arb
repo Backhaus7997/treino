@@ -163,6 +163,7 @@
   "athleteFilesButtonLabel": "MY FILES",
   "athleteNutritionPlanScreenTitle": "NUTRITION PLAN",
   "athleteNutritionChooseOneHint": "Choose one",
+  "athleteNutritionEmptyGroup": "Your coach has not added options here yet.",
   "athleteNutritionAllHint": "Include all",
   "athleteNutritionPlanEmpty": "Your trainer hasn't added your nutrition plan yet.",
   "athleteNutritionPlanLoadError": "We couldn't load your nutrition plan.",

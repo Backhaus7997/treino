@@ -444,6 +444,10 @@ class AppL10nEn extends AppL10n {
   String get athleteNutritionChooseOneHint => 'Choose one';
 
   @override
+  String get athleteNutritionEmptyGroup =>
+      'Your coach has not added options here yet.';
+
+  @override
   String get athleteNutritionAllHint => 'Include all';
 
   @override
