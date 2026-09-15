@@ -244,11 +244,17 @@ temprano, use catálogo o rutina propia.
 >
 > ⚠️ Este párrafo decía que el reloj de Apple era «**lo único que bloquea
 > encender el paywall**». Ya no. El 2026-09-11 aparecieron dos bloqueantes más
-> de este mismo eje, y ninguno es del reloj: `npm run seed:all` le borra
-> `isPremium` al catálogo, y el candado de copiar una plantilla paga vive sólo
-> en el cliente. La lista al día está en
+> de este mismo eje, y ninguno es del reloj: el seed que le borraba `isPremium`
+> al catálogo, y el candado de copiar una plantilla paga que vive sólo en el
+> cliente. **El del seed se cerró el 2026-09-14** (`bef1b3b8`); el del candado
+> sigue abierto. La lista al día está en
 > `lib/features/paywall/domain/athlete_entitlement.dart`, y se mantiene ahí y
 > en ningún otro lado.
+>
+> ⚠️ Y una segunda vez, el 2026-09-15: este mismo párrafo nombraba el bug del
+> seed como vigente **un día después de estar arreglado**, y alguien arrancó a
+> trabajarlo antes de verificar. Los dos carteles —éste y el del `.dart`—
+> fallaron juntos. Si cerrás un bloqueante, cerralo también acá.
 
 **Flag explícito, no `level` reutilizado — decisión de esta sesión.** Gatear
 directo por `level` sería gratis en código (el campo ya existe), pero ata el
