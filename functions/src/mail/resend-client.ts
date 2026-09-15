@@ -6,7 +6,11 @@
  *     package. `functions/package.json` deliberately carries only
  *     firebase-admin + firebase-functions, and this is a single POST; adding a
  *     dependency (and its version churn) for one endpoint is not worth it.
- *     Node 20 — the configured runtime — ships global fetch.
+ *     Global `fetch` has been stable since Node 18, so every runtime Cloud
+ *     Functions still accepts ships it. Naming the FLOOR instead of "the
+ *     configured runtime" on purpose: the runtime moved 20 -> 22 on
+ *     2026-09-15 and a sign that names the current version rots on every
+ *     migration, while one that names where the capability landed does not.
  *   - `MailSender` is an interface so `send-queued-mail` can take a mock,
  *     mirroring the optional `messaging` injection in sendFcm (ADR-PN-004).
  *     No test ever needs a network call or a real API key.

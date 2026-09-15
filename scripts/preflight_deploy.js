@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * preflight_deploy.js — chequea, ANTES de que arranque un deploy de functions,
- * las dos cosas que el 2026-09-15 costaron horas y que ningún test puede ver.
+ * las cosas que el 2026-09-15 costaron horas y que ningún test puede ver.
  *
  * ═══════════════════════════════════════════════════════════════════════════
  *  POR QUÉ EXISTE
@@ -22,9 +22,22 @@
  *   3. `firestore.rules` pasado de 256 KiB. Ese ya tiene su guarda en
  *      `scripts/strip_rules.js` + el job `rules-size` de CI.
  *
- * Este script cubre 1 y 2. No reemplaza al deploy: le adelanta el diagnóstico
- * con un mensaje que dice QUÉ falta, en vez de un 400 mudo o un error que
- * parece del cambio que uno está haciendo.
+ * Este script cubre 1 y 2, más un tercero que se sumó el mismo día y que no
+ * había aparecido todavía SÓLO porque faltaban 45 días:
+ *
+ *   4. `firebase.json` pedía el runtime `nodejs20`, que se decomisiona el
+ *      **2026-10-30**. Pasada esa fecha no se puede deployar NINGUNA función
+ *      —ni un hotfix—, y el único aviso previo son unos warnings de
+ *      deprecación perdidos entre las 48 líneas de un deploy normal.
+ *
+ * Los tres primeros fallan cuando alguien rompe algo. El cuarto falla cuando
+ * pasa el TIEMPO: nadie lo introduce, se pudre solo. Por eso es el único
+ * chequeo que corre antes de los `skip()` —no necesita credenciales ni red— y
+ * por eso su tabla de fechas se LEE de firebase-tools en vez de copiarse acá.
+ *
+ * No reemplaza al deploy: le adelanta el diagnóstico con un mensaje que dice
+ * QUÉ falta, en vez de un 400 mudo o un error que parece del cambio que uno
+ * está haciendo.
  *
  * ── La fuente de verdad es `functions/lib`, no el código fuente ──
  *
@@ -82,28 +95,167 @@ function skip(motivo) {
  * De paso se hereda el manejo de `invalid_rapt` y del refresh de la CLI, que
  * es la que de verdad sabe cómo está guardada la sesión.
  */
-function authDeFirebaseTools() {
+function moduloDeFirebaseTools(relativo) {
   const intentos = [
-    () => require.resolve("firebase-tools/lib/auth.js"),
+    () => require.resolve(`firebase-tools/${relativo}`),
     () =>
       path.join(
         require("child_process")
           .execSync("npm root -g", { encoding: "utf8" })
           .trim(),
         "firebase-tools",
-        "lib",
-        "auth.js",
+        ...relativo.split("/"),
       ),
   ];
   for (const intento of intentos) {
     try {
-      const mod = require(intento());
-      if (typeof mod.getAccessToken === "function") return mod;
+      return require(intento());
     } catch {
       // Probamos la siguiente estrategia.
     }
   }
   return null;
+}
+
+function authDeFirebaseTools() {
+  const mod = moduloDeFirebaseTools("lib/auth.js");
+  return mod && typeof mod.getAccessToken === "function" ? mod : null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  3. El runtime configurado sigue estando vivo
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// El 2026-09-15 `firebase.json` pedía `nodejs20`, que se decomisiona el
+// 2026-10-30. Después de esa fecha NO SE PUEDE DEPLOYAR NINGUNA FUNCIÓN —ni un
+// hotfix— y el aviso previo son unos warnings de deprecación que se pierden
+// entre las 48 líneas que escupe un deploy normal.
+//
+// Misma forma que los otros dos chequeos: el CI no puede verlo porque no es un
+// test, y este repo mergea mucho más seguido de lo que deploya. La diferencia
+// es que éste tiene FECHA: no falla cuando rompés algo, falla cuando pasa el
+// tiempo. Nadie lo introduce; se pudre solo.
+//
+// ── La tabla de fechas NO se copia acá ──
+//
+// Se lee de la firebase-tools instalada, que es exactamente la que después va
+// a aceptar o rechazar el deploy. Copiarla sería otro cartel con fechas que se
+// desactualiza en silencio cada vez que Google mueve una — y este repo ya sabe
+// cómo termina eso.
+
+/** Cuánto antes del decommission conviene enterarse. */
+const DIAS_DE_AVISO = 180;
+
+/** Los runtimes que pide `firebase.json`, como [{codebase, runtime}]. */
+function runtimesConfigurados() {
+  const fb = JSON.parse(fs.readFileSync(path.join(ROOT, "firebase.json"), "utf8"));
+  const bloques = Array.isArray(fb.functions)
+    ? fb.functions
+    : fb.functions
+      ? [fb.functions]
+      : [];
+  return bloques
+    .filter((b) => b.runtime)
+    .map((b) => ({ codebase: b.codebase || b.source || "default", runtime: b.runtime }));
+}
+
+/**
+ * Chequeos del runtime. Van ANTES que todo lo demás a propósito: no necesitan
+ * credenciales, ni red, ni el build hecho, así que son los únicos que corren
+ * SIEMPRE. Los otros dos se saltean solos en una máquina sin login, y este no
+ * debería irse con ellos — es el que tiene fecha de vencimiento.
+ */
+function chequearRuntime(problemas) {
+  let configurados;
+  try {
+    configurados = runtimesConfigurados();
+  } catch (e) {
+    console.log(`preflight: no pude leer el runtime de firebase.json (${e.message})`);
+    return;
+  }
+  if (!configurados.length) return;
+
+  // El engines de `functions/package.json` tiene que decir lo mismo. Son dos
+  // lugares para un solo hecho: `firebase.json` decide dónde CORRE y el
+  // engines decide contra qué se instala y se testea. Desincronizados, CI
+  // valida sobre una versión que producción no usa — y eso sale verde.
+  let engines = null;
+  let tipos = null;
+  try {
+    const pkg = JSON.parse(
+      fs.readFileSync(path.join(ROOT, "functions", "package.json"), "utf8"),
+    );
+    engines = pkg.engines && pkg.engines.node;
+    tipos = pkg.devDependencies && pkg.devDependencies["@types/node"];
+  } catch {
+    // Sin package.json legible no hay nada que comparar.
+  }
+  const mayorDe = (v) => {
+    const m = /(\d+)/.exec(String(v || ""));
+    return m ? m[1] : null;
+  };
+  for (const { codebase, runtime } of configurados) {
+    const mayor = mayorDe(/^nodejs(\d+)$/.test(runtime) ? runtime : "");
+    if (engines && mayor && mayorDe(engines) !== mayor) {
+      problemas.push(
+        `✗ ${codebase}: firebase.json pide ${runtime} y functions/package.json pide node "${engines}".\n` +
+          `    CI instala y testea con el engines; producción corre con el runtime.\n` +
+          `    Mientras no coincidan, el verde de CI es sobre otra versión de Node.`,
+      );
+    }
+    // El TERCER lugar donde vive la misma versión, y el más silencioso: si
+    // `@types/node` es de una major más nueva que el runtime, `tsc` acepta
+    // APIs que en producción NO EXISTEN y el rojo llega recién en runtime.
+    // Es exactamente la forma del bug de `module.registerHooks()` que documenta
+    // `docs/security.md`. No corta el deploy —no lo rompe— pero sí vuelve el
+    // verde de CI menos cierto de lo que parece.
+    if (tipos && mayor && mayorDe(tipos) !== mayor) {
+      console.warn(
+        `\n  ⚠️ ${codebase}: @types/node es "${tipos}" y el runtime es ${runtime}.\n` +
+          `     tsc está tipando contra una superficie de Node que no es la que corre.\n`,
+      );
+    }
+  }
+
+  const tabla = moduloDeFirebaseTools(
+    "lib/deploy/functions/runtimes/supported/types.js",
+  );
+  const RUNTIMES = tabla && tabla.RUNTIMES;
+  if (!RUNTIMES) {
+    console.log("preflight: no pude leer la tabla de runtimes de firebase-tools");
+    return;
+  }
+
+  const hoy = new Date();
+  for (const { codebase, runtime } of configurados) {
+    const info = RUNTIMES[runtime];
+    if (!info) {
+      console.log(`  ? ${codebase}: firebase-tools no conoce el runtime ${runtime}`);
+      continue;
+    }
+    const muere = info.decommissionDate ? new Date(info.decommissionDate) : null;
+    const dias = muere ? Math.ceil((muere - hoy) / 86400000) : null;
+
+    if (info.status === "decommissioned" || (dias !== null && dias <= 0)) {
+      problemas.push(
+        `✗ ${codebase}: el runtime ${runtime} está DECOMISIONADO ` +
+          `(${info.decommissionDate}).\n` +
+          `    No se puede deployar ninguna función, ni un hotfix, hasta subirlo.\n` +
+          `    Se cambia en DOS lugares: firebase.json y functions/package.json.`,
+      );
+    } else if (info.status === "deprecated" || (dias !== null && dias <= DIAS_DE_AVISO)) {
+      console.warn(
+        `\n  ⚠️ ${codebase}: el runtime ${runtime} se decomisiona el ` +
+          `${info.decommissionDate} — faltan ${dias} días.\n` +
+          `     Después de esa fecha no se puede deployar NADA de este codebase.\n` +
+          `     Se cambia en firebase.json y en functions/package.json (y CI).\n`,
+      );
+    } else {
+      console.log(
+        `  ✓ runtime ${runtime} (${codebase}) — vive hasta ${info.decommissionDate}`,
+      );
+    }
+  }
 }
 
 async function accessToken() {
@@ -250,7 +402,22 @@ async function funcionesConCodigoViejo(eps, token, project) {
   return viejas;
 }
 
+/** Imprime los problemas encontrados y corta el deploy. */
+function fallar(problemas) {
+  console.error(`\npreflight: ${problemas.length} problema(s) — el deploy va a fallar.\n`);
+  problemas.forEach((p) => console.error(`  ${p}\n`));
+  process.exit(1);
+}
+
 async function main() {
+  const problemas = [];
+
+  // Va primero y fuera de los `skip()` de abajo a propósito: no necesita
+  // credenciales ni red, así que es el único chequeo que corre SIEMPRE —
+  // incluso en la máquina sin login donde todo lo demás se saltea.
+  chequearRuntime(problemas);
+  if (problemas.length) fallar(problemas);
+
   const project = process.env.GCLOUD_PROJECT;
   if (!project) skip("no sé contra qué proyecto (falta GCLOUD_PROJECT)");
   if (!fs.existsSync(LIB)) skip(`no existe ${path.relative(ROOT, LIB)} — falta build`);
@@ -274,7 +441,6 @@ async function main() {
   }
 
   console.log(`preflight: ${eps.length} funciones · proyecto ${project} · bucket ${bucket}`);
-  const problemas = [];
 
   // ── 1. Todo `defineSecret` tiene que tener una versión ENABLED ──────────
   const declarados = new Map(); // secreto -> [funciones que lo usan]
@@ -367,11 +533,7 @@ async function main() {
     console.log(`preflight: no pude chequear frescura (${e.message})`);
   }
 
-  if (problemas.length) {
-    console.error(`\npreflight: ${problemas.length} problema(s) — el deploy va a fallar.\n`);
-    problemas.forEach((p) => console.error(`  ${p}\n`));
-    process.exit(1);
-  }
+  if (problemas.length) fallar(problemas);
   console.log("preflight: OK");
 }
 
