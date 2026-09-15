@@ -589,30 +589,53 @@ void main() {
         // La regla que sale de ahí: todo texto que le diga al PF dónde se
         // contrata es un candidato a que alguien lo vuelva el atajo, así que
         // todos entran acá. Si mañana aparece un tercero, va en esta lista.
-        final carteles = <String>[
-          'SE CONTRATA EN TREINO WEB',
-          'El alta y el cambio de plan se hacen desde TREINO web, '
-              'con esta misma cuenta.',
-        ];
-
-        for (final texto in carteles) {
-          final cartel = find.text(texto);
+        // ⚠️ ESTE TEST CAMBIÓ DE TRABAJO EL 2026-09-15, y el de antes se
+        // quedaría verde sobre el problema.
+        //
+        // Antes verificaba que los dos carteles EXISTIERAN y no fueran
+        // tappables. Ahora los carteles **no existen**: `pricing_screen.dart`
+        // los vació bajo 3.1.3(f), que ampara este binario sólo «provided
+        // there is no purchasing inside the app, **or calls to action for
+        // purchase outside of the app**». Un cartel que dice dónde se paga ya
+        // es un call to action, tappable o no.
+        //
+        // Así que la garantía es más fuerte: no hay nada que envolver.
+        //
+        // Se sigue barriendo por SUBSTRING y no por texto exacto: si alguien
+        // vuelve a escribir «TREINO web» con otro copy, cae acá igual. Y el
+        // que impide que reaparezca en el FUENTE es
+        // `test/features/paywall/anti_steering_movil_test.dart`.
+        for (final aguja in <String>[
+          'TREINO WEB',
+          'TREINO web',
+          'se contrata'
+        ]) {
           expect(
-            cartel,
-            findsWidgets,
-            reason: 'no se encontró "$texto" — si el copy cambió, actualizá '
-                'esta lista o el guard deja de estar cubierto',
+            find.textContaining(aguja),
+            findsNothing,
+            reason: 'volvió a aparecer «$aguja» en la pricing page móvil. '
+                'Bajo 3.1.3(f) eso es un call to action de compra externa, y '
+                'el amparo se cae solo el día que el alumno compre por IAP.\n'
+                'Si hace falta avisarle al PF dónde pagar: por MAIL, que Apple '
+                'permite explícitamente. Adentro de la app, no.',
           );
+        }
 
-          for (final tipo in <Type>[TreinoTappable, GestureDetector, InkWell]) {
-            expect(
-              find.ancestor(of: cartel, matching: find.byType(tipo)),
-              findsNothing,
-              reason: 'la app móvil quedó tappable vía $tipo sobre "$texto": '
-                  'sea lo que sea que abra, es un punto de compra adentro de '
-                  'la app',
-            );
-          }
+        // El guard de tappabilidad se conserva sobre lo que SÍ queda en
+        // pantalla. Una auditoría colgó una vez un `TreinoTappable` con
+        // `showDialog('CHECKOUT MERCADO PAGO')` del pie, la app móvil quedó
+        // vendiendo, y la suite entera siguió verde (6527, 0 issues).
+        for (final tipo in <Type>[TreinoTappable, GestureDetector, InkWell]) {
+          expect(
+            find.ancestor(
+              of: find.textContaining('plan'),
+              matching: find.byType(tipo),
+            ),
+            findsNothing,
+            reason: 'algo que habla de planes quedó tappable vía $tipo en la '
+                'app móvil: sea lo que sea que abra, es un punto de compra '
+                'adentro de la app',
+          );
         }
       });
     }
@@ -634,13 +657,19 @@ void main() {
       // Lo único que no hay es el punto de compra.
       expect(find.text('ELEGIR PLAN'), findsNothing);
 
-      // Y en su lugar, dónde se contrata. Sin «próximamente» (sería falso: en
-      // la web ya se contrata) y sin nombrar a Apple.
-      expect(find.text('SE CONTRATA EN TREINO WEB'), findsNWidgets(3));
+      // Y en su lugar, NADA. Este bloque decía lo contrario —«el PF tiene que
+      // saber dónde se da de alta»— y esa decisión se dio vuelta el
+      // 2026-09-15: bajo 3.1.3(f) decirlo es un call to action de compra
+      // externa. Sigue sin «próximamente» y sin nombrar a Apple.
+      //
+      // ⚠️ Lo que esto cuesta está escrito en `pricing_screen.dart`, no acá:
+      // el PF que entró por el teléfono queda sin saber dónde pagar, y la
+      // salida es un mail.
+      expect(find.text('SE CONTRATA EN TREINO WEB'), findsNothing);
       expect(
         find.textContaining('TREINO web'),
-        findsWidgets,
-        reason: 'el PF tiene que saber dónde se da de alta',
+        findsNothing,
+        reason: 'la app móvil no puede nombrar dónde se da de alta',
       );
       final textos = tester
           .widgetList<Text>(find.byType(Text))
@@ -669,7 +698,10 @@ void main() {
       expect(find.text('PLANES Y\nPRECIOS'), findsNothing);
 
       expect(find.text('ELEGIR PLAN'), findsNothing);
-      expect(find.text('SE CONTRATA EN TREINO WEB'), findsNWidgets(3));
+      // Ni el punto de compra ni el cartel que decía dónde comprar: ver el
+      // bloque equivalente del layout angosto.
+      expect(find.text('SE CONTRATA EN TREINO WEB'), findsNothing);
+      expect(find.textContaining('TREINO web'), findsNothing);
     });
 
     // No alcanza con que el label diga otra cosa: lo que la guideline mira es

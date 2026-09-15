@@ -552,12 +552,32 @@ class _PrimaryCta extends StatelessWidget {
           Navigator.of(context).pop();
           switch (checkout) {
             case PlanCheckoutOnWebOnly():
-              // La app informa donde se regulariza. No navega, no linkea y no
-              // abre nada: si algun dia esto arranca un cobro, es 3.1.3(c).
+              // ⚠️ ACA DECIA DONDE SE REGULARIZA, Y ESO ERA EL PROBLEMA.
+              //
+              // El comentario que estaba aca razonaba sobre 3.1.3(c) —«no
+              // navega, no linkea y no abre nada»— y miraba el COBRO. La
+              // clausula que muerde es otra: 3.1.3(f) ampara la app del PF
+              // «provided there is no purchasing inside the app, **or calls to
+              // action for purchase outside of the app**». Un call to action no
+              // necesita abrir nada: alcanza con decir donde se paga.
+              //
+              // Y el amparo se cae solo el dia que el ALUMNO compre por IAP:
+              // ahi el binario deja de ser una «free app» y 3.1.3(f) no le
+              // aplica mas, por su propio texto.
+              //
+              // Ahora dice el ESTADO de la cuenta y nada mas. Eso no es un CTA
+              // de compra externa: es un hecho sobre su suscripcion.
+              //
+              // ⚠️ SE PIERDE ALGO REAL, Y NO ES GRATIS: el PF que entro por el
+              // telefono se queda sin saber que hacer. El encabezado de
+              // `pricing_screen.dart` lo cuantifica — es el 100% del funnel de
+              // $12.000-$39.000 por mes. Recuperarlo NO puede ser un cartel
+              // acá: tiene que salir por fuera de la app (un mail), que es lo
+              // unico que Apple no gobierna.
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text(
-                    'Regularizá tu suscripción desde TREINO web.',
+                    'Tu suscripción está pausada.',
                   ), // i18n: Fase W3
                 ),
               );
@@ -570,7 +590,7 @@ class _PrimaryCta extends StatelessWidget {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text(
-                      'Regularizá tu suscripción desde TREINO web.',
+                      'Tu suscripción está pausada.',
                     ), // i18n: Fase W3
                   ),
                 );
