@@ -375,8 +375,9 @@ describe("terminated partido por terminationReason", () => {
       .calls[0][0] as MulticastMessage;
     expect(callArg.tokens).toEqual(["trainer-token-w1"]);
     expect(callArg.notification?.title).toBe("Solicitud cancelada");
-    // Mismo destino que la solicitud nueva: lo que cambió es su bandeja.
-    expect(callArg.data?.deepLink).toBe("/home/notifications?tab=solicitudes");
+    // Al HISTORIAL, no a «Solicitudes»: el vínculo ya está `terminated` y esa
+    // pestaña sólo lista `pending`, así que ahí no podría verse nunca.
+    expect(callArg.data?.deepLink).toBe("/home/notifications");
   });
 
   it("un terminate REAL sigue notificando a los dos (ADR-PN-007 intacto)", async () => {
