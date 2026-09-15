@@ -135,37 +135,39 @@ void main() {
       expect(yArchivos, lessThan(yAgenda),
           reason: 'la agenda queda última: hoy aporta poco dato propio');
 
-      // EL contrato, y el que este PR rompió en su primera versión: el CTA
-      // relleno es UNO POR PANTALLA (ver la grilla en `TreinoButtonTokens`).
-      // Acá ya lo ocupa «MENSAJE», así que ninguno de los tres accesos puede
-      // ser relleno — si lo fuera, habría dos verdes compitiendo y la
-      // jerarquía que este test protege no significaría nada.
+      // La jerarquía se afirma sobre el FONDO, no sobre el tipo de widget.
       //
-      // Lo encontró Codex en la review. La versión anterior de este test
-      // acotaba la afirmación a los tres accesos y por eso pasaba en verde con
-      // el segundo CTA puesto.
-      expect(find.byType(ElevatedButton), findsOneWidget,
-          reason: 'el único relleno de la pantalla es MENSAJE');
-
-      // Y la jerarquía entre los tres sale del COLOR del texto, no del
-      // relleno: el plan nutricional en acento, los otros dos en neutro.
-      Color colorDe(String etiqueta) =>
-          tester.widget<Text>(find.text(etiqueta)).style?.color ??
-          DefaultTextStyle.of(
-            tester.element(find.text(etiqueta)),
-          ).style.color!;
+      // Los tres accesos son `OutlinedButton` con `backgroundColor` del token,
+      // así que contar `ElevatedButton` daría 1 (sólo MENSAJE) tanto si el
+      // plan nutricional está relleno como si no. Ese assert pasaba en verde
+      // con el cambio puesto Y sin él: no medía nada.
+      Color? fondoDe(String etiqueta) {
+        final boton = tester.widget<OutlinedButton>(
+          find
+              .ancestor(
+                of: find.text(etiqueta),
+                matching: find.byType(OutlinedButton),
+              )
+              .first,
+        );
+        return boton.style?.backgroundColor?.resolve(<WidgetState>{});
+      }
 
       final palette = AppPalette.of(
         tester.element(find.text(l10n.athleteFilesButtonLabel)),
       );
-      expect(colorDe(l10n.athleteNutritionPlanButtonLabel), palette.accentText,
-          reason: 'el plan nutricional es el destacado de los tres');
-      for (final neutro in [
+
+      // Decisión de producto del maintainer, contra la recomendación del
+      // design system (el CTA relleno es uno por pantalla y «MENSAJE» ya lo
+      // es). Queda fijado acá para que un refactor no lo "corrija" solo.
+      expect(fondoDe(l10n.athleteNutritionPlanButtonLabel), palette.accent,
+          reason: 'el plan nutricional va RELLENO, por decisión de producto');
+      for (final delineado in [
         l10n.athleteFilesButtonLabel,
         l10n.agendaButtonLabel,
       ]) {
-        expect(colorDe(neutro), palette.textPrimary,
-            reason: '$neutro es secundario de verdad');
+        expect(fondoDe(delineado), isNot(palette.accent),
+            reason: '$delineado va delineado, no relleno');
       }
     });
 

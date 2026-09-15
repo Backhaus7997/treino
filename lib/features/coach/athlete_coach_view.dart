@@ -250,10 +250,16 @@ class LinkStateCard extends ConsumerWidget {
                 // son las reuniones del alumno; el calendario con los días
                 // ocupados del PF es contexto, no una acción.
                 _AccesoDelAlumno(
-                  // El más destacado de los tres, pero NO relleno: ese lugar
-                  // ya lo ocupa «MENSAJE» más abajo, y el CTA relleno es uno
-                  // por pantalla.
-                  variante: TreinoButtonVariant.secondaryAccent,
+                  // Relleno por decisión de producto del maintainer, sobre la
+                  // alternativa que proponía el design system.
+                  //
+                  // El contrato de `TreinoButtonTokens` dice que el CTA
+                  // relleno es UNO por pantalla, y acá «MENSAJE» ya es otro:
+                  // son dos verdes compitiendo. Se elige igual porque el plan
+                  // nutricional es lo que el alumno viene a buscar y se lo
+                  // quiere con ese peso. Queda escrito para que el próximo que
+                  // lea la regla no crea que es un descuido.
+                  variante: TreinoButtonVariant.primary,
                   icono: TreinoIcon.sidebarNutricion,
                   etiqueta: l10n.athleteNutritionPlanButtonLabel,
                   onPressed: () => context.push(
@@ -262,14 +268,14 @@ class LinkStateCard extends ConsumerWidget {
                 ),
                 const SizedBox(height: 12),
                 _AccesoDelAlumno(
-                  variante: TreinoButtonVariant.secondary,
+                  variante: TreinoButtonVariant.secondaryAccent,
                   icono: TreinoIcon.file,
                   etiqueta: l10n.athleteFilesButtonLabel,
                   onPressed: () => context.push('/coach/archivos'),
                 ),
                 const SizedBox(height: 12),
                 _AccesoDelAlumno(
-                  variante: TreinoButtonVariant.secondary,
+                  variante: TreinoButtonVariant.secondaryAccent,
                   icono: TreinoIcon.tabWorkout,
                   etiqueta: l10n.agendaButtonLabel,
                   // El trainerId viaja por la ruta para que el host NO tenga
@@ -697,6 +703,10 @@ class _AccesoDelAlumno extends StatelessWidget {
       child: OutlinedButton.icon(
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
+          // `primary` trae fondo acento; las otras variantes lo traen
+          // transparente, así que el mismo widget sirve para relleno y para
+          // delineado sin ramificar.
+          backgroundColor: v.background,
           side: BorderSide(color: v.borderColor, width: 1),
           foregroundColor: v.foreground,
           minimumSize: const Size.fromHeight(48),
