@@ -63,39 +63,59 @@ const CONFIGSTORE = path.join(
   "firebase-tools.json",
 );
 
-// client_id / client_secret públicos de firebase-tools (installed app, open
-// source). No son un secreto: están en el repo de firebase-tools.
-const CLIENT_ID =
-  "563584335869-fgrhgmd47bqnekij5i8b5pr03ho849e6.apps.googleusercontent.com";
-const CLIENT_SECRET = "j9iVZfS8kkCEFUPaAeJV0sAi";
-
 /** Sale sin fallar, avisando por qué no pudo chequear. */
 function skip(motivo) {
   console.log(`preflight: SALTEADO — ${motivo}`);
   process.exit(0);
 }
 
+/**
+ * El módulo de auth de la firebase-tools que está corriendo este predeploy.
+ *
+ * Se resuelve en vez de reimplementar el refresh de OAuth a mano, y NO es una
+ * cuestión de elegancia: la versión anterior de este script hardcodeaba el
+ * `client_secret` público de firebase-tools, y `gitleaks` la rechazó con
+ * `generic-api-key`. Tenía razón — un literal llamado CLIENT_SECRET es
+ * exactamente lo que un scanner tiene que marcar, sin ponerse a evaluar si ese
+ * valor puntual es público. Delegar no deja nada que marcar.
+ *
+ * De paso se hereda el manejo de `invalid_rapt` y del refresh de la CLI, que
+ * es la que de verdad sabe cómo está guardada la sesión.
+ */
+function authDeFirebaseTools() {
+  const intentos = [
+    () => require.resolve("firebase-tools/lib/auth.js"),
+    () =>
+      path.join(
+        require("child_process")
+          .execSync("npm root -g", { encoding: "utf8" })
+          .trim(),
+        "firebase-tools",
+        "lib",
+        "auth.js",
+      ),
+  ];
+  for (const intento of intentos) {
+    try {
+      const mod = require(intento());
+      if (typeof mod.getAccessToken === "function") return mod;
+    } catch {
+      // Probamos la siguiente estrategia.
+    }
+  }
+  return null;
+}
+
 async function accessToken() {
+  const auth = authDeFirebaseTools();
+  if (!auth) throw new Error("no pude resolver firebase-tools/lib/auth");
   const cfg = JSON.parse(fs.readFileSync(CONFIGSTORE, "utf8"));
   const refresh = cfg.tokens && cfg.tokens.refresh_token;
   if (!refresh) throw new Error("el configstore no tiene refresh_token");
-  const res = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: CLIENT_ID,
-      client_secret: CLIENT_SECRET,
-      refresh_token: refresh,
-      grant_type: "refresh_token",
-    }),
-  });
-  if (!res.ok) {
-    const txt = await res.text();
-    // `invalid_rapt` es Google pidiendo `firebase login --reauth`. No es un
-    // problema del deploy, así que se saltea en vez de bloquear.
-    throw new Error(`token ${res.status} ${txt.slice(0, 120)}`);
-  }
-  return (await res.json()).access_token;
+  const r = await auth.getAccessToken(refresh, []);
+  const token = typeof r === "string" ? r : r && r.access_token;
+  if (!token) throw new Error("firebase-tools no devolvió un access token");
+  return token;
 }
 
 /** El bucket por defecto del proyecto, o null si no se puede resolver. */
