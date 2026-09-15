@@ -90,17 +90,7 @@ enum AthleteEntitlement {
 ///      y nada más. El checklist está en `docs/paywall-watchos-plan.md` §5, y
 ///      el caso que más importa no es el obvio — es el CONTROL NEGATIVO: que
 ///      un free entrene una plantilla de principiante sin fricción.
-///   2. **El seed que apaga el cobro del catálogo.** `npm run seed:all` corre
-///      `scripts/seed_workout_catalog.js`, que pisa seis plantillas con
-///      `.set()` —reemplazo total, no merge— y **no conoce `isPremium`**: cero
-///      menciones en todo el archivo. Tres de las cuatro pagas quedarían
-///      gratis. Y como el campo falla ABIERTO en las tres puntas, no hay error
-///      ni log: el catálogo deja de cobrar y nadie se entera. Medido contra
-///      producción el 2026-09-11: están las 4, o sea que el bug está cargado y
-///      todavía no disparó. El que SÍ escribe el campo (`seed_templates.js`)
-///      es dry-run por default y no tiene alias npm — el camino fácil
-///      destruye, el difícil construye, y por eso esto va a volver a pasar.
-///   3. **El candado del catálogo vive sólo acá, no en el servidor.**
+///   2. **El candado del catálogo vive sólo acá, no en el servidor.**
 ///      `isPremium` aparece en `firestore.rules` únicamente dentro del bloque
 ///      de `sessions`; el CREATE de `/routines` no lo mira NUNCA. Copiar una
 ///      plantilla paga a rutina propia pasa el servidor si la copia entra en
@@ -108,10 +98,29 @@ enum AthleteEntitlement {
 ///      `numWeeks`— entra exacto. No se arregla con una cláusula nueva: el
 ///      servidor no puede distinguir tres días copiados de tres días escritos
 ///      a mano, porque el payload es idéntico. Es una decisión de producto.
-///   4. **Los tres carteles de steering** de la app móvil del PF, declarados
+///   3. **Los tres carteles de steering** de la app móvil del PF, declarados
 ///      con fecha límite en `test/features/paywall/anti_steering_movil_test.dart`.
 ///
 /// ─── Lo que SALIÓ de esta lista, y por qué ───
+///
+/// **El seed que apagaba el cobro del catálogo**, que estuvo acá y ya no está.
+/// Cerrado el 2026-09-14 por `bef1b3b8`, que le sacó a
+/// `scripts/seed_workout_catalog.js` la mitad que sembraba `/routines`. Hoy ese
+/// script sólo siembra ejercicios, `--routines` y `--all` **cortan con un
+/// error** en vez de destruir en silencio, y los alias `seed:routines` y
+/// `seed:all` dejaron de existir. El que quedó —`seed:templates`— es dry-run
+/// por default. Lo guarda `scripts/test/catalogo_una_sola_fuente.test.js`.
+///
+/// Verificado contra producción el 2026-09-15: las 4 plantillas pagas siguen
+/// con `isPremium: true`. El bug nunca llegó a disparar.
+///
+/// ⚠️ Esta entrada existe porque el ítem se quedó acá **un día entero después
+/// de estar resuelto**, y alguien arrancó a trabajarlo antes de verificar. En
+/// este archivo eso cuesta más que en otros: `docs/paywall-alumno-suelto.md`
+/// dice textualmente que «la lista al día está acá», o sea que es la fuente
+/// autoritativa para decidir cuándo encender el paywall. **Una lista
+/// autoritativa equivocada es peor que no tener lista.** Si cerrás un ítem,
+/// moverlo a esta sección es parte de cerrarlo.
 ///
 /// **El grandfathering**, que estuvo acá y ya no está. Eran dos problemas con
 /// el mismo nombre y se cerraron por caminos distintos:
