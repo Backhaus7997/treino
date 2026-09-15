@@ -210,6 +210,35 @@ class FcmService {
   Future<NotificationSettings> requestPermission() =>
       _messaging.requestPermission();
 
+  /// Habilita la presentación de notificaciones en primer plano en iOS.
+  ///
+  /// ## No es opcional, y el motivo es contraintuitivo
+  ///
+  /// `FLTFirebaseMessagingPlugin.willPresentNotification` decide qué se
+  /// presenta con la app abierta, y su rama por defecto es literal:
+  ///
+  /// ```objc
+  /// UNNotificationPresentationOptions presentationOptions =
+  ///     UNNotificationPresentationOptionNone;
+  /// NSDictionary *persistedOptions = [NSUserDefaults ... presentationOptions];
+  /// if (persistedOptions != nil) { ... }
+  /// ```
+  ///
+  /// Sin esta llamada, `persistedOptions` es `nil` y devuelve **None para
+  /// TODA notificación de primer plano** — incluida la LOCAL que dibuja la
+  /// app. Medido en un iPhone 16 el 2026-09-15: el plugin de locales reportaba
+  /// "mostrada" y en la pantalla no aparecía nada.
+  ///
+  /// Antes esto no se notaba porque el delegate de FCM ni siquiera se
+  /// instalaba (ver `AppDelegate.swift`), así que nadie suprimía nada —
+  /// tampoco se mostraba nada, por otro motivo.
+  Future<void> habilitarPresentacionEnPrimerPlano() =>
+      _messaging.setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+
   /// Stream of foreground messages (app in focus).
   /// REQ-PN-HANDLER-001.
   Stream<RemoteMessage> get onForegroundMessage => FirebaseMessaging.onMessage;

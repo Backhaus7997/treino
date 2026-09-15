@@ -29,6 +29,34 @@ void goDeepLink(BuildContext context, String? deepLink) {
   context.go(deepLink);
 }
 
+/// Location concreta del router, o `null` si todavía no resolvió ninguna.
+///
+/// ## Por qué `state.uri` y no las otras dos opciones obvias
+///
+/// No sirve **`state.fullPath`**: es el PATRÓN de la ruta
+/// (`/coach/chat/:chatId`) y hay que comparar contra un deep link CONCRETO.
+///
+/// No sirve **`routerDelegate.currentConfiguration.uri`**, aunque parezca la
+/// correcta y sea la que usaba la primera versión de esto. Su propio dartdoc
+/// dice que la URL "ignora cualquier RouteBase que sea resultado de una
+/// llamada imperativa". Y el chat se abre SIEMPRE con `context.push(...)`, así
+/// que estando adentro del chat devolvía la location de abajo (`/coach`,
+/// `/home`) y [shouldSuppressForegroundNotification] no podía matchear NUNCA.
+/// La supresión del chat no funcionó desde que se escribió; se detectó
+/// probando con dos teléfonos el 2026-09-15.
+///
+/// `state.uri` sí: su dartdoc dice que es el estado de la ruta usada por
+/// última vez "en `go` **o `push`**", y expone la uri completa.
+///
+/// Vive acá afuera y no adentro del State de la app para que se pueda testear
+/// con un router de verdad — que es justo lo que faltaba cuando se coló el bug.
+String? locationActualDe(GoRouter router) {
+  // Con la lista de matches vacía, `state` tira `StateError: No element`.
+  // Mismo motivo que documenta `RouteAnalytics._currentRoute`.
+  if (router.routerDelegate.currentConfiguration.isEmpty) return null;
+  return router.state.uri.toString();
+}
+
 /// El centro de notificaciones in-app. Estando acá, la lista ya se actualiza
 /// sola: un aviso encima sería el mismo dato dos veces.
 const kCentroDeNotificaciones = '/feed/notifications';
