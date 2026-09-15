@@ -35,6 +35,12 @@ class ChatVideoBubble extends StatelessWidget {
           child: FirebaseStorageVideoPlayer(
             url: message.mediaUrl ?? '',
             palette: palette,
+            // Tap-to-load: este bubble vive en el `ListView.builder` de la
+            // conversación, así que con el auto-init cada video que pasa por
+            // pantalla dispara una descarga — y otra cada vez que volvés a
+            // scrollear, porque es un `State` nuevo. Egress a USD 0,12/GB sin
+            // CDN, y datos móviles del usuario, por videos que nadie pidió.
+            autoInicializar: false,
           ),
         ),
         if (message.text.isNotEmpty)
