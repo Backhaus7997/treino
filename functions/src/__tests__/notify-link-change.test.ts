@@ -100,7 +100,7 @@ describe("SCENARIO-637: new link status=pending → notify trainer", () => {
 
   afterEach(() => cleanup(trainerId, athleteId));
 
-  it("calls sendFcm with uids=[trainerId] and deepLink=/coach", async () => {
+  it("manda al PF a la bandeja de solicitudes, no a la lista de alumnos", async () => {
     const mock = makeMockMessaging();
     const afterData = { trainerId, athleteId, status: "pending" };
 
@@ -110,7 +110,10 @@ describe("SCENARIO-637: new link status=pending → notify trainer", () => {
     const callArg = (mock.sendEachForMulticast as jest.Mock).mock.calls[0][0] as MulticastMessage;
     expect(callArg.tokens).toContain("trainer-token-637");
     expect(callArg.tokens).not.toContain("athlete-token-637");
-    expect(callArg.data?.deepLink).toBe("/coach");
+    // NO es "/coach": eso abre la pestaña ALUMNOS, o sea la lista de los que
+    // YA están vinculados. El PF tocaba el aviso de una solicitud nueva y
+    // caía en una pantalla que no la menciona ni deja aceptarla.
+    expect(callArg.data?.deepLink).toBe("/coach/solicitudes");
     expect(callArg.data?.kind).toBe("link-change");
   });
 
@@ -372,6 +375,8 @@ describe("terminated partido por terminationReason", () => {
       .calls[0][0] as MulticastMessage;
     expect(callArg.tokens).toEqual(["trainer-token-w1"]);
     expect(callArg.notification?.title).toBe("Solicitud cancelada");
+    // Mismo destino que la solicitud nueva: lo que cambió es su bandeja.
+    expect(callArg.data?.deepLink).toBe("/coach/solicitudes");
   });
 
   it("un terminate REAL sigue notificando a los dos (ADR-PN-007 intacto)", async () => {

@@ -913,19 +913,34 @@ void _showPendingRequestsSheet(BuildContext context) {
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
     ),
-    builder: (_) => const _PendingRequestsSheet(),
+    builder: (_) => const PendingRequestsView(cerrarAlVaciarse: true),
   );
 }
 
-class _PendingRequestsSheet extends ConsumerStatefulWidget {
-  const _PendingRequestsSheet();
+/// Lista de solicitudes de vinculación pendientes del PF.
+///
+/// Tiene DOS hosts con ciclos de vida opuestos, y por eso el flag:
+/// - el bottom sheet de la campana (`_showPendingRequestsSheet`), que se cierra
+///   solo al quedar vacío;
+/// - la pantalla `/coach/solicitudes`, donde cae el push de `nueva_solicitud` y
+///   donde auto-cerrar sería sacarle al PF la pantalla de abajo de los pies
+///   justo después de aceptar.
+///
+/// Se comparte la vista en vez de duplicarla porque lo caro de acá no es el
+/// layout: es [_PendingRequestCard], con su accept/decline, su guarda de
+/// doble-tap, su analytics y su paywall. Dos copias de eso divergen.
+class PendingRequestsView extends ConsumerStatefulWidget {
+  const PendingRequestsView({super.key, required this.cerrarAlVaciarse});
+
+  /// `true` en el modal, `false` en la pantalla. Ver el docstring de la clase.
+  final bool cerrarAlVaciarse;
 
   @override
-  ConsumerState<_PendingRequestsSheet> createState() =>
-      _PendingRequestsSheetState();
+  ConsumerState<PendingRequestsView> createState() =>
+      _PendingRequestsViewState();
 }
 
-class _PendingRequestsSheetState extends ConsumerState<_PendingRequestsSheet> {
+class _PendingRequestsViewState extends ConsumerState<PendingRequestsView> {
   /// Latches once the sheet has shown at least one request.
   ///
   /// It distinguishes the two ways of ending up with an empty list, which need
@@ -994,7 +1009,7 @@ class _PendingRequestsSheetState extends ConsumerState<_PendingRequestsSheet> {
 
     if (pending.isNotEmpty) _hadAny = true;
 
-    if (pending.isEmpty && _hadAny) {
+    if (widget.cerrarAlVaciarse && pending.isEmpty && _hadAny) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (context.mounted) Navigator.of(context).maybePop();
       });
@@ -1050,7 +1065,8 @@ class PendingRequestsSheetTestHarness extends StatelessWidget {
   const PendingRequestsSheetTestHarness({super.key});
 
   @override
-  Widget build(BuildContext context) => const _PendingRequestsSheet();
+  Widget build(BuildContext context) =>
+      const PendingRequestsView(cerrarAlVaciarse: true);
 }
 
 // ── Resumen del día (3 stat columns) ──────────────────────────────────────────

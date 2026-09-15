@@ -26,6 +26,7 @@ import '../features/coach/presentation/athlete_files_screen.dart';
 import '../features/coach/presentation/athlete_nutrition_plan_screen.dart';
 import '../features/coach/presentation/athlete_detail_screen.dart';
 import '../features/coach/presentation/availability_editor_screen.dart';
+import '../features/coach/presentation/solicitudes_screen.dart';
 import '../features/coach/presentation/trainer_public_profile_screen.dart';
 import '../features/workout/application/session_providers.dart'
     show currentUidProvider;
@@ -847,6 +848,14 @@ GoRouter buildRouter({
               // athlete detail + 1-1 chat moved to top-level immersive routes
               // (/coach/athlete/:id, /coach/chat/:id) so they show NO bottom
               // nav bar — see the top-level GoRoutes above.
+              // Destino del push de `nueva_solicitud` (notify-link-change.ts).
+              // Antes ese aviso caía en `/coach` a secas, que abre la pestaña
+              // ALUMNOS: la lista de los que YA están vinculados, donde la
+              // solicitud nueva no figura.
+              GoRoute(
+                path: 'solicitudes',
+                builder: (_, __) => _withBg(const SolicitudesScreen()),
+              ),
               GoRoute(
                 path: 'agenda',
                 builder: (_, state) => _withBg(

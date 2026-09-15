@@ -9,14 +9,17 @@
  *   - Guards: after missing → skip; after.reason === 'account-deleted' → skip;
  *     before?.status === after.status → skip (no-op write).
  *   - Branches:
- *       create + pending → notify trainer, deepLink "/coach"
+ *       create + pending → notify trainer, deepLink "/coach/solicitudes"
  *       pending → active → notify athlete (aceptada), deepLink "/coach"
  *       active → paused → notify athlete (pausada), deepLink "/coach"
  *       paused → active → notify athlete (reanudada), deepLink "/coach"
  *       terminated + reason 'account-deleted' → NO notifica, pero purga
  *       terminated + reason 'declined' → notify ATHLETE (el PF rechazó)
- *       terminated + reason 'cancelled-by-athlete' → notify TRAINER
+ *       terminated + reason 'cancelled-by-athlete' → notify TRAINER,
+ *         deepLink "/coach/solicitudes"
  *       * → terminated (resto) → notify BOTH, deepLink "/coach"
+ *   - Las dos ramas que le hablan al PF de su BANDEJA apuntan a
+ *     `kDeepLinkSolicitudes`; el resto se queda en "/coach".
  *   - All user-facing strings in es-AR.
  *   - Tail effect: a `terminated` link that was NEVER accepted is DELETED after
  *     the notification goes out (purge-rejected-link.ts). It lives here, and
@@ -50,6 +53,20 @@ function ensureApp(): App {
 }
 
 type LinkData = Record<string, unknown>;
+
+/**
+ * Deep link a la bandeja de solicitudes pendientes del PF.
+ *
+ * Es UN solo string para las DOS superficies, porque el push lo es. En la app
+ * móvil `/coach/solicitudes` es una ruta real (`lib/app/router.dart`); en el
+ * Coach Hub web no existe ninguna ruta bajo `/coach`, así que `coachHubRedirect`
+ * la traduce a `/invitaciones`, que es donde vive la misma sección con el
+ * nombre de path viejo (ADR-F4-01).
+ *
+ * Si algún día cambia cualquiera de los dos lados, este string y esas dos rutas
+ * tienen que moverse juntos — no hay tipo que los ate.
+ */
+const kDeepLinkSolicitudes = "/coach/solicitudes";
 
 /**
  * Queues the email counterpart of a link push, when the branch has one.
@@ -89,9 +106,12 @@ async function enqueueLinkMail(
       // El destinatario es el PF, asi que el CTA va al Coach Hub. El default
       // (la landing) es para los mails que reciben ATLETAS.
       //
-      // `to: "solicitudes"`: no hay una pantalla propia en mobile (las
-      // pendientes viven en un bottom sheet, #393) asi que ahi cae en
-      // `/coach` a secas, pero en el Hub web SI hay `/invitaciones`.
+      // `to: "solicitudes"`: en el Hub web cae en `/invitaciones`.
+      //
+      // (Este comentario decia que en mobile no habia pantalla propia y que
+      // por eso caia en `/coach` a secas. Dejo de ser cierto: las pendientes
+      // ahora tienen ruta, `/coach/solicitudes` — ver `kDeepLinkSolicitudes`.
+      // El CTA del MAIL sigue yendo al Hub igual, que es donde el PF lee mail.)
       params: { athleteName, ctaUrl: trainerEntry({ to: "solicitudes" }) },
       // The recipient is always the trainer, who HAS a settings screen for
       // this row (kNotifTypes `nueva_solicitud`). Honour their toggle.
@@ -242,7 +262,14 @@ export async function notifyOnLinkChangeHandler(
     return;
   }
 
-  const deepLink = "/coach"; // i18n: Fase 6 Etapa 2 (deepLink is not user-facing copy)
+  // Destino por defecto. Las ramas que le hablan al PF sobre su BANDEJA de
+  // solicitudes lo pisan con `kDeepLinkSolicitudes` más abajo.
+  //
+  // `/coach` en la app móvil abre la pestaña ALUMNOS: la lista de los que YA
+  // están vinculados. Para «Nueva solicitud de vinculación» eso es un destino
+  // engañoso — el aviso habla de algo que esa pantalla no muestra, y el PF no
+  // tiene desde ahí forma de aceptar ni rechazar.
+  let deepLink = "/coach"; // i18n: Fase 6 Etapa 2 (deepLink is not user-facing copy)
   let recipientUids: string[];
   let title: string;
   let body: string;
@@ -257,6 +284,7 @@ export async function notifyOnLinkChangeHandler(
     recipientUids = [trainerId];
     actorUid = athleteId;
     prefKey = "nueva_solicitud";
+    deepLink = kDeepLinkSolicitudes;
     title = "Nueva solicitud de vinculación"; // i18n: Fase 6 Etapa 2
     body = "Un atleta quiere vincularse contigo."; // i18n: Fase 6 Etapa 2
   } else if (afterStatus === "active") {
@@ -313,6 +341,10 @@ export async function notifyOnLinkChangeHandler(
       const athleteName = await resolveAthleteName(app, athleteId);
       recipientUids = [trainerId];
       actorUid = athleteId;
+      // Mismo destino que `pending`, y por el mismo motivo: lo que cambió es
+      // su BANDEJA de solicitudes. `/coach` le mostraría la lista de alumnos
+      // ya vinculados, que no tiene nada que ver con lo que dice el aviso.
+      deepLink = kDeepLinkSolicitudes;
       title = "Solicitud cancelada"; // i18n: Fase W1
       body = `${athleteName} canceló su solicitud de vinculación.`; // i18n: Fase W1
     } else {

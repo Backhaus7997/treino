@@ -242,6 +242,59 @@ void main() {
       expect(find.text('No tenés solicitudes pendientes.'), findsNothing);
     });
 
+    // Control negativo del flag `cerrarAlVaciarse`, y la razón de que exista.
+    //
+    // El test de arriba prueba que el MODAL se cierra al quedar vacío. Sin
+    // éste, un `cerrarAlVaciarse` que se ignorara siempre —o que estuviera
+    // cableado al revés— pasaría igual, porque nadie mira el otro valor.
+    //
+    // En la pantalla `/coach/solicitudes` auto-cerrar sería sacarle el piso al
+    // PF justo después de aceptar la última solicitud: llegó por una
+    // notificación, con `go`, así que no hay nada atrás donde caer.
+    testWidgets(
+        'cerrarAlVaciarse:false → se queda con el estado vacío, no se cierra',
+        (tester) async {
+      final controller = StreamController<List<TrainerLink>>();
+      addTearDown(controller.close);
+
+      await tester.pumpWidget(ProviderScope(
+        overrides: [
+          trainerLinksStreamProvider.overrideWith((ref) => controller.stream),
+          userPublicProfileProvider.overrideWith(
+            (ref, uid) => Stream<UserPublicProfile?>.value(null),
+          ),
+        ],
+        child: _wrap(const Text('BASE')),
+      ));
+
+      Navigator.of(tester.element(find.text('BASE'))).push(
+        MaterialPageRoute<void>(
+          builder: (_) => const Scaffold(
+            body: PendingRequestsView(cerrarAlVaciarse: false),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Abre CON una solicitud…
+      controller.add([_pending('l1', 'a1')]);
+      await tester.pumpAndSettle();
+      expect(find.byType(ElevatedButton), findsOneWidget);
+
+      // …y el PF resuelve la última.
+      controller.add(const <TrainerLink>[]);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byType(PendingRequestsView),
+        findsOneWidget,
+        reason: 'la PANTALLA no se cierra sola: el PF llegó por un deep link '
+            'con `go` y abajo no hay nada donde caer',
+      );
+      expect(find.text('BASE'), findsNothing);
+      expect(find.text('No tenés solicitudes pendientes.'), findsOneWidget);
+    });
+
     // H3: a failed read must show a retry, NOT the "no requests" empty state —
     // which would hide a real pending request behind a false empty.
     testWidgets('links error → sheet shows a retry, not the empty state',
