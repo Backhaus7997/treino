@@ -29,8 +29,11 @@
     }
   },
   "firestore": {
-    "rules": "firestore.rules",
-    "indexes": "firestore.indexes.json"
+    "rules": "firestore.deploy.rules",
+    "indexes": "firestore.indexes.json",
+    "predeploy": [
+      "node scripts/strip_rules.js"
+    ]
   },
   "storage": {
     "rules": "storage.rules"
@@ -88,7 +91,10 @@
       "source": "functions",
       "codebase": "default",
       "runtime": "nodejs20",
-      "predeploy": ["npm --prefix \"$RESOURCE_DIR\" run build"]
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run build",
+        "node scripts/preflight_deploy.js"
+      ]
     }
   ],
   "emulators": {

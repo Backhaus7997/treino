@@ -125,6 +125,23 @@ export interface RcClient {
  * por dominio, y si lo tocamos es por rafaga, no por un bug. Reintentar en 5
  * minutos es exactamente lo que corresponde.
  */
+/**
+ * Si conviene gastar uno de los cinco reintentos en este status.
+ *
+ * ⚠️ **RevenueCat tambien lo dice en el CUERPO del error, y aca se infiere del
+ * status.** Observado el 2026-09-15 contra la API real:
+ *
+ *     {"type":"resource_missing","retryable":false,
+ *      "message":"Could not find customer ID associated with this project", ...}
+ *
+ * En ese caso las dos fuentes COINCIDEN —`esRetryable(404)` es `false`— asi que
+ * no se cambio nada: con una sola muestra de acuerdo, leer el campo del
+ * proveedor seria trabajo especulativo.
+ *
+ * Queda escrito para el dia que alguien debuguee por que un evento se reintento
+ * (o no): si el status y el `retryable` del body discrepan, ESA es la pista, y
+ * ahi si conviene preferir lo que dice el proveedor sobre lo que inferimos.
+ */
 function esRetryable(status: number): boolean {
   return status === 429 || status >= 500;
 }

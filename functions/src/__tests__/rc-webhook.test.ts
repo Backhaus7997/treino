@@ -75,6 +75,7 @@ import {
   RC_WEBHOOK_EVENTS_COLLECTION,
   STATUS_SIN_DERECHO,
   TOLERANCIA_FIRMA_MS,
+  esDeSandbox,
   firmaRcValida,
   runRcWebhook,
   uidDelEvento,
@@ -199,6 +200,9 @@ const deps = (
   nowMs: AHORA,
   signingSecret: SECRETO,
   entitlement: ENTITLEMENT_ALUMNO,
+  // Como se shipea hoy (`ACEPTAR_SANDBOX`). Los tests del camino APAGADO lo
+  // overridean por `over`.
+  aceptarSandbox: true,
   ...over,
 });
 
@@ -589,5 +593,103 @@ describe("rc/webhook — el handler", () => {
     expect(uidDelEvento({ event: {} })).toBeNull();
     expect(uidDelEvento({})).toBeNull();
     expect(uidDelEvento(null)).toBeNull();
+  });
+  // -------------------------------------------------------------------------
+  // El entorno de la tienda
+  // -------------------------------------------------------------------------
+  //
+  // El codigo NO miraba `event.environment`, asi que una compra de SANDBOX
+  // acreditaba premium REAL. La decision existia unicamente en el dropdown
+  // «Environment to send events for» del dashboard de RevenueCat: invisible
+  // para cualquiera que leyera el repo, y sin un solo test encima.
+
+  describe("entorno de la tienda (sandbox vs produccion)", () => {
+    const sandbox = () => evento({ environment: "SANDBOX" });
+
+    it("con ACEPTAR_SANDBOX prendido, un evento de sandbox acredita igual", async () => {
+      // Es el camino que se shipea HOY, y tiene que seguir andando: cuando
+      // haya tiendas conectadas, una suscripcion de sandbox es la UNICA forma
+      // de ejercitar la acreditacion de punta a punta.
+      const { app, store } = fakeApp(MUNDO());
+      const rc = fakeRc([sub()]);
+
+      const r = await runRcWebhook(app, pedido(sandbox()), deps(rc.rcClient));
+
+      expect(r).toBe("acreditado");
+      expect(store.users[UID].athleteSubscription).toEqual({ status: "active" });
+    });
+
+    it("con ACEPTAR_SANDBOX apagado, un evento de sandbox NO acredita", async () => {
+      const { app, store } = fakeApp(MUNDO());
+      const rc = fakeRc([sub()]);
+
+      const r = await runRcWebhook(
+        app,
+        pedido(sandbox()),
+        deps(rc.rcClient, { aceptarSandbox: false }),
+      );
+
+      expect(r).toBe("sandbox-ignorado");
+      // Ni escribe el derecho...
+      expect(store.users[UID].athleteSubscription).toBeUndefined();
+      // ...ni gasta una llamada a RevenueCat.
+      expect(rc.consultados).toEqual([]);
+    });
+
+    it("un evento de sandbox ignorado NO deja marca de dedupe", async () => {
+      // El dedupe es PERMANENTE. Si un sandbox ignorado lo marcara, el dia que
+      // se prenda `ACEPTAR_SANDBOX` los reintentos que sigan vivos rebotarian
+      // contra un `duplicado` que nadie puso a proposito.
+      const { app, store } = fakeApp(MUNDO());
+
+      await runRcWebhook(
+        app,
+        pedido(sandbox()),
+        deps(fakeRc([sub()]).rcClient, { aceptarSandbox: false }),
+      );
+
+      expect(store[RC_WEBHOOK_EVENTS_COLLECTION]?.[EVENTO_ID]).toBeUndefined();
+    });
+
+    it("con ACEPTAR_SANDBOX apagado, un evento de PRODUCTION sigue acreditando", async () => {
+      // El contrapeso: sin esto, un gate de mas —o un `esDeSandbox` que
+      // devolviera true de mas— pasaria desapercibido detras de los rojos.
+      const { app, store } = fakeApp(MUNDO());
+      const rc = fakeRc([sub()]);
+
+      const r = await runRcWebhook(
+        app,
+        pedido(evento({ environment: "PRODUCTION" })),
+        deps(rc.rcClient, { aceptarSandbox: false }),
+      );
+
+      expect(r).toBe("acreditado");
+      expect(store.users[UID].athleteSubscription).toEqual({ status: "active" });
+    });
+
+    it("sin campo `environment`, se trata como PRODUCCION", async () => {
+      // El default que NO regala derecho de mas si RevenueCat dejara de
+      // mandar el campo: ante la duda, se procesa.
+      const { app } = fakeApp(MUNDO());
+
+      const r = await runRcWebhook(
+        app,
+        pedido(evento()),
+        deps(fakeRc([sub()]).rcClient, { aceptarSandbox: false }),
+      );
+
+      expect(r).toBe("acreditado");
+    });
+
+    it("esDeSandbox reconoce el valor de la doc y aguanta basura", () => {
+      expect(esDeSandbox({ event: { environment: "SANDBOX" } })).toBe(true);
+      // Case-insensitive: la doc dice mayuscula, pero no se depende de eso.
+      expect(esDeSandbox({ event: { environment: "sandbox" } })).toBe(true);
+      expect(esDeSandbox({ event: { environment: "PRODUCTION" } })).toBe(false);
+      expect(esDeSandbox({ event: {} })).toBe(false);
+      expect(esDeSandbox({ event: { environment: 42 } })).toBe(false);
+      expect(esDeSandbox({})).toBe(false);
+      expect(esDeSandbox(null)).toBe(false);
+    });
   });
 });

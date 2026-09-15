@@ -61,9 +61,18 @@
  * dentro del tope, no borra nada, y el guard de "escribi solo si cambio" no
  * escribe. Dos redes, igual que en `athlete-paywall-enforced.ts`.
  *
- * Region southamerica-east1 per ADR-PN-005. El bucket vive en la misma region
- * (`docs/roadmap.md`, Fase 1 Etapa 6) — un trigger de Storage DEBE estar donde
- * esta el bucket o el deploy falla.
+ * ⚠️ Region us-east1, y es la EXCEPCION a ADR-PN-005 (todo lo demas vive en
+ * southamerica-east1). No es una preferencia: un trigger de Storage DEBE estar
+ * en la region del BUCKET o el deploy falla con
+ * «A function in region X cannot listen to a bucket in region Y».
+ *
+ * `treino-dev.firebasestorage.app` esta en **US-EAST1** — medido contra la API
+ * de GCS el 2026-09-15. `docs/roadmap.md` (Fase 1 Etapa 6) dice que el bucket
+ * se creo en southamerica-east1 y **es falso**; de ahi lo copio este modulo, y
+ * por eso el primer deploy se cayo.
+ *
+ * Si algun dia se migra el bucket, esta region se mueve con el. Verificalo
+ * contra la API, no contra el roadmap.
  */
 
 import { App, getApp, initializeApp } from "firebase-admin/app";
@@ -291,14 +300,14 @@ async function onVideoObjectEvent(
 }
 
 export const maintainCustomExerciseVideoQuotaOnFinalize = onObjectFinalized(
-  { region: "southamerica-east1" },
+  { region: "us-east1" },
   async (event) => {
     await onVideoObjectEvent(event.data.name);
   },
 );
 
 export const maintainCustomExerciseVideoQuotaOnDelete = onObjectDeleted(
-  { region: "southamerica-east1" },
+  { region: "us-east1" },
   async (event) => {
     await onVideoObjectEvent(event.data.name);
   },
