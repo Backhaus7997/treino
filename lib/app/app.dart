@@ -134,7 +134,8 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
     // (a) Attach foreground handler. (REQ-PN-HANDLER-001)
     final fcm = ref.read(fcmServiceProvider);
 
-    // Sin esto iOS no dibuja NADA en primer plano — ni la remota ni la local.
+    // En iOS quién se dibuja lo decide `PresentacionEnPrimerPlano`
+    // (`AppDelegate.swift`); esto es sólo la red si ese delegate se cae.
     // Ver el dartdoc de `habilitarPresentacionEnPrimerPlano`.
     unawaited(fcm.habilitarPresentacionEnPrimerPlano());
 

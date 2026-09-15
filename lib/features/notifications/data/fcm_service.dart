@@ -210,28 +210,36 @@ class FcmService {
   Future<NotificationSettings> requestPermission() =>
       _messaging.requestPermission();
 
-  /// Habilita la presentación de notificaciones en primer plano en iOS.
+  /// Red de emergencia para la presentación en primer plano en iOS.
   ///
-  /// ## No es opcional, y el motivo es contraintuitivo
+  /// ## Hoy no decide nada, y así tiene que ser
   ///
-  /// `FLTFirebaseMessagingPlugin.willPresentNotification` decide qué se
-  /// presenta con la app abierta, y su rama por defecto es literal:
+  /// `FLTFirebaseMessagingPlugin.willPresentNotification` sólo mira estas
+  /// opciones cuando NO tiene a quién cederle la decisión:
   ///
   /// ```objc
-  /// UNNotificationPresentationOptions presentationOptions =
-  ///     UNNotificationPresentationOptionNone;
-  /// NSDictionary *persistedOptions = [NSUserDefaults ... presentationOptions];
-  /// if (persistedOptions != nil) { ... }
+  /// if (_originalNotificationCenterDelegate != nil && ...) {
+  ///   [_originalNotificationCenterDelegate ... completionHandler];
+  /// } else {
+  ///   // acá recién se leen las persistedOptions que escribe esta llamada
+  /// }
   /// ```
   ///
-  /// Sin esta llamada, `persistedOptions` es `nil` y devuelve **None para
-  /// TODA notificación de primer plano** — incluida la LOCAL que dibuja la
-  /// app. Medido en un iPhone 16 el 2026-09-15: el plugin de locales reportaba
-  /// "mostrada" y en la pantalla no aparecía nada.
+  /// Con `PresentacionEnPrimerPlano` instalado (ver `AppDelegate.swift`) FCM
+  /// siempre entra por la primera rama, así que estos flags quedan sin efecto:
+  /// quién se dibuja lo decide el delegate nativo, notificación por
+  /// notificación.
   ///
-  /// Antes esto no se notaba porque el delegate de FCM ni siquiera se
-  /// instalaba (ver `AppDelegate.swift`), así que nadie suprimía nada —
-  /// tampoco se mostraba nada, por otro motivo.
+  /// Se mantiene igual porque es la rama que corre si ese delegate se cae —un
+  /// cambio de plugin, la reemisión de `didFinishLaunching` que deja de
+  /// funcionar—. Puestos en `true`, esa caída se degrada a **dos banners**, que
+  /// se ve y se reporta. Puestos en `false`, se degradaría a **silencio total**,
+  /// que no se nota hasta que alguien se pierde un mensaje.
+  ///
+  /// Medido en un iPhone 16 el 2026-09-15, cuando FCM todavía era delegate
+  /// único: sin esta llamada devolvía `None` para TODA notificación de primer
+  /// plano —incluida la local— y el plugin de locales reportaba "mostrada"
+  /// con la pantalla vacía.
   Future<void> habilitarPresentacionEnPrimerPlano() =>
       _messaging.setForegroundNotificationPresentationOptions(
         alert: true,
