@@ -102,6 +102,64 @@ void main() {
       expect(find.text('TERMINAR VÍNCULO'), findsOneWidget);
     });
 
+    // Los tres accesos eran `OutlinedButton` idénticos, en el orden en que se
+    // fueron agregando: agenda, nutrición, archivos. Sin jerarquía visual
+    // ninguno "entraba" más que otro, y el más importante quedaba en el medio.
+    //
+    // Se testea el ORDEN y la JERARQUÍA juntos porque por separado cada uno
+    // pasa con el bug del otro puesto: reordenar sin destacar deja tres
+    // botones iguales, y destacar sin reordenar deja el primario en el medio.
+    testWidgets('el plan nutricional va primero y es el único relleno',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        const AthleteCoachView(),
+        overrides: [
+          currentAthleteLinkProvider
+              .overrideWith((ref) => Stream.value(_makeLink())),
+          userPublicProfileProvider('trainer-1')
+              .overrideWith((ref) => Stream.value(_makePub())),
+        ],
+      ));
+      await tester.pumpAndSettle();
+
+      final l10n = await AppL10n.delegate.load(const Locale('es', 'AR'));
+      final yNutricion =
+          tester.getTopLeft(find.text(l10n.athleteNutritionPlanButtonLabel)).dy;
+      final yArchivos =
+          tester.getTopLeft(find.text(l10n.athleteFilesButtonLabel)).dy;
+      final yAgenda = tester.getTopLeft(find.text(l10n.agendaButtonLabel)).dy;
+
+      expect(yNutricion, lessThan(yArchivos),
+          reason: 'el plan nutricional es lo que el alumno viene a buscar');
+      expect(yArchivos, lessThan(yAgenda),
+          reason: 'la agenda queda última: hoy aporta poco dato propio');
+
+      // La jerarquía se afirma sobre LOS TRES ACCESOS, no sobre la pantalla:
+      // hay otros `ElevatedButton` acá (la sección de cuota), así que contar
+      // por tipo daría un número que no significa nada.
+      expect(
+        find.ancestor(
+          of: find.text(l10n.athleteNutritionPlanButtonLabel),
+          matching: find.byType(ElevatedButton),
+        ),
+        findsOneWidget,
+        reason: 'el plan nutricional es el único relleno de los tres',
+      );
+      for (final secundario in [
+        l10n.athleteFilesButtonLabel,
+        l10n.agendaButtonLabel,
+      ]) {
+        expect(
+          find.ancestor(
+            of: find.text(secundario),
+            matching: find.byType(OutlinedButton),
+          ),
+          findsOneWidget,
+          reason: '$secundario tiene que quedar delineado, no relleno',
+        );
+      }
+    });
+
     testWidgets('Fase B: status active → muestra botón MENSAJE',
         (tester) async {
       await tester.pumpWidget(_wrap(

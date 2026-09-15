@@ -241,11 +241,19 @@ class LinkStateCard extends ConsumerWidget {
                 const SizedBox(height: 14),
                 _ShareInfo(palette: palette),
                 const SizedBox(height: 12),
-                _AgendaButton(trainerId: link.trainerId),
-                const SizedBox(height: 12),
+                // Orden por importancia, no por historia. El plan nutricional es
+                // lo que el alumno viene a buscar, así que va primero y es el
+                // ÚNICO relleno: con tres botones idénticos no había jerarquía
+                // y ninguno "entraba" más que otro.
+                //
+                // La agenda queda última a propósito: hoy su único dato propio
+                // son las reuniones del alumno; el calendario con los días
+                // ocupados del PF es contexto, no una acción.
                 _NutritionPlanButton(trainerId: link.trainerId),
                 const SizedBox(height: 12),
                 const _AthleteFilesButton(),
+                const SizedBox(height: 12),
+                _AgendaButton(trainerId: link.trainerId),
                 const SizedBox(height: 16),
                 _CuotaSection(link: link),
               ],
@@ -648,7 +656,7 @@ class _AgendaButton extends StatelessWidget {
           l10n.agendaButtonLabel,
           style: GoogleFonts.barlowCondensed(
             fontWeight: FontWeight.w700,
-            fontSize: 13,
+            fontSize: AppTextSize.bodyDense,
             letterSpacing: 0.8,
           ),
         ),
@@ -664,16 +672,23 @@ class _NutritionPlanButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppL10n.of(context);
-    final palette = AppPalette.of(context);
     return SizedBox(
       width: double.infinity,
-      child: OutlinedButton.icon(
+      child: ElevatedButton.icon(
         onPressed: () => context.push(
           '/coach/nutricion?trainerId=${Uri.encodeComponent(trainerId)}',
         ),
-        style: OutlinedButton.styleFrom(
-          side: BorderSide(color: palette.accent, width: 1),
-          foregroundColor: palette.accent,
+        // Relleno, no delineado: es el único `primary` de los tres accesos.
+        //
+        // El foreground sale de `TreinoButtonTokens` y no de la paleta: sobre
+        // el mint hay que usar el ink profundo para cumplir AA. En oscuro
+        // `accent` y `accentText` son el MISMO color, así que pintarlo con
+        // `accentText` daría un botón ilegible que el harness en dark no
+        // delata.
+        style: ElevatedButton.styleFrom(
+          backgroundColor: TreinoButtonTokens.background(context),
+          foregroundColor: TreinoButtonTokens.foreground(context),
+          elevation: 0,
           minimumSize: const Size.fromHeight(48),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.full),
@@ -682,7 +697,7 @@ class _NutritionPlanButton extends StatelessWidget {
         icon: Icon(
           TreinoIcon.sidebarNutricion,
           size: 18,
-          color: palette.accent,
+          color: TreinoButtonTokens.foreground(context),
         ),
         label: Text(
           l10n.athleteNutritionPlanButtonLabel,

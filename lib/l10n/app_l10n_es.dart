@@ -452,6 +452,10 @@ class AppL10nEs extends AppL10n {
   String get athleteNutritionChooseOneHint => 'Elegí una';
 
   @override
+  String get athleteNutritionEmptyGroup =>
+      'Tu PF todavía no cargó opciones acá.';
+
+  @override
   String get athleteNutritionAllHint => 'Va todo';
 
   @override
@@ -5093,6 +5097,10 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get athleteNutritionChooseOneHint => 'Elegí una';
+
+  @override
+  String get athleteNutritionEmptyGroup =>
+      'Tu PF todavía no cargó opciones acá.';
 
   @override
   String get athleteNutritionAllHint => 'Va todo';

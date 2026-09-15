@@ -50,6 +50,29 @@ NutritionPlan _plan() => NutritionPlan(
       updatedAt: DateTime.utc(2026, 9, 1),
     );
 
+NutritionPlan _planConGrupoVacio() => NutritionPlan(
+      id: '${_trainerId}_$_athleteId',
+      trainerId: _trainerId,
+      athleteId: _athleteId,
+      title: 'Plan a medio cargar',
+      meals: const [
+        Meal(
+          id: 'breakfast',
+          name: 'Desayuno',
+          time: '08:00',
+          groups: [
+            FoodGroup(
+              id: 'protein',
+              name: 'Proteínas',
+              selectionMode: SelectionMode.chooseOne,
+              options: [],
+            ),
+          ],
+        ),
+      ],
+      updatedAt: DateTime.utc(2026, 9, 1),
+    );
+
 Widget _wrap(NutritionPlan? plan) => ProviderScope(
       overrides: [
         nutritionPlanProvider(
@@ -104,5 +127,34 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('No pudimos cargar tu plan nutricional.'), findsNothing);
+  });
+  // Un grupo sin opciones quedaba con el título, el hint, y NADA debajo. Eso
+  // no se lee como información: se lee como un control esperando que elijas
+  // algo — y encima el hint estaba pintado con el color de las acciones.
+  //
+  // Reportado mirando la pantalla real: «me sale como si pudiera elegir algo
+  // debajo de cada título».
+  testWidgets('un grupo sin opciones lo dice, no queda en silencio',
+      (tester) async {
+    await tester.pumpWidget(_wrap(_planConGrupoVacio()));
+    await tester.pumpAndSettle();
+
+    final l10n = await AppL10n.delegate.load(const Locale('es', 'AR'));
+    expect(find.text(l10n.athleteNutritionEmptyGroup), findsOneWidget);
+    // El hint de la regla sigue estando: dice CÓMO se come ese grupo, y eso
+    // no deja de ser cierto porque todavía no haya opciones.
+    expect(find.text(l10n.athleteNutritionChooseOneHint), findsOneWidget);
+  });
+
+  // Control del anterior: con opciones cargadas NO aparece el cartel de vacío.
+  // Sin esto, un mensaje que se mostrara siempre pasaría el test de arriba.
+  testWidgets('con opciones cargadas no aparece el cartel de vacío',
+      (tester) async {
+    await tester.pumpWidget(_wrap(_plan()));
+    await tester.pumpAndSettle();
+
+    final l10n = await AppL10n.delegate.load(const Locale('es', 'AR'));
+    expect(find.text(l10n.athleteNutritionEmptyGroup), findsNothing);
+    expect(find.text('Avena'), findsOneWidget);
   });
 }

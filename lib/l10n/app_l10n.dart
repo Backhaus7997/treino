@@ -908,6 +908,12 @@ abstract class AppL10n {
   /// **'Elegí una'**
   String get athleteNutritionChooseOneHint;
 
+  /// Se muestra cuando un grupo del plan nutricional no tiene ninguna opción cargada. Sin esto el grupo quedaba con el título y nada debajo, y se leía como un control esperando que el alumno eligiera algo.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Tu PF todavía no cargó opciones acá.'**
+  String get athleteNutritionEmptyGroup;
+
   /// Indica que el alumno debe incluir todas las opciones del grupo.
   ///
   /// In es_AR, this message translates to:
