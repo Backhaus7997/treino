@@ -186,6 +186,55 @@ export const TOLERANCIA_FIRMA_MS = 5 * 60 * 1000;
 /** Lo que se le escribe al alumno cuando ninguna suscripcion otorga. */
 export const STATUS_SIN_DERECHO = "expired";
 
+/**
+ * Si un evento de SANDBOX otorga derecho igual que uno de produccion.
+ *
+ * ── Por que esto vive en el codigo y no solo en el dashboard ──
+ *
+ * El webhook de RevenueCat tiene un dropdown «Environment to send events for»
+ * con Production / Sandbox / Both, y hoy esta en **Both**. Ese dropdown es hoy
+ * el UNICO lugar del mundo donde existe esta decision: nadie que lea este repo
+ * se entera de que una compra de PRUEBA acredita premium de VERDAD, y ningun
+ * test la cubre.
+ *
+ * Con la constante aca, la decision queda grepeable, testeada, y visible en un
+ * diff el dia que alguien la toque. Mismo motivo —y mismo idiom— que
+ * `RETENTION_SWEEP_DRY_RUN` y `kAthletePaywallEnabled`.
+ *
+ * ── Por que arranca en `true` ──
+ *
+ * Porque todavia no hay tiendas conectadas, y cuando las haya la UNICA forma
+ * de probar el flujo completo de compra es con una suscripcion de sandbox. Un
+ * `false` hoy dejaria el camino de acreditacion sin poder ejercitarse nunca —
+ * que es exactamente el problema que tiene `client.ts` con el parseo de la
+ * respuesta v2.
+ *
+ * ── ⚠️ Que hay que hacer antes de lanzar ──
+ *
+ * **Ponerlo en `false`.** Con `true`, cualquiera con una cuenta de sandbox
+ * tester en App Store Connect o Play Console se acredita premium real en
+ * `treino-dev`. El radio hoy es chico —esos testers los da de alta el equipo—
+ * pero crece con cada persona que se suma, y no hay nada que avise.
+ *
+ * Apagarlo es cambiar esta linea y redeployar. A proposito: que sea un cambio
+ * que alguien tiene que hacer mirando.
+ */
+export const ACEPTAR_SANDBOX = true;
+
+/**
+ * Si el evento viene del entorno de PRUEBA de la tienda.
+ *
+ * `event.environment` es `"SANDBOX"` o `"PRODUCTION"` (doc de RevenueCat,
+ * «Event Types and Fields», leida el 2026-09-15). Un valor ausente o
+ * desconocido se trata como PRODUCCION: es el default que no regala derecho de
+ * mas si RevenueCat algun dia deja de mandar el campo.
+ */
+export function esDeSandbox(body: unknown): boolean {
+  const ev = (body as { event?: Record<string, unknown> })?.event;
+  if (typeof ev !== "object" || ev === null) return false;
+  return String(ev.environment ?? "").toUpperCase() === "SANDBOX";
+}
+
 export type RcWebhookOutcome =
   | "acreditado"
   | "revocado"
@@ -193,6 +242,8 @@ export type RcWebhookOutcome =
   | "duplicado"
   | "sin-uid"
   | "sin-alumno"
+  /** Evento de SANDBOX con `ACEPTAR_SANDBOX` apagado. */
+  | "sandbox-ignorado"
   | "firma-invalida"
   /** RevenueCat no contesto. El UNICO que pide reintento. */
   | "error-rc";
@@ -203,6 +254,12 @@ export interface RcWebhookDeps {
   /** Vacio = modo degradado, se procesa sin validar el origen. */
   signingSecret: string;
   entitlement: string;
+  /**
+   * Ver [ACEPTAR_SANDBOX]. Es PARAMETRO y no la constante leida directo por el
+   * mismo motivo que `enabled` en `resolveAthletePaywallEnforced`: si no, el
+   * camino APAGADO se shipearia sin un solo test encima.
+   */
+  aceptarSandbox: boolean;
 }
 
 function ensureApp(): App {
@@ -331,6 +388,20 @@ export async function runRcWebhook(
     return "firma-invalida";
   }
 
+  // ── El entorno, apenas validada la firma ────────────────────────────────
+  //
+  // Va aca y no mas abajo por dos motivos. DESPUES de la firma, porque no se
+  // decide nada mirando un body que no se autentico. Y ANTES del dedupe, para
+  // no gastar una marca PERMANENTE en un evento que no vamos a procesar: si
+  // manana se prende `ACEPTAR_SANDBOX`, los reintentos que sigan vivos entran
+  // normal en vez de rebotar contra un `duplicado` que nadie puso a proposito.
+  if (!deps.aceptarSandbox && esDeSandbox(req.body)) {
+    logger.info("rc/webhook: evento de sandbox ignorado", {
+      uid: uidDelEvento(req.body),
+    });
+    return "sandbox-ignorado";
+  }
+
   const uid = uidDelEvento(req.body);
   if (!uid) {
     // Sin uid no hay a quien acreditarle nada, y ningun reintento le va a
@@ -455,6 +526,7 @@ export const rcWebhook = onRequest(
           nowMs: Date.now(),
           signingSecret: RC_WEBHOOK_SECRET.value(),
           entitlement: ENTITLEMENT_ALUMNO,
+          aceptarSandbox: ACEPTAR_SANDBOX,
         },
       );
     } catch (err) {
