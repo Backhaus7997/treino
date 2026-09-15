@@ -235,9 +235,18 @@ cualquier otro tope, `rg` el número literal en los `.arb`.
 ## 6. Qué queda pendiente
 
 - **`postPhotos` y `athleteFiles`** no se revisaron en este pase.
-- **Región del trigger**: la CF se despliega en `southamerica-east1` porque el
-  bucket está ahí (`roadmap.md`, Fase 1 Etapa 6). Un trigger de Storage en otra
-  región **falla al deployar** — es un rojo ruidoso, no un bug silencioso.
+- **Región del trigger**: las CFs se despliegan en **`us-east1`**, que es la
+  EXCEPCIÓN a ADR-PN-005 (todo lo demás vive en `southamerica-east1`). Un
+  trigger de Storage tiene que estar en la región del BUCKET o el deploy falla
+  con *«A function in region X cannot listen to a bucket in region Y»* — rojo
+  ruidoso, no bug silencioso.
+
+  > ⚠️ **`treino-dev.firebasestorage.app` está en `US-EAST1`**, medido contra la
+  > API de GCS el 2026-09-15. Esta misma viñeta decía `southamerica-east1`
+  > citando `roadmap.md` Fase 1 Etapa 6 — **y esa línea del roadmap es falsa**.
+  > De ahí lo copiaron los dos módulos de CF, y por eso el primer deploy se
+  > cayó. Si algún día se migra el bucket, verificalo contra la API y no contra
+  > el roadmap.
 - **El tope de cantidad no tiene grandfathering**, igual que el resto del
   paywall del alumno. Hoy no hace falta (ningún alumno tiene videos), pero si
   eso cambia antes de prender `kAthletePaywallEnabled`, revisá el mismo problema
