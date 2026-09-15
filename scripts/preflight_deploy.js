@@ -176,6 +176,80 @@ function endpoints(project, bucket) {
     .map(([nombre, v]) => [nombre, v.__endpoint]);
 }
 
+/**
+ * Qué archivo define cada función exportada, según el `from` de su `export` en
+ * `functions/src/index.ts`.
+ *
+ * Se lee el índice y no el filesystem porque el índice ES el contrato: una
+ * función que no está exportada ahí no se deploya, exista o no su archivo.
+ */
+function fuentePorFuncion() {
+  const idx = fs.readFileSync(
+    path.join(ROOT, "functions", "src", "index.ts"),
+    "utf8",
+  );
+  const mapa = new Map();
+  const re = /export\s*\{([^}]+)\}\s*from\s*"([^"]+)"/g;
+  let m;
+  while ((m = re.exec(idx))) {
+    const archivo =
+      m[2].replace(/^\.\//, "functions/src/") + ".ts";
+    for (const nombre of m[1]
+      .split(",")
+      .map((x) => x.trim())
+      .filter(Boolean)) {
+      mapa.set(nombre, archivo);
+    }
+  }
+  return mapa;
+}
+
+/** Las funciones cuyo archivo tiene commits posteriores a su último deploy. */
+async function funcionesConCodigoViejo(eps, token, project) {
+  const { execSync } = require("child_process");
+  const r = await fetch(
+    `https://cloudfunctions.googleapis.com/v2/projects/${project}/locations/-/functions?pageSize=200`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!r.ok) throw new Error(`cloudfunctions ${r.status}`);
+  const desplegadas = new Map(
+    ((await r.json()).functions || []).map((f) => [
+      f.name.split("/").pop(),
+      f.updateTime,
+    ]),
+  );
+
+  const mapa = fuentePorFuncion();
+  const viejas = [];
+  for (const [nombre] of eps) {
+    const desplegada = desplegadas.get(nombre);
+    const archivo = mapa.get(nombre);
+    // Sin deploy previo no está vieja: está por nacer, y de eso se ocupa este
+    // mismo deploy.
+    if (!desplegada || !archivo) continue;
+    let commit;
+    try {
+      commit = execSync(`git log -1 --format=%cI -- "${archivo}"`, {
+        cwd: ROOT,
+        encoding: "utf8",
+      }).trim();
+    } catch {
+      continue;
+    }
+    if (!commit) continue;
+    // Las dos fechas llevan zona horaria (`Z` una, offset la otra), así que
+    // `Date` las compara bien. Compararlas como texto NO funcionaría.
+    if (new Date(commit) > new Date(desplegada)) {
+      viejas.push({
+        nombre,
+        deploy: desplegada.slice(0, 19) + "Z",
+        commit,
+      });
+    }
+  }
+  return viejas;
+}
+
 async function main() {
   const project = process.env.GCLOUD_PROJECT;
   if (!project) skip("no sé contra qué proyecto (falta GCLOUD_PROJECT)");
@@ -251,6 +325,46 @@ async function main() {
         );
       }
     }
+  }
+
+  // ── 3. Funciones deployadas que corren código MÁS VIEJO que `main` ──────
+  //
+  // ⚠️ Esto AVISA, no falla, y la distinción es deliberada.
+  //
+  // Deployar un subconjunto es legítimo y pasa todo el tiempo. Si esto
+  // bloqueara, el primero que corra un `--only functions:unaSola` con otra
+  // función atrasada se comería un rojo que no tiene nada que ver con lo suyo —
+  // y la guarda terminaría desactivada, que es el destino de toda guarda que
+  // opina de más.
+  //
+  // El caso que SÍ vale la pena avisar: venís a deployar X y hace una semana
+  // que Y está mergeada sin subir. Ese fue el estado real del proyecto el
+  // 2026-09-15 — ocho funciones en `main` sin deployar, una de ellas la mitad
+  // del bloqueo de usuarios — y el chequeo de «¿falta alguna?» NO lo ve: la
+  // función existe, sólo que no es la que está en el repo.
+  //
+  // ── Lo que este chequeo NO ve ──
+  //
+  // Mapea cada función a SU archivo (el `from` de su `export` en `index.ts`),
+  // así que **no detecta un cambio en un módulo compartido**: tocar
+  // `mail/format.ts` deja viejas a todas las que lo importan y acá no aparece
+  // ninguna. Detecta el caso común, no el transitivo. Preferí un chequeo
+  // parcial que se entiende a uno completo que nadie pueda razonar.
+  try {
+    const viejas = await funcionesConCodigoViejo(eps, token, project);
+    if (viejas.length) {
+      console.warn(
+        `\n⚠ ${viejas.length} función(es) deployadas corren código más viejo que main:`,
+      );
+      for (const v of viejas) {
+        console.warn(`    ${v.nombre} — deploy ${v.deploy}, último commit ${v.commit}`);
+      }
+      console.warn(
+        "  Si son las que estás deployando ahora, ignoralo: salen solas de la lista.\n",
+      );
+    }
+  } catch (e) {
+    console.log(`preflight: no pude chequear frescura (${e.message})`);
   }
 
   if (problemas.length) {
