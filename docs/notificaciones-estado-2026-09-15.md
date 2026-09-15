@@ -11,8 +11,8 @@ Android 16 (CPH2749)— salvo donde diga explícitamente lo contrario.
 
 ## Resumen en una línea
 
-Android está **completo**. iOS notifica pero muestra **dos banners**, y ésa es
-la única decisión abierta.
+Android y iOS están **completos**: un banner por mensaje, con supresión, medido
+en los dos teléfonos.
 
 ---
 
@@ -21,8 +21,9 @@ la única decisión abierta.
 | | Android | iOS |
 |---|---|---|
 | Notificación del SO con la app abierta | ✅ | ✅ |
-| Supresión adentro del chat | ✅ | ❌ (ver §3) |
-| Supresión en el centro de notificaciones | ✅ | ❌ (ver §3) |
+| Supresión adentro del chat | ✅ | ✅ (ver §3) |
+| Supresión en el centro de notificaciones | ✅ | ✅ (ver §3) |
+| Un solo banner por mensaje | ✅ | ✅ (ver §3) |
 | Notificación con la app en background | ✅ | ✅ |
 | Tap que abre el deep link | ✅ | ✅ |
 
@@ -84,6 +85,10 @@ que se pinte lo decide otra capa, después.
 
 **Arreglo:** llamar a `setForegroundNotificationPresentationOptions(alert, badge, sound)`.
 
+> **Superado por §3.** Con `PresentacionEnPrimerPlano` instalado, FCM ya no
+> llega a esa rama: estos flags quedan como red por si el shim se cae. El
+> diagnóstico de acá sigue siendo el correcto; lo que cambió es quién decide.
+
 ### 2.3 La supresión por pantalla nunca funcionó, en ninguna plataforma
 
 El más caro, y el que la suite no podía ver.
@@ -118,78 +123,113 @@ app; control negativo corrido (con la API vieja caen 3).
 
 ---
 
-## 3. La decisión abierta: los dos banners en iOS
+## 3. Los dos banners en iOS: resuelto
 
-**Estado:** en iOS aparecen **dos** banners por mensaje — el remoto que dibuja
-el sistema y el local que dibuja la app.
+**Estado:** resuelto el 2026-09-15 y medido en el iPhone 16. Un banner por
+mensaje, con la supresión por pantalla funcionando.
 
-**Por qué no se puede elegir:** son dos notificaciones distintas y el
-interruptor que las habilita es **uno solo, global y binario**. No hay forma de
-decirle a iOS "presentá ésta sí y ésta no" por mensaje.
+### Por qué aparecían dos, de verdad
 
-Las opciones, con su costo:
+El diagnóstico original —"el interruptor es uno solo, global y binario"— era
+correcto pero incompleto. Faltaba la causa de fondo: **el puesto de delegate de
+`UNUserNotificationCenter` estaba vacante**, y con la app en primer plano ese
+delegate es quien decide qué se dibuja.
 
-| | Banners | Supresión en iOS | Riesgo |
-|---|---|---|---|
-| **A** — no postear la local en iOS | 1 | se pierde | ninguno |
-| **B** — togglear el interruptor global al entrar/salir de pantallas | 1 | se recupera, pero **de más** (adentro de un chat suprime los de otros chats) | si el toggle queda apagado, **te quedás mudo sin enterarte** |
-| **C** — hipótesis de orden de delegates | 1 | completa | sin medir |
+- `flutter_local_notifications` **nunca** se asigna como delegate en iOS; sólo
+  hace `addApplicationDelegate` (`FlutterLocalNotificationsPlugin.m:145-159`).
+  Por eso su `willPresentNotification` —que presenta las suyas y se retira con
+  las ajenas— era **código muerto**: nadie lo llamaba.
+- `FlutterAppDelegate` tampoco se asigna. Implementa los métodos y los reenvía a
+  todos los plugins, pero nadie cableaba la entrada de esa cadena.
 
-### Sobre la opción A
+Con el puesto libre, FCM se lo quedaba entero (`shouldReplaceDelegate = YES` con
+`_original = nil`) y caía siempre a su rama por defecto, que aplica un único
+interruptor global a **toda** notificación — incluida la local de la app. De ahí
+los dos banners, y de ahí también el bug 2.2.
 
-Perder la supresión en iOS apaga **dos** guardas, no una:
+### La opción C estaba mal planteada
 
-1. La supresión por pantalla.
-2. **`isOwnChatMessage`**, que evita que veas tu propio mensaje cuando tu token
-   quedó registrado en la cuenta del otro. Pasa al probar dos cuentas en un
-   mismo teléfono. Corre en Dart; con la remota nunca llega a correr.
+Decía forzar el orden de registro para que el plugin de locales ganara el
+delegate. **No podía funcionar bajo ningún orden**, porque ese plugin no compite
+por el puesto. El orden de `GeneratedPluginRegistrant` es irrelevante acá.
 
-### Sobre la opción C — la pista concreta, sin medir
+Se falsificó leyendo las fuentes, sin gastar ninguno de los ciclos de build en
+device que la estimación preveía.
 
-`FLTFirebaseMessagingPlugin.willPresentNotification` tiene esta rama:
+### Opción D — la que se implementó
 
-```objc
-// Forward on to any other delegates and allow them to control presentation behavior.
-if (_originalNotificationCenterDelegate != nil && respondsTo.willPresentNotification) {
-    [_originalNotificationCenterDelegate ... withCompletionHandler:completionHandler];
-}
+Un delegate propio, `PresentacionEnPrimerPlano` (en `AppDelegate.swift`), que
+ocupa el puesto **antes** de la reemisión de `didFinishLaunching`. FCM lo captura
+como `_originalNotificationCenterDelegate` y le cede la decisión **por
+notificación** (`FLTFirebaseMessagingPlugin.m:336-344`):
+
+- **remota** (trae `gcm.message_id`) → `[]`, no se dibuja. No se pierde nada: su
+  llegada ya disparó `Messaging#onMessage` en Dart, que aplica `isOwnChatMessage`
+  y la supresión por pantalla, y publica la local si corresponde.
+- **local** → pasa, con las opciones que eligió Dart (se leen del `userInfo`, así
+  `DarwinNotificationDetails` sigue siendo la única fuente de verdad).
+
+Resultado: un banner, supresión completa, las dos guardas vivas, y sin
+Notification Service Extension.
+
+### Tres trampas que tiene adentro
+
+1. **`_originalNotificationCenterDelegate` es `__weak`**
+   (`FLTFirebaseMessagingPlugin.m:45`). Si no lo retenemos, se libera, FCM deja
+   de reenviarle y vuelve a decidir él — **en silencio**. Por eso el
+   `AppDelegate` lo guarda en una propiedad `let`.
+2. **No puede conformar `FlutterAppLifeCycleProvider`.** Si lo hiciera, FCM lo
+   detectaría y NO se quedaría con el delegate
+   (`FLTFirebaseMessagingPlugin.m:271-274`), dejándonos como delegate único y sin
+   nadie que dispare `onMessage`. Es un `NSObject` pelado a propósito.
+3. **No implementa `didReceiveNotificationResponse`.** A propósito: si lo
+   hiciera, FCM le reenviaría también los taps y habría que reimplementar su
+   ruteo entero. Sin implementarlo, `respondsTo` da 0 y el tap se resuelve
+   exactamente como antes.
+
+Los `setForegroundNotificationPresentationOptions` del lado Dart quedan **sin
+efecto** mientras el shim esté vivo, y se dejan en `true` a propósito: son la
+rama que corre si el shim se cae, y así esa caída se degrada a dos banners —que
+se ven y se reportan— en vez de a silencio total, que no se nota hasta que
+alguien se pierde un mensaje.
+
+### La medición
+
+Log nativo del iPhone 16, con el control al lado:
+
+```
+10:56:48.173  [fcm] delegate armado: FCM se quedó con el centro y nos cede la decisión
+10:57:09.388  [fcm] remota callada          ← mensaje 1, fuera del chat
+10:57:09.408  [fcm] local presentada        ← 20 ms después → UN banner
+10:57:24.781  [fcm] remota callada          ← mensaje 2, adentro del chat
+              (sin local atrás)             → SUPRIMIDA
 ```
 
-Si **otro** delegate llegó primero, FCM le cede la decisión. Y
-`flutter_local_notifications` tiene exactamente el comportamiento que queremos:
-presenta **las suyas** y se retira sin tocar el handler para las ajenas — lo que
-en la práctica suprime la remota.
+El segundo caso sin el primero no probaría nada, y el primero sin el segundo
+tampoco: juntos separan "se suprimió" de "el push nunca llegó", que desde la
+pantalla se ven idénticos.
 
-El orden lo fija `GeneratedPluginRegistrant`, que es alfabético:
-`firebase_messaging` va **antes** que `flutter_local_notifications`. Se podría
-forzar registrando el de locales a mano primero en el `AppDelegate`.
-
-⚠️ **Es una hipótesis leída, no medida.** El orden real depende de cómo Flutter
-encadena los application delegates. Estimación: 1 a 3 iteraciones de
-build+prueba en device (10-15 min cada una), con chance real de que no dé y haya
-que ir a una **Notification Service Extension** — un target nativo nuevo,
-bastante más obra.
-
----
+⚠️ Los `debugPrint` de Dart **no salen** por el console de `devicectl`, e
+`idevicesyslog` devuelve vacío en este iOS. Por eso el shim loguea las dos ramas
+—la callada y la presentada—: para que el log nativo alcance solo.
 
 ## 4. Pendientes, por orden sugerido
 
-1. **Decidir iOS** (§3). Bloquea el merge de esta rama.
-2. **La carrera del permiso.** Un push que llega antes de que `PermissionGate`
+1. **La carrera del permiso.** Un push que llega antes de que `PermissionGate`
    pida autorización se degrada al cartel in-app. En una instalación nueva está
    **garantizado**: el gate necesita el perfil cargado. Visto en iOS hoy
    (`Error 2003 — Source is not authorized` con la app en `/splash`) y es
    probablemente el "cartel blanco" que se veía en Android ayer.
    **Arreglo propuesto:** encolar el aviso hasta que el permiso resuelva, en vez
    de degradarlo.
-3. **Cold-start tap** de la notificación local: pierde el deep link
+2. **Cold-start tap** de la notificación local: pierde el deep link
    (`getNotificationAppLaunchDetails` sin implementar). Sólo afecta Android hoy.
    Hallazgo de Codex en el PR #1128.
-4. **Los eventos nuevos del lado del PF** (hallazgo original del E2E, punto 1):
+3. **Los eventos nuevos del lado del PF** (hallazgo original del E2E, punto 1):
    sesión terminada, medidas cargadas, molestia reportada; y del lado del alumno,
    rutina asignada. Ninguno existe. El doc del E2E advierte —y coincido— que
    conviene elegir pocos: una app que notifica todo se silencia entera.
-5. **Los accesos en el header del Home** (punto 1.5 del doc del E2E), con badge
+4. **Los accesos en el header del Home** (punto 1.5 del doc del E2E), con badge
    de no leídos. Independiente de todo lo anterior.
 
 ---
@@ -204,6 +244,7 @@ Dicho explícito para que nadie lea el verde como garantía:
 | Regla de supresión | ✅ 11 | ya existían |
 | Reemitir `didFinishLaunching` | ❌ | Swift nativo; la suite de Dart no lo alcanza |
 | `setForegroundNotificationPresentationOptions` | ❌ | su efecto vive en `UNUserNotificationCenter` |
+| `PresentacionEnPrimerPlano` | ❌ | Swift nativo, y su efecto vive en `UNUserNotificationCenter` |
 
 Los dos últimos **sólo se pueden verificar en un device**, y así se verificaron.
 
@@ -225,15 +266,28 @@ adb logcat -T 1 | grep -aE "se muestra|suprimido|mostrada|show\(\) FALLÓ"
 ```bash
 flutter build ios --release
 xcrun devicectl device install app --device <UDID> build/ios/iphoneos/Runner.app
-xcrun devicectl device process launch --device <UDID> com.backhaus.treino
+xcrun devicectl device process launch --console --terminate-existing \
+  --device <UDID> com.backhaus.treino > console.log 2>&1 &
 ```
 
 En **debug** no sirve `devicectl`: un build JIT sin depurador muestra la
 pantalla de "iOS 14+ debug mode".
 
-**Mandar un push de prueba** sin depender del Coach Hub: hay un script de sólo
-lectura + envío en el scratchpad de la sesión (`diag_push.js`), que lee los
-`fcmTokens` del alumno y manda uno a cada uno reportando el error por token.
+**Para ver los diagnósticos** va `--console`, y hay que saber qué NO se ve por
+ahí: sólo salen los `NSLog` nativos. Los `debugPrint` de Dart **no aparecen**, e
+`idevicesyslog` devuelve cero bytes en este iOS. Por eso `PresentacionEnPrimer
+Plano` loguea sus dos ramas —`remota callada` y `local presentada`—: para que el
+log nativo se baste solo. Ojo también con el retraso de APNS: se midieron hasta
+**55 segundos** entre mandar el mensaje y la línea en el log, así que un log que
+parece vacío puede estar sólo atrasado.
+
+**Mandar un push de prueba** sin depender del Coach Hub: hacía falta un script
+de sólo lectura + envío (`diag_push.js`) que leyera los `fcmTokens` del alumno.
+Vivía en el scratchpad de aquella sesión, **y ya no existe** — el scratchpad se
+vacía. Si hace falta de nuevo, hay que rehacerlo, y necesita credenciales de
+Admin SDK que hoy no están en la máquina (sin ADC y sin service account). La
+alternativa que se usó el 2026-09-15 fue mandar el mensaje real desde el PF, que
+además prueba el camino de producción entero.
 
 ---
 
