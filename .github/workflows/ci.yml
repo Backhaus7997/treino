@@ -47,6 +47,38 @@ jobs:
       - name: El default de .firebaserc tiene que ser un proyecto demo-
         run: bash scripts/check_firebaserc_default.sh
 
+  # Un ruleset de Firebase no puede pasar de 262.144 bytes, y `firestore.rules`
+  # los cruzo el 2026-09-10 (en `58324d29`) POR CINCO BYTES.
+  #
+  # Nadie se entero durante cinco dias porque la API contesta
+  # `400 Request contains an invalid argument` SIN decir el tamano: se lee como
+  # un error de sintaxis del cambio que uno esta haciendo. El deploy fallaba, el
+  # que lo corria asumia que era lo suyo, y el archivo seguia creciendo.
+  #
+  # Costo: NUEVE commits de reglas que nunca llegaron a produccion, dos de ellos
+  # las reglas de moderacion y bloqueo de usuarios — mergeadas, testeadas, y sin
+  # aplicarse del lado del servidor.
+  #
+  # Este job convierte ese 400 mudo en un rojo que dice el numero, ANTES del
+  # merge. `--check` no escribe nada: solo mide el resultado de strippear.
+  #
+  # Es un job propio y no un paso del de arriba a proposito: son dos guardas
+  # distintas y cuando una se pone roja conviene leer el nombre y saber cual.
+  rules-size:
+    name: Los rulesets entran en el limite de 256 KiB
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '20'
+
+      - name: firestore.rules strippeado y storage.rules entran en 262144 bytes
+        run: node scripts/strip_rules.js --check
+
   # `Analyze & Test` era UN job con dos pasos, y el segundo paso ERA el CI:
   # medido sobre `main` en el run 33527262247, el paso `Run tests` tarda 820 s
   # (13:40) sobre un job de 908 s (15:08), mientras que los otros OCHO jobs del

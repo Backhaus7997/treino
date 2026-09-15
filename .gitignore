@@ -104,3 +104,9 @@ scripts/places.local.json
 #
 # Se regenera en segundos:  gentle-ai skill-registry refresh --force
 .atl/
+
+# Generado por `scripts/strip_rules.js` en el predeploy de Firestore.
+# La fuente de verdad es `firestore.rules` (con comentarios); esto es la copia
+# sin prosa que sube al ruleset, porque el original pesa 109% del limite de
+# 256 KiB y la API rechaza con un 400 que no dice por que.
+firestore.deploy.rules

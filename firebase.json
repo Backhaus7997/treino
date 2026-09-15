@@ -29,8 +29,11 @@
     }
   },
   "firestore": {
-    "rules": "firestore.rules",
-    "indexes": "firestore.indexes.json"
+    "rules": "firestore.deploy.rules",
+    "indexes": "firestore.indexes.json",
+    "predeploy": [
+      "node scripts/strip_rules.js"
+    ]
   },
   "storage": {
     "rules": "storage.rules"
