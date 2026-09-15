@@ -107,6 +107,22 @@ String? coachHubRedirect(
       return isNotAllowed ? null : '/not-allowed';
     }
 
+    // El push de vinculación manda UN SOLO `deepLink` a las dos superficies, y
+    // las rutas no coinciden: en la app móvil las solicitudes pendientes viven
+    // en `/home/notifications?tab=solicitudes` y acá la sección es
+    // `/invitaciones` (el path quedó con el nombre viejo por estabilidad —
+    // ADR-F4-01 —, la copia de usuario es «Solicitudes»).
+    //
+    // Sin este mapeo, el PF que toca la notificación con el Hub abierto cae en
+    // la pantalla de error de go_router, porque en ESTE router no hay ninguna
+    // ruta bajo `/home`. Va acá y no en la lista de aterrizajes de abajo
+    // porque no es un aterrizaje: es una traducción de path, y tiene que valer
+    // también para el PF que ya está navegando adentro del Hub.
+    //
+    // Se compara sólo el path: el `?tab=` del deep link lo descarta go_router
+    // antes de llegar acá, y el Hub no tiene sub-pestañas que honrarlo.
+    if (location == '/home/notifications') return '/invitaciones';
+
     // Trainer autenticado → si está en una de las rutas de ATERRIZAJE,
     // mandalo al dashboard o al destino fino que trajo el link.
     //

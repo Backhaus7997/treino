@@ -10,7 +10,12 @@ import '../../profile/domain/user_profile.dart';
 /// Receives [UserProfile?] by parameter — no provider reads (REQ-HOME-SCREEN-001).
 /// null profile triggers the "HOLA!" fallback branch (REQ-HOME-HEADER-002/004).
 class HomeHeader extends StatelessWidget {
-  const HomeHeader({super.key, required this.profile, this.onAvatarTap});
+  const HomeHeader({
+    super.key,
+    required this.profile,
+    this.onAvatarTap,
+    this.accion,
+  });
 
   final UserProfile? profile;
 
@@ -20,6 +25,15 @@ class HomeHeader extends StatelessWidget {
   /// Navigation itself stays with the caller so this widget keeps its
   /// no-provider-reads / no-routing contract (REQ-HOME-SCREEN-001).
   final VoidCallback? onAvatarTap;
+
+  /// Control opcional a la izquierda del avatar — hoy, la campana del centro
+  /// de notificaciones.
+  ///
+  /// Llega COMO WIDGET y no se construye acá por el mismo motivo que
+  /// [onAvatarTap] no navega: este header no lee providers ni rutea
+  /// (REQ-HOME-SCREEN-001). Montar adentro un `ConsumerWidget` rompía ese
+  /// contrato y, de paso, los ocho tests que lo pumpean sin `ProviderScope`.
+  final Widget? accion;
 
   static String _computeInitials(String? displayName) {
     if (displayName == null || displayName.isEmpty) return '?';
@@ -106,7 +120,14 @@ class HomeHeader extends StatelessWidget {
             ),
           ),
         ),
+        // Separación FIJA, no repartida: el `Expanded` del saludo ya come el
+        // sobrante, y dejar que el resto se reparta movería la campana de
+        // lugar según el largo del nombre.
         const SizedBox(width: 12),
+        if (accion != null) ...[
+          accion!,
+          const SizedBox(width: 8),
+        ],
         avatarWidget,
       ],
     );

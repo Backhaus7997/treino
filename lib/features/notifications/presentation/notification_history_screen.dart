@@ -12,14 +12,34 @@ import '../../feed/application/follow_providers.dart';
 import '../../feed/presentation/widgets/feed_empty_state.dart';
 import '../../feed/presentation/widgets/post_avatar.dart';
 import '../../profile/application/user_public_profile_providers.dart';
+import '../../coach/presentation/trainer_dashboard_tab.dart'
+    show PendingRequestsView;
+import '../../../core/widgets/treino_segmented_pill.dart';
+import '../../profile/application/user_providers.dart';
+import '../../profile/domain/user_role.dart';
 import '../../workout/application/session_providers.dart'
     show currentUidProvider;
 import '../application/notification_history_providers.dart';
 import '../application/notification_router.dart';
 import '../domain/notification_history_item.dart';
 
+/// Nombres de las sub-pestañas, tal como viajan en el `?tab=` de la ruta y en
+/// el `deepLink` que mandan las Cloud Functions.
+///
+/// Son strings y no un enum porque cruzan el límite del proceso: los escribe
+/// `notify-link-change.ts` y los lee el router. Un enum acá daría una falsa
+/// sensación de que los dos lados están atados por el tipo.
+const kTabTodas = 'todas';
+const kTabSolicitudes = 'solicitudes';
+
 class NotificationHistoryScreen extends ConsumerStatefulWidget {
-  const NotificationHistoryScreen({super.key});
+  const NotificationHistoryScreen({super.key, this.initialTab});
+
+  /// `'todas'` (default) o `'solicitudes'`, del `?tab=` de la ruta.
+  ///
+  /// Un valor desconocido cae en «Todas» a propósito: un deep link viejo o mal
+  /// escrito tiene que mostrar algo útil, no una pantalla vacía.
+  final String? initialTab;
 
   @override
   ConsumerState<NotificationHistoryScreen> createState() =>
@@ -50,60 +70,134 @@ class _NotificationHistoryScreenState
     final pending =
         uid == null ? 0 : ref.watch(pendingFollowRequestCountProvider(uid));
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: AppBar(
+    // `TreinoSegmentedPill` LEE un `DefaultTabController` ancestro (lo dice su
+    // dartdoc): sin él revienta en runtime, no en compilación.
+    return DefaultTabController(
+      length: 2,
+      // Un `initialTab` desconocido cae en «Todas»: un deep link viejo o mal
+      // escrito tiene que mostrar algo útil, no una pestaña vacía.
+      initialIndex: widget.initialTab == kTabSolicitudes ? 1 : 0,
+      child: Scaffold(
         backgroundColor: Colors.transparent,
-        leading: IconButton(
-          onPressed: () => context.pop(),
-          icon: Icon(TreinoIcon.back, color: palette.textPrimary),
-        ),
-        title: Text(
-          l10n.notificationHistoryTitle,
-          style: GoogleFonts.barlowCondensed(
-            fontWeight: FontWeight.w700,
-            letterSpacing: 1.2,
-            color: palette.textPrimary,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          leading: IconButton(
+            onPressed: () => context.pop(),
+            icon: Icon(TreinoIcon.back, color: palette.textPrimary),
           ),
+          title: Text(
+            l10n.notificationHistoryTitle,
+            style: GoogleFonts.barlowCondensed(
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.2,
+              color: palette.textPrimary,
+            ),
+          ),
+        ),
+        body: Column(
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 4, 20, 0),
+              child: TreinoSegmentedPill(labels: ['TODAS', 'SOLICITUDES']),
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: TabBarView(
+                physics: const NeverScrollableScrollPhysics(),
+                children: [
+                  _tabTodas(context, notifications, lastSeenAt, palette),
+                  _TabSolicitudes(pendientesDeAmistad: pending),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
-      body: Column(
+    );
+  }
+
+  Widget _tabTodas(
+    BuildContext context,
+    AsyncValue<List<NotificationHistoryItem>> notifications,
+    DateTime? lastSeenAt,
+    AppPalette palette,
+  ) {
+    final l10n = AppL10n.of(context);
+    return notifications.when(
+      loading: () => Center(
+        key: const Key('notificationHistoryLoading'),
+        child: CircularProgressIndicator(color: palette.accent),
+      ),
+      error: (_, __) => _NotificationError(
+        onRetry: () => ref.invalidate(notificationHistoryProvider),
+      ),
+      data: (items) => items.isEmpty
+          ? FeedEmptyState(
+              key: const Key('notificationHistoryEmpty'),
+              icon: TreinoIcon.bell,
+              message: l10n.notificationHistoryEmpty,
+            )
+          : ListView.separated(
+              key: const Key('notificationHistoryList'),
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+              itemCount: items.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (_, index) => _NotificationItem(
+                notification: items[index],
+                unread: notificationIsUnread(
+                  items[index],
+                  lastSeenAt,
+                ),
+              ),
+            ),
+    );
+  }
+}
+
+/// Pestaña «Solicitudes»: todo lo que espera una decisión de esta persona.
+///
+/// ## Por qué UNA pestaña y no una por tipo
+///
+/// «Solicitud» significa dos cosas distintas en el modelo —vinculación
+/// (`trainer_links`) y amistad (`follows`)— pero para quien la mira significa
+/// una sola: *algo que tengo que aceptar o rechazar*. Partirlas en dos
+/// pestañas obligaría a la persona a saber de qué colección salió cada una.
+///
+/// El PF ve las dos. El alumno sólo tiene amistades, así que el bloque de
+/// vinculaciones ni se monta — y la comprobación es por ROL y no por lista
+/// vacía, porque una lista vacía también es lo que se ve mientras carga.
+class _TabSolicitudes extends ConsumerWidget {
+  const _TabSolicitudes({required this.pendientesDeAmistad});
+
+  final int pendientesDeAmistad;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppL10n.of(context);
+    final esPf = ref.watch(
+          userProfileProvider.select((a) => a.valueOrNull?.role),
+        ) ==
+        UserRole.trainer;
+
+    // Nada que decidir, para ninguno de los dos caminos.
+    if (!esPf && pendientesDeAmistad == 0) {
+      return FeedEmptyState(
+        key: const Key('solicitudesEmpty'),
+        icon: TreinoIcon.users,
+        message: l10n.notificationHistoryEmpty,
+      );
+    }
+
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (pending > 0)
+          if (pendientesDeAmistad > 0)
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-              child: _PendingRequestsBlock(count: pending),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+              child: _PendingRequestsBlock(count: pendientesDeAmistad),
             ),
-          Expanded(
-            child: notifications.when(
-              loading: () => Center(
-                key: const Key('notificationHistoryLoading'),
-                child: CircularProgressIndicator(color: palette.accent),
-              ),
-              error: (_, __) => _NotificationError(
-                onRetry: () => ref.invalidate(notificationHistoryProvider),
-              ),
-              data: (items) => items.isEmpty
-                  ? FeedEmptyState(
-                      key: const Key('notificationHistoryEmpty'),
-                      icon: TreinoIcon.bell,
-                      message: l10n.notificationHistoryEmpty,
-                    )
-                  : ListView.separated(
-                      key: const Key('notificationHistoryList'),
-                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-                      itemCount: items.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 8),
-                      itemBuilder: (_, index) => _NotificationItem(
-                        notification: items[index],
-                        unread: notificationIsUnread(
-                          items[index],
-                          lastSeenAt,
-                        ),
-                      ),
-                    ),
-            ),
-          ),
+          if (esPf) const PendingRequestsView(),
         ],
       ),
     );

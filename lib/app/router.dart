@@ -790,10 +790,6 @@ GoRouter buildRouter({
                 builder: (_, __) => _withBg(const SearchUsersScreen()),
               ),
               GoRoute(
-                path: 'notifications',
-                builder: (_, __) => _withBg(const NotificationHistoryScreen()),
-              ),
-              GoRoute(
                 // Friend-requests inbox reached from the feed header bell.
                 // Mirror of /profile/friend-requests: _ShellScaffold derives
                 // the highlighted tab from the location's path prefix, so the
@@ -813,6 +809,22 @@ GoRouter buildRouter({
             path: '/home',
             pageBuilder: (_, __) => _noAnim(const HomeScreen()),
             routes: [
+              // Centro de notificaciones. Vive bajo /home y no bajo /feed
+              // porque la campana se movió a la pantalla principal: el
+              // `_ShellScaffold` deriva la pestaña resaltada del prefijo del
+              // path, así que registrarla acá mantiene INICIO marcado y el
+              // `pop` vuelve a /home (mismo patrón que `profile/:uid`).
+              //
+              // El `?tab=` lo escriben las Cloud Functions en su `deepLink`
+              // (ver `kTabSolicitudes`). Un valor desconocido cae en «Todas».
+              GoRoute(
+                path: 'notifications',
+                builder: (_, state) => _withBg(
+                  NotificationHistoryScreen(
+                    initialTab: state.uri.queryParameters['tab'],
+                  ),
+                ),
+              ),
               GoRoute(
                 // Public profile reached from the HomeHeader avatar. Mirror
                 // of /feed/profile/:uid: _ShellScaffold derives the

@@ -191,12 +191,16 @@ void main() {
       final handle = tester.ensureSemantics();
       await _pumpDashboard(tester);
 
-      expect(find.bySemanticsLabel('0 solicitudes pendientes'), findsOneWidget);
+      // La campana dejó de anunciar «N solicitudes pendientes»: ya no es la
+      // puerta al sheet de pendientes sino al centro de notificaciones, y la
+      // etiqueta tiene que decir lo que hace. El punto del test —que NO se
+      // fusione con el saludo— no cambia.
+      expect(find.bySemanticsLabel('Abrir notificaciones'), findsOneWidget);
       expect(find.bySemanticsLabel('Editar tu perfil profesional'),
           findsOneWidget);
       // The greeting must NOT carry either control's label.
       expect(
-        find.bySemanticsLabel(RegExp(r'HOLA, MATEO.*(solicitudes|perfil)')),
+        find.bySemanticsLabel(RegExp(r'HOLA, MATEO.*(notificaciones|perfil)')),
         findsNothing,
       );
       handle.dispose();

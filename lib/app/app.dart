@@ -133,6 +133,12 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
 
     // (a) Attach foreground handler. (REQ-PN-HANDLER-001)
     final fcm = ref.read(fcmServiceProvider);
+
+    // En iOS quién se dibuja lo decide `PresentacionEnPrimerPlano`
+    // (`AppDelegate.swift`); esto es sólo la red si ese delegate se cae.
+    // Ver el dartdoc de `habilitarPresentacionEnPrimerPlano`.
+    unawaited(fcm.habilitarPresentacionEnPrimerPlano());
+
     _fgSub = fcm.onForegroundMessage.listen(_onForeground);
 
     // (a2) Background tap: app resumed from background via notification tap →
@@ -179,13 +185,10 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
   /// tira `StateError: No element`. Acá además devolver `null` es lo correcto
   /// semánticamente — "no sé dónde está" hace que la supresión falle abierta.
   ///
-  /// Va la URI y no `state.fullPath`: `fullPath` es el PATRÓN de la ruta
-  /// (`/coach/chat/:chatId`) y hay que comparar contra un deep link CONCRETO.
-  String? _currentLocation() {
-    final config = _router.routerDelegate.currentConfiguration;
-    if (config.isEmpty) return null;
-    return config.uri.toString();
-  }
+  /// Location concreta del router. La lógica vive en [locationActualDe] para
+  /// que se pueda testear con un router de verdad — ver su dartdoc, que
+  /// explica por qué las otras dos APIs obvias no sirven.
+  String? _currentLocation() => locationActualDe(_router);
 
   /// Handler de mensajes con la app en PRIMER PLANO.
   ///

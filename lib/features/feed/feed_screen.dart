@@ -19,11 +19,9 @@ import '../chat/application/chat_providers.dart';
 import '../gym_rankings/presentation/rankings_screen.dart' show RankingsBody;
 import '../gyms/domain/gym.dart' show kNoGymId;
 import '../moderation/application/moderation_providers.dart';
-import '../notifications/application/notification_history_providers.dart';
 import '../profile/application/user_providers.dart';
 import '../profile/domain/user_public_profile.dart';
 import '../profile/domain/user_role.dart';
-import '../workout/application/session_providers.dart' show currentUidProvider;
 import 'application/feed_screen_providers.dart';
 import 'application/feed_pagination_notifier.dart';
 import 'application/post_providers.dart';
@@ -349,9 +347,8 @@ class _FeedActions extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
-    final uid = ref.watch(currentUidProvider);
-    final notificationBadge =
-        uid == null ? 0 : ref.watch(notificationHeaderBadgeProvider(uid));
+    // La campana se mudó a la pantalla principal (`NotificationBell`): el feed
+    // ya no la muestra, así que tampoco mira su badge.
     // REQ-CHATUNREAD-005: count of chats with unread messages for the badge.
     // Only user↔user (social) chats feed this badge — messages from the
     // athlete's coach live under the COACH tab badge. See
@@ -366,56 +363,6 @@ class _FeedActions extends ConsumerWidget {
       key: const ValueKey('feed-header-actions'),
       mainAxisSize: MainAxisSize.min,
       children: [
-        Semantics(
-          button: true,
-          label: notificationBadge > 0
-              ? l10n.notificationBellWithCountA11y(notificationBadge)
-              : l10n.notificationBellA11y,
-          child: TreinoTappable(
-            onTap: () => context.push('/feed/notifications'),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(
-                minWidth: _kFeedActionTapTarget,
-                minHeight: _kFeedActionTapTarget,
-              ),
-              child: Center(
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    const _FeedIconBubble(icon: TreinoIcon.bell),
-                    if (notificationBadge > 0)
-                      Positioned(
-                        top: -2,
-                        right: -3,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 4,
-                            vertical: 1,
-                          ),
-                          constraints: const BoxConstraints(minWidth: 16),
-                          decoration: BoxDecoration(
-                            color: palette.accent,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            notificationBadge > 9 ? '9+' : '$notificationBadge',
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.barlow(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              height: 1.2,
-                              color: TreinoButtonTokens.foreground(context),
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-        SizedBox(width: spacing),
         Semantics(
           button: true,
           label: unreadChats > 0

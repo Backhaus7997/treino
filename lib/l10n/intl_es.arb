@@ -948,7 +948,7 @@
   "notificationPendingRequests": "{count, plural, =1{1 solicitud de seguidor pendiente} other{{count} solicitudes de seguidor pendientes}}",
   "@notificationPendingRequests": {"description": "Acceso compacto a solicitudes de amistad pendientes.", "placeholders": {"count": {"type": "int"}}},
   "notificationBellA11y": "Abrir notificaciones",
-  "@notificationBellA11y": {"description": "Etiqueta accesible de la campanita de notificaciones del feed."},
+  "@notificationBellA11y": {"description": "Etiqueta accesible de la campana de notificaciones de la pantalla principal."},
   "notificationBellWithCountA11y": "Abrir notificaciones, {count} pendientes",
   "@notificationBellWithCountA11y": {"description": "Etiqueta accesible de la campanita con su badge combinado.", "placeholders": {"count": {"type": "int"}}},
   "postDetailTitle": "PUBLICACIÓN",

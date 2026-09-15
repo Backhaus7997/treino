@@ -210,6 +210,43 @@ class FcmService {
   Future<NotificationSettings> requestPermission() =>
       _messaging.requestPermission();
 
+  /// Red de emergencia para la presentación en primer plano en iOS.
+  ///
+  /// ## Hoy no decide nada, y así tiene que ser
+  ///
+  /// `FLTFirebaseMessagingPlugin.willPresentNotification` sólo mira estas
+  /// opciones cuando NO tiene a quién cederle la decisión:
+  ///
+  /// ```objc
+  /// if (_originalNotificationCenterDelegate != nil && ...) {
+  ///   [_originalNotificationCenterDelegate ... completionHandler];
+  /// } else {
+  ///   // acá recién se leen las persistedOptions que escribe esta llamada
+  /// }
+  /// ```
+  ///
+  /// Con `PresentacionEnPrimerPlano` instalado (ver `AppDelegate.swift`) FCM
+  /// siempre entra por la primera rama, así que estos flags quedan sin efecto:
+  /// quién se dibuja lo decide el delegate nativo, notificación por
+  /// notificación.
+  ///
+  /// Se mantiene igual porque es la rama que corre si ese delegate se cae —un
+  /// cambio de plugin, la reemisión de `didFinishLaunching` que deja de
+  /// funcionar—. Puestos en `true`, esa caída se degrada a **dos banners**, que
+  /// se ve y se reporta. Puestos en `false`, se degradaría a **silencio total**,
+  /// que no se nota hasta que alguien se pierde un mensaje.
+  ///
+  /// Medido en un iPhone 16 el 2026-09-15, cuando FCM todavía era delegate
+  /// único: sin esta llamada devolvía `None` para TODA notificación de primer
+  /// plano —incluida la local— y el plugin de locales reportaba "mostrada"
+  /// con la pantalla vacía.
+  Future<void> habilitarPresentacionEnPrimerPlano() =>
+      _messaging.setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+
   /// Stream of foreground messages (app in focus).
   /// REQ-PN-HANDLER-001.
   Stream<RemoteMessage> get onForegroundMessage => FirebaseMessaging.onMessage;

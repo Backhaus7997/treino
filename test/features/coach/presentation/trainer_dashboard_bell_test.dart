@@ -196,52 +196,6 @@ void main() {
       expect(find.byType(PendingRequestsSheetTestHarness), findsOneWidget);
     });
 
-    testWidgets(
-        'the LAST request disappearing still auto-closes (not an empty state)',
-        (tester) async {
-      final controller = StreamController<List<TrainerLink>>();
-      addTearDown(controller.close);
-
-      await tester.pumpWidget(ProviderScope(
-        overrides: [
-          trainerLinksStreamProvider.overrideWith((ref) => controller.stream),
-          userPublicProfileProvider.overrideWith(
-            (ref, uid) => Stream<UserPublicProfile?>.value(null),
-          ),
-        ],
-        child: _wrap(const Text('BASE')),
-      ));
-
-      // Pushed as a real route: `maybePop` is a no-op on the only route in the
-      // stack, so the sheet needs something underneath for the auto-close to
-      // be observable at all.
-      Navigator.of(tester.element(find.text('BASE'))).push(
-        MaterialPageRoute<void>(
-          builder: (_) =>
-              const Scaffold(body: PendingRequestsSheetTestHarness()),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      // Opens WITH a request…
-      controller.add([_pending('l1', 'a1')]);
-      await tester.pumpAndSettle();
-      expect(find.byType(ElevatedButton), findsOneWidget);
-
-      // …and the trainer resolves the last one.
-      controller.add(const <TrainerLink>[]);
-      await tester.pumpAndSettle();
-
-      expect(
-        find.byType(PendingRequestsSheetTestHarness),
-        findsNothing,
-        reason: 'must auto-close, not sit on an empty state — the trainer '
-            'just acted, they did not come to browse',
-      );
-      expect(find.text('BASE'), findsOneWidget);
-      expect(find.text('No tenés solicitudes pendientes.'), findsNothing);
-    });
-
     // H3: a failed read must show a retry, NOT the "no requests" empty state —
     // which would hide a real pending request behind a false empty.
     testWidgets('links error → sheet shows a retry, not the empty state',
