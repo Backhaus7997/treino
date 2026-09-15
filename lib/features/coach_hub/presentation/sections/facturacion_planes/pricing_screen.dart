@@ -51,13 +51,36 @@ const double _kNarrowBreakpoint = 820;
 ///
 /// Lo que NO se puede hacer en ninguno de los dos casos es convertirlo en un
 /// link, un botón o un deep link: eso es 3.1.1 sin discusión posible.
-const String _kSubscribeElsewhereShort =
-    'SE CONTRATA EN TREINO WEB'; // i18n: Fase W3
+/// ⚠️ **DECIDIDO EL 2026-09-15: callarlo.** El dartdoc de arriba dejaba las dos
+/// salidas abiertas; ésta es la que se tomó, y las dos constantes quedaron
+/// vacías como el propio texto anticipaba («se quedan sin texto y listo»).
+///
+/// El motivo no es 3.1.1 —eso ya lo cerraba el guard de superficie— sino
+/// **3.1.3(f)**, que ampara este binario sólo *«provided there is no purchasing
+/// inside the app, **or calls to action for purchase outside of the app**»*. Un
+/// call to action no necesita ser un link: alcanza con nombrar dónde se paga.
+///
+/// Y el amparo se cae solo el día que el ALUMNO compre por IAP: ahí la app deja
+/// de ser una «free app» y 3.1.3(f) no le aplica más, por su propio texto. Ese
+/// es el deadline, y está declarado en
+/// `test/features/paywall/anti_steering_movil_test.dart`.
+///
+/// ⚠️ **NO se gatea por plataforma, y se verificó por qué.** La tentación es
+/// dejar el texto en Android —3.1.3 es de Apple— pero el programa de
+/// *external content links* de Google Play es **sólo para usuarios de Estados
+/// Unidos**. Argentina no entra, así que «en Android está permitido» no es una
+/// suposición segura y no se construyó sobre ella.
+///
+/// ⚠️ **LO QUE ESTO CUESTA, para que nadie lo descubra por accidente**: el PF
+/// que entró por el teléfono queda sin saber dónde pagar, y el dartdoc de
+/// arriba lo cuantifica en el 100% del funnel de $12.000-$39.000 por mes.
+/// Recuperarlo no puede ser otro cartel acá — tiene que salir **por fuera de la
+/// app** (un mail al PF con la suscripción vencida), que es lo único que Apple
+/// no gobierna. Eso todavía no existe.
+const String _kSubscribeElsewhereShort = ''; // i18n: Fase W3
 
-/// Ver [_kSubscribeElsewhereShort] — misma decisión pendiente.
-const String _kSubscribeElsewhereLong =
-    'El alta y el cambio de plan se hacen desde TREINO web, '
-    'con esta misma cuenta.'; // i18n: Fase W3
+/// Ver [_kSubscribeElsewhereShort] — misma decisión, mismo motivo.
+const String _kSubscribeElsewhereLong = ''; // i18n: Fase W3
 
 /// El pie legal de la pantalla, en las dos superficies.
 ///

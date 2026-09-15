@@ -60,13 +60,37 @@ import 'package:flutter_test/flutter_test.dart';
 /// Si agregas una frase nueva que este guard no atrapa, el problema no es el
 /// guard: es que no leiste 3.1.3 antes de escribirla.
 const _carteles = <String>[
-  'TREINO web',
+  'treino web',
   'desde la web',
   'en la web',
   'suscribite en',
-  'contratá en',
+  'contrata en',
   'contratar en',
 ];
+
+/// El texto listo para buscarle una aguja: minúsculas y sin acentos.
+///
+/// ⚠️ **SIN ESTO EL GUARD MENTÍA, y se descubrió por mutación el 2026-09-15.**
+///
+/// Las agujas estaban escritas `'TREINO web'` y `'contratá en'`, y el cartel
+/// que vivía en `pricing_screen.dart` decía **`'SE CONTRATA EN TREINO WEB'`**:
+/// mayúsculas y sin tilde. Un `contains` es case-sensitive, así que ese cartel
+/// —el del slot del CTA, el más visible de los tres— **nunca estuvo cubierto**.
+/// El archivo figuraba en `declarados` por el cartel LARGO, y el corto viajaba
+/// de arriba sin que nadie lo mirara.
+///
+/// Se verificó: reinyectando ese texto exacto, el guard quedaba VERDE.
+///
+/// Normalizar las dos puntas es lo que hace que la lista de agujas signifique
+/// lo que uno cree que significa al leerla. Las agujas de arriba van en
+/// minúsculas y sin acento por la misma razón.
+String _normalizado(String s) => s
+    .toLowerCase()
+    .replaceAll('á', 'a')
+    .replaceAll('é', 'e')
+    .replaceAll('í', 'i')
+    .replaceAll('ó', 'o')
+    .replaceAll('ú', 'u');
 
 /// El código de [f] sin comentarios.
 ///
@@ -96,14 +120,20 @@ void main() {
     //
     // Que la carpeta se llame `coach_hub` no los saca de iOS.
     const declarados = <String, String>{
-      'lib/features/coach_hub/presentation/sections/facturacion_planes/plan_limit_paywall.dart':
-          'DEUDA: dos veces «Regularizá tu suscripción desde TREINO web.» — '
-              'es un call to action bajo 3.1.3(f). Tiene que salir antes de la '
-              'primera submission con IAP del alumno',
-      'lib/features/coach_hub/presentation/sections/facturacion_planes/pricing_screen.dart':
-          'DEUDA: «El alta y el cambio de plan se hacen desde TREINO web» — '
-              'mismo problema, misma fecha límite',
-      // Éste NO es deuda y no comparte el destino de los dos de arriba.
+      // Los dos de DEUDA —`plan_limit_paywall.dart` y `pricing_screen.dart`—
+      // se pagaron el 2026-09-15 y por eso ya no están en esta lista.
+      //
+      // El snackbar ahora dice el ESTADO de la cuenta («Tu suscripción está
+      // pausada.») y las dos constantes de la pricing page quedaron VACÍAS,
+      // que es exactamente lo que su propio dartdoc anticipaba para el caso de
+      // «callarlo».
+      //
+      // ⚠️ Lo que se pagó con eso está escrito donde se pagó, y no se repite
+      // acá para que no se desactualice: el PF que entró por el teléfono queda
+      // sin saber dónde pagar. La salida es un MAIL, que es lo único que Apple
+      // no gobierna — y todavía no existe.
+      //
+      // Éste NO era deuda y por eso se queda.
       //
       // Dice «Pausar la cuenta todavía no está disponible desde la web», que
       // habla de una función que falta, no de dónde se paga. Está acá sólo
@@ -112,13 +142,25 @@ void main() {
       'lib/features/coach_hub/presentation/sections/ajustes/tabs/cuenta_tab.dart':
           'NO es steering: habla de pausar la cuenta, no de pagar. Falso '
               'positivo de la aguja `desde la web`',
+      // Éste APARECIÓ el 2026-09-15, y no porque alguien lo escribiera: lo
+      // destapó arreglar la case-sensitivity de `_carteles`. Dice «EDITOR EN LA
+      // WEB» —en mayúsculas, que es justo lo que el guard viejo no veía— y
+      // venía pasando desapercibido desde siempre.
+      //
+      // Tampoco es steering: habla del EDITOR DE RUTINAS, no de pagar. Se
+      // declara por el mismo criterio que el de arriba, y no se afina la aguja
+      // por el mismo motivo.
+      'lib/features/onboarding/presentation/custom_exercise_onboarding_art.dart':
+          'NO es steering: «EDITOR EN LA WEB» habla de dónde se edita una '
+              'rutina, no de dónde se paga. Falso positivo de `en la web`',
     };
 
     test('la lista de carteles es exactamente la declarada', () {
       final encontrados = <String>{};
       for (final f in _dartsDe('lib')) {
         final codigo = _sinComentarios(f);
-        if (_carteles.any(codigo.contains)) {
+        final normalizado = _normalizado(codigo);
+        if (_carteles.any(normalizado.contains)) {
           // Barras normalizadas: en Windows `File.path` usa `\`, y sin esto
           // ninguna clave matchea y el guard falla siempre.
           encontrados.add(f.path.replaceAll(r'\', '/'));
@@ -151,10 +193,15 @@ void main() {
       );
     });
 
-    test('la deuda no creció: siguen siendo dos los archivos a limpiar', () {
+    test('la deuda está en CERO y se queda en cero', () {
       // Un contador explícito, separado del guard de arriba, para que la deuda
       // tenga un número y no se diluya en una lista que también contiene un
       // falso positivo declarado.
+      //
+      // Estuvo en 2 hasta el 2026-09-15. Ahora que está en cero este test
+      // cambia de trabajo: dejó de medir cuánto falta y pasó a ser un
+      // **ratchet** — el que agregue el próximo cartel se entera acá, antes de
+      // mandarlo, y no en el rechazo de review.
       final deuda = declarados.entries
           .where((e) => e.value.startsWith('DEUDA:'))
           .map((e) => e.key)
@@ -162,10 +209,14 @@ void main() {
 
       expect(
         deuda,
-        hasLength(2),
-        reason: 'cambió la cantidad de archivos con carteles de steering.\n'
-            'Si SUBIÓ: no agregues carteles nuevos, leé 3.1.3 primero.\n'
-            'Si BAJÓ: bien ahí — bajá este número y borrá el renglón.',
+        isEmpty,
+        reason: 'volvió a haber carteles de steering declarados como deuda.\n'
+            'No los agregues: bajo 3.1.3(f) este binario está amparado sólo '
+            '«provided there is no purchasing inside the app, OR CALLS TO '
+            'ACTION for purchase outside of the app», y ese amparo se cae solo '
+            'el día que el alumno compre por IAP.\n\n'
+            'Si de verdad hace falta avisarle al PF dónde pagar, se avisa POR '
+            'MAIL. Adentro de la app, no.',
       );
     });
   });
