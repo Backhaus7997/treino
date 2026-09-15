@@ -49,13 +49,14 @@ Widget _app({
   required Stream<List<NotificationHistoryItem>> notifications,
   Stream<DateTime?>? lastSeen,
   int pending = 0,
+  String? initialTab,
 }) {
   final router = GoRouter(
     initialLocation: '/',
     routes: [
       GoRoute(
         path: '/',
-        builder: (_, __) => const NotificationHistoryScreen(),
+        builder: (_, __) => NotificationHistoryScreen(initialTab: initialTab),
       ),
       GoRoute(
         path: '/target',
@@ -234,6 +235,52 @@ void main() {
 
     expect(
         find.byKey(const Key('notificationPendingRequests')), findsOneWidget);
+  });
+
+  // P1 de la review de Codex en el PR #1142.
+  //
+  // Abrir con `?tab=solicitudes` mostraba la OTRA pestaña, pero el `markSeen`
+  // vivía en el `build` de la pantalla y corría igual: se apagaba el badge de
+  // no leídas de avisos que la persona nunca vio. Información perdida en
+  // silencio, y sin forma de recuperarla.
+  //
+  // Este test fija además el supuesto del que depende el arreglo: que
+  // `TabBarView` construye sus páginas PEREZOSAMENTE. Si algún día dejara de
+  // hacerlo, «Todas» se montaría igual y el bug volvería sin que nada más
+  // cambie — y acá se vería.
+  testWidgets('abrir en «Solicitudes» NO marca el historial como visto',
+      (tester) async {
+    final repository = _FakeRepository();
+    await tester.pumpWidget(
+      _app(
+        repository: repository,
+        notifications: Stream.value([_item()]),
+        initialTab: 'solicitudes',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.markSeenCalls, 0,
+        reason: 'la lista de «Todas» no se mostró: no hay nada que dar por '
+            'visto');
+
+    // Y al mostrarla, sí.
+    await tester.tap(find.text('TODAS'));
+    await tester.pumpAndSettle();
+
+    expect(repository.markSeenCalls, 1);
+  });
+
+  // Control del anterior: abriendo en la pestaña por defecto SÍ se marca.
+  // Sin esto, un `markSeen` que no se llamara nunca pasaría el test de arriba.
+  testWidgets('abrir en «Todas» marca el historial como visto', (tester) async {
+    final repository = _FakeRepository();
+    await tester.pumpWidget(
+      _app(repository: repository, notifications: Stream.value([_item()])),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.markSeenCalls, 1);
   });
 
   testWidgets('lazy list subtree has no TreinoFadeSlideIn', (tester) async {

@@ -18,8 +18,9 @@
  *       terminated + reason 'cancelled-by-athlete' → notify TRAINER,
  *         deepLink al centro de notificaciones
  *       * → terminated (resto) → notify BOTH, deepLink "/coach"
- *   - Las dos ramas que le hablan al PF de su BANDEJA apuntan a
- *     `kDeepLinkSolicitudes`; el resto se queda en "/coach".
+ *   - `pending` es la ÚNICA rama que abre «Solicitudes»: es la única cuyo
+ *     vínculo sigue en `pending` y por lo tanto la lista puede mostrarlo.
+ *     `cancelled-by-athlete` cuenta algo ya terminado y va al historial.
  *   - All user-facing strings in es-AR.
  *   - Tail effect: a `terminated` link that was NEVER accepted is DELETED after
  *     the notification goes out (purge-rejected-link.ts). It lives here, and
@@ -67,6 +68,16 @@ type LinkData = Record<string, unknown>;
  * tienen que moverse juntos — no hay tipo que los ate.
  */
 const kDeepLinkSolicitudes = "/home/notifications?tab=solicitudes";
+
+/**
+ * Deep link al historial de notificaciones, pestaña «Todas».
+ *
+ * Es el destino de los avisos que cuentan algo que YA PASÓ. La pestaña
+ * «Solicitudes» sólo lista vínculos en `pending`, así que mandar ahí un aviso
+ * sobre un vínculo ya `terminated` aterriza en una lista que —por definición—
+ * no lo contiene, y encima el doc se purga después.
+ */
+const kDeepLinkNotificaciones = "/home/notifications";
 
 /**
  * Queues the email counterpart of a link push, when the branch has one.
@@ -342,10 +353,13 @@ export async function notifyOnLinkChangeHandler(
       const athleteName = await resolveAthleteName(app, athleteId);
       recipientUids = [trainerId];
       actorUid = athleteId;
-      // Mismo destino que `pending`, y por el mismo motivo: lo que cambió es
-      // su BANDEJA de solicitudes. `/coach` le mostraría la lista de alumnos
-      // ya vinculados, que no tiene nada que ver con lo que dice el aviso.
-      deepLink = kDeepLinkSolicitudes;
+      // Al HISTORIAL, no a «Solicitudes». La solicitud que se canceló quedó
+      // `terminated` y se purga unas líneas más abajo, y `PendingRequestsView`
+      // filtra `status == pending`: el PF tocaría «Solicitud cancelada» para
+      // caer en una lista que no puede contenerla. Es el mismo defecto que
+      // este cambio vino a sacar —un aviso cuyo destino no muestra lo que el
+      // aviso dice— sólo que una rama más abajo.
+      deepLink = kDeepLinkNotificaciones;
       title = "Solicitud cancelada"; // i18n: Fase W1
       body = `${athleteName} canceló su solicitud de vinculación.`; // i18n: Fase W1
     } else {

@@ -48,20 +48,9 @@ class NotificationHistoryScreen extends ConsumerStatefulWidget {
 
 class _NotificationHistoryScreenState
     extends ConsumerState<NotificationHistoryScreen> {
-  bool _markScheduled = false;
-
-  void _scheduleMarkSeen(String uid) {
-    if (_markScheduled) return;
-    _markScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(notificationHistoryRepositoryProvider).markSeen(uid);
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final uid = ref.watch(currentUidProvider);
-    if (uid != null) _scheduleMarkSeen(uid);
 
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
@@ -97,7 +86,7 @@ class _NotificationHistoryScreenState
         body: Column(
           children: [
             const Padding(
-              padding: EdgeInsets.fromLTRB(20, 4, 20, 0),
+              padding: EdgeInsets.fromLTRB(20, 8, 20, 0),
               child: TreinoSegmentedPill(labels: ['TODAS', 'SOLICITUDES']),
             ),
             const SizedBox(height: 8),
@@ -105,7 +94,11 @@ class _NotificationHistoryScreenState
               child: TabBarView(
                 physics: const NeverScrollableScrollPhysics(),
                 children: [
-                  _tabTodas(context, notifications, lastSeenAt, palette),
+                  _TabTodas(
+                    uid: uid,
+                    notifications: notifications,
+                    lastSeenAt: lastSeenAt,
+                  ),
                   _TabSolicitudes(pendientesDeAmistad: pending),
                 ],
               ),
@@ -115,14 +108,56 @@ class _NotificationHistoryScreenState
       ),
     );
   }
+}
 
-  Widget _tabTodas(
-    BuildContext context,
-    AsyncValue<List<NotificationHistoryItem>> notifications,
-    DateTime? lastSeenAt,
-    AppPalette palette,
-  ) {
+/// Pestaña «Todas»: la lista del historial.
+///
+/// Es un widget con estado propio —y no un método de la pantalla— porque
+/// marcar el historial como visto tiene que ser un efecto de MOSTRAR esta
+/// lista, no de abrir la pantalla.
+///
+/// El bug que cierra: con `?tab=solicitudes` el push abría la otra pestaña,
+/// «Todas» no se dibujaba nunca, y el `markSeen` del `build` de la pantalla
+/// corría igual. Se apagaba el badge de no leídas de avisos que la persona no
+/// llegó a ver — información perdida en silencio, sin forma de recuperarla.
+///
+/// `TabBarView` construye sus páginas de forma perezosa, así que este
+/// `initState` no corre hasta que la pestaña se muestra. Eso NO se da por
+/// supuesto: lo fija un test que abre en «Solicitudes», verifica que no se
+/// marcó nada, toca «TODAS» y recién ahí lo espera.
+class _TabTodas extends ConsumerStatefulWidget {
+  const _TabTodas({
+    required this.uid,
+    required this.notifications,
+    required this.lastSeenAt,
+  });
+
+  final String? uid;
+  final AsyncValue<List<NotificationHistoryItem>> notifications;
+  final DateTime? lastSeenAt;
+
+  @override
+  ConsumerState<_TabTodas> createState() => _TabTodasState();
+}
+
+class _TabTodasState extends ConsumerState<_TabTodas> {
+  @override
+  void initState() {
+    super.initState();
+    final uid = widget.uid;
+    if (uid == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(notificationHistoryRepositoryProvider).markSeen(uid);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
+    final notifications = widget.notifications;
+    final lastSeenAt = widget.lastSeenAt;
     return notifications.when(
       loading: () => Center(
         key: const Key('notificationHistoryLoading'),
@@ -194,7 +229,7 @@ class _TabSolicitudes extends ConsumerWidget {
         children: [
           if (pendientesDeAmistad > 0)
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
               child: _PendingRequestsBlock(count: pendientesDeAmistad),
             ),
           if (esPf) const PendingRequestsView(),
