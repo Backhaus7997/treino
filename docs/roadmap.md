@@ -205,7 +205,16 @@ Dos SDDs adicionales arrancaron post-cierre de Fase 3 para cerrar gaps no contem
 - 2 indexes orphan (`routines: assignedBy+source+createdAt`, `commercialPlans: trainerId+createdAt`) en producción pero no en `firestore.indexes.json` — sumar al repo.
 - `gymSearchQueryProvider` no es autoDispose (workaround actual: reset en `initState`).
 - CF runtime SA refactor a `firebase-adminsdk-fbsvc` (cleaner IAM, ahora corre con default compute SA).
-- Node 20 → 22 + firebase-functions upgrade (deprecation warnings al deploy).
+- ~~Node 20 → 22~~ **HECHO el 2026-09-15.** No era un follow-up «no bloqueante»:
+  el runtime `nodejs20` se **decomisiona el 2026-10-30** y después de esa fecha
+  no se puede deployar NINGUNA función. Este renglón lo empaquetaba junto al
+  upgrade de firebase-functions como si viajaran juntos, y **no viajan**:
+  `firebase-functions@5.1.1` declara `engines: node >=14.10.0` y no menciona
+  ningún runtime — quien valida el runtime es firebase-tools. El deadline era
+  del runtime solo.
+- firebase-functions v5 → v6 (breaking changes). **Sin deadline**, ahora que se
+  verificó que no está atado al runtime. Lo que sí trae hoy son los warnings de
+  deprecación al deploy.
 - FirebaseCore init race en cold-start (Google login stuck primera vez si tapeás <2s post-launch).
 - SCENARIO-548 test mejorable (forzar Storage error real para verificar `status=partial`).
 

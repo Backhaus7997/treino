@@ -78,7 +78,11 @@
  *
  * ── Nada de dependencias nuevas ──
  *
- * `crypto.randomUUID()` es de Node, y `functions/package.json` pide Node 20.
+ * `randomUUID()` sale de `node:crypto`, que lo tiene desde Node 14.17 — o sea
+ * desde muy por debajo de cualquier runtime que Cloud Functions todavia acepte.
+ * Se nombra el PISO y no la version configurada a proposito: el runtime paso de
+ * 20 a 22 el 2026-09-15, y un cartel que nombra la version de hoy se pudre en
+ * cada migracion.
  * Se evita a proposito sumar un paquete: `functions/` tiene DOS dependencias
  * de produccion y este modulo vive al lado del unico endpoint del repo que
  * otorga acceso pago.

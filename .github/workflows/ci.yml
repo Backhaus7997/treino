@@ -74,7 +74,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: firestore.rules strippeado y storage.rules entran en 262144 bytes
         run: node scripts/strip_rules.js --check
@@ -472,7 +472,7 @@ jobs:
       - name: Logica de permisos de Salud
         run: bash scripts/test_watch_swift.sh
 
-  # Gate de compilación para las Cloud Functions (functions/, Node 20 + TS).
+  # Gate de compilación para las Cloud Functions (functions/, Node 22 + TS).
   # Antes NADIE compilaba functions en CI: flutter analyze/test no ven functions/,
   # así que un error de tipos o de compilación en functions/src podía entrar a
   # main sin que nada lo frenara. Este job corre `tsc` y falla ante cualquiera.
@@ -502,7 +502,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '22'
           cache: npm
           cache-dependency-path: functions/package-lock.json
 
@@ -525,7 +525,7 @@ jobs:
       # errors, uno por cada archivo de src/__tests__/— y ningún job lo corría,
       # así que nadie se enteraba. Arreglado en el PR que agrega este paso
       # (functions/tsconfig.eslint.json). Se corre acá y no en un job aparte
-      # porque `functions-build` ya tiene Node 20 y las deps instaladas: sumarlo
+      # porque `functions-build` ya tiene Node 22 y las deps instaladas: sumarlo
       # cuesta segundos, un job nuevo cuesta otro `npm ci` entero.
       #
       # Va DESPUÉS de build y typecheck a propósito: si el código no compila,
@@ -580,7 +580,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '22'
           cache: npm
           cache-dependency-path: functions/package-lock.json
 
@@ -650,7 +650,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '22'
           cache: npm
           cache-dependency-path: scripts/rules_test/package-lock.json
 
@@ -724,15 +724,37 @@ jobs:
   # Instalar `firebase-admin` acá sería medio minuto por run para nada — y
   # peor, dejaría que un test toque la red sin que se note.
   #
-  # Node 20 igual que los otros jobs de Node, y NO se sube. Este job ya se puso
-  # rojo una vez por una API que sólo existe de Node 22.15 para arriba
-  # (`module.registerHooks`), y la tentación fue subir el job. Habría tapado el
-  # problema real: sin el hook, el subproceso carga el `firebase-admin` DE
-  # VERDAD y los tests de compuerta —que prueban la AUSENCIA de un marcador—
-  # quedan verdes midiendo nada. El fix fue `module.register()`, que existe
-  # desde Node 20.6, más un marcador de intercepción que los tests exigen en
-  # cada corrida: `esm_stub_interception.test.js` lo custodia con control
-  # negativo. La versión vieja de Node no es una molestia acá, es el CANARIO.
+  # ⚠️ NODE 20, Y ES EL ÚNICO JOB DEL REPO QUE QUEDA ACÁ. NO SE SUBE.
+  #
+  # Hasta el 2026-09-15 esta línea se justificaba sola con «igual que los otros
+  # jobs de Node». Ese argumento se murió: el resto del repo se fue a Node 22
+  # porque el runtime `nodejs20` de Cloud Functions se decomisiona el
+  # 2026-10-30. Así que el motivo hay que escribirlo entero, porque ya no se
+  # deduce mirando al de al lado.
+  #
+  # Este job ya se puso rojo una vez por una API que sólo existe de Node 22.15
+  # para arriba (`module.registerHooks`), y la tentación fue subir el job.
+  # Habría tapado el problema real: sin el hook, el subproceso carga el
+  # `firebase-admin` DE VERDAD y los tests de compuerta —que prueban la
+  # AUSENCIA de un marcador— quedan verdes midiendo nada. El fix fue
+  # `module.register()`, que existe desde Node 20.6, más un marcador de
+  # intercepción que los tests exigen en cada corrida:
+  # `esm_stub_interception.test.js` lo custodia con control negativo.
+  #
+  # **La versión vieja de Node no es una molestia acá, es el CANARIO**, y el
+  # canario sólo sirve si es más viejo que todo lo demás. Subirlo a 22 no
+  # rompería nada hoy —439/439 en verde, medido en 20, 22 y 26— y ése es
+  # justamente el problema: no se notaría hasta el día que alguien vuelva a
+  # alcanzar una API nueva y la compuerta vuelva a medir nada.
+  #
+  # `scripts/` NO se deploya a Cloud Functions: son scripts que corren en la
+  # laptop del dev y acá. El decommission del 2026-10-30 no los toca, así que
+  # esta línea no tiene fecha de vencimiento por ese lado. Lo que sí hay que
+  # saber es que Node 20 salió de soporte de la comunidad el 2026-04-30: si
+  # `actions/setup-node` algún día deja de servirlo, el reemplazo NO es subir a
+  # 22 sin más — es bajar el piso a la versión soportada más vieja que haya, o
+  # mover el canario a un control negativo explícito que no dependa de la
+  # versión.
   #
   # Anda en 20 y en 22 también por el glob: el del `npm test` lo expande el
   # shell. El `--test "test/*.test.js"` entrecomillado que traía el #835 exigía

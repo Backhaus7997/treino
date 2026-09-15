@@ -154,7 +154,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '22'
 
       # functions/ es el único que corre en producción (Cloud Functions).
       # scripts/ y scripts/rules_test/ son tooling local, pero comparten
