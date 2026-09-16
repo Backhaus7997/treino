@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import '../../profile/data/timestamp_converter.dart';
+import 'exercise_feedback.dart';
+import 'feedback_counts_converter.dart';
 import 'session_status.dart';
 
 part 'session.freezed.dart';
@@ -25,6 +27,21 @@ class Session with _$Session {
     // Periodization (Model B): 0-based week of the plan this session belongs to.
     // @Default(0) keeps single-week sessions intact and retro-compatible.
     @Default(0) int weekNumber,
+    // Cuántos reportes (#628) tiene esta sesión, por kind. Lo escribe SÓLO
+    // `maintainSessionFeedbackCounters` (functions/), recontando desde la
+    // subcolección; las reglas rechazan que un cliente lo toque.
+    //
+    // Existe para que el historial del PF marque de un vistazo qué sesiones
+    // traen una molestia o una nota. Sin esto la marca cuesta una lectura de
+    // subcolección por fila.
+    //
+    // `@Default({})` y no `required`: las sesiones anteriores al agregado no
+    // tienen el campo, y una sesión sin reportes tampoco lo tiene — el mapa
+    // vacío es la respuesta correcta para las dos. Ojo con lo que NO significa:
+    // vacío es "ningún reporte", no "no se pudo leer".
+    @FeedbackCountsConverter()
+    @Default(<ExerciseFeedbackKind, int>{})
+    Map<ExerciseFeedbackKind, int> feedbackCounts,
   }) = _Session;
 
   factory Session.fromJson(Map<String, Object?> json) =>

@@ -40,6 +40,7 @@ export { notifyOnFollow } from "./notifications/notify-friendship";
 export { notifyOnReaction } from "./notifications/notify-reaction";
 export { reassignFcmToken } from "./notifications/reassign-fcm-token";
 export { notifyWearOnWorkoutStarted } from "./notifications/notify-wear-workout";
+export { maintainSessionFeedbackCounters } from "./notifications/maintain-session-feedback-counters";
 export { maintainFollowCounters } from "./social/maintain-follow-counters";
 export { maintainReactionCounters } from "./social/maintain-reaction-counters";
 // Tope de costo de los videos de ejercicio custom. Son DOS triggers y no uno:

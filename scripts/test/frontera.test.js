@@ -155,7 +155,7 @@ test('todo script que habla con Firebase importa la frontera', () => {
   );
 });
 
-test('los 46 scripts que inicializan Firebase pasan por la frontera', () => {
+test('los 47 scripts que inicializan Firebase pasan por la frontera', () => {
   // 45 tocaban credenciales de verdad + `seed_emulator_full.js`, que es
   // emulator-only y entra igual para que no quede NINGÚN `initializeApp` suelto.
   //
@@ -164,13 +164,20 @@ test('los 46 scripts que inicializan Firebase pasan por la frontera', () => {
   // proyecto resuelto en la primera línea, que es lo que AGENTS.md §11.1 le
   // reclama a los scripts destructivos.
   //
+  // El 47 es `backfill_session_feedback_counts.js`: llena `feedbackCounts` en
+  // las sesiones anteriores al agregado. Entra por `lib/admin`, imprime el
+  // proyecto y el modo en la primera línea, y es DRY-RUN POR DEFECTO — escribe
+  // sólo con `--write`. Va más cerrado que el resto de los backfill a
+  // propósito: toca el doc de sesión de todos los usuarios y lo que escribe es
+  // una afirmación sobre salud.
+  //
   // El número está clavado a propósito: si alguien agrega un script que entra
   // por `lib/`, este test lo cuenta y hay que subirlo — leyendo el diff. Es el
   // recordatorio de que la lista se mira, no se asume.
   const cableados = ARCHIVOS.filter(({ codigo }) => IMPORTA_LA_FRONTERA.test(codigo));
   assert.strictEqual(
     cableados.length,
-    46,
+    47,
     `cableados: ${cableados.length}. Si agregaste o sacaste un script, actualizá ` +
       'este número Y confirmá que el nuevo entra por lib/:\n  ' +
       cableados.map((a) => a.nombre).join('\n  '),

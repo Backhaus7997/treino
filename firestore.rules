@@ -2564,15 +2564,45 @@ service cloud.firestore {
       // watchOS lo exige para siquiera armar la sesión
       // (`HistorySync.swift:142`), así que en el camino gateado su ausencia no
       // es un cliente viejo: es un payload que la app no produce. Se deniega.
+      // `feedbackCounts` tampoco se puede traer PUESTO desde el create, y esto
+      // no es simetría cosmética con el update de abajo: sin esta línea la
+      // guarda de allá no vale nada. Un cliente parcheado crea la sesión con
+      // `{discomfort: 9}` de entrada y NADIE lo corrige — el agregado recuenta
+      // desde `exerciseFeedback`, y si no hay ningún reporte su trigger no
+      // dispara jamás. El historial del PF muestra un dolor inventado que no
+      // tiene forma de irse.
+      //
+      // Se exige ausente, no vacío: una sesión nace sin reportes y el mapa
+      // ausente ya significa "ninguno" para el modelo Dart.
       allow create: if request.auth != null
                     && request.auth.uid == uid
+                    && !('feedbackCounts' in request.resource.data)
                     && (!paywallEnforcedFor(uid)
                         || sesionSobreRutinaLibre(request.resource.data));
 
-      // Update y delete NO llevan el gate, por lo dicho arriba: cerrar o
-      // corregir un entreno empezado no puede depender de un derecho que se
-      // pudo vencer en el medio.
-      allow update, delete: if request.auth != null && request.auth.uid == uid;
+      // Update y delete NO llevan el gate del paywall, por lo dicho arriba:
+      // cerrar o corregir un entreno empezado no puede depender de un derecho
+      // que se pudo vencer en el medio.
+      //
+      // `feedbackCounts` es la EXCEPCIÓN, y es lo único que el dueño no puede
+      // tocar. Lo escribe sólo `maintainSessionFeedbackCounters` por Admin SDK
+      // —que se saltea estas reglas— recontando desde `exerciseFeedback`.
+      // Sin esta cláusula el alumno, que es dueño del doc, podría escribirle
+      // `{discomfort: 9}` a mano y hacerle ver a su PF un dolor que no
+      // reportó, o borrar el contador de uno que sí. El contador es una
+      // AFIRMACIÓN SOBRE SALUD que el PF va a leer como tal; que la derive el
+      // backend desde la subcolección real es justamente lo que la hace valer.
+      //
+      // `affectedKeys()` y no comparar valores: alcanza con que la clave no se
+      // toque. Un update que la deje igual pasa; uno que la agregue, cambie o
+      // borre, no. Va sólo en `update` — en `delete` no hay
+      // `request.resource`.
+      allow update: if request.auth != null
+                    && request.auth.uid == uid
+                    && !request.resource.data.diff(resource.data)
+                        .affectedKeys().hasAny(['feedbackCounts']);
+
+      allow delete: if request.auth != null && request.auth.uid == uid;
 
       // `true` si la rutina que la sesión apunta NO es del catálogo pago.
       //

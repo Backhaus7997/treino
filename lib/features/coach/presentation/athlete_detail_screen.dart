@@ -1966,14 +1966,50 @@ class _EntrenamientosSection extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // ── Section header ────────────────────────────────────────────────
-        Text(
-          'HISTORIAL DE SESIONES',
-          style: GoogleFonts.barlowCondensed(
-            fontWeight: FontWeight.w700,
-            fontSize: 12,
-            letterSpacing: 1.2,
-            color: palette.textMuted,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'HISTORIAL DE SESIONES',
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                  letterSpacing: 1.2,
+                  color: palette.textMuted,
+                ),
+              ),
+            ),
+            // La puerta al historial completo. Esta sección corta en 20 y
+            // ADEMÁS descarta las sesiones en curso e incompletas
+            // (`_isCompleted`), así que lo que se ve acá no es "las últimas
+            // 20": es "las últimas 20 de las que califican". La pantalla
+            // completa no filtra nada.
+            // `shrinkWrap` y no el tap target por defecto: un TextButton
+            // normal reserva 48 px de alto, y este header mide 12. Dejarlo
+            // así engordaba la sección 33 px y empujaba la primera fila fuera
+            // de alcance — lo detectaron siete tests de esta pantalla, con el
+            // warning de hit test que dice que el tap "no hit-testea sobre el
+            // widget". No era un detalle de tests: la fila se volvía difícil de
+            // tocar de verdad.
+            TextButton(
+              onPressed: () =>
+                  context.push('/coach/athlete/$athleteId/historial'),
+              style: TextButton.styleFrom(
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                minimumSize: Size.zero,
+              ),
+              child: Text(
+                l10n.workoutHistorialSeeAll,
+                style: GoogleFonts.barlowCondensed(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                  letterSpacing: 1.2,
+                  color: palette.accent,
+                ),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 12),
 

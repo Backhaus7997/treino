@@ -252,6 +252,118 @@ describe('TERMINAR un entreno empezado nunca rebota', () => {
   });
 });
 
+describe('feedbackCounts es del backend, no del dueño', () => {
+  // `feedbackCounts` lo escribe SÓLO `maintainSessionFeedbackCounters` por
+  // Admin SDK, recontando desde la subcolección `exerciseFeedback`.
+  //
+  // Sin esta guarda el alumno —que es dueño del doc de sesión y puede
+  // actualizarlo— le escribiría `{discomfort: 9}` a mano y le haría ver a su PF
+  // un dolor que nunca reportó, o borraría el contador de uno que sí. Es una
+  // AFIRMACIÓN SOBRE SALUD que el PF lee como tal; lo único que la hace valer
+  // es que la derive el backend desde los reportes reales.
+  const ID = 's-fc';
+
+  beforeEach(async () => {
+    await seedUser(ATHLETE, {});
+    await seedPlantilla(LIBRE, {});
+    await seedSesion(ID, sesion({ routineId: LIBRE }));
+  });
+
+  it('el dueño NO puede escribir feedbackCounts', async () => {
+    await assertFails(
+      sesiones(ATHLETE).doc(ID).update({ feedbackCounts: { discomfort: 9 } }),
+    );
+  });
+
+  // Sin esta guarda, la del update no vale NADA: el cliente trae el mapa puesto
+  // desde el create y nadie lo corrige nunca. El agregado recuenta desde
+  // `exerciseFeedback`, así que con cero reportes su trigger no dispara jamás y
+  // el dolor inventado se queda para siempre. Lo encontró Codex en el #1153.
+  it('tampoco puede traerlo PUESTO en el create', async () => {
+    await assertFails(
+      sesiones(ATHLETE).add({
+        ...sesion({ routineId: LIBRE }),
+        feedbackCounts: { discomfort: 9 },
+      }),
+    );
+  });
+
+  it('CONTROL — crear una sesión SIN el campo sigue pasando', async () => {
+    await assertSucceeds(sesiones(ATHLETE).add(sesion({ routineId: LIBRE })));
+  });
+
+  // Ni siquiera vacío: una sesión nace sin reportes y el campo ausente ya
+  // significa "ninguno". Aceptar `{}` sería abrir la puerta a discutir qué
+  // valores son "inofensivos".
+  it('ni siquiera un mapa VACÍO en el create', async () => {
+    await assertFails(
+      sesiones(ATHLETE).add({
+        ...sesion({ routineId: LIBRE }),
+        feedbackCounts: {},
+      }),
+    );
+  });
+
+  it('tampoco puede borrarlo una vez puesto', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx
+        .firestore()
+        .collection('users')
+        .doc(ATHLETE)
+        .collection('sessions')
+        .doc(ID)
+        .update({ feedbackCounts: { discomfort: 1 } });
+    });
+
+    await assertFails(
+      sesiones(ATHLETE).doc(ID).update({ feedbackCounts: {} }),
+    );
+  });
+
+  // ⚠️ EL CONTROL. Los dos de arriba pasarían IGUAL con una regla que denegara
+  // todos los updates, y desde afuera se vería idéntico a una guarda que
+  // funciona. Este test es el que separa "bloquea el campo" de "bloquea todo":
+  // cerrar un entreno es el update más importante del producto y no puede
+  // haberse roto.
+  it('CONTROL — cerrar la sesión sin tocar feedbackCounts SIGUE pasando', async () => {
+    await assertSucceeds(
+      sesiones(ATHLETE).doc(ID).update({
+        status: 'completed',
+        finishedAt: new Date(),
+        durationMin: 45,
+        totalVolumeKg: 1200,
+      }),
+    );
+  });
+
+  // SEMÁNTICA REAL de `affectedKeys()`, medida acá y no supuesta: devuelve las
+  // claves cuyo VALOR CAMBIÓ, no las claves presentes en la escritura. Un
+  // update que reenvía el mismo mapa no la "afecta" y pasa.
+  //
+  // Está bien que pase, y conviene dejarlo escrito porque parece un agujero y
+  // no lo es: una escritura que deja el contador exactamente donde estaba es un
+  // no-op — no hay forma de mentir con ella. Lo que la guarda tiene que frenar
+  // es CAMBIARLO, y eso lo cubren los dos tests de arriba.
+  //
+  // (La primera versión de este test afirmaba lo contrario y se puso roja. El
+  // equivocado era el test, no la regla.)
+  it('reenviar el MISMO valor pasa: es un no-op, no una forja', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx
+        .firestore()
+        .collection('users')
+        .doc(ATHLETE)
+        .collection('sessions')
+        .doc(ID)
+        .update({ feedbackCounts: { comment: 2 } });
+    });
+
+    await assertSucceeds(
+      sesiones(ATHLETE).doc(ID).update({ feedbackCounts: { comment: 2 } }),
+    );
+  });
+});
+
 describe('el eje no le toca nada al PF', () => {
   it('el PF vinculado sigue leyendo las sesiones de su alumno', async () => {
     // El paywall del alumno no puede recortarle al PF lo que ve de él.

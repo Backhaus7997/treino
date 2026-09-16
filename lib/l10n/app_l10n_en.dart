@@ -852,6 +852,15 @@ class AppL10nEn extends AppL10n {
   String get workoutHistorialHeading => '';
 
   @override
+  String get coachSessionHistoryInProgress => '';
+
+  @override
+  String get coachSessionHistoryIncomplete => '';
+
+  @override
+  String get coachSessionHistoryEmpty => '';
+
+  @override
   String get workoutHistorialEmptyMessage => '';
 
   @override
