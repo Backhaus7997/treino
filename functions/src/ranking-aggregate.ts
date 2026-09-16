@@ -234,6 +234,43 @@ export async function recomputeMetrics(
  *
  * Deployed to southamerica-east1 per ADR-RV-003.
  */
+/**
+ * `true` cuando el ÚNICO cambio del doc de sesión es `feedbackCounts`.
+ *
+ * Existe porque este trigger escucha CUALQUIER escritura sobre
+ * `users/{uid}/sessions/{sessionId}` y recomputa sin condición: hasta 365
+ * sesiones más los `setLogs` de cada una. Cuando se agregó
+ * `maintainSessionFeedbackCounters`, cada comentario o molestia del alumno pasó
+ * a escribir ese doc — y por lo tanto a lanzar un recompute completo de
+ * rankings que no tiene nada que ver.
+ *
+ * El corte es por "el único que cambió", no por una allowlist de campos
+ * relevantes: una allowlist se desactualiza en silencio el día que alguien
+ * agrega un campo que SÍ mueve el ranking, y el modo de falla sería dejar de
+ * recomputar cuando corresponde. Así, lo único que se saltea es exactamente lo
+ * que sabemos que no mueve nada.
+ *
+ * Exportada aparte para testearla sin construir un CloudEvent, mismo criterio
+ * que [shouldRecomputeOnOptInTransition].
+ */
+export function soloCambioFeedbackCounts(
+  before: Record<string, unknown> | undefined,
+  after: Record<string, unknown> | undefined,
+): boolean {
+  if (!before || !after) return false;
+
+  const claves = new Set([...Object.keys(before), ...Object.keys(after)]);
+  let cambioFeedbackCounts = false;
+
+  for (const k of claves) {
+    if (JSON.stringify(before[k]) === JSON.stringify(after[k])) continue;
+    if (k !== "feedbackCounts") return false; // cambió otra cosa
+    cambioFeedbackCounts = true;
+  }
+
+  return cambioFeedbackCounts;
+}
+
 export const rankingAggregateOnSession = onDocumentWritten(
   { document: "users/{uid}/sessions/{sessionId}", region: "southamerica-east1" },
   async (event) => {
@@ -244,6 +281,20 @@ export const rankingAggregateOnSession = onDocumentWritten(
       });
       return;
     }
+
+    if (
+      soloCambioFeedbackCounts(
+        event.data?.before.data(),
+        event.data?.after.data(),
+      )
+    ) {
+      logger.debug(
+        "rankingAggregateOnSession: sólo cambió feedbackCounts, no se recomputa",
+        { uid },
+      );
+      return;
+    }
+
     await recomputeMetrics(ensureApp(), uid);
   },
 );

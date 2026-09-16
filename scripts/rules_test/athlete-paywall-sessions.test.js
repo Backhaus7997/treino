@@ -275,6 +275,35 @@ describe('feedbackCounts es del backend, no del dueño', () => {
     );
   });
 
+  // Sin esta guarda, la del update no vale NADA: el cliente trae el mapa puesto
+  // desde el create y nadie lo corrige nunca. El agregado recuenta desde
+  // `exerciseFeedback`, así que con cero reportes su trigger no dispara jamás y
+  // el dolor inventado se queda para siempre. Lo encontró Codex en el #1153.
+  it('tampoco puede traerlo PUESTO en el create', async () => {
+    await assertFails(
+      sesiones(ATHLETE).add({
+        ...sesion({ routineId: LIBRE }),
+        feedbackCounts: { discomfort: 9 },
+      }),
+    );
+  });
+
+  it('CONTROL — crear una sesión SIN el campo sigue pasando', async () => {
+    await assertSucceeds(sesiones(ATHLETE).add(sesion({ routineId: LIBRE })));
+  });
+
+  // Ni siquiera vacío: una sesión nace sin reportes y el campo ausente ya
+  // significa "ninguno". Aceptar `{}` sería abrir la puerta a discutir qué
+  // valores son "inofensivos".
+  it('ni siquiera un mapa VACÍO en el create', async () => {
+    await assertFails(
+      sesiones(ATHLETE).add({
+        ...sesion({ routineId: LIBRE }),
+        feedbackCounts: {},
+      }),
+    );
+  });
+
   it('tampoco puede borrarlo una vez puesto', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await ctx
