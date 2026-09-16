@@ -220,7 +220,49 @@ describe("notifyOnSessionFinishedHandler", () => {
   });
 
   // ⚠️ EL ZOMBI. El barrido escribe `finishedAt` igual que un cierre real.
-  it("no notifica cuando la cerró el barrido de colgadas (>8h)", async () => {
+  it("no notifica cuando el barrido la MARCÓ como cerrada por él", async () => {
+    const mock = makeMockMessaging();
+
+    await notifyOnSessionFinishedHandler(
+      testApp,
+      ATHLETE,
+      SESSION,
+      sesion(),
+      terminada(FIN, { wasFullyCompleted: false, closedBySweep: true }),
+      mock,
+    );
+
+    expect(mock.sendEachForMulticast as jest.Mock).not.toHaveBeenCalled();
+  });
+
+  // ⚠️ EL CASO QUE LA PRIMERA VERSIÓN DEJABA PASAR, y el que motivó la marca.
+  // Cuando la sesión más nueva sigue viva, el barrido cierra las DUPLICADAS sin
+  // mirarles la edad (`aCerrar = snap.docs.skip(1)`). Una colgada de minutos —el
+  // reloj y el teléfono abriendo una cada uno— se cerraba dentro de las 8h y la
+  // heurística de tiempo la dejaba pasar: el PF recibía "terminó su
+  // entrenamiento" por un entreno que nunca existió.
+  it("una duplicada barrida A LOS MINUTOS tampoco notifica", async () => {
+    const mock = makeMockMessaging();
+    const aLosDiezMinutos = new Date(INICIO.getTime() + 10 * 60 * 1000);
+
+    await notifyOnSessionFinishedHandler(
+      testApp,
+      ATHLETE,
+      SESSION,
+      sesion(),
+      terminada(aLosDiezMinutos, {
+        wasFullyCompleted: false,
+        closedBySweep: true,
+      }),
+      mock,
+    );
+
+    expect(mock.sendEachForMulticast as jest.Mock).not.toHaveBeenCalled();
+  });
+
+  // FALLBACK: las sesiones que ya están en la base, cerradas por un cliente
+  // anterior a la marca, nunca la van a tener. Para ésas queda el tiempo.
+  it("sin marca pero excediendo las 8h (cliente viejo) tampoco notifica", async () => {
     const mock = makeMockMessaging();
 
     await notifyOnSessionFinishedHandler(

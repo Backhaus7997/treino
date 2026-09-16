@@ -37,10 +37,23 @@
  * barrido como en `abandonSession()`, que es un abandono deliberado y sí
  * merece aviso — es justamente el caso donde el alumno dejó una nota y se fue.
  *
- * Lo que los separa es el TIEMPO: el barrido, por construcción, sólo toca
- * sesiones de más de `maxWorkoutDuration`. Un entreno real cerrado más tarde
- * que eso no existe, porque el barrido lo habría agarrado antes. Así que
- * `finishedAt - startedAt > 8h` ⇒ lo cerró el barrido ⇒ no se notifica.
+ * La señal es `closedBySweep`, que el propio barrido escribe. Es explícita.
+ *
+ * ⚠️ La PRIMERA versión de este archivo deducía el barrido por el TIEMPO
+ * ("cerrada más de 8h después de empezar ⇒ la cerró el barrido") y esa premisa
+ * es FALSA. El barrido tiene dos ramas:
+ *
+ *     final aCerrar = vencio ? snap.docs : snap.docs.skip(1).toList();
+ *
+ * Cuando la sesión más nueva sigue viva, cierra **todas las duplicadas sin
+ * mirarles la edad**. Dos sesiones abiertas con minutos de diferencia —una del
+ * reloj, otra del teléfono— se cierran a los minutos de empezar, y la
+ * heurística de las 8h las deja pasar como si el alumno hubiera terminado.
+ * Lo encontró Codex en el #1154.
+ *
+ * El tiempo transcurrido quedó SÓLO como fallback para las sesiones que ya
+ * están en la base cerradas por clientes anteriores a la marca, que nunca la
+ * van a tener.
  *
  * ## Por qué lee la subcolección y no `feedbackCounts`
  *
@@ -141,10 +154,32 @@ export async function notifyOnSessionFinishedHandler(
   if (antes !== null || despues === null) return;
 
   // ── Guarda 2: el barrido de colgadas, no el atleta ────────────────────────
+  //
+  // Dos señales, y el orden importa porque sólo la primera es CONFIABLE.
+  //
+  // `closedBySweep` lo escribe el propio barrido (`session_repository.getActive`).
+  // Es explícito y no se deduce de nada.
+  //
+  // El tiempo transcurrido es el FALLBACK para las sesiones que cerró un
+  // cliente anterior a esa marca, que ya están en la base y nunca la van a
+  // tener. Es una heurística y no alcanza sola: cuando la sesión más nueva
+  // sigue viva, el barrido cierra las duplicadas SIN mirarles la edad
+  // (`aCerrar = snap.docs.skip(1)`), así que una colgada de minutos se le
+  // escapa. La primera versión de este archivo tenía SÓLO esta mitad — lo
+  // encontró Codex en el #1154.
+  if (after.closedBySweep === true) {
+    logger.info(
+      "notifyOnSessionFinished: cerrada por el barrido (marcada), no se notifica",
+      { athleteUid, sessionId },
+    );
+    return;
+  }
+
   const inicio = aFecha(after.startedAt);
   if (inicio !== null && despues.getTime() - inicio.getTime() > MAX_WORKOUT_MS) {
     logger.info(
-      "notifyOnSessionFinished: la cerró el barrido de colgadas, no se notifica",
+      "notifyOnSessionFinished: excede la duración máxima, la cerró un barrido " +
+        "de un cliente viejo (sin marca), no se notifica",
       { athleteUid, sessionId },
     );
     return;
