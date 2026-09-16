@@ -59,7 +59,7 @@ import { App } from "firebase-admin/app";
 import { DocumentData, FieldValue, Timestamp, getFirestore } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 
-import { effectiveWeightLimit } from "./effective-limit";
+import { effectiveWeightLimit, SubscriptionState } from "./effective-limit";
 import { toSubscriptionState } from "./subscription-state";
 import { computeWeightedLoad, WeightedLink } from "./weighted-load";
 import { reconcileEntitlements, BlockableLink } from "./select-blocked-links";
@@ -112,6 +112,18 @@ export interface SyncEntitlementsResult {
    * ver la valvula.
    */
   blockedAthleteIds: string[];
+  /**
+   * El estado de suscripcion con el que se reconcilio. `null` = el documento
+   * NO tiene el mapa `subscription`, o sea que este PF nunca pago.
+   *
+   * Se devuelve —en vez de dejar que el llamador lea el documento otra vez—
+   * porque esa segunda lectura estaria FUERA de esta transaccion, y entre las
+   * dos el mapa puede cambiar. `decideProspectMail` decide sobre el mismo
+   * estado con el que se estaciono a la gente, o decide sobre otra cosa.
+   */
+  subscription: SubscriptionState | null;
+  /** El mapa existe pero no se pudo leer. Ver la valvula de degradacion. */
+  degraded: boolean;
 }
 
 /**
@@ -330,6 +342,8 @@ export async function syncTrainerEntitlements(
       unblocked: unblock,
       weightedLoad,
       blockedAthleteIds: blockedAthleteIdsNow,
+      subscription: sub,
+      degraded,
     };
   });
 }
