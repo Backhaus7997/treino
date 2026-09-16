@@ -48,13 +48,18 @@ de entrenamiento por sí misma.
 
 ## 3. Edad mínima y cuentas de menores
 
-Para crear una cuenta en TREINO tenés que tener **9 años cumplidos**.
+Para crear una cuenta en TREINO tenés que tener **16 años cumplidos**. No
+admitimos cuentas de personas que no hayan alcanzado esa edad.
 
-**Si tenés menos de 18 años**, necesitás que tu madre, padre o representante
-legal lea estos Términos, la Política de Privacidad y el Descargo Médico, y dé
-su consentimiento antes de que uses la aplicación.
+Al crear la cuenta te pedimos tu **fecha de nacimiento**. Es un dato obligatorio:
+sin él no se puede completar el alta.
 
-**Si sos madre, padre o representante legal** de una persona menor de edad que
+**Si tenés 16 o 17 años** seguís siendo menor de edad para la ley argentina, así
+que necesitás que tu madre, padre o representante legal lea estos Términos, la
+Política de Privacidad y el Descargo Médico, y dé su consentimiento antes de que
+uses la aplicación.
+
+**Si sos madre, padre o representante legal** de una persona de 16 o 17 años que
 usa TREINO:
 
 - Sos responsable de supervisar su uso de la aplicación.
@@ -67,21 +72,29 @@ usa TREINO:
   vínculo habilita mensajería privada y el acceso a datos corporales. Ver la
   sección 6.
 
-Si tomamos conocimiento de que una cuenta de una persona menor se creó **sin
-ese consentimiento**, la suspendemos y eliminamos sus datos.
+Si tomamos conocimiento de que una cuenta pertenece a una persona menor de 16
+años, o de que una persona de 16 o 17 la creó **sin ese consentimiento**, la
+suspendemos y eliminamos sus datos.
 
-[[PENDIENTE — REVISIÓN LEGAL PRIORITARIA. Admitir cuentas desde los 9 años con
-alcance mundial activa regímenes específicos de protección de menores: COPPA en
-Estados Unidos exige consentimiento parental **verificable** previo a toda
-recolección, con derechos de acceso y supresión para el progenitor; el art. 8
-del RGPD lo exige en Europa; y ambas tiendas aplican políticas de familias. El
-abogado tiene que definir el mecanismo de verificación exigible y si el vínculo
-con entrenadores debe restringirse por edad.]]
+### Por qué la edad mínima es 16
 
-> **Nota de implementación.** Hoy la aplicación **no verifica edad ni pide
-> consentimiento parental**: la fecha de nacimiento es un campo opcional del
-> editor de perfil, no del alta. Esta cláusula no es exigible hasta que ese
-> flujo exista, y con esta decisión pasa a ser bloqueante de publicación.
+No es un número arbitrario. Es el umbral que deja fuera de alcance a los
+regímenes de protección de la infancia que se activan por debajo de esa edad:
+
+- **COPPA**, en los Estados Unidos, se aplica a menores de 13 años.
+- El **art. 8 del Reglamento General de Protección de Datos** europeo fija 16
+  años como edad de consentimiento digital, y habilita a cada Estado miembro a
+  bajarla hasta 13, pero nunca a subirla. Con el mínimo en 16, la regla se cumple
+  en los 27 Estados sin excepción.
+
+Las políticas de familias de las tiendas de aplicaciones tampoco se activan,
+porque TREINO no se dirige a público infantil ni lo admite.
+
+### La edad es declarada
+
+No verificamos tu edad con documentación. **Declarar una edad falsa para crear
+una cuenta es un incumplimiento de estos Términos** y habilita la baja de la
+cuenta en cuanto lo detectemos.
 
 ## 4. Tu cuenta
 
@@ -204,11 +217,9 @@ terceros, y a no vulnerar la seguridad de la plataforma.
 Las reglas completas están en las [Normas de
 Comunidad](./normas-de-comunidad.md), que forman parte de estos Términos.
 
-Podés **reportar contenido** y **bloquear usuarios** desde la aplicación.
-
-> **Nota de implementación.** El reporte y el bloqueo **todavía no existen**.
-> Son requisito de la App Store Review Guideline 1.2 y bloquean la publicación.
-> Esta cláusula no puede publicarse antes que la funcionalidad.
+Podés **reportar contenido** y **bloquear usuarios** desde la aplicación. El
+bloqueo corta el chat, las reacciones, el seguimiento y las reseñas en las dos
+direcciones.
 
 ---
 
@@ -232,22 +243,39 @@ con antelación razonable y te damos forma de exportarlos o conservarlos.
 
 ---
 
-## 13. Limitación de responsabilidad
+## 13. Alcance del servicio y responsabilidad
 
-En la máxima medida permitida por la legislación aplicable, y **sin afectar los
-derechos que la normativa de defensa del consumidor reconozca como
-irrenunciables**, BACKHAUSTIN S.A.S. no será responsable por:
+Esta sección delimita **qué servicio prestamos**, que no es lo mismo que limitar
+nuestra responsabilidad. La Ley 24.240 de Defensa del Consumidor es de orden
+público: cualquier cláusula que intente llevarte por debajo del piso que esa ley
+te reconoce se tiene por no escrita, y nada de lo que sigue pretende hacerlo.
 
-- Lesiones o daños derivados del entrenamiento. Ver el [Descargo
-  Médico](./descargo-medico.md).
-- Los servicios prestados por entrenadores independientes.
-- Conflictos económicos entre vos y tu entrenador.
-- Pérdida de datos por causas ajenas a nuestro control.
-- Daños indirectos o lucro cesante.
+**Qué hace TREINO.** Provee una herramienta para organizar y registrar
+entrenamientos, un catálogo de rutinas de carácter general, y la infraestructura
+para que un entrenador personal independiente te asigne planes y se comunique
+con vos.
 
-[[REVISIÓN LEGAL — el alcance exigible de esta limitación en una relación de
-consumo lo define el abogado. La Ley 24.240 es de orden público y una cláusula
-que vaya por debajo del piso legal se tiene por no escrita.]]
+**Qué no hace TREINO.** No presta servicios de salud, no diagnostica, no
+prescribe, no supervisa cómo ejecutás los ejercicios y no evalúa si una rutina es
+adecuada para tu estado físico. **Ninguna rutina del catálogo se arma para vos ni
+la revisa un profesional para tu caso particular**, y eso vale tanto para las
+producidas con herramientas automáticas como para las publicadas por entrenadores
+de la plataforma. Ver el [Descargo Médico](./descargo-medico.md).
+
+**Los entrenadores son independientes.** No son empleados ni representantes de
+BACKHAUSTIN S.A.S. Contratan directamente con vos, definen sus propios servicios
+y responden por ellos. **No verificamos sus credenciales profesionales**, y te lo
+informamos antes de que te vincules. Los conflictos económicos entre vos y tu
+entrenador se dirimen entre ustedes.
+
+**Eximentes.** Como en cualquier relación de consumo, nuestra responsabilidad se
+excluye o atenúa cuando el daño obedece al hecho de un tercero por quien no
+debemos responder, al hecho del propio damnificado o al caso fortuito, conforme a
+los arts. 1729, 1730 y 1731 del Código Civil y Comercial.
+
+**Lo que no excluimos.** No limitamos nuestra responsabilidad por dolo ni por
+culpa grave, ni pretendemos desplazar el deber de seguridad de los arts. 5 y 6 de
+la Ley 24.240.
 
 ---
 
@@ -278,22 +306,37 @@ datos y de defensa del consumidor del país donde residas. Reconocemos y
 respetamos los derechos que esas normas te reconozcan, aunque sean más amplios
 que los previstos acá.
 
-[[PENDIENTE — REVISIÓN LEGAL. El alcance mundial exige como mínimo: base legal
-por finalidad y no sólo consentimiento (RGPD art. 6), mecanismo de transferencia
-internacional, evaluación de representante en la Unión Europea (art. 27),
-derechos ampliados de portabilidad y oposición, notificación de incidentes en 72
-horas, y régimen de menores por jurisdicción.]]
+Si residís en el Espacio Económico Europeo, el Reino Unido, Brasil o cualquier
+otra jurisdicción cuya normativa de protección de datos te alcance, esos derechos
+**se suman** a los que te reconoce la ley argentina y no los desplazan.
+
+La [Política de Privacidad](./politica-de-privacidad.md) detalla, para cada
+finalidad, qué datos tratamos y con qué base legal; cómo se transfieren datos
+fuera de tu país; los plazos en que notificamos un incidente de seguridad; y cómo
+ejercer los derechos de acceso, rectificación, supresión, portabilidad y
+oposición.
+
+---
 
 ## 17. Ley aplicable y jurisdicción
 
 Estos Términos se rigen por las leyes de la República Argentina.
 
-[[REVISIÓN LEGAL — jurisdicción. La sociedad tiene sede en Córdoba, pero en
-relaciones de consumo la competencia se fija en el domicilio del consumidor
-y una cláusula que lo desplace se tiene por no escrita. La cláusula para el
-atleta (consumidor) y la del entrenador (profesional independiente) no pueden
-ser la misma. Ver la pregunta correspondiente en la sección 6.2 de
-`guia-legal-treino.pdf`.]]
+**Si usás TREINO como atleta, sos consumidor.** Los conflictos que surjan de
+estos Términos se resuelven ante los tribunales del lugar **donde recibiste o
+debiste recibir el servicio**, conforme al art. 1109 del Código Civil y
+Comercial. **No hay prórroga de jurisdicción:** ninguna cláusula puede obligarte
+a litigar en otra sede, y si la hubiera, la ley la tiene por no escrita. Si
+residís fuera de la Argentina, el art. 2654 del mismo Código tampoco admite el
+acuerdo de elección de foro en esta materia.
+
+**Tampoco te obligamos a arbitraje.** El art. 1651, incs. c) y d), lo excluye
+tanto para las relaciones de consumo como para los contratos por adhesión,
+cualquiera sea su objeto.
+
+**Si usás TREINO como entrenador**, la relación no es de consumo y las
+condiciones de competencia están en el [Contrato del
+Entrenador](./contrato-entrenador.md).
 
 ---
 

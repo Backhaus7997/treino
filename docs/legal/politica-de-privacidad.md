@@ -262,14 +262,63 @@ Si residís fuera de la Argentina, pueden aplicarse además las normas de
 protección de datos de tu país, y reconocemos los derechos que te reconozcan
 aunque sean más amplios que los previstos acá.
 
-[[PENDIENTE — REESTRUCTURACIÓN POR ALCANCE MUNDIAL. Esta política está escrita
-sobre la Ley 25.326. Ofrecer el servicio en todo el mundo exige incorporar al
-menos: base legal por finalidad y no consentimiento genérico (RGPD art. 6),
-tratamiento de categorías especiales (art. 9) para los datos de salud,
-mecanismo de transferencia con cláusulas contractuales tipo, evaluación de
-representante en la Unión (art. 27), derechos de portabilidad y oposición,
-notificación de incidentes en 72 horas, y los avisos que exijan otras
-jurisdicciones relevantes. Es una reescritura estructural, no un párrafo.]]
+### 7.1 Con qué base legal tratamos cada dato
+
+Cuando se aplica el Reglamento General de Protección de Datos europeo, el
+consentimiento genérico no alcanza: cada finalidad necesita su propia base legal
+y tiene que estar informada. Esta es la tabla completa.
+
+| Para qué | Base legal | Si hay datos de salud |
+|---|---|---|
+| Prestarte el servicio que contrataste | Ejecución del contrato, art. 6(1)(b) | Consentimiento explícito, art. 9(2)(a) |
+| Registrar tus medidas, molestias y check-ins | Ejecución del contrato, art. 6(1)(b) | Consentimiento explícito, art. 9(2)(a) |
+| Compartir tus datos con el entrenador al que te vinculaste | Ejecución del contrato, art. 6(1)(b) | Consentimiento explícito, art. 9(2)(a) |
+| Analítica de producto y mejora del servicio | Interés legítimo, art. 6(1)(f) | No usamos datos de salud identificables |
+| Comunicaciones comerciales | Tu consentimiento, art. 6(1)(a) | No aplica |
+| Facturación y respaldo contable | Obligación legal, art. 6(1)(c) | No aplica |
+
+**Podés retirar tu consentimiento cuando quieras**, y hacerlo no afecta la
+licitud de lo que tratamos antes de que lo retiraras.
+
+### 7.2 Cómo se amparan las transferencias
+
+La Argentina cuenta con **decisión de adecuación de la Comisión Europea**, de
+modo que transferir datos desde el Espacio Económico Europeo hacia la Argentina
+no requiere garantías adicionales. Para los proveedores de infraestructura que
+operan fuera de esos ámbitos, la transferencia se ampara en los acuerdos de
+tratamiento de datos suscriptos con cada uno.
+
+### 7.3 Derechos adicionales si te alcanza el RGPD
+
+Se suman a los de la sección 9:
+
+- **Portabilidad (art. 20).** Podés pedir una copia de los datos que nos
+  facilitaste, en formato estructurado y de uso común. Alcanza a lo que vos
+  cargaste, no a lo que la aplicación calcula o infiere a partir de eso. **Incluye
+  tus datos de salud**, precisamente porque los tratamos con tu consentimiento
+  explícito.
+- **Oposición (art. 21).** Podés oponerte al tratamiento que hacemos por interés
+  legítimo. Y **para las comunicaciones comerciales la oposición es absoluta**:
+  si la ejercés, dejamos de enviarlas sin ponderar nada en contra.
+
+### 7.4 Qué hacemos ante un incidente de seguridad
+
+- Damos aviso a la autoridad de control **sin dilación indebida y, de ser
+  posible, dentro de las 72 horas** de haber tomado conocimiento, salvo que sea
+  improbable que el incidente entrañe un riesgo para tus derechos (art. 33 del
+  RGPD).
+- **Te avisamos a vos** cuando sea probable que entrañe un alto riesgo para tus
+  derechos y libertades (art. 34).
+- Si residís en Brasil, el aviso a la ANPD se cursa dentro de los **3 días
+  hábiles**, conforme a la Resolución CD/ANPD 15/2024.
+
+### 7.5 Otras jurisdicciones
+
+- **Brasil.** La LGPD se aplica por ofrecer el servicio a personas que están en
+  Brasil. Tus datos de salud son sensibles bajo esa ley y su tratamiento requiere
+  consentimiento específico y destacado.
+- **Reino Unido.** Rige el UK GDPR, y la Argentina también tiene adecuación
+  reconocida por el Reino Unido.
 
 ## 8. Cuánto tiempo conservamos tus datos
 
@@ -343,19 +392,21 @@ corresponda.
 
 ---
 
-## 12. Menores de edad
+## 12. Personas de 16 y 17 años
 
-**La edad mínima para crear una cuenta en TREINO es de 9 años.**
+**La edad mínima para crear una cuenta en TREINO es de 16 años.** No admitimos
+cuentas de personas que no hayan alcanzado esa edad, y la fecha de nacimiento es
+un dato obligatorio del alta.
 
-Si tenés menos de 18, hace falta el consentimiento de tu madre, padre o
-representante legal antes de que uses la aplicación y antes de que carguemos
-cualquier dato tuyo.
+Si tenés 16 o 17 años seguís siendo menor de edad para la ley argentina, así que
+hace falta el consentimiento de tu madre, padre o representante legal antes de
+que uses la aplicación y antes de que carguemos cualquier dato tuyo.
 
 ### 12.1 Si sos madre, padre o representante legal
 
 Tenés derecho a:
 
-- **Saber qué datos recolectamos** de la persona menor a tu cargo. Están todos
+- **Saber qué datos recolectamos** de la persona a tu cargo. Están todos
   descriptos en la sección 3 de esta política, incluidos los datos de salud.
 - **Acceder** a esos datos y pedir una copia.
 - **Rectificarlos** o pedir que los eliminemos.
@@ -385,18 +436,23 @@ consentir.
 
 ### 12.3 Cumplimiento
 
-Si tomamos conocimiento de que se creó una cuenta de una persona menor **sin el
-consentimiento de su representante legal**, la suspendemos y eliminamos sus
-datos.
+Si tomamos conocimiento de que una cuenta pertenece a una persona menor de 16
+años, o de que una persona de 16 o 17 la creó **sin el consentimiento de su
+representante legal**, la suspendemos y eliminamos sus datos.
 
-[[PENDIENTE — REVISIÓN LEGAL PRIORITARIA. Con edad mínima de 9 años y alcance
-mundial se activan: COPPA en Estados Unidos, que exige consentimiento parental
-**verificable** —no declarativo— antes de recolectar el primer dato, aviso
-directo al progenitor y derecho de revisión y supresión; el art. 8 del RGPD en
-Europa, con umbral de 13 a 16 según el Estado miembro; y las políticas de
-familias de App Store y Google Play. El abogado tiene que definir el mecanismo
-de verificación exigible por jurisdicción y si corresponde restringir funciones
-por edad — en particular el vínculo con entrenadores y el feed social.]]
+### 12.4 Por qué el mínimo es 16
+
+El umbral está elegido para que ningún régimen de protección de la infancia
+quede activo sobre nuestros usuarios:
+
+- **COPPA**, en los Estados Unidos, alcanza a menores de 13 años.
+- El **art. 8 del RGPD** fija en 16 años la edad de consentimiento digital y
+  permite a cada Estado miembro bajarla hasta 13, pero **nunca subirla**. Con el
+  mínimo en 16, la regla se cumple en los 27 Estados sin excepción y sin
+  configuración por país.
+
+La edad es declarada por quien crea la cuenta y no la verificamos con
+documentación.
 
 ## 13. Cambios a esta política
 

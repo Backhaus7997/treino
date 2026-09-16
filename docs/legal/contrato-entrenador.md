@@ -105,20 +105,40 @@ En particular:
 - **Adecuá el trabajo a cada persona.** La aplicación te muestra medidas,
   molestias y check-ins; usarlos con criterio es parte de tu servicio.
 
-Te comprometés a mantener indemne a BACKHAUSTIN S.A.S. frente a reclamos de
-terceros originados en tu actividad profesional.
+### 5.1 Indemnidad, con su alcance dicho de frente
 
-[[REVISIÓN LEGAL — el alcance de esta indemnidad, y si es exigible, lo define
-el abogado.]]
+Te comprometés a mantener indemne a BACKHAUSTIN S.A.S. frente a reclamos de
+terceros originados **en tu propio hecho profesional**: impericia o negligencia
+en la prestación, falsedad de las credenciales que declaraste, e incumplimiento
+de la normativa que rige tu actividad.
+
+Esa obligación tiene límites explícitos, y los decimos acá para que no haya
+sorpresas:
+
+- **No alcanza a nuestro propio hecho.** No respondés por fallas del software, de
+  la infraestructura o de cualquier obligación que sea nuestra. Una indemnidad
+  que cubriera eso sería una dispensa indirecta de nuestra responsabilidad, y el
+  art. 1743 del Código Civil y Comercial no la admite. Nunca cubre el dolo.
+- **No es un escudo frente al alumno.** Por el art. 40 de la Ley 24.240, un
+  alumno lesionado puede demandarnos a nosotros y nosotros respondemos frente a
+  él. La indemnidad opera **después**, entre vos y nosotros, como acción de
+  repetición.
+- **Tiene tope.** Tu obligación de indemnidad se limita al monto total que hayas
+  facturado a través de la plataforma en los doce meses anteriores al hecho que
+  origine el reclamo.
+
+Si en algún caso concreto se resolviera que sos consumidor de nuestro servicio, o
+que el vínculo entre nosotros es laboral, esta cláusula no se te aplica.
 
 ---
 
-## 5.bis Si trabajás con personas menores de edad
+## 5.bis Si trabajás con alumnos de 16 o 17 años
 
-**La edad mínima para tener una cuenta en TREINO es de 9 años.** Eso significa
-que tus alumnos pueden ser menores, y que ahí tus obligaciones son distintas.
+**La edad mínima para tener una cuenta en TREINO es de 16 años.** Aun así, quien
+tenga 16 o 17 sigue siendo menor de edad para la ley argentina, y ahí tus
+obligaciones son distintas.
 
-Al aceptar un vínculo con una persona menor te obligás a:
+Al aceptar un vínculo con un alumno de 16 o 17 años te obligás a:
 
 1. **Estar habilitado para hacerlo.** Declarás que cumplís los requisitos que tu
    jurisdicción exija para trabajar con menores — certificaciones,
@@ -129,27 +149,32 @@ Al aceptar un vínculo con una persona menor te obligás a:
 3. **No trasladar la comunicación fuera de la plataforma.** El chat de TREINO
    deja registro. Pasar a un canal privado sin registro no está permitido.
 4. **No solicitar fotografías** más allá de lo que los flujos de la aplicación
-   contemplen, ni pedirle a la persona menor material que no haya pedido su
+   contemplen, ni pedirle al alumno material que no haya pedido su
    representante.
 5. **Adecuar el trabajo a una persona en desarrollo.** La aplicación no
    diferencia por edad: las cargas y progresiones que muestra son las mismas
    para todo el mundo. Adaptarlas es parte de tu criterio profesional, y de tu
    responsabilidad.
 6. **Extremar el cuidado con el registro corporal.** Peso, medidas y porcentaje
-   de grasa en niñas, niños y adolescentes son datos sensibles con implicancias
-   propias. Usalos con criterio o no los uses.
-7. **Avisarnos** si detectás una situación que ponga en riesgo a una persona
-   menor.
+   de grasa en adolescentes son datos sensibles con implicancias propias. Usalos
+   con criterio o no los uses.
+7. **Avisarnos** si detectás una situación que ponga en riesgo a un alumno menor
+   de edad.
 
 **El incumplimiento de esta sección es causal de baja inmediata**, sin aviso
 previo y sin perjuicio de las acciones legales que correspondan.
 
-[[PENDIENTE — REVISIÓN LEGAL PRIORITARIA. Admitir alumnos desde los 9 años en una
-plataforma que habilita mensajería privada con adultos no verificados exige
-dictamen sobre: (a) si corresponde exigir verificación de antecedentes al
-entrenador, (b) si el vínculo con menores debe requerir participación activa del
-representante legal en el canal, y (c) qué obligaciones impone cada jurisdicción
-relevante. Es la exposición más alta del producto.]]
+### 5.bis.1 Lo que no verificamos, y por qué te lo decimos
+
+**TREINO no verifica tus títulos, tu matrícula ni tus antecedentes**, y tampoco
+verifica que estés habilitado para trabajar con personas menores de edad. Lo
+declarás vos, y respondés vos.
+
+Se lo decimos también al alumno y a su representante legal, en los mismos
+términos, antes de que acepten el vínculo. Que la plataforma no verifique no te
+exime de nada: **si tu jurisdicción exige un certificado, un registro o
+antecedentes para trabajar con menores, tenerlos es tu obligación**, y operar sin
+ellos a través de TREINO es incumplir esta sección.
 
 ---
 
@@ -335,15 +360,27 @@ suscripción sin penalidad antes de que entre en vigencia.
 
 ---
 
-## 13. Ley aplicable
+## 13. Ley aplicable y jurisdicción
 
 Se rigen por las leyes de la República Argentina.
 
-[[REVISIÓN LEGAL — jurisdicción. La sociedad tiene sede en Córdoba, pero acá
-conviven dos escenarios: la relación con el entrenador (comercial entre
-empresa y profesional independiente) y la relación con el alumno (de consumo,
-donde la competencia se fija en el domicilio del consumidor). No es la misma
-cláusula para los dos.]]
+**Entre vos y nosotros**, que es lo que rige este contrato, la relación es entre
+una empresa y un profesional independiente. Para los conflictos que surjan de
+estos términos acordamos la competencia de los tribunales ordinarios de la ciudad
+de Córdoba, Provincia de Córdoba.
+
+Dos aclaraciones que corresponde hacer, porque este es un contrato por adhesión:
+
+- **Si en un caso concreto se resolviera que sos consumidor de nuestro servicio,
+  o que el vínculo entre nosotros es laboral**, esta cláusula no se aplica y la
+  competencia es la que esas normas fijen, que es improrrogable.
+- **No te obligamos a arbitraje.** El art. 1651, inc. d), del Código Civil y
+  Comercial lo excluye para los contratos por adhesión, cualquiera sea su objeto.
+
+**Entre vos y tu alumno la cláusula es otra, y no la fijamos nosotros.** Esa
+relación es de consumo: por el art. 1109 del Código Civil y Comercial la
+competencia queda en el lugar donde el alumno recibió o debió recibir el
+servicio, y cualquier prórroga se tiene por no escrita.
 
 ---
 

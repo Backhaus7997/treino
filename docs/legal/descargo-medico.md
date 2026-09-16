@@ -185,34 +185,36 @@ localidad o acudí a una guardia. No uses la aplicación para eso.
 
 ---
 
-## 9. Menores de edad
+## 9. Personas de 16 y 17 años
 
-**La edad mínima para usar TREINO es de 9 años**, y toda persona menor de 18
-necesita el consentimiento de su representante legal.
+**La edad mínima para usar TREINO es de 16 años.** Quien tenga 16 o 17 sigue
+siendo menor de edad para la ley argentina y necesita el consentimiento de su
+representante legal.
 
-Si vas a consentir por una persona menor, leé esto antes.
+Si vas a consentir por una persona de 16 o 17 años, leé esto antes.
 
-### 9.1 TREINO no está diseñada para entrenar niños
+### 9.1 La aplicación no diferencia por edad
 
-Es importante que sea explícito: **la aplicación no diferencia por edad.** Las
-rutinas, las progresiones de carga, los ejercicios y las métricas son idénticos
-para una persona de 9 años y para una de 40.
+Es importante que sea explícito: **las rutinas, las progresiones de carga, los
+ejercicios y las métricas son idénticos para una persona de 16 años y para una de
+40.** La aplicación no adapta nada en función de la edad.
 
-El entrenamiento de fuerza en personas en desarrollo tiene consideraciones
-propias —maduración esquelética, técnica, volumen, intensidad, supervisión— que
-**esta aplicación no contempla**. Antes de que una persona menor use TREINO para
-entrenar, consultá a su pediatra o a un profesional del deporte infantil.
+El entrenamiento de fuerza en personas que todavía están completando su
+maduración esquelética tiene consideraciones propias —técnica, volumen,
+intensidad, supervisión— que **esta aplicación no contempla**. Antes de que una
+persona de 16 o 17 años use TREINO para entrenar, consultá a su médico o a un
+profesional del deporte.
 
 ### 9.2 Sobre el registro del cuerpo
 
 TREINO registra **peso, medidas corporales y porcentaje de grasa**, y grafica su
 evolución en el tiempo.
 
-Tenelo presente: ese tipo de seguimiento, en niñas, niños y adolescentes, puede
+Tenelo presente: ese tipo de seguimiento, en adolescentes, puede
 favorecer una relación problemática con el cuerpo y con la alimentación. Es una
 función opcional. **Se puede usar la aplicación sin cargar ninguno de esos
-datos**, y en el caso de una persona menor conviene evaluarlo con criterio, o
-consultarlo con su profesional tratante.
+datos**, y en el caso de una persona de 16 o 17 años conviene evaluarlo con
+criterio, o consultarlo con su profesional tratante.
 
 ### 9.3 Sobre los entrenadores
 
@@ -221,9 +223,9 @@ La aplicación permite vincularse con entrenadores personales independientes.
 vínculo habilita mensajería privada y acceso a las medidas y fotos que la
 persona comparta.
 
-Si vas a consentir el uso por una persona menor, **la decisión de vincularla con
-un entrenador es tuya**, y te corresponde verificar sus credenciales y supervisar
-esa relación.
+Si vas a consentir el uso por una persona de 16 o 17 años, **la decisión de
+vincularla con un entrenador es tuya**, y te corresponde verificar sus
+credenciales y supervisar esa relación.
 
 ### 9.4 Otras situaciones
 
@@ -234,33 +236,50 @@ contenido no está adaptado a esa situación.
 Si tenés o tuviste un **trastorno de la conducta alimentaria**, tené en cuenta
 lo de la sección 9.2 y consultalo con tu equipo tratante antes de usarla.
 
-[[PENDIENTE — REVISIÓN LEGAL PRIORITARIA. Con edad mínima de 9 años y alcance
-mundial, el abogado tiene que dictaminar: (a) si el descargo aceptado por el
-representante legal es oponible y con qué forma de aceptación, (b) si
-corresponde restringir por edad el vínculo con entrenadores y el registro de
-composición corporal, y (c) qué exige cada jurisdicción relevante para servicios
-de actividad física dirigidos a menores.]]
+### 9.5 Qué hace, y qué no hace, tu consentimiento
 
-## 10. Limitación de responsabilidad
+Que vos aceptes este Descargo como representante legal **no traslada hacia vos la
+responsabilidad que le corresponda a TREINO**, ni te convierte en garante de lo
+que la plataforma haga o deje de hacer. Tampoco desplaza los derechos que la
+persona a tu cargo tenga como consumidora.
 
-En la máxima medida permitida por la legislación aplicable, y sin afectar los
-derechos que la normativa de defensa del consumidor reconozca como
-irrenunciables, **BACKHAUSTIN S.A.S. no será responsable por lesiones, daños a
-la salud, incapacidades ni perjuicios de ninguna naturaleza** derivados de:
+Lo que sí hace es dejar constancia de que la información de este documento estuvo
+a tu disposición antes del uso, y de las decisiones que tomaste con ella: en
+particular, la de habilitar o no el vínculo con un entrenador, que es la de mayor
+exposición porque abre mensajería privada con un adulto cuyas credenciales no
+verificamos.
 
-- La realización de ejercicios, rutinas o programas obtenidos a través de la
-  aplicación.
-- Rutinas o recomendaciones generadas automáticamente.
-- Los servicios, indicaciones o planes provistos por entrenadores independientes.
-- El uso o la interpretación de las mediciones, estadísticas y progresiones que
-  la aplicación calcula.
-- La decisión de no consultar a un profesional de la salud.
+## 10. Qué alcance tiene este Descargo
 
-[[REVISIÓN LEGAL — el alcance de esta limitación frente a la Ley 24.240 es
-justamente lo que tiene que dictaminar el abogado. En una relación de consumo
-hay un piso irrenunciable, y una cláusula que pretenda ir por debajo se tiene
-por no escrita. Conviene una limitación defendible antes que una máxima que se
-caiga entera.]]
+Este documento **no es una renuncia a tus derechos**, y no podría serlo: la Ley
+24.240 de Defensa del Consumidor es de orden público, y una cláusula que pretenda
+llevarte por debajo del piso que esa ley te reconoce se tiene por no escrita.
+Aceptar este Descargo no te quita ninguna acción.
+
+Lo que hace es otra cosa, y es la razón por la que existe.
+
+**Delimita qué prestamos.** TREINO entrega rutinas y contenidos de carácter
+general. No presta servicio médico, no diagnostica, no prescribe y no evalúa tu
+caso particular. Definir el objeto de lo que prestamos es legítimo; vaciar el
+deber de seguridad de los arts. 5 y 6 de la Ley 24.240 no lo es, y no lo
+intentamos.
+
+**Deja constancia de que te informamos.** Las advertencias de las secciones
+anteriores —consultá a un profesional antes de empezar, frená ante estos
+síntomas, nadie está monitoreando lo que cargás— cumplen el deber de información
+de los arts. 4 y 6 de la Ley 24.240.
+
+**Registra lo que declarás.** Al aceptar este Descargo declarás que estás en
+condiciones de realizar actividad física y que no tenés contraindicaciones
+médicas conocidas. Esa declaración queda registrada con su fecha, y es tu
+responsabilidad que sea veraz.
+
+**Las eximentes son las de la ley, ninguna más.** Nuestra responsabilidad se
+excluye o atenúa cuando el daño obedece al hecho de un tercero por quien no
+debemos responder, al hecho del propio damnificado o al caso fortuito, conforme a
+los arts. 1729, 1730 y 1731 del Código Civil y Comercial. **No agregamos topes de
+indemnización, no excluimos el daño moral ni el lucro cesante, y no limitamos
+nuestra responsabilidad por dolo ni por culpa grave.**
 
 ---
 
@@ -292,9 +311,9 @@ advertencia, no si estaba disponible en algún lado.
 | 5 | **Al reportar una molestia** | Sección 7, una línea: «esto no es una consulta médica» | No |
 | 6 | **En Perfil → Legales**, siempre accesible | Documento completo | No |
 
-### A.1 Si la cuenta es de una persona menor
+### A.1 Si la cuenta es de una persona de 16 o 17 años
 
-Con la edad mínima en 9 años, los puntos 1, 3 y 4 **no los puede aceptar quien
+Con la edad mínima en 16 años, los puntos 1, 3 y 4 **no los puede aceptar quien
 usa la aplicación**: los tiene que aceptar su representante legal, y hay que
 poder probar que fue así.
 
@@ -302,7 +321,7 @@ poder probar que fue así.
 |---|---|
 | 1 — Onboarding | Se muestra además la sección 9 completa, y acepta el representante legal |
 | 3 — Rutina automática | Ídem |
-| 4 — Vínculo con entrenador | **Lo autoriza el representante legal, no la persona menor.** Es el punto de mayor exposición: habilita chat privado con un adulto no verificado |
+| 4 — Vínculo con entrenador | **Lo autoriza el representante legal, no la persona de 16 o 17 años.** Es el punto de mayor exposición: habilita chat privado con un adulto no verificado |
 
 Eso implica que el flujo de consentimiento parental **tiene que existir antes**
 que estos puntos, no después. Ver

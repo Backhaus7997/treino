@@ -25,7 +25,7 @@ Tres decisiones tomadas que condicionan todo lo de abajo:
 - **Se vende a consumidores.** Suscripción para entrenadores, y a futuro para
   atletas.
 - **Alcance mundial.**
-- **Edad mínima de cuenta: 9 años.**
+- **Edad mínima de cuenta: 16 años.**
 
 ---
 
@@ -213,10 +213,11 @@ Antes del pago hay que mostrar, sin que el usuario tenga que buscarlo:
 
 ## 7. Menores
 
-La edad mínima de cuenta es **9 años**. Si el sitio recolecta cualquier dato
-—un formulario de contacto, una newsletter— hay que contemplar que quien lo
-complete puede ser menor. El régimen aplicable lo está definiendo el asesor
-legal; **consultarlo antes de sumar cualquier formulario que capture datos.**
+La edad mínima de cuenta es **16 años**. Con ese piso, COPPA no aplica (alcanza
+a menores de 13) y el art. 8 del RGPD queda cubierto en toda la Unión, así que un
+formulario de contacto o una newsletter no activan régimen de menores. Sigue
+valiendo la cautela general: **no pedir más datos de los necesarios**, y no pedir
+datos de salud en el sitio.
 
 ---
 

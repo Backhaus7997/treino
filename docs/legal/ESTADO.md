@@ -38,7 +38,7 @@ mockup de diseño.
 | # | Decisión | Qué se resolvió |
 |---|---|---|
 | D1 | **Titular** | BACKHAUSTIN S.A.S., sociedad constituida |
-| D2 | **Edad mínima** | **9 años**, con consentimiento del representante legal para menores de 18 |
+| D2 | **Edad mínima** | **16 años** (resuelto el 2026-09-16; antes 9), con consentimiento del representante legal para quienes tengan 16 o 17 |
 | D3 | **Alcance** | **Mundial** |
 | D4 | **Cobro** | Mixto: entrenador por Mercado Pago en la web, atleta por compra integrada |
 | D5 | **Alumno ↔ PF** | TREINO **no intermedia** esa plata. Sólo registra la deuda |
@@ -279,9 +279,12 @@ Están en `briefing-revision-legal.pdf`. Resumidas:
 2. **Relación con los entrenadores** — no pedimos redacción, pedimos el **manual
    de operación**: rige la primacía de la realidad, el contrato pesa poco y la
    conducta pesa todo.
-3. **Menores de 9 años con alcance mundial** — qué mecanismo de consentimiento
-   parental es exigible por jurisdicción, y si el vínculo con entrenadores debe
-   restringirse por edad. **Esta bloquea código.**
+3. ~~**Menores de 9 años con alcance mundial**~~ — **RESUELTA** el 2026-09-16
+   subiendo la edad mínima a 16. COPPA deja de aplicar (alcanza a menores de 13)
+   y el art. 8 del RGPD queda cubierto en los 27 Estados, porque 16 es el umbral
+   máximo que cualquiera puede fijar. Ya no hace falta mecanismo de
+   consentimiento parental verificable. **Queda pendiente el código**: el age
+   gate, especificado aparte.
 4. **Alcance mundial en protección de datos** — qué incorporar sobre la Ley
    25.326.
 5. **Retención tras un pedido de supresión** — hoy se conservan el registro de
@@ -301,13 +304,15 @@ su respuesta.
 Vale decirlo sin vueltas, porque atraviesa varias decisiones:
 
 TREINO permite que **adultos cuyas credenciales la plataforma no verifica**
-tengan **mensajería privada** con usuarios que pueden tener **9 años**, y acceso
+tengan **mensajería privada** con usuarios que pueden tener **16 años**, y acceso
 a sus medidas corporales y a las fotos que suban.
 
 La recomendación técnica había sido edad mínima 18 por este motivo. El titular
-decidió 9, con el argumento sobre la mesa. Lo que corresponde ahora es que el
-dictamen legal defina si ese vínculo debe restringirse por edad o exigir
-participación del representante legal — que es la pregunta 3.
+fijó primero 9 y el 2026-09-16 la subió a **16**, que es lo que desactiva COPPA y
+el art. 8 del RGPD. **La exposición se reduce pero no desaparece:** el vínculo
+adulto no verificado ↔ menor de edad sigue existiendo para los alumnos de 16 y
+17 años. Lo que la mitiga hoy es el bloqueo, el reporte y la baja del entrenador,
+más las obligaciones de la sección 5.bis del contrato del entrenador.
 
 ---
 
