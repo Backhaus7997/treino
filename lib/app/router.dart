@@ -562,6 +562,33 @@ GoRouter buildRouter({
         },
       ),
       GoRoute(
+        // ─── Detalle de UNA sesión del alumno, para el PF ──────────────────
+        // Hasta acá no existía ninguna ruta que llevara a una SESIÓN: el push
+        // de molestia (`notifyOnExerciseFeedback`) y «Actividad reciente» del
+        // dashboard caían los dos en `/coach/athlete/:id`, la ficha entera del
+        // alumno, y el PF tenía que ir a buscar a mano el entrenamiento del
+        // que le hablaba el aviso. Un aviso cuyo destino no muestra lo que el
+        // aviso dice.
+        //
+        // TOP-LEVEL (fuera del ShellRoute) como su origen `/coach/athlete/:id`
+        // y sus hermanas de plan/ejercicio: empujar una ruta in-shell desde una
+        // out-of-shell rebuildea la rama del shell y aterriza en blanco
+        // (#399, #410).
+        //
+        // `_report` —Cupertino nativo + fade— es la misma transición que
+        // `/workout/historial/:sessionId`, que monta ESTA misma pantalla del
+        // lado del alumno. El destino es el mismo informe; sólo cambia quién
+        // mira.
+        path: '/coach/athlete/:athleteId/session/:sessionId',
+        pageBuilder: (_, state) => _report(
+          state.pageKey,
+          SessionDetailScreen(
+            sessionId: state.pathParameters['sessionId']!,
+            coachAthleteId: state.pathParameters['athleteId']!,
+          ),
+        ),
+      ),
+      GoRoute(
         // Exercise detail reached from a coach's read-only plan detail. Like
         // its origin (the plan route above) it MUST stay top-level (out of the
         // shell): pushing the in-shell `/workout/exercise/:id` from an
