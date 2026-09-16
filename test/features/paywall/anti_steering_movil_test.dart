@@ -31,21 +31,29 @@
 // El razonamiento miraba el COBRO. La clausula que muerde es la de los *calls
 // to action*, y esa no necesita que abras nada: alcanza con decirlo.
 //
-// ─── Por que es un ratchet y no un rojo ─────────────────────────────────────
+// ─── Era un ratchet con deuda; hoy es un ratchet en cero ────────────────────
 //
-// Los tres carteles que hay hoy estan DECLARADOS abajo, no borrados. Que digan
-// o no digan es una decision de producto —¿que le muestra la app movil al PF
-// que choco el limite?— y no se resuelve dentro de un test.
+// Este encabezado decia que los tres carteles estaban DECLARADOS abajo y no
+// borrados, y que vaciarlos era una decision de producto sin resolver. **Se
+// resolvio el 2026-09-15 (PR #1141): los tres estan vacios.** El deadline que
+// este bloque nombraba —la primera submission de iOS con la suscripcion del
+// alumno— dejo de ser una fecha a la que llegar.
 //
-// Lo que el test SI garantiza es que la lista no CREZCA. El que agregue el
-// cuarto cartel se entera antes de mandarlo, no despues del rechazo.
+// Asi que el test cambio de trabajo. Ya no mide cuanto falta: impide que
+// reaparezca. El que agregue el proximo cartel se entera antes de mandarlo, y
+// no en el rechazo de review.
 //
-// ─── Cuando hay que vaciar la lista ─────────────────────────────────────────
+// ─── Lo que ese cierre cuesta, que NO esta pago ─────────────────────────────
 //
-// **Antes de la primera submission de iOS que incluya la suscripcion del
-// alumno.** Ese es el momento exacto en que un revisor humano abre estas
-// pantallas y las mira en serio, y es el unico deadline real que tiene esta
-// deuda.
+// El PF que entro por el telefono quedo sin saber donde pagar. Eso no se
+// recupera adentro de la app —3.1.3(f) no lo permite— sino por MAIL, que es lo
+// unico que Apple habilita explicitamente. Ese canal existe: son los tres mails
+// del paywall (`subscription-grace`, `subscription-downgraded`, y
+// `limit-reached` para el que nunca pago).
+//
+// Si alguien apaga ese ultimo mail, este ratchet sigue en cero y el funnel
+// igual queda sin salida. El cero de abajo NO es la prueba de que el problema
+// este resuelto: es la prueba de que no volvio a entrar por esta puerta.
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -131,7 +139,12 @@ void main() {
       // ⚠️ Lo que se pagó con eso está escrito donde se pagó, y no se repite
       // acá para que no se desactualice: el PF que entró por el teléfono queda
       // sin saber dónde pagar. La salida es un MAIL, que es lo único que Apple
-      // no gobierna — y todavía no existe.
+      // no gobierna — y YA EXISTE: `limit-reached` (PR #1149).
+      //
+      // Esta línea decía «y todavía no existe», y era falso incluso cuando se
+      // escribió: `subscription-grace` y `subscription-downgraded` ya estaban
+      // deployados. Se corrigió el 2026-09-16 después de verificarlo, en vez de
+      // seguir citando el cartel.
       //
       // Éste NO era deuda y por eso se queda.
       //
@@ -217,6 +230,68 @@ void main() {
             'el día que el alumno compre por IAP.\n\n'
             'Si de verdad hace falta avisarle al PF dónde pagar, se avisa POR '
             'MAIL. Adentro de la app, no.',
+      );
+    });
+
+    test('la lista autoritativa del paywall no lo sigue dando por pendiente',
+        () {
+      // ─── POR QUÉ ESTE TEST EXISTE ───────────────────────────────────────
+      //
+      // Porque el mismo error pasó DOS VECES sobre el mismo archivo.
+      //
+      // `athlete_entitlement.dart` es la lista autoritativa que decide cuándo
+      // se enciende el paywall — `docs/paywall-alumno-suelto.md` dice textual
+      // que «la lista al día está acá». Y dos veces un ítem se quedó ahí
+      // después de estar resuelto:
+      //
+      //   · el seed del catálogo, cerrado el 2026-09-14 y listado hasta el 15.
+      //     Alguien arrancó a trabajarlo antes de verificar.
+      //   · estos carteles, cerrados el 2026-09-15 (PR #1141) y listados hasta
+      //     el 16 — cerrados por la MISMA persona que dejó el renglón.
+      //
+      // El archivo ya traía una advertencia escrita para que no se repitiera.
+      // **No alcanzó**: una advertencia la lee el que ya se acordó. Por eso
+      // ahora es un test.
+      //
+      // Lo que ata: si la deuda de ARRIBA está en cero, la lista NO puede
+      // seguir nombrando estos carteles entre los ítems abiertos. Las dos
+      // mitades se mueven juntas o esto se pone rojo.
+      final lista = File(
+        'lib/features/paywall/domain/athlete_entitlement.dart',
+      ).readAsStringSync();
+
+      // Sólo el bloque de ítems ABIERTOS. La sección de cerrados los nombra a
+      // propósito —ahí es donde tienen que estar— así que mirar el archivo
+      // entero haría que este test fallara justo cuando alguien hace lo
+      // correcto.
+      final desde = lista.indexOf('Lo que falta HOY');
+      final hasta = lista.indexOf('Lo que SALIÓ de esta lista');
+      expect(
+        desde,
+        isNot(-1),
+        reason: 'no encontré el bloque «Lo que falta HOY» en la lista '
+            'autoritativa. Si lo renombraste, actualizá este test: sin ese '
+            'ancla deja de mirar nada y te da un verde vacío.',
+      );
+      expect(hasta, greaterThan(desde),
+          reason: 'el bloque de cerrados tiene '
+              'que venir DESPUÉS del de abiertos; si no, el recorte está al revés.');
+
+      final abiertos = _normalizado(lista.substring(desde, hasta));
+
+      expect(
+        abiertos.contains('carteles de steering'),
+        isFalse,
+        reason: 'la deuda de carteles está en CERO (el test de acá arriba) '
+            'pero `athlete_entitlement.dart` los sigue listando entre los '
+            'ítems que FALTAN.\n\n'
+            'Movelo a la sección «Lo que SALIÓ de esta lista, y por qué». Una '
+            'lista autoritativa equivocada es peor que no tener lista: manda a '
+            'alguien a trabajar algo que ya está hecho, y eso ya pasó dos '
+            'veces con este archivo.\n\n'
+            'Y si lo movés, escribí también lo que el cierre COSTÓ: el PF que '
+            'entró por el teléfono quedó sin saber dónde pagar, y eso se paga '
+            'con el mail `limit-reached`, no con el ratchet.',
       );
     });
   });

@@ -62,6 +62,7 @@ import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { logger } from "firebase-functions";
 
 import { syncTrainerLoad } from "./promote-link";
+import { decideProspectMail, enqueueProspectMail } from "./subscription-mail";
 import { syncTrainerEntitlements } from "./sync-entitlements";
 
 function ensureApp(): App {
@@ -191,6 +192,7 @@ export async function linkLoadReconcileHandler(
   // link-load-reconcile.test.ts, que CUENTAN los saltos en vez de asumir que la
   // cascada termina.
   try {
+    const nowMs = Date.now();
     const r = await syncTrainerEntitlements(app, trainerId);
     logger.info("linkLoadReconcile: reconciled entitlements", {
       trainerId,
@@ -198,6 +200,53 @@ export async function linkLoadReconcileHandler(
       blocked: r.blocked.length,
       unblocked: r.unblocked.length,
     });
+
+    // ── El mail del PF que nunca pago y choco el cupo Free ────────────────
+    //
+    // VA ACA Y NO EN `syncEntitlementsOnSubscription`, y no es una preferencia:
+    // ese trigger esta gateado por `subscriptionChanged`, que es una GUARDA
+    // ANTI-LOOP y compara SOLO el mapa `subscription` porque
+    // `syncTrainerEntitlements` escribe `blockedAthleteIds` en ese mismo
+    // documento. Ensancharla para que vea los bloqueados es un bucle que se
+    // auto-dispara y factura sin parar — lo dice su propio docstring.
+    //
+    // Este trigger, en cambio, escucha `trainer_links` y el unico escritor de
+    // esa coleccion en este camino es `syncTrainerEntitlements`, cuyas
+    // escrituras ya las corta `isEntitlementOnlyWrite` ANTES de llamar a este
+    // handler. O sea: aca solo llegan cambios genuinos del set de vinculos,
+    // que es exactamente cuando el PF intento crecer.
+    //
+    // ── Y LLEVA SU PROPIO try/catch, que no es ceremonia ──────────────────
+    //
+    // La primera version compartia el catch de abajo, «total tambien logea y
+    // sigue». Un test lo desmintio: el catch de abajo logea `error`, y ese
+    // nivel esta documentado ahi mismo como «esto es PERMANENTE y hay UN
+    // documento que arreglar a mano». Un mail que no se encola NO es eso —
+    // Firestore lento, una cuota, lo que sea— y ademas el vinculo YA quedo
+    // reconciliado cuando falla.
+    //
+    // Compartiendo el catch, una falla de mail se leia como una falla de
+    // reconciliacion: alguien sale a buscar el documento roto que no existe, y
+    // peor, la señal de que SI hay uno roto se diluye entre ruido.
+    const prospecto = decideProspectMail(
+      r.subscription,
+      r.degraded,
+      r.limit,
+      r.blocked,
+      nowMs,
+    );
+    if (prospecto) {
+      try {
+        await enqueueProspectMail(app, trainerId, prospecto, r.blockedAthleteIds.length);
+      } catch (err) {
+        // `warn` y no `error`: se reintenta solo en el proximo evento del PF, y
+        // el dedupe por scope hace que no salgan dos si el anterior si entro.
+        logger.warn("linkLoadReconcile: no pude encolar el mail de tope alcanzado", {
+          trainerId,
+          err,
+        });
+      }
+    }
   } catch (err) {
     // Mismo contrato que arriba: se logea y se sigue, porque un doc malformado
     // no puede provocar una tormenta de reintentos de Eventarc.
