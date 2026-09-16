@@ -402,6 +402,24 @@ async function funcionesConCodigoViejo(eps, token, project) {
   return viejas;
 }
 
+/**
+ * La firma de un índice, para poder comparar los dos lados.
+ *
+ * El orden de los campos ES PARTE del índice —`(a, b)` y `(b, a)` son índices
+ * distintos y sirven a queries distintas— así que la firma NO se ordena.
+ *
+ * `__name__` se descarta: Firestore lo agrega solo al final de todo índice
+ * compuesto y `firestore.indexes.json` no lo declara. Compararlo haría que
+ * TODOS dieran distinto, que es el modo de falla más aburrido posible — el
+ * chequeo gritaría siempre y el equipo aprendería a ignorarlo.
+ */
+function firmaDeIndice(i) {
+  const campos = (i.fields || [])
+    .filter((f) => f.fieldPath !== "__name__")
+    .map((f) => `${f.fieldPath}(${f.order || f.arrayConfig || "?"})`);
+  return `${i.collectionGroup}: ${campos.join(", ")}`;
+}
+
 /** Imprime los problemas encontrados y corta el deploy. */
 function fallar(problemas) {
   console.error(`\npreflight: ${problemas.length} problema(s) — el deploy va a fallar.\n`);
@@ -531,6 +549,76 @@ async function main() {
     }
   } catch (e) {
     console.log(`preflight: no pude chequear frescura (${e.message})`);
+  }
+
+  // ── 4. Los índices declarados y los que existen dicen lo mismo ──────────
+  //
+  // El 2026-09-16 producción tenía CINCO índices que `firestore.indexes.json`
+  // no declaraba —dos de `posts`, dos de `follows` y uno de `appointments`—,
+  // todos en READY y todos con queries vivas detrás. Se acumularon porque un
+  // índice nace fácil: alguien pega en el navegador el link que Firestore
+  // ofrece cuando una query falla, y listo. Nada lo trae de vuelta al repo.
+  //
+  // POR QUÉ IMPORTA, en las dos direcciones:
+  //
+  //   · HUÉRFANO (vive en producción, el repo no lo declara)  →
+  //     `firebase deploy --only firestore:indexes` OFRECE BORRARLO. El día que
+  //     alguien confirme esa pregunta sin mirar, la query que lo necesita
+  //     empieza a fallar en vivo, y falla lejos del deploy que la rompió.
+  //   · FANTASMA (el repo lo declara, en producción no está) → hay una query
+  //     que YA está fallando, o que va a fallar en cuanto alguien la pise.
+  //     Hoy son cero; el día que no lo sean, hay que enterarse acá.
+  //
+  // Es de la misma familia que los otros tres chequeos de este archivo: nada
+  // de esto es un test, así que el CI no puede verlo — y este repo mergea
+  // mucho más seguido de lo que deploya.
+  //
+  // AVISA, NO CORTA. Un índice de más no rompe ningún deploy, y cortarlo por
+  // esto sería la guarda que el equipo aprende a saltear un viernes. El
+  // fantasma tampoco corta: si la query ya está fallando, frenar el deploy que
+  // capaz la arregla es exactamente al revés.
+  try {
+    const declarados = new Set(
+      JSON.parse(
+        fs.readFileSync(path.join(ROOT, "firestore.indexes.json"), "utf8"),
+      ).indexes.map(firmaDeIndice),
+    );
+    const res = await fetch(
+      `https://firestore.googleapis.com/v1/projects/${project}` +
+        "/databases/(default)/collectionGroups/-/indexes",
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const vivos = new Map();
+    for (const i of (await res.json()).indexes || []) {
+      // El nombre trae la colección embebida: .../collectionGroups/<col>/indexes/<id>
+      const col = i.name.split("/collectionGroups/")[1].split("/")[0];
+      vivos.set(firmaDeIndice({ collectionGroup: col, fields: i.fields }), i.state);
+    }
+    const huerfanos = [...vivos.keys()].filter((k) => !declarados.has(k));
+    const fantasmas = [...declarados].filter((k) => !vivos.has(k));
+
+    if (!huerfanos.length && !fantasmas.length) {
+      console.log(`  ✓ ${vivos.size} índices — el repo y producción dicen lo mismo`);
+    }
+    if (huerfanos.length) {
+      console.warn(
+        `\n  ⚠️ ${huerfanos.length} índice(s) viven en producción y NO están en ` +
+          "firestore.indexes.json:\n" +
+          huerfanos.map((k) => `     ${k}`).join("\n") +
+          "\n     Un deploy de índices puede OFRECER borrarlos. Sumalos al archivo.\n",
+      );
+    }
+    if (fantasmas.length) {
+      console.warn(
+        `\n  ⚠️ ${fantasmas.length} índice(s) declarados que en producción NO ` +
+          "existen:\n" +
+          fantasmas.map((k) => `     ${k}`).join("\n") +
+          "\n     Hay una query que ya falla o va a fallar. Deployá los índices.\n",
+      );
+    }
+  } catch (e) {
+    console.log(`preflight: no pude chequear los índices (${e.message})`);
   }
 
   if (problemas.length) fallar(problemas);
