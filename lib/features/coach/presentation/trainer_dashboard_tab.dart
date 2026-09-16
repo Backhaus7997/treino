@@ -1728,7 +1728,21 @@ class _ActividadRecienteList extends ConsumerWidget {
     final entries =
         (cap != null && all.length > cap) ? all.sublist(0, cap) : all;
 
-    return Container(
+    // El tope de DATOS del provider, que esta pantalla no puede superar aunque
+    // no ponga tope de presentación.
+    //
+    // Sin este aviso, el «Ver todo» del dashboard llevaba a una pantalla que
+    // mostraba las 50 más nuevas COMO SI FUERAN TODAS — exactamente la falla
+    // que este mismo change combate en el header (un «Ver todo» que no cumple
+    // lo que promete entrena al PF a ignorarlo). Lo marcó Codex en el #1161, y
+    // tenía razón: el corte ocurre en el provider, antes de que la pantalla vea
+    // un solo dato, así que ella no tenía forma de saberlo ni de decirlo.
+    //
+    // Sólo en la pantalla completa (`limit == null`). En el dashboard el tope
+    // que se ve es el de presentación y ya lo declara el «Ver todo».
+    final puedeFaltar = cap == null && all.length >= kRecentActivityMaxEntries;
+
+    final lista = Container(
       decoration: BoxDecoration(
         color: palette.bgCard,
         borderRadius: BorderRadius.circular(AppRadius.md),
@@ -1749,6 +1763,30 @@ class _ActividadRecienteList extends ConsumerWidget {
           ],
         ],
       ),
+    );
+
+    if (!puedeFaltar) return lista;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        lista,
+        Padding(
+          padding: const EdgeInsets.only(top: AppSpacing.s12),
+          child: Text(
+            // «Puede haber», no «hay»: llegar al tope no prueba que falte algo
+            // —con exactamente 50 entradas la condición se cumple y no hay
+            // ninguna más—, y un cartel que promete lo que no puede respaldar
+            // es la misma falla en la otra dirección (AGENTS.md §11.1).
+            l10n.dashboardActividadTopeAlcanzado,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.barlow(
+              fontSize: AppTextSize.caption,
+              color: palette.textMuted,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

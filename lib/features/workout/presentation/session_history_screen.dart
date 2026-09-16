@@ -163,9 +163,7 @@ class SessionHistoryScreen extends ConsumerWidget {
                         ),
                         itemBuilder: (_, i) {
                           if (i == visibles.length) {
-                            return const _TopeAlcanzado(
-                              cantidad: kSessionHistoryFetchLimit,
-                            );
+                            return const _TopeAlcanzado();
                           }
                           return _HistoryCard(
                             session: visibles[i],
@@ -185,20 +183,26 @@ class SessionHistoryScreen extends ConsumerWidget {
   }
 }
 
-/// Pie que declara el tope del fetch cuando la lista lo alcanzó.
+/// Pie que avisa que la lista pudo haber quedado cortada por el tope del fetch.
 ///
-/// No es un vacío decorativo: sin él, la lista termina y punto, y una lista que
-/// termina afirma «esto es todo». Es el mismo criterio que AGENTS.md §11.1
-/// aplica a los mensajes tranquilizadores —lo que no se puede garantizar no se
-/// afirma— y el mismo que el repo ya usa en el selector de períodos de los
-/// gráficos, que no ofrece un «todo» porque con este tope sería mentira.
+/// Sin él, la lista termina y punto, y una lista que termina afirma «esto es
+/// todo» — el criterio de AGENTS.md §11.1 del lado de la UI.
 ///
-/// Desaparece solo el día que el historial pagine detrás de un cursor: el
-/// `llegoAlTope` deja de darse cuando ya no hay tope que alcanzar.
+/// **Pero el texto NO afirma que haya más atrás, y eso es deliberado.** Llegar
+/// al tope no lo prueba: un usuario con exactamente `kSessionHistoryFetchLimit`
+/// sesiones cumple la condición y no tiene ni una más. Probarlo de verdad
+/// pediría un registro extra, y ese límite lo comparten Home, Insights y el
+/// panel del PF. Tampoco puede prometer un número de filas: en modo alumno el
+/// filtro de incompletas deja menos de las que se trajeron.
+///
+/// Así que informa sin asegurar. Un cartel que dice «hay más viejos» cuando no
+/// los hay es la MISMA falla que este pie vino a tapar, sólo que en la otra
+/// dirección — y de esas, AGENTS.md §11.1 dice que la peor es la que
+/// tranquiliza (o promete) sin poder respaldarlo. Lo marcó Codex en el #1161.
+///
+/// Desaparece solo el día que el historial pagine detrás de un cursor.
 class _TopeAlcanzado extends StatelessWidget {
-  const _TopeAlcanzado({required this.cantidad});
-
-  final int cantidad;
+  const _TopeAlcanzado();
 
   @override
   Widget build(BuildContext context) {
@@ -206,7 +210,7 @@ class _TopeAlcanzado extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.s18),
       child: Text(
-        AppL10n.of(context).workoutHistorialTopeAlcanzado(cantidad),
+        AppL10n.of(context).workoutHistorialTopeAlcanzado,
         textAlign: TextAlign.center,
         style: GoogleFonts.barlow(
           // El token y no `12` crudo: el archivo ya está en la allowlist del

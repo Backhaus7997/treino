@@ -7521,11 +7521,17 @@ abstract class AppL10n {
   /// **'MOLESTIA'**
   String get exerciseFeedbackNoteTagDiscomfort;
 
-  /// Pie del historial cuando la lista llegó al tope de fetch (kSessionHistoryFetchLimit). Sin este aviso la lista corta en silencio y el corte se lee como 'esto es todo tu historial', que es falso.
+  /// Pie del historial cuando la lista llegó al tope de fetch (kSessionHistoryFetchLimit). NO asertivo a proposito: llegar al tope no PRUEBA que haya mas atras (con exactamente 365 sesiones la condicion se cumple y no hay nada mas), y el numero de filas visibles puede ser menor porque el modo alumno filtra las incompletas. Sin el aviso la lista corta en silencio, con un aviso asertivo miente; esto informa sin afirmar.
   ///
   /// In es_AR, this message translates to:
-  /// **'Estos son los últimos {cantidad}. Los más viejos todavía no se pueden ver.'**
-  String workoutHistorialTopeAlcanzado(int cantidad);
+  /// **'Puede haber entrenamientos más viejos que no entran en esta lista.'**
+  String get workoutHistorialTopeAlcanzado;
+
+  /// Pie de la pantalla completa de Actividad reciente cuando el feed llego al tope de datos (kRecentActivityMaxEntries). El Ver todo del dashboard lleva ahi, y sin esto mostraria las 50 mas nuevas como si fueran todas.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Puede haber más actividad que no entra en esta lista.'**
+  String get dashboardActividadTopeAlcanzado;
 
   /// Serie a la que quedó anclado el reporte, al lado del tag.
   ///

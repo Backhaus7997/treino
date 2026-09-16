@@ -70,7 +70,14 @@ Widget _wrap(Widget child, {required List<Override> overrides}) {
   final router = GoRouter(
     initialLocation: '/dash',
     routes: [
-      GoRoute(path: '/dash', builder: (_, __) => Scaffold(body: child)),
+      // `SingleChildScrollView` como en `RecentActivityScreen`: con el feed
+      // lleno la lista mide más que la pantalla, y sin scroll el test explota
+      // por un overflow que la app real no tiene. La Column de adentro NO es
+      // lazy, así que `find.text` igual encuentra las filas fuera de vista.
+      GoRoute(
+        path: '/dash',
+        builder: (_, __) => Scaffold(body: SingleChildScrollView(child: child)),
+      ),
       GoRoute(
         path: '/coach/actividad',
         builder: (_, __) => const Scaffold(
@@ -163,6 +170,57 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Ver todo'), findsNothing);
+    });
+  });
+
+  // ── El tope de DATOS, declarado en la pantalla completa ──────────────────
+  //
+  // P2 de Codex en el #1161. El «Ver todo» llevaba a una pantalla que mostraba
+  // las `kRecentActivityMaxEntries` más nuevas COMO SI FUERAN TODAS. El corte
+  // ocurre en el provider, antes de que la pantalla vea un solo dato, así que
+  // no tenía forma de saberlo — ni de decirlo.
+  //
+  // Es exactamente la falla que este mismo change combate del otro lado: un
+  // «Ver todo» que no cumple lo que promete entrena al PF a ignorarlo.
+  group('tope de datos', () {
+    const texto = 'Puede haber más actividad que no entra en esta lista.';
+
+    testWidgets('la pantalla completa avisa cuando el feed llegó al tope',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        const ActividadRecienteListTestHarness(), // limit: null
+        overrides: _overrides(kRecentActivityMaxEntries),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text(texto), findsOneWidget);
+    });
+
+    testWidgets('no avisa nada si el feed no llegó al tope', (tester) async {
+      await tester.pumpWidget(_wrap(
+        const ActividadRecienteListTestHarness(),
+        overrides: _overrides(kRecentActivityMaxEntries - 1),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text(texto), findsNothing);
+    });
+
+    // La distinción que hace falta que exista: el dashboard TAMBIÉN recibe el
+    // feed capado, pero ahí el corte que el PF ve es el de presentación y ya lo
+    // declara el «Ver todo». Dos carteles diciendo lo mismo en la misma
+    // pantalla es ruido, y el ruido se ignora igual que una promesa falsa.
+    testWidgets('el dashboard NO lo repite: ahí lo declara el «Ver todo»',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        const ActividadRecienteListTestHarness(
+          limit: kRecentActivityPreviewCount,
+        ),
+        overrides: _overrides(kRecentActivityMaxEntries),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text(texto), findsNothing);
     });
   });
 }

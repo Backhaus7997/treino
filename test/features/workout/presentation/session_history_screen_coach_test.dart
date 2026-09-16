@@ -234,16 +234,19 @@ void main() {
   // en el dartdoc del propio límite). Esto no lo reemplaza: declara el tope
   // mientras tanto.
   group('tope del fetch', () {
-    String textoDelTope() =>
-        'Estos son los últimos $kSessionHistoryFetchLimit. '
-        'Los más viejos todavía no se pueden ver.';
+    // NO asertivo a propósito. Un cartel que afirme «hay entrenamientos más
+    // viejos» es falso para quien tiene exactamente `kSessionHistoryFetchLimit`
+    // sesiones, y prometer un número de filas es falso en modo alumno, donde el
+    // filtro de incompletas deja menos. Lo marcó Codex en el #1161.
+    const textoDelTope =
+        'Puede haber entrenamientos más viejos que no entran en esta lista.';
 
     List<Session> completas(int n) => [
           for (int i = 0; i < n; i++) _completa(id: 's-$i', name: 'Push $i'),
         ];
 
     Future<void> hastaElFinal(WidgetTester tester) =>
-        tester.scrollUntilVisible(find.text(textoDelTope()), 600);
+        tester.scrollUntilVisible(find.text(textoDelTope), 600);
 
     // Control negativo del de abajo. Sin éste, un pie incondicional pasaría
     // igual — y le diría a TODO usuario que le falta historial, que es una
@@ -253,7 +256,7 @@ void main() {
       await tester.pumpWidget(_wrap(sessions: completas(3)));
       await tester.pumpAndSettle();
 
-      expect(find.text(textoDelTope()), findsNothing);
+      expect(find.text(textoDelTope), findsNothing);
     });
 
     testWidgets('al llegar al tope, el pie lo dice', (tester) async {
@@ -264,7 +267,7 @@ void main() {
 
       await hastaElFinal(tester);
 
-      expect(find.text(textoDelTope()), findsOneWidget);
+      expect(find.text(textoDelTope), findsOneWidget);
     });
 
     // El punto sutil, y la razón por la que la comparación va contra `all` y no
@@ -284,7 +287,7 @@ void main() {
 
       await hastaElFinal(tester);
 
-      expect(find.text(textoDelTope()), findsOneWidget);
+      expect(find.text(textoDelTope), findsOneWidget);
     });
   });
 }
