@@ -48,6 +48,27 @@ mixin _$Session {
 // tienen el campo, y una sesión sin reportes tampoco lo tiene — el mapa
 // vacío es la respuesta correcta para las dos. Ojo con lo que NO significa:
 // vacío es "ningún reporte", no "no se pudo leer".
+//
+// ⚠️ `includeToJson: false` — ESTE CAMPO SE LEE, NO SE ESCRIBE.
+//
+// Sin esto, `SessionRepository.create()` —que es `ref.set(session.toJson())`,
+// el único write de una Session ENTERA— mandaba `feedbackCounts: {}` en
+// cada sesión nueva. Y la regla de Firestore rechaza la clave presente en
+// el `create`, así que el servidor devolvía `permission-denied` y el
+// atleta veía "No pudimos iniciar la sesión": **no se podía empezar a
+// entrenar**.
+//
+// El arreglo correcto no era ablandar la regla para aceptar el mapa vacío,
+// sino que el cliente deje de mandarlo. El campo es del backend: lo escribe
+// sólo `maintainSessionFeedbackCounters` recontando desde
+// `exerciseFeedback`, y que el modelo no pueda emitirlo hace que eso sea
+// cierto por construcción y no por disciplina.
+//
+// Sacarlo del `toJson` es seguro porque `create()` escribe un documento
+// NUEVO: no hay contador que pisar. `finish()` y el barrido usan `update()`
+// con campos explícitos, y los otros `set(x.toJson())` del repositorio son
+// de `SetLog`, no de `Session`.
+  @JsonKey(includeToJson: false)
   @FeedbackCountsConverter()
   Map<ExerciseFeedbackKind, int> get feedbackCounts =>
       throw _privateConstructorUsedError;
@@ -79,6 +100,7 @@ abstract class $SessionCopyWith<$Res> {
       int dayNumber,
       bool wasFullyCompleted,
       int weekNumber,
+      @JsonKey(includeToJson: false)
       @FeedbackCountsConverter()
       Map<ExerciseFeedbackKind, int> feedbackCounts});
 }
@@ -189,6 +211,7 @@ abstract class _$$SessionImplCopyWith<$Res> implements $SessionCopyWith<$Res> {
       int dayNumber,
       bool wasFullyCompleted,
       int weekNumber,
+      @JsonKey(includeToJson: false)
       @FeedbackCountsConverter()
       Map<ExerciseFeedbackKind, int> feedbackCounts});
 }
@@ -293,6 +316,7 @@ class _$SessionImpl implements _Session {
       this.dayNumber = 1,
       this.wasFullyCompleted = false,
       this.weekNumber = 0,
+      @JsonKey(includeToJson: false)
       @FeedbackCountsConverter()
       final Map<ExerciseFeedbackKind, int> feedbackCounts =
           const <ExerciseFeedbackKind, int>{}})
@@ -346,6 +370,26 @@ class _$SessionImpl implements _Session {
 // tienen el campo, y una sesión sin reportes tampoco lo tiene — el mapa
 // vacío es la respuesta correcta para las dos. Ojo con lo que NO significa:
 // vacío es "ningún reporte", no "no se pudo leer".
+//
+// ⚠️ `includeToJson: false` — ESTE CAMPO SE LEE, NO SE ESCRIBE.
+//
+// Sin esto, `SessionRepository.create()` —que es `ref.set(session.toJson())`,
+// el único write de una Session ENTERA— mandaba `feedbackCounts: {}` en
+// cada sesión nueva. Y la regla de Firestore rechaza la clave presente en
+// el `create`, así que el servidor devolvía `permission-denied` y el
+// atleta veía "No pudimos iniciar la sesión": **no se podía empezar a
+// entrenar**.
+//
+// El arreglo correcto no era ablandar la regla para aceptar el mapa vacío,
+// sino que el cliente deje de mandarlo. El campo es del backend: lo escribe
+// sólo `maintainSessionFeedbackCounters` recontando desde
+// `exerciseFeedback`, y que el modelo no pueda emitirlo hace que eso sea
+// cierto por construcción y no por disciplina.
+//
+// Sacarlo del `toJson` es seguro porque `create()` escribe un documento
+// NUEVO: no hay contador que pisar. `finish()` y el barrido usan `update()`
+// con campos explícitos, y los otros `set(x.toJson())` del repositorio son
+// de `SetLog`, no de `Session`.
   final Map<ExerciseFeedbackKind, int> _feedbackCounts;
 // Cuántos reportes (#628) tiene esta sesión, por kind. Lo escribe SÓLO
 // `maintainSessionFeedbackCounters` (functions/), recontando desde la
@@ -359,8 +403,28 @@ class _$SessionImpl implements _Session {
 // tienen el campo, y una sesión sin reportes tampoco lo tiene — el mapa
 // vacío es la respuesta correcta para las dos. Ojo con lo que NO significa:
 // vacío es "ningún reporte", no "no se pudo leer".
+//
+// ⚠️ `includeToJson: false` — ESTE CAMPO SE LEE, NO SE ESCRIBE.
+//
+// Sin esto, `SessionRepository.create()` —que es `ref.set(session.toJson())`,
+// el único write de una Session ENTERA— mandaba `feedbackCounts: {}` en
+// cada sesión nueva. Y la regla de Firestore rechaza la clave presente en
+// el `create`, así que el servidor devolvía `permission-denied` y el
+// atleta veía "No pudimos iniciar la sesión": **no se podía empezar a
+// entrenar**.
+//
+// El arreglo correcto no era ablandar la regla para aceptar el mapa vacío,
+// sino que el cliente deje de mandarlo. El campo es del backend: lo escribe
+// sólo `maintainSessionFeedbackCounters` recontando desde
+// `exerciseFeedback`, y que el modelo no pueda emitirlo hace que eso sea
+// cierto por construcción y no por disciplina.
+//
+// Sacarlo del `toJson` es seguro porque `create()` escribe un documento
+// NUEVO: no hay contador que pisar. `finish()` y el barrido usan `update()`
+// con campos explícitos, y los otros `set(x.toJson())` del repositorio son
+// de `SetLog`, no de `Session`.
   @override
-  @JsonKey()
+  @JsonKey(includeToJson: false)
   @FeedbackCountsConverter()
   Map<ExerciseFeedbackKind, int> get feedbackCounts {
     if (_feedbackCounts is EqualUnmodifiableMapView) return _feedbackCounts;
@@ -451,6 +515,7 @@ abstract class _Session implements Session {
       final int dayNumber,
       final bool wasFullyCompleted,
       final int weekNumber,
+      @JsonKey(includeToJson: false)
       @FeedbackCountsConverter()
       final Map<ExerciseFeedbackKind, int> feedbackCounts}) = _$SessionImpl;
 
@@ -495,7 +560,28 @@ abstract class _Session implements Session {
 // tienen el campo, y una sesión sin reportes tampoco lo tiene — el mapa
 // vacío es la respuesta correcta para las dos. Ojo con lo que NO significa:
 // vacío es "ningún reporte", no "no se pudo leer".
+//
+// ⚠️ `includeToJson: false` — ESTE CAMPO SE LEE, NO SE ESCRIBE.
+//
+// Sin esto, `SessionRepository.create()` —que es `ref.set(session.toJson())`,
+// el único write de una Session ENTERA— mandaba `feedbackCounts: {}` en
+// cada sesión nueva. Y la regla de Firestore rechaza la clave presente en
+// el `create`, así que el servidor devolvía `permission-denied` y el
+// atleta veía "No pudimos iniciar la sesión": **no se podía empezar a
+// entrenar**.
+//
+// El arreglo correcto no era ablandar la regla para aceptar el mapa vacío,
+// sino que el cliente deje de mandarlo. El campo es del backend: lo escribe
+// sólo `maintainSessionFeedbackCounters` recontando desde
+// `exerciseFeedback`, y que el modelo no pueda emitirlo hace que eso sea
+// cierto por construcción y no por disciplina.
+//
+// Sacarlo del `toJson` es seguro porque `create()` escribe un documento
+// NUEVO: no hay contador que pisar. `finish()` y el barrido usan `update()`
+// con campos explícitos, y los otros `set(x.toJson())` del repositorio son
+// de `SetLog`, no de `Session`.
   @override
+  @JsonKey(includeToJson: false)
   @FeedbackCountsConverter()
   Map<ExerciseFeedbackKind, int> get feedbackCounts;
 
