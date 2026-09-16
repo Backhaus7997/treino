@@ -3048,6 +3048,25 @@ class _RoutineEditorScreenState extends ConsumerState<RoutineEditorScreen> {
                 ? RoutineVisibility.public
                 : RoutineVisibility.private,
             numWeeks: _numWeeks,
+            // ── El sello de procedencia ────────────────────────────────────
+            //
+            // `SelfCustomizing` es la ÚNICA variante donde el id del modo es
+            // una FUENTE y no un destino (ver `_existingIdFor`): el editor la
+            // carga y guarda un documento nuevo. Ese id es, literalmente, de
+            // dónde vino esta rutina.
+            //
+            // Va sólo en el create. En el update de abajo NO se pone, y no es
+            // un olvido: el `affectedKeys().hasOnly([...])` de firestore.rules
+            // no lista `copiedFrom`, así que mandarlo en un update rebotaría
+            // la edición entera. El sello se pone una vez, al nacer, y después
+            // es inmutable por regla — que es exactamente lo que tiene que ser.
+            //
+            // Las otras tres variantes del modo dejan esto en null: una rutina
+            // escrita desde cero no viene de ningún lado.
+            copiedFrom: switch (widget.mode) {
+              SelfCustomizing(:final sourceRoutineId) => sourceRoutineId,
+              _ => null,
+            },
           );
           final created = await repo.createUserOwned(uid: uid, draft: draft);
           // Va antes del mounted-guard a propósito: usa el `analytics`

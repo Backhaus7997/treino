@@ -545,7 +545,57 @@ service cloud.firestore {
         return ['name', 'level', 'days',
                 'source', 'createdBy', 'visibility', 'createdAt', 'status',
                 'split', 'estimatedMinutesPerDay', 'imageUrl', 'numWeeks',
-                'ratingAvg', 'ratingsCount', 'summary', 'goals'];
+                'ratingAvg', 'ratingsCount', 'summary', 'goals',
+                // La procedencia: de qué rutina se copió ésta con «Usar como
+                // base». Ver `copiadaDelCatalogo()`.
+                //
+                // Antes de este slice el campo era IMPOSIBLE de escribir —el
+                // `hasOnly` de esta misma lista lo rechazaba— así que no hay
+                // documentos viejos con un valor raro adentro. La primera
+                // rutina que lo tenga va a ser la primera copia hecha después
+                // de este deploy.
+                'copiedFrom'];
+      }
+
+      // ¿Es `routineId` una plantilla del CATÁLOGO del sistema?
+      //
+      // Falla ABIERTO en los dos bordes, igual que `rutinaEsPaga` más abajo:
+      // una rutina inexistente devuelve null y desreferenciarla tira ERROR DE
+      // EVALUACIÓN —que rebota la escritura con un mensaje que no dice nada—,
+      // y un `source` ausente es el default histórico de las plantillas
+      // seedeadas viejas. Un error de datos abre, no cobra.
+      function esPlantillaDelSistema(routineId) {
+        let r = get(/databases/$(database)/documents/routines/$(routineId));
+        return r != null && r.data.get('source', '') == 'system';
+      }
+
+      // ── El sello de procedencia, y QUÉ FRENA DE VERDAD ────────────────────
+      //
+      // «Usar como base» copia una plantilla del catálogo a una rutina propia.
+      // El cliente ya lo gatea —`routine_editor_screen.dart` bloquea cuando la
+      // fuente es `source == 'system'` y el candado está activo— pero hasta
+      // este slice el SERVIDOR no tenía una sola cláusula sobre copiar: sabía
+      // de TAMAÑO (`withinFreeRoutineShape`) y de nada más.
+      //
+      // ⚠️ SE DICE LO QUE ESTO **NO** HACE, porque la tentación es creer que
+      // cierra el agujero: **no frena a quien escribe a mano contra Firestore**.
+      // El sello lo pone el cliente, así que un payload fabricado simplemente
+      // omite `copiedFrom` y pasa. Lo que sí frena es el camino de la app, que
+      // es por donde pasa el 100% de los usuarios reales, y le da al servidor
+      // su primera cláusula sobre el asunto. Es defensa en profundidad, no una
+      // puerta blindada.
+      //
+      // Lo que NINGUNA regla puede frenar, y conviene tenerlo escrito: el
+      // servidor no distingue tres días copiados de tres días escritos a mano,
+      // porque el payload es idéntico. Medido el 2026-09-16 contra producción:
+      // las CUATRO plantillas pagas tienen 4, 4, 5 y 6 días, o sea que la copia
+      // ENTERA de cualquiera ya rebota por `withinFreeRoutineShape` (tope 3).
+      // Lo que queda abierto es copiar 3 días de una de 6 y rehacerlos, y eso
+      // no tiene arreglo del lado del servidor.
+      function copiadaDelCatalogo(data) {
+        return data.get('copiedFrom', null) is string
+               && data.copiedFrom.size() > 0
+               && esPlantillaDelSistema(data.copiedFrom);
       }
 
       // Read: público para autenticados si la rutina es `visibility: 'public'`
@@ -705,7 +755,20 @@ service cloud.firestore {
                     // reglas cortan por izquierda — un payload que ya falla por
                     // cualquiera de las guardas de arriba no la paga.
                     && (withinFreeRoutineShape(request.resource.data)
-                        || !paywallEnforcedFor(request.auth.uid));
+                        || !paywallEnforcedFor(request.auth.uid))
+                    // El sello de procedencia. Ver `copiadaDelCatalogo()` para
+                    // qué frena y —sobre todo— qué NO.
+                    //
+                    // Va DESPUÉS del tope y empieza por la guarda barata: una
+                    // rutina escrita desde cero no tiene `copiedFrom`, así que
+                    // el caso común corta en el primer término y no paga NADA.
+                    // Sólo una copia real llega al `get()`, y para entonces
+                    // `paywallEnforcedFor` ya leyó `users/{uid}` en esta misma
+                    // evaluación — las reglas cachean los `get()` dentro de una
+                    // evaluación, así que el costo extra es UNA lectura, no dos.
+                    && (!('copiedFrom' in request.resource.data)
+                        || !paywallEnforcedFor(request.auth.uid)
+                        || !copiadaDelCatalogo(request.resource.data));
 
       // UPDATE path 1 (narrow): owner flips only `status` — archive / restore.
       // REQ-USR-013, SCENARIO-607, SCENARIO-608.
