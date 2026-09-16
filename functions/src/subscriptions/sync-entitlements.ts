@@ -95,6 +95,32 @@ function readMillis(raw: unknown): number | null {
   return typeof ms === "number" && Number.isFinite(ms) ? ms : null;
 }
 
+/**
+ * Como se ve un `acceptedAt` que no se pudo leer, para que el aviso sirva para
+ * DECIDIR sin tener que abrir el documento.
+ *
+ * `typeof` solo NO alcanza, y esa fue la mitad de un falso positivo que vivio
+ * meses en Cloud Logging: en JavaScript `typeof null === "object"`, igual que
+ * un `{_seconds,_nanoseconds}` serializado y que un sentinel de
+ * `serverTimestamp()` que nunca resolvio. Las tres formas salian como
+ * `acceptedAtType: "object"` — la sana, la recuperable y la perdida — y no
+ * habia con que separarlas. Un aviso que no distingue el dato correcto del
+ * roto no mide nada: hace creer que hay corrupcion donde hay una solicitud de
+ * vinculo normal.
+ *
+ * Reporta las CLAVES crudas, no una categoria. Clasificar aca seria adivinar, y
+ * el que lee el log necesita el dato, no nuestra interpretacion:
+ * `{_seconds,_nanoseconds}` se lee solo, y un `{}` tambien dice lo suyo.
+ */
+function describeShape(raw: unknown): { acceptedAtType: string; acceptedAtKeys?: string[] } {
+  // null ANTES que typeof, porque `typeof null === "object"` es justamente la
+  // confusion que este helper existe para deshacer.
+  if (raw === null) return { acceptedAtType: "null" };
+  const acceptedAtType = typeof raw;
+  if (acceptedAtType !== "object") return { acceptedAtType };
+  return { acceptedAtType, acceptedAtKeys: Object.keys(raw as object).sort() };
+}
+
 export interface SyncEntitlementsResult {
   trainerId: string;
   /** `null` = sin limite (plan3). */
@@ -180,11 +206,38 @@ export async function syncTrainerEntitlements(
       // cliente — y `instanceof` ademas se rompe contra los dobles de test.
       const acceptedAt = d.acceptedAt;
       const acceptedAtMs = readMillis(acceptedAt);
-      if (acceptedAt !== undefined && acceptedAtMs === null) {
+      //
+      // EL AVISO NO SE DECIDE POR LA FORMA DEL VALOR, SE DECIDE POR SI IMPORTA.
+      //
+      // El guard viejo era `acceptedAt !== undefined`, y con eso un
+      // `acceptedAt: null` entraba: `readMillis` lo degrada a null por su
+      // propio `raw == null`, asi que el segundo termino tambien daba true.
+      // Pero null es la forma LEGAL de un vinculo todavia no aceptado —
+      // firestore.rules (~:1112) lo EXIGE en el `allow create` y
+      // `TrainerLinkRepository.request()` lo manda explicito, o sea que TODO
+      // vinculo nace asi. Como la query de arriba no filtra por status, cada
+      // pending viejo disparaba el warn en cada corrida: ~30 avisos diarios
+      // sobre datos perfectamente sanos, que es exactamente como un aviso deja
+      // de leerse.
+      //
+      // Y OJO CON EL ARREGLO FACIL: silenciar todo null de una perdia el caso
+      // que de verdad duele. Un `active`/`paused` SIN fecha no es un pending,
+      // es un vinculo vivo al que se le perdio el dato — y ese si compite por
+      // cupo, entra a `reconcileEntitlements` con POSITIVE_INFINITY y se
+      // estaciona PRIMERO. Ausente se tolera solo mientras el vinculo no este
+      // vivo; cualquier otra forma (string, mapa, lo que sea) se avisa siempre,
+      // porque viola el pin de rules en cualquier status.
+      const ausente = acceptedAt == null;
+      const vivo = d.status === "active" || d.status === "paused";
+      if (acceptedAtMs === null && (!ausente || vivo)) {
         logger.warn("syncTrainerEntitlements: acceptedAt no es un Timestamp", {
           trainerId,
           linkId: doc.id,
-          acceptedAtType: typeof acceptedAt,
+          // `status` porque decide si el aviso IMPORTA: `reconcileEntitlements`
+          // descarta todo lo que no sea active|paused, asi que una fecha rota en
+          // un pending no mueve a NADIE de lugar en la cola del limite.
+          status: typeof d.status === "string" ? d.status : "(sin status)",
+          ...describeShape(acceptedAt),
         });
       }
       return {
