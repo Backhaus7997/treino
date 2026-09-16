@@ -22,6 +22,10 @@ _$SessionImpl _$$SessionImplFromJson(Map<String, dynamic> json) =>
       dayNumber: (json['dayNumber'] as num?)?.toInt() ?? 1,
       wasFullyCompleted: json['wasFullyCompleted'] as bool? ?? false,
       weekNumber: (json['weekNumber'] as num?)?.toInt() ?? 0,
+      feedbackCounts: json['feedbackCounts'] == null
+          ? const <ExerciseFeedbackKind, int>{}
+          : const FeedbackCountsConverter()
+              .fromJson(json['feedbackCounts'] as Map<String, dynamic>?),
     );
 
 Map<String, dynamic> _$$SessionImplToJson(_$SessionImpl instance) =>
@@ -39,6 +43,8 @@ Map<String, dynamic> _$$SessionImplToJson(_$SessionImpl instance) =>
       'dayNumber': instance.dayNumber,
       'wasFullyCompleted': instance.wasFullyCompleted,
       'weekNumber': instance.weekNumber,
+      'feedbackCounts':
+          const FeedbackCountsConverter().toJson(instance.feedbackCounts),
     };
 
 Value? _$JsonConverterFromJson<Json, Value>(
