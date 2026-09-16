@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 
+import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../notifications/presentation/widgets/notification_bell.dart';
 import '../../../core/analytics/analytics_service.dart';
@@ -96,11 +97,9 @@ class TrainerDashboardTab extends ConsumerWidget {
         const SizedBox(height: 8),
         const _EntrenaronHoyList(),
         const SizedBox(height: 20),
-        _SectionHeader(
-          label: AppL10n.of(context).dashboardActividadRecienteSectionLabel,
-        ),
+        const _ActividadRecienteHeader(),
         const SizedBox(height: 8),
-        const _ActividadRecienteList(),
+        const _ActividadRecienteList(limit: kRecentActivityPreviewCount),
         const SizedBox(height: 20),
         _PagosPorCobrarSection(palette: palette),
         const SizedBox(height: 20),
@@ -921,10 +920,22 @@ class EntrenaronHoyListTestHarness extends StatelessWidget {
 ///
 /// @visibleForTesting
 class ActividadRecienteListTestHarness extends StatelessWidget {
-  const ActividadRecienteListTestHarness({super.key});
+  const ActividadRecienteListTestHarness({super.key, this.limit});
+
+  /// Tope de presentación. `null` = todas, igual que la pantalla completa.
+  final int? limit;
 
   @override
-  Widget build(BuildContext context) => const _ActividadRecienteList();
+  Widget build(BuildContext context) => _ActividadRecienteList(limit: limit);
+}
+
+/// Harness del header de «Actividad reciente», para testear el «Ver todo»
+/// condicional sin montar el dashboard entero con sus diez providers.
+class ActividadRecienteHeaderTestHarness extends StatelessWidget {
+  const ActividadRecienteHeaderTestHarness({super.key});
+
+  @override
+  Widget build(BuildContext context) => const _ActividadRecienteHeader();
 }
 
 /// Lista de solicitudes de vinculación pendientes del PF, con accept/decline.
@@ -1570,8 +1581,122 @@ class _EntrenaronHoyRow extends ConsumerWidget {
 
 // ── Actividad reciente ────────────────────────────────────────────────────────
 
+/// La lista completa de «Actividad reciente», detrás del «Ver todo».
+///
+/// Muestra la MISMA ventana de 7 días que el dashboard —no más días— sin el
+/// tope de presentación: el dashboard corta en [kRecentActivityPreviewCount]
+/// para no comerse la pantalla, y acá se ve todo lo que el provider trae.
+///
+/// Reusa [_ActividadRecienteList] con `limit: null` en vez de duplicar las
+/// filas. La lección está escrita en el test de `SessionExerciseBlock`: si el
+/// render vive duplicado por pantalla, hay que mantener dos copias y alguna se
+/// queda atrás.
+///
+/// **No es** la `SessionHistoryScreen` parametrizada que sugería el plan del
+/// PF §3. Ésa es el historial de UN alumno (`coachAthleteId`); este feed es de
+/// todos los alumnos a la vez, así que no hay parámetro que la haga servir.
+class RecentActivityScreen extends StatelessWidget {
+  const RecentActivityScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+
+    return Scaffold(
+      body: AppBackground(
+        child: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                child: Row(
+                  children: [
+                    IconButton(
+                      tooltip: l10n.commonBack,
+                      icon: Icon(TreinoIcon.back,
+                          size: 20, color: palette.textPrimary),
+                      // `canPop` antes de `pop`: la ruta es top-level y se
+                      // llega por push desde el dashboard, pero un deep link
+                      // puede montarla sin nada debajo.
+                      onPressed: () => context.canPop()
+                          ? context.pop()
+                          : context.go('/coach'),
+                    ),
+                    const SizedBox(width: 6),
+                    Semantics(
+                      header: true,
+                      child: Text(
+                        l10n.dashboardActividadRecienteSectionLabel,
+                        style: GoogleFonts.barlowCondensed(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
+                          letterSpacing: 1.0,
+                          color: palette.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Expanded(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(20, 0, 20, 20),
+                  child: _ActividadRecienteList(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// El header de «Actividad reciente», con su «Ver todo» CONDICIONAL.
+///
+/// El trailing aparece sólo si hay más entradas de las que el dashboard
+/// muestra. Un «Ver todo» que lleva a una pantalla con exactamente las mismas
+/// cinco filas no es un adorno inofensivo: entrena al PF a ignorarlo, y el día
+/// que sí haya algo detrás no lo va a tocar. Es la versión de UI de la
+/// advertencia falsa de AGENTS.md §11.1 — un cartel que promete y no cumple
+/// desactiva la atención justo donde hacía falta.
+class _ActividadRecienteHeader extends ConsumerWidget {
+  const _ActividadRecienteHeader();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppL10n.of(context);
+    // `select` y no el AsyncValue entero: al header sólo le importa SI hay más
+    // filas de las que entran, no cuáles son ni en qué orden. Sin el select se
+    // rebuildearía con cada cambio del feed para no cambiar un pixel
+    // (AGENTS.md regla 6).
+    final hayMas = ref.watch(
+      recentActivityProvider.select(
+        (a) => (a.valueOrNull?.length ?? 0) > kRecentActivityPreviewCount,
+      ),
+    );
+
+    return _SectionHeader(
+      label: l10n.dashboardActividadRecienteSectionLabel,
+      trailingLabel: hayMas ? l10n.workoutHistorialSeeAll : null,
+      trailingOnTap: hayMas ? () => context.push('/coach/actividad') : null,
+    );
+  }
+}
+
+/// La lista de «Actividad reciente».
+///
+/// [limit] es el tope de PRESENTACIÓN, no el de datos — el provider ya corta en
+/// [kRecentActivityMaxEntries]. `null` muestra todo lo que traiga, que es lo que
+/// hace la pantalla completa; el dashboard pasa
+/// [kRecentActivityPreviewCount] y deja el resto detrás del «Ver todo».
 class _ActividadRecienteList extends ConsumerWidget {
-  const _ActividadRecienteList();
+  const _ActividadRecienteList({this.limit});
+
+  final int? limit;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1592,13 +1717,16 @@ class _ActividadRecienteList extends ConsumerWidget {
       );
     }
 
-    final entries = activityAsync.valueOrNull ?? const [];
-    if (entries.isEmpty) {
+    final all = activityAsync.valueOrNull ?? const <RecentActivityEntry>[];
+    if (all.isEmpty) {
       return _PlaceholderCard(
         palette: palette,
         message: l10n.dashboardSinActividadReciente,
       );
     }
+    final cap = limit;
+    final entries =
+        (cap != null && all.length > cap) ? all.sublist(0, cap) : all;
 
     return Container(
       decoration: BoxDecoration(

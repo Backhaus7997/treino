@@ -26,6 +26,8 @@ import '../features/coach/presentation/athlete_files_screen.dart';
 import '../features/coach/presentation/athlete_nutrition_plan_screen.dart';
 import '../features/coach/presentation/athlete_detail_screen.dart';
 import '../features/coach/presentation/availability_editor_screen.dart';
+import '../features/coach/presentation/trainer_dashboard_tab.dart'
+    show RecentActivityScreen;
 import '../features/coach/presentation/trainer_public_profile_screen.dart';
 import '../features/workout/application/session_providers.dart'
     show currentUidProvider;
@@ -532,6 +534,20 @@ GoRouter buildRouter({
             },
           ),
         ],
+      ),
+
+      GoRoute(
+        // ─── «Actividad reciente» completa, para el PF ─────────────────────
+        // El destino del «Ver todo» del dashboard. El dashboard corta el feed
+        // en 5 filas para no comerse la pantalla; acá se ve la ventana entera
+        // de 7 días.
+        //
+        // TOP-LEVEL (fuera del ShellRoute) como sus hermanas de `/coach/...`:
+        // empujar una ruta in-shell desde una out-of-shell rebuildea la rama
+        // del shell y aterriza en blanco (#399, #410).
+        path: '/coach/actividad',
+        pageBuilder: (_, state) =>
+            _report(state.pageKey, const RecentActivityScreen()),
       ),
 
       GoRoute(
