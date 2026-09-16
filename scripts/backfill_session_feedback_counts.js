@@ -58,6 +58,12 @@
  *   B · sesión sin ningún reporte                      → NO se toca (queda ausente)
  *   C · sesión con el mapa ya correcto                 → no se reescribe
  *   D · reportes huérfanos, sesión borrada             → no se resucita
+ *   E · un reporte nuevo entre el escaneo y la escritura → se cuenta el nuevo
+ *
+ * El E es el que agregó el recuento transaccional (P2 de Codex en el #1153).
+ * Para reproducirlo hace falta escribir en la subcolección DESPUÉS de que el
+ * paso 1 haya terminado y antes del commit; sin esa ventana forzada, el caso
+ * pasa por casualidad y el test no prueba nada.
  *
  * Medido: dry-run reportó 1 pendiente y no escribió; `--write` escribió 1; la
  * segunda corrida dio 0 pendientes y 2 "ya estaban correctas".
@@ -150,40 +156,67 @@ async function main() {
   // Paso 2 — escribir sólo lo que DIFIERE. Una sesión que ya tiene el mapa
   // correcto (porque el CF ya la tocó) no se reescribe: el backfill se puede
   // volver a correr sin costo y sin tocar `updatedAt` de nada.
+  //
+  // ⚠️ La escritura RECUENTA dentro de una transacción, y no escribe lo que
+  // contó el paso 1. Ese conteo es una FOTO: si entre el escaneo y la
+  // escritura alguien crea o borra un reporte, escribir la foto pisa el valor
+  // correcto con uno viejo.
+  //
+  // Y no se arregla solo, que es lo que lo vuelve un P2 y no un detalle: el
+  // trigger que mantiene el agregado (`maintainSessionFeedbackCounters`)
+  // escucha la SUBCOLECCIÓN, así que tocar el doc padre NO lo redispara. El
+  // contador queda mintiendo hasta el próximo reporte de esa misma sesión —
+  // que puede no llegar nunca, porque son sesiones viejas y ya terminadas.
+  // O sea: el backfill que existe para arreglar contadores ausentes podía
+  // dejar contadores FALSOS, que es estrictamente peor (el modelo Dart lee el
+  // mapa ausente como "ningún reporte", igual que un mapa en cero, pero un
+  // conteo viejo afirma un número que nadie va a corregir).
+  //
+  // Lo del paso 1 se usa sólo para saber A QUÉ SESIONES IR. Firestore
+  // reintenta la transacción sola si algo cambió en el medio.
   let aEscribir = 0;
   let yaEstaban = 0;
   let ausentes = 0;
-  let batch = db.batch();
-  let enBatch = 0;
 
   for (const [path, datas] of porSesion) {
     const ref = db.doc(path);
-    const snap = await ref.get();
-    if (!snap.exists) {
-      // Reportes huérfanos: la sesión se borró y la subcolección quedó. No se
-      // crea el doc — un backfill no puede resucitar lo que alguien borró.
-      ausentes++;
+
+    if (!escribir) {
+      // Dry-run: compara contra la foto del paso 1 y no abre transacción. Es
+      // un informe de "qué pasaría", no la escritura — y abrir una transacción
+      // por sesión sólo para contar duplicaría el costo de una corrida cuyo
+      // punto es ser barata y repetible.
+      const snap = await ref.get();
+      if (!snap.exists) {
+        ausentes++;
+      } else if (iguales(snap.data()?.feedbackCounts, contar(datas))) {
+        yaEstaban++;
+      } else {
+        aEscribir++;
+      }
       continue;
     }
 
-    const nuevo = contar(datas);
-    if (iguales(snap.data()?.feedbackCounts, nuevo)) {
-      yaEstaban++;
-      continue;
-    }
+    // Todas las lecturas ANTES de la escritura: Firestore lo exige dentro de
+    // una transacción.
+    const resultado = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) {
+        // Reportes huérfanos: la sesión se borró y la subcolección quedó. No se
+        // crea el doc — un backfill no puede resucitar lo que alguien borró.
+        return 'ausente';
+      }
+      const reportes = await tx.get(ref.collection('exerciseFeedback'));
+      const nuevo = contar(reportes.docs.map((d) => d.data()));
+      if (iguales(snap.data()?.feedbackCounts, nuevo)) return 'igual';
+      tx.update(ref, { feedbackCounts: nuevo });
+      return 'escrita';
+    });
 
-    aEscribir++;
-    if (!escribir) continue;
-
-    batch.update(ref, { feedbackCounts: nuevo });
-    if (++enBatch >= PAGE_SIZE) {
-      await batch.commit();
-      batch = db.batch();
-      enBatch = 0;
-    }
+    if (resultado === 'ausente') ausentes++;
+    else if (resultado === 'igual') yaEstaban++;
+    else aEscribir++;
   }
-
-  if (escribir && enBatch > 0) await batch.commit();
 
   console.log('');
   console.log(`ya estaban correctas: ${yaEstaban}`);

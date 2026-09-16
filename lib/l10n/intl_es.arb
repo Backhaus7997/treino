@@ -1043,6 +1043,8 @@
   "exerciseFeedbackError": "No pudimos guardar tu reporte. Probá de nuevo.",
   "exerciseFeedbackNoteTagComment": "DEL ALUMNO",
   "exerciseFeedbackNoteTagDiscomfort": "MOLESTIA",
+  "workoutHistorialTopeAlcanzado": "Puede haber entrenamientos más viejos que no entran en esta lista.",
+  "dashboardActividadTopeAlcanzado": "Puede haber más actividad que no entra en esta lista.",
   "exerciseFeedbackNoteSetTag": "SERIE {setNumber}",
   "coachSessionFeedbackLoadError": "No pudimos cargar los reportes del alumno.",
   "sessionFeedbackLoadError": "No pudimos cargar tus reportes.",

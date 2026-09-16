@@ -194,6 +194,15 @@ Future<void> _pumpScreen(
               body: Text('RoutineEditor:${state.pathParameters['athleteId']}'),
             ),
           ),
+          // Destino real de la card de «En curso». Existe acá para que un tap
+          // que navega mal falle diciendo a dónde fue, en vez de confundirse
+          // con un 404.
+          GoRoute(
+            path: '/coach/athlete/:athleteId/session/:sessionId',
+            builder: (_, state) => Scaffold(
+              body: Text('sesion:${state.pathParameters['sessionId']}'),
+            ),
+          ),
         ],
       ),
     ],
@@ -1108,6 +1117,146 @@ void main() {
       expect(find.text('PLANES ASIGNADOS'), findsOneWidget);
       expect(find.text('ANTROPOMETRÍA'), findsOneWidget);
       expect(find.text('CREAR PLAN'), findsOneWidget);
+    });
+  });
+
+  // ── La sesión EN CURSO en la ficha (plan del PF §4) ───────────────────────
+  //
+  // Hasta este cambio la sesión en curso no aparecía acá EN ABSOLUTO — no es
+  // que estuviera abajo. `_isCompleted` exige `status == finished` Y
+  // `wasFullyCompleted`, así que la descartaba por dos motivos distintos. Un
+  // alumno entrenando ahora mismo era invisible en su propia ficha.
+  group('sesión en curso', () {
+    Session enCurso({
+      required String id,
+      required DateTime startedAt,
+      String routineName = 'Full Body',
+    }) =>
+        Session(
+          id: id,
+          uid: 'athlete-1',
+          routineId: 'routine-1',
+          routineName: routineName,
+          startedAt: startedAt,
+          status: SessionStatus.active,
+          wasFullyCompleted: false,
+        );
+
+    List<Override> base() => [
+          currentUidProvider.overrideWithValue('trainer-1'),
+          userPublicProfileProvider('athlete-1').overrideWith(
+            (ref) => Stream.value(_makeProfile('athlete-1', 'Martín García')),
+          ),
+          assignedRoutinesByTrainerProvider.overrideWith(
+            (ref, key) async => const [],
+          ),
+        ];
+
+    testWidgets('aparece y lleva a esa sesión', (tester) async {
+      await _pumpScreen(
+        tester,
+        athleteId: 'athlete-1',
+        overrides: [
+          ...base(),
+          sessionsByUidProvider('athlete-1').overrideWith(
+            (ref) async => [
+              enCurso(id: 'viva', startedAt: DateTime(2024, 1, 10, 18)),
+            ],
+          ),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('EN CURSO'), findsOneWidget);
+      expect(find.text('Full Body'), findsOneWidget);
+
+      await tester.tap(find.text('EN CURSO'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('sesion:viva'), findsOneWidget);
+    });
+
+    // Control negativo del de arriba: sin sesión activa la card NO tiene que
+    // estar. Sin esto, una card incondicional pasaría aquel test igual.
+    testWidgets('no aparece si no hay ninguna activa', (tester) async {
+      await _pumpScreen(
+        tester,
+        athleteId: 'athlete-1',
+        overrides: [
+          ...base(),
+          sessionsByUidProvider('athlete-1').overrideWith(
+            (ref) async => [_makeSession(id: 'ses-1', wasFullyCompleted: true)],
+          ),
+          coachSessionSetLogsProvider(
+                  (athleteUid: 'athlete-1', sessionId: 'ses-1'))
+              .overrideWith((ref) async => []),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('EN CURSO'), findsNothing);
+    });
+
+    // Las sesiones abandonadas sin cerrar quedan `active` hasta que el barrido
+    // las levanta, así que un alumno puede tener dos. Mandar al PF a la colgada
+    // es mandarlo a un entrenamiento muerto.
+    testWidgets('con varias activas muestra la más reciente', (tester) async {
+      await _pumpScreen(
+        tester,
+        athleteId: 'athlete-1',
+        overrides: [
+          ...base(),
+          sessionsByUidProvider('athlete-1').overrideWith(
+            (ref) async => [
+              enCurso(
+                id: 'colgada',
+                startedAt: DateTime(2024, 1, 8, 9),
+                routineName: 'Pierna vieja',
+              ),
+              enCurso(
+                id: 'viva',
+                startedAt: DateTime(2024, 1, 10, 18),
+                routineName: 'Full Body',
+              ),
+            ],
+          ),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Full Body'), findsOneWidget);
+      expect(find.text('Pierna vieja'), findsNothing);
+
+      await tester.tap(find.text('EN CURSO'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('sesion:viva'), findsOneWidget);
+    });
+
+    testWidgets('va ARRIBA de las terminadas, no mezclada entre ellas',
+        (tester) async {
+      await _pumpScreen(
+        tester,
+        athleteId: 'athlete-1',
+        overrides: [
+          ...base(),
+          sessionsByUidProvider('athlete-1').overrideWith(
+            (ref) async => [
+              _makeSession(id: 'ses-1', wasFullyCompleted: true),
+              enCurso(id: 'viva', startedAt: DateTime(2024, 1, 10, 18)),
+            ],
+          ),
+          coachSessionSetLogsProvider(
+                  (athleteUid: 'athlete-1', sessionId: 'ses-1'))
+              .overrideWith((ref) async => []),
+        ],
+      );
+      await tester.pumpAndSettle();
+
+      final yEnCurso = tester.getTopLeft(find.text('EN CURSO')).dy;
+      final yTerminada = tester.getTopLeft(find.text('Plan Test')).dy;
+      expect(yEnCurso, lessThan(yTerminada),
+          reason: 'es lo único que está pasando ahora; abajo no se ve');
     });
   });
 }
