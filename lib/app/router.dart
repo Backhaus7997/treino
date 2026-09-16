@@ -79,6 +79,7 @@ import '../features/profile/presentation/profile_routines_screen.dart';
 // real settings content exists (notifications/theme/language).
 import '../features/profile/profile_screen.dart';
 import '../features/profile_setup/presentation/birth_date_gate_screen.dart';
+import '../features/profile_setup/domain/profile_setup_validators.dart';
 import '../features/profile_setup/presentation/profile_setup_flow.dart';
 import '../features/workout/workout_screen.dart';
 import 'theme/app_background.dart';
@@ -209,8 +210,14 @@ String? authRedirect(
     // Fires ANTES del gate de trainer-incompleto: es un requisito legal, y el
     // onboarding comercial del PF puede esperar un minuto más. Self-skip con
     // startsWith, mismo idiom que el gate de abajo, para no auto-rebotarse.
+    // Dispara si la fecha FALTA **o si no llega al piso**, y lo segundo no es
+    // hipotético: `bornAt` existía como campo opcional editable desde el perfil
+    // desde antes de este requisito, así que puede haber cuentas con una fecha
+    // de menor de 16 ya persistida. Sin mirar el validador, esas cuentas pasan
+    // el gate y se comen un permission-denied opaco en su PRIMERA escritura —
+    // las rules validan el piso en TODO update, no sólo en el create.
     if (!isPublic &&
-        profile.bornAt == null &&
+        ProfileSetupValidators.validateBornAt(profile.bornAt) != null &&
         !location.startsWith(_birthDateRoute)) {
       return _birthDateRoute;
     }

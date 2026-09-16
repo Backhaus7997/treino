@@ -93,6 +93,19 @@ UserProfile _athletePreAgeGate() => UserProfile(
       updatedAt: _kDate,
     );
 
+/// Cuenta con una fecha POR DEBAJO del piso ya persistida. No es hipotética:
+/// `bornAt` existía como campo opcional editable desde el perfil antes de que
+/// hubiera edad mínima.
+UserProfile _athleteUnderMinAge() => UserProfile(
+      uid: 'athlete-uid',
+      email: 'athlete@example.com',
+      displayName: 'sporty',
+      bornAt: DateTime.utc(DateTime.now().year - 10, 1, 1),
+      role: UserRole.athlete,
+      createdAt: _kDate,
+      updatedAt: _kDate,
+    );
+
 /// PF con el perfil comercial incompleto Y sin fecha. Fija el ORDEN de los dos
 /// gates: el legal primero.
 UserProfile _trainerIncompletePreAgeGate() => UserProfile(
@@ -318,6 +331,15 @@ void main() {
         reason: 'la edad es un requisito legal; el onboarding comercial '
             'del PF puede esperar',
       );
+    });
+
+    test('una fecha de menor de 16 YA persistida también cae en el gate',
+        () async {
+      // Sin mirar el validador (sólo `bornAt == null`), esta cuenta pasa el
+      // gate y se come un permission-denied opaco en su PRIMERA escritura: las
+      // rules validan el piso en todo update, no sólo en el create.
+      final c = await ready(_athleteUnderMinAge());
+      expect(callRedirect(c, '/home'), equals('/birth-date'));
     });
 
     test('las rutas públicas no las secuestra el gate', () async {

@@ -41,6 +41,16 @@ class _BirthDateGateScreenState extends ConsumerState<BirthDateGateScreen> {
   bool _saving = false;
   String? _saveError;
 
+  @override
+  void initState() {
+    super.initState();
+    // Precargamos la fecha que YA tiene el perfil, si la tiene. No es
+    // cosmético: a este gate también llega quien cargó en su momento una fecha
+    // por debajo del piso desde el editor de perfil. Si el campo apareciera
+    // vacío, no tendría forma de ver cuál es la fecha que lo está trabando.
+    _picked = ref.read(userProfileProvider).valueOrNull?.bornAt;
+  }
+
   Future<void> _save() async {
     final validation = ProfileSetupValidators.validateBornAt(_picked);
     if (validation != null) return;
