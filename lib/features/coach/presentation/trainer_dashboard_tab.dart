@@ -905,6 +905,28 @@ class DejarFeedbackSheetTestHarness extends StatelessWidget {
   Widget build(BuildContext context) => const _DejarFeedbackSheet();
 }
 
+/// Test-only harness que monta la lista de ENTRENARON HOY sola, sin el grafo
+/// de providers del dashboard entero (mismo criterio que los otros harnesses
+/// de este archivo). Existe para poder verificar a dónde navega una fila.
+///
+/// @visibleForTesting
+class EntrenaronHoyListTestHarness extends StatelessWidget {
+  const EntrenaronHoyListTestHarness({super.key});
+
+  @override
+  Widget build(BuildContext context) => const _EntrenaronHoyList();
+}
+
+/// Test-only harness que monta la lista de ACTIVIDAD RECIENTE sola.
+///
+/// @visibleForTesting
+class ActividadRecienteListTestHarness extends StatelessWidget {
+  const ActividadRecienteListTestHarness({super.key});
+
+  @override
+  Widget build(BuildContext context) => const _ActividadRecienteList();
+}
+
 /// Lista de solicitudes de vinculación pendientes del PF, con accept/decline.
 ///
 /// Vive en la sub-pestaña «Solicitudes» del centro de notificaciones. Antes era
@@ -1486,7 +1508,12 @@ class _EntrenaronHoyRow extends ConsumerWidget {
     final session = entry.session;
 
     return InkWell(
-      onTap: () => context.push('/coach/athlete/${entry.athleteId}'),
+      // Al entrenamiento que tocaste, no a la ficha entera del alumno: la fila
+      // habla de UNA sesión y hasta ahora te dejaba en una pantalla larga donde
+      // había que ir a buscarla a mano.
+      onTap: () => context.push(
+        '/coach/athlete/${entry.athleteId}/session/${session.id}',
+      ),
       borderRadius: BorderRadius.circular(AppRadius.md),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -1614,7 +1641,12 @@ class _ActividadRecienteRow extends ConsumerWidget {
     final session = entry.session;
 
     return InkWell(
-      onTap: () => context.push('/coach/athlete/${entry.athleteId}'),
+      // Al entrenamiento que tocaste, no a la ficha entera del alumno: la fila
+      // habla de UNA sesión y hasta ahora te dejaba en una pantalla larga donde
+      // había que ir a buscarla a mano.
+      onTap: () => context.push(
+        '/coach/athlete/${entry.athleteId}/session/${session.id}',
+      ),
       borderRadius: BorderRadius.circular(AppRadius.md),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
