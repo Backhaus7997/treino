@@ -1,7 +1,7 @@
 # Estado del trabajo legal y de moderación
 
-**Última actualización:** 14 de septiembre de 2026
-**Alcance:** todo lo trabajado entre el 31 de agosto y el 14 de septiembre.
+**Última actualización:** 16 de septiembre de 2026
+**Alcance:** todo lo trabajado entre el 31 de agosto y el 16 de septiembre.
 
 Este documento se sostiene solo. Sirve para retomar el tema sin leer ninguna
 conversación previa, y para pasárselo a otra persona.
@@ -10,9 +10,14 @@ conversación previa, y para pasárselo a otra persona.
 
 ## Dónde estamos, en una línea
 
-**Dos pull requests abiertos y sin revisar.** Los documentos legales están
-escritos y el paquete para el abogado está listo hace días. Lo que bloquea
-publicar ya no es redacción: es un dictamen legal, un merge y tres features.
+**La redacción legal está cerrada.** Los dos PR se mergearon, la edad mínima
+subió a 16 y los once marcadores de revisión legal se resolvieron con
+investigación de fuentes primarias, sin esperar al abogado. El dictamen sigue
+siendo necesario para validar, pero ya no bloquea.
+
+Lo que bloquea publicar hoy son **tres cosas de código y dos de trámite**: el age
+gate, el filtrado de términos vetados, la vista de revisión de reportes, la
+inscripción ante la AAIP y la designación de representante en la Unión Europea.
 
 ---
 
@@ -174,16 +179,18 @@ Sin el fix, bloquear y reportar habrían fallado **siempre** con
 
 ### Bloquea publicar
 
-| # | Qué | De quién |
-|---|---|---|
-| 1 | **Mergear los dos PRs** | Equipo |
-| 2 | **Dictamen legal** — siete preguntas | Abogado |
-| 3 | **Control de edad en el alta** — hoy la app no pregunta la edad en ningún momento | Desarrollo |
-| 4 | **Consentimiento parental verificable** — COPPA lo exige antes de recolectar el primer dato. **Depende del dictamen**: el abogado define qué mecanismo es exigible | Desarrollo, después del abogado |
-| 5 | **Filtrado de términos vetados** — cuarto requisito de la Guideline 1.2, el único que #1114 no cubre | Desarrollo |
-| 6 | **Vista de revisión de reportes** — ver abajo | Desarrollo |
-| 7 | **Seis páginas legales** en la landing, más las dos que ya están desincronizadas | Desarrollo |
-| 8 | **Política multi-jurisdicción** — el alcance mundial la pide. Es reescritura estructural | Redacción + abogado |
+| # | Qué | De quién | Estado |
+|---|---|---|---|
+| 1 | ~~Mergear los dos PRs~~ | Equipo | **HECHO** |
+| 2 | ~~Política multi-jurisdicción~~ — bases legales por finalidad, transferencias, portabilidad, oposición, plazos de incidente | Redacción | **HECHO** el 2026-09-16 |
+| 3 | ~~Consentimiento parental verificable~~ | — | **NO HACE FALTA** con la edad mínima en 16 |
+| 4 | **Age gate en el alta** — hoy `bornAt` es opcional y se carga desde el editor de perfil, no del alta. La cláusula de edad no es exigible hasta que exista | Desarrollo | Especificado |
+| 5 | **Filtrado de términos vetados** — cuarto requisito de la Guideline 1.2, el único que #1114 no cubre | Desarrollo | Pendiente |
+| 6 | **Vista de revisión de reportes** — ver la sección 6 | Desarrollo | Pendiente |
+| 7 | **Páginas legales en la landing** — con los marcadores cerrados ya no hay documento bloqueado por texto | Desarrollo | Especificado |
+| 8 | **Encender el barrido de retención** — leer el log del dry-run y poner `RETENTION_SWEEP_DRY_RUN = false` | Titular | Pendiente |
+| 9 | **Representante en la Unión Europea y en el Reino Unido** — el art. 27 del RGPD lo exige y las excepciones del 27(2) no aplican, porque el tratamiento de datos de salud es continuo y a gran escala. Son **dos**, y hay que publicar su identidad y contacto en la política de privacidad | Titular | Pendiente, y hoy la política no lo menciona |
+| 10 | **Dictamen legal** — las siete preguntas, ahora para validar lo ya resuelto en vez de destrabar | Abogado | No bloquea |
 
 ### Trámites
 
@@ -262,10 +269,10 @@ Copiarlas a mano crea una tercera fuente del mismo texto legal, en otro
 repositorio, sin ningún gate de sincronización. Es exactamente el movimiento que
 rompió la sincronización las dos veces anteriores.
 
-**De las seis páginas que faltan, sólo tres son publicables hoy**: Normas de
-Comunidad, Retención y borrado, y Aviso Legal. El Descargo Médico y los Términos
-para Entrenadores **no salen sin dictamen**, y los Términos de Suscripción
-tienen pendientes de revisión.
+**Desde el 2026-09-16 ya no hay documento bloqueado por texto.** Con los once
+marcadores de revisión legal cerrados, el generador sólo se frena por dos
+marcadores operativos: encender el barrido de retención y confirmar el estado del
+registro de marca ante el INPI. Los dos son del titular y ninguno es redacción.
 
 ---
 
