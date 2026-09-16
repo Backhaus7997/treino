@@ -1946,6 +1946,107 @@ class _NotaEditor extends StatelessWidget {
 bool _isCompleted(session) =>
     session.status == SessionStatus.finished && session.wasFullyCompleted;
 
+/// La sesión que el alumno está entrenando AHORA, o null si no hay ninguna.
+///
+/// Devuelve la MÁS RECIENTE por `startedAt`, no "la primera que aparezca":
+/// puede haber más de una `active` a la vez. Una sesión abandonada sin cerrar
+/// queda colgada en ese estado hasta que el barrido la levanta, así que un
+/// alumno con una colgada de anteayer y una de verdad ahora mismo tiene dos, y
+/// mandar al PF a la vieja es mandarlo a un entrenamiento muerto.
+Session? _enCurso(List<Session> sessions) {
+  Session? masReciente;
+  for (final s in sessions) {
+    if (s.status != SessionStatus.active) continue;
+    if (masReciente == null || s.startedAt.isAfter(masReciente.startedAt)) {
+      masReciente = s;
+    }
+  }
+  return masReciente;
+}
+
+/// El entrenamiento EN CURSO, arriba de todo en la ficha del alumno.
+///
+/// Hasta este cambio la sesión en curso no aparecía en NINGUNA superficie de la
+/// ficha: `_isCompleted` exige `status == finished` **y** `wasFullyCompleted`,
+/// así que la descartaba dos veces. No es que estuviera abajo — no estaba.
+///
+/// Va fuera de la card del historial y no como su primera fila. Es lo único de
+/// esta pantalla que está pasando ahora mismo; puesta entre las terminadas,
+/// aunque fuera primera, se lee como una fila más y el PF tiene que buscarla.
+///
+/// El tint al 8% sobre `textPrimary` es el mismo par que usa
+/// [ExerciseFeedbackNote], elegido porque ahí ya está medido en las DOS
+/// paletas (AGENTS.md §2: todo par con `accent` de fondo se mide en las dos).
+/// El color acompaña; lo que distingue es la PALABRA del tag.
+class _SesionEnCursoCard extends StatelessWidget {
+  const _SesionEnCursoCard({required this.session, required this.athleteId});
+
+  final Session session;
+  final String athleteId;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    final l10n = AppL10n.of(context);
+    final nombre = session.routineName.trim();
+
+    return Semantics(
+      button: true,
+      label: '${l10n.coachSessionHistoryInProgress}'
+          '${nombre.isEmpty ? '' : ': $nombre'}',
+      child: TreinoTappable(
+        onTap: () => context.push(
+          '/coach/athlete/$athleteId/session/${session.id}',
+        ),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.s14,
+            vertical: AppSpacing.s12,
+          ),
+          decoration: BoxDecoration(
+            color: palette.accent.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(color: palette.accent.withValues(alpha: 0.4)),
+          ),
+          child: Row(
+            children: [
+              Icon(TreinoIcon.play, size: 14, color: palette.accent),
+              const SizedBox(width: AppSpacing.s8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.coachSessionHistoryInProgress.toUpperCase(),
+                      style: GoogleFonts.barlowCondensed(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                        letterSpacing: 1.2,
+                        color: palette.textPrimary,
+                      ),
+                    ),
+                    if (nombre.isNotEmpty)
+                      Text(
+                        nombre,
+                        style: GoogleFonts.barlow(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          color: palette.textPrimary,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              Icon(TreinoIcon.chevronRight, size: 16, color: palette.textMuted),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Mobile "Historial de sesiones" section (REQ-SETLOGS-010).
 ///
 /// Watches [sessionsByUidProvider] for [athleteId], filters to completed
@@ -2032,8 +2133,9 @@ class _EntrenamientosSection extends ConsumerWidget {
             ),
           ),
           data: (sessions) {
+            final enCurso = _enCurso(sessions);
             final finished = sessions.where(_isCompleted).take(20).toList();
-            if (finished.isEmpty) {
+            if (enCurso == null && finished.isEmpty) {
               return _card(
                 palette: palette,
                 child: Text(
@@ -2043,19 +2145,35 @@ class _EntrenamientosSection extends ConsumerWidget {
                 ),
               );
             }
-            return _card(
-              palette: palette,
-              child: Column(
-                children: [
-                  for (var i = 0; i < finished.length; i++) ...[
-                    if (i > 0) Divider(color: palette.border, height: 1),
-                    _ExpandableSessionRow(
-                      session: finished[i],
-                      athleteId: athleteId,
-                    ),
-                  ],
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Arriba de todo y SOLA, fuera de la card del historial: es lo
+                // único de esta pantalla que está pasando ahora mismo, y
+                // mezclarla entre las terminadas la vuelve una fila más.
+                if (enCurso != null) ...[
+                  _SesionEnCursoCard(
+                    session: enCurso,
+                    athleteId: athleteId,
+                  ),
+                  const SizedBox(height: AppSpacing.s12),
                 ],
-              ),
+                if (finished.isNotEmpty)
+                  _card(
+                    palette: palette,
+                    child: Column(
+                      children: [
+                        for (var i = 0; i < finished.length; i++) ...[
+                          if (i > 0) Divider(color: palette.border, height: 1),
+                          _ExpandableSessionRow(
+                            session: finished[i],
+                            athleteId: athleteId,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+              ],
             );
           },
         ),
