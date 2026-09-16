@@ -124,6 +124,11 @@ function makeCallableRequest(
     } as any,
     rawRequest: {} as CallableRequest["rawRequest"],
     instanceIdToken: undefined,
+    // Campo REQUERIDO desde firebase-functions v7: dice si el cliente acepta
+    // una respuesta por streaming. `false` es lo correcto acá —`deleteAccount`
+    // devuelve un objeto y nada más— y es lo que manda un cliente que no pidió
+    // streaming, o sea el caso que estos tests simulan.
+    acceptsStreaming: false,
     app: undefined,
   };
 }
@@ -222,6 +227,7 @@ describe("callable guard: unauthenticated", () => {
       rawRequest: {} as CallableRequest["rawRequest"],
       instanceIdToken: undefined,
       app: undefined,
+      acceptsStreaming: false,
     };
     await expect(wrappedHandler(req)).rejects.toMatchObject({
       code: "unauthenticated",
