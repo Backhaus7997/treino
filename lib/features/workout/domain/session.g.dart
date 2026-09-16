@@ -43,8 +43,6 @@ Map<String, dynamic> _$$SessionImplToJson(_$SessionImpl instance) =>
       'dayNumber': instance.dayNumber,
       'wasFullyCompleted': instance.wasFullyCompleted,
       'weekNumber': instance.weekNumber,
-      'feedbackCounts':
-          const FeedbackCountsConverter().toJson(instance.feedbackCounts),
     };
 
 Value? _$JsonConverterFromJson<Json, Value>(
