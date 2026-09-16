@@ -812,6 +812,80 @@ void main() {
               'guardar se entera — perdiendo el trabajo');
     });
 
+    testWidgets('EL SELLO: la copia guardada lleva `copiedFrom` con la fuente',
+        (tester) async {
+      // ⚠️ ESTE TEST EXISTE POR EL CALL SITE, NO POR EL CAMPO.
+      //
+      // `firestore.rules` ya tiene su propia prueba del sello
+      // (`routine-copy-rules.test.ts`), y ahí se verificó por mutación que la
+      // cláusula muerde. Pero una regla que castiga un campo que NADIE escribe
+      // no protege nada: si el editor deja de estampar `copiedFrom`, las dos
+      // suites quedan verdes y el sello es decorativo.
+      //
+      // Es la misma forma de falla que apareció tres veces esta semana — el
+      // guard anti-steering del #1141, los tests de tap-to-load del #1137, y el
+      // mail del prospecto del #1149: el punto probado no era el punto.
+      // La fuente lleva un día REAL con un ejercicio: con `days: []` el editor
+      // hidrata un día vacío, el form no valida y `_submit` no llega a llamar
+      // al repo — el test pasaría el tap y fallaría sin ejercitar el sello.
+      // Mismo detalle que ya documenta el test de EL AGUJERO, más arriba.
+      const slotFuente = RoutineSlot(
+        exerciseId: 'squat',
+        exerciseName: 'Sentadilla',
+        muscleGroup: 'legs',
+        targetSets: 3,
+        targetRepsMin: 8,
+        targetRepsMax: 12,
+        restSeconds: 90,
+        targetReps: [10],
+      );
+      const fuente = Routine(
+        id: 'sys-1',
+        name: 'Full Body 3 días',
+        split: 'FULL BODY',
+        level: ExperienceLevel.beginner,
+        days: [
+          RoutineDay(dayNumber: 1, name: 'Día 1', slots: [slotFuente]),
+        ],
+        source: RoutineSource.system,
+        visibility: RoutineVisibility.public,
+      );
+      final repo = repoCon(fuente);
+      when(() => repo.createUserOwned(
+                uid: any(named: 'uid'),
+                draft: any(named: 'draft'),
+              ))
+          .thenAnswer((inv) async =>
+              inv.namedArguments[const Symbol('draft')] as Routine);
+
+      await _pumpEditor(
+        tester,
+        mode: const SelfCustomizing(sourceRoutineId: 'sys-1'),
+        overrides: _overrides(
+          paywallEnabled: true,
+          // Con derecho: si estuviera free, el gate del catálogo lo frena antes
+          // y nunca se llega a guardar nada.
+          entitlement: AthleteEntitlement.entitled,
+          repo: repo,
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('footer_submit_button')));
+      await tester.pumpAndSettle();
+
+      final capturado = verify(() => repo.createUserOwned(
+            uid: any(named: 'uid'),
+            draft: captureAny(named: 'draft'),
+          )).captured.single as Routine;
+
+      expect(capturado.copiedFrom, 'sys-1',
+          reason: 'sin esto, la cláusula del servidor no tiene qué mirar y el '
+              'sello no existe');
+      // Y el otro lado del mismo hecho: la copia se guarda como rutina PROPIA,
+      // no arrastra el `source` de la plantilla.
+      expect(capturado.source, RoutineSource.userCreated);
+    });
+
     testWidgets('alumno con derecho: entra normal', (tester) async {
       final repo = repoCon(plantilla());
       await _pumpEditor(

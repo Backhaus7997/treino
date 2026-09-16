@@ -31,6 +31,7 @@ _$RoutineImpl _$$RoutineImplFromJson(Map<String, dynamic> json) =>
       ratingAvg: (json['ratingAvg'] as num?)?.toDouble(),
       ratingsCount: (json['ratingsCount'] as num?)?.toInt(),
       isPremium: json['isPremium'] as bool? ?? false,
+      copiedFrom: json['copiedFrom'] as String?,
       summary: json['summary'] as String?,
       goals: json['goals'] == null
           ? const <RoutineGoal>[]
@@ -53,6 +54,7 @@ Map<String, dynamic> _$$RoutineImplToJson(_$RoutineImpl instance) =>
       'createdBy': instance.createdBy,
       'status': _$RoutineStatusEnumMap[instance.status]!,
       'numWeeks': instance.numWeeks,
+      'copiedFrom': instance.copiedFrom,
       'summary': instance.summary,
       'goals': const RoutineGoalListConverter().toJson(instance.goals),
     };

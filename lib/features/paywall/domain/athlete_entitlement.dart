@@ -98,10 +98,36 @@ enum AthleteEntitlement {
 ///      `numWeeks`— entra exacto. No se arregla con una cláusula nueva: el
 ///      servidor no puede distinguir tres días copiados de tres días escritos
 ///      a mano, porque el payload es idéntico. Es una decisión de producto.
-///   3. **Los tres carteles de steering** de la app móvil del PF, declarados
-///      con fecha límite en `test/features/paywall/anti_steering_movil_test.dart`.
+///
+/// Son DOS, y ninguno de los dos es código: uno necesita un reloj en la mano y
+/// el otro una decisión de producto. Del lado del servidor y del cliente, el
+/// paywall del alumno está.
 ///
 /// ─── Lo que SALIÓ de esta lista, y por qué ───
+///
+/// **Los tres carteles de steering de la app móvil del PF**, que estuvieron
+/// acá y ya no están. Cerrado el 2026-09-15 por el PR #1141: los tres snackbars
+/// de `plan_limit_paywall.dart` pasaron a decir el ESTADO de la cuenta («Tu
+/// suscripción está pausada.») y las dos constantes del CTA de
+/// `pricing_screen.dart` quedaron VACÍAS.
+///
+/// Verificado el 2026-09-16 corriendo el ratchet: `anti_steering_movil_test.dart`
+/// da **deuda en CERO**, y el test que la contaba cambió de trabajo — dejó de
+/// medir cuánto falta y pasó a impedir que reaparezca.
+///
+/// ⚠️ Lo que ese cierre COSTÓ no se borra con el ítem, porque no está pago: el
+/// PF que entró por el teléfono quedó sin saber dónde pagar, y bajo 3.1.3(f) no
+/// se le puede volver a decir adentro de la app. La salida es un mail, y por eso
+/// existe `limit-reached` (PR #1149): el tercer mail del paywall, el único canal
+/// que Apple permite explícitamente. Si alguien apaga ese mail, este ítem vuelve
+/// a estar abierto aunque el ratchet siga en cero.
+///
+/// ⚠️ Y este renglón se escribe el día siguiente al cierre, no el mismo día,
+/// porque **volvió a pasar exactamente lo que la nota del seed —acá abajo—
+/// advierte**: el ítem se quedó en la lista después de estar resuelto, y en la
+/// sesión siguiente se lo volvió a nombrar como pendiente. Dos veces el mismo
+/// error sobre el mismo archivo. La advertencia de abajo no alcanzó; lo que
+/// falta es hacerlo en el MISMO PR que cierra el ítem.
 ///
 /// **El seed que apagaba el cobro del catálogo**, que estuvo acá y ya no está.
 /// Cerrado el 2026-09-14 por `bef1b3b8`, que le sacó a

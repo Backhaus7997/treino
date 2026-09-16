@@ -793,6 +793,63 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
     );
   }
 
+  // ── El PF que nunca pago y choco el cupo del plan Free ──────────────────
+  //
+  // NINGUNA PALABRA DE DEUDA ACA, y no es estilo: es que seria FALSO. El
+  // destinatario no tiene `subscription` en su documento, asi que no hay cobro
+  // fallido, ni pausa, ni nada atrasado. «Regularizá» y «poné al día» son de
+  // sus dos hermanos y no se copian; decirselo a alguien que no debe nada lo
+  // manda a buscar un problema que no tiene.
+  //
+  // Y por el mismo motivo el CTA es «VER LOS PLANES» y no «AMPLIAR MI PLAN»:
+  // todavia no hay un plan que ampliar.
+  //
+  // LA LINEA DE «tus alumnos no pierden nada» SE QUEDA, aunque el contexto sea
+  // otro. El PR #758 la nombra como el peor error posible de todo este trabajo:
+  // sugerir que el alumno perdio algo es falso —conserva rutinas, historial y
+  // chat— y ademas le mueve la presion a quien no decide. Vale igual acá: el
+  // alumno numero 3 no se entero de nada.
+  //
+  // El vocabulario («en solo lectura», «verlos pero no editarles rutinas ni
+  // notas») esta copiado LITERAL de `blocked_students_screen.dart`, igual que
+  // en el downgrade. Son el mismo hecho contado por dos canales: si divergen,
+  // el PF cree que son dos problemas distintos.
+  case "limit-reached": {
+    const blocked = countParam(params.blockedCount);
+    const limit = limitParam(params.limit);
+
+    const lines: Line[] = [
+      limit === undefined || limit === null
+        ? ["Llegaste al tope de alumnos de tu cuenta."]
+        : ["Llegaste al tope de tu cuenta: ", strong(cupoLabel(limit)), "."],
+    ];
+
+    // `blocked` puede ser 0 legitimamente si el estado cambia entre que se
+    // encola el mail y que se renderiza —el outbox re-renderiza al ENVIAR—,
+    // por ejemplo si el PF saca un alumno en el medio. La frase de abajo tiene
+    // que seguir siendo cierta en ese caso, y por eso no nombra un numero.
+    lines.push(
+      blocked === 1
+        ? ["1 alumno quedó en solo lectura: lo podés ver, pero no editarle " +
+          "rutinas ni notas."]
+        : blocked > 1
+          ? [`${blocked} alumnos quedaron en solo lectura: los podés ver, ` +
+            "pero no editarles rutinas ni notas."]
+          : ["Los alumnos que pasen ese tope quedan en solo lectura: los podés " +
+            "ver, pero no editarles rutinas ni notas."],
+      ["Tus alumnos no pierden nada: conservan sus rutinas, su historial y el chat."],
+      ["Si querés seguir sumando, hay planes más grandes."],
+    );
+
+    return build(
+      "Llegaste al tope de alumnos de tu cuenta", // i18n: email transaccional
+      "Llegaste al tope",
+      lines,
+      "VER LOS PLANES",
+      ctaUrl,
+    );
+  }
+
   // ── Aviso de baja por inactividad ───────────────────────────────────────
   //
   // ESTE MAIL NO ENUMERA LO QUE SE BORRA, y es la decision del copy.

@@ -41,9 +41,13 @@ export type MailKind =
   // lo que EL le paga a TREINO. Son dos sistemas de plata distintos que en
   // castellano se dicen casi igual.
   //
-  // Son los dos unicos mails del paywall, y los produce `subscription-mail.ts`.
-  // El criterio de por que existen ESTOS dos y no otros vive alla; en una linea:
-  // el mail existe para llegar cuando el PF NO esta mirando la app.
+  // Los produce `subscription-mail.ts`, y el criterio de por que existen ESTOS
+  // y no otros vive alla; en una linea: el mail existe para llegar cuando el PF
+  // NO esta mirando la app.
+  //
+  // NO son los unicos del paywall. El tercero es `limit-reached`, mas abajo:
+  // va por otro disparador porque su destinatario no tiene `subscription` que
+  // pueda transicionar.
   //
   // Se cobro mal y hay ventana para arreglarlo. `grace` conserva el limite
   // pagado, asi que NO se bloquea a nadie y NO rebota ninguna escritura: no
@@ -52,6 +56,30 @@ export type MailKind =
   // El limite efectivo BAJO y ya hay consecuencia. Cubre pausa, cancelacion
   // vencida y bajada de tier — el disparador es el limite, no el status.
   | "subscription-downgraded"
+  // ── El PF que NUNCA pago y choco el cupo del plan Free ──────────────────
+  //
+  // El TERCERO del paywall, y el unico que no habla de una suscripcion que
+  // existe: el destinatario no tiene `subscription` en su documento. Por eso
+  // NO puede decir "regularizá" ni "poné al dia" — no hay nada atrasado. Dice
+  // que llego al tope y que hay planes mas grandes.
+  //
+  // POR QUE ES UN MAIL Y NO UN CARTEL. Porque el cartel ya no se puede poner.
+  // El 2026-09-15 (PR #1141) la app movil dejo de nombrar donde se paga, bajo
+  // la Guideline 3.1.3(f) de Apple: un cartel que dice donde se paga YA es un
+  // "call to action for purchase outside of the app", tappable o no. Lo que
+  // Apple SI permite, y textual, es "send communications outside of the app to
+  // their user base about purchasing methods other than in-app purchase".
+  //
+  // O sea que este mail no es un canal mas: **es el unico canal legal que le
+  // queda al PF que entro por el telefono**. Si se saca, ese funnel no tiene
+  // por donde salir.
+  //
+  // Los otros dos del paywall no lo cubren: los dos disparan por TRANSICION de
+  // `subscription`, y el que nunca pago no transiciona nada.
+  //
+  // Sin `prefKey`, igual que sus dos hermanos: es la respuesta a algo que el PF
+  // acaba de intentar hacer, no una novedad de producto.
+  | "limit-reached"
   // ── Baja automatica por inactividad ─────────────────────────────────────
   //
   // El aviso de los 24 meses. Lo produce `sweepInactiveAccounts`, y es el
