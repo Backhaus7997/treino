@@ -44,7 +44,8 @@ export type NotificationKind =
   | "monthly-report"
   | "overdue-payment"
   | "reaction"
-  | "review";
+  | "review"
+  | "session-finished";
 
 /** Input shape accepted by sendFcm. */
 export interface SendFcmInput {

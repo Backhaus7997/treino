@@ -82,6 +82,13 @@ class NotifType {
 const kNotifTypes = <NotifType>[
   NotifType('nueva_solicitud', 'ALUMNOS', 'Nueva solicitud de vinculación'),
   NotifType('vinculo_finalizado', 'ALUMNOS', 'Vínculo finalizado'),
+  // `notifyOnSessionFinished` — el alumno terminó, y el cuerpo dice cuántas
+  // molestias y notas dejó adentro.
+  //
+  // SÍ lleva prefKey, a diferencia de la molestia: un PF con veinte alumnos
+  // puede querer apagarla y nadie se lastima por no enterarse de que alguien
+  // entrenó. La molestia no la lleva porque apagarla sí tiene consecuencias.
+  NotifType('sesion_terminada', 'ALUMNOS', 'Sesión terminada'),
   NotifType('resena_nueva', 'ALUMNOS', 'Reseña nueva'), // i18n: Fase W3
   NotifType('sesion_cancelada', 'AGENDA', 'Sesión cancelada'),
   NotifType('mensaje_nuevo', 'CHAT', 'Mensaje nuevo'),
@@ -104,6 +111,7 @@ const kPushBackedTypes = <String>{
   'resena_nueva',
   'sesion_cancelada',
   'mensaje_nuevo',
+  'sesion_terminada',
 };
 
 /// Preferencias de notificación: matriz `tipo -> canal -> bool`.
