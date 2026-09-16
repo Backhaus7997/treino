@@ -562,6 +562,28 @@ GoRouter buildRouter({
         },
       ),
       GoRoute(
+        // ─── Historial de entrenamientos del alumno, para el PF ────────────
+        // Saca el historial de adentro de la ficha larga y le da su lugar,
+        // igual que `/workout/historial` del lado del alumno — y monta LA MISMA
+        // pantalla, en modo PF.
+        //
+        // Se declara ANTES que `/session/:sessionId` por la misma razón que
+        // `/workout/historial` va antes que su detalle: el literal tiene que
+        // ganarle al parámetro.
+        //
+        // La diferencia que importa con la sección que reemplaza: acá entran
+        // las sesiones EN CURSO y las INCOMPLETAS. Hoy no aparecen en ninguna
+        // superficie del PF, así que una molestia reportada en una sesión
+        // abandonada genera un aviso cuyo registro no se puede encontrar.
+        path: '/coach/athlete/:athleteId/historial',
+        pageBuilder: (_, state) => _report(
+          state.pageKey,
+          SessionHistoryScreen(
+            coachAthleteId: state.pathParameters['athleteId']!,
+          ),
+        ),
+      ),
+      GoRoute(
         // ─── Detalle de UNA sesión del alumno, para el PF ──────────────────
         // Hasta acá no existía ninguna ruta que llevara a una SESIÓN: el push
         // de molestia (`notifyOnExerciseFeedback`) y «Actividad reciente» del

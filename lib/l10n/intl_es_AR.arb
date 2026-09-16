@@ -557,6 +557,18 @@
     }
   },
   "workoutHistorialHeading": "HISTORIAL",
+  "coachSessionHistoryInProgress": "En curso",
+  "@coachSessionHistoryInProgress": {
+    "description": "Badge en el historial del PF para una sesión del alumno que todavía no terminó (finishedAt == null). El PF necesita distinguirla: un reporte de molestia puede llegarle mientras el entreno sigue."
+  },
+  "coachSessionHistoryIncomplete": "Sin completar",
+  "@coachSessionHistoryIncomplete": {
+    "description": "Badge en el historial del PF para una sesión terminada con wasFullyCompleted == false — incluidas las que el barrido de zombis cerró sola. Antes no se listaban en ningún lado."
+  },
+  "coachSessionHistoryEmpty": "Este alumno todavía no registró entrenamientos.",
+  "@coachSessionHistoryEmpty": {
+    "description": "Estado vacío del historial de sesiones del alumno, visto por el PF. No lleva CTA: el PF no puede entrenar por él."
+  },
   "workoutHistorialEmptyMessage": "Todavía no entrenaste.",
   "workoutHistorialEmptyCta": "Empezar entrenamiento",
   "workoutHistorialErrorMessage": "No pudimos cargar tu historial.",

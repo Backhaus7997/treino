@@ -868,6 +868,16 @@ class AppL10nEs extends AppL10n {
   String get workoutHistorialHeading => 'HISTORIAL';
 
   @override
+  String get coachSessionHistoryInProgress => 'En curso';
+
+  @override
+  String get coachSessionHistoryIncomplete => 'Sin completar';
+
+  @override
+  String get coachSessionHistoryEmpty =>
+      'Este alumno todavía no registró entrenamientos.';
+
+  @override
   String get workoutHistorialEmptyMessage => 'Todavía no entrenaste.';
 
   @override
@@ -5513,6 +5523,16 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get workoutHistorialHeading => 'HISTORIAL';
+
+  @override
+  String get coachSessionHistoryInProgress => 'En curso';
+
+  @override
+  String get coachSessionHistoryIncomplete => 'Sin completar';
+
+  @override
+  String get coachSessionHistoryEmpty =>
+      'Este alumno todavía no registró entrenamientos.';
 
   @override
   String get workoutHistorialEmptyMessage => 'Todavía no entrenaste.';

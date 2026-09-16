@@ -1658,6 +1658,24 @@ abstract class AppL10n {
   /// **'HISTORIAL'**
   String get workoutHistorialHeading;
 
+  /// Badge en el historial del PF para una sesión del alumno que todavía no terminó (finishedAt == null). El PF necesita distinguirla: un reporte de molestia puede llegarle mientras el entreno sigue.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'En curso'**
+  String get coachSessionHistoryInProgress;
+
+  /// Badge en el historial del PF para una sesión terminada con wasFullyCompleted == false — incluidas las que el barrido de zombis cerró sola. Antes no se listaban en ningún lado.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Sin completar'**
+  String get coachSessionHistoryIncomplete;
+
+  /// Estado vacío del historial de sesiones del alumno, visto por el PF. No lleva CTA: el PF no puede entrenar por él.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Este alumno todavía no registró entrenamientos.'**
+  String get coachSessionHistoryEmpty;
+
   /// No description provided for @workoutHistorialEmptyMessage.
   ///
   /// In es_AR, this message translates to:
