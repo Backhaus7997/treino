@@ -170,8 +170,9 @@ class _OnboardingTourViewState extends State<OnboardingTourView> {
 
 /// Segmented progress bar, parameterised by [total].
 ///
-/// Not a reuse of `ProfileSetupHeader`: that widget hardcodes `_totalSteps = 4`
-/// and parameterising it would mean editing `profile_setup`, which this change
+/// Not a reuse of `ProfileSetupHeader`: that widget takes its count from
+/// `ProfileSetupState.total` (the ProfileSetup flow's own step count) and
+/// parameterising it would mean editing `profile_setup`, which this change
 /// deliberately leaves untouched. Same visual idiom, ~20 lines.
 class _TourProgressBars extends StatelessWidget {
   const _TourProgressBars({required this.current, required this.total});

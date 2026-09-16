@@ -68,7 +68,8 @@ void main() {
 
     testWidgets('adapts the bar count to the slide count', (tester) async {
       // Guards the parameterisation: mobile runs 5 slides, web runs 8, and
-      // ProfileSetupHeader (the visual source) hardcodes 4.
+      // ProfileSetupHeader (the visual source) is pinned to
+      // ProfileSetupState.total.
       await _pump(
         tester,
         onFinish: () {},

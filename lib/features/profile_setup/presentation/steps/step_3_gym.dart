@@ -44,8 +44,8 @@ import '../widgets/gym_search_box.dart';
 /// Either way, `profileSetupNotifierProvider`'s draft is kept in sync
 /// (`updateGymId`) so `submit()`'s `draft.gymId` read and the search box's
 /// `selected` highlight stay consistent.
-class Step2Gym extends ConsumerWidget {
-  const Step2Gym({super.key});
+class Step3Gym extends ConsumerWidget {
+  const Step3Gym({super.key});
 
   Future<void> _onGymIdSelected(WidgetRef ref, String? gymId) async {
     final notifier = ref.read(profileSetupNotifierProvider.notifier);

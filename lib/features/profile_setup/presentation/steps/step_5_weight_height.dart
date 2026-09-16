@@ -10,14 +10,14 @@ import '../../application/profile_setup_providers.dart';
 import '../../domain/profile_setup_validators.dart';
 
 /// Step 4: peso y altura. Mockup: `profile-setup-4.png`.
-class Step4WeightHeight extends ConsumerStatefulWidget {
-  const Step4WeightHeight({super.key});
+class Step5WeightHeight extends ConsumerStatefulWidget {
+  const Step5WeightHeight({super.key});
 
   @override
-  ConsumerState<Step4WeightHeight> createState() => _Step4WeightHeightState();
+  ConsumerState<Step5WeightHeight> createState() => _Step5WeightHeightState();
 }
 
-class _Step4WeightHeightState extends ConsumerState<Step4WeightHeight> {
+class _Step5WeightHeightState extends ConsumerState<Step5WeightHeight> {
   late final TextEditingController _weightCtrl;
   late final TextEditingController _heightCtrl;
 

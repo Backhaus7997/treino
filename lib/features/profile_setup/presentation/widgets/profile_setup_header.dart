@@ -4,11 +4,12 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../../app/theme/app_motion.dart';
 import '../../../../app/theme/app_palette.dart';
+import '../../application/profile_setup_notifier.dart';
 import '../../../../core/widgets/motion/treino_state_switcher.dart';
 
-/// Header común a los 4 steps:
-/// - 4 segmentos arriba que se llenan en accent al avanzar.
-/// - Etiqueta `PASO N DE 4` chiquita en condensed.
+/// Header común a todos los steps del flow:
+/// - Un segmento por step arriba, que se llena en accent al avanzar.
+/// - Etiqueta `PASO N DE M` chiquita en condensed.
 /// - Título grande en Barlow Condensed UPPERCASE (multilinea).
 class ProfileSetupHeader extends StatelessWidget {
   const ProfileSetupHeader({
@@ -17,14 +18,17 @@ class ProfileSetupHeader extends StatelessWidget {
     required this.title,
   });
 
-  /// Step 0-indexed (0..3).
+  /// Step 0-indexed (0..[ProfileSetupState.total] - 1).
   final int currentStep;
 
   /// Título del step (ej. "¿CÓMO TE LLAMÁS?", "PESO Y ALTURA"). Puede tener
   /// salto de línea para matchear el mockup.
   final String title;
 
-  static const _totalSteps = 4;
+  /// FUENTE ÚNICA con el notifier. Mientras este número vivió duplicado acá y
+  /// en `ProfileSetupState.total`, agregar un paso y tocar uno solo dejaba el
+  /// indicador diciendo "PASO 5 DE 4".
+  static const _totalSteps = ProfileSetupState.total;
 
   @override
   Widget build(BuildContext context) {

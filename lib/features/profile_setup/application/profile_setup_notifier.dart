@@ -36,7 +36,7 @@ enum UsernameAvailability {
   error,
 }
 
-/// Estado in-memory del flow: el draft del usuario + el step actual (0..3) +
+/// Estado in-memory del flow: el draft del usuario + el step actual (0..4) +
 /// flags de submit (loading / error).
 class ProfileSetupState {
   const ProfileSetupState({
@@ -89,7 +89,10 @@ class ProfileSetupState {
         avatarUploadFailed: avatarUploadFailed ?? this.avatarUploadFailed,
       );
 
-  static const total = 4;
+  /// Cantidad de steps del flow. FUENTE ÚNICA — `ProfileSetupHeader` lee de
+  /// acá. Mientras el número vivió duplicado en los dos archivos, agregar un
+  /// paso y tocar uno solo dejaba el indicador diciendo "PASO 5 DE 4".
+  static const total = 5;
 
   // Step 1 sólo deja avanzar con username de formato válido Y verificado como
   // disponible — `displayName` es el handle público y tiene que ser único.
@@ -101,6 +104,7 @@ class ProfileSetupState {
         1 => draft.isStep2Valid,
         2 => draft.isStep3Valid,
         3 => draft.isStep4Valid,
+        4 => draft.isStep5Valid,
         _ => false,
       };
 
@@ -198,6 +202,11 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
   void updateAvatarLocalPath(String? value) => state = state.copyWith(
         draft: state.draft.copyWith(avatarLocalPath: value),
       );
+
+  /// Fecha de nacimiento (step 2). Llega ya normalizada a fecha-only UTC desde
+  /// el picker — ver `Step2BornAt._pick`.
+  void updateBornAt(DateTime value) =>
+      state = state.copyWith(draft: state.draft.copyWith(bornAt: value));
 
   void updateGymId(String? value) =>
       state = state.copyWith(draft: state.draft.copyWith(gymId: value));
@@ -297,6 +306,18 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
         throw StateError('terms-not-accepted');
       }
 
+      // Revalidación del gate de edad en el submit, misma red de seguridad que
+      // la unicidad del username de acá abajo y por el mismo motivo: el
+      // validador del paso 2 pudo haber pasado hace diez minutos, y el draft se
+      // puede editar volviendo atrás con VOLVER. Salvo que lo que se cuela acá
+      // no es un handle repetido sino un menor de la edad mínima.
+      //
+      // Va ANTES del check de unicidad para fallar sin pagar el viaje a la red.
+      if (ProfileSetupValidators.validateBornAt(draft.bornAt) != null) {
+        state = state.copyWith(isSubmitting: false);
+        throw StateError('born-at-invalid');
+      }
+
       // Revalidación de unicidad en el último submit (red de seguridad sobre el
       // check con debounce de step 1): nunca persistimos un handle duplicado en
       // silencio. Si otro usuario lo tomó entre el check y el submit, marcamos
@@ -323,6 +344,10 @@ class ProfileSetupNotifier extends Notifier<ProfileSetupState> {
 
       final partial = <String, Object?>{
         'displayName': handle,
+        // DateTime crudo: Firestore lo convierte a Timestamp al escribir y el
+        // modelo lo lee de vuelta con @TimestampConverter. Misma forma que usa
+        // el editor de perfil.
+        'bornAt': draft.bornAt,
         'gymId': draft.gymId == kNoGymId ? null : draft.gymId,
         'experienceLevel': draft.experienceLevel?.toJson(),
         'gender': draft.gender?.toJson(),

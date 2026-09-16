@@ -21,7 +21,7 @@ import 'widgets/pinned_current_gym.dart';
 /// Places Text Search (AD-12), then persist the selection to their profile.
 ///
 /// REQ-PSR-019: search + selection + `UserRepository.update({'gymId': ...})`.
-/// Reuses [GymSearchBox] — shared with `step_2_gym.dart` per spec gym-catalog
+/// Reuses [GymSearchBox] — shared with `step_3_gym.dart` per spec gym-catalog
 /// "Onboarding and profile-edit pickers share behavior" (single-search-box
 /// contract, ADR-PSR-011).
 ///

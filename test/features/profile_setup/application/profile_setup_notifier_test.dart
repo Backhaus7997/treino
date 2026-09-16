@@ -34,6 +34,13 @@ class _FakeAvatarUploadService implements AvatarUploadService {
   }
 }
 
+/// Fecha de nacimiento válida para el gate de edad mínima.
+///
+/// Fija y bien lejos del borde a propósito: estos tests miden el SUBMIT, no el
+/// cálculo de la edad. Ese tiene su propia suite en
+/// `profile_setup_validators_test.dart`, con los bordes y el 29 de febrero.
+final _adultBornAt = DateTime.utc(1990, 5, 20);
+
 void main() {
   late FakeFirebaseFirestore firestore;
   late _MockFirebaseAuth mockAuth;
@@ -101,6 +108,7 @@ void main() {
 
     final notifier = container.read(profileSetupNotifierProvider.notifier);
     notifier.updateUsername('Carlos');
+    notifier.updateBornAt(_adultBornAt);
 
     await notifier.submit();
 
@@ -125,6 +133,7 @@ void main() {
 
     final notifier = container.read(profileSetupNotifierProvider.notifier);
     notifier.updateUsername('Carlos');
+    notifier.updateBornAt(_adultBornAt);
 
     await notifier.submit();
 
@@ -150,6 +159,7 @@ void main() {
 
     final notifier = container.read(profileSetupNotifierProvider.notifier);
     notifier.updateUsername('Carlos');
+    notifier.updateBornAt(_adultBornAt);
     // QA-AUTH-001 (issue #434): sin `users/{uid}`, userProfileProvider
     // resuelve null — desde el código esto es indistinguible de una cuenta
     // OAuth nueva, así que ahora también exige el checkbox. Es el
@@ -197,6 +207,7 @@ void main() {
 
       final notifier = container.read(profileSetupNotifierProvider.notifier);
       notifier.updateUsername('Carlos');
+      notifier.updateBornAt(_adultBornAt);
       // termsAccepted se queda en su default (false) — checkbox sin marcar.
 
       await expectLater(
@@ -228,6 +239,7 @@ void main() {
 
       final notifier = container.read(profileSetupNotifierProvider.notifier);
       notifier.updateUsername('Carlos');
+      notifier.updateBornAt(_adultBornAt);
       notifier.updateTermsAccepted(true);
 
       await notifier.submit();
@@ -250,6 +262,7 @@ void main() {
 
       final notifier = container.read(profileSetupNotifierProvider.notifier);
       notifier.updateUsername('Carlos');
+      notifier.updateBornAt(_adultBornAt);
       notifier.updateTermsAccepted(true);
 
       await notifier.submit();
@@ -283,6 +296,7 @@ void main() {
 
       final notifier = container.read(profileSetupNotifierProvider.notifier);
       notifier.updateUsername('Carlos');
+      notifier.updateBornAt(_adultBornAt);
       // termsAccepted se queda en false — un perfil existente NO exige el
       // checkbox (ya aceptó en Register).
 
@@ -315,6 +329,7 @@ void main() {
 
       final notifier = container.read(profileSetupNotifierProvider.notifier);
       notifier.updateUsername('Carlos');
+      notifier.updateBornAt(_adultBornAt);
       notifier.updateAvatarLocalPath('/tmp/pic.jpg');
 
       await notifier.submit(); // must NOT throw — best-effort policy stands
@@ -340,6 +355,7 @@ void main() {
 
       final notifier = container.read(profileSetupNotifierProvider.notifier);
       notifier.updateUsername('Carlos');
+      notifier.updateBornAt(_adultBornAt);
       notifier.updateAvatarLocalPath('/tmp/pic.jpg');
 
       await notifier.submit();
@@ -357,6 +373,7 @@ void main() {
 
       final notifier = container.read(profileSetupNotifierProvider.notifier);
       notifier.updateUsername('Carlos');
+      notifier.updateBornAt(_adultBornAt);
       notifier.updateAvatarLocalPath('/tmp/pic.jpg');
 
       await notifier.submit();
@@ -379,6 +396,7 @@ void main() {
 
       final notifier = container.read(profileSetupNotifierProvider.notifier);
       notifier.updateUsername('Carlos');
+      notifier.updateBornAt(_adultBornAt);
       notifier.updateAvatarLocalPath('/tmp/pic.jpg');
 
       await notifier.submit();
@@ -394,6 +412,68 @@ void main() {
       final usersSnap = await firestore.collection('users').doc('u1').get();
       expect(usersSnap.data()!['avatarUrl'],
           equals('https://fake.url/avatar.jpg'));
+    });
+  });
+  // ──────────────────────────────────────────────────────────────────────────
+  // Gate de edad mínima en el submit
+  //
+  // El validador del paso 2 corre cuando el usuario elige la fecha, pero el
+  // draft se puede editar volviendo atrás con VOLVER. Esta es la red de
+  // seguridad, igual que la revalidación de unicidad del username.
+  // ──────────────────────────────────────────────────────────────────────────
+  group('gate de edad mínima en submit', () {
+    test('un menor de la edad mínima no se persiste y submit tira', () async {
+      await seedUserDoc('u1');
+      final container = makeContainer();
+      addTearDown(container.dispose);
+      await primeUserProfile(container);
+
+      final notifier = container.read(profileSetupNotifierProvider.notifier);
+      notifier.updateUsername('Carlos');
+      // ~10 años, relativo a hoy para que el test no envejezca.
+      notifier.updateBornAt(DateTime.utc(DateTime.now().year - 10, 1, 1));
+
+      await expectLater(notifier.submit(), throwsStateError);
+
+      final usersSnap = await firestore.collection('users').doc('u1').get();
+      expect(usersSnap.data()!['displayName'], isNull,
+          reason: 'un submit rechazado no debe escribir NADA del perfil');
+      expect(container.read(profileSetupNotifierProvider).isSubmitting, isFalse,
+          reason: 'el spinner tiene que cortarse, no quedar colgado');
+    });
+
+    test('sin fecha tampoco persiste — el campo es obligatorio', () async {
+      await seedUserDoc('u1');
+      final container = makeContainer();
+      addTearDown(container.dispose);
+      await primeUserProfile(container);
+
+      final notifier = container.read(profileSetupNotifierProvider.notifier);
+      notifier.updateUsername('Carlos'); // sin updateBornAt a propósito
+
+      await expectLater(notifier.submit(), throwsStateError);
+
+      final usersSnap = await firestore.collection('users').doc('u1').get();
+      expect(usersSnap.data()!['displayName'], isNull);
+    });
+
+    test('una fecha válida sí se persiste en users/{uid}', () async {
+      await seedUserDoc('u1');
+      final container = makeContainer();
+      addTearDown(container.dispose);
+      await primeUserProfile(container);
+
+      final notifier = container.read(profileSetupNotifierProvider.notifier);
+      notifier.updateUsername('Carlos');
+      notifier.updateBornAt(_adultBornAt);
+
+      await notifier.submit();
+
+      final stored = (await firestore.collection('users').doc('u1').get())
+          .data()!['bornAt'];
+      final storedDate =
+          stored is Timestamp ? stored.toDate() : stored as DateTime;
+      expect(storedDate.toUtc(), equals(_adultBornAt));
     });
   });
 }

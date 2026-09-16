@@ -1,4 +1,4 @@
-// Rewritten for gym-google-places Slice 3 (Phase 3): Step2Gym now wraps the
+// Rewritten for gym-google-places Slice 3 (Phase 3): Step3Gym now wraps the
 // shared GymSearchBox (single debounced Google Places search) — the prior
 // version covered the retired two-step brand→branch picker (see git history).
 // Mirrors profile_gym_screen_test.dart's mock/override conventions.
@@ -26,7 +26,7 @@ import 'package:treino/features/profile/data/user_repository.dart';
 import 'package:treino/features/profile_setup/application/profile_setup_notifier.dart';
 import 'package:treino/features/profile_setup/application/profile_setup_providers.dart';
 import 'package:treino/features/profile_setup/domain/profile_setup_draft.dart';
-import 'package:treino/features/profile_setup/presentation/steps/step_2_gym.dart';
+import 'package:treino/features/profile_setup/presentation/steps/step_3_gym.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 // ---------------------------------------------------------------------------
@@ -65,7 +65,7 @@ class MockResolveGymPlaceService extends Mock
 class MockUserRepository extends Mock implements UserRepository {}
 
 /// Call-counting fake — gym-selection-v2 Phase 2 task 2.3 regression guard.
-/// Onboarding (`step_2_gym.dart`) must NEVER read `nearbyGymsProvider`,
+/// Onboarding (`step_3_gym.dart`) must NEVER read `nearbyGymsProvider`,
 /// which would invoke this and bill a `searchNearby` call mid-onboarding.
 class _CountingNearbySearchService implements PlacesNearbySearchService {
   int callCount = 0;
@@ -104,7 +104,7 @@ Widget _buildStep({
     ],
     child: MaterialApp(
       theme: AppTheme.dark(),
-      home: const Scaffold(body: Step2Gym()),
+      home: const Scaffold(body: Step3Gym()),
       localizationsDelegates: AppL10n.localizationsDelegates,
       supportedLocales: AppL10n.supportedLocales,
       locale: const Locale('es', 'AR'),
@@ -143,7 +143,7 @@ void main() {
         gymSearchLocationBiasProvider.overrideWith((ref) async => null),
       ];
 
-  group('Step2Gym', () {
+  group('Step3Gym', () {
     testWidgets('shows the search box and kNoGymId option on first render',
         (tester) async {
       await tester.pumpWidget(_buildStep(overrides: baseOverrides()));
@@ -225,7 +225,7 @@ void main() {
           .called(1);
 
       final container = ProviderScope.containerOf(
-        tester.element(find.byType(Step2Gym)),
+        tester.element(find.byType(Step3Gym)),
       );
       expect(
         container.read(profileSetupNotifierProvider).draft.gymId,
@@ -276,7 +276,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final container = ProviderScope.containerOf(
-        tester.element(find.byType(Step2Gym)),
+        tester.element(find.byType(Step3Gym)),
       );
       expect(
         container.read(profileSetupNotifierProvider).draft.gymId,
@@ -290,7 +290,7 @@ void main() {
 
     // gym-selection-v2 Phase 2 task 2.3 — onboarding isolation regression
     // guard (design AD-10 risk: "Breaking onboarding via the shared
-    // widget"). Step2Gym constructs GymSearchBox WITHOUT emptyQueryContent
+    // widget"). Step3Gym constructs GymSearchBox WITHOUT emptyQueryContent
     // (verified by task 2.4), so it must never read nearbyGymsProvider or
     // nearbyLocationProvider — asserted here with call-counting fakes,
     // not just "existing tests still pass." Still holds after the Phase 3
