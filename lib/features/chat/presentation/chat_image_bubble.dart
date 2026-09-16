@@ -4,9 +4,9 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
+import '../../../core/widgets/photo_viewer_screen.dart';
 import '../../../l10n/app_l10n.dart';
 import '../domain/message.dart';
-import 'photo_viewer_screen.dart';
 
 /// Inline image bubble for chat messages with [MediaType.image].
 ///

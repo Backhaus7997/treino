@@ -2,10 +2,10 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/app/theme/app_theme.dart';
+import 'package:treino/core/widgets/photo_viewer_screen.dart';
 import 'package:treino/features/chat/domain/media_type.dart';
 import 'package:treino/features/chat/domain/message.dart';
 import 'package:treino/features/chat/presentation/chat_image_bubble.dart';
-import 'package:treino/features/chat/presentation/photo_viewer_screen.dart';
 import 'package:treino/l10n/app_l10n.dart';
 
 Widget _wrap(Widget child) => MaterialApp(
