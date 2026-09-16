@@ -56,22 +56,56 @@ const NotificationKind _centinelaSoloDeDart = NotificationKind.unknown;
 
 /// Los literales de `export type NotificationKind` en el archivo TypeScript.
 ///
-/// Devuelve `null` si el bloque no está donde este test lo busca, o si está
-/// pero no se le pudo sacar ni un literal. Las dos cosas significan lo mismo —
-/// el guard quedó ciego— y las dos hacen fallar el test **a propósito**: un
-/// guard que no encuentra lo que busca y pasa igual es peor que no tenerlo,
-/// porque hace creer que hay una red que no está.
+/// Devuelve `null` en los TRES casos en que el guard quedaría ciego, y los tres
+/// hacen fallar el test **a propósito**: un guard que no encuentra lo que busca
+/// y pasa igual es peor que no tenerlo, porque hace creer que hay una red que
+/// no está.
+///
+///   1. El bloque no está donde este test lo busca (lo renombraron, lo
+///      movieron, lo convirtieron en enum o en const object).
+///   2. Está, pero no se le pudo sacar ni un literal.
+///   3. **Está, se le sacaron literales, y ADEMÁS quedó algo sin consumir.**
+///
+/// El tercero es el sutil, y es el que hacía fallar ABIERTO a la primera
+/// versión de este archivo (lo encontró Codex en la review del PR). Si la unión
+/// se extiende por un alias —`type Extra = "new-kind";` y después
+/// `export type NotificationKind = Extra | "…"`— el regex matchea igual pero
+/// sólo levanta los literales escritos ahí mismo. El enum Dart coincide con ese
+/// subconjunto incompleto, todas las aserciones de paridad salen VERDES, y el
+/// backend puede emitir `new-kind` mientras Dart lo manda a [unknown]. O sea:
+/// exactamente el agujero que este archivo existe para cerrar, reintroducido
+/// por el propio guard. Medido antes de arreglarlo: 5 tests verdes con
+/// `new-kind` emitible y ausente del enum.
+///
+/// Por eso no alcanza con "saqué algún literal". Después de sacarlos, lo que
+/// queda en la unión tiene que ser NADA — sólo separadores y espacios. Si sobra
+/// un identificador, este guard dice que no sabe en vez de contestar de menos.
 Set<String>? _kindsDelTypeScript(String fuente) {
   final bloque = RegExp(
     r'export\s+type\s+NotificationKind\s*=([^;]*);',
   ).firstMatch(fuente);
   if (bloque == null) return null;
 
-  final literales = RegExp(r'"([^"]+)"')
-      .allMatches(bloque.group(1)!)
-      .map((m) => m.group(1)!)
-      .toSet();
-  return literales.isEmpty ? null : literales;
+  // Los comentarios salen primero: un literal citado adentro de un comentario
+  // no es miembro de la unión, y no tiene que contar ni como kind ni como resto.
+  final cuerpo = bloque
+      .group(1)!
+      .replaceAll(RegExp(r'/\*.*?\*/', dotAll: true), '')
+      .replaceAll(RegExp(r'//[^\n]*'), '');
+
+  final literales =
+      RegExp(r'"([^"]+)"').allMatches(cuerpo).map((m) => m.group(1)!).toSet();
+  if (literales.isEmpty) return null;
+
+  // Nada que no sea un literal puede quedar en pie. Un alias, una referencia a
+  // otro tipo, un `string` — cualquier cosa que este regex no sepa resolver
+  // significa que la lista que levanté está INCOMPLETA, y una lista incompleta
+  // acá no falla: pasa.
+  final resto =
+      cuerpo.replaceAll(RegExp(r'"[^"]*"'), '').replaceAll('|', '').trim();
+  if (resto.isNotEmpty) return null;
+
+  return literales;
 }
 
 void main() {
@@ -97,8 +131,14 @@ void main() {
         _kindsDelTypeScript(ts.readAsStringSync()),
         isNotNull,
         reason: 'no pude leer `export type NotificationKind = "…" | "…";` en '
-            '${ts.path}, o lo leí vacío. Un guard que no encuentra lo que '
-            'busca y pasa igual es peor que no tenerlo.',
+            '${ts.path}: o no está, o lo leí vacío, o la unión tiene algún '
+            'miembro que NO es un literal (un alias, una referencia a otro '
+            'tipo). Ese último caso es el peligroso: los literales sueltos se '
+            'leen igual, el enum Dart coincide con ese subconjunto incompleto, '
+            'y el guard pasa en VERDE mientras el backend emite un kind que '
+            'Dart no conoce. Escribí la unión con literales directos, o '
+            'enseñale a `_kindsDelTypeScript` a resolver la referencia — pero '
+            'no la dejes pasar de largo.',
       );
     });
 
