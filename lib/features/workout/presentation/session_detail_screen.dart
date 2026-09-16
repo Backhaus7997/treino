@@ -24,27 +24,56 @@ import 'widgets/stat_tile.dart';
 import '../../../l10n/app_l10n.dart';
 
 class SessionDetailScreen extends ConsumerWidget {
-  const SessionDetailScreen({super.key, required this.sessionId});
+  const SessionDetailScreen({
+    super.key,
+    required this.sessionId,
+    this.coachAthleteId,
+  });
 
   final String sessionId;
 
+  /// Cuando NO es null, el que mira es el PF y la sesión es de este alumno.
+  /// Mismo contrato que [RoutineDetailScreen.coachAthleteId]: un solo
+  /// parámetro define las tres cosas que cambian entre las dos superficies
+  /// —de quién es la sesión, qué provider de reportes se lee, y a dónde vuelve
+  /// el back— en vez de tres flags que se pueden setear inconsistentes.
+  ///
+  /// Las reglas ya habilitan este camino: `users/{uid}/sessions/{sessionId}`
+  /// y su `setLogs` comparten el mismo predicado (dueño OR PF con
+  /// `session_shares/{uid}.trainerId == auth.uid`), así que el PF vinculado
+  /// lee el doc de sesión igual que lee las series.
+  final String? coachAthleteId;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final uid = ref.watch(currentUidProvider) ?? '';
+    final currentUid = ref.watch(currentUidProvider) ?? '';
+    // El dueño de la sesión, que NO es el que mira cuando entra el PF.
+    // `sessionSummaryProvider` ya estaba parametrizado por `uid` — lo único
+    // que hardcodeaba al usuario actual era esta pantalla.
+    final uid = coachAthleteId ?? currentUid;
     final summaryAsync = ref.watch(
       sessionSummaryProvider((uid: uid, sessionId: sessionId)),
     );
     // #628 — el alumno tiene que poder releer lo que él mismo reportó: si sólo
     // lo ve el PF, la persona no tiene registro de lo que dijo que le pasó.
-    // Va la variante de dueño (`uid` propio), no la del PF, y se watchea
-    // aparte de la sesión a propósito: un fallo leyendo reportes degrada a
-    // "sin reportes" y NO tumba el detalle, igual que en las dos superficies
-    // del PF — pero se AVISA, también igual que en las dos del PF. Que la
-    // persona relea "no reporté nada" cuando en realidad no se pudo leer es el
-    // mismo silencio, sólo que del lado del que escribió.
-    final feedbackAsync = ref.watch(
-      sessionExerciseFeedbackProvider((uid: uid, sessionId: sessionId)),
-    );
+    // Se watchea aparte de la sesión a propósito: un fallo leyendo reportes
+    // degrada a "sin reportes" y NO tumba el detalle — pero se AVISA. Que
+    // cualquiera de los dos lea "no reportó nada" cuando en realidad no se
+    // pudo leer es el mismo silencio.
+    //
+    // Los dos providers NO son intercambiables: el del dueño es un
+    // `StreamProvider` sobre su propia subcolección; el del PF un
+    // `FutureProvider` que ya trae la guarda de uid vacío. Por eso el ternario
+    // está acá y no adentro de un provider único.
+    final feedbackAsync = coachAthleteId != null
+        ? ref.watch(
+            coachSessionExerciseFeedbackProvider(
+              (athleteUid: coachAthleteId!, sessionId: sessionId),
+            ),
+          )
+        : ref.watch(
+            sessionExerciseFeedbackProvider((uid: uid, sessionId: sessionId)),
+          );
     final feedback = feedbackAsync.valueOrNull ?? const <ExerciseFeedback>[];
     final feedbackFailed = feedbackAsync.hasError;
 
@@ -74,6 +103,13 @@ class SessionDetailScreen extends ConsumerWidget {
                   setLogs: data.setLogs,
                   feedback: feedback,
                   feedbackFailed: feedbackFailed,
+                  // Sin esto el PF que llega por deep link —sin nada que
+                  // popear— cae en `/workout`, que es SU propio entreno. El
+                  // mismo defecto que el #410 arregló para el detalle de
+                  // ejercicio.
+                  backFallbackRoute: coachAthleteId != null
+                      ? '/coach/athlete/$coachAthleteId'
+                      : '/workout',
                 );
               },
             ),
@@ -92,10 +128,15 @@ class _DetailLoaded extends StatelessWidget {
     required this.setLogs,
     this.feedback = const <ExerciseFeedback>[],
     this.feedbackFailed = false,
+    this.backFallbackRoute = '/workout',
   });
 
   final Session session;
   final List<SetLog> setLogs;
+
+  /// A dónde manda el back cuando no hay nada que popear (deep link, restore).
+  /// `/workout` para el dueño; la ficha del alumno cuando mira el PF.
+  final String backFallbackRoute;
 
   /// Lo que el alumno reportó en esta sesión (#628). Ya filtrado por sesión;
   /// el reparto por ejercicio y por serie lo hace [SessionExerciseBlock].
@@ -132,8 +173,9 @@ class _DetailLoaded extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: IconButton(
               icon: Icon(TreinoIcon.back, color: palette.textPrimary),
-              onPressed: () =>
-                  context.canPop() ? context.pop() : context.go('/workout'),
+              onPressed: () => context.canPop()
+                  ? context.pop()
+                  : context.go(backFallbackRoute),
             ),
           ),
           const SizedBox(height: 8),

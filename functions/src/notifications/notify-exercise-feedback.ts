@@ -244,11 +244,21 @@ export async function notifyOnExerciseFeedbackHandler(
   // propósito — ver el header de este archivo.
   const body = `${athleteName} reportó una molestia en ${exerciseName}`; // i18n: #628
 
-  // No existe today una ruta para una sesión puntual del lado del coach
-  // (routine_detail_screen.dart y session_detail_sheet.dart ya navegan a
-  // este mismo path para que el PF vea a SU alumno); el PF entra a la ficha
-  // del alumno y ahí tiene el historial de sesiones con este reporte adentro.
-  const deepLink = `/coach/athlete/${athleteUid}`;
+  // A la SESIÓN donde se reportó la molestia. Hasta que existió
+  // `/coach/athlete/:athleteId/session/:sessionId` esto apuntaba a la ficha
+  // entera del alumno, y el PF que tocaba un aviso de dolor caía en una
+  // pantalla larga donde tenía que ir a buscar el entrenamiento a mano — un
+  // aviso cuyo destino no mostraba lo que el aviso decía.
+  //
+  // `sessionId` ya viajaba en `data` (abajo) desde antes: lo que faltaba era
+  // el destino, no el dato.
+  //
+  // Ojo: este push sale al CREARSE el reporte, así que la sesión puede estar
+  // EN CURSO. La pantalla lo aguanta —no lee `finishedAt`— y muestra las
+  // series ya cargadas con el reporte pegado. `durationMin` y `totalVolumeKg`
+  // van en 0 hasta que se cierre la sesión, que es la decisión deliberada de
+  // `session_repository.dart` (un 0 honesto antes que un valor inventado).
+  const deepLink = `/coach/athlete/${athleteUid}/session/${sessionId}`;
 
   await sendFcm(
     app,

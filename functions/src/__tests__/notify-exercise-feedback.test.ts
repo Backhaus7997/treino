@@ -229,6 +229,32 @@ describe("kind: discomfort with a live session_shares grant → sends the push",
     expect(callArg.notification?.body).toContain("Ana Atleta");
     expect(callArg.notification?.body).toContain("Sentadilla");
   });
+
+  // El destino, que es la mitad que faltaba: este push avisaba de un DOLOR y
+  // dejaba al PF en la ficha entera del alumno, a buscar el entrenamiento a
+  // mano. Sus hermanas (`notify-review`, `notify-chat-message`) ya pineaban su
+  // deepLink con un test; ésta no, y por ese hueco se fue.
+  it("manda a la SESIÓN del reporte, no a la ficha entera del alumno", async () => {
+    const mock = makeMockMessaging();
+
+    await notifyOnExerciseFeedbackHandler(
+      testApp,
+      athleteUid,
+      sessionId,
+      makeFeedback(),
+      mock,
+    );
+
+    const callArg = (mock.sendEachForMulticast as jest.Mock).mock
+      .calls[0][0] as MulticastMessage;
+    expect(callArg.data?.deepLink).toBe(
+      `/coach/athlete/${athleteUid}/session/${sessionId}`,
+    );
+    // Explícito y no redundante: el path viejo es PREFIJO del nuevo, así que un
+    // `toContain` pasaría con los dos. Esta línea es la que separa "llega a la
+    // sesión" de "llega a la ficha".
+    expect(callArg.data?.deepLink).not.toBe(`/coach/athlete/${athleteUid}`);
+  });
 });
 
 // ---------------------------------------------------------------------------
