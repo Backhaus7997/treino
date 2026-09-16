@@ -132,18 +132,46 @@ class SessionHistoryScreen extends ConsumerWidget {
                       if (visibles.isEmpty) {
                         return _EmptyState(coachAthleteId: coachAthleteId);
                       }
+                      // El fetch corta en `kSessionHistoryFetchLimit` y hasta
+                      // acá lo hacía EN SILENCIO. Para el alumno prolífico (o
+                      // para el PF que mira su historial) la lista simplemente
+                      // terminaba, y una lista que termina afirma que eso es
+                      // todo — o sea que el corte mentía sobre el pasado del
+                      // usuario sin decir una palabra.
+                      //
+                      // El arreglo de fondo es paginar detrás de un cursor, y
+                      // el dartdoc del propio límite ya lo tiene anotado como
+                      // follow-up. Mientras tanto el tope se DECLARA: el repo
+                      // ya eligió este camino en el selector de períodos de los
+                      // gráficos, donde no ofrece un «todo» porque con 365 de
+                      // tope «sería mentira».
+                      //
+                      // La comparación es contra `all` y no contra `visibles`:
+                      // el tope lo aplica el fetch, antes de que `_visibles`
+                      // filtre. Mirando la lista ya filtrada, el modo ALUMNO
+                      // —que descarta las incompletas— nunca llegaría al número
+                      // y el aviso no saldría jamás.
+                      final llegoAlTope =
+                          all.length >= kSessionHistoryFetchLimit;
                       return ListView.separated(
                         padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
                         physics: const AlwaysScrollableScrollPhysics(),
-                        itemCount: visibles.length,
+                        itemCount: visibles.length + (llegoAlTope ? 1 : 0),
                         separatorBuilder: (_, __) => Divider(
                           height: 1,
                           color: palette.textMuted.withValues(alpha: 0.12),
                         ),
-                        itemBuilder: (_, i) => _HistoryCard(
-                          session: visibles[i],
-                          coachAthleteId: coachAthleteId,
-                        ),
+                        itemBuilder: (_, i) {
+                          if (i == visibles.length) {
+                            return const _TopeAlcanzado(
+                              cantidad: kSessionHistoryFetchLimit,
+                            );
+                          }
+                          return _HistoryCard(
+                            session: visibles[i],
+                            coachAthleteId: coachAthleteId,
+                          );
+                        },
                       );
                     },
                   ),
@@ -151,6 +179,42 @@ class SessionHistoryScreen extends ConsumerWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Pie que declara el tope del fetch cuando la lista lo alcanzó.
+///
+/// No es un vacío decorativo: sin él, la lista termina y punto, y una lista que
+/// termina afirma «esto es todo». Es el mismo criterio que AGENTS.md §11.1
+/// aplica a los mensajes tranquilizadores —lo que no se puede garantizar no se
+/// afirma— y el mismo que el repo ya usa en el selector de períodos de los
+/// gráficos, que no ofrece un «todo» porque con este tope sería mentira.
+///
+/// Desaparece solo el día que el historial pagine detrás de un cursor: el
+/// `llegoAlTope` deja de darse cuando ya no hay tope que alcanzar.
+class _TopeAlcanzado extends StatelessWidget {
+  const _TopeAlcanzado({required this.cantidad});
+
+  final int cantidad;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = AppPalette.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.s18),
+      child: Text(
+        AppL10n.of(context).workoutHistorialTopeAlcanzado(cantidad),
+        textAlign: TextAlign.center,
+        style: GoogleFonts.barlow(
+          // El token y no `12` crudo: el archivo ya está en la allowlist del
+          // scan de tamaños, pero su ratchet cuenta OCURRENCIAS y su contrato
+          // dice que la deuda total nunca crece. Pasar por la holgura del
+          // techo no es lo mismo que no sumar deuda.
+          fontSize: AppTextSize.caption,
+          color: palette.textMuted,
         ),
       ),
     );

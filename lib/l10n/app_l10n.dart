@@ -7521,6 +7521,12 @@ abstract class AppL10n {
   /// **'MOLESTIA'**
   String get exerciseFeedbackNoteTagDiscomfort;
 
+  /// Pie del historial cuando la lista llegó al tope de fetch (kSessionHistoryFetchLimit). Sin este aviso la lista corta en silencio y el corte se lee como 'esto es todo tu historial', que es falso.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Estos son los últimos {cantidad}. Los más viejos todavía no se pueden ver.'**
+  String workoutHistorialTopeAlcanzado(int cantidad);
+
   /// Serie a la que quedó anclado el reporte, al lado del tag.
   ///
   /// In es_AR, this message translates to:

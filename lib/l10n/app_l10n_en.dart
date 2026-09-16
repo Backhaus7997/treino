@@ -4235,6 +4235,11 @@ class AppL10nEn extends AppL10n {
   String get exerciseFeedbackNoteTagDiscomfort => 'DISCOMFORT';
 
   @override
+  String workoutHistorialTopeAlcanzado(int cantidad) {
+    return 'These are the latest $cantidad. Older ones aren\'t available yet.';
+  }
+
+  @override
   String exerciseFeedbackNoteSetTag(int setNumber) {
     return 'SET $setNumber';
   }

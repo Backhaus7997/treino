@@ -222,4 +222,69 @@ void main() {
     expect(find.text('propia:s-42'), findsOneWidget,
         reason: 'el alumno no puede terminar en una ruta de coach');
   });
+
+  // ── El tope del fetch, declarado (P2 de Codex en el #1153) ───────────────
+  //
+  // `sessionsByUidProvider` corta en `kSessionHistoryFetchLimit` y hasta acá lo
+  // hacía EN SILENCIO: la lista simplemente terminaba. Una lista que termina
+  // afirma «esto es todo», así que el corte mentía sobre el pasado del usuario
+  // sin decir una palabra — el mismo modo de falla que AGENTS.md §11.1.
+  //
+  // El arreglo de fondo es paginar detrás de un cursor (anotado como follow-up
+  // en el dartdoc del propio límite). Esto no lo reemplaza: declara el tope
+  // mientras tanto.
+  group('tope del fetch', () {
+    String textoDelTope() =>
+        'Estos son los últimos $kSessionHistoryFetchLimit. '
+        'Los más viejos todavía no se pueden ver.';
+
+    List<Session> completas(int n) => [
+          for (int i = 0; i < n; i++) _completa(id: 's-$i', name: 'Push $i'),
+        ];
+
+    Future<void> hastaElFinal(WidgetTester tester) =>
+        tester.scrollUntilVisible(find.text(textoDelTope()), 600);
+
+    // Control negativo del de abajo. Sin éste, un pie incondicional pasaría
+    // igual — y le diría a TODO usuario que le falta historial, que es una
+    // mentira nueva en lugar de la vieja.
+    testWidgets('no se declara nada si la lista no llegó al tope',
+        (tester) async {
+      await tester.pumpWidget(_wrap(sessions: completas(3)));
+      await tester.pumpAndSettle();
+
+      expect(find.text(textoDelTope()), findsNothing);
+    });
+
+    testWidgets('al llegar al tope, el pie lo dice', (tester) async {
+      await tester.pumpWidget(
+        _wrap(sessions: completas(kSessionHistoryFetchLimit)),
+      );
+      await tester.pumpAndSettle();
+
+      await hastaElFinal(tester);
+
+      expect(find.text(textoDelTope()), findsOneWidget);
+    });
+
+    // El punto sutil, y la razón por la que la comparación va contra `all` y no
+    // contra la lista ya filtrada: el tope lo aplica el FETCH, antes de que
+    // `_visibles` descarte nada. Mirando `visibles`, el modo ALUMNO —que filtra
+    // las incompletas— nunca alcanzaría el número y el aviso no saldría jamás
+    // justo para quien más historial tiene.
+    testWidgets('el modo alumno lo declara aunque su filtro achique la lista',
+        (tester) async {
+      final sessions = [
+        ...completas(kSessionHistoryFetchLimit - 1),
+        _incompleta(),
+      ];
+
+      await tester.pumpWidget(_wrap(sessions: sessions));
+      await tester.pumpAndSettle();
+
+      await hastaElFinal(tester);
+
+      expect(find.text(textoDelTope()), findsOneWidget);
+    });
+  });
 }

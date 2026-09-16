@@ -3736,6 +3736,8 @@
   "@exerciseFeedbackNoteTagComment": {"description": "Tag del reporte cuando es un comentario común. Espejo de 'DEL COACH' en la otra dirección."},
   "exerciseFeedbackNoteTagDiscomfort": "MOLESTIA",
   "@exerciseFeedbackNoteTagDiscomfort": {"description": "Tag del reporte cuando el alumno marcó dolor o molestia. Se ve distinto de un comentario a propósito."},
+  "workoutHistorialTopeAlcanzado": "Estos son los últimos {cantidad}. Los más viejos todavía no se pueden ver.",
+  "@workoutHistorialTopeAlcanzado": {"description": "Pie del historial cuando la lista llegó al tope de fetch (kSessionHistoryFetchLimit). Sin este aviso la lista corta en silencio y el corte se lee como 'esto es todo tu historial', que es falso.", "placeholders": {"cantidad": {"type": "int"}}},
   "exerciseFeedbackNoteSetTag": "SERIE {setNumber}",
   "@exerciseFeedbackNoteSetTag": {"description": "Serie a la que quedó anclado el reporte, al lado del tag.", "placeholders": {"setNumber": {"type": "int"}}},
   "coachSessionFeedbackLoadError": "No pudimos cargar los reportes del alumno.",

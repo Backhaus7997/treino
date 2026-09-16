@@ -1043,6 +1043,7 @@
   "exerciseFeedbackError": "No pudimos guardar tu reporte. Probá de nuevo.",
   "exerciseFeedbackNoteTagComment": "DEL ALUMNO",
   "exerciseFeedbackNoteTagDiscomfort": "MOLESTIA",
+  "workoutHistorialTopeAlcanzado": "Estos son los últimos {cantidad}. Los más viejos todavía no se pueden ver.",
   "exerciseFeedbackNoteSetTag": "SERIE {setNumber}",
   "coachSessionFeedbackLoadError": "No pudimos cargar los reportes del alumno.",
   "sessionFeedbackLoadError": "No pudimos cargar tus reportes.",

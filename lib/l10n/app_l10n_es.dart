@@ -4316,6 +4316,11 @@ class AppL10nEs extends AppL10n {
   String get exerciseFeedbackNoteTagDiscomfort => 'MOLESTIA';
 
   @override
+  String workoutHistorialTopeAlcanzado(int cantidad) {
+    return 'Estos son los últimos $cantidad. Los más viejos todavía no se pueden ver.';
+  }
+
+  @override
   String exerciseFeedbackNoteSetTag(int setNumber) {
     return 'SERIE $setNumber';
   }
@@ -8968,6 +8973,11 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get exerciseFeedbackNoteTagDiscomfort => 'MOLESTIA';
+
+  @override
+  String workoutHistorialTopeAlcanzado(int cantidad) {
+    return 'Estos son los últimos $cantidad. Los más viejos todavía no se pueden ver.';
+  }
 
   @override
   String exerciseFeedbackNoteSetTag(int setNumber) {

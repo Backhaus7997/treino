@@ -1724,6 +1724,8 @@
   "@exerciseFeedbackNoteTagComment": {},
   "exerciseFeedbackNoteTagDiscomfort": "DISCOMFORT",
   "@exerciseFeedbackNoteTagDiscomfort": {},
+  "workoutHistorialTopeAlcanzado": "These are the latest {cantidad}. Older ones aren't available yet.",
+  "@workoutHistorialTopeAlcanzado": {"placeholders": {"cantidad": {"type": "int"}}},
   "exerciseFeedbackNoteSetTag": "SET {setNumber}",
   "@exerciseFeedbackNoteSetTag": {"placeholders": {"setNumber": {"type": "int"}}},
   "coachSessionFeedbackLoadError": "We could not load the athlete's reports.",
