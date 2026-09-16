@@ -123,13 +123,20 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
     // `init` es async y no se espera: lo único que hace antes de estar listo es
     // que un `show()` muy temprano se descarte con un log. Bloquear el arranque
     // de la app por el canal de notificaciones sería un intercambio malo.
-    unawaited(ref.read(localNotificationsServiceProvider).init(
+    final localNotifs = ref.read(localNotificationsServiceProvider);
+    // El future se GUARDA (y además se deja sin esperar acá). El cold-start
+    // gate de más abajo lo espera antes de preguntar por el aviso que abrió la
+    // app: en iOS el launch notification lo registra `initialize`, así que
+    // preguntar antes de que termine devuelve null y el deep link se pierde
+    // justo en el caso que este gate existe para cubrir.
+    final localNotifsInit = localNotifs.init(
       onTap: (deepLink) {
         final ctx = _router.routerDelegate.navigatorKey.currentContext;
         if (ctx == null || !ctx.mounted) return;
         goDeepLink(ctx, deepLink);
       },
-    ));
+    );
+    unawaited(localNotifsInit);
 
     // (a) Attach foreground handler. (REQ-PN-HANDLER-001)
     final fcm = ref.read(fcmServiceProvider);
@@ -159,14 +166,33 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
     //     ADR-PN-011, REQ-PN-HANDLER-003, SCENARIO-657, 658.
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final message = await fcm.getInitialMessage();
-      if (message == null) return;
-      if (isOwnChatMessage(
-          message, ref.read(firebaseAuthProvider).currentUser?.uid)) {
+      if (message != null) {
+        if (isOwnChatMessage(
+            message, ref.read(firebaseAuthProvider).currentUser?.uid)) {
+          return;
+        }
+        final ctx = _router.routerDelegate.navigatorKey.currentContext;
+        if (ctx == null || !ctx.mounted) return;
+        goDeepLink(ctx, message.data['deepLink'] as String?);
         return;
       }
+
+      // (b2) El mismo gate, para las notificaciones LOCALES.
+      //
+      // Hasta acá esto no existía y el tap se perdía entero: el callback de
+      // `LocalNotificationsService.init` sólo corre con la app VIVA, así que
+      // tocar un aviso local con la app cerrada la arrancaba en la pantalla de
+      // inicio. `getInitialMessage` cubría únicamente el lado de FCM.
+      //
+      // Va en el `else` del de arriba porque la app la abre UNA notificación:
+      // si FCM ya reclamó el arranque, preguntar por la local sólo puede
+      // devolver un aviso viejo y pisar el destino correcto.
+      await localNotifsInit;
+      final deepLinkLocal = await localNotifs.deepLinkDeArranque();
+      if (deepLinkLocal == null) return;
       final ctx = _router.routerDelegate.navigatorKey.currentContext;
       if (ctx == null || !ctx.mounted) return;
-      goDeepLink(ctx, message.data['deepLink'] as String?);
+      goDeepLink(ctx, deepLinkLocal);
     });
   }
 

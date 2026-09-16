@@ -125,6 +125,41 @@ class LocalNotificationsService {
         );
   }
 
+  /// El deep link de la notificación LOCAL que ABRIÓ la app, o null.
+  ///
+  /// Es el equivalente local de `FirebaseMessaging.getInitialMessage()`, y
+  /// tapa el mismo agujero que aquél tapa del lado de FCM.
+  ///
+  /// El callback de [init] —`onDidReceiveNotificationResponse`— sólo se dispara
+  /// con la app VIVA. Si el usuario toca un aviso local con la app cerrada, el
+  /// sistema la ARRANCA y ese callback no corre nunca: el tap se pierde y el
+  /// usuario aterriza en la pantalla de inicio en vez de donde el aviso
+  /// prometía. Y no es un caso raro — es el más común, porque una notificación
+  /// se toca justamente cuando no estabas usando la app.
+  ///
+  /// Se volvió más caro desde el #1150: los deep links ahora llevan a UNA
+  /// sesión concreta y no a la ficha genérica del alumno, así que perderlo ya
+  /// no es aterrizar cerca, es aterrizar en otro lado.
+  ///
+  /// **Se consume después de que el router esté montado**, igual que su gemelo
+  /// de FCM: navegar antes del primer frame no tiene a dónde.
+  ///
+  /// Nunca tira: un fallo del canal nativo devuelve null y el arranque sigue
+  /// normal, que es exactamente lo que pasaba antes de que este método
+  /// existiera.
+  Future<String?> deepLinkDeArranque() async {
+    try {
+      final detalles = await _plugin.getNotificationAppLaunchDetails();
+      if (detalles == null || !detalles.didNotificationLaunchApp) return null;
+      final payload = detalles.notificationResponse?.payload;
+      debugPrint('[local-notif] arrancó por notificación — deepLink=$payload');
+      return payload;
+    } catch (e) {
+      debugPrint('[local-notif] getNotificationAppLaunchDetails FALLÓ — $e');
+      return null;
+    }
+  }
+
   /// Dibuja la notificación. [deepLink] viaja como payload y vuelve en el tap.
   ///
   /// Devuelve `true` si se dibujó, `false` si NO se pudo.
