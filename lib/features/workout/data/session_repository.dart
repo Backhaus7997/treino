@@ -498,6 +498,19 @@ class SessionRepository {
             'status': SessionStatusX(SessionStatus.finished).toJson(),
             'finishedAt': cerradaEn,
             'wasFullyCompleted': false,
+            // MARCA DE ORIGEN, y no es cosmética: `notifyOnSessionFinished`
+            // dispara sobre la transición `finishedAt: null → no-null`, que es
+            // exactamente lo que este barrido escribe. Sin la marca, cerrar una
+            // colgada le avisa al PF que el alumno "terminó su entrenamiento",
+            // que es falso.
+            //
+            // No alcanza con mirar el tiempo transcurrido: cuando la más nueva
+            // sigue viva (`vencio == false`), acá se cierran las duplicadas
+            // SIN importar su edad — dos sesiones abiertas con minutos de
+            // diferencia, una del reloj y otra del teléfono, caen por este
+            // camino a los minutos de empezar. El dato tiene que ser explícito,
+            // no deducido.
+            'closedBySweep': true,
           });
         }
       } catch (e, st) {

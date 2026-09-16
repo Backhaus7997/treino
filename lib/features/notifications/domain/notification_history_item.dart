@@ -1,5 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart' show Timestamp;
 
+/// Espejo a mano de `NotificationKind` en
+/// `functions/src/notifications/send-fcm.ts`.
+///
+/// ⚠️ HOY ESTÁ DESINCRONIZADO y no se nota, porque nada de la UI ramifica por
+/// este valor: se parsea y no se usa. Faltan `discomfort` y `monthly-report`,
+/// que el backend emite desde hace meses y acá caen en [unknown] sin que
+/// ninguna pantalla cambie. Si algún día algo empieza a ramificar por el kind,
+/// eso deja de ser inofensivo — revisar la lista de allá antes.
 enum NotificationKind {
   appointment('appointment'),
   chatMessage('chat-message'),
@@ -10,6 +18,7 @@ enum NotificationKind {
   overduePayment('overdue-payment'),
   reaction('reaction'),
   review('review'),
+  sessionFinished('session-finished'),
   unknown('unknown');
 
   const NotificationKind(this.value);
