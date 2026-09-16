@@ -87,6 +87,24 @@ class Routine with _$Routine {
     // aplica a la rutina propia del alumno, no al catálogo (spec §4).
     // ignore: invalid_annotation_target
     @JsonKey(includeToJson: false) @Default(false) bool isPremium,
+    // ── Procedencia: de qué rutina se copió ésta ─────────────────────────────
+    //
+    // Lo pone «Usar como base» (#647) con el id de la plantilla fuente. `null`
+    // en todo lo demás: una rutina escrita desde cero no viene de ningún lado.
+    //
+    // ⚠️ AL REVÉS QUE `isPremium`: este campo SÍ viaja en `toJson()`, y tiene
+    // que hacerlo. `isPremium` se excluye porque el cliente sólo lo lee; éste
+    // es al revés — el cliente es el ÚNICO que lo puede escribir, y si no
+    // viaja, `firestore.rules` no tiene nada que mirar y el sello no existe.
+    //
+    // Por eso `copiedFrom` está en `userCreatedRoutineFields()` de las reglas.
+    // Si se saca de ahí, el `hasOnly` rechaza el create de TODA copia y el
+    // editor deja de guardar — el mismo modo de falla del #563 que el COUPLING
+    // WARNING de `firestore.rules` advierte, pero por el otro lado.
+    //
+    // No necesita backfill: hasta este slice el campo era imposible de
+    // escribir, así que no hay documentos viejos que lo tengan.
+    String? copiedFrom,
     // ── Plain-language summary (#648) ────────────────────────────────────────
     // One sentence explaining what the routine IS, in words someone who has
     // never set foot in a gym can parse. The catalogue leads with jargon —

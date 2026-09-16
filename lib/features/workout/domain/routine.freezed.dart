@@ -89,6 +89,24 @@ mixin _$Routine {
 // ignore: invalid_annotation_target
   @JsonKey(includeToJson: false)
   bool get isPremium =>
+      throw _privateConstructorUsedError; // ── Procedencia: de qué rutina se copió ésta ─────────────────────────────
+//
+// Lo pone «Usar como base» (#647) con el id de la plantilla fuente. `null`
+// en todo lo demás: una rutina escrita desde cero no viene de ningún lado.
+//
+// ⚠️ AL REVÉS QUE `isPremium`: este campo SÍ viaja en `toJson()`, y tiene
+// que hacerlo. `isPremium` se excluye porque el cliente sólo lo lee; éste
+// es al revés — el cliente es el ÚNICO que lo puede escribir, y si no
+// viaja, `firestore.rules` no tiene nada que mirar y el sello no existe.
+//
+// Por eso `copiedFrom` está en `userCreatedRoutineFields()` de las reglas.
+// Si se saca de ahí, el `hasOnly` rechaza el create de TODA copia y el
+// editor deja de guardar — el mismo modo de falla del #563 que el COUPLING
+// WARNING de `firestore.rules` advierte, pero por el otro lado.
+//
+// No necesita backfill: hasta este slice el campo era imposible de
+// escribir, así que no hay documentos viejos que lo tengan.
+  String? get copiedFrom =>
       throw _privateConstructorUsedError; // ── Plain-language summary (#648) ────────────────────────────────────────
 // One sentence explaining what the routine IS, in words someone who has
 // never set foot in a gym can parse. The catalogue leads with jargon —
@@ -168,6 +186,7 @@ abstract class $RoutineCopyWith<$Res> {
       @JsonKey(includeToJson: false) double? ratingAvg,
       @JsonKey(includeToJson: false) int? ratingsCount,
       @JsonKey(includeToJson: false) bool isPremium,
+      String? copiedFrom,
       String? summary,
       @RoutineGoalListConverter() List<RoutineGoal> goals});
 }
@@ -204,6 +223,7 @@ class _$RoutineCopyWithImpl<$Res, $Val extends Routine>
     Object? ratingAvg = freezed,
     Object? ratingsCount = freezed,
     Object? isPremium = null,
+    Object? copiedFrom = freezed,
     Object? summary = freezed,
     Object? goals = null,
   }) {
@@ -276,6 +296,10 @@ class _$RoutineCopyWithImpl<$Res, $Val extends Routine>
           ? _value.isPremium
           : isPremium // ignore: cast_nullable_to_non_nullable
               as bool,
+      copiedFrom: freezed == copiedFrom
+          ? _value.copiedFrom
+          : copiedFrom // ignore: cast_nullable_to_non_nullable
+              as String?,
       summary: freezed == summary
           ? _value.summary
           : summary // ignore: cast_nullable_to_non_nullable
@@ -313,6 +337,7 @@ abstract class _$$RoutineImplCopyWith<$Res> implements $RoutineCopyWith<$Res> {
       @JsonKey(includeToJson: false) double? ratingAvg,
       @JsonKey(includeToJson: false) int? ratingsCount,
       @JsonKey(includeToJson: false) bool isPremium,
+      String? copiedFrom,
       String? summary,
       @RoutineGoalListConverter() List<RoutineGoal> goals});
 }
@@ -347,6 +372,7 @@ class __$$RoutineImplCopyWithImpl<$Res>
     Object? ratingAvg = freezed,
     Object? ratingsCount = freezed,
     Object? isPremium = null,
+    Object? copiedFrom = freezed,
     Object? summary = freezed,
     Object? goals = null,
   }) {
@@ -419,6 +445,10 @@ class __$$RoutineImplCopyWithImpl<$Res>
           ? _value.isPremium
           : isPremium // ignore: cast_nullable_to_non_nullable
               as bool,
+      copiedFrom: freezed == copiedFrom
+          ? _value.copiedFrom
+          : copiedFrom // ignore: cast_nullable_to_non_nullable
+              as String?,
       summary: freezed == summary
           ? _value.summary
           : summary // ignore: cast_nullable_to_non_nullable
@@ -452,6 +482,7 @@ class _$RoutineImpl extends _Routine {
       @JsonKey(includeToJson: false) this.ratingAvg,
       @JsonKey(includeToJson: false) this.ratingsCount,
       @JsonKey(includeToJson: false) this.isPremium = false,
+      this.copiedFrom,
       this.summary,
       @RoutineGoalListConverter()
       final List<RoutineGoal> goals = const <RoutineGoal>[]})
@@ -558,6 +589,25 @@ class _$RoutineImpl extends _Routine {
   @override
   @JsonKey(includeToJson: false)
   final bool isPremium;
+// ── Procedencia: de qué rutina se copió ésta ─────────────────────────────
+//
+// Lo pone «Usar como base» (#647) con el id de la plantilla fuente. `null`
+// en todo lo demás: una rutina escrita desde cero no viene de ningún lado.
+//
+// ⚠️ AL REVÉS QUE `isPremium`: este campo SÍ viaja en `toJson()`, y tiene
+// que hacerlo. `isPremium` se excluye porque el cliente sólo lo lee; éste
+// es al revés — el cliente es el ÚNICO que lo puede escribir, y si no
+// viaja, `firestore.rules` no tiene nada que mirar y el sello no existe.
+//
+// Por eso `copiedFrom` está en `userCreatedRoutineFields()` de las reglas.
+// Si se saca de ahí, el `hasOnly` rechaza el create de TODA copia y el
+// editor deja de guardar — el mismo modo de falla del #563 que el COUPLING
+// WARNING de `firestore.rules` advierte, pero por el otro lado.
+//
+// No necesita backfill: hasta este slice el campo era imposible de
+// escribir, así que no hay documentos viejos que lo tengan.
+  @override
+  final String? copiedFrom;
 // ── Plain-language summary (#648) ────────────────────────────────────────
 // One sentence explaining what the routine IS, in words someone who has
 // never set foot in a gym can parse. The catalogue leads with jargon —
@@ -632,7 +682,7 @@ class _$RoutineImpl extends _Routine {
 
   @override
   String toString() {
-    return 'Routine(id: $id, name: $name, split: $split, level: $level, days: $days, estimatedMinutesPerDay: $estimatedMinutesPerDay, imageUrl: $imageUrl, source: $source, assignedBy: $assignedBy, assignedTo: $assignedTo, visibility: $visibility, createdBy: $createdBy, status: $status, numWeeks: $numWeeks, ratingAvg: $ratingAvg, ratingsCount: $ratingsCount, isPremium: $isPremium, summary: $summary, goals: $goals)';
+    return 'Routine(id: $id, name: $name, split: $split, level: $level, days: $days, estimatedMinutesPerDay: $estimatedMinutesPerDay, imageUrl: $imageUrl, source: $source, assignedBy: $assignedBy, assignedTo: $assignedTo, visibility: $visibility, createdBy: $createdBy, status: $status, numWeeks: $numWeeks, ratingAvg: $ratingAvg, ratingsCount: $ratingsCount, isPremium: $isPremium, copiedFrom: $copiedFrom, summary: $summary, goals: $goals)';
   }
 
   @override
@@ -667,6 +717,8 @@ class _$RoutineImpl extends _Routine {
                 other.ratingsCount == ratingsCount) &&
             (identical(other.isPremium, isPremium) ||
                 other.isPremium == isPremium) &&
+            (identical(other.copiedFrom, copiedFrom) ||
+                other.copiedFrom == copiedFrom) &&
             (identical(other.summary, summary) || other.summary == summary) &&
             const DeepCollectionEquality().equals(other._goals, _goals));
   }
@@ -692,6 +744,7 @@ class _$RoutineImpl extends _Routine {
         ratingAvg,
         ratingsCount,
         isPremium,
+        copiedFrom,
         summary,
         const DeepCollectionEquality().hash(_goals)
       ]);
@@ -731,6 +784,7 @@ abstract class _Routine extends Routine {
           @JsonKey(includeToJson: false) final double? ratingAvg,
           @JsonKey(includeToJson: false) final int? ratingsCount,
           @JsonKey(includeToJson: false) final bool isPremium,
+          final String? copiedFrom,
           final String? summary,
           @RoutineGoalListConverter() final List<RoutineGoal> goals}) =
       _$RoutineImpl;
@@ -817,7 +871,26 @@ abstract class _Routine extends Routine {
   @override
   @JsonKey(includeToJson: false)
   bool
-      get isPremium; // ── Plain-language summary (#648) ────────────────────────────────────────
+      get isPremium; // ── Procedencia: de qué rutina se copió ésta ─────────────────────────────
+//
+// Lo pone «Usar como base» (#647) con el id de la plantilla fuente. `null`
+// en todo lo demás: una rutina escrita desde cero no viene de ningún lado.
+//
+// ⚠️ AL REVÉS QUE `isPremium`: este campo SÍ viaja en `toJson()`, y tiene
+// que hacerlo. `isPremium` se excluye porque el cliente sólo lo lee; éste
+// es al revés — el cliente es el ÚNICO que lo puede escribir, y si no
+// viaja, `firestore.rules` no tiene nada que mirar y el sello no existe.
+//
+// Por eso `copiedFrom` está en `userCreatedRoutineFields()` de las reglas.
+// Si se saca de ahí, el `hasOnly` rechaza el create de TODA copia y el
+// editor deja de guardar — el mismo modo de falla del #563 que el COUPLING
+// WARNING de `firestore.rules` advierte, pero por el otro lado.
+//
+// No necesita backfill: hasta este slice el campo era imposible de
+// escribir, así que no hay documentos viejos que lo tengan.
+  @override
+  String?
+      get copiedFrom; // ── Plain-language summary (#648) ────────────────────────────────────────
 // One sentence explaining what the routine IS, in words someone who has
 // never set foot in a gym can parse. The catalogue leads with jargon —
 // "Bro Split", "PPL", "Upper/Lower" — and 2 of 5 usability participants
