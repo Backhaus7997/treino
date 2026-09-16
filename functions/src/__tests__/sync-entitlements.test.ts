@@ -510,3 +510,116 @@ describe("syncTrainerEntitlements — acceptedAt corrupto", () => {
     expect(state.trainer_links.L3.entitlement).toBe("blocked");
   });
 });
+
+/**
+ * El aviso de `acceptedAt` — que es un INSTRUMENTO DE MEDICION, y estuvo roto.
+ *
+ * Durante meses Cloud Logging mostro ~30 `acceptedAt no es un Timestamp` por
+ * corrida con `acceptedAtType: "object"`, y se leyeron como corrupcion de datos
+ * en produccion. No lo eran: el guard era `acceptedAt !== undefined`, que deja
+ * pasar el `null` LEGAL de todo vinculo no aceptado, y el payload reportaba
+ * `typeof`, que en JavaScript devuelve `"object"` para null. La forma sana, la
+ * recuperable (`{_seconds,_nanoseconds}`) y la perdida salian las tres iguales.
+ *
+ * Estos cuatro casos son los que el aviso tiene que saber separar. Cada uno
+ * falla con alguna version anterior del codigo: son mutacion, no decorado.
+ */
+describe("syncTrainerEntitlements — el aviso de acceptedAt separa lo sano de lo roto", () => {
+  const warnSpy = (
+    jest.requireMock("firebase-functions") as { logger: { warn: jest.Mock } }
+  ).logger.warn;
+
+  const avisos = () =>
+    warnSpy.mock.calls.filter(
+      ([msg]) => typeof msg === "string" && msg.includes("acceptedAt no es un Timestamp"),
+    );
+
+  it("NO avisa por un pending con acceptedAt null — es la forma que exigen las rules", async () => {
+    install({
+      users: { t1: {} },
+      trainer_links: {
+        L1: lnk({ athleteId: "a1", acceptedAt: ts(100) }),
+        PEND: lnk({ athleteId: "a2", status: "pending", acceptedAt: null }),
+      },
+    });
+
+    await syncTrainerEntitlements(app, "t1", 5_000);
+
+    // Con el guard viejo (`!== undefined`) esto logeaba, y con
+    // `acceptedAtType: "object"` — identico a lo que se leia en produccion.
+    expect(avisos()).toEqual([]);
+  });
+
+  it("SI avisa por un ACTIVE sin fecha, que es el que se estaciona primero", async () => {
+    install({
+      users: { t1: {} },
+      trainer_links: {
+        L1: lnk({ athleteId: "a1", acceptedAt: ts(100) }),
+        VIVO: lnk({ athleteId: "a2", status: "active", acceptedAt: null }),
+      },
+    });
+
+    await syncTrainerEntitlements(app, "t1", 5_000);
+
+    // Silenciar TODO null hubiera perdido este caso, que es el unico null que
+    // de verdad duele: entra a reconcileEntitlements con POSITIVE_INFINITY.
+    // `"null"` y no `"object"`: el aviso tiene que nombrar lo que encontro.
+    expect(avisos()).toEqual([
+      [
+        expect.stringContaining("acceptedAt no es un Timestamp"),
+        expect.objectContaining({
+          linkId: "VIVO",
+          status: "active",
+          acceptedAtType: "null",
+        }),
+      ],
+    ]);
+  });
+
+  it("dice QUE FORMA tiene un objeto, no solo que es un objeto", async () => {
+    install({
+      users: { t1: {} },
+      trainer_links: {
+        L1: lnk({ athleteId: "a1", acceptedAt: ts(100) }),
+        RAW: lnk({ athleteId: "a2", acceptedAt: { _seconds: 7, _nanoseconds: 0 } }),
+      },
+    });
+
+    await syncTrainerEntitlements(app, "t1", 5_000);
+
+    // Las CLAVES son lo que separa un Timestamp serializado (recuperable sin
+    // perdida) de un sentinel que nunca resolvio. Con `typeof` a secas las dos
+    // decian `"object"` y habia que abrir el documento para saber cual era.
+    expect(avisos()).toEqual([
+      [
+        expect.anything(),
+        expect.objectContaining({
+          linkId: "RAW",
+          acceptedAtType: "object",
+          acceptedAtKeys: ["_nanoseconds", "_seconds"],
+        }),
+      ],
+    ]);
+  });
+
+  it("una forma ilegal se avisa aunque el vinculo no compita por cupo", async () => {
+    install({
+      users: { t1: {} },
+      trainer_links: {
+        L1: lnk({ athleteId: "a1", acceptedAt: ts(100) }),
+        STR: lnk({ athleteId: "a2", status: "pending", acceptedAt: "2026-01-01" }),
+      },
+    });
+
+    await syncTrainerEntitlements(app, "t1", 5_000);
+
+    // La tolerancia es solo para el AUSENTE. Un string viola el pin de
+    // firestore.rules en cualquier status, y eso hay que mirarlo igual.
+    expect(avisos()).toEqual([
+      [
+        expect.anything(),
+        expect.objectContaining({ linkId: "STR", status: "pending", acceptedAtType: "string" }),
+      ],
+    ]);
+  });
+});
