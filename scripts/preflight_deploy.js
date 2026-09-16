@@ -621,6 +621,70 @@ async function main() {
     console.log(`preflight: no pude chequear los índices (${e.message})`);
   }
 
+  // ── 5. Las funciones vivas y las declaradas son las mismas ──────────────
+  //
+  // El 2026-09-16 producción tenía 50 funciones y `main` declaraba 48.
+  // `maintainSessionFeedbackCounters` y `notifyOnSessionFinished` estaban
+  // VIVAS y corriendo, y su código no existía en `main`: se habían deployado
+  // desde una rama sin mergear. Se arreglaron solas al mergear #1153 y #1154,
+  // pero nadie se había enterado hasta que este archivo contó 48 y la API
+  // contestó 50.
+  //
+  // Mismo par de direcciones que los índices, y el mismo gatillo invertido:
+  //
+  //   · HUÉRFANA (vive, el código no la declara) → un `firebase deploy --only
+  //     functions` completo OFRECE BORRARLA. Y mientras tanto corre código que
+  //     nadie puede leer en `main`.
+  //   · SIN DEPLOYAR (el código la declara, no existe) → normal ANTES de un
+  //     deploy: son las que están por nacer. Se avisa igual, sin drama, porque
+  //     después del deploy la lista tiene que quedar vacía y ahí sí significa
+  //     otra cosa.
+  //
+  // AVISA, NO CORTA, por lo mismo que los índices: ninguna de las dos rompe el
+  // deploy que está por correr, y una guarda que frena por algo que no es
+  // suyo es la que el equipo aprende a saltear.
+  //
+  // Va DESPUÉS del chequeo de frescura a propósito: ése ya tiene la lista de
+  // funciones desplegadas, pero se pide de nuevo en vez de compartirla — son
+  // dos guardas distintas, y cuando una se pone roja conviene leer el nombre y
+  // saber cuál. Una llamada más a la API en un deploy no se nota.
+  try {
+    const r = await fetch(
+      `https://cloudfunctions.googleapis.com/v2/projects/${project}` +
+        "/locations/-/functions?pageSize=200",
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    if (!r.ok) throw new Error(`cloudfunctions ${r.status}`);
+    const vivas = new Set(
+      ((await r.json()).functions || []).map((f) => f.name.split("/").pop()),
+    );
+    const declaradas = new Set(eps.map(([nombre]) => nombre));
+    const huerfanas = [...vivas].filter((n) => !declaradas.has(n));
+    const sinDeployar = [...declaradas].filter((n) => !vivas.has(n));
+
+    if (!huerfanas.length && !sinDeployar.length) {
+      console.log(`  ✓ ${vivas.size} funciones — el código y producción dicen lo mismo`);
+    }
+    if (huerfanas.length) {
+      console.warn(
+        `\n  ⚠️ ${huerfanas.length} función(es) viven en producción y el código NO ` +
+          "las declara:\n" +
+          huerfanas.map((n) => `     ${n}`).join("\n") +
+          "\n     Corren código que no está en `main`. O falta mergear la rama que\n" +
+          "     las trae, o hay que borrarlas a mano — un deploy completo va a\n" +
+          "     ofrecer lo segundo.\n",
+      );
+    }
+    if (sinDeployar.length) {
+      console.log(
+        `  · ${sinDeployar.length} declarada(s) todavía sin deployar: ` +
+          `${sinDeployar.join(", ")}`,
+      );
+    }
+  } catch (e) {
+    console.log(`preflight: no pude chequear las funciones vivas (${e.message})`);
+  }
+
   if (problemas.length) fallar(problemas);
   console.log("preflight: OK");
 }
