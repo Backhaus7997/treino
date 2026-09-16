@@ -10,8 +10,11 @@ import 'package:go_router/go_router.dart';
 import '../core/analytics/analytics_service.dart';
 import '../core/analytics/route_analytics.dart';
 import '../features/auth/application/auth_providers.dart';
+import '../features/notifications/application/cola_de_avisos.dart';
 import '../features/notifications/application/notification_providers.dart';
 import '../features/notifications/application/notification_router.dart';
+import '../features/notifications/presentation/permission_gate.dart'
+    show permissionPromptSettledProvider;
 import '../features/watch/application/watch_credential_providers.dart';
 import '../features/watch/application/watch_effort_notifier.dart';
 import '../features/watch/application/watch_timer_control_notifier.dart';
@@ -68,6 +71,19 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
 
   /// Background-tap subscription (onMessageOpenedApp) — cancelled on dispose.
   StreamSubscription<RemoteMessage>? _bgSub;
+
+  /// Avisos que llegaron antes de que el permiso del sistema se resolviera.
+  /// Las reglas de la cola (tope, orden, drenaje) viven en [ColaDeAvisos], que
+  /// tiene sus propios tests — acá sólo se decide CUÁNDO encolar y drenar.
+  final ColaDeAvisos _avisosEnEspera = ColaDeAvisos();
+
+  /// Corta la espera si el permiso no resuelve nunca. Se cancela en [dispose]:
+  /// un timer vivo después del desmontaje revienta tests ajenos con
+  /// `!timersPending`, y el error no nombra a quién lo dejó colgado.
+  Timer? _esperaDelPermiso;
+
+  /// Escucha a [permissionPromptSettledProvider] para drenar la cola.
+  ProviderSubscription<bool>? _permisoSub;
 
   @override
   void initState() {
@@ -148,6 +164,16 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
 
     _fgSub = fcm.onForegroundMessage.listen(_onForeground);
 
+    // (a1) Cuando el prompt del permiso termina, sale lo que quedó esperando.
+    //      `fireImmediately` no hace falta: si ya está resuelto, `_onForeground`
+    //      no encola nada y esto no tiene trabajo.
+    _permisoSub = ref.listenManual<bool>(
+      permissionPromptSettledProvider,
+      (_, resuelto) {
+        if (resuelto) unawaited(_drenarAvisosEnEspera());
+      },
+    );
+
     // (a2) Background tap: app resumed from background via notification tap →
     //      navigate to the deepLink. (ADR-PN-009, REQ-PN-HANDLER-002,
     //      SCENARIO-655, 656.)
@@ -201,6 +227,8 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
     _routeAnalytics.detach();
     _fgSub?.cancel();
     _bgSub?.cancel();
+    _esperaDelPermiso?.cancel();
+    _permisoSub?.close();
     super.dispose();
   }
 
@@ -272,23 +300,91 @@ class _TreinoAppState extends ConsumerState<TreinoApp> {
       return;
     }
 
-    // Se ESPERA el resultado, y de ahí sale el fallback.
+    final aviso = Aviso(title: title, body: body, deepLink: deepLink);
+
+    // La CARRERA DEL PERMISO: un aviso que llega antes de que el usuario haya
+    // contestado el prompt del sistema se ENCOLA, no se degrada.
     //
-    // Antes esto iba con `unawaited` y el bool se tiraba a la basura: si el
-    // plugin no había inicializado —cosa que pasa en silencio, porque su
-    // `init` también corre sin await— el aviso se perdía entero y el usuario
-    // no se enteraba de que le habían escrito. Un cartel in-app es un mal
-    // premio consuelo, pero es infinitamente mejor que nada.
-    unawaited(() async {
+    // `PermissionGate` no pide permiso hasta tener el perfil cargado y el
+    // onboarding resuelto, así que en una instalación nueva esta ventana está
+    // garantizada, no es un caso de borde. Y los dos sistemas fallan distinto
+    // adentro de ella: en iOS `show()` tira (`Error 2003 — Source is not
+    // authorized`) y devuelve false, así que al menos salía el cartel; en
+    // Android, sin `POST_NOTIFICATIONS`, no tira nada —el sistema descarta la
+    // notificación en silencio y `show()` devuelve true— así que el aviso
+    // desaparecía ENTERO, sin cartel y sin log.
+    //
+    // Encolar lo arregla en las dos: el aviso espera a que el permiso resuelva
+    // y recién ahí se intenta de verdad.
+    if (!ref.read(permissionPromptSettledProvider)) {
+      _encolarHastaQueElPermisoResuelva(aviso);
+      return;
+    }
+
+    unawaited(_entregar(aviso));
+  }
+
+  /// Entrega un aviso: notificación del sistema y, si no salió, cartel in-app.
+  ///
+  /// Se ESPERA el resultado de `show`, y de ahí sale el fallback. Antes esto
+  /// iba con `unawaited` y el bool se tiraba a la basura: si el plugin no había
+  /// inicializado —cosa que pasa en silencio, porque su `init` también corre
+  /// sin await— el aviso se perdía entero y el usuario no se enteraba de que le
+  /// habían escrito. Un cartel in-app es un mal premio consuelo, pero es
+  /// infinitamente mejor que nada.
+  Future<void> _entregar(Aviso aviso, {bool soloCartel = false}) async {
+    if (!soloCartel) {
       final mostrada = await ref.read(localNotificationsServiceProvider).show(
-            title: title,
-            body: body,
-            deepLink: deepLink,
+            title: aviso.title,
+            body: aviso.body,
+            deepLink: aviso.deepLink,
           );
       if (mostrada || !mounted) return;
       debugPrint('[fcm] la notificación del sistema no salió — cae al cartel');
-      _mostrarSnackBar(title: title, body: body, deepLink: deepLink);
-    }());
+    }
+    if (!mounted) return;
+    _mostrarSnackBar(
+      title: aviso.title,
+      body: aviso.body,
+      deepLink: aviso.deepLink,
+    );
+  }
+
+  /// Guarda el aviso hasta que el prompt del permiso termine.
+  ///
+  /// La cola tiene tope y tira los MÁS VIEJOS: si llegan quince avisos antes de
+  /// que el usuario conteste, mostrarle quince notificaciones de golpe apenas
+  /// acepta es su propia forma de ser ignorado.
+  ///
+  /// El timer es la red, y existe porque el permiso puede no resolverse NUNCA:
+  /// el gate espera perfil completo y onboarding terminado, y un usuario que se
+  /// queda en el tour deja la cola colgada para siempre. Al vencer, los avisos
+  /// salen por el cartel — que es exactamente lo que pasaba antes de que esta
+  /// cola existiera, así que el peor caso de este cambio empata con el mejor
+  /// caso del anterior.
+  void _encolarHastaQueElPermisoResuelva(Aviso aviso) {
+    debugPrint('[fcm] permiso sin resolver — el aviso espera');
+    _avisosEnEspera.encolar(aviso);
+    _esperaDelPermiso ??= Timer(
+      ColaDeAvisos.kEsperaMaxima,
+      () => _drenarAvisosEnEspera(soloCartel: true),
+    );
+  }
+
+  /// Saca todo lo encolado. Nunca descarta: o sale por el sistema, o por el
+  /// cartel.
+  Future<void> _drenarAvisosEnEspera({bool soloCartel = false}) async {
+    _esperaDelPermiso?.cancel();
+    _esperaDelPermiso = null;
+    if (_avisosEnEspera.vacia) return;
+
+    final pendientes = _avisosEnEspera.drenar();
+    debugPrint('[fcm] drenando ${pendientes.length} aviso(s) en espera');
+
+    for (final aviso in pendientes) {
+      if (!mounted) return;
+      await _entregar(aviso, soloCartel: soloCartel);
+    }
   }
 
   /// Cartel in-app. Camino de WEB únicamente — ver [_onForeground].
