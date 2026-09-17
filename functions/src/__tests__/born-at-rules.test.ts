@@ -31,7 +31,13 @@ import {
   initializeTestEnvironment,
   RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
-import { doc, setDoc, updateDoc, setLogLevel } from "firebase/firestore";
+import {
+  doc,
+  setDoc,
+  updateDoc,
+  deleteField,
+  setLogLevel,
+} from "firebase/firestore";
 
 const PROJECT_ID = "treino-rules-test-born-at";
 const RULES_PATH = path.resolve(__dirname, "../../../firestore.rules");
@@ -155,6 +161,29 @@ describe("bornAtOk — piso de edad mínima en users/{uid}", () => {
       await assertSucceeds(
         updateDoc(doc(asUser(UID), "users", UID), {
           bornAt: yearsAgo(30),
+        }),
+      );
+    });
+
+    // Hallazgo de Codex en el PR #1162, verificado contra el emulador ANTES de
+    // cerrarlo: sin `bornAtKept` este assertFails era un assertSucceeds.
+    it("BORRAR un bornAt ya cargado → denegado", async () => {
+      await seedUser({ bornAt: yearsAgo(20) });
+      await assertFails(
+        updateDoc(doc(asUser(UID), "users", UID), {
+          bornAt: deleteField(),
+        }),
+      );
+    });
+
+    // Control de que la clausula nueva no rompio el resto: aplica a TODO
+    // update, y un update que ni menciona bornAt tiene que seguir pasando
+    // (`request.resource.data` es el documento resultante completo, no el diff).
+    it("un update ajeno a bornAt sigue permitido", async () => {
+      await seedUser({ bornAt: yearsAgo(20) });
+      await assertSucceeds(
+        updateDoc(doc(asUser(UID), "users", UID), {
+          displayName: "carlitos",
         }),
       );
     });

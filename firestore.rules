@@ -209,6 +209,21 @@ service cloud.firestore {
     // tipo no DENIEGA — tira error de evaluación, que rebota la escritura con
     // un mensaje que no dice nada. Es el mismo modo de falla que documenta el
     // `u != null` de `paywallEnforcedFor`.
+    // Una vez cargada, la fecha NO se puede SACAR.
+    //
+    // `bornAtOk` deja pasar el campo ausente a propósito, y tiene que seguir
+    // haciéndolo: el alta por email crea el documento antes de preguntar la
+    // fecha. Pero "ausente en el create" y "removida en un update" son casos
+    // DISTINTOS, y el segundo sí se cierra sin romper nada, porque en un update
+    // tenemos `resource.data` — el documento previo.
+    //
+    // No es hipotético. Medido contra el emulador antes de cerrarlo: un cliente
+    // autenticado mandaba `{bornAt: deleteField()}` sobre su propio documento y
+    // las reglas lo PERMITÍAN. O sea que cualquiera se sacaba el dato de encima
+    // y volvía a un estado indistinguible de una cuenta anterior al requisito.
+    function bornAtKept(prev, next) {
+      return !('bornAt' in prev) || ('bornAt' in next);
+    }
     function bornAtOk(data) {
       return !('bornAt' in data)
              || (data.bornAt is timestamp
@@ -432,7 +447,10 @@ service cloud.firestore {
                     // El piso de edad tambien en UPDATE. Sin esta linea el gate
                     // es decorativo: uno se da de alta con una fecha valida y
                     // despues la cambia desde el editor de perfil.
-                    && bornAtOk(request.resource.data);
+                    && bornAtOk(request.resource.data)
+                    // Y no alcanza con el piso: sin esta otra, en vez de
+                    // cambiarla por una invalida uno simplemente la BORRA.
+                    && bornAtKept(resource.data, request.resource.data);
 
       // Delete denied — account deletion goes through privileged Cloud Function.
       allow delete: if false;
