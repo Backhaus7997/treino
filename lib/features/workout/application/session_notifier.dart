@@ -241,13 +241,42 @@ class SessionNotifier
       startedAt: DateTime.now(),
       dayNumber: dayNumber,
       weekNumber: clampedWeek,
+      // Empezar un entreno NO puede depender de que haya red. El documento se
+      // aplica al caché al instante y Firestore sincroniza solo; esperar la
+      // confirmación dejaba al player en `AsyncLoading` para siempre sin una
+      // sola excepción — el atleta tocaba Empezar y miraba un spinner eterno.
+      waitForServer: false,
+      onServerRejected: (e) {
+        _reportarRechazoDelServidor(
+            e, 'no se pudo crear la sesión del entreno');
+        if (_disposed) return;
+        // El atleta tiene que ENTERARSE, no entrenar media hora contra una
+        // sesión que no existe. Es el mismo criterio que ya tomó el camino
+        // del reloj (`WearSessionFailed`, con test que lo fija) y lo que
+        // promete el docstring de `create`: que la PANTALLA pueda decirlo.
+        //
+        // Va por `state` y no por un canal nuevo porque la pantalla ya sabe
+        // renderizar `AsyncError` con su botón de reintento. Antes de este PR
+        // el rechazo llegaba acá solo: `create` esperaba al servidor y su
+        // excepción salía por `build`.
+        state = AsyncError(e, StackTrace.current);
+      },
     );
     _resetElapsedBaseline(elapsedSeconds: 0, at: session.startedAt);
     _nudgeWatch(WatchNudgeService.reasonWorkoutStarted);
-    // DESPUÉS de que `repo.create` resolvió, nunca antes: el reloj lee Firestore
-    // por REST y no tiene listeners. Si se abriera antes de que el documento con
-    // `status: active` exista, no encontraría sesión que adoptar y se quedaría
-    // en la pantalla equivocada, sin nada que lo corrija después.
+    // ⚠️ Este orden YA NO garantiza lo que garantizaba, y conviene saberlo.
+    //
+    // Decía: «DESPUÉS de que `repo.create` resolvió, nunca antes — el reloj lee
+    // Firestore por REST y no tiene listeners; si se abriera antes de que el
+    // documento exista, no encontraría sesión que adoptar». Con
+    // `waitForServer: false`, `create` resuelve cuando la escritura entra al
+    // CACHÉ del teléfono, que el reloj no ve: su adopción por REST puede venir
+    // vacía igual.
+    //
+    // No se revierte porque el costo es chico y acotado: el reloj se recupera
+    // solo cuando el atleta levanta la muñeca y su `restore()` vuelve a
+    // preguntar. Cambiar eso pediría tocar el lado Swift, y no entra en este
+    // PR. Pero el invariante que este comentario declaraba ya no existe.
     _launchWatch();
 
     // REQ-WPRES-021 (ADR-WPRES-09): filter slots by presence BEFORE building
@@ -859,6 +888,16 @@ class SessionNotifier
         // contra el objetivo de la rutina activa, y quien sabe resolver eso
         // es la capa de aplicación.
         weeklyTarget: ref.read(weeklyStreakTargetProvider),
+        // Cerrar el entreno tampoco puede depender de la red, y acá el daño
+        // de esperar era peor que en `create`: `_finalized` ya está en `true`
+        // desde antes del await, así que un await que no vuelve deja marcar,
+        // editar y borrar series como no-ops silenciosos, el cronómetro
+        // corriendo y ninguna navegación al resumen.
+        waitForServer: false,
+        onServerRejected: (e) => _reportarRechazoDelServidor(
+          e,
+          'no se pudo cerrar la sesión del entreno',
+        ),
       );
     } catch (_) {
       _finalized = false;
@@ -906,6 +945,16 @@ class SessionNotifier
         // contra el objetivo de la rutina activa, y quien sabe resolver eso
         // es la capa de aplicación.
         weeklyTarget: ref.read(weeklyStreakTargetProvider),
+        // Cerrar el entreno tampoco puede depender de la red, y acá el daño
+        // de esperar era peor que en `create`: `_finalized` ya está en `true`
+        // desde antes del await, así que un await que no vuelve deja marcar,
+        // editar y borrar series como no-ops silenciosos, el cronómetro
+        // corriendo y ninguna navegación al resumen.
+        waitForServer: false,
+        onServerRejected: (e) => _reportarRechazoDelServidor(
+          e,
+          'no se pudo cerrar la sesión del entreno',
+        ),
       );
     } catch (_) {
       _finalized = false;
@@ -952,6 +1001,26 @@ class SessionNotifier
     if (current == null || _finalized) return;
     final elapsed = _elapsedSecondsNow();
     state = AsyncData(current.copyWith(elapsedSeconds: elapsed));
+  }
+
+  /// Reporta un rechazo REAL del servidor sobre una escritura diferida.
+  ///
+  /// No se dispara por falta de red: sin conexión el future de Firestore queda
+  /// pendiente —no falla— y se reintenta solo. Lo que llega acá es un `no`
+  /// del servidor, típicamente `permission-denied`, que no se arregla
+  /// reintentando nunca.
+  ///
+  /// Va a telemetría y no a la pantalla porque para cuando llega, el atleta ya
+  /// terminó y se fue: es un fallo que el equipo tiene que poder VER aunque
+  /// nadie lo esté mirando. Sin esto, una sesión que el servidor rechaza
+  /// desaparece sin rastro — ni para el atleta ni para Crashlytics.
+  void _reportarRechazoDelServidor(Object error, String queSePerdio) {
+    unawaited(reportNonFatal(
+      error,
+      StackTrace.current,
+      reason: 'SessionNotifier: $queSePerdio (rechazo del servidor sobre una '
+          'escritura diferida).',
+    ).catchError((_) {}));
   }
 
   void _finalize() {

@@ -185,6 +185,8 @@ void main() {
             startedAt: any(named: 'startedAt'),
             dayNumber: any(named: 'dayNumber'),
             weekNumber: any(named: 'weekNumber'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async => makeSession());
       final recibidas = _gateAddSetLog(repo);
 
@@ -233,6 +235,8 @@ void main() {
             startedAt: any(named: 'startedAt'),
             dayNumber: any(named: 'dayNumber'),
             weekNumber: any(named: 'weekNumber'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async => makeSession());
       _gateAddSetLog(repo);
 
@@ -295,6 +299,8 @@ void main() {
             startedAt: any(named: 'startedAt'),
             dayNumber: any(named: 'dayNumber'),
             weekNumber: any(named: 'weekNumber'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async => makeSession());
       final acks = _gateAddSetLogConAcks(repo);
 
@@ -364,6 +370,8 @@ void main() {
             startedAt: any(named: 'startedAt'),
             dayNumber: any(named: 'dayNumber'),
             weekNumber: any(named: 'weekNumber'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async => makeSession());
       final acks = _gateAddSetLogConAcks(repo);
 
@@ -433,6 +441,8 @@ void main() {
             startedAt: any(named: 'startedAt'),
             dayNumber: any(named: 'dayNumber'),
             weekNumber: any(named: 'weekNumber'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async => makeSession());
       final recibidas = _gateAddSetLog(repo);
 

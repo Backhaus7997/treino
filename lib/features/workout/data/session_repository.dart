@@ -215,19 +215,44 @@ class SessionRepository {
     required int durationMin,
     bool wasFullyCompleted = false,
     required int weeklyTarget,
+    bool waitForServer = true,
+    void Function(Object error)? onServerRejected,
   }) async {
     // finishedAt MUST be Timestamp.fromDate, not a raw DateTime — real Firestore
     // serializes a raw DateTime as an ISO string, but the @TimestampConverter
     // on Session.finishedAt expects a Firestore Timestamp on read. Without
     // this conversion, listByUid()/getActive() would fail to deserialize
     // sessions finished against production Firestore.
-    await _sessions(uid).doc(sessionId).update({
+    final escritura = _sessions(uid).doc(sessionId).update({
       'status': SessionStatusX(SessionStatus.finished).toJson(),
       'finishedAt': Timestamp.fromDate(finishedAt.toUtc()),
       'totalVolumeKg': totalVolumeKg,
       'durationMin': durationMin,
       'wasFullyCompleted': wasFullyCompleted,
     });
+    if (waitForServer) {
+      await escritura;
+    } else {
+      // Mismo contrato que `create`: la escritura ya se aplicó al caché, lo
+      // que se saltea es la confirmación. Sin red el future queda PENDIENTE
+      // —no falla— y Firestore lo reintenta solo; lo que llega al catchError
+      // es un rechazo REAL del servidor.
+      //
+      // Sin esto, terminar un entreno sin conexión no se colgaba solamente:
+      // `finishSession` pone `_finalized = true` ANTES del await, así que el
+      // `finally` y el `catch` que lo resetean tampoco corrían. La sesión
+      // quedaba con el guard trabado, marcar/editar/borrar series pasaban a
+      // ser no-ops silenciosos y el cronómetro seguía corriendo.
+      unawaited(
+        escritura.catchError((Object e) {
+          developer.log(
+            'finish: el servidor rechazó el cierre de la sesión — $e',
+            name: 'SessionRepository',
+          );
+          onServerRejected?.call(e);
+        }),
+      );
+    }
 
     // Cross-feature: update public stats counters (best-effort, REQ-WRX-003).
     // Executes after the primary session update. Reads a BOUNDED window of the
@@ -257,6 +282,64 @@ class SessionRepository {
     final pubRepo = _publicProfileRepository;
     if (pubRepo == null) return;
 
+    // Los contadores se recalculan DESPUÉS de que el servidor confirmó, y ése
+    // es todo el truco.
+    //
+    // El recálculo lee las sesiones recientes del atleta. Hacerlo sin
+    // confirmación lo dejaría leyendo el CACHÉ, que puede estar incompleto
+    // —instalación nueva, historial sin sincronizar— y escribir un
+    // `workoutsCount` derivado de ahí le PISA al perfil público un valor
+    // correcto con uno más chico.
+    //
+    // ⚠️ La primera versión de esto los SALTEABA cuando `waitForServer` era
+    // false, con el argumento de que «el contador queda viejo hasta el próximo
+    // cierre con conexión, que lo recalcula entero». Era falso y grave:
+    // `waitForServer: false` no significa «estoy sin red», significa «no me
+    // bloquees». El teléfono lo pasa SIEMPRE, así que ese próximo cierre no
+    // existía y los contadores dejaban de escribirse para siempre.
+    //
+    // El daño no habría sido un número viejo: `effectiveRachaSemanas` hace
+    // decay EN LECTURA contra `rachaSemanasUpdatedAt`, el sello que estampa
+    // `updateCounters`. Sin sello nuevo, a las dos semanas todo atleta que
+    // cierre desde el teléfono aparece con racha 0 en su perfil y en el board
+    // del gimnasio, entrenando todos los días. Y el servidor no lo salva:
+    // `workoutsCount`/`rachaSemanas` no se tocan en `functions/src/`.
+    //
+    // Colgarlo del ACK resuelve las dos cosas: no se lee de un caché frío, y
+    // se recalcula siempre — apenas vuelve la red.
+    if (waitForServer) {
+      await _recalcularContadoresPublicos(uid, pubRepo, weeklyTarget);
+    } else {
+      unawaited(
+        escritura
+            .then((_) =>
+                _recalcularContadoresPublicos(uid, pubRepo, weeklyTarget))
+            // El `then` no corre si la escritura fue rechazada, y está bien:
+            // sin sesión escrita no hay contador que actualizar. El rechazo ya
+            // viaja por `onServerRejected`.
+            //
+            // Tampoco corre si el atleta MATA la app antes de que vuelva la
+            // red: Firestore replica la escritura al reabrir, pero este
+            // callback ya no existe. Se auto-cura y por eso no se defiende
+            // más: `_recalcularContadoresPublicos` recalcula la ventana
+            // entera, no incrementa, así que el próximo cierre con ACK repara
+            // el salteado. Queda dicho porque es justo el tipo de supuesto que
+            // hizo caer la versión anterior de este bloque.
+            .catchError((Object _) {}),
+      );
+    }
+  }
+
+  /// Recalcula `workoutsCount`/`rachaSemanas` del perfil público.
+  ///
+  /// Best-effort (ADR-WRS-10): romperle el cierre de sesión al atleta por un
+  /// contador es la prioridad invertida. Pero best-effort NO es «que no se
+  /// entere nadie» — un fallo sale como non-fatal.
+  Future<void> _recalcularContadoresPublicos(
+    String uid,
+    UserPublicProfileRepository pubRepo,
+    int weeklyTarget,
+  ) async {
     try {
       final completedList = await listRecentCompletedByUid(uid);
       final racha = weeklyStreakOf(
@@ -1025,14 +1108,44 @@ class SessionRepository {
     required String sessionId,
   }) {
     if (uid.isEmpty || sessionId.isEmpty) return Stream.value(false);
+    // Estado derivado del PROPIO stream, no un booleano que la capa de
+    // aplicación sincroniza contra un hecho remoto — eso ya falló dos veces
+    // acá (`_creacionRechazada`, `_sesionConfirmada`).
+    //
+    // La closure guarda estado POR SUSCRIPCIÓN, y está bien porque
+    // `watchSessionFinished` arma un stream nuevo en cada llamada. Si alguien
+    // lo convierte en un broadcast compartido, esto se rompe.
+    var existioDeVerdad = false;
     return _sessions(uid).doc(sessionId).snapshots().map((snap) {
-      if (!snap.exists) return true;
-      final data = snap.data();
-      // `finishedAt` viaja SIEMPRE como clave (json_serializable la incluye
-      // con null), así que preguntar por la presencia de la clave no alcanza:
-      // hay que mirar el valor. Es la misma trampa que rompió el lado del
-      // reloj — ver `FS.isEmpty` en FirestoreREST.swift.
-      return data != null && data['finishedAt'] != null;
+      if (snap.exists) {
+        // Existencia CONFIRMADA: el documento está Y no hay una escritura
+        // local pendiente inventándolo. `hasPendingWrites` es el dato que
+        // contesta la pregunta de verdad —«¿esta sesión llegó a existir en el
+        // servidor?»— en vez de un proxy cercano.
+        if (!snap.metadata.hasPendingWrites && !snap.metadata.isFromCache) {
+          existioDeVerdad = true;
+        }
+        final data = snap.data();
+        // `finishedAt` viaja SIEMPRE como clave (json_serializable la incluye
+        // con null), así que preguntar por la presencia de la clave no alcanza:
+        // hay que mirar el valor. Es la misma trampa que rompió el lado del
+        // reloj — ver `FS.isEmpty` en FirestoreREST.swift.
+        return data != null && data['finishedAt'] != null;
+      }
+
+      // Una desaparición sólo significa «terminada» si antes estuvo DE VERDAD,
+      // y si es el SERVIDOR el que dice que ya no está.
+      //
+      // Hacen falta las dos condiciones, y cada una tapa un agujero distinto:
+      //
+      // • Sin `isFromCache`: una sesión sin ACKear —entreno empezado sin red—
+      //   se leía como terminada.
+      // • Sin `existioDeVerdad`: un create RECHAZADO por el servidor produce
+      //   una ausencia que TAMBIÉN viene del servidor (el SDK revierte la
+      //   mutación y empuja el snapshot). Indistinguible de «se cerró» mirando
+      //   sólo la procedencia — y es justo el caso que le mostraba al atleta
+      //   «terminaste el entreno desde la muñeca» sobre un rechazo de paywall.
+      return existioDeVerdad && !snap.metadata.isFromCache;
     });
   }
 

@@ -101,6 +101,8 @@ void _stubCreateAndLog(MockSessionRepository repo) {
         startedAt: any(named: 'startedAt'),
         dayNumber: any(named: 'dayNumber'),
         weekNumber: any(named: 'weekNumber'),
+        waitForServer: any(named: 'waitForServer'),
+        onServerRejected: any(named: 'onServerRejected'),
       )).thenAnswer((_) async => makeSession());
   when(() => repo.addSetLog(
         uid: any(named: 'uid'),
@@ -121,6 +123,8 @@ Completer<void> _gateFinish(MockSessionRepository repo) {
         durationMin: any(named: 'durationMin'),
         wasFullyCompleted: any(named: 'wasFullyCompleted'),
         weeklyTarget: any(named: 'weeklyTarget'),
+        waitForServer: any(named: 'waitForServer'),
+        onServerRejected: any(named: 'onServerRejected'),
       )).thenAnswer((_) => gate.future);
   return gate;
 }
