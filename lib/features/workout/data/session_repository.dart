@@ -166,7 +166,6 @@ class SessionRepository {
     int weekNumber = 0,
     bool waitForServer = true,
     void Function(Object error)? onServerRejected,
-    void Function()? onServerConfirmed,
   }) async {
     final ref = _sessions(uid).doc();
     final session = Session(
@@ -194,13 +193,7 @@ class SessionRepository {
       // llega acá es un rechazo REAL del servidor —típicamente `permission-
       // denied`— y ése no se arregla reintentando nunca.
       unawaited(
-        escritura.then((_) {
-          // El servidor ACEPTÓ: recién ahora la sesión existe fuera de este
-          // teléfono. Quien escuche `watchSessionFinished` necesita saberlo,
-          // porque ese stream lee «el documento no existe» como «terminada», y
-          // hasta este momento no existir es lo NORMAL.
-          onServerConfirmed?.call();
-        }).catchError((Object e) {
+        escritura.catchError((Object e) {
           developer.log(
             'create: el servidor rechazó la sesión — $e',
             name: 'SessionRepository',
@@ -1116,7 +1109,21 @@ class SessionRepository {
   }) {
     if (uid.isEmpty || sessionId.isEmpty) return Stream.value(false);
     return _sessions(uid).doc(sessionId).snapshots().map((snap) {
-      if (!snap.exists) return true;
+      // Un «no existe» sólo significa «terminada» si lo dice el SERVIDOR.
+      //
+      // Dicho por el caché no significa nada: la sesión puede estar todavía en
+      // la cola de escritura sin ACKear, o el servidor pudo haberla rechazado
+      // y el SDK revirtió la mutación local. Tratar las dos cosas igual le
+      // mostraba al atleta «terminaste el entreno desde el reloj» sobre un
+      // rechazo de paywall — una explicación falsa, peor que ninguna.
+      //
+      // La primera versión de esta defensa vivía en el notifier, con un flag
+      // que recordaba si la creación había sido confirmada. No alcanzaba: una
+      // sesión RETOMADA sale de `getActive`, que usa un `.get()` pelado y sin
+      // red devuelve el CACHÉ, así que el flag se prendía sobre algo que el
+      // servidor nunca vio. Firestore ya etiqueta cada snapshot con su
+      // procedencia; no hace falta un booleano que la recuerde.
+      if (!snap.exists) return !snap.metadata.isFromCache;
       final data = snap.data();
       // `finishedAt` viaja SIEMPRE como clave (json_serializable la incluye
       // con null), así que preguntar por la presencia de la clave no alcanza:

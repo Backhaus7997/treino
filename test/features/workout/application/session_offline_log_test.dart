@@ -187,7 +187,6 @@ void main() {
             weekNumber: any(named: 'weekNumber'),
             waitForServer: any(named: 'waitForServer'),
             onServerRejected: any(named: 'onServerRejected'),
-            onServerConfirmed: any(named: 'onServerConfirmed'),
           )).thenAnswer((_) async => makeSession());
       final recibidas = _gateAddSetLog(repo);
 
@@ -238,7 +237,6 @@ void main() {
             weekNumber: any(named: 'weekNumber'),
             waitForServer: any(named: 'waitForServer'),
             onServerRejected: any(named: 'onServerRejected'),
-            onServerConfirmed: any(named: 'onServerConfirmed'),
           )).thenAnswer((_) async => makeSession());
       _gateAddSetLog(repo);
 
@@ -303,7 +301,6 @@ void main() {
             weekNumber: any(named: 'weekNumber'),
             waitForServer: any(named: 'waitForServer'),
             onServerRejected: any(named: 'onServerRejected'),
-            onServerConfirmed: any(named: 'onServerConfirmed'),
           )).thenAnswer((_) async => makeSession());
       final acks = _gateAddSetLogConAcks(repo);
 
@@ -375,7 +372,6 @@ void main() {
             weekNumber: any(named: 'weekNumber'),
             waitForServer: any(named: 'waitForServer'),
             onServerRejected: any(named: 'onServerRejected'),
-            onServerConfirmed: any(named: 'onServerConfirmed'),
           )).thenAnswer((_) async => makeSession());
       final acks = _gateAddSetLogConAcks(repo);
 
@@ -447,7 +443,6 @@ void main() {
             weekNumber: any(named: 'weekNumber'),
             waitForServer: any(named: 'waitForServer'),
             onServerRejected: any(named: 'onServerRejected'),
-            onServerConfirmed: any(named: 'onServerConfirmed'),
           )).thenAnswer((_) async => makeSession());
       final recibidas = _gateAddSetLog(repo);
 

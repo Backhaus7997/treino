@@ -103,7 +103,6 @@ void _stubCreateAndLog(MockSessionRepository repo) {
         weekNumber: any(named: 'weekNumber'),
         waitForServer: any(named: 'waitForServer'),
         onServerRejected: any(named: 'onServerRejected'),
-        onServerConfirmed: any(named: 'onServerConfirmed'),
       )).thenAnswer((_) async => makeSession());
   when(() => repo.addSetLog(
         uid: any(named: 'uid'),

@@ -87,7 +87,6 @@ void _modoAvion(_MockSessionRepository repo) {
         weekNumber: any(named: 'weekNumber'),
         waitForServer: any(named: 'waitForServer'),
         onServerRejected: any(named: 'onServerRejected'),
-        onServerConfirmed: any(named: 'onServerConfirmed'),
       )).thenAnswer((inv) {
     final espera = inv.namedArguments[#waitForServer] as bool? ?? true;
     if (espera) return Completer<Session>().future;
@@ -258,25 +257,57 @@ void main() {
     });
 
     test(
-        'un create RECHAZADO no se disfraza de «lo cerró el reloj», aunque el '
-        'snapshot llegue primero', () async {
-      // Un create rechazado dispara DOS canales del SDK sin orden garantizado:
-      // el snapshot que revierte el caché (y hace desaparecer el doc) y el
-      // future de la escritura que falla. `watchSessionFinished` lee «el doc
-      // no existe» como «terminada», así que si el snapshot gana, la pantalla
-      // le dice al atleta que terminó el entreno desde la muñeca — sobre un
-      // rechazo de paywall.
+        'cuando el reloj cierra el entreno, el teléfono se entera (el lado '
+        'POSITIVO del aviso)', () async {
+      // Este test existe porque el archivo sólo probaba que la defensa
+      // BLOQUEA, y ninguno que DEJA PASAR: `rg finishedElsewhere test/` daba
+      // un único hit, y era una aserción negativa.
       //
-      // Este test fuerza el orden PEOR: el stream emite `true` ANTES de que
-      // llegue el rechazo. Una defensa que se prenda con el rechazo no puede
-      // pasarlo; sólo lo pasa invertir la polaridad y no creerle a la
-      // desaparición hasta que el servidor confirmó que la sesión existe.
+      // Sin este par, una defensa que bloqueara TODO —incluido el aviso
+      // legítimo del reloj— dejaba la suite en verde y rompía en silencio la
+      // función entera de «cerrar desde la muñeca».
       final repo = _MockSessionRepository();
       final routine = _routine();
       final finished = StreamController<bool>.broadcast();
       addTearDown(finished.close);
       repo.finishedStream = finished.stream;
+      _modoAvion(repo);
 
+      final container = _container(repo, routine);
+      addTearDown(container.dispose);
+      final init = FreshSession(routineId: routine.id, dayNumber: 1);
+      final sub = container.listen(
+        sessionNotifierProvider(init),
+        (_, __) {},
+        fireImmediately: true,
+      );
+      addTearDown(sub.close);
+      await container
+          .read(sessionNotifierProvider(init).future)
+          .timeout(const Duration(seconds: 5));
+      final notifier = container.read(sessionNotifierProvider(init).notifier);
+
+      expect(notifier.finishedElsewhere.value, isFalse);
+
+      // `watchSessionFinished` ya resolvió que esto es un cierre de verdad:
+      // decidir si la desaparición del documento cuenta es responsabilidad del
+      // repositorio, y se prueba en session_repository_finished_source_test.
+      finished.add(true);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        notifier.finishedElsewhere.value,
+        isTrue,
+        reason: 'es el camino por el que el atleta se entera de que cerró el '
+            'entreno desde la muñeca. Si el notifier lo ignora, sigue '
+            'entrenando sobre una sesión que ya no existe.',
+      );
+    });
+
+    test('un create RECHAZADO llega a la pantalla como error, no como silencio',
+        () async {
+      final repo = _MockSessionRepository();
+      final routine = _routine();
       late void Function(Object) rechazar;
       when(() => repo.create(
             uid: any(named: 'uid'),
@@ -287,7 +318,6 @@ void main() {
             weekNumber: any(named: 'weekNumber'),
             waitForServer: any(named: 'waitForServer'),
             onServerRejected: any(named: 'onServerRejected'),
-            onServerConfirmed: any(named: 'onServerConfirmed'),
           )).thenAnswer((inv) {
         rechazar =
             inv.namedArguments[#onServerRejected] as void Function(Object);
@@ -306,30 +336,15 @@ void main() {
       await container
           .read(sessionNotifierProvider(init).future)
           .timeout(const Duration(seconds: 5));
-      final notifier = container.read(sessionNotifierProvider(init).notifier);
 
-      // El SNAPSHOT gana: el doc desapareció porque el SDK revirtió.
-      finished.add(true);
-      await Future<void>.delayed(Duration.zero);
-
-      expect(
-        notifier.finishedElsewhere.value,
-        isFalse,
-        reason: 'la sesión nunca se confirmó en el servidor, así que su '
-            'desaparición NO significa que alguien la haya terminado. '
-            'Decirle al atleta que cerró el entreno desde el reloj sobre un '
-            'rechazo es una explicación falsa, peor que ninguna.',
-      );
-
-      // Y recién ahora llega el rechazo por el otro canal.
       rechazar(Exception('permission-denied'));
       await Future<void>.delayed(Duration.zero);
 
       expect(
         container.read(sessionNotifierProvider(init)).hasError,
         isTrue,
-        reason: 'el rechazo tiene que llegar a la pantalla como error, con su '
-            'motivo real y su reintento.',
+        reason: 'el atleta tiene que ENTERARSE, no entrenar media hora contra '
+            'una sesión que el servidor nunca aceptó.',
       );
     });
 

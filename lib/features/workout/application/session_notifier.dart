@@ -130,10 +130,6 @@ class SessionNotifier
         .watchSessionFinished(uid: uid, sessionId: sessionId)
         .listen((finished) {
       if (!finished || _finalized) return;
-      // Sin confirmación del servidor no se le cree a la desaparición del
-      // documento: hasta entonces, que no exista es lo esperable. Y el reloj
-      // tampoco pudo haberla cerrado — lee por REST y no ve este caché.
-      if (!_sesionConfirmada) return;
       // Lo cerró el reloj. Se marca finalizado ANTES de avisar para que un
       // `finishSession`/`abandonSession` que llegue después sea no-op: escribir
       // encima pisaría el volumen y la duración que ya calculó el reloj.
@@ -250,7 +246,6 @@ class SessionNotifier
       // confirmación dejaba al player en `AsyncLoading` para siempre sin una
       // sola excepción — el atleta tocaba Empezar y miraba un spinner eterno.
       waitForServer: false,
-      onServerConfirmed: () => _sesionConfirmada = true,
       onServerRejected: (e) {
         _reportarRechazoDelServidor(
             e, 'no se pudo crear la sesión del entreno');
@@ -379,12 +374,6 @@ class SessionNotifier
         'Sesión activa ${session.id} no coincide con la solicitada $sessionId',
       );
     }
-    // Una sesión RETOMADA ya existe en el servidor: salió de `getActive`, que
-    // la leyó de Firestore. Así que acá `watchSessionFinished` sí puede creerle
-    // a la desaparición del documento — es el camino por el que el reloj cierra
-    // un entreno y el teléfono se entera.
-    _sesionConfirmada = true;
-
     // Retomar también abre el reloj. Antes este camino no le avisaba NADA — ni
     // siquiera el nudge—, así que un entreno retomado desde el teléfono dejaba
     // la muñeca sin enterarse.
@@ -455,27 +444,6 @@ class SessionNotifier
   /// disposeado— tira. El fallo se pierde, que es lo correcto: no hay dónde
   /// mostrarlo.
   bool _disposed = false;
-
-  /// La sesión EXISTE en el servidor, no sólo en el caché de este teléfono.
-  ///
-  /// `watchSessionFinished` lee «el documento no existe» como «terminada», y
-  /// eso sólo es cierto si alguna vez existió. Mientras la creación no esté
-  /// confirmada, no existir es lo NORMAL: la escritura sigue en la cola de
-  /// Firestore, o el servidor la rechazó y el SDK revirtió el caché.
-  ///
-  /// ⚠️ La primera versión de esta defensa era un flag `_creacionRechazada`
-  /// que se prendía al recibir el rechazo, y NO CERRABA LA CARRERA. Un create
-  /// rechazado dispara dos canales independientes del SDK —el snapshot que
-  /// revierte y el future que falla— sin orden garantizado, y el orden natural
-  /// es que el snapshot llegue PRIMERO. Con el flag todavía en false, el
-  /// listener corría entero y la pantalla le decía al atleta «terminaste el
-  /// entreno desde el reloj» sobre un rechazo de paywall.
-  ///
-  /// Un flag que se prende en respuesta al mismo evento del que querés
-  /// protegerte no puede ganarle la carrera: hay que invertir la polaridad y
-  /// no creerle al evento hasta tener permiso. De ahí «confirmada» y no
-  /// «rechazada».
-  bool _sesionConfirmada = false;
 
   Future<void> logSet(SetLog setLog) async {
     final current = state.value;

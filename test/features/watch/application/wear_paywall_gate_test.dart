@@ -66,7 +66,6 @@ class _RepoQueElServidorRechaza extends SessionRepository {
     int weekNumber = 0,
     bool waitForServer = true,
     void Function(Object error)? onServerRejected,
-    void Function()? onServerConfirmed,
   }) {
     _avisar = onServerRejected;
     return super.create(
