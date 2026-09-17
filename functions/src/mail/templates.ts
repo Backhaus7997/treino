@@ -55,36 +55,55 @@ function esc(value: string | number | undefined): string {
 }
 
 /**
- * Landing pública. Destino por defecto de los CTA.
+ * Landing pública de TREINO. Hoy vive **sólo en el pie** del mail, como el
+ * link de texto «gettreino.com» que dice de dónde viene el correo.
  *
- * Es el default —y no el Coach Hub— porque la MAYORÍA de estos mails van a
- * ATLETAS, que usan la app móvil, no el dashboard web del entrenador. Mandar a
- * un atleta a `app.gettreino.com` lo deja mirando una herramienta que no es
- * suya. La landing al menos explica qué es TREINO y cómo bajarla.
+ * ── Lo que este comentario decía y ya no es cierto ──
  *
- * TODO(deep-links): el destino correcto para un atleta es la app, no una web.
- * Hoy el repo no tiene Universal Links ni App Links configurados (ni
- * `assetlinks.json`, ni associated domains, ni `autoVerify` en el manifest),
- * así que no hay forma de abrir la app desde un mail. Cuando eso exista, estos
- * CTA tienen que apuntar ahí.
+ * Decía «destino por defecto de los CTA», y que lo era porque la mayoría de
+ * estos mails van a atletas. Dejó de serlo cuando [APP_ENTRY_ATHLETE] lo
+ * reemplazó: hoy ningún CTA apunta acá. El único uso es `renderEmail`.
+ *
+ * Y traía un `TODO(deep-links)` que afirmaba que «el repo no tiene Universal
+ * Links ni App Links configurados (ni `assetlinks.json`, ni associated
+ * domains, ni `autoVerify` en el manifest)». **Las tres cosas existen**,
+ * verificadas el 2026-09-17:
+ *
+ * - `web/well-known/assetlinks.json`
+ * - `applinks:app.gettreino.com` en `ios/Runner/Runner.entitlements:13`
+ * - `android:autoVerify="true"` sobre `app.gettreino.com` en
+ *   `android/app/src/main/AndroidManifest.xml:61-66`
+ *
+ * O sea que el TODO ya estaba cumplido por el propio [APP_ENTRY_ATHLETE] que
+ * vive doce líneas más abajo, y seguía pidiendo que se hiciera. Regla 11.1 de
+ * `AGENTS.md`: una advertencia falsa es peor que ninguna.
  */
 export const LANDING_URL = "https://gettreino.com";
-
-/** Coach Hub web. Solo para los mails cuyo destinatario ES el entrenador. */
-export const COACH_HUB_URL = "https://app.gettreino.com";
 
 /**
  * A donde manda el CTA cuando el destinatario NO es el entrenador.
  *
- * Antes era `LANDING_URL`, y era un error medido: `gettreino.com` es de OTRO
- * producto —gimnasios y rankings, en ingles— y dice literalmente "No custom
- * app". Un atleta que recibia "tu entrenador confirmo la sesion" tocaba el
- * boton y caia en una pagina sin login, sin descarga, y que le negaba la
- * existencia de la app que tiene instalada.
- *
  * `/abrir/alumno` es un App Link: en un telefono con la app instalada, el
  * sistema operativo la abre y esta URL nunca llega al navegador. Quien la ve
  * como pagina es porque abrio el mail en una computadora o no tiene la app.
+ * Esa es la razon de que exista, y no cambia.
+ *
+ * ── ⚠️ La justificacion que estaba escrita aca era FALSA ──
+ *
+ * Decia que `LANDING_URL` habia sido «un error medido» porque `gettreino.com`
+ * «es de OTRO producto —gimnasios y rankings, en ingles— y dice literalmente
+ * "No custom app"».
+ *
+ * Verificado abriendo la URL el 2026-09-17: `gettreino.com` **es la landing de
+ * TREINO**, en castellano, con `/es/user` para el alumno y `/es/gym` para el
+ * entrenador. No hay ningun "No custom app" ni nada en ingles.
+ *
+ * La DECISION sigue siendo la correcta y por eso no se toca: un App Link que
+ * abre la app le gana a cualquier pagina web. Lo que se corrige es el motivo,
+ * porque un comentario que describe mal el mundo manda a la proxima persona a
+ * resolver un problema que no existe — y este ya lo hizo: hay un doc del repo
+ * (`docs/legal/ESTADO.md:228`) que dice lo contrario de este parrafo, y quien
+ * leyera los dos no tenia forma de saber cual creer.
  */
 export const APP_ENTRY_ATHLETE = "https://app.gettreino.com/abrir/alumno";
 
@@ -95,8 +114,10 @@ export const APP_ENTRY_ATHLETE = "https://app.gettreino.com/abrir/alumno";
  * tiene la app. Mandar a los dos al mismo lado obliga a una de las dos mitades
  * a leer instrucciones que no le corresponden.
  *
- * Reemplaza al viejo `COACH_HUB_URL` como destino de mail: mandaba al profe
- * derecho a la web incluso desde el telefono, donde la app le sirve mas.
+ * Reemplazo a una constante `COACH_HUB_URL` —ya borrada— que apuntaba a la
+ * raiz de `app.gettreino.com`: mandaba al profe derecho a la web incluso desde
+ * el telefono, donde la app le sirve mas. Esa constante sobrevivio sin un solo
+ * uso desde entonces, declarando en su dartdoc un rol que ya no cumplia.
  */
 export const APP_ENTRY_TRAINER = "https://app.gettreino.com/abrir/profe";
 
