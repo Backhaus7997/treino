@@ -220,6 +220,7 @@ void main() {
           'stall y empieza a cortar lecturas sanas, que es el trade peligroso: '
           'un duplicado que el teléfono esconde y el ranking suma.',
     );
+    // La relación con la otra cota documenta la INTENCIÓN...
     expect(
       kWatchAdoptionReadTimeout,
       lessThan(kFirestoreReadTimeout),
@@ -227,6 +228,25 @@ void main() {
           'tiene que ser MÁS corta que la cota de las lecturas de arranque: '
           'ésta está en el camino de marcar una serie, no en el de abrir la '
           'pantalla.',
+    );
+    // ...pero el que ataja es el número ABSOLUTO, y hacen falta los dos.
+    //
+    // Con sólo el techo relativo, `seconds: 14` pasaba en verde: 7× el valor
+    // real, contradiciendo de frente el dartdoc de la propia constante
+    // («esperar 15 segundos ahí es tan inservible como colgarse»). Medido.
+    //
+    // El disparador es plausible, no rebuscado: llega un reporte de duplicados
+    // desde la cancha, alguien razona «la lectura se está cortando, dale más
+    // tiempo», lo sube a 10 segundos, y un techo relativo lo bendice. A partir
+    // de ahí cada serie marcada puede clavar la fila 10 segundos con el guard
+    // anti doble-tap tomado, en el gesto más repetido de la app.
+    expect(
+      kWatchAdoptionReadTimeout,
+      lessThanOrEqualTo(const Duration(seconds: 3)),
+      reason: 'esta cota está en el camino de marcar una serie. Si necesitás '
+          'subirla de 3 segundos, el problema no es el número: es que la '
+          'lectura de adopción no puede seguir estando en ese camino. '
+          'Cambiá el diseño, no el techo.',
     );
   });
 }

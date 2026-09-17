@@ -465,6 +465,55 @@ void main() {
     );
   });
 
+  test('saltear la adopción se REPORTA: no puede morir en un catch mudo',
+      () async {
+    // Saltear la adopción crea un segundo documento sobre una serie que el
+    // reloj tal vez ya escribió. Ese duplicado es INVISIBLE en el teléfono
+    // —`_dedupedLogs` lo filtra del estado local— y el servidor lo cuenta:
+    // `functions/src/ranking-aggregate.ts` relee `setLogs` y suma los dos. Es
+    // el daño de los «24 documentos de más y 11.450 kg fantasma».
+    //
+    // Por eso el `catch` no puede ser mudo: sin telemetría, la tasa real de
+    // salteo en la cancha se deduce meses después contando duplicados. El
+    // dartdoc de `_reportNonFatal` dice que es inyectable exactamente para
+    // que un test assertee que el error viajó — esto es eso.
+    const sessionId = 'session-reporta-el-salteo';
+    final reporter = _RecordingNonFatalReporter();
+    final repoConReporter = SessionRepository(
+      firestore: firestore,
+      nonFatalReporter: reporter.call,
+    );
+    final watchRef = firestore
+        .collection('users')
+        .doc(uid)
+        .collection('sessions')
+        .doc(sessionId)
+        .collection('setLogs')
+        .doc('bench-press__1');
+
+    whenCalling(Invocation.method(#get, null))
+        .on(watchRef)
+        .thenThrow(FirebaseException(
+          plugin: 'cloud_firestore',
+          code: 'unavailable',
+          message: 'Failed to get document because the client is offline.',
+        ));
+
+    final logged = await repoConReporter.addSetLog(
+      uid: uid,
+      sessionId: sessionId,
+      setLog: buildSetLog(setNumber: 1, completedAt: testNow()),
+    );
+    await logged.acknowledged;
+
+    expect(
+      reporter.reports.map((r) => r.reason).toList(),
+      [contains('addSetLog')],
+      reason: 'tiene que salir exactamente UN reporte, y su razón tiene que '
+          'nombrar la operación: en Crashlytics se lee la razón, no el stack.',
+    );
+  });
+
   // ─── addSetLog(): dedupe contra lo que escribió el RELOJ ──────────────────
   //
   // El reloj escribe las series con id determinístico (`{exerciseId}__{n}`) y el
