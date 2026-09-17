@@ -90,20 +90,36 @@ enum AthleteEntitlement {
 ///      y nada más. El checklist está en `docs/paywall-watchos-plan.md` §5, y
 ///      el caso que más importa no es el obvio — es el CONTROL NEGATIVO: que
 ///      un free entrene una plantilla de principiante sin fricción.
-///   2. **El candado del catálogo vive sólo acá, no en el servidor.**
-///      `isPremium` aparece en `firestore.rules` únicamente dentro del bloque
-///      de `sessions`; el CREATE de `/routines` no lo mira NUNCA. Copiar una
-///      plantilla paga a rutina propia pasa el servidor si la copia entra en
-///      `withinFreeRoutineShape`, y `hipertrofia-intermedio` —3 días, sin
-///      `numWeeks`— entra exacto. No se arregla con una cláusula nueva: el
-///      servidor no puede distinguir tres días copiados de tres días escritos
-///      a mano, porque el payload es idéntico. Es una decisión de producto.
-///
-/// Son DOS, y ninguno de los dos es código: uno necesita un reloj en la mano y
-/// el otro una decisión de producto. Del lado del servidor y del cliente, el
-/// paywall del alumno está.
+/// Es UNO, y no es código: necesita un reloj de Apple en la mano. Del lado del
+/// servidor y del cliente, el paywall del alumno está.
 ///
 /// ─── Lo que SALIÓ de esta lista, y por qué ───
+///
+/// **El candado del catálogo del lado del servidor**, que estuvo acá y ya no
+/// está. Cerrado el 2026-09-16 por el PR #1155: «Usar como base» sella la copia
+/// con `copiedFrom: <id de la fuente>`, y el CREATE de `/routines` deniega
+/// cuando un alumno con el paywall activo crea una rutina cuyo sello apunta a
+/// una plantilla `source: 'system'`. Antes de ese PR el servidor sabía de
+/// TAMAÑO (`withinFreeRoutineShape`) y de nada más.
+///
+/// ⚠️ **ESTE RENGLÓN TENÍA LOS NÚMEROS MAL, y eso mandó a medir.** Decía que
+/// `hipertrofia-intermedio` es «3 días, sin `numWeeks`» y que «entra exacto» en
+/// la forma free. Medido contra producción el 2026-09-16: tiene **6 días**, y
+/// las CUATRO plantillas pagas tienen 4, 4, 5 y 6 — todas por encima del tope
+/// de 3. O sea que la copia ENTERA de cualquiera **ya rebotaba** por tamaño, y
+/// el agujero era más chico que el que este archivo describía.
+///
+/// ⚠️ **LO QUE EL SELLO NO HACE**, porque es fácil creer que cierra la puerta:
+/// no frena a quien escribe a mano contra Firestore —lo pone el cliente, así
+/// que un payload fabricado lo omite— y NADA puede frenar copiar 3 días de una
+/// plantilla de 6 y rehacerlos, porque ese payload es idéntico a uno escrito a
+/// mano. Lo que sí frena es el camino de la app, por donde pasa el 100% de los
+/// usuarios reales. Es defensa en profundidad, no una puerta blindada.
+///
+/// ⚠️ Y ESTE RENGLÓN LLEGÓ UN DÍA TARDE, otra vez, escrito por quien cerró el
+/// PR. Van TRES: el seed, los carteles de steering, y éste. El guard de
+/// `anti_steering_movil_test.dart` no lo atrapó porque cuidaba UN ítem, no la
+/// propiedad — se generalizó junto con este cambio.
 ///
 /// **Los tres carteles de steering de la app móvil del PF**, que estuvieron
 /// acá y ya no están. Cerrado el 2026-09-15 por el PR #1141: los tres snackbars
