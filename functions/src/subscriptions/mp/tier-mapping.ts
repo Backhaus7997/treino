@@ -37,6 +37,7 @@ import { App } from "firebase-admin/app";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 
+import { athleteAmountFor } from "../athlete-plan-config";
 import {
   SubscriptionCycle,
   SubscriptionTier,
@@ -74,11 +75,41 @@ export const CYCLES: readonly SubscriptionCycle[] = [
   "annual",
 ] as const;
 
-export interface PreapprovalMapping {
-  uid: string;
-  tier: SubscriptionTier;
-  cycle: SubscriptionCycle;
-}
+/**
+ * Cual de los DOS productos de TREINO se cobro con este plan de Mercado Pago.
+ *
+ * `mp_plans` es una sola coleccion para los dos, y sin este campo no hay forma
+ * de distinguirlos: los documentos tienen la misma forma y estan keyeados por
+ * el id que devuelve MP. Antes de que existiera el alumno eso no importaba
+ * porque todo plan era de un PF; hoy importa, y el modo de falla es feo —
+ * `reconcile-my-checkout` consulta `mp_plans where uid == uid` SIN filtro de
+ * tipo, asi que un plan de alumno pasado por el escritor del PF le escribiria
+ * al alumno un `subscription` de entrenador.
+ */
+export type ProductoMp = "trainer" | "athlete";
+
+/**
+ * Lo que sabemos de un plan de MP: de quien es, que producto cobra, y cada
+ * cuanto.
+ *
+ * Es una union discriminada y no un objeto con `tier` opcional a proposito: el
+ * alumno NO TIENE tier —un solo plan, dos ciclos— y un `tier?: SubscriptionTier`
+ * dejaria que alguien lo leyera sin preguntar por el producto y se llevara un
+ * `undefined` hasta el lugar equivocado. Con la union, TypeScript obliga a
+ * decidir en cada lectura.
+ */
+export type PreapprovalMapping =
+  | {
+      producto: "trainer";
+      uid: string;
+      tier: SubscriptionTier;
+      cycle: SubscriptionCycle;
+    }
+  | {
+      producto: "athlete";
+      uid: string;
+      cycle: SubscriptionCycle;
+    };
 
 /**
  * Cada cuantos MESES cobra MP para este ciclo.
@@ -115,26 +146,53 @@ export function amountFor(
  * compro. Un throw al importar rompe el deploy y el arranque de los tests —
  * ruidoso y temprano. Devolver `null` en silencio dejaria el bug esperando a
  * que alguien pague.
+ *
+ * ── Por que el indice cubre los DOS productos ──
+ *
+ * Porque la colision que importa es entre productos, no dentro de uno. El
+ * precio del alumno vive en su propio archivo (`athlete-plan-config.ts`, ver
+ * el porque alla), pero si quedara fuera de ESTE indice aparecerian dos fallas
+ * nuevas: un precio de alumno igual a uno del PF le acreditaria a un alumno un
+ * tier de entrenador —exactamente la catastrofe que el throw existe para
+ * impedir—, y un plan de alumno que perdiera su documento en `mp_plans` no
+ * tendria fallback y el pago no destrabaria nada.
  */
 const BY_AMOUNT: ReadonlyMap<number, PreapprovalMapping> = (() => {
   const m = new Map<number, PreapprovalMapping>();
+  const choque = (amount: number, previo: PreapprovalMapping, quien: string) =>
+    new Error(
+      "mp/tier-mapping: dos planes comparten el monto " +
+        `${amount} (${describirPlan(previo)} y ${quien}). ` +
+        "El monto dejo de identificar el plan — revisar TIER_PRICES_ARS " +
+        "y ATHLETE_PRICE_MONTHLY_ARS.",
+    );
+
   for (const tier of PAID_TIERS) {
     for (const cycle of CYCLES) {
       const amount = amountFor(tier, cycle);
       if (amount === null) continue;
       const previo = m.get(amount);
-      if (previo) {
-        throw new Error(
-          "mp/tier-mapping: dos planes comparten el monto " +
-            `${amount} (${previo.tier}/${previo.cycle} y ${tier}/${cycle}). ` +
-            "El monto dejo de identificar el plan — revisar TIER_PRICES_ARS.",
-        );
-      }
-      m.set(amount, { uid: "", tier, cycle });
+      if (previo) throw choque(amount, previo, `${tier}/${cycle}`);
+      m.set(amount, { producto: "trainer", uid: "", tier, cycle });
     }
   }
+
+  for (const cycle of CYCLES) {
+    const amount = athleteAmountFor(cycle);
+    const previo = m.get(amount);
+    if (previo) throw choque(amount, previo, `alumno/${cycle}`);
+    m.set(amount, { producto: "athlete", uid: "", cycle });
+  }
+
   return m;
 })();
+
+/** Como se nombra un plan en un mensaje de error o en un log. */
+function describirPlan(m: PreapprovalMapping): string {
+  return m.producto === "trainer"
+    ? `${m.tier}/${m.cycle}`
+    : `alumno/${m.cycle}`;
+}
 
 /**
  * Deriva el par (tier, ciclo) desde el monto cobrado. `null` si ningun plan
@@ -144,12 +202,9 @@ const BY_AMOUNT: ReadonlyMap<number, PreapprovalMapping> = (() => {
  * `null` y no un tier por defecto: adivinar un plan a partir de un monto que no
  * reconocemos seria regalar entitlement.
  */
-export function tierFromAmount(
-  amount: unknown,
-): { tier: SubscriptionTier; cycle: SubscriptionCycle } | null {
+export function tierFromAmount(amount: unknown): PreapprovalMapping | null {
   if (typeof amount !== "number" || !Number.isFinite(amount)) return null;
-  const hit = BY_AMOUNT.get(amount);
-  return hit ? { tier: hit.tier, cycle: hit.cycle } : null;
+  return BY_AMOUNT.get(amount) ?? null;
 }
 
 /**
@@ -159,6 +214,10 @@ export function tierFromAmount(
  * `set` sin merge: el documento es inmutable por diseño. Un cambio de plan crea
  * un preapproval NUEVO en MP, con su propio id — nunca se reescribe el viejo,
  * asi que el historial de que compro cada PF queda entero.
+ *
+ * El `producto` viaja adentro del mapping y por eso se escribe solo. Este es el
+ * unico escritor de `mp_plans`, asi que todo documento nuevo lo tiene; los
+ * viejos no, y de eso se ocupa el default de [lookupPlan].
  */
 export async function recordPlan(
   app: App,
@@ -200,22 +259,48 @@ export async function lookupPlan(
     const tier = data.tier;
     const cycle = data.cycle;
     const uid = data.uid;
+
+    // ⚠️ DEFAULT A `trainer` CUANDO EL CAMPO FALTA, y no es una comodidad.
+    //
+    // `producto` se agrego el 2026-09-17. Todo documento de `mp_plans` escrito
+    // antes —o sea TODOS los planes de PF que hay en produccion— no lo tiene.
+    // Sin este default, el primer deploy que incluya este codigo deja ilegible
+    // el mapeo de cada PF que ya paga: `lookupPlan` cae al fallback por monto,
+    // que loguea un warn por cada reconciliacion, y si el monto tampoco
+    // matchea devuelve null y el pago deja de acreditar.
+    //
+    // El default es seguro en la direccion que importa: un plan de alumno
+    // SIEMPRE se escribe con `producto` explicito (ver `recordPlan`), asi que
+    // un documento sin el campo solo puede ser viejo, y viejo solo puede ser
+    // de un PF.
+    const producto: ProductoMp = data.producto === "athlete" ? "athlete" : "trainer";
+
     // Se valida aunque lo hayamos escrito nosotros: es un documento de
     // Firestore, y "lo escribimos nosotros" no es una garantia de runtime. Es
     // la misma leccion que documenta `subscription-state.ts`.
+    const uidOk = typeof uid === "string" && uid !== "";
+    const cycleOk =
+      typeof cycle === "string" && (CYCLES as readonly string[]).includes(cycle);
+
+    if (uidOk && cycleOk && producto === "athlete") {
+      return { producto, uid, cycle: cycle as SubscriptionCycle };
+    }
+
     if (
-      typeof uid === "string" && uid !== "" &&
-      typeof tier === "string" && (PAID_TIERS as readonly string[]).includes(tier) &&
-      typeof cycle === "string" && (CYCLES as readonly string[]).includes(cycle)
+      uidOk && cycleOk &&
+      typeof tier === "string" && (PAID_TIERS as readonly string[]).includes(tier)
     ) {
       return {
+        producto: "trainer",
         uid,
         tier: tier as SubscriptionTier,
         cycle: cycle as SubscriptionCycle,
       };
     }
+
     logger.warn("mp/tier-mapping: documento de mapeo ilegible — se usa el monto", {
       planId,
+      producto,
       tier,
       cycle,
     });
@@ -226,7 +311,7 @@ export async function lookupPlan(
 
   logger.warn(
     "mp/tier-mapping: sin documento de mapeo — plan derivado del monto",
-    { planId, amount: summarizedAmount, ...porMonto },
+    { planId, amount: summarizedAmount, plan: describirPlan(porMonto) },
   );
-  return { uid: "", ...porMonto };
+  return porMonto;
 }
