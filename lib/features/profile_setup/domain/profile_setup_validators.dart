@@ -42,20 +42,19 @@ class ProfileSetupValidators {
   }
 
   /// Edad mínima de cuenta, en años cumplidos.
+  /// Ver `docs/legal/terminos-y-condiciones.md` §3.
   ///
-  /// El número no es sólo política de producto. Con 16 la app queda FUERA del
-  /// alcance de COPPA (16 CFR 312, que aplica bajo 13) y parada en el piso
-  /// máximo del art. 8 del RGPD (16, que ningún estado miembro puede subir),
-  /// así que no hay que construir verificación de consentimiento parental para
-  /// ninguna jurisdicción. Ese es el ahorro real de elegir 16 y no 13.
+  /// **13 y no menos**: COPPA, en los Estados Unidos, alcanza a los menores de
+  /// 13 y les exige un consentimiento parental VERIFICABLE que TREINO no
+  /// implementa. Con este piso, ningún usuario queda dentro de ese régimen.
   ///
-  /// Lo que NO elimina: los de 16 y 17 siguen siendo menores para el CCyC
-  /// argentino y los textos legales les siguen exigiendo consentimiento del
-  /// representante legal. Lo que 16 saca de encima es la obligación de
-  /// VERIFICARLO con un mecanismo técnico.
+  /// **13 y no más**: el caso del club. Un entrenador con alumnos de 13 a 15 no
+  /// tenía forma legítima de llevarlos, y esa banda está enteramente fuera de
+  /// COPPA.
   ///
-  /// Ver `docs/legal/terminos-y-condiciones.md`.
-  static const int kMinAgeYears = 16;
+  /// Este número lo leen el texto legal in-app y las reglas de Firestore. Si lo
+  /// cambiás, `legal_content_test` te va a decir qué más hay que tocar.
+  static const int kMinAgeYears = 13;
 
   /// Edad máxima plausible. Por encima de esto es un dedazo en el año, no una
   /// persona — el date picker ofrece 1920 como `firstDate`.
@@ -88,10 +87,19 @@ class ProfileSetupValidators {
   /// alguien el día de su propio cumpleaños.
   ///
   /// El 29 de febrero sale bien de acá SIN ninguna excepción, y conviene decir
-  /// por qué para que nadie agregue una: el 16º cumpleaños de alguien nacido un
-  /// 29/2 cae SIEMPRE en año bisiesto (16 es múltiplo de 4), así que la fecha
-  /// existe. Para cualquier día posterior el `day >=` ya resuelve solo el 28/2
-  /// de un año no bisiesto.
+  /// por qué para que nadie agregue una.
+  ///
+  /// Cuando la edad mínima era 16 el argumento era que el 16º cumpleaños de un
+  /// nacido el 29/2 cae siempre en año bisiesto, porque 16 es múltiplo de 4.
+  /// **Con 13 ese argumento ya no vale**: 2008 + 13 = 2021, que no es bisiesto,
+  /// así que ese cumpleaños no existe como fecha. El código igual funciona, pero
+  /// por otro motivo, y el motivo importa porque es una decisión:
+  ///
+  /// el `day >=` hace que en un año no bisiesto la persona cumpla el **1 de
+  /// marzo**, no el 28 de febrero. Es la convención más conservadora de las dos
+  /// que se usan, y es la correcta para un gate de edad: entre adelantar o
+  /// atrasar un día el cumplimiento de la edad mínima, atrasar nunca deja pasar
+  /// a alguien que todavía no la tiene.
   static int _yearsBetween(DateTime born, DateTime now) {
     var years = now.year - born.year;
     final hadBirthday = now.month > born.month ||

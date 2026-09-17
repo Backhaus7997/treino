@@ -21,6 +21,7 @@ import 'package:treino/features/profile_setup/application/profile_setup_provider
 import 'package:treino/features/profile_setup/data/avatar_upload_service.dart';
 
 import '../../../helpers/onboarding_test_helpers.dart';
+import 'package:treino/features/profile_setup/domain/profile_setup_validators.dart';
 
 // ---------------------------------------------------------------------------
 // Mocks & fakes
@@ -353,7 +354,8 @@ void main() {
     // validate(): una fecha de menor de 16 viajaba a Firestore, las rules la
     // denegaban, y la pantalla decía "No pudimos guardar… Probá de nuevo" sobre
     // algo que reintentar nunca iba a arreglar.
-    testWidgets('una fecha de menor de 16 bloquea el guardado y NO escribe',
+    testWidgets(
+        'una fecha por debajo del piso bloquea el guardado y NO escribe',
         (tester) async {
       final repo = MockUserRepository();
       when(() => repo.update(any(), any())).thenAnswer((_) async {});
@@ -361,7 +363,11 @@ void main() {
       await tester.pumpWidget(
         _buildScreen(
           profile: _profile(
-            bornAt: DateTime.utc(DateTime.now().year - 10, 1, 1),
+            bornAt: DateTime.utc(
+              DateTime.now().year - (ProfileSetupValidators.kMinAgeYears - 3),
+              1,
+              1,
+            ),
           ),
           userRepository: repo,
           authenticated: true,
@@ -375,7 +381,9 @@ void main() {
       await tester.tap(find.byKey(const Key('edit_personal_save_button')));
       await tester.pumpAndSettle();
 
-      expect(find.text('Tenés que tener 16 años para usar TREINO'),
+      expect(
+          find.text(
+              'Tenés que tener ${ProfileSetupValidators.kMinAgeYears} años para usar TREINO'),
           findsOneWidget);
       verifyNever(() => repo.update(any(), any()));
     });
@@ -396,7 +404,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-          find.text('Tenés que tener 16 años para usar TREINO'), findsNothing);
+          find.text(
+              'Tenés que tener ${ProfileSetupValidators.kMinAgeYears} años para usar TREINO'),
+          findsNothing);
 
       await tester
           .ensureVisible(find.byKey(const Key('edit_personal_save_button')));

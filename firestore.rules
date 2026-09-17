@@ -187,10 +187,10 @@ service cloud.firestore {
     // Edad mínima de cuenta — ver `ProfileSetupValidators.kMinAgeYears` y
     // `docs/legal/terminos-y-condiciones.md`.
     //
-    // APROXIMACIÓN DELIBERADA: los 16 años se aproximan por 5840 días
-    // (16 × 365), que son CUATRO DÍAS MENOS que 16 años reales — 5844,
-    // contando los cuatro bisiestos del período. El error va a favor del
-    // usuario a propósito: esta regla NUNCA rechaza a alguien que sí tiene 16,
+    // APROXIMACIÓN DELIBERADA: los 13 años se aproximan por 4745 días
+    // (13 × 365), que son TRES DÍAS MENOS que 13 años reales — 4748,
+    // contando los tres bisiestos del período. El error va a favor del
+    // usuario a propósito: esta regla NUNCA rechaza a alguien que sí tiene 13,
     // y el cálculo exacto por componentes de fecha lo hace el cliente. Al revés
     // —una regla MÁS estricta que el validador— produciría un rechazo que la UI
     // no sabe explicar: el usuario vería su fecha aceptada en pantalla y la
@@ -227,7 +227,7 @@ service cloud.firestore {
     function bornAtOk(data) {
       return !('bornAt' in data)
              || (data.bornAt is timestamp
-                 && data.bornAt <= request.time - duration.value(5840, 'd'));
+                 && data.bornAt <= request.time - duration.value(4745, 'd'));
     }
     match /users/{uid} {
       // Owner-only read.
