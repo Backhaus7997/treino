@@ -166,6 +166,7 @@ class SessionRepository {
     int weekNumber = 0,
     bool waitForServer = true,
     void Function(Object error)? onServerRejected,
+    void Function()? onServerConfirmed,
   }) async {
     final ref = _sessions(uid).doc();
     final session = Session(
@@ -193,7 +194,13 @@ class SessionRepository {
       // llega acá es un rechazo REAL del servidor —típicamente `permission-
       // denied`— y ése no se arregla reintentando nunca.
       unawaited(
-        escritura.catchError((Object e) {
+        escritura.then((_) {
+          // El servidor ACEPTÓ: recién ahora la sesión existe fuera de este
+          // teléfono. Quien escuche `watchSessionFinished` necesita saberlo,
+          // porque ese stream lee «el documento no existe» como «terminada», y
+          // hasta este momento no existir es lo NORMAL.
+          onServerConfirmed?.call();
+        }).catchError((Object e) {
           developer.log(
             'create: el servidor rechazó la sesión — $e',
             name: 'SessionRepository',

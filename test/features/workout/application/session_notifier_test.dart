@@ -192,6 +192,7 @@ void main() {
             weekNumber: any(named: 'weekNumber'),
             waitForServer: any(named: 'waitForServer'),
             onServerRejected: any(named: 'onServerRejected'),
+            onServerConfirmed: any(named: 'onServerConfirmed'),
           )).thenAnswer((_) async => makeSession());
 
       final container = ProviderContainer(
@@ -240,6 +241,7 @@ void main() {
             dayNumber: any(named: 'dayNumber'),
             waitForServer: any(named: 'waitForServer'),
             onServerRejected: any(named: 'onServerRejected'),
+            onServerConfirmed: any(named: 'onServerConfirmed'),
           )).thenAnswer((_) async => session);
 
       final container = _makeContainer(
@@ -260,6 +262,7 @@ void main() {
             dayNumber: any(named: 'dayNumber'),
             waitForServer: any(named: 'waitForServer'),
             onServerRejected: any(named: 'onServerRejected'),
+            onServerConfirmed: any(named: 'onServerConfirmed'),
           )).called(1);
     });
 
@@ -278,6 +281,7 @@ void main() {
             dayNumber: any(named: 'dayNumber'),
             waitForServer: any(named: 'waitForServer'),
             onServerRejected: any(named: 'onServerRejected'),
+            onServerConfirmed: any(named: 'onServerConfirmed'),
           )).thenAnswer((_) async => session);
 
       final container = _makeContainer(
@@ -307,6 +311,7 @@ void main() {
             dayNumber: any(named: 'dayNumber'),
             waitForServer: any(named: 'waitForServer'),
             onServerRejected: any(named: 'onServerRejected'),
+            onServerConfirmed: any(named: 'onServerConfirmed'),
           )).thenAnswer((_) async => session);
 
       final container = _makeContainer(
@@ -357,6 +362,7 @@ void main() {
             dayNumber: any(named: 'dayNumber'),
             waitForServer: any(named: 'waitForServer'),
             onServerRejected: any(named: 'onServerRejected'),
+            onServerConfirmed: any(named: 'onServerConfirmed'),
           ));
     });
 
@@ -537,6 +543,7 @@ void main() {
             dayNumber: any(named: 'dayNumber'),
             waitForServer: any(named: 'waitForServer'),
             onServerRejected: any(named: 'onServerRejected'),
+            onServerConfirmed: any(named: 'onServerConfirmed'),
           )).thenAnswer((_) async => session);
 
       final container = _makeContainer(repo: repo, uid: 'u1', routine: r);
@@ -732,6 +739,7 @@ void main() {
             dayNumber: any(named: 'dayNumber'),
             waitForServer: any(named: 'waitForServer'),
             onServerRejected: any(named: 'onServerRejected'),
+            onServerConfirmed: any(named: 'onServerConfirmed'),
           )).thenAnswer((_) async => makeSession());
       when(() => repo.finish(
             uid: any(named: 'uid'),
@@ -782,6 +790,7 @@ void main() {
             dayNumber: any(named: 'dayNumber'),
             waitForServer: any(named: 'waitForServer'),
             onServerRejected: any(named: 'onServerRejected'),
+            onServerConfirmed: any(named: 'onServerConfirmed'),
           )).thenAnswer((_) async => makeSession());
       when(() => repo.finish(
             uid: any(named: 'uid'),
@@ -833,6 +842,7 @@ void main() {
             dayNumber: any(named: 'dayNumber'),
             waitForServer: any(named: 'waitForServer'),
             onServerRejected: any(named: 'onServerRejected'),
+            onServerConfirmed: any(named: 'onServerConfirmed'),
           )).thenAnswer((_) async => makeSession());
       when(() => repo.finish(
             uid: any(named: 'uid'),
@@ -891,6 +901,7 @@ void main() {
             dayNumber: any(named: 'dayNumber'),
             waitForServer: any(named: 'waitForServer'),
             onServerRejected: any(named: 'onServerRejected'),
+            onServerConfirmed: any(named: 'onServerConfirmed'),
           )).thenAnswer((_) async => session);
       when(() => repo.addSetLog(
             uid: any(named: 'uid'),
@@ -946,6 +957,7 @@ void main() {
             dayNumber: any(named: 'dayNumber'),
             waitForServer: any(named: 'waitForServer'),
             onServerRejected: any(named: 'onServerRejected'),
+            onServerConfirmed: any(named: 'onServerConfirmed'),
           )).thenAnswer((_) async => makeSession());
 
       final routine = makeRoutine();
@@ -986,6 +998,7 @@ void main() {
             dayNumber: any(named: 'dayNumber'),
             waitForServer: any(named: 'waitForServer'),
             onServerRejected: any(named: 'onServerRejected'),
+            onServerConfirmed: any(named: 'onServerConfirmed'),
           )).thenAnswer((_) async => makeSession());
       when(() => repo.addSetLog(
             uid: any(named: 'uid'),
@@ -1051,6 +1064,7 @@ void main() {
             weekNumber: any(named: 'weekNumber'),
             waitForServer: any(named: 'waitForServer'),
             onServerRejected: any(named: 'onServerRejected'),
+            onServerConfirmed: any(named: 'onServerConfirmed'),
           )).thenAnswer((_) async => session);
 
       final container = _makeContainer(
@@ -1076,6 +1090,7 @@ void main() {
             weekNumber: captureAny(named: 'weekNumber'),
             waitForServer: any(named: 'waitForServer'),
             onServerRejected: any(named: 'onServerRejected'),
+            onServerConfirmed: any(named: 'onServerConfirmed'),
           )).captured;
       return captured.last as int;
     }
@@ -1143,6 +1158,7 @@ void main() {
             weekNumber: any(named: 'weekNumber'),
             waitForServer: any(named: 'waitForServer'),
             onServerRejected: any(named: 'onServerRejected'),
+            onServerConfirmed: any(named: 'onServerConfirmed'),
           )).thenAnswer((_) async => session);
 
       final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
@@ -1187,6 +1203,7 @@ void main() {
             weekNumber: any(named: 'weekNumber'),
             waitForServer: any(named: 'waitForServer'),
             onServerRejected: any(named: 'onServerRejected'),
+            onServerConfirmed: any(named: 'onServerConfirmed'),
           )).thenAnswer((_) async => session);
 
       final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
@@ -1255,6 +1272,7 @@ void main() {
             weekNumber: any(named: 'weekNumber'),
             waitForServer: any(named: 'waitForServer'),
             onServerRejected: any(named: 'onServerRejected'),
+            onServerConfirmed: any(named: 'onServerConfirmed'),
           )).thenAnswer((_) async => sessionWeek1);
 
       when(() => repo.addSetLog(
@@ -1311,6 +1329,7 @@ void main() {
             weekNumber: any(named: 'weekNumber'),
             waitForServer: any(named: 'waitForServer'),
             onServerRejected: any(named: 'onServerRejected'),
+            onServerConfirmed: any(named: 'onServerConfirmed'),
           )).thenAnswer((_) async => session);
 
       final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
@@ -1355,6 +1374,7 @@ void main() {
             weekNumber: any(named: 'weekNumber'),
             waitForServer: any(named: 'waitForServer'),
             onServerRejected: any(named: 'onServerRejected'),
+            onServerConfirmed: any(named: 'onServerConfirmed'),
           )).thenAnswer((_) async => session);
       when(() => repo.addSetLog(
             uid: any(named: 'uid'),
@@ -1425,6 +1445,7 @@ void main() {
             weekNumber: any(named: 'weekNumber'),
             waitForServer: any(named: 'waitForServer'),
             onServerRejected: any(named: 'onServerRejected'),
+            onServerConfirmed: any(named: 'onServerConfirmed'),
           )).thenAnswer((_) async => session);
       when(() => repo.addSetLog(
             uid: any(named: 'uid'),
@@ -1491,6 +1512,7 @@ void main() {
             weekNumber: any(named: 'weekNumber'),
             waitForServer: any(named: 'waitForServer'),
             onServerRejected: any(named: 'onServerRejected'),
+            onServerConfirmed: any(named: 'onServerConfirmed'),
           )).thenAnswer((_) async => session);
       when(() => repo.addSetLog(
             uid: any(named: 'uid'),
@@ -1559,6 +1581,7 @@ void main() {
             weekNumber: any(named: 'weekNumber'),
             waitForServer: any(named: 'waitForServer'),
             onServerRejected: any(named: 'onServerRejected'),
+            onServerConfirmed: any(named: 'onServerConfirmed'),
           )).thenAnswer((_) async => session);
       when(() => repo.addSetLog(
             uid: any(named: 'uid'),
@@ -1647,6 +1670,7 @@ void main() {
             weekNumber: any(named: 'weekNumber'),
             waitForServer: any(named: 'waitForServer'),
             onServerRejected: any(named: 'onServerRejected'),
+            onServerConfirmed: any(named: 'onServerConfirmed'),
           )).thenAnswer((_) async => session);
       when(() => repo.addSetLog(
             uid: any(named: 'uid'),
@@ -1752,6 +1776,7 @@ void main() {
             weekNumber: any(named: 'weekNumber'),
             waitForServer: any(named: 'waitForServer'),
             onServerRejected: any(named: 'onServerRejected'),
+            onServerConfirmed: any(named: 'onServerConfirmed'),
           )).thenAnswer((_) async => session);
       when(() => repo.addSetLog(
             uid: any(named: 'uid'),
@@ -1813,6 +1838,7 @@ void main() {
             weekNumber: any(named: 'weekNumber'),
             waitForServer: any(named: 'waitForServer'),
             onServerRejected: any(named: 'onServerRejected'),
+            onServerConfirmed: any(named: 'onServerConfirmed'),
           )).thenAnswer((_) async => session);
       when(() => repo.addSetLog(
             uid: any(named: 'uid'),
@@ -1905,6 +1931,7 @@ void main() {
             weekNumber: any(named: 'weekNumber'),
             waitForServer: any(named: 'waitForServer'),
             onServerRejected: any(named: 'onServerRejected'),
+            onServerConfirmed: any(named: 'onServerConfirmed'),
           )).thenAnswer((_) async => session);
       when(() => repo.addSetLog(
             uid: any(named: 'uid'),
@@ -2058,6 +2085,7 @@ void main() {
             weekNumber: any(named: 'weekNumber'),
             waitForServer: any(named: 'waitForServer'),
             onServerRejected: any(named: 'onServerRejected'),
+            onServerConfirmed: any(named: 'onServerConfirmed'),
           )).thenAnswer((_) async => makeSession());
 
       final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);

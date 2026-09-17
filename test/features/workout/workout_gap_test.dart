@@ -173,6 +173,7 @@ void main() {
             dayNumber: any(named: 'dayNumber'),
             waitForServer: any(named: 'waitForServer'),
             onServerRejected: any(named: 'onServerRejected'),
+            onServerConfirmed: any(named: 'onServerConfirmed'),
           )).thenAnswer((_) async => makeSession());
       when(() => repo.updateSetLog(
             uid: any(named: 'uid'),
@@ -214,6 +215,7 @@ void main() {
             dayNumber: any(named: 'dayNumber'),
             waitForServer: any(named: 'waitForServer'),
             onServerRejected: any(named: 'onServerRejected'),
+            onServerConfirmed: any(named: 'onServerConfirmed'),
           )).thenAnswer((_) async => makeSession());
       // addSetLog devuelve el SetLog que recibió (así se conserva el id
       // persistido) con la confirmación del servidor ya resuelta: este test no

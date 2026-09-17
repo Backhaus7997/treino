@@ -81,6 +81,7 @@ void main() {
             weekNumber: any(named: 'weekNumber'),
             waitForServer: any(named: 'waitForServer'),
             onServerRejected: any(named: 'onServerRejected'),
+            onServerConfirmed: any(named: 'onServerConfirmed'),
           )).thenAnswer((_) async => makeSession());
 
       // First finish throws (offline / Firestore error), second succeeds.
@@ -148,6 +149,7 @@ void main() {
             weekNumber: any(named: 'weekNumber'),
             waitForServer: any(named: 'waitForServer'),
             onServerRejected: any(named: 'onServerRejected'),
+            onServerConfirmed: any(named: 'onServerConfirmed'),
           )).thenAnswer((_) async => makeSession());
       when(() => repo.addSetLog(
             uid: any(named: 'uid'),
