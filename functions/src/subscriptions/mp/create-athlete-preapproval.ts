@@ -37,7 +37,9 @@ import {
   athleteAmountFor,
 } from "../athlete-plan-config";
 import { SubscriptionCycle } from "../tier-config";
-import { CYCLES, frequencyMonthsFor } from "./tier-mapping";
+import { CYCLES, MP_PLANS_COLLECTION, frequencyMonthsFor } from "./tier-mapping";
+import { AthleteStatus, athleteStatusOtorga } from "./map-status";
+import { puedeSeguirCobrando } from "./reconcile";
 import { MpClient, createMpClient } from "./client";
 import { CheckoutAbierto, abrirCheckout } from "./abrir-checkout";
 
@@ -118,6 +120,44 @@ function parseCycle(raw: unknown): SubscriptionCycle | null {
 }
 
 /**
+ * Si este alumno ya tiene derecho vigente Y su plan activo es de este ciclo.
+ *
+ * Las DOS condiciones hacen falta:
+ *
+ *   - Sin la del derecho, alguien cuyo plan vencio no podria volver a
+ *     suscribirse nunca, porque el documento de `mp_plans` sigue ahi.
+ *   - Sin la del ciclo, el que quiere pasar de mensual a anual queda trabado.
+ *
+ * Lee `mp_plans` con la misma consulta por uid que usa el resto del modulo, y
+ * filtra EN MEMORIA: un segundo `where` la convertiria en compuesta y exigiria
+ * desplegar un indice, para uno o dos documentos por usuario.
+ */
+async function yaPagaEsteCiclo(
+  app: App,
+  uid: string,
+  userData: Record<string, unknown> | undefined,
+  cycle: SubscriptionCycle,
+): Promise<boolean> {
+  const sub = userData?.athleteSubscription as { status?: unknown } | undefined;
+  const status = typeof sub?.status === "string" ? sub.status : null;
+  if (status === null || !athleteStatusOtorga(status as AthleteStatus)) {
+    return false;
+  }
+
+  const snap = await getFirestore(app)
+    .collection(MP_PLANS_COLLECTION)
+    .where("uid", "==", uid)
+    .get();
+
+  return snap.docs.some((d) => {
+    const datos = d.data();
+    return datos.producto === "athlete" &&
+      datos.cycle === cycle &&
+      puedeSeguirCobrando(datos);
+  });
+}
+
+/**
  * El cuerpo del callable, sin el envoltorio de Firebase. Testeable en local.
  */
 export async function runCreateAthletePreapproval(
@@ -174,6 +214,29 @@ export async function runCreateAthletePreapproval(
     throw new HttpsError(
       "failed-precondition",
       "tu entrenador ya paga tu lugar — no necesitas suscribirte",
+    );
+  }
+
+  // ── No se puede comprar dos veces el MISMO ciclo ──
+  //
+  // La ventana de `abrirCheckout` cubre el doble click, pero sólo 30 minutos.
+  // El caso que queda afuera es real y no tiene nada que ver con las tiendas:
+  // alguien que ya paga vuelve a la pagina de precios un mes despues y aprieta
+  // de nuevo, porque no se acuerda o porque no hay nada que se lo diga.
+  //
+  // Sin esta guarda MP le abre un segundo cobro. El reconciliador lo corrige
+  // despues —`darDeBajaLosReemplazados` da de baja el plan viejo cuando el
+  // nuevo confirma— pero "se corrige despues" significa que en el medio existio
+  // un momento con dos suscripciones vivas, y esa ventana la paga el alumno.
+  //
+  // ⚠️ **Sólo bloquea el MISMO ciclo, y eso es el punto.** Un alumno que paga
+  // mensual y quiere pasarse a anual tiene que poder hacerlo: ese camino es
+  // exactamente para lo que existe `darDeBajaLosReemplazados`, y bloquearlo
+  // seria cerrarle la puerta al que quiere pagarnos mas.
+  if (await yaPagaEsteCiclo(app, uid, userSnap.data(), cycle)) {
+    throw new HttpsError(
+      "failed-precondition",
+      "ya tenes una suscripcion activa con este ciclo",
     );
   }
 

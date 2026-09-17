@@ -71,6 +71,8 @@ type Store = Record<string, Record<string, unknown>>;
 function fakeApp(seed: Store = {}) {
   const store: Store = JSON.parse(JSON.stringify(seed));
   const escrituras: { col: string; id: string; data: unknown }[] = [];
+  /** Que colecciones se consultaron por query. Para probar el camino feliz. */
+  const queries: string[] = [];
 
   const coleccion = (col: string) => ({
     doc: (id: string) => ({
@@ -93,6 +95,7 @@ function fakeApp(seed: Store = {}) {
       filtrada(col, [...filtros, [campo, valor]]),
     limit: () => filtrada(col, filtros),
     get: async () => {
+      queries.push(col);
       const docs = Object.entries(store[col] ?? {})
         .filter(([, d]) =>
           filtros.every(([c, v]) => (d as Record<string, unknown>)[c] === v))
@@ -102,7 +105,7 @@ function fakeApp(seed: Store = {}) {
   });
 
   const app = { firestore: () => ({ collection: coleccion }) } as unknown as App;
-  return { app, store, escrituras };
+  return { app, store, escrituras, queries: () => queries };
 }
 
 /** Un alumno SUELTO: existe, es `athlete`, y no tiene vinculo activo. */
@@ -414,5 +417,113 @@ describe("la ventana de reuso", () => {
       producto: "athlete", cycle: "monthly",
     });
     expect(store.mp_checkouts[UID]).not.toHaveProperty("tier");
+  });
+});
+
+describe("no se puede comprar dos veces el MISMO ciclo", () => {
+  /** Un alumno que YA paga, con su plan vivo en `mp_plans`. */
+  const YA_PAGA = (cycle = "monthly"): Store => ({
+    users: {
+      [UID]: {
+        role: "athlete",
+        displayName: "Ana",
+        athleteSubscription: { status: "active" },
+      },
+    },
+    mp_plans: { viejo: { producto: "athlete", uid: UID, cycle } },
+  });
+
+  it("rechaza el mismo ciclo que ya paga", async () => {
+    // El caso real: vuelve a la pagina de precios un mes despues y aprieta de
+    // nuevo, porque no se acuerda o porque nada se lo dice. La ventana de
+    // `abrirCheckout` no lo cubre — dura 30 minutos.
+    const { app } = fakeApp(YA_PAGA("monthly"));
+    const mp = fakeMp();
+
+    await expect(correr(app, { cycle: "monthly" }, mp))
+      .rejects.toMatchObject({ code: "failed-precondition" });
+    // Y no se abrio ningun cobro en MP.
+    expect(mp.pedidos).toEqual([]);
+  });
+
+  it("PERMITE cambiar de mensual a anual", async () => {
+    // El contrapeso que evita que la guarda le cierre la puerta al que quiere
+    // pagarnos MAS. De ese camino se encarga `darDeBajaLosReemplazados`.
+    const { app } = fakeApp(YA_PAGA("monthly"));
+
+    const r = await correr(app, { cycle: "annual" }, fakeMp());
+
+    expect(r.status).toBe("created");
+  });
+
+  it("PERMITE volver a suscribirse si el derecho ya vencio", async () => {
+    // Sin la condicion del derecho, alguien cuyo plan vencio no podria
+    // suscribirse NUNCA MAS, porque el documento de `mp_plans` sigue ahi.
+    const mundo = YA_PAGA("monthly");
+    (mundo.users[UID] as Record<string, unknown>).athleteSubscription = {
+      status: "expired",
+    };
+    const { app } = fakeApp(mundo);
+
+    const r = await correr(app, { cycle: "monthly" }, fakeMp());
+
+    expect(r.status).toBe("created");
+  });
+
+  it("`grace` tambien cuenta como que ya paga", async () => {
+    // `grace` OTORGA derecho: el cobro rebota y MP reintenta. Dejarlo comprar
+    // ahi le abriria un segundo cobro mientras el primero todavia se resuelve.
+    const mundo = YA_PAGA("monthly");
+    (mundo.users[UID] as Record<string, unknown>).athleteSubscription = {
+      status: "grace",
+    };
+    const { app } = fakeApp(mundo);
+
+    await expect(correr(app, { cycle: "monthly" }, fakeMp()))
+      .rejects.toMatchObject({ code: "failed-precondition" });
+  });
+
+  it("un plan TERMINAL no lo traba", async () => {
+    // Un plan que ya no cobra no puede impedir contratar uno nuevo.
+    const mundo = YA_PAGA("monthly");
+    (mundo.mp_plans.viejo as Record<string, unknown>).terminal = true;
+    const { app } = fakeApp(mundo);
+
+    const r = await correr(app, { cycle: "monthly" }, fakeMp());
+
+    expect(r.status).toBe("created");
+  });
+
+  it("el plan de OTRO alumno no lo traba", async () => {
+    const mundo = YA_PAGA("monthly");
+    (mundo.mp_plans.viejo as Record<string, unknown>).uid = "otro";
+    const { app } = fakeApp(mundo);
+
+    const r = await correr(app, { cycle: "monthly" }, fakeMp());
+
+    expect(r.status).toBe("created");
+  });
+
+  it("un plan de PF del mismo uid no lo traba", async () => {
+    // No deberia pasar —`role` es inmutable— pero si pasara, un plan de
+    // entrenador no dice nada sobre la suscripcion de alumno.
+    const mundo = YA_PAGA("monthly");
+    (mundo.mp_plans.viejo as Record<string, unknown>).producto = "trainer";
+    const { app } = fakeApp(mundo);
+
+    const r = await correr(app, { cycle: "monthly" }, fakeMp());
+
+    expect(r.status).toBe("created");
+  });
+
+  it("sin derecho vigente NO consulta mp_plans", async () => {
+    // El orden importa: la condicion barata primero. Un alumno que nunca pago
+    // es el caso NORMAL, y no tiene por que costar una query de mas en el
+    // camino feliz.
+    const { app, queries } = fakeApp(ALUMNO_SUELTO());
+
+    await correr(app, { cycle: "monthly" }, fakeMp());
+
+    expect(queries()).not.toContain("mp_plans");
   });
 });
