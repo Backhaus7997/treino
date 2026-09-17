@@ -198,6 +198,26 @@ export { mintWatchCredential } from "./mint-watch-credential";
 //   firebase functions:secrets:set MP_ACCESS_TOKEN --project prod
 export { createPreapproval } from "./subscriptions/mp/create-preapproval";
 
+// Paywall del ALUMNO — su checkout de Mercado Pago, y el precio que la landing
+// muestra.
+//
+// Espejo del de arriba, y el mismo contrato: el monto NO viene del cliente, el
+// uid sale del token, la URL de retorno la arma el servidor. Tampoco escribe
+// derecho: eso lo hace el reconciliador cuando MP confirme.
+//
+// Dos diferencias con el del PF, las dos deliberadas:
+//   - El gate es `role === "athlete"`, y ademas rechaza al alumno VINCULADO: su
+//     PF ya paga por ese cupo y cobrarle seria cobrar dos veces lo mismo.
+//   - `getAthletePricing` NO exige auth. Es la unica lectura publica del repo,
+//     porque la pagina de precios tiene que decir cuanto sale antes de que
+//     alguien se loguee.
+//
+// Usa el mismo secreto MP_ACCESS_TOKEN.
+export {
+  createAthletePreapproval,
+  getAthletePricing,
+} from "./subscriptions/mp/create-athlete-preapproval";
+
 // Paywall del entrenador — el reconciliador. Es lo que hace que pagar
 // SIGNIFIQUE algo: sin esto, `createPreapproval` abre un cobro y nadie se
 // entera. Corre a las 03:00 ART, una hora ANTES que `sweepEntitlements`, para

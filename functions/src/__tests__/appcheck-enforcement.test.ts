@@ -159,6 +159,46 @@ const EXEMPTIONS: Readonly<Record<string, Exemption>> = {
       "unico callable del repo que YA tiene enforceAppCheck: true, " +
       "add-alias.ts:148.)",
   },
+  "subscriptions/mp/create-athlete-preapproval:createAthletePreapproval": {
+    permanence: "debt",
+    reason:
+      "El gemelo de createPreapproval para el ALUMNO, y hereda su motivo de " +
+      "plataforma con un agravante: no lo llama el Coach Hub sino la landing " +
+      "publica (gettreino.com, repo treino-app), que hoy no tiene App Check " +
+      "porque no tiene Firebase en absoluto. Con el flag puesto, ningun alumno " +
+      "podria contratar. " +
+      "La superficie de abuso queda acotada por diseño, igual que la del PF: " +
+      "el uid sale del token, el ciclo es un enum cerrado, el monto sale de " +
+      "ATHLETE_PRICES_ARS, y la URL de retorno la arma el servidor desde una " +
+      "lista blanca de locales — un valor fuera de la lista cae al default en " +
+      "vez de convertirse en un destino. Un atacante autenticado solo puede " +
+      "abrir checkouts a nombre PROPIO, y la ventana de mp_checkouts/{uid} los " +
+      "limita a uno por ciclo cada 30 minutos: dos en total, contra los seis " +
+      "del PF. " +
+      "Y tiene un gate que el del PF no tiene: rechaza al alumno VINCULADO, " +
+      "cuyo entrenador ya paga por el.",
+    exitCondition:
+      "Cuando la landing inicialice App Check (ReCaptcha v3 con su propio " +
+      "appId, NO el del Coach Hub — App Check se configura por app y reusarlo " +
+      "obligaria a prenderlo en los dos). Medir primero en modo monitoring " +
+      "sobre jsonPayload.verifications.app en Cloud Logging hasta ver CERO " +
+      "INVALID, y recien ahi poner el flag. Ponerlo antes convierte el " +
+      "checkout en un error permanente que no agarra ningun test, porque vive " +
+      "en la capa de transporte — es literalmente lo que paso con " +
+      "deleteAccount y mintWatchCredential.",
+  },
+  "subscriptions/mp/create-athlete-preapproval:getAthletePricing": {
+    permanence: "decided",
+    reason:
+      "No se atesta a proposito, y no es deuda: es la UNICA lectura publica " +
+      "del repo. La pagina de precios tiene que poder decir cuanto sale ANTES " +
+      "de que el alumno se loguee; pedirle cuenta para ver un precio es " +
+      "exactamente la friccion que el canal web viene a sacar. " +
+      "No hay nada que proteger: devuelve dos numeros que se van a publicar en " +
+      "la landing, no escribe nada, no lee datos de nadie y no acepta body. El " +
+      "costo de un abuso es una invocacion de Cloud Functions, que es lo mismo " +
+      "que cuesta cargar la pagina que lo llama.",
+  },
   "subscriptions/mp/reconcile-my-checkout:reconcileMyCheckout": {
     // `decided` y no `debt`, a diferencia de createPreapproval, y la diferencia
     // es real: aquel ABRE un cobro, este solo pregunta por el estado de uno que
@@ -239,8 +279,10 @@ const EXEMPTIONS: Readonly<Record<string, Exemption>> = {
 const EXPECTED_DEPLOYED = [
   "acceptTrainerLink",
   "addAlias",
+  "createAthletePreapproval",
   "createPreapproval",
   "deleteAccount",
+  "getAthletePricing",
   "mintWatchCredential",
   "promoteChatToInquiry",
   "reconcileMyCheckout",
@@ -364,6 +406,18 @@ describe("QA-SEC-016: el guard falla cuando tiene que fallar", () => {
       module: "subscriptions/mp/create-preapproval",
       symbol: "createPreapproval",
       as: "createPreapproval",
+      attested: false,
+    },
+    {
+      module: "subscriptions/mp/create-athlete-preapproval",
+      symbol: "createAthletePreapproval",
+      as: "createAthletePreapproval",
+      attested: false,
+    },
+    {
+      module: "subscriptions/mp/create-athlete-preapproval",
+      symbol: "getAthletePricing",
+      as: "getAthletePricing",
       attested: false,
     },
     {
