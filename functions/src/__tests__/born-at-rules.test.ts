@@ -45,11 +45,11 @@ const RULES_PATH = path.resolve(__dirname, "../../../firestore.rules");
 const UID = "athlete-uid";
 
 /**
- * Días con los que la regla aproxima la edad mínima: 16 × 365. Son CUATRO
- * MENOS que 16 años reales (5844, contando los bisiestos del período), y esa
- * holgura es deliberada — ver el comentario de `bornAtOk` en firestore.rules.
+ * Días con los que la regla aproxima la edad mínima: 13 × 365. Son TRES MENOS
+ * que 13 años reales (4748, contando los bisiestos del período), y esa holgura
+ * es deliberada — ver el comentario de `bornAtOk` en firestore.rules.
  */
-const FLOOR_DAYS = 5840;
+const FLOOR_DAYS = 4745;
 
 let testEnv: RulesTestEnvironment;
 
@@ -116,8 +116,20 @@ describe("bornAtOk — piso de edad mínima en users/{uid}", () => {
       );
     });
 
-    it("con la fecha de alguien de 14 → denegado", async () => {
+    it("con la fecha de alguien de 12 → denegado", async () => {
       await assertFails(
+        setDoc(
+          doc(asUser(UID), "users", UID),
+          newUserDoc({ bornAt: yearsAgo(12) }),
+        ),
+      );
+    });
+
+    // La banda 13-15 es el motivo del cambio de 16 a 13. Sin este caso, bajar
+    // el piso en las reglas pasa con el valor viejo intacto: los de 20 y 12
+    // dan igual con 5840 dias que con 4745.
+    it("con la fecha de alguien de 14 → PERMITIDO (la banda nueva)", async () => {
+      await assertSucceeds(
         setDoc(
           doc(asUser(UID), "users", UID),
           newUserDoc({ bornAt: yearsAgo(14) }),
@@ -147,11 +159,11 @@ describe("bornAtOk — piso de edad mínima en users/{uid}", () => {
   });
 
   describe("update — la cláusula sin la cual el gate es decorativo", () => {
-    it("cambiar bornAt a la fecha de alguien de 14 → denegado", async () => {
+    it("bajar bornAt a la fecha de alguien de 12 → denegado", async () => {
       await seedUser({ bornAt: yearsAgo(20) });
       await assertFails(
         updateDoc(doc(asUser(UID), "users", UID), {
-          bornAt: yearsAgo(14),
+          bornAt: yearsAgo(12),
         }),
       );
     });

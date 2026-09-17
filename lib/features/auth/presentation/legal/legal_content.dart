@@ -34,13 +34,13 @@ const String kPrivacyLastUpdated = '17 de septiembre de 2026';
 /// Entero monotónico, independiente de [kPrivacyVersion] — bumpear uno de
 /// los dos documentos NUNCA obliga a tocar el otro; son textos legales
 /// separados que cambian en momentos distintos.
-const int kTermsVersion = 2;
+const int kTermsVersion = 3;
 
 /// Versión de la Política de Privacidad vigente, para evidencia de
 /// aceptación (`UserProfile.acceptedPrivacyVersion`).
 ///
 /// Independiente de [kTermsVersion] — ver ese dartdoc.
-const int kPrivacyVersion = 2;
+const int kPrivacyVersion = 3;
 
 /// Fecha, machine-comparable (UTC), en la que el texto de la Política de
 /// Privacidad identificado por [kPrivacyVersion] entró en vigencia.
@@ -93,13 +93,19 @@ const List<LegalSection> kTermsSections = <LegalSection>[
     '4. Tu cuenta',
     'Podés registrarte con email, Google o Apple. Sos responsable de mantener la '
         'confidencialidad de tus credenciales y de toda la actividad de tu '
-        'cuenta. Debés tener 16 años cumplidos: no admitimos cuentas de personas '
+        'cuenta. Debés tener 13 años cumplidos: no admitimos cuentas de personas '
         'que no hayan alcanzado esa edad. Al crear la cuenta te pedimos tu fecha '
-        'de nacimiento, y es un dato obligatorio. Si tenés 16 o 17 años seguís '
-        'siendo menor para la ley argentina, así que necesitás que tu madre, '
-        'padre o representante legal lea estos Términos, la Política de '
+        'de nacimiento, y es un dato obligatorio. Si tenés menos de 18 años '
+        'seguís siendo menor para la ley argentina, así que necesitás que tu '
+        'madre, padre o representante legal lea estos Términos, la Política de '
         'Privacidad y el Descargo Médico, y dé su consentimiento antes de que '
-        'uses la aplicación. Los datos que cargás deben ser veraces.',
+        'uses la aplicación. Los datos que cargás deben ser veraces.\n\n'
+        'El piso es 13 porque COPPA, la ley de protección de la infancia en '
+        'línea de los Estados Unidos, alcanza a los menores de esa edad y les '
+        'exige un consentimiento parental verificable que TREINO no implementa: '
+        'con el piso en 13, ningún usuario queda alcanzado por ese régimen. No '
+        'verificamos tu edad con documentación, así que declarar una edad falsa '
+        'es un incumplimiento de estos Términos y habilita la baja de la cuenta.',
   ),
   LegalSection(
     '5. Entrenadores (PFs)',
@@ -175,7 +181,7 @@ const List<LegalSection> kPrivacySections = <LegalSection>[
         'dispositivo.\n\n'
         'La fecha de nacimiento es obligatoria, y es el único dato de esta lista '
         'que no te pedimos para prestarte el servicio sino para cumplir la ley: '
-        'con ella verificamos la edad mínima de 16 años. No se muestra a nadie, '
+        'con ella verificamos la edad mínima de 13 años. No se muestra a nadie, '
         'no se usa con ningún otro fin, y no se comparte con tu entrenador salvo '
         'que vos actives compartir tu perfil.',
   ),

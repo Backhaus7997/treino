@@ -7,8 +7,15 @@ import 'package:treino/features/profile_setup/application/profile_setup_notifier
 import 'package:treino/features/profile_setup/application/profile_setup_providers.dart';
 import 'package:treino/features/profile_setup/domain/profile_setup_draft.dart';
 import 'package:treino/features/profile_setup/presentation/steps/step_2_born_at.dart';
+import 'package:treino/features/profile_setup/domain/profile_setup_validators.dart';
 
-const _minAgeError = 'Tenés que tener 16 años para usar TREINO';
+// Interpolado, no hardcodeado: el día que kMinAgeYears cambie, este test
+// tiene que seguir al código en vez de ponerse rojo por un número viejo.
+final _minAgeError =
+    'Tenés que tener ${ProfileSetupValidators.kMinAgeYears} años para usar TREINO';
+
+/// Una edad claramente por debajo del piso, sea cual sea el piso.
+int get _underAge => ProfileSetupValidators.kMinAgeYears - 3;
 
 /// Relativas a hoy para que los tests no envejezcan. Los bordes exactos
 /// (cumple 16 hoy / mañana, 29 de febrero) viven en
@@ -46,10 +53,10 @@ void main() {
       expect(find.text(_minAgeError), findsNothing);
     });
 
-    testWidgets('una fecha de menor de 16 muestra el error de edad',
+    testWidgets('una fecha por debajo del piso muestra el error de edad',
         (tester) async {
       await tester.pumpWidget(_wrap(container));
-      notifier().updateBornAt(_yearsAgo(10));
+      notifier().updateBornAt(_yearsAgo(_underAge));
       await tester.pump();
 
       expect(find.text(_minAgeError), findsOneWidget);
@@ -81,8 +88,8 @@ void main() {
       expect(stateWith(null).canGoNext, isFalse);
     });
 
-    test('con una fecha de menor de 16 no deja avanzar', () {
-      expect(stateWith(_yearsAgo(10)).canGoNext, isFalse);
+    test('con una fecha por debajo del piso no deja avanzar', () {
+      expect(stateWith(_yearsAgo(_underAge)).canGoNext, isFalse);
     });
 
     test('con una fecha válida deja avanzar', () {
