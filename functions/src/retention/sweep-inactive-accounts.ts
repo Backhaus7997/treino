@@ -630,7 +630,7 @@ export async function sweepInactiveAccountsHandler(
  * apagarlo (spec §4.6). Prenderlo de verdad es cambiar este valor a `false` y
  * redeployar — un cambio de una línea que alguien tiene que hacer a propósito.
  */
-export const RETENTION_SWEEP_DRY_RUN = true;
+export const RETENTION_SWEEP_DRY_RUN = false;
 
 function ensureApp(): App {
   try {
