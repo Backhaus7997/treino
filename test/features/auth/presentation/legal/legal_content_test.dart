@@ -59,37 +59,66 @@ void main() {
     final todoElTexto =
         '${cuerpo(kTermsSections)}\n\n${cuerpo(kPrivacySections)}';
 
-    /// La mayoría de edad argentina. Es el único otro número que puede aparecer
-    /// legítimamente al lado de "años" en estos textos.
+    /// La frase con la que CADA documento declara el piso. Está acoplada a la
+    /// redacción a propósito: si alguien la reescribe, este test falla y lo
+    /// obliga a volver a confirmar el número, que es exactamente lo que no
+    /// pasó las dos veces anteriores.
+    final declaracionDePiso =
+        RegExp(r'(?:Debés tener|edad mínima para crear una cuenta es de)'
+            r'\s+(\d+)\s+años');
+
+    /// La mayoría de edad argentina. Es el único otro número que puede
+    /// aparecer legítimamente al lado de "años" en estos textos.
     const mayoriaDeEdad = 18;
 
-    test('ninguna edad citada contradice a kMinAgeYears', () {
-      final citadas = RegExp(r'(\d+)\s*años')
-          .allMatches(todoElTexto)
-          .map((m) => int.parse(m.group(1)!))
-          .toSet();
+    // Los dos chequeos van POR DOCUMENTO, no sobre la unión.
+    //
+    // Hacerlos sobre el texto concatenado era otra vez más débil que el
+    // invariante, y Codex lo marcó en el PR #1183: si los Términos regresaban a
+    // declarar 18 como piso mientras la Política seguía diciendo 13, el
+    // conjunto de edades citadas quedaba en {13, 18} y el `contains('13 años')`
+    // global también pasaba. Medido antes de arreglarlo: 6/6 en verde con los
+    // Términos declarando 18.
+    for (final doc in [
+      (nombre: 'Términos', secciones: kTermsSections),
+      (nombre: 'Política', secciones: kPrivacySections),
+    ]) {
+      test('${doc.nombre}: declara el piso y es kMinAgeYears', () {
+        final texto = cuerpo(doc.secciones);
+        final match = declaracionDePiso.firstMatch(texto);
 
-      expect(citadas, isNotEmpty,
-          reason: 'si no hay ninguna edad citada, el guard no está midiendo '
-              'nada — probablemente cambió la redacción');
+        expect(match, isNotNull,
+            reason: '${doc.nombre} no declara ninguna edad mínima con una '
+                'frase que este test reconozca. Si la redacción cambió, '
+                'actualizá `declaracionDePiso` Y volvé a confirmar el número.');
 
-      expect(
-        citadas
-            .difference({ProfileSetupValidators.kMinAgeYears, mayoriaDeEdad}),
-        isEmpty,
-        reason: 'los textos citan edades que no son ni kMinAgeYears '
-            '(${ProfileSetupValidators.kMinAgeYears}) ni la mayoría de edad '
-            '($mayoriaDeEdad). Si kMinAgeYears cambió, este texto tiene que '
-            'cambiar con él — en los DOS documentos.',
-      );
-    });
+        expect(
+          int.parse(match!.group(1)!),
+          equals(ProfileSetupValidators.kMinAgeYears),
+          reason: '${doc.nombre} declara un piso distinto del que aplica el '
+              'código. Los dos documentos y kMinAgeYears tienen que decir lo '
+              'mismo.',
+        );
+      });
 
-    test('el piso se declara, no se insinúa', () {
-      expect(
-        todoElTexto,
-        contains('${ProfileSetupValidators.kMinAgeYears} años'),
-      );
-    });
+      test('${doc.nombre}: no cita ninguna otra edad', () {
+        final citadas = RegExp(r'(\d+)\s*años')
+            .allMatches(cuerpo(doc.secciones))
+            .map((m) => int.parse(m.group(1)!))
+            .toSet();
+
+        expect(
+          citadas.difference({
+            ProfileSetupValidators.kMinAgeYears,
+            mayoriaDeEdad,
+          }),
+          isEmpty,
+          reason: '${doc.nombre} cita edades que no son ni kMinAgeYears '
+              '(${ProfileSetupValidators.kMinAgeYears}) ni la mayoría de edad '
+              '($mayoriaDeEdad).',
+        );
+      });
+    }
 
     test('no se ofrece a un "adulto responsable" como vía alrededor del piso',
         () {
