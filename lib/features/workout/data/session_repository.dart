@@ -612,8 +612,32 @@ class SessionRepository {
       setNumber: setLog.setNumber,
     );
     final watchRef = _setLogs(uid, sessionId).doc(watchDocId);
-    final watchSnap = await watchRef.get();
-    final watchData = watchSnap.data();
+
+    // Esta lectura es una OPTIMIZACIÓN, no un requisito: sirve para adoptar el
+    // documento del reloj cuando llegó primero. Si no se puede hacer, la serie
+    // tiene que escribirse igual.
+    //
+    // Sin red el resultado depende del cache. Cuando el documento del reloj no
+    // está cacheado, esta lectura puede terminar en error en vez de en un
+    // snapshot vacío — y sin este catch, ese error salía por `addSetLog`, lo
+    // agarraba el `catch` de `logSet`, y la serie NO se escribía. O sea que
+    // separar la confirmación del servidor no alcanzaba: entrenar sin conexión
+    // seguía roto, ahora por la LECTURA en vez de por la escritura.
+    // Lo señaló Codex en la review del PR.
+    //
+    // Un fallo acá se trata como "el reloj no escribió nada": es el mismo
+    // camino que un documento ausente, y es el que ya corría antes de que el
+    // reloj existiera. El riesgo que queda —crear un documento propio mientras
+    // el del reloj existe pero no se pudo leer— es el duplicado que esta
+    // lectura evita cuando funciona, y es estrictamente mejor que perder la
+    // serie que el atleta acaba de marcar.
+    DocumentSnapshot<Map<String, dynamic>>? watchSnap;
+    try {
+      watchSnap = await watchRef.get();
+    } catch (_) {
+      watchSnap = null;
+    }
+    final watchData = watchSnap?.data();
 
     // La identidad se decide por los CAMPOS, nunca por el path. Un documento
     // puede quedar en una ruta que ya no lo describe: `removeSet` renumera las
@@ -627,7 +651,8 @@ class SessionRepository {
     // desde el teléfono —la renumeración dejó `peso-muerto__3` conteniendo la
     // serie 2— y al cargar una serie 3 nueva el teléfono creó su propio
     // documento. Confiando en la ruta, esa serie 2 se habría destruido.
-    final holdsThisSet = watchSnap.exists &&
+    final holdsThisSet = watchSnap != null &&
+        watchSnap.exists &&
         watchData != null &&
         setLogDocHoldsSet(
           docExerciseId: watchData['exerciseId'],

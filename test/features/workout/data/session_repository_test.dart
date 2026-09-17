@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart'
-    show QueryDocumentSnapshot, Timestamp;
+    show FirebaseException, QueryDocumentSnapshot, Timestamp;
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
+import 'package:mock_exceptions/mock_exceptions.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/core/telemetry/non_fatal.dart';
 import 'package:treino/core/utils/argentina_time.dart';
@@ -402,6 +403,66 @@ void main() {
         .get();
 
     expect(snap.exists, isTrue);
+  });
+
+  // ─── addSetLog(): la lectura de adopción puede fallar y la serie va igual ──
+
+  test(
+      'addSetLog escribe la serie AUNQUE la lectura del doc del reloj falle '
+      '(sin conexión y sin cache)', () async {
+    // Hallazgo de Codex en la review del PR de entrenar sin conexión.
+    //
+    // `addSetLog` abre con un `get()` del documento determinístico del reloj
+    // para adoptarlo si llegó primero. Esa lectura es una OPTIMIZACIÓN, pero
+    // estaba en el camino de todos: sin red, con el documento del reloj fuera
+    // del cache, podía terminar en error en vez de en un snapshot vacío. Ese
+    // error salía por `addSetLog`, lo agarraba el `catch` de `logSet`, y la
+    // serie no se escribía.
+    //
+    // O sea: separar la confirmación del servidor NO alcanzaba. Entrenar sin
+    // conexión seguía roto, ahora por la lectura en vez de por la escritura, y
+    // los tests del notifier no lo veían porque mockean `addSetLog` entero.
+    const sessionId = 'session-lectura-rota';
+    final watchRef = firestore
+        .collection('users')
+        .doc(uid)
+        .collection('sessions')
+        .doc(sessionId)
+        .collection('setLogs')
+        .doc('bench-press__1');
+
+    whenCalling(Invocation.method(#get, null))
+        .on(watchRef)
+        .thenThrow(FirebaseException(
+          plugin: 'cloud_firestore',
+          code: 'unavailable',
+          message: 'Failed to get document because the client is offline.',
+        ));
+
+    final persisted = await _escribirSerie(
+      repo,
+      uid: uid,
+      sessionId: sessionId,
+      setLog: buildSetLog(setNumber: 1, completedAt: testNow()),
+    );
+
+    expect(
+      persisted.id,
+      isNotEmpty,
+      reason: 'la adopción del doc del reloj es un extra: si no se puede '
+          'leer, la serie que el atleta marcó se escribe igual.',
+    );
+
+    // La lectura de vuelta NO puede ir por `.get()`: `mock_exceptions` empareja
+    // por NOMBRE de método, así que el throw registrado arriba también le cae
+    // al `get()` de la colección. `dump()` mira el store del fake directo.
+    final store = firestore.dump();
+    expect(
+      store,
+      contains(persisted.id),
+      reason: 'el documento con el id que devolvió el repositorio tiene que '
+          'estar escrito de verdad, no sólo prometido.',
+    );
   });
 
   // ─── addSetLog(): dedupe contra lo que escribió el RELOJ ──────────────────
