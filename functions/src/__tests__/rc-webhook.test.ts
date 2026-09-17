@@ -71,6 +71,7 @@ jest.mock("firebase-admin/firestore", () => (
 import { createHmac } from "node:crypto";
 
 import {
+  ACEPTAR_SANDBOX,
   ENTITLEMENT_ALUMNO,
   RC_WEBHOOK_EVENTS_COLLECTION,
   STATUS_SIN_DERECHO,
@@ -200,9 +201,9 @@ const deps = (
   nowMs: AHORA,
   signingSecret: SECRETO,
   entitlement: ENTITLEMENT_ALUMNO,
-  // Como se shipea hoy (`ACEPTAR_SANDBOX`). Los tests del camino APAGADO lo
-  // overridean por `over`.
-  aceptarSandbox: true,
+  // Como se shipea hoy (`ACEPTAR_SANDBOX`, apagado desde el 2026-09-17). Los
+  // tests del camino PRENDIDO lo overridean por `over`.
+  aceptarSandbox: false,
   ...over,
 });
 
@@ -607,13 +608,18 @@ describe("rc/webhook — el handler", () => {
     const sandbox = () => evento({ environment: "SANDBOX" });
 
     it("con ACEPTAR_SANDBOX prendido, un evento de sandbox acredita igual", async () => {
-      // Es el camino que se shipea HOY, y tiene que seguir andando: cuando
-      // haya tiendas conectadas, una suscripcion de sandbox es la UNICA forma
-      // de ejercitar la acreditacion de punta a punta.
+      // YA NO es el camino que se shipea —ver el test del valor de la
+      // constante, abajo— pero el camino tiene que seguir andando: si alguna
+      // vez se vuelve a conectar una tienda, prenderlo es una linea y esto es
+      // lo que prueba que la linea alcanza.
       const { app, store } = fakeApp(MUNDO());
       const rc = fakeRc([sub()]);
 
-      const r = await runRcWebhook(app, pedido(sandbox()), deps(rc.rcClient));
+      const r = await runRcWebhook(
+        app,
+        pedido(sandbox()),
+        deps(rc.rcClient, { aceptarSandbox: true }),
+      );
 
       expect(r).toBe("acreditado");
       expect(store.users[UID].athleteSubscription).toEqual({ status: "active" });
@@ -679,6 +685,17 @@ describe("rc/webhook — el handler", () => {
       );
 
       expect(r).toBe("acreditado");
+    });
+
+    it("lo que se SHIPEA es el camino apagado", () => {
+      // El unico test de todo el archivo que mira la constante y no el
+      // parametro. Sin el, los dos caminos quedan cubiertos y el valor que
+      // sale a produccion no lo cubre nadie: `ACEPTAR_SANDBOX` podria volver a
+      // `true` en un rebase y la suite seguiria verde.
+      //
+      // Con `true`, cualquier sandbox tester de App Store Connect o Play
+      // Console se acredita premium REAL en `treino-dev`, que es produccion.
+      expect(ACEPTAR_SANDBOX).toBe(false);
     });
 
     it("esDeSandbox reconoce el valor de la doc y aguanta basura", () => {
