@@ -41,6 +41,9 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:treino/features/watch/application/watch_credential_providers.dart'
+    show watchNudgeServiceProvider;
+import 'package:treino/features/watch/data/watch_nudge_service.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
 import 'package:treino/features/workout/application/session_init.dart';
 import 'package:treino/features/workout/application/session_providers.dart';
@@ -49,6 +52,21 @@ import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 
 import 'stub_factories.dart';
+
+/// Anota los avisos que se le mandaron al reloj, con su motivo.
+class _SpyWatchNudge implements WatchNudgeService {
+  final motivos = <String>[];
+
+  @override
+  Future<bool> nudge(
+      {String reason = WatchNudgeService.reasonActiveRoutine}) async {
+    motivos.add(reason);
+    return true;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
 
 class _MockSessionRepository extends Mock implements SessionRepository {
   @override
@@ -120,6 +138,30 @@ List<SetLog> _gateAddSetLog(_MockSessionRepository repo) {
     );
   });
   return recibidas;
+}
+
+/// Igual que [_gateAddSetLog] pero devolviendo los `Completer` de cada ACK,
+/// para poder simular la vuelta de la red a mano.
+List<Completer<void>> _gateAddSetLogConAcks(_MockSessionRepository repo) {
+  final acks = <Completer<void>>[];
+  when(() => repo.addSetLog(
+        uid: any(named: 'uid'),
+        sessionId: any(named: 'sessionId'),
+        setLog: any(named: 'setLog'),
+      )).thenAnswer((inv) {
+    final pedida = inv.namedArguments[#setLog] as SetLog;
+    final ack = Completer<void>();
+    acks.add(ack);
+    return Future<LoggedSet>.value(
+      LoggedSet(
+        setLog: pedida.copyWith(
+          id: 'doc-${pedida.exerciseId}-${pedida.setNumber}',
+        ),
+        acknowledged: ack.future,
+      ),
+    );
+  });
+  return acks;
 }
 
 void main() {
@@ -221,6 +263,80 @@ void main() {
         reason: 'lo que el atleta marcó tiene que verse tildado sin esperar '
             'la confirmación del servidor. Si no, entrenar sin conexión es '
             'indistinguible de la app colgada.',
+      );
+    });
+
+    test(
+        'al reloj se le avisa cuando el SERVIDOR confirma, no cuando se encola '
+        'la escritura', () async {
+      // Hallazgo de Codex en la review del PR, y tenía razón.
+      //
+      // `reasonSetLogged` no le manda la serie al reloj: le pide que RELEA
+      // Firestore. Avisarle apenas se encola la escritura le hace leer un
+      // servidor que todavía no la tiene — el reloj queda igual de
+      // desactualizado y NO hay un segundo aviso cuando la confirmación llega.
+      // Con el reloj creyendo que la serie no existe, marcarla en la muñeca
+      // escribe un SEGUNDO documento (los ids de los dos clientes no
+      // coinciden) y vuelven los duplicados que esta sincronización existe
+      // para evitar.
+      //
+      // Antes el orden salía gratis: el `await` sobre la escritura garantizaba
+      // que el servidor ya la tenía. Al sacarlo del camino crítico hay que
+      // reponerlo a mano, y esto lo fija.
+      final repo = _MockSessionRepository();
+      final routine = _fourSetRoutine();
+      final espia = _SpyWatchNudge();
+      when(() => repo.create(
+            uid: any(named: 'uid'),
+            routineId: any(named: 'routineId'),
+            routineName: any(named: 'routineName'),
+            startedAt: any(named: 'startedAt'),
+            dayNumber: any(named: 'dayNumber'),
+            weekNumber: any(named: 'weekNumber'),
+          )).thenAnswer((_) async => makeSession());
+      final acks = _gateAddSetLogConAcks(repo);
+
+      final container = ProviderContainer(
+        overrides: [
+          sessionRepositoryProvider.overrideWithValue(repo),
+          currentUidProvider.overrideWithValue('u1'),
+          routineByIdProvider(routine.id).overrideWith((ref) async => routine),
+          sessionsByUidProvider('u1').overrideWith((ref) async => const []),
+          watchNudgeServiceProvider.overrideWithValue(espia),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final init = FreshSession(routineId: routine.id, dayNumber: 1);
+      final sub = container.listen(
+        sessionNotifierProvider(init),
+        (_, __) {},
+        fireImmediately: true,
+      );
+      addTearDown(sub.close);
+      await container.read(sessionNotifierProvider(init).future);
+      final notifier = container.read(sessionNotifierProvider(init).notifier);
+
+      unawaited(notifier.logSet(makeSetLog(exerciseId: 'e1', setNumber: 1)));
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        espia.motivos.where((m) => m == WatchNudgeService.reasonSetLogged),
+        isEmpty,
+        reason: 'sin confirmación del servidor, avisarle al reloj lo manda a '
+            'leer un Firestore que todavía no tiene la serie. El aviso se '
+            'gasta y no hay otro.',
+      );
+
+      // Vuelve la red: Firestore sincroniza la escritura encolada.
+      acks.single.complete();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        espia.motivos.where((m) => m == WatchNudgeService.reasonSetLogged),
+        hasLength(1),
+        reason: 'con la serie ya en el servidor, ahí sí el reloj tiene qué '
+            'releer — y es el único momento en que el aviso sirve.',
       );
     });
 

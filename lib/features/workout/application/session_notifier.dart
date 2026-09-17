@@ -436,7 +436,7 @@ class SessionNotifier
         sessionId: current.session.id,
         setLog: setLog,
       );
-      _reportIfWriteFails(
+      _onWriteSettled(
         logged.acknowledged,
         SessionLogError(action: SessionLogAction.log, setLog: setLog),
       );
@@ -474,11 +474,8 @@ class SessionNotifier
         setLogs: newLogs,
         currentExerciseIndex: newIndex,
       ));
-      // El reloj no tiene listeners: hasta que no se entere de esta serie,
-      // marcarla en la muñeca escribiría un SEGUNDO documento de la misma
-      // serie (los dos clientes generan ids distintos) y el atleta la vería
-      // marcada dos veces.
-      _nudgeWatch(WatchNudgeService.reasonSetLogged);
+      // El aviso al reloj NO va acá: viaja con la confirmación del servidor,
+      // en `_onWriteSettled`. Ver el porqué en ese método.
     } catch (e) {
       // El write a Firestore falló (red caída, permisos, offline). NO mutamos
       // `state` a AsyncError: eso flipearía `when()` al branch `error:` y volaría
@@ -493,18 +490,42 @@ class SessionNotifier
     }
   }
 
-  /// Publica [error] si la escritura diferida termina fallando.
+  /// Ata al desenlace de una escritura diferida las dos cosas que SÍ necesitan
+  /// que el servidor la tenga: avisarle al reloj, y reportar el fallo.
   ///
-  /// **Sin red no hace nada**, y eso es lo correcto: offline el future queda
-  /// pendiente —no falla— y Firestore lo sincroniza cuando vuelve. Sólo
-  /// dispara ante un fallo real, como un permission-denied.
-  void _reportIfWriteFails(Future<void> write, SessionLogError error) {
-    unawaited(write.catchError((Object _) {
-      // El future sobrevive a la pantalla: si ya no hay dónde mostrar el
-      // fallo, se descarta en vez de escribir sobre un notifier destruido.
-      if (_disposed) return;
-      _logSetError.value = error;
-    }));
+  /// **El aviso al reloj tiene que esperar la confirmación, no la escritura
+  /// local.** `reasonSetLogged` no le manda la serie al reloj: le pide que
+  /// RELEA Firestore. Dispararlo apenas se encola la escritura le hace leer un
+  /// servidor que todavía no la tiene, así que el reloj queda igual de
+  /// desactualizado y **no hay un segundo aviso** cuando la confirmación llega.
+  /// Con el reloj creyendo que la serie no existe, marcarla en la muñeca
+  /// escribe un SEGUNDO documento —los ids de los dos clientes no coinciden— y
+  /// vuelven los duplicados y el volumen inflado que esta sincronización
+  /// existe para evitar.
+  ///
+  /// Antes el orden salía gratis: el `await` sobre la escritura garantizaba que
+  /// el servidor ya la tenía cuando se avisaba. Al sacar ese `await` del camino
+  /// crítico, la garantía hay que reponerla acá a mano. Lo señaló Codex en la
+  /// review del PR y tenía razón.
+  ///
+  /// Offline no dispara NINGUNA de las dos: el future queda pendiente —no
+  /// falla— y Firestore lo sincroniza cuando vuelve la red. Ahí recién se avisa
+  /// al reloj, que es exactamente cuando tiene sentido hacerlo.
+  void _onWriteSettled(Future<void> write, SessionLogError error) {
+    unawaited(write.then<void>(
+      (_) {
+        // El future sobrevive a la pantalla: si el atleta ya salió del
+        // entreno, no hay reloj que sincronizar con esta sesión.
+        if (_disposed) return;
+        _nudgeWatch(WatchNudgeService.reasonSetLogged);
+      },
+      onError: (Object _) {
+        // Mismo motivo: sin pantalla no hay dónde mostrar el fallo, y tocar
+        // un `_logSetError` ya disposeado tira.
+        if (_disposed) return;
+        _logSetError.value = error;
+      },
+    ));
   }
 
   /// Agrega un set extra a [slot] más allá del plan actual (live-set-editing
