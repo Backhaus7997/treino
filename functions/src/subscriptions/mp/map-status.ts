@@ -160,3 +160,80 @@ export function hayCobroPendiente(summarized: unknown): boolean {
 
   return typeof q === "number" && Number.isFinite(q) && q > 0;
 }
+
+/**
+ * Los tres estados del derecho del ALUMNO.
+ *
+ * NO son los cinco de `effective-limit.ts`. El PF tiene una escalera de cupo y
+ * necesita distinguir `pending` de `paused` de `cancelled` para saber que
+ * limite darle; el alumno tiene un interruptor, y lo unico que se le pregunta
+ * es si hoy puede armarse una rutina larga.
+ *
+ * El vocabulario NO se inventa aca: es el que ya escribe `rc/webhook.ts` en
+ * `users/{uid}.athleteSubscription.status` y el que ya lee
+ * `ENTITLING_SUBSCRIPTION_STATUSES` (`athlete-paywall-enforced.ts`) y el
+ * cliente Dart (`athlete_entitlement_provider.dart`). Este archivo agrega una
+ * SEGUNDA proyeccion del mismo `status` de MP, no un contrato nuevo — y por
+ * eso vive al lado de [mapMpStatus] en vez de en un archivo propio: son dos
+ * lecturas del mismo dato y tienen que moverse juntas.
+ */
+export const ATHLETE_STATUSES = ["active", "grace", "expired"] as const;
+
+export type AthleteStatus = (typeof ATHLETE_STATUSES)[number];
+
+/**
+ * Proyecta los cinco estados del PF a los tres del alumno.
+ *
+ * PURA, igual que [mapMpStatus]: el reloj entra por parametro.
+ *
+ * | entra | sale | por que |
+ * |---|---|---|
+ * | `active` | `active` | — |
+ * | `grace` | `grace` | el cobro rebota y MP reintenta; cortarle las
+ * funciones ahi es la peor forma de pedirle que actualice la tarjeta |
+ * | `pending` | `expired` | arranco el alta y no autorizo: todavia no pago nada |
+ * | `paused` | `expired` | espeja `effectiveWeightLimit`, que a un PF pausado le da el limite Free |
+ * | `cancelled` | depende de la fecha | ver abajo |
+ *
+ * ── La fila que hace el trabajo: `cancelled` ──
+ *
+ * Un `cancelled` NO revoca en el acto. Es literalmente la rama `cancelled` de
+ * `effectiveWeightLimit`, y es lo que hace verdadera la promesa que ya esta
+ * publicada en `docs/legal/terminos-suscripcion.md` §7: «Conservás el acceso
+ * hasta el final del período que ya pagaste».
+ *
+ * Que la fecha entre por parametro —y no salga de `users/{uid}`— es
+ * deliberado: `athleteSubscription` tiene UN SOLO CAMPO y eso es load-bearing.
+ * `athletePaywallInputChanged` compara el mapa entero serializado, asi que un
+ * `currentPeriodEnd` adentro dispararia `syncAthletePaywallOnUser` en cada
+ * evento de MP. La fecha vive en `mp_plans/{planId}`, que ya es CF-only y que
+ * el reconciliador ya lee.
+ *
+ * ── `periodEndMs` nulo ──
+ *
+ * `expired`. No conocer la fecha de fin no puede significar acceso infinito:
+ * es exactamente el caso en que conviene fallar del lado de no regalar
+ * derecho, porque el alumno que de verdad pago tiene fecha.
+ */
+export function athleteStatusDesde(
+  status: SubscriptionStatus,
+  periodEndMs: number | null,
+  nowMs: number,
+): AthleteStatus {
+  switch (status) {
+  case "active":
+    return "active";
+  case "grace":
+    return "grace";
+  case "pending":
+  case "paused":
+    return "expired";
+  case "cancelled":
+    return periodEndMs !== null && nowMs < periodEndMs ? "active" : "expired";
+  }
+}
+
+/** Si este estado del alumno le da acceso a las funciones pagas. */
+export function athleteStatusOtorga(status: AthleteStatus): boolean {
+  return status === "active" || status === "grace";
+}

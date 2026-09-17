@@ -13,7 +13,10 @@ jest.mock("firebase-functions", () => ({
 }));
 
 import {
+  ATHLETE_STATUSES,
   MP_PREAPPROVAL_STATUSES,
+  athleteStatusDesde,
+  athleteStatusOtorga,
   hayCobroPendiente,
   mapMpStatus,
 } from "../subscriptions/mp/map-status";
@@ -204,5 +207,71 @@ describe("hayCobroPendiente", () => {
       cobroPendiente: hayCobroPendiente(summarized),
     });
     expect(r.status).toBe("grace");
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// athleteStatusDesde — la proyeccion de los 5 estados del PF a los 3 del alumno
+// ───────────────────────────────────────────────────────────────────────────
+
+describe("athleteStatusDesde", () => {
+  const AHORA = 1_757_000_000_000;
+  const MANANA = AHORA + 24 * 60 * 60 * 1000;
+  const AYER = AHORA - 24 * 60 * 60 * 1000;
+
+  it("active y grace pasan tal cual", () => {
+    expect(athleteStatusDesde("active", null, AHORA)).toBe("active");
+    // `grace` OTORGA: el cobro rebota y MP reintenta. Cortarle las funciones
+    // ahi es la peor forma de pedirle que actualice la tarjeta.
+    expect(athleteStatusDesde("grace", null, AHORA)).toBe("grace");
+  });
+
+  it("pending y paused no otorgan", () => {
+    // `pending`: arranco el alta y no autorizo. Todavia no pago nada.
+    expect(athleteStatusDesde("pending", MANANA, AHORA)).toBe("expired");
+    // `paused` espeja `effectiveWeightLimit`, que a un PF pausado le da Free.
+    expect(athleteStatusDesde("paused", MANANA, AHORA)).toBe("expired");
+  });
+
+  describe("cancelled — la fila que hace el trabajo", () => {
+    it("dentro del periodo pagado SIGUE otorgando", () => {
+      // Es la promesa ya publicada en `docs/legal/terminos-suscripcion.md` §7:
+      // «Conservás el acceso hasta el final del período que ya pagaste».
+      expect(athleteStatusDesde("cancelled", MANANA, AHORA)).toBe("active");
+    });
+
+    it("pasado el periodo, expira", () => {
+      expect(athleteStatusDesde("cancelled", AYER, AHORA)).toBe("expired");
+    });
+
+    it("justo en el borde expira — el periodo es semiabierto", () => {
+      // `nowMs < periodEndMs`, no `<=`: a la hora exacta del vencimiento el
+      // periodo ya termino. Un `<=` regalaria un milisegundo de derecho, que
+      // no importa, pero la asimetria si: es el mismo criterio que usa
+      // `effectiveWeightLimit` y tienen que decir lo mismo.
+      expect(athleteStatusDesde("cancelled", AHORA, AHORA)).toBe("expired");
+    });
+
+    it("sin fecha de fin, expira", () => {
+      // No conocer la fecha NO puede significar acceso infinito. El alumno que
+      // de verdad pago tiene fecha; el que no, no.
+      expect(athleteStatusDesde("cancelled", null, AHORA)).toBe("expired");
+    });
+  });
+
+  it("es total: los cinco estados del PF tienen destino", () => {
+    // El switch es exhaustivo y TypeScript lo verifica, pero eso se pierde si
+    // alguien le agrega un `default`. Esto lo agarra en runtime.
+    for (const status of SUBSCRIPTION_STATUSES) {
+      expect(ATHLETE_STATUSES).toContain(athleteStatusDesde(status, MANANA, AHORA));
+    }
+  });
+});
+
+describe("athleteStatusOtorga", () => {
+  it("otorgan active y grace, y nada mas", () => {
+    expect(athleteStatusOtorga("active")).toBe(true);
+    expect(athleteStatusOtorga("grace")).toBe(true);
+    expect(athleteStatusOtorga("expired")).toBe(false);
   });
 });
