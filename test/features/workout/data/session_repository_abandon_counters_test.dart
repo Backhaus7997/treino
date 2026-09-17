@@ -101,4 +101,62 @@ void main() {
     // Only the 1 fully completed session counts.
     expect(data['workoutsCount'], equals(1));
   });
+
+  test(
+      'con waitForServer:false los contadores SE SIGUEN escribiendo (es como '
+      'los pasa el teléfono, siempre)', () async {
+    // Este test existe por un bug que casi entra a main.
+    //
+    // Una versión de `finish` salteaba el recálculo cuando `waitForServer` era
+    // false, razonando que «el contador queda viejo hasta el próximo cierre
+    // con conexión». El razonamiento tenía un agujero: `waitForServer: false`
+    // NO significa «estoy sin red», significa «no me bloquees», y el teléfono
+    // lo pasa SIEMPRE. Los únicos callers con el default `true` son el
+    // descarte del Home y el reloj, así que ese «próximo cierre» no existía y
+    // los contadores dejaban de escribirse para siempre.
+    //
+    // Y no habría sido un número viejo: `effectiveRachaSemanas` hace decay EN
+    // LECTURA contra `rachaSemanasUpdatedAt`, el sello que estampa
+    // `updateCounters`. Sin sello nuevo, a las dos semanas todo atleta que
+    // cierre desde el teléfono aparece con racha 0 mientras entrena todos los
+    // días. El servidor no lo salva: `workoutsCount`/`rachaSemanas` no se
+    // tocan en `functions/src/`.
+    //
+    // Ninguno de los otros tests de este archivo lo habría visto: todos usan
+    // el default `true`, que es justamente el camino que el teléfono ya no
+    // toma.
+    final s1 = await repo.create(
+      uid: uid,
+      routineId: routineId,
+      routineName: routineName,
+      startedAt: DateTime.utc(2026, 5, 15, 8, 0, 0),
+      waitForServer: false,
+    );
+    await repo.finish(
+      uid: uid,
+      sessionId: s1.id,
+      finishedAt: DateTime.utc(2026, 5, 15, 9, 0, 0),
+      totalVolumeKg: 100.0,
+      durationMin: 60,
+      wasFullyCompleted: true,
+      weeklyTarget: 1,
+      waitForServer: false,
+    );
+
+    // El recálculo cuelga del ACK de la escritura, no del `await` de `finish`.
+    // Con el fake el ACK resuelve en microtasks, así que alcanza con dejar
+    // drenar la cola. En producción ocurre cuando vuelve la red.
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    final profileSnap =
+        await firestore.collection('userPublicProfiles').doc(uid).get();
+    expect(
+      profileSnap.data()?['workoutsCount'],
+      equals(1),
+      reason:
+          'sin esto, cerrar un entreno desde el teléfono deja de actualizar '
+          'el perfil público PARA SIEMPRE, y la racha decae a 0 en dos semanas.',
+    );
+  });
 }
