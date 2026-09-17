@@ -218,6 +218,16 @@ export {
   getAthletePricing,
 } from "./subscriptions/mp/create-athlete-preapproval";
 
+// El alta de un alumno desde la WEB. La landing no toca Firestore y no deberia:
+// crear una cuenta en TREINO es un dual-write atomico a `users/{uid}` y a
+// `userPublicProfiles/{uid}`, y hacer solo el primero deja al atleta VARADO en
+// el onboarding la primera vez que abre la app — bug conocido, documentado en
+// `user_repository.dart:101-114`.
+//
+// Idempotente: se llama despues de todo login, no solo del alta, y asi cubre
+// tambien a la cuenta vieja que nunca tuvo doc publico.
+export { ensureAthleteProfile } from "./profile/ensure-athlete-profile";
+
 // Paywall del entrenador — el reconciliador. Es lo que hace que pagar
 // SIGNIFIQUE algo: sin esto, `createPreapproval` abre un cobro y nadie se
 // entera. Corre a las 03:00 ART, una hora ANTES que `sweepEntitlements`, para

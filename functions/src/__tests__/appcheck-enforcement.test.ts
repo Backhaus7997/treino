@@ -180,6 +180,24 @@ const EXEMPTIONS: Readonly<Record<string, Exemption>> = {
       "web active App Check. Va DESPUES de createPreapproval en la cola: aquel " +
       "abre un cobro a nombre propio, este solo cierra uno propio.",
   },
+  "profile/ensure-athlete-profile:ensureAthleteProfile": {
+    permanence: "debt",
+    reason:
+      "Mismo motivo de plataforma que el resto del flujo web: lo llama la " +
+      "landing publica, que no tiene App Check porque no tiene Firebase. Con " +
+      "el flag puesto, nadie podria darse de alta desde la web. " +
+      "La cerradura es que NO HAY BODY: el uid y el mail salen del token. Un " +
+      "atacante autenticado solo puede crear SU PROPIO documento, que es algo " +
+      "que ya puede hacer desde el cliente movil — y con menos, porque acá el " +
+      "`role` esta escrito literal como `athlete` y no se puede influir. " +
+      "Es idempotente y no acepta parametros, asi que llamarlo N veces escribe " +
+      "lo mismo que llamarlo una.",
+    exitCondition:
+      "Junto con el resto del flujo web, cuando la landing inicialice App " +
+      "Check. Va PRIMERO de la cola web: es el unico que se llama en TODO " +
+      "login, asi que es el que mas trafico legitimo produce y el que mejor " +
+      "mide si la atestacion funciona antes de tocar los que cobran.",
+  },
   "subscriptions/mp/create-athlete-preapproval:createAthletePreapproval": {
     permanence: "debt",
     reason:
@@ -304,6 +322,7 @@ const EXPECTED_DEPLOYED = [
   "createAthletePreapproval",
   "createPreapproval",
   "deleteAccount",
+  "ensureAthleteProfile",
   "getAthletePricing",
   "mintWatchCredential",
   "promoteChatToInquiry",
@@ -446,6 +465,12 @@ describe("QA-SEC-016: el guard falla cuando tiene que fallar", () => {
       module: "subscriptions/mp/create-athlete-preapproval",
       symbol: "getAthletePricing",
       as: "getAthletePricing",
+      attested: false,
+    },
+    {
+      module: "profile/ensure-athlete-profile",
+      symbol: "ensureAthleteProfile",
+      as: "ensureAthleteProfile",
       attested: false,
     },
     {
