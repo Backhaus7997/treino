@@ -142,35 +142,6 @@ recuperar una cuenta eliminada.
 
 ## 6. Cuentas inactivas
 
-[[PENDIENTE — ENCENDER EL BARRIDO. El plazo está resuelto y el proceso ya
-existe: `sweepInactiveAccounts`, en
-`functions/src/retention/sweep-inactive-accounts.ts`. Lo que falta es que
-ejerza. Se despliega con `RETENTION_SWEEP_DRY_RUN = true`, o sea que cuenta,
-lista y loguea, y no manda un solo mail ni borra una sola cuenta.
-
-Ese modo no es prudencia genérica. La señal de actividad sale de los metadatos
-de Firebase Auth, que YA TIENEN HISTORIA, así que la primera corrida ve de una
-todas las cuentas que hoy superan los 24 meses. Encenderlo sin leer ese número
-antes es mandar ese número de mails de golpe.
-
-El marcador bloquea la publicación A PROPÓSITO, y sigue bloqueándola por el
-mismo motivo de siempre: mientras el barrido no ejerza, el texto de abajo
-promete una baja automática que no ocurre, y una cláusula que promete lo que el
-sistema no hace es peor que no tenerla. Que el código exista no cambia eso: lo
-que el usuario lee es lo que PASA, no lo que está deployado.
-
-El desacuerdo entre esta sección y el barrido quedó RESUELTO el 2026-09-14: el
-piso entre el aviso y la baja es de 90 días (`MIN_NOTICE_AGE_DAYS`) y el párrafo
-de abajo ya promete ese piso en vez de un número fijo, así que es cierto tanto
-en régimen estable como para el backlog. No se subió a 365 porque retener un año
-más datos de salud de cuentas abandonadas, sólo para honrar una frase, pelearía
-contra el art. 4 inc. 7 que esta misma sección invoca.
-
-PARA SACARLO quedan dos cosas, en este orden:
-
-  1. Leer el log de una corrida en `dryRun` y ver el tamaño del backlog.
-  2. Poner `RETENTION_SWEEP_DRY_RUN = false` y deployar.]]
-
 Si no usás tu cuenta durante **24 meses**, te avisamos por correo a la
 dirección con la que te registraste. Si seguís sin usarla, **a los 36 meses de
 inactividad damos de baja la cuenta** y borramos tus datos personales con el
@@ -223,5 +194,73 @@ proyecto en materia de cumplimiento.
 | 1 | Página pública `gettreino.com/eliminar-cuenta` | **Sí** — Google Play |
 | 2 | Que la confirmación de borrado avise qué se conserva (sección 3) | No, pero es lo correcto |
 | 3 | Procedimiento operativo para responder pedidos de acceso | No |
-| 4 | Definir política de cuentas inactivas | No |
+| 4 | ~~Definir política de cuentas inactivas~~ | **HECHO** — 24/36 meses, piso de 90 días |
 | 5 | Confirmar plazo fiscal de `payments` con asesor | No |
+
+---
+
+### 8.1 El barrido, encendido el 2026-09-17
+
+`RETENTION_SWEEP_DRY_RUN` pasó a `false`. La condición que el marcador pedía
+—leer el backlog antes de encender— se cumplió, y el resultado fue que **no hay
+backlog**.
+
+**Medido por dos caminos independientes que coinciden:** los logs de las dos
+corridas en `dryRun` (16 y 17 de septiembre) y un conteo directo contra Firebase
+Auth.
+
+```
+cuentas en Auth ............ 58
+inactividad máxima ......... 129 días  (4,2 meses)
+mediana .................... 43 días
+≥24 meses → aviso .......... 0
+≥36 meses → baja ........... 0
+capped ..................... false   (0 acciones contra un tope de 50)
+```
+
+**A la cuenta más inactiva le faltan 601 días para el umbral de aviso.** Y el
+cero es estructural, no una casualidad: el primer commit de `lib/features/auth`
+es del 2026-05-08, así que la distribución entera está donde la edad del producto
+obliga. El primer aviso posible es de ~2028-05 y la primera baja de ~2029-05.
+
+### 8.2 Esto ACTIVA el mecanismo, no lo valida
+
+Conviene que quede escrito, porque dentro de un año el log va a inducir a error.
+
+Encender el barrido va a producir **veinte meses de corridas en cero**, que
+parecen confirmación y no confirman nada: producción no va a ejecutar ninguna
+rama que no sea «cuenta activa» hasta 2028. El código que efectivamente da de
+baja se estrena en 2029, contra una base que hoy no existe.
+
+**La evidencia de que la baja funciona está en la suite, no en producción.**
+`functions/src/__tests__/sweep-inactive-accounts.test.ts` tiene 27 casos y cubre
+las ramas que producción no va a tocar:
+
+- `nunca borra sin aviso previo registrado` — una cuenta de 5 años sin registro
+  de aviso recibe aviso, no baja
+- `NO borra a los 35 meses aunque el aviso esté maduro`
+- `una cuenta del backlog NO se borra un día antes del piso`
+- `borra con las DOS condiciones, y firma el audit log aparte`
+- `exclusiones — sacan del barrido ENTERO, no sólo de la baja`
+
+Si en algún momento hace falta más evidencia, el camino es **sembrar cuentas
+viejas en el emulador y correr el handler ahí**, no mirar producción.
+
+### 8.3 Cómo leer el resultado de una corrida
+
+Tres trampas del `SweepInactiveResult`, verificadas contra el código:
+
+| Campo | Lo que NO es |
+|---|---|
+| `inactive` | **No es el backlog accionable.** `r.inactive++` está en las tres ramas del switch (556, 574, 595), así que incluye las exclusiones: `inactive = excludedTrainers + excludedSubscription + excludedActiveLink + noticed + deleted`. Lo accionable es `noticed + deleted` |
+| `inactive` | **Tampoco sobrevive al tope.** El chequeo hace `break` y no `continue` (530), así que cuando el tope muerde la corrida deja de mirar cuentas y `inactive` se congela con el resto. Es un piso, no un total |
+| `capped` | **Está en el resultado**, no hay que inferirlo de `noticed == 50` |
+
+Y una del flujo: **en la primera corrida real `deleted` va a ser 0**, sin
+importar la edad de las cuentas. `evaluarCuenta` (381) devuelve `aviso` cuando no
+hay registro de aviso previo, y el `dryRun` no lo escribe. Para caer en `baja`
+hacen falta cuatro cosas a la vez: registro de aviso, con `noticeSentAt` no nulo,
+≥36 meses de inactividad, y que el aviso tenga ≥90 días.
+
+**El riesgo del encendido nunca fue un borrado masivo: era un envío masivo de
+mails**, y el tope de 50 por corrida es lo que protege contra eso.
