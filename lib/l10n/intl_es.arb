@@ -923,9 +923,9 @@
   "postPrivacyGym": "MI GYM",
   "postPrivacyPublic": "PÚBLICO",
   "postPrivacyNoGymHint": "Asociate a un gym para postear acá",
-  "suggestedUsersTitle": "PERSONAS DE TU GYM",
+  "suggestedUsersTitle": "SUGERENCIAS PARA VOS",
   "@suggestedUsersTitle": {
-    "description": "Section heading for same-gym people suggested below the empty Friends feed."
+    "description": "Section heading for the people suggested below the empty Friends feed. Same-gym profiles come first, then profiles from nearby gyms (5x5 geohash grid), so the copy must NOT claim they are all from the viewer's gym."
   },
   "suggestedUserAnonymous": "Anónimo",
   "@suggestedUserAnonymous": {

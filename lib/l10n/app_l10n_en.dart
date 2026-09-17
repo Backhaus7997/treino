@@ -3730,7 +3730,7 @@ class AppL10nEn extends AppL10n {
   String get postPrivacyNoGymHint => 'Join a gym to post here';
 
   @override
-  String get suggestedUsersTitle => 'PEOPLE FROM YOUR GYM';
+  String get suggestedUsersTitle => 'SUGGESTED FOR YOU';
 
   @override
   String get suggestedUserAnonymous => 'Anonymous';

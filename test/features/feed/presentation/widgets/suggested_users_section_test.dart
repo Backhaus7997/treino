@@ -9,6 +9,7 @@ import 'package:treino/features/feed/presentation/widgets/suggested_users_sectio
 import 'package:treino/features/gyms/domain/gym.dart' show kNoGymId;
 import 'package:treino/features/profile/domain/user_public_profile.dart';
 import 'package:treino/l10n/app_l10n.dart';
+import 'package:treino/l10n/app_l10n_es.dart';
 
 const _emptyMessage = 'Todavía no hay posts de a quienes seguís';
 
@@ -103,7 +104,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('suggested_users_section')), findsNothing);
-    expect(find.text('PERSONAS DE TU GYM'), findsNothing);
+    // El título sale del l10n, NO de un literal copiado acá. Con el literal,
+    // renombrar el copy volvía esta línea trivialmente cierta —el string viejo
+    // ya no existe en ningún lado— y la aserción quedaba viva pero muerta.
+    expect(find.text(AppL10nEs().suggestedUsersTitle), findsNothing);
   });
 
   testWidgets('tapping a suggestion opens the matching public profile', (

@@ -3366,9 +3366,9 @@
   "@postPrivacyNoGymHint": {
     "description": "Hint shown under the PostPrivacySelector pills when the athlete has no gym, explaining why MI GYM is disabled."
   },
-  "suggestedUsersTitle": "PERSONAS DE TU GYM",
+  "suggestedUsersTitle": "SUGERENCIAS PARA VOS",
   "@suggestedUsersTitle": {
-    "description": "Section heading for same-gym people suggested below the empty Friends feed."
+    "description": "Section heading for the people suggested below the empty Friends feed. Same-gym profiles come first, then profiles from nearby gyms (5x5 geohash grid), so the copy must NOT claim they are all from the viewer's gym."
   },
   "suggestedUserAnonymous": "Anónimo",
   "@suggestedUserAnonymous": {
