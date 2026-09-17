@@ -201,25 +201,40 @@ export const STATUS_SIN_DERECHO = "expired";
  * diff el dia que alguien la toque. Mismo motivo —y mismo idiom— que
  * `RETENTION_SWEEP_DRY_RUN` y `kAthletePaywallEnabled`.
  *
- * ── Por que arranca en `true` ──
+ * ── Por que esta en `false`, y por que antes no ──
  *
- * Porque todavia no hay tiendas conectadas, y cuando las haya la UNICA forma
- * de probar el flujo completo de compra es con una suscripcion de sandbox. Un
- * `false` hoy dejaria el camino de acreditacion sin poder ejercitarse nunca —
- * que es exactamente el problema que tiene `client.ts` con el parseo de la
- * respuesta v2.
+ * Arranco en `true` con un motivo escrito: todavia no habia tiendas
+ * conectadas, y una suscripcion de sandbox iba a ser la UNICA forma de
+ * ejercitar la acreditacion de punta a punta. Un `false` dejaba el camino sin
+ * poder probarse nunca.
  *
- * ── ⚠️ Que hay que hacer antes de lanzar ──
+ * **Esa premisa vencio el 2026-09-17.** El alumno pasa a pagar por Mercado
+ * Pago desde `gettreino.com`, asi que la acreditacion se ejercita contra MP y
+ * contra el emulador — no contra un sandbox de tienda. La constante declaraba
+ * su propia condicion de salida y esta se cumplio, asi que se apaga.
  *
- * **Ponerlo en `false`.** Con `true`, cualquiera con una cuenta de sandbox
- * tester en App Store Connect o Play Console se acredita premium real en
- * `treino-dev`. El radio hoy es chico —esos testers los da de alta el equipo—
- * pero crece con cada persona que se suma, y no hay nada que avise.
+ * ── Lo que evita tenerlo en `false` ──
  *
- * Apagarlo es cambiar esta linea y redeployar. A proposito: que sea un cambio
- * que alguien tiene que hacer mirando.
+ * Con `true`, cualquiera con una cuenta de sandbox tester en App Store Connect
+ * o Play Console se acredita premium REAL en `treino-dev` —que es produccion,
+ * ver `index.ts`—. El radio era chico porque esos testers los da de alta el
+ * equipo, pero crecia con cada persona que se sumaba y no habia nada que
+ * avisara.
+ *
+ * ── Lo que NO cambia ──
+ *
+ * El camino de sandbox sigue existiendo y sigue testeado: `aceptarSandbox` es
+ * un parametro de [RcWebhookDeps], no esta constante leida directo. Si algun
+ * dia hace falta volver a conectar una tienda, se prende aca y los tests de
+ * los dos caminos ya estan escritos.
+ *
+ * ⚠️ Este modulo entero esta previsto para borrarse cuando el checkout web del
+ * alumno convierta un pago real (PR R3 del plan de cobro por Mercado Pago).
+ * Mientras exista, tiene que estar apagado: un webhook publico que acredita
+ * derecho desde una compra de prueba no se deja prendido "porque igual lo
+ * vamos a borrar".
  */
-export const ACEPTAR_SANDBOX = true;
+export const ACEPTAR_SANDBOX = false;
 
 /**
  * Si el evento viene del entorno de PRUEBA de la tienda.
