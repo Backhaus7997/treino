@@ -39,6 +39,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:treino/core/utils/network_timeouts.dart';
 import 'package:treino/features/workout/data/session_repository.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 
@@ -139,6 +140,25 @@ void main() {
     // Control del control: si la cota fuera tan agresiva que se comiera
     // siempre la adopción, el test de arriba pasaría por el motivo equivocado
     // y habríamos roto la deduplicación con el reloj sin enterarnos.
+    //
+    // ⚠️ EL DOBLE TIENE QUE CONSUMIR TIEMPO DE TIMER, no de microtask.
+    //
+    // La primera versión de este test stubeaba `thenAnswer((_) async => snap)`
+    // y era INSERVIBLE: pasaba con `Duration.zero`, la cota más agresiva que
+    // se puede escribir. Un `async` resuelve en la cola de MICROTASKS y
+    // `Future.timeout` está implementado con un `Timer`; Dart drena todas las
+    // microtasks antes de correr cualquier timer, así que el timer no gana
+    // nunca — para NINGUNA duración. El test no medía la cota: medía que el
+    // código adopta cuando la lectura es instantánea, que es otra cosa.
+    //
+    // `Future.delayed` sí es un Timer, así que compite en la misma cola.
+    // Medido en los dos sentidos: con la cota de 20 ms va verde; con
+    // `Duration.zero` va rojo.
+    //
+    // La regla general, que vale para cualquier `.timeout()` de este repo: si
+    // el control es sobre la EXISTENCIA de la cota, un `Completer` eterno
+    // alcanza (test de arriba). Si es sobre su MAGNITUD, el doble tiene que
+    // gastar tiempo real de Timer.
     final setLogs = _MockCollection();
     final sessionDoc = _MockDoc();
     final sessions = _MockCollection();
@@ -152,7 +172,19 @@ void main() {
     when(() => sessions.doc(sessionId)).thenReturn(sessionDoc);
     when(() => sessionDoc.collection('setLogs')).thenReturn(setLogs);
     when(() => setLogs.doc(watchDocId)).thenReturn(watchRef);
-    when(() => watchRef.get()).thenAnswer((_) async => snap);
+    when(() => watchRef.get()).thenAnswer(
+      (_) => Future<DocumentSnapshot<Map<String, Object?>>>.delayed(
+        const Duration(milliseconds: 5),
+        () => snap,
+      ),
+    );
+    // Sin esto, romper la adopción falla con un `MissingStub` críptico en vez
+    // del `reason:` escrito abajo: un test que falla mal enseña mal.
+    when(() => setLogs.doc()).thenReturn(nuevoRef);
+    when(() => nuevoRef.id).thenReturn('id-autogenerado');
+    when(() => nuevoRef.set(any())).thenAnswer((inv) async {
+      escrituras.add(inv.positionalArguments[0] as Map<String, Object?>);
+    });
     when(() => watchRef.set(any())).thenAnswer((inv) async {
       escrituras.add(inv.positionalArguments[0] as Map<String, Object?>);
     });
@@ -170,6 +202,31 @@ void main() {
       watchDocId,
       reason: 'con la lectura contestando a tiempo, la adopción tiene que '
           'ocurrir: es lo que evita el segundo documento de la misma serie.',
+    );
+  });
+
+  test('la cota de producción sigue siendo holgada para una lectura normal',
+      () {
+    // Los dos tests de arriba INYECTAN 20 ms, así que el valor real de
+    // `kWatchAdoptionReadTimeout` no lo mira nadie: un typo de `seconds: 2` a
+    // `milliseconds: 2` entraría sin un solo rojo, y su consecuencia —saltear
+    // la adopción y duplicar la serie— es invisible en el teléfono porque
+    // `_dedupedLogs` la filtra del estado local. Quien la cuenta es el
+    // servidor (`functions/src/ranking-aggregate.ts` relee `setLogs`).
+    expect(
+      kWatchAdoptionReadTimeout,
+      greaterThanOrEqualTo(const Duration(seconds: 1)),
+      reason: 'por debajo de un segundo la cota deja de proteger contra un '
+          'stall y empieza a cortar lecturas sanas, que es el trade peligroso: '
+          'un duplicado que el teléfono esconde y el ranking suma.',
+    );
+    expect(
+      kWatchAdoptionReadTimeout,
+      lessThan(kFirestoreReadTimeout),
+      reason:
+          'tiene que ser MÁS corta que la cota de las lecturas de arranque: '
+          'ésta está en el camino de marcar una serie, no en el de abrir la '
+          'pantalla.',
     );
   });
 }

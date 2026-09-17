@@ -649,8 +649,33 @@ class SessionRepository {
     DocumentSnapshot<Map<String, dynamic>>? watchSnap;
     try {
       watchSnap = await watchRef.get().timeout(_watchAdoptionReadTimeout);
-    } catch (_) {
+    } catch (e, st) {
       watchSnap = null;
+      // Saltear la adopción NO es gratis, y por eso no se traga en silencio.
+      //
+      // Sin adoptar, el teléfono crea su propio documento sobre una serie que
+      // el reloj tal vez ya escribió. Ese duplicado es INVISIBLE en el
+      // teléfono —`_dedupedLogs` lo filtra del estado local— pero el servidor
+      // lo cuenta: `functions/src/ranking-aggregate.ts` relee `setLogs` y suma
+      // los dos. Es el daño que esta lectura existe para evitar: 24 documentos
+      // de más y 11.450 kg fantasma, medidos el 2026-08-11.
+      //
+      // Se reportan los dos casos, con razones distintas, porque preguntan
+      // cosas distintas: el timeout dice "¿la cota está bien elegida?" —hoy 2
+      // segundos, decididos sin datos de campo— y el error dice "¿se rompió
+      // algo?" (un permission-denied acá sería una regresión de reglas).
+      unawaited(_reportNonFatal(
+        e,
+        st,
+        reason: e is TimeoutException
+            ? 'SessionRepository.addSetLog: la lectura de adopción del reloj '
+                'superó ${_watchAdoptionReadTimeout.inMilliseconds} ms. La '
+                'serie se escribe igual, con el riesgo de duplicar la del '
+                'reloj si había una.'
+            : 'SessionRepository.addSetLog: falló la lectura de adopción del '
+                'reloj. La serie se escribe igual, con el riesgo de duplicar '
+                'la del reloj si había una.',
+      ).catchError((_) {}));
     }
     final watchData = watchSnap?.data();
 

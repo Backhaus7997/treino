@@ -46,6 +46,8 @@ import 'package:treino/features/watch/application/watch_credential_providers.dar
 import 'package:treino/features/watch/data/watch_nudge_service.dart';
 import 'package:treino/features/workout/application/routine_providers.dart';
 import 'package:treino/features/workout/application/session_init.dart';
+import 'package:treino/features/workout/application/session_notifier.dart'
+    show SessionLogAction;
 import 'package:treino/features/workout/application/session_providers.dart';
 import 'package:treino/features/workout/data/session_repository.dart';
 import 'package:treino/features/workout/domain/routine.dart';
@@ -337,6 +339,82 @@ void main() {
         hasLength(1),
         reason: 'con la serie ya en el servidor, ahí sí el reloj tiene qué '
             'releer — y es el único momento en que el aviso sirve.',
+      );
+    });
+
+    test(
+        'una escritura RECHAZADA por el servidor publica el error y NO avisa '
+        'al reloj', () async {
+      // La rama `onError` de `_onWriteSettled` no la ejercitaba NINGÚN test, y
+      // es la pieza central del riesgo de este diseño: antes el error viajaba
+      // por el `await` y lo agarraba un `catch`; ahora viaja por un future que
+      // nadie espera. Un fallo silencioso acá se lleva la serie sin que se
+      // entere nadie.
+      //
+      // OJO con la diferencia que este test fija: sin red el future queda
+      // PENDIENTE —no falla— y no pasa por acá. Esto es el otro caso: el
+      // servidor contestó que NO (un permission-denied, por ejemplo).
+      final repo = _MockSessionRepository();
+      final routine = _fourSetRoutine();
+      final espia = _SpyWatchNudge();
+      when(() => repo.create(
+            uid: any(named: 'uid'),
+            routineId: any(named: 'routineId'),
+            routineName: any(named: 'routineName'),
+            startedAt: any(named: 'startedAt'),
+            dayNumber: any(named: 'dayNumber'),
+            weekNumber: any(named: 'weekNumber'),
+          )).thenAnswer((_) async => makeSession());
+      final acks = _gateAddSetLogConAcks(repo);
+
+      final container = ProviderContainer(
+        overrides: [
+          sessionRepositoryProvider.overrideWithValue(repo),
+          currentUidProvider.overrideWithValue('u1'),
+          routineByIdProvider(routine.id).overrideWith((ref) async => routine),
+          sessionsByUidProvider('u1').overrideWith((ref) async => const []),
+          watchNudgeServiceProvider.overrideWithValue(espia),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final init = FreshSession(routineId: routine.id, dayNumber: 1);
+      final sub = container.listen(
+        sessionNotifierProvider(init),
+        (_, __) {},
+        fireImmediately: true,
+      );
+      addTearDown(sub.close);
+      await container.read(sessionNotifierProvider(init).future);
+      final notifier = container.read(sessionNotifierProvider(init).notifier);
+
+      unawaited(notifier.logSet(makeSetLog(exerciseId: 'e1', setNumber: 1)));
+      await Future<void>.delayed(Duration.zero);
+      expect(notifier.logSetError.value, isNull);
+
+      acks.single.completeError(
+        Exception('permission-denied'),
+        StackTrace.current,
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        notifier.logSetError.value?.action,
+        SessionLogAction.log,
+        reason: 'un rechazo del servidor tiene que llegar al canal de error, '
+            'no perderse en un future que nadie mira.',
+      );
+      expect(
+        notifier.logSetError.value?.setLog?.setNumber,
+        1,
+        reason: 'el error conserva QUÉ serie se perdió: sin eso el cartel no '
+            'puede ofrecer reintentar.',
+      );
+      expect(
+        espia.motivos.where((m) => m == WatchNudgeService.reasonSetLogged),
+        isEmpty,
+        reason: 'si el servidor rechazó la serie, mandar al reloj a releer '
+            'Firestore no tiene ningún sentido: no hay nada que leer.',
       );
     });
 

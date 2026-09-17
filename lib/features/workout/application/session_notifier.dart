@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/analytics/analytics_service.dart';
+import '../../../core/telemetry/non_fatal.dart';
 import '../../../core/utils/network_timeouts.dart';
 import '../../watch/application/watch_credential_providers.dart'
     show watchLauncherServiceProvider, watchNudgeServiceProvider;
@@ -93,13 +94,16 @@ class SessionNotifier
     _timer = Timer.periodic(const Duration(seconds: 1), _onTick);
     _watchRemoteChanges(state.session.id);
     ref.onDispose(() {
+      // PRIMERO, antes de cualquier `dispose()`: lo que corre después ya no
+      // puede tocar los notifiers, y un error que llegue en el medio tiene que
+      // ver el flag arriba.
+      _disposed = true;
       _timer?.cancel();
       _timer = null;
       _setLogsSub?.cancel();
       _finishedSub?.cancel();
       _logSetError.dispose();
       _finishedElsewhere.dispose();
-      _disposed = true;
     });
 
     return state;
@@ -165,11 +169,24 @@ class SessionNotifier
 
   /// Reemplaza las series con lo que dice Firestore.
   ///
-  /// Se pisa entero en vez de mezclar porque el remoto YA es la fuente de
-  /// verdad: `logSet`, `updateSetLog` y `deleteSetLog` escriben primero y
-  /// recién después tocan el estado, así que lo local nunca tiene nada que el
-  /// remoto no tenga. Mezclar solo agregaría la chance de resucitar una serie
-  /// borrada.
+  /// Se pisa entero en vez de mezclar porque el remoto es la fuente de verdad.
+  ///
+  /// ⚠️ El motivo CAMBIÓ y conviene leerlo, porque el de antes ya no aplica.
+  /// Decía que «lo local nunca tiene nada que el remoto no tenga», porque las
+  /// mutaciones escribían primero y tocaban el estado después. Desde que
+  /// `logSet` dejó de esperar la confirmación del servidor —para que entrenar
+  /// sin conexión funcione— el estado local SÍ puede tener una serie que el
+  /// servidor todavía no confirmó, o que rechazó.
+  ///
+  /// Pisar sigue siendo lo correcto, y ahora es MÁS importante: este método es
+  /// lo único que puede corregir un estado local optimista. Si Firestore
+  /// rechaza la escritura, el SDK revierte la mutación del caché, el listener
+  /// re-emite sin ese documento, y acá se destilda la fila. Mezclar dejaría la
+  /// serie fantasma para siempre.
+  ///
+  /// El corolario incómodo: si el stream MUERE (ver el `onError` de
+  /// `_watchRemoteChanges`), no queda ningún reconciliador y el estado local se
+  /// congela en su versión optimista por el resto del entreno.
   void _applyRemoteSetLogs(List<SetLog> remote) {
     final current = state.valueOrNull;
     if (current == null) return;
@@ -519,9 +536,24 @@ class SessionNotifier
         if (_disposed) return;
         _nudgeWatch(WatchNudgeService.reasonSetLogged);
       },
-      onError: (Object _) {
-        // Mismo motivo: sin pantalla no hay dónde mostrar el fallo, y tocar
-        // un `_logSetError` ya disposeado tira.
+      onError: (Object e, StackTrace st) {
+        // REPORTAR y MOSTRAR son dos cosas distintas, y confundirlas era el
+        // agujero: sin pantalla no hay dónde mostrar, pero siempre hay dónde
+        // reportar. Si no, una serie que Firestore rechazó desaparece sin que
+        // se entere nadie —ni el atleta ni Crashlytics— y si las reglas se
+        // rompen para todos, el síntoma es cero.
+        //
+        // Mismo criterio que `create(waitForServer: false)` con su
+        // `onServerRejected`, en session_repository.dart.
+        //
+        // Offline no pasa por acá: el future queda PENDIENTE, no falla.
+        unawaited(reportNonFatal(
+          e,
+          st,
+          reason: 'SessionNotifier.logSet: la escritura diferida de la serie '
+              '${error.setLog?.exerciseId}#${error.setLog?.setNumber} fue '
+              'rechazada${_disposed ? ' (con la pantalla ya cerrada)' : ''}.',
+        ).catchError((_) {}));
         if (_disposed) return;
         _logSetError.value = error;
       },
