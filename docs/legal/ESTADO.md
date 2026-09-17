@@ -184,7 +184,7 @@ Sin el fix, bloquear y reportar habrían fallado **siempre** con
 | 1 | ~~Mergear los dos PRs~~ | Equipo | **HECHO** |
 | 2 | ~~Política multi-jurisdicción~~ — bases legales por finalidad, transferencias, portabilidad, oposición, plazos de incidente | Redacción | **HECHO** el 2026-09-16 |
 | 3 | ~~Consentimiento parental verificable~~ | — | **NO HACE FALTA** con la edad mínima en 16 |
-| 4 | **Age gate en el alta** — hoy `bornAt` es opcional y se carga desde el editor de perfil, no del alta. La cláusula de edad no es exigible hasta que exista | Desarrollo | Especificado |
+| 4 | ~~**Age gate en el alta**~~ — `bornAt` pasó a ser obligatorio y se pide en el paso 2 del alta; el router manda a `/birth-date` a las cuentas anteriores, y las reglas de Firestore validan el piso en `create` y en `update` | Desarrollo | **HECHO** — PR #1162, mergeado el 2026-09-17 |
 | 5 | **Filtrado de términos vetados** — cuarto requisito de la Guideline 1.2, el único que #1114 no cubre | Desarrollo | Pendiente |
 | 6 | **Vista de revisión de reportes** — ver la sección 6 | Desarrollo | Pendiente |
 | 7 | **Páginas legales en la landing** — con los marcadores cerrados ya no hay documento bloqueado por texto | Desarrollo | Especificado |
