@@ -1464,3 +1464,230 @@ describe("reconcileAllSubscriptions — saca del barrido lo abandonado", () => {
     expect(segunda.total).toBe(0);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// El escritor del ALUMNO.
+//
+// El alumno no tiene tiers ni cupo: tiene un interruptor de tres estados en
+// `users/{uid}.athleteSubscription.status`. Lo que sigue prueba las tres cosas
+// en que su escritor NO puede copiar al del PF.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Un mundo con un plan de ALUMNO ya mapeado y el alumno sin derecho todavia. */
+const MUNDO_ALUMNO = (): Store => ({
+  users: { u1: { role: "athlete", displayName: "Ana" } },
+  mp_plans: {
+    a1: {
+      producto: "athlete",
+      uid: "u1",
+      cycle: "monthly",
+      createdAt: ts(AHORA - 60 * DIA_MS),
+    },
+  },
+});
+
+const ALUMNO_AUTORIZADA: MpPreapproval = {
+  id: "a1",
+  status: "authorized",
+  external_reference: "u1",
+  next_payment_date: "2026-10-03T12:00:00.000Z",
+  auto_recurring: { transaction_amount: 3500 },
+  summarized: { pending_charge_quantity: 0 },
+};
+
+describe("reconcileSubscription — el alumno", () => {
+  it("escribe athleteSubscription con UNA SOLA clave", async () => {
+    // La asercion mas importante del bloque, y por eso es sobre las CLAVES y
+    // no sobre el valor. `athletePaywallInputChanged` compara el mapa entero
+    // serializado, asi que cualquier campo de mas —`updatedAt`,
+    // `currentPeriodEnd`, `lastEventId`— dispara `syncAthletePaywallOnUser` en
+    // CADA evento de MP, y con el paywall prendido eso paga una query a
+    // `trainer_links` por alumno y por evento.
+    const { app, store } = fakeApp(MUNDO_ALUMNO());
+
+    const r = await reconcileSubscription(app, "a1", fakeMp(ALUMNO_AUTORIZADA));
+
+    expect(r.outcome).toBe("written");
+    expect(r.producto).toBe("athlete");
+    expect(r.athleteStatus).toBe("active");
+
+    const escrito = store.users.u1.athleteSubscription as Record<string, unknown>;
+    expect(Object.keys(escrito)).toEqual(["status"]);
+    expect(escrito.status).toBe("active");
+  });
+
+  it("NUNCA escribe `subscription` — eso le daria cupo de entrenador", async () => {
+    // El modo de falla que motivo el discriminador `producto`: el escritor del
+    // PF sobre un alumno no es un no-op, le da un tier con cupo de alumnos.
+    const { app, store } = fakeApp(MUNDO_ALUMNO());
+
+    await reconcileSubscription(app, "a1", fakeMp(ALUMNO_AUTORIZADA));
+
+    expect(store.users.u1.subscription).toBeUndefined();
+  });
+
+  it("escribe con MERGE — el documento de usuario tiene el perfil entero", async () => {
+    const { app, store, escrituras } = fakeApp(MUNDO_ALUMNO());
+
+    await reconcileSubscription(app, "a1", fakeMp(ALUMNO_AUTORIZADA));
+
+    expect(escrituras.find((e) => e.col === "users")?.merge).toBe(true);
+    expect(store.users.u1.role).toBe("athlete");
+    expect(store.users.u1.displayName).toBe("Ana");
+  });
+
+  it("authorized CON cobro pendiente da grace, que SIGUE otorgando", async () => {
+    const { app, store } = fakeApp(MUNDO_ALUMNO());
+
+    await reconcileSubscription(app, "a1", fakeMp({
+      ...ALUMNO_AUTORIZADA,
+      summarized: { pending_charge_quantity: 1 },
+    }));
+
+    expect((store.users.u1.athleteSubscription as Record<string, unknown>).status)
+      .toBe("grace");
+  });
+
+  it("la fecha de fin va a mp_plans, NO a users", async () => {
+    // Consecuencia directa del test de la clave unica: la fecha no puede vivir
+    // en el mapa, y un campo hermano en `users/{uid}` costaria dos pines en
+    // `firestore.rules`. `mp_plans` ya es CF-only.
+    const { app, store } = fakeApp(MUNDO_ALUMNO());
+
+    await reconcileSubscription(app, "a1", fakeMp(ALUMNO_AUTORIZADA));
+
+    const plan = store.mp_plans.a1 as Record<string, unknown>;
+    expect((plan.currentPeriodEnd as { toMillis(): number }).toMillis())
+      .toBe(Date.parse("2026-10-03T12:00:00.000Z"));
+  });
+
+  describe("la baja — donde el escritor del PF NO se puede copiar", () => {
+    const CANCELADA_CON_PERIODO_VIVO: MpPreapproval = {
+      ...ALUMNO_AUTORIZADA,
+      status: "cancelled",
+      next_payment_date: new Date(AHORA + 10 * DIA_MS).toISOString(),
+    };
+
+    it("dentro del periodo pagado el derecho SIGUE activo", async () => {
+      // La promesa ya publicada en `terminos-suscripcion.md` seccion 7:
+      // «Conservás el acceso hasta el final del período que ya pagaste».
+      const { app, store } = fakeApp(MUNDO_ALUMNO());
+
+      const r = await reconcileSubscription(
+        app, "a1", fakeMp(CANCELADA_CON_PERIODO_VIVO),
+      );
+
+      expect(r.status).toBe("cancelled");
+      expect(r.athleteStatus).toBe("active");
+      expect((store.users.u1.athleteSubscription as Record<string, unknown>).status)
+        .toBe("active");
+    });
+
+    it("NO marca `terminal` mientras el periodo siga corriendo", async () => {
+      // ESTE ES EL TEST QUE JUSTIFICA EL PR.
+      //
+      // El escritor del PF marca `terminal` apenas MP dice `cancelled`, y eso
+      // saca el plan del barrido PARA SIEMPRE. Para el PF es inofensivo: su
+      // fecha vive en `users/{uid}.subscription` y `effectiveWeightLimit` la
+      // relee en cada corrida, asi que el limite cae solo.
+      //
+      // El alumno no tiene ese mecanismo: su derecho es un string y solo una
+      // ESCRITURA puede pasarlo a `expired`. La unica escritura que queda
+      // despues de la baja es la del barrido. Copiar la guarda del PF le
+      // regalaba acceso PERMANENTE a todo el que se diera de baja.
+      const { app, store } = fakeApp(MUNDO_ALUMNO());
+
+      await reconcileSubscription(app, "a1", fakeMp(CANCELADA_CON_PERIODO_VIVO));
+
+      expect((store.mp_plans.a1 as Record<string, unknown>).terminal)
+        .toBeUndefined();
+    });
+
+    it("pasado el periodo expira Y marca `terminal`", async () => {
+      // El contrapeso del test de arriba. Sin esto, una guarda que NUNCA
+      // marcara terminal pasaria igual, y el plan se quedaria en el barrido
+      // para siempre gastando una llamada diaria a MP.
+      const { app, store } = fakeApp(MUNDO_ALUMNO());
+
+      const r = await reconcileSubscription(app, "a1", fakeMp({
+        ...ALUMNO_AUTORIZADA,
+        status: "cancelled",
+        next_payment_date: new Date(AHORA - DIA_MS).toISOString(),
+      }));
+
+      expect(r.athleteStatus).toBe("expired");
+      expect((store.users.u1.athleteSubscription as Record<string, unknown>).status)
+        .toBe("expired");
+      expect((store.mp_plans.a1 as Record<string, unknown>).terminal).toBe(true);
+    });
+
+    it("el barrido siguiente hace el flip que la baja dejo pendiente", async () => {
+      // El escenario completo, que es lo que ninguno de los tests de arriba
+      // prueba por separado: baja hoy con periodo vivo, y el derecho se apaga
+      // solo cuando el barrido corre despues del vencimiento.
+      const { app, store } = fakeApp(MUNDO_ALUMNO());
+
+      // Dia 1: se da de baja. Conserva el acceso.
+      await reconcileSubscription(app, "a1", fakeMp(CANCELADA_CON_PERIODO_VIVO));
+      expect((store.users.u1.athleteSubscription as Record<string, unknown>).status)
+        .toBe("active");
+
+      // Dia 11: el barrido vuelve a mirar el MISMO plan, con el reloj movido.
+      const r = await reconcileSubscription(
+        app,
+        "a1",
+        fakeMp(CANCELADA_CON_PERIODO_VIVO, AHORA + 11 * DIA_MS),
+      );
+
+      expect(r.athleteStatus).toBe("expired");
+      expect((store.users.u1.athleteSubscription as Record<string, unknown>).status)
+        .toBe("expired");
+    });
+  });
+
+  it("un `pending` no pisa un derecho vigente", async () => {
+    // Mismo caso real que el del PF: nada impide abrir un checkout estando ya
+    // suscripto, asi que un alumno que pasa de mensual a anual queda con DOS
+    // documentos en `mp_plans`. Sin esta guarda, el `pending` del plan nuevo le
+    // corta las funciones a alguien que acaba de intentar pagarnos mas.
+    const mundo = MUNDO_ALUMNO();
+    mundo.users.u1.athleteSubscription = { status: "active" };
+    const { app, store, escrituras } = fakeApp(mundo);
+
+    const r = await reconcileSubscription(app, "a1", fakeMp({
+      ...ALUMNO_AUTORIZADA,
+      status: "pending",
+    }));
+
+    expect(r.outcome).toBe("skipped-pending-no-pisa");
+    expect((store.users.u1.athleteSubscription as Record<string, unknown>).status)
+      .toBe("active");
+    expect(escrituras.find((e) => e.col === "users")).toBeUndefined();
+  });
+
+  it("sin cambios no escribe nada", async () => {
+    const mundo = MUNDO_ALUMNO();
+    mundo.users.u1.athleteSubscription = { status: "active" };
+    (mundo.mp_plans.a1 as Record<string, unknown>).currentPeriodEnd =
+      ts(Date.parse("2026-10-03T12:00:00.000Z"));
+    const { app, escrituras } = fakeApp(mundo);
+
+    const r = await reconcileSubscription(app, "a1", fakeMp(ALUMNO_AUTORIZADA));
+
+    expect(r.outcome).toBe("unchanged");
+    expect(escrituras).toEqual([]);
+  });
+
+  it("un plan de PF sigue yendo al escritor del PF", async () => {
+    // El contrapeso del corte por producto: sin esto, un corte de mas mandaria
+    // a TODOS al escritor del alumno y nadie se enteraria.
+    const { app, store } = fakeApp(MUNDO());
+
+    const r = await reconcileSubscription(app, "p1", fakeMp(AUTORIZADA));
+
+    expect(r.producto).toBe("trainer");
+    expect(r.athleteStatus).toBeUndefined();
+    expect(store.users.t1.subscription).toBeDefined();
+    expect(store.users.t1.athleteSubscription).toBeUndefined();
+  });
+});

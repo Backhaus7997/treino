@@ -160,9 +160,16 @@ import {
   MpPreapproval,
   createMpClient,
 } from "./client";
-import { hayCobroPendiente, mapMpStatus } from "./map-status";
+import {
+  AthleteStatus,
+  athleteStatusDesde,
+  athleteStatusOtorga,
+  hayCobroPendiente,
+  mapMpStatus,
+} from "./map-status";
 import {
   MP_PLANS_COLLECTION,
+  ProductoMp,
   lookupPlan,
 } from "./tier-mapping";
 
@@ -186,19 +193,28 @@ export type ReconcileOutcome =
    */
   | "skipped-reemplazado"
   | "sin-suscripcion"
-  /**
-   * El plan cobra un producto que este reconciliador todavia no sabe escribir.
-   * Hoy: el del ALUMNO. Ver la guarda de producto mas abajo.
-   */
-  | "skipped-producto-sin-escritor"
   | "error-mp";
 
 export interface ReconcileResult {
   planId: string;
   outcome: ReconcileOutcome;
   uid?: string;
+  /**
+   * Cual de los dos productos escribio este plan. Lo necesita el cliente para
+   * saber que pantalla dibujar al volver del checkout.
+   */
+  producto?: ProductoMp;
+  /** Solo para `producto: "trainer"`. El alumno no tiene tiers. */
   tier?: SubscriptionTier;
+  /**
+   * El estado en el vocabulario del PF, los cinco de `effective-limit.ts`.
+   * Se reporta para LOS DOS productos: es lo que mira `estadoDesdeResultados`
+   * en `reconcile-my-checkout.ts`, y traducirlo ahi tambien obligaria a ese
+   * archivo a saber de productos.
+   */
   status?: SubscriptionStatus;
+  /** Solo para `producto: "athlete"`. Lo que se escribio de verdad. */
+  athleteStatus?: AthleteStatus;
   /**
    * Cuantas suscripciones VIEJAS se dieron de baja en MP porque este plan las
    * reemplaza. Casi siempre 0; un 1 es un cambio de plan que dejo de cobrarse
@@ -650,6 +666,167 @@ async function darDeBajaLosReemplazados(
  * Total: nunca tira. Cualquier fallo se reporta en el `outcome` — un barrido
  * que se cae por un PF deja a todos los demas sin reconciliar.
  */
+/**
+ * Escribe el derecho del ALUMNO. El espejo de lo que el resto de
+ * `reconcileSubscription` hace para el PF, con tres diferencias que importan.
+ *
+ * ── 1. Escribe UN SOLO CAMPO, y eso es load-bearing ──
+ *
+ * `users/{uid}.athleteSubscription` es `{ status }` y nada mas. No es
+ * minimalismo estetico: `athletePaywallInputChanged`
+ * (`athlete-paywall-enforced.ts`) compara **el mapa entero serializado**, asi
+ * que cualquier campo volatil adentro —`updatedAt`, `currentPeriodEnd`,
+ * `lastEventId`— dispararia `syncAthletePaywallOnUser` en cada evento de MP. Y
+ * con el paywall prendido, ese trigger paga una query a `trainer_links` por
+ * alumno y por evento.
+ *
+ * Lo mismo ya lo documenta `rc/webhook.ts`, que es el otro escritor de este
+ * campo. Hay un test que fija que el mapa escrito tiene exactamente una clave.
+ *
+ * ── 2. La fecha de fin de periodo vive en `mp_plans/{planId}` ──
+ *
+ * Consecuencia directa de lo anterior: la fecha no puede ir en el mapa, y un
+ * campo hermano en `users/{uid}` tampoco es gratis —necesitaria pin en los dos
+ * verbos de `firestore.rules`, un archivo que ya cruzo los 256 KiB una vez.
+ * `mp_plans` ya es CF-only por regla y este reconciliador ya lo lee.
+ * **Costo en reglas: cero lineas.**
+ *
+ * ── 3. `terminal` NO se marca por `cancelled` a secas ──
+ *
+ * Ver la guarda al final. Es el unico lugar donde este escritor no puede
+ * copiar al del PF, y copiarlo le regalaba acceso permanente al alumno.
+ */
+async function escribirSuscripcionDeAlumno(i: {
+  app: App;
+  planId: string;
+  uid: string;
+  mp: MpPreapproval;
+  status: SubscriptionStatus;
+  planDoc: Record<string, unknown> | undefined;
+  deps: ReconcileDeps;
+}): Promise<ReconcileResult> {
+  const { app, planId, uid, mp, status, planDoc, deps } = i;
+
+  const db = getFirestore(app);
+  const userRef = db.collection("users").doc(uid);
+  const planRef = db.collection(MP_PLANS_COLLECTION).doc(planId);
+
+  const userData = (await userRef.get()).data();
+  const actual = userData?.athleteSubscription as
+    | Record<string, unknown>
+    | undefined;
+  const statusPrevio =
+    typeof actual?.status === "string" ? actual.status : undefined;
+
+  // La fecha sale de la MISMA cascada que la del PF, cambiando de donde se lee
+  // la anterior: del plan y no del usuario.
+  const periodEnd = resolverFinDePeriodo({
+    deMp: parsePeriodEnd(mp.next_payment_date, planId),
+    yaGuardada: planDoc?.currentPeriodEnd,
+    autoRecurring: mp.auto_recurring,
+    status,
+    planId,
+  });
+
+  const athleteStatus = athleteStatusDesde(
+    status,
+    periodEnd === null ? null : periodEnd.toMillis(),
+    deps.nowMs,
+  );
+
+  // ── GUARDA DE NO-REGRESION: un `pending` NUNCA pisa un derecho vigente ──
+  //
+  // Misma politica que la del PF, mismo caso real: nada impide abrir un
+  // checkout estando ya suscripto, asi que un alumno que pasa de mensual a
+  // anual queda con DOS documentos en `mp_plans`. El barrido los recorre a los
+  // dos, y sin esta guarda el `pending` del plan nuevo le corta las funciones
+  // pagas a alguien que acaba de intentar pagarnos mas.
+  //
+  // Solo `pending`. `paused` y `cancelled` SI bajan el derecho: ahi MP dijo
+  // algo terminal sobre la suscripcion que el alumno tenia, no sobre una que
+  // esta naciendo.
+  if (
+    status === "pending" &&
+    statusPrevio !== undefined &&
+    athleteStatusOtorga(statusPrevio as AthleteStatus)
+  ) {
+    logger.info("mp/reconcile: `pending` que no pisa un derecho vigente", {
+      planId,
+      uid,
+      producto: "athlete",
+      statusPrevio,
+    });
+    return {
+      planId,
+      outcome: "skipped-pending-no-pisa",
+      uid,
+      producto: "athlete",
+      status,
+    };
+  }
+
+  const sinCambios = statusPrevio === athleteStatus;
+
+  if (!sinCambios) {
+    await userRef.set(
+      // UN SOLO CAMPO. Ver el encabezado — agregarle uno rompe el guard
+      // anti-loop de `athletePaywallInputChanged`.
+      { athleteSubscription: { status: athleteStatus } },
+      // `merge` y no `set` pelado: el documento de usuario tiene el perfil
+      // entero. Sin merge, reconciliar una suscripcion borraria la cuenta.
+      { merge: true },
+    );
+
+    logger.info("mp/reconcile: derecho del alumno actualizado", {
+      planId,
+      uid,
+      status,
+      athleteStatus,
+    });
+  }
+
+  // ── La fecha se guarda aunque el status NO haya cambiado ──
+  //
+  // Es lo que hace posible el flip `active → expired` del dia que vence el
+  // periodo. Colgarla del `if (!sinCambios)` seria un bug de la misma familia
+  // que el del `terminal`: el caso normal de una baja es status `cancelled`
+  // con derecho `active` y fecha nueva, y si esa fecha no se persiste, el
+  // barrido no tiene contra que comparar.
+  if (periodEnd !== null && !mismaFecha(periodEnd, planDoc?.currentPeriodEnd)) {
+    await planRef.set({ currentPeriodEnd: periodEnd }, { merge: true });
+  }
+
+  // ── ⚠️ `terminal` SOLO cuando el derecho YA se apago ──
+  //
+  // El escritor del PF marca `terminal` apenas MP dice `cancelled`, y eso lo
+  // saca del barrido para siempre. Para el PF es inofensivo: su
+  // `currentPeriodEnd` vive en `users/{uid}.subscription` y
+  // `effectiveWeightLimit` la relee en cada corrida de `sweepEntitlements`, asi
+  // que el limite cae solo cuando la fecha pasa, sin que nadie escriba nada.
+  //
+  // **Para el alumno no existe ese mecanismo.** Su derecho es un string, y el
+  // unico que puede cambiarlo de `active` a `expired` es una ESCRITURA. La
+  // unica escritura que queda despues de la baja es la del barrido. Marcar
+  // `terminal` ahi lo saca del barrido, y el alumno que se dio de baja se queda
+  // con acceso **para siempre**.
+  //
+  // Por eso la condicion tiene dos partes: MP dijo `cancelled` **y** el periodo
+  // pago ya termino. Mientras siga corriendo, el plan se queda en el barrido —
+  // que es exactamente para lo que el barrido existe.
+  if (status === "cancelled" && athleteStatus === "expired") {
+    await planRef.set({ terminal: true }, { merge: true });
+  }
+
+  return {
+    planId,
+    outcome: sinCambios ? "unchanged" : "written",
+    uid,
+    producto: "athlete",
+    status,
+    athleteStatus,
+  };
+}
+
 export async function reconcileSubscription(
   app: App,
   planId: string,
@@ -764,31 +941,6 @@ export async function reconcileSubscription(
     return { planId, outcome: "skipped-uid-no-coincide" };
   }
 
-  // ── El camino del ALUMNO todavia no tiene escritor ──
-  //
-  // `mp_plans` es una sola coleccion para los dos productos, asi que desde que
-  // existe `createAthletePreapproval` este reconciliador puede recibir un plan
-  // de alumno — tanto por el webhook como por el barrido, que escanea la
-  // coleccion entera.
-  //
-  // Todo lo que viene DESPUES de esta linea escribe `users/{uid}.subscription`
-  // con un tier de entrenador. Correrlo sobre un alumno no seria un no-op: le
-  // escribiria un entitlement de PF, con el cupo de alumnos y todo. Por eso el
-  // corte esta aca arriba y no adentro del escritor.
-  //
-  // El escritor del alumno llega en el PR siguiente. Hasta entonces esto sale
-  // por un outcome propio y NO por `skipped-sin-plan`: el plan se entendio
-  // perfectamente, lo que falta es a donde escribirlo, y confundir las dos
-  // cosas en un log deja al que lo lea buscando un problema de mapeo.
-  if (mapping.producto !== "trainer") {
-    logger.info("mp/reconcile: plan de alumno — todavia sin escritor", {
-      planId,
-      uid,
-      producto: mapping.producto,
-    });
-    return { planId, outcome: "skipped-producto-sin-escritor", uid };
-  }
-
   const { status, degraded } = mapMpStatus({
     raw: mp.status,
     cobroPendiente: hayCobroPendiente(mp.summarized),
@@ -801,9 +953,42 @@ export async function reconcileSubscription(
     logger.error("mp/reconcile: estado de MP ininteligible — NO se escribe", {
       planId,
       uid,
+      producto: mapping.producto,
       recibido: mp.status,
     });
-    return { planId, outcome: "skipped-degraded", uid, tier: mapping.tier };
+    return {
+      planId,
+      outcome: "skipped-degraded",
+      uid,
+      producto: mapping.producto,
+      ...(mapping.producto === "trainer" ? { tier: mapping.tier } : {}),
+    };
+  }
+
+  // ── EL CORTE POR PRODUCTO ──
+  //
+  // `mp_plans` es una sola coleccion para los dos, asi que este reconciliador
+  // recibe planes de alumno tanto por el webhook como por el barrido, que
+  // escanea la coleccion entera.
+  //
+  // Todo lo que viene DESPUES del corte escribe `users/{uid}.subscription` con
+  // un tier de entrenador. Correrlo sobre un alumno no seria un no-op: le
+  // escribiria un entitlement de PF, con cupo de alumnos y todo.
+  //
+  // El corte esta ACA y no antes de `mapMpStatus` porque los dos escritores
+  // necesitan `status` y `degraded`: son dos proyecciones del MISMO estado de
+  // MP, no dos lecturas distintas. Traducir dos veces seria la forma mas facil
+  // de que un dia digan cosas diferentes.
+  if (mapping.producto === "athlete") {
+    return escribirSuscripcionDeAlumno({
+      app,
+      planId,
+      uid,
+      mp,
+      status,
+      planDoc,
+      deps,
+    });
   }
 
   const userRef = getFirestore(app).collection("users").doc(uid);
@@ -852,6 +1037,7 @@ export async function reconcileSubscription(
         planId,
         outcome: "skipped-pending-no-pisa",
         uid,
+        producto: "trainer",
         tier: mapping.tier,
         status,
       };
@@ -933,6 +1119,7 @@ export async function reconcileSubscription(
     planId,
     outcome: sinCambios ? "unchanged" : "written",
     uid,
+    producto: "trainer",
     tier: mapping.tier,
     status,
     dadosDeBaja,
