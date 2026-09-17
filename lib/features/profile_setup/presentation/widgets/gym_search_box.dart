@@ -12,7 +12,7 @@ import 'gym_card.dart';
 /// Single search box replacing the two-step brand→sucursal picker (retired
 /// `GymBrand`/`gymBrandsProvider`/`branchesForBrandProvider`).
 ///
-/// Shared by `step_2_gym.dart` (onboarding) and `profile_gym_screen.dart`
+/// Shared by `step_3_gym.dart` (onboarding) and `profile_gym_screen.dart`
 /// (profile edit) per spec gym-catalog "Onboarding and profile-edit pickers
 /// share behavior" — both wrap this single widget so their search/loading/
 /// error/retry/no-gym behavior stays identical by construction.
@@ -49,7 +49,7 @@ class GymSearchBox extends ConsumerStatefulWidget {
   /// search query is empty. `null` (the default) preserves the original
   /// `SizedBox.shrink()` behavior — design gym-selection-v2 AD-10.
   ///
-  /// `step_2_gym.dart` (onboarding) omits this and stays byte-for-byte
+  /// `step_3_gym.dart` (onboarding) omits this and stays byte-for-byte
   /// unchanged; `profile_gym_screen.dart` passes the nearby-gyms list.
   final Widget? emptyQueryContent;
 

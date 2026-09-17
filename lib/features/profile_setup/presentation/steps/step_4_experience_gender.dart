@@ -12,8 +12,8 @@ import '../widgets/gender_chip.dart';
 
 /// Step 3: nivel de experiencia (3 cards) + género (3 chips).
 /// Mockup: `profile-setup-3.png`.
-class Step3ExperienceGender extends ConsumerWidget {
-  const Step3ExperienceGender({super.key});
+class Step4ExperienceGender extends ConsumerWidget {
+  const Step4ExperienceGender({super.key});
 
   // Labels y descripciones de los niveles de experiencia. Viven acá porque
   // el enum canónico (lib/features/profile/domain/experience_level.dart) no

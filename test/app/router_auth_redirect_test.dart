@@ -10,6 +10,13 @@ import 'package:treino/features/profile/application/user_providers.dart';
 import 'package:treino/features/profile/domain/user_profile.dart';
 import 'package:treino/features/profile/domain/user_role.dart';
 
+/// Fecha de nacimiento de un adulto.
+///
+/// Desde el gate de edad mínima, un perfil "completo" incluye `bornAt`: sin él
+/// `authRedirect` manda a `/birth-date`, que es exactamente lo que le pasa a
+/// una cuenta creada antes del requisito.
+final _adultBornAt = DateTime.utc(1990, 5, 20);
+
 class MockUser extends Mock implements User {}
 
 /// Helper — calls authRedirect with the given container and location.
@@ -42,6 +49,7 @@ UserProfile _athleteProfile() => UserProfile(
       uid: 'athlete-uid',
       email: 'athlete@example.com',
       displayName: 'sporty',
+      bornAt: _adultBornAt,
       role: UserRole.athlete,
       createdAt: _kDate,
       updatedAt: _kDate,
@@ -51,6 +59,7 @@ UserProfile _trainerIncomplete() => UserProfile(
       uid: 'trainer-uid',
       email: 'trainer@example.com',
       displayName: 'pf-mauro',
+      bornAt: _adultBornAt,
       role: UserRole.trainer,
       createdAt: _kDate,
       updatedAt: _kDate,
@@ -61,6 +70,7 @@ UserProfile _trainerComplete() => UserProfile(
       uid: 'trainer-uid',
       email: 'trainer@example.com',
       displayName: 'pf-mauro',
+      bornAt: _adultBornAt,
       role: UserRole.trainer,
       createdAt: _kDate,
       updatedAt: _kDate,
@@ -69,6 +79,43 @@ UserProfile _trainerComplete() => UserProfile(
       trainerMonthlyRate: 50000,
       trainerLocations: const [],
       trainerOffersOnline: true,
+    );
+
+/// Cuenta creada ANTES del requisito de edad: tiene displayName (pasó
+/// ProfileSetup en su momento) y NO tiene bornAt. Es el caso exacto que existe
+/// para cubrir el gate — toda la base de usuarios el día del deploy.
+UserProfile _athletePreAgeGate() => UserProfile(
+      uid: 'athlete-uid',
+      email: 'athlete@example.com',
+      displayName: 'sporty',
+      role: UserRole.athlete,
+      createdAt: _kDate,
+      updatedAt: _kDate,
+    );
+
+/// Cuenta con una fecha POR DEBAJO del piso ya persistida. No es hipotética:
+/// `bornAt` existía como campo opcional editable desde el perfil antes de que
+/// hubiera edad mínima.
+UserProfile _athleteUnderMinAge() => UserProfile(
+      uid: 'athlete-uid',
+      email: 'athlete@example.com',
+      displayName: 'sporty',
+      bornAt: DateTime.utc(DateTime.now().year - 10, 1, 1),
+      role: UserRole.athlete,
+      createdAt: _kDate,
+      updatedAt: _kDate,
+    );
+
+/// PF con el perfil comercial incompleto Y sin fecha. Fija el ORDEN de los dos
+/// gates: el legal primero.
+UserProfile _trainerIncompletePreAgeGate() => UserProfile(
+      uid: 'trainer-uid',
+      email: 'trainer@example.com',
+      displayName: 'pf-mauro',
+      role: UserRole.trainer,
+      createdAt: _kDate,
+      updatedAt: _kDate,
+      trainerBio: null,
     );
 
 UserProfile _trainerNoDisplayName() => UserProfile(
@@ -241,5 +288,105 @@ void main() {
         );
       },
     );
+  });
+  // ────────────────────────────────────────────────────────────────────────
+  // Gate de edad mínima (bornAt) — cuentas preexistentes
+  // ────────────────────────────────────────────────────────────────────────
+  group('gate de edad mínima (bornAt)', () {
+    Future<ProviderContainer> ready(UserProfile profile) async {
+      final c = _loggedInContainer(profile: profile);
+      addTearDown(c.dispose);
+      await c.read(authNotifierProvider.future);
+      await c.read(userProfileProvider.future);
+      return c;
+    }
+
+    test('cuenta preexistente sin bornAt + /home → /birth-date', () async {
+      final c = await ready(_athletePreAgeGate());
+      expect(callRedirect(c, '/home'), equals('/birth-date'));
+    });
+
+    test('ya en /birth-date no vuelve a redirigir (self-skip)', () async {
+      final c = await ready(_athletePreAgeGate());
+      expect(callRedirect(c, '/birth-date'), isNull);
+    });
+
+    test('con bornAt cargado el gate no dispara', () async {
+      final c = await ready(_athleteProfile());
+      expect(callRedirect(c, '/home'), isNull);
+    });
+
+    test('sin displayName gana ProfileSetup, no el gate de edad', () async {
+      // Orden: una cuenta que nunca completó el alta va al flow, que YA pide la
+      // fecha en su paso 2. Mandarla al gate primero la dejaría sin username.
+      final c = await ready(_trainerNoDisplayName());
+      expect(callRedirect(c, '/home'), equals('/profile-setup'));
+    });
+
+    test('el gate de edad corre ANTES del de trainer incompleto', () async {
+      final c = await ready(_trainerIncompletePreAgeGate());
+      expect(
+        callRedirect(c, '/home'),
+        equals('/birth-date'),
+        reason: 'la edad es un requisito legal; el onboarding comercial '
+            'del PF puede esperar',
+      );
+    });
+
+    test('una fecha de menor de 16 YA persistida también cae en el gate',
+        () async {
+      // Sin mirar el validador (sólo `bornAt == null`), esta cuenta pasa el
+      // gate y se come un permission-denied opaco en su PRIMERA escritura: las
+      // rules validan el piso en todo update, no sólo en el create.
+      final c = await ready(_athleteUnderMinAge());
+      expect(callRedirect(c, '/home'), equals('/birth-date'));
+    });
+
+    test('las rutas públicas no las secuestra el gate', () async {
+      final c = await ready(_athletePreAgeGate());
+      expect(
+        callRedirect(c, '/login'),
+        isNot(equals('/birth-date')),
+        reason: 'mismo contrato que el gate de trainer incompleto',
+      );
+    });
+
+    // ── EL TEST QUE JUSTIFICA TODO EL DISEÑO ──────────────────────────────
+    //
+    // La solución obvia —sumar `bornAt == null` a la condición de displayName
+    // de arriba— produce un LOOP DE REDIRECT INFINITO: la cuenta vieja tiene
+    // displayName, así que el bloque "onboarding-completo" la saca de
+    // /profile-setup de vuelta a /home, y /home la manda de nuevo a
+    // /profile-setup. Iteramos el redirect como lo haría go_router y exigimos
+    // que llegue a un punto fijo sin repetir destino.
+    test('el redirect llega a un punto fijo — no hay loop', () async {
+      final c = await ready(_athletePreAgeGate());
+
+      var location = '/home';
+      final visited = <String>[location];
+      for (var i = 0; i < 10; i++) {
+        final next = callRedirect(c, location);
+        if (next == null) break;
+        expect(
+          visited,
+          isNot(contains(next)),
+          reason: 'ciclo de redirect: ${visited.join(" → ")} → $next',
+        );
+        visited.add(next);
+        location = next;
+      }
+
+      expect(location, equals('/birth-date'));
+      expect(callRedirect(c, location), isNull,
+          reason: 'el destino final no puede volver a redirigir');
+    });
+
+    test('/profile-setup NO es destino de una cuenta preexistente', () async {
+      // El otro lado de la moneda del loop: si esto volviera a ser
+      // /profile-setup, el paso 1 le pediría el username a alguien que ya lo
+      // tiene, y el chequeo de disponibilidad lo rechazaría contra sí mismo.
+      final c = await ready(_athletePreAgeGate());
+      expect(callRedirect(c, '/home'), isNot(equals('/profile-setup')));
+    });
   });
 }

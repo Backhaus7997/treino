@@ -13,13 +13,14 @@ import '../../profile/application/user_providers.dart';
 import '../application/profile_setup_notifier.dart';
 import '../application/profile_setup_providers.dart';
 import 'steps/step_1_username_avatar.dart';
-import 'steps/step_2_gym.dart';
-import 'steps/step_3_experience_gender.dart';
-import 'steps/step_4_weight_height.dart';
+import 'steps/step_2_born_at.dart';
+import 'steps/step_3_gym.dart';
+import 'steps/step_4_experience_gender.dart';
+import 'steps/step_5_weight_height.dart';
 import 'widgets/profile_setup_footer.dart';
 import 'widgets/profile_setup_header.dart';
 
-/// Shell del flow ProfileSetup. Renderiza header + PageView con los 4 steps +
+/// Shell del flow ProfileSetup. Renderiza header + PageView con los 5 steps +
 /// footer con VOLVER + SIGUIENTE/EMPEZAR. El PageView se sincroniza con el
 /// `currentStep` del notifier.
 class ProfileSetupFlow extends ConsumerStatefulWidget {
@@ -36,6 +37,7 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
   // so they stay correct under large OS text scaling and odd viewports (F4).
   static const List<String> _titles = [
     '¿CÓMO TE LLAMÁS?',
+    '¿CUÁNDO NACISTE?',
     '¿DÓNDE ENTRENÁS?',
     'NIVEL DE EXPERIENCIA',
     'PESO Y ALTURA',
@@ -229,9 +231,10 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
                       physics: const NeverScrollableScrollPhysics(),
                       children: const [
                         Step1UsernameAvatar(),
-                        Step2Gym(),
-                        Step3ExperienceGender(),
-                        Step4WeightHeight(),
+                        Step2BornAt(),
+                        Step3Gym(),
+                        Step4ExperienceGender(),
+                        Step5WeightHeight(),
                       ],
                     ),
                   ),

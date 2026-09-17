@@ -7,7 +7,7 @@
 // pumping the real 300/600ms window.
 //
 // Drives the shared GymSearchBox widget directly — the single search box
-// that step_2_gym.dart and profile_gym_screen.dart both wrap. Covers spec
+// that step_3_gym.dart and profile_gym_screen.dart both wrap. Covers spec
 // gym-catalog "Athlete gym selection is a single debounced search": type ->
 // debounced suggestions, tap -> selection callback, kNoGymId option,
 // loading/error+retry/empty-results states, and works without location

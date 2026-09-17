@@ -78,6 +78,8 @@ import '../features/profile/presentation/profile_routines_screen.dart';
 // route was removed as part of the PR#4 pivot. Settings surface deferred until
 // real settings content exists (notifications/theme/language).
 import '../features/profile/profile_screen.dart';
+import '../features/profile_setup/presentation/birth_date_gate_screen.dart';
+import '../features/profile_setup/domain/profile_setup_validators.dart';
 import '../features/profile_setup/presentation/profile_setup_flow.dart';
 import '../features/workout/workout_screen.dart';
 import 'theme/app_background.dart';
@@ -98,6 +100,15 @@ final GlobalKey<NavigatorState> _shellNavigatorKey =
     GlobalKey<NavigatorState>(debugLabel: 'ShellNav');
 
 /// Routes that are public (no redirect when anonymous).
+/// Gate de edad mínima para cuentas preexistentes. Ver [BirthDateGateScreen].
+///
+/// Deliberadamente NO cuelga de `/profile-setup`: `isProfileSetup` se calcula
+/// con `startsWith`, así que un `/profile-setup/...` entraría al bloque
+/// "onboarding-completo" de abajo y rebotaría a `/home` en el mismo frame.
+/// Tampoco cuelga de `/profile`, que vive dentro del shell de 5 tabs y dejaría
+/// la barra inferior a mano para saltearse el gate.
+const _birthDateRoute = '/birth-date';
+
 const _publicRoutes = {
   '/splash',
   '/welcome',
@@ -179,6 +190,36 @@ String? authRedirect(
     final profile = profileAsync.valueOrNull;
     if (profile == null || profile.displayName == null) {
       return '/profile-setup';
+    }
+
+    // Gate de edad mínima (bornAt) — cuentas que YA existían cuando se
+    // introdujo el requisito y nunca declararon su fecha de nacimiento.
+    //
+    // Va como rama PROPIA y NO sumando `bornAt == null` al chequeo de
+    // displayName de arriba. Ese atajo produce un LOOP DE REDIRECT INFINITO
+    // para toda la base de usuarios existente el día del deploy: una cuenta
+    // vieja tiene displayName cargado, así que el bloque "onboarding-completo"
+    // de más abajo la saca de /profile-setup en cuanto entra, /home la vuelve a
+    // mandar, y así. El bloque de abajo no se puede borrar — existe para
+    // resolver una carrera contra el stream del perfil (ver su comentario).
+    //
+    // El otro motivo para una pantalla propia: el paso 1 de ProfileSetup
+    // verifica que el username esté libre, y el de una cuenta vieja está
+    // tomado POR ELLA MISMA.
+    //
+    // Fires ANTES del gate de trainer-incompleto: es un requisito legal, y el
+    // onboarding comercial del PF puede esperar un minuto más. Self-skip con
+    // startsWith, mismo idiom que el gate de abajo, para no auto-rebotarse.
+    // Dispara si la fecha FALTA **o si no llega al piso**, y lo segundo no es
+    // hipotético: `bornAt` existía como campo opcional editable desde el perfil
+    // desde antes de este requisito, así que puede haber cuentas con una fecha
+    // de menor de 16 ya persistida. Sin mirar el validador, esas cuentas pasan
+    // el gate y se comen un permission-denied opaco en su PRIMERA escritura —
+    // las rules validan el piso en TODO update, no sólo en el create.
+    if (!isPublic &&
+        ProfileSetupValidators.validateBornAt(profile.bornAt) != null &&
+        !location.startsWith(_birthDateRoute)) {
+      return _birthDateRoute;
     }
 
     // ADR-TPO-003: trainer-incomplete onboarding gate.
@@ -349,6 +390,14 @@ GoRouter buildRouter({
       GoRoute(
         path: '/profile-setup',
         pageBuilder: (_, __) => _noAnim(const ProfileSetupFlow()),
+      ),
+
+      // Gate de edad mínima para cuentas preexistentes. Fullscreen, sin
+      // bottom bar — igual que /profile-setup, y por el mismo motivo: es un
+      // gate, no una pantalla a la que se navega.
+      GoRoute(
+        path: _birthDateRoute,
+        pageBuilder: (_, __) => _noAnim(const BirthDateGateScreen()),
       ),
 
       // Estado degradado "autenticado pero sin perfil accesible" (#544).

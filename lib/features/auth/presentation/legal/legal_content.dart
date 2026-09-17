@@ -16,7 +16,7 @@ class LegalSection {
 }
 
 /// Fecha de última actualización de los Términos y Condiciones.
-const String kTermsLastUpdated = '12 de junio de 2026';
+const String kTermsLastUpdated = '17 de septiembre de 2026';
 
 /// Fecha de última actualización de la Política de Privacidad.
 ///
@@ -26,7 +26,7 @@ const String kTermsLastUpdated = '12 de junio de 2026';
 /// política fechada en junio, o le inventaba a los Términos una revisión que
 /// nunca tuvieron. Las dos opciones mienten sobre qué texto estaba vigente
 /// cuándo, que es justo lo que una fecha de revisión existe para contestar.
-const String kPrivacyLastUpdated = '3 de septiembre de 2026';
+const String kPrivacyLastUpdated = '17 de septiembre de 2026';
 
 /// Versión de los Términos y Condiciones vigentes, para evidencia de
 /// aceptación (`UserProfile.acceptedTermsVersion`).
@@ -34,13 +34,13 @@ const String kPrivacyLastUpdated = '3 de septiembre de 2026';
 /// Entero monotónico, independiente de [kPrivacyVersion] — bumpear uno de
 /// los dos documentos NUNCA obliga a tocar el otro; son textos legales
 /// separados que cambian en momentos distintos.
-const int kTermsVersion = 1;
+const int kTermsVersion = 2;
 
 /// Versión de la Política de Privacidad vigente, para evidencia de
 /// aceptación (`UserProfile.acceptedPrivacyVersion`).
 ///
 /// Independiente de [kTermsVersion] — ver ese dartdoc.
-const int kPrivacyVersion = 1;
+const int kPrivacyVersion = 2;
 
 /// Fecha, machine-comparable (UTC), en la que el texto de la Política de
 /// Privacidad identificado por [kPrivacyVersion] entró en vigencia.
@@ -93,8 +93,13 @@ const List<LegalSection> kTermsSections = <LegalSection>[
     '4. Tu cuenta',
     'Podés registrarte con email, Google o Apple. Sos responsable de mantener la '
         'confidencialidad de tus credenciales y de toda la actividad de tu '
-        'cuenta. Debés tener al menos 16 años, o contar con el consentimiento de '
-        'una persona adulta responsable. Los datos que cargás deben ser veraces.',
+        'cuenta. Debés tener 16 años cumplidos: no admitimos cuentas de personas '
+        'que no hayan alcanzado esa edad. Al crear la cuenta te pedimos tu fecha '
+        'de nacimiento, y es un dato obligatorio. Si tenés 16 o 17 años seguís '
+        'siendo menor para la ley argentina, así que necesitás que tu madre, '
+        'padre o representante legal lea estos Términos, la Política de '
+        'Privacidad y el Descargo Médico, y dé su consentimiento antes de que '
+        'uses la aplicación. Los datos que cargás deben ser veraces.',
   ),
   LegalSection(
     '5. Entrenadores (PFs)',
@@ -162,12 +167,17 @@ const List<LegalSection> kTermsSections = <LegalSection>[
 const List<LegalSection> kPrivacySections = <LegalSection>[
   LegalSection(
     '1. Qué datos recolectamos',
-    'Recolectamos: datos de tu cuenta (email, nombre de usuario y foto/avatar si '
-        'la cargás); tus datos de entrenamiento (rutinas, sesiones, pesos, '
-        'progreso); tu ubicación, solo si la activás y con el alcance que '
-        'explica la sección Ubicación; datos de uso y '
+    'Recolectamos: datos de tu cuenta (email, nombre de usuario, tu fecha de '
+        'nacimiento y foto/avatar si la cargás); tus datos de entrenamiento '
+        '(rutinas, sesiones, pesos, progreso); tu ubicación, solo si la activás '
+        'y con el alcance que explica la sección Ubicación; datos de uso y '
         'analítica para mejorar la app; y datos técnicos básicos de tu '
-        'dispositivo.',
+        'dispositivo.\n\n'
+        'La fecha de nacimiento es obligatoria, y es el único dato de esta lista '
+        'que no te pedimos para prestarte el servicio sino para cumplir la ley: '
+        'con ella verificamos la edad mínima de 16 años. No se muestra a nadie, '
+        'no se usa con ningún otro fin, y no se comparte con tu entrenador salvo '
+        'que vos actives compartir tu perfil.',
   ),
   LegalSection(
     '2. Para qué los usamos',

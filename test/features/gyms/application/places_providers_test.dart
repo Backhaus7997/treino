@@ -82,7 +82,7 @@ void main() {
     });
 
     // `select` DEBE devolver el resultado, no dejarlo solo en el estado del
-    // provider. Step2Gym lo necesita así porque leer `ref` después del await
+    // provider. Step3Gym lo necesita así porque leer `ref` después del await
     // tira "Cannot use ref after the widget was disposed" si la pantalla se
     // desmontó con la operación en vuelo — y eso trababa el onboarding en el
     // paso del gimnasio sin ningún mensaje.

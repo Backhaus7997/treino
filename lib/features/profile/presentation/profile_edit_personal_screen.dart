@@ -16,6 +16,8 @@ import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../auth/application/auth_providers.dart';
 import '../../profile_setup/application/profile_setup_providers.dart';
+import '../../profile_setup/domain/profile_setup_validators.dart';
+import '../../profile_setup/presentation/widgets/born_at_field.dart';
 import '../application/user_providers.dart';
 import '../domain/experience_level.dart';
 import '../domain/gender.dart';
@@ -163,26 +165,30 @@ class _ProfileEditPersonalScreenState
     return null;
   }
 
-  /// Opens a date picker bounded to a plausible birth-date range (no future
-  /// dates). Stored as a date-only UTC value.
+  /// Abre el date picker compartido con el alta (`pickBornAt`) y guarda la
+  /// fecha ya normalizada a fecha-only UTC.
+  ///
+  /// Comparte el helper con `Step2BornAt` a propósito: si cada pantalla armara
+  /// su propio `showDatePicker`, los límites del calendario podrían divergir y
+  /// la misma persona podría o no cargar su fecha real según por dónde entró.
   Future<void> _pickBornAt() async {
     if (_isBusy) return;
-    final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedBornAt ?? DateTime(now.year - 25, 1, 1),
-      firstDate: DateTime(1920),
-      lastDate: now,
-      helpText: 'Fecha de nacimiento', // i18n: Fase 6 Etapa 3
-    );
+    final picked = await pickBornAt(context, _selectedBornAt);
     if (picked != null && mounted) {
-      setState(() => _selectedBornAt =
-          DateTime.utc(picked.year, picked.month, picked.day));
+      setState(() => _selectedBornAt = picked);
     }
   }
 
-  String _formatBornAt(DateTime d) => '${d.day.toString().padLeft(2, '0')}/'
-      '${d.month.toString().padLeft(2, '0')}/${d.year}';
+  /// Error de edad de la fecha elegida, o `null` si es válida.
+  ///
+  /// `null` en el campo NO es error acá, a diferencia del alta: a esta pantalla
+  /// se llega con el perfil ya completo, y de una cuenta sin fecha se encarga el
+  /// gate del router (`/birth-date`) antes de que llegue hasta acá. Bloquear la
+  /// edición del teléfono por una fecha ausente sería castigar al usuario por un
+  /// estado que no puede resolver desde esta pantalla.
+  String? get _bornAtError => _selectedBornAt == null
+      ? null
+      : ProfileSetupValidators.validateBornAt(_selectedBornAt);
 
   /// True while an avatar upload or Firestore update is in flight.
   /// Used to gate the save handler, the header back-tap, the system back
@@ -230,6 +236,17 @@ class _ProfileEditPersonalScreenState
   Future<void> _save() async {
     if (_isBusy) return; // re-entrancy guard — a save is already in flight
     if (!(_formKey.currentState?.validate() ?? false)) return;
+    // El gate de edad, ANTES de escribir. El campo de fecha no es un
+    // `TextFormField` y por lo tanto NO cuelga del `_formKey`: se escapaba
+    // entero del `validate()` de la línea de arriba, así que
+    // una fecha de menor de 16 viajaba a Firestore, las rules la denegaban, y
+    // la pantalla mostraba "No pudimos guardar… Probá de nuevo" sobre algo que
+    // reintentar NUNCA iba a arreglar. Es exactamente el rechazo-que-la-UI-no-
+    // sabe-explicar contra el que advierte el comentario de `bornAtOk`.
+    if (_bornAtError != null) {
+      setState(() {}); // repinta el campo con el error a la vista
+      return;
+    }
 
     _setSaveState(_SaveState.saving);
 
@@ -597,14 +614,11 @@ class _ProfileEditPersonalScreenState
                       label: 'FECHA DE NACIMIENTO', // i18n: Fase 6 Etapa 3
                       palette: palette),
                   const SizedBox(height: 8),
-                  _DateField(
+                  BornAtField(
                     key: const Key('edit_personal_born_at_field'),
-                    formatted: _selectedBornAt == null
-                        ? null
-                        : _formatBornAt(_selectedBornAt!),
-                    hint: 'DD/MM/AAAA', // i18n: Fase 6 Etapa 3
+                    value: _selectedBornAt,
+                    errorText: _bornAtError,
                     onTap: _pickBornAt,
-                    palette: palette,
                   ),
                   const SizedBox(height: 18),
 
@@ -1122,54 +1136,6 @@ class _FieldLabel extends StatelessWidget {
         fontSize: 12,
         fontWeight: FontWeight.w700,
         letterSpacing: 1.4,
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Date field (tap to open the picker)
-// ---------------------------------------------------------------------------
-
-/// Tappable field that mimics the text-input styling: shows the formatted date,
-/// or a muted [hint] when empty. Opens the date picker on tap via [onTap].
-class _DateField extends StatelessWidget {
-  const _DateField({
-    super.key,
-    required this.formatted,
-    required this.hint,
-    required this.onTap,
-    required this.palette,
-  });
-
-  final String? formatted;
-  final String hint;
-  final VoidCallback onTap;
-  final AppPalette palette;
-
-  @override
-  Widget build(BuildContext context) {
-    final hasValue = formatted != null;
-    // TreinoTappable REEMPLAZA al GestureDetector pelado (campo bornAt): ya
-    // trae HitTestBehavior.opaque, swap conducta-equivalente.
-    return TreinoTappable(
-      onTap: onTap,
-      child: Container(
-        height: 46,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        decoration: BoxDecoration(
-          color: palette.bgCard,
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-          border: Border.all(color: palette.textMuted.withValues(alpha: 0.2)),
-        ),
-        alignment: Alignment.centerLeft,
-        child: Text(
-          hasValue ? formatted! : hint,
-          style: GoogleFonts.barlow(
-            color: hasValue ? palette.textPrimary : palette.textMuted,
-            fontSize: 14,
-          ),
-        ),
       ),
     );
   }

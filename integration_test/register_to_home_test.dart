@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Critical flow: a brand-new athlete signs up on /register (email + password +
 // Terms), gets routed to /profile-setup (because the freshly created
-// users/{uid} doc has displayName == null), completes the 4 onboarding steps,
+// users/{uid} doc has displayName == null), completes the 5 onboarding steps,
 // and the submit persists displayName → router's onboarding-complete gate
 // pushes them to /home. See lib/app/router.dart `authRedirect`.
 //
@@ -88,26 +88,38 @@ void main() {
     await tester.tap(find.text('SIGUIENTE'));
     await tester.pumpAndSettle();
 
-    // ── Step 2: gym ──────────────────────────────────────────────────────────
-    // TODO(seed/finder): Step2Gym gates `canGoNext` on a gym selection (search
+    // ── Step 2: fecha de nacimiento (gate de edad mínima) ────────────────────
+    // TODO(finder): Step2BornAt gates `canGoNext` on a date that passes
+    // `ProfileSetupValidators.validateBornAt` — tap the field
+    // (`profile_setup_born_at_field`) and drive the Material date picker to a
+    // date at or above the minimum age. Un SIGUIENTE pelado acá NO avanza.
+    await tester.tap(find.text('SIGUIENTE'));
+    await tester.pumpAndSettle();
+
+    // ── Step 3: gym ──────────────────────────────────────────────────────────
+    // TODO(seed/finder): Step3Gym gates `canGoNext` on a gym selection (search
     // + pick, or "entreno solo"). Drive the real selector here — e.g. tap the
     // "Entreno por mi cuenta / sin gimnasio" affordance so the step validates.
     await tester.tap(find.text('SIGUIENTE'));
     await tester.pumpAndSettle();
 
-    // ── Step 3: experience + gender ──────────────────────────────────────────
+    // ── Step 4: experience + gender ──────────────────────────────────────────
     // TODO(finder): tap one experience-level chip and one gender chip so
     // `canGoNext` turns true before advancing.
     await tester.tap(find.text('SIGUIENTE'));
     await tester.pumpAndSettle();
 
-    // ── Step 4: weight + height → submit ("EMPEZAR") ─────────────────────────
+    // ── Step 5: weight + height → submit ("EMPEZAR") ─────────────────────────
     // TODO(finder): enter weight + height in the two numeric fields; the last
     // step's primary button is labelled "EMPEZAR" and calls notifier.submit().
     await tester.tap(find.text('EMPEZAR'));
     await tester.pumpAndSettle(const Duration(seconds: 5));
 
     // Submit persisted displayName → onboarding-complete gate → /home.
+    //
+    // Ojo al tocar esto: el submit persiste displayName Y bornAt en la MISMA
+    // escritura, y de eso depende que no haya loop. Si alguna vez se separan,
+    // el gate de edad del router manda a /birth-date en lugar de a /home.
     expect(
       find.byType(HomeScreen),
       findsOneWidget,
