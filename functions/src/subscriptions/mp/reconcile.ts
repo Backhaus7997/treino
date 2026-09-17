@@ -186,6 +186,11 @@ export type ReconcileOutcome =
    */
   | "skipped-reemplazado"
   | "sin-suscripcion"
+  /**
+   * El plan cobra un producto que este reconciliador todavia no sabe escribir.
+   * Hoy: el del ALUMNO. Ver la guarda de producto mas abajo.
+   */
+  | "skipped-producto-sin-escritor"
   | "error-mp";
 
 export interface ReconcileResult {
@@ -757,6 +762,31 @@ export async function reconcileSubscription(
       { planId, mapeo: mapping.uid, externalReference: externo },
     );
     return { planId, outcome: "skipped-uid-no-coincide" };
+  }
+
+  // ── El camino del ALUMNO todavia no tiene escritor ──
+  //
+  // `mp_plans` es una sola coleccion para los dos productos, asi que desde que
+  // existe `createAthletePreapproval` este reconciliador puede recibir un plan
+  // de alumno — tanto por el webhook como por el barrido, que escanea la
+  // coleccion entera.
+  //
+  // Todo lo que viene DESPUES de esta linea escribe `users/{uid}.subscription`
+  // con un tier de entrenador. Correrlo sobre un alumno no seria un no-op: le
+  // escribiria un entitlement de PF, con el cupo de alumnos y todo. Por eso el
+  // corte esta aca arriba y no adentro del escritor.
+  //
+  // El escritor del alumno llega en el PR siguiente. Hasta entonces esto sale
+  // por un outcome propio y NO por `skipped-sin-plan`: el plan se entendio
+  // perfectamente, lo que falta es a donde escribirlo, y confundir las dos
+  // cosas en un log deja al que lo lea buscando un problema de mapeo.
+  if (mapping.producto !== "trainer") {
+    logger.info("mp/reconcile: plan de alumno — todavia sin escritor", {
+      planId,
+      uid,
+      producto: mapping.producto,
+    });
+    return { planId, outcome: "skipped-producto-sin-escritor", uid };
   }
 
   const { status, degraded } = mapMpStatus({

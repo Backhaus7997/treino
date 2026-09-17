@@ -287,7 +287,7 @@ export async function runCreatePreapproval(
   // El mapeo va PRIMERO, antes del doc de checkout: si algo falla despues, lo
   // que no se puede perder es de que plan es esta suscripcion. El checkout es
   // una comodidad; el mapeo es lo que hace reconciliable el cobro.
-  await recordPlan(app, planId, { uid, tier, cycle });
+  await recordPlan(app, planId, { producto: "trainer", uid, tier, cycle });
 
   await checkoutRef.set({
     planId,

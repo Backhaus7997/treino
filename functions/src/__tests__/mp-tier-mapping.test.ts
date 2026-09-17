@@ -64,6 +64,7 @@ import {
   recordPlan,
   tierFromAmount,
 } from "../subscriptions/mp/tier-mapping";
+import { ATHLETE_PRICES_ARS } from "../subscriptions/athlete-plan-config";
 import { TIER_PRICES_ARS } from "../subscriptions/tier-config";
 
 function fakeApp(seed: Record<string, Record<string, unknown>> = {}) {
@@ -132,7 +133,8 @@ describe("tierFromAmount", () => {
   it("ida y vuelta: todo par se recupera desde su monto", () => {
     for (const tier of PAID_TIERS) {
       for (const cycle of CYCLES) {
-        expect(tierFromAmount(amountFor(tier, cycle))).toEqual({ tier, cycle });
+        expect(tierFromAmount(amountFor(tier, cycle)))
+          .toEqual({ producto: "trainer", uid: "", tier, cycle });
       }
     }
   });
@@ -162,12 +164,27 @@ describe("recordPlan", () => {
     const { app, store } = fakeApp();
 
     return recordPlan(app, "2c93", {
-      uid: "t1", tier: "plan2", cycle: "annual",
+      producto: "trainer", uid: "t1", tier: "plan2", cycle: "annual",
     }).then(() => {
       expect(store.mp_plans).toHaveProperty("2c93");
       expect((store.mp_plans as Record<string, unknown>)["2c93"])
-        .toMatchObject({ uid: "t1", tier: "plan2", cycle: "annual" });
+        .toMatchObject({
+          producto: "trainer", uid: "t1", tier: "plan2", cycle: "annual",
+        });
     });
+  });
+
+  it("un plan de ALUMNO se escribe SIEMPRE con su producto, y sin tier", async () => {
+    // Es lo que hace seguro el default de `lookupPlan`: si un documento de
+    // alumno pudiera quedar sin `producto`, el default lo leeria como plan de
+    // PF y el escritor del entrenador le pisaria el entitlement.
+    const { app, store } = fakeApp();
+
+    await recordPlan(app, "a1", { producto: "athlete", uid: "u1", cycle: "monthly" });
+
+    const doc = (store.mp_plans as Record<string, Record<string, unknown>>)["a1"];
+    expect(doc).toMatchObject({ producto: "athlete", uid: "u1", cycle: "monthly" });
+    expect(doc).not.toHaveProperty("tier");
   });
 });
 
@@ -181,7 +198,7 @@ describe("lookupPlan", () => {
 
     // Se le pasa un monto de plan1 a proposito: el documento tiene que ganar.
     expect(await lookupPlan(app, "2c93", 12000)).toEqual({
-      uid: "t1", tier: "plan3", cycle: "annual",
+      producto: "trainer", uid: "t1", tier: "plan3", cycle: "annual",
     });
     expect(warnSpy).not.toHaveBeenCalled();
   });
@@ -193,7 +210,9 @@ describe("lookupPlan", () => {
 
     const r = await lookupPlan(app, "2c93", 22000);
 
-    expect(r).toEqual({ uid: "", tier: "plan2", cycle: "monthly" });
+    expect(r).toEqual({
+      producto: "trainer", uid: "", tier: "plan2", cycle: "monthly",
+    });
     expect(warnSpy).toHaveBeenCalledTimes(1);
     expect(warnSpy.mock.calls[0][0]).toContain("derivado del monto");
   });
@@ -229,7 +248,9 @@ describe("lookupPlan", () => {
 
       const r = await lookupPlan(app, "2c93", 12000);
 
-      expect(r).toEqual({ uid: "", tier: "plan1", cycle: "monthly" });
+      expect(r).toEqual({
+        producto: "trainer", uid: "", tier: "plan1", cycle: "monthly",
+      });
       expect(warnSpy).toHaveBeenCalled();
       expect(warnSpy.mock.calls[0][0]).toContain("ilegible");
     });
@@ -241,5 +262,76 @@ describe("lookupPlan", () => {
     });
 
     expect(await lookupPlan(app, "2c93")).toBeNull();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // El discriminador `producto`, agregado el 2026-09-17.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  it("un documento SIN `producto` se lee como del PF — son los de produccion", async () => {
+    // EL test que importa de todo este bloque. `producto` no existia hasta hoy,
+    // asi que ningun plan de PF que este cobrando en produccion lo tiene. Si el
+    // default fuera `athlete`, o si la ausencia del campo hiciera fallar la
+    // validacion, el primer deploy dejaria de acreditarle el pago a todos los
+    // PF que ya pagan.
+    const { app } = fakeApp({
+      mp_plans: { viejo: { uid: "t1", tier: "plan2", cycle: "monthly" } },
+    });
+
+    expect(await lookupPlan(app, "viejo", 22000)).toEqual({
+      producto: "trainer", uid: "t1", tier: "plan2", cycle: "monthly",
+    });
+    // Y sin caer al fallback por monto: el documento se entendio entero.
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it("un documento de ALUMNO se lee como tal, y no necesita tier", async () => {
+    const { app } = fakeApp({
+      mp_plans: { a1: { producto: "athlete", uid: "u1", cycle: "annual" } },
+    });
+
+    expect(await lookupPlan(app, "a1")).toEqual({
+      producto: "athlete", uid: "u1", cycle: "annual",
+    });
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it("un `producto` basura NO se acepta como alumno — cae a PF y se valida", async () => {
+    // El default es `trainer` para todo lo que no diga exactamente "athlete".
+    // Un valor raro no puede abrirle la puerta al camino del alumno.
+    const { app } = fakeApp({
+      mp_plans: { x: { producto: "ATHLETE", uid: "t1", tier: "plan1", cycle: "monthly" } },
+    });
+
+    expect(await lookupPlan(app, "x")).toEqual({
+      producto: "trainer", uid: "t1", tier: "plan1", cycle: "monthly",
+    });
+  });
+});
+
+describe("el indice de montos cubre los DOS productos", () => {
+  it("los montos del alumno se recuperan como plan de alumno", () => {
+    for (const cycle of CYCLES) {
+      expect(tierFromAmount(ATHLETE_PRICES_ARS[cycle])).toEqual({
+        producto: "athlete", uid: "", cycle,
+      });
+    }
+  });
+
+  it("ningun monto del alumno coincide con uno del PF", () => {
+    // La restriccion esta escrita en `athlete-plan-config.ts` y la hace cumplir
+    // el throw de BY_AMOUNT al importar el modulo. Este test la dice en voz
+    // alta: si alguien cambia el precio del alumno a 12.000, el mensaje de
+    // error del import no explica QUE regla rompio, y este si.
+    const delPf = new Set(
+      PAID_TIERS.flatMap((t) => CYCLES.map((c) => amountFor(t, c))),
+    );
+    for (const cycle of CYCLES) {
+      expect(delPf.has(ATHLETE_PRICES_ARS[cycle])).toBe(false);
+    }
+  });
+
+  it("el anual del alumno son diez meses, derivado y no escrito a mano", () => {
+    expect(ATHLETE_PRICES_ARS.annual).toBe(ATHLETE_PRICES_ARS.monthly * 10);
   });
 });
