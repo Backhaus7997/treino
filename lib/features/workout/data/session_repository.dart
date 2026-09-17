@@ -23,6 +23,38 @@ import '../domain/set_log.dart';
 import '../application/session_duration.dart';
 import '../domain/set_log_identity.dart';
 
+/// Una serie ya escrita LOCALMENTE, con la confirmación del servidor aparte.
+///
+/// Existe porque en Firestore esas son DOS cosas distintas y el código las
+/// trataba como una sola. La escritura se aplica al cache del teléfono de
+/// inmediato —y `.snapshots()` emite por compensación de latencia—, pero el
+/// future de `set()` **no completa hasta que el servidor confirma**. Sin red no
+/// completa nunca.
+///
+/// Mientras `addSetLog` devolvía un `Future<SetLog>` pelado, el único que
+/// tenía el id era ese future, así que quien lo necesitaba quedaba obligado a
+/// esperar al servidor para seguir. Eso es lo que colgaba a `logSet` sin
+/// conexión y le dejaba el guard anti doble-tap trabado en `true`.
+///
+/// El tipo ahora dice la verdad: [setLog] está disponible sin red, y
+/// [acknowledged] es una promesa aparte que el que la quiera espera y el que
+/// no, no. Un `await` de más sobre [acknowledged] vuelve a colgar el camino:
+/// es deliberado que haya que escribirlo.
+class LoggedSet {
+  const LoggedSet({required this.setLog, required this.acknowledged});
+
+  /// La serie con su id definitivo. Se resuelve sin tocar la red: `doc()`
+  /// genera el id en el cliente.
+  final SetLog setLog;
+
+  /// Completa cuando el servidor confirmó la escritura.
+  ///
+  /// **Sin red no completa nunca** — no falla, queda pendiente y Firestore la
+  /// sincroniza cuando vuelve. Falla sólo ante un error real (permisos, por
+  /// ejemplo). No la esperes en el camino crítico.
+  final Future<void> acknowledged;
+}
+
 class SessionRepository {
   SessionRepository({
     required FirebaseFirestore firestore,
@@ -570,7 +602,7 @@ class SessionRepository {
   /// El teléfono NO pasa a usar ids determinísticos para sus propias series: al
   /// borrar una serie renumera las siguientes, y eso obligaría a mover documentos
   /// (HANDOFF §4.3). Solo ADOPTA el id del reloj cuando el reloj llegó primero.
-  Future<SetLog> addSetLog({
+  Future<LoggedSet> addSetLog({
     required String uid,
     required String sessionId,
     required SetLog setLog,
@@ -611,14 +643,20 @@ class SessionRepository {
       // devuelve es el del reloj, para que un `updateSet`/`removeSet` posterior
       // apunte al documento que existe y no a uno inventado.
       final adopted = setLog.copyWith(id: watchDocId);
-      await watchRef.set(adopted.toJson());
-      return adopted;
+      // Sin `await`: el id ya lo tenemos y la serie tiene que poder seguir su
+      // camino sin red. La confirmación viaja aparte, en `acknowledged`.
+      return LoggedSet(
+        setLog: adopted,
+        acknowledged: watchRef.set(adopted.toJson()),
+      );
     }
 
     final ref = _setLogs(uid, sessionId).doc();
     final withId = setLog.copyWith(id: ref.id);
-    await ref.set(withId.toJson());
-    return withId;
+    return LoggedSet(
+      setLog: withId,
+      acknowledged: ref.set(withId.toJson()),
+    );
   }
 
   // ─── addSetLogFromWatch ─────────────────────────────────────────────────

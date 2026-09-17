@@ -1,6 +1,7 @@
 // Fábricas de stubs para tests de application layer.
 // Centralizadas acá para evitar duplicación entre archivos de test.
 
+import 'package:treino/features/workout/data/session_repository.dart';
 import 'package:treino/features/workout/domain/routine.dart';
 import 'package:treino/features/workout/domain/routine_day.dart';
 import 'package:treino/features/workout/domain/routine_slot.dart';
@@ -138,4 +139,16 @@ Routine makeRoutine({
       estimatedMinutesPerDay: estimatedMinutesPerDay,
       imageUrl: imageUrl,
       numWeeks: numWeeks,
+    );
+
+/// Una serie ya escrita localmente, con su confirmación ya resuelta.
+///
+/// El default de [acknowledged] es un future YA completado: la mayoría de los
+/// tests no le interesa la segunda fase y no deberían tener que pensarla. Para
+/// simular el offline —el ACK que no llega nunca— se pasa
+/// `acknowledged: Completer<void>().future`.
+LoggedSet makeLoggedSet({SetLog? setLog, Future<void>? acknowledged}) =>
+    LoggedSet(
+      setLog: setLog ?? makeSetLog(),
+      acknowledged: acknowledged ?? Future<void>.value(),
     );

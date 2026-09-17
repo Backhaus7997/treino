@@ -211,13 +211,17 @@ void main() {
             startedAt: any(named: 'startedAt'),
             dayNumber: any(named: 'dayNumber'),
           )).thenAnswer((_) async => makeSession());
-      // addSetLog returns the SetLog it was given (so the persisted id is kept).
+      // addSetLog devuelve el SetLog que recibió (así se conserva el id
+      // persistido) con la confirmación del servidor ya resuelta: este test no
+      // ejercita el camino sin conexión.
       when(() => repo.addSetLog(
             uid: any(named: 'uid'),
             sessionId: any(named: 'sessionId'),
             setLog: any(named: 'setLog'),
           )).thenAnswer(
-        (inv) async => inv.namedArguments[const Symbol('setLog')] as SetLog,
+        (inv) async => makeLoggedSet(
+          setLog: inv.namedArguments[const Symbol('setLog')] as SetLog,
+        ),
       );
       when(() => repo.updateSetLog(
             uid: any(named: 'uid'),

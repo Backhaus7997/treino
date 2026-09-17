@@ -1,0 +1,271 @@
+// session_offline_log_test.dart — entrenar sin conexión.
+//
+// ─── El bug ─────────────────────────────────────────────────────────────────
+//
+// En Firestore, **un `await` sobre una escritura no resuelve hasta que el
+// servidor confirma**. Sin red ese future no completa NUNCA. La escritura sí
+// se aplica al cache local de inmediato, y por eso el `.snapshots()` de
+// `watchSetLogs` emite igual (compensación de latencia) — pero el `await`
+// queda colgado para siempre.
+//
+// `logSet` tomaba el guard anti doble-tap ANTES de ese `await`:
+//
+//     _isLoggingSet = true;
+//     try   { await repo.addSetLog(...); ... }
+//     finally { _isLoggingSet = false; }        // ← nunca corre sin red
+//
+// Sin conexión, el `try` no sale, el `finally` no corre, y la guarda de la
+// primera línea de `logSet` **descarta en silencio todas las series
+// siguientes**. Sin error, sin spinner que termine, sin nada.
+//
+// ─── El síntoma real NO es "no se puede loguear nada" ───────────────────────
+//
+// Esto importa para entender el bug y para no "arreglarlo" mirando el lugar
+// equivocado. La PRIMERA serie **se ve normal**: la escritura entra al cache,
+// el stream emite y el estado se actualiza. Es de la SEGUNDA en adelante que
+// la pantalla deja de responder, para siempre.
+//
+// O sea que el atleta no recibe ninguna señal de que algo se rompió. Marca la
+// serie 1, la ve tildarse, marca la 2 y no pasa nada. Y no va a pasar nada
+// nunca más en esa sesión.
+//
+// ─── Por qué el test no toca Firestore ──────────────────────────────────────
+//
+// `fake_cloud_firestore` no modela el offline: sus escrituras resuelven
+// siempre, así que ahí el bug es INVISIBLE. Lo que hay que reproducir no es
+// Firestore, es "el repositorio no contesta": se cuelga `addSetLog` con un
+// Completer, igual que `_gateFinish` en session_notifier_dispose_race_test.
+
+import 'dart:async';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:treino/features/workout/application/routine_providers.dart';
+import 'package:treino/features/workout/application/session_init.dart';
+import 'package:treino/features/workout/application/session_providers.dart';
+import 'package:treino/features/workout/data/session_repository.dart';
+import 'package:treino/features/workout/domain/routine.dart';
+import 'package:treino/features/workout/domain/set_log.dart';
+
+import 'stub_factories.dart';
+
+class _MockSessionRepository extends Mock implements SessionRepository {
+  @override
+  Stream<List<SetLog>> watchSetLogs({
+    required String uid,
+    required String sessionId,
+  }) =>
+      const Stream<List<SetLog>>.empty();
+
+  @override
+  Stream<bool> watchSessionFinished({
+    required String uid,
+    required String sessionId,
+  }) =>
+      const Stream<bool>.empty();
+}
+
+/// Una rutina de un ejercicio con cuatro series, para poder loguear varias.
+Routine _fourSetRoutine() => makeRoutine(
+      days: [
+        makeDay(slots: [makeSlot(exerciseId: 'e1', targetSets: 4)])
+      ],
+    );
+
+ProviderContainer _makeContainer(
+  _MockSessionRepository repo,
+  Routine routine,
+) {
+  return ProviderContainer(
+    overrides: [
+      sessionRepositoryProvider.overrideWithValue(repo),
+      currentUidProvider.overrideWithValue('u1'),
+      routineByIdProvider(routine.id).overrideWith((ref) async => routine),
+      sessionsByUidProvider('u1').overrideWith((ref) async => const []),
+    ],
+  );
+}
+
+/// Un repositorio EN MODO AVIÓN: contesta el id al instante y no confirma nunca.
+///
+/// Es el contrato real de Firestore sin red, y el que fija [LoggedSet]:
+/// `doc()` genera el id en el cliente —así que `setLog` está disponible sin
+/// tocar la red— mientras que el future de `set()` **queda pendiente para
+/// siempre**. No falla: queda colgado hasta que vuelve la conexión.
+///
+/// Por eso `acknowledged` acá es un `Completer` que nadie completa. Si alguien
+/// vuelve a meter ese future en el camino crítico de `logSet` —con un `await`,
+/// que es exactamente el bug que estos tests cierran— el notifier se cuelga y
+/// las aserciones de abajo se ponen rojas.
+///
+/// Devuelve la lista de series que el notifier alcanzó a mandarle al
+/// repositorio, que es lo que el bug perdía en silencio.
+List<SetLog> _gateAddSetLog(_MockSessionRepository repo) {
+  final recibidas = <SetLog>[];
+  when(() => repo.addSetLog(
+        uid: any(named: 'uid'),
+        sessionId: any(named: 'sessionId'),
+        setLog: any(named: 'setLog'),
+      )).thenAnswer((inv) {
+    final pedida = inv.namedArguments[#setLog] as SetLog;
+    recibidas.add(pedida);
+    return Future<LoggedSet>.value(
+      LoggedSet(
+        setLog: pedida.copyWith(
+          id: 'doc-${pedida.exerciseId}-${pedida.setNumber}',
+        ),
+        acknowledged: Completer<void>().future,
+      ),
+    );
+  });
+  return recibidas;
+}
+
+void main() {
+  setUpAll(() {
+    registerFallbackValue(makeSession());
+    registerFallbackValue(makeSetLog());
+  });
+
+  group('logSet sin conexión', () {
+    test(
+        'la serie 2 llega al repositorio aunque la 1 siga sin confirmarse '
+        '(el guard no se sostiene sobre el ACK del servidor)', () async {
+      final repo = _MockSessionRepository();
+      final routine = _fourSetRoutine();
+      when(() => repo.create(
+            uid: any(named: 'uid'),
+            routineId: any(named: 'routineId'),
+            routineName: any(named: 'routineName'),
+            startedAt: any(named: 'startedAt'),
+            dayNumber: any(named: 'dayNumber'),
+            weekNumber: any(named: 'weekNumber'),
+          )).thenAnswer((_) async => makeSession());
+      final recibidas = _gateAddSetLog(repo);
+
+      final container = _makeContainer(repo, routine);
+      addTearDown(container.dispose);
+
+      final init = FreshSession(routineId: routine.id, dayNumber: 1);
+      final sub = container.listen(
+        sessionNotifierProvider(init),
+        (_, __) {},
+        fireImmediately: true,
+      );
+      addTearDown(sub.close);
+      await container.read(sessionNotifierProvider(init).future);
+      final notifier = container.read(sessionNotifierProvider(init).notifier);
+
+      // OJO: sin `await`. Sin red este future no completa nunca, y esperarlo
+      // colgaría el test igual que cuelga a la app — que es justo el punto.
+      unawaited(notifier.logSet(makeSetLog(exerciseId: 'e1', setNumber: 1)));
+      await Future<void>.delayed(Duration.zero);
+
+      unawaited(notifier.logSet(makeSetLog(exerciseId: 'e1', setNumber: 2)));
+      await Future<void>.delayed(Duration.zero);
+
+      unawaited(notifier.logSet(makeSetLog(exerciseId: 'e1', setNumber: 3)));
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        recibidas.map((s) => s.setNumber).toList(),
+        [1, 2, 3],
+        reason: 'sin conexión, la serie 1 entra al cache y se ve, pero el '
+            '`await` sobre su escritura no resuelve nunca. Si el guard anti '
+            'doble-tap se sostiene sobre ese await, su `finally` no corre y '
+            'la 2 y la 3 se descartan EN SILENCIO: la pantalla deja de '
+            'responder y el atleta no recibe ninguna señal.',
+      );
+    });
+
+    test('las series sin confirmar igual entran al estado local', () async {
+      final repo = _MockSessionRepository();
+      final routine = _fourSetRoutine();
+      when(() => repo.create(
+            uid: any(named: 'uid'),
+            routineId: any(named: 'routineId'),
+            routineName: any(named: 'routineName'),
+            startedAt: any(named: 'startedAt'),
+            dayNumber: any(named: 'dayNumber'),
+            weekNumber: any(named: 'weekNumber'),
+          )).thenAnswer((_) async => makeSession());
+      _gateAddSetLog(repo);
+
+      final container = _makeContainer(repo, routine);
+      addTearDown(container.dispose);
+
+      final init = FreshSession(routineId: routine.id, dayNumber: 1);
+      final sub = container.listen(
+        sessionNotifierProvider(init),
+        (_, __) {},
+        fireImmediately: true,
+      );
+      addTearDown(sub.close);
+      await container.read(sessionNotifierProvider(init).future);
+      final notifier = container.read(sessionNotifierProvider(init).notifier);
+
+      unawaited(notifier.logSet(makeSetLog(exerciseId: 'e1', setNumber: 1)));
+      await Future<void>.delayed(Duration.zero);
+      unawaited(notifier.logSet(makeSetLog(exerciseId: 'e1', setNumber: 2)));
+      await Future<void>.delayed(Duration.zero);
+
+      // En la app real el stream de Firestore también las mete (la escritura
+      // entra al cache y `.snapshots()` emite). Acá el stream es vacío a
+      // propósito, así que esto mide SÓLO el camino local del notifier: si
+      // el atleta ve tildarse lo que marcó, sin esperar al servidor.
+      final estado = container.read(sessionNotifierProvider(init)).value!;
+      expect(
+        estado.setLogs.map((s) => s.setNumber).toList(),
+        [1, 2],
+        reason: 'lo que el atleta marcó tiene que verse tildado sin esperar '
+            'la confirmación del servidor. Si no, entrenar sin conexión es '
+            'indistinguible de la app colgada.',
+      );
+    });
+
+    test('un mismo set marcado dos veces sigue entrando una sola vez',
+        () async {
+      // El guard anti doble-tap (device feedback 2026-06-12) no se puede
+      // perder por el camino: sacarlo trae de vuelta los duplicados masivos.
+      // La defensa que queda es la idempotencia por `exerciseId + setNumber`,
+      // y este test la fija.
+      final repo = _MockSessionRepository();
+      final routine = _fourSetRoutine();
+      when(() => repo.create(
+            uid: any(named: 'uid'),
+            routineId: any(named: 'routineId'),
+            routineName: any(named: 'routineName'),
+            startedAt: any(named: 'startedAt'),
+            dayNumber: any(named: 'dayNumber'),
+            weekNumber: any(named: 'weekNumber'),
+          )).thenAnswer((_) async => makeSession());
+      final recibidas = _gateAddSetLog(repo);
+
+      final container = _makeContainer(repo, routine);
+      addTearDown(container.dispose);
+
+      final init = FreshSession(routineId: routine.id, dayNumber: 1);
+      final sub = container.listen(
+        sessionNotifierProvider(init),
+        (_, __) {},
+        fireImmediately: true,
+      );
+      addTearDown(sub.close);
+      await container.read(sessionNotifierProvider(init).future);
+      final notifier = container.read(sessionNotifierProvider(init).notifier);
+
+      unawaited(notifier.logSet(makeSetLog(exerciseId: 'e1', setNumber: 1)));
+      await Future<void>.delayed(Duration.zero);
+      unawaited(notifier.logSet(makeSetLog(exerciseId: 'e1', setNumber: 1)));
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        recibidas.length,
+        1,
+        reason: 'la misma serie marcada dos veces se escribe UNA. Sin esto '
+            'vuelven los sets duplicados masivos del 2026-06-12.',
+      );
+    });
+  });
+}

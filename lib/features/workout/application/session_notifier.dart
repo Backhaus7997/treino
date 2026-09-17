@@ -99,6 +99,7 @@ class SessionNotifier
       _finishedSub?.cancel();
       _logSetError.dispose();
       _finishedElsewhere.dispose();
+      _disposed = true;
     });
 
     return state;
@@ -389,6 +390,15 @@ class SessionNotifier
   /// 2026-06-12).
   bool _isLoggingSet = false;
 
+  /// El notifier ya se destruyó.
+  ///
+  /// Hace falta desde que la confirmación del servidor dejó de estar en el
+  /// camino crítico: ese future sobrevive a la pantalla. Si la escritura falla
+  /// después de que el atleta salió del entreno, tocar `_logSetError` —ya
+  /// disposeado— tira. El fallo se pierde, que es lo correcto: no hay dónde
+  /// mostrarlo.
+  bool _disposed = false;
+
   Future<void> logSet(SetLog setLog) async {
     final current = state.value;
     if (current == null || _finalized || _isLoggingSet) return;
@@ -411,11 +421,26 @@ class SessionNotifier
       // El repo asigna el id de Firestore al doc y devuelve el SetLog
       // persisted — usamos ese para que `updateSet` futuro pueda referirse
       // por id (sino el log local quedaría con id='').
-      final persisted = await repo.addSetLog(
+      // `addSetLog` devuelve el id sin tocar la red; la confirmación del
+      // servidor viaja aparte en `acknowledged` y NO se espera acá.
+      //
+      // Esperarla era el bug de entrenar sin conexión: sin red ese future no
+      // completa nunca, así que el `try` no salía, el `finally` no corría, y
+      // `_isLoggingSet` quedaba en `true` para siempre descartando EN SILENCIO
+      // todas las series siguientes. La primera se veía igual —la escritura
+      // entra al cache y `.snapshots()` emite—, así que el síntoma era una
+      // pantalla que dejaba de responder sin un solo error.
+      // Lo fija session_offline_log_test.dart.
+      final logged = await repo.addSetLog(
         uid: uid,
         sessionId: current.session.id,
         setLog: setLog,
       );
+      _reportIfWriteFails(
+        logged.acknowledged,
+        SessionLogError(action: SessionLogAction.log, setLog: setLog),
+      );
+      final persisted = logged.setLog;
 
       // Re-leemos el estado: pudo cambiar durante el await.
       final latest = state.value ?? current;
@@ -466,6 +491,20 @@ class SessionNotifier
     } finally {
       _isLoggingSet = false;
     }
+  }
+
+  /// Publica [error] si la escritura diferida termina fallando.
+  ///
+  /// **Sin red no hace nada**, y eso es lo correcto: offline el future queda
+  /// pendiente —no falla— y Firestore lo sincroniza cuando vuelve. Sólo
+  /// dispara ante un fallo real, como un permission-denied.
+  void _reportIfWriteFails(Future<void> write, SessionLogError error) {
+    unawaited(write.catchError((Object _) {
+      // El future sobrevive a la pantalla: si ya no hay dónde mostrar el
+      // fallo, se descarta en vez de escribir sobre un notifier destruido.
+      if (_disposed) return;
+      _logSetError.value = error;
+    }));
   }
 
   /// Agrega un set extra a [slot] más allá del plan actual (live-set-editing

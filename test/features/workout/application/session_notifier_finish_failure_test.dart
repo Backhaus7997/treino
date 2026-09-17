@@ -145,7 +145,7 @@ void main() {
             uid: any(named: 'uid'),
             sessionId: any(named: 'sessionId'),
             setLog: any(named: 'setLog'),
-          )).thenAnswer((_) async => makeSetLog());
+          )).thenAnswer((_) async => makeLoggedSet());
 
       var calls = 0;
       when(() => repo.finish(

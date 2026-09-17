@@ -11,6 +11,25 @@ import 'package:treino/features/workout/application/session_duration.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
 
+/// Escribe la serie **y espera la confirmación** del servidor.
+///
+/// `addSetLog` ahora devuelve un [LoggedSet]: el id al instante y el ACK
+/// aparte, para que entrenar sin conexión no se cuelgue. Los tests de este
+/// archivo verifican lo que quedó EN Firestore, así que necesitan las dos
+/// fases — de ahí este helper en vez de repetir el `await ... .acknowledged`
+/// en cada caso.
+Future<SetLog> _escribirSerie(
+  SessionRepository repo, {
+  required String uid,
+  required String sessionId,
+  required SetLog setLog,
+}) async {
+  final logged =
+      await repo.addSetLog(uid: uid, sessionId: sessionId, setLog: setLog);
+  await logged.acknowledged;
+  return logged.setLog;
+}
+
 void main() {
   late FakeFirebaseFirestore firestore;
   late SessionRepository repo;
@@ -338,7 +357,8 @@ void main() {
     final sessionId = await createActiveSession();
     final completedAt = DateTime.utc(2026, 5, 18, 10, 5, 0);
 
-    await repo.addSetLog(
+    await _escribirSerie(
+      repo,
       uid: uid,
       sessionId: sessionId,
       setLog: buildSetLog(setNumber: 1, completedAt: completedAt),
@@ -362,7 +382,8 @@ void main() {
     final sessionId = await createActiveSession();
     final completedAt = DateTime.utc(2026, 5, 18, 10, 5, 0);
 
-    final result = await repo.addSetLog(
+    final result = await _escribirSerie(
+      repo,
       uid: uid,
       sessionId: sessionId,
       setLog: buildSetLog(setNumber: 1, completedAt: completedAt),
@@ -444,7 +465,8 @@ void main() {
       fieldSetNumber: 1,
     );
 
-    final persisted = await repo.addSetLog(
+    final persisted = await _escribirSerie(
+      repo,
       uid: uid,
       sessionId: sessionId,
       setLog: buildSetLog(
@@ -486,7 +508,8 @@ void main() {
       fieldSetNumber: 2,
     );
 
-    final persisted = await repo.addSetLog(
+    final persisted = await _escribirSerie(
+      repo,
       uid: uid,
       sessionId: sessionId,
       setLog: buildSetLog(
@@ -524,7 +547,8 @@ void main() {
       fieldSetNumber: 1,
     );
 
-    final persisted = await repo.addSetLog(
+    final persisted = await _escribirSerie(
+      repo,
       uid: uid,
       sessionId: sessionId,
       setLog: buildSetLog(
@@ -546,7 +570,8 @@ void main() {
       () async {
     final sessionId = await createActiveSession();
 
-    await repo.addSetLog(
+    await _escribirSerie(
+      repo,
       uid: uid,
       sessionId: sessionId,
       setLog: buildSetLog(setNumber: 1, completedAt: testNow()),
@@ -618,7 +643,8 @@ void main() {
     final sessionId = await createActiveSession();
     final completedAt = DateTime.utc(2026, 5, 18, 10, 5, 0);
 
-    final persisted = await repo.addSetLog(
+    final persisted = await _escribirSerie(
+      repo,
       uid: uid,
       sessionId: sessionId,
       setLog: buildSetLog(setNumber: 1, completedAt: completedAt),
@@ -654,17 +680,20 @@ void main() {
     final sessionId = await createActiveSession();
 
     // Add in reverse order on purpose
-    await repo.addSetLog(
+    await _escribirSerie(
+      repo,
       uid: uid,
       sessionId: sessionId,
       setLog: buildSetLog(setNumber: 3, completedAt: testNow()),
     );
-    await repo.addSetLog(
+    await _escribirSerie(
+      repo,
       uid: uid,
       sessionId: sessionId,
       setLog: buildSetLog(setNumber: 1, completedAt: testNow()),
     );
-    await repo.addSetLog(
+    await _escribirSerie(
+      repo,
       uid: uid,
       sessionId: sessionId,
       setLog: buildSetLog(setNumber: 2, completedAt: testNow()),
@@ -690,12 +719,14 @@ void main() {
   test('SCENARIO-251: SetLogs are accessible after session is finished',
       () async {
     final sessionId = await createActiveSession();
-    await repo.addSetLog(
+    await _escribirSerie(
+      repo,
       uid: uid,
       sessionId: sessionId,
       setLog: buildSetLog(setNumber: 1, completedAt: testNow()),
     );
-    await repo.addSetLog(
+    await _escribirSerie(
+      repo,
       uid: uid,
       sessionId: sessionId,
       setLog: buildSetLog(setNumber: 2, completedAt: testNow()),
@@ -976,7 +1007,8 @@ void main() {
       routineName: routineName,
       startedAt: DateTime.utc(2026, 5, 15, 8, 0, 0),
     );
-    await repoWithProfile.addSetLog(
+    await _escribirSerie(
+      repoWithProfile,
       uid: uid,
       sessionId: session.id,
       setLog: SetLog(
@@ -1025,7 +1057,8 @@ void main() {
       routineName: routineName,
       startedAt: DateTime.utc(2026, 5, 15, 8, 0, 0),
     );
-    await repoWithProfile.addSetLog(
+    await _escribirSerie(
+      repoWithProfile,
       uid: uid,
       sessionId: session.id,
       setLog: SetLog(
