@@ -216,6 +216,18 @@ export interface ReconcileResult {
   /** Solo para `producto: "athlete"`. Lo que se escribio de verdad. */
   athleteStatus?: AthleteStatus;
   /**
+   * Hasta cuando el derecho sigue valiendo, en ms. Es la fecha que
+   * `resolverFinDePeriodo` acaba de decidir.
+   *
+   * Se reporta —y no se deja que el llamador la busque— porque es lo que la
+   * pantalla de baja tiene que decirle al usuario: «conservás el acceso hasta
+   * el X». Sacarla de acá evita persistir un campo nuevo en `users/{uid}`, que
+   * costaria pin en los dos verbos de `firestore.rules`.
+   *
+   * Ausente cuando no se pudo determinar por ningun camino de la cascada.
+   */
+  accesoHastaMs?: number;
+  /**
    * Cuantas suscripciones VIEJAS se dieron de baja en MP porque este plan las
    * reemplaza. Casi siempre 0; un 1 es un cambio de plan que dejo de cobrarse
    * dos veces.
@@ -824,6 +836,7 @@ async function escribirSuscripcionDeAlumno(i: {
     producto: "athlete",
     status,
     athleteStatus,
+    ...(periodEnd === null ? {} : { accesoHastaMs: periodEnd.toMillis() }),
   };
 }
 
@@ -1123,6 +1136,7 @@ export async function reconcileSubscription(
     tier: mapping.tier,
     status,
     dadosDeBaja,
+    ...(periodEnd === null ? {} : { accesoHastaMs: periodEnd.toMillis() }),
   };
 }
 

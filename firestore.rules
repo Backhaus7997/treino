@@ -4476,6 +4476,12 @@ service cloud.firestore {
     match /mp_preapprovals/{preapprovalId} {
       allow read, write: if false;
     }
+    // El cooldown de la baja: un doc por usuario con cuando fue la ultima.
+    // Escribirlo desde el cliente permitiria saltearse el cooldown y quemarnos
+    // la cuota de Mercado Pago con un bucle de reintentos.
+    match /mp_cancelaciones/{uid} {
+      allow read, write: if false;
+    }
     // El dedupe del webhook: un doc por evento de Mercado Pago ya procesado.
     // Escribirlo es hacerle creer al sistema que un evento REAL ya se atendio,
     // y como el dedupe corta ANTES de consultarle a MP, eso alcanza para que a
