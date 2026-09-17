@@ -130,6 +130,10 @@ class SessionNotifier
         .watchSessionFinished(uid: uid, sessionId: sessionId)
         .listen((finished) {
       if (!finished || _finalized) return;
+      // Un create rechazado hace desaparecer el doc, y este stream lee eso
+      // como «terminado». No lo es: lo dice `_creacionRechazada`, que ya puso
+      // el estado en error con el motivo real.
+      if (_creacionRechazada) return;
       // Lo cerró el reloj. Se marca finalizado ANTES de avisar para que un
       // `finishSession`/`abandonSession` que llegue después sea no-op: escribir
       // encima pisaría el volumen y la duración que ya calculó el reloj.
@@ -246,17 +250,38 @@ class SessionNotifier
       // confirmación dejaba al player en `AsyncLoading` para siempre sin una
       // sola excepción — el atleta tocaba Empezar y miraba un spinner eterno.
       waitForServer: false,
-      onServerRejected: (e) => _reportarRechazoDelServidor(
-        e,
-        'no se pudo crear la sesión del entreno',
-      ),
+      onServerRejected: (e) {
+        _reportarRechazoDelServidor(
+            e, 'no se pudo crear la sesión del entreno');
+        if (_disposed) return;
+        // El atleta tiene que ENTERARSE, no entrenar media hora contra una
+        // sesión que no existe. Es el mismo criterio que ya tomó el camino
+        // del reloj (`WearSessionFailed`, con test que lo fija) y lo que
+        // promete el docstring de `create`: que la PANTALLA pueda decirlo.
+        //
+        // Va por `state` y no por un canal nuevo porque la pantalla ya sabe
+        // renderizar `AsyncError` con su botón de reintento. Antes de este PR
+        // el rechazo llegaba acá solo: `create` esperaba al servidor y su
+        // excepción salía por `build`.
+        _creacionRechazada = true;
+        state = AsyncError(e, StackTrace.current);
+      },
     );
     _resetElapsedBaseline(elapsedSeconds: 0, at: session.startedAt);
     _nudgeWatch(WatchNudgeService.reasonWorkoutStarted);
-    // DESPUÉS de que `repo.create` resolvió, nunca antes: el reloj lee Firestore
-    // por REST y no tiene listeners. Si se abriera antes de que el documento con
-    // `status: active` exista, no encontraría sesión que adoptar y se quedaría
-    // en la pantalla equivocada, sin nada que lo corrija después.
+    // ⚠️ Este orden YA NO garantiza lo que garantizaba, y conviene saberlo.
+    //
+    // Decía: «DESPUÉS de que `repo.create` resolvió, nunca antes — el reloj lee
+    // Firestore por REST y no tiene listeners; si se abriera antes de que el
+    // documento exista, no encontraría sesión que adoptar». Con
+    // `waitForServer: false`, `create` resuelve cuando la escritura entra al
+    // CACHÉ del teléfono, que el reloj no ve: su adopción por REST puede venir
+    // vacía igual.
+    //
+    // No se revierte porque el costo es chico y acotado: el reloj se recupera
+    // solo cuando el atleta levanta la muñeca y su `restore()` vuelve a
+    // preguntar. Cambiar eso pediría tocar el lado Swift, y no entra en este
+    // PR. Pero el invariante que este comentario declaraba ya no existe.
     _launchWatch();
 
     // REQ-WPRES-021 (ADR-WPRES-09): filter slots by presence BEFORE building
@@ -424,6 +449,16 @@ class SessionNotifier
   /// disposeado— tira. El fallo se pierde, que es lo correcto: no hay dónde
   /// mostrarlo.
   bool _disposed = false;
+
+  /// El servidor RECHAZÓ la creación de esta sesión.
+  ///
+  /// Hace falta porque `watchSessionFinished` devuelve `true` cuando el
+  /// documento no existe, y un create rechazado es exactamente eso: el SDK
+  /// revierte la mutación del caché y el doc desaparece. Sin este flag, el
+  /// listener lo leía como «lo cerró el reloj» y la pantalla le decía al
+  /// atleta que había terminado el entreno desde la muñeca — sobre un rechazo
+  /// de paywall o de reglas. Una explicación falsa es peor que ninguna.
+  bool _creacionRechazada = false;
 
   Future<void> logSet(SetLog setLog) async {
     final current = state.value;

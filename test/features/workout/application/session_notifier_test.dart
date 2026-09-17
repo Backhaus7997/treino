@@ -355,6 +355,8 @@ void main() {
             routineName: any(named: 'routineName'),
             startedAt: any(named: 'startedAt'),
             dayNumber: any(named: 'dayNumber'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           ));
     });
 

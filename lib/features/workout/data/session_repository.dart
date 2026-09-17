@@ -282,24 +282,64 @@ class SessionRepository {
     final pubRepo = _publicProfileRepository;
     if (pubRepo == null) return;
 
-    // Sin esperar al servidor NO se tocan los contadores, y es deliberado.
+    // Los contadores se recalculan DESPUÉS de que el servidor confirmó, y ése
+    // es todo el truco.
     //
-    // El recálculo lee las sesiones recientes del atleta. Sin red esa lectura
-    // sale del CACHÉ, que puede estar incompleto —instalación nueva, historial
-    // no sincronizado— y escribir un `workoutsCount` derivado de ahí le PISA
-    // al perfil público un valor correcto con uno más chico. Corromper el
-    // perfil es peor que atrasarlo.
+    // El recálculo lee las sesiones recientes del atleta. Hacerlo sin
+    // confirmación lo dejaría leyendo el CACHÉ, que puede estar incompleto
+    // —instalación nueva, historial sin sincronizar— y escribir un
+    // `workoutsCount` derivado de ahí le PISA al perfil público un valor
+    // correcto con uno más chico.
     //
-    // El costo de saltearlo es acotado: el contador queda viejo hasta el
-    // próximo cierre con conexión, que lo recalcula entero. Y las métricas de
-    // ranking no dependen de esto —las recalcula `rankingAggregateOnSession`
-    // del lado del servidor cuando la escritura de la sesión sincroniza—, así
-    // que lo único que se atrasa es `workoutsCount`/`rachaSemanas`.
+    // ⚠️ La primera versión de esto los SALTEABA cuando `waitForServer` era
+    // false, con el argumento de que «el contador queda viejo hasta el próximo
+    // cierre con conexión, que lo recalcula entero». Era falso y grave:
+    // `waitForServer: false` no significa «estoy sin red», significa «no me
+    // bloquees». El teléfono lo pasa SIEMPRE, así que ese próximo cierre no
+    // existía y los contadores dejaban de escribirse para siempre.
     //
-    // La solución de fondo sería recalcularlos también en ese trigger, que hoy
-    // no lo hace. Queda anotado, no entra acá.
-    if (!waitForServer) return;
+    // El daño no habría sido un número viejo: `effectiveRachaSemanas` hace
+    // decay EN LECTURA contra `rachaSemanasUpdatedAt`, el sello que estampa
+    // `updateCounters`. Sin sello nuevo, a las dos semanas todo atleta que
+    // cierre desde el teléfono aparece con racha 0 en su perfil y en el board
+    // del gimnasio, entrenando todos los días. Y el servidor no lo salva:
+    // `workoutsCount`/`rachaSemanas` no se tocan en `functions/src/`.
+    //
+    // Colgarlo del ACK resuelve las dos cosas: no se lee de un caché frío, y
+    // se recalcula siempre — apenas vuelve la red.
+    if (waitForServer) {
+      await _recalcularContadoresPublicos(uid, pubRepo, weeklyTarget);
+    } else {
+      unawaited(
+        escritura
+            .then((_) =>
+                _recalcularContadoresPublicos(uid, pubRepo, weeklyTarget))
+            // El `then` no corre si la escritura fue rechazada, y está bien:
+            // sin sesión escrita no hay contador que actualizar. El rechazo ya
+            // viaja por `onServerRejected`.
+            //
+            // Tampoco corre si el atleta MATA la app antes de que vuelva la
+            // red: Firestore replica la escritura al reabrir, pero este
+            // callback ya no existe. Se auto-cura y por eso no se defiende
+            // más: `_recalcularContadoresPublicos` recalcula la ventana
+            // entera, no incrementa, así que el próximo cierre con ACK repara
+            // el salteado. Queda dicho porque es justo el tipo de supuesto que
+            // hizo caer la versión anterior de este bloque.
+            .catchError((Object _) {}),
+      );
+    }
+  }
 
+  /// Recalcula `workoutsCount`/`rachaSemanas` del perfil público.
+  ///
+  /// Best-effort (ADR-WRS-10): romperle el cierre de sesión al atleta por un
+  /// contador es la prioridad invertida. Pero best-effort NO es «que no se
+  /// entere nadie» — un fallo sale como non-fatal.
+  Future<void> _recalcularContadoresPublicos(
+    String uid,
+    UserPublicProfileRepository pubRepo,
+    int weeklyTarget,
+  ) async {
     try {
       final completedList = await listRecentCompletedByUid(uid);
       final racha = weeklyStreakOf(
