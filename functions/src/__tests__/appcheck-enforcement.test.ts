@@ -159,6 +159,27 @@ const EXEMPTIONS: Readonly<Record<string, Exemption>> = {
       "unico callable del repo que YA tiene enforceAppCheck: true, " +
       "add-alias.ts:148.)",
   },
+  "subscriptions/mp/cancel-my-subscription:cancelMySubscription": {
+    permanence: "debt",
+    reason:
+      "Mismo motivo de plataforma que reconcileMyCheckout: lo llaman el Coach " +
+      "Hub web y la landing, que no activan App Check. Con el flag puesto, " +
+      "nadie podria darse de baja — y eso no es una degradacion cualquiera: la " +
+      "Res. 424/2020 obliga a que la baja sea por el mismo medio de " +
+      "contratacion, y terminos-suscripcion.md §7 la promete publicada. " +
+      "`debt` y NO `decided`, a diferencia de reconcileMyCheckout, y la " +
+      "diferencia es real: aquel solo PREGUNTA por el estado de un cobro, este " +
+      "lo FRENA, y en Mercado Pago frenar es irreversible — un preapproval " +
+      "cancelado no se reactiva. " +
+      "La cerradura es que NO HAY BODY: la entrada es el uid del token y nada " +
+      "mas. Un atacante autenticado solo puede darse de baja a SI MISMO, que " +
+      "es algo que ya puede hacer. El daño techo es quemarnos cuota de MP con " +
+      "un bucle, y de eso se ocupa el cooldown de mp_cancelaciones/{uid}.",
+    exitCondition:
+      "Junto con reconcileMyCheckout y createPreapproval, cuando el Coach Hub " +
+      "web active App Check. Va DESPUES de createPreapproval en la cola: aquel " +
+      "abre un cobro a nombre propio, este solo cierra uno propio.",
+  },
   "subscriptions/mp/create-athlete-preapproval:createAthletePreapproval": {
     permanence: "debt",
     reason:
@@ -279,6 +300,7 @@ const EXEMPTIONS: Readonly<Record<string, Exemption>> = {
 const EXPECTED_DEPLOYED = [
   "acceptTrainerLink",
   "addAlias",
+  "cancelMySubscription",
   "createAthletePreapproval",
   "createPreapproval",
   "deleteAccount",
@@ -412,6 +434,12 @@ describe("QA-SEC-016: el guard falla cuando tiene que fallar", () => {
       module: "subscriptions/mp/create-athlete-preapproval",
       symbol: "createAthletePreapproval",
       as: "createAthletePreapproval",
+      attested: false,
+    },
+    {
+      module: "subscriptions/mp/cancel-my-subscription",
+      symbol: "cancelMySubscription",
+      as: "cancelMySubscription",
       attested: false,
     },
     {

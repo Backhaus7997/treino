@@ -236,6 +236,20 @@ export { reconcileMpSubscriptions } from "./subscriptions/mp/reconcile";
 // Usa el mismo secreto MP_ACCESS_TOKEN que los dos de arriba.
 export { reconcileMyCheckout } from "./subscriptions/mp/reconcile-my-checkout";
 
+// La BAJA, para los dos productos. Hasta que existio, el repo no tenia ningun
+// control de baja — y `docs/legal/terminos-suscripcion.md` §7 promete,
+// publicado, que se puede dar de baja «en línea, sin llamar ni escribir a
+// nadie». La Res. 424/2020 obliga a que sea por el mismo medio de contratacion.
+//
+// No escribe el derecho: le pide la baja a MP y despues llama al reconciliador,
+// que sigue siendo el unico escritor. Asi el usuario conserva el acceso hasta el
+// fin del periodo que ya pago, sin que este archivo tenga que saber cuando es.
+//
+// ⚠️ Cancelar es TERMINAL en MP: un preapproval cancelado no se reactiva.
+//
+// Usa el mismo secreto MP_ACCESS_TOKEN.
+export { cancelMySubscription } from "./subscriptions/mp/cancel-my-subscription";
+
 // Paywall del entrenador — la notificacion de Mercado Pago. **El PRIMER
 // endpoint HTTP publico del repo**: todo lo demas es onCall con request.auth o
 // un trigger de Firestore, esto lo puede POSTear cualquiera.
