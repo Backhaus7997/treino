@@ -67,8 +67,23 @@ afterEach(async () => {
 });
 
 /**
- * Full new-client wire shape: post.toJson() emits EVERY key, optional ones
- * as explicit null (no includeIfNull:false on these models).
+ * Full new-client wire shape: post.toJson() emits every key it CAN emit,
+ * optional ones as explicit null (no includeIfNull:false on these models).
+ *
+ * `reactionCounts` no está acá, y la ausencia es el contrato, no un olvido: el
+ * campo lo mantiene en exclusiva la Cloud Function con el Admin SDK, así que
+ * `Post` lo marca `@JsonKey(includeToJson: false)` y el cliente no lo manda
+ * nunca. Fijate el `it("DENIES reactionCounts...")` de más abajo.
+ *
+ * ⚠️ Esta lista es una copia A MANO de `Post.toJson()`, y ya se desincronizó
+ * una vez: entre el 2026-07-28 (#591, cuando coincidían) y el 2026-07-31
+ * (cuando `reactionCounts` entró al modelo) este fixture quedó viejo, el test
+ * en verde, y TODO create de post en PERMISSION_DENIED durante siete semanas.
+ * Quien custodia la sincronización ahora NO es este archivo —no puede, es del
+ * mismo material que el modelo— sino
+ * `test/conformance/post_wire_shape_parity_test.dart`, que deriva las keys de
+ * `Post(...).toJson()` en runtime y las contrasta contra el `.rules`. Si
+ * tocás la forma del post, ese test es el que te va a avisar.
  */
 function validPost(overrides: Record<string, unknown> = {}) {
   return {
@@ -152,6 +167,20 @@ describe("posts/{postId} create — shape hardening", () => {
 
   it("DENIES an extra key outside the allowlist", async () => {
     await assertFails(createPost(AUTHOR, validPost({ hacked: true })));
+  });
+
+  // Control negativo del fix del 2026-09-17. `reactionCounts` es el caso
+  // concreto que rompió publicar durante siete semanas, y merece su propio
+  // test aunque el genérico de arriba ya cubra "key de más": si algún día
+  // alguien intenta destrabar el create agregando la key al `hasOnly` —el fix
+  // tentador y equivocado—, es ESTE nombre el que se pone rojo y explica por
+  // qué no. Abrirla dejaría que cualquiera se plante 999 reacciones en su
+  // propio post (ver reaction-rules.test.ts).
+  it("DENIES reactionCounts on create — es Cloud-Function-only", async () => {
+    await assertFails(createPost(AUTHOR, validPost({ reactionCounts: {} })));
+    await assertFails(
+      createPost(AUTHOR, validPost({ reactionCounts: { fire: 999 } }))
+    );
   });
 
   it("DENIES text over the 1120 anti-abuse bound", async () => {
