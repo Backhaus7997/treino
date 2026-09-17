@@ -106,7 +106,7 @@ void _stubCreateAndLog(MockSessionRepository repo) {
         uid: any(named: 'uid'),
         sessionId: any(named: 'sessionId'),
         setLog: any(named: 'setLog'),
-      )).thenAnswer((_) async => makeSetLog());
+      )).thenAnswer((_) async => makeLoggedSet());
 }
 
 /// Makes `repo.finish` hang until the returned completer is completed, so the

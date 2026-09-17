@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/analytics/analytics_service.dart';
+import '../../../core/telemetry/non_fatal.dart';
 import '../../../core/utils/network_timeouts.dart';
 import '../../watch/application/watch_credential_providers.dart'
     show watchLauncherServiceProvider, watchNudgeServiceProvider;
@@ -93,6 +94,10 @@ class SessionNotifier
     _timer = Timer.periodic(const Duration(seconds: 1), _onTick);
     _watchRemoteChanges(state.session.id);
     ref.onDispose(() {
+      // PRIMERO, antes de cualquier `dispose()`: lo que corre después ya no
+      // puede tocar los notifiers, y un error que llegue en el medio tiene que
+      // ver el flag arriba.
+      _disposed = true;
       _timer?.cancel();
       _timer = null;
       _setLogsSub?.cancel();
@@ -164,11 +169,24 @@ class SessionNotifier
 
   /// Reemplaza las series con lo que dice Firestore.
   ///
-  /// Se pisa entero en vez de mezclar porque el remoto YA es la fuente de
-  /// verdad: `logSet`, `updateSetLog` y `deleteSetLog` escriben primero y
-  /// recién después tocan el estado, así que lo local nunca tiene nada que el
-  /// remoto no tenga. Mezclar solo agregaría la chance de resucitar una serie
-  /// borrada.
+  /// Se pisa entero en vez de mezclar porque el remoto es la fuente de verdad.
+  ///
+  /// ⚠️ El motivo CAMBIÓ y conviene leerlo, porque el de antes ya no aplica.
+  /// Decía que «lo local nunca tiene nada que el remoto no tenga», porque las
+  /// mutaciones escribían primero y tocaban el estado después. Desde que
+  /// `logSet` dejó de esperar la confirmación del servidor —para que entrenar
+  /// sin conexión funcione— el estado local SÍ puede tener una serie que el
+  /// servidor todavía no confirmó, o que rechazó.
+  ///
+  /// Pisar sigue siendo lo correcto, y ahora es MÁS importante: este método es
+  /// lo único que puede corregir un estado local optimista. Si Firestore
+  /// rechaza la escritura, el SDK revierte la mutación del caché, el listener
+  /// re-emite sin ese documento, y acá se destilda la fila. Mezclar dejaría la
+  /// serie fantasma para siempre.
+  ///
+  /// El corolario incómodo: si el stream MUERE (ver el `onError` de
+  /// `_watchRemoteChanges`), no queda ningún reconciliador y el estado local se
+  /// congela en su versión optimista por el resto del entreno.
   void _applyRemoteSetLogs(List<SetLog> remote) {
     final current = state.valueOrNull;
     if (current == null) return;
@@ -389,6 +407,15 @@ class SessionNotifier
   /// 2026-06-12).
   bool _isLoggingSet = false;
 
+  /// El notifier ya se destruyó.
+  ///
+  /// Hace falta desde que la confirmación del servidor dejó de estar en el
+  /// camino crítico: ese future sobrevive a la pantalla. Si la escritura falla
+  /// después de que el atleta salió del entreno, tocar `_logSetError` —ya
+  /// disposeado— tira. El fallo se pierde, que es lo correcto: no hay dónde
+  /// mostrarlo.
+  bool _disposed = false;
+
   Future<void> logSet(SetLog setLog) async {
     final current = state.value;
     if (current == null || _finalized || _isLoggingSet) return;
@@ -411,11 +438,26 @@ class SessionNotifier
       // El repo asigna el id de Firestore al doc y devuelve el SetLog
       // persisted — usamos ese para que `updateSet` futuro pueda referirse
       // por id (sino el log local quedaría con id='').
-      final persisted = await repo.addSetLog(
+      // `addSetLog` devuelve el id sin tocar la red; la confirmación del
+      // servidor viaja aparte en `acknowledged` y NO se espera acá.
+      //
+      // Esperarla era el bug de entrenar sin conexión: sin red ese future no
+      // completa nunca, así que el `try` no salía, el `finally` no corría, y
+      // `_isLoggingSet` quedaba en `true` para siempre descartando EN SILENCIO
+      // todas las series siguientes. La primera se veía igual —la escritura
+      // entra al cache y `.snapshots()` emite—, así que el síntoma era una
+      // pantalla que dejaba de responder sin un solo error.
+      // Lo fija session_offline_log_test.dart.
+      final logged = await repo.addSetLog(
         uid: uid,
         sessionId: current.session.id,
         setLog: setLog,
       );
+      _onWriteSettled(
+        logged.acknowledged,
+        SessionLogError(action: SessionLogAction.log, setLog: setLog),
+      );
+      final persisted = logged.setLog;
 
       // Re-leemos el estado: pudo cambiar durante el await.
       final latest = state.value ?? current;
@@ -449,11 +491,8 @@ class SessionNotifier
         setLogs: newLogs,
         currentExerciseIndex: newIndex,
       ));
-      // El reloj no tiene listeners: hasta que no se entere de esta serie,
-      // marcarla en la muñeca escribiría un SEGUNDO documento de la misma
-      // serie (los dos clientes generan ids distintos) y el atleta la vería
-      // marcada dos veces.
-      _nudgeWatch(WatchNudgeService.reasonSetLogged);
+      // El aviso al reloj NO va acá: viaja con la confirmación del servidor,
+      // en `_onWriteSettled`. Ver el porqué en ese método.
     } catch (e) {
       // El write a Firestore falló (red caída, permisos, offline). NO mutamos
       // `state` a AsyncError: eso flipearía `when()` al branch `error:` y volaría
@@ -466,6 +505,59 @@ class SessionNotifier
     } finally {
       _isLoggingSet = false;
     }
+  }
+
+  /// Ata al desenlace de una escritura diferida las dos cosas que SÍ necesitan
+  /// que el servidor la tenga: avisarle al reloj, y reportar el fallo.
+  ///
+  /// **El aviso al reloj tiene que esperar la confirmación, no la escritura
+  /// local.** `reasonSetLogged` no le manda la serie al reloj: le pide que
+  /// RELEA Firestore. Dispararlo apenas se encola la escritura le hace leer un
+  /// servidor que todavía no la tiene, así que el reloj queda igual de
+  /// desactualizado y **no hay un segundo aviso** cuando la confirmación llega.
+  /// Con el reloj creyendo que la serie no existe, marcarla en la muñeca
+  /// escribe un SEGUNDO documento —los ids de los dos clientes no coinciden— y
+  /// vuelven los duplicados y el volumen inflado que esta sincronización
+  /// existe para evitar.
+  ///
+  /// Antes el orden salía gratis: el `await` sobre la escritura garantizaba que
+  /// el servidor ya la tenía cuando se avisaba. Al sacar ese `await` del camino
+  /// crítico, la garantía hay que reponerla acá a mano. Lo señaló Codex en la
+  /// review del PR y tenía razón.
+  ///
+  /// Offline no dispara NINGUNA de las dos: el future queda pendiente —no
+  /// falla— y Firestore lo sincroniza cuando vuelve la red. Ahí recién se avisa
+  /// al reloj, que es exactamente cuando tiene sentido hacerlo.
+  void _onWriteSettled(Future<void> write, SessionLogError error) {
+    unawaited(write.then<void>(
+      (_) {
+        // El future sobrevive a la pantalla: si el atleta ya salió del
+        // entreno, no hay reloj que sincronizar con esta sesión.
+        if (_disposed) return;
+        _nudgeWatch(WatchNudgeService.reasonSetLogged);
+      },
+      onError: (Object e, StackTrace st) {
+        // REPORTAR y MOSTRAR son dos cosas distintas, y confundirlas era el
+        // agujero: sin pantalla no hay dónde mostrar, pero siempre hay dónde
+        // reportar. Si no, una serie que Firestore rechazó desaparece sin que
+        // se entere nadie —ni el atleta ni Crashlytics— y si las reglas se
+        // rompen para todos, el síntoma es cero.
+        //
+        // Mismo criterio que `create(waitForServer: false)` con su
+        // `onServerRejected`, en session_repository.dart.
+        //
+        // Offline no pasa por acá: el future queda PENDIENTE, no falla.
+        unawaited(reportNonFatal(
+          e,
+          st,
+          reason: 'SessionNotifier.logSet: la escritura diferida de la serie '
+              '${error.setLog?.exerciseId}#${error.setLog?.setNumber} fue '
+              'rechazada${_disposed ? ' (con la pantalla ya cerrada)' : ''}.',
+        ).catchError((_) {}));
+        if (_disposed) return;
+        _logSetError.value = error;
+      },
+    ));
   }
 
   /// Agrega un set extra a [slot] más allá del plan actual (live-set-editing

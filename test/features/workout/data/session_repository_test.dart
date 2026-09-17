@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart'
-    show QueryDocumentSnapshot, Timestamp;
+    show FirebaseException, QueryDocumentSnapshot, Timestamp;
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
+import 'package:mock_exceptions/mock_exceptions.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/core/telemetry/non_fatal.dart';
 import 'package:treino/core/utils/argentina_time.dart';
@@ -10,6 +11,25 @@ import 'package:treino/features/workout/data/session_repository.dart';
 import 'package:treino/features/workout/application/session_duration.dart';
 import 'package:treino/features/workout/domain/set_log.dart';
 import 'package:treino/features/workout/domain/session_status.dart';
+
+/// Escribe la serie **y espera la confirmación** del servidor.
+///
+/// `addSetLog` ahora devuelve un [LoggedSet]: el id al instante y el ACK
+/// aparte, para que entrenar sin conexión no se cuelgue. Los tests de este
+/// archivo verifican lo que quedó EN Firestore, así que necesitan las dos
+/// fases — de ahí este helper en vez de repetir el `await ... .acknowledged`
+/// en cada caso.
+Future<SetLog> _escribirSerie(
+  SessionRepository repo, {
+  required String uid,
+  required String sessionId,
+  required SetLog setLog,
+}) async {
+  final logged =
+      await repo.addSetLog(uid: uid, sessionId: sessionId, setLog: setLog);
+  await logged.acknowledged;
+  return logged.setLog;
+}
 
 void main() {
   late FakeFirebaseFirestore firestore;
@@ -338,7 +358,8 @@ void main() {
     final sessionId = await createActiveSession();
     final completedAt = DateTime.utc(2026, 5, 18, 10, 5, 0);
 
-    await repo.addSetLog(
+    await _escribirSerie(
+      repo,
       uid: uid,
       sessionId: sessionId,
       setLog: buildSetLog(setNumber: 1, completedAt: completedAt),
@@ -362,7 +383,8 @@ void main() {
     final sessionId = await createActiveSession();
     final completedAt = DateTime.utc(2026, 5, 18, 10, 5, 0);
 
-    final result = await repo.addSetLog(
+    final result = await _escribirSerie(
+      repo,
       uid: uid,
       sessionId: sessionId,
       setLog: buildSetLog(setNumber: 1, completedAt: completedAt),
@@ -381,6 +403,115 @@ void main() {
         .get();
 
     expect(snap.exists, isTrue);
+  });
+
+  // ─── addSetLog(): la lectura de adopción puede fallar y la serie va igual ──
+
+  test(
+      'addSetLog escribe la serie AUNQUE la lectura del doc del reloj falle '
+      '(sin conexión y sin cache)', () async {
+    // Hallazgo de Codex en la review del PR de entrenar sin conexión.
+    //
+    // `addSetLog` abre con un `get()` del documento determinístico del reloj
+    // para adoptarlo si llegó primero. Esa lectura es una OPTIMIZACIÓN, pero
+    // estaba en el camino de todos: sin red, con el documento del reloj fuera
+    // del cache, podía terminar en error en vez de en un snapshot vacío. Ese
+    // error salía por `addSetLog`, lo agarraba el `catch` de `logSet`, y la
+    // serie no se escribía.
+    //
+    // O sea: separar la confirmación del servidor NO alcanzaba. Entrenar sin
+    // conexión seguía roto, ahora por la lectura en vez de por la escritura, y
+    // los tests del notifier no lo veían porque mockean `addSetLog` entero.
+    const sessionId = 'session-lectura-rota';
+    final watchRef = firestore
+        .collection('users')
+        .doc(uid)
+        .collection('sessions')
+        .doc(sessionId)
+        .collection('setLogs')
+        .doc('bench-press__1');
+
+    whenCalling(Invocation.method(#get, null))
+        .on(watchRef)
+        .thenThrow(FirebaseException(
+          plugin: 'cloud_firestore',
+          code: 'unavailable',
+          message: 'Failed to get document because the client is offline.',
+        ));
+
+    final persisted = await _escribirSerie(
+      repo,
+      uid: uid,
+      sessionId: sessionId,
+      setLog: buildSetLog(setNumber: 1, completedAt: testNow()),
+    );
+
+    expect(
+      persisted.id,
+      isNotEmpty,
+      reason: 'la adopción del doc del reloj es un extra: si no se puede '
+          'leer, la serie que el atleta marcó se escribe igual.',
+    );
+
+    // La lectura de vuelta NO puede ir por `.get()`: `mock_exceptions` empareja
+    // por NOMBRE de método, así que el throw registrado arriba también le cae
+    // al `get()` de la colección. `dump()` mira el store del fake directo.
+    final store = firestore.dump();
+    expect(
+      store,
+      contains(persisted.id),
+      reason: 'el documento con el id que devolvió el repositorio tiene que '
+          'estar escrito de verdad, no sólo prometido.',
+    );
+  });
+
+  test('saltear la adopción se REPORTA: no puede morir en un catch mudo',
+      () async {
+    // Saltear la adopción crea un segundo documento sobre una serie que el
+    // reloj tal vez ya escribió. Ese duplicado es INVISIBLE en el teléfono
+    // —`_dedupedLogs` lo filtra del estado local— y el servidor lo cuenta:
+    // `functions/src/ranking-aggregate.ts` relee `setLogs` y suma los dos. Es
+    // el daño de los «24 documentos de más y 11.450 kg fantasma».
+    //
+    // Por eso el `catch` no puede ser mudo: sin telemetría, la tasa real de
+    // salteo en la cancha se deduce meses después contando duplicados. El
+    // dartdoc de `_reportNonFatal` dice que es inyectable exactamente para
+    // que un test assertee que el error viajó — esto es eso.
+    const sessionId = 'session-reporta-el-salteo';
+    final reporter = _RecordingNonFatalReporter();
+    final repoConReporter = SessionRepository(
+      firestore: firestore,
+      nonFatalReporter: reporter.call,
+    );
+    final watchRef = firestore
+        .collection('users')
+        .doc(uid)
+        .collection('sessions')
+        .doc(sessionId)
+        .collection('setLogs')
+        .doc('bench-press__1');
+
+    whenCalling(Invocation.method(#get, null))
+        .on(watchRef)
+        .thenThrow(FirebaseException(
+          plugin: 'cloud_firestore',
+          code: 'unavailable',
+          message: 'Failed to get document because the client is offline.',
+        ));
+
+    final logged = await repoConReporter.addSetLog(
+      uid: uid,
+      sessionId: sessionId,
+      setLog: buildSetLog(setNumber: 1, completedAt: testNow()),
+    );
+    await logged.acknowledged;
+
+    expect(
+      reporter.reports.map((r) => r.reason).toList(),
+      [contains('addSetLog')],
+      reason: 'tiene que salir exactamente UN reporte, y su razón tiene que '
+          'nombrar la operación: en Crashlytics se lee la razón, no el stack.',
+    );
   });
 
   // ─── addSetLog(): dedupe contra lo que escribió el RELOJ ──────────────────
@@ -444,7 +575,8 @@ void main() {
       fieldSetNumber: 1,
     );
 
-    final persisted = await repo.addSetLog(
+    final persisted = await _escribirSerie(
+      repo,
       uid: uid,
       sessionId: sessionId,
       setLog: buildSetLog(
@@ -486,7 +618,8 @@ void main() {
       fieldSetNumber: 2,
     );
 
-    final persisted = await repo.addSetLog(
+    final persisted = await _escribirSerie(
+      repo,
       uid: uid,
       sessionId: sessionId,
       setLog: buildSetLog(
@@ -524,7 +657,8 @@ void main() {
       fieldSetNumber: 1,
     );
 
-    final persisted = await repo.addSetLog(
+    final persisted = await _escribirSerie(
+      repo,
       uid: uid,
       sessionId: sessionId,
       setLog: buildSetLog(
@@ -546,7 +680,8 @@ void main() {
       () async {
     final sessionId = await createActiveSession();
 
-    await repo.addSetLog(
+    await _escribirSerie(
+      repo,
       uid: uid,
       sessionId: sessionId,
       setLog: buildSetLog(setNumber: 1, completedAt: testNow()),
@@ -618,7 +753,8 @@ void main() {
     final sessionId = await createActiveSession();
     final completedAt = DateTime.utc(2026, 5, 18, 10, 5, 0);
 
-    final persisted = await repo.addSetLog(
+    final persisted = await _escribirSerie(
+      repo,
       uid: uid,
       sessionId: sessionId,
       setLog: buildSetLog(setNumber: 1, completedAt: completedAt),
@@ -654,17 +790,20 @@ void main() {
     final sessionId = await createActiveSession();
 
     // Add in reverse order on purpose
-    await repo.addSetLog(
+    await _escribirSerie(
+      repo,
       uid: uid,
       sessionId: sessionId,
       setLog: buildSetLog(setNumber: 3, completedAt: testNow()),
     );
-    await repo.addSetLog(
+    await _escribirSerie(
+      repo,
       uid: uid,
       sessionId: sessionId,
       setLog: buildSetLog(setNumber: 1, completedAt: testNow()),
     );
-    await repo.addSetLog(
+    await _escribirSerie(
+      repo,
       uid: uid,
       sessionId: sessionId,
       setLog: buildSetLog(setNumber: 2, completedAt: testNow()),
@@ -690,12 +829,14 @@ void main() {
   test('SCENARIO-251: SetLogs are accessible after session is finished',
       () async {
     final sessionId = await createActiveSession();
-    await repo.addSetLog(
+    await _escribirSerie(
+      repo,
       uid: uid,
       sessionId: sessionId,
       setLog: buildSetLog(setNumber: 1, completedAt: testNow()),
     );
-    await repo.addSetLog(
+    await _escribirSerie(
+      repo,
       uid: uid,
       sessionId: sessionId,
       setLog: buildSetLog(setNumber: 2, completedAt: testNow()),
@@ -976,7 +1117,8 @@ void main() {
       routineName: routineName,
       startedAt: DateTime.utc(2026, 5, 15, 8, 0, 0),
     );
-    await repoWithProfile.addSetLog(
+    await _escribirSerie(
+      repoWithProfile,
       uid: uid,
       sessionId: session.id,
       setLog: SetLog(
@@ -1025,7 +1167,8 @@ void main() {
       routineName: routineName,
       startedAt: DateTime.utc(2026, 5, 15, 8, 0, 0),
     );
-    await repoWithProfile.addSetLog(
+    await _escribirSerie(
+      repoWithProfile,
       uid: uid,
       sessionId: session.id,
       setLog: SetLog(

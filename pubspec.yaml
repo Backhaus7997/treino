@@ -127,6 +127,13 @@ dev_dependencies:
   json_serializable: ^6.8.0
   mocktail: ^1.0.4
   fake_cloud_firestore: ^3.0.3
+  # Inyecta excepciones en los dobles de `fake_cloud_firestore` — es el mismo
+  # paquete que ese fake usa por dentro para su `maybeThrowException`. Se
+  # declara explícito (ya venía como transitiva) porque `session_repository_test`
+  # lo importa directo para probar que `addSetLog` escribe la serie AUNQUE la
+  # lectura de adopción del reloj falle, que es lo que pasa sin conexión cuando
+  # el documento del reloj no está cacheado.
+  mock_exceptions: ^0.8.1
   # Generates ios/Runner/Assets.xcassets/AppIcon.appiconset/ from a single
   # 1024×1024 source (assets/icon/app_icon.png). Run after changing the
   # source: `dart run flutter_launcher_icons`. NOT a runtime dependency

@@ -12,6 +12,7 @@ import 'package:cloud_firestore/cloud_firestore.dart'
 
 import '../../../core/telemetry/non_fatal.dart';
 import '../../../core/utils/argentina_time.dart';
+import '../../../core/utils/network_timeouts.dart';
 import '../../../core/utils/weekly_streak_calculator.dart';
 import '../../profile/data/user_public_profile_repository.dart';
 import '../domain/duration_timer.dart';
@@ -23,16 +24,56 @@ import '../domain/set_log.dart';
 import '../application/session_duration.dart';
 import '../domain/set_log_identity.dart';
 
+/// Una serie ya escrita LOCALMENTE, con la confirmación del servidor aparte.
+///
+/// Existe porque en Firestore esas son DOS cosas distintas y el código las
+/// trataba como una sola. La escritura se aplica al cache del teléfono de
+/// inmediato —y `.snapshots()` emite por compensación de latencia—, pero el
+/// future de `set()` **no completa hasta que el servidor confirma**. Sin red no
+/// completa nunca.
+///
+/// Mientras `addSetLog` devolvía un `Future<SetLog>` pelado, el único que
+/// tenía el id era ese future, así que quien lo necesitaba quedaba obligado a
+/// esperar al servidor para seguir. Eso es lo que colgaba a `logSet` sin
+/// conexión y le dejaba el guard anti doble-tap trabado en `true`.
+///
+/// El tipo ahora dice la verdad: [setLog] está disponible sin red, y
+/// [acknowledged] es una promesa aparte que el que la quiera espera y el que
+/// no, no. Un `await` de más sobre [acknowledged] vuelve a colgar el camino:
+/// es deliberado que haya que escribirlo.
+class LoggedSet {
+  const LoggedSet({required this.setLog, required this.acknowledged});
+
+  /// La serie con su id definitivo. Se resuelve sin tocar la red: `doc()`
+  /// genera el id en el cliente.
+  final SetLog setLog;
+
+  /// Completa cuando el servidor confirmó la escritura.
+  ///
+  /// **Sin red no completa nunca** — no falla, queda pendiente y Firestore la
+  /// sincroniza cuando vuelve. Falla sólo ante un error real (permisos, por
+  /// ejemplo). No la esperes en el camino crítico.
+  final Future<void> acknowledged;
+}
+
 class SessionRepository {
   SessionRepository({
     required FirebaseFirestore firestore,
     UserPublicProfileRepository? publicProfileRepository,
     NonFatalReporter? nonFatalReporter,
+    Duration? watchAdoptionReadTimeout,
   })  : _firestore = firestore,
         _publicProfileRepository = publicProfileRepository,
-        _reportNonFatal = nonFatalReporter ?? reportNonFatal;
+        _reportNonFatal = nonFatalReporter ?? reportNonFatal,
+        _watchAdoptionReadTimeout =
+            watchAdoptionReadTimeout ?? kWatchAdoptionReadTimeout;
 
   final FirebaseFirestore _firestore;
+
+  /// Cota de la lectura de adopción de [addSetLog]. Inyectable para que los
+  /// tests puedan bajarla: un test que espera segundos reales no se corre, y
+  /// uno que no se corre no protege nada.
+  final Duration _watchAdoptionReadTimeout;
   final UserPublicProfileRepository? _publicProfileRepository;
 
   /// Cómo se reporta un error que [finish] decide NO propagar.
@@ -570,7 +611,7 @@ class SessionRepository {
   /// El teléfono NO pasa a usar ids determinísticos para sus propias series: al
   /// borrar una serie renumera las siguientes, y eso obligaría a mover documentos
   /// (HANDOFF §4.3). Solo ADOPTA el id del reloj cuando el reloj llegó primero.
-  Future<SetLog> addSetLog({
+  Future<LoggedSet> addSetLog({
     required String uid,
     required String sessionId,
     required SetLog setLog,
@@ -580,8 +621,63 @@ class SessionRepository {
       setNumber: setLog.setNumber,
     );
     final watchRef = _setLogs(uid, sessionId).doc(watchDocId);
-    final watchSnap = await watchRef.get();
-    final watchData = watchSnap.data();
+
+    // Esta lectura es una OPTIMIZACIÓN, no un requisito: sirve para adoptar el
+    // documento del reloj cuando llegó primero. Si no se puede hacer, la serie
+    // tiene que escribirse igual.
+    //
+    // Sin red el resultado depende del cache. Cuando el documento del reloj no
+    // está cacheado, esta lectura puede terminar en error en vez de en un
+    // snapshot vacío — y sin este catch, ese error salía por `addSetLog`, lo
+    // agarraba el `catch` de `logSet`, y la serie NO se escribía. O sea que
+    // separar la confirmación del servidor no alcanzaba: entrenar sin conexión
+    // seguía roto, ahora por la LECTURA en vez de por la escritura.
+    // Lo señaló Codex en la review del PR.
+    //
+    // Un fallo acá se trata como "el reloj no escribió nada": es el mismo
+    // camino que un documento ausente, y es el que ya corría antes de que el
+    // reloj existiera. El riesgo que queda —crear un documento propio mientras
+    // el del reloj existe pero no se pudo leer— es el duplicado que esta
+    // lectura evita cuando funciona, y es estrictamente mejor que perder la
+    // serie que el atleta acaba de marcar.
+    // La cota NO es redundante con el `catch`: cubren dos fallas distintas.
+    // El `catch` agarra la lectura que TIRA; la cota agarra la que no devuelve
+    // ni tira, que es el caso que este repo midió en el simulador el
+    // 2026-08-12 y documentó en `network_timeouts.dart`. Sin ella, una conexión
+    // a medias deja `logSet` esperando, su guard trabado, y vuelve el bug
+    // entero: no se puede marcar nada sin conexión.
+    DocumentSnapshot<Map<String, dynamic>>? watchSnap;
+    try {
+      watchSnap = await watchRef.get().timeout(_watchAdoptionReadTimeout);
+    } catch (e, st) {
+      watchSnap = null;
+      // Saltear la adopción NO es gratis, y por eso no se traga en silencio.
+      //
+      // Sin adoptar, el teléfono crea su propio documento sobre una serie que
+      // el reloj tal vez ya escribió. Ese duplicado es INVISIBLE en el
+      // teléfono —`_dedupedLogs` lo filtra del estado local— pero el servidor
+      // lo cuenta: `functions/src/ranking-aggregate.ts` relee `setLogs` y suma
+      // los dos. Es el daño que esta lectura existe para evitar: 24 documentos
+      // de más y 11.450 kg fantasma, medidos el 2026-08-11.
+      //
+      // Se reportan los dos casos, con razones distintas, porque preguntan
+      // cosas distintas: el timeout dice "¿la cota está bien elegida?" —hoy 2
+      // segundos, decididos sin datos de campo— y el error dice "¿se rompió
+      // algo?" (un permission-denied acá sería una regresión de reglas).
+      unawaited(_reportNonFatal(
+        e,
+        st,
+        reason: e is TimeoutException
+            ? 'SessionRepository.addSetLog: la lectura de adopción del reloj '
+                'superó ${_watchAdoptionReadTimeout.inMilliseconds} ms. La '
+                'serie se escribe igual, con el riesgo de duplicar la del '
+                'reloj si había una.'
+            : 'SessionRepository.addSetLog: falló la lectura de adopción del '
+                'reloj. La serie se escribe igual, con el riesgo de duplicar '
+                'la del reloj si había una.',
+      ).catchError((_) {}));
+    }
+    final watchData = watchSnap?.data();
 
     // La identidad se decide por los CAMPOS, nunca por el path. Un documento
     // puede quedar en una ruta que ya no lo describe: `removeSet` renumera las
@@ -595,7 +691,8 @@ class SessionRepository {
     // desde el teléfono —la renumeración dejó `peso-muerto__3` conteniendo la
     // serie 2— y al cargar una serie 3 nueva el teléfono creó su propio
     // documento. Confiando en la ruta, esa serie 2 se habría destruido.
-    final holdsThisSet = watchSnap.exists &&
+    final holdsThisSet = watchSnap != null &&
+        watchSnap.exists &&
         watchData != null &&
         setLogDocHoldsSet(
           docExerciseId: watchData['exerciseId'],
@@ -611,14 +708,20 @@ class SessionRepository {
       // devuelve es el del reloj, para que un `updateSet`/`removeSet` posterior
       // apunte al documento que existe y no a uno inventado.
       final adopted = setLog.copyWith(id: watchDocId);
-      await watchRef.set(adopted.toJson());
-      return adopted;
+      // Sin `await`: el id ya lo tenemos y la serie tiene que poder seguir su
+      // camino sin red. La confirmación viaja aparte, en `acknowledged`.
+      return LoggedSet(
+        setLog: adopted,
+        acknowledged: watchRef.set(adopted.toJson()),
+      );
     }
 
     final ref = _setLogs(uid, sessionId).doc();
     final withId = setLog.copyWith(id: ref.id);
-    await ref.set(withId.toJson());
-    return withId;
+    return LoggedSet(
+      setLog: withId,
+      acknowledged: ref.set(withId.toJson()),
+    );
   }
 
   // ─── addSetLogFromWatch ─────────────────────────────────────────────────

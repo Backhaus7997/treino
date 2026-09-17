@@ -533,7 +533,7 @@ void main() {
             uid: any(named: 'uid'),
             sessionId: any(named: 'sessionId'),
             setLog: any(named: 'setLog'),
-          )).thenAnswer((_) async => makeSetLog());
+          )).thenAnswer((_) async => makeLoggedSet());
 
       final (:container, :init) = await setupFresh(repo: repo);
       addTearDown(container.dispose);
@@ -551,7 +551,7 @@ void main() {
             uid: any(named: 'uid'),
             sessionId: any(named: 'sessionId'),
             setLog: any(named: 'setLog'),
-          )).thenAnswer((_) async => makeSetLog());
+          )).thenAnswer((_) async => makeLoggedSet());
 
       final (:container, :init) = await setupFresh(repo: repo);
       addTearDown(container.dispose);
@@ -583,7 +583,7 @@ void main() {
             uid: any(named: 'uid'),
             sessionId: any(named: 'sessionId'),
             setLog: any(named: 'setLog'),
-          )).thenAnswer((_) async => makeSetLog());
+          )).thenAnswer((_) async => makeLoggedSet());
 
       final (:container, :init) =
           await setupFresh(repo: repo, routine: routine);
@@ -605,7 +605,7 @@ void main() {
             uid: any(named: 'uid'),
             sessionId: any(named: 'sessionId'),
             setLog: any(named: 'setLog'),
-          )).thenAnswer((_) async => makeSetLog());
+          )).thenAnswer((_) async => makeLoggedSet());
       when(() => repo.finish(
             uid: any(named: 'uid'),
             sessionId: any(named: 'sessionId'),
@@ -643,7 +643,8 @@ void main() {
             sessionId: any(named: 'sessionId'),
             setLog: any(named: 'setLog'),
           )).thenAnswer(
-        (inv) async => inv.namedArguments[const Symbol('setLog')] as dynamic,
+        (inv) async => makeLoggedSet(
+            setLog: inv.namedArguments[const Symbol('setLog')] as SetLog),
       );
 
       final (:container, :init) = await setupFresh(repo: repo);
@@ -674,7 +675,8 @@ void main() {
             sessionId: any(named: 'sessionId'),
             setLog: any(named: 'setLog'),
           )).thenAnswer(
-        (inv) async => inv.namedArguments[const Symbol('setLog')] as dynamic,
+        (inv) async => makeLoggedSet(
+            setLog: inv.namedArguments[const Symbol('setLog')] as SetLog),
       );
 
       final (:container, :init) = await setupFresh(repo: repo);
@@ -856,7 +858,7 @@ void main() {
             uid: any(named: 'uid'),
             sessionId: any(named: 'sessionId'),
             setLog: any(named: 'setLog'),
-          )).thenAnswer((_) async => makeSetLog());
+          )).thenAnswer((_) async => makeLoggedSet());
       when(() => repo.finish(
             uid: any(named: 'uid'),
             sessionId: any(named: 'sessionId'),
@@ -943,7 +945,7 @@ void main() {
             uid: any(named: 'uid'),
             sessionId: any(named: 'sessionId'),
             setLog: any(named: 'setLog'),
-          )).thenAnswer((_) async => makeSetLog());
+          )).thenAnswer((_) async => makeLoggedSet());
       when(() => repo.finish(
             uid: any(named: 'uid'),
             sessionId: any(named: 'sessionId'),
@@ -1202,7 +1204,8 @@ void main() {
             sessionId: any(named: 'sessionId'),
             setLog: any(named: 'setLog'),
           )).thenAnswer(
-        (inv) async => inv.namedArguments[const Symbol('setLog')] as dynamic,
+        (inv) async => makeLoggedSet(
+            setLog: inv.namedArguments[const Symbol('setLog')] as SetLog),
       );
 
       final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
@@ -1296,7 +1299,8 @@ void main() {
             sessionId: any(named: 'sessionId'),
             setLog: any(named: 'setLog'),
           )).thenAnswer(
-        (inv) async => inv.namedArguments[const Symbol('setLog')] as dynamic,
+        (inv) async => makeLoggedSet(
+            setLog: inv.namedArguments[const Symbol('setLog')] as SetLog),
       );
 
       final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
@@ -1363,7 +1367,8 @@ void main() {
             sessionId: any(named: 'sessionId'),
             setLog: any(named: 'setLog'),
           )).thenAnswer(
-        (inv) async => inv.namedArguments[const Symbol('setLog')] as dynamic,
+        (inv) async => makeLoggedSet(
+            setLog: inv.namedArguments[const Symbol('setLog')] as SetLog),
       );
 
       final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
@@ -1426,7 +1431,8 @@ void main() {
             sessionId: any(named: 'sessionId'),
             setLog: any(named: 'setLog'),
           )).thenAnswer(
-        (inv) async => inv.namedArguments[const Symbol('setLog')] as dynamic,
+        (inv) async => makeLoggedSet(
+            setLog: inv.namedArguments[const Symbol('setLog')] as SetLog),
       );
 
       final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
@@ -1491,7 +1497,8 @@ void main() {
             sessionId: any(named: 'sessionId'),
             setLog: any(named: 'setLog'),
           )).thenAnswer(
-        (inv) async => inv.namedArguments[const Symbol('setLog')] as dynamic,
+        (inv) async => makeLoggedSet(
+            setLog: inv.namedArguments[const Symbol('setLog')] as SetLog),
       );
       when(() => repo.deleteSetLog(
             uid: any(named: 'uid'),
@@ -1576,7 +1583,8 @@ void main() {
             sessionId: any(named: 'sessionId'),
             setLog: any(named: 'setLog'),
           )).thenAnswer(
-        (inv) async => inv.namedArguments[const Symbol('setLog')] as dynamic,
+        (inv) async => makeLoggedSet(
+            setLog: inv.namedArguments[const Symbol('setLog')] as SetLog),
       );
       when(() => repo.deleteSetLog(
             uid: any(named: 'uid'),
@@ -1678,7 +1686,8 @@ void main() {
             sessionId: any(named: 'sessionId'),
             setLog: any(named: 'setLog'),
           )).thenAnswer(
-        (inv) async => inv.namedArguments[const Symbol('setLog')] as dynamic,
+        (inv) async => makeLoggedSet(
+            setLog: inv.namedArguments[const Symbol('setLog')] as SetLog),
       );
 
       final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
@@ -1736,7 +1745,8 @@ void main() {
             sessionId: any(named: 'sessionId'),
             setLog: any(named: 'setLog'),
           )).thenAnswer(
-        (inv) async => inv.namedArguments[const Symbol('setLog')] as dynamic,
+        (inv) async => makeLoggedSet(
+            setLog: inv.namedArguments[const Symbol('setLog')] as SetLog),
       );
       when(() => repo.updateSetLog(
             uid: any(named: 'uid'),
@@ -1825,7 +1835,8 @@ void main() {
             sessionId: any(named: 'sessionId'),
             setLog: any(named: 'setLog'),
           )).thenAnswer(
-        (inv) async => inv.namedArguments[const Symbol('setLog')] as dynamic,
+        (inv) async => makeLoggedSet(
+            setLog: inv.namedArguments[const Symbol('setLog')] as SetLog),
       );
 
       // First deleteSetLog call fails; the retry's call succeeds.
@@ -1914,7 +1925,7 @@ void main() {
         controller.add([nueva]);
         // Deja correr el listener del stream ANTES de que logSet siga.
         await Future<void>.delayed(Duration.zero);
-        return nueva;
+        return makeLoggedSet(setLog: nueva);
       });
 
       final container = _makeContainer(repo: repo, uid: 'u1', routine: routine);
@@ -2010,8 +2021,8 @@ void main() {
                 sessionId: any(named: 'sessionId'),
                 setLog: any(named: 'setLog'),
               ))
-          .thenAnswer(
-              (i) async => i.namedArguments[const Symbol('setLog')] as SetLog);
+          .thenAnswer((i) async => makeLoggedSet(
+              setLog: i.namedArguments[const Symbol('setLog')] as SetLog));
 
       final booted = await boot(repo: repo);
       final notifier =
