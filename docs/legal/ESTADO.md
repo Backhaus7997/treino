@@ -1,7 +1,7 @@
 # Estado del trabajo legal y de moderación
 
-**Última actualización:** 16 de septiembre de 2026
-**Alcance:** todo lo trabajado entre el 31 de agosto y el 16 de septiembre.
+**Última actualización:** 17 de septiembre de 2026
+**Alcance:** todo lo trabajado entre el 31 de agosto y el 17 de septiembre.
 
 Este documento se sostiene solo. Sirve para retomar el tema sin leer ninguna
 conversación previa, y para pasárselo a otra persona.
@@ -10,15 +10,21 @@ conversación previa, y para pasárselo a otra persona.
 
 ## Dónde estamos, en una línea
 
-**La redacción legal está cerrada.** Los dos PR se mergearon, la edad mínima
-subió a 16 y los once marcadores de revisión legal se resolvieron con
-investigación de fuentes primarias, sin esperar al abogado. El dictamen sigue
-siendo necesario para validar, pero ya no bloquea.
+**La redacción legal está cerrada y el generador está a un solo marcador.** Los
+once marcadores de revisión legal se resolvieron con investigación de fuentes
+primarias, sin esperar al abogado. La edad mínima quedó en **13**, el age gate se
+mergeó (#1162) y el barrido de retención se encendió el 17/09 después de medir
+que no hay backlog. **El único marcador que queda es el INPI.**
 
-Lo que bloquea publicar hoy son **dos cosas de código y dos de trámite**: el
-filtrado de términos vetados, la vista de revisión de reportes, la inscripción
-ante la AAIP y la designación de representante en la Unión Europea. El age gate
-dejó de estar en esta lista con el PR #1162.
+Lo que bloquea publicar hoy son **dos cosas de código, una de la landing y dos de
+trámite**: el filtrado de términos vetados, la vista de revisión de reportes, las
+páginas legales de `gettreino.com`, la inscripción ante la AAIP y el registro de
+marca.
+
+⚠️ **El alcance se acotó a la Argentina el 17/09.** Con eso se cayeron el
+representante en la Unión Europea, el del Reino Unido y todo el paquete de
+Estados Unidos. No es un olvido: es una decisión, y el día que se abra otro
+mercado hay que volver a esta lista.
 
 ---
 
@@ -189,8 +195,9 @@ Sin el fix, bloquear y reportar habrían fallado **siempre** con
 | 5 | **Filtrado de términos vetados** — cuarto requisito de la Guideline 1.2, el único que #1114 no cubre | Desarrollo | Pendiente |
 | 6 | **Vista de revisión de reportes** — ver la sección 6 | Desarrollo | Pendiente |
 | 7 | **Páginas legales en la landing** — con los marcadores cerrados ya no hay documento bloqueado por texto | Desarrollo | Especificado |
-| 8 | **Encender el barrido de retención** — leer el log del dry-run y poner `RETENTION_SWEEP_DRY_RUN = false` | Titular | Pendiente |
-| 9 | **Representante en la Unión Europea y en el Reino Unido** — el art. 27 del RGPD lo exige y las excepciones del 27(2) no aplican, porque el tratamiento de datos de salud es continuo y a gran escala. Son **dos**, y hay que publicar su identidad y contacto en la política de privacidad | Titular | Pendiente, y hoy la política no lo menciona |
+| 8 | ~~**Encender el barrido de retención**~~ | Titular | **HECHO** el 2026-09-17. El backlog se midió por dos caminos independientes y dio **cero**: a la cuenta más inactiva le faltan 601 días para el umbral de aviso. Ver §8.1 de `retencion-y-borrado.md` |
+| 9 | ~~Representante en la Unión Europea y en el Reino Unido~~ | Titular | **FUERA DE ALCANCE** desde el 17/09, con el lanzamiento acotado a la Argentina. El art. 27 del RGPD los exige y las excepciones del 27(2) no aplican —el tratamiento de datos de salud es continuo y a gran escala—, así que **son obligatorios el día que se abra la Unión Europea**, y hay que publicar su identidad y contacto en la política |
+| 11 | **Registro de marca ante el INPI** — es el último marcador vivo del generador. Con presentar la solicitud alcanza: el número sale el mismo día y el aviso legal puede decir "en trámite" | Titular | Pendiente |
 | 10 | **Dictamen legal** — las siete preguntas, ahora para validar lo ya resuelto en vez de destrabar | Abogado | No bloquea |
 
 ### Trámites
@@ -270,10 +277,14 @@ Copiarlas a mano crea una tercera fuente del mismo texto legal, en otro
 repositorio, sin ningún gate de sincronización. Es exactamente el movimiento que
 rompió la sincronización las dos veces anteriores.
 
-**Desde el 2026-09-16 ya no hay documento bloqueado por texto.** Con los once
-marcadores de revisión legal cerrados, el generador sólo se frena por dos
-marcadores operativos: encender el barrido de retención y confirmar el estado del
-registro de marca ante el INPI. Los dos son del titular y ninguno es redacción.
+**Desde el 2026-09-17 el generador está a un solo marcador.** Los once de
+revisión legal se cerraron el 16/09, y el del barrido el 17/09 al encenderlo.
+Queda **el INPI**, y con presentar la solicitud alcanza.
+
+> ⚠️ **El generador y la landing tienen que salir juntos.** Hoy las dos están
+> viejas. Si el generador corre solo, la app pasa a tener el texto nuevo y
+> `gettreino.com` se queda con el de marzo: el desfasaje se agranda en vez de
+> cerrarse, y la URL que Play Console tiene declarada apunta a la landing.
 
 ---
 

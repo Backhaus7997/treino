@@ -618,11 +618,19 @@ describe("dryRun — el modo obligatorio de la primera corrida", () => {
     expect(MIN_NOTICE_AGE_DAYS).toBe(90);
   });
 
-  it("se despliega en dryRun", () => {
-    // Trinquete, igual que el interruptor del paywall del alumno. La señal de
-    // actividad ya tiene historia, así que la primera corrida ve TODO el
-    // backlog de una. Si alguien apaga esto, que rompa este test y lea el
-    // encabezado del módulo antes de deployar.
-    expect(RETENTION_SWEEP_DRY_RUN).toBe(true);
+  it("ya NO se despliega en dryRun", () => {
+    // El trinquete original pedía que apagar el dryRun rompiera este test y
+    // obligara a leer el encabezado del módulo antes de deployar. Disparó, se
+    // leyó, y la condición que pedía se cumplió el 2026-09-17: el backlog se
+    // midió por dos caminos independientes —los logs de dos corridas en dryRun
+    // y un conteo directo contra Auth— y dio CERO. A la cuenta más inactiva de
+    // la base le faltan 601 días para el umbral de aviso. Ver §8.1 de
+    // docs/legal/retencion-y-borrado.md.
+    //
+    // El trinquete no se borra, se da vuelta: ahora guarda la otra dirección.
+    // Volver a dryRun deja de ejercer una baja que la §6 del documento publicado
+    // promete, así que si alguien lo apaga, que rompa este test y cambie la
+    // frase del documento en el mismo commit.
+    expect(RETENTION_SWEEP_DRY_RUN).toBe(false);
   });
 });
