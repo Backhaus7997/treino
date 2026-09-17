@@ -75,10 +75,16 @@ El resto de este documento es el detalle de eso.
 | Nombre y apellido | No | Lo cargás vos |
 | Nombre visible y foto de perfil | No | Lo cargás vos |
 | Teléfono | No | Lo cargás vos. **No se publica** |
-| Fecha de nacimiento | No | Lo cargás vos. **No se publica** |
+| Fecha de nacimiento | **Sí** | La cargás vos al crear la cuenta. **No se publica** |
 | Género | No | Lo cargás vos |
 | Gimnasio | No | Lo elegís vos |
 | Fecha de aceptación de los términos | Sí | Registrada automáticamente |
+
+**Por qué la fecha de nacimiento es obligatoria.** Es el único dato de esta
+tabla que no pedimos para prestarte el servicio, sino para cumplir la ley: es
+con lo que verificamos la edad mínima de 16 años de la sección 12. No se muestra
+a nadie, no se usa con ningún otro fin, y no se comparte con tu entrenador salvo
+que vos actives el compartir perfil.
 
 ### 3.2 Datos de salud y estado físico — categoría sensible
 
