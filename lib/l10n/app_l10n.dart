@@ -6675,10 +6675,10 @@ abstract class AppL10n {
   /// **'Asociate a un gym para postear acá'**
   String get postPrivacyNoGymHint;
 
-  /// Section heading for same-gym people suggested below the empty Friends feed.
+  /// Section heading for the people suggested below the empty Friends feed. Same-gym profiles come first, then profiles from nearby gyms (5x5 geohash grid), so the copy must NOT claim they are all from the viewer's gym.
   ///
   /// In es_AR, this message translates to:
-  /// **'PERSONAS DE TU GYM'**
+  /// **'SUGERENCIAS PARA VOS'**
   String get suggestedUsersTitle;
 
   /// Fallback display name for a suggested public profile without a name.

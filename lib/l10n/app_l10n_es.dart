@@ -3809,7 +3809,7 @@ class AppL10nEs extends AppL10n {
   String get postPrivacyNoGymHint => 'Asociate a un gym para postear acá';
 
   @override
-  String get suggestedUsersTitle => 'PERSONAS DE TU GYM';
+  String get suggestedUsersTitle => 'SUGERENCIAS PARA VOS';
 
   @override
   String get suggestedUserAnonymous => 'Anónimo';
@@ -8471,7 +8471,7 @@ class AppL10nEsAr extends AppL10nEs {
   String get postPrivacyNoGymHint => 'Asociate a un gym para postear acá';
 
   @override
-  String get suggestedUsersTitle => 'PERSONAS DE TU GYM';
+  String get suggestedUsersTitle => 'SUGERENCIAS PARA VOS';
 
   @override
   String get suggestedUserAnonymous => 'Anónimo';
