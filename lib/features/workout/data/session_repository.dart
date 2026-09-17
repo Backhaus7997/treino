@@ -1108,28 +1108,44 @@ class SessionRepository {
     required String sessionId,
   }) {
     if (uid.isEmpty || sessionId.isEmpty) return Stream.value(false);
+    // Estado derivado del PROPIO stream, no un booleano que la capa de
+    // aplicación sincroniza contra un hecho remoto — eso ya falló dos veces
+    // acá (`_creacionRechazada`, `_sesionConfirmada`).
+    //
+    // La closure guarda estado POR SUSCRIPCIÓN, y está bien porque
+    // `watchSessionFinished` arma un stream nuevo en cada llamada. Si alguien
+    // lo convierte en un broadcast compartido, esto se rompe.
+    var existioDeVerdad = false;
     return _sessions(uid).doc(sessionId).snapshots().map((snap) {
-      // Un «no existe» sólo significa «terminada» si lo dice el SERVIDOR.
+      if (snap.exists) {
+        // Existencia CONFIRMADA: el documento está Y no hay una escritura
+        // local pendiente inventándolo. `hasPendingWrites` es el dato que
+        // contesta la pregunta de verdad —«¿esta sesión llegó a existir en el
+        // servidor?»— en vez de un proxy cercano.
+        if (!snap.metadata.hasPendingWrites && !snap.metadata.isFromCache) {
+          existioDeVerdad = true;
+        }
+        final data = snap.data();
+        // `finishedAt` viaja SIEMPRE como clave (json_serializable la incluye
+        // con null), así que preguntar por la presencia de la clave no alcanza:
+        // hay que mirar el valor. Es la misma trampa que rompió el lado del
+        // reloj — ver `FS.isEmpty` en FirestoreREST.swift.
+        return data != null && data['finishedAt'] != null;
+      }
+
+      // Una desaparición sólo significa «terminada» si antes estuvo DE VERDAD,
+      // y si es el SERVIDOR el que dice que ya no está.
       //
-      // Dicho por el caché no significa nada: la sesión puede estar todavía en
-      // la cola de escritura sin ACKear, o el servidor pudo haberla rechazado
-      // y el SDK revirtió la mutación local. Tratar las dos cosas igual le
-      // mostraba al atleta «terminaste el entreno desde el reloj» sobre un
-      // rechazo de paywall — una explicación falsa, peor que ninguna.
+      // Hacen falta las dos condiciones, y cada una tapa un agujero distinto:
       //
-      // La primera versión de esta defensa vivía en el notifier, con un flag
-      // que recordaba si la creación había sido confirmada. No alcanzaba: una
-      // sesión RETOMADA sale de `getActive`, que usa un `.get()` pelado y sin
-      // red devuelve el CACHÉ, así que el flag se prendía sobre algo que el
-      // servidor nunca vio. Firestore ya etiqueta cada snapshot con su
-      // procedencia; no hace falta un booleano que la recuerde.
-      if (!snap.exists) return !snap.metadata.isFromCache;
-      final data = snap.data();
-      // `finishedAt` viaja SIEMPRE como clave (json_serializable la incluye
-      // con null), así que preguntar por la presencia de la clave no alcanza:
-      // hay que mirar el valor. Es la misma trampa que rompió el lado del
-      // reloj — ver `FS.isEmpty` en FirestoreREST.swift.
-      return data != null && data['finishedAt'] != null;
+      // • Sin `isFromCache`: una sesión sin ACKear —entreno empezado sin red—
+      //   se leía como terminada.
+      // • Sin `existioDeVerdad`: un create RECHAZADO por el servidor produce
+      //   una ausencia que TAMBIÉN viene del servidor (el SDK revierte la
+      //   mutación y empuja el snapshot). Indistinguible de «se cerró» mirando
+      //   sólo la procedencia — y es justo el caso que le mostraba al atleta
+      //   «terminaste el entreno desde la muñeca» sobre un rechazo de paywall.
+      return existioDeVerdad && !snap.metadata.isFromCache;
     });
   }
 

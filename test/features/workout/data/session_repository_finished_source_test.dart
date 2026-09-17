@@ -54,33 +54,45 @@ class _MockDoc extends Mock
 
 class _MockMetadata extends Mock implements SnapshotMetadata {}
 
-class _SnapshotAusente extends Mock
-    implements DocumentSnapshot<Map<String, Object?>> {
-  _SnapshotAusente({required bool desdeElCache})
-      : _metadata = (_MockMetadata()..stubIsFromCache(desdeElCache));
+class _Snapshot extends Mock implements DocumentSnapshot<Map<String, Object?>> {
+  _Snapshot({
+    required bool existe,
+    required bool desdeElCache,
+    bool escrituraPendiente = false,
+    Map<String, Object?>? datos,
+  })  : _existe = existe,
+        _datos = datos,
+        _metadata = (_MockMetadata()
+          ..stub(desdeElCache: desdeElCache, pendiente: escrituraPendiente));
 
+  final bool _existe;
+  final Map<String, Object?>? _datos;
   final _MockMetadata _metadata;
 
   @override
-  bool get exists => false;
+  bool get exists => _existe;
 
   @override
   SnapshotMetadata get metadata => _metadata;
 
   @override
-  Map<String, Object?>? data() => null;
+  Map<String, Object?>? data() => _datos;
 }
 
 extension on _MockMetadata {
-  void stubIsFromCache(bool v) => when(() => isFromCache).thenReturn(v);
+  void stub({required bool desdeElCache, required bool pendiente}) {
+    when(() => isFromCache).thenReturn(desdeElCache);
+    when(() => hasPendingWrites).thenReturn(pendiente);
+  }
 }
 
 void main() {
   const uid = 'u1';
   const sessionId = 's1';
 
-  /// Arma el repositorio sobre un `snapshots()` que emite [snap].
-  SessionRepository repoQueEmite(DocumentSnapshot<Map<String, Object?>> snap) {
+  /// Arma el repositorio sobre un `snapshots()` que emite [snaps] en orden.
+  SessionRepository repoQueEmite(
+      List<DocumentSnapshot<Map<String, Object?>>> snaps) {
     final firestore = _MockFirestore();
     final users = _MockCollection();
     final userDoc = _MockDoc();
@@ -92,18 +104,27 @@ void main() {
     when(() => userDoc.collection('sessions')).thenReturn(sessions);
     when(() => sessions.doc(sessionId)).thenReturn(sessionDoc);
     when(sessionDoc.snapshots).thenAnswer(
-      (_) => Stream<DocumentSnapshot<Map<String, Object?>>>.value(snap),
+      (_) => Stream<DocumentSnapshot<Map<String, Object?>>>.fromIterable(snaps),
     );
     return SessionRepository(firestore: firestore);
   }
 
   test('un «no existe» del SERVIDOR sí significa que la sesión se cerró',
       () async {
-    final repo = repoQueEmite(_SnapshotAusente(desdeElCache: false));
+    final repo = repoQueEmite([
+      // Primero existió DE VERDAD: confirmada por el servidor, sin escrituras
+      // locales pendientes. Es la sesión que el reloj después cierra.
+      _Snapshot(
+        existe: true,
+        desdeElCache: false,
+        datos: const {'finishedAt': null},
+      ),
+      _Snapshot(existe: false, desdeElCache: false),
+    ]);
 
     await expectLater(
       repo.watchSessionFinished(uid: uid, sessionId: sessionId),
-      emits(true),
+      emitsInOrder([false, true]),
       reason: 'es el camino por el que el reloj cierra un entreno y el '
           'teléfono se entera. Romperlo dejaría al atleta entrenando sobre una '
           'sesión que ya no existe.',
@@ -111,7 +132,7 @@ void main() {
   });
 
   test('un «no existe» del CACHÉ no significa nada', () async {
-    final repo = repoQueEmite(_SnapshotAusente(desdeElCache: true));
+    final repo = repoQueEmite([_Snapshot(existe: false, desdeElCache: true)]);
 
     await expectLater(
       repo.watchSessionFinished(uid: uid, sessionId: sessionId),
@@ -120,6 +141,48 @@ void main() {
           'o el servidor pudo haberlo rechazado y el SDK revirtió la mutación. '
           'Decirle al atleta que cerró el entreno desde el reloj sobre un '
           'rechazo de paywall es una explicación falsa.',
+    );
+  });
+
+  test(
+      'un create RECHAZADO no se lee como «terminada», aunque la ausencia '
+      'venga del servidor', () async {
+    // ⚠️ ESTE es el caso original del PR, y casi se queda sin cobertura.
+    //
+    // La aserción end-to-end que lo cubría vivía en el test del notifier y se
+    // borró al mudar el invariante acá. Sin este test, el bug que el PR vino a
+    // matar quedaba sin un solo guard.
+    //
+    // El agujero de la versión anterior: mirar sólo `isFromCache` separa «no
+    // sé» de «habló el servidor», pero NO separa las dos cosas que el servidor
+    // puede estar diciendo — «existió y ya no está» (terminada) de «nunca
+    // existió» (rechazada). Con red, un create denegado por las reglas produce
+    // una ausencia que TAMBIÉN viene del servidor: el SDK revierte la mutación
+    // local y empuja el snapshot.
+    //
+    // Lo que las distingue es si el documento llegó a existir SIN una
+    // escritura local pendiente inventándolo.
+    final repo = repoQueEmite([
+      // Lo que ve el atleta al tocar Empezar: el doc "existe", pero sólo
+      // porque hay una escritura local sin confirmar.
+      _Snapshot(
+        existe: true,
+        desdeElCache: false,
+        escrituraPendiente: true,
+        datos: const {'finishedAt': null},
+      ),
+      // Las reglas lo deniegan, el SDK revierte, y el servidor empuja la
+      // ausencia.
+      _Snapshot(existe: false, desdeElCache: false),
+    ]);
+
+    await expectLater(
+      repo.watchSessionFinished(uid: uid, sessionId: sessionId),
+      emitsInOrder([false, false]),
+      reason: 'la sesión nunca existió en el servidor, así que su ausencia no '
+          'significa que alguien la haya terminado. Leerlo como «terminada» le '
+          'dice al atleta que cerró el entreno desde la muñeca sobre un '
+          'rechazo de paywall.',
     );
   });
 }
