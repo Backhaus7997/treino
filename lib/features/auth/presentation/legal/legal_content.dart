@@ -40,7 +40,7 @@ const int kTermsVersion = 3;
 /// aceptación (`UserProfile.acceptedPrivacyVersion`).
 ///
 /// Independiente de [kTermsVersion] — ver ese dartdoc.
-const int kPrivacyVersion = 3;
+const int kPrivacyVersion = 4;
 
 /// Fecha, machine-comparable (UTC), en la que el texto de la Política de
 /// Privacidad identificado por [kPrivacyVersion] entró en vigencia.
@@ -243,9 +243,14 @@ const List<LegalSection> kPrivacySections = <LegalSection>[
   ),
   LegalSection(
     '9. Menores',
-    'TREINO no está dirigido a menores de 16 años sin el consentimiento de una '
-        'persona adulta responsable. Si creés que un menor nos brindó datos sin '
-        'ese consentimiento, escribinos para eliminarlos.',
+    'La edad mínima para crear una cuenta es de 13 años: no admitimos cuentas '
+        'de personas que no hayan alcanzado esa edad, y la fecha de nacimiento '
+        'es un dato obligatorio del alta. Si tenés menos de 18 años seguís '
+        'siendo menor para la ley argentina, así que hace falta el '
+        'consentimiento de tu madre, padre o representante legal antes de que '
+        'uses la aplicación y antes de que carguemos cualquier dato tuyo. Si '
+        'creés que una persona menor de 13 años nos brindó datos, escribinos '
+        'para eliminarlos.',
   ),
   LegalSection(
     '10. Cambios a esta política',
