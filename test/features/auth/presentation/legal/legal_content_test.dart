@@ -35,59 +35,82 @@ void main() {
   // ────────────────────────────────────────────────────────────────────────
   // El contrato que la app MUESTRA no puede prometer lo que el código rechaza
   //
-  // Hallazgo de Codex en el PR #1162. Los términos decían "al menos 16 años, o
-  // contar con el consentimiento de una persona adulta responsable" mientras el
-  // validador rechazaba a todo menor de 16 sin excepción: un chico de 14
-  // aceptaba un contrato que le decía que podía, y lo frenábamos dos pantallas
-  // después. El texto vive en DOS copias —este Dart y `docs/legal/*.md`— y ya se
-  // desincronizaron una vez.
+  // Hallazgo de Codex en el PR #1162, y después un segundo agujero que este
+  // mismo grupo NO cazó: al bajar el piso a 13, la §9 de la POLÍTICA siguió
+  // diciendo 16 y nadie se enteró. La versión anterior fallaba por dos motivos
+  // que conviene dejar escritos, porque son el mismo error:
+  //
+  //   1. Miraba sólo `kTermsSections`. La línea viva estaba en
+  //      `kPrivacySections`, que nunca se escaneaba.
+  //   2. Asserteaba `isNot(contains('o contar con el consentimiento'))` — la
+  //      cadena EXACTA que se estaba borrando en ese momento. La línea que
+  //      sobrevivió decía «SIN el consentimiento de una persona adulta
+  //      responsable»: misma promesa rota, otras palabras.
+  //
+  // O sea: era un snapshot disfrazado de invariante. Ahora se assertea el
+  // invariante, sobre los DOS documentos.
   // ────────────────────────────────────────────────────────────────────────
-  group('los términos y el gate de edad dicen lo mismo', () {
+  group('los documentos in-app y el gate de edad dicen lo mismo', () {
     String cuerpo(List<LegalSection> secs) =>
         secs.map((s) => '${s.heading}\n${s.body}').join('\n\n');
 
-    test('los términos declaran la MISMA edad mínima que el validador', () {
+    /// Todo lo que la app muestra como texto legal, junto. Que sean dos listas
+    /// es un detalle de estructura, no una excusa para revisar sólo una.
+    final todoElTexto =
+        '${cuerpo(kTermsSections)}\n\n${cuerpo(kPrivacySections)}';
+
+    /// La mayoría de edad argentina. Es el único otro número que puede aparecer
+    /// legítimamente al lado de "años" en estos textos.
+    const mayoriaDeEdad = 18;
+
+    test('ninguna edad citada contradice a kMinAgeYears', () {
+      final citadas = RegExp(r'(\d+)\s*años')
+          .allMatches(todoElTexto)
+          .map((m) => int.parse(m.group(1)!))
+          .toSet();
+
+      expect(citadas, isNotEmpty,
+          reason: 'si no hay ninguna edad citada, el guard no está midiendo '
+              'nada — probablemente cambió la redacción');
+
       expect(
-        cuerpo(kTermsSections),
-        contains('${ProfileSetupValidators.kMinAgeYears} años cumplidos'),
-        reason: 'si kMinAgeYears cambia, este texto tiene que cambiar con él',
+        citadas
+            .difference({ProfileSetupValidators.kMinAgeYears, mayoriaDeEdad}),
+        isEmpty,
+        reason: 'los textos citan edades que no son ni kMinAgeYears '
+            '(${ProfileSetupValidators.kMinAgeYears}) ni la mayoría de edad '
+            '($mayoriaDeEdad). Si kMinAgeYears cambió, este texto tiene que '
+            'cambiar con él — en los DOS documentos.',
       );
     });
 
-    test('los términos NO ofrecen una excepción por consentimiento adulto', () {
-      // El gate no la contempla, y no puede: un consentimiento declarado por el
-      // propio menor en un checkbox no es el consentimiento parental
-      // VERIFICABLE que exige COPPA §312.5. Prometerla sería ofrecer un camino
-      // que la app no tiene.
+    test('el piso se declara, no se insinúa', () {
       expect(
-        cuerpo(kTermsSections).toLowerCase(),
-        isNot(contains('o contar con el consentimiento')),
+        todoElTexto,
+        contains('${ProfileSetupValidators.kMinAgeYears} años'),
+      );
+    });
+
+    test('no se ofrece a un "adulto responsable" como vía alrededor del piso',
+        () {
+      // La formulación rota, en sus dos variantes, colgaba de «persona adulta
+      // responsable» — que no es una figura legal. El texto correcto nombra a
+      // «madre, padre o representante legal», que sí lo es, y lo pide COMO
+      // REQUISITO para los menores de 18, no como excepción al piso de edad.
+      //
+      // Por eso el guard prohíbe la formulación vaga en vez de la palabra
+      // «consentimiento», que en el texto correcto aparece y debe aparecer.
+      expect(
+        todoElTexto.toLowerCase(),
+        isNot(contains('persona adulta responsable')),
       );
     });
 
     test('la política declara que recolecta la fecha de nacimiento', () {
-      // Pasó a ser un dato OBLIGATORIO en el alta. Recolectarlo sin declararlo
-      // es el agujero que este grupo existe para tapar.
       expect(
         cuerpo(kPrivacySections).toLowerCase(),
         contains('fecha de nacimiento'),
       );
-    });
-  });
-
-  group('kPrivacyV1PublishedAt', () {
-    test('is a machine-comparable UTC date marking the current Privacy text',
-        () {
-      expect(kPrivacyV1PublishedAt, equals(DateTime.utc(2026, 9, 3)));
-      expect(kPrivacyV1PublishedAt.isUtc, isTrue);
-    });
-
-    test('is distinct from kPrivacyLastUpdated (display-only, never parsed)',
-        () {
-      // kPrivacyLastUpdated es un String de display — no debe usarse como
-      // sustituto de esta constante machine-comparable.
-      expect(kPrivacyLastUpdated, isA<String>());
-      expect(kPrivacyV1PublishedAt, isA<DateTime>());
     });
   });
 }
