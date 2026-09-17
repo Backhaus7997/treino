@@ -44,7 +44,7 @@ mockup de diseño.
 | # | Decisión | Qué se resolvió |
 |---|---|---|
 | D1 | **Titular** | BACKHAUSTIN S.A.S., sociedad constituida |
-| D2 | **Edad mínima** | **16 años** (resuelto el 2026-09-16; antes 9), con consentimiento del representante legal para quienes tengan 16 o 17 |
+| D2 | **Edad mínima** | **13 años** (2026-09-17; antes 16, antes 9), con consentimiento del representante legal para todo menor de 18 |
 | D3 | **Alcance** | **Mundial** |
 | D4 | **Cobro** | Mixto: entrenador por Mercado Pago en la web, atleta por compra integrada |
 | D5 | **Alumno ↔ PF** | TREINO **no intermedia** esa plata. Sólo registra la deuda |
@@ -184,7 +184,7 @@ Sin el fix, bloquear y reportar habrían fallado **siempre** con
 |---|---|---|---|
 | 1 | ~~Mergear los dos PRs~~ | Equipo | **HECHO** |
 | 2 | ~~Política multi-jurisdicción~~ — bases legales por finalidad, transferencias, portabilidad, oposición, plazos de incidente | Redacción | **HECHO** el 2026-09-16 |
-| 3 | ~~Consentimiento parental verificable~~ | — | **NO HACE FALTA** con la edad mínima en 16 |
+| 3 | ~~Consentimiento parental **verificable**~~ | — | **NO HACE FALTA** con el piso en 13: COPPA alcanza a menores de 13. El consentimiento del representante **declarado** sí se pide, para todo menor de 18 |
 | 4 | ~~**Age gate en el alta**~~ — `bornAt` pasó a ser obligatorio y se pide en el paso 2 del alta; el router manda a `/birth-date` a las cuentas anteriores, y las reglas de Firestore validan el piso en `create` y en `update` | Desarrollo | **HECHO** — PR #1162, mergeado el 2026-09-17 |
 | 5 | **Filtrado de términos vetados** — cuarto requisito de la Guideline 1.2, el único que #1114 no cubre | Desarrollo | Pendiente |
 | 6 | **Vista de revisión de reportes** — ver la sección 6 | Desarrollo | Pendiente |
@@ -288,11 +288,9 @@ Están en `briefing-revision-legal.pdf`. Resumidas:
    de operación**: rige la primacía de la realidad, el contrato pesa poco y la
    conducta pesa todo.
 3. ~~**Menores de 9 años con alcance mundial**~~ — **RESUELTA** el 2026-09-16
-   subiendo la edad mínima a 16. COPPA deja de aplicar (alcanza a menores de 13)
-   y el art. 8 del RGPD queda cubierto en los 27 Estados, porque 16 es el umbral
-   máximo que cualquiera puede fijar. Ya no hace falta mecanismo de
-   consentimiento parental verificable. **Queda pendiente el código**: el age
-   gate, especificado aparte.
+   subiendo la edad mínima a **13**. COPPA alcanza a los menores de 13, así que
+   con ese piso no hace falta mecanismo de consentimiento parental verificable.
+   **Queda pendiente el código**, especificado aparte.
 4. **Alcance mundial en protección de datos** — qué incorporar sobre la Ley
    25.326.
 5. **Retención tras un pedido de supresión** — hoy se conservan el registro de
@@ -312,14 +310,14 @@ su respuesta.
 Vale decirlo sin vueltas, porque atraviesa varias decisiones:
 
 TREINO permite que **adultos cuyas credenciales la plataforma no verifica**
-tengan **mensajería privada** con usuarios que pueden tener **16 años**, y acceso
+tengan **mensajería privada** con usuarios que pueden tener **13 años**, y acceso
 a sus medidas corporales y a las fotos que suban.
 
 La recomendación técnica había sido edad mínima 18 por este motivo. El titular
 fijó primero 9 y el 2026-09-16 la subió a **16**, que es lo que desactiva COPPA y
 el art. 8 del RGPD. **La exposición se reduce pero no desaparece:** el vínculo
-adulto no verificado ↔ menor de edad sigue existiendo para los alumnos de 16 y
-17 años. Lo que la mitiga hoy es el bloqueo, el reporte y la baja del entrenador,
+adulto no verificado ↔ menor de edad sigue existiendo para todo alumno menor de
+18, y con el piso en 13 alcanza a una franja más amplia que antes. Lo que la mitiga hoy es el bloqueo, el reporte y la baja del entrenador,
 más las obligaciones de la sección 5.bis del contrato del entrenador.
 
 ---

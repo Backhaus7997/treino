@@ -23,7 +23,7 @@ tres partes:
 
 | # | Decisión |
 |---|---|
-| 1 | **Edad mínima de cuenta: 16 años** (subida desde 9 el 2026-09-16) |
+| 1 | **Edad mínima de cuenta: 13 años** (2026-09-17) |
 | 2 | **Alcance mundial** |
 | 3 | **Cobro por pasarela de pago externa**, liquidando a cuenta de la sociedad |
 | 4 | **La plataforma NO intermedia** el dinero entre alumno y entrenador |
@@ -83,13 +83,14 @@ de operación**. Rige la primacía de la realidad, así que necesitamos saber qu
 podemos y qué no podemos hacer para que no se configure dependencia — control,
 precios, horarios, evaluación.
 
-**3. Menores, alcance mundial.** Con la edad mínima en 16 no hace falta
-mecanismo de consentimiento parental verificable: COPPA alcanza a menores de 13 y
-el art. 8 del RGPD fija 16 como techo. Lo que queda para dictamen es más acotado:
-¿corresponde restringir por edad el vínculo con entrenadores y el registro de
-composición corporal **para los alumnos de 16 y 17 años**? Sigue siendo la mayor
-exposición del producto: adultos sin credenciales verificadas con canal privado
-hacia menores de edad.
+**3. Menores.** Con el piso en 13 no hace falta mecanismo de consentimiento
+parental **verificable**: COPPA alcanza a menores de 13. Lo que sí pedimos, para
+todo menor de 18, es el consentimiento del representante **declarado** en el alta.
+Tres preguntas: ¿alcanza el consentimiento declarado o hace falta verificarlo?
+¿Corresponde restringir por edad el vínculo con entrenadores y el registro de
+composición corporal? ¿Y alcanza el art. 26 del CCyC para que una persona de 16
+acepte por sí misma el Descargo Médico? Sigue siendo la mayor exposición del
+producto: adultos sin credenciales verificadas con canal privado hacia menores.
 
 **4. Alcance mundial en protección de datos.** La política está escrita sobre la
 Ley 25.326. ¿Qué hace falta incorporar? Base legal por finalidad, categorías

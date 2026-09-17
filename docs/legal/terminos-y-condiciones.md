@@ -48,18 +48,18 @@ de entrenamiento por sí misma.
 
 ## 3. Edad mínima y cuentas de menores
 
-Para crear una cuenta en TREINO tenés que tener **16 años cumplidos**. No
+Para crear una cuenta en TREINO tenés que tener **13 años cumplidos**. No
 admitimos cuentas de personas que no hayan alcanzado esa edad.
 
 Al crear la cuenta te pedimos tu **fecha de nacimiento**. Es un dato obligatorio:
 sin él no se puede completar el alta.
 
-**Si tenés 16 o 17 años** seguís siendo menor de edad para la ley argentina, así
-que necesitás que tu madre, padre o representante legal lea estos Términos, la
+**Si tenés menos de 18 años** seguís siendo menor de edad para la ley argentina,
+así que necesitás que tu madre, padre o representante legal lea estos Términos, la
 Política de Privacidad y el Descargo Médico, y dé su consentimiento antes de que
 uses la aplicación.
 
-**Si sos madre, padre o representante legal** de una persona de 16 o 17 años que
+**Si sos madre, padre o representante legal** de una persona menor de 18 años que
 usa TREINO:
 
 - Sos responsable de supervisar su uso de la aplicación.
@@ -72,23 +72,24 @@ usa TREINO:
   vínculo habilita mensajería privada y el acceso a datos corporales. Ver la
   sección 6.
 
-Si tomamos conocimiento de que una cuenta pertenece a una persona menor de 16
-años, o de que una persona de 16 o 17 la creó **sin ese consentimiento**, la
+Si tomamos conocimiento de que una cuenta pertenece a una persona menor de 13
+años, o de que una persona menor de 18 la creó **sin ese consentimiento**, la
 suspendemos y eliminamos sus datos.
 
-### Por qué la edad mínima es 16
+### Por qué la edad mínima es 13
 
-No es un número arbitrario. Es el umbral que deja fuera de alcance a los
-regímenes de protección de la infancia que se activan por debajo de esa edad:
+No es un número arbitrario. **COPPA**, la ley de protección de la infancia en
+línea de los Estados Unidos, alcanza a los menores de 13 años y les exige un
+consentimiento parental verificable que TREINO no implementa. Con el piso en 13,
+ningún usuario de TREINO queda alcanzado por ese régimen.
 
-- **COPPA**, en los Estados Unidos, se aplica a menores de 13 años.
-- El **art. 8 del Reglamento General de Protección de Datos** europeo fija 16
-  años como edad de consentimiento digital, y habilita a cada Estado miembro a
-  bajarla hasta 13, pero nunca a subirla. Con el mínimo en 16, la regla se cumple
-  en los 27 Estados sin excepción.
+La ley argentina no fija una edad de consentimiento digital: lo que exige es el
+consentimiento del representante legal mientras la persona sea menor de 18, y eso
+es lo que pedimos en el alta.
 
-Las políticas de familias de las tiendas de aplicaciones tampoco se activan,
-porque TREINO no se dirige a público infantil ni lo admite.
+Las políticas de familias de las tiendas de aplicaciones no se activan, porque
+TREINO no se dirige a público infantil: no tiene contenido infantil, no lo
+promociona y su función es el registro de entrenamiento.
 
 ### La edad es declarada
 

@@ -132,13 +132,13 @@ que el vínculo entre nosotros es laboral, esta cláusula no se te aplica.
 
 ---
 
-## 5.bis Si trabajás con alumnos de 16 o 17 años
+## 5.bis Si trabajás con alumnos menores de 18 años
 
-**La edad mínima para tener una cuenta en TREINO es de 16 años.** Aun así, quien
-tenga 16 o 17 sigue siendo menor de edad para la ley argentina, y ahí tus
-obligaciones son distintas.
+**La edad mínima para tener una cuenta en TREINO es de 13 años.** Todo alumno
+menor de 18 es menor de edad para la ley argentina, y ahí tus obligaciones son
+distintas.
 
-Al aceptar un vínculo con un alumno de 16 o 17 años te obligás a:
+Al aceptar un vínculo con un alumno menor de 18 años te obligás a:
 
 1. **Estar habilitado para hacerlo.** Declarás que cumplís los requisitos que tu
    jurisdicción exija para trabajar con menores — certificaciones,
@@ -156,8 +156,8 @@ Al aceptar un vínculo con un alumno de 16 o 17 años te obligás a:
    para todo el mundo. Adaptarlas es parte de tu criterio profesional, y de tu
    responsabilidad.
 6. **Extremar el cuidado con el registro corporal.** Peso, medidas y porcentaje
-   de grasa en adolescentes son datos sensibles con implicancias propias. Usalos
-   con criterio o no los uses.
+   de grasa en niñas, niños y adolescentes son datos sensibles con implicancias
+   propias, y más cuanto menor es la persona. Usalos con criterio o no los uses.
 7. **Avisarnos** si detectás una situación que ponga en riesgo a un alumno menor
    de edad.
 

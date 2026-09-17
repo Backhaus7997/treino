@@ -82,7 +82,7 @@ El resto de este documento es el detalle de eso.
 
 **Por qué la fecha de nacimiento es obligatoria.** Es el único dato de esta
 tabla que no pedimos para prestarte el servicio, sino para cumplir la ley: es
-con lo que verificamos la edad mínima de 16 años de la sección 12. No se muestra
+con lo que verificamos la edad mínima de la sección 12. No se muestra
 a nadie, no se usa con ningún otro fin, y no se comparte con tu entrenador salvo
 que vos actives el compartir perfil.
 
@@ -398,15 +398,15 @@ corresponda.
 
 ---
 
-## 12. Personas de 16 y 17 años
+## 12. Personas menores de 18 años
 
-**La edad mínima para crear una cuenta en TREINO es de 16 años.** No admitimos
+**La edad mínima para crear una cuenta en TREINO es de 13 años.** No admitimos
 cuentas de personas que no hayan alcanzado esa edad, y la fecha de nacimiento es
 un dato obligatorio del alta.
 
-Si tenés 16 o 17 años seguís siendo menor de edad para la ley argentina, así que
-hace falta el consentimiento de tu madre, padre o representante legal antes de
-que uses la aplicación y antes de que carguemos cualquier dato tuyo.
+Si tenés menos de 18 años seguís siendo menor de edad para la ley argentina, así
+que hace falta el consentimiento de tu madre, padre o representante legal antes
+de que uses la aplicación y antes de que carguemos cualquier dato tuyo.
 
 ### 12.1 Si sos madre, padre o representante legal
 
@@ -446,16 +446,16 @@ Si tomamos conocimiento de que una cuenta pertenece a una persona menor de 16
 años, o de que una persona de 16 o 17 la creó **sin el consentimiento de su
 representante legal**, la suspendemos y eliminamos sus datos.
 
-### 12.4 Por qué el mínimo es 16
+### 12.4 Por qué el mínimo es 13
 
-El umbral está elegido para que ningún régimen de protección de la infancia
-quede activo sobre nuestros usuarios:
+**COPPA**, la ley de protección de la infancia en línea de los Estados Unidos,
+alcanza a los menores de 13 años y exige un consentimiento parental verificable
+que TREINO no implementa. Con el piso en 13, ningún usuario queda alcanzado por
+ese régimen.
 
-- **COPPA**, en los Estados Unidos, alcanza a menores de 13 años.
-- El **art. 8 del RGPD** fija en 16 años la edad de consentimiento digital y
-  permite a cada Estado miembro bajarla hasta 13, pero **nunca subirla**. Con el
-  mínimo en 16, la regla se cumple en los 27 Estados sin excepción y sin
-  configuración por país.
+La ley argentina no fija una edad de consentimiento digital. Lo que exige es el
+consentimiento del representante legal mientras la persona sea menor de 18, y eso
+es lo que pedimos en el alta.
 
 La edad es declarada por quien crea la cuenta y no la verificamos con
 documentación.

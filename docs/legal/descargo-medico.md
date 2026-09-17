@@ -185,25 +185,39 @@ localidad o acudí a una guardia. No uses la aplicación para eso.
 
 ---
 
-## 9. Personas de 16 y 17 años
+## 9. Personas menores de 18 años
 
-**La edad mínima para usar TREINO es de 16 años.** Quien tenga 16 o 17 sigue
-siendo menor de edad para la ley argentina y necesita el consentimiento de su
-representante legal.
+**La edad mínima para usar TREINO es de 13 años.** Toda persona menor de 18 es
+menor de edad para la ley argentina y necesita el consentimiento de su
+representante legal para usar la aplicación.
 
-Si vas a consentir por una persona de 16 o 17 años, leé esto antes.
+### 9.0 Quién acepta este Descargo, según la edad
+
+La ley argentina distingue, y este documento la sigue:
+
+| Edad | Quién acepta este Descargo |
+|---|---|
+| **13, 14 y 15 años** | **Su representante legal.** La persona no puede aceptarlo por sí misma |
+| **16 y 17 años** | **La propia persona.** El art. 26 del Código Civil y Comercial la considera adulta para las decisiones atinentes al cuidado de su propio cuerpo, y entrenar es una de ellas |
+| **18 en adelante** | La propia persona |
+
+Que a los 16 pueda aceptar este Descargo **no la vuelve mayor de edad para todo
+lo demás**: los Términos y Condiciones siguen necesitando el consentimiento de su
+representante legal hasta los 18.
+
+Si vas a consentir por una persona menor de edad, leé lo que sigue antes.
 
 ### 9.1 La aplicación no diferencia por edad
 
 Es importante que sea explícito: **las rutinas, las progresiones de carga, los
-ejercicios y las métricas son idénticos para una persona de 16 años y para una de
+ejercicios y las métricas son idénticos para una persona de 13 años y para una de
 40.** La aplicación no adapta nada en función de la edad.
 
 El entrenamiento de fuerza en personas que todavía están completando su
 maduración esquelética tiene consideraciones propias —técnica, volumen,
-intensidad, supervisión— que **esta aplicación no contempla**. Antes de que una
-persona de 16 o 17 años use TREINO para entrenar, consultá a su médico o a un
-profesional del deporte.
+intensidad, supervisión— que **esta aplicación no contempla**, y que pesan más
+cuanto menor es la persona. Antes de que una persona menor de edad use TREINO
+para entrenar, consultá a su médico o a un profesional del deporte.
 
 ### 9.2 Sobre el registro del cuerpo
 
@@ -213,7 +227,7 @@ evolución en el tiempo.
 Tenelo presente: ese tipo de seguimiento, en adolescentes, puede
 favorecer una relación problemática con el cuerpo y con la alimentación. Es una
 función opcional. **Se puede usar la aplicación sin cargar ninguno de esos
-datos**, y en el caso de una persona de 16 o 17 años conviene evaluarlo con
+datos**, y en el caso de una persona menor de edad conviene evaluarlo con
 criterio, o consultarlo con su profesional tratante.
 
 ### 9.3 Sobre los entrenadores
@@ -223,7 +237,7 @@ La aplicación permite vincularse con entrenadores personales independientes.
 vínculo habilita mensajería privada y acceso a las medidas y fotos que la
 persona comparta.
 
-Si vas a consentir el uso por una persona de 16 o 17 años, **la decisión de
+Si vas a consentir el uso por una persona menor de edad, **la decisión de
 vincularla con un entrenador es tuya**, y te corresponde verificar sus
 credenciales y supervisar esa relación.
 
@@ -311,17 +325,22 @@ advertencia, no si estaba disponible en algún lado.
 | 5 | **Al reportar una molestia** | Sección 7, una línea: «esto no es una consulta médica» | No |
 | 6 | **En Perfil → Legales**, siempre accesible | Documento completo | No |
 
-### A.1 Si la cuenta es de una persona de 16 o 17 años
+### A.1 Si la cuenta es de una persona menor de edad
 
-Con la edad mínima en 16 años, los puntos 1, 3 y 4 **no los puede aceptar quien
-usa la aplicación**: los tiene que aceptar su representante legal, y hay que
-poder probar que fue así.
+Con la edad mínima en 13 años, los puntos 1, 3 y 4 **no los puede aceptar quien
+usa la aplicación** mientras tenga menos de 16: los tiene que aceptar su
+representante legal, y hay que poder probar que fue así.
+
+A partir de los 16, por el art. 26 del CCyC, la propia persona puede aceptar el
+punto 1 —el Descargo— pero **no los Términos**, que siguen necesitando al
+representante hasta los 18. El flujo tiene que distinguir esas dos aceptaciones,
+que hoy van juntas.
 
 | Punto | Cambio |
 |---|---|
 | 1 — Onboarding | Se muestra además la sección 9 completa, y acepta el representante legal |
 | 3 — Rutina automática | Ídem |
-| 4 — Vínculo con entrenador | **Lo autoriza el representante legal, no la persona de 16 o 17 años.** Es el punto de mayor exposición: habilita chat privado con un adulto no verificado |
+| 4 — Vínculo con entrenador | **Lo autoriza el representante legal, no la persona menor de edad**, a cualquier edad por debajo de 18. Es el punto de mayor exposición: habilita chat privado con un adulto no verificado |
 
 Eso implica que el flujo de consentimiento parental **tiene que existir antes**
 que estos puntos, no después. Ver
