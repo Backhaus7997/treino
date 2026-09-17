@@ -15,9 +15,10 @@ subió a 16 y los once marcadores de revisión legal se resolvieron con
 investigación de fuentes primarias, sin esperar al abogado. El dictamen sigue
 siendo necesario para validar, pero ya no bloquea.
 
-Lo que bloquea publicar hoy son **tres cosas de código y dos de trámite**: el age
-gate, el filtrado de términos vetados, la vista de revisión de reportes, la
-inscripción ante la AAIP y la designación de representante en la Unión Europea.
+Lo que bloquea publicar hoy son **dos cosas de código y dos de trámite**: el
+filtrado de términos vetados, la vista de revisión de reportes, la inscripción
+ante la AAIP y la designación de representante en la Unión Europea. El age gate
+dejó de estar en esta lista con el PR #1162.
 
 ---
 
