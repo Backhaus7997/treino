@@ -12,6 +12,7 @@ import 'package:cloud_firestore/cloud_firestore.dart'
 
 import '../../../core/telemetry/non_fatal.dart';
 import '../../../core/utils/argentina_time.dart';
+import '../../../core/utils/network_timeouts.dart';
 import '../../../core/utils/weekly_streak_calculator.dart';
 import '../../profile/data/user_public_profile_repository.dart';
 import '../domain/duration_timer.dart';
@@ -60,11 +61,19 @@ class SessionRepository {
     required FirebaseFirestore firestore,
     UserPublicProfileRepository? publicProfileRepository,
     NonFatalReporter? nonFatalReporter,
+    Duration? watchAdoptionReadTimeout,
   })  : _firestore = firestore,
         _publicProfileRepository = publicProfileRepository,
-        _reportNonFatal = nonFatalReporter ?? reportNonFatal;
+        _reportNonFatal = nonFatalReporter ?? reportNonFatal,
+        _watchAdoptionReadTimeout =
+            watchAdoptionReadTimeout ?? kWatchAdoptionReadTimeout;
 
   final FirebaseFirestore _firestore;
+
+  /// Cota de la lectura de adopción de [addSetLog]. Inyectable para que los
+  /// tests puedan bajarla: un test que espera segundos reales no se corre, y
+  /// uno que no se corre no protege nada.
+  final Duration _watchAdoptionReadTimeout;
   final UserPublicProfileRepository? _publicProfileRepository;
 
   /// Cómo se reporta un error que [finish] decide NO propagar.
@@ -631,9 +640,15 @@ class SessionRepository {
     // el del reloj existe pero no se pudo leer— es el duplicado que esta
     // lectura evita cuando funciona, y es estrictamente mejor que perder la
     // serie que el atleta acaba de marcar.
+    // La cota NO es redundante con el `catch`: cubren dos fallas distintas.
+    // El `catch` agarra la lectura que TIRA; la cota agarra la que no devuelve
+    // ni tira, que es el caso que este repo midió en el simulador el
+    // 2026-08-12 y documentó en `network_timeouts.dart`. Sin ella, una conexión
+    // a medias deja `logSet` esperando, su guard trabado, y vuelve el bug
+    // entero: no se puede marcar nada sin conexión.
     DocumentSnapshot<Map<String, dynamic>>? watchSnap;
     try {
-      watchSnap = await watchRef.get();
+      watchSnap = await watchRef.get().timeout(_watchAdoptionReadTimeout);
     } catch (_) {
       watchSnap = null;
     }

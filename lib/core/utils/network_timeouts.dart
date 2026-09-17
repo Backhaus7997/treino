@@ -32,6 +32,26 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// subirlo es barato; lo que no puede volver es el spinner infinito.
 const Duration kFirestoreReadTimeout = Duration(seconds: 15);
 
+/// Cota para la lectura de ADOPCIÓN del documento del reloj en `addSetLog`.
+///
+/// Es mucho más corta que [kFirestoreReadTimeout] a propósito, y el motivo es
+/// que las dos lecturas no valen lo mismo. Abrir un entreno NECESITA su lectura:
+/// sin ella no hay pantalla, y 15 segundos es "no te cuelgues para siempre".
+/// La adopción del doc del reloj es un EXTRA —evita un duplicado cuando el
+/// reloj escribió primero— y está en el camino de marcar una serie, que es el
+/// gesto más repetido de la app. Esperar 15 segundos ahí es tan inservible
+/// como colgarse: el atleta marca y la fila no reacciona.
+///
+/// Así que acá el fondo no es "que termine alguna vez", es "que no se note".
+/// Si la lectura no contesta en este tiempo, la serie se escribe sin adoptar:
+/// el mismo camino que cuando el reloj no escribió nada.
+///
+/// Hace falta porque un `get()` de Firestore puede quedar a medias sin
+/// devolver NI tirar —está medido y documentado arriba—, y un `try/catch` solo
+/// no cubre ese caso: sin cota, `logSet` se queda esperando, su guard queda
+/// trabado y vuelve el bug de no poder marcar nada sin conexión.
+const Duration kWatchAdoptionReadTimeout = Duration(seconds: 2);
+
 /// La cota, inyectable.
 ///
 /// Va por provider y no como constante suelta para que los tests puedan bajarla
