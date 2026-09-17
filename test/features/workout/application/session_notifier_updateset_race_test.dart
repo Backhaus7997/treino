@@ -92,6 +92,8 @@ void main() {
           startedAt: any(named: 'startedAt'),
           dayNumber: any(named: 'dayNumber'),
           weekNumber: any(named: 'weekNumber'),
+          waitForServer: any(named: 'waitForServer'),
+          onServerRejected: any(named: 'onServerRejected'),
         )).thenAnswer((_) async => session);
 
     // logSet echoes back the persisted SetLog so it lands in state with its id.

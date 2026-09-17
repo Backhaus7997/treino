@@ -215,19 +215,44 @@ class SessionRepository {
     required int durationMin,
     bool wasFullyCompleted = false,
     required int weeklyTarget,
+    bool waitForServer = true,
+    void Function(Object error)? onServerRejected,
   }) async {
     // finishedAt MUST be Timestamp.fromDate, not a raw DateTime — real Firestore
     // serializes a raw DateTime as an ISO string, but the @TimestampConverter
     // on Session.finishedAt expects a Firestore Timestamp on read. Without
     // this conversion, listByUid()/getActive() would fail to deserialize
     // sessions finished against production Firestore.
-    await _sessions(uid).doc(sessionId).update({
+    final escritura = _sessions(uid).doc(sessionId).update({
       'status': SessionStatusX(SessionStatus.finished).toJson(),
       'finishedAt': Timestamp.fromDate(finishedAt.toUtc()),
       'totalVolumeKg': totalVolumeKg,
       'durationMin': durationMin,
       'wasFullyCompleted': wasFullyCompleted,
     });
+    if (waitForServer) {
+      await escritura;
+    } else {
+      // Mismo contrato que `create`: la escritura ya se aplicó al caché, lo
+      // que se saltea es la confirmación. Sin red el future queda PENDIENTE
+      // —no falla— y Firestore lo reintenta solo; lo que llega al catchError
+      // es un rechazo REAL del servidor.
+      //
+      // Sin esto, terminar un entreno sin conexión no se colgaba solamente:
+      // `finishSession` pone `_finalized = true` ANTES del await, así que el
+      // `finally` y el `catch` que lo resetean tampoco corrían. La sesión
+      // quedaba con el guard trabado, marcar/editar/borrar series pasaban a
+      // ser no-ops silenciosos y el cronómetro seguía corriendo.
+      unawaited(
+        escritura.catchError((Object e) {
+          developer.log(
+            'finish: el servidor rechazó el cierre de la sesión — $e',
+            name: 'SessionRepository',
+          );
+          onServerRejected?.call(e);
+        }),
+      );
+    }
 
     // Cross-feature: update public stats counters (best-effort, REQ-WRX-003).
     // Executes after the primary session update. Reads a BOUNDED window of the
@@ -256,6 +281,24 @@ class SessionRepository {
     // un olvido en dato corrupto; sin default, el compilador lo caza.
     final pubRepo = _publicProfileRepository;
     if (pubRepo == null) return;
+
+    // Sin esperar al servidor NO se tocan los contadores, y es deliberado.
+    //
+    // El recálculo lee las sesiones recientes del atleta. Sin red esa lectura
+    // sale del CACHÉ, que puede estar incompleto —instalación nueva, historial
+    // no sincronizado— y escribir un `workoutsCount` derivado de ahí le PISA
+    // al perfil público un valor correcto con uno más chico. Corromper el
+    // perfil es peor que atrasarlo.
+    //
+    // El costo de saltearlo es acotado: el contador queda viejo hasta el
+    // próximo cierre con conexión, que lo recalcula entero. Y las métricas de
+    // ranking no dependen de esto —las recalcula `rankingAggregateOnSession`
+    // del lado del servidor cuando la escritura de la sesión sincroniza—, así
+    // que lo único que se atrasa es `workoutsCount`/`rachaSemanas`.
+    //
+    // La solución de fondo sería recalcularlos también en ese trigger, que hoy
+    // no lo hace. Queda anotado, no entra acá.
+    if (!waitForServer) return;
 
     try {
       final completedList = await listRecentCompletedByUid(uid);

@@ -241,6 +241,15 @@ class SessionNotifier
       startedAt: DateTime.now(),
       dayNumber: dayNumber,
       weekNumber: clampedWeek,
+      // Empezar un entreno NO puede depender de que haya red. El documento se
+      // aplica al caché al instante y Firestore sincroniza solo; esperar la
+      // confirmación dejaba al player en `AsyncLoading` para siempre sin una
+      // sola excepción — el atleta tocaba Empezar y miraba un spinner eterno.
+      waitForServer: false,
+      onServerRejected: (e) => _reportarRechazoDelServidor(
+        e,
+        'no se pudo crear la sesión del entreno',
+      ),
     );
     _resetElapsedBaseline(elapsedSeconds: 0, at: session.startedAt);
     _nudgeWatch(WatchNudgeService.reasonWorkoutStarted);
@@ -859,6 +868,16 @@ class SessionNotifier
         // contra el objetivo de la rutina activa, y quien sabe resolver eso
         // es la capa de aplicación.
         weeklyTarget: ref.read(weeklyStreakTargetProvider),
+        // Cerrar el entreno tampoco puede depender de la red, y acá el daño
+        // de esperar era peor que en `create`: `_finalized` ya está en `true`
+        // desde antes del await, así que un await que no vuelve deja marcar,
+        // editar y borrar series como no-ops silenciosos, el cronómetro
+        // corriendo y ninguna navegación al resumen.
+        waitForServer: false,
+        onServerRejected: (e) => _reportarRechazoDelServidor(
+          e,
+          'no se pudo cerrar la sesión del entreno',
+        ),
       );
     } catch (_) {
       _finalized = false;
@@ -906,6 +925,16 @@ class SessionNotifier
         // contra el objetivo de la rutina activa, y quien sabe resolver eso
         // es la capa de aplicación.
         weeklyTarget: ref.read(weeklyStreakTargetProvider),
+        // Cerrar el entreno tampoco puede depender de la red, y acá el daño
+        // de esperar era peor que en `create`: `_finalized` ya está en `true`
+        // desde antes del await, así que un await que no vuelve deja marcar,
+        // editar y borrar series como no-ops silenciosos, el cronómetro
+        // corriendo y ninguna navegación al resumen.
+        waitForServer: false,
+        onServerRejected: (e) => _reportarRechazoDelServidor(
+          e,
+          'no se pudo cerrar la sesión del entreno',
+        ),
       );
     } catch (_) {
       _finalized = false;
@@ -952,6 +981,26 @@ class SessionNotifier
     if (current == null || _finalized) return;
     final elapsed = _elapsedSecondsNow();
     state = AsyncData(current.copyWith(elapsedSeconds: elapsed));
+  }
+
+  /// Reporta un rechazo REAL del servidor sobre una escritura diferida.
+  ///
+  /// No se dispara por falta de red: sin conexión el future de Firestore queda
+  /// pendiente —no falla— y se reintenta solo. Lo que llega acá es un `no`
+  /// del servidor, típicamente `permission-denied`, que no se arregla
+  /// reintentando nunca.
+  ///
+  /// Va a telemetría y no a la pantalla porque para cuando llega, el atleta ya
+  /// terminó y se fue: es un fallo que el equipo tiene que poder VER aunque
+  /// nadie lo esté mirando. Sin esto, una sesión que el servidor rechaza
+  /// desaparece sin rastro — ni para el atleta ni para Crashlytics.
+  void _reportarRechazoDelServidor(Object error, String queSePerdio) {
+    unawaited(reportNonFatal(
+      error,
+      StackTrace.current,
+      reason: 'SessionNotifier: $queSePerdio (rechazo del servidor sobre una '
+          'escritura diferida).',
+    ).catchError((_) {}));
   }
 
   void _finalize() {

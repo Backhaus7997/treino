@@ -79,6 +79,8 @@ void main() {
             startedAt: any(named: 'startedAt'),
             dayNumber: any(named: 'dayNumber'),
             weekNumber: any(named: 'weekNumber'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async => makeSession());
 
       // First finish throws (offline / Firestore error), second succeeds.
@@ -91,6 +93,8 @@ void main() {
             durationMin: any(named: 'durationMin'),
             wasFullyCompleted: any(named: 'wasFullyCompleted'),
             weeklyTarget: any(named: 'weeklyTarget'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async {
         calls++;
         if (calls == 1) throw Exception('firestore write failed');
@@ -119,6 +123,8 @@ void main() {
             durationMin: any(named: 'durationMin'),
             wasFullyCompleted: any(named: 'wasFullyCompleted'),
             weeklyTarget: any(named: 'weeklyTarget'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).called(2);
     });
 
@@ -140,6 +146,8 @@ void main() {
             startedAt: any(named: 'startedAt'),
             dayNumber: any(named: 'dayNumber'),
             weekNumber: any(named: 'weekNumber'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async => makeSession());
       when(() => repo.addSetLog(
             uid: any(named: 'uid'),
@@ -156,6 +164,8 @@ void main() {
             durationMin: any(named: 'durationMin'),
             wasFullyCompleted: any(named: 'wasFullyCompleted'),
             weeklyTarget: any(named: 'weeklyTarget'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).thenAnswer((_) async {
         calls++;
         if (calls == 1) throw Exception('firestore write failed');
@@ -185,6 +195,8 @@ void main() {
             durationMin: any(named: 'durationMin'),
             wasFullyCompleted: any(named: 'wasFullyCompleted'),
             weeklyTarget: any(named: 'weeklyTarget'),
+            waitForServer: any(named: 'waitForServer'),
+            onServerRejected: any(named: 'onServerRejected'),
           )).called(2);
     });
   });
