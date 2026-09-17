@@ -51,7 +51,6 @@ import { App, getApp, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import * as functions from "firebase-functions/v2/https";
 import { HttpsError } from "firebase-functions/v2/https";
-import { logger } from "firebase-functions";
 import { defineSecret } from "firebase-functions/params";
 
 import { SubscriptionCycle, SubscriptionTier } from "../tier-config";
@@ -60,9 +59,11 @@ import {
   PAID_TIERS,
   amountFor,
   frequencyMonthsFor,
-  recordPlan,
 } from "./tier-mapping";
-import { MpApiError, MpClient, createMpClient } from "./client";
+import { MpClient, createMpClient } from "./client";
+import { CheckoutAbierto, abrirCheckout } from "./abrir-checkout";
+
+export { MP_CHECKOUTS_COLLECTION } from "./abrir-checkout";
 
 const MP_ACCESS_TOKEN = defineSecret("MP_ACCESS_TOKEN");
 
@@ -105,34 +106,20 @@ const MP_ACCESS_TOKEN = defineSecret("MP_ACCESS_TOKEN");
  */
 const BACK_URL = "https://app.gettreino.com/abrir/profe?to=facturacion";
 
-/** Coleccion del checkout en curso por PF. Un doc por uid, se pisa. */
-export const MP_CHECKOUTS_COLLECTION = "mp_checkouts";
-
-/**
- * Cuanto vale reusar un checkout ya abierto.
- *
- * Sin esto, dos clicks en "ELEGIR PLAN" abren DOS suscripciones en MP, y si el
- * PF completa las dos paga dos veces. MP no deduplica: cada preapproval es
- * independiente.
- *
- * 30 minutos es la vida util razonable de una sesion de checkout. Pasado eso se
- * abre uno nuevo, porque un `init_point` viejo probablemente ya no le sirva a
- * nadie.
- */
-const CHECKOUT_REUSE_MS = 30 * 60 * 1000;
-
 export interface CreatePreapprovalRequest {
   tier: SubscriptionTier;
   cycle: SubscriptionCycle;
 }
 
-export interface CreatePreapprovalResult {
-  /** La URL a la que hay que mandar al PF. Es lo unico que el cliente usa. */
-  initPoint: string;
-  planId: string;
-  /** `reused` cuando se devolvio un checkout ya abierto (doble click). */
-  status: "created" | "reused";
-}
+/**
+ * Alias de [CheckoutAbierto], no una copia.
+ *
+ * El nombre se conserva porque es el que nombra el contrato de este callable
+ * —lo que el cliente espera de `createPreapproval`— pero la forma la define el
+ * modulo compartido. Dos interfaces con los mismos tres campos serian dos cosas
+ * que hay que acordarse de mover juntas.
+ */
+export type CreatePreapprovalResult = CheckoutAbierto;
 
 export interface CreatePreapprovalDeps {
   mpClient: MpClient;
@@ -215,99 +202,28 @@ export async function runCreatePreapproval(
     throw new HttpsError("internal", `sin precio para ${tier}/${cycle}`);
   }
 
-  const checkoutRef = getFirestore(app)
-    .collection(MP_CHECKOUTS_COLLECTION)
-    .doc(uid);
-
-  // ── Reuso: el mismo plan, pedido de nuevo, dentro de la ventana ──
-  const previo = (await checkoutRef.get()).data();
-  if (previo) {
-    const creado = previo.createdAtMs;
-    const vigente =
-      typeof creado === "number" && deps.nowMs - creado < CHECKOUT_REUSE_MS;
-    if (
-      vigente &&
-      previo.tier === tier &&
-      previo.cycle === cycle &&
-      typeof previo.initPoint === "string" && previo.initPoint !== "" &&
-      typeof previo.planId === "string" && previo.planId !== ""
-    ) {
-      logger.info("mp/create-preapproval: se reusa el checkout abierto", {
-        uid,
-        tier,
-        cycle,
-        planId: previo.planId,
-      });
-      return {
-        initPoint: previo.initPoint,
-        planId: previo.planId,
-        status: "reused",
-      };
-    }
-  }
-
-  let creado;
-  try {
-    creado = await deps.mpClient.createPreapprovalPlan({
-      reason: `TREINO — ${tier} (${cycle === "annual" ? "anual" : "mensual"})`,
-      externalReference: uid,
-      backUrl: BACK_URL,
-      transactionAmount: amount,
-      frequencyMonths: frequencyMonthsFor(cycle),
-    });
-  } catch (e) {
-    const err = e as MpApiError;
-    logger.error("mp/create-preapproval: MP rechazo la creacion", {
-      uid,
-      tier,
-      cycle,
-      status: err.status,
-      body: err.body,
-    });
-    // `unavailable` solo cuando reintentar sirve: el cliente puede ofrecer
-    // "probá de nuevo" sin mentir. Lo demas es `internal` — un 401 nuestro no
-    // se arregla porque el PF vuelva a tocar el boton.
-    throw new HttpsError(
-      err.retryable ? "unavailable" : "internal",
-      "no se pudo abrir el checkout de Mercado Pago",
-    );
-  }
-
-  const planId = creado.id;
-  const initPoint = (creado as { init_point?: unknown }).init_point;
-  if (typeof planId !== "string" || planId === "") {
-    throw new HttpsError("internal", "MP no devolvio un id de plan");
-  }
-  if (typeof initPoint !== "string" || initPoint === "") {
-    // Sin `init_point` el PF no tiene a donde ir. Falla ruidoso en vez de
-    // devolver un string vacio que el cliente intentaria abrir.
-    throw new HttpsError("internal", "MP no devolvio init_point");
-  }
-
-  // El mapeo va PRIMERO, antes del doc de checkout: si algo falla despues, lo
-  // que no se puede perder es de que plan es esta suscripcion. El checkout es
-  // una comodidad; el mapeo es lo que hace reconciliable el cobro.
-  await recordPlan(app, planId, { producto: "trainer", uid, tier, cycle });
-
-  await checkoutRef.set({
-    planId,
-    tier,
-    cycle,
-    initPoint,
-    // Milisegundos y no serverTimestamp: la ventana de reuso se compara contra
-    // un reloj inyectado, y un sentinel no se puede leer en el mismo request.
-    createdAtMs: deps.nowMs,
-  });
-
-  logger.info("mp/create-preapproval: checkout abierto", {
+  // Todo lo que sigue —la ventana anti-doble-click, el mapeo de error de MP a
+  // `HttpsError`, la validacion de lo que MP devuelve y el orden de las dos
+  // escrituras— vive en `abrir-checkout.ts`, compartido con el checkout del
+  // alumno. Lo que se queda aca es lo que hace distinto a este producto: el
+  // gate de rol, el precio, y a donde vuelve el navegador.
+  return abrirCheckout({
+    app,
     uid,
-    tier,
-    cycle,
-    planId,
+    // ⚠️ La huella es EXACTAMENTE `{tier, cycle}` y no puede ganar campos: los
+    // documentos de `mp_checkouts` que hay en produccion tienen esos dos y
+    // ninguno mas. Ver el dartdoc de `AbrirCheckoutInput.huella`.
+    huella: { tier, cycle },
+    reason: `TREINO — ${tier} (${cycle === "annual" ? "anual" : "mensual"})`,
+    backUrl: BACK_URL,
+    amount,
+    frequencyMonths: frequencyMonthsFor(cycle),
+    mapping: { producto: "trainer", uid, tier, cycle },
+    mpClient: deps.mpClient,
+    nowMs: deps.nowMs,
   });
-
-  return { initPoint, planId, status: "created" };
 }
+
 
 export const createPreapproval = functions.onCall(
   // SIN enforceAppCheck, por el mismo motivo que `acceptTrainerLink`: el Coach
