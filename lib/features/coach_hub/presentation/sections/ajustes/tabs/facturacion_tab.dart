@@ -9,6 +9,8 @@ import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/subscription_tier.dart';
 import 'package:treino/features/coach/domain/weighted_load.dart';
+import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/cancel_subscription_dialog.dart';
+import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_cancel.dart';
 import 'package:treino/features/coach_hub/presentation/sections/facturacion_planes/plan_upsell_banner.dart';
 import 'package:treino/features/profile/application/user_providers.dart';
 
@@ -66,6 +68,20 @@ class FacturacionTab extends ConsumerWidget {
           limit: limit,
           palette: palette,
         ),
+        // ── La baja ──
+        //
+        // Sólo con un plan PAGO: un PF en Free no tiene nada que dar de baja, y
+        // ofrecérselo le haría creer que sí. El servidor devuelve
+        // `sin-suscripcion` igual —un botón que no se dibuja no es una
+        // garantía— pero acá no hay por qué mostrarlo.
+        //
+        // Fuera de la card y no adentro, a propósito: la card dice lo que el PF
+        // TIENE, y esto es una acción destructiva. Meterla ahí la pondría al
+        // lado de «CAMBIAR PLAN», que es lo contrario de lo que hace.
+        if (tier != SubscriptionTier.free) ...[
+          const SizedBox(height: AppSpacing.s14),
+          _CancelSubscriptionLink(palette: palette),
+        ],
       ],
     );
   }
@@ -236,6 +252,55 @@ class _ChangePlanButton extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// El acceso a la baja.
+///
+/// Es un LINK discreto y no un botón con borde: a lo que el PF viene a
+/// Facturación es a mirar su plan o a cambiarlo, y darle a la baja el mismo
+/// peso visual que a «CAMBIAR PLAN» sería empujarla. Tampoco está escondida —
+/// la Res. 424/2020 exige poder darse de baja «en línea, sin llamar ni escribir
+/// a nadie», y algo que no se encuentra no cumple eso.
+///
+/// El texto dice «dar de baja» y no «cancelar suscripción»: es el término de
+/// los Términos de Suscripción §7, y usar dos nombres para lo mismo obliga al
+/// PF a adivinar si son la misma cosa.
+class _CancelSubscriptionLink extends StatelessWidget {
+  const _CancelSubscriptionLink({required this.palette});
+
+  final AppPalette palette;
+
+  @override
+  Widget build(BuildContext context) {
+    // En móvil el tipo sellado no expone `cancelar`, así que no hay nada que
+    // ofrecer. Mismo criterio que `PlanCheckoutOnWebOnly`.
+    if (resolvePlanCancel() is! PlanCancelAvailable) {
+      return const SizedBox.shrink();
+    }
+
+    return Semantics(
+      button: true,
+      label: 'Dar de baja la suscripción', // i18n: Fase W3
+      child: TreinoTappable(
+        onTap: () => showCancelSubscriptionDialog(context),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.s8),
+          child: Text(
+            'Dar de baja la suscripción', // i18n: Fase W3
+            style: TextStyle(
+              // Token y no literal: este archivo está en la allowlist del guard
+              // de `fontSize` crudo, pero su deuda NO puede crecer — código
+              // nuevo usa la escala.
+              fontSize: AppTextSize.caption,
+              color: palette.textMuted,
+              decoration: TextDecoration.underline,
+              decorationColor: palette.textMuted,
+            ),
           ),
         ),
       ),
