@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../auth/application/auth_providers.dart';
 import '../data/moderation_queue_service.dart';
 import '../domain/moderation_stats.dart';
-import '../domain/pending_report.dart';
+import '../domain/pending_queue.dart';
 
 /// Los callables de moderacion viven en `southamerica-east1`, igual que el
 /// resto de las functions del repo.
@@ -47,8 +47,12 @@ final isModeratorProvider = Provider<bool>(
 );
 
 /// Los reportes pendientes. Se refresca con `ref.invalidate`.
-final pendingReportsProvider = FutureProvider<List<PendingReport>>((ref) {
-  if (!ref.watch(isModeratorProvider)) return Future.value(const []);
+final pendingReportsProvider = FutureProvider<PendingQueue>((ref) {
+  if (!ref.watch(isModeratorProvider)) {
+    return Future.value(
+      const PendingQueue(reportes: [], incompleta: false),
+    );
+  }
   return ref.watch(moderationQueueServiceProvider).listPending();
 });
 

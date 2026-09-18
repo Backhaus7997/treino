@@ -34,6 +34,13 @@
  *
  *     firebase auth:revoke-refresh-tokens <uid> --project prod
  *
+ * ## Sobre que cuenta
+ *
+ * SOLO sobre una cuenta de ENTRENADOR. La cola vive en el Coach Hub y
+ * `coachHubRedirect` manda a `/not-allowed` a cualquier otro rol antes de que
+ * la pantalla mire el claim, asi que un `moderator` sobre una cuenta de atleta
+ * queda escrito y no habilita nada. El script lo verifica y se niega.
+ *
  * ## Cuantos moderadores
  *
  * Uno para empezar. No hace falta un sistema de roles, y un sistema de roles
@@ -42,6 +49,7 @@
 
 const { inicializarAdmin } = require('./lib/admin');
 const { getAuth } = require('firebase-admin/auth');
+const { getFirestore } = require('firebase-admin/firestore');
 
 function arg(nombre) {
   const hit = process.argv.find((a) => a.startsWith(`--${nombre}=`));
@@ -75,6 +83,39 @@ async function main() {
 
   const revocar = process.argv.includes('--revoke');
   const user = await auth.getUser(uid);
+
+  // El claim SOLO sirve sobre una cuenta de entrenador, y hay que decirlo acá.
+  //
+  // La cola vive en el Coach Hub, y `coachHubRedirect` manda a `/not-allowed`
+  // a cualquier rol que no sea `trainer` — ANTES de que la pantalla llegue a
+  // mirar el claim. Sin este chequeo, otorgarle `moderator` a una cuenta de
+  // atleta "funciona": el script imprime éxito, el claim queda escrito, y la
+  // persona no puede entrar nunca. Un permiso que se otorga y no habilita nada
+  // es peor que no tenerlo: nadie va a sospechar del permiso.
+  //
+  // Se valida al OTORGAR y no al revocar: sacar un claim de una cuenta que no
+  // podía usarlo igual es limpieza, no un error.
+  if (!revocar) {
+    const snap = await getFirestore(app).doc(`users/${uid}`).get();
+    const role = snap.exists ? snap.data().role : null;
+    if (role !== 'trainer') {
+      console.error(`ERROR: ${uid} tiene role=${role ?? '(sin perfil)'}.`);
+      console.error('');
+      console.error('  El claim `moderator` sólo sirve sobre una cuenta de');
+      console.error('  ENTRENADOR. La cola vive en el Coach Hub, y el router');
+      console.error('  manda a /not-allowed a cualquier otro rol antes de');
+      console.error('  que la pantalla mire el claim.');
+      console.error('');
+      console.error('  Otorgarlo igual escribiría un permiso que no habilita');
+      console.error('  nada, y nadie sospecharía del permiso.');
+      console.error('');
+      console.error('  `role` es INMUTABLE post-creación (AGENTS.md §3): los');
+      console.error('  entrenadores se crean a mano por el equipo. Usá una');
+      console.error('  cuenta de entrenador, o creá una para moderación.');
+      process.exitCode = 3;
+      return;
+    }
+  }
 
   // Los claims se REEMPLAZAN, no se mergean: `setCustomUserClaims` pisa el
   // objeto entero. Sin este spread, otorgar `moderator` borraria cualquier otro

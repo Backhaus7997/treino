@@ -218,37 +218,94 @@ class _Cola extends ConsumerWidget {
           ],
         ),
       ),
-      data: (reportes) {
+      data: (cola) {
+        final reportes = cola.reportes;
+
+        // «Vacía» e «incompleta» NO se dicen igual. El servidor escanea hasta
+        // un tope y avisa cuando lo alcanza; mostrar «no hay reportes
+        // esperando» sobre una lista cortada es afirmar que no hay nada cuando
+        // lo que pasó es que dejamos de buscar.
         if (reportes.isEmpty) {
           return Center(
             child: Text(
-              'No hay reportes esperando.', // i18n: Fase W3
+              cola.incompleta
+                  ? 'No pudimos terminar de revisar la cola. '
+                      'Volvé a intentar.' // i18n: Fase W3
+                  : 'No hay reportes esperando.', // i18n: Fase W3
+              textAlign: TextAlign.center,
               style: GoogleFonts.barlow(
-                color: palette.textMuted,
+                color: cola.incompleta ? palette.danger : palette.textMuted,
                 fontSize: AppTextSize.body,
               ),
             ),
           );
         }
         return ListView.builder(
-          itemCount: reportes.length,
-          itemBuilder: (_, i) => Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.s12),
-            child: _Fila(reporte: reportes[i]),
-          ),
+          itemCount: reportes.length + (cola.incompleta ? 1 : 0),
+          itemBuilder: (_, i) {
+            if (i == reportes.length) {
+              return Padding(
+                padding: const EdgeInsets.only(top: AppSpacing.s8),
+                child: Text(
+                  'La lista está incompleta: el servidor dejó de buscar '
+                  'antes de llegar al final.', // i18n: Fase W3
+                  style: GoogleFonts.barlow(
+                    color: palette.danger,
+                    fontSize: AppTextSize.caption,
+                  ),
+                ),
+              );
+            }
+            return Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.s12),
+              child: _Fila(reporte: reportes[i]),
+            );
+          },
         );
       },
     );
   }
 }
 
-class _Fila extends ConsumerWidget {
+class _Fila extends ConsumerStatefulWidget {
   const _Fila({required this.reporte});
 
   final PendingReport reporte;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_Fila> createState() => _FilaState();
+}
+
+class _FilaState extends ConsumerState<_Fila> {
+  @override
+  void initState() {
+    super.initState();
+    // Marca el reporte como MIRADO cuando la fila entra en pantalla.
+    //
+    // Acá y no al traer la página: el `ListView` es perezoso, así que esto
+    // corre para las filas que el moderador de verdad tiene delante. Estampar
+    // `firstViewedAt` al listar marcaba los 50 de la página —incluidos los que
+    // ni se renderizaban— y `moderationStats` los contaba dentro del plazo
+    // PARA SIEMPRE: el tablero podía declarar cumplimiento sin que nadie
+    // hubiera leído nada.
+    //
+    // Es best-effort a propósito. Si falla, el reporte queda sin marcar y
+    // aparece como no mirado, que es el lado correcto del error: la métrica se
+    // equivoca acusándonos, no absolviéndonos.
+    final id = widget.reporte.id;
+    if (widget.reporte.firstViewedAt != null || id.isEmpty) return;
+    Future<void>.microtask(() async {
+      try {
+        await ref.read(moderationQueueServiceProvider).markViewed(id);
+      } catch (_) {
+        // Ver arriba: no marcar es el error seguro.
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reporte = widget.reporte;
     final palette = AppPalette.of(context);
     final tarde = reporte.rompioElPlazo;
 
@@ -349,6 +406,7 @@ class _Fila extends ConsumerWidget {
     String status,
     String action,
   ) async {
+    final reporte = widget.reporte;
     final messenger = ScaffoldMessenger.of(context);
     try {
       await ref.read(moderationQueueServiceProvider).resolve(

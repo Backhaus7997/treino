@@ -1,6 +1,7 @@
 import 'package:cloud_functions/cloud_functions.dart';
 
 import '../domain/moderation_stats.dart';
+import '../domain/pending_queue.dart';
 import '../domain/pending_report.dart';
 
 /// La cola de revision de reportes, del lado del cliente.
@@ -21,17 +22,37 @@ class ModerationQueueService {
   final FirebaseFunctions _functions;
 
   /// Los pendientes, mas viejos primero.
-  Future<List<PendingReport>> listPending({int limit = 50}) async {
+  ///
+  /// Devuelve tambien `reachedScanCap`. El servidor escanea hasta un tope y
+  /// avisa cuando lo alcanzo: descartar ese dato haria que la pantalla diga
+  /// "no hay reportes esperando" cuando la verdad es "dejamos de buscar", y
+  /// los reportes de mas atras quedarian invisibles en cada refresco.
+  ///
+  /// Es exactamente la mentira que el flag existe para evitar, asi que viaja
+  /// hasta la UI.
+  Future<PendingQueue> listPending({int limit = 50}) async {
     final res = await _functions
         .httpsCallable('listPendingReports')
         .call<Map<String, dynamic>>({'limit': limit});
 
     final crudos = res.data['reports'];
-    if (crudos is! List) return const [];
-    return crudos
-        .whereType<Map<Object?, Object?>>()
-        .map(PendingReport.fromMap)
-        .toList();
+    return PendingQueue(
+      reportes: crudos is! List
+          ? const []
+          : crudos
+              .whereType<Map<Object?, Object?>>()
+              .map(PendingReport.fromMap)
+              .toList(),
+      incompleta: res.data['reachedScanCap'] == true,
+    );
+  }
+
+  /// Marca un reporte como MIRADO. Idempotente: el servidor estampa una sola
+  /// vez y no reabre un reporte ya resuelto.
+  Future<void> markViewed(String reportId) async {
+    await _functions
+        .httpsCallable('markReportViewed')
+        .call<Map<String, dynamic>>({'reportId': reportId});
   }
 
   /// Cierra un reporte. [status] es `actioned` o `dismissed`.

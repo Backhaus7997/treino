@@ -6,6 +6,7 @@ import 'package:treino/features/coach_hub/presentation/sections/moderacion/moder
 import 'package:treino/features/moderation/application/moderation_queue_providers.dart';
 import 'package:treino/features/moderation/data/moderation_queue_service.dart';
 import 'package:treino/features/moderation/domain/moderation_stats.dart';
+import 'package:treino/features/moderation/domain/pending_queue.dart';
 import 'package:treino/features/moderation/domain/pending_report.dart';
 
 /// Doble del servicio. Registra lo que se le pidio resolver.
@@ -15,17 +16,26 @@ import 'package:treino/features/moderation/domain/pending_report.dart';
 /// Firebase inicializado tira `FirebaseException` antes de llegar a medir
 /// nada. Implementando el contrato no hay super al que llamar.
 class _ServicioFalso implements ModerationQueueService {
-  _ServicioFalso({required this.reportes, this.explota = false});
+  _ServicioFalso({
+    required this.reportes,
+    this.explota = false,
+    this.incompleta = false,
+  });
 
   final List<PendingReport> reportes;
   final bool explota;
+  final bool incompleta;
   final List<({String id, String status, String action})> resueltos = [];
+  final List<String> marcados = [];
 
   @override
-  Future<List<PendingReport>> listPending({int limit = 50}) async {
+  Future<PendingQueue> listPending({int limit = 50}) async {
     if (explota) throw Exception('sin red');
-    return reportes;
+    return PendingQueue(reportes: reportes, incompleta: incompleta);
   }
+
+  @override
+  Future<void> markViewed(String reportId) async => marcados.add(reportId);
 
   @override
   Future<ModerationStats> stats() async => const ModerationStats(
@@ -67,8 +77,13 @@ void main() {
     required bool esModerador,
     List<PendingReport> reportes = const [],
     bool explota = false,
+    bool incompleta = false,
   }) async {
-    final servicio = _ServicioFalso(reportes: reportes, explota: explota);
+    final servicio = _ServicioFalso(
+      reportes: reportes,
+      explota: explota,
+      incompleta: incompleta,
+    );
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -122,6 +137,56 @@ void main() {
     expect(servicio.resueltos.first.id, 'r1');
     expect(servicio.resueltos.first.status, 'dismissed');
     expect(servicio.resueltos.first.action, 'none');
+  });
+
+  testWidgets('la fila marca el reporte como MIRADO al renderizarse',
+      (tester) async {
+    // Listar no es mirar. El servidor dejó de estampar `firstViewedAt` al
+    // traer la página: marcarlos todos ahí —incluidos los que el ListView
+    // perezoso ni renderiza— dejaba a `moderationStats` contándolos dentro del
+    // plazo PARA SIEMPRE, y el tablero podía declarar cumplimiento sin que
+    // nadie hubiera leído nada.
+    final servicio =
+        await montar(tester, esModerador: true, reportes: [_reporte(id: 'r1')]);
+
+    expect(servicio.marcados, ['r1']);
+  });
+
+  testWidgets('no vuelve a marcar uno que ya fue mirado', (tester) async {
+    final yaVisto = PendingReport.fromMap({
+      'id': 'r1',
+      'targetKind': 'post',
+      'reason': 'harassment',
+      'createdAt': DateTime.now().toUtc().toIso8601String(),
+      'firstViewedAt': DateTime.now().toUtc().toIso8601String(),
+    });
+    final servicio =
+        await montar(tester, esModerador: true, reportes: [yaVisto]);
+
+    expect(servicio.marcados, isEmpty);
+  });
+
+  testWidgets('una cola INCOMPLETA no se dice igual que una vacía',
+      (tester) async {
+    // El servidor escanea hasta un tope y avisa cuando lo alcanza. Decir «no
+    // hay reportes esperando» sobre una lista cortada es afirmar que no hay
+    // nada cuando lo que pasó es que dejamos de buscar — y esos reportes
+    // quedarían invisibles en cada refresco.
+    await montar(tester, esModerador: true, incompleta: true);
+
+    expect(find.textContaining('No hay reportes esperando'), findsNothing);
+    expect(find.textContaining('No pudimos terminar'), findsOneWidget);
+  });
+
+  testWidgets('con resultados incompletos lo avisa al pie', (tester) async {
+    await montar(
+      tester,
+      esModerador: true,
+      reportes: [_reporte(id: 'r1')],
+      incompleta: true,
+    );
+
+    expect(find.textContaining('La lista está incompleta'), findsOneWidget);
   });
 
   testWidgets('la cola vacia lo dice, no queda en blanco', (tester) async {
