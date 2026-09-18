@@ -32,6 +32,27 @@ enum EstadoDeBaja {
 
   /// Mercado Pago no contestó. NO se escribió nada: se puede reintentar.
   noDisponible,
+
+  /// El servidor cortó por cooldown y **no le preguntó a Mercado Pago**.
+  ///
+  /// ── Por qué esto necesita su propio estado ──
+  ///
+  /// El servidor devuelve `sin-suscripcion` con `enfriando: true` cuando la
+  /// baja anterior fue hace menos de diez segundos. Sin distinguirlo, este
+  /// camino termina mintiendo:
+  ///
+  ///   1. El PF aprieta DAR DE BAJA. El servidor marca el cooldown **antes**
+  ///      de salir a MP (`cancel-my-subscription.ts`, es deliberado), llama, y
+  ///      MP no contesta.
+  ///   2. El diálogo dice bien: «tu suscripción SIGUE como estaba».
+  ///   3. El PF hace exactamente lo que le dijimos y reintenta enseguida.
+  ///   4. El servidor corta por cooldown → `sin-suscripcion`.
+  ///   5. El diálogo diría «NO HAY NADA QUE DAR DE BAJA».
+  ///
+  /// El paso 5 es **falso**: la suscripción sigue viva y cobrando, y se le
+  /// acaba de decir que se quede tranquilo. En el único camino de baja que la
+  /// Res. 424/2020 obliga a tener.
+  enfriando,
 }
 
 /// El resultado de pedir la baja.
@@ -90,8 +111,32 @@ Future<ResultadoDeBaja> _cancelar() async {
       .httpsCallable('cancelMySubscription')
       .call<Map<String, dynamic>>();
 
-  final crudo = res.data['estado'];
-  final estado = switch (crudo) {
+  return resultadoDesde(res.data);
+}
+
+/// Traduce la respuesta cruda del servidor.
+///
+/// ── Por qué esto es una función aparte y no está adentro de `_cancelar` ──
+///
+/// Porque `debugPlanCancelCaller` reemplaza la llamada ENTERA, parseo incluido.
+/// Mientras esto vivió adentro, ningún test tocaba una sola línea de este
+/// código: los tests inyectaban un `ResultadoDeBaja` ya armado.
+///
+/// No es una hipótesis. Cuando se agregó [EstadoDeBaja.enfriando] se escribieron
+/// dos tests, los dos pasaron, y **borrar el chequeo de `enfriando` no rompió
+/// ninguno**: verificaban que el diálogo sabe dibujar el estado, no que el
+/// parseo sepa producirlo. Con el parseo acá afuera, el mismo experimento pone
+/// tests en rojo.
+@visibleForTesting
+ResultadoDeBaja resultadoDesde(Map<String, dynamic> data) {
+  // `enfriando` se mira ANTES que el estado: el servidor manda
+  // `sin-suscripcion` junto con la bandera, y quedarse con el estado a secas
+  // es justo el bug que documenta `EstadoDeBaja.enfriando`.
+  if (data['enfriando'] == true) {
+    return const ResultadoDeBaja(estado: EstadoDeBaja.enfriando);
+  }
+
+  final estado = switch (data['estado']) {
     'dada-de-baja' => EstadoDeBaja.dadaDeBaja,
     'sin-suscripcion' => EstadoDeBaja.sinSuscripcion,
     // Cualquier valor que no conozcamos cae en `noDisponible` y NO en
@@ -100,7 +145,7 @@ Future<ResultadoDeBaja> _cancelar() async {
     _ => EstadoDeBaja.noDisponible,
   };
 
-  final iso = res.data['accesoHastaIso'];
+  final iso = data['accesoHastaIso'];
   return ResultadoDeBaja(
     estado: estado,
     accesoHasta: iso is String ? DateTime.tryParse(iso) : null,

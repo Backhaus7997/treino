@@ -132,6 +132,23 @@ void main() {
       expect(porFragmento('SE DIO DE BAJA'), findsNothing);
     });
 
+    testWidgets('⚠️ el cooldown NO dice que no hay nada que dar de baja',
+        (tester) async {
+      // Es el estado en el que cae quien reintenta despues de un fallo, que es
+      // exactamente lo que el mensaje de fallo le pide hacer. Decirle que no
+      // hay nada que dar de baja lo manda a su casa con la suscripcion viva.
+      debugPlanCancelCaller =
+          () async => const ResultadoDeBaja(estado: EstadoDeBaja.enfriando);
+
+      await abrir(tester);
+      await tester.tap(find.text('DAR DE BAJA'));
+      await tester.pumpAndSettle();
+
+      expect(porFragmento('Esperá unos segundos'), findsOneWidget);
+      expect(find.text('NO HAY NADA QUE DAR DE BAJA'), findsNothing);
+      expect(find.text('LISTO, SE DIO DE BAJA'), findsNothing);
+    });
+
     testWidgets('sin suscripción no se presenta como un error', (tester) async {
       debugPlanCancelCaller = () async =>
           const ResultadoDeBaja(estado: EstadoDeBaja.sinSuscripcion);
