@@ -64,6 +64,15 @@ export const QUARANTINE_COLLECTION = "moderation_quarantine";
  */
 const REDACTADO = "";
 
+/**
+ * Codigo gRPC de `FAILED_PRECONDITION`.
+ *
+ * Es 9. El 10 es `ABORTED`, y confundirlos hace que la redaccion se propague
+ * como error en vez de abandonarse — lo cazo el test de la precondicion, que
+ * es exactamente para lo que estaba.
+ */
+const FAILED_PRECONDITION = 9;
+
 export interface QuarantineInput {
   db: Firestore;
   /** Ruta completa del documento que disparo el trigger. */
@@ -76,6 +85,19 @@ export interface QuarantineInput {
   kind: "post" | "message" | "review" | "profile";
   /** Autor del contenido, si se puede derivar. Para la cola de moderacion. */
   authorUid?: string;
+  /**
+   * `updateTime` del snapshot que disparo el trigger.
+   *
+   * Se usa como PRECONDICION de la redaccion. Entre que el handler mira el
+   * valor y escribe, el usuario pudo editar el documento: sin precondicion, el
+   * `update()` cae sobre la version NUEVA y borra una edicion limpia que nadie
+   * reviso — la funcion termina destruyendo contenido valido.
+   *
+   * Si el documento cambio, la escritura falla con FAILED_PRECONDITION y se
+   * abandona, que es lo correcto: esa escritura nueva disparo SU PROPIO
+   * trigger y se revisa por su cuenta.
+   */
+  updateTime?: FirebaseFirestore.Timestamp;
 }
 
 /**
@@ -86,7 +108,7 @@ export interface QuarantineInput {
 export async function quarantineIfVetted(
   input: QuarantineInput,
 ): Promise<ModerationVerdict> {
-  const { db, path, field, value, kind, authorUid } = input;
+  const { db, path, field, value, kind, authorUid, updateTime } = input;
 
   if (typeof value !== "string" || value.trim() === "") return "ok";
 
@@ -119,13 +141,40 @@ export async function quarantineIfVetted(
 
   if (verdict !== "block") return verdict;
 
-  await db.doc(path).update({ [field]: REDACTADO });
+  try {
+    await db
+      .doc(path)
+      .update(
+        { [field]: REDACTADO },
+        updateTime ? { lastUpdateTime: updateTime } : {},
+      );
+  } catch (err) {
+    // FAILED_PRECONDITION (10): el documento cambio despues del evento. No se
+    // pisa: la escritura nueva disparo su propio trigger.
+    if ((err as { code?: number }).code === FAILED_PRECONDITION) {
+      logger.info("quarantine: el documento cambio, lo revisa su propio evento",
+        { path, field });
+      return verdict;
+    }
+    throw err;
+  }
   logger.warn("contenido vetado redactado por el servidor", { path, field });
 
   return verdict;
 }
 
-/** Igual que arriba, pero el `displayName` vive en DOS documentos. */
+/**
+ * Con que se reemplaza un nombre vetado.
+ *
+ * Vaciarlo NO sirve: el nombre se renderiza en cada post, cada mensaje y cada
+ * tarjeta de descubrimiento, y ademas tiene que seguir siendo unico. Derivarlo
+ * del uid cumple las dos cosas y no le pone a nadie el nombre de otro.
+ */
+export function nombreDeReemplazo(uid: string): string {
+  return `usuario_${uid.slice(0, 6)}`;
+}
+
+/** Igual que arriba, pero el `displayName` vive en TRES documentos. */
 export async function quarantineDisplayName(
   db: Firestore,
   uid: string,
@@ -152,15 +201,15 @@ export async function quarantineDisplayName(
 
   if (verdict !== "block") return verdict;
 
-  // Vaciarlo NO sirve acá: el nombre se renderiza en cada post, cada mensaje y
-  // cada tarjeta de descubrimiento, y ademas tiene que seguir siendo unico. Un
-  // reemplazo derivado del uid cumple las dos cosas y no le pone a nadie el
-  // nombre de otro.
-  const reemplazo = `usuario_${uid.slice(0, 6)}`;
+  const reemplazo = nombreDeReemplazo(uid);
 
-  // Los DOS documentos, y en batch. `userPublicProfiles` es el que leen los
-  // demas: dejarlo con el nombre vetado mientras `users` queda limpio es
-  // redactar la copia que nadie mira.
+  // Los TRES documentos donde vive el nombre, no dos.
+  //
+  // La primera version limpiaba `users` y `userPublicProfiles`. Faltaba
+  // `trainerPublicProfiles`, que es el que alimenta el descubrimiento de PFs:
+  // un entrenador con nombre vetado quedaba limpio en su perfil y vetado en la
+  // tarjeta que ve todo el mundo. Redactar la copia que nadie mira y dejar la
+  // publica es no redactar nada.
   const batch = db.batch();
   batch.update(db.doc(`users/${uid}`), { displayName: reemplazo });
   batch.set(
@@ -171,10 +220,62 @@ export async function quarantineDisplayName(
     },
     { merge: true },
   );
+
+  // `trainerPublicProfiles` solo si YA existe: un `set` con merge lo crearia
+  // para un atleta, y un doc de entrenador fantasma en la coleccion de
+  // descubrimiento es un problema nuevo, no la solucion de este.
+  const trainerRef = db.doc(`trainerPublicProfiles/${uid}`);
+  if ((await trainerRef.get()).exists) {
+    batch.set(
+      trainerRef,
+      {
+        displayName: reemplazo,
+        displayNameLowercase: reemplazo.toLowerCase(),
+      },
+      { merge: true },
+    );
+  }
+
   await batch.commit();
 
   logger.warn("displayName vetado redactado por el servidor", { uid });
   return verdict;
+}
+
+/**
+ * Redacta el `authorDisplayName` denormalizado de un post.
+ *
+ * Funcion propia y exportada, no logica adentro del wrapper: lo que vive
+ * adentro de un `onDocumentWritten` no se puede testear sin el arnes de
+ * triggers, y un test que reimplementa el comportamiento para despues
+ * asertarselo a si mismo no prueba nada.
+ */
+export async function quarantineAuthorName(input: {
+  db: Firestore;
+  path: string;
+  authorUid: string;
+  name: unknown;
+  updateTime?: FirebaseFirestore.Timestamp;
+}): Promise<boolean> {
+  const { db, path, authorUid, name, updateTime } = input;
+  if (typeof name !== "string" || name.trim() === "") return false;
+  if (checkText(name) !== "block") return false;
+
+  try {
+    await db
+      .doc(path)
+      .update(
+        { authorDisplayName: nombreDeReemplazo(authorUid) },
+        updateTime ? { lastUpdateTime: updateTime } : {},
+      );
+  } catch (err) {
+    if ((err as { code?: number }).code === FAILED_PRECONDITION) {
+      return false;
+    }
+    throw err;
+  }
+  logger.warn("authorDisplayName vetado redactado", { path });
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -191,14 +292,74 @@ export const quarantinePost = onDocumentWritten(
   async (event) => {
     const after = event.data?.after;
     if (!after?.exists) return;
+    const db = getFirestore();
+    const authorUid = after.get("authorUid") as string | undefined;
+
     await quarantineIfVetted({
-      db: getFirestore(),
+      db,
       path: after.ref.path,
       field: "text",
       value: after.get("text"),
       kind: "post",
-      authorUid: after.get("authorUid") as string | undefined,
+      authorUid,
+      updateTime: after.updateTime,
     });
+
+    // `authorDisplayName` viaja DENORMALIZADO en el post y lo pone el cliente:
+    // la regla de create (`firestore.rules:1388`) lo acepta sin atarlo al
+    // perfil. Un llamador por SDK directo puede crear un post con `text`
+    // limpio y un nombre vetado en el encabezado, que `PostCard` renderiza tal
+    // cual — y mirando solo `text` ese nombre se quedaba ahi para siempre.
+    //
+    // Se redacta con el mismo reemplazo derivado del uid que usa el perfil,
+    // para que el post no quede sin autor visible.
+    await quarantineAuthorName({
+      db,
+      path: after.ref.path,
+      authorUid: authorUid ?? "",
+      name: after.get("authorDisplayName"),
+      updateTime: after.updateTime,
+    });
+  },
+);
+
+/**
+ * Los ESPEJOS publicos del nombre, que el dueno puede escribir directo.
+ *
+ * `firestore.rules:1568` deja al dueno escribir `userPublicProfiles/{uid}` y
+ * `firestore.rules:1864` deja al entrenador escribir
+ * `trainerPublicProfiles/{uid}`. Escuchar solo `users/{uid}` dejaba abierto
+ * justamente el bypass por SDK directo que esta capa existe para cerrar: los
+ * dos documentos son los que alimentan la busqueda de perfiles y el
+ * descubrimiento de PFs.
+ *
+ * Los dos delegan en `quarantineDisplayName`, que limpia los TRES documentos.
+ * No hay bucle: el reemplazo es un nombre limpio, asi que la pasada siguiente
+ * devuelve `ok`.
+ */
+export const quarantinePublicProfileName = onDocumentWritten(
+  { document: "userPublicProfiles/{uid}", region: REGION },
+  async (event) => {
+    const after = event.data?.after;
+    if (!after?.exists) return;
+    await quarantineDisplayName(
+      getFirestore(),
+      event.params.uid,
+      after.get("displayName"),
+    );
+  },
+);
+
+export const quarantineTrainerProfileName = onDocumentWritten(
+  { document: "trainerPublicProfiles/{uid}", region: REGION },
+  async (event) => {
+    const after = event.data?.after;
+    if (!after?.exists) return;
+    await quarantineDisplayName(
+      getFirestore(),
+      event.params.uid,
+      after.get("displayName"),
+    );
   },
 );
 
@@ -214,6 +375,7 @@ export const quarantineChatMessage = onDocumentWritten(
       value: after.get("text"),
       kind: "message",
       authorUid: after.get("senderId") as string | undefined,
+      updateTime: after.updateTime,
     });
   },
 );
@@ -230,6 +392,7 @@ export const quarantineReview = onDocumentWritten(
       value: after.get("comment"),
       kind: "review",
       authorUid: after.get("athleteId") as string | undefined,
+      updateTime: after.updateTime,
     });
   },
 );

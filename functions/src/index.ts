@@ -318,5 +318,7 @@ export {
   quarantineChatMessage,
   quarantineDisplayNameOnWrite,
   quarantinePost,
+  quarantinePublicProfileName,
   quarantineReview,
+  quarantineTrainerProfileName,
 } from "./moderation/quarantine-vetted-content";
