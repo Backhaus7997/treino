@@ -4667,6 +4667,10 @@ class AppL10nEs extends AppL10n {
 
   @override
   String get moderationBlockError => 'No pudimos bloquear. Probá de nuevo.';
+
+  @override
+  String get moderationBlockedMessage =>
+      'Ese texto no se puede publicar porque incumple las Normas de Comunidad. Revísalo e inténtalo de nuevo.';
 }
 
 /// The translations for Spanish Castilian, as used in Argentina (`es_AR`).
@@ -9329,4 +9333,8 @@ class AppL10nEsAr extends AppL10nEs {
 
   @override
   String get moderationBlockError => 'No pudimos bloquear. Probá de nuevo.';
+
+  @override
+  String get moderationBlockedMessage =>
+      'Ese texto no se puede publicar porque incumple las Normas de Comunidad. Revisalo y volvé a intentar.';
 }

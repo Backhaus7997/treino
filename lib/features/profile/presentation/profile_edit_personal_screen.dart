@@ -9,6 +9,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
+import '../../../core/moderation/moderation_guard.dart';
 import '../../../core/image/avatar_cropper.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/motion/treino_tappable.dart';
@@ -374,14 +375,17 @@ class _ProfileEditPersonalScreenState
         );
         context.pop();
       }
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
+        // `displayName` pasa por el filtro de términos vetados. El texto
+        // genérico invita a reintentar, y para un bloqueo eso es consejo
+        // falso: el mismo nombre va a fallar siempre.
+        final copy = e is ModerationBlockedException
+            ? AppL10n.of(context).moderationBlockedMessage
+            : 'No pudimos guardar los cambios. Probá de nuevo.'; // i18n
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              'No pudimos guardar los cambios. Probá de nuevo.', // i18n: Fase 6 Etapa 3
-              style: GoogleFonts.barlow(fontSize: 14),
-            ),
+            content: Text(copy, style: GoogleFonts.barlow(fontSize: 14)),
           ),
         );
       }

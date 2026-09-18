@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart'
     show CollectionReference, FirebaseFirestore;
 
+import '../../../core/moderation/moderation_guard.dart';
 import '../domain/review.dart';
 
 /// Firestore repository for athlete → trainer reviews.
@@ -21,6 +22,10 @@ class ReviewRepository {
   /// Uses set without merge so that stale fields from a previous version are
   /// never retained. REQ-RV-DATA-003.
   Future<void> upsert(Review review) async {
+    // Guideline 1.2 de App Review. El comentario de una resena es texto libre
+    // que otro usuario ve en el perfil publico del entrenador.
+    ModerationGuard.ensure(review.comment, campo: 'comment');
+
     await _reviews.doc(review.id).set(review.toJson());
   }
 

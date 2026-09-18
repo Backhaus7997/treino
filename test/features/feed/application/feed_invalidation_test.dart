@@ -170,7 +170,7 @@ void main() {
           container.read(createPostNotifierProvider(null).notifier);
       notifier.setText('Nuevo PR de sentadilla 140kg');
       notifier.setPrivacy(PostPrivacy.gym);
-      final ok = await notifier.submit();
+      final ok = await notifier.submit(moderationMessage: 'bloqueado');
       expect(ok, isTrue);
 
       final after = await container.read(myGymFeedProvider.future);

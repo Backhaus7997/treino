@@ -3,6 +3,7 @@ import 'dart:developer' as developer;
 import 'package:cloud_firestore/cloud_firestore.dart'
     show CollectionReference, FirebaseFirestore, SetOptions, Timestamp;
 
+import '../../../core/moderation/moderation_guard.dart';
 import '../../gyms/data/gym_repository.dart';
 import '../../gyms/domain/gym.dart' show kNoGymId;
 import '../domain/user_profile.dart';
@@ -438,6 +439,17 @@ class UserRepository {
             'trainerLocationConsentPromptedAt': now,
           }
         : partial;
+
+    // Guideline 1.2 de App Review. El `displayName` es el texto libre que mas
+    // se ve: aparece en cada post, cada mensaje y cada tarjeta de descubrimiento.
+    //
+    // Se filtra aca —en el unico `update` publico— y no en cada llamador,
+    // porque el repositorio es el cuello de botella. `getOrCreate` no necesita
+    // el guard: escribe `displayName: null` por construccion.
+    if (efectivo.containsKey('displayName')) {
+      ModerationGuard.ensure(efectivo['displayName'] as String?,
+          campo: 'displayName');
+    }
 
     _assertTrainerLocationStateIsValid(efectivo);
     final sanitized = Map<String, Object?>.fromEntries(
