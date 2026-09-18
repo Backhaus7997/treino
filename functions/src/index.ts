@@ -305,3 +305,20 @@ export { ensureStoreAccountToken } from "./subscriptions/store-account-token";
 // solo doc del resultado no pasa). Ver el encabezado de
 // `moderation/remove-follows-on-block.ts`.
 export { removeFollowEdgesOnBlock } from "./moderation/remove-follows-on-block";
+
+// Cola de revision de reportes. `docs/legal/normas-de-comunidad.md:123` dice,
+// publicado, que revisamos todo reporte dentro de las 24 horas — y no habia
+// donde verlos. Eso no era una feature que faltaba: era una afirmacion falsa
+// en un documento que el usuario acepta.
+//
+// Los tres arrancan con `assertModerator`. No es defensa en profundidad: es la
+// UNICA defensa, porque del otro lado hay Admin SDK y las rules no participan.
+export {
+  listPendingReports,
+  moderationStats,
+  resolveReport,
+} from "./moderation/report-review";
+
+// El aviso es lo que hace verdadera la promesa: sin el, la cola existe y nadie
+// la mira. Ver el encabezado de `moderation/notify-report-created.ts`.
+export { notifyReportCreated } from "./moderation/notify-report-created";

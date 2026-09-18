@@ -4579,6 +4579,25 @@ service cloud.firestore {
     // read/update/delete cerrados a TODO cliente, reporterUid incluido: los
     // reportes se revisan por consola. Un denunciante que pudiera leer
     // reportes (propios o ajenos) es un canal de acoso nuevo.
+    // Resultado de la moderacion de un reporte. UN doc por reporte, mismo id.
+    //
+    // CERRADA a todo cliente, en las dos direcciones. La escribe el Admin SDK
+    // desde `functions/src/moderation/report-review.ts`, que ignora estas
+    // reglas.
+    //
+    // Va APARTE de `reports` y no como campo suyo por dos motivos. Uno: el
+    // `hasOnly` del create de `reports` no incluye ningun campo de estado y su
+    // `update` esta cerrado, asi que no hay por donde. Dos, y es el que
+    // importa: mutar una coleccion disenada como inmutable invita a que
+    // alguien, en seis meses, afloje ese `update` "solo para el estado" y abra
+    // un agujero. Separarlas hace que esa tentacion no exista.
+    //
+    // Leerla desde el cliente seria un canal de acoso nuevo, igual que leer
+    // `reports`: dice a quien denunciaron, por que, y si prospero.
+    match /report_reviews/{reportId} {
+      allow read, write: if false;
+    }
+
     match /reports/{reportId} {
       allow read: if false;
 

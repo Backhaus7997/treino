@@ -189,8 +189,14 @@ export async function sendQueuedMailHandler(
     return;
   }
 
+  // Un `toAddress` es una direccion literal: no hay uid que resolver ni
+  // `notificationPrefs` que consultar. Se saltea las dos cosas a proposito —
+  // un buzon de equipo no tiene preferencias, y pedirle las suyas a un uid que
+  // no existe haria fallar un mail que sí tiene destino.
+  const literal = typeof data.toAddress === "string" && data.toAddress !== "";
+
   // Opt-out check, when this mail is subject to one.
-  if (data.prefKey) {
+  if (data.prefKey && !literal) {
     const allowed = await emailChannelAllowed(app, data.toUid, data.prefKey);
     if (!allowed) {
       logger.info("sendQueuedMail: email channel off, skipping", {
@@ -202,7 +208,7 @@ export async function sendQueuedMailHandler(
     }
   }
 
-  const to = await resolveAddress(app, data.toUid);
+  const to = literal ? data.toAddress! : await resolveAddress(app, data.toUid);
   if (!to) {
     await ref.update({
       status: "failed",
