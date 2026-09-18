@@ -6,6 +6,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import '../../../../app/theme/app_palette.dart';
 import '../../../../core/widgets/motion/treino_fade_slide_in.dart';
 import '../../../../core/widgets/motion/treino_success_check.dart';
+import '../../../../../core/moderation/moderation_guard.dart';
 import '../../../../l10n/app_l10n.dart';
 import '../../application/review_notifier.dart';
 import '../../domain/review.dart';
@@ -103,8 +104,19 @@ class _ReviewBottomSheetState extends ConsumerState<ReviewBottomSheet> {
     if (!mounted) return;
     final state = ref.read(reviewNotifierProvider(_args));
     if (state is AsyncError) {
+      // `reviewSnackBarError` invita a reintentar. Para un bloqueo del filtro
+      // de términos vetados eso es consejo falso: el mismo comentario va a
+      // fallar siempre, y el usuario concluye que la app está rota en vez de
+      // que su texto no pasa.
+      final bloqueado = state.error is ModerationBlockedException;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.reviewSnackBarError)),
+        SnackBar(
+          content: Text(
+            bloqueado
+                ? l10n.moderationBlockedMessage
+                : l10n.reviewSnackBarError,
+          ),
+        ),
       );
     } else {
       Navigator.of(context).pop();

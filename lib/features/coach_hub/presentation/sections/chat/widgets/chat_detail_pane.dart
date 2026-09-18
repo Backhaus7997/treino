@@ -6,6 +6,8 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../../../../app/theme/app_palette.dart';
 import '../../../../../../app/theme/tokens/primitives.dart';
+import '../../../../../../core/moderation/moderation_guard.dart';
+import '../../../../../../l10n/app_l10n.dart';
 import '../../../../../../core/telemetry/non_fatal.dart';
 import '../../../../../../core/utils/firestore_error.dart';
 import '../../../../../../core/widgets/motion/treino_state_switcher.dart';
@@ -175,20 +177,26 @@ class _ChatDetailPaneState extends ConsumerState<ChatDetailPane> {
             // una sospecha: cuando este texto aparece, es porque las reglas
             // denegaron la escritura.
             content: Text(
-              switch ((
-                isPermissionDenied(e),
-                widget.chatId == chatIdDelEnvio,
-              )) {
-                // El deíctico "este" sólo es cierto si el PF sigue parado en la
-                // conversación donde falló. Si ya se fue a otra, el cartel
-                // aparece sobre una conversación distinta y "este chat" señala
-                // a la equivocada.
-                (true, true) => 'No tenés permiso para escribir en este chat.',
-                (true, false) =>
-                  'No pudimos enviar el mensaje: no tenés permiso en '
-                      'esa conversación.',
-                (false, _) => 'No pudimos enviar el mensaje. Reintentá.',
-              },
+              // El bloqueo del filtro de términos vetados va PRIMERO: no es
+              // permission-denied ni un problema de red, y los tres textos de
+              // abajo mandan al PF a reintentar algo que va a fallar siempre.
+              e is ModerationBlockedException
+                  ? AppL10n.of(context).moderationBlockedMessage
+                  : switch ((
+                      isPermissionDenied(e),
+                      widget.chatId == chatIdDelEnvio,
+                    )) {
+                      // El deíctico "este" sólo es cierto si el PF sigue parado en la
+                      // conversación donde falló. Si ya se fue a otra, el cartel
+                      // aparece sobre una conversación distinta y "este chat" señala
+                      // a la equivocada.
+                      (true, true) =>
+                        'No tenés permiso para escribir en este chat.',
+                      (true, false) =>
+                        'No pudimos enviar el mensaje: no tenés permiso en '
+                            'esa conversación.',
+                      (false, _) => 'No pudimos enviar el mensaje. Reintentá.',
+                    },
             ), // i18n: Fase W2
           ),
         );
