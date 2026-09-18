@@ -316,6 +316,38 @@ void main() {
       expect(callRedirect(c, '/home'), isNull);
     });
 
+    test('con la fecha ya cargada, /birth-date SACA al usuario', () async {
+      // El caso que faltaba, y es el que se ve en la app: el gate tenía regla
+      // de ENTRADA con self-skip y ninguna de SALIDA.
+      //
+      // Guardar la fecha hace que la rama del gate deje de disparar, pero
+      // `/birth-date` no es ruta pública, así que el redirect `/public → /home`
+      // tampoco la alcanza: `authRedirect` devuelve null y el usuario se queda
+      // mirando la misma pantalla, con la fecha ya persistida. Cerrar sesión y
+      // volver a entrar "lo arregla" porque esa cadena arranca en /splash y
+      // nunca pasa por acá.
+      //
+      // Es el mismo par entrada/salida que `/profile-unavailable` resuelve diez
+      // líneas más arriba en la misma función. Ahí la salida se escribió; acá
+      // no.
+      final c = await ready(_athleteProfile());
+      expect(
+        callRedirect(c, '/birth-date'),
+        equals('/home'),
+        reason: 'un gate con entrada y sin salida deja al usuario adentro '
+            'para siempre',
+      );
+    });
+
+    test('la salida NO se dispara si la fecha sigue sin servir', () async {
+      // Control del control: si la salida no mirara el validador, sacaría al
+      // usuario del gate con la fecha todavía inválida — que es exactamente lo
+      // que el gate existe para impedir. Sin este caso, el test de arriba pasa
+      // con un `return '/home'` incondicional.
+      final c = await ready(_athleteUnderMinAge());
+      expect(callRedirect(c, '/birth-date'), isNull);
+    });
+
     test('sin displayName gana ProfileSetup, no el gate de edad', () async {
       // Orden: una cuenta que nunca completó el alta va al flow, que YA pide la
       // fecha en su paso 2. Mandarla al gate primero la dejaría sin username.
