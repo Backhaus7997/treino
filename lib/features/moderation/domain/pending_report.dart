@@ -27,7 +27,8 @@ class PendingReport {
   /// cola de moderacion que no abre porque el servidor cambio una clave deja
   /// al equipo sin la herramienta justo cuando corre el reloj de las 24 horas.
   factory PendingReport.fromMap(Map<Object?, Object?> raw) {
-    String texto(String clave) => raw[clave] is String ? raw[clave]! as String : '';
+    String texto(String clave) =>
+        raw[clave] is String ? raw[clave]! as String : '';
     DateTime? fecha(String clave) {
       final v = raw[clave];
       return v is String ? DateTime.tryParse(v) : null;
@@ -43,9 +44,8 @@ class PendingReport {
       detail: raw['detail'] is String ? raw['detail']! as String : null,
       createdAt: fecha('createdAt'),
       firstViewedAt: fecha('firstViewedAt'),
-      contentPath: raw['contentPath'] is String
-          ? raw['contentPath']! as String
-          : null,
+      contentPath:
+          raw['contentPath'] is String ? raw['contentPath']! as String : null,
     );
   }
 
