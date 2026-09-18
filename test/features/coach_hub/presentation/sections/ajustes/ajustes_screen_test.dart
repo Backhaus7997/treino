@@ -60,11 +60,11 @@ Widget _harness({
       // `AppL10n.of(context)` devuelve null y cualquier texto localizado de
       // esta pantalla revienta — el arbol de test no se parecia al de
       // produccion y el primer uso de l10n en `cuenta_tab` lo destapo.
-      child: MaterialApp(
+      child: const MaterialApp(
         localizationsDelegates: AppL10n.localizationsDelegates,
         supportedLocales: AppL10n.supportedLocales,
-        locale: const Locale('es', 'AR'),
-        home: const Scaffold(body: AjustesScreen()),
+        locale: Locale('es', 'AR'),
+        home: Scaffold(body: AjustesScreen()),
       ),
     );
 
