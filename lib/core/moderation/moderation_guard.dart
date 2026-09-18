@@ -13,10 +13,13 @@ class ModerationBlockedException implements Exception {
   /// pintar el error, NUNCA para mostrarle al usuario que palabra fue.
   final String campo;
 
-  /// Lo que ve el usuario.
-  String get mensaje =>
-      'Ese texto no se puede publicar porque incumple las Normas de '
-      'Comunidad. Revisalo y volvé a intentar.';
+  // Esta excepcion NO carga el texto que ve el usuario.
+  //
+  // La app tiene tres locales (`en`, `es`, `es_AR`) y el copy vive en
+  // `lib/l10n/*.arb`, bajo `moderationBlockedMessage`. Una capa de datos que
+  // devuelve una cadena en castellano rioplatense obliga a traducirla desde
+  // donde no hay contexto, o —peor— la deja sin traducir y nadie lo nota
+  // hasta que un usuario en ingles ve media pantalla en espaniol.
 
   @override
   String toString() => 'ModerationBlockedException($campo)';

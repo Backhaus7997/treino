@@ -8078,6 +8078,12 @@ abstract class AppL10n {
   /// In es_AR, this message translates to:
   /// **'No pudimos bloquear. Probá de nuevo.'**
   String get moderationBlockError;
+
+  /// Error mostrado cuando el filtro de terminos vetados rechaza un texto. NO nombra el termino que lo disparo a proposito: decirlo convierte al filtro en un oraculo para encontrarle el borde.
+  ///
+  /// In es_AR, this message translates to:
+  /// **'Ese texto no se puede publicar porque incumple las Normas de Comunidad. Revisalo y volvé a intentar.'**
+  String get moderationBlockedMessage;
 }
 
 class _AppL10nDelegate extends LocalizationsDelegate<AppL10n> {

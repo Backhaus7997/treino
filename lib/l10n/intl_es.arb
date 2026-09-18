@@ -1061,5 +1061,7 @@
   "legacyPrivacyNoticeTitle": "Actualizamos la Política de Privacidad",
   "legacyPrivacyNoticeBody": "Aclaramos cómo tratamos tu ubicación. No cambió nada de lo que recolectamos de ti.",
   "legacyPrivacyNoticeAction": "LEER LA POLÍTICA",
-  "legacyPrivacyNoticeDismiss": "Cerrar"
+  "legacyPrivacyNoticeDismiss": "Cerrar",
+  "moderationBlockedMessage": "Ese texto no se puede publicar porque incumple las Normas de Comunidad. Revísalo e inténtalo de nuevo.",
+  "@moderationBlockedMessage": {}
 }

@@ -1,6 +1,8 @@
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:treino/core/moderation/moderation_guard.dart';
+import 'package:treino/l10n/app_l10n_en.dart';
+import 'package:treino/l10n/app_l10n_es.dart';
 import 'package:treino/features/chat/data/chat_repository.dart';
 import 'package:treino/features/feed/data/post_repository.dart';
 import 'package:treino/features/feed/domain/post.dart';
@@ -171,13 +173,22 @@ void main() {
   });
 
   group('el mensaje al usuario', () {
-    test('no nombra el termino que lo disparo', () {
+    test('la excepcion no carga copy: eso vive en l10n', () {
+      // Una capa de datos que devuelve castellano rioplatense obliga a
+      // traducirlo desde donde no hay contexto. La app tiene tres locales.
+      const e = ModerationBlockedException('text');
+      expect(e.toString(), contains('text'));
+    });
+
+    test('el copy de l10n no nombra el termino que lo disparo', () {
       // Decirlo convierte al filtro en un oraculo: se prueban variantes hasta
       // que el mensaje deja de aparecer, y el mensaje confirma el exito.
-      const e = ModerationBlockedException('text');
-      expect(e.mensaje, isNot(contains('puta')));
-      expect(e.mensaje, isNot(contains('hijo')));
-      expect(e.mensaje, contains('Normas de Comunidad'));
+      for (final l in [AppL10nEsAr(), AppL10nEs(), AppL10nEn()]) {
+        final copy = l.moderationBlockedMessage.toLowerCase();
+        expect(copy, isNot(contains('puta')), reason: l.localeName);
+        expect(copy, isNot(contains('hijo')), reason: l.localeName);
+        expect(copy, isNotEmpty, reason: l.localeName);
+      }
     });
   });
 }

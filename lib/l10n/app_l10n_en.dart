@@ -4574,4 +4574,8 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get moderationBlockError => 'We couldn\'t block them. Try again.';
+
+  @override
+  String get moderationBlockedMessage =>
+      'That text can\'t be posted because it breaks the Community Guidelines. Please review it and try again.';
 }

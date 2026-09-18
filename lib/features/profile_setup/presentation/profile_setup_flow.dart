@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../app/theme/app_background.dart';
 import '../../../app/theme/app_motion.dart';
 import '../../../app/theme/app_palette.dart';
+import '../../../core/moderation/moderation_guard.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../auth/application/auth_providers.dart';
@@ -97,11 +98,19 @@ class _ProfileSetupFlowState extends ConsumerState<ProfileSetupFlow> {
           ),
         );
       }
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
+      // El handle publico se persiste como `displayName`, asi que pasa por el
+      // filtro de terminos vetados (`UserRepository.update`). `profileSetupSaveError`
+      // invita a reintentar, y para un bloqueo eso es consejo falso: el mismo
+      // handle va a fallar siempre. Peor aca que en cualquier otra pantalla —
+      // es el onboarding, y el usuario todavia no entro a la app.
+      final copy = e is ModerationBlockedException
+          ? AppL10n.of(context).moderationBlockedMessage
+          : AppL10n.of(context).profileSetupSaveError;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(AppL10n.of(context).profileSetupSaveError),
+          content: Text(copy),
           duration: const Duration(seconds: 3),
         ),
       );

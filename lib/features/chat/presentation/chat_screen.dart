@@ -12,6 +12,7 @@ import '../../../app/theme/app_palette.dart';
 import '../../../core/analytics/analytics_service.dart';
 import '../../../core/widgets/motion/treino_state_switcher.dart';
 import '../../../core/widgets/treino_icon.dart';
+import '../../../core/moderation/moderation_guard.dart';
 import '../../../l10n/app_l10n.dart';
 import '../../feed/application/follow_providers.dart';
 import '../../feed/domain/follow.dart';
@@ -121,10 +122,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         stackTrace: st,
       );
       if (mounted) {
+        // `chatScreenSendError` dice "Probá de nuevo", y para un bloqueo de
+        // moderación eso es consejo falso: el mismo texto falla siempre.
+        final copy = e is ModerationBlockedException
+            ? AppL10n.of(context).moderationBlockedMessage
+            : AppL10n.of(context).chatScreenSendError;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(AppL10n.of(context).chatScreenSendError),
-          ),
+          SnackBar(content: Text(copy)),
         );
       }
     } finally {

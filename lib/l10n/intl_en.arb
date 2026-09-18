@@ -1946,5 +1946,7 @@
       }
     }
   },
-  "moderationBlockError": "We couldn't block them. Try again."
+  "moderationBlockError": "We couldn't block them. Try again.",
+  "moderationBlockedMessage": "That text can't be posted because it breaks the Community Guidelines. Please review it and try again.",
+  "@moderationBlockedMessage": {}
 }
