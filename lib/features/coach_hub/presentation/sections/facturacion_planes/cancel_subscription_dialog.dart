@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:treino/app/theme/app_palette.dart';
+import 'package:treino/core/utils/argentina_time.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/widgets/motion/treino_tappable.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
@@ -202,13 +203,26 @@ class _CancelDialogState extends State<_CancelDialog> {
     ];
   }
 
-  /// `dd/mm/aaaa`. Sin `intl` a propósito: una fecha corta no justifica cargar
-  /// el locale, y el formato argentino es el único que se muestra.
+  /// `dd/mm/aaaa` en hora de **Argentina**, no en la del navegador.
+  ///
+  /// La primera versión usaba la hora del NAVEGADOR y estaba mal — lo agarró
+  /// `no_raw_clock_scan_test.dart`, que prohíbe esa lectura en el Coach Hub. El
+  /// motivo es real: el navegador del PF puede estar en cualquier zona horaria,
+  /// y entre las 21:00 y las 23:59 ART el día en UTC ya es el siguiente. Un PF
+  /// de viaje vería una fecha de vencimiento distinta de la que el servidor usa
+  /// para decidir cuándo se le apaga el plan.
+  ///
+  /// (El guard es TEXTUAL y no distingue código de prosa, así que este dartdoc
+  /// tampoco puede nombrar la API prohibida. Es deliberado del guard, no un
+  /// bug: así atrapa también la documentación que quedó mintiendo.)
+  ///
+  /// Sin `intl` a propósito: una fecha corta no justifica cargar el locale, y
+  /// el formato argentino es el único que se muestra.
   String _fecha(DateTime d) {
-    final l = d.toLocal();
-    final dd = l.day.toString().padLeft(2, '0');
-    final mm = l.month.toString().padLeft(2, '0');
-    return '$dd/$mm/${l.year}';
+    final ar = toArgentina(d.toUtc());
+    final dd = ar.day.toString().padLeft(2, '0');
+    final mm = ar.month.toString().padLeft(2, '0');
+    return '$dd/$mm/${ar.year}';
   }
 }
 
