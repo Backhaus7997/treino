@@ -4,7 +4,9 @@ import {
   VETTED_BLOCK_PHRASES,
   VETTED_BLOCK_WORDS,
   VETTED_COLLAPSE_MIN,
+  VETTED_COMBINING_RANGES,
   VETTED_FOLD,
+  VETTED_JOIN_MAX_FRAGMENT,
   VETTED_LEET,
   VETTED_LEET_ONLY_BETWEEN_LETTERS,
   VETTED_REVIEW_PHRASES,
@@ -90,8 +92,22 @@ export function normalize(text: string): string {
 
 function fold(s: string): string {
   let out = "";
-  for (const ch of s) out += VETTED_FOLD[ch] ?? ch;
+  for (const ch of s) {
+    // Las marcas combinantes se DESCARTAN, no se traducen. Ver el comentario
+    // gemelo en `moderation_filter.dart`: el mapa solo cubre precompuestos, y
+    // el texto descompuesto conservaba la marca, que partia el token en dos.
+    if (isCombining(ch.codePointAt(0) ?? 0)) continue;
+    out += VETTED_FOLD[ch] ?? ch;
+  }
   return out;
+}
+
+function isCombining(cp: number): boolean {
+  for (let i = 0; i < VETTED_COMBINING_RANGES.length; i += 2) {
+    if (cp < VETTED_COMBINING_RANGES[i]) return false;
+    if (cp <= VETTED_COMBINING_RANGES[i + 1]) return true;
+  }
+  return false;
 }
 
 function leet(s: string): string {
@@ -183,22 +199,31 @@ function hasPhrase(
  */
 function evades(tokens: readonly string[]): boolean {
   const candidatos: string[] = [];
-  let corrida = "";
+  let corrida: string[] = [];
 
   const cerrarCorrida = (): void => {
-    if (corrida.length > 1) candidatos.push(corrida);
-    corrida = "";
+    if (corrida.length > 1) candidatos.push(corrida.join(""));
+    corrida = [];
   };
 
   for (const t of tokens) {
-    if (t.length === 1) {
-      corrida += t;
+    // Se pega con el anterior solo si LOS DOS son cortos. Ver el comentario
+    // gemelo en `moderation_filter.dart`: con la regla vieja —corridas de UN
+    // caracter— `pu-to` y `p-uto` salteaban la capa entera.
+    const corto = t.length <= VETTED_JOIN_MAX_FRAGMENT;
+    const anteriorCorto =
+      corrida.length > 0 &&
+      corrida[corrida.length - 1].length <= VETTED_JOIN_MAX_FRAGMENT;
+
+    if (corto && (corrida.length === 0 || anteriorCorto)) {
+      corrida.push(t);
       continue;
     }
     cerrarCorrida();
     // La allowlist no puede aportar letras a un match: `computo` contiene
     // `puto` y `controlo` contiene `trolo`, y las dos son palabras normales.
     if (!VETTED_ALLOWLIST.has(t)) candidatos.push(t);
+    if (corto) corrida.push(t);
   }
   cerrarCorrida();
 
