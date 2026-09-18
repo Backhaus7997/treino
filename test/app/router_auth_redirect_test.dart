@@ -144,6 +144,7 @@ ProviderContainer _anonContainer() => ProviderContainer(
 ProviderContainer _loggedInContainer({
   required UserProfile profile,
   bool deletionInFlight = false,
+  bool pendingWrites = false,
 }) {
   final mockUser = MockUser();
   return ProviderContainer(
@@ -153,6 +154,9 @@ ProviderContainer _loggedInContainer({
       ),
       userProfileProvider.overrideWith(
         (ref) => Stream<UserProfile?>.value(profile),
+      ),
+      userProfileHasPendingWritesProvider.overrideWith(
+        (ref) => Stream<bool>.value(pendingWrites),
       ),
       accountDeletionInFlightProvider.overrideWith((ref) => deletionInFlight),
     ],
@@ -314,6 +318,77 @@ void main() {
     test('con bornAt cargado el gate no dispara', () async {
       final c = await ready(_athleteProfile());
       expect(callRedirect(c, '/home'), isNull);
+    });
+
+    test('con la fecha ya cargada, /birth-date SACA al usuario', () async {
+      // El caso que faltaba, y es el que se ve en la app: el gate tenía regla
+      // de ENTRADA con self-skip y ninguna de SALIDA.
+      //
+      // Guardar la fecha hace que la rama del gate deje de disparar, pero
+      // `/birth-date` no es ruta pública, así que el redirect `/public → /home`
+      // tampoco la alcanza: `authRedirect` devuelve null y el usuario se queda
+      // mirando la misma pantalla, con la fecha ya persistida. Cerrar sesión y
+      // volver a entrar "lo arregla" porque esa cadena arranca en /splash y
+      // nunca pasa por acá.
+      //
+      // Es el mismo par entrada/salida que `/profile-unavailable` resuelve diez
+      // líneas más arriba en la misma función. Ahí la salida se escribió; acá
+      // no.
+      final c = await ready(_athleteProfile());
+      expect(
+        callRedirect(c, '/birth-date'),
+        equals('/home'),
+        reason: 'un gate con entrada y sin salida deja al usuario adentro '
+            'para siempre',
+      );
+    });
+
+    test('al salir del gate, el PF incompleto sigue hasta SU onboarding',
+        () async {
+      // La salida devuelve /home y no el destino final a proposito: go_router
+      // re-evalua el redirect sobre /home y los gates de abajo re-aplican
+      // solos. Es el mismo mecanismo del que depende la salida de
+      // /profile-unavailable.
+      //
+      // Sin este caso, la salida podria devolver /home y dejar al PF ahi —
+      // salteandole el onboarding comercial que el gate de abajo existe para
+      // imponer.
+      final c = await ready(_trainerIncomplete());
+      expect(callRedirect(c, '/birth-date'), equals('/home'));
+      expect(
+        callRedirect(c, '/home'),
+        equals('/profile/edit-trainer?mode=onboarding'),
+      );
+    });
+
+    test('la salida NO se dispara con la escritura sin confirmar', () async {
+      // Firestore aplica el update en el cache ANTES del ack del servidor, asi
+      // que el stream emite el `bornAt` optimista de inmediato.
+      //
+      // Sin este chequeo el usuario sale del gate con un dato que todavia
+      // puede volver atras — y si el servidor lo rechaza, vuelve al gate SIN
+      // EXPLICACION, con la pantalla que podia mostrarle el error ya
+      // desmontada. Es peor que el bug original: en vez de "no pasa nada",
+      // "funciona y despues rebota solo".
+      final c = _loggedInContainer(
+        profile: _athleteProfile(),
+        pendingWrites: true,
+      );
+      addTearDown(c.dispose);
+      await c.read(authNotifierProvider.future);
+      await c.read(userProfileProvider.future);
+      await c.read(userProfileHasPendingWritesProvider.future);
+
+      expect(callRedirect(c, '/birth-date'), isNull);
+    });
+
+    test('la salida NO se dispara si la fecha sigue sin servir', () async {
+      // Control del control: si la salida no mirara el validador, sacaría al
+      // usuario del gate con la fecha todavía inválida — que es exactamente lo
+      // que el gate existe para impedir. Sin este caso, el test de arriba pasa
+      // con un `return '/home'` incondicional.
+      final c = await ready(_athleteUnderMinAge());
+      expect(callRedirect(c, '/birth-date'), isNull);
     });
 
     test('sin displayName gana ProfileSetup, no el gate de edad', () async {
