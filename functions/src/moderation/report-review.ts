@@ -105,6 +105,56 @@ interface PendingReport {
   reporterUid: string;
   createdAt: string | null;
   firstViewedAt: string | null;
+  /**
+   * Ruta del documento reportado, o `null` si no se puede derivar.
+   *
+   * Sin esto la cola es inservible para los reportes de MENSAJE: el cliente
+   * manda `message.id` pelado (`chat_screen.dart:573`) y el documento vive en
+   * `chats/{chatId}/messages/{messageId}`. Un id sin su chat no localiza nada,
+   * y la cola se presenta como el lugar autenticado donde se mira el
+   * contenido.
+   *
+   * El chatId NO hace falta pedirlo ni guardarlo: es deterministico
+   * (`ChatRepository.chatIdFor` ordena el par y lo une con `_`), y el reporte
+   * ya trae las dos puntas — `reporterUid` y `targetOwnerUid`. Derivarlo acá
+   * evita tocar la forma de `reports`, que es inmutable y cuyo `hasOnly` es
+   * criterio de aceptacion de este cambio.
+   */
+  contentPath: string | null;
+}
+
+/** Donde vive el contenido reportado. Ver `PendingReport.contentPath`. */
+export function resolveContentPath(input: {
+  targetKind: string;
+  targetId: string;
+  reporterUid: string;
+  targetOwnerUid: string;
+}): string | null {
+  const { targetKind, targetId, reporterUid, targetOwnerUid } = input;
+  if (!targetId) return null;
+
+  switch (targetKind) {
+  case "post":
+    return `posts/${targetId}`;
+  case "review":
+    return `reviews/${targetId}`;
+  case "profile":
+    // El `targetId` de un reporte de perfil ES el uid
+    // (`public_profile_screen.dart:89`).
+    return `users/${targetId}`;
+  case "message": {
+    if (!reporterUid || !targetOwnerUid || reporterUid === targetOwnerUid) {
+      return null;
+    }
+    const chatId = [reporterUid, targetOwnerUid].sort().join("_");
+    return `chats/${chatId}/messages/${targetId}`;
+  }
+  default:
+    // Un `targetKind` que no conocemos devuelve null en vez de armar una ruta
+    // inventada: una ruta que no existe se lee igual que una que si, y manda
+    // al moderador a buscar un documento que nunca estuvo ahi.
+    return null;
+  }
 }
 
 /**
@@ -112,55 +162,118 @@ interface PendingReport {
  *
  * Mas viejos primero y no mas nuevos: la promesa es un TECHO de 24 horas, asi
  * que lo que hay que atacar es lo que esta mas cerca de romperla.
+ *
+ * ## Por que escanea en lotes en vez de un solo `limit`
+ *
+ * El estado de un reporte NO vive en `reports` —vive en `report_reviews`, que
+ * es otra coleccion— asi que "pendiente" no se puede poner en el `where`. La
+ * primera version pedia los `limit` mas viejos y filtraba los resueltos
+ * DESPUES: el dia que los 50 mas viejos estuvieran resueltos, la cola devolvia
+ * vacio para siempre, con pendientes mas nuevos esperando.
+ *
+ * Una cola que se vacia sola es peor que no tener cola: no dice "no hay nada",
+ * dice "no hay nada" mintiendo, y nadie vuelve a mirar.
+ *
+ * Ahora avanza con cursor hasta juntar los que se pidieron. `escaneados` tiene
+ * tope duro y se devuelve: si el escaneo se corto por el tope, quien consume
+ * la cola tiene que poder saber que la respuesta esta incompleta en vez de
+ * leerla como "esto es todo".
  */
 export async function listPendingReportsHandler(
   db: Firestore,
   limit = 50,
-): Promise<{ reports: PendingReport[] }> {
-  const snap = await db
-    .collection("reports")
-    .orderBy("createdAt", "asc")
-    .limit(Math.min(Math.max(limit, 1), 200))
-    .get();
+): Promise<{
+  reports: PendingReport[];
+  scanned: number;
+  reachedScanCap: boolean;
+}> {
+  const objetivo = Math.min(Math.max(limit, 1), 200);
+  const LOTE = 100;
+  const TOPE_ESCANEO = 2000;
 
   const out: PendingReport[] = [];
   const ahora = new Date();
+  let cursor: FirebaseFirestore.QueryDocumentSnapshot | undefined;
+  let escaneados = 0;
 
-  for (const doc of snap.docs) {
-    const reviewRef = db.collection(REVIEWS_COLLECTION).doc(doc.id);
-    const review = await reviewRef.get();
-    const status = review.get("status") as ReportStatus | undefined;
-    if (status === "actioned" || status === "dismissed") continue;
+  while (out.length < objetivo && escaneados < TOPE_ESCANEO) {
+    let q = db
+      .collection("reports")
+      .orderBy("createdAt", "asc")
+      .limit(LOTE);
+    if (cursor) q = q.startAfter(cursor);
 
-    // `firstViewedAt` se setea UNA sola vez. Es lo que permite medir cuanto
-    // tardamos en MIRAR un reporte, que es la promesa que publicamos — no
-    // cuanto tardamos en resolverlo.
-    const yaVisto = review.get("firstViewedAt") as
-      { toDate(): Date } | undefined;
-    if (!yaVisto) {
-      await reviewRef.set(
-        { status: "pending", firstViewedAt: ahora },
-        { merge: true },
-      );
+    const snap = await q.get();
+    if (snap.empty) break;
+    escaneados += snap.size;
+    cursor = snap.docs[snap.docs.length - 1];
+
+    for (const doc of snap.docs) {
+      if (out.length >= objetivo) break;
+
+      const reviewRef = db.collection(REVIEWS_COLLECTION).doc(doc.id);
+
+      // Transaccion y no read-then-set: entre leer el review y estampar
+      // `firstViewedAt`, OTRO moderador puede resolver el reporte. Un `set`
+      // con merge sobre esa carrera escribe `status: "pending"` encima del
+      // estado resuelto —conservando `resolvedAt`, que queda mintiendo— y el
+      // reporte REAPARECE en la cola y en las estadisticas. Un listado no
+      // puede reabrir nada.
+      const vista = await db.runTransaction(async (tx) => {
+        const rev = await tx.get(reviewRef);
+        const status = rev.get("status") as ReportStatus | undefined;
+        if (status === "actioned" || status === "dismissed") {
+          return { resuelto: true, firstViewedAt: null as Date | null };
+        }
+        const ya = rev.get("firstViewedAt") as { toDate(): Date } | undefined;
+        if (ya) {
+          return { resuelto: false, firstViewedAt: ya.toDate() };
+        }
+        tx.set(
+          reviewRef,
+          { status: "pending", firstViewedAt: ahora },
+          { merge: true },
+        );
+        return { resuelto: false, firstViewedAt: ahora };
+      });
+
+      if (vista.resuelto) continue;
+
+      const createdAt = doc.get("createdAt") as { toDate(): Date } | undefined;
+      const reporterUid = String(doc.get("reporterUid") ?? "");
+      const targetKind = String(doc.get("targetKind") ?? "");
+      const targetId = String(doc.get("targetId") ?? "");
+      const targetOwnerUid = String(doc.get("targetOwnerUid") ?? "");
+
+      out.push({
+        id: doc.id,
+        targetKind,
+        targetId,
+        targetOwnerUid,
+        reason: String(doc.get("reason") ?? ""),
+        detail: (doc.get("detail") as string | undefined) ?? null,
+        reporterUid,
+        createdAt: createdAt ? createdAt.toDate().toISOString() : null,
+        firstViewedAt: vista.firstViewedAt
+          ? vista.firstViewedAt.toISOString()
+          : null,
+        contentPath: resolveContentPath({
+          targetKind,
+          targetId,
+          reporterUid,
+          targetOwnerUid,
+        }),
+      });
     }
 
-    const createdAt = doc.get("createdAt") as { toDate(): Date } | undefined;
-    out.push({
-      id: doc.id,
-      targetKind: String(doc.get("targetKind") ?? ""),
-      targetId: String(doc.get("targetId") ?? ""),
-      targetOwnerUid: String(doc.get("targetOwnerUid") ?? ""),
-      reason: String(doc.get("reason") ?? ""),
-      detail: (doc.get("detail") as string | undefined) ?? null,
-      reporterUid: String(doc.get("reporterUid") ?? ""),
-      createdAt: createdAt ? createdAt.toDate().toISOString() : null,
-      firstViewedAt: yaVisto
-        ? yaVisto.toDate().toISOString()
-        : ahora.toISOString(),
-    });
+    if (snap.size < LOTE) break;
   }
 
-  return { reports: out };
+  return {
+    reports: out,
+    scanned: escaneados,
+    reachedScanCap: escaneados >= TOPE_ESCANEO && out.length < objetivo,
+  };
 }
 
 export async function resolveReportHandler(
@@ -225,11 +338,24 @@ export async function resolveReportHandler(
 }
 
 /**
- * Cuantos pendientes y cual es el mas viejo.
+ * Cuantos pendientes, cual es el mas viejo, y cuantos rompieron la promesa.
  *
- * Es lo que permite PROBAR que se cumplen las 24 horas, en vez de afirmarlo.
- * Una promesa publica sin forma de medirla es la misma clase de afirmacion sin
+ * Es lo que permite PROBAR que se cumplen las 24 horas en vez de afirmarlo. Una
+ * promesa publica sin forma de medirla es la misma clase de afirmacion sin
  * verificar que AGENTS.md 11.1 trata.
+ *
+ * ## Que cuenta como incumplimiento
+ *
+ * Lo que `docs/legal/normas-de-comunidad.md:123` promete es REVISAR dentro de
+ * las 24 horas, no resolver. `firstViewedAt` es exactamente esa medida, y por
+ * eso existe.
+ *
+ * La primera version contaba como incumplimiento todo pendiente con
+ * `createdAt` de mas de 24 horas, mirado o no. Eso contradice la distincion que
+ * el resto del modulo sostiene y rompe la metrica por los dos lados: un reporte
+ * que se miro a las dos horas y sigue abierto —porque resolverlo requiere
+ * decidir algo— aparecia como promesa rota, y el numero dejaba de poder probar
+ * nada.
  */
 export async function moderationStatsHandler(
   db: Firestore,
@@ -255,9 +381,21 @@ export async function moderationStatsHandler(
     pending++;
     const createdAt = doc.get("createdAt") as { toDate(): Date } | undefined;
     if (!createdAt) continue;
-    const fecha = createdAt.toDate();
-    if (oldest === null || fecha < oldest) oldest = fecha;
-    if (ahora - fecha.getTime() > VEINTICUATRO_HS) breaching++;
+    const creado = createdAt.toDate();
+    if (oldest === null || creado < oldest) oldest = creado;
+
+    const vencimiento = creado.getTime() + VEINTICUATRO_HS;
+    const visto = review.get("firstViewedAt") as { toDate(): Date } | undefined;
+
+    if (!visto) {
+      // Nunca se miro. Rompe la promesa solo una vez pasado el plazo; antes de
+      // eso todavia esta en tiempo.
+      if (ahora > vencimiento) breaching++;
+    } else if (visto.toDate().getTime() > vencimiento) {
+      // Se miro, pero tarde. Queda contado para siempre: mirarlo despues no
+      // deshace el incumplimiento.
+      breaching++;
+    }
   }
 
   return {

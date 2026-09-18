@@ -29,7 +29,15 @@ const REGION = "southamerica-east1";
 export const MODERATION_MAILBOX = "treino@gettreino.com";
 
 export const notifyReportCreated = onDocumentCreated(
-  { document: "reports/{reportId}", region: REGION },
+  // `retry: true`, igual que `sendQueuedMail` y por el mismo motivo: sin el,
+  // un fallo transitorio al encolar pierde PARA SIEMPRE el unico aviso que le
+  // dice al equipo que hay un reporte nuevo — y el reporte queda en la cola sin
+  // que nadie sepa que existe, que es el estado que esta funcion viene a
+  // impedir.
+  //
+  // Es seguro reintentar porque el id del documento es deterministico: el
+  // segundo intento choca con ALREADY_EXISTS y no manda un segundo mail.
+  { document: "reports/{reportId}", region: REGION, retry: true },
   async (event) => {
     const snap = event.data;
     if (!snap) return;
