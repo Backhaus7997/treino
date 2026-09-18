@@ -113,6 +113,44 @@ const EXEMPTIONS: Readonly<Record<string, Exemption>> = {
       "angosto del §4.8.2, que mide un callable y un dia) y pedir cero INVALID " +
       "por plataforma antes de poner el flag.",
   },
+  // Los tres de la cola de moderacion. Mismo impedimento de PLATAFORMA que
+  // acceptTrainerLink: los llama el Coach Hub web, que no activa App Check
+  // (`main_coach_hub.dart` no tiene una sola referencia a FirebaseAppCheck, y
+  // `main.dart` lo saltea con `if (!kIsWeb)`).
+  //
+  // `decided` y no `debt` por eso: no es que la atestacion no funcione todavia,
+  // es que en la superficie donde se usan no existe. Una deuda sin condicion de
+  // salida posible es una decision disfrazada.
+  //
+  // Lo que los protege es el claim `moderator` de Firebase Auth, que se otorga
+  // a mano con `scripts/grant_moderator.js` y que ningun usuario puede darse a
+  // si mismo. El flag de App Check, ademas, no agregaria nada contra el riesgo
+  // real aca: no es un bot anonimo, es una cuenta autenticada sin el claim — y
+  // contra eso el guard es `assertModerator`, no la atestacion del dispositivo.
+  "moderation/report-review:listPendingReports": {
+    permanence: "decided",
+    reason:
+      "Lo llama el Coach Hub web, que no activa App Check. Protegido por el " +
+      "claim `moderator` de Firebase Auth via `assertModerator`, que corre " +
+      "PRIMERO y es la unica defensa —del otro lado hay Admin SDK y las rules " +
+      "no participan—. Ver report-review.ts:71.",
+  },
+  "moderation/report-review:resolveReport": {
+    permanence: "decided",
+    reason:
+      "Lo llama el Coach Hub web, que no activa App Check. Protegido por el " +
+      "claim `moderator` de Firebase Auth via `assertModerator`, que corre " +
+      "PRIMERO y es la unica defensa —del otro lado hay Admin SDK y las rules " +
+      "no participan—. Ver report-review.ts:71.",
+  },
+  "moderation/report-review:moderationStats": {
+    permanence: "decided",
+    reason:
+      "Lo llama el Coach Hub web, que no activa App Check. Protegido por el " +
+      "claim `moderator` de Firebase Auth via `assertModerator`, que corre " +
+      "PRIMERO y es la unica defensa —del otro lado hay Admin SDK y las rules " +
+      "no participan—. Ver report-review.ts:71.",
+  },
   "subscriptions/accept-trainer-link:acceptTrainerLink": {
     permanence: "decided",
     reason:
@@ -324,11 +362,14 @@ const EXPECTED_DEPLOYED = [
   "deleteAccount",
   "ensureAthleteProfile",
   "getAthletePricing",
+  "listPendingReports",
   "mintWatchCredential",
+  "moderationStats",
   "promoteChatToInquiry",
   "reconcileMyCheckout",
   "requestEmailVerification",
   "requestPasswordReset",
+  "resolveReport",
   "resumeTrainerLink",
 ] as const;
 
@@ -425,6 +466,24 @@ describe("QA-SEC-016: el guard falla cuando tiene que fallar", () => {
       attested: false,
     },
     { module: "add-alias", symbol: "addAlias", as: "addAlias", attested: true },
+    {
+      module: "moderation/report-review",
+      symbol: "listPendingReports",
+      as: "listPendingReports",
+      attested: false,
+    },
+    {
+      module: "moderation/report-review",
+      symbol: "resolveReport",
+      as: "resolveReport",
+      attested: false,
+    },
+    {
+      module: "moderation/report-review",
+      symbol: "moderationStats",
+      as: "moderationStats",
+      attested: false,
+    },
     {
       module: "chat/promote-chat-to-inquiry",
       symbol: "promoteChatToInquiry",

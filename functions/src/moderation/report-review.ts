@@ -36,6 +36,23 @@
  *
  * Antes de esto, `rg 'isAdmin|admin|staff|moderator' firestore.rules` devolvia
  * CERO. No existia noción de admin en el proyecto.
+ *
+ * ## App Check: exentos, y por que
+ *
+ * Los tres van SIN `enforceAppCheck`, declarados como exencion `decided` en
+ * `__tests__/appcheck-enforcement.test.ts`. Mismo impedimento de PLATAFORMA que
+ * `acceptTrainerLink`: los llama el Coach Hub web, que no activa App Check
+ * —`main_coach_hub.dart` no tiene una sola referencia a `FirebaseAppCheck`, y
+ * `main.dart` lo saltea con `if (!kIsWeb)`—. Con el flag puesto, cada llamada
+ * desde la web seria rechazada; es el bug que arreglo el PR #704.
+ *
+ * `decided` y no `debt` porque no hay condicion de salida posible: no es que la
+ * atestacion no funcione todavia, es que en esta superficie no existe. Una
+ * deuda sin condicion de salida es una decision disfrazada.
+ *
+ * Y contra el riesgo real, la atestacion no agregaria nada. El riesgo no es un
+ * bot anonimo: es una cuenta autenticada SIN el claim. Contra eso el guard es
+ * `assertModerator`, no la firma del dispositivo.
  */
 
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
