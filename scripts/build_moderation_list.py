@@ -125,6 +125,57 @@ def solo_letras(s: str) -> str:
     return re.sub(r"[^0-9a-z]", "", sin_diacriticos(s.lower()))
 
 
+def normalizar(texto: str) -> str:
+    """La normalizacion DE REFERENCIA. Dart y TypeScript son puertos de esto.
+
+    El corpus guarda la salida de esta funcion para cada caso, y las dos suites
+    la comparan ademas del veredicto. Sin eso el corpus solo caza una
+    divergencia cuando llega a voltear un `ok` en `block`: dos normalizaciones
+    distintas que no cruzan ese umbral quedan vivas, con las dos suites en
+    verde, hasta el dia que alguien agrega un termino y el bug aparece lejos
+    de donde se escribio.
+
+    Que la referencia viva aca y no en uno de los dos runtimes es a proposito.
+    Si la referencia fuera Dart, TypeScript se conformaria a Dart y nadie
+    estaria mirando a Dart; con el generador en el medio, los dos se conforman
+    a lo mismo y ninguno es juez de su propio caso.
+    """
+    s = sin_diacriticos(texto.lower())
+
+    # Leet. Los simbolos solo con letra a los DOS lados: ver
+    # LEET_SOLO_ENTRE_LETRAS.
+    chars = list(s)
+    fuera = []
+    for i, ch in enumerate(chars):
+        rep = LEET.get(ch)
+        if rep is None:
+            fuera.append(ch)
+            continue
+        if ch in LEET_SOLO_ENTRE_LETRAS:
+            antes = i > 0 and _es_alnum(chars[i - 1])
+            despues = i + 1 < len(chars) and _es_alnum(chars[i + 1])
+            fuera.append(rep if antes and despues else ch)
+        else:
+            fuera.append(rep)
+    s = "".join(fuera)
+
+    # Colapsar runs de COLAPSO_MINIMO o mas.
+    out = []
+    i = 0
+    while i < len(s):
+        j = i
+        while j < len(s) and s[j] == s[i]:
+            j += 1
+        largo = j - i
+        out.append(s[i] if largo >= COLAPSO_MINIMO else s[i] * largo)
+        i = j
+    return "".join(out)
+
+
+def _es_alnum(ch: str) -> bool:
+    return len(ch) == 1 and ("0" <= ch <= "9" or "a" <= ch <= "z")
+
+
 def cargar() -> dict:
     if not SRC.exists():
         sys.exit(f"[!] falta {SRC.relative_to(ROOT)}")
@@ -229,7 +280,8 @@ def cargar() -> dict:
         if c["espera"] not in ESPERAS:
             sys.exit(f"[!] {SRC.name}: el caso #{i} espera {c['espera']!r}, "
                      f"que no es uno de {sorted(ESPERAS)}")
-        casos.append((c["texto"], c["espera"], c.get("por", "")))
+        casos.append((c["texto"], c["espera"], c.get("por", ""),
+                      normalizar(c["texto"])))
 
     if not casos:
         sys.exit(f"[!] {SRC.name}: 'cases' esta vacio. El corpus es lo unico "
@@ -268,8 +320,9 @@ def emitir_dart(d: dict) -> str:
         return "[" + ", ".join(lista(x) for x in xs) + "]"
 
     casos = ",\n".join(
-        f"  (texto: {dart_str(t)}, espera: {dart_str(e)}, por: {dart_str(p)})"
-        for t, e, p in d["casos"])
+        f"  (texto: {dart_str(t)}, espera: {dart_str(e)}, "
+        f"normalizado: {dart_str(n)}, por: {dart_str(p)})"
+        for t, e, p, n in d["casos"])
 
     fold = ", ".join(f"{dart_str(k)}: {dart_str(v)}"
                      for k, v in sorted(d["plegado"].items()))
@@ -328,7 +381,7 @@ const Set<String> kVettedAllowlist = {{{", ".join(dart_str(x) for x in d["allowl
 /// Corpus de conformidad. La suite de TypeScript corre EXACTAMENTE estos
 /// mismos casos: si los dos veredictos no coinciden, una de las dos se pone
 /// roja. Ninguna de las dos escribe sus expectativas a mano.
-const List<({{String texto, String espera, String por}})> kVettedCases = [
+const List<({{String texto, String espera, String normalizado, String por}})>\n    kVettedCases = [
 {casos},
 ];
 '''
@@ -342,8 +395,9 @@ def emitir_ts(d: dict) -> str:
         return "[" + ", ".join(lista(x) for x in xs) + "]"
 
     casos = ",\n".join(
-        f"  {{ texto: {ts_str(t)}, espera: {ts_str(e)}, por: {ts_str(p)} }}"
-        for t, e, p in d["casos"])
+        f"  {{ texto: {ts_str(t)}, espera: {ts_str(e)}, "
+        f"normalizado: {ts_str(n)}, por: {ts_str(p)} }}"
+        for t, e, p, n in d["casos"])
 
     fold_ts = ", ".join(f"{ts_str(k)}: {ts_str(v)}"
                         for k, v in sorted(d["plegado"].items()))
@@ -414,7 +468,7 @@ export const VETTED_ALLOWLIST: ReadonlySet<string> = new Set({lista(d["allowlist
  * casos: si los dos veredictos no coinciden, una de las dos se pone roja.
  * Ninguna de las dos escribe sus expectativas a mano.
  */
-export const VETTED_CASES: readonly {{ texto: string; espera: string; por: string }}[] = [
+export const VETTED_CASES: readonly {{\n  texto: string;\n  espera: string;\n  normalizado: string;\n  por: string;\n}}[] = [
 {casos},
 ];
 '''

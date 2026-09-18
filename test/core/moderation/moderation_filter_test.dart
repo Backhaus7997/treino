@@ -24,10 +24,23 @@ void main() {
     });
 
     for (final caso in kVettedCases) {
-      final esperado = ModerationVerdict.values
-          .firstWhere((v) => v.name == caso.espera);
+      final esperado =
+          ModerationVerdict.values.firstWhere((v) => v.name == caso.espera);
 
       test('${caso.espera.padRight(6)} · "${caso.texto}"', () {
+        // La forma normalizada se compara ADEMAS del veredicto, y sale de la
+        // implementacion de referencia en el generador.
+        //
+        // Sin esto el corpus solo caza una divergencia cuando llega a voltear
+        // un `ok` en `block`: dos normalizaciones distintas que no cruzan ese
+        // umbral quedan vivas, con las dos suites en verde, hasta el dia que
+        // alguien agrega un termino y el bug aparece lejos de donde se
+        // escribio.
+        expect(
+          ModerationFilter.normalize(caso.texto),
+          caso.normalizado,
+          reason: 'la normalizacion de Dart se separo de la referencia',
+        );
         expect(
           ModerationFilter.check(caso.texto),
           esperado,

@@ -133,7 +133,7 @@ const Map<String, String> kVettedFold = {
   'ȭ': 'o',
   'ȯ': 'o',
   'ȱ': 'o',
-  'ȳ': 'y',
+  'ȳ': 'y'
 };
 
 /// Deshacer leet: `0` -> `o`, `@` -> `a`.
@@ -146,7 +146,7 @@ const Map<String, String> kVettedLeet = {
   '4': 'a',
   '5': 's',
   '7': 't',
-  '@': 'a',
+  '@': 'a'
 };
 
 /// Los simbolos de `kVettedLeet` que SOLO se traducen con letra a los dos
@@ -209,7 +209,7 @@ const Set<String> kVettedBlockWords = {
   'trolos',
   'verga',
   'vergas',
-  'zoofilia',
+  'zoofilia'
 };
 
 /// Terminos de severidad `block` de VARIAS palabras, como secuencia de tokens.
@@ -235,7 +235,7 @@ const List<List<String>> kVettedBlockPhrases = [
   ['te', 'voy', 'a', 'cagar', 'a', 'trompadas'],
   ['te', 'voy', 'a', 'matar'],
   ['te', 'voy', 'a', 'reventar'],
-  ['vaca', 'de', 'mierda'],
+  ['vaca', 'de', 'mierda']
 ];
 
 /// Terminos de severidad `review` de UNA palabra.
@@ -263,7 +263,7 @@ const Set<String> kVettedReviewWords = {
   'tarado',
   'tetas',
   'thinspiration',
-  'thinspo',
+  'thinspo'
 };
 
 /// Terminos de severidad `review` de VARIAS palabras.
@@ -271,7 +271,7 @@ const List<List<String>> kVettedReviewPhrases = [
   ['dejar', 'de', 'comer', 'para'],
   ['manga', 'de', 'inutiles'],
   ['pro', 'ana'],
-  ['vomitar', 'despues', 'de', 'comer'],
+  ['vomitar', 'despues', 'de', 'comer']
 ];
 
 /// Subconjunto para la pasada antievasion: subcadena sobre el texto sin
@@ -292,7 +292,7 @@ const List<String> kVettedAntiEvasion = [
   'tortillera',
   'travuco',
   'trolo',
-  'zoofilia',
+  'zoofilia'
 ];
 
 /// Palabras legitimas que contienen un termino de `kVettedAntiEvasion`. Se
@@ -305,125 +305,247 @@ const Set<String> kVettedAllowlist = {
   'descontrolo',
   'disputo',
   'imputo',
-  'reputo',
+  'reputo'
 };
 
 /// Corpus de conformidad. La suite de TypeScript corre EXACTAMENTE estos
 /// mismos casos: si los dos veredictos no coinciden, una de las dos se pone
 /// roja. Ninguna de las dos escribe sus expectativas a mano.
-const List<({String texto, String espera, String por})> kVettedCases = [
-  (texto: 'computadora', espera: 'ok', por: 'contiene `puta`'),
+const List<({String texto, String espera, String normalizado, String por})>
+    kVettedCases = [
+  (
+    texto: 'computadora',
+    espera: 'ok',
+    normalizado: 'computadora',
+    por: 'contiene `puta`'
+  ),
   (
     texto: 'me lo anote en la computadora',
     espera: 'ok',
-    por: 'contiene `puta`',
+    normalizado: 'me lo anote en la computadora',
+    por: 'contiene `puta`'
   ),
-  (texto: 'calculo', espera: 'ok', por: 'contiene `culo`'),
-  (texto: 'cálculo', espera: 'ok', por: 'contiene `culo`, con acento'),
-  (texto: 'disputa', espera: 'ok', por: 'contiene `puta`'),
-  (texto: 'reputación', espera: 'ok', por: 'contiene `puta`'),
-  (texto: 'sexteto', espera: 'ok', por: 'contiene `sex`'),
-  (texto: 'escocia', espera: 'ok', por: 'falso positivo clasico'),
+  (
+    texto: 'calculo',
+    espera: 'ok',
+    normalizado: 'calculo',
+    por: 'contiene `culo`'
+  ),
+  (
+    texto: 'cálculo',
+    espera: 'ok',
+    normalizado: 'calculo',
+    por: 'contiene `culo`, con acento'
+  ),
+  (
+    texto: 'disputa',
+    espera: 'ok',
+    normalizado: 'disputa',
+    por: 'contiene `puta`'
+  ),
+  (
+    texto: 'reputación',
+    espera: 'ok',
+    normalizado: 'reputacion',
+    por: 'contiene `puta`'
+  ),
+  (
+    texto: 'sexteto',
+    espera: 'ok',
+    normalizado: 'sexteto',
+    por: 'contiene `sex`'
+  ),
+  (
+    texto: 'escocia',
+    espera: 'ok',
+    normalizado: 'escocia',
+    por: 'falso positivo clasico'
+  ),
   (
     texto: 'cuatro series para el musculo dorsal',
     espera: 'ok',
-    por: '`musculo` contiene `culo`: el caso de ESTE producto',
+    normalizado: 'cuatro series para el musculo dorsal',
+    por: '`musculo` contiene `culo`: el caso de ESTE producto'
   ),
   (
     texto: 'trabajo de musculacion tres veces por semana',
     espera: 'ok',
-    por: 'vocabulario central de la app',
+    normalizado: 'trabajo de musculacion tres veces por semana',
+    por: 'vocabulario central de la app'
   ),
   (
     texto: 'el computo de las series',
     espera: 'ok',
-    por: 'contiene `puto` — el que obliga a la allowlist',
+    normalizado: 'el computo de las series',
+    por: 'contiene `puto` — el que obliga a la allowlist'
   ),
-  (texto: 'me puse el pijama', espera: 'ok', por: 'contiene `pija`'),
+  (
+    texto: 'me puse el pijama',
+    espera: 'ok',
+    normalizado: 'me puse el pijama',
+    por: 'contiene `pija`'
+  ),
   (
     texto: 'el diputado Vergara',
     espera: 'ok',
-    por: 'contiene `puta` y `verga`',
+    normalizado: 'el diputado vergara',
+    por: 'contiene `puta` y `verga`'
   ),
   (
     texto: 'hoy entrené piernas y me fue bien',
     espera: 'ok',
-    por: 'control: texto normal pasa',
+    normalizado: 'hoy entrene piernas y me fue bien',
+    por: 'control: texto normal pasa'
   ),
-  (texto: 'puto', espera: 'block', por: 'termino directo'),
-  (texto: 'PUTO', espera: 'block', por: 'mayusculas'),
-  (texto: 'pÚtO', espera: 'block', por: 'mayusculas mezcladas y acento'),
-  (texto: 'putooooo', espera: 'block', por: 'caracteres repetidos'),
-  (texto: 'p u t o', espera: 'block', por: 'separado por espacios'),
-  (texto: 'p-u-t-o', espera: 'block', por: 'separado por guiones'),
-  (texto: 'p.u.t.o', espera: 'block', por: 'separado por puntos'),
-  (texto: 'pvto', espera: 'block', por: 'v por u'),
+  (texto: 'puto', espera: 'block', normalizado: 'puto', por: 'termino directo'),
+  (texto: 'PUTO', espera: 'block', normalizado: 'puto', por: 'mayusculas'),
+  (
+    texto: 'pÚtO',
+    espera: 'block',
+    normalizado: 'puto',
+    por: 'mayusculas mezcladas y acento'
+  ),
+  (
+    texto: 'putooooo',
+    espera: 'block',
+    normalizado: 'puto',
+    por: 'caracteres repetidos'
+  ),
+  (
+    texto: 'p u t o',
+    espera: 'block',
+    normalizado: 'p u t o',
+    por: 'separado por espacios'
+  ),
+  (
+    texto: 'p-u-t-o',
+    espera: 'block',
+    normalizado: 'p-u-t-o',
+    por: 'separado por guiones'
+  ),
+  (
+    texto: 'p.u.t.o',
+    espera: 'block',
+    normalizado: 'p.u.t.o',
+    por: 'separado por puntos'
+  ),
+  (texto: 'pvto', espera: 'block', normalizado: 'pvto', por: 'v por u'),
   (
     texto: 'sos un hijo de puta',
     espera: 'block',
-    por: 'frase de varias palabras',
+    normalizado: 'sos un hijo de puta',
+    por: 'frase de varias palabras'
   ),
-  (texto: 'hijo  de   PUTA', espera: 'block', por: 'frase con espacios de mas'),
-  (texto: 'te voy a matar', espera: 'block', por: 'amenaza'),
-  (texto: 'and4te a morir', espera: 'block', por: 'leet: 4 -> a'),
+  (
+    texto: 'hijo  de   PUTA',
+    espera: 'block',
+    normalizado: 'hijo  de puta',
+    por: 'frase con espacios de mas'
+  ),
+  (
+    texto: 'te voy a matar',
+    espera: 'block',
+    normalizado: 'te voy a matar',
+    por: 'amenaza'
+  ),
+  (
+    texto: 'and4te a morir',
+    espera: 'block',
+    normalizado: 'andate a morir',
+    por: 'leet: 4 -> a'
+  ),
   (
     texto: 'sos un pelotudo',
     espera: 'review',
-    por: 'insulto casual rioplatense',
+    normalizado: 'sos un pelotudo',
+    por: 'insulto casual rioplatense'
   ),
-  (texto: 'que gil', espera: 'review', por: 'insulto leve'),
+  (
+    texto: 'que gil',
+    espera: 'review',
+    normalizado: 'que gil',
+    por: 'insulto leve'
+  ),
   (
     texto: 'thinspo',
     espera: 'review',
-    por: 'contenido pro trastorno alimentario',
+    normalizado: 'thinspo',
+    por: 'contenido pro trastorno alimentario'
   ),
   (
     texto: 'cuantos años entrenas por semana',
     espera: 'ok',
+    normalizado: 'cuantos anos entrenas por semana',
     por:
-        '`ñ` pliega a `n`: `años` -> `anos`. Vigila que nadie meta `ano` en la lista',
+        '`ñ` pliega a `n`: `años` -> `anos`. Vigila que nadie meta `ano` en la lista'
   ),
   (
     texto: 'hace 3 años que entreno',
     espera: 'ok',
-    por: 'leet `3`->`e` sobre un numero real, mas el plegado de la ñ',
+    normalizado: 'hace e anos que entreno',
+    por: 'leet `3`->`e` sobre un numero real, mas el plegado de la ñ'
   ),
   (
     texto: 'sos un puta!',
     espera: 'block',
+    normalizado: 'sos un puta!',
     por:
-        'el `!` final NO se traduce a `i`: si se tradujera, `putai` no matchearia',
+        'el `!` final NO se traduce a `i`: si se tradujera, `putai` no matchearia'
   ),
   (
     texto: '10x3 con 90 segundos de pausa',
     espera: 'ok',
+    normalizado: 'ioxe con 9o segundos de pausa',
     por:
-        'notacion de series: los digitos pasan por leet y no pueden inventar un veto',
+        'notacion de series: los digitos pasan por leet y no pueden inventar un veto'
   ),
   (
     texto: 'otro loco que entrena a las 6',
     espera: 'ok',
+    normalizado: 'otro loco que entrena a las 6',
     por:
-        'pegado entero daria `otroloco` -> contiene `trolo`. La pasada B NO pega entre palabras',
+        'pegado entero daria `otroloco` -> contiene `trolo`. La pasada B NO pega entre palabras'
   ),
   (
     texto: 'traeme otro lote de bandas',
     espera: 'ok',
-    por: 'mismo caso: `otrolote` contiene `trolo`',
+    normalizado: 'traeme otro lote de bandas',
+    por: 'mismo caso: `otrolote` contiene `trolo`'
   ),
   (
     texto: 'pvto',
     espera: 'block',
-    por: 'grafia de evasion explicita, no transformacion',
+    normalizado: 'pvto',
+    por: 'grafia de evasion explicita, no transformacion'
   ),
   (
     texto: 'holaputo',
     espera: 'block',
-    por: 'pegado adentro de un token: la pasada B busca subcadena por token',
+    normalizado: 'holaputo',
+    por: 'pegado adentro de un token: la pasada B busca subcadena por token'
   ),
   (
     texto: 'no me controlo con la comida',
     espera: 'ok',
-    por: '`controlo` contiene `trolo` y esta en la allowlist',
+    normalizado: 'no me controlo con la comida',
+    por: '`controlo` contiene `trolo` y esta en la allowlist'
+  ),
+  (
+    texto: 'hice press banca con barra',
+    espera: 'ok',
+    normalizado: 'hice press banca con barra',
+    por: 'dobles `ss` y `rr`: el colapso arranca en TRES, no en dos'
+  ),
+  (
+    texto: 'el perro del gimnasio se llama Rocco',
+    espera: 'ok',
+    normalizado: 'el perro del gimnasio se llama rocco',
+    por: 'tres dobles seguidas — `rr`, `ll`, `cc`'
+  ),
+  (
+    texto: 'acción correcta en el banco',
+    espera: 'ok',
+    normalizado: 'accion correcta en el banco',
+    por: 'doble con acento arriba: plegado y colapso se tocan'
   ),
 ];

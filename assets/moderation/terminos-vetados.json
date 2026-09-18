@@ -415,6 +415,21 @@
       "texto": "no me controlo con la comida",
       "espera": "ok",
       "por": "`controlo` contiene `trolo` y esta en la allowlist"
+    },
+    {
+      "texto": "hice press banca con barra",
+      "espera": "ok",
+      "por": "dobles `ss` y `rr`: el colapso arranca en TRES, no en dos"
+    },
+    {
+      "texto": "el perro del gimnasio se llama Rocco",
+      "espera": "ok",
+      "por": "tres dobles seguidas — `rr`, `ll`, `cc`"
+    },
+    {
+      "texto": "acción correcta en el banco",
+      "espera": "ok",
+      "por": "doble con acento arriba: plegado y colapso se tocan"
     }
   ]
 }
