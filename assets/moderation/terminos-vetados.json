@@ -1,0 +1,475 @@
+{
+  "_lea_esto": [
+    "FUENTE UNICA de la lista de terminos vetados. Todo lo demas se genera:",
+    "  python3 scripts/build_moderation_list.py",
+    "  -> lib/core/moderation/vetted_terms.g.dart",
+    "  -> functions/src/moderation/vetted_terms.g.ts",
+    "",
+    "Este archivo NO se bundlea. No esta declarado en el `assets:` de",
+    "pubspec.yaml a proposito: vive bajo assets/ porque es contenido de",
+    "producto y no codigo, pero se consume en tiempo de GENERACION, no de",
+    "ejecucion. Declararlo lo haria viajar dos veces en el APK (como JSON y",
+    "compilado adentro del .g.dart) sin que nadie lo lea.",
+    "",
+    "Dos listas escritas a mano en dos lenguajes es el bug que este repo ya",
+    "cometio tres veces: Block.toJson (incluia `id`, el hasOnly no),",
+    "feedbackCounts (#1160) y Post.reactionCounts — este ultimo rompio la",
+    "publicacion de posts SIETE SEMANAS con la suite en verde. Por eso los",
+    "`cases` de abajo tambien se generan a los dos lenguajes: ninguna de las",
+    "dos implementaciones escribe sus expectativas a mano."
+  ],
+  "version": 1,
+  "_severities": [
+    "block  — se rechaza al componer. El contenido no llega a postearse.",
+    "review — se deja pasar y se crea un reporte automatico en la cola de",
+    "         moderacion. Para lo ambiguo, donde bloquear costaria mas que",
+    "         revisar.",
+    "",
+    "Los terminos van SIN acentos y en minuscula: la normalizacion saca los",
+    "diacriticos antes de comparar, asi que `mogolico` cubre `mogólico`.",
+    "",
+    "Las entradas de varias palabras se comparan contra la secuencia de",
+    "tokens, no contra el texto crudo. `hijo de puta` matchea `hijo  de",
+    "PUTA` y `hijo de puta!` igual."
+  ],
+  "severities": {
+    "block": [
+      "puto",
+      "putos",
+      "puta",
+      "putas",
+      "putazo",
+      "putito",
+      "hijo de puta",
+      "hija de puta",
+      "hijos de puta",
+      "hdp",
+      "la concha de tu madre",
+      "la concha de su madre",
+      "lctm",
+      "andate a la concha",
+      "conchudo",
+      "conchuda",
+      "maricon",
+      "maricones",
+      "marica",
+      "trolo",
+      "trolos",
+      "travuco",
+      "tortillera",
+      "mogolico",
+      "mogolica",
+      "mogolicos",
+      "retrasado mental",
+      "subnormal",
+      "sidoso",
+      "negro de mierda",
+      "negra de mierda",
+      "gorda de mierda",
+      "gordo de mierda",
+      "vaca de mierda",
+      "muerta de hambre",
+      "muerto de hambre",
+      "concha",
+      "conchas",
+      "pija",
+      "pijas",
+      "verga",
+      "vergas",
+      "garchar",
+      "garcha",
+      "garchame",
+      "chupapija",
+      "chupapijas",
+      "chupame la pija",
+      "culiar",
+      "cojer",
+      "porno",
+      "pornografia",
+      "pornhub",
+      "te voy a matar",
+      "te voy a cagar a trompadas",
+      "te reviento",
+      "te voy a reventar",
+      "ojala te mueras",
+      "andate a morir",
+      "matate",
+      "suicidate",
+      "colgate de un arbol",
+      "pedofilo",
+      "pedofila",
+      "pedofilia",
+      "zoofilia",
+      "pvto",
+      "pvta",
+      "pvtos",
+      "pvtas",
+      "kulo",
+      "koncha"
+    ],
+    "review": [
+      "pelotudo",
+      "pelotuda",
+      "pelotudos",
+      "pelotudas",
+      "forro",
+      "forra",
+      "gil",
+      "gila",
+      "sorete",
+      "idiota",
+      "estupido",
+      "estupida",
+      "imbecil",
+      "tarado",
+      "tarada",
+      "manga de inutiles",
+      "coger",
+      "cogerte",
+      "tetas",
+      "culo",
+      "culos",
+      "proana",
+      "pro ana",
+      "promia",
+      "thinspo",
+      "thinspiration",
+      "vomitar despues de comer",
+      "dejar de comer para"
+    ]
+  },
+  "_antievasion": [
+    "Subconjunto para la PASADA B. Esa pasada hace dos cosas:",
+    "",
+    "  1. Junta las corridas de tokens de UN caracter. `p u t o` y `p-u-t-o`",
+    "     dan cuatro tokens de un caracter cada uno, y pegados dan `puto`.",
+    "  2. Busca cada termino de esta lista como SUBCADENA de cada token,",
+    "     salteando los que estan en `allowlist`.",
+    "",
+    "Lo que NO hace es pegar el texto entero. Esa version ingenua bloquea",
+    "`otro loco` —o-t-r-o-l-o-c-o contiene `trolo`— y `otro lote`. Es",
+    "castellano rioplatense corriente, y hay un caso en el corpus por cada",
+    "uno para que nadie lo reintroduzca.",
+    "",
+    "El criterio para entrar aca es duro a proposito: el termino no puede",
+    "aparecer adentro de una palabra legitima del castellano rioplatense,",
+    "ni del vocabulario de ESTE producto. Por eso NO estan `culo` ni `puta`:",
+    "",
+    "  culo -> musculo, musculos, musculacion, calculo, vinculo, circulo,",
+    "          articulo, testiculo, ventriculo, curriculo, ridiculo...",
+    "  puta -> computadora, disputa, reputacion, diputada",
+    "",
+    "`musculo` no es un ejemplo de manual: es la palabra mas escrita de una",
+    "app de entrenamiento. Un filtro que la bloquea dura una semana.",
+    "",
+    "Los dos siguen vetados por la pasada A, que compara por PALABRA",
+    "COMPLETA — ahi `musculo` no es `culo` y no hay conflicto. Lo unico que",
+    "se resigna es cazarlos escritos como `c u l o`, y ese es el precio",
+    "correcto: un falso positivo sobre `musculo` le rompe la app a un",
+    "usuario que no hizo nada."
+  ],
+  "antievasion": [
+    "puto",
+    "putazo",
+    "conchudo",
+    "chupapija",
+    "maricon",
+    "trolo",
+    "travuco",
+    "tortillera",
+    "mogolico",
+    "sidoso",
+    "garchar",
+    "garchame",
+    "pedofilo",
+    "pedofilia",
+    "zoofilia",
+    "pornhub"
+  ],
+  "_allowlist": [
+    "Palabras legitimas que CONTIENEN un termino de `antievasion`. Antes de",
+    "la pasada B se sacan del texto, asi que no pueden aportar letras a un",
+    "match por subcadena.",
+    "",
+    "Van sin acentos: se comparan despues de normalizar.",
+    "",
+    "El generador EXIGE que cada entrada contenga al menos un termino de",
+    "`antievasion`, y falla si no. Es corto a proposito: una allowlist larga",
+    "se lee como una defensa grande, y si sus entradas no tapan nada es una",
+    "defensa imaginaria — el mismo problema que AGENTS.md 11.1 describe para",
+    "las advertencias falsas.",
+    "",
+    "Notar que `musculo`, `computadora`, `calculo`, `disputa`, `reputacion`,",
+    "`pijama` y `vergara` NO estan aca, y eso NO es un olvido: `culo`,",
+    "`puta`, `pija` y `verga` estan fuera de `antievasion` justamente para",
+    "que esas palabras nunca se comparen por subcadena. La pasada A las deja",
+    "pasar sola, porque compara por palabra completa."
+  ],
+  "allowlist": [
+    "computo",
+    "computos",
+    "amputo",
+    "imputo",
+    "disputo",
+    "reputo",
+    "controlo",
+    "descontrolo"
+  ],
+  "_cases": [
+    "Corpus de conformidad. Se genera a los DOS lenguajes y las dos",
+    "implementaciones lo corren: si Dart y TypeScript dan veredictos",
+    "distintos para la misma entrada, una de las dos suites se pone roja.",
+    "",
+    "Ninguna implementacion escribe estas expectativas a mano. Ese es el",
+    "punto entero del archivo.",
+    "",
+    "`espera` es uno de: ok | block | review"
+  ],
+  "cases": [
+    {
+      "texto": "computadora",
+      "espera": "ok",
+      "por": "contiene `puta`"
+    },
+    {
+      "texto": "me lo anote en la computadora",
+      "espera": "ok",
+      "por": "contiene `puta`"
+    },
+    {
+      "texto": "calculo",
+      "espera": "ok",
+      "por": "contiene `culo`"
+    },
+    {
+      "texto": "cálculo",
+      "espera": "ok",
+      "por": "contiene `culo`, con acento"
+    },
+    {
+      "texto": "disputa",
+      "espera": "ok",
+      "por": "contiene `puta`"
+    },
+    {
+      "texto": "reputación",
+      "espera": "ok",
+      "por": "contiene `puta`"
+    },
+    {
+      "texto": "sexteto",
+      "espera": "ok",
+      "por": "contiene `sex`"
+    },
+    {
+      "texto": "escocia",
+      "espera": "ok",
+      "por": "falso positivo clasico"
+    },
+    {
+      "texto": "cuatro series para el musculo dorsal",
+      "espera": "ok",
+      "por": "`musculo` contiene `culo`: el caso de ESTE producto"
+    },
+    {
+      "texto": "trabajo de musculacion tres veces por semana",
+      "espera": "ok",
+      "por": "vocabulario central de la app"
+    },
+    {
+      "texto": "el computo de las series",
+      "espera": "ok",
+      "por": "contiene `puto` — el que obliga a la allowlist"
+    },
+    {
+      "texto": "me puse el pijama",
+      "espera": "ok",
+      "por": "contiene `pija`"
+    },
+    {
+      "texto": "el diputado Vergara",
+      "espera": "ok",
+      "por": "contiene `puta` y `verga`"
+    },
+    {
+      "texto": "hoy entrené piernas y me fue bien",
+      "espera": "ok",
+      "por": "control: texto normal pasa"
+    },
+    {
+      "texto": "puto",
+      "espera": "block",
+      "por": "termino directo"
+    },
+    {
+      "texto": "PUTO",
+      "espera": "block",
+      "por": "mayusculas"
+    },
+    {
+      "texto": "pÚtO",
+      "espera": "block",
+      "por": "mayusculas mezcladas y acento"
+    },
+    {
+      "texto": "putooooo",
+      "espera": "block",
+      "por": "caracteres repetidos"
+    },
+    {
+      "texto": "p u t o",
+      "espera": "block",
+      "por": "separado por espacios"
+    },
+    {
+      "texto": "p-u-t-o",
+      "espera": "block",
+      "por": "separado por guiones"
+    },
+    {
+      "texto": "p.u.t.o",
+      "espera": "block",
+      "por": "separado por puntos"
+    },
+    {
+      "texto": "pvto",
+      "espera": "block",
+      "por": "v por u"
+    },
+    {
+      "texto": "sos un hijo de puta",
+      "espera": "block",
+      "por": "frase de varias palabras"
+    },
+    {
+      "texto": "hijo  de   PUTA",
+      "espera": "block",
+      "por": "frase con espacios de mas"
+    },
+    {
+      "texto": "te voy a matar",
+      "espera": "block",
+      "por": "amenaza"
+    },
+    {
+      "texto": "and4te a morir",
+      "espera": "block",
+      "por": "leet: 4 -> a"
+    },
+    {
+      "texto": "sos un pelotudo",
+      "espera": "review",
+      "por": "insulto casual rioplatense"
+    },
+    {
+      "texto": "que gil",
+      "espera": "review",
+      "por": "insulto leve"
+    },
+    {
+      "texto": "thinspo",
+      "espera": "review",
+      "por": "contenido pro trastorno alimentario"
+    },
+    {
+      "texto": "cuantos años entrenas por semana",
+      "espera": "ok",
+      "por": "`ñ` pliega a `n`: `años` -> `anos`. Vigila que nadie meta `ano` en la lista"
+    },
+    {
+      "texto": "hace 3 años que entreno",
+      "espera": "ok",
+      "por": "leet `3`->`e` sobre un numero real, mas el plegado de la ñ"
+    },
+    {
+      "texto": "sos un puta!",
+      "espera": "block",
+      "por": "el `!` final NO se traduce a `i`: si se tradujera, `putai` no matchearia"
+    },
+    {
+      "texto": "10x3 con 90 segundos de pausa",
+      "espera": "ok",
+      "por": "notacion de series: los digitos pasan por leet y no pueden inventar un veto"
+    },
+    {
+      "texto": "otro loco que entrena a las 6",
+      "espera": "ok",
+      "por": "pegado entero daria `otroloco` -> contiene `trolo`. La pasada B NO pega entre palabras"
+    },
+    {
+      "texto": "traeme otro lote de bandas",
+      "espera": "ok",
+      "por": "mismo caso: `otrolote` contiene `trolo`"
+    },
+    {
+      "texto": "pvto",
+      "espera": "block",
+      "por": "grafia de evasion explicita, no transformacion"
+    },
+    {
+      "texto": "holaputo",
+      "espera": "block",
+      "por": "pegado adentro de un token: la pasada B busca subcadena por token"
+    },
+    {
+      "texto": "no me controlo con la comida",
+      "espera": "ok",
+      "por": "`controlo` contiene `trolo` y esta en la allowlist"
+    },
+    {
+      "texto": "hice press banca con barra",
+      "espera": "ok",
+      "por": "dobles `ss` y `rr`: el colapso arranca en TRES, no en dos"
+    },
+    {
+      "texto": "el perro del gimnasio se llama Rocco",
+      "espera": "ok",
+      "por": "tres dobles seguidas — `rr`, `ll`, `cc`"
+    },
+    {
+      "texto": "acción correcta en el banco",
+      "espera": "ok",
+      "por": "doble con acento arriba: plegado y colapso se tocan"
+    },
+    {
+      "texto": "pu-to",
+      "espera": "block",
+      "por": "fragmentos de 2 y 2. Con la regla vieja —corridas de UN caracter— un separador salteaba la capa entera"
+    },
+    {
+      "texto": "p-uto",
+      "espera": "block",
+      "por": "fragmentos de 1 y 3"
+    },
+    {
+      "texto": "pu to",
+      "espera": "block",
+      "por": "mismo caso, separado por espacio"
+    },
+    {
+      "texto": "púto",
+      "espera": "block",
+      "por": "`u` + U+0301 descompuesto: se ve identico a `púto` y antes pasaba, porque la marca partia el token en dos"
+    },
+    {
+      "texto": "mogólico",
+      "espera": "block",
+      "por": "misma descomposicion sobre otro termino"
+    },
+    {
+      "texto": "otro lo hizo mejor",
+      "espera": "ok",
+      "por": "`otro`+`lo` pegados dan `otrolo`, que contiene `trolo`. La regla pide que los DOS fragmentos sean cortos, y `otro` no lo es"
+    },
+    {
+      "texto": "dale que va",
+      "espera": "ok",
+      "por": "tres fragmentos cortos seguidos se pegan: `dalequeva` no contiene nada, y tiene que seguir siendo asi"
+    },
+    {
+      "texto": "con-chudo",
+      "espera": "ok",
+      "por": "HUECO CONOCIDO, fijado a proposito. `con`(3) y `chudo`(5): la regla no los pega porque el segundo es largo. Pegarlos igual reintroduce el falso positivo sobre `otro lo`, y un filtro que bloquea castellano corriente dura una semana. El backstop de este caso es la cola de reportes, no la lista"
+    }
+  ]
+}
