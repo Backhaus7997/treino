@@ -53,11 +53,46 @@ DART="lib/features/auth/presentation/legal/legal_content.dart"
 # ajenos —los que entraron a la base mientras tanto— como si fueran de este PR, y
 # el gate se pondria rojo por el trabajo de otro. Un cartel que acusa al que no
 # fue se apaga rapido.
-RAW="${1:-origin/main}"
-BASE="$(git merge-base "$RAW" HEAD 2>/dev/null || true)"
-if [ -z "$BASE" ]; then
-  echo "[OK] No hay base con que comparar (base='${RAW}') — nada que verificar."
-  exit 0
+RAW="${1:-}"
+
+# Un `github.event.before` de ceros no es una base: es un push que crea la
+# rama. Ahi si corresponde caer a main.
+if [ -z "$RAW" ] || [ "$RAW" = "0000000000000000000000000000000000000000" ]; then
+  RAW="origin/main"
+fi
+
+# FALLA CERRADO. Esta funcion es la que decide si el gate corre, asi que un
+# "no pude resolver la base" que imprime [OK] y sale 0 es un gate que reporta
+# haber verificado algo que no miro — exactamente el modo de falla que este
+# script existe para arreglar, adentro del arreglo.
+#
+# Pasa de verdad: un force-push a main deja `github.event.before` inalcanzable,
+# y en local `origin/main` puede no existir en un clone recien hecho. En los
+# dos casos la version anterior dejaba pasar un cambio a un documento legal
+# publicado sin decir una palabra.
+if ! git rev-parse --verify --quiet "${RAW}^{commit}" >/dev/null; then
+  echo "FAIL: no se pudo resolver la base '${RAW}'."
+  echo ""
+  echo "  Sin base no hay con que comparar, y este check NO puede decir que"
+  echo "  todo esta bien: no miro nada. Falla cerrado a proposito."
+  echo ""
+  echo "  En CI suele ser un force-push que dejo el commit anterior"
+  echo "  inalcanzable. En local, que falte 'origin/main':"
+  echo ""
+  echo "      git fetch origin main"
+  echo ""
+  echo "  O pasale una base explicita:"
+  echo ""
+  echo "      bash scripts/check_legal_generado.sh <sha>"
+  exit 1
+fi
+
+if ! BASE="$(git merge-base "$RAW" HEAD)"; then
+  echo "FAIL: '${RAW}' y HEAD no tienen ancestro comun."
+  echo ""
+  echo "  Sin ancestro comun no se puede saber que archivos toco este cambio,"
+  echo "  asi que este check no puede opinar. Falla cerrado."
+  exit 1
 fi
 
 # Los nueve nombres del ORDER, leidos del generador. Import puro: el modulo no
