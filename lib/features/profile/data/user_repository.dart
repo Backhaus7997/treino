@@ -581,6 +581,29 @@ class UserRepository {
     });
   }
 
+  /// `true` mientras `users/{uid}` tenga escrituras locales sin confirmar.
+  ///
+  /// Firestore aplica un `update()` en el cache ANTES de que el servidor lo
+  /// acepte —compensacion de latencia— y `snapshots()` emite ese valor
+  /// optimista con `hasPendingWrites == true`. [watch] descarta la metadata al
+  /// mapear al modelo, asi que quien lo consume no puede distinguir un dato
+  /// confirmado de uno que todavia puede volver atras.
+  ///
+  /// Para casi toda la UI eso es lo que se quiere: el usuario ve su cambio al
+  /// instante. Para un GATE no: dejar pasar a alguien con una escritura sin
+  /// confirmar significa que si el servidor la rechaza, vuelve al gate sin
+  /// explicacion y con la pantalla que podia mostrarle el error ya desmontada.
+  ///
+  /// El listener es el MISMO que el de [watch] —Firestore comparte el snapshot
+  /// entre suscriptores del mismo documento— asi que no cuesta una lectura
+  /// extra.
+  Stream<bool> watchHasPendingWrites(String uid) {
+    return _users
+        .doc(uid)
+        .snapshots()
+        .map((snap) => snap.metadata.hasPendingWrites);
+  }
+
   Future<void> delete(String uid) async {
     throw UnsupportedError(
       'UserRepository.delete is not allowed from client code. '

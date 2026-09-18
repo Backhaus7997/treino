@@ -144,6 +144,7 @@ ProviderContainer _anonContainer() => ProviderContainer(
 ProviderContainer _loggedInContainer({
   required UserProfile profile,
   bool deletionInFlight = false,
+  bool pendingWrites = false,
 }) {
   final mockUser = MockUser();
   return ProviderContainer(
@@ -153,6 +154,9 @@ ProviderContainer _loggedInContainer({
       ),
       userProfileProvider.overrideWith(
         (ref) => Stream<UserProfile?>.value(profile),
+      ),
+      userProfileHasPendingWritesProvider.overrideWith(
+        (ref) => Stream<bool>.value(pendingWrites),
       ),
       accountDeletionInFlightProvider.overrideWith((ref) => deletionInFlight),
     ],
@@ -355,6 +359,27 @@ void main() {
         callRedirect(c, '/home'),
         equals('/profile/edit-trainer?mode=onboarding'),
       );
+    });
+
+    test('la salida NO se dispara con la escritura sin confirmar', () async {
+      // Firestore aplica el update en el cache ANTES del ack del servidor, asi
+      // que el stream emite el `bornAt` optimista de inmediato.
+      //
+      // Sin este chequeo el usuario sale del gate con un dato que todavia
+      // puede volver atras — y si el servidor lo rechaza, vuelve al gate SIN
+      // EXPLICACION, con la pantalla que podia mostrarle el error ya
+      // desmontada. Es peor que el bug original: en vez de "no pasa nada",
+      // "funciona y despues rebota solo".
+      final c = _loggedInContainer(
+        profile: _athleteProfile(),
+        pendingWrites: true,
+      );
+      addTearDown(c.dispose);
+      await c.read(authNotifierProvider.future);
+      await c.read(userProfileProvider.future);
+      await c.read(userProfileHasPendingWritesProvider.future);
+
+      expect(callRedirect(c, '/birth-date'), isNull);
     });
 
     test('la salida NO se dispara si la fecha sigue sin servir', () async {

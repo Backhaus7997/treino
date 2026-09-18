@@ -239,7 +239,20 @@ String? authRedirect(
     // La salida mira el validador y no solo "hay algo en bornAt": sin eso
     // sacaria al usuario del gate con una fecha que el gate existe para
     // rechazar.
-    if (enElGateDeEdad && !bornAtNoSirve) {
+    //
+    // Y exige que la escritura este CONFIRMADA POR EL SERVIDOR. Firestore
+    // aplica el update en el cache antes del ack, asi que el stream emite el
+    // `bornAt` optimista de inmediato: sin este chequeo el usuario sale del
+    // gate con un dato que todavia puede volver atras, y si el servidor lo
+    // rechaza vuelve al gate SIN EXPLICACION, con la pantalla que podia
+    // mostrarle el error ya desmontada.
+    //
+    // Mientras la escritura viaja, el boton sigue en "guardando" —`_save`
+    // espera el ack— asi que el usuario ve que algo esta pasando en vez de
+    // quedarse mirando una pantalla quieta.
+    final escrituraPendiente =
+        read(userProfileHasPendingWritesProvider).valueOrNull ?? false;
+    if (enElGateDeEdad && !bornAtNoSirve && !escrituraPendiente) {
       return '/home';
     }
 
