@@ -4579,6 +4579,23 @@ service cloud.firestore {
     // read/update/delete cerrados a TODO cliente, reporterUid incluido: los
     // reportes se revisan por consola. Un denunciante que pudiera leer
     // reportes (propios o ajenos) es un canal de acoso nuevo.
+    // Registro de cuarentena del filtro de terminos vetados.
+    //
+    // CERRADA a todo cliente, en las dos direcciones. Lo escribe el Admin SDK
+    // desde `functions/src/moderation/quarantine-vetted-content.ts`, que
+    // ignora estas reglas.
+    //
+    // Leerla seria un canal de evasion: dice exactamente que documentos
+    // cazo el filtro y cuales no, o sea que convierte la coleccion en el
+    // oraculo que el mensaje generico del cliente existe para no ser.
+    //
+    // El registro NO guarda el texto vetado. Puede tener datos personales de
+    // terceros, y en el chat puede tener datos de salud; quien modere abre el
+    // documento original, autenticado.
+    match /moderation_quarantine/{quarantineId} {
+      allow read, write: if false;
+    }
+
     // Resultado de la moderacion de un reporte. UN doc por reporte, mismo id.
     //
     // CERRADA a todo cliente, en las dos direcciones. La escribe el Admin SDK

@@ -306,6 +306,23 @@ export { ensureStoreAccountToken } from "./subscriptions/store-account-token";
 // `moderation/remove-follows-on-block.ts`.
 export { removeFollowEdgesOnBlock } from "./moderation/remove-follows-on-block";
 
+// Cuarentena de terminos vetados. El filtro del cliente
+// (`lib/core/moderation/`) es el que satisface la Guideline 1.2 de App Review
+// —el contenido no llega a postearse— pero se saltea con el SDK directo. Estos
+// cuatro triggers son la capa que no se puede evadir.
+//
+// `onDocumentWritten` y no `onDocumentCreated`: editar un post cambia su
+// texto, y un trigger solo-create deja abierta la puerta de crear algo limpio
+// y editarlo. Ver el encabezado de `moderation/quarantine-vetted-content.ts`.
+export {
+  quarantineChatMessage,
+  quarantineDisplayNameOnWrite,
+  quarantinePost,
+  quarantinePublicProfileName,
+  quarantineReview,
+  quarantineTrainerProfileName,
+} from "./moderation/quarantine-vetted-content";
+
 // Cola de revision de reportes. `docs/legal/normas-de-comunidad.md:123` dice,
 // publicado, que revisamos todo reporte dentro de las 24 horas — y no habia
 // donde verlos. Eso no era una feature que faltaba: era una afirmacion falsa
