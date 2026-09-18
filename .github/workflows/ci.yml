@@ -233,6 +233,22 @@ jobs:
           rm -rf .dart_tool/build
           dart run build_runner build --delete-conflicting-outputs
 
+          # La lista de terminos vetados sale de
+          # `assets/moderation/terminos-vetados.json` y se emite a Dart Y a
+          # TypeScript en la MISMA corrida.
+          #
+          # Va acá y no en un gate propio con `--check` porque el paso de abajo
+          # ya hace algo que `--check` no puede: `git status --porcelain` caza
+          # tambien el generado NUEVO que alguien se olvido de commitear.
+          #
+          # Que las dos salidas se separen es el bug que este repo ya cometio
+          # tres veces —`Block.toJson()`, `feedbackCounts` (#1160) y
+          # `Post.reactionCounts`, que rompio la publicacion de posts siete
+          # semanas con la suite entera en verde—. Acá el cliente filtraria con
+          # una lista y el servidor con otra, y cada suite seguiria verde
+          # porque cada una testea SU copia.
+          python3 scripts/build_moderation_list.py
+
       # `git status --porcelain` y no `git diff`: tambien caza el generado NUEVO
       # que alguien se olvido de commitear, que `git diff` no ve por no estar
       # trackeado. Respeta .gitignore, asi que `.dart_tool/` y demas no cuentan.
@@ -242,7 +258,7 @@ jobs:
           if [ -n "$sucios" ]; then
             echo "$sucios"
             echo ""
-            echo "::error::Hay generados desactualizados. Corre 'dart run build_runner build --delete-conflicting-outputs' y commitea el resultado."
+            echo "::error::Hay generados desactualizados. Corre 'dart run build_runner build --delete-conflicting-outputs' y/o 'python3 scripts/build_moderation_list.py', y commitea el resultado."
             exit 1
           fi
           echo "[OK] los generados commiteados coinciden con lo que produce el generador."

@@ -20,6 +20,12 @@ module.exports = {
   ignorePatterns: [
     "/lib/**/*",
     ".eslintrc.js",
+    // Salida de generador, igual que `/lib`. Un `.g.ts` no se arregla a mano
+    // —el proximo `python3 scripts/build_moderation_list.py` lo pisa—, asi que
+    // un warning ahi no se puede accionar y solo suma ruido permanente a la
+    // salida del lint. `tsc` los sigue mirando, que es lo que de verdad
+    // importa: los errores de TIPO no se saltean, solo los de estilo.
+    "/src/**/*.g.ts",
   ],
   rules: {
     "quotes": ["error", "double"],
