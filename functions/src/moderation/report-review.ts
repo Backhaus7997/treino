@@ -192,7 +192,6 @@ export async function listPendingReportsHandler(
   const TOPE_ESCANEO = 2000;
 
   const out: PendingReport[] = [];
-  const ahora = new Date();
   let cursor: FirebaseFirestore.QueryDocumentSnapshot | undefined;
   let escaneados = 0;
 
@@ -211,33 +210,25 @@ export async function listPendingReportsHandler(
     for (const doc of snap.docs) {
       if (out.length >= objetivo) break;
 
-      const reviewRef = db.collection(REVIEWS_COLLECTION).doc(doc.id);
-
-      // Transaccion y no read-then-set: entre leer el review y estampar
-      // `firstViewedAt`, OTRO moderador puede resolver el reporte. Un `set`
-      // con merge sobre esa carrera escribe `status: "pending"` encima del
-      // estado resuelto —conservando `resolvedAt`, que queda mintiendo— y el
-      // reporte REAPARECE en la cola y en las estadisticas. Un listado no
-      // puede reabrir nada.
-      const vista = await db.runTransaction(async (tx) => {
-        const rev = await tx.get(reviewRef);
-        const status = rev.get("status") as ReportStatus | undefined;
-        if (status === "actioned" || status === "dismissed") {
-          return { resuelto: true, firstViewedAt: null as Date | null };
-        }
-        const ya = rev.get("firstViewedAt") as { toDate(): Date } | undefined;
-        if (ya) {
-          return { resuelto: false, firstViewedAt: ya.toDate() };
-        }
-        tx.set(
-          reviewRef,
-          { status: "pending", firstViewedAt: ahora },
-          { merge: true },
-        );
-        return { resuelto: false, firstViewedAt: ahora };
-      });
-
-      if (vista.resuelto) continue;
+      // LISTAR NO ES MIRAR. Este handler solo LEE el review; `firstViewedAt`
+      // lo estampa `markReportViewed`, cuando el moderador tiene el reporte
+      // de verdad delante.
+      //
+      // La primera version lo estampaba aca, y eso rompia la unica metrica que
+      // prueba la promesa publicada: abrir la pantalla una vez marcaba los 50
+      // reportes de la pagina como revisados —incluidos los que ni se
+      // renderizaron, porque el ListView es perezoso— y `moderationStats` los
+      // contaba dentro del plazo PARA SIEMPRE. El tablero podia declarar
+      // cumplimiento sin que nadie hubiera leido nada.
+      //
+      // Una metrica que se puede satisfacer abriendo una pantalla no mide
+      // nada: es la misma clase de afirmacion sin verificar que AGENTS.md 11.1
+      // trata, y de la peor especie, porque tranquiliza sobre un compromiso
+      // legal.
+      const rev = await db.collection(REVIEWS_COLLECTION).doc(doc.id).get();
+      const status = rev.get("status") as ReportStatus | undefined;
+      if (status === "actioned" || status === "dismissed") continue;
+      const visto = rev.get("firstViewedAt") as { toDate(): Date } | undefined;
 
       const createdAt = doc.get("createdAt") as { toDate(): Date } | undefined;
       const reporterUid = String(doc.get("reporterUid") ?? "");
@@ -254,9 +245,7 @@ export async function listPendingReportsHandler(
         detail: (doc.get("detail") as string | undefined) ?? null,
         reporterUid,
         createdAt: createdAt ? createdAt.toDate().toISOString() : null,
-        firstViewedAt: vista.firstViewedAt
-          ? vista.firstViewedAt.toISOString()
-          : null,
+        firstViewedAt: visto ? visto.toDate().toISOString() : null,
         contentPath: resolveContentPath({
           targetKind,
           targetId,
@@ -274,6 +263,44 @@ export async function listPendingReportsHandler(
     scanned: escaneados,
     reachedScanCap: escaneados >= TOPE_ESCANEO && out.length < objetivo,
   };
+}
+
+/**
+ * Estampa `firstViewedAt` — UNA sola vez — sobre un reporte que el moderador
+ * tiene delante.
+ *
+ * Separado de `listPendingReports` a proposito: listar no es mirar. Ver el
+ * comentario largo en el loop de aquel handler.
+ *
+ * Transaccional y no read-then-set: entre leer el review y escribir, OTRO
+ * moderador puede resolver el reporte. Un `set` con merge sobre esa carrera
+ * escribiria `status: "pending"` encima del estado resuelto —conservando
+ * `resolvedAt`, que quedaria mintiendo— y el reporte REAPARECERIA en la cola.
+ * Marcar algo como visto no puede reabrirlo.
+ */
+export async function markReportViewedHandler(
+  db: Firestore,
+  reportId: unknown,
+): Promise<{ firstViewedAt: string | null }> {
+  if (typeof reportId !== "string" || reportId.trim() === "") {
+    throw new HttpsError("invalid-argument", "reportId es requerido.");
+  }
+
+  const ref = db.collection(REVIEWS_COLLECTION).doc(reportId);
+  const ahora = new Date();
+
+  return db.runTransaction(async (tx) => {
+    const rev = await tx.get(ref);
+    const status = rev.get("status") as ReportStatus | undefined;
+    if (status === "actioned" || status === "dismissed") {
+      return { firstViewedAt: null };
+    }
+    const ya = rev.get("firstViewedAt") as { toDate(): Date } | undefined;
+    if (ya) return { firstViewedAt: ya.toDate().toISOString() };
+
+    tx.set(ref, { status: "pending", firstViewedAt: ahora }, { merge: true });
+    return { firstViewedAt: ahora.toISOString() };
+  });
 }
 
 export async function resolveReportHandler(
@@ -417,6 +444,11 @@ export const listPendingReports = onCall({ region: REGION }, async (req) => {
   assertModerator(req);
   const limit = typeof req.data?.limit === "number" ? req.data.limit : 50;
   return listPendingReportsHandler(getFirestore(), limit);
+});
+
+export const markReportViewed = onCall({ region: REGION }, async (req) => {
+  assertModerator(req);
+  return markReportViewedHandler(getFirestore(), req.data?.reportId);
 });
 
 export const resolveReport = onCall({ region: REGION }, async (req) => {

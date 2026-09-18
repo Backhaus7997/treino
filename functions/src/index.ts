@@ -332,6 +332,7 @@ export {
 // UNICA defensa, porque del otro lado hay Admin SDK y las rules no participan.
 export {
   listPendingReports,
+  markReportViewed,
   moderationStats,
   resolveReport,
 } from "./moderation/report-review";

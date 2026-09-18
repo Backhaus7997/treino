@@ -6,6 +6,7 @@ import '../core/utils/deep_link_destination.dart';
 import '../features/auth/application/auth_providers.dart';
 import '../features/coach_hub/presentation/coach_hub_login_screen.dart';
 import '../features/coach_hub/presentation/coach_hub_not_allowed_screen.dart';
+import 'package:treino/features/coach_hub/presentation/sections/moderacion/routes.dart';
 import '../features/coach_hub/presentation/sections/actividad/routes.dart';
 import '../features/coach_hub/presentation/sections/agenda/routes.dart';
 import '../features/coach_hub/presentation/sections/ajustes/routes.dart';
@@ -243,6 +244,7 @@ final List<RouteBase> _signedInRoutes = [
   ...suplementosRoutes,
   ...habitosRoutes,
   ...pagosRoutes,
+  ...moderacionRoutes,
   ...perfilPublicoRoutes,
   ...planesRoutes,
   ...facturacionPlanesRoutes,

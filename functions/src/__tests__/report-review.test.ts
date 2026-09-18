@@ -12,6 +12,7 @@ import { HttpsError, type CallableRequest } from "firebase-functions/v2/https";
 
 import {
   assertModerator,
+  markReportViewedHandler,
   resolveContentPath,
   listPendingReportsHandler,
   moderationStatsHandler,
@@ -105,19 +106,21 @@ describe("listPendingReports", () => {
     expect(reports).toHaveLength(0);
   });
 
-  it("firstViewedAt se setea UNA vez y no se pisa", async () => {
-    // Es lo que permite medir cuanto tardamos en MIRAR un reporte, que es la
-    // promesa publicada. Si cada listado lo reescribiera, el numero mediria
-    // "cuando fue el ultimo listado" y siempre daria bien.
+  it("LISTAR NO ES MIRAR: el listado no estampa firstViewedAt", async () => {
+    // La version anterior lo estampaba aca, y eso rompia la unica metrica que
+    // prueba la promesa publicada: abrir la pantalla una vez marcaba los 50
+    // reportes de la pagina como revisados —incluidos los que el ListView
+    // perezoso ni renderiza— y `moderationStats` los contaba dentro del plazo
+    // PARA SIEMPRE.
+    //
+    // Una metrica que se satisface abriendo una pantalla no mide nada.
     await sembrarReporte("r1", 3 * 3600_000);
 
-    const primera = await listPendingReportsHandler(db);
-    const t1 = primera.reports[0].firstViewedAt;
+    const res = await listPendingReportsHandler(db);
 
-    await new Promise((r) => setTimeout(r, 25));
-    const segunda = await listPendingReportsHandler(db);
-
-    expect(segunda.reports[0].firstViewedAt).toBe(t1);
+    expect(res.reports[0].firstViewedAt).toBeNull();
+    const rev = await db.collection(REVIEWS_COLLECTION).doc("r1").get();
+    expect(rev.get("firstViewedAt")).toBeUndefined();
   });
 });
 
@@ -166,6 +169,53 @@ describe("listPendingReports — hallazgos de la revision", () => {
     await sembrarReporte("r1", 3600_000);
     const { reports } = await listPendingReportsHandler(db);
     expect(reports[0].contentPath).toBe("posts/p1");
+  });
+});
+
+describe("markReportViewed", () => {
+  it("estampa firstViewedAt", async () => {
+    await sembrarReporte("r1", 3600_000);
+
+    const res = await markReportViewedHandler(db, "r1");
+
+    expect(res.firstViewedAt).not.toBeNull();
+    const rev = await db.collection(REVIEWS_COLLECTION).doc("r1").get();
+    expect(rev.get("firstViewedAt")).toBeTruthy();
+    expect(rev.get("status")).toBe("pending");
+  });
+
+  it("la segunda vez NO lo pisa", async () => {
+    // Si cada render lo reescribiera, el numero mediria "cuando fue la
+    // ultima vez que alguien abrio la pantalla" y siempre daria bien.
+    await sembrarReporte("r1", 3600_000);
+
+    const primera = await markReportViewedHandler(db, "r1");
+    await new Promise((r) => setTimeout(r, 25));
+    const segunda = await markReportViewedHandler(db, "r1");
+
+    expect(segunda.firstViewedAt).toBe(primera.firstViewedAt);
+  });
+
+  it("NO reabre un reporte ya resuelto", async () => {
+    // Marcar algo como visto no puede sacarlo del estado resuelto.
+    await sembrarReporte("r1", 3600_000);
+    await db.collection(REVIEWS_COLLECTION).doc("r1").set({
+      status: "actioned",
+      action: "contentRemoved",
+      reviewedBy: "mod1",
+      resolvedAt: new Date(),
+    });
+
+    await markReportViewedHandler(db, "r1");
+
+    const rev = await db.collection(REVIEWS_COLLECTION).doc("r1").get();
+    expect(rev.get("status")).toBe("actioned");
+  });
+
+  it("rechaza un reportId vacio", async () => {
+    await expect(markReportViewedHandler(db, "")).rejects.toThrow(HttpsError);
+    await expect(markReportViewedHandler(db, null)).rejects
+      .toThrow(HttpsError);
   });
 });
 

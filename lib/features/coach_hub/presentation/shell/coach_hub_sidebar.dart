@@ -57,7 +57,12 @@ class CoachHubSidebar extends ConsumerWidget {
     final canToggle = collapsedOverride == null &&
         ref.watch(sharedPreferencesProvider).hasValue;
     final location = GoRouterState.of(context).uri.toString();
-    final items = itemsOverride ?? sidebarRegistry;
+    final todos = itemsOverride ?? sidebarRegistry;
+    // Un item sin `visibleProvider` es visible, que es el caso de casi todos.
+    final items = todos
+        .where((item) =>
+            item.visibleProvider == null || ref.watch(item.visibleProvider!))
+        .toList();
 
     final groups = <SidebarGroup, List<SidebarItem>>{};
     for (final group in SidebarGroup.values) {

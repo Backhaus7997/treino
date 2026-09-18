@@ -127,6 +127,14 @@ const EXEMPTIONS: Readonly<Record<string, Exemption>> = {
   // si mismo. El flag de App Check, ademas, no agregaria nada contra el riesgo
   // real aca: no es un bot anonimo, es una cuenta autenticada sin el claim — y
   // contra eso el guard es `assertModerator`, no la atestacion del dispositivo.
+  "moderation/report-review:markReportViewed": {
+    permanence: "decided",
+    reason:
+      "Lo llama el Coach Hub web, que no activa App Check. Protegido por el " +
+      "claim `moderator` de Firebase Auth via `assertModerator`, que corre " +
+      "PRIMERO y es la unica defensa —del otro lado hay Admin SDK y las rules " +
+      "no participan—. Ver report-review.ts:71.",
+  },
   "moderation/report-review:listPendingReports": {
     permanence: "decided",
     reason:
@@ -363,6 +371,7 @@ const EXPECTED_DEPLOYED = [
   "ensureAthleteProfile",
   "getAthletePricing",
   "listPendingReports",
+  "markReportViewed",
   "mintWatchCredential",
   "moderationStats",
   "promoteChatToInquiry",
@@ -470,6 +479,12 @@ describe("QA-SEC-016: el guard falla cuando tiene que fallar", () => {
       module: "moderation/report-review",
       symbol: "listPendingReports",
       as: "listPendingReports",
+      attested: false,
+    },
+    {
+      module: "moderation/report-review",
+      symbol: "markReportViewed",
+      as: "markReportViewed",
       attested: false,
     },
     {

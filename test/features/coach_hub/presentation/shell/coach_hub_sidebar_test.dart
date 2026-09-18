@@ -12,6 +12,7 @@ import 'package:treino/app/theme/tokens/components/treino_badge_tokens.dart';
 import 'package:treino/core/persistence/shared_prefs_provider.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
+import 'package:treino/features/moderation/application/moderation_queue_providers.dart';
 import 'package:treino/features/coach_hub/presentation/shell/coach_hub_sidebar.dart';
 import 'package:treino/features/coach_hub/presentation/shell/navigator_semantics_boundary.dart';
 import 'package:treino/features/coach_hub/presentation/shell/sidebar_item.dart';
@@ -28,6 +29,7 @@ Future<void> _pumpSidebar(
   Map<String, Object> prefs = const {},
   String initial = '/dashboard',
   ThemeData? theme,
+  List<Override> overrides = const [],
 }) async {
   SharedPreferences.setMockInitialValues(prefs);
   final sp = await SharedPreferences.getInstance();
@@ -61,6 +63,7 @@ Future<void> _pumpSidebar(
     ProviderScope(
       overrides: [
         sharedPreferencesProvider.overrideWith((ref) => Future.value(sp)),
+        ...overrides,
       ],
       child: MaterialApp.router(
         theme: theme ?? AppTheme.dark(),
@@ -181,10 +184,28 @@ void main() {
       expect(find.text(empty), findsNothing, reason: 'empty group $empty');
     }
 
-    for (final item in sidebarRegistry) {
+    // Sin `visibleProvider` = visible siempre, que es el caso de los diez que
+    // ve un entrenador. El item de staff tiene su propio caso abajo.
+    for (final item
+        in sidebarRegistry.where((i) => i.visibleProvider == null)) {
       expect(find.text(item.label), findsOneWidget, reason: item.label);
     }
     expect(find.text('Ajustes'), findsNothing);
+  });
+
+  testWidgets('expandido + claim de moderador → aparece CUENTA con Moderación',
+      (tester) async {
+    // El contrapunto del caso de arriba, donde CUENTA figura entre los grupos
+    // que NO se dibujan. Sin este test, «CUENTA no aparece» pasaría igual si el
+    // item se hubiera caído del registry, y el grupo quedaría muerto para todos
+    // sin que nada avisara.
+    await _pumpSidebar(
+      tester,
+      overrides: [isModeratorProvider.overrideWith((ref) => true)],
+    );
+
+    expect(find.text('CUENTA'), findsOneWidget);
+    expect(find.text('Moderación'), findsOneWidget);
   });
 
   testWidgets(
@@ -527,13 +548,34 @@ void main() {
     expect(_labelOculto(tester, 'Dashboard'), isTrue);
     expect(_labelOculto(tester, 'Alumnos'), isTrue);
 
-    for (final item in sidebarRegistry) {
+    // Los items CON `visibleProvider` se filtran antes de renderizar, asi que
+    // pedirles tooltip es pedirle nombre a algo que no esta en pantalla. El que
+    // hay hoy —«Moderación»— tiene su propio caso abajo, con el claim puesto:
+    // saltearlo sin cubrirlo seria debilitar este test en vez de arreglarlo.
+    final visibles = sidebarRegistry.where((i) => i.visibleProvider == null);
+    expect(visibles, isNotEmpty);
+
+    for (final item in visibles) {
       expect(
         find.byTooltip(item.label),
         findsOneWidget,
         reason: 'sin tooltip, «${item.label}» es un ícono sin nombre',
       );
     }
+  });
+
+  testWidgets('colapsado → el item de staff tambien se nombra por tooltip',
+      (tester) async {
+    // El caso que el filtro de arriba deja afuera. Un item que sólo ve el
+    // equipo no es excusa para que sea un glifo anónimo: colapsado, el sidebar
+    // es todo glifos.
+    await _pumpSidebar(
+      tester,
+      prefs: {'coach_hub.sidebar.collapsed': true},
+      overrides: [isModeratorProvider.overrideWith((ref) => true)],
+    );
+
+    expect(find.byTooltip('Moderación'), findsOneWidget);
   });
 
   testWidgets('colapsado con badge → el conteo viaja en el tooltip',
