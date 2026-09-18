@@ -122,106 +122,106 @@ describe("listPendingReports", () => {
 });
 
 describe("listPendingReports — hallazgos de la revision", () => {
-    it("NO devuelve vacio cuando los mas viejos ya estan resueltos", async () => {
-      // El bug: la consulta pedia los `limit` mas viejos y filtraba los
-      // resueltos DESPUES. El dia que los 50 mas viejos estuvieran resueltos,
-      // la cola devolvia vacio para siempre con pendientes mas nuevos
-      // esperando.
-      //
-      // Una cola que se vacia sola es peor que no tener cola: no dice "no hay
-      // nada", lo dice MINTIENDO, y nadie vuelve a mirar.
-      for (let i = 0; i < 55; i++) {
-        await sembrarReporte(`viejo${i}`, (100 - i) * 3600_000);
-        await db.collection(REVIEWS_COLLECTION).doc(`viejo${i}`).set({
-          status: "dismissed",
-        });
-      }
-      await sembrarReporte("elQueImporta", 2 * 3600_000);
-
-      const { reports } = await listPendingReportsHandler(db);
-
-      expect(reports.map((r) => r.id)).toEqual(["elQueImporta"]);
-    });
-
-    it("un listado NO reabre un reporte ya resuelto", async () => {
-      // La estampa de `firstViewedAt` era un `set` con merge sobre una lectura
-      // previa. Si otro moderador resolvia el reporte en el medio, el merge
-      // escribia `status: "pending"` encima del estado resuelto —conservando
-      // `resolvedAt`, que quedaba mintiendo— y el reporte reaparecia.
-      await sembrarReporte("r1", 3600_000);
-      await db.collection(REVIEWS_COLLECTION).doc("r1").set({
-        status: "actioned",
-        action: "contentRemoved",
-        reviewedBy: "mod1",
-        resolvedAt: new Date(),
+  it("NO devuelve vacio cuando los mas viejos ya estan resueltos", async () => {
+    // El bug: la consulta pedia los `limit` mas viejos y filtraba los
+    // resueltos DESPUES. El dia que los 50 mas viejos estuvieran resueltos,
+    // la cola devolvia vacio para siempre con pendientes mas nuevos
+    // esperando.
+    //
+    // Una cola que se vacia sola es peor que no tener cola: no dice "no hay
+    // nada", lo dice MINTIENDO, y nadie vuelve a mirar.
+    for (let i = 0; i < 55; i++) {
+      await sembrarReporte(`viejo${i}`, (100 - i) * 3600_000);
+      await db.collection(REVIEWS_COLLECTION).doc(`viejo${i}`).set({
+        status: "dismissed",
       });
+    }
+    await sembrarReporte("elQueImporta", 2 * 3600_000);
 
-      await listPendingReportsHandler(db);
+    const { reports } = await listPendingReportsHandler(db);
 
-      const rev = await db.collection(REVIEWS_COLLECTION).doc("r1").get();
-      expect(rev.get("status")).toBe("actioned");
-    });
-
-    it("devuelve donde vive el contenido reportado", async () => {
-      await sembrarReporte("r1", 3600_000);
-      const { reports } = await listPendingReportsHandler(db);
-      expect(reports[0].contentPath).toBe("posts/p1");
-    });
+    expect(reports.map((r) => r.id)).toEqual(["elQueImporta"]);
   });
 
-  describe("resolveContentPath", () => {
-    it("el mensaje deriva su chat del par de uids", () => {
-      // El cliente manda `message.id` pelado y el documento vive en
-      // `chats/{chatId}/messages/{messageId}`. Un id sin su chat no localiza
-      // nada — y la cola se presenta como el lugar donde se mira el contenido.
-      //
-      // El chatId no hace falta pedirlo: es deterministico (par ordenado unido
-      // con `_`) y el reporte ya trae las dos puntas.
-      expect(
-        resolveContentPath({
-          targetKind: "message",
-          targetId: "m1",
-          reporterUid: "zzz",
-          targetOwnerUid: "aaa",
-        }),
-      ).toBe("chats/aaa_zzz/messages/m1");
+  it("un listado NO reabre un reporte ya resuelto", async () => {
+    // La estampa de `firstViewedAt` era un `set` con merge sobre una lectura
+    // previa. Si otro moderador resolvia el reporte en el medio, el merge
+    // escribia `status: "pending"` encima del estado resuelto —conservando
+    // `resolvedAt`, que quedaba mintiendo— y el reporte reaparecia.
+    await sembrarReporte("r1", 3600_000);
+    await db.collection(REVIEWS_COLLECTION).doc("r1").set({
+      status: "actioned",
+      action: "contentRemoved",
+      reviewedBy: "mod1",
+      resolvedAt: new Date(),
     });
 
-    it("el orden de los uids no cambia la ruta", () => {
-      const a = resolveContentPath({
-        targetKind: "message", targetId: "m1",
-        reporterUid: "aaa", targetOwnerUid: "zzz",
-      });
-      const b = resolveContentPath({
-        targetKind: "message", targetId: "m1",
-        reporterUid: "zzz", targetOwnerUid: "aaa",
-      });
-      expect(a).toBe(b);
-    });
+    await listPendingReportsHandler(db);
 
-    it("post, review y profile", () => {
-      const base = { targetId: "x1", reporterUid: "r", targetOwnerUid: "o" };
-      expect(resolveContentPath({ ...base, targetKind: "post" }))
-        .toBe("posts/x1");
-      expect(resolveContentPath({ ...base, targetKind: "review" }))
-        .toBe("reviews/x1");
-      expect(resolveContentPath({ ...base, targetKind: "profile" }))
-        .toBe("users/x1");
-    });
-
-    it("un targetKind desconocido devuelve null, no una ruta inventada", () => {
-      // Una ruta que no existe se lee igual que una que si, y manda al
-      // moderador a buscar un documento que nunca estuvo ahi.
-      expect(
-        resolveContentPath({
-          targetKind: "loQueSea", targetId: "x1",
-          reporterUid: "r", targetOwnerUid: "o",
-        }),
-      ).toBeNull();
-    });
+    const rev = await db.collection(REVIEWS_COLLECTION).doc("r1").get();
+    expect(rev.get("status")).toBe("actioned");
   });
 
-  describe("resolveReport", () => {
+  it("devuelve donde vive el contenido reportado", async () => {
+    await sembrarReporte("r1", 3600_000);
+    const { reports } = await listPendingReportsHandler(db);
+    expect(reports[0].contentPath).toBe("posts/p1");
+  });
+});
+
+describe("resolveContentPath", () => {
+  it("el mensaje deriva su chat del par de uids", () => {
+    // El cliente manda `message.id` pelado y el documento vive en
+    // `chats/{chatId}/messages/{messageId}`. Un id sin su chat no localiza
+    // nada — y la cola se presenta como el lugar donde se mira el contenido.
+    //
+    // El chatId no hace falta pedirlo: es deterministico (par ordenado unido
+    // con `_`) y el reporte ya trae las dos puntas.
+    expect(
+      resolveContentPath({
+        targetKind: "message",
+        targetId: "m1",
+        reporterUid: "zzz",
+        targetOwnerUid: "aaa",
+      }),
+    ).toBe("chats/aaa_zzz/messages/m1");
+  });
+
+  it("el orden de los uids no cambia la ruta", () => {
+    const a = resolveContentPath({
+      targetKind: "message", targetId: "m1",
+      reporterUid: "aaa", targetOwnerUid: "zzz",
+    });
+    const b = resolveContentPath({
+      targetKind: "message", targetId: "m1",
+      reporterUid: "zzz", targetOwnerUid: "aaa",
+    });
+    expect(a).toBe(b);
+  });
+
+  it("post, review y profile", () => {
+    const base = { targetId: "x1", reporterUid: "r", targetOwnerUid: "o" };
+    expect(resolveContentPath({ ...base, targetKind: "post" }))
+      .toBe("posts/x1");
+    expect(resolveContentPath({ ...base, targetKind: "review" }))
+      .toBe("reviews/x1");
+    expect(resolveContentPath({ ...base, targetKind: "profile" }))
+      .toBe("users/x1");
+  });
+
+  it("un targetKind desconocido devuelve null, no una ruta inventada", () => {
+    // Una ruta que no existe se lee igual que una que si, y manda al
+    // moderador a buscar un documento que nunca estuvo ahi.
+    expect(
+      resolveContentPath({
+        targetKind: "loQueSea", targetId: "x1",
+        reporterUid: "r", targetOwnerUid: "o",
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("resolveReport", () => {
   it("escribe el resultado en report_reviews", async () => {
     await sembrarReporte("r1", 3600_000);
 
