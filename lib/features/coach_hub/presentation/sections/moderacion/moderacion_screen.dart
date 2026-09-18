@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
 import 'package:treino/core/widgets/treino_icon.dart';
+import 'package:treino/features/coach_hub/presentation/widgets/button/treino_button.dart';
 import 'package:treino/features/coach_hub/presentation/widgets/section_hero/section_hero.dart';
 import 'package:treino/features/moderation/application/moderation_queue_providers.dart';
 import 'package:treino/features/moderation/domain/pending_report.dart';
@@ -208,9 +209,11 @@ class _Cola extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: AppSpacing.s8),
-            TextButton(
+            TreinoButton(
+              label: 'Reintentar', // i18n: Fase W3
+              variant: TreinoButtonVariant.ghost,
+              size: TreinoButtonSize.sm,
               onPressed: () => ref.invalidate(pendingReportsProvider),
-              child: const Text('Reintentar'), // i18n: Fase W3
             ),
           ],
         ),
@@ -308,21 +311,30 @@ class _Fila extends ConsumerWidget {
           const SizedBox(height: AppSpacing.s12),
           Row(
             children: [
-              TextButton(
+              // `ghost` para descartar y `secondary` para las dos que SÍ
+              // accionan: cerrar sin hacer nada no puede verse igual de
+              // consecuente que retirar contenido ajeno.
+              TreinoButton(
+                label: 'Descartar', // i18n: Fase W3
+                variant: TreinoButtonVariant.ghost,
+                size: TreinoButtonSize.sm,
                 onPressed: () => _resolver(context, ref, 'dismissed', 'none'),
-                child: const Text('Descartar'), // i18n: Fase W3
               ),
               const SizedBox(width: AppSpacing.s8),
-              TextButton(
+              TreinoButton(
+                label: 'Contenido retirado', // i18n: Fase W3
+                variant: TreinoButtonVariant.secondary,
+                size: TreinoButtonSize.sm,
                 onPressed: () =>
                     _resolver(context, ref, 'actioned', 'contentRemoved'),
-                child: const Text('Contenido retirado'), // i18n: Fase W3
               ),
               const SizedBox(width: AppSpacing.s8),
-              TextButton(
+              TreinoButton(
+                label: 'Usuario advertido', // i18n: Fase W3
+                variant: TreinoButtonVariant.secondary,
+                size: TreinoButtonSize.sm,
                 onPressed: () =>
                     _resolver(context, ref, 'actioned', 'userWarned'),
-                child: const Text('Usuario advertido'), // i18n: Fase W3
               ),
             ],
           ),
