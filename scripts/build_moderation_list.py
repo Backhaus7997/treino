@@ -95,7 +95,7 @@ JOIN_MAX_FRAGMENT = 3
 
 
 def _rangos_combinantes() -> list[tuple[int, int]]:
-    """Rangos del BMP cuya categoria Unicode es `Mn` (marca sin ancho).
+    """Los bloques Unicode de marcas combinantes. Limites FIJOS, no derivados.
 
     Hacen falta porque el mapa de plegado solo cubre caracteres PRECOMPUESTOS.
     El mismo texto puede llegar descompuesto —`u` seguido de U+0301 en vez de
@@ -103,22 +103,32 @@ def _rangos_combinantes() -> list[tuple[int, int]]:
     matchea: `puto` escrito `pu´to` pasaba, mientras que el `púto` precompuesto
     se bloqueaba. Los dos se ven IDENTICOS en pantalla.
 
-    Python resuelve las dos formas solo, via NFD. Dart y TypeScript no tienen
-    NFD en su biblioteca estandar, asi que reciben los rangos ya calculados: una
-    tabla generada no se puede desincronizar entre los dos.
+    ## Por que NO se barre por categoria
+
+    La primera version escaneaba el BMP entero preguntando
+    `unicodedata.category(c) == 'Mn'`, y eso hace que la salida del generador
+    dependa de la VERSION DE UNICODE del interprete que lo corre. Esta maquina
+    tiene Python 3.14 con Unicode 16.0.0 y el runner de CI trae otra: el mismo
+    comando producia dos archivos distintos, y el gate `Generados al dia` se
+    puso rojo — que es exactamente para lo que existe.
+
+    Un generador cuya salida depende de la maquina no es un generador: es la
+    misma divergencia que todo esto viene a evitar, corrida un escalon.
+
+    Los LIMITES DE BLOQUE, en cambio, son inmutables en el estandar: Unicode no
+    mueve un bloque ya asignado. Estos cinco contienen las marcas que se
+    combinan con letras latinas, que es lo unico que este filtro necesita. De
+    los 212 rangos que devolvia el barrido por categoria, 204 caian fuera de
+    estos cinco —hebreo, arabe, devanagari—: irrelevantes para un filtro en
+    castellano rioplatense, y la fuente entera de la deriva.
     """
-    rangos: list[tuple[int, int]] = []
-    ini = None
-    for cp in range(0x0300, 0x10000):
-        es_mn = unicodedata.category(chr(cp)) == "Mn"
-        if es_mn and ini is None:
-            ini = cp
-        elif not es_mn and ini is not None:
-            rangos.append((ini, cp - 1))
-            ini = None
-    if ini is not None:
-        rangos.append((ini, 0xFFFF))
-    return rangos
+    return [
+        (0x0300, 0x036F),  # Combining Diacritical Marks — el que importa
+        (0x1AB0, 0x1AFF),  # Combining Diacritical Marks Extended
+        (0x1DC0, 0x1DFF),  # Combining Diacritical Marks Supplement
+        (0x20D0, 0x20FF),  # Combining Diacritical Marks for Symbols
+        (0xFE20, 0xFE2F),  # Combining Half Marks
+    ]
 
 
 def _mapa_de_plegado() -> dict[str, str]:
@@ -134,8 +144,16 @@ def _mapa_de_plegado() -> dict[str, str]:
     bloquearia `año`, `años`, `añadir` y `pequeño`. Hay un caso en el corpus
     que lo vigila.
     """
+    # Latin-1 Supplement (00C0-00FF) y Latin Extended-A (0100-017F): los dos
+    # asignados por completo desde Unicode 1.1 y congelados desde entonces.
+    #
+    # NO se llega hasta 0x0250 (Latin Extended-B) por el mismo motivo que los
+    # rangos combinantes: ese bloque recibio asignaciones nuevas entre
+    # versiones, asi que incluirlo hace que la tabla dependa del interprete que
+    # corre el generador. Lo que queda afuera —`ǎ`, `ǧ` y companía— no es
+    # castellano ni aparece en el vocabulario de este producto.
     out: dict[str, str] = {}
-    for cp in range(0x00C0, 0x0250):
+    for cp in range(0x00C0, 0x0180):
         ch = chr(cp)
         bajo = ch.lower()
         # Solo claves de UN codepoint. La `İ` turca (U+0130) baja a dos —`i` mas
@@ -147,6 +165,24 @@ def _mapa_de_plegado() -> dict[str, str]:
         plano = sin_diacriticos(bajo)
         if plano != bajo and plano.isascii() and plano.isalpha():
             out[bajo] = plano
+
+    # El tamano queda PINEADO.
+    #
+    # Lo que se emite tiene que ser identico en cualquier maquina, o el gate
+    # `Generados al dia` se pone rojo sin decir por que — que es justo lo que
+    # paso: la version anterior barria por categoria Unicode y esta maquina
+    # (Unicode 16.0.0) producia un archivo distinto al del runner.
+    #
+    # El rango que se recorre esta congelado desde Unicode 1.1, asi que este
+    # numero no deberia moverse nunca. Si se mueve, algo cambio en el
+    # interprete y hay que MIRARLO, no subir el numero de taquito: la salida
+    # del generador acaba de volverse dependiente de la maquina otra vez.
+    if len(out) != 80:
+        sys.exit(f"[!] el mapa de plegado tiene {len(out)} entradas y se "
+                 "esperaban 80. El rango 00C0-017F esta congelado desde "
+                 "Unicode 1.1, asi que esto significa que la salida del "
+                 "generador dejo de ser identica entre maquinas. Mirá qué "
+                 "cambió antes de tocar este número.")
     return out
 
 
