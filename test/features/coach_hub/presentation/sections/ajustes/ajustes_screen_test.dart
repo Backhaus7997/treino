@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:treino/l10n/app_l10n.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:treino/features/coach/application/trainer_link_providers.dart';
 import 'package:treino/features/coach/domain/trainer_link.dart';
@@ -55,7 +56,16 @@ Widget _harness({
         if (authService != null)
           authServiceProvider.overrideWithValue(authService),
       ],
-      child: const MaterialApp(home: Scaffold(body: AjustesScreen())),
+      // Con las localizaciones montadas, igual que la app real. Sin ellas
+      // `AppL10n.of(context)` devuelve null y cualquier texto localizado de
+      // esta pantalla revienta — el arbol de test no se parecia al de
+      // produccion y el primer uso de l10n en `cuenta_tab` lo destapo.
+      child: MaterialApp(
+        localizationsDelegates: AppL10n.localizationsDelegates,
+        supportedLocales: AppL10n.supportedLocales,
+        locale: const Locale('es', 'AR'),
+        home: const Scaffold(body: AjustesScreen()),
+      ),
     );
 
 /// Enfocar un TextField dispara `ensureVisible` del scroll de Configuración,

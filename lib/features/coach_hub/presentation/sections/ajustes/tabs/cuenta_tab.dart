@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:treino/app/theme/app_motion.dart';
 import 'package:treino/app/theme/app_palette.dart';
 import 'package:treino/app/theme/tokens/tokens.dart';
+import 'package:treino/core/moderation/moderation_guard.dart';
+import 'package:treino/l10n/app_l10n.dart';
 import 'package:treino/core/image/avatar_cropper.dart';
 import 'package:treino/core/widgets/motion/treino_fade_slide_in.dart';
 import 'package:treino/core/widgets/motion/treino_shimmer.dart';
@@ -208,6 +210,9 @@ class _CuentaFormState extends ConsumerState<_CuentaForm> {
     }
     final displayName = [first, last].where((s) => s.isNotEmpty).join(' ');
     setState(() => _saving = true);
+    // Capturado ANTES del await: `AppL10n.of(context)` del otro lado es un
+    // contexto que pudo morir, y el analizador lo marca.
+    final copyBloqueado = AppL10n.of(context).moderationBlockedMessage;
     try {
       await ref.read(userRepositoryProvider).update(widget.profile.uid, {
         'firstName': first,
@@ -216,6 +221,11 @@ class _CuentaFormState extends ConsumerState<_CuentaForm> {
         'displayName': displayName,
       });
       _toast('Cambios guardados'); // i18n: Fase W3
+    } on ModerationBlockedException catch (_) {
+      // El `displayName` pasa por el filtro de términos vetados. El texto de
+      // abajo invita a reintentar, y para un bloqueo eso es consejo falso: el
+      // mismo nombre va a fallar siempre.
+      _toast(copyBloqueado);
     } catch (_) {
       _toast('No se pudieron guardar los cambios. Probá de nuevo.'); // i18n
     } finally {
