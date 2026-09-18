@@ -120,6 +120,52 @@ jobs:
   #    forma asincrónica—: el primer test del archivo se come la carrera y los
   #    demás heredan el registro tibio. Repartiendo archivos enteros eso no puede
   #    pasar: nadie se separa de sus hermanos de archivo.
+  # El paso "Gate de desfasaje legal" del job `test` (mas abajo) compara el
+  # markdown de docs/legal/ contra `legal_content.dart` con `--check`, y arranca
+  # con esta condicion:
+  #
+  #     head -1 lib/.../legal_content.dart | grep -q "GENERADO POR"
+  #
+  # Hoy la primera linea de ese archivo dice `/// Contenido de los documentos
+  # legales de TREINO (Terminos y Condiciones +`, porque el generador NUNCA
+  # corrio: aborta a proposito mientras queden `[[PENDIENTE]]`, y quedan. El
+  # `grep` no matchea, el bloque no entra, el job pasa en verde — y alguien puede
+  # editar un markdown legal, no regenerar nada, y llevarse un CI aprobado.
+  #
+  # Ese paso no esta mal escrito: la mitad que hace, la hace bien, y para hacerla
+  # NECESITA el toolchain (sin `dart format` compararia salida sin formatear
+  # contra archivo formateado, y gritaria siempre). Lo que faltaba es la otra
+  # mitad: la ventana que va desde hoy hasta la primera generacion real. Esa no
+  # necesita Dart —git para saber que se toco, python3 para los tests del
+  # generador, los dos vienen en el runner—, asi que va aca arriba con los gates
+  # baratos y no colgada de `test`, que ademas es una matriz de shards (el paso
+  # de abajo corre una vez por shard) y solo llega al gate si los ~800 s de
+  # `Run tests` salieron verdes.
+  legal-generado:
+    name: Los textos legales no se desfasan del markdown
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # El unico job que necesita historia: sin ella no hay con que comparar
+          # para saber que archivos toco este cambio.
+          fetch-depth: 0
+
+      # El generador nacio sin tests, y por eso la fecha del encabezado se le
+      # escapaba al guard de marcadores. Stdlib pura contra un arbol temporal:
+      # 0,2 s y ningun toolchain.
+      - name: Tests del generador legal
+        run: python3 scripts/test/build_legal_content.test.py
+
+      - name: Si el cambio toca docs/legal/, el Dart tiene que estar generado
+        # El sha entra por `env:` y no interpolado adentro del `run:`, por el
+        # mismo motivo que explica el job `test`: `${{ }}` lo sustituye GitHub
+        # ANTES de que bash vea la linea.
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: bash scripts/check_legal_generado.sh "$BASE_SHA"
+
   analyze:
     name: Analyze
     runs-on: ubuntu-latest
@@ -341,8 +387,21 @@ jobs:
       # regenera, la app y gettreino.com quedan diciendo cosas distintas — y
       # entonces no hay forma de probar qué aceptó el usuario. Este paso lo
       # convierte en error de CI en vez de en un bug legal silencioso.
-      # No corre si nunca se generó (mientras queden [[PENDIENTE]] el
-      # generador aborta a propósito y el archivo todavía no existe).
+      #
+      # Sólo corre cuando `legal_content.dart` YA es generado, y necesita el
+      # toolchain: `--check` pasa `dart format` antes de comparar, así que sin
+      # Dart compararía salida sin formatear contra archivo formateado y se
+      # pondría rojo siempre.
+      #
+      # OJO con el `else`: "gate omitido" NO quiere decir "cubierto". Mientras
+      # el archivo sea el escrito a mano —hoy lo es, el generador nunca corrió—
+      # esta condición no matchea NUNCA y este paso no verifica nada. Esa
+      # ventana la cubre el job `legal-generado`, más arriba.
+      #
+      # (La versión anterior de este comentario decía "el archivo todavía no
+      # existe". Existe, y está commiteado desde siempre; lo que no está es
+      # generado. Esa palabra de más es la que hacía leer el `else` como una
+      # tranquilidad en vez de como un agujero — AGENTS.md §11.1.)
       - name: Gate de desfasaje legal
         run: |
           if [ -f lib/features/auth/presentation/legal/legal_content.dart ] \
@@ -799,5 +858,11 @@ jobs:
       - name: Install scripts deps
         run: npm --prefix scripts ci
 
+      # OJO con el nombre de este job: corre `node --test test/*.test.js`, o sea
+      # SOLO los tests de Node. `scripts/test/` tiene tambien `.test.py`
+      # —`build_legal_content.test.py`, hoy el unico— y esos los corre el job
+      # `legal-generado`, que no necesita toolchain. Si agregas un test de
+      # Python aca, acordate de engancharlo alla: en este job no se ejecuta, y
+      # "Scripts Test (scripts/test)" en verde se lee como si lo cubriera todo.
       - name: Run scripts test suite
         run: npm --prefix scripts test
