@@ -430,6 +430,46 @@
       "texto": "acción correcta en el banco",
       "espera": "ok",
       "por": "doble con acento arriba: plegado y colapso se tocan"
+    },
+    {
+      "texto": "pu-to",
+      "espera": "block",
+      "por": "fragmentos de 2 y 2. Con la regla vieja —corridas de UN caracter— un separador salteaba la capa entera"
+    },
+    {
+      "texto": "p-uto",
+      "espera": "block",
+      "por": "fragmentos de 1 y 3"
+    },
+    {
+      "texto": "pu to",
+      "espera": "block",
+      "por": "mismo caso, separado por espacio"
+    },
+    {
+      "texto": "púto",
+      "espera": "block",
+      "por": "`u` + U+0301 descompuesto: se ve identico a `púto` y antes pasaba, porque la marca partia el token en dos"
+    },
+    {
+      "texto": "mogólico",
+      "espera": "block",
+      "por": "misma descomposicion sobre otro termino"
+    },
+    {
+      "texto": "otro lo hizo mejor",
+      "espera": "ok",
+      "por": "`otro`+`lo` pegados dan `otrolo`, que contiene `trolo`. La regla pide que los DOS fragmentos sean cortos, y `otro` no lo es"
+    },
+    {
+      "texto": "dale que va",
+      "espera": "ok",
+      "por": "tres fragmentos cortos seguidos se pegan: `dalequeva` no contiene nada, y tiene que seguir siendo asi"
+    },
+    {
+      "texto": "con-chudo",
+      "espera": "ok",
+      "por": "HUECO CONOCIDO, fijado a proposito. `con`(3) y `chudo`(5): la regla no los pega porque el segundo es largo. Pegarlos igual reintroduce el falso positivo sobre `otro lo`, y un filtro que bloquea castellano corriente dura una semana. El backstop de este caso es la cola de reportes, no la lista"
     }
   ]
 }
