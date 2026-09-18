@@ -1,3 +1,4 @@
+import 'package:treino/features/coach_hub/presentation/sections/moderacion/routes.dart';
 import 'package:treino/features/coach_hub/presentation/sections/agenda/routes.dart';
 import 'package:treino/features/coach_hub/presentation/sections/ajustes/routes.dart';
 import 'package:treino/features/coach_hub/presentation/sections/alumnos/routes.dart';
@@ -62,6 +63,7 @@ final List<SidebarItem> sidebarRegistry = [
   ...invitacionesSidebarItems,
   ...agendaSidebarItems,
   ...chatSidebarItems,
+  ...moderacionSidebarItems,
   ...perfilPublicoSidebarItems,
 
   // RECURSOS — bibliotecas del PF y finanzas
