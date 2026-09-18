@@ -57,6 +57,12 @@ persiste `lat` y `lng` crudos, no sólo el geohash. Ver
 | Tipo | Recolectado | Compartido | Obligatorio | Propósito | Dónde |
 |---|---|---|---|---|---|
 | Fotos | Sí | No | Opcional | Funcionalidad — avatar, posts del feed, media de chat, foto adjunta al reporte de molestias | `image_picker`, `firebase_storage` |
+| Videos | Sí | Sí — con el PF vinculado | Opcional | Funcionalidad — video adjunto en el chat, y videos de ejercicios propios que sube el PF | `chat_screen.dart:208` (`pickVideo`) → `storage.rules:336`; `customExerciseVideos` → `storage.rules:197` |
+
+**Play Console trata Fotos y Videos como tipos SEPARADOS**, cada uno con su
+propia casilla. Este cuadro declaraba sólo Fotos, así que quien cargara la
+ficha siguiendo el documento dejaba Videos sin tildar — aunque el picker del
+chat llama a `pickVideo` y la regla de Storage acepta `video/*`.
 
 ### Datos de salud y estado físico ⚠️
 
@@ -66,28 +72,34 @@ especial y la mira con lupa.
 | Tipo | Recolectado | Compartido | Obligatorio | Propósito | Dónde |
 |---|---|---|---|---|---|
 | Info de salud | **Sí** | Sí — sólo con el PF vinculado | Opcional | Funcionalidad | `exerciseFeedback` con `kind: discomfort` = **dolor declarado**, más `photoUrl` (commit `99644ed3`, #795/#628) |
-| Info de estado físico — medidas | **Sí** | Sí — sólo con el PF vinculado | **Opcional** | Funcionalidad | Peso, altura y **20+ medidas corporales** (`measurement.dart`: `fatPercentage`, `muscleMassKg`, `waistCm`, `bicepsLCm`, …) |
-| Info de estado físico — historial de sesiones | **Sí** | Sí — sólo con el PF vinculado | **Obligatorio** | Funcionalidad | Cada serie marcada en un entreno |
+| Info de estado físico | **Sí** | Sí — sólo con el PF vinculado | **Obligatorio** | Funcionalidad | Peso, altura y **20+ medidas corporales** (`measurement.dart`) **más** el historial de sesiones |
 
 Sobre el "Sí" de *Compartido*: los datos no salen a terceros, pero sí a **otro
 usuario** — el PF vinculado. Play cuenta eso como compartir. El gate es
 `sharedWithTrainer` y el predicado de `session_shares`; el PF nunca puede
 escribir datos del alumno (canal one-way).
 
-> **Por qué esta fila está partida en dos.**
+> **Por qué esta fila va con UNA sola respuesta, y por qué es «Obligatorio».**
 >
-> Google pregunta si el usuario puede usar la app **sin dar el dato**, y para
-> estas dos cosas la respuesta es distinta:
+> Play Console expone **un** tipo `Info de estado físico` con **una** respuesta
+> de obligatorio-versus-opcional. No admite dos filas, así que partirla —como
+> hacía la versión anterior de este documento— deja a quien carga la ficha
+> eligiendo entre dos respuestas contradictorias, que es exactamente el
+> problema que el documento existe para evitar.
 >
-> - Las **20+ medidas corporales** se cargan a mano desde Mediciones. Un usuario
->   puede entrenar durante meses sin tocar esa pantalla. Opcional es correcto.
+> El dato se recolecta por dos caminos con respuestas distintas:
+>
+> - Las **20+ medidas corporales** se cargan a mano. Un usuario puede entrenar
+>   meses sin abrir Mediciones: por sí solas serían *opcional*.
 > - El **historial de sesiones** se genera por usar la función central del
->   producto. No hay forma de entrenar en TREINO sin producirlo, así que no es
->   opcional en el sentido que la pregunta le da a esa palabra.
+>   producto. No hay forma de entrenar en TREINO sin producirlo.
 >
-> Una sola fila `Opcional` cubriendo las dos declara el historial como algo que
-> el usuario puede no dar, y no puede. Esa clase de imprecisión es la que hace
-> que Play rechace una ficha completa, no una fila.
+> La regla de Google para un tipo recolectado por un camino opcional **y** uno
+> no opcional es declararlo como **no opcional**: la pregunta es si el usuario
+> puede usar la app sin dar el dato, y acá no puede.
+>
+> El desglose queda escrito igual, porque es lo que justifica la respuesta y lo
+> que hay que volver a mirar si algún día el historial deja de ser obligatorio.
 
 ### Información financiera
 
@@ -135,29 +147,53 @@ TREINO sólo recibe el estado resultante.
 
 ---
 
-### Archivos y documentos — **NO se declara**
+### Archivos y documentos
 
-Verificado, y queda anotado acá para que la próxima persona no repita el
-trabajo.
+| Tipo | Recolectado | Compartido | Obligatorio | Propósito | Dónde |
+|---|---|---|---|---|---|
+| Otros archivos y documentos | Sí | Sí — entre el PF y su alumno | Opcional | Funcionalidad — archivos que el entrenador adjunta al legajo del alumno | `alumno_detail_screen.dart:3684` (`allowedExtensions: ['pdf', …]`), `AthleteFileRepository`, `storage.rules:380` (`application/pdf`, < 10 MB) |
 
-El adjunto del chat acepta **sólo imágenes y videos**, y no es una restricción
-del cliente que se pueda saltear con el SDK: la hacen cumplir las reglas de
-Storage.
+**Esta sección decía «NO se declara», y era falso.** El razonamiento miraba sólo
+el adjunto del chat —que efectivamente es sólo imagen y video— y sacaba una
+conclusión categórica sobre *todos* los caminos de subida de la app. Hay otro:
+el Coach Hub deja al entrenador cargar **PDFs** en el legajo del alumno, y las
+reglas de Storage los aceptan.
+
+Un «verificado que no» sobre una categoría entera, cuando en realidad se
+verificó un solo camino, es peor que no haberlo mirado: la próxima persona lee
+la evidencia citada, la da por cerrada, y la categoría queda sin tildar en Play
+Console.
+
+**Lo que sí sigue siendo cierto:** el adjunto del **chat** acepta sólo imágenes
+y videos, y no por el picker —eso se saltea con el SDK— sino porque
+`storage.rules` lo exige por `contentType`:
 
 ```
-storage.rules — match /chatMedia/{chatId}/{userId}/{file=**}
-  request.resource.contentType.matches('image/.*')  && size < 15 MB
+match /chatMedia/{chatId}/{userId}/{file=**}
+  request.resource.contentType.matches('image/.*')   && size < 15 MB
   || request.resource.contentType.matches('video/.*') && size < 50 MB
 ```
 
-Cualquier otro `contentType` se deniega del lado del servidor. Del lado del
-cliente, `MediaType` (`lib/features/chat/domain/media_type.dart`) tiene
-exactamente dos valores —`image` y `video`— y el picker abre `pickImage` /
-`pickVideo`.
+Eso acota el chat. No acota `athleteFiles`, que es otro bloque de reglas.
 
-Conclusión: **queda cubierto por “Fotos y videos”.** Si alguna vez se agrega un
-tercer valor a `MediaType`, o si esas dos líneas de `storage.rules` se aflojan,
-esta sección hay que rehacerla.
+**Cómo verificar los caminos de subida, entero y no de a uno.** El comando que
+debí correr la primera vez:
+
+```bash
+rg -n 'contentType' storage.rules | rg -v '^\s*//'
+```
+
+Cada `match` con `contentType` es un camino de subida. Al 2026-09-18 devuelve
+**ocho**, y entre todos aceptan exactamente tres cosas:
+
+| tipo | dónde |
+|---|---|
+| `image/*` | `avatars`, `postPhotos`, `sessionFeedback`, `chatMedia`, `athleteFiles` |
+| `video/*` | `chatMedia`, `customExerciseVideos` |
+| `application/pdf` | `athleteFiles` — **el único** |
+
+Si ese comando devuelve un `contentType` que no esté en esta tabla, hay un tipo
+de dato sin declarar.
 
 ## Pendientes antes de cargar
 
