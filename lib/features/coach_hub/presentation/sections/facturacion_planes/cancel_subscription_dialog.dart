@@ -149,6 +149,15 @@ class _CancelDialogState extends State<_CancelDialog> {
               'un error, escribinos.', // i18n: Fase W3
           TreinoIcon.infoCircle,
         ),
+      EstadoDeBaja.enfriando => (
+          'ESPERÁ UNOS SEGUNDOS', // i18n: Fase W3
+          // NO dice «no hay nada que dar de baja»: el servidor no le preguntó
+          // a Mercado Pago, así que no sabemos nada nuevo. Ver el dartdoc de
+          // `EstadoDeBaja.enfriando`.
+          'Acabás de pedir la baja hace un momento. Esperá unos segundos y '
+              'probá de nuevo para ver si se confirmó.', // i18n: Fase W3
+          TreinoIcon.infoCircle,
+        ),
       EstadoDeBaja.noDisponible => (
           'NO PUDIMOS CONFIRMARLO', // i18n: Fase W3
           'Mercado Pago no respondió. **Tu suscripción sigue como estaba** — no '
