@@ -66,12 +66,46 @@ especial y la mira con lupa.
 | Tipo | Recolectado | Compartido | Obligatorio | Propósito | Dónde |
 |---|---|---|---|---|---|
 | Info de salud | **Sí** | Sí — sólo con el PF vinculado | Opcional | Funcionalidad | `exerciseFeedback` con `kind: discomfort` = **dolor declarado**, más `photoUrl` (commit `99644ed3`, #795/#628) |
-| Info de estado físico | **Sí** | Sí — sólo con el PF vinculado | Opcional | Funcionalidad | Peso, altura y **20+ medidas corporales** (`measurement.dart`: `fatPercentage`, `muscleMassKg`, `waistCm`, `bicepsLCm`, …) + historial de sesiones |
+| Info de estado físico — medidas | **Sí** | Sí — sólo con el PF vinculado | **Opcional** | Funcionalidad | Peso, altura y **20+ medidas corporales** (`measurement.dart`: `fatPercentage`, `muscleMassKg`, `waistCm`, `bicepsLCm`, …) |
+| Info de estado físico — historial de sesiones | **Sí** | Sí — sólo con el PF vinculado | **Obligatorio** | Funcionalidad | Cada serie marcada en un entreno |
 
 Sobre el "Sí" de *Compartido*: los datos no salen a terceros, pero sí a **otro
 usuario** — el PF vinculado. Play cuenta eso como compartir. El gate es
 `sharedWithTrainer` y el predicado de `session_shares`; el PF nunca puede
 escribir datos del alumno (canal one-way).
+
+> **Por qué esta fila está partida en dos.**
+>
+> Google pregunta si el usuario puede usar la app **sin dar el dato**, y para
+> estas dos cosas la respuesta es distinta:
+>
+> - Las **20+ medidas corporales** se cargan a mano desde Mediciones. Un usuario
+>   puede entrenar durante meses sin tocar esa pantalla. Opcional es correcto.
+> - El **historial de sesiones** se genera por usar la función central del
+>   producto. No hay forma de entrenar en TREINO sin producirlo, así que no es
+>   opcional en el sentido que la pregunta le da a esa palabra.
+>
+> Una sola fila `Opcional` cubriendo las dos declara el historial como algo que
+> el usuario puede no dar, y no puede. Esa clase de imprecisión es la que hace
+> que Play rechace una ficha completa, no una fila.
+
+### Información financiera
+
+Hay dos cosas distintas acá, y sólo una es una compra.
+
+| Tipo | Recolectado | Compartido | Obligatorio | Propósito | Dónde |
+|---|---|---|---|---|---|
+| Historial de compras | Sí | No | Opcional | Funcionalidad — estado de la suscripción | `users/{uid}.subscription` (entrenador, Mercado Pago: `functions/src/subscriptions/mp/reconcile.ts`) y `users/{uid}.athleteSubscription` (alumno, RevenueCat: `functions/src/subscriptions/rc/`) |
+| Otra info financiera | Sí | Sí — entre el alumno y su PF | Opcional | Funcionalidad — la cuota que el alumno le paga al entrenador | `athleteBilling` (`{trainerId, athleteId, amountArs, cadence}`, `firestore.rules:3988`) y `payments/{paymentId}` (`firestore.rules:4203`) |
+
+**La segunda fila es la que se olvida.** TREINO **no intermedia** esa plata — el
+alumno le paga al entrenador por fuera— pero **sí registra cuánto es y si está
+paga** (decisión D5). Que el dinero no pase por la app no cambia que el monto
+esté guardado en ella, y Play pregunta por el dato, no por el flujo de fondos.
+
+**Ningún número de tarjeta ni dato bancario toca la app.** Mercado Pago y las
+compras integradas de Apple/Google resuelven el cobro en su propio checkout;
+TREINO sólo recibe el estado resultante.
 
 ### Mensajes
 
@@ -100,6 +134,30 @@ escribir datos del alumno (canal one-way).
 | Token de push | Sí | No | Opcional | Notificaciones | `firebase_messaging` |
 
 ---
+
+### Archivos y documentos — **NO se declara**
+
+Verificado, y queda anotado acá para que la próxima persona no repita el
+trabajo.
+
+El adjunto del chat acepta **sólo imágenes y videos**, y no es una restricción
+del cliente que se pueda saltear con el SDK: la hacen cumplir las reglas de
+Storage.
+
+```
+storage.rules — match /chatMedia/{chatId}/{userId}/{file=**}
+  request.resource.contentType.matches('image/.*')  && size < 15 MB
+  || request.resource.contentType.matches('video/.*') && size < 50 MB
+```
+
+Cualquier otro `contentType` se deniega del lado del servidor. Del lado del
+cliente, `MediaType` (`lib/features/chat/domain/media_type.dart`) tiene
+exactamente dos valores —`image` y `video`— y el picker abre `pickImage` /
+`pickVideo`.
+
+Conclusión: **queda cubierto por “Fotos y videos”.** Si alguna vez se agrega un
+tercer valor a `MediaType`, o si esas dos líneas de `storage.rules` se aflojan,
+esta sección hay que rehacerla.
 
 ## Pendientes antes de cargar
 
