@@ -86,10 +86,25 @@ abstract final class ModerationFilter {
   static String _fold(String s) {
     final out = StringBuffer();
     for (final rune in s.runes) {
+      // Las marcas combinantes se DESCARTAN, no se traducen. El mapa de
+      // plegado solo cubre caracteres precompuestos, asi que el mismo texto
+      // llegado descompuesto —`u` seguido de U+0301 en vez de `ú`— conservaba
+      // la marca, que no es `[0-9a-z]` y por lo tanto partia el token en dos:
+      // `púto` escrito descompuesto daba `['pu','to']` y pasaba, mientras que
+      // el precompuesto se bloqueaba. Los dos se ven IDENTICOS en pantalla.
+      if (_isCombining(rune)) continue;
       final ch = String.fromCharCode(rune);
       out.write(kVettedFold[ch] ?? ch);
     }
     return out.toString();
+  }
+
+  static bool _isCombining(int rune) {
+    for (var i = 0; i < kVettedCombiningRanges.length; i += 2) {
+      if (rune < kVettedCombiningRanges[i]) return false;
+      if (rune <= kVettedCombiningRanges[i + 1]) return true;
+    }
+    return false;
   }
 
   static String _leet(String s) {
@@ -179,22 +194,33 @@ abstract final class ModerationFilter {
   /// corpus.
   static bool _evades(List<String> tokens) {
     final candidatos = <String>[];
-    final corrida = StringBuffer();
+    final corrida = <String>[];
 
     void cerrarCorrida() {
-      if (corrida.length > 1) candidatos.add(corrida.toString());
+      if (corrida.length > 1) candidatos.add(corrida.join());
       corrida.clear();
     }
 
     for (final t in tokens) {
-      if (t.length == 1) {
-        corrida.write(t);
+      // Se pega con el anterior solo si LOS DOS son cortos.
+      //
+      // Antes se pegaban unicamente las corridas de UN caracter, y `pu-to` o
+      // `p-uto` se escapaban: dos fragmentos de dos y tres letras, ninguno de
+      // largo 1, asi que no se juntaban y ninguno contenia el termino. Un
+      // separador salteaba la capa entera.
+      final corto = t.length <= kVettedJoinMaxFragment;
+      final anteriorCorto =
+          corrida.isNotEmpty && corrida.last.length <= kVettedJoinMaxFragment;
+
+      if (corto && (corrida.isEmpty || anteriorCorto)) {
+        corrida.add(t);
         continue;
       }
       cerrarCorrida();
       // La allowlist no puede aportar letras a un match: `computo` contiene
       // `puto` y `controlo` contiene `trolo`, y las dos son palabras normales.
       if (!kVettedAllowlist.contains(t)) candidatos.add(t);
+      if (corto) corrida.add(t);
     }
     cerrarCorrida();
 

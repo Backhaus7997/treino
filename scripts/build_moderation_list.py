@@ -75,6 +75,51 @@ LEET_SOLO_ENTRE_LETRAS = {"@", "$", "!"}
 # `perro`, `llave`, `accion`). Colapsar dobles las romperia todas.
 COLAPSO_MINIMO = 3
 
+# Largo maximo de un fragmento para que la pasada antievasion lo PEGUE con el
+# de al lado.
+#
+# La version anterior pegaba solo corridas de UN caracter, y `pu-to` o `p-uto`
+# se le escapaban: dos fragmentos de dos y tres letras, ninguno de largo 1, asi
+# que no se juntaban y ninguno contenia el termino. Un separador alcanzaba para
+# saltear la capa entera.
+#
+# Pegar TODO tampoco sirve: `otro loco` da `otroloco`, que contiene `trolo`, y
+# es castellano rioplatense corriente.
+#
+# El 3 sale de la diferencia real entre los dos casos. Quien parte una palabra
+# para evadir produce fragmentos CORTOS (`p u t o`, `pu-to`, `con-chudo`); el
+# castellano separa palabras LARGAS (`otro` y `loco`, `otro` y `lote`, cuatro
+# letras cada una). Tres es el ultimo largo donde lo primero es mucho mas
+# probable que lo segundo.
+JOIN_MAX_FRAGMENT = 3
+
+
+def _rangos_combinantes() -> list[tuple[int, int]]:
+    """Rangos del BMP cuya categoria Unicode es `Mn` (marca sin ancho).
+
+    Hacen falta porque el mapa de plegado solo cubre caracteres PRECOMPUESTOS.
+    El mismo texto puede llegar descompuesto —`u` seguido de U+0301 en vez de
+    `ú`— y entonces la marca sobrevive, parte el token en dos y el termino no
+    matchea: `puto` escrito `pu´to` pasaba, mientras que el `púto` precompuesto
+    se bloqueaba. Los dos se ven IDENTICOS en pantalla.
+
+    Python resuelve las dos formas solo, via NFD. Dart y TypeScript no tienen
+    NFD en su biblioteca estandar, asi que reciben los rangos ya calculados: una
+    tabla generada no se puede desincronizar entre los dos.
+    """
+    rangos: list[tuple[int, int]] = []
+    ini = None
+    for cp in range(0x0300, 0x10000):
+        es_mn = unicodedata.category(chr(cp)) == "Mn"
+        if es_mn and ini is None:
+            ini = cp
+        elif not es_mn and ini is not None:
+            rangos.append((ini, cp - 1))
+            ini = None
+    if ini is not None:
+        rangos.append((ini, 0xFFFF))
+    return rangos
+
 
 def _mapa_de_plegado() -> dict[str, str]:
     """`á`->`a`, `ñ`->`n`, para todo el latino extendido.
@@ -301,6 +346,8 @@ def cargar() -> dict:
         "leet": LEET,
         "leet_entre_letras": sorted(LEET_SOLO_ENTRE_LETRAS),
         "colapso_minimo": COLAPSO_MINIMO,
+        "join_max": JOIN_MAX_FRAGMENT,
+        "combinantes": _rangos_combinantes(),
     }
 
 
@@ -330,6 +377,8 @@ def emitir_dart(d: dict) -> str:
                      for k, v in sorted(d["leet"].items()))
     leet_entre = ", ".join(dart_str(k) for k in d["leet_entre_letras"])
     colapso = d["colapso_minimo"]
+    join_max = d["join_max"]
+    comb = ", ".join(f"0x{a:04X}, 0x{b:04X}" for a, b in d["combinantes"])
 
     return f'''// {BANNER}
 //
@@ -357,6 +406,17 @@ const Set<String> kVettedLeetOnlyBetweenLetters = {{{leet_entre}}};
 /// Tres y no dos: el castellano tiene dobles (`carro`, `perro`) pero no
 /// triples.
 const int kVettedCollapseMin = {colapso};
+
+/// Largo maximo de un fragmento para que la pasada antievasion lo PEGUE con el
+/// de al lado. Ver el porque en scripts/build_moderation_list.py.
+const int kVettedJoinMaxFragment = {join_max};
+
+/// Rangos `[desde, hasta]` de marcas combinantes (categoria Unicode `Mn`),
+/// aplanados. Se descartan antes de tokenizar: sin esto, el mismo texto llega
+/// descompuesto —`u` + U+0301 en vez de `ú`— la marca parte el token en dos y
+/// el termino no matchea, mientras que la forma precompuesta si se bloquea.
+/// Los dos se ven IDENTICOS en pantalla.
+const List<int> kVettedCombiningRanges = [{comb}];
 
 /// Terminos de severidad `block` de UNA palabra, ya normalizados.
 const Set<String> kVettedBlockWords = {{{", ".join(dart_str(x) for x in d["block_palabras"])}}};
@@ -406,6 +466,8 @@ def emitir_ts(d: dict) -> str:
     leet_entre_ts = "[" + ", ".join(ts_str(k)
                                     for k in d["leet_entre_letras"]) + "]"
     colapso_ts = d["colapso_minimo"]
+    join_max_ts = d["join_max"]
+    comb_ts = ", ".join(f"0x{a:04X}, 0x{b:04X}" for a, b in d["combinantes"])
 
     return f'''// {BANNER}
 //
@@ -438,6 +500,20 @@ export const VETTED_LEET_ONLY_BETWEEN_LETTERS: ReadonlySet<string> = new Set({le
  * triples.
  */
 export const VETTED_COLLAPSE_MIN = {colapso_ts};
+
+/**
+ * Largo maximo de un fragmento para que la pasada antievasion lo PEGUE con el
+ * de al lado. Ver el porque en scripts/build_moderation_list.py.
+ */
+export const VETTED_JOIN_MAX_FRAGMENT = {join_max_ts};
+
+/**
+ * Rangos `[desde, hasta]` de marcas combinantes (categoria Unicode `Mn`),
+ * aplanados. Se descartan antes de tokenizar: sin esto el mismo texto llega
+ * descompuesto —`u` + U+0301 en vez de `ú`—, la marca parte el token en dos y
+ * el termino no matchea, mientras que la forma precompuesta si se bloquea.
+ */
+export const VETTED_COMBINING_RANGES: readonly number[] = [{comb_ts}];
 
 /** Terminos de severidad `block` de UNA palabra, ya normalizados. */
 export const VETTED_BLOCK_WORDS: ReadonlySet<string> = new Set({lista(d["block_palabras"])});
