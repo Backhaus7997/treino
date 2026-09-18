@@ -480,6 +480,25 @@ def load() -> tuple[list[dict], list[str]]:
         for hit in PENDING_RE.findall(md):
             pending.append(f"{name}: {hit[:70]}")
         um = UPDATED_RE.search(text)
+        # La fecha se lee del archivo COMPLETO, no de `publishable(text)`. El
+        # encabezado `**Ultima actualizacion:**` vive ARRIBA del primer `## `, y
+        # siete de los nueve documentos del ORDER no tienen
+        # `<!-- publish:start -->`, asi que caen al fallback del primer `## ` y
+        # dejan la fecha afuera de lo que el barrido de marcadores inspecciona.
+        #
+        # Por eso hay que revisarla aparte. Sin esto un
+        # `[[PENDIENTE - fecha de publicacion]]` se estampa en un `const` de
+        # Dart y en el `<header>` de cada HTML —a la vista del usuario— con el
+        # generador saliendo en 0 y el gate de CI en verde. Es exactamente lo
+        # que este guard existe para impedir, y no lo veia.
+        if not um:
+            sys.exit(f"[!] {name}: no tiene '**Ultima actualizacion:**'. "
+                     "Un documento legal sin fecha no dice que version rige, "
+                     "asi que no se puede publicar. Antes esto caia a la "
+                     "cadena 'sin fecha' y se publicaba como si fuera un "
+                     "valor legitimo: un defecto no es un default.")
+        for hit in PENDING_RE.findall(um.group(1)):
+            pending.append(f"{name} (fecha): {hit[:70]}")
 
         # `version:` y `published:` son opcionales, pero NO independientes:
         # el nombre de la constante de fecha lleva la version adentro
@@ -512,7 +531,8 @@ def load() -> tuple[list[dict], list[str]]:
             "slug": fm["slug"],
             "title": fm["title"],
             "dart": fm["dart"],
-            "updated": inline(um.group(1)) if um else "sin fecha",
+            # `um` no puede ser None: `load()` aborta arriba si falta.
+            "updated": inline(um.group(1)),
             # kTermsSections -> kTermsLastUpdated. Los nombres de #941 salen
             # solos de esta regla, asi que nada que mapear a mano.
             "date_const": fm["dart"].replace("Sections", "LastUpdated"),
@@ -561,7 +581,12 @@ def main() -> int:
                 CONTACT_EMAIL = m.group(0)
 
     if pending and not args.allow_pending:
-        print("[!] Hay marcadores sin resolver en el texto PUBLICABLE.\n"
+        # Dice "publicable o en la fecha" y no solo "publicable" porque la
+        # fecha NO esta en el texto publicable —vive en el encabezado— y este
+        # mensaje ahora la reporta. Un cartel que nombra mal lo que encontro
+        # manda a buscar el marcador al lugar equivocado (AGENTS.md 11.1).
+        print("[!] Hay marcadores sin resolver en el texto publicable "
+              "o en la fecha.\n"
               "    No se genera: un '[[PENDIENTE]]' no puede llegar a un "
               "usuario.\n"
               "    Resolvelos, o usa --allow-pending para previsualizar.\n",
