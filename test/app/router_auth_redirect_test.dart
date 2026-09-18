@@ -339,6 +339,24 @@ void main() {
       );
     });
 
+    test('al salir del gate, el PF incompleto sigue hasta SU onboarding',
+        () async {
+      // La salida devuelve /home y no el destino final a proposito: go_router
+      // re-evalua el redirect sobre /home y los gates de abajo re-aplican
+      // solos. Es el mismo mecanismo del que depende la salida de
+      // /profile-unavailable.
+      //
+      // Sin este caso, la salida podria devolver /home y dejar al PF ahi —
+      // salteandole el onboarding comercial que el gate de abajo existe para
+      // imponer.
+      final c = await ready(_trainerIncomplete());
+      expect(callRedirect(c, '/birth-date'), equals('/home'));
+      expect(
+        callRedirect(c, '/home'),
+        equals('/profile/edit-trainer?mode=onboarding'),
+      );
+    });
+
     test('la salida NO se dispara si la fecha sigue sin servir', () async {
       // Control del control: si la salida no mirara el validador, sacaría al
       // usuario del gate con la fecha todavía inválida — que es exactamente lo
