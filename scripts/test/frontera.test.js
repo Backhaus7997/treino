@@ -155,7 +155,7 @@ test('todo script que habla con Firebase importa la frontera', () => {
   );
 });
 
-test('los 47 scripts que inicializan Firebase pasan por la frontera', () => {
+test('los 48 scripts que inicializan Firebase pasan por la frontera', () => {
   // 45 tocaban credenciales de verdad + `seed_emulator_full.js`, que es
   // emulator-only y entra igual para que no quede NINGÚN `initializeApp` suelto.
   //
@@ -171,13 +171,19 @@ test('los 47 scripts que inicializan Firebase pasan por la frontera', () => {
   // propósito: toca el doc de sesión de todos los usuarios y lo que escribe es
   // una afirmación sobre salud.
   //
+  // El 48 es `grant_moderator.js`: otorga y revoca el claim `moderator` de
+  // Firebase Auth. Entra por `lib/admin` y no toca Firestore — sólo Auth. Es un
+  // script y no un callable a propósito: un callable que otorga el permiso de
+  // moderar ES el permiso de moderar, porque quien pueda invocarlo se lo otorga
+  // a sí mismo.
+  //
   // El número está clavado a propósito: si alguien agrega un script que entra
   // por `lib/`, este test lo cuenta y hay que subirlo — leyendo el diff. Es el
   // recordatorio de que la lista se mira, no se asume.
   const cableados = ARCHIVOS.filter(({ codigo }) => IMPORTA_LA_FRONTERA.test(codigo));
   assert.strictEqual(
     cableados.length,
-    47,
+    48,
     `cableados: ${cableados.length}. Si agregaste o sacaste un script, actualizá ` +
       'este número Y confirmá que el nuevo entra por lib/:\n  ' +
       cableados.map((a) => a.nombre).join('\n  '),

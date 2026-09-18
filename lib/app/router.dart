@@ -216,10 +216,44 @@ String? authRedirect(
     // de menor de 16 ya persistida. Sin mirar el validador, esas cuentas pasan
     // el gate y se comen un permission-denied opaco en su PRIMERA escritura —
     // las rules validan el piso en TODO update, no sólo en el create.
-    if (!isPublic &&
-        ProfileSetupValidators.validateBornAt(profile.bornAt) != null &&
-        !location.startsWith(_birthDateRoute)) {
+    //
+    // ENTRADA Y SALIDA, escritas juntas y contra la MISMA condicion. La
+    // primera version tenia solo la entrada, con self-skip, y ninguna salida:
+    // al guardar la fecha la rama dejaba de disparar, pero `/birth-date` no es
+    // ruta publica, asi que el redirect `/public -> /home` tampoco la
+    // alcanzaba. `authRedirect` devolvia null y el usuario se quedaba mirando
+    // el gate con el dato YA persistido — cerrar sesion y volver a entrar lo
+    // "arreglaba" porque esa cadena arranca en /splash y nunca pasa por aca.
+    //
+    // Es el mismo par que `/profile-unavailable` resuelve unas lineas mas
+    // arriba, donde la salida SI esta escrita. Un gate al que se entra por una
+    // condicion tiene que salir por la negacion de esa misma condicion, o la
+    // salida se desincroniza de la entrada.
+    final bornAtNoSirve =
+        ProfileSetupValidators.validateBornAt(profile.bornAt) != null;
+    final enElGateDeEdad = location.startsWith(_birthDateRoute);
+
+    if (!isPublic && bornAtNoSirve && !enElGateDeEdad) {
       return _birthDateRoute;
+    }
+    // La salida mira el validador y no solo "hay algo en bornAt": sin eso
+    // sacaria al usuario del gate con una fecha que el gate existe para
+    // rechazar.
+    //
+    // Y exige que la escritura este CONFIRMADA POR EL SERVIDOR. Firestore
+    // aplica el update en el cache antes del ack, asi que el stream emite el
+    // `bornAt` optimista de inmediato: sin este chequeo el usuario sale del
+    // gate con un dato que todavia puede volver atras, y si el servidor lo
+    // rechaza vuelve al gate SIN EXPLICACION, con la pantalla que podia
+    // mostrarle el error ya desmontada.
+    //
+    // Mientras la escritura viaja, el boton sigue en "guardando" —`_save`
+    // espera el ack— asi que el usuario ve que algo esta pasando en vez de
+    // quedarse mirando una pantalla quieta.
+    final escrituraPendiente =
+        read(userProfileHasPendingWritesProvider).valueOrNull ?? false;
+    if (enElGateDeEdad && !bornAtNoSirve && !escrituraPendiente) {
+      return '/home';
     }
 
     // ADR-TPO-003: trainer-incomplete onboarding gate.

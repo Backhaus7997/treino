@@ -605,6 +605,30 @@ export function renderMail(kind: MailKind, params: MailParams): RenderedMail {
       ctaUrl,
     );
 
+  // El correo NO lleva el contenido reportado, solo el id, el tipo de objetivo
+  // y el motivo. Un mail con el texto adentro es una copia de datos personales
+  // de terceros viajando a un buzon —y en el chat pueden ser datos de salud—.
+  // El contenido se mira en la cola, autenticado.
+  case "moderation-report-created":
+    return build(
+      "Reporte nuevo para revisar",
+      "Moderación",
+      [
+        ["Entró un reporte y el reloj de las 24 horas ya arrancó."],
+        [strong("Motivo: "), String(params.reason ?? "sin motivo")],
+        [strong("Tipo: "), String(params.targetKind ?? "?")],
+        [strong("Reporte: "), String(params.reportId ?? "?")],
+        ["El contenido se mira en la cola, autenticado — no viaja en este mail."],
+      ],
+      // SIN boton, a proposito. La ruta de la cola todavia no existe —es el
+      // slice 2 de este cambio— y `build` cae a `APP_ENTRY_ATHLETE` cuando no
+      // le pasan `ctaUrl`. Un boton que dice "ABRIR LA COLA" y lleva a la app
+      // del alumno es peor que ninguno: el moderador lo toca, aterriza en otro
+      // lado, y la proxima vez ya no lo toca.
+      //
+      // Cuando la ruta exista, el CTA vuelve con SU url — no con el fallback.
+    );
+
   case "link-requested":
     return build(
       "Tenés una solicitud de vinculación",

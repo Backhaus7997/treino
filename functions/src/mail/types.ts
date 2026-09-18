@@ -34,6 +34,11 @@ export type MailKind =
   // le duele MIENTRAS entrena, y si el PF no tiene la app abierta se entera
   // tarde. Destinatario: el PF. Sin `prefKey` a proposito — ver `templates.ts`.
   | "discomfort-reported"
+  // Aviso interno al buzon del equipo cuando entra un reporte. NO va a un
+  // usuario: es el unico `kind` que viaja con `toAddress` en vez de `toUid`.
+  // Sin el, la cola de revision existe pero nadie la mira, y las 24 horas que
+  // promete `docs/legal/normas-de-comunidad.md:123` siguen siendo mentira.
+  | "moderation-report-created"
   // ── Suscripcion del PF a TREINO ─────────────────────────────────────────
   //
   // OJO — NO CONFUNDIR CON `payment-overdue`. Ese va al ATLETA y es sobre la
@@ -108,6 +113,17 @@ export type MailStatus = "pending" | "sent" | "failed";
 export interface MailQueueDoc {
   /** Recipient uid. The address is resolved from Auth at send time. */
   toUid: string;
+  /**
+   * Direccion literal, para los mails que NO van a un usuario.
+   *
+   * Hoy la usa uno solo: el aviso de reporte nuevo, que va al buzon del equipo.
+   * Cuando esta presente, el consumidor la usa tal cual y NO resuelve por uid
+   * ni consulta `notificationPrefs` — un buzon de equipo no tiene preferencias
+   * de notificacion que consultar, y `resolveAddress` sobre un uid que no
+   * existe fallaria con "no email address for uid" sobre un mail que sí tiene
+   * destino.
+   */
+  toAddress?: string;
   /** Selects the template. */
   kind: MailKind;
   /** Template parameters. */
