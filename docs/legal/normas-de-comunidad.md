@@ -6,7 +6,7 @@ dart: kCommunitySections
 
 # Normas de Comunidad de TREINO
 
-**Última actualización:** [[PENDIENTE — fecha de publicación]]
+**Última actualización:** <!-- fecha:auto -->
 **Versión:** 1.0 (borrador)
 
 > ⚠️ **BORRADOR.** Este documento cumple doble función: es el texto que se

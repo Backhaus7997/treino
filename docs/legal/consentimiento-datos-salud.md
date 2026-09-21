@@ -6,7 +6,7 @@ dart: kHealthConsentSections
 
 # Consentimiento para el tratamiento de datos de salud
 
-**Última actualización:** [[PENDIENTE — fecha de publicación]]
+**Última actualización:** <!-- fecha:auto -->
 **Versión:** 1.0 (borrador)
 
 > Documento con doble función: el **texto que se muestra al usuario** y la

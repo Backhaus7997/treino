@@ -8,7 +8,7 @@ published: 2026-09-03
 
 # Política de Privacidad de TREINO
 
-**Última actualización:** [[PENDIENTE — fecha de publicación]]
+**Última actualización:** <!-- fecha:auto -->
 **Versión:** 2.0 (borrador)
 
 > ⚠️ **BORRADOR — NO PUBLICAR TODAVÍA.**
@@ -128,6 +128,10 @@ Te lo decimos explícitamente porque no lo verías por tu cuenta.
 ordenar por cercanía los gimnasios y entrenadores. Es opcional de verdad: sin el
 permiso, la búsqueda funciona por nombre y especialidad. **Tu ubicación no se
 publica a otros usuarios.**
+
+Tus **coordenadas exactas no salen de tu teléfono**: para buscar gimnasios le
+mandamos a nuestro proveedor de mapas una **zona aproximada de unos 5 km**, no tu
+punto.
 
 **Si sos entrenador:** las ubicaciones donde trabajás forman parte de tu **perfil
 público**. Se guardan con coordenadas precisas y se muestran en el mapa a
@@ -442,8 +446,8 @@ consentir.
 
 ### 12.3 Cumplimiento
 
-Si tomamos conocimiento de que una cuenta pertenece a una persona menor de 16
-años, o de que una persona de 16 o 17 la creó **sin el consentimiento de su
+Si tomamos conocimiento de que una cuenta pertenece a una persona menor de 13
+años, o de que una persona menor de 18 la creó **sin el consentimiento de su
 representante legal**, la suspendemos y eliminamos sus datos.
 
 ### 12.4 Por qué el mínimo es 13

@@ -6,7 +6,7 @@ dart: kTrainerTermsSections
 
 # Términos para Entrenadores de TREINO
 
-**Última actualización:** [[PENDIENTE — fecha de publicación]]
+**Última actualización:** <!-- fecha:auto -->
 **Versión:** 1.0 (borrador)
 
 > 🔴 **REVISIÓN LEGAL OBLIGATORIA.**

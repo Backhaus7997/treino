@@ -54,6 +54,7 @@ llegue a un usuario. `--allow-pending` lo saltea, solo para previsualizar.
 from __future__ import annotations
 
 import argparse
+import datetime
 import re
 import shutil
 import subprocess
@@ -463,6 +464,89 @@ ORDER = [
 UPDATED_RE = re.compile(r"\*\*Última actualización:\*\*\s*(.+)")
 PENDING_RE = re.compile(r"\[\[[^\]]*\]\]")
 
+# El centinela que dice "esta fecha la deriva el generador del historial".
+# Es OPT-IN a proposito: una fecha escrita a mano sigue siendo valida, asi que
+# un documento nuevo no hereda el mecanismo sin que alguien lo pida.
+FECHA_AUTO = "<!-- fecha:auto -->"
+
+MESES_ES = (
+    "enero", "febrero", "marzo", "abril", "mayo", "junio",
+    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+)
+
+
+def _git(*args: str) -> str | None:
+    """git dentro de ROOT. `None` si no se pudo (no hay repo, no hay git, …)."""
+    try:
+        r = subprocess.run(("git", "-C", str(ROOT), *args),
+                           capture_output=True, text=True, check=False)
+    except (OSError, ValueError):
+        return None
+    return r.stdout.strip() if r.returncode == 0 else None
+
+
+def _es_fecha(iso: str) -> str:
+    """`2026-09-21` -> `21 de septiembre de 2026`."""
+    y, m, d = (int(p) for p in iso.split("-"))
+    return f"{d} de {MESES_ES[m - 1]} de {y}"
+
+
+def fecha_auto(name: str) -> str:
+    """La fecha de `name`, derivada de cuando cambio DE VERDAD.
+
+    Por que no se escriben a mano: una fecha escrita a mano queda vieja la
+    proxima vez que alguien edita el texto y no se acuerda de moverla. No es
+    hipotetico —las paginas legales del sitio quedaron en marzo mientras el
+    documento real avanzaba— y el costo no es cosmetico: la linea dice
+    "Ultima actualizacion" en un documento que el usuario ACEPTA.
+
+    Dos fuentes, y el orden importa:
+
+      · Si el archivo tiene cambios sin commitear, la fecha es HOY. El commit
+        que los va a guardar todavia no existe, asi que preguntarle a git
+        devolveria la fecha del cambio ANTERIOR: una fecha vieja para un texto
+        nuevo, que es exactamente lo que este mecanismo existe para impedir.
+      · Si esta limpio, la fecha del ultimo commit que lo toco. En CI el arbol
+        siempre esta limpio, asi que `--check` es determinista: no depende de
+        cuando corre.
+
+    El flujo normal cierra solo: editas, generas (estampa hoy), commiteas los
+    dos juntos, y el commit queda fechado hoy. CI regenera con el arbol limpio,
+    obtiene esa misma fecha y `--check` pasa.
+
+    Si generas un dia y commiteas al siguiente, CI va a marcar el desfasaje y
+    hay que regenerar. Es molesto y es CORRECTO: lo generado quedo viejo.
+
+    FALLA CERRADO. Sin repo, sin git o sin commits no hay historial que
+    consultar, y una fecha inventada en un documento legal es peor que no
+    generar: el usuario no puede distinguir una de la otra. Por el mismo
+    criterio que el resto de este archivo —un defecto no es un default— aca se
+    aborta en vez de caer a hoy.
+    """
+    rel = f"docs/legal/{name}"
+
+    if _git("rev-parse", "--git-dir") is None:
+        sys.exit(f"[!] {name}: usa '{FECHA_AUTO}' pero esto no es un repo git.\n"
+                 "    Sin historial no hay de donde sacar la fecha, y este\n"
+                 "    generador no la inventa: pone la fecha real o no genera.\n"
+                 "    Escribi la fecha a mano en el documento si no hay repo.")
+
+    sucio = _git("status", "--porcelain", "--", rel)
+    if sucio is None:
+        sys.exit(f"[!] {name}: git no pudo decir si tiene cambios sin commitear.\n"
+                 "    Sin esa respuesta la fecha puede salir vieja para un texto\n"
+                 "    nuevo, asi que se aborta en vez de arriesgarla.")
+    if sucio:
+        return _es_fecha(datetime.date.today().isoformat())
+
+    iso = _git("log", "-1", "--format=%cd", "--date=short", "--", rel)
+    if not iso:
+        sys.exit(f"[!] {name}: usa '{FECHA_AUTO}' y git no tiene ningun commit\n"
+                 "    que lo toque. Un archivo sin historial no tiene fecha de\n"
+                 "    ultima actualizacion, y este generador no la inventa.\n"
+                 "    Commitealo primero, o escribi la fecha a mano.")
+    return _es_fecha(iso)
+
 
 def load() -> tuple[list[dict], list[str]]:
     docs, pending = [], []
@@ -500,6 +584,13 @@ def load() -> tuple[list[dict], list[str]]:
         for hit in PENDING_RE.findall(um.group(1)):
             pending.append(f"{name} (fecha): {hit[:70]}")
 
+        # El centinela se resuelve DESPUES del barrido de marcadores, no antes:
+        # asi un `[[PENDIENTE]]` escrito en la misma linea sigue abortando en
+        # vez de quedar tapado por la fecha derivada.
+        updated_raw = um.group(1).strip()
+        if updated_raw == FECHA_AUTO:
+            updated_raw = fecha_auto(name)
+
         # `version:` y `published:` son opcionales, pero NO independientes:
         # el nombre de la constante de fecha lleva la version adentro
         # (kPrivacyV1PublishedAt), asi que una fecha sin version no tiene
@@ -532,7 +623,8 @@ def load() -> tuple[list[dict], list[str]]:
             "title": fm["title"],
             "dart": fm["dart"],
             # `um` no puede ser None: `load()` aborta arriba si falta.
-            "updated": inline(um.group(1)),
+            # `updated_raw` ya trae el centinela resuelto, si lo habia.
+            "updated": inline(updated_raw),
             # kTermsSections -> kTermsLastUpdated. Los nombres de #941 salen
             # solos de esta regla, asi que nada que mapear a mano.
             "date_const": fm["dart"].replace("Sections", "LastUpdated"),

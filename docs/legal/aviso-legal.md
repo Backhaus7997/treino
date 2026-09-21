@@ -6,7 +6,7 @@ dart: kLegalNoticeSections
 
 # Aviso Legal
 
-**Última actualización:** [[PENDIENTE — fecha de publicación]]
+**Última actualización:** <!-- fecha:auto -->
 
 ## Titular del servicio
 
@@ -50,11 +50,11 @@ de la salud, y no intermedia los pagos entre alumnos y entrenadores.** Ver el
 
 ## Propiedad intelectual
 
-La marca TREINO, el diseño de la aplicación, su código y sus contenidos
-originales son propiedad de BACKHAUSTIN S.A.S.
+El diseño de la aplicación, su código y sus contenidos originales son propiedad
+de BACKHAUSTIN S.A.S.
 
-[[PENDIENTE — confirmar el estado del registro de la marca ante el INPI. La
-cláusula se sostiene mejor con registro que sin él.]]
+TREINO es la designación comercial bajo la cual BACKHAUSTIN S.A.S. presta el
+servicio.
 
 ## Documentos relacionados
 

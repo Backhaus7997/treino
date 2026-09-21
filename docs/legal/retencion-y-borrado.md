@@ -6,7 +6,7 @@ dart: kDataRetentionSections
 
 # Política de Retención y Eliminación de Datos
 
-**Última actualización:** [[PENDIENTE — fecha de publicación]]
+**Última actualización:** <!-- fecha:auto -->
 **Versión:** 1.0 (borrador)
 
 > Documento de respaldo de la [Política de Privacidad](./politica-de-privacidad.md),

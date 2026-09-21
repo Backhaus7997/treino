@@ -7,7 +7,7 @@ version: 1
 
 # Términos y Condiciones de TREINO
 
-**Última actualización:** [[PENDIENTE — fecha de publicación]]
+**Última actualización:** <!-- fecha:auto -->
 **Versión:** 2.0 (borrador)
 
 > ⚠️ **BORRADOR INCOMPLETO A PROPÓSITO.**

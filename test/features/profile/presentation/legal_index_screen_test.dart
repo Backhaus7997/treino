@@ -76,6 +76,22 @@ void main() {
     await tester.pumpWidget(wrap(const LegalIndexScreen()));
     await tester.pumpAndSettle();
 
+    // Hay que scrollear: el contacto está al final de un `ListView` y desde el
+    // 2026-09-21 la pantalla lista los NUEVE documentos legales, no dos. El
+    // archivo de contenido estaba escrito a mano y registraba sólo Términos y
+    // Privacidad; al generarlo desde `docs/legal/` aparecieron los otros siete
+    // y el pie se fue abajo del fold, donde un `ListView` ni lo construye.
+    //
+    // `scrollUntilVisible` y no una altura fija: con una constante, este test
+    // vuelve a romperse el día que se agregue el décimo documento, y la falla
+    // no diría nada sobre el contacto.
+    await tester.scrollUntilVisible(
+      find.textContaining(kLegalContactEmail),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
     expect(find.textContaining(kLegalContactEmail), findsOneWidget);
   });
 }
