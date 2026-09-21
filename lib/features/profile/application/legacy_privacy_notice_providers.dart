@@ -40,7 +40,7 @@ final legacyPrivacyNoticeDismissedProvider =
 /// `acceptedPrivacyVersion == null` — el campo no distingue a nadie hasta
 /// que la población rote. La única evidencia que ya existe hoy en
 /// producción es `termsAcceptedAt`, y por eso la comparación es contra
-/// [kPrivacyV1PublishedAt].
+/// [kPrivacyV4PublishedAt].
 ///
 /// **Por qué sólo atletas.** Al entrenador la sección "4. Ubicación" vieja
 /// le decía algo FALSO, y su camino es el sheet de re-consentimiento, que
@@ -70,5 +70,5 @@ final shouldShowLegacyPrivacyNoticeProvider = Provider<bool>((ref) {
   if (fields.role != UserRole.athlete) return false;
   final acceptedAt = fields.acceptedAt;
   if (acceptedAt == null) return false;
-  return acceptedAt.isBefore(kPrivacyV1PublishedAt);
+  return acceptedAt.isBefore(kPrivacyV4PublishedAt);
 });

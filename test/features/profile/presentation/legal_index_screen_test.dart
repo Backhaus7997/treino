@@ -76,15 +76,22 @@ void main() {
     await tester.pumpWidget(wrap(const LegalIndexScreen()));
     await tester.pumpAndSettle();
 
-    // Hay que scrollear: el contacto está al final de un `ListView` y desde el
-    // 2026-09-21 la pantalla lista los NUEVE documentos legales, no dos. El
-    // archivo de contenido estaba escrito a mano y registraba sólo Términos y
-    // Privacidad; al generarlo desde `docs/legal/` aparecieron los otros siete
-    // y el pie se fue abajo del fold, donde un `ListView` ni lo construye.
+    // Se scrollea antes de buscar, aunque HOY el contacto entre en pantalla.
     //
-    // `scrollUntilVisible` y no una altura fija: con una constante, este test
-    // vuelve a romperse el día que se agregue el décimo documento, y la falla
-    // no diría nada sobre el contacto.
+    // El contacto vive al final de un `ListView`, y un `ListView` no construye
+    // lo que está abajo del fold: el finder no lo encuentra aunque el widget
+    // esté en el árbol. Cuántos documentos hacen falta para empujarlo abajo
+    // depende de `kLegalDocuments`, que es contenido GENERADO desde
+    // `docs/legal/` — o sea que puede cambiar sin que nadie toque esta
+    // pantalla.
+    //
+    // No es hipotético: el 2026-09-21 una versión de ese generador emitió los
+    // nueve documentos en vez de dos y este test se puso rojo. El split volvió
+    // a dos por la Guideline 3.1.3 de Apple (ver `EN_EL_BINARIO` en
+    // `scripts/build_legal_content.py`), pero el acoplamiento sigue ahí.
+    //
+    // `scrollUntilVisible` y no una altura fija: con una constante, el test se
+    // rompe otra vez y la falla no dice nada sobre el contacto.
     await tester.scrollUntilVisible(
       find.textContaining(kLegalContactEmail),
       200,

@@ -2,7 +2,16 @@
 slug: privacidad
 title: Política de Privacidad
 dart: kPrivacySections
-version: 1
+# 4 y no 1, por el mismo motivo que los Terminos: es lo que hoy se sella en
+# `acceptedPrivacyVersion`. Ver el front matter de terminos-y-condiciones.md.
+version: 4
+# OJO — esta fecha venia apareada al nombre `kPrivacyV1PublishedAt` mientras
+# la version en produccion ya era 4. Al generar, el nombre pasa a
+# `kPrivacyV4PublishedAt` (regla `kPrivacy` + `V{version}` + `PublishedAt`) y
+# el gate del aviso legacy se actualiza con el. La FECHA no se toco: el gate
+# compara contra el mismo 2026-09-03 de siempre y ningun usuario cambia de
+# lado. Que la fecha de v1 quedara colgada de la version 4 es deuda heredada
+# del archivo escrito a mano, y conviene revisarla aparte.
 published: 2026-09-03
 -->
 
@@ -380,9 +389,9 @@ y sesiones, tus medidas y tests, tus check-ins, tus molestias reportadas y sus
 fotos, tus publicaciones, tus archivos, tus vínculos con entrenadores, y **los
 registros privados que tu entrenador llevaba sobre vos**.
 
-También podés solicitarlo desde la web, sin instalar la app y sin iniciar
-sesión, en
-[gettreino.com/es/eliminar-cuenta](https://gettreino.com/es/eliminar-cuenta).
+También podés solicitarlo en
+[gettreino.com/es/eliminar-cuenta](https://gettreino.com/es/eliminar-cuenta),
+sin instalar la app y sin iniciar sesión.
 
 Detalle técnico en [`retencion-y-borrado.md`](./retencion-y-borrado.md).
 

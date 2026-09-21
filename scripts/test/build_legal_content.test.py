@@ -303,6 +303,45 @@ class GeneradorLegal(unittest.TestCase):
         self.assertIn(BLANCO, r.stdout + r.stderr,
                       "aborto, pero sin decir que archivo hay que arreglar")
 
+    # --- el split app/web ------------------------------------------------
+
+    def test_al_dart_solo_van_los_de_en_el_binario(self):
+        """El Dart lleva SOLO `EN_EL_BINARIO`, no los nueve de `ORDER`.
+
+        No es preferencia de presentacion: el texto de los otros siete no puede
+        estar en el archivo aunque no se muestre. `terminos-suscripcion.md`
+        dice «Contratado en la web: Mercado Pago», y meter esa frase en el
+        binario de iOS es un *call to action* para pagar afuera — prohibido por
+        el intro de la Guideline 3.1.3 de Apple fuera de la storefront de EEUU.
+
+        Lo cuida tambien `anti_steering_movil_test`, pero ese solo se entera si
+        el documento nuevo ADEMAS trae una de sus frases. Este fija el split.
+        """
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("blc", SCRIPT)
+        blc = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(blc)
+
+        self.assertTrue(
+            set(blc.EN_EL_BINARIO).issubset(set(blc.ORDER)),
+            "EN_EL_BINARIO nombra un documento que no esta en ORDER")
+
+        tmp = self.arbol_git()
+        r = self.correr(tmp)
+        self.assertEqual(r.returncode, 0, f"{r.stdout}\n{r.stderr}")
+        dart = self.dart_generado(tmp)
+
+        adentro = {n for n, _, _, const in DOCS if n in blc.EN_EL_BINARIO}
+        for nombre, _, _, const in DOCS:
+            if nombre in adentro:
+                self.assertIn(f"{const} =", dart,
+                              f"falta {nombre}, que SI tiene que viajar")
+            else:
+                self.assertNotIn(
+                    f"{const} =", dart,
+                    f"{nombre} se emitio al Dart y no esta en EN_EL_BINARIO: "
+                    "su texto viaja en el binario movil")
+
     # --- lo que NO se puede romper al arreglar ---------------------------
 
     def test_allow_pending_sigue_previsualizando(self):

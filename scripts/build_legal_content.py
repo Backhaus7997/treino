@@ -290,6 +290,16 @@ def dart_format(path: Path) -> None:
 
 
 def emit_dart(docs: list[dict]) -> str:
+    # El Dart lleva SOLO los documentos de `EN_EL_BINARIO`. No es un filtro de
+    # presentacion: el texto de los otros siete no puede estar en el archivo
+    # aunque no se muestre, porque `anti_steering_movil_test` escanea el
+    # ARCHIVO —no lo que se renderiza— y porque un `const` que nadie referencia
+    # sigue siendo texto adentro del .app. Ver el comentario de `EN_EL_BINARIO`.
+    docs = [d for d in docs if d["file"] in EN_EL_BINARIO]
+    if not docs:
+        sys.exit("[!] EN_EL_BINARIO no matcheo ningun documento de ORDER. "
+                 "Sin esa lista el Dart sale vacio y la app se queda sin "
+                 "textos legales, que es peor que no generar.")
     out = [BANNER_DART, "library;", "", "/// Una seccion de un documento legal: encabezado + cuerpo.",
            "class LegalSection {", "  const LegalSection(this.heading, this.body);",
            "", "  final String heading;", "  final String body;", "}", ""]
@@ -461,6 +471,32 @@ ORDER = [
     "aviso-legal.md",
 ]
 
+# Los unicos documentos cuyo TEXTO viaja adentro del binario movil.
+#
+# ⚠️ ESTA LISTA NO CRECE SIN MIRAR LA GUIDELINE 3.1.3 DE APPLE.
+#
+# El intro de la 3.1.3 prohibe que una app «encourage users to use a purchasing
+# method other than in-app purchase», con excepcion solo para la storefront de
+# EEUU. Y la exencion 3.1.3(f) que ampara el cobro web del PF exige ademas «no
+# calls to action for purchase outside of the app»: no alcanza con no linkear,
+# un cartel que dice donde se paga YA es un call to action.
+#
+# `terminos-suscripcion.md` dice, textual, «Contratado en la web: Mercado Pago».
+# Emitirlo al Dart mete esa frase en el binario de iOS. Pasó: el 2026-09-21 una
+# primera version de este split emitia los nueve y `anti_steering_movil_test`
+# se puso rojo — que es exactamente para lo que existe. El guard estaba en CERO
+# desde el PR #1141 y este cambio le volvia a meter deuda.
+#
+# Los otros siete NO desaparecen: siguen siendo publicables (`ORDER`), siguen
+# generando su HTML y son la fuente de la landing. Lo que no hacen es viajar en
+# el telefono.
+#
+# Decision del titular, 2026-09-21: el binario se queda con estos dos.
+EN_EL_BINARIO = [
+    "terminos-y-condiciones.md",
+    "politica-de-privacidad.md",
+]
+
 UPDATED_RE = re.compile(r"\*\*Última actualización:\*\*\s*(.+)")
 PENDING_RE = re.compile(r"\[\[[^\]]*\]\]")
 
@@ -491,8 +527,14 @@ def _es_fecha(iso: str) -> str:
     return f"{d} de {MESES_ES[m - 1]} de {y}"
 
 
+def _publicable_en(rev: str, rel: str) -> str | None:
+    """Lo PUBLICABLE de `rel` en `rev`. `None` si ahi no existia el archivo."""
+    crudo = _git("show", f"{rev}:{rel}")
+    return None if crudo is None else publishable(crudo).strip()
+
+
 def fecha_auto(name: str) -> str:
-    """La fecha de `name`, derivada de cuando cambio DE VERDAD.
+    """La fecha de `name`, derivada de cuando cambio DE VERDAD lo PUBLICABLE.
 
     Por que no se escriben a mano: una fecha escrita a mano queda vieja la
     proxima vez que alguien edita el texto y no se acuerda de moverla. No es
@@ -500,52 +542,81 @@ def fecha_auto(name: str) -> str:
     documento real avanzaba— y el costo no es cosmetico: la linea dice
     "Ultima actualizacion" en un documento que el usuario ACEPTA.
 
+    **Mira `publishable()`, no el archivo.** Varios documentos llevan anexos
+    internos despues de `<!-- publish:end -->` —checklists, specs, estado del
+    codigo— que no ve ningun usuario. Fechar por el archivo entero hace que
+    tachar un item de una checklist interna estampe la fecha de hoy sobre un
+    texto legal que no cambio: una actualizacion anunciada que no ocurrio, que
+    es la misma familia de mentira que este mecanismo existe para evitar.
+
     Dos fuentes, y el orden importa:
 
-      · Si el archivo tiene cambios sin commitear, la fecha es HOY. El commit
-        que los va a guardar todavia no existe, asi que preguntarle a git
-        devolveria la fecha del cambio ANTERIOR: una fecha vieja para un texto
-        nuevo, que es exactamente lo que este mecanismo existe para impedir.
-      · Si esta limpio, la fecha del ultimo commit que lo toco. En CI el arbol
-        siempre esta limpio, asi que `--check` es determinista: no depende de
-        cuando corre.
+      · Si lo publicable difiere de HEAD, la fecha es HOY. El commit que lo va
+        a guardar todavia no existe, asi que preguntarle a git devolveria la
+        fecha del cambio ANTERIOR: una fecha vieja para un texto nuevo.
+      · Si coincide, la del ultimo commit donde lo publicable CAMBIO respecto
+        de su padre. No el ultimo que toco el archivo: ese puede ser un
+        retoque del anexo.
 
     El flujo normal cierra solo: editas, generas (estampa hoy), commiteas los
     dos juntos, y el commit queda fechado hoy. CI regenera con el arbol limpio,
-    obtiene esa misma fecha y `--check` pasa.
+    encuentra ese mismo commit y `--check` pasa.
 
-    Si generas un dia y commiteas al siguiente, CI va a marcar el desfasaje y
-    hay que regenerar. Es molesto y es CORRECTO: lo generado quedo viejo.
+    FALLA CERRADO, y son tres casos distintos:
 
-    FALLA CERRADO. Sin repo, sin git o sin commits no hay historial que
-    consultar, y una fecha inventada en un documento legal es peor que no
-    generar: el usuario no puede distinguir una de la otra. Por el mismo
-    criterio que el resto de este archivo —un defecto no es un default— aca se
-    aborta en vez de caer a hoy.
+      · Sin repo, sin git o sin commits no hay historial que consultar.
+      · **En un clon SHALLOW git miente sin avisar**: trata el tip como el
+        borde de la historia y devuelve su fecha para todos los archivos. Eso
+        dejaria los nueve documentos fechados el dia del ultimo commit del
+        repo, aunque ninguno se haya tocado. Se detecta y se aborta.
+      · Si el historial no alcanza para encontrar donde cambio lo publicable.
+
+    Una fecha inventada en un documento legal es peor que no generar: el
+    usuario no puede distinguir una derivada de una fabricada.
     """
     rel = f"docs/legal/{name}"
 
     if _git("rev-parse", "--git-dir") is None:
         sys.exit(f"[!] {name}: usa '{FECHA_AUTO}' pero esto no es un repo git.\n"
                  "    Sin historial no hay de donde sacar la fecha, y este\n"
-                 "    generador no la inventa: pone la fecha real o no genera.\n"
-                 "    Escribi la fecha a mano en el documento si no hay repo.")
+                 "    generador no la inventa. Escribi la fecha a mano si no\n"
+                 "    hay repo.")
 
-    sucio = _git("status", "--porcelain", "--", rel)
-    if sucio is None:
-        sys.exit(f"[!] {name}: git no pudo decir si tiene cambios sin commitear.\n"
-                 "    Sin esa respuesta la fecha puede salir vieja para un texto\n"
-                 "    nuevo, asi que se aborta en vez de arriesgarla.")
-    if sucio:
-        return _es_fecha(datetime.date.today().isoformat())
+    if _git("rev-parse", "--is-shallow-repository") == "true":
+        sys.exit(f"[!] {name}: usa '{FECHA_AUTO}' y este clon es SHALLOW.\n"
+                 "    git trataria el tip como el borde de la historia y\n"
+                 "    devolveria su fecha para TODOS los documentos, aunque\n"
+                 "    ninguno se haya tocado. Eso no se nota mirando: por eso\n"
+                 "    se aborta en vez de arriesgarlo.\n\n"
+                 "        git fetch --unshallow\n\n"
+                 "    En CI: 'fetch-depth: 0' en el checkout del job.")
 
-    iso = _git("log", "-1", "--format=%cd", "--date=short", "--", rel)
-    if not iso:
+    hoy = _es_fecha(datetime.date.today().isoformat())
+
+    actual = publishable((SRC / name).read_text(encoding="utf-8")).strip()
+    en_head = _publicable_en("HEAD", rel)
+    if en_head is None or actual != en_head:
+        # Sin commitear todavia, o nuevo: el cambio es de hoy.
+        return hoy
+
+    historial = _git("log", "--format=%H", "--", rel)
+    if not historial:
         sys.exit(f"[!] {name}: usa '{FECHA_AUTO}' y git no tiene ningun commit\n"
-                 "    que lo toque. Un archivo sin historial no tiene fecha de\n"
-                 "    ultima actualizacion, y este generador no la inventa.\n"
-                 "    Commitealo primero, o escribi la fecha a mano.")
-    return _es_fecha(iso)
+                 "    que lo toque. Commitealo primero, o escribi la fecha a\n"
+                 "    mano.")
+
+    for commit in historial.split("\n"):
+        aqui = _publicable_en(commit, rel)
+        antes = _publicable_en(f"{commit}^", rel)
+        if antes is None or aqui != antes:
+            iso = _git("log", "-1", "--format=%cd", "--date=short", commit)
+            if not iso:
+                break
+            return _es_fecha(iso)
+
+    sys.exit(f"[!] {name}: no se pudo ubicar en que commit cambio su texto\n"
+             "    publicable. Con el historial incompleto la fecha saldria\n"
+             "    inventada, asi que se aborta.")
 
 
 def load() -> tuple[list[dict], list[str]]:

@@ -2,7 +2,11 @@
 slug: terminos
 title: Términos y Condiciones
 dart: kTermsSections
-version: 1
+# 3 y no 1: es la version que HOY se sella en los documentos de usuario
+# (`acceptedTermsVersion`). El markdown decia 1 y el Dart escrito a mano 3;
+# generar con el 1 habria hecho indistinguible una aceptacion nueva de una
+# historica de v1, que es justo lo que este campo existe para distinguir.
+version: 3
 -->
 
 # Términos y Condiciones de TREINO

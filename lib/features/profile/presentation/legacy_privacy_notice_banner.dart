@@ -12,7 +12,7 @@ import '../application/legacy_privacy_notice_providers.dart';
 /// consentimiento-legal-versionado — R4.
 ///
 /// Aviso NO bloqueante de política de privacidad actualizada, para el atleta
-/// que aceptó antes de [kPrivacyV1PublishedAt].
+/// que aceptó antes de [kPrivacyV4PublishedAt].
 ///
 /// Cumple la promesa que la sección 10 de la política ya hacía —"si los
 /// cambios son relevantes, te lo avisaremos dentro de la app"— y que hasta

@@ -326,6 +326,22 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        # Historial COMPLETO, sin blobs — lo necesita el paso «Gate de
+        # desfasaje legal» de más abajo.
+        #
+        # `build_legal_content.py` deriva la fecha de «Última actualización»
+        # de cada documento con `git log -1 -- <path>`. En un checkout de
+        # profundidad 1 git trata el tip como el borde de la historia y
+        # devuelve LA FECHA DEL TIP para los nueve, aunque ninguno haya
+        # cambiado: `--check` regeneraría nueve fechas distintas de las
+        # commiteadas y se pondría rojo en TODO PR posterior.
+        #
+        # `filter: blob:none` es lo que lo hace barato: hacen falta las FECHAS
+        # de los commits, no el contenido de cada revisión. El job
+        # `legal-generado` ya pedía `fetch-depth: 0` por su `merge-base`.
+        with:
+          fetch-depth: 0
+          filter: blob:none
 
       - name: Set up Flutter
         # MISMA versión que `analyze` y que `visual-gate`. Ver el comentario del
