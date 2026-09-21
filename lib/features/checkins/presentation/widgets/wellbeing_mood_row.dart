@@ -57,13 +57,19 @@ class WellbeingMoodGlyph extends StatelessWidget {
         fit: BoxFit.scaleDown,
         child: Text(
           emoji,
-          // #456 — RESUELTO el 2026-09-21, y conviene leerlo entero antes de
-          // tocar este `style`.
+          // #456 — conviene leerlo entero antes de tocar este `style`.
           //
-          // En el SIMULADOR de iOS estos glifos salen como tofu "?". Medido en
-          // iPhone 17 Pro Max y en iPad Pro 13" (M5). **En un iPhone FISICO se
-          // ven bien**, asi que es un artefacto del simulador y ningun usuario
-          // lo sufre.
+          // En el SIMULADOR de iOS estos glifos salen como tofu "?". Eso esta
+          // medido y es reproducible: iPhone 17 Pro Max y iPad Pro 13" (M5),
+          // 2026-09-21.
+          //
+          // En hardware real NO esta reproducido: en el unico iPhone fisico
+          // que se probo se ven bien. **Modelo y version de iOS no quedaron
+          // registrados**, asi que eso NO alcanza para concluir que ningun
+          // usuario lo sufre — quedan sin probar otros modelos de iPhone y de
+          // iPad, otras versiones de iOS y otras del engine de Flutter. Si lo
+          // ves en tofu en un device, es un hallazgo nuevo: anotá ahi el
+          // modelo y la version, y reabri.
           //
           // Lo que NO es: un problema de seleccion de fuente. Se probaron
           // cuatro variantes del mismo glifo lado a lado y las CUATRO dieron
@@ -74,8 +80,9 @@ class WellbeingMoodGlyph extends StatelessWidget {
           // tiene nada que ver. En ese simulador el motor no resuelve el glifo
           // con ningun nombre de familia.
           //
-          // Corolario: si lo ves en tofu, NO gastes tiempo en el `style` — no
-          // hay nada ahi que arreglar. Probalo en un device.
+          // Corolario, acotado al simulador: si lo ves en tofu AHI, no gastes
+          // tiempo en el `style` — esas cuatro variantes ya se probaron.
+          // Contrastalo con un device antes de sacar cualquier conclusion.
           //
           // El `fontFamilyFallback` se deja puesto: la verificacion en device
           // se hizo CON el, asi que no esta probado que sobre. Sacarlo seria un
