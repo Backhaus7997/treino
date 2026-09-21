@@ -33,24 +33,66 @@ Future<void> _aplicarEnFirebase(bool enabled) =>
 final analyticsToggleProvider =
     Provider<AnalyticsToggle>((_) => _aplicarEnFirebase);
 
+/// Cómo se persiste. Segundo seam, por el mismo motivo que [AnalyticsToggle]:
+/// un test tiene que poder hacer fallar la escritura, y con un
+/// `SharedPreferences` real no se puede.
+typedef ConsentWriter = Future<bool> Function(bool enabled);
+
 /// El interruptor de analítica, persistido y aplicado en el acto.
 ///
 /// «En el acto» es el punto: la política dice «en cualquier momento», y un
-/// interruptor que recién hace efecto al reiniciar la app no cumple eso. Por
-/// eso [setEnabled] llama a Firebase además de guardar.
+/// interruptor que recién hace efecto al reiniciar la app no cumple eso.
 class AnalyticsConsentNotifier extends StateNotifier<bool> {
-  AnalyticsConsentNotifier(this._prefs, this._toggle)
-      : super(analyticsConsentFromPrefs(_prefs));
+  AnalyticsConsentNotifier(this._escribir, this._toggle,
+      {required bool inicial})
+      : super(inicial);
 
-  final SharedPreferences _prefs;
+  final ConsentWriter _escribir;
   final AnalyticsToggle _toggle;
 
-  /// Guarda y aplica. El estado se mueve primero para que el switch de la UI
-  /// no quede trabado esperando a la red.
+  /// Apaga o prende, y deja los TRES lugares de acuerdo: lo que muestra el
+  /// switch, lo que hace Firebase y lo que queda guardado.
+  ///
+  /// El orden no es casual. Primero se le avisa a Firebase, que es lo único
+  /// que de verdad corta la recolección; recién después se guarda. Al revés
+  /// —como estaba— un fallo al guardar dejaba el switch en «apagado» con la
+  /// recolección viva, que es la peor combinación posible: el usuario cree que
+  /// revocó y no revocó.
+  ///
+  /// Si algo falla se **vuelve atrás en los tres**, incluido el switch. Que
+  /// rebote a la vista es la señal honesta de que no tomó. Dejarlo en el valor
+  /// nuevo seria un cartel que miente (AGENTS.md §11.1).
+  ///
+  /// `setBool` devuelve un `bool` y **puede devolver `false` sin tirar**: eso
+  /// tambien es un fallo, y tratarlo como exito hace que al proximo arranque
+  /// la analitica vuelva sola sin que nadie se entere.
   Future<void> setEnabled(bool enabled) async {
+    final anterior = state;
+    if (anterior == enabled) return;
+
     state = enabled;
-    await _prefs.setBool(kAnalyticsConsentKey, enabled);
-    await _toggle(enabled);
+    // Si el toggle NO llegó a aplicarse, Firebase sigue en `anterior` y
+    // revertirlo sería una llamada al pedo. Sólo se revierte lo que cambió.
+    var aplicado = false;
+    try {
+      await _toggle(enabled);
+      aplicado = true;
+      if (!await _escribir(enabled)) {
+        throw StateError('SharedPreferences no pudo guardar el consentimiento');
+      }
+    } catch (_) {
+      state = anterior;
+      if (aplicado) {
+        // Mejor esfuerzo: si esto también falla, el estado ya volvió al valor
+        // anterior y la próxima interacción reintenta. El error no se traga en
+        // silencio — queda el switch rebotando, que es visible.
+        try {
+          await _toggle(anterior);
+        } catch (_) {
+          // nada más que hacer desde acá
+        }
+      }
+    }
   }
 }
 
@@ -61,5 +103,9 @@ class AnalyticsConsentNotifier extends StateNotifier<bool> {
 final analyticsConsentProvider =
     StateNotifierProvider<AnalyticsConsentNotifier, bool>((ref) {
   final prefs = ref.watch(sharedPreferencesProvider).requireValue;
-  return AnalyticsConsentNotifier(prefs, ref.watch(analyticsToggleProvider));
+  return AnalyticsConsentNotifier(
+    (v) => prefs.setBool(kAnalyticsConsentKey, v),
+    ref.watch(analyticsToggleProvider),
+    inicial: analyticsConsentFromPrefs(prefs),
+  );
 });

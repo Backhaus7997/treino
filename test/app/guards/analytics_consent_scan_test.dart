@@ -46,6 +46,30 @@ void main() {
     );
   });
 
+  test('las DOS vistas de perfil llevan al interruptor', () {
+    // `ProfileScreen` reparte por rol: el atleta ve `_AthleteProfile` y el
+    // entrenador ve `TrainerProfileView`, que son dos arboles distintos. Poner
+    // la entrada en uno solo deja a la mitad de los usuarios sin forma de
+    // revocar en el telefono — y encima el tab de Privacidad del Coach Hub les
+    // dice que «en el telefono se configura aparte», mandandolos a un lugar que
+    // para ellos no existe. Lo encontro Codex en el PR #1205 (P1).
+    //
+    // Es un scan y no un widget test porque lo que se protege es que la RUTA
+    // este alcanzable desde las dos vistas; montar `TrainerProfileView` pide
+    // mockear perfil, auth y vinculos, y ese costo no compra mas garantia.
+    for (final vista in [
+      'lib/features/profile/profile_screen.dart',
+      'lib/features/profile/trainer_profile_view.dart',
+    ]) {
+      expect(
+        File(vista).readAsStringSync(),
+        contains('/profile/settings/privacidad'),
+        reason: '$vista no ofrece entrada a Privacidad: ese rol se queda sin '
+            'poder apagar la analitica en el telefono',
+      );
+    }
+  });
+
   test('los dos entry points la derivan de las preferencias', () {
     // Los dos, no uno: la Política es una sola y promete lo mismo a la app y
     // al Coach Hub. Que uno respete el interruptor y el otro no deja al

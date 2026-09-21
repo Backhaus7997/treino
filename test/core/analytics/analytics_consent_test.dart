@@ -49,6 +49,78 @@ void main() {
     });
   });
 
+  group('AnalyticsConsentNotifier — cuando algo falla', () {
+    // Los tres lugares que tienen que quedar de acuerdo: lo que muestra el
+    // switch, lo que hace Firebase y lo que queda guardado. Si uno falla, la
+    // combinacion peligrosa es «switch en apagado + recoleccion viva»: el
+    // usuario cree que revoco y no revoco.
+
+    test('si Firebase falla, el switch vuelve atras', () async {
+      final llamadas = <bool>[];
+      final n = AnalyticsConsentNotifier(
+        (_) async => true,
+        (v) async {
+          llamadas.add(v);
+          if (v == false) throw Exception('sin red');
+        },
+        inicial: true,
+      );
+
+      await n.setEnabled(false);
+
+      expect(n.state, isTrue,
+          reason: 'el switch quedo en apagado con la recoleccion todavia '
+              'prendida: le miente al usuario sobre su propia revocacion');
+      expect(llamadas, [false], reason: 'no reintenta al pedo el rollback');
+    });
+
+    test('si NO se pudo guardar, se vuelve atras en los tres', () async {
+      final llamadas = <bool>[];
+      final n = AnalyticsConsentNotifier(
+        (_) async => false, // setBool devuelve false SIN tirar
+        (v) async => llamadas.add(v),
+        inicial: true,
+      );
+
+      await n.setEnabled(false);
+
+      expect(n.state, isTrue,
+          reason: 'un `setBool` en false es un fallo: al proximo arranque la '
+              'analitica volveria sola y el switch ya decia apagado');
+      expect(llamadas, [false, true],
+          reason: 'no se revirtio la recoleccion despues de no poder guardar');
+    });
+
+    test('si guardar TIRA, tambien se vuelve atras', () async {
+      final llamadas = <bool>[];
+      final n = AnalyticsConsentNotifier(
+        (_) async => throw Exception('disco lleno'),
+        (v) async => llamadas.add(v),
+        inicial: true,
+      );
+
+      await n.setEnabled(false);
+
+      expect(n.state, isTrue);
+      expect(llamadas, [false, true]);
+    });
+
+    test('poner el mismo valor no toca nada', () async {
+      final llamadas = <bool>[];
+      final n = AnalyticsConsentNotifier(
+        (_) async => true,
+        (v) async => llamadas.add(v),
+        inicial: true,
+      );
+
+      await n.setEnabled(true);
+
+      expect(llamadas, isEmpty,
+          reason: 'una escritura y una llamada a Firebase por cada rebuild '
+              'que pase el mismo valor');
+    });
+  });
+
   group('AnalyticsConsentNotifier', () {
     test('arranca en el valor persistido', () async {
       final (container, _) = _armar({kAnalyticsConsentKey: false});

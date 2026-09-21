@@ -143,6 +143,21 @@ class TrainerProfileView extends ConsumerWidget {
         // "Configuración por defecto" menu row REMOVED 2026-05-28 — main
         // PR#4 pivot deleted the /profile/settings route. Settings surface
         // deferred to a future SDD (notifications/theme/language).
+        // Privacidad — la MISMA entrada que tiene el atleta.
+        //
+        // Va acá y no sólo en `_AthleteProfile` porque `ProfileScreen` reparte
+        // por rol: un entrenador en el teléfono ve esta vista y nunca la otra.
+        // Sin esto, `main.dart` le enciende la analítica y no tiene dónde
+        // apagarla — y el tab de Privacidad del Coach Hub le dice que «en el
+        // teléfono se configura aparte», o sea que lo manda a un lugar que para
+        // él no existe. Un cartel que miente, de los de AGENTS.md §11.1.
+        _MenuRow(
+          icon: TreinoIcon.shieldCheck,
+          label: 'Privacidad', // i18n: esta vista todavía no usa AppL10n
+          onTap: () => context.push('/profile/settings/privacidad'),
+          palette: palette,
+        ),
+        const SizedBox(height: 10),
         _MenuRow(
           icon: TreinoIcon.signOut,
           label: 'Cerrar sesión',
