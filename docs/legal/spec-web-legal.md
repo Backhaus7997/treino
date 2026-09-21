@@ -350,9 +350,29 @@ código:
 > que su pedido cuenta desde hoy, que es lo único que se puede hacer sin el
 > sumidero — pero eso es una red de contención, no el cumplimiento del art. 5.
 >
-> **Esto no se arregla con código.** Hay que cargar la variable de entorno
-> `ARREPENTIMIENTO_WEBHOOK_URL` en Vercel; el endpoint de baja cae a esa misma
-> variable a propósito, así que **con cargar una andan los dos**.
+> **Esto no se arregla con código, pero tampoco alcanza con cargar una variable.**
+> Son **dos** pasos, y saltearse el primero deja la variable apuntando a la nada:
+>
+> 1. **Averiguar si el destino existe, y crearlo si no.** Al **2026-09-10** el
+>    Apps Script que tiene que recibir las solicitudes **no existía**; si se creó
+>    después, nadie lo registró acá. **Eso no se puede medir desde afuera**: el
+>    `{"configured":false}` de arriba sólo prueba que la variable no está
+>    cargada, y diría exactamente lo mismo con el script ya creado. Lo sabe
+>    Martín, o se ve entrando al proyecto de Apps Script. El patrón es el que ya
+>    usa la waitlist: escribe la fila en una planilla y manda el correo con el
+>    código.
+> 2. **Cargar `ARREPENTIMIENTO_WEBHOOK_URL` en Vercel** apuntando a ese script.
+>    El endpoint de baja cae a esa misma variable a propósito, así que **con
+>    cargar una andan los dos**.
+>
+> El paso 2 es el único confirmado con fecha de hoy. El 1 es un pendiente
+> **probable**, no verificado — y la diferencia importa: si ya está hecho,
+> esto se resuelve en cinco minutos de panel.
+>
+> La planilla recibe los dos trámites mezclados y se distinguen por el prefijo
+> del código: `ARR-` contra `BAJA-`. Son trámites con efectos distintos —uno
+> devuelve la plata, el otro no— así que quien procesa tiene que mirar el
+> prefijo **antes** de actuar.
 >
 > Tener el botón visible y el canal muerto es peor que no tenerlo, porque la
 > persona se va creyendo que hizo el trámite. Es lo más urgente de este archivo.

@@ -311,8 +311,12 @@ contra producción. → [spec-web-legal.md §3.5](./spec-web-legal.md).
 > `ARREPENTIMIENTO_WEBHOOK_URL` nunca se cargó en Vercel, así que toda solicitud
 > válida recibe un `503`: no se registra, no se emite código y no sale correo.
 >
-> No se arregla con código — es cargar la variable. El endpoint de baja cae a esa
-> misma variable a propósito, así que **con una andan los dos**.
+> No se arregla con código, pero **tampoco alcanza con cargar una variable**: al
+> 2026-09-10 el Apps Script que tiene que recibir las solicitudes **no existía**.
+> Son dos pasos —crear el destino, después cargar
+> `ARREPENTIMIENTO_WEBHOOK_URL`— y saltearse el primero deja la variable
+> apuntando a la nada. El endpoint de baja cae a esa misma variable a propósito,
+> así que **con una andan los dos**. → [spec-web-legal.md §3.5](./spec-web-legal.md).
 >
 > Un botón visible con el canal muerto es peor que no tenerlo: la persona se va
 > creyendo que hizo el trámite. **Es lo más urgente de este archivo.**
