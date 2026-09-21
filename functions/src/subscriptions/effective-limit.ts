@@ -29,9 +29,57 @@ export interface SubscriptionState {
   status: SubscriptionStatus;
   /** MP-confirmed paid-through instant, ms since epoch. Null while free. */
   currentPeriodEndMs?: number | null;
+  /**
+   * EL PISO PREPAGO: el tier que el PF ya pago y que sigue vigente aunque su
+   * suscripcion actual sea otra. Ver [resolverPisoPrepago] para de donde sale.
+   */
+  prepaidTier?: SubscriptionTier | null;
+  /** Hasta cuando vale el piso, ms desde epoch. Va SIEMPRE con `prepaidTier`. */
+  prepaidUntilMs?: number | null;
+}
+
+/**
+ * El piso prepago, como lo devuelve [resolverPisoPrepago] y como se escribe.
+ * Los dos campos viajan juntos o no viajan: uno solo no significa nada.
+ */
+export interface PisoPrepago {
+  tier: SubscriptionTier;
+  untilMs: number;
 }
 
 const FREE_LIMIT = TIER_WEIGHT_LIMITS.free; // 2
+
+/**
+ * Ordena limites para poder comparar `number | null`.
+ *
+ * `null` es plan3 = SIN TOPE, o sea el MAYOR de todos — no una ausencia. Un `>`
+ * a secas con `null` de un lado compara contra 0 en JS y da la respuesta al
+ * reves, y justo para el PF que mas paga.
+ *
+ * Vive ACA, que es el modulo puro del limite, y no en cada consumidor. Habia dos
+ * copias privadas —`limitRank` en `subscription-mail.ts` y `rangoDelLimite` en
+ * `mp/reconcile.ts`— y el piso prepago necesitaba una tercera adentro de este
+ * mismo archivo. Tres copias de la misma trampa es como se desincroniza: la
+ * cuarta persona que la escriba de memoria se la come.
+ */
+export function limitRank(limit: number | null): number {
+  return limit === null ? Number.POSITIVE_INFINITY : limit;
+}
+
+/**
+ * El limite NOMINAL de un tier. `null` = SIN TOPE (plan3).
+ *
+ * Va con `hasOwnProperty` y NO con `in`: `in` camina la cadena de prototipos,
+ * asi que `"toString" in TIER_WEIGHT_LIMITS` da true y devolveria la funcion
+ * toString tipada como `number | null`. Un limite que es una funcion rompe toda
+ * comparacion aguas abajo, en silencio. Estaba inline en `effectiveWeightLimit`;
+ * se extrae porque el piso prepago necesita exactamente lo mismo.
+ */
+export function tierLimit(tier: SubscriptionTier): number | null {
+  return Object.prototype.hasOwnProperty.call(TIER_WEIGHT_LIMITS, tier)
+    ? TIER_WEIGHT_LIMITS[tier]
+    : FREE_LIMIT;
+}
 
 /**
  * Effective weighted-load limit for a subscription.
@@ -57,17 +105,56 @@ export function effectiveWeightLimit(
 ): number | null {
   if (!sub) return FREE_LIMIT;
 
+  return conPisoPrepago(limiteDelStatus(sub, nowMs), sub, nowMs);
+}
+
+/**
+ * El maximo entre lo que dice el status y el PISO PREPAGO, mientras el piso siga
+ * vigente.
+ *
+ * ── Por que el piso NO pasa por el switch de status ──
+ *
+ * Porque no habla de la suscripcion actual: dice "esto ya esta pagado". El
+ * status del plan NUEVO no tiene nada que opinar sobre un periodo que el PF
+ * compro antes. Si el piso pasara por el switch, un `pending` del plan nuevo lo
+ * bajaria a Free y el piso no serviria para nada justo cuando mas hace falta.
+ *
+ * ── Por que MAXIMO y no reemplazo ──
+ *
+ * Es un PISO, nunca un techo. Solo puede SUBIR el limite. Eso es lo que hace
+ * que este cambio sea seguro para los cuatro consumidores de este modulo: el
+ * gate de `promote-link` puede dejar pasar de mas pero nunca denegar de mas, y
+ * el barrido de `sync-entitlements` puede desbloquear pero nunca bloquear por
+ * culpa del piso. Un bug acá se paga en cupo regalado, no en alumnos
+ * bloqueados — que es el lado barato de equivocarse.
+ *
+ * Se compara con [limitRank] y NUNCA con `>` a secas: `null` es plan3 = SIN
+ * TOPE, o sea el mayor, y crudo vale 0.
+ */
+function conPisoPrepago(
+  base: number | null,
+  sub: SubscriptionState,
+  nowMs: number,
+): number | null {
+  const { prepaidTier, prepaidUntilMs } = sub;
+  if (prepaidTier == null || prepaidUntilMs == null) return base;
+  if (nowMs >= prepaidUntilMs) return base;
+
+  const piso = tierLimit(prepaidTier);
+  return limitRank(piso) > limitRank(base) ? piso : base;
+}
+
+/** El limite que sale del status, o sea el modulo entero antes del piso. */
+function limiteDelStatus(
+  sub: SubscriptionState,
+  nowMs: number,
+): number | null {
   // OJO con `??` aca: `null` es un VALOR LEGITIMO (plan3 = sin tope), no una
   // ausencia. Con `TIER_WEIGHT_LIMITS[tier] ?? FREE_LIMIT` el plan mas caro
   // devolvia 2 — menos alumnos que el mas barato — y compilaba perfecto.
-  // El chequeo de propiedad separa "el tier no existe" de "el tier no tiene
-  // tope". Va con hasOwnProperty y no con `in`: `in` camina la CADENA DE
-  // PROTOTIPOS, asi que `"toString" in TIER_WEIGHT_LIMITS` da true y devolvia
-  // la funcion toString tipada como `number | null`. Un limite que es una
-  // funcion rompe toda comparacion aguas abajo, en silencio.
-  const tierLimit = Object.prototype.hasOwnProperty.call(TIER_WEIGHT_LIMITS, sub.tier)
-    ? TIER_WEIGHT_LIMITS[sub.tier]
-    : FREE_LIMIT;
+  // El chequeo de propiedad vive ahora en [tierLimit]; ver el porque del
+  // `hasOwnProperty` alla.
+  const limiteNominal = tierLimit(sub.tier);
 
   // Indentacion de los `case` al ras del `switch`: es lo que pide la regla
   // `indent` del repo (default SwitchCase: 0) y lo que ya hacia
@@ -76,10 +163,10 @@ export function effectiveWeightLimit(
   switch (sub.status) {
   case "active":
   case "grace":
-    return tierLimit;
+    return limiteNominal;
   case "cancelled":
     return sub.currentPeriodEndMs != null && nowMs < sub.currentPeriodEndMs
-      ? tierLimit
+      ? limiteNominal
       : FREE_LIMIT;
   case "pending":
   case "paused":
@@ -111,4 +198,103 @@ export function effectiveWeightLimit(
     return FREE_LIMIT;
   }
   }
+}
+
+/**
+ * Que PISO PREPAGO hay que dejar escrito cuando el reconciliador esta por
+ * escribir [tierEntrante] encima de [actual].
+ *
+ * PURA, como todo este archivo: sin Firestore, sin reloj propio, sin MP.
+ *
+ * ── EL PROBLEMA QUE RESUELVE ──
+ *
+ * Un PF con plan3 (SIN TOPE) que se pasa a plan1 (7) perdia el remanente que ya
+ * habia pagado: el reconciliador escribia `{tier: plan1, status: active}` y el
+ * `currentPeriodEnd` del plan3 desaparecia del entitlement. El limite caia en el
+ * acto y `syncEntitlementsOnSubscription` le bloqueaba alumnos EN LA MISMA
+ * invocacion, mas el mail de degradacion. A alguien que pago por esos alumnos.
+ *
+ * Lo mismo con el ANUAL: plan3 anual son 12 meses en UN cobro. Un cambio en
+ * marzo evaporaba nueve.
+ *
+ * ── DE DONDE SALE EL DATO, QUE ES LA PARTE LINDA ──
+ *
+ * De ningun lado nuevo. [actual] es lo que el reconciliador esta por PISAR, y es
+ * exactamente lo que se pierde — refrescado todas las noches por el barrido
+ * mientras ese plan estuvo vivo. Cero llamadas a MP: el piso no depende de que
+ * la baja confirme, asi que un 429 de Mercado Pago no le toca el entitlement al
+ * PF.
+ *
+ * ── LOS DOS CONSERVABLES ──
+ *
+ *   1. El piso que YA estaba guardado, si sigue vigente. Nunca se tira uno vivo:
+ *      tirarlo BAJA el limite, y bajar el limite es revocar relaciones
+ *      existentes — lo que la politica de `subscription-state.ts` prohibe.
+ *
+ *   2. El periodo que estamos por pisar, si es futuro, si su status dice que se
+ *      pago (`active`, `grace` o `cancelled`) y —esto es lo que evita el bug
+ *      obvio— si su tier es ESTRICTAMENTE MAYOR que el entrante.
+ *
+ * Gana el de mayor tier; si empatan, el de fecha mas lejana.
+ *
+ * ── POR QUE LA COMPARACION VA CONTRA EL TIER NOMINAL DE [actual] ──
+ *
+ * Y no contra el limite EFECTIVO, que es la version ingenua y esta rota. El
+ * limite efectivo ya incluye el piso, asi que un plan1 con piso plan3
+ * reconciliandose todas las noches se veria a si mismo como "downgrade" y
+ * capturaria un piso nuevo de plan1 cada noche: escritura diaria de
+ * `users/{uid}`, o sea un disparo diario de `syncEntitlementsOnSubscription`
+ * para siempre. Comparando tier nominal contra tier entrante, reconciliar el
+ * MISMO plan no captura nada y el piso viejo se conserva intacto.
+ *
+ * @param actual        - Lo que hoy dice `users/{uid}.subscription`, ya saneado.
+ * @param tierEntrante  - El tier que el reconciliador esta por escribir.
+ * @param statusEntrante- El status que va con el. Solo `active`/`grace` capturan
+ *                        piso nuevo: un `pending` no confirma ninguna compra, y
+ *                        `paused`/`cancelled` entrantes son otra politica.
+ * @param nowMs         - Reloj, inyectado.
+ */
+export function resolverPisoPrepago(
+  actual: SubscriptionState | null | undefined,
+  tierEntrante: SubscriptionTier,
+  statusEntrante: SubscriptionStatus,
+  nowMs: number,
+): PisoPrepago | null {
+  if (!actual) return null;
+
+  const candidatos: PisoPrepago[] = [];
+
+  // (1) El piso guardado, si no vencio.
+  if (
+    actual.prepaidTier != null &&
+    actual.prepaidUntilMs != null &&
+    nowMs < actual.prepaidUntilMs
+  ) {
+    candidatos.push({ tier: actual.prepaidTier, untilMs: actual.prepaidUntilMs });
+  }
+
+  // (2) Lo que estamos por pisar, solo si el entrante CONFIRMA una compra.
+  const confirma = statusEntrante === "active" || statusEntrante === "grace";
+  const pago =
+    actual.status === "active" ||
+    actual.status === "grace" ||
+    actual.status === "cancelled";
+  if (
+    confirma &&
+    pago &&
+    actual.currentPeriodEndMs != null &&
+    nowMs < actual.currentPeriodEndMs &&
+    limitRank(tierLimit(actual.tier)) > limitRank(tierLimit(tierEntrante))
+  ) {
+    candidatos.push({ tier: actual.tier, untilMs: actual.currentPeriodEndMs });
+  }
+
+  if (candidatos.length === 0) return null;
+
+  return candidatos.reduce((mejor, c) => {
+    const rc = limitRank(tierLimit(c.tier));
+    const rm = limitRank(tierLimit(mejor.tier));
+    if (rc !== rm) return rc > rm ? c : mejor;
+    return c.untilMs > mejor.untilMs ? c : mejor;
+  });
 }

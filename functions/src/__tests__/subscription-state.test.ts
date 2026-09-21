@@ -114,7 +114,7 @@ describe("toSubscriptionState — el mapa se escribe A MANO, hay que validarlo",
     expect(
       toSubscriptionState({ subscription: { tier: "plan2", status: "grace" } }, "t1"),
     ).toEqual({
-      state: { tier: "plan2", status: "grace", currentPeriodEndMs: null },
+      state: { tier: "plan2", status: "grace", currentPeriodEndMs: null, prepaidTier: null, prepaidUntilMs: null },
       degraded: false,
     });
     expect(warnSpy).not.toHaveBeenCalled();
@@ -139,7 +139,7 @@ describe("toSubscriptionState — el mapa se escribe A MANO, hay que validarlo",
     expect(
       toSubscriptionState({ subscription: { tier: "gold", status: "active" } }, "t1"),
     ).toEqual({
-      state: { tier: "free", status: "active", currentPeriodEndMs: null },
+      state: { tier: "free", status: "active", currentPeriodEndMs: null, prepaidTier: null, prepaidUntilMs: null },
       degraded: true,
     });
     expect(warnSpy).toHaveBeenCalledWith(
@@ -174,7 +174,7 @@ describe("toSubscriptionState — el mapa se escribe A MANO, hay que validarlo",
     expect(
       toSubscriptionState({ subscription: { tier: "plan2", status: "canceled" } }, "t1"),
     ).toEqual({
-      state: { tier: "plan2", status: "paused", currentPeriodEndMs: null },
+      state: { tier: "plan2", status: "paused", currentPeriodEndMs: null, prepaidTier: null, prepaidUntilMs: null },
       degraded: true,
     });
     expect(warnSpy).toHaveBeenCalledWith(
@@ -201,7 +201,7 @@ describe("toSubscriptionState — el mapa se escribe A MANO, hay que validarlo",
         "t1",
       ),
     ).toEqual({
-      state: { tier: "plan1", status: "cancelled", currentPeriodEndMs: 7000 },
+      state: { tier: "plan1", status: "cancelled", currentPeriodEndMs: 7000, prepaidTier: null, prepaidUntilMs: null },
       degraded: false,
     });
     expect(warnSpy).not.toHaveBeenCalled();
@@ -210,7 +210,7 @@ describe("toSubscriptionState — el mapa se escribe A MANO, hay que validarlo",
   it("currentPeriodEnd ausente o null → null, sin warn y sin degradacion", () => {
     const base = { tier: "plan1", status: "cancelled" };
     expect(toSubscriptionState({ subscription: base }, "t1")).toEqual({
-      state: { tier: "plan1", status: "cancelled", currentPeriodEndMs: null },
+      state: { tier: "plan1", status: "cancelled", currentPeriodEndMs: null, prepaidTier: null, prepaidUntilMs: null },
       degraded: false,
     });
     expect(
@@ -233,6 +233,69 @@ describe("toSubscriptionState — el mapa se escribe A MANO, hay que validarlo",
       expect.objectContaining({ trainerId: "t1", received: "number" }),
     );
   });
+
+  // ── EL PISO PREPAGO ──
+  //
+  // Son DOS campos que valen solo juntos, asi que no se puede "degradar por
+  // campo" como con `tier` y `status`: el valor conservador de uno depende del
+  // otro. Se cae ENTERO, y eso ES degradacion — tirar el piso BAJA el limite, o
+  // sea revocar relaciones existentes, que es lo que la politica prohibe.
+
+  const ts = (ms: number) => ({ toMillis: () => ms });
+
+  it("un piso completo se mapea", () => {
+    expect(
+      toSubscriptionState({
+        subscription: {
+          tier: "plan1",
+          status: "active",
+          prepaidTier: "plan3",
+          prepaidUntil: ts(9_000),
+        },
+      }, "t1"),
+    ).toMatchObject({
+      state: { prepaidTier: "plan3", prepaidUntilMs: 9_000 },
+      degraded: false,
+    });
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it("un piso AUSENTE no es degradacion — es el estado normal de casi todos", () => {
+    // Confundir "no hay piso" con "el piso esta roto" apagaria el bloqueo del
+    // barrido para TODOS los PF, que es la mayoria.
+    expect(
+      toSubscriptionState({ subscription: { tier: "plan1", status: "active" } }, "t1"),
+    ).toMatchObject({
+      state: { prepaidTier: null, prepaidUntilMs: null },
+      degraded: false,
+    });
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  const pisosRotos: [string, Record<string, unknown>][] = [
+    ["solo el tier", { prepaidTier: "plan3" }],
+    ["solo la fecha", { prepaidUntil: { toMillis: () => 9_000 } }],
+    ["un tier desconocido", { prepaidTier: "plan9", prepaidUntil: { toMillis: () => 9 } }],
+    ["una fecha que no es Timestamp", { prepaidTier: "plan3", prepaidUntil: 9_000 }],
+    ["una fecha en null con tier presente", { prepaidTier: "plan3", prepaidUntil: null }],
+  ];
+  for (const [caso, patch] of pisosRotos) {
+    it(`un piso con ${caso} se cae ENTERO y degrada`, () => {
+      const r = toSubscriptionState({
+        subscription: { tier: "plan1", status: "active", ...patch },
+      }, "t1");
+
+      expect(r.state).toMatchObject({ prepaidTier: null, prepaidUntilMs: null });
+      expect(r.degraded).toBe(true);
+      // El tier y el status SI se conservan: la degradacion del piso no
+      // contamina lo que si se entendio.
+      expect(r.state?.tier).toBe("plan1");
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining("piso prepago"),
+        expect.objectContaining({ trainerId: "t1" }),
+      );
+    });
+  }
 });
 
 /**
