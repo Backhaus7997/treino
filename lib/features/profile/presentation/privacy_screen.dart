@@ -46,7 +46,7 @@ class PrivacyScreen extends ConsumerWidget {
                   l10n.privacyTitle.toUpperCase(),
                   style: GoogleFonts.barlowCondensed(
                     fontWeight: FontWeight.w700,
-                    fontSize: 20,
+                    fontSize: AppTextSize.titleLarge,
                     color: palette.textPrimary,
                   ),
                 ),
@@ -88,7 +88,7 @@ class PrivacyScreen extends ConsumerWidget {
                             l10n.privacyAnalyticsTitle,
                             style: GoogleFonts.barlow(
                               fontWeight: FontWeight.w600,
-                              fontSize: 15,
+                              fontSize: AppTextSize.body,
                               color: palette.textPrimary,
                             ),
                           ),
@@ -96,7 +96,7 @@ class PrivacyScreen extends ConsumerWidget {
                           Text(
                             l10n.privacyAnalyticsSubtitle,
                             style: GoogleFonts.barlow(
-                              fontSize: 13,
+                              fontSize: AppTextSize.bodyDense,
                               color: palette.textMuted,
                             ),
                           ),
@@ -128,7 +128,7 @@ class PrivacyScreen extends ConsumerWidget {
           child: Text(
             l10n.privacyAnalyticsExplainer,
             style: GoogleFonts.barlow(
-              fontSize: 13,
+              fontSize: AppTextSize.bodyDense,
               height: 1.45,
               color: palette.textMuted,
             ),
@@ -144,7 +144,7 @@ class PrivacyScreen extends ConsumerWidget {
           child: Text(
             l10n.privacyAnalyticsCrashNote,
             style: GoogleFonts.barlow(
-              fontSize: 12,
+              fontSize: AppTextSize.caption,
               height: 1.45,
               color: palette.textMuted.withValues(alpha: 0.75),
             ),

@@ -43,7 +43,7 @@ class PrivacidadTab extends ConsumerWidget {
             fontWeight: AppFonts.w700,
             letterSpacing: AppFonts.headingTracking,
             color: palette.textPrimary,
-            fontSize: 13,
+            fontSize: AppTextSize.bodyDense,
           ),
         ),
         const SizedBox(height: AppSpacing.hairline),
@@ -52,7 +52,7 @@ class PrivacidadTab extends ConsumerWidget {
           style: TextStyle(
             fontFamily: AppFonts.barlow,
             color: palette.textMuted,
-            fontSize: 13,
+            fontSize: AppTextSize.bodyDense,
           ),
         ),
         const SizedBox(height: AppSpacing.s14),
@@ -87,7 +87,7 @@ class PrivacidadTab extends ConsumerWidget {
                           fontFamily: AppFonts.barlow,
                           fontWeight: AppFonts.w600,
                           color: palette.textPrimary,
-                          fontSize: 14,
+                          fontSize: AppTextSize.body,
                         ),
                       ),
                       const SizedBox(height: AppSpacing.hairline),
@@ -96,7 +96,7 @@ class PrivacidadTab extends ConsumerWidget {
                         style: TextStyle(
                           fontFamily: AppFonts.barlow,
                           color: palette.textMuted,
-                          fontSize: 13,
+                          fontSize: AppTextSize.bodyDense,
                         ),
                       ),
                     ],
@@ -128,7 +128,7 @@ class PrivacidadTab extends ConsumerWidget {
           style: TextStyle(
             fontFamily: AppFonts.barlow,
             color: palette.textMuted,
-            fontSize: 13,
+            fontSize: AppTextSize.bodyDense,
             height: 1.45,
           ),
         ),
@@ -145,7 +145,7 @@ class PrivacidadTab extends ConsumerWidget {
           style: TextStyle(
             fontFamily: AppFonts.barlow,
             color: palette.textMuted.withValues(alpha: 0.75),
-            fontSize: 12,
+            fontSize: AppTextSize.caption,
             height: 1.45,
           ),
         ),
