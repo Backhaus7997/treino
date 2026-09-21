@@ -64,10 +64,10 @@ afirmar sobre el chequeo.)*
 
 | Requisito | Estado |
 |---|---|
-| Acceso desde la página de inicio | **Sí** — enlace en el pie, presente en la home |
+| Alcanzable desde la home | **Sí** — enlace en el pie, presente en la home |
 | Texto sin ambigüedad | **Sí** — dice literalmente «Botón de Arrepentimiento» |
 | Sin registración previa ni otro trámite | **Sí** — el formulario no pide iniciar sesión |
-| Lugar destacado | **Sí** — pie de página, que es la práctica de mercado |
+| «A simple vista … y en el primer acceso» | **No, y es una decisión tomada** — sigue en el pie. Ver §3.2 |
 | Formulario con datos de la compra | **Sí** — nombre, correo, fecha, plan y notas |
 | Informa el plazo | **Sí** — 14 días |
 | Menciona el código de identificación | **Sí** |
@@ -144,10 +144,15 @@ compra o del servicio contratado. Agrega que al momento de usarlo el proveedor
 **no podrá requerir registración previa ni ningún otro trámite adicional**.
 
 > **Precisión.** Los arts. 3, 4 y 5 de abajo están transcriptos **literales** del
-> texto publicado. Este párrafo del art. 1 es una **descripción**, no una cita:
-> la transcripción literal del art. 1 no se pudo confirmar contra el original y
-> un entrecomillado sería una cita inventada. Antes de apoyarse en su redacción
-> exacta, leerlo en el Boletín Oficial.
+> texto publicado. El resto de este párrafo del art. 1 es una **descripción**, no
+> una cita. Antes de apoyarse en su redacción exacta, leerlo en el Boletín
+> Oficial.
+>
+> **Lo que sí está confirmado textual** (2026-09-21, contra el aviso del BO del
+> 4/9/2025) es la frase de ubicación: **«a simple vista, en lugar destacado y en
+> el primer acceso»**. Aparece idéntica en el art. 1 y en el art. 4 — y el art. 4
+> ya estaba transcripto literal acá, así que las dos fuentes coinciden. Esa frase
+> es la que decide §1.1 y §3.2, y por eso se verificó aparte.
 
 #### El art. 5 — las 24 horas y el código, para LOS DOS botones
 
@@ -180,8 +185,40 @@ el alcance.)*
 | **Desde la home** | Alcanzable desde `gettreino.com` en un click |
 | **Sin login para LLEGAR** | Una persona sin sesión iniciada tiene que poder **abrir** el formulario. Ver el matiz de la 3/2026 abajo |
 | **Sin pasos previos** | Nada de "primero ingresá a tu cuenta" ni menúes intermedios **antes** del link |
-| **Destacado** | El pie de página alcanza y es la práctica de mercado. No puede estar detrás de un acordeón ni en una página de tercer nivel |
+| **«A simple vista … y en el primer acceso»** | Ver el recuadro de abajo: el criterio cambió con la derogación y la ubicación actual es una decisión tomada, no un cumplimiento verificado |
 | **Texto literal** | El enlace dice **"Botón de Arrepentimiento"**. Nada de "Gestión de suscripción" ni eufemismos: la norma pide que no deje dudas |
+
+> ⚠️ **Los dos botones están en el pie, y la norma vigente pide más que eso.**
+>
+> El criterio **cambió con la derogación**, y la conclusión vieja de este archivo
+> se quedó sin fundamento sin que nada lo indicara:
+>
+> | | Texto |
+> |---|---|
+> | **Res. 424/2020** (derogada) | «link de acceso fácil y directo **desde la página de inicio**» |
+> | **Disp. 954/2025**, arts. 1 y 4 | «**a simple vista, en lugar destacado y en el primer acceso**» |
+>
+> Bajo la redacción vieja, un enlace en el pie de la home cumple **literal**:
+> está «desde la página de inicio». Por eso se puso ahí y por eso este archivo
+> decía «el pie alcanza y es la práctica de mercado». Bajo «a simple vista … en
+> el primer acceso», esa misma frase ya no describe algo que exige scrollear
+> pasando el Hero y las ValueProps.
+>
+> Los arts. 1 y 4 usan la **misma** redacción: esto no es del botón de baja, el
+> de arrepentimiento lo arrastra desde antes de que el otro existiera.
+>
+> **Decisión del 2026-09-21: se dejan en el pie.** La tomó Martín, con el texto
+> de la norma y la alternativa —una franja fina sobre el Navbar— sobre la mesa.
+> Mover los links cambia la primera pantalla de la landing en todas las páginas,
+> y esa es una decisión de negocio, no de implementación.
+>
+> **Lo que NO hay que hacer con esto:** ni «arreglarlo» por iniciativa propia en
+> un PR de otra cosa, ni volver a escribir que el pie alcanza. Queda como riesgo
+> conocido y aceptado, a revisar con el abogado junto con los nueve documentos.
+> Si la decisión se da vuelta, el lugar es el `Navbar` de `treino-app`
+> (`fixed top-0 h-16`), y hay **11 lugares** que compensan su altura con
+> `pt-24`/`pt-20`/`pt-16` — todos se tocan en el mismo PR o la landing queda con
+> el contenido debajo del header.
 
 #### El matiz de la Disposición 3/2026 — se puede verificar identidad
 
