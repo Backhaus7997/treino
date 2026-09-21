@@ -1,56 +1,54 @@
 // Guard de superficie de cobro — el lado del ALUMNO.
 //
-// ─── LEER ESTO PRIMERO: LA REGLA QUE PROTEGE CAMBIO ─────────────────────────
+// ─── LEER ESTO PRIMERO: LA REGLA CAMBIO DOS VECES ───────────────────────────
 //
-// Este archivo nacio defendiendo la Guideline **3.1.3(f)** (*Free Stand-alone
-// App*): la app movil no vende nada ni linkea al checkout, el alumno paga en la
-// web y el entitlement llega por Firestore.
+// Este archivo defendio dos decisiones opuestas y ahora vuelve a la primera.
+// La historia importa, porque quien la ignore va a revertirla una tercera vez:
 //
-// **Esa decision se revirtio.** El alumno paga por IAP (App Store + Google
-// Play) via RevenueCat. El motivo esta en `docs/paywall-alumno-suelto.md`: la
-// exencion 3.1.3(f) exige que la app sea companion de una *"paid web based
-// tool"*, y para el ALUMNO no existe ninguna superficie web — solo el PF tiene
-// Coach Hub. Sin web no habia exencion que invocar.
+//   1. **El alumno paga por web.** Apoyado en la Guideline 3.1.3(f), que exime
+//      del IAP a la app companion de una *"paid web based tool"*.
+//   2. **El alumno paga por IAP.** Se revirtio porque para el ALUMNO no habia
+//      ninguna superficie web de la cual ser companion: sin web no habia
+//      exencion, y caia 3.1.1.
+//   3. **El alumno paga por web, otra vez** — y ahora si existe la superficie:
+//      `gettreino.com` tiene checkout, ingreso y baja. El IAP se desarmo
+//      entero: `purchases_flutter` salio del binario con esta misma PR.
 //
-// El PF sigue cobrando por Mercado Pago desde la web, y eso NO cambia: ahi
-// 3.1.3(f) aplica de verdad.
+// El PF nunca dejo de cobrar por Mercado Pago desde el Coach Hub web.
 //
-// ─── POR QUE ESTE ARCHIVO SE REESCRIBIO EN VEZ DE BORRARSE ──────────────────
+// ─── LO QUE ESTE ARCHIVO FIJA HOY ───────────────────────────────────────────
 //
-// Porque cuando la decision se dio vuelta, **los guards no se pusieron rojos**.
-// Verificado por mutacion, no razonado: se cableo `Purchases.purchasePackage`
-// adentro de `lib/features/paywall/` y los cuatro tests siguieron verdes.
+//   1. **Nadie compra adentro de la app.** Ni el alumno ni el PF. La allowlist
+//      de compras esta VACIA, y eso es la funcionalidad: el primero que cablee
+//      un SDK de billing pone rojo este test.
 //
-// La razon es que todos los guards de este archivo miraban APERTURA DE URL
-// (`launchUrl`, `url_launcher`, `WebViewController`). RevenueCat no usa ninguna:
-// habla por platform channel contra StoreKit y Play Billing. O sea que la
-// arquitectura que el repo blindo a mano se podia revertir en silencio.
+//   2. **El paywall del alumno no abre nada afuera de la app.** Ni un
+//      `launchUrl`, ni un WebView, ni una mencion de la landing.
 //
-// Un guard que no se pone rojo cuando la decision que defiende se revierte no
-// es un guard: es un archivo que miente. Por eso ahora hay un tercer eje —
-// **quien puede COMPRAR**— que es el que faltaba.
+//   3. **El repo entero declara quien abre una URL.** (allowlist)
 //
-// ─── LOS TRES EJES QUE ESTE ARCHIVO FIJA ────────────────────────────────────
+// ─── El costo de equivocarse, que es lo que casi nadie ve ───────────────────
 //
-//   1. El paywall del alumno no abre nada afuera de la app.
-//      Sigue valiendo, y ahora por un motivo MAS fuerte: con IAP adentro, el
-//      intro de 3.1.3 prohibe *"encourage users to use a purchasing method
-//      other than in-app purchase"*, y la excepcion es solo para la storefront
-//      de EEUU. Argentina no lo es.
+// La tentacion obvia es poner un boton que diga «suscribite en gettreino.com»
+// cuando el alumno topa el limite. Parece inofensivo: no cobra nada adentro.
 //
-//   2. El repo entero declara quien abre una URL. (allowlist)
+// Es lo peor que se puede hacer. 3.1.3 ampara el binario mientras no haya
+// compras adentro **NI llamados a comprar afuera**. Ese boton no le cuesta
+// plata al alumno: le cuesta la exencion **al ENTRENADOR**, que hoy es el
+// unico ingreso real del producto.
 //
-//   3. **NUEVO**: el repo entero declara quien COMPRA. (allowlist)
-//      Comprar adentro de la app es ahora lo correcto para el alumno, pero
-//      tiene que pasar por los archivos declarados y por ningun otro. Sin esto,
-//      cualquier pantalla puede disparar una compra y nadie se entera al
-//      revisar el PR.
+// Por eso la app, cuando el limite muerde, dice que el limite mordio y nada
+// mas. No hay CTA. No es un olvido.
 //
-// ─── El costo de equivocarse ────────────────────────────────────────────────
+// ─── Por que la version anterior de este archivo no sirvio ──────────────────
 //
-// Del lado del PF, cobrar por afuera desde el binario movil es 3.1.3(c) y hoy
-// no hay exencion que lo cubra. Del lado del alumno, una compra disparada desde
-// un lugar no declarado es una que nadie reviso.
+// Cuando la decision se dio vuelta la primera vez, **los guards no se pusieron
+// rojos**. Verificado por mutacion: se cableo `Purchases.purchasePackage` y los
+// cuatro tests siguieron verdes, porque todos miraban APERTURA DE URL y
+// RevenueCat no usa ninguna — habla por platform channel.
+//
+// De ahi salio el eje de «quien COMPRA», que es el que ahora esta en cero.
+
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -254,22 +252,16 @@ void main() {
     // Cuando llegue el cableado, la lista deberia quedar corta: el bootstrap
     // que hace `Purchases.configure`, y el repositorio que dispara la compra.
     // Una pantalla NO deberia estar aca — deberia llamar al repositorio.
-    const permitidos = <String, String>{
-      // El PRIMER y por ahora UNICO punto de compra del alumno. Es un tipo
-      // sellado: `AthleteCheckoutOnStore` tiene `start`, `AthleteCheckoutUnavailable`
-      // no lo tiene, y los constructores son privados a la libreria — asi que
-      // desde `lib/` la unica forma de conseguir la variante que cobra es
-      // `resolveAthleteCheckout()`.
-      //
-      // Una PANTALLA no deberia entrar nunca a esta lista: tiene que llamar a
-      // este archivo, no hablarle al SDK por su cuenta. Si estas por agregar
-      // una, ese es el olor.
-      'lib/features/paywall/application/revenuecat_store.dart':
-          'EL UNICO archivo de lib/ que le habla a RevenueCat. Todo lo que hay '
-              'adentro es traduccion: del SDK a nuestros tipos, y de sus '
-              'codigos de error a AthleteStoreFalla. Si aparece una decision '
-              'de producto ahi, esta en el lugar equivocado',
-    };
+    // ⚠️ VACIA, y esa es la funcionalidad.
+    //
+    // Antes tenia una entrada: `revenuecat_store.dart`, el unico archivo que le
+    // hablaba al SDK. Ese archivo se borro con el resto del IAP.
+    //
+    // El primero que cablee un SDK de billing en `lib/` va a poner rojo este
+    // test y va a tener que escribir aca por que ese archivo es un punto de
+    // compra legitimo. Ese medio minuto es todo el punto — y es exactamente el
+    // medio minuto que falto la vez que la decision se revirtio en silencio.
+    const permitidos = <String, String>{};
 
     test('la lista de archivos que compran es exactamente la declarada', () {
       final encontrados = <String>{};
@@ -304,75 +296,54 @@ void main() {
     });
   });
 
-  group('quién puede ABRIR el paywall del alumno', () {
-    // ─── Este grupo REEMPLAZA a «ningún call site pasa `onUpgrade`» ──────────
+  group('la pantalla que vendia ya no existe', () {
+    // ─── Este grupo REEMPLAZA a «quien puede ABRIR el paywall del alumno» ────
     //
-    // Aquel fijaba el estado de entonces: la hoja de límite no dibujaba botón
-    // porque el checkout del alumno no existía, y su comentario decía que
-    // ponerse rojo el día del cableado era su función — el recordatorio de
-    // leer 3.1.3 antes de decidir qué hacía el botón.
+    // Aquel declaraba, con una allowlist, desde donde se llegaba a
+    // `AthletePaywallScreen`. Tenia una entrada: la hoja de limite.
     //
-    // El recordatorio se cobró: se leyó, y la decisión fue sacar `onUpgrade`
-    // de la firma. Eran 8 call sites pasando la MISMA closure, o sea 8
-    // lugares donde alguien podía pasar una distinta —una que abriera la
-    // web— sin que el tipo sellado se enterara. Ahora la hoja mira
-    // `athleteCheckoutProvider` y decide sola.
-    //
-    // Con el parámetro afuera, aquel test no vigilaba nada: pasaba por
-    // construcción. Lo que SÍ hay que vigilar ahora es el otro extremo —
-    // **desde dónde se llega a la pantalla que vende**.
-    const permitidos = <String, String>{
-      'lib/features/paywall/presentation/free_plan_limit_sheet.dart':
-          'la hoja de límite: es el instante en que el tope muerde, y el '
-              'único lugar donde hoy se ofrece comprar',
-    };
+    // Ya no hay pantalla que abrir. El alumno compra en `gettreino.com`, la app
+    // no vende, y **tampoco puede decir donde se compra** — ver el encabezado.
+    // Asi que la allowlist se convierte en su forma mas fuerte: cero.
 
-    test('la lista de archivos que abren el paywall es la declarada', () {
-      final encontrados = <String>{};
+    test('ningun archivo de lib/ nombra una pantalla de paywall', () {
+      final encontrados = <String>[];
       for (final f in _dartsDe('lib')) {
-        if (f.path.endsWith('athlete_paywall_screen.dart')) continue;
-        final codigo = _sinComentarios(f);
-        if (codigo.contains('AthletePaywallScreen')) {
+        if (_sinComentarios(f).contains('AthletePaywallScreen')) {
           encontrados.add(f.path.replaceAll(r'\', '/'));
         }
       }
 
-      final nuevos = encontrados.difference(permitidos.keys.toSet());
       expect(
-        nuevos,
+        encontrados,
         isEmpty,
-        reason: 'lugares nuevos que abren el paywall del alumno:\n'
-            '${nuevos.join("\n")}\n\n'
-            'No está prohibido — el alumno TIENE que poder comprar. Pero cada '
-            'entrada nueva es una pantalla más que un revisor de Apple puede '
-            'abrir, así que sumala acá con su razón y mirá que el contexto '
-            'tenga sentido: el paywall se ofrece cuando el límite MUERDE, no '
-            'porque sí.',
-      );
-
-      final desaparecidos = permitidos.keys.toSet().difference(encontrados);
-      expect(
-        desaparecidos,
-        isEmpty,
-        reason: 'estos ya no abren el paywall: sacalos de `permitidos`\n'
-            '${desaparecidos.join("\n")}',
+        reason: 'volvio una pantalla de compra a la app:\n'
+            '${encontrados.join("\n")}\n\n'
+            'Antes de reponerla: el alumno paga en gettreino.com. Una pantalla '
+            'que venda adentro del binario rompe 3.1.3(f) y se lleva puesta la '
+            'exencion del ENTRENADOR, que es el ingreso real de hoy.',
       );
     });
 
-    test('`onUpgrade` no volvió a la firma de la hoja', () {
-      // El parámetro se sacó a propósito. Si vuelve, vuelve con él la
-      // posibilidad de que un call site pase una closure que abra otra cosa.
+    test('la hoja de limite no ofrece comprar', () {
+      // El instante en que el tope muerde es donde mas tienta poner un CTA.
       final hoja = File(
         'lib/features/paywall/presentation/free_plan_limit_sheet.dart',
       );
       expect(hoja.existsSync(), isTrue);
+
+      final codigo = _sinComentarios(hoja);
       expect(
-        _sinComentarios(hoja).contains('onUpgrade'),
+        codigo.contains('free_plan_limit_upgrade'),
         isFalse,
-        reason: 'volvió `onUpgrade` a la hoja de límite. Antes de reponerlo: '
+        reason: 'volvio el boton de comprar a la hoja de limite',
+      );
+      expect(
+        codigo.contains('onUpgrade'),
+        isFalse,
+        reason: 'volvio `onUpgrade` a la hoja de limite. Antes de reponerlo: '
             'eran 8 call sites pasando la misma closure, y cada uno era un '
-            'lugar donde se podía pasar otra. La hoja decide sola mirando '
-            '`athleteCheckoutProvider`.',
+            'lugar donde se podia pasar otra.',
       );
     });
   });

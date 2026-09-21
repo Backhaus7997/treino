@@ -70,12 +70,26 @@ enum AthleteEntitlement {
 /// ─── Lo que ya NO es el motivo ───
 ///
 /// Este dartdoc decía que el bloqueante era que no existía forma de pagar: ni
-/// checkout, ni webhook. **Las dos cosas existen** desde el 2026-09-10, sólo
-/// que por un camino distinto del que decía la spec — el alumno paga por IAP,
-/// no por web, y el porqué está en `docs/paywall-alumno-suelto.md` §7.1.
+/// checkout, ni webhook. **Las dos cosas existen**, aunque no donde este
+/// archivo decía antes.
 ///
-///   • la compra: `athlete_checkout.dart` + `athlete_paywall_screen.dart`
-///   • el webhook: `functions/src/subscriptions/rc/webhook.ts`
+/// La historia completa, porque la decisión se dio vuelta dos veces y un
+/// comentario a medias es peor que ninguno:
+///
+///   1. Primero el alumno iba a pagar por web. No había superficie web para
+///      él, así que no había exención 3.1.3(f) que invocar.
+///   2. Entonces se construyó el IAP por RevenueCat. Nunca corrió: ni una
+///      compra real, y los tres interruptores quedaron apagados en serie.
+///   3. Ahora paga por **Mercado Pago desde `gettreino.com`**, que es la
+///      superficie web que faltaba. El IAP se desarmó entero.
+///
+///   • la compra: `treino-app`, `/[locale]/suscripcion/checkout`
+///   • el derecho: `functions/src/subscriptions/mp/reconcile.ts`
+///
+/// ⚠️ **La app no vende y tampoco puede decir dónde se compra.** Nombrar la
+/// landing desde el binario sería un *call to action for purchase outside of
+/// the app*, y eso tira abajo la exención 3.1.3(f) del ENTRENADOR, que es el
+/// ingreso real de hoy. Lo fija `superficie_de_cobro_alumno_test.dart`.
 ///
 /// Lo que sigue valiendo del razonamiento viejo, y por eso no se borra: con el
 /// gate encendido y sin forma de pagar, **todos** los usuarios serían `free`
