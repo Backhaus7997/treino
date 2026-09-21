@@ -500,16 +500,33 @@ un número que puede salir mal es la guideline 2.3.1(a) —*promoting a false
 price*— cuya pena escrita es la baja de la app y la terminación de la cuenta.
 Muestra el precio de la tienda y una advertencia cualitativa.
 
-### 7.4 Qué se construyó
+### 7.4 Qué se construyó, y por qué ya no está
 
-| Pieza | Dónde |
-|---|---|
-| Capacidad de comprar (tipo sellado) | `lib/features/paywall/application/athlete_checkout.dart` |
-| El puerto, sin tipos de terceros | `lib/features/paywall/application/athlete_store.dart` |
-| El adaptador — **único archivo de `lib/` que importa el SDK** | `lib/features/paywall/application/revenuecat_store.dart` |
-| Pantalla de paywall | `lib/features/paywall/presentation/athlete_paywall_screen.dart` |
-| Webhook que escribe `athleteSubscription` | `functions/src/subscriptions/rc/webhook.ts` |
-| UUID por usuario (seguro para un futuro sin RevenueCat) | `functions/src/subscriptions/store-account-token.ts` |
+⚠️ **De las seis piezas de esta tabla, CINCO se borraron.** El camino de
+RevenueCat se desarmó entero —el binario en el PR #1201, el backend en el que
+borró `functions/src/subscriptions/rc/`— sin haber procesado **una sola compra
+real**. Si alguna vez hay que volver, está en git.
+
+Se deja el mapa igual, porque saber qué había es la mitad de poder revertirlo:
+
+| Pieza | Dónde estaba | |
+|---|---|---|
+| Capacidad de comprar (tipo sellado) | `lib/features/paywall/application/athlete_checkout.dart` | borrada |
+| El puerto, sin tipos de terceros | `lib/features/paywall/application/athlete_store.dart` | borrado |
+| El adaptador — único archivo de `lib/` que importaba el SDK | `lib/features/paywall/application/revenuecat_store.dart` | borrado |
+| Pantalla de paywall | `lib/features/paywall/presentation/athlete_paywall_screen.dart` | borrada |
+| Webhook que escribía `athleteSubscription` | `functions/src/subscriptions/rc/webhook.ts` | borrado |
+| UUID por usuario | `functions/src/subscriptions/store-account-token.ts` | **se queda** |
+
+El UUID sobrevive porque su valor es **retroactivo**: el día que haga falta se
+lo necesita para todo el que ya compró. Y sacar RevenueCat lo vuelve MÁS
+necesario, no menos — era redundante mientras un intermediario resolvía la
+identidad del comprador. Ver su encabezado.
+
+**Hoy el alumno paga por Mercado Pago desde `gettreino.com`.** El checkout vive
+en `treino-app` (`/[locale]/suscripcion/checkout`) y el derecho lo escribe
+`functions/src/subscriptions/mp/reconcile.ts` — el mismo reconciliador que el
+del entrenador, ramificado por `producto`.
 
 ### 7.5 La deuda que dejó la reversión
 

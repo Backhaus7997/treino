@@ -5,9 +5,18 @@
  *  POR QUE EXISTE ALGO QUE NO SE USA
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * Es un seguro, y de los baratos. Hoy TREINO le cobra al alumno por IAP a
- * traves de RevenueCat, y RevenueCat resuelve la identidad del comprador con
- * UNA linea: `Purchases.logIn(uid)`.
+ * Es un seguro, y de los baratos.
+ *
+ * ⚠️ Este encabezado decia "hoy TREINO le cobra al alumno por IAP a traves de
+ * RevenueCat". **Ya no.** El alumno paga por Mercado Pago desde
+ * `gettreino.com`, y el camino de RevenueCat se borro entero —binario y
+ * backend— sin haber procesado una sola compra real.
+ *
+ * Eso NO invalida este archivo, y conviene entender por que. RevenueCat
+ * resolvia la identidad del comprador con UNA linea (`Purchases.logIn(uid)`),
+ * asi que mientras estuvo, este token era redundante. Al sacarlo, la unica
+ * forma futura de hablarle a una tienda es directo — y ahi este campo pasa de
+ * redundante a ser el unico puente.
  *
  * **Ninguna de las dos tiendas tiene equivalente.** El dia que se quiera
  * hablarles directo:

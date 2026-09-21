@@ -107,7 +107,7 @@ Hay dos cosas distintas acá, y sólo una es una compra.
 
 | Tipo | Recolectado | Compartido | Obligatorio | Propósito | Dónde |
 |---|---|---|---|---|---|
-| Historial de compras | Sí | No | Opcional | Funcionalidad — estado de la suscripción | `users/{uid}.subscription` (entrenador, Mercado Pago: `functions/src/subscriptions/mp/reconcile.ts`) y `users/{uid}.athleteSubscription` (alumno, RevenueCat: `functions/src/subscriptions/rc/`) |
+| Historial de compras | Sí | No | Opcional | Funcionalidad — estado de la suscripción | `users/{uid}.subscription` (entrenador) y `users/{uid}.athleteSubscription` (alumno). **Los dos por Mercado Pago**, escritos por el mismo `functions/src/subscriptions/mp/reconcile.ts`, ramificado por `producto` |
 | Otra info financiera | Sí | Sí — entre el alumno y su PF | Opcional | Funcionalidad — la cuota que el alumno le paga al entrenador | `athleteBilling` (`{trainerId, athleteId, amountArs, cadence}`, `firestore.rules:3988`) y `payments/{paymentId}` (`firestore.rules:4203`) |
 
 **La segunda fila es la que se olvida.** TREINO **no intermedia** esa plata — el
