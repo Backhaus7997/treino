@@ -1140,6 +1140,24 @@ function ts(date) {
   return Timestamp.fromDate(date);
 }
 
+/** Fecha de nacimiento para el gate de edad minima de 13 anios.
+ *
+ * Este seed es anterior a `/birth-date` y no escribia `bornAt`. Sin ese campo
+ * el router (`lib/app/router.dart`, `validateBornAt(profile.bornAt) != null`)
+ * manda al gate a TODO usuario sembrado: el seed corria verde y dejaba el
+ * emulador inutilizable para prueba manual, porque no se podia entrar con
+ * ninguna de las 16 cuentas.
+ *
+ * La edad se deriva del uid para que cada persona tenga la suya y sea estable
+ * entre corridas, y cae siempre en 24-41 anios: adultos, lejos del borde de 13
+ * donde el validador rechaza.
+ */
+function bornAtFor(uid) {
+  const suma = [...uid].reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+  const edad = 24 + (suma % 18);
+  return ts(daysAgo(Math.round(edad * 365.25)));
+}
+
 /** Deletes every doc in a (sub)collection ref. Overwriting or deleting a
  * parent doc never touches its subcollections, so both seed and --clear need
  * this for `setLogs`. */
@@ -1207,6 +1225,7 @@ async function seedCoaches() {
       email: c.email,
       displayName: c.displayName,
       role: 'trainer',
+      bornAt: bornAtFor(c.uid),
       createdAt: ts(daysAgo(90)),
       updatedAt: ts(NOW),
       avatarUrl: null,
@@ -1288,6 +1307,7 @@ async function seedAthletes() {
       email: a.email,
       displayName: a.displayName,
       role: 'athlete',
+      bornAt: bornAtFor(a.uid),
       createdAt: ts(daysAgo(70)),
       updatedAt: ts(NOW),
       avatarUrl: null,
