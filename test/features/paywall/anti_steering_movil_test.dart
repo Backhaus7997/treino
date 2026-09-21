@@ -116,6 +116,36 @@ List<File> _dartsDe(String ruta) => Directory(ruta)
     .where((f) => f.path.endsWith('.dart'))
     .toList();
 
+/// Un ítem de la lista que el código YA desmiente.
+///
+/// [frase] se busca en el bloque de ítems ABIERTOS de
+/// `athlete_entitlement.dart` (normalizada: minúsculas, sin acentos).
+/// [marcador] se busca TAL CUAL en [archivo]. Si aparecen los dos, la lista
+/// quedó vieja.
+class _Contradiccion {
+  const _Contradiccion(this.frase, this.archivo, this.marcador, this.porque);
+  final String frase;
+  final String archivo;
+  final String marcador;
+  final String porque;
+}
+
+const _contradicciones = <_Contradiccion>[
+  _Contradiccion(
+    'carteles de steering',
+    'test/features/paywall/anti_steering_movil_test.dart',
+    "startsWith('DEUDA:')",
+    'la deuda de carteles se mide ahí y está en CERO (el test de más arriba).',
+  ),
+  _Contradiccion(
+    'no lo mira nunca',
+    'firestore.rules',
+    'copiadaDelCatalogo',
+    'el CREATE de `/routines` SÍ mira de dónde se copió una rutina, desde el '
+        'PR #1155.',
+  ),
+];
+
 void main() {
   group('el binario móvil no dice dónde pagar por afuera', () {
     // Los tres carteles de hoy. Declarados, no perdonados.
@@ -279,20 +309,39 @@ void main() {
 
       final abiertos = _normalizado(lista.substring(desde, hasta));
 
-      expect(
-        abiertos.contains('carteles de steering'),
-        isFalse,
-        reason: 'la deuda de carteles está en CERO (el test de acá arriba) '
-            'pero `athlete_entitlement.dart` los sigue listando entre los '
-            'ítems que FALTAN.\n\n'
-            'Movelo a la sección «Lo que SALIÓ de esta lista, y por qué». Una '
-            'lista autoritativa equivocada es peor que no tener lista: manda a '
-            'alguien a trabajar algo que ya está hecho, y eso ya pasó dos '
-            'veces con este archivo.\n\n'
-            'Y si lo movés, escribí también lo que el cierre COSTÓ: el PF que '
-            'entró por el teléfono quedó sin saber dónde pagar, y eso se paga '
-            'con el mail `limit-reached`, no con el ratchet.',
-      );
+      // ─── LA TABLA, y por qué el guard dejó de cuidar UN ítem ────────────
+      //
+      // La primera versión de esto miraba una sola aguja: «carteles de
+      // steering». Sirvió una vez y falló a la siguiente — el 2026-09-16 se
+      // cerró el candado del catálogo (#1155) y el renglón se quedó en la
+      // lista un día más, sin que nada chillara. Van TRES con esa forma: el
+      // seed, los carteles, y el candado.
+      //
+      // El patrón real es más general: **cada ítem abierto afirma algo sobre
+      // el código, y esa afirmación se puede desmentir leyendo el código.**
+      // Si la lista dice «el servidor no mira las copias» y `firestore.rules`
+      // tiene `copiadaDelCatalogo`, la lista miente y el test lo sabe.
+      //
+      // Agregar un ítem a la lista = agregar su fila acá. Es una línea.
+      for (final c in _contradicciones) {
+        if (!abiertos.contains(_normalizado(c.frase))) continue;
+        final codigo = File(c.archivo).readAsStringSync();
+        expect(
+          codigo.contains(c.marcador),
+          isFalse,
+          reason:
+              '`athlete_entitlement.dart` sigue listando como PENDIENTE algo '
+              'que el código ya resolvió.\n\n'
+              'Dice: «${c.frase}»\n'
+              'Pero ${c.archivo} contiene `${c.marcador}` — ${c.porque}\n\n'
+              'Movelo a la sección «Lo que SALIÓ de esta lista, y por qué». '
+              'Una lista autoritativa equivocada es PEOR que no tener lista: '
+              'manda a alguien a trabajar algo que ya está hecho, y con este '
+              'archivo ya pasó tres veces.\n\n'
+              'Y al moverlo, escribí lo que el cierre COSTÓ o dejó abierto. '
+              'Un ítem que sale sin su precio es sólo una línea menos.',
+        );
+      }
     });
   });
 }
