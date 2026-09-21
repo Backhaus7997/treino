@@ -75,6 +75,92 @@ void main() {
     });
   });
 
+  group('⚠️ el parseo de la respuesta cruda', () {
+    // Este grupo existe porque los tests de arriba NO tocan el parseo:
+    // `debugPlanCancelCaller` reemplaza la llamada entera. Cuando se agregó
+    // `enfriando` se escribieron dos tests, los dos pasaron, y borrar el
+    // chequeo no rompió ninguno. Acá se le pasa el mapa tal cual lo manda el
+    // servidor.
+
+    test('⚠️ `sin-suscripcion` CON `enfriando` no es sin-suscripción', () {
+      // LA aserción. El servidor manda las dos cosas juntas cuando corta por
+      // cooldown, y quedarse con el estado a secas le dice «no hay nada que dar
+      // de baja» a alguien cuya suscripción sigue viva y cobrando.
+      final r = resultadoDesde(const {
+        'estado': 'sin-suscripcion',
+        'enfriando': true,
+      });
+
+      expect(r.estado, EstadoDeBaja.enfriando);
+      expect(r.estado, isNot(EstadoDeBaja.sinSuscripcion));
+    });
+
+    test('sin la bandera, `sin-suscripcion` sí lo es', () {
+      final r = resultadoDesde(const {'estado': 'sin-suscripcion'});
+      expect(r.estado, EstadoDeBaja.sinSuscripcion);
+    });
+
+    test('`dada-de-baja` con fecha la parsea', () {
+      final r = resultadoDesde(const {
+        'estado': 'dada-de-baja',
+        'accesoHastaIso': '2026-10-03T12:00:00.000Z',
+      });
+
+      expect(r.estado, EstadoDeBaja.dadaDeBaja);
+      expect(r.accesoHasta, DateTime.utc(2026, 10, 3, 12));
+    });
+
+    test('`dada-de-baja` sin fecha sigue siendo una baja', () {
+      final r = resultadoDesde(const {'estado': 'dada-de-baja'});
+      expect(r.estado, EstadoDeBaja.dadaDeBaja);
+      expect(r.accesoHasta, isNull);
+    });
+
+    test('una fecha que no se puede parsear no rompe nada', () {
+      final r = resultadoDesde(const {
+        'estado': 'dada-de-baja',
+        'accesoHastaIso': 'mañana',
+      });
+
+      expect(r.estado, EstadoDeBaja.dadaDeBaja);
+      expect(r.accesoHasta, isNull);
+    });
+
+    test('un estado desconocido NO cae en dadaDeBaja', () {
+      for (final crudo in [null, '', 'casi', 42, true]) {
+        final r = resultadoDesde({'estado': crudo});
+        expect(r.estado, EstadoDeBaja.noDisponible, reason: 'con $crudo');
+      }
+    });
+
+    test('una respuesta vacía tampoco', () {
+      expect(resultadoDesde(const {}).estado, EstadoDeBaja.noDisponible);
+    });
+  });
+
+  group('⚠️ el cooldown', () {
+    test('`enfriando` NO se lee como «no hay nada que dar de baja»', () async {
+      // El camino que esto evita, entero:
+      //
+      //   1. El PF aprieta dar de baja. El servidor marca el cooldown ANTES de
+      //      salir a MP, llama, y MP no contesta.
+      //   2. El diálogo dice bien: «tu suscripción sigue como estaba».
+      //   3. El PF hace lo que le dijimos y reintenta enseguida.
+      //   4. El servidor corta por cooldown y manda `sin-suscripcion`.
+      //   5. Sin este estado, el diálogo diría «no hay nada que dar de baja»,
+      //      que es FALSO: la suscripción sigue viva y cobrando.
+      debugPlanCancelCaller =
+          () async => const ResultadoDeBaja(estado: EstadoDeBaja.enfriando);
+
+      final r =
+          await (planCancelFor(isWeb: true) as PlanCancelAvailable).cancelar();
+
+      expect(r.estado, EstadoDeBaja.enfriando);
+      expect(r.estado, isNot(EstadoDeBaja.sinSuscripcion));
+      expect(r.estado, isNot(EstadoDeBaja.dadaDeBaja));
+    });
+  });
+
   group('cuando algo falla', () {
     test('un error del servidor NO se reporta como baja', () async {
       // LA aserción del archivo. Si un `unavailable` saliera como
