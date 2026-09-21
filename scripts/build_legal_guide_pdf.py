@@ -511,16 +511,30 @@ def build_story():
           "que diga «no hay reembolsos» se tiene por no escrita y se aplica la "
           "ley igual. Escribirla es peor que no escribirla"],
          ["<b>Botón de Arrepentimiento</b>",
-          "Resolución 424/2020: enlace de acceso fácil y directo desde la "
-          "página de inicio, destacado en visibilidad y tamaño, y <b>sin "
-          "requerir registración previa ni ningún otro trámite</b>. El pie de "
-          "página alcanza y es la práctica de mercado"],
+          "Disposición 954/2025 (derogó la Res. 424/2020): link a simple vista, "
+          "en lugar destacado y en el <b>primer acceso</b>, y <b>sin requerir "
+          "registración previa ni ningún otro trámite</b>. El pie de página "
+          "alcanza y es la práctica de mercado"],
+         ["<b>Botón de Baja de Servicio</b>",
+          "Disposición 954/2025, art. 4: un <b>segundo botón</b>, distinto del "
+          "de arrepentimiento, con los mismos requisitos de ubicación y acceso. "
+          "Sirve para dar de baja un servicio ya contratado (art. 10 ter de la "
+          "Ley 24.240). Exigible desde el 04/11/2025"],
+         ["<b>Se puede verificar identidad</b>",
+          "Disposición 3/2026: detrás del link se pueden pedir pasos "
+          "«razonables, a través de medios habituales y con finalidad exclusiva "
+          "de verificación de identidad y seguridad». El link sigue teniendo que "
+          "ser público; lo que viene después, no"],
          ["<b>Código en 24 horas</b>",
-          "La norma exige informar por el mismo medio, dentro de las 24 horas, "
-          "un código de identificación del arrepentimiento. Es lo que casi "
-          "nadie implementa y lo primero que se verifica"],
+          "El art. 5 de la Disposición 954/2025 exige informar por el mismo "
+          "medio, dentro de las 24 horas, un código de identificación. Nombra "
+          "la revocación <b>y/o la solicitud de baja</b>, así que aplica a los "
+          "DOS botones, no sólo al de arrepentimiento. Es lo que casi nadie "
+          "implementa y lo primero que se verifica"],
          ["<b>Baja en línea</b>",
-          "Sin llamar ni escribir. Va en el Coach Hub web"],
+          "Sin llamar ni escribir, por el mismo medio en que se contrató "
+          "(art. 10 ter, Ley 24.240). El flujo vive en el Coach Hub web, pero "
+          "la <b>puerta</b> tiene que ser el botón público del sitio"],
          ["<b>Si el cobro va por las tiendas</b>",
           "Apple y Google gestionan baja y reembolso con sus políticas. No se "
           "puede procesar ni negar. Otra razón para resolver la regla 3.1.1 "
@@ -701,8 +715,12 @@ def build_story():
          "primera rutina generada por IA",
          "Un descargo enterrado en la sección 3 de los términos protege menos "
          "que uno que el usuario ve y acepta", "Sí"],
-        ["<b>Botón de arrepentimiento y baja en línea</b> en el Coach Hub",
-         "Resolución 424/2020. Aplica al sitio que vende",
+        ["<b>Botón de arrepentimiento y botón de baja</b>, públicos en "
+         "gettreino.com",
+         "Disposición 954/2025 (arts. 1 y 4). Son DOS botones distintos, los "
+         "dos en el primer acceso del sitio y sin sesión iniciada. El flujo de "
+         "baja que ya existe adentro del Coach Hub NO los reemplaza: ése es "
+         "para quien ya entró. El de baja está fuera de plazo",
          "Sí, cuando cobres"],
         ["<b>Opción de desactivar la analítica</b>",
          "Hoy se activa incondicionalmente al arrancar la app, sin salida",

@@ -48,9 +48,19 @@ viven bajo `/es/`, no en la raíz. Cuatro ya están publicadas y funcionando:
 | `/es/aviso-legal` | 404 |
 | `/es/cookies` | 404 |
 
-### 1.1 El Botón de Arrepentimiento ya cumple
+### 1.1 El Botón de Arrepentimiento — re-verificación PENDIENTE
 
-Se verificó contra la Resolución 424/2020, punto por punto:
+**No tratar esta tabla como un gate legal aprobado.** Los requisitos se
+contrastaron contra la **Disposición 954/2025**, pero la transcripción literal de
+su art. 1 no se pudo confirmar contra el Boletín Oficial (ver §3.1). Un texto que
+no se leyó puede traer condiciones que no están acá.
+
+Lo que la tabla dice es: de los requisitos **conocidos**, éstos se cumplen.
+
+*(La verificación anterior decía «punto por punto» y era contra la Resolución
+424/2020, **derogada** por el art. 10 de la 954/2025 — ver §3. Los requisitos
+sobrevivieron a la derogación; lo que cambió es de dónde salen y cuánto se puede
+afirmar sobre el chequeo.)*
 
 | Requisito | Estado |
 |---|---|
@@ -110,29 +120,93 @@ entre los demás.
 
 ## 3. Botón de Arrepentimiento
 
-**Lo exige la Resolución 424/2020 de la Secretaría de Comercio Interior.** Es un
-requisito argentino, y como la sociedad es argentina y vende desde Argentina,
-está claramente alcanzada.
+**Lo exige la Disposición 954/2025** de la Subsecretaría de Defensa del
+Consumidor y Lealtad Comercial (BO 4/9/2025), **modificada por la Disposición
+3/2026** (BO 6/2/2026). Es un requisito argentino, y como la sociedad es
+argentina y vende desde Argentina, está claramente alcanzada.
 
-### 3.1 Lo que dice la norma, textual
+> ⚠️ **La Resolución 424/2020 está DEROGADA.** El art. 10 de la 954/2025 derogó
+> las Resoluciones 316/2018 y 424/2020 y las reemplazó por un texto único. Este
+> documento las citaba hasta el 2026-09-21; la verificación previa del botón
+> estaba hecha contra una norma muerta. Los requisitos conocidos sobrevivieron
+> casi iguales, así que **no hay motivo para creer que el botón haya dejado de
+> cumplir por la derogación** — pero eso no es lo mismo que decir que cumple:
+> falta re-verificar el art. 1 contra el texto original (§3.1). Y la 954/2025 trae
+> **dos cosas que la 424/2020 no tenía**: el botón de baja (§3.5) y las
+> exenciones del art. 3 (§3.6).
 
-> «deberá ser un link de acceso **fácil y directo desde la página de inicio**
-> del sitio de Internet institucional de los sujetos obligados y ocupar un
-> **lugar destacado, en cuanto a visibilidad y tamaño**, no dejando lugar a
-> dudas respecto del trámite seleccionado»
+### 3.1 Lo que dice la norma
 
-> «Al momento de hacer uso del Botón, el proveedor **no podrá requerir al
-> consumidor registración previa ni ningún otro trámite**»
+El **art. 1** obliga a los proveedores que venden a distancia por web o canal
+digital a tener, **a simple vista, en lugar destacado y en el primer acceso**, un
+link denominado **«BOTÓN DE ARREPENTIMIENTO»** para solicitar la revocación de la
+compra o del servicio contratado. Agrega que al momento de usarlo el proveedor
+**no podrá requerir registración previa ni ningún otro trámite adicional**.
+
+> **Precisión.** Los arts. 3, 4 y 5 de abajo están transcriptos **literales** del
+> texto publicado. Este párrafo del art. 1 es una **descripción**, no una cita:
+> la transcripción literal del art. 1 no se pudo confirmar contra el original y
+> un entrecomillado sería una cita inventada. Antes de apoyarse en su redacción
+> exacta, leerlo en el Boletín Oficial.
+
+#### El art. 5 — las 24 horas y el código, para LOS DOS botones
+
+El plazo de respuesta **no sale del art. 1**: es un artículo aparte, y por eso
+alcanza también al botón de baja del art. 4.
+
+> «A partir de la solicitud de revocación de la aceptación **y/o de la solicitud
+> de baja del servicio**, dentro de las VEINTICUATRO (24) horas subsiguientes y
+> por el mismo medio, el proveedor deberá informar al consumidor el código de
+> identificación […]»
+
+Ese **«y/o de la solicitud de baja del servicio»** es el que cierra la pregunta:
+las 24 horas con código **no son sólo del arrepentimiento**. Los dos botones
+tienen que responder igual.
+
+*(La cita está cortada en el cierre — de ahí el `[…]`. Lo que sigue al código de
+identificación no se pudo confirmar. El fragmento citado sí, y es el que decide
+el alcance.)*
+
+**Fuentes:**
+
+- [BO — Disposición 954/2025](https://www.boletinoficial.gob.ar/detalleAviso/primera/330827/20250904)
+- [InfoLEG — texto 954/2025](https://servicios.infoleg.gob.ar/infolegInternet/anexos/415000-419999/417152/norma.htm)
+- [BO — Disposición 3/2026](https://www.boletinoficial.gob.ar/detalleAviso/primera/338248/20260206)
 
 ### 3.2 Traducido a requisitos de implementación
 
 | Requisito | Qué significa |
 |---|---|
 | **Desde la home** | Alcanzable desde `gettreino.com` en un click |
-| **Sin login** | Una persona sin sesión iniciada tiene que poder completarlo |
-| **Sin pasos previos** | Nada de "primero ingresá a tu cuenta" ni menúes intermedios |
+| **Sin login para LLEGAR** | Una persona sin sesión iniciada tiene que poder **abrir** el formulario. Ver el matiz de la 3/2026 abajo |
+| **Sin pasos previos** | Nada de "primero ingresá a tu cuenta" ni menúes intermedios **antes** del link |
 | **Destacado** | El pie de página alcanza y es la práctica de mercado. No puede estar detrás de un acordeón ni en una página de tercer nivel |
 | **Texto literal** | El enlace dice **"Botón de Arrepentimiento"**. Nada de "Gestión de suscripción" ni eufemismos: la norma pide que no deje dudas |
+
+#### El matiz de la Disposición 3/2026 — se puede verificar identidad
+
+La 3/2026 complementa los arts. 1 y 4 de la 954/2025. Su art. 1 dice que el
+consumidor
+
+> «deberá cumplimentar los mecanismos o pasos previstos al efecto por el
+> proveedor, siempre que estos sean **razonables**, a través de **medios
+> habituales** y tengan por **finalidad exclusiva la verificación de identidad y
+> seguridad** del usuario»
+
+**Qué cambia en la práctica.** La prohibición de registración previa se lee sobre
+el **acceso al botón**, no sobre todo el trámite. El link sigue teniendo que
+estar público y alcanzable sin sesión; lo que viene **después** de tocarlo puede
+pedir verificación de identidad, siempre que sea razonable y sólo para eso.
+
+**Por qué importa acá y no es un detalle legal.** Un endpoint público y sin
+autenticar que da de baja suscripciones es un canal de abuso: cualquiera puede
+dar de baja la suscripción de otro con sólo saberle el correo. La 3/2026 habilita
+exactamente el resguardo que ese diseño necesitaba. Leer la norma como «prohibido
+verificar identidad» obliga a construir el agujero.
+
+**Lo que NO habilita:** usar la verificación como traba. «Razonable», «medios
+habituales» y «finalidad exclusiva» son tres condiciones, no una sugerencia. Un
+flujo que exija crear cuenta, llamar por teléfono o subir documentación no entra.
 
 ### 3.3 El formulario en `/arrepentimiento`
 
@@ -164,6 +238,118 @@ hace falta automatizarlo.
   período pagado, pero sin reembolso.
 - **Si la suscripción se contrató desde la app por Apple o Google**, el
   reembolso lo gestiona la tienda y hay que dirigir al usuario a su flujo.
+
+### 3.5 Botón de Baja de Servicio — el segundo botón
+
+La 954/2025 trae un botón que la 424/2020 **no tenía**. Art. 4, literal:
+
+> «Los proveedores que comercialicen bienes y servicios a distancia, a través de
+> páginas web y/o canales digitales de comercialización o formato similar,
+> deberán tener a simple vista, en lugar destacado y en el primer acceso, un link
+> denominado **"BOTÓN DE BAJA DE SERVICIO"**, mediante el cual el consumidor
+> pueda solicitar la baja del servicio contratado, con base en lo normado en el
+> **Artículo 10 ter de la Ley N° 24.240** y sus modificatorias.
+>
+> Al momento de hacer uso del BOTÓN DE BAJA DE SERVICIOS, el proveedor no podrá
+> requerir al consumidor registración previa ni ningún otro trámite adicional.»
+
+**Es un botón distinto del de arrepentimiento**, con los mismos requisitos de
+ubicación. No es lo mismo que `/es/eliminar-cuenta`, que es borrado de datos
+personales (§4). Son tres cosas separadas.
+
+**Plazo:** el art. 8 dio 60 días corridos para adecuarse. Exigible **desde el
+2025-11-04**. Estamos fuera de plazo.
+
+#### Esto NO es un requisito nuevo en este repo
+
+Al actualizar la norma se descubrió que la tabla de pendientes del §8 ya listaba
+**«Baja en línea del plan del entrenador»**, atribuida a la 424/2020. Es el mismo
+requisito: lo que faltaba era el nombre que le pone la norma y el hecho de que
+tiene que ser **un link público en el primer acceso**, no sólo un flujo alcanzable
+estando adentro. Vale decirlo porque un análisis externo lo reportó como hallazgo
+nuevo que agrandaba el alcance del release, y no lo es.
+
+#### A quién alcanza en TREINO
+
+Lo mismo que el arrepentimiento, y por el mismo motivo:
+
+| Quién | Cómo paga | Quién gestiona la baja |
+|---|---|---|
+| **Profesor / entrenador** | Directo, Mercado Pago, desde el Coach Hub | **TREINO** — acá hace falta el botón |
+| **Alumno** | Compra integrada (Apple / Google) | La **tienda**. El sitio indica la ruta, no ofrece el flujo |
+
+#### Qué falta construir, concretamente
+
+La **capacidad** ya existe: `cancelMySubscription` del lado del servidor y
+`plan_cancel.dart` en el Coach Hub. Lo que falta es **la puerta pública**:
+
+1. Un link en el pie de `gettreino.com`, al lado del de arrepentimiento, con el
+   texto literal «Botón de Baja de Servicio».
+2. Su página, alcanzable **sin sesión iniciada**.
+3. Detrás, verificación de identidad razonable (habilitada por la 3/2026 — §3.2),
+   y de ahí al flujo de baja que ya existe.
+4. Respuesta por el mismo medio **dentro de las 24 h** con código de
+   identificación. No es analogía con el arrepentimiento: lo dice el **art. 5**,
+   que nombra expresamente «la solicitud de baja del servicio» (§3.1).
+
+El punto 3 es lo que hace que esto sea chico: sin la 3/2026 habría que construir
+un camino de baja público y anónimo, paralelo al que ya existe y sin forma de
+saber quién pide la baja.
+
+### 3.6 Las exenciones del art. 3 — leer antes de tocar el plazo
+
+El art. 3 exime **del art. 1** (la obligación del botón de arrepentimiento) en
+cuatro casos. Literal:
+
+> «No regirá lo previsto en el Artículo 1° de la presente disposición, en los
+> siguientes casos:
+>
+> a) En los casos establecidos en el Artículo 1.116 del Código Civil y Comercial
+> de la Nación, excepto pacto en contrario.
+>
+> b) Cuando el consumidor **efectivamente haya utilizado o consumido** el producto
+> o servicio contratado y, con posterioridad, pretenda ejercer el derecho de
+> arrepentimiento dentro del plazo previsto en el Artículo 34 de la Ley N° 24.240
+> y sus modificatorias.
+>
+> c) En el caso que el consumidor, sea persona humana o jurídica, pretenda
+> ejercer el derecho de arrepentimiento respecto de la adquisición o contratación
+> de productos o servicios con fines de reventa y/o sean integrados en procesos
+> de producción, transformación, comercialización o prestación a terceros cuando
+> se relacionen con dichos procesos, sea de manera genérica o específica,
+> conforme lo establece el Artículo 2° del Decreto N° 1.798 de fecha 13 de
+> octubre de 1994.
+>
+> d) Cuando se trate de la adquisición de productos perecederos.»
+
+**El inciso b) es directamente relevante para TREINO**, que es una app que se usa
+el mismo día que se paga. **Relevante no es «aplicable»**, y la diferencia no la
+zanja este documento.
+
+**Dos preguntas distintas, las dos abiertas:**
+
+1. **¿Entrenar con la app cuenta como «efectivamente utilizado o consumido el
+   servicio»?** Parece que sí en la lectura llana, pero «servicio» en una
+   suscripción de tracto sucesivo no es lo mismo que un producto consumido, y el
+   inciso no lo define. **Pregunta de abogado.**
+2. **Si cuenta, ¿qué recorta?** El art. 3 exime de **lo previsto en el art. 1**,
+   que es la obligación de tener el botón. Si eso además recorta el derecho de
+   fondo del art. 34 de la Ley 24.240 —que es irrenunciable y no lo dicta esta
+   disposición— **tampoco está contestado acá.**
+
+Lo que sí queda establecido:
+
+- La exención **existe** y su texto es el de arriba. Eso no es interpretación.
+- El inciso a) remite al **art. 1116 CCyC «excepto pacto en contrario»**, así que
+  el análisis del 1116 no es una rama independiente: la 954/2025 lo incorpora por
+  referencia.
+- El sustento escrito de «14 días» en `ESTADO.md` decía que el piso argentino son
+  10 días. Ese piso sigue siendo el del art. 34, pero **la interacción con el
+  inciso b) no está resuelta**. Ser más generoso que la ley siempre se puede: la
+  decisión de negocio puede quedar igual. Lo que no se sostiene es el razonamiento
+  tal como estaba escrito.
+
+→ Va como pregunta al dictamen legal, con el texto citado.
 
 ---
 
@@ -241,13 +427,14 @@ Pendiente:
 
 | | Qué | Lo exige |
 |---|---|---|
-| ☐ | Probar de punta a punta que el correo con el código llega en 24 h | **Res. 424/2020** |
+| ☐ | **Re-verificar el art. 1 de la 954/2025 contra el texto del Boletín Oficial.** Su transcripción literal no se pudo confirmar, así que la tabla del §1.1 cubre sólo los requisitos conocidos | **Disp. 954/2025 art. 1** |
+| ☐ | Probar de punta a punta que el correo con el código llega en 24 h — **en LOS DOS botones** | **Disp. 954/2025 art. 5** |
 | ☐ | Las seis páginas legales que faltan | Apple 1.2, consumidor |
 | ☐ | Footer con identificación del titular (razón social, CUIT, domicilio) | Comercio electrónico AR |
 | ☐ | Banner de cookies con rechazo tan visible como aceptar | RGPD |
 | ☐ | Inventario de terceros que carga el sitio | RGPD |
 | ☐ | Precio final y condiciones antes de pagar | Defensa del consumidor |
-| ☐ | Baja en línea del plan del entrenador | Res. 424/2020 |
+| ☐ | **«BOTÓN DE BAJA DE SERVICIO»** público para el plan del entrenador (§3.5) — *antes decía «Baja en línea», mismo requisito* | **Disp. 954/2025 art. 4** — fuera de plazo desde 2025-11-04 |
 | ☐ | Cargar las URLs reales en App Store Connect y Play Console | Apple y Google |
 
 > **Ojo con el alumno.** Su suscripción se cobra por compra integrada, así que

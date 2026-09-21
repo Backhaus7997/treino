@@ -12,12 +12,24 @@ import 'package:flutter/foundation.dart';
 /// No es la Guideline 3.1.3: dar de baja no es una compra, y Apple no prohíbe
 /// cancelar dentro de la app —de hecho exige lo contrario cuando el cobro pasó
 /// por la tienda—. El motivo es más simple y es de producto: **el PF contrata
-/// en el Coach Hub, y la Res. 424/2020 exige que pueda darse de baja por el
-/// mismo medio**. Ese medio es la web.
+/// en el Coach Hub, y el art. 10 ter de la Ley 24.240 exige que pueda darse de
+/// baja por el mismo medio**. Ese medio es la web.
 ///
 /// Ponerla además en el teléfono no estaría prohibido, pero sí obligaría a
 /// mantener dos superficies para una acción irreversible, y la del teléfono no
 /// tiene dónde mostrar el estado de la suscripción que la justifica.
+///
+/// ── Lo que ESTA capacidad no cubre ──
+///
+/// La **Disposición 954/2025** (art. 4) —que derogó la Res. 424/2020 que este
+/// comentario citaba— exige además un «BOTÓN DE BAJA DE SERVICIO» **público en
+/// el primer acceso del sitio, sin sesión iniciada**. Esto de acá es el flujo
+/// de adentro; ese botón es la puerta de afuera, y todavía no existe.
+///
+/// La buena noticia es que no hace falta un camino anónimo paralelo: la
+/// **Disposición 3/2026** permite verificar identidad detrás del link, así que
+/// la puerta pública puede desembocar en esta misma capacidad.
+/// → `docs/legal/spec-web-legal.md` §3.5.
 sealed class PlanCancel {
   const PlanCancel._();
 }
@@ -51,7 +63,7 @@ enum EstadoDeBaja {
   ///
   /// El paso 5 es **falso**: la suscripción sigue viva y cobrando, y se le
   /// acaba de decir que se quede tranquilo. En el único camino de baja que la
-  /// Res. 424/2020 obliga a tener.
+  /// Disposición 954/2025 obliga a tener.
   enfriando,
 }
 

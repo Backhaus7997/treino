@@ -264,8 +264,15 @@ class _ChangePlanButton extends StatelessWidget {
 /// Es un LINK discreto y no un botón con borde: a lo que el PF viene a
 /// Facturación es a mirar su plan o a cambiarlo, y darle a la baja el mismo
 /// peso visual que a «CAMBIAR PLAN» sería empujarla. Tampoco está escondida —
-/// la Res. 424/2020 exige poder darse de baja «en línea, sin llamar ni escribir
-/// a nadie», y algo que no se encuentra no cumple eso.
+/// el art. 10 ter de la Ley 24.240 exige poder darse de baja por el mismo medio
+/// en que se contrató, y algo que no se encuentra no cumple eso.
+///
+/// La norma que lo reglamenta es la **Disposición 954/2025** (art. 4), que
+/// derogó la Res. 424/2020 que este comentario citaba. Y OJO: este link no es
+/// el «BOTÓN DE BAJA DE SERVICIO» que esa disposición exige — ése tiene que
+/// estar público en el pie de `gettreino.com`, alcanzable sin sesión iniciada.
+/// Éste es el acceso para quien YA está adentro. Los dos hacen falta.
+/// → `docs/legal/spec-web-legal.md` §3.5.
 ///
 /// El texto dice «dar de baja» y no «cancelar suscripción»: es el término de
 /// los Términos de Suscripción §7, y usar dos nombres para lo mismo obliga al
