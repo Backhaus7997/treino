@@ -6,9 +6,7 @@ import 'package:treino/app/theme/tokens/tokens.dart';
 import '../../../app/theme/app_palette.dart';
 import '../../../core/widgets/treino_icon.dart';
 import '../../../l10n/app_l10n.dart';
-import '../application/athlete_checkout.dart';
 import '../domain/athlete_entitlement.dart';
-import 'athlete_paywall_screen.dart';
 
 /// Qué eje del plan free se tocó. Cambia sólo el cuerpo del mensaje: el título
 /// y la acción son los mismos.
@@ -131,9 +129,8 @@ class _FreePlanLimitBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // La UNICA decision sobre si se puede comprar. No la toma el call site.
-    final puedeComprar =
-        ref.watch(athleteCheckoutProvider) is AthleteCheckoutOnStore;
+    // Ya no se decide nada sobre comprar: la app no vende, y tampoco puede
+    // decir donde se compra. Ver el encabezado de la clase.
     final palette = AppPalette.of(context);
     final l10n = AppL10n.of(context);
 
@@ -217,17 +214,6 @@ class _FreePlanLimitBody extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: AppSpacing.s18),
-            if (puedeComprar) ...[
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  key: const Key('free_plan_limit_upgrade'),
-                  onPressed: () => _abrirPaywall(context),
-                  child: Text(l10n.paywallFreePlanLimitUpgrade),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.s8),
-            ],
             SizedBox(
               width: double.infinity,
               child: TextButton(
@@ -240,21 +226,5 @@ class _FreePlanLimitBody extends ConsumerWidget {
         ),
       ),
     );
-  }
-
-  /// Abre el paywall y, si el alumno compro, cierra tambien esta hoja.
-  ///
-  /// Se navega en vez de mostrar la compra adentro de la hoja porque la
-  /// guideline 3.1.2 pide describir claramente que se lleva por ese precio, y
-  /// eso no entra en un bottom sheet arriba del cuerpo del limite.
-  Future<void> _abrirPaywall(BuildContext context) async {
-    final compro = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (_) => const AthletePaywallScreen(),
-      ),
-    );
-    if (compro == true && context.mounted && Navigator.of(context).canPop()) {
-      Navigator.of(context).pop();
-    }
   }
 }

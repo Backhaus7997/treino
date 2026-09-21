@@ -36,7 +36,6 @@ import 'package:treino/features/workout/domain/routine_visibility.dart';
 import 'package:treino/features/workout/presentation/routine_editor_mode.dart';
 import 'package:treino/features/workout/presentation/routine_editor_screen.dart';
 import 'package:treino/l10n/app_l10n.dart';
-import 'package:treino/features/paywall/application/athlete_checkout.dart';
 
 import '../../../fixtures/exercises.dart';
 import '../../../fixtures/routine_editor_ui.dart';
@@ -240,14 +239,23 @@ void main() {
 
     testWidgets('la hoja no ofrece un botón de pago que no lleva a ningún lado',
         (tester) async {
-      // El motivo cambió y conviene decirlo: antes el CTA no se dibujaba
-      // porque `onUpgrade` era null. Ese parámetro ya no existe — la hoja mira
-      // `athleteCheckoutProvider` y decide sola.
+      // El motivo cambió por tercera vez, y la historia importa:
       //
-      // Acá sigue sin dibujarse por la razón CORRECTA: en un test no hay clave
-      // del SDK, así que `resolveAthleteCheckout()` devuelve
-      // `AthleteCheckoutUnavailable`. Un botón que promete una salida
-      // inexistente es peor que no tenerlo, y eso no cambió.
+      //   1. Antes no se dibujaba porque `onUpgrade` era null.
+      //   2. Después porque la hoja miraba `athleteCheckoutProvider` y en un
+      //      test no había clave del SDK.
+      //   3. Ahora **el botón no existe**. La app no vende nada, y tampoco
+      //      puede decir dónde se compra: nombrar la landing desde el binario
+      //      sería un «call to action for purchase outside of the app» y
+      //      tiraría abajo la exención 3.1.3(f) del ENTRENADOR.
+      //
+      // Acá abajo había un test hermano —«con una superficie que SÍ puede
+      // cobrar, el CTA aparece»— que existía justamente para que esta
+      // aserción no pasara si alguien borraba el botón entero. Eso es lo que
+      // pasó, a propósito, así que ese control ya no tiene qué controlar y se
+      // fue con él. Lo que ocupa su lugar es
+      // `superficie_de_cobro_alumno_test.dart`, que fija que NINGÚN archivo
+      // del paywall pueda comprar ni abrir el navegador.
       await _pumpEditor(
         tester,
         mode: const SelfCreating(),
@@ -263,31 +271,6 @@ void main() {
       expect(_sheet, findsOneWidget);
       expect(find.byKey(const Key('free_plan_limit_upgrade')), findsNothing);
       expect(find.byKey(const Key('free_plan_limit_dismiss')), findsOneWidget);
-    });
-
-    testWidgets('con una superficie que SÍ puede cobrar, el CTA aparece',
-        (tester) async {
-      // La contraparte del test de arriba. Sin este, «no se dibuja el botón»
-      // pasaría también si alguien borrara el botón entero.
-      await _pumpEditor(
-        tester,
-        mode: const SelfCreating(),
-        overrides: [
-          ..._overrides(
-            paywallEnabled: true,
-            entitlement: AthleteEntitlement.free,
-          ),
-          athleteCheckoutProvider.overrideWithValue(
-            resolveAthleteCheckout(store: _StoreDeMentira()),
-          ),
-        ],
-      );
-      await _tapAgregarDia(tester);
-      await _tapAgregarDia(tester);
-      await _tapAgregarDia(tester);
-
-      expect(_sheet, findsOneWidget);
-      expect(find.byKey(const Key('free_plan_limit_upgrade')), findsOneWidget);
     });
 
     testWidgets('alumno con derecho: no se le gatea nada', (tester) async {
@@ -938,23 +921,4 @@ void main() {
       expect(find.byKey(const Key('editor_name_field')), findsOneWidget);
     });
   });
-}
-
-/// Lo mínimo para que `resolveAthleteCheckout` devuelva la variante que cobra.
-///
-/// La hoja de límite sólo mira el TIPO —¿es `AthleteCheckoutOnStore`?— y nunca
-/// le pregunta nada a la tienda, así que ningún método de acá se llama.
-final class _StoreDeMentira implements AthleteStore {
-  @override
-  Future<void> identificar(String uid) async => throw UnimplementedError();
-
-  @override
-  Future<List<AthletePlanOferta>> ofertas() async => throw UnimplementedError();
-
-  @override
-  Future<Set<String>> comprar(AthletePlan plan) async =>
-      throw UnimplementedError();
-
-  @override
-  Future<Set<String>> restaurar() async => throw UnimplementedError();
 }
