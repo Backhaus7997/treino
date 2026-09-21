@@ -126,23 +126,40 @@
  *     pagar al dia 35. Saltearlo dejaba a ese PF con cobro doble PARA SIEMPRE,
  *     porque el barrido tampoco lo reconcilia.
  *
- * ── LO QUE ESTE ARCHIVO DECIDE SIN QUE NADIE LO HAYA DECIDIDO ──
+ * ── EL PERIODO QUE EL PF YA PAGO, Y POR QUE ESTE ARCHIVO LO CAPTURA ──
  *
- * La regla es "cancelar todo lo estrictamente mas viejo", y es CIEGA al ciclo y
- * a la direccion del cambio. Dos consecuencias que no son bugs pero tampoco
- * fueron elegidas, y que conviene mirar antes de que pasen:
+ * La baja cierra el cobro doble, pero abrio un agujero al lado: como la guarda
+ * (6) impide que el plan viejo escriba, su `cancelled` —que llevaria su
+ * `currentPeriodEnd`— no se guarda en ningun lado. Y ese era el unico registro
+ * de lo que el PF ya habia pagado.
  *
- *   - **El ANUAL.** Un plan3 anual son $390.000 en UN cobro que cubre 12 meses
- *     (`tier-config.ts`). Si el PF hace upgrade en marzo, acá se cancela ese
- *     preapproval: MP no reembolsa y una baja no se revierte, asi que los meses
- *     que le quedaban se evaporan. Cancelar igual es mejor que no cancelar —si
- *     no, en enero le cobran el anual DE NUEVO mas el plan nuevo— pero la
- *     opcion buena de verdad seria diferir la baja hasta el fin del periodo
- *     pago, y eso todavia no existe.
+ * El daño NO es que MP no reembolse: eso es inevitable y no lo arregla ningun
+ * codigo. El daño es que TREINO dejaba de honrar el periodo comprado. Un plan3
+ * (SIN TOPE) que bajaba a plan1 (7) caia a 7 EN EL ACTO, y
+ * `syncEntitlementsOnSubscription` le bloqueaba alumnos en la MISMA invocacion
+ * mas un mail de degradacion. A alguien que pago por esos alumnos. Con el anual
+ * es peor de escala: son 12 meses en UN cobro (`tier-config.ts`), asi que un
+ * cambio en marzo evaporaba nueve.
  *
- *   - **El DOWNGRADE.** plan3 -> plan1 entra por el mismo camino: se cancela el
- *     caro y se escribe el barato, con lo cual el limite baja EN EL ACTO aunque
- *     al PF le queden meses pagos del caro.
+ * Por eso, en la misma escritura, se guarda el PISO PREPAGO: `prepaidTier` y
+ * `prepaidUntil`. El dato no sale de ningun lado nuevo —es lo que estabamos por
+ * pisar— y `effectiveWeightLimit` devuelve el MAXIMO entre lo que dice el status
+ * y ese piso mientras siga vigente. Ver `resolverPisoPrepago` en
+ * `effective-limit.ts` para las reglas.
+ *
+ * Lo que SIGUE sin resolverse, y conviene saberlo:
+ *
+ *   - **La plata.** Nada de esto recupera un peso. Un upgrade DESDE un anual
+ *     chico sigue quemando lo prepago: el piso plan1 no aporta nada si el plan
+ *     nuevo ya es plan3. Esto arregla ENTITLEMENT, no facturacion.
+ *
+ *   - **La escalera.** Hay UN solo slot de piso. Dos downgrades dentro del
+ *     mismo periodo conservan solo el mejor. Falla hacia MENOS cupo, nunca
+ *     hacia mas, y nunca peor que antes de este cambio.
+ *
+ *   - **El `paused`.** Un PF que pausa en MP sigue cayendo a Free en el acto
+ *     aunque tenga periodo pago. Es la misma injusticia de forma, pero es otra
+ *     decision de politica y meterla acá seria cambiarla de contrabando.
  */
 
 import { App, getApp, initializeApp } from "firebase-admin/app";
@@ -151,7 +168,12 @@ import { logger } from "firebase-functions";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { defineSecret } from "firebase-functions/params";
 
-import { SubscriptionStatus, effectiveWeightLimit } from "../effective-limit";
+import {
+  SubscriptionStatus,
+  effectiveWeightLimit,
+  limitRank,
+  resolverPisoPrepago,
+} from "../effective-limit";
 import { toSubscriptionState } from "../subscription-state";
 import { SubscriptionTier } from "../tier-config";
 import {
@@ -383,18 +405,14 @@ export function resolverFinDePeriodo(
 }
 
 /**
- * El limite, como numero comparable.
+ * El rango del limite (`null` = plan3 = SIN TOPE = el mayor) ahora se importa de
+ * `effective-limit.ts` como `limitRank`.
  *
- * `null` es plan3 = SIN TOPE, o sea el MAYOR de todos, no una ausencia. Un `>`
- * a secas con `null` de un lado compara contra 0 en JS y da la respuesta al
- * reves — y justo para el PF que mas paga. Es el mismo pozo que documenta
- * `limitRank` en `subscription-mail.ts`; se repite acá y no se importa porque
- * aquel es privado de ese modulo y exportarlo ataria dos archivos que hoy no se
- * conocen.
+ * Habia una copia privada acá —`rangoDelLimite`— y otra en
+ * `subscription-mail.ts`. El piso prepago necesitaba una tercera adentro del
+ * propio modulo del limite, y tres copias de la misma trampa es exactamente como
+ * se desincronizan: se centralizo donde vive el concepto.
  */
-function rangoDelLimite(limite: number | null): number {
-  return limite === null ? Number.POSITIVE_INFINITY : limite;
-}
 
 /** Los dos Timestamp son el mismo instante. Tolera nulls de los dos lados. */
 function mismaFecha(
@@ -1033,14 +1051,16 @@ export async function reconcileSubscription(
   // Solo aplica a `pending`. `paused` y `cancelled` SI bajan el limite, y tienen
   // que poder hacerlo: ahi MP dijo algo terminal sobre la suscripcion que el PF
   // tenia, no sobre una que esta naciendo.
+  // El estado saneado de lo que hay HOY. Se lee una sola vez y lo usan las dos
+  // cosas que miran hacia atras: la guarda de `pending` y el piso prepago.
+  const { state: previo } = toSubscriptionState(userData, uid);
+
   if (status === "pending") {
-    const { state: previo } = toSubscriptionState(userData, uid);
     const limitePrevio = effectiveWeightLimit(previo, deps.nowMs);
     // Se compara contra el limite de un PF SIN suscripcion, no contra un 2
     // escrito a mano: si algun dia Free cambia de tope, la guarda lo sigue sola.
     if (
-      rangoDelLimite(limitePrevio) >
-      rangoDelLimite(effectiveWeightLimit(null, deps.nowMs))
+      limitRank(limitePrevio) > limitRank(effectiveWeightLimit(null, deps.nowMs))
     ) {
       logger.info(
         "mp/reconcile: `pending` que no pisa un entitlement pago vigente",
@@ -1065,11 +1085,48 @@ export async function reconcileSubscription(
     planId,
   });
 
+  // ── EL PISO PREPAGO: lo que el PF ya pago y este write estaba tirando ──
+  //
+  // El dato no viene de ningun lado nuevo: `previo` es lo que estamos por PISAR,
+  // y es exactamente lo que se perdia. Cero llamadas de mas a MP, y por lo tanto
+  // el piso NO depende de que la baja de la vieja confirme — un 429 de Mercado
+  // Pago no le toca el entitlement al PF.
+  //
+  // Va en el MISMO `set` que el resto, y eso no es prolijidad: cada escritura de
+  // `users/{uid}` dispara `syncEntitlementsOnSubscription`. En dos escrituras,
+  // la primera le bloquea alumnos y le manda el mail de degradacion, y la
+  // segunda lo desbloquea. Una escritura, un disparo.
+  //
+  // Consecuencia que cae sola y es la mitad del valor: en el instante del cambio
+  // de plan `limitBefore == limitAfter`, asi que `decideSubscriptionMail` no
+  // manda nada y `sync-entitlements` no bloquea a nadie. Sin una sola rama nueva
+  // en esos dos archivos.
+  const piso = resolverPisoPrepago(previo, mapping.tier, status, deps.nowMs);
+  const prepaidUntil = piso === null ? null : Timestamp.fromMillis(piso.untilMs);
+
+  if (
+    piso === null &&
+    previo != null &&
+    (status === "active" || status === "grace") &&
+    limitRank(effectiveWeightLimit(previo, deps.nowMs)) >
+      limitRank(effectiveWeightLimit({ tier: mapping.tier, status }, deps.nowMs))
+  ) {
+    // Le bajamos el cupo EN EL ACTO a alguien y no pudimos armarle piso —
+    // tipicamente porque su `currentPeriodEnd` esta en null (los PF sembrados a
+    // mano con el Admin SDK no lo tienen). Hay que poder encontrarlo despues.
+    logger.warn(
+      "mp/reconcile: downgrade sin piso prepago — el PF pierde cupo en el acto",
+      { planId, uid, tierPrevio: previo.tier, tierEntrante: mapping.tier },
+    );
+  }
+
   const sinCambios =
     actual != null &&
     actual.tier === mapping.tier &&
     actual.status === status &&
-    mismaFecha(periodEnd, actual.currentPeriodEnd);
+    mismaFecha(periodEnd, actual.currentPeriodEnd) &&
+    (actual.prepaidTier ?? null) === (piso === null ? null : piso.tier) &&
+    mismaFecha(prepaidUntil, actual.prepaidUntil);
 
   if (!sinCambios) {
     await userRef.set(
@@ -1078,6 +1135,11 @@ export async function reconcileSubscription(
           tier: mapping.tier,
           status,
           currentPeriodEnd: periodEnd,
+          // EXPLICITOS y nunca omitidos: `merge` es superficial sobre el mapa
+          // `subscription`, asi que omitirlos confiando en que se preserven es
+          // apostar a un comportamiento que no existe.
+          prepaidTier: piso === null ? null : piso.tier,
+          prepaidUntil,
         },
       },
       // `merge` y no `set` pelado: el documento de usuario tiene el perfil

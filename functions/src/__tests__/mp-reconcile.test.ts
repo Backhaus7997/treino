@@ -76,6 +76,8 @@ import {
 } from "../subscriptions/mp/reconcile";
 import { MpApiError, MpPreapproval } from "../subscriptions/mp/client";
 import { ReconcileDeps } from "../subscriptions/mp/reconcile";
+import { effectiveWeightLimit } from "../subscriptions/effective-limit";
+import { toSubscriptionState } from "../subscriptions/subscription-state";
 
 // ---------------------------------------------------------------------------
 
@@ -1689,5 +1691,172 @@ describe("reconcileSubscription — el alumno", () => {
     expect(r.athleteStatus).toBeUndefined();
     expect(store.users.t1.subscription).toBeDefined();
     expect(store.users.t1.athleteSubscription).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// EL PISO PREPAGO: lo que el PF ya pagó y el cambio de plan estaba tirando.
+//
+// El #1027 cerró el cobro doble, pero su guarda de reemplazo dejó un agujero al
+// lado: el plan viejo queda `supersededBy` y su `cancelled` —que llevaría su
+// `currentPeriodEnd`— NUNCA se escribe. Está bien que no se escriba, pisaría el
+// plan nuevo. Pero con eso se perdía el único registro del período pago.
+//
+// El daño no es que MP no reembolse (eso es inevitable): es que TREINO dejaba
+// de honrar lo que el PF pagó. Un plan3 (SIN TOPE) que baja a plan1 (7) caía a
+// 7 EN EL ACTO, y `syncEntitlementsOnSubscription` le bloqueaba alumnos en la
+// misma invocación, más el mail de degradación.
+// ---------------------------------------------------------------------------
+
+/** Mundo del DOWNGRADE: plan3 pago y vigente, y un checkout de plan1. */
+const BAJADA = (): Store => ({
+  users: {
+    t1: {
+      role: "trainer",
+      displayName: "Martin",
+      subscription: {
+        tier: "plan3",
+        status: "active",
+        currentPeriodEnd: ts(AHORA + 90 * DIA_MS),
+      },
+    },
+  },
+  mp_plans: {
+    p1: {
+      uid: "t1", tier: "plan3", cycle: "annual",
+      createdAt: ts(AHORA - 60 * DIA_MS),
+    },
+    p2: {
+      uid: "t1", tier: "plan1", cycle: "monthly",
+      createdAt: ts(AHORA - 1 * DIA_MS),
+    },
+  },
+});
+
+/** La suscripción del plan1 nuevo, ya confirmada por MP. */
+const BARATA: MpPreapproval = {
+  ...VIEJA,
+  id: "sub-barata",
+  auto_recurring: { transaction_amount: 12000 },
+};
+
+describe("reconcileSubscription — el periodo prepago no se tira", () => {
+  it("el downgrade conserva el cupo de plan3 hasta que vence lo pagado", async () => {
+    const { app, store } = fakeApp(BAJADA());
+
+    await reconcileSubscription(app, "p2", fakeMpMultiPlan({
+      p1: VIEJA,
+      p2: BARATA,
+    }));
+
+    const sub = store.users.t1.subscription as Record<string, unknown>;
+    // La verdad se escribe: paga plan1 y está activo.
+    expect(sub.tier).toBe("plan1");
+    expect(sub.status).toBe("active");
+    // Y lo que pagó queda registrado como piso.
+    expect(sub.prepaidTier).toBe("plan3");
+    expect((sub.prepaidUntil as { toMillis(): number }).toMillis())
+      .toBe(AHORA + 90 * DIA_MS);
+  });
+
+  it("y el limite efectivo sigue SIN TOPE, que es el punto entero", async () => {
+    const { app, store } = fakeApp(BAJADA());
+
+    await reconcileSubscription(app, "p2", fakeMpMultiPlan({
+      p1: VIEJA, p2: BARATA,
+    }));
+
+    const { state } = toSubscriptionState(store.users.t1, "t1");
+    expect(effectiveWeightLimit(state, AHORA)).toBeNull();
+    // Y cuando vence el piso, recién ahí cae a los 7 que compró.
+    expect(effectiveWeightLimit(state, AHORA + 91 * DIA_MS)).toBe(7);
+  });
+
+  it("es UNA SOLA escritura de users/{uid}, no dos", async () => {
+    // Cada escritura dispara `syncEntitlementsOnSubscription`. En dos, la
+    // primera le bloquea alumnos y le manda el mail de degradación, y la segunda
+    // lo desbloquea. Por eso el piso va en el MISMO `set`.
+    const { app, escrituras } = fakeApp(BAJADA());
+
+    await reconcileSubscription(app, "p2", fakeMpMultiPlan({
+      p1: VIEJA, p2: BARATA,
+    }));
+
+    expect(escrituras.filter((e) => e.col === "users")).toHaveLength(1);
+  });
+
+  it("y la baja de la vieja corre igual: el cobro doble sigue cerrado", async () => {
+    const { app } = fakeApp(BAJADA());
+    const mp = fakeMpMultiPlan({ p1: VIEJA, p2: BARATA });
+
+    const r = await reconcileSubscription(app, "p2", mp);
+
+    expect(r.dadosDeBaja).toBe(1);
+    expect(mp.bajas).toEqual(["sub-vieja"]);
+  });
+
+  it("el piso se escribe aunque MP rechace la baja", async () => {
+    // El piso sale de Firestore, no de la red: no depende de que la baja
+    // confirme. Un 429 de MP no le puede tocar el entitlement al PF.
+    const { app, store } = fakeApp(BAJADA());
+
+    await reconcileSubscription(app, "p2", fakeMpMultiPlan(
+      { p1: VIEJA, p2: BARATA },
+      { fallaLaBaja: new MpApiError("MP caido", 500) },
+    ));
+
+    expect((store.users.t1.subscription as Record<string, unknown>).prepaidTier)
+      .toBe("plan3");
+  });
+
+  it("el piso SOBREVIVE la reconciliacion siguiente, que no cambia nada mas", async () => {
+    // El candado contra un `set` futuro que omita los campos confiando en que el
+    // merge los preserve: `merge` es superficial sobre el mapa `subscription`.
+    const { app, store, escrituras } = fakeApp(BAJADA());
+
+    await reconcileSubscription(app, "p2", fakeMpMultiPlan({
+      p1: VIEJA, p2: BARATA,
+    }));
+    const escriturasTrasLaPrimera = escrituras.length;
+
+    const r = await reconcileSubscription(app, "p2", fakeMpMultiPlan({
+      p1: { ...VIEJA, status: "cancelled" }, p2: BARATA,
+    }));
+
+    expect(r.outcome).toBe("unchanged");
+    expect(escrituras.length).toBe(escriturasTrasLaPrimera);
+    expect((store.users.t1.subscription as Record<string, unknown>).prepaidTier)
+      .toBe("plan3");
+  });
+
+  it("el UPGRADE no arma piso: no hay nada que conservar", async () => {
+    const mundo = UPGRADE();
+    mundo.users.t1.subscription = {
+      tier: "plan2", status: "active", currentPeriodEnd: ts(AHORA + 30 * DIA_MS),
+    };
+    const { app, store } = fakeApp(mundo);
+
+    await reconcileSubscription(app, "p2", fakeMpMultiPlan(DOS_VIVAS()));
+
+    const sub = store.users.t1.subscription as Record<string, unknown>;
+    expect(sub.tier).toBe("plan3");
+    expect(sub.prepaidTier).toBeNull();
+  });
+
+  it("sin `currentPeriodEnd` no hay piso, y se logea el warn", async () => {
+    // Los PF sembrados a mano con el Admin SDK no lo tienen. Degradan al
+    // comportamiento de siempre, pero hay que poder encontrarlos: les acabamos
+    // de bajar el cupo en el acto.
+    const mundo = BAJADA();
+    mundo.users.t1.subscription = { tier: "plan3", status: "active" };
+    const { app, store } = fakeApp(mundo);
+
+    await reconcileSubscription(app, "p2", fakeMpMultiPlan({
+      p1: VIEJA, p2: BARATA,
+    }));
+
+    expect((store.users.t1.subscription as Record<string, unknown>).prepaidTier)
+      .toBeNull();
+    expect(warnSpy).toHaveBeenCalled();
   });
 });
