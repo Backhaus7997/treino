@@ -57,11 +57,29 @@ class WellbeingMoodGlyph extends StatelessWidget {
         fit: BoxFit.scaleDown,
         child: Text(
           emoji,
-          // #456: on the iOS simulator (iPhone 16e / iOS 26.3) these glyphs can
-          // render as tofu "?" — the theme's Barlow families carry no emoji and
-          // the automatic platform fallback doesn't kick in there (likely an
-          // engine/Impeller simulator issue). The explicit fallback pins the
-          // system emoji font; physical-device verification is still pending.
+          // #456 — RESUELTO el 2026-09-21, y conviene leerlo entero antes de
+          // tocar este `style`.
+          //
+          // En el SIMULADOR de iOS estos glifos salen como tofu "?". Medido en
+          // iPhone 17 Pro Max y en iPad Pro 13" (M5). **En un iPhone FISICO se
+          // ven bien**, asi que es un artefacto del simulador y ningun usuario
+          // lo sufre.
+          //
+          // Lo que NO es: un problema de seleccion de fuente. Se probaron
+          // cuatro variantes del mismo glifo lado a lado y las CUATRO dieron
+          // tofu — este `fontFamilyFallback`, `inherit: false` (sin ninguna
+          // familia heredada), `fontFamily: 'Apple Color Emoji'` explicito, y
+          // `fontFamilyFallback: ['.AppleColorEmoji']` con el nombre de
+          // sistema. La variante sin familia es la que manda: el tema Barlow no
+          // tiene nada que ver. En ese simulador el motor no resuelve el glifo
+          // con ningun nombre de familia.
+          //
+          // Corolario: si lo ves en tofu, NO gastes tiempo en el `style` — no
+          // hay nada ahi que arreglar. Probalo en un device.
+          //
+          // El `fontFamilyFallback` se deja puesto: la verificacion en device
+          // se hizo CON el, asi que no esta probado que sobre. Sacarlo seria un
+          // cambio sin medir.
           style: TextStyle(
             fontSize: fontSize,
             fontFamilyFallback: const ['Apple Color Emoji'],
