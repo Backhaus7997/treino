@@ -273,19 +273,14 @@ export { cancelMySubscription } from "./subscriptions/mp/cancel-my-subscription"
 //   firebase functions:secrets:set MP_WEBHOOK_SECRET --project prod
 export { mpWebhook } from "./subscriptions/mp/webhook";
 
-// El webhook de RevenueCat: el que le acredita la suscripcion al ALUMNO.
+// El webhook de RevenueCat acreditaba la suscripcion del ALUMNO y ya no
+// existe: el alumno paga por Mercado Pago desde `gettreino.com`, o sea por el
+// `mpWebhook` de arriba. Se borro entero —nunca proceso una compra real— junto
+// con el SDK del binario. Si algun dia hay que volver, esta en git.
 //
-// Mismo principio que el de MP —del evento se usa el `app_user_id` y la verdad
-// se le pregunta a RevenueCat con nuestra key— pero la POLITICA DE CODIGOS es
-// la inversa, y esa es la parte que no se puede copiar: MP reintenta cada 15
-// minutos para siempre, RevenueCat reintenta 5 veces y abandona. Aca un fallo
-// transitorio SI tiene que contestar 5xx. Ver el encabezado del archivo.
-//
-// Requiere DOS secretos y una variable de entorno:
-//   firebase functions:secrets:set RC_API_KEY         --project prod
-//   firebase functions:secrets:set RC_WEBHOOK_SECRET  --project prod
-//   RC_PROJECT_ID=proj...  (no es secreto)
-export { rcWebhook } from "./subscriptions/rc/webhook";
+// ⚠️ Quedan HUERFANOS en Secret Manager: `RC_API_KEY` y `RC_WEBHOOK_SECRET`.
+// Ya no los declara nadie, asi que no rompen ningun deploy, pero conviene
+// borrarlos — un secreto vivo sin consumidor es superficie de ataque gratis.
 
 // Un UUID v4 por usuario, que HOY NO SE USA PARA NADA. Es un seguro: el dia
 // que se le hable directo a las tiendas hace falta un token propio para saber

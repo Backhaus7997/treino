@@ -491,8 +491,8 @@ sección en el mismo PR.** Concretamente:
    ```bash
    python3 - <<'PY'
    import re
-   EXCL = {"mp_checkouts","mp_plans","mp_preapprovals",
-           "mp_webhook_events","rc_webhook_events"}   # §2.0 punto 1
+   EXCL = {"mp_cancelaciones","mp_checkouts","mp_plans","mp_preapprovals",
+           "mp_webhook_events"}   # §2.0 punto 1
    rules = open("firestore.rules").read(); doc = open("docs/security.md").read()
    paths, pila, d = [], [], 0
    for raw in rules.splitlines():
@@ -627,18 +627,31 @@ que el borrado de cuenta se lleva todo eso, y que la política dice la verdad.
 **Método.** Nada acá sale de memoria ni de suposición:
 
 1. El universo de stores se enumeró con `rg '^\s*match /' firestore.rules` →
-   **45 líneas**, que son **44 colecciones** una vez descontado el wrapper
+   **47 líneas**, que son **46 colecciones** una vez descontado el wrapper
    `match /databases/{database}/documents`.
 
-   Ese 44 **no es** el número de §1.1, y conviene dejar escrito por qué, porque
-   la cifra ya derivó una vez por no estarlo: §1.1 declara **39 paths** y las
-   **5** que faltan son `mp_checkouts`, `mp_plans`, `mp_preapprovals`,
-   `mp_webhook_events` y `rc_webhook_events`. Las cinco son `allow read, write:
-   if false` — bloques **documentales**, escritos sólo por el Admin SDK, que
-   existen para que el default-deny quede explícito en el archivo. No ejercitan
-   ningún permiso de cliente y por eso no aportan celdas a aquella matriz
-   (`mp-collections-rules.test.ts` sí las testea: verifica justamente que estén
-   cerradas). **44 = 39 + 5.**
+   Ese 46 **no es** el número de §1.1, y conviene dejar escrito por qué, porque
+   la cifra ya derivó una vez por no estarlo: §1.1 declara **39 paths**, y hay
+   **5** colecciones `allow read, write: if false` — `mp_cancelaciones`,
+   `mp_checkouts`, `mp_plans`, `mp_preapprovals` y `mp_webhook_events`. Son
+   bloques **documentales**, escritos sólo por el Admin SDK, que existen para
+   que el default-deny quede explícito en el archivo. No ejercitan ningún
+   permiso de cliente y por eso no aportan celdas a aquella matriz.
+
+   ⚠️ **LA CUENTA NO CIERRA, y la deriva es anterior a este cambio.** 39 + 5 =
+   44, pero hay 46: **sobran DOS colecciones sin explicar**. Medido el
+   2026-09-21 sobre `firestore.rules`, no estimado.
+
+   Este párrafo decía «45 líneas / 44 colecciones / **44 = 39 + 5**» cuando el
+   archivo ya tenía 48 `match`, y su lista de cinco omitía `mp_cancelaciones`
+   mientras nombraba `rc_webhook_events` —que se borró con el camino de
+   RevenueCat—. O sea que estaba mal por los dos lados a la vez.
+
+   **No se reemplaza por un total nuevo a propósito.** Cerrar esto es
+   recontar la tabla de §1.1 desde el parseo, que es exactamente lo que el
+   punto 3 de arriba manda hacer y no cabe en el PR que borró RevenueCat. Un
+   número inventado acá volvería a pasar por medido, que es cómo llegamos hasta
+   esta línea.
 
    ⚠️ `if false` **no** es el criterio, aunque lo parezca: `mail_queue` y
    `retention_notices` son igual de CF-only, igual de `if false`, y **sí**
