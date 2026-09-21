@@ -188,7 +188,10 @@ el alcance.)*
 | **«A simple vista … y en el primer acceso»** | Ver el recuadro de abajo: el criterio cambió con la derogación y la ubicación actual es una decisión tomada, no un cumplimiento verificado |
 | **Texto literal** | El enlace dice **"Botón de Arrepentimiento"**. Nada de "Gestión de suscripción" ni eufemismos: la norma pide que no deje dudas |
 
-> ⚠️ **Los dos botones están en el pie, y la norma vigente pide más que eso.**
+> ⚠️ **Los dos botones están en el pie —el de baja desde el 2026-09-21— y la
+> norma vigente pide más que eso.** (Que estén publicados no quiere decir que
+> funcionen: el canal que registra las solicitudes está caído en los dos. Eso
+> es §3.5, y es más urgente que esto.)
 >
 > El criterio **cambió con la derogación**, y la conclusión vieja de este archivo
 > se quedó sin fundamento sin que nada lo indicara:
@@ -315,19 +318,46 @@ Lo mismo que el arrepentimiento, y por el mismo motivo:
 | **Profesor / entrenador** | Directo, Mercado Pago, desde el Coach Hub | **TREINO** — acá hace falta el botón |
 | **Alumno** | Compra integrada (Apple / Google) | La **tienda**. El sitio indica la ruta, no ofrece el flujo |
 
-#### Qué falta construir, concretamente
+#### Qué falta construir — actualizado el 2026-09-21
 
-La **capacidad** ya existe: `cancelMySubscription` del lado del servidor y
-`plan_cancel.dart` en el Coach Hub. Lo que falta es **la puerta pública**:
+La **capacidad** ya existía (`cancelMySubscription` del lado del servidor y
+`plan_cancel.dart` en el Coach Hub). La **puerta pública se construyó** en
+`treino-app#15`, mergeado el 2026-09-21.
 
-1. Un link en el pie de `gettreino.com`, al lado del de arrepentimiento, con el
-   texto literal «Botón de Baja de Servicio».
-2. Su página, alcanzable **sin sesión iniciada**.
-3. Detrás, verificación de identidad razonable (habilitada por la 3/2026 — §3.2),
-   y de ahí al flujo de baja que ya existe.
-4. Respuesta por el mismo medio **dentro de las 24 h** con código de
-   identificación. No es analogía con el arrepentimiento: lo dice el **art. 5**,
-   que nombra expresamente «la solicitud de baja del servicio» (§3.1).
+Estado de los cuatro puntos, **verificado contra producción**, no contra el
+código:
+
+| | Qué pedía | Estado |
+|---|---|---|
+| 1 | Link en el pie con el texto literal «Botón de Baja de Servicio» | ✅ `curl https://gettreino.com/es` lo devuelve |
+| 2 | Su página, alcanzable **sin sesión iniciada** | ✅ `/es/baja-de-servicio` → `200` |
+| 3 | Verificación de identidad detrás (habilitada por la 3/2026) | ⬜ **No se puso, a propósito.** El art. 4 prohíbe «otro trámite adicional»; la 3/2026 *permite* verificar, no obliga. Se pide nombre, correo, plan y canal, y la identidad la valida quien procesa |
+| 4 | Respuesta en **24 h** con código de identificación (art. 5) | ❌ **BLOQUEADO** — ver abajo |
+
+> 🚨 **El punto 4 no funciona, y tampoco funciona el del arrepentimiento.**
+>
+> Medido el 2026-09-21 contra producción:
+>
+> ```
+> GET https://gettreino.com/api/baja-de-servicio  →  {"configured":false}
+> GET https://gettreino.com/api/arrepentimiento   →  {"configured":false}
+> ```
+>
+> El sumidero que registra las solicitudes **nunca se cargó en Vercel**. Las dos
+> páginas se ven, los dos formularios se completan, y al enviar el servidor
+> contesta `503`: no se registra nada, no se emite código y no sale ningún
+> correo. El formulario deriva a `treino@gettreino.com` y le dice a la persona
+> que su pedido cuenta desde hoy, que es lo único que se puede hacer sin el
+> sumidero — pero eso es una red de contención, no el cumplimiento del art. 5.
+>
+> **Esto no se arregla con código.** Hay que cargar la variable de entorno
+> `ARREPENTIMIENTO_WEBHOOK_URL` en Vercel; el endpoint de baja cae a esa misma
+> variable a propósito, así que **con cargar una andan los dos**.
+>
+> Tener el botón visible y el canal muerto es peor que no tenerlo, porque la
+> persona se va creyendo que hizo el trámite. Es lo más urgente de este archivo.
+
+El **art. 8** dio 60 días para adecuarse: exigible desde el **2025-11-04**.
 
 El punto 3 es lo que hace que esto sea chico: sin la 3/2026 habría que construir
 un camino de baja público y anónimo, paralelo al que ya existe y sin forma de
