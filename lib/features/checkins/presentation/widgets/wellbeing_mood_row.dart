@@ -63,13 +63,12 @@ class WellbeingMoodGlyph extends StatelessWidget {
           // medido y es reproducible: iPhone 17 Pro Max y iPad Pro 13" (M5),
           // 2026-09-21.
           //
-          // En hardware real NO esta reproducido: en el unico iPhone fisico
-          // que se probo se ven bien. **Modelo y version de iOS no quedaron
-          // registrados**, asi que eso NO alcanza para concluir que ningun
-          // usuario lo sufre — quedan sin probar otros modelos de iPhone y de
-          // iPad, otras versiones de iOS y otras del engine de Flutter. Si lo
-          // ves en tofu en un device, es un hallazgo nuevo: anotá ahi el
-          // modelo y la version, y reabri.
+          // En hardware real NO esta reproducido: en un **iPhone 16 con iOS
+          // 27** se ven bien. Esa es UNA configuracion, y no alcanza para
+          // concluir que ningun usuario lo sufre — quedan sin probar otros
+          // modelos de iPhone, cualquier iPad fisico, otras versiones de iOS y
+          // otras del engine de Flutter. Si lo ves en tofu en un device, es un
+          // hallazgo nuevo: sumá ahi el modelo y la version, y reabri.
           //
           // Lo que NO es: un problema de seleccion de fuente. Se probaron
           // cuatro variantes del mismo glifo lado a lado y las CUATRO dieron
