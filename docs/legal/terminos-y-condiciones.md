@@ -12,13 +12,19 @@ version: 3
 # Términos y Condiciones de TREINO
 
 **Última actualización:** <!-- fecha:auto -->
-**Versión:** 2.0 (borrador)
+**Versión:** 2.0
 
-> ⚠️ **BORRADOR INCOMPLETO A PROPÓSITO.**
-> Reemplaza a `kTermsSections` en `lib/features/auth/presentation/legal/legal_content.dart`.
-> Tres cláusulas dependen de decisiones pendientes y están marcadas: **edad
-> mínima (D2)**, **ámbito territorial (D3)** y **suscripciones y reembolsos
-> (D4/D6)**. El resto está redactado y es revisable.
+> **ESTADO: PUBLICADO, SIN REVISIÓN LEGAL.**
+>
+> Decisión del titular del 2026-09-21: se sale al mercado con estos textos y el
+> dictamen profesional se hace después. Este bloque vive **arriba del primer
+> `## `**, o sea afuera de lo publicable: no lo lee ningún usuario. Está acá
+> para que el que venga sepa qué se decidió y qué falta mirar.
+>
+> **Qué falta:** nada marcado. El cartel anterior decía que tres cláusulas
+> dependían de decisiones pendientes —edad mínima (D2), ámbito territorial (D3)
+> y suscripciones y reembolsos (D4/D6)—. Las tres están resueltas: 13 años,
+> Argentina (2026-09-17) y 14 días (2026-09-21). No quedan marcadores.
 
 ---
 

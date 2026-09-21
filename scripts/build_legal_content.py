@@ -55,6 +55,8 @@ from __future__ import annotations
 
 import argparse
 import datetime
+import hashlib
+import json
 import re
 import shutil
 import subprocess
@@ -65,6 +67,31 @@ ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "docs" / "legal"
 DART_OUT = ROOT / "lib/features/auth/presentation/legal/legal_content.dart"
 WEB_OUT = ROOT / "build" / "legal-web"
+
+# El TERCER eslabon: lo que consume la landing (`gettreino.com`, repo
+# `treino-app`).
+#
+# Va commiteado y bajo `web/` porque ese arbol es PUBLICO —`treino` es un repo
+# publico— y eso es lo que hace posible el control cruzado sin tokens: el CI de
+# `treino-app`, que es privado, puede bajar este archivo por `raw.github...` y
+# comparar contra lo suyo. Sin esa asimetria habria que meter un submodulo o un
+# paquete versionado.
+#
+# Lleva los NUEVE documentos, no los dos de `EN_EL_BINARIO`: la Guideline 3.1.3
+# de Apple habla de lo que pasa «within the app», y un sitio web no es la app.
+LANDING_OUT = ROOT / "web" / "legal" / "legal-content.json"
+
+# El MANIFIESTO: slug + titulo + nada mas.
+#
+# Existe por peso de bundle, no por comodidad. El pie de `gettreino.com` es un
+# componente de CLIENTE y esta en todas las paginas: si importa el JSON completo
+# para pintar nueve titulos, el navegador se baja el corpus legal entero —92 KB
+# con el cuerpo de los nueve documentos— en cada visita a la landing.
+#
+# Lo marco Codex en treino-app#14 (P2). La salida no es que la landing mantenga
+# su propia lista de nombres —seria otra copia mas que nada compara— sino que el
+# generador emita las dos cosas desde la misma fuente.
+LANDING_MANIFEST = ROOT / "web" / "legal" / "legal-manifest.json"
 
 CONTACT_EMAIL = "[[PENDIENTE]]"   # se sobreescribe desde aviso-legal.md
 SITE = "gettreino.com"
@@ -151,15 +178,36 @@ def flatten_table(rows: list[str]) -> list[str]:
     header, body = cells[0], cells[1:]
     if not body:
         return []
+    # Cuando el encabezado de la PRIMERA columna esta vacio, esa columna no es un
+    # dato: es la ETIQUETA de la fila. Hay que conservarla aparte.
+    #
+    # Sin esto se perdia, porque el `zip(header, row)` de abajo filtra por
+    # `if v and h` y ahi `h` es "". El caso real, en terminos-suscripcion.md:
+    #
+    #     | | Contratado en la web | Contratado desde la app |
+    #     | Quién gestiona la baja      | TREINO | La tienda |
+    #     | Quién gestiona el reembolso | TREINO | La tienda |
+    #
+    # salia como DOS BULLETS IDENTICOS —«Contratado en la web: TREINO —
+    # Contratado desde la app: La tienda»— y el usuario no podia distinguir la
+    # baja del reembolso. En un documento legal sobre bajas y reembolsos.
+    etiquetas = bool(header) and not header[0]
+
     out = []
     for row in body:
         if len(row) == 2:
             left, right = row
             out.append(f"• {left}: {right}" if left else f"• {right}")
         else:
-            parts = [f"{h}: {v}" for h, v in zip(header, row) if v and h]
-            out.append("• " + " — ".join(parts) if parts
-                       else "• " + " — ".join(x for x in row if x))
+            pares = list(zip(header, row))
+            prefijo = ""
+            if etiquetas and pares and pares[0][1]:
+                prefijo = f"{pares[0][1]} — "
+                pares = pares[1:]
+            parts = [f"{h}: {v}" for h, v in pares if v and h]
+            out.append("• " + prefijo + " — ".join(parts) if parts
+                       else "• " + prefijo.rstrip(" —")
+                       + " — ".join(x for x in row if x))
     return out
 
 
@@ -723,6 +771,56 @@ def load() -> tuple[list[dict], list[str]]:
     return docs, pending
 
 
+def emit_landing(docs: list[dict]) -> str:
+    """El JSON que consume la landing. Los NUEVE documentos.
+
+    Formato estable a proposito: `indent=2`, `sort_keys=False` y el orden de
+    `ORDER`. `--check` compara texto contra texto, asi que cualquier cambio de
+    formato se leeria como desfasaje y mandaria a regenerar sin motivo.
+
+    `sourceSha` es el que hace barato el control cruzado: la landing no tiene
+    que re-derivar nada, le alcanza con comparar esa cadena contra la del
+    archivo publicado en `treino`.
+    """
+    cuerpo = {
+        "$comment": (
+            "GENERADO POR scripts/build_legal_content.py en el repo `treino`. "
+            "NO EDITAR A MANO, ni aca ni en la copia de `treino-app`: la "
+            "fuente son los markdown de docs/legal/."
+        ),
+        "documents": [
+            {
+                "slug": d["slug"],
+                "title": d["title"],
+                "lastUpdated": d["updated"],
+                **({"version": d["version"]} if d["version"] is not None else {}),
+                "sections": [
+                    {"heading": h, "body": b} for h, b in d["sections"]
+                ],
+            }
+            for d in docs
+        ],
+    }
+    # El sha se calcula sobre el contenido YA serializado y sin el propio sha,
+    # para que sea reproducible de los dos lados.
+    sin_sha = json.dumps(cuerpo, ensure_ascii=False, indent=2, sort_keys=False)
+    cuerpo["sourceSha"] = hashlib.sha256(sin_sha.encode("utf-8")).hexdigest()
+    return json.dumps(cuerpo, ensure_ascii=False, indent=2,
+                      sort_keys=False) + "\n"
+
+
+def emit_manifest(docs: list[dict]) -> str:
+    """Slug y titulo de los nueve. Lo que el pie necesita y nada mas."""
+    return json.dumps({
+        "$comment": (
+            "GENERADO POR scripts/build_legal_content.py en el repo `treino`. "
+            "Es el indice liviano de legal-content.json — mismo orden, mismos "
+            "slugs. NO EDITAR A MANO."
+        ),
+        "documents": [{"slug": d["slug"], "title": d["title"]} for d in docs],
+    }, ensure_ascii=False, indent=2, sort_keys=False) + "\n"
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--check", action="store_true",
@@ -774,6 +872,18 @@ def main() -> int:
         stale = []
         if not DART_OUT.exists() or DART_OUT.read_text(encoding="utf-8") != dart:
             stale.append(str(DART_OUT.relative_to(ROOT)))
+        # El tercer eslabon entra al mismo `--check`. Sin esto la landing
+        # quedaria fuera del gate y volveria a desfasarse, que es lo que ya
+        # paso: `gettreino.com` sirvio texto de marzo durante meses mientras
+        # el markdown avanzaba.
+        landing = emit_landing(docs)
+        if (not LANDING_OUT.exists()
+                or LANDING_OUT.read_text(encoding="utf-8") != landing):
+            stale.append(str(LANDING_OUT.relative_to(ROOT)))
+        manifiesto = emit_manifest(docs)
+        if (not LANDING_MANIFEST.exists()
+                or LANDING_MANIFEST.read_text(encoding="utf-8") != manifiesto):
+            stale.append(str(LANDING_MANIFEST.relative_to(ROOT)))
         if stale:
             print("[!] Desfasaje: se edito docs/legal/ y no se regenero.\n"
                   "    Corre: python3 scripts/build_legal_content.py\n",
@@ -788,7 +898,16 @@ def main() -> int:
     dart_path.write_text(dart, encoding="utf-8")
     dart_format(dart_path)
 
+    landing_path = (ROOT / "build/legal-preview/legal-content.json"
+                    if args.preview else LANDING_OUT)
+    landing_path.parent.mkdir(parents=True, exist_ok=True)
+    landing_path.write_text(emit_landing(docs), encoding="utf-8")
+    manifest_path = (ROOT / "build/legal-preview/legal-manifest.json"
+                     if args.preview else LANDING_MANIFEST)
+    manifest_path.write_text(emit_manifest(docs), encoding="utf-8")
+
     print(f"[OK] {dart_path.relative_to(ROOT)}")
+    print(f"[OK] {landing_path.relative_to(ROOT)}  ({len(docs)} documentos)")
     print("     falta el segundo eslabon: dart run tool/build_legal_pages.dart")
     for d in docs:
         print(f"       {len(d['sections']):>2} secciones  {d['slug']}")

@@ -7,23 +7,26 @@ dart: kTrainerTermsSections
 # Términos para Entrenadores de TREINO
 
 **Última actualización:** <!-- fecha:auto -->
-**Versión:** 1.0 (borrador)
+**Versión:** 1.0
 
-> 🔴 **REVISIÓN LEGAL OBLIGATORIA.**
+> **ESTADO: PUBLICADO, SIN REVISIÓN LEGAL.**
 >
-> El riesgo de este documento es la **relación laboral encubierta**. Y hay algo
-> que conviene entender antes de leerlo: en derecho laboral argentino rige la
-> **primacía de la realidad**. Si un entrenador demuestra que trabajaba en
+> Decisión del titular del 2026-09-21: se sale al mercado con estos textos y el
+> dictamen profesional se hace después. Este bloque vive **arriba del primer
+> `## `**, o sea afuera de lo publicable: no lo lee ningún usuario. Está acá
+> para que el que venga sepa qué se decidió y qué falta mirar.
+>
+> 🔴 **El riesgo de este documento no se arregla redactando.**
+>
+> Es la **relación laboral encubierta**. En derecho laboral argentino rige la
+> **primacía de la realidad**: si un entrenador demuestra que trabajaba en
 > relación de dependencia, este contrato diciendo «prestador independiente»
 > vale poco.
 >
-> Es decir: **el valor del abogado acá no está en redactar mejor estas
-> cláusulas, sino en decir cómo operar** para que la dependencia no se
-> configure. Cuánto control se ejerce sobre el PF, quién fija sus precios, si
-> se le imponen horarios, cómo se lo evalúa. Eso son decisiones de producto que
-> ya se están tomando en el código.
->
-> Ver la pregunta 2 de la sección 6.2 de `guia-legal-treino.pdf`.
+> O sea que el valor del abogado acá **no está en mejorar estas cláusulas, sino
+> en decir cómo operar** para que la dependencia no se configure: cuánto control
+> se ejerce sobre el PF, quién fija sus precios, cómo se lo presenta. Publicar
+> el texto no mueve esa aguja — ni para bien ni para mal.
 
 ---
 

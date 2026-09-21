@@ -303,6 +303,56 @@ class GeneradorLegal(unittest.TestCase):
         self.assertIn(BLANCO, r.stdout + r.stderr,
                       "aborto, pero sin decir que archivo hay que arreglar")
 
+    # --- tablas ----------------------------------------------------------
+
+    def test_la_tabla_conserva_la_etiqueta_de_fila(self):
+        """Con el encabezado de la 1ª columna vacío, esa columna es la ETIQUETA.
+
+        Sin esto se perdía: el `zip(header, row)` filtra por `if v and h`, y ahi
+        `h` es "". En `terminos-suscripcion.md` eso producia DOS BULLETS
+        IDENTICOS para «quién gestiona la baja» y «quién gestiona el reembolso»
+        —los dos «Contratado en la web: TREINO — Contratado desde la app: La
+        tienda»— asi que el usuario no podia distinguirlos. En un documento
+        legal sobre bajas y reembolsos. Lo encontro Codex en el PR #1207 (P1).
+        """
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("blc", SCRIPT)
+        blc = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(blc)
+
+        filas = [
+            "| | En la web | En la app |",
+            "|---|---|---|",
+            "| Baja | TREINO | La tienda |",
+            "| Reembolso | TREINO | La tienda |",
+        ]
+        salida = blc.flatten_table(filas)
+
+        self.assertEqual(len(salida), 2)
+        self.assertNotEqual(
+            salida[0], salida[1],
+            "dos filas distintas dieron el MISMO bullet: se perdio la etiqueta")
+        self.assertIn("Baja", salida[0])
+        self.assertIn("Reembolso", salida[1])
+
+    def test_la_tabla_normal_no_cambia(self):
+        """CONTROL: con encabezado en la 1ª columna, el formato es el de antes.
+
+        Sin este control, el arreglo de arriba podria estar metiendo la etiqueta
+        en TODAS las tablas y el otro test pasaria igual.
+        """
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("blc", SCRIPT)
+        blc = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(blc)
+
+        salida = blc.flatten_table([
+            "| Dato | Quién lo ve |",
+            "|---|---|",
+            "| Tu peso | Sólo vos |",
+        ])
+        self.assertEqual(salida, ["• Tu peso: Sólo vos"])
+
     # --- el split app/web ------------------------------------------------
 
     def test_al_dart_solo_van_los_de_en_el_binario(self):
@@ -341,6 +391,58 @@ class GeneradorLegal(unittest.TestCase):
                     f"{const} =", dart,
                     f"{nombre} se emitio al Dart y no esta en EN_EL_BINARIO: "
                     "su texto viaja en el binario movil")
+
+    # --- el tercer eslabon: la landing -----------------------------------
+
+    def test_al_json_de_la_landing_van_los_NUEVE(self):
+        """El JSON lleva los nueve, no los dos de `EN_EL_BINARIO`.
+
+        El split del binario existe por la Guideline 3.1.3 de Apple, que habla
+        de lo que pasa «within the app». Un sitio web no es la app: filtrar ahi
+        tambien dejaria a `gettreino.com` sin siete documentos legales que la
+        Guideline 1.2 y la ley de consumidor SI le piden publicar.
+
+        O sea: los dos filtros son opuestos a proposito, y este test lo fija
+        para que nadie los unifique «por consistencia».
+        """
+        import json as _json
+        tmp = self.arbol_git()
+        r = self.correr(tmp)
+        self.assertEqual(r.returncode, 0, f"{r.stdout}\n{r.stderr}")
+
+        destino = tmp / "web" / "legal" / "legal-content.json"
+        self.assertTrue(destino.exists(), "no se emitio el JSON de la landing")
+        d = _json.loads(destino.read_text(encoding="utf-8"))
+
+        self.assertEqual(
+            [x["slug"] for x in d["documents"]],
+            [slug for _, slug, _, _ in DOCS],
+            "el JSON no lleva los nueve documentos, o cambio el orden")
+        self.assertTrue(d.get("sourceSha"),
+                        "falta el sha: sin el, el control cruzado con "
+                        "`treino-app` tiene que re-derivar todo")
+
+    def test_el_sha_cambia_si_cambia_el_texto(self):
+        """CONTROL: el sha tiene que MOVERSE con el contenido.
+
+        Un sha que no se mueve es peor que ninguno: los dos repos comparan una
+        cadena que siempre coincide y el control cruzado pasa en verde sobre
+        textos distintos.
+        """
+        import json as _json
+
+        def sha_de(cuerpo: str) -> str:
+            tmp = self.arbol_git(**{
+                BLANCO: doc("terminos", "Términos y Condiciones",
+                            "kTermsSections", cuerpo=cuerpo),
+            })
+            self.assertEqual(self.correr(tmp).returncode, 0)
+            destino = tmp / "web" / "legal" / "legal-content.json"
+            return _json.loads(destino.read_text(encoding="utf-8"))["sourceSha"]
+
+        self.assertNotEqual(sha_de("Texto publicable."),
+                            sha_de("Texto publicable, distinto."),
+                            "el sha no se movio al cambiar el texto")
 
     # --- lo que NO se puede romper al arreglar ---------------------------
 

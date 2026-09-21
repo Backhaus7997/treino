@@ -7,16 +7,24 @@ dart: kHealthDisclaimerSections
 # Descargo de Responsabilidad Médica y Asunción de Riesgo
 
 **Última actualización:** <!-- fecha:auto -->
-**Versión:** 1.0 (borrador)
+**Versión:** 1.0
 
-> 🔴 **REVISIÓN LEGAL OBLIGATORIA — no publicar sin ella.**
+> **ESTADO: PUBLICADO, SIN REVISIÓN LEGAL.**
+>
+> Decisión del titular del 2026-09-21: se sale al mercado con estos textos y el
+> dictamen profesional se hace después. Este bloque vive **arriba del primer
+> `## `**, o sea afuera de lo publicable: no lo lee ningún usuario. Está acá
+> para que el que venga sepa qué se decidió y qué falta mirar.
+>
+> 🔴 **Y acá el «después» pesa más que en los otros ocho.**
 >
 > Este es el documento de mayor exposición de TREINO. Si una persona se lesiona
-> entrenando con la app, este texto y su flujo de aceptación son la defensa. No
-> hay corrección posterior: o sirve el día del hecho, o no sirve.
+> entrenando con la app, este texto y su flujo de aceptación son la defensa.
+> **No hay corrección posterior: o sirve el día del hecho, o no sirve.**
 >
-> El borrador está armado para que el abogado trabaje sobre algo concreto, no
-> para publicarse tal cual. Ver la pregunta 1 de la sección 6.2 de
+> El texto está redactado y es coherente con el producto. Lo que no tiene es a
+> alguien habilitado diciendo que alcanza. Cuando llegue el abogado, este es el
+> primero de la pila. Ver la pregunta 1 de la sección 6.2 de
 > `guia-legal-treino.pdf`.
 
 ---

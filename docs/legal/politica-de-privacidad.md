@@ -18,14 +18,21 @@ published: 2026-09-03
 # Política de Privacidad de TREINO
 
 **Última actualización:** <!-- fecha:auto -->
-**Versión:** 2.0 (borrador)
+**Versión:** 2.0
 
-> ⚠️ **BORRADOR — NO PUBLICAR TODAVÍA.**
+> **ESTADO: PUBLICADO, SIN REVISIÓN LEGAL.**
+>
+> Decisión del titular del 2026-09-21: se sale al mercado con estos textos y el
+> dictamen profesional se hace después. Este bloque vive **arriba del primer
+> `## `**, o sea afuera de lo publicable: no lo lee ningún usuario. Está acá
+> para que el que venga sepa qué se decidió y qué falta mirar.
+>
 > Redactado contra el código y las reglas de Firestore, verificado el 2026-08-31.
-> Titular, sede social y casilla de contacto resueltos. Lo que queda pendiente
-> son las decisiones D2/D3/D4/D6 y la fecha de publicación. Requiere revisión de un
-> profesional legal antes de publicarse. Ver
-> [`AUDITORIA-legal-vigente.md`](./AUDITORIA-legal-vigente.md).
+> Titular, sede social y casilla de contacto resueltos.
+>
+> **Qué falta mirar:** la inscripción ante la AAIP, que hoy es una infracción
+> leve por tratar datos sin estar inscripto. No es requisito de tienda ni
+> bloquea publicar.
 
 ---
 
