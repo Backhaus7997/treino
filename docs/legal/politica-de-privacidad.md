@@ -2,13 +2,22 @@
 slug: privacidad
 title: Política de Privacidad
 dart: kPrivacySections
-version: 1
+# 4 y no 1, por el mismo motivo que los Terminos: es lo que hoy se sella en
+# `acceptedPrivacyVersion`. Ver el front matter de terminos-y-condiciones.md.
+version: 4
+# OJO — esta fecha venia apareada al nombre `kPrivacyV1PublishedAt` mientras
+# la version en produccion ya era 4. Al generar, el nombre pasa a
+# `kPrivacyV4PublishedAt` (regla `kPrivacy` + `V{version}` + `PublishedAt`) y
+# el gate del aviso legacy se actualiza con el. La FECHA no se toco: el gate
+# compara contra el mismo 2026-09-03 de siempre y ningun usuario cambia de
+# lado. Que la fecha de v1 quedara colgada de la version 4 es deuda heredada
+# del archivo escrito a mano, y conviene revisarla aparte.
 published: 2026-09-03
 -->
 
 # Política de Privacidad de TREINO
 
-**Última actualización:** [[PENDIENTE — fecha de publicación]]
+**Última actualización:** <!-- fecha:auto -->
 **Versión:** 2.0 (borrador)
 
 > ⚠️ **BORRADOR — NO PUBLICAR TODAVÍA.**
@@ -128,6 +137,10 @@ Te lo decimos explícitamente porque no lo verías por tu cuenta.
 ordenar por cercanía los gimnasios y entrenadores. Es opcional de verdad: sin el
 permiso, la búsqueda funciona por nombre y especialidad. **Tu ubicación no se
 publica a otros usuarios.**
+
+Tus **coordenadas exactas no salen de tu teléfono**: para buscar gimnasios le
+mandamos a nuestro proveedor de mapas una **zona aproximada de unos 5 km**, no tu
+punto.
 
 **Si sos entrenador:** las ubicaciones donde trabajás forman parte de tu **perfil
 público**. Se guardan con coordenadas precisas y se muestran en el mapa a
@@ -376,9 +389,9 @@ y sesiones, tus medidas y tests, tus check-ins, tus molestias reportadas y sus
 fotos, tus publicaciones, tus archivos, tus vínculos con entrenadores, y **los
 registros privados que tu entrenador llevaba sobre vos**.
 
-También podés solicitarlo desde la web, sin instalar la app y sin iniciar
-sesión, en
-[gettreino.com/es/eliminar-cuenta](https://gettreino.com/es/eliminar-cuenta).
+También podés solicitarlo en
+[gettreino.com/es/eliminar-cuenta](https://gettreino.com/es/eliminar-cuenta),
+sin instalar la app y sin iniciar sesión.
 
 Detalle técnico en [`retencion-y-borrado.md`](./retencion-y-borrado.md).
 
@@ -442,8 +455,8 @@ consentir.
 
 ### 12.3 Cumplimiento
 
-Si tomamos conocimiento de que una cuenta pertenece a una persona menor de 16
-años, o de que una persona de 16 o 17 la creó **sin el consentimiento de su
+Si tomamos conocimiento de que una cuenta pertenece a una persona menor de 13
+años, o de que una persona menor de 18 la creó **sin el consentimiento de su
 representante legal**, la suspendemos y eliminamos sus datos.
 
 ### 12.4 Por qué el mínimo es 13

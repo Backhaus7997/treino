@@ -58,7 +58,7 @@ Widget _host(UserProfile profile, {required VoidCallback onTapBehind}) {
 }
 
 void main() {
-  final before = kPrivacyV1PublishedAt.subtract(const Duration(days: 30));
+  final before = kPrivacyV4PublishedAt.subtract(const Duration(days: 30));
 
   testWidgets('el aviso aparece para el atleta legacy', (tester) async {
     await tester.pumpWidget(
@@ -109,7 +109,7 @@ void main() {
       (tester) async {
     await tester.pumpWidget(
       _host(
-        _athlete(termsAcceptedAt: kPrivacyV1PublishedAt),
+        _athlete(termsAcceptedAt: kPrivacyV4PublishedAt),
         onTapBehind: () {},
       ),
     );

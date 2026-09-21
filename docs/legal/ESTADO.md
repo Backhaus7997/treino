@@ -64,10 +64,17 @@ cae el trámite del D-U-N-S, que era el de mayor plazo del proyecto.
 
 ### Por qué 14 días y no 10
 
-Argentina exige 10 (art. 34 de la Ley 24.240) y la Unión Europea 14. Con 14 **una
-sola regla cumple en todas partes**, sin lógica por jurisdicción. El derecho es
-**irrenunciable**: una cláusula que diga «no hay reembolsos» se tiene por no
-escrita y se aplica la ley igual.
+**Decisión del titular, 2026-09-21: se mantienen los 14 días para los dos
+planes.** Argentina exige 10 corridos (art. 34 de la Ley 24.240) y damos cuatro
+más. El derecho es **irrenunciable**: una cláusula que diga «no hay reembolsos»
+se tiene por no escrita y se aplica la ley igual.
+
+El motivo anterior decía que con 14 «una sola regla cumple en todas partes»,
+porque 14 era el plazo europeo. **Ese argumento ya no aplica**: con el
+lanzamiento acotado a la Argentina (2026-09-17) hay un solo mercado, así que no
+hay dos plazos que unificar. La política no cambió; el motivo sí, y ahora es
+simplemente que ser más generoso que el piso legal no hay que defenderlo ante
+nadie.
 
 > ⚠️ **Este razonamiento quedó incompleto (2026-09-21).** Citaba la Resolución
 > 424/2020, **derogada** por el art. 10 de la Disposición 954/2025. La que la

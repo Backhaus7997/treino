@@ -63,9 +63,19 @@ void main() {
     /// redacción a propósito: si alguien la reescribe, este test falla y lo
     /// obliga a volver a confirmar el número, que es exactamente lo que no
     /// pasó las dos veces anteriores.
-    final declaracionDePiso =
-        RegExp(r'(?:Debés tener|edad mínima para crear una cuenta es de)'
-            r'\s+(\d+)\s+años');
+    ///
+    /// Las variantes salieron del markdown de `docs/legal/`, que desde el
+    /// 2026-09-21 es la fuente real: antes este archivo estaba escrito a mano y
+    /// usaba otras palabras que las del documento. Al generarlo, los Términos
+    /// pasaron a decir «tenés que tener N años cumplidos» y la Política «…para
+    /// crear una cuenta en TREINO es de N años». El número se volvió a
+    /// confirmar contra `kMinAgeYears` al agregar cada variante.
+    final declaracionDePiso = RegExp(
+      r'(?:Debés tener|tenés que tener'
+      r'|edad mínima para (?:crear una cuenta|usar TREINO)'
+      r'(?: en TREINO)? es de)'
+      r'\s+(\d+)\s+años',
+    );
 
     /// La mayoría de edad argentina. Es el único otro número que puede
     /// aparecer legítimamente al lado de "años" en estos textos.

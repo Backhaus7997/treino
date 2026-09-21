@@ -142,11 +142,20 @@ void main() {
       // La versión anterior decía "Tu ubicación no es visible para otros
       // usuarios" a secas, y para un entrenador eso era falso: su pin se
       // publica en el mapa. Es el agujero que este cambio cierra.
+      // La redacción cambió el 2026-09-21, cuando `legal_content.dart` pasó a
+      // GENERARSE desde `docs/legal/`: el archivo escrito a mano decía «SÍ es
+      // visible para los atletas» y el markdown —que ahora es la fuente— lo
+      // dice más explícito, nombrando el perfil público y el mapa. El
+      // invariante es el mismo y no se aflojó: la política tiene que decir que
+      // la ubicación del PF se publica.
       final src =
           File('lib/features/auth/presentation/legal/legal_content.dart')
               .readAsStringSync();
-      expect(src, contains('SÍ es visible para los atletas'),
+      expect(src, contains('se muestran en el mapa a cualquier usuario'),
           reason: 'la sección Ubicación volvió a ocultar el caso del PF');
+      expect(src, contains('perfil público'),
+          reason:
+              'la política dejó de decir que la ubicación del PF se publica');
       expect(src, isNot(contains('Tu ubicación no es visible para otros')),
           reason: 'volvió la afirmación que le miente al entrenador');
     });

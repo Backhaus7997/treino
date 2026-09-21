@@ -16,16 +16,25 @@ temporal: `ROOT` sale de `Path(__file__).resolve().parent.parent`, asi que una
 copia del script en `<tmp>/scripts/` hace que `SRC` apunte a
 `<tmp>/docs/legal/`. Nada toca el repo.
 
-El aislamiento no es comodidad, es correccion: contra el `docs/legal/` real
-estos tests saldrian en rojo HOY, pero por el marcador del INPI que sigue vivo
-en el cuerpo de `aviso-legal.md` — o sea por el motivo equivocado. Con fixtures
-limpios, un exit 2 solo puede venir de la fecha.
+El aislamiento no es comodidad, es correccion: un exit 2 contra el `docs/legal/`
+real puede venir de cualquier marcador vivo en cualquiera de los nueve
+documentos, o sea por el motivo equivocado. Con fixtures limpios solo puede
+venir de la fecha. (Cuando estos tests se escribieron el ruido era concreto: el
+marcador del INPI seguia vivo en `aviso-legal.md`. Se cerro el 2026-09-21, pero
+el argumento no dependia de ese marcador en particular.)
+
+Los tres casos de `<!-- fecha:auto -->` usan `arbol_git()` en vez de `arbol()`,
+porque necesitan historial. El tercero es el control negativo y usa `arbol()` a
+proposito: sin repo, el generador tiene que abortar en vez de inventar una
+fecha.
 
 Los dos primeros casos son controles, y no son decorado: sin ellos un fixture
 mal armado tumbaria al generador por cualquier otra razon y los tests de la
 fecha pasarian en verde sin haber medido nada.
 """
 
+import datetime
+import os
 import shutil
 import subprocess
 import sys
@@ -38,6 +47,14 @@ SCRIPT = ROOT / "scripts" / "build_legal_content.py"
 
 FECHA_OK = "**Última actualización:** 3 de septiembre de 2026"
 FECHA_PENDIENTE = "**Última actualización:** [[PENDIENTE — fecha de publicación]]"
+FECHA_AUTO = "**Última actualización:** <!-- fecha:auto -->"
+
+# Una fecha de commit fija, para poder asertar contra un valor concreto en vez
+# de contra "algo que parezca una fecha". Un test que acepta cualquier fecha
+# pasa igual si el generador estampa la de hoy cuando deberia leer el historial.
+COMMIT_ISO = "2026-03-14"
+COMMIT_ES = "14 de marzo de 2026"
+DART_OUT = Path("lib/features/auth/presentation/legal/legal_content.dart")
 
 # (archivo, slug, title, dart) — el ORDER completo de build_legal_content.py.
 # Si el generador suma un documento, estos fixtures fallan con "falta
@@ -111,6 +128,38 @@ class GeneradorLegal(unittest.TestCase):
             capture_output=True, text=True,
         )
 
+    def arbol_git(self, **overrides: str) -> Path:
+        """Como `arbol()`, pero con historial: un repo con todo commiteado.
+
+        `arbol()` NO hace `git init` a proposito —los tests de marcadores no
+        necesitan historial— asi que los de `<!-- fecha:auto -->` necesitan su
+        propia version. La fecha del commit se fija con las variables de
+        entorno de git para poder asertar contra un valor exacto.
+        """
+        tmp = self.arbol(**overrides)
+        env = {
+            **os.environ,
+            "GIT_AUTHOR_DATE": f"{COMMIT_ISO}T12:00:00",
+            "GIT_COMMITTER_DATE": f"{COMMIT_ISO}T12:00:00",
+        }
+
+        def git(*args: str, **kw) -> None:
+            subprocess.run(("git", "-C", str(tmp), *args),
+                           capture_output=True, check=True, **kw)
+
+        git("init", "-q")
+        git("config", "user.email", "test@treino.local")
+        git("config", "user.name", "test")
+        git("add", "-A")
+        git("commit", "-q", "-m", "fixture", env=env)
+        return tmp
+
+    def dart_generado(self, tmp: Path) -> str:
+        destino = tmp / DART_OUT
+        self.assertTrue(destino.exists(),
+                        f"el generador no escribio {DART_OUT}")
+        return destino.read_text(encoding="utf-8")
+
     # --- controles -------------------------------------------------------
     # Sin estos dos, los tests de la fecha pueden salir verdes sin medir nada.
 
@@ -141,11 +190,13 @@ class GeneradorLegal(unittest.TestCase):
     def test_marcador_en_la_fecha_aborta(self):
         """Un `[[PENDIENTE]]` en la fecha tiene que abortar igual que en el cuerpo.
 
-        Es el caso real: los nueve documentos de `docs/legal/` dicen hoy
-        `**Última actualización:** [[PENDIENTE — fecha de publicación]]`, y esa
-        fecha se estampa en un `const` de Dart y en el `<header>` de cada HTML.
-        Sin este guard, la primera corrida real publica el marcador a la vista
-        del usuario — que es exactamente lo que el gate existe para impedir.
+        Los nueve documentos de `docs/legal/` decian
+        `**Última actualización:** [[PENDIENTE — fecha de publicación]]` hasta
+        el 2026-09-21; hoy usan `<!-- fecha:auto -->`. El guard sigue haciendo
+        falta igual: la fecha se estampa en un `const` de Dart y en el
+        `<header>` de cada HTML, asi que un marcador escrito ahi a mano —en un
+        documento nuevo, o al revertir el centinela— se publicaria a la vista
+        del usuario.
         """
         r = self.correr(self.arbol(**{
             BLANCO: doc("terminos", "Términos y Condiciones", "kTermsSections",
@@ -175,6 +226,121 @@ class GeneradorLegal(unittest.TestCase):
             f"stdout:{r.stdout}\nstderr:{r.stderr}")
         self.assertIn(BLANCO, r.stdout + r.stderr,
                       "aborto, pero sin decir que archivo hay que arreglar")
+
+    # --- `<!-- fecha:auto -->`: la fecha sale del historial ---------------
+
+    def test_fecha_auto_sale_del_ultimo_commit(self):
+        """Con historial limpio, la fecha es la del commit que toco el archivo.
+
+        Es el caso que justifica el mecanismo: nadie tiene que acordarse de
+        mover la fecha porque no la escribe nadie. Se asierta contra una fecha
+        EXACTA y no contra "algo con forma de fecha": un test que acepta
+        cualquiera pasa igual si el generador estampa hoy.
+        """
+        tmp = self.arbol_git(**{
+            BLANCO: doc("terminos", "Términos y Condiciones", "kTermsSections",
+                        fecha=FECHA_AUTO),
+        })
+        r = self.correr(tmp)
+        self.assertEqual(r.returncode, 0,
+                         f"stdout:{r.stdout}\nstderr:{r.stderr}")
+        self.assertIn(
+            f"kTermsLastUpdated = '{COMMIT_ES}'", self.dart_generado(tmp),
+            "la fecha no salio del commit. Si dice la de hoy, el generador "
+            "esta inventandola en vez de leer el historial.")
+
+    def test_fecha_auto_con_cambios_sin_commitear_usa_hoy(self):
+        """Con el archivo sucio, la fecha es HOY, no la del commit anterior.
+
+        Sin esto el flujo normal —editar, generar, commitear los dos juntos—
+        estamparia la fecha del cambio ANTERIOR: una fecha vieja para un texto
+        nuevo, que es justo lo que este mecanismo existe para impedir.
+        """
+        tmp = self.arbol_git(**{
+            BLANCO: doc("terminos", "Términos y Condiciones", "kTermsSections",
+                        fecha=FECHA_AUTO),
+        })
+        # editar DESPUES del commit: el texto cambia, el historial todavia no
+        destino = tmp / "docs" / "legal" / BLANCO
+        destino.write_text(
+            destino.read_text(encoding="utf-8").replace(
+                "Texto publicable.", "Texto publicable, recien cambiado."),
+            encoding="utf-8")
+
+        r = self.correr(tmp)
+        self.assertEqual(r.returncode, 0,
+                         f"stdout:{r.stdout}\nstderr:{r.stderr}")
+        dart = self.dart_generado(tmp)
+        self.assertNotIn(
+            f"kTermsLastUpdated = '{COMMIT_ES}'", dart,
+            "el texto cambio y la fecha quedo en la del commit anterior: "
+            "una fecha vieja sobre un texto nuevo.")
+        hoy = datetime.date.today()
+        meses = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
+                 "agosto", "septiembre", "octubre", "noviembre", "diciembre")
+        esperado = f"{hoy.day} de {meses[hoy.month - 1]} de {hoy.year}"
+        self.assertIn(f"kTermsLastUpdated = '{esperado}'", dart)
+
+    def test_fecha_auto_sin_repo_aborta(self):
+        """CONTROL NEGATIVO: sin git no hay fecha, y no se inventa una.
+
+        Es el caso que decide si el mecanismo es confiable. Caer a hoy cuando
+        no se puede leer el historial seria estampar una fecha inventada en un
+        documento legal, y el usuario no tiene forma de distinguir una fecha
+        derivada de una fabricada. Por el mismo criterio del resto del
+        generador —un defecto no es un default— aca se aborta.
+
+        `arbol()` no hace `git init`, asi que el arbol no es un repo.
+        """
+        r = self.correr(self.arbol(**{
+            BLANCO: doc("terminos", "Términos y Condiciones", "kTermsSections",
+                        fecha=FECHA_AUTO),
+        }))
+        self.assertNotEqual(
+            r.returncode, 0,
+            "sin repo git el generador invento una fecha y la publico.\n"
+            f"stdout:{r.stdout}\nstderr:{r.stderr}")
+        self.assertIn(BLANCO, r.stdout + r.stderr,
+                      "aborto, pero sin decir que archivo hay que arreglar")
+
+    # --- el split app/web ------------------------------------------------
+
+    def test_al_dart_solo_van_los_de_en_el_binario(self):
+        """El Dart lleva SOLO `EN_EL_BINARIO`, no los nueve de `ORDER`.
+
+        No es preferencia de presentacion: el texto de los otros siete no puede
+        estar en el archivo aunque no se muestre. `terminos-suscripcion.md`
+        dice «Contratado en la web: Mercado Pago», y meter esa frase en el
+        binario de iOS es un *call to action* para pagar afuera — prohibido por
+        el intro de la Guideline 3.1.3 de Apple fuera de la storefront de EEUU.
+
+        Lo cuida tambien `anti_steering_movil_test`, pero ese solo se entera si
+        el documento nuevo ADEMAS trae una de sus frases. Este fija el split.
+        """
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("blc", SCRIPT)
+        blc = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(blc)
+
+        self.assertTrue(
+            set(blc.EN_EL_BINARIO).issubset(set(blc.ORDER)),
+            "EN_EL_BINARIO nombra un documento que no esta en ORDER")
+
+        tmp = self.arbol_git()
+        r = self.correr(tmp)
+        self.assertEqual(r.returncode, 0, f"{r.stdout}\n{r.stderr}")
+        dart = self.dart_generado(tmp)
+
+        adentro = {n for n, _, _, const in DOCS if n in blc.EN_EL_BINARIO}
+        for nombre, _, _, const in DOCS:
+            if nombre in adentro:
+                self.assertIn(f"{const} =", dart,
+                              f"falta {nombre}, que SI tiene que viajar")
+            else:
+                self.assertNotIn(
+                    f"{const} =", dart,
+                    f"{nombre} se emitio al Dart y no esta en EN_EL_BINARIO: "
+                    "su texto viaja en el binario movil")
 
     # --- lo que NO se puede romper al arreglar ---------------------------
 

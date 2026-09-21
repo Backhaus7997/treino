@@ -6,7 +6,7 @@ dart: kSubscriptionSections
 
 # Términos de Suscripción de TREINO
 
-**Última actualización:** [[PENDIENTE — fecha de publicación]]
+**Última actualización:** <!-- fecha:auto -->
 **Versión:** 1.1 (borrador)
 
 > ⚠️ **BORRADOR.** Complementa los [Términos y
@@ -133,9 +133,10 @@ recuperar todo lo pagado**, sin dar explicaciones y sin costo alguno.
 Es el mismo derecho, con el mismo plazo y el mismo reembolso, para los dos
 planes. El precio no cambia nada: lo que define el derecho es dónde contrataste.
 
-Adoptamos 14 días **para todo el mundo**. Es más de lo que exige la ley
-argentina —que son 10— y equivale al plazo europeo, así que la misma regla te
-cubre vivas donde vivas.
+Adoptamos 14 días **para los dos planes, sin excepciones**. La ley argentina
+exige 10 corridos (art. 34 de la Ley 24.240) y nosotros damos cuatro más,
+porque preferimos que no tengas que fijarte en el calendario para saber si
+llegás.
 
 ### Cómo ejercerlo
 
@@ -294,14 +295,42 @@ Dato verificado el 2026-09-17: **Argentina no está en ningún programa de billi
 alternativo** — ni en el External Purchase Link Entitlement de Apple (UE/EEA y
 Corea del Sur) ni en el User Choice Billing de Google. No hay atajo.
 
-[[PENDIENTE — REVISIÓN LEGAL. Quedan tres: (a) si algún supuesto del art. 1116
-del Código Civil y Comercial excluye a un servicio por suscripción del derecho
-de revocación, y si es oponible una renuncia expresa a cambio de ejecución
-inmediata como admite el régimen europeo; (b) tratamiento fiscal de servicios
-digitales en cada mercado donde se cobre; (c) NUEVO — si el derecho de
-arrepentimiento de 14 días con reembolso total sobre un ticket de ARS 3.500
-requiere algún resguardo distinto del de un ticket de ARS 39.000, dado que el
-reembolso se opera a mano.]]
+**Revisión legal — cerrada el 2026-09-21.** Las tres preguntas que estaban acá,
+contestadas. Ninguna necesitó abogado, y lo que sí lo necesita quedó marcado
+como tal en vez de resuelto a ojo.
+
+**(a) El art. 1116 del Código Civil y Comercial no alcanza a TREINO.** Sus tres
+excepciones al derecho de revocar son productos a medida o no devolvibles,
+ficheros suministrados por vía electrónica descargables para **uso permanente**,
+y prensa periódica. Una suscripción con acceso continuo no es ninguna: no hay
+fichero entregado para uso permanente, el acceso termina con la suscripción.
+
+La segunda mitad —la renuncia expresa a cambio de ejecución inmediata que admite
+el régimen europeo— **sale de alcance** con el lanzamiento acotado a la
+Argentina (2026-09-17).
+
+Ojo con una vuelta de tuerca que apareció después: el **art. 3 inciso a) de la
+Disposición 954/2025** remite a este mismo art. 1116 «excepto pacto en
+contrario», así que el análisis no es una rama independiente — la disposición lo
+incorpora por referencia. Detalle en
+[spec-web-legal.md §3.6](./spec-web-legal.md).
+
+**(b) Un solo mercado.** Con el alcance acotado, «cada mercado donde se cobre»
+es uno. El tratamiento fiscal pasa a ser tema del contador, junto con las
+cuentas de tienda a nombre personal.
+
+**(c) Se mantienen los 14 días para los dos tickets**, con reembolso operado a
+mano. **Decisión del titular, 2026-09-21.** El piso legal argentino son 10 días
+corridos (art. 34 de la Ley 24.240) y damos cuatro más. El resguardo para el
+ticket bajo no es una cláusula distinta: es que el reembolso manual sostenga el
+volumen. El día que no lo sostenga, se automatiza.
+
+**Lo que SÍ sigue siendo pregunta de abogado**, y no se contesta acá: si
+entrenar con la app cuenta como «efectivamente utilizado o consumido el
+servicio» a los fines del **art. 3 inciso b)** de la 954/2025, y si esa exención
+—que lo es de la obligación del botón— recorta además el derecho de fondo del
+art. 34. Va al dictamen con el texto citado. La decisión de arriba no depende de
+la respuesta: ser más generoso que la ley se puede siempre.
 
 ## C. Estado del código
 
